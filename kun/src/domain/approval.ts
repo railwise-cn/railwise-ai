@@ -12,6 +12,8 @@ export type ApprovalRequest = {
   turnId: string
   toolName: string
   summary: string
+  requestHash?: string
+  callId?: string
   status: ApprovalStatus
   createdAt: string
   decidedAt?: string
@@ -24,6 +26,8 @@ export function createApprovalRequest(input: {
   turnId: string
   toolName: string
   summary: string
+  requestHash?: string
+  callId?: string
   createdAt?: string
 }): ApprovalRequest {
   return {
@@ -32,6 +36,8 @@ export function createApprovalRequest(input: {
     turnId: input.turnId,
     toolName: input.toolName,
     summary: input.summary,
+    ...(input.requestHash ? { requestHash: input.requestHash } : {}),
+    ...(input.callId ? { callId: input.callId } : {}),
     status: 'pending',
     createdAt: input.createdAt ?? new Date().toISOString()
   }

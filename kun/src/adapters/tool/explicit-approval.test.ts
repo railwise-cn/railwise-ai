@@ -14,6 +14,17 @@ describe('explicit confirmation for external writes', () => {
     expect(executed).toBe(0)
   })
 
+  it('binds approval IDs to thread, Turn and exact arguments even when models reuse a call ID', async () => {
+    const ids: string[] = []
+    const host = new LocalToolHost({ tools: [LocalToolHost.defineTool({ name: 'complete_task', description: 'Complete task', inputSchema: {}, policy: 'on-request', requireExplicitApproval: true, execute: async () => ({ output: {} }) })] })
+    const approve: ToolHostContext['awaitApproval'] = async request => { ids.push(request.id); return 'deny' }
+    await host.execute(call, { ...context(), awaitApproval: approve })
+    await host.execute(call, { ...context(), threadId: 'other-thread', awaitApproval: approve })
+    await host.execute(call, { ...context(), turnId: 'next-turn', awaitApproval: approve })
+    await host.execute({ ...call, arguments: { taskId: 'other-task' } }, { ...context(), awaitApproval: approve })
+    expect(new Set(ids).size).toBe(4)
+  })
+
   it('rechecks revocation after confirmation and preserves a distinct failure code', async () => {
     let executed = 0
     let validations = 0

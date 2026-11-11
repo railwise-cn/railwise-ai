@@ -192,16 +192,20 @@ export class LocalToolHost implements ToolHost {
     }
     const needsApproval = this.requiresApproval(tool, activeCall, context)
     const approvedRequestHash = createHash('sha256').update(JSON.stringify(activeCall.arguments)).digest('hex')
+    const approvalId = `appr_${createHash('sha256').update(JSON.stringify([context.threadId, context.turnId, activeCall.callId, activeCall.toolName, approvedRequestHash])).digest('hex')}`
     if (needsApproval) {
-      const approvalId = `appr_${activeCall.callId}`
       const approval: ApprovalRequest = createApprovalRequest({
         id: approvalId,
         threadId: context.threadId,
         turnId: context.turnId,
         toolName: activeCall.toolName,
+        requestHash: approvedRequestHash,
+        callId: activeCall.callId,
         summary: this.buildApprovalSummary(activeCall, context.workspace)
       })
-      const decision = await waitForApprovalDecision(() => context.awaitApproval(approval), context.abortSignal)
+      const decision = context.claimUndispatchedApproval?.(approval)
+        ? 'allow'
+        : await waitForApprovalDecision(() => context.awaitApproval(approval), context.abortSignal)
       if (decision !== 'allow') {
         const item = makeApprovalItem({
           id: `item_${approvalId}`,
@@ -220,6 +224,9 @@ export class LocalToolHost implements ToolHost {
     let result: Awaited<ReturnType<LocalTool['execute']>>
     try {
       await context.validateExecutionGrant?.()
+      if (needsApproval && createHash('sha256').update(JSON.stringify(activeCall.arguments)).digest('hex') !== approvedRequestHash) {
+        throw Object.assign(new Error('Tool arguments changed after review. Request approval for the actual operation.'), { code: 'approval_request_changed' })
+      }
       // A connector can be disabled, refreshed or rebound while approval is
       // pending. Approval covers this exact tool instance, never its replacement.
       let currentTool
@@ -241,7 +248,7 @@ export class LocalToolHost implements ToolHost {
         context.recordToolDispatch?.()
         result = await tool.execute(activeCall.arguments, {
         ...context,
-        explicitApproval: needsApproval ? { callId: activeCall.callId, toolName: activeCall.toolName, requestHash: approvedRequestHash } : undefined
+        explicitApproval: needsApproval ? { approvalId, callId: activeCall.callId, toolName: activeCall.toolName, requestHash: approvedRequestHash } : undefined
       }, async (update) => {
         if (!onUpdate) return
         const partialItem = makeToolResultItem({

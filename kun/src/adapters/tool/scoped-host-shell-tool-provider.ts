@@ -69,7 +69,7 @@ export function buildScopedHostShellToolProviders(options: {
         }
         const proof = context.explicitApproval
         if (proof?.toolName !== 'request_host_shell' || proof.requestHash !== requestHash) return fail('host_shell_approval_required', 'This exact command requires a real explicit user approval.')
-        const approvalId = `appr_${proof.callId}`, approved = repository.humanRequest(approvalId)
+        const approvalId = proof.approvalId ?? `appr_${proof.callId}`, approved = repository.humanRequest(approvalId)
         const expectedSummary = buildToolArgumentSummary({ toolName: 'request_host_shell', arguments: raw, workspace: context.workspace })
         if (!approved || approved.kind !== 'approval' || approved.threadId !== context.threadId || approved.turnId !== context.turnId || approved.status !== 'answered' || (approved.resolution as { decision?: string })?.decision !== 'allow' || approved.message !== expectedSummary) return fail('host_shell_approval_required', 'No persisted approval matches this command and workspace.')
         const issuedAt = approved.updatedAt ?? approved.createdAt

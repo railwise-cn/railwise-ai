@@ -8,6 +8,8 @@ import { createThreadRecord } from '../domain/thread.js'
 import { TaskController } from './task-controller.js'
 import { TaskLeaseLostError, TaskRunRepository } from './task-run-repository.js'
 import { RuntimeSpanService } from './runtime-span-service.js'
+import { createApprovalRequest } from '../domain/approval.js'
+import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { makeAssistantTextItem, makeToolResultItem } from '../domain/item.js'
 
 const cleanup: string[] = []
@@ -60,6 +62,50 @@ async function fixture(prompt = '完成可靠性测试。') {
 }
 
 describe('TaskController reliability boundaries', () => {
+  it.each(['exact', 'unknown', 'missing_hash', 'arguments', 'provider', 'target', 'account', 'backend', 'workspace', 'scope', 'denied', 'forged_transfer'])('transfers an undispatched approval only for the exact reviewed operation (%s)', async variation => {
+    const { repository, controller, task, thread } = await fixture()
+    try {
+      controller.beginAttempt(thread.id, 'turn_reliability')
+      const grant = ExecutionGrantSchema.parse({ id: 'new-grant', taskId: task.id, threadId: thread.id, turnId: 'turn_reliability',
+        workspaceRoot: thread.workspace, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', sandboxMode: 'workspace-write', approvalPolicy: 'on-request',
+        workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'new-grant', issuedAt: '2026-07-18T00:00:00.000Z',
+        expiresAt: '2026-07-18T00:15:00.000Z', connectorBackends: { dingtalk: 'dws' }, connectorIdentityFingerprints: { dingtalk: 'a'.repeat(64) } })
+      const current = controller.beginToolOperation('turn_reliability', { callId: 'new-call', toolName: 'write', arguments: { path: 'summary.md', content: 'reviewed' } }, grant)!
+      const request = repository.operation(task.id, current.key)!.request!
+      const oldGrant = { ...grant, id: 'old-grant', turnId: 'previous-turn', idempotencyKey: 'old-grant',
+        // Reauthorization uses a valid new Grant even if the interrupted Turn expired.
+        expiresAt: '2026-07-17T23:59:00.000Z' }
+      const oldRequest: Record<string, unknown> = { ...request, turnId: 'previous-turn', callId: 'old-call', executionGrant: oldGrant }
+      if (variation === 'missing_hash') delete oldRequest.approvalRequestHash
+      if (variation === 'arguments') oldRequest.argumentsHash = 'changed'
+      if (variation === 'provider') oldRequest.providerId = 'different-provider'
+      if (variation === 'target') oldRequest.target = 'different-target'
+      if (variation === 'account') oldGrant.connectorIdentityFingerprints = { dingtalk: 'b'.repeat(64) }
+      if (variation === 'backend') oldGrant.connectorBackends = { dingtalk: 'openapi' }
+      if (variation === 'workspace') oldGrant.workspaceRevision = 2
+      if (variation === 'scope') oldRequest.scopeRevision = 2
+      repository.beginOperation({ ownerId: task.id, idempotencyKey: 'old-operation', kind: 'tool', request: oldRequest, nowIso: '2026-07-17T23:30:00.000Z' })
+      repository.finishOperation(task.id, 'old-operation', { status: variation === 'unknown' ? 'outcome_unknown' : 'failed', result: {
+        approved: false, item: makeToolResultItem({ id: 'old-result', threadId: thread.id, turnId: 'previous-turn', callId: 'old-call', toolName: 'write',
+          isError: true, output: { code: 'operation_not_dispatched' } }) } }, '2026-07-17T23:31:00.000Z')
+      const oldApproval = createApprovalRequest({ id: 'appr_old-call', threadId: thread.id, turnId: 'previous-turn', toolName: 'write', summary: 'Write reviewed summary' })
+      repository.saveHumanRequest({ id: oldApproval.id, kind: 'approval', threadId: thread.id, turnId: oldApproval.turnId,
+        message: oldApproval.summary, payload: { approval: oldApproval, ...(variation === 'forged_transfer' ? { continuedFromApprovalId: 'unverified-parent' } : {}) }, status: 'answered', resolution: { decision: variation === 'denied' ? 'deny' : 'allow' },
+        createdAt: '2026-07-17T23:30:00.000Z', updatedAt: '2026-07-18T00:00:00.000Z' })
+      const approval = createApprovalRequest({ id: 'new-approval', threadId: thread.id, turnId: 'turn_reliability', toolName: 'write', summary: 'Write reviewed summary',
+        callId: 'new-call', requestHash: request.approvalRequestHash as string })
+      expect(controller.claimUndispatchedApproval(current.token, current.key, approval)).toBe(variation === 'exact')
+      expect(repository.operations(task.id, 'approval_transfer')).toHaveLength(variation === 'exact' ? 1 : 0)
+      expect(repository.inbox(undefined, true)).toHaveLength(0)
+      if (variation === 'exact') {
+        expect(controller.claimUndispatchedApproval(current.token, current.key, approval)).toBe(true)
+        const repeated = controller.beginToolOperation('turn_reliability', { callId: 'another-call', toolName: 'write', arguments: { path: 'summary.md', content: 'reviewed' } }, grant)!
+        expect(controller.claimUndispatchedApproval(repeated.token, repeated.key, { ...approval, id: 'another-approval', callId: 'another-call' })).toBe(false)
+        expect(repository.humanRequest(approval.id)?.payload.continuedFromApprovalId).toBe(oldApproval.id)
+      }
+    } finally { repository.close() }
+  })
+
   it('charges concurrent work against one root execution budget and aborts at the shared limit',async()=>{
     const {repository,controller,task,thread,setNow,threadStore,sessionStore}=await fixture()
     repository.update(task.id,task.revision,current=>({...current,budget:{...current.budget,version:2,maxExecutionMs:100}}))

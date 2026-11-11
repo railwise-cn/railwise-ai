@@ -38,6 +38,24 @@ describe('persistent human gates', () => {
     second.close()
   })
 
+  it('rejects approval ID reuse across operations and shares an identical live decision', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-gate-conflict-')); roots.push(root)
+    const repository = new TaskRunRepository(join(root, 'tasks.sqlite3')); repository.create(task())
+    const gate = new PersistentApprovalGate(repository, () => '2026-11-09T00:00:01Z')
+    const approval = createApprovalRequest({ id: 'approval-conflict', threadId: 'thread-gate', turnId: 'turn-1', toolName: 'write', summary: '写入文档', requestHash: 'a'.repeat(64), callId: 'same-call' })
+    const waiting = gate.request(approval)
+    const duplicate = gate.request(approval)
+    expect(duplicate).toBe(waiting)
+    for (const changed of [{ turnId: 'turn-2' }, { threadId: 'other-thread' }, { toolName: 'send' }, { requestHash: 'b'.repeat(64) }, { summary: 'different content' }]) {
+      await expect(gate.request({ ...approval, ...changed })).rejects.toMatchObject({ code: 'approval_request_conflict' })
+    }
+    gate.decide(approval.id, 'allow')
+    await expect(waiting).resolves.toBe('allow')
+    await expect(duplicate).resolves.toBe('allow')
+    await expect(gate.request({ ...approval, turnId: 'turn-2' })).rejects.toMatchObject({ code: 'approval_request_conflict' })
+    repository.close()
+  })
+
   it('persists structured question payloads for reconnecting UIs', async () => {
     const root = await mkdtemp(join(tmpdir(), 'railwise-question-')); roots.push(root)
     const repository = new TaskRunRepository(join(root, 'tasks.sqlite3')); repository.create(task())

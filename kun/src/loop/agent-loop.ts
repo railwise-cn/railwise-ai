@@ -1992,6 +1992,7 @@ export class AgentLoop {
           const result = await this.opts.toolHost.execute(input.call, { ...input.context, ...(dispatchOperation ? {
             assertExecution: () => this.opts.tasks?.assertToken(dispatchOperation.token),
             assertExternalTarget: (provider: string, operation: string, target: string) => this.opts.tasks!.assertExternalTarget(input.turnId, provider, operation, target),
+            claimUndispatchedApproval: approval => this.opts.tasks!.claimUndispatchedApproval(dispatchOperation.token, dispatchOperation.key, approval),
             recordExplicitApproval: approval => this.opts.tasks!.recordToolApproval(dispatchOperation.token, dispatchOperation.key, approval),
             recordToolDispatch: () => this.opts.tasks!.recordToolDispatch(dispatchOperation.token, dispatchOperation.key),
             ...(input.context.executionGrant?.taskPermissionId ? { claimTaskPermission: () => this.opts.claimTaskPermission!(input.threadId, input.context.executionGrant!.taskPermissionId!, dispatchOperation.key) } : {}),

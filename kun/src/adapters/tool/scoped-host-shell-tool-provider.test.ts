@@ -55,8 +55,8 @@ async function fixture(prompt = '在工作区运行一次本地检查命令。')
   const args = { command, idempotency_key: 'one-command', ttl_seconds: 60, timeout_seconds: 10 }
   const run = async (callId: string, raw = args, decision: 'allow' | 'deny' = 'allow', activeContext = context) => {
     const pending = host.execute({ callId, toolName: 'request_host_shell', arguments: raw }, activeContext)
-    await vi.waitFor(() => expect(gate.pending().some(item => item.id === `appr_${callId}`)).toBe(true))
-    gate.decide(`appr_${callId}`, decision)
+    await vi.waitFor(() => expect(gate.pending()).toHaveLength(1))
+    gate.decide(gate.pending()[0]!.id, decision)
     return pending
   }
   return { root, repository, tasks, task, gate, abort, bashTool, execute, onAuthorized, providers, host, context, args, run, advance: (seconds: number) => { now = new Date(Date.parse(now) + seconds * 1000).toISOString() } }
@@ -72,7 +72,7 @@ describe('one-shot, explicitly reviewed host shell', () => {
     expect(f.gate.pending()[0]!.summary).toContain('Full host access for this exact command only')
     expect(f.gate.pending()[0]!.summary).toContain(`Workspace (JSON): ${JSON.stringify(f.root)}`)
     expect(f.gate.pending()[0]!.summary).toContain('Lifetime seconds: 60')
-    f.gate.decide('appr_one', 'allow')
+    f.gate.decide(f.gate.pending()[0]!.id, 'allow')
     const result = await pending
     expect(result).toMatchObject({ approved: true, item: { isError: false, output: { output: 'approved-once', status: 'completed', exit_code: 0 } } })
     expect(f.execute).toHaveBeenCalledOnce()
@@ -95,8 +95,8 @@ describe('one-shot, explicitly reviewed host shell', () => {
     const pending = f.host.execute({ callId: 'changed', toolName: 'request_host_shell', arguments: changing }, f.context)
     await vi.waitFor(() => expect(f.gate.pending()).toHaveLength(1))
     changing.command += ' '
-    f.gate.decide('appr_changed', 'allow')
-    await expect(pending).resolves.toMatchObject({ item: { isError: true, output: { code: 'host_shell_approval_required' } } })
+    f.gate.decide(f.gate.pending()[0]!.id, 'allow')
+    await expect(pending).resolves.toMatchObject({ item: { isError: true, output: { code: 'approval_request_changed' } } })
     const revokedContext = { ...f.context, validateExecutionGrant: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValue(new Error('revoked')) }
     const revoked = await f.run('revoked', f.args, 'allow', revokedContext)
     expect(revoked.item).toMatchObject({ isError: true })

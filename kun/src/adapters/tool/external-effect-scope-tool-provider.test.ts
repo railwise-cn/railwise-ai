@@ -113,7 +113,7 @@ describe('finite reviewed external effect scope', () => {
     await vi.waitFor(() => expect(gate.pending()).toHaveLength(1))
     expect(f.repository.get(f.task.id)!).toMatchObject({ status: 'waiting_approval' })
     expect(f.repository.get(f.task.id)!.revision).toBeGreaterThan(beforeTaskRevision)
-    expect(gate.decide('appr_persistent-confirm', 'allow')).toBe(true)
+    expect(gate.decide(gate.pending()[0]!.id, 'allow')).toBe(true)
     await expect(pending).resolves.toMatchObject({ approved: true, item: { output: { status: 'scope_confirmed', revision: scopeRevision + 1 } } })
     expect(f.repository.get(f.task.id)!.acceptance.effect!.requiredEffects).toHaveLength(2)
     expect(f.repository.get(f.task.id)!.revision).toBeGreaterThan(beforeTaskRevision + 1)
@@ -124,7 +124,7 @@ describe('finite reviewed external effect scope', () => {
     const result = await f.host.execute({ callId: 'changed', toolName: 'confirm_external_effect_scope', arguments: args }, {
       ...f.context, awaitApproval: async () => { args.effects[0]!.target = 'changed-after-review'; return 'allow' }
     })
-    expect(result.item).toMatchObject({ isError: true, output: { code: 'effect_scope_confirmation_required' } })
+    expect(result.item).toMatchObject({ isError: true, output: { code: 'approval_request_changed' } })
     expect(f.repository.get(f.task.id)!.acceptance.effect!.requiredEffects).toBeUndefined()
   })
 

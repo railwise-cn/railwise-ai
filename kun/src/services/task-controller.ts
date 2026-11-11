@@ -2,12 +2,13 @@ import { authorizedArtifactWrites } from './task-artifact-proof.js'
 import type { ToolEffectResolver } from '../ports/tool-effect.js'
 import { externalTaskIntent } from './external-task-capability.js'
 import { verifiedEffectReceipts, externalOperationForTool, externalTarget } from './external-effect-evidence.js'
-import { HostShellAuthorizationSchema, type ExecutionGrant } from '../contracts/permissions.js'
+import { ExecutionGrantSchema, HostShellAuthorizationSchema, type ExecutionGrant } from '../contracts/permissions.js'
 import { randomUUID as executionUUID } from 'node:crypto'
 import type { ExecutionToken, InputDelivery, ProcessIdentity } from '../contracts/execution.js'
 import { processIdentity, inspectProcess } from './process-identity.js'
 import type { ToolCallLike, ToolHostResult } from '../ports/tool-host.js'
 import { makeToolResultItem } from '../domain/item.js'
+import type { ApprovalRequest } from '../domain/approval.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { extname, isAbsolute, relative, resolve } from 'node:path'
@@ -710,13 +711,69 @@ export class TaskController {
       // canonical digest belongs in the durable operation ledger.
       const scope = effect ? this.repository.get(token.taskId)?.acceptance.effect : undefined
       const verificationLocator = effect ? externalVerificationLocator(call.arguments) : undefined
-      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, callId: call.callId, dispatchTracking: 'host-v1', providerId: call.providerId, ...effect, ...(effect ? { effectDefinition: effect } : {}), target, turnId, argumentsHash: operationFingerprint(call.arguments), ...(effect ? { approvalRequestHash: createHash('sha256').update(JSON.stringify(call.arguments)).digest('hex') } : {}), ...(verificationLocator ? { verificationLocator } : {}), ...(executionGrant ? { executionGrant } : {}), ...(scope?.scopeConfirmationId ? { scopeConfirmationId: scope.scopeConfirmationId, scopeRevision: scope.scopeRevision } : {}) }, nowIso: this.nowIso() })
+      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, callId: call.callId, dispatchTracking: 'host-v1', providerId: call.providerId, ...effect, ...(effect ? { effectDefinition: effect } : {}), target, turnId, argumentsHash: operationFingerprint(call.arguments), approvalRequestHash: createHash('sha256').update(JSON.stringify(call.arguments)).digest('hex'), ...(verificationLocator ? { verificationLocator } : {}), ...(executionGrant ? { executionGrant } : {}), ...(scope?.scopeConfirmationId ? { scopeConfirmationId: scope.scopeConfirmationId, scopeRevision: scope.scopeRevision } : {}) }, nowIso: this.nowIso() })
       if (!prepared.created) {
         if (prepared.receipt.status === 'succeeded' && prepared.receipt.result) return { key, token, prior: prepared.receipt.result as ToolHostResult }
         if (['running', 'outcome_unknown'].includes(prepared.receipt.status)) throw Object.assign(new Error('Previous tool outcome must be verified before another dispatch.'), { code: 'outcome_unknown' })
         if (prepared.receipt.status === 'failed') throw Object.assign(new Error('Failed tool operation requires a new explicit attempt.'), { code: 'operation_failed' })
       }
       return { key, token }
+    })
+  }
+
+  claimUndispatchedApproval(token: ExecutionToken, key: string, approval: ApprovalRequest): boolean {
+    return this.repository.transact(() => {
+      this.assertToken(token)
+      const current = this.repository.operation(token.taskId, key)
+      const grant = ExecutionGrantSchema.safeParse(current?.request?.executionGrant)
+      if (!current || current.status !== 'prepared' || !grant.success || !approval.requestHash ||
+          current.request?.approvalRequestHash !== approval.requestHash || current.request?.toolName !== approval.toolName ||
+          current.request?.callId !== approval.callId || approval.turnId !== token.turnId ||
+          grant.data.taskId !== token.taskId || grant.data.turnId !== token.turnId) return false
+      const now = this.nowIso()
+      if (grant.data.expiresAt && Date.parse(grant.data.expiresAt) <= Date.parse(now)) return false
+      const approvedRequests = this.repository.humanRequests('approval', false)
+      for (const previous of this.repository.operations(token.taskId, 'tool')) {
+        const output = (previous.result as ToolHostResult | undefined)?.item
+        if (previous.id === current.id || previous.status !== 'failed' || previous.request?.dispatchTracking !== 'host-v1' ||
+            output?.kind !== 'tool_result' || (output.output as { code?: string } | undefined)?.code !== 'operation_not_dispatched' ||
+            previous.request.toolName !== current.request?.toolName || previous.request.providerId !== current.request?.providerId ||
+            previous.request.target !== current.request?.target || previous.request.scopeConfirmationId !== current.request?.scopeConfirmationId ||
+            previous.request.scopeRevision !== current.request?.scopeRevision || previous.request.argumentsHash !== current.request?.argumentsHash ||
+            previous.request.approvalRequestHash !== approval.requestHash) continue
+        const priorGrant = ExecutionGrantSchema.safeParse(previous.request.executionGrant)
+        if (!priorGrant.success || priorGrant.data.taskId !== token.taskId ||
+            approvalAuthorityFingerprint(priorGrant.data) !== approvalAuthorityFingerprint(grant.data)) continue
+        const source = approvedRequests.find(request => {
+          const original = request.payload.approval as ApprovalRequest | undefined
+          const continuedFrom = request.payload.continuedFromApprovalId
+          const transfer = typeof continuedFrom === 'string' ? this.repository.operation(token.taskId, `approval-transfer:${continuedFrom}`) : undefined
+          if (continuedFrom && (transfer?.status !== 'succeeded' || transfer.request?.destinationOperationId !== previous.id || transfer.request?.approvalId !== request.id)) return false
+          return request.status === 'answered' && (request.resolution as { decision?: string })?.decision === 'allow' &&
+            request.threadId === approval.threadId &&
+            request.turnId === previous.request?.turnId && original?.toolName === approval.toolName &&
+            (original.callId === previous.request?.callId || request.id === `appr_${previous.request?.callId}`) &&
+            (!original.requestHash || original.requestHash === approval.requestHash)
+        })
+        if (!source) continue
+        const transferKey = `approval-transfer:${source.id}`
+        const existing = this.repository.operation(token.taskId, transferKey)
+        if (existing) {
+          if (existing.status === 'succeeded' && existing.request?.destinationOperationId === current.id) return true
+          continue
+        }
+        const saved = this.repository.humanRequest(approval.id)
+        if (saved) return false
+        this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: transferKey, kind: 'approval_transfer',
+          request: { sourceApprovalId: source.id, sourceOperationId: previous.id, destinationOperationId: current.id,
+            approvalId: approval.id, executionGrantId: grant.data.id }, nowIso: now })
+        this.repository.saveHumanRequest({ id: approval.id, kind: 'approval', threadId: approval.threadId, turnId: approval.turnId,
+          message: approval.summary, payload: { approval, continuedFromApprovalId: source.id }, status: 'answered',
+          resolution: { decision: 'allow' }, createdAt: now, updatedAt: source.updatedAt })
+        this.repository.finishOperation(token.taskId, transferKey, { status: 'succeeded', result: { approvalId: approval.id } }, now)
+        return true
+      }
+      return false
     })
   }
 
@@ -733,7 +790,6 @@ export class TaskController {
     this.repository.transact(() => {
       this.assertToken(token)
       const receipt = this.repository.operation(token.taskId, key)
-      if (!receipt?.request?.provider) return
       if (!receipt || receipt.request?.toolName !== approval.toolName || !/^[a-f0-9]{64}$/.test(approval.requestHash)) throw Object.assign(new Error('Approval does not match the dispatched operation.'), { code: 'execution_grant_scope' })
       if (receipt.request.approvalRequestHash !== approval.requestHash) throw Object.assign(new Error('The external request changed before approval. Submit a new typed request.'), { code: 'idempotency_conflict' })
       this.repository.finishOperation(token.taskId, key, { status: receipt.status, dispatchApproval: { ...approval, approvedAt: this.nowIso() } }, this.nowIso())
@@ -1455,4 +1511,10 @@ function fingerprint(items: TurnItem[], artifacts: TaskArtifact[] = []): string 
 
 function activeExecutionMs(task: TaskRun, now: string): number {
   return task.executionStartedAt ? Math.max(0, Date.parse(now) - Date.parse(task.executionStartedAt)) : 0
+}
+
+/** Turn identity changes after restart; all reviewed authority and account bindings must agree. */
+function approvalAuthorityFingerprint(grant: ExecutionGrant): string {
+  const { id: _id, turnId: _turnId, idempotencyKey: _idempotencyKey, issuedAt: _issuedAt, expiresAt: _expiresAt, ...authority } = grant
+  return operationFingerprint(authority)
 }

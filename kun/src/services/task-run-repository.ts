@@ -721,6 +721,8 @@ export class TaskRunRepository {
       const old = this.humanRequest(request.id)
       if (old) return old
       this.db.prepare('INSERT INTO human_requests(id, data_json) VALUES (?, ?)').run(request.id, JSON.stringify(request))
+      // A transferred answer is already settled and must not create another user todo.
+      if (request.status !== 'pending') return request
       const task = this.findActiveByThread(request.threadId)
       const now = request.createdAt
       if (task) {

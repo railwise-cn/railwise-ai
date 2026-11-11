@@ -105,7 +105,9 @@ export type ToolHostContext = {
   /** Immutable effective workspace/agent grant for this execution attempt. */
   executionGrant?: ExecutionGrant
   /** Supplied by LocalToolHost only after this exact call received an allow decision. */
-  explicitApproval?: { callId: string; toolName: string; requestHash: string }
+  explicitApproval?: { approvalId?: string; callId: string; toolName: string; requestHash: string }
+  /** Claim an exact, durably approved operation that was proven undispatched before restart. */
+  claimUndispatchedApproval?: (approval: ApprovalRequest) => boolean
   /** Persist proof of a real allow decision before dispatching the approved action. */
   recordExplicitApproval?: (approval: { toolName: string; requestHash: string }) => void
   /** Persist the dispatch boundary after approval and before invoking the tool. */
