@@ -17,11 +17,13 @@ function createHarness(options: { ensureRuntime?: () => Promise<void> } = {}) {
   const settings = {
     agents: { kun: defaultKunRuntimeSettings() }
   } as AppSettingsV1
+  const load = vi.fn(async () => settings)
+  const ensureRuntime = vi.fn(options.ensureRuntime ?? (async () => undefined))
 
   registerRuntimeSseIpc({
     ipcMain,
-    store: { load: vi.fn(async () => settings) } as never,
-    ensureRuntime: vi.fn(options.ensureRuntime ?? (async () => undefined)),
+    store: { load } as never,
+    ensureRuntime,
     logError: vi.fn()
   })
 
@@ -33,9 +35,11 @@ function createHarness(options: { ensureRuntime?: () => Promise<void> } = {}) {
   const event = { sender } as unknown as IpcMainInvokeEvent
 
   return {
-    start: (streamId: string, threadId = 'thread-1') =>
+    settings, load, ensureRuntime, sender,
+    start: (streamId: string, threadId = 'thread-1', scope: 'thread' | 'tasks' = 'thread') =>
       handlers.get('runtime:sse:start')?.(event, {
-        threadId,
+        ...(scope === 'thread' ? { threadId } : {}),
+        scope,
         sinceSeq: 0,
         streamId
       }),
@@ -54,7 +58,63 @@ describe('runtime SSE IPC lifecycle', () => {
 
   afterEach(async () => {
     await stopAllRuntimeSse('test_cleanup')
+    vi.useRealTimers()
     vi.unstubAllGlobals()
+  })
+
+  it.each(['tasks', 'thread'] as const)('reloads the endpoint and auth while retaining the %s cursor on reconnect', async scope => {
+    vi.useFakeTimers()
+    const harness = createHarness()
+    harness.settings.agents.kun.port = 43101
+    harness.settings.agents.kun.runtimeToken = 'old-test-token'
+    const read = vi.fn()
+      .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode('id: 7\nevent: task_updated\ndata: {"taskId":"task-fixture"}\n\n') })
+      .mockRejectedValueOnce(new Error('network disconnected'))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, body: { getReader: () => ({ read }) } })
+      .mockImplementation(() => new Promise<Response>(() => undefined))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await harness.start('reconnect-stream', 'thread-fixture', scope)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const nextSettings = structuredClone(harness.settings)
+    nextSettings.agents.kun.port = 43102
+    nextSettings.agents.kun.runtimeToken = 'new-test-token'
+    harness.load.mockResolvedValue(nextSettings)
+    await vi.advanceTimersByTimeAsync(750)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const [url, options] = fetchMock.mock.calls[1]!
+    expect(url.port).toBe('43102')
+    expect(url.searchParams.get('since_seq')).toBe('7')
+    expect(url.pathname).toBe(scope === 'tasks' ? '/v1/tasks/stream' : '/v1/threads/thread-fixture/events')
+    expect(options.headers.authorization).toBe('Bearer new-test-token')
+    expect(options.headers['Last-Event-ID']).toBe('7')
+    expect(harness.ensureRuntime).toHaveBeenLastCalledWith(nextSettings)
+    await harness.stop('reconnect-stream')
+    expect(options.signal.aborted).toBe(true)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['settings', 'runtime'] as const)('keeps a stopped subscription stopped during reconnect %s refresh', async phase => {
+    vi.useFakeTimers()
+    const harness = createHarness()
+    const fetchMock = vi.fn().mockRejectedValue(new Error('fetch failed'))
+    vi.stubGlobal('fetch', fetchMock)
+    await harness.start('stopped-reconnect', 'thread-fixture', 'tasks')
+    await vi.advanceTimersByTimeAsync(0)
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    if (phase === 'settings') harness.load.mockImplementationOnce(async () => { await pending; return harness.settings })
+    else harness.ensureRuntime.mockImplementationOnce(() => pending)
+    await vi.advanceTimersByTimeAsync(750)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await expect(harness.stop('stopped-reconnect')).resolves.toBe(true)
+    release()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('releases stopped streams synchronously before a replacement starts', async () => {
