@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -34,6 +34,71 @@ function options(f: Awaited<ReturnType<typeof fixture>>, baseUrl = 'http://127.0
 }
 
 describe('production official DingTalk runtime assembly', () => {
+  it.skipIf(process.platform === 'win32').each([false, true])('completes an unfinished-task read through coordinator, model, real CLI dispatch and SQLite (legacy contract %s)', async legacyContract => {
+    const f = await fixture({})
+    const executable = join(f.root, 'synthetic-dws')
+    const callLog = join(f.root, 'dws-calls.jsonl')
+    const source = `#!${process.execPath}
+const fs = require('node:fs')
+const args = process.argv.slice(2)
+fs.appendFileSync(${JSON.stringify(callLog)}, JSON.stringify(args) + '\\n')
+if (args[0] === 'auth' && args[1] === 'status') console.log(${JSON.stringify(JSON.stringify({ success: true, authenticated: true, token_valid: true, refresh_token_valid: true, corp_id: 'corp-synthetic', user_id: 'user-synthetic' }))})
+else if (args.slice(0, 3).join(' ') === 'todo task list') console.log(JSON.stringify({ success: true, todoCards: [] }))
+else { console.error('unexpected synthetic command'); process.exitCode = 1 }
+`
+    await writeFile(executable, source, { mode: 0o700 })
+    const dws = { ...dwsTestConfig, executablePath: executable, executableHash: createHash('sha256').update(source).digest('hex') }
+    f.capabilities = KunCapabilitiesConfig.parse({ dws })
+    await writeFile(f.configPath, JSON.stringify({ capabilities: { dws } }))
+    vi.stubEnv('WORKWISE_TOOLS_ROOT', join(f.root, 'tools'))
+    let modelCalls = 0
+    const server = createServer(async (request, response) => {
+      for await (const _chunk of request) { /* Consume the synthetic model request. */ }
+      modelCalls++
+      const delta = modelCalls === 1
+        ? { tool_calls: [{ index: 0, id: 'query-unfinished', type: 'function', function: { name: 'dingtalk_list_tasks', arguments: JSON.stringify({ page: 1, pageSize: 5 }) } }] }
+        : { content: '已读取当前未完成的钉钉待办，本页返回 0 条。' }
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(`data: ${JSON.stringify({ id: 'synthetic-read', choices: [{ index: 0, delta, finish_reason: modelCalls === 1 ? 'tool_calls' : 'stop' }] })}\n\ndata: [DONE]\n\n`)
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    cleanup.push(() => new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections() }))
+    const address = server.address() as { port: number }
+    const runtime = await createKunServeRuntime(options(f, `http://127.0.0.1:${address.port}/v1`))
+    cleanup.push(async () => runtime.shutdown?.())
+    const origin = await runtime.threadService.create({ workspace: f.root, model: 'synthetic', mode: 'agent' })
+    const prompt = '请查询我当前未完成的钉钉待办，最多列出 5 条的标题和当前状态。这次仅做只读验收。'
+    let previousTaskId: string | undefined
+    if (legacyContract) {
+      const old = runtime.taskController!.createWaitingTask({ id: 'legacy-read-contract', thread: origin, request: { prompt }, reason: '历史版本误判为写操作' })
+      runtime.taskRepository!.update(old.id, old.revision, task => ({ ...task, acceptance: { ...task.acceptance,
+        effect: { ...task.acceptance.effect!, operation: 'complete', target: undefined, requiresConfirmation: true } } }))
+      previousTaskId = old.id
+    }
+    const result = await runtime.taskCoordinator!.command({ threadId: origin.id, ...(previousTaskId ? { taskId: previousTaskId, intent: 'resume' as const } : { intent: 'new' as const }),
+      idempotencyKey: 'query-unfinished', request: { prompt: previousTaskId ? '继续' : prompt } })
+    if (result.kind !== 'task_started' || !result.task) throw new Error('Expected an executable read task')
+    const taskId = result.task.id
+    if (previousTaskId) expect(taskId).toBe(previousTaskId)
+    await vi.waitFor(() => {
+      const current = runtime.taskRepository!.get(taskId)!
+      expect(current.status, JSON.stringify({ status: current.status, reason: current.waitingReason, stalled: current.stalledReason, calls: modelCalls,
+        operations: runtime.taskRepository!.operations(taskId, 'tool').map(item => ({ status: item.status, result: item.result })) })).toBe('completed')
+    }, { timeout: 5_000 })
+    const task = runtime.taskRepository!.get(taskId)!
+    expect(task.acceptance.effect).toMatchObject({ provider: 'dingtalk', operation: 'list', target: 'current_user', requiresConfirmation: false })
+    expect(task.nodes.every(node => node.status === 'completed')).toBe(true)
+    expect(task.resultEvidence).toMatchObject([{ operation: 'list', target: 'current_user', verified: true }])
+    expect(runtime.taskRepository!.operations(taskId, 'tool')).toMatchObject([{ status: 'succeeded', request: { toolName: 'dingtalk_list_tasks', mutation: false } }])
+    expect(runtime.approvalGate.pending()).toHaveLength(0)
+    expect(runtime.taskRepository!.humanRequests('approval', false)).toHaveLength(0)
+    const commands = (await readFile(callLog, 'utf8')).trim().split('\n').map(line => JSON.parse(line) as string[])
+    expect(commands.map(args => args.slice(0, 3))).toEqual([['auth', 'status', '--readonly'], ['todo', 'task', 'list']])
+    expect(commands[1]).toEqual(expect.arrayContaining(['--status', 'false', '--size', '5']))
+    expect(modelCalls).toBe(2)
+    if (legacyContract) expect(runtime.taskRepository!.events(taskId).some(event => (event.payload as { acceptanceCorrection?: unknown })?.acceptanceCorrection)).toBe(true)
+  }, 15_000)
+
   it('persists an install blocker, then resumes with the exact DWS identity-bound catalog and Grant', async () => {
     const f = await fixture({ dws: { authState: 'not_installed' } })
     const catalogs: string[][] = []

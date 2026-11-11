@@ -94,7 +94,7 @@ export class ManagedLarkAppSetup {
     if (this.pending && !this.pending.closed) return { ok: false, message: 'The previous application setup process is still stopping. Check its state before retrying.' }
     this.pending = undefined
     this.clearBinding()
-    const check = await this.run(executablePath, ['config', 'show', '--json'])
+    const check = await this.run(executablePath, ['config', 'show'])
     if (generation !== this.generation) return { ok: true, state: 'cancelled' }
     const configuration = larkAppConfiguration(check.output, check.ok)
     if (configuration === 'configured') {
@@ -166,7 +166,7 @@ export class ManagedLarkAppSetup {
     }
     const status = this.snapshot(pending)
     if (pending.state !== 'verifying' && pending.state !== 'succeeded') return status
-    const check = await this.run(pending.executablePath, ['config', 'show', '--profile', pending.profile, '--json'])
+    const check = await this.run(pending.executablePath, ['config', 'show', '--profile', pending.profile])
     const stale = this.invalidated(pending)
     if (stale) return stale
     let profile: unknown

@@ -32,6 +32,7 @@ describe('managed official Lark app initialization', () => {
   it('reuses existing application configuration and never creates or replaces profiles', async () => {
     const f = fixture(); f.run.mockResolvedValue({ ok: true, output: JSON.stringify({ appId: 'cli-existing', brand: 'feishu' }) })
     expect(await f.setup.begin(executable)).toEqual({ ok: true, state: 'configured' })
+    expect(f.run).toHaveBeenCalledWith(executable, ['config', 'show'])
     expect(f.launch).not.toHaveBeenCalled()
   })
 
@@ -59,7 +60,7 @@ describe('managed official Lark app initialization', () => {
     expect(completed).toEqual({ ok: true, state: 'configured' })
     expect(f.setup.binding()).toMatchObject({ executablePath: executable, profile: args[4], appId: 'cli-new', brand: 'feishu', executableHash: expect.stringMatching(/^[a-f0-9]{64}$/) })
     expect(JSON.stringify([result, completed])).not.toContain('must-not-cross-ipc')
-    expect(f.run).toHaveBeenLastCalledWith(executable, ['config', 'show', '--profile', args[4], '--json'])
+    expect(f.run).toHaveBeenLastCalledWith(executable, ['config', 'show', '--profile', args[4]])
     f.setup.cancel()
     expect(f.setup.binding()).toBeUndefined()
   })

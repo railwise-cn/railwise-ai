@@ -44,7 +44,8 @@ export async function renderWriteSvgImage(source: string): Promise<WriteRendered
       const naturalWidth=image.naturalWidth,naturalHeight=image.naturalHeight;
       if(!naturalWidth||!naturalHeight)throw new Error('SVG dimensions are unavailable');
       const scale=Math.min(2,${MAX_RENDER_WIDTH}/naturalWidth,${MAX_RENDER_HEIGHT}/naturalHeight);
-      const width=Math.max(1,Math.ceil(naturalWidth*scale)),height=Math.max(1,Math.ceil(naturalHeight*scale));
+      const width=Math.min(${MAX_RENDER_WIDTH},Math.max(1,Math.ceil(naturalWidth*scale)));
+      const height=Math.min(${MAX_RENDER_HEIGHT},Math.max(1,Math.ceil(naturalHeight*scale)));
       image.style.width=width+'px';image.style.height=height+'px';return {width:width,height:height};
     })()`)) as { width: number; height: number }
     if (!Number.isFinite(size.width) || !Number.isFinite(size.height) || size.width < 1 || size.height < 1 || size.width > MAX_RENDER_WIDTH || size.height > MAX_RENDER_HEIGHT) return null
@@ -185,10 +186,13 @@ export async function renderWriteMermaidDiagrams(sources: readonly string[]): Pr
           const box=diagram.viewBox.baseVal;
           const naturalWidth=box.width||Number.parseFloat(diagram.getAttribute('width'))||600;
           const naturalHeight=box.height||Number.parseFloat(diagram.getAttribute('height'))||400;
+          if(!Number.isFinite(naturalWidth)||!Number.isFinite(naturalHeight)||naturalWidth<=0||naturalHeight<=0)throw new Error('Invalid diagram dimensions.');
           const scale=Math.min(2,${MAX_RENDER_WIDTH}/naturalWidth,${MAX_RENDER_HEIGHT}/naturalHeight);
-          diagram.setAttribute('width',String(Math.max(1,Math.ceil(naturalWidth*scale))));
-          diagram.setAttribute('height',String(Math.max(1,Math.ceil(naturalHeight*scale))));
-          return {width:Math.ceil(naturalWidth*scale)+24,height:Math.ceil(naturalHeight*scale)+24};
+          const width=Math.min(${MAX_RENDER_WIDTH},Math.max(1,Math.ceil(naturalWidth*scale)));
+          const height=Math.min(${MAX_RENDER_HEIGHT},Math.max(1,Math.ceil(naturalHeight*scale)));
+          diagram.setAttribute('width',String(width));
+          diagram.setAttribute('height',String(height));
+          return {width:width+24,height:height+24};
         })()`)) as { width: number; height: number }
         if (!Number.isFinite(size.width) || !Number.isFinite(size.height) || size.width < 1 || size.height < 1 || size.width > MAX_RENDER_WIDTH + 24 || size.height > MAX_RENDER_HEIGHT + 24) {
           results.set(source, null)
@@ -199,7 +203,7 @@ export async function renderWriteMermaidDiagrams(sources: readonly string[]): Pr
         const image = await withRenderDeadline(window.webContents.capturePage({ x: 0, y: 0, width: size.width, height: size.height }))
         results.set(source, { svg, png: image.toPNG(), ...size })
       } catch {
-        // Export retains a visible source/error fallback for a malformed diagram.
+        // Export retains a visible source/error fallback when rendering fails.
         results.set(source, null)
       }
     }

@@ -8,6 +8,11 @@ export type ExternalTaskPreflight = (text: string, thread?: ThreadRecord) => Ext
 const KNOWLEDGE = /^(?:(?:请|帮我)\s*)?(?:如何|怎么|怎样|介绍|解释|什么是|对比|比较|how\s+(?:to|do|does)|what\s+is|explain|compare\b)/i
 const WORK = /待办|审批|任务|工单|处理|办理|代办|办结|同意|批准|拒绝|驳回|完成|查询|列出|查看|详情|发送|消息|邮件|邮箱|上传|云盘|转交|转办|approvals?|todo|task|complete|approve|reject|send|upload|transfer|detail|list|show/i
 const CONNECT = /连接|接入|授权|登录|配置|安装|connect|authorize|login|setup|install/i
+// Query filters describe stored state. Keep independent imperative clauses so
+// “list unfinished tasks, then complete one” still requires write authority.
+const QUERY_STATE = /(?:需要|需)(?:完成|审批|处理|办理)(?=的)|(?:尚未|已经|已被|曾被|未|待|已|被)(?:完成|审批|同意|批准|拒绝|驳回|发送|上传|转交|转办|处理|办理|办结)|(?:完成|审批|同意|批准|拒绝|驳回|发送|上传|转交|转办|处理|办理)(?:状态|情况|结果|记录|历史|进度|时间)|\b(?:incomplete|uncompleted|completed|unapproved|approved|rejected|sent|uploaded|transferred|not(?:\s+yet)?\s+completed?)\b/gi
+const NEGATED_QUERY_ACTION = /(?:不要|请勿|禁止|不必|勿)(?:自动|批量)?(?:完成|审批|同意|批准|拒绝|驳回|发送|上传|转交|转办|处理|办理)(?:(?:或|和|及|、)(?:完成|审批|同意|批准|拒绝|驳回|发送|上传|转交|转办|处理|办理))*|\b(?:do\s+not|don't|never)\s+(?:complete|approve|reject|send|upload|transfer)\b/gi
+
 
 /** Multiple providers require a durable, explicit choice; never fall back to unrestricted chat. */
 export function externalProviderAmbiguity(text: string): boolean {
@@ -23,11 +28,19 @@ export function externalTaskIntent(text: string): TaskIntent | null {
   if (ding === lark) return null
   const hasWorkIntent = WORK.test(value)
   const provider = ding ? 'dingtalk' : 'lark'
-  const operation = /拒绝|驳回|reject/i.test(value) ? 'reject' : /转交|转办|transfer/i.test(value) ? 'transfer'
-    : /同意|批准|自动审批|approve\b/i.test(value) ? 'approve'
-    : /上传|upload\b/i.test(value) ? 'upload' : /发送|发(?:一封)?邮件|发(?:一条)?消息|send\b/i.test(value) ? 'send' : /完成|complete\b/i.test(value) ? 'complete' : /详情|detail/i.test(value) ? 'detail' : /查询|列出|查看|列表|list\b|show\b/i.test(value) ? 'list' : undefined
+  const readOperation = /详情|\bdetail/i.test(value) ? 'detail'
+    : /查询|列出|查看|读取|列表|有哪些|\b(?:list|show|read)\b/i.test(value) ? 'list' : undefined
+  const actionText = readOperation ? value.replace(QUERY_STATE, ' ').replace(NEGATED_QUERY_ACTION, ' ') : value
+  const writeOperation = /拒绝|驳回|\breject\b/i.test(actionText) ? 'reject' : /转交|转办|\btransfer\b/i.test(actionText) ? 'transfer'
+    : /同意|批准|自动审批|\bapprove\b/i.test(actionText) ? 'approve'
+    : /上传|\bupload\b/i.test(actionText) ? 'upload'
+    : /发送|发(?:一封)?邮件|发(?:一条)?消息|\bsend\b/i.test(actionText) ? 'send'
+    : /完成|\bcomplete\b/i.test(actionText) ? 'complete' : undefined
+  const genericMutation = /处理|办理|代办|办结/.test(actionText)
+  const operation = writeOperation ?? (genericMutation ? undefined : readOperation)
   return { kind: CONNECT.test(value) && !hasWorkIntent ? 'connect_provider' : 'external_task', provider, operation,
-    mutation: operation ? ['approve', 'reject', 'complete', 'send', 'transfer', 'upload'].includes(operation) : /处理|办理|代办|办结/.test(value), confidence: 'rule' }
+    mutation: Boolean(writeOperation || genericMutation), confidence: 'rule' }
+
 }
 export function detectExternalTaskProvider(text: string): ExternalTaskProvider | null {
   return externalTaskIntent(text)?.provider ?? null

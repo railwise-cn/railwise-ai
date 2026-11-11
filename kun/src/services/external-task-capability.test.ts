@@ -42,6 +42,28 @@ describe('external task capability preflight', () => {
     expect(externalProviderAmbiguity('帮我处理钉钉待办')).toBe(false)
   })
 
+  it.each([
+    '请查询我当前未完成的钉钉待办，最多列出 5 条的标题和当前状态。这次仅做只读验收。',
+    '查询钉钉已完成的待办', '查看钉钉待完成的待办', '列出飞书未审批的申请',
+    '查询飞书已批准和已拒绝的审批', '查看钉钉待办完成情况', '查询需要处理的飞书待办',
+    '查询钉钉待办，不要完成或批准任何一条', 'list incomplete DingTalk tasks', 'show completed Lark tasks',
+    'list rejected Lark approvals'
+  ])('treats status filters as read-only queries (%s)', prompt => {
+    expect(externalTaskIntent(prompt)).toMatchObject({ operation: 'list', mutation: false })
+  })
+
+  it.each([
+    ['列出钉钉待办并完成第一条', 'complete'],
+    ['查询后需要完成钉钉待办', 'complete'],
+    ['查询飞书审批，不要拒绝而是批准', 'approve'],
+    ['列出未完成的钉钉待办，然后完成第一条', 'complete'],
+    ['查看已拒绝的飞书审批，然后批准我选定的审批', 'approve'],
+    ['list incomplete DingTalk tasks then complete task 1', 'complete'],
+    ['列出钉钉待办并处理它们', undefined]
+  ])('preserves explicit mutations after a read (%s)', (prompt, operation) => {
+    expect(externalTaskIntent(prompt!)).toMatchObject({ operation, mutation: true })
+  })
+
   it('recognizes direct sends, transfers, and detail reads as platform operations', () => {
     expect(externalTaskIntent('完成报告并通过飞书发送邮件')).toMatchObject({ provider: 'lark', operation: 'send' })
     expect(externalTaskIntent('完成报告并上传到飞书云盘')).toMatchObject({ provider: 'lark', operation: 'upload' })

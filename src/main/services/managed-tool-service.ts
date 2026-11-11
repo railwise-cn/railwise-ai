@@ -548,7 +548,7 @@ async function beginManagedLarkLoginOnce(capability: 'tasks' | 'mail' | 'im' | '
   const diagnosis = await diagnoseManagedTool('lark-cli')
   assertLarkConnectionCurrent(generation)
   if (!diagnosis.ok || !diagnosis.status.executablePath || diagnosis.status.state === 'error') return { ok: false, message: 'Install and diagnose Lark CLI before connecting an account.' }
-  const app = await runTool(diagnosis.status.executablePath, ['config', 'show', ...(selection ? ['--profile', selection.profile] : []), '--json'])
+  const app = await runTool(diagnosis.status.executablePath, ['config', 'show', ...(selection ? ['--profile', selection.profile] : [])])
   assertLarkConnectionCurrent(generation)
   const configuration = larkAppConfiguration(app.output, app.ok)
   if (configuration === 'missing') return { ok: false, reason: 'app_configuration_required', message: 'Configure a Feishu application on the official scan page first, then log in. Existing apps and accounts are preserved.' }
@@ -584,7 +584,7 @@ export async function completeManagedLarkLogin(): Promise<ManagedToolResult> {
       pendingLarkLogin = undefined
       return { ok: false, message: 'Lark CLI changed during authorization. Check the official account state before reconnecting.' }
     }
-    const app = await runTool(pending.executablePath, ['config', 'show', '--profile', pending.profile, '--json'])
+    const app = await runTool(pending.executablePath, ['config', 'show', '--profile', pending.profile])
     assertLarkConnectionCurrent(pending.generation)
     const appConfig = jsonRecord(app.output)
     if (larkAppConfiguration(app.output, app.ok) !== 'configured' || appConfig.appId !== pending.appId || appConfig.brand !== pending.brand || (typeof appConfig.profile === 'string' && appConfig.profile !== pending.profile)) {

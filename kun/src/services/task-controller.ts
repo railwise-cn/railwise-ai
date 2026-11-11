@@ -308,6 +308,28 @@ export class TaskController {
     this.recoveryInFlight.clear()
   }
 
+  /** Repair only unreviewed legacy query contracts, preserving any actual write history. */
+  private correctedReadAcceptance(task: TaskRun): TaskAcceptance | undefined {
+    const accepted = task.acceptance.effect
+    const intent = externalTaskIntent(task.goal)
+    if (!accepted?.requiresConfirmation || intent?.mutation || intent?.operation !== 'list' || intent.provider !== accepted.provider ||
+        accepted.scopeConfirmationId || accepted.requiredEffects?.length || accepted.target && accepted.target !== 'current_user') return undefined
+    const supplementalWrite = this.repository.inputs(task.id).some(input => input.kind === 'supplement' &&
+      externalTaskIntent(`${accepted.provider} ${input.text}`)?.mutation)
+    if (supplementalWrite) return undefined
+    const unverifiedHistory = this.repository.operations(task.id, 'tool').some(receipt => {
+      if (['prepared', 'running', 'outcome_unknown'].includes(receipt.status)) return true
+      const notDispatched = receipt.request?.dispatchTracking === 'host-v1' && receipt.status === 'failed' &&
+        (receipt.result as { approved?: boolean } | undefined)?.approved === false
+      if (notDispatched) return false
+      const name = typeof receipt.request?.toolName === 'string' ? receipt.request.toolName : ''
+      const effect = this.resolveToolEffect(name) ?? externalOperationForTool(name)
+      return !effect || effect.mutation || receipt.request?.mutation === true
+    })
+    if (unverifiedHistory) return undefined
+    return { ...task.acceptance, effect: { ...accepted, operation: 'list', target: 'current_user', requiresConfirmation: false, requiredScopes: [] } }
+  }
+
   beginAttempt(threadId: string, turnId: string): TaskRun | null {
     const task = this.repository.findActiveByThread(threadId)
     if (!task || task.activeTurnId !== turnId || TERMINAL.has(task.status) || task.status === 'paused') return task
@@ -329,10 +351,12 @@ export class TaskController {
     this.attemptTokens.set(turnId, token)
     this.repository.execution.beginAttempt(token, now)
     this.recoveryInFlight.delete(task.id)
+    const correctedAcceptance = this.correctedReadAcceptance(task)
     let started: TaskRun
     try {
       started = this.repository.update(task.id, task.revision, (current) => ({
         ...current,
+        ...(correctedAcceptance ? { acceptance: correctedAcceptance } : {}),
         status: 'running',
         executionStartedAt: current.executionStartedAt ?? now,
         attempts: current.attempts + 1,
@@ -345,7 +369,7 @@ export class TaskController {
       }), {
         key: `attempt-started:${task.attempts + 1}`,
         kind: 'attempt_started',
-        payload: { turnId, attempt: task.attempts + 1 },
+        payload: { turnId, attempt: task.attempts + 1, ...(correctedAcceptance ? { acceptanceCorrection: { from: task.acceptance.effect?.operation, to: 'list', reason: 'query_state_filter' } } : {}) },
         createdAt: now
       }, this.leaseGuard(task.id))
     } catch (error) {

@@ -271,13 +271,17 @@ describe('managed-tool-service', () => {
     _internals.setToolRunnerForTests(runner)
     expect(await beginManagedLarkLogin()).toMatchObject({ ok: true })
     expect(await completeManagedLarkLogin()).toMatchObject({ ok: true, status: { profile: binding.profile, appId: binding.appId, userOpenId: 'ou-authorized' } })
+    expect(calls.filter(args => args[0] === 'config')).toEqual([
+      ['config', 'show', '--profile', binding.profile],
+      ['config', 'show', '--profile', binding.profile]
+    ])
     selected.mockRestore()
     _internals.clearPendingLarkLogin()
     calls.length = 0
     expect(await diagnoseManagedTool('lark-cli')).toMatchObject({ ok: true, status: { state: 'installed', profile: binding.profile, appId: binding.appId, userOpenId: 'ou-authorized' } })
     expect(calls).toContainEqual(['auth', 'status', '--profile', binding.profile, '--json'])
     expect(await beginManagedLarkLogin()).toMatchObject({ ok: true })
-    expect(calls.filter(args => args[0] === 'config')).toEqual([['config', 'show', '--profile', binding.profile, '--json']])
+    expect(calls.filter(args => args[0] === 'config')).toEqual([['config', 'show', '--profile', binding.profile]])
     expect(calls.filter(args => args[1] === 'login').every(args => args.includes(binding.profile))).toBe(true)
     expect(readFileSync(join(toolsRoot, 'lark-account-selection.json'), 'utf8')).not.toContain('private-code')
   })

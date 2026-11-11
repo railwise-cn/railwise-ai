@@ -138,8 +138,11 @@ export function buildLarkDeliveryTools(config: LarkCapabilityConfig, run: Run): 
         try {
           const approval = context.explicitApproval
           if (!approval) throw failure('connector_confirmation_missing')
-          const idempotencyKey = hashText(JSON.stringify([context.executionGrant?.taskId, approval.callId, approval.requestHash]))
-          const sent = await run(['im', '+messages-send', '--chat-id', args.chatId, '--text', args.text, '--idempotency-key', idempotencyKey, ...jsonFlags],
+          const idempotencyKey = hashText(JSON.stringify([context.executionGrant?.taskId, approval.callId, approval.requestHash])).slice(0, 50)
+          // JSON keeps @file and stdin markers inside the literal text. Like
+          // Go's JSON encoder, escape '<' before the CLI's mention normalizer.
+          const content = JSON.stringify({ text: args.text }).replace(/</g, '\\u003c')
+          const sent = await run(['im', '+messages-send', '--chat-id', args.chatId, '--msg-type', 'text', '--content', content, '--idempotency-key', idempotencyKey, ...jsonFlags],
             [...LARK_DELIVERY_SCOPES.im], dispatchContext(context, () => { dispatched = true }), { operation: 'send', target: args.chatId })
           if (!sent.ok) return failed('send', args.chatId, 'connector_send_unconfirmed', dispatched)
           const data = dataOf(sent.output)

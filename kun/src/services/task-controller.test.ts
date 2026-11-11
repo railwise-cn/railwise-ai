@@ -106,6 +106,28 @@ describe('TaskController reliability boundaries', () => {
     } finally { repository.close() }
   })
 
+  it.each(['confirmed', 'dispatched', 'supplement', 'unsettled_unknown', 'unrecognized', 'legacy_denial'])('preserves historical write obligations when a query task has %s authority or work', async reason => {
+    const { repository, controller, task, thread } = await fixture('查询钉钉未完成的待办')
+    try {
+      const previous = repository.update(task.id, task.revision, current => ({ ...current, acceptance: { ...current.acceptance,
+        effect: { ...current.acceptance.effect!, operation: 'complete', target: undefined, requiresConfirmation: true,
+          ...(reason === 'confirmed' ? { scopeConfirmationId: 'reviewed-write-scope' } : {}) } } }))
+      if (reason === 'dispatched') {
+        repository.beginOperation({ ownerId: task.id, idempotencyKey: 'previous-write', kind: 'tool', request: {
+          toolName: 'dingtalk_complete_task', provider: 'dingtalk', operation: 'complete', mutation: true, turnId: 'old-turn', target: 'task-1'
+        }, nowIso: task.createdAt })
+        repository.finishOperation(task.id, 'previous-write', { status: 'succeeded', result: { approved: true } }, task.createdAt)
+      }
+      if (['unsettled_unknown', 'unrecognized', 'legacy_denial'].includes(reason)) {
+        repository.beginOperation({ ownerId: task.id, idempotencyKey: 'unrecognized-history', kind: 'tool', request: { toolName: 'unregistered_tool' }, nowIso: task.createdAt })
+        repository.finishOperation(task.id, 'unrecognized-history', { status: reason === 'unsettled_unknown' ? 'outcome_unknown' : reason === 'legacy_denial' ? 'failed' : 'succeeded', result: { approved: reason !== 'legacy_denial' } }, task.createdAt)
+      }
+      if (reason === 'supplement') controller.appendInput(task.id, previous.revision, 'write-supplement', '然后完成第一项待办')
+      controller.beginAttempt(thread.id, 'turn_reliability')
+      expect(repository.get(task.id)?.acceptance.effect).toMatchObject({ operation: 'complete', requiresConfirmation: true })
+    } finally { repository.close() }
+  })
+
   it('charges concurrent work against one root execution budget and aborts at the shared limit',async()=>{
     const {repository,controller,task,thread,setNow,threadStore,sessionStore}=await fixture()
     repository.update(task.id,task.revision,current=>({...current,budget:{...current.budget,version:2,maxExecutionMs:100}}))

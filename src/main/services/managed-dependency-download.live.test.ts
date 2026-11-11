@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ManagedUvRuntimeService } from './managed-uv-runtime-service'
-import { installManagedTool, managedToolsSkillRoot } from './managed-tool-service'
+import { beginManagedLarkAppSetup, beginManagedLarkLogin, cancelManagedLarkAppSetup, installManagedTool, managedToolsSkillRoot } from './managed-tool-service'
 
 const enabled = process.env.RAILWISE_DEPENDENCY_MIRROR_ACCEPTANCE === '1'
 const execFileAsync = promisify(execFile)
@@ -43,6 +43,19 @@ describe.runIf(enabled)('immutable managed dependency cold-cache acceptance', ()
     expect(lark.status).toMatchObject({ state: 'needs_login', installedVersion: '1.0.100', scopes: [] })
     expect(existsSync(join(managedToolsSkillRoot(), 'lark-doc', 'SKILL.md'))).toBe(true)
     expect(existsSync(join(managedToolsSkillRoot(), 'lark-mail', 'SKILL.md'))).toBe(true)
+    // Exercise the pinned CLI's real first-login argument contract in an empty
+    // isolated configuration. No authorization request or credentials are created.
+    vi.stubEnv('WORKWISE_CANDIDATE_CREDENTIAL_ACCESS', '1')
+    expect(await beginManagedLarkLogin()).toMatchObject({ ok: false, reason: 'app_configuration_required' })
+    try {
+      const setup = await beginManagedLarkAppSetup()
+      if (!setup.ok) throw new Error(setup.message)
+      expect(setup.state).toBe('waiting')
+      expect(Boolean(setup.verificationUrl?.startsWith('https://'))).toBe(true)
+    } finally {
+      await cancelManagedLarkAppSetup()
+      vi.stubEnv('WORKWISE_CANDIDATE_CREDENTIAL_ACCESS', '0')
+    }
     const office = await installManagedTool('officecli')
     if (!office.ok) throw new Error(office.message)
     expect(office.status).toMatchObject({ state: 'installed', installedVersion: '1.0.160' })
@@ -57,7 +70,7 @@ describe.runIf(enabled)('immutable managed dependency cold-cache acceptance', ()
       schema: 'railwise.dependency-cold-cache-evidence.v1', at: new Date().toISOString(),
       platform: process.platform, arch: process.arch, uvVersion: uv.stdout.trim(), pythonVersion: python.stdout.trim(),
       larkVersion: lark.status.installedVersion, officeVersion: office.status.installedVersion, companionSkillsInstalled: true,
-      credentialAccess: false, upstreamFallbackAllowed: false, downloads
+      credentialAccess: 'empty isolated Lark configuration only', larkInitialAuthorizationPageReceived: true, larkAuthorizationCancelled: true, upstreamFallbackAllowed: false, downloads
     }, null, 2)}\n`)
     console.log(`Cold-cache dependency evidence ${join(directory, 'evidence.json')}`)
   }, 480_000)

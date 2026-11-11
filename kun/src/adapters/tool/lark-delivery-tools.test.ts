@@ -57,6 +57,18 @@ describe('typed Lark deliveries', () => {
     expect(await f.tool('lark_mail_send').execute({ recipient: 'test@example.com', subject: 'Synthetic', body: 'body' }, f.context)).toMatchObject({ output: { status: 'failed', code: 'connector_send_blocked' } })
     expect(runner).toHaveBeenCalledOnce()
   })
+  it.each(['@./credentials.json', '@@literal', '-', '--body-file=secret.txt', '<img src="./secret.png">'])('keeps mail subject and body literal for %s', async text => {
+    const runner = vi.fn<LarkCliRunner>(async (_path, args) => ({ ok: true, output: { data:
+      args[1] === '+send' ? { message_id: 'mail-1' } : { message_id: 'mail-1', details: [{ recipient: { mail_address: 'test@example.com' }, status: 4 }] } } }))
+    const f = fixture(runner)
+    expect(await f.tool('lark_mail_send').execute({ recipient: 'test@example.com', subject: text, body: text }, f.context)).toMatchObject({ output: { status: 'succeeded' } })
+    const args = runner.mock.calls[0][1]
+    expect(args[args.indexOf('--subject') + 1]).toBe(text)
+    expect(args[args.indexOf('--body') + 1]).toBe(text)
+    expect(args).toContain('--plain-text')
+    expect(args).toContain('--no-signature')
+    for (const flag of ['--body-file', '--attach', '--inline']) expect(args).not.toContain(flag)
+  })
   it('requires exact chat, sender and content for IM readback, with a stable upstream idempotency key', async () => {
     const text = '合成消息'
     const runner = vi.fn(async (_path: string, args: string[]) => ({ ok: true, output: { ok: true, data:
@@ -69,12 +81,42 @@ describe('typed Lark deliveries', () => {
     const locator = { messageId: 'om-1', chatId: 'oc-1', contentHash: hash(text), senderId: 'ou-synthetic' }
     expect(verifiedLarkDeliveryState('lark_im_send', locator, { message_id: 'om-1', chat_id: 'oc-1', contentHash: hash(text), msg_type: 'text', deleted: false, sender: { id: 'other' } })).toBeUndefined()
   })
+  it.each(['@./credentials.json', '@@literal', '-', '--text=secret', '<at id=ou-synthetic/>', '中文正文\n"quoted" \\path'])('sends literal IM text without CLI file or stdin interpretation for %s', async text => {
+    const runner = vi.fn<LarkCliRunner>(async (_path, args) => ({ ok: true, output: { data:
+      args[1] === '+messages-send' ? { message_id: 'om-1', chat_id: 'oc-1' } : { messages: [{ message_id: 'om-1', chat_id: 'oc-1', msg_type: 'text', content: text, sender: { id: 'ou-synthetic' }, deleted: false }] } } }))
+    const f = fixture(runner)
+    expect(await f.tool('lark_im_send').execute({ chatId: 'oc-1', text }, f.context)).toMatchObject({ output: { status: 'succeeded', verificationLocator: { contentHash: hash(text) } } })
+    const args = runner.mock.calls[0][1]
+    expect(args).not.toContain('--text')
+    expect(args[args.indexOf('--msg-type') + 1]).toBe('text')
+    const content = args[args.indexOf('--content') + 1]
+    expect(content.startsWith('{')).toBe(true)
+    expect(content).not.toContain('<')
+    expect(JSON.parse(content)).toEqual({ text })
+  })
   it('does not dispatch on a changed account or revoked grant', async () => {
     const runner = vi.fn()
     const f = fixture(runner)
     f.context.executionGrant = { ...f.context.executionGrant!, connectorIdentityFingerprints: { 'lark-cli': '0'.repeat(64) } }
     expect(await f.tool('lark_mail_send').execute({ recipient: 'test@example.com', subject: 'Synthetic', body: 'body' }, f.context)).toMatchObject({ output: { status: 'failed', code: 'connector_identity_changed' } })
     expect(runner).not.toHaveBeenCalled()
+  })
+  it('keeps IM idempotency keys within 50 characters, stable for retries and distinct for separate confirmed operations', async () => {
+    const runner = vi.fn<LarkCliRunner>(async () => ({ ok: false, output: { code: 1 } }))
+    const f = fixture(runner)
+    const tool = f.tool('lark_im_send')
+    const request = { chatId: 'oc-1', text: '合成消息' }
+    await tool.execute(request, f.context)
+    await tool.execute(request, f.context)
+    await tool.execute(request, { ...f.context, explicitApproval: { ...f.context.explicitApproval!, callId: 'call-2' } })
+    await tool.execute(request, { ...f.context, explicitApproval: { ...f.context.explicitApproval!, requestHash: hash('different-request') } })
+    await tool.execute(request, { ...f.context, executionGrant: { ...f.context.executionGrant!, taskId: 'different-task' } })
+    const keys = runner.mock.calls.map(([, args]) => args[args.indexOf('--idempotency-key') + 1])
+    expect(keys).toHaveLength(5)
+    for (const key of keys) expect(key).toMatch(/^[a-f0-9]{50}$/)
+    expect(keys[0]).toBe(hash(JSON.stringify(['task', 'call-1', hash('request')])).slice(0, 50))
+    expect(keys[1]).toBe(keys[0])
+    expect(new Set([keys[0], ...keys.slice(2)]).size).toBe(4)
   })
   it('stages the approved file bytes and verifies the downloaded remote hash', async () => {
     const root = await mkdtemp(join(tmpdir(), 'lark-upload-test-')); roots.push(root)
