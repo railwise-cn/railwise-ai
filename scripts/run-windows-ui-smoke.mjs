@@ -270,7 +270,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.resources.defaultSkills = skills.filter(skill => defaultSkillIds.includes(skill.id))
     const defaultSkills = validateDefaultSkillSources(skills)
     for (const skill of defaultSkills) {
-      const entry = `src/asset/skills/${skill.id}/SKILL.md`
+      const entry = join('src', 'asset', 'skills', skill.id, 'SKILL.md')
       const expectedRoot = join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', skill.id)
       assert.equal(resolve(skill.root).toLowerCase(), expectedRoot.toLowerCase())
       assert.equal(resolve(skill.entryPath).toLowerCase(), join(expectedRoot, 'SKILL.md').toLowerCase())

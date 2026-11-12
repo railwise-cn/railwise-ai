@@ -141,6 +141,9 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   assert.ok(ui.indexOf("'the loaded local Amap and Zotero catalog entries'") < ui.indexOf("查看 GitHub MCP 连接详情"))
   assert.match(ui, /window\.workwise\.listCatalogPackages\(\)/)
   assert.match(ui, /window\.workwise\.listSkills\(\)/)
+  // @electron/asar splits archive lookups using the host path separator.
+  assert.match(ui, /const entry = join\('src', 'asset', 'skills', skill.id, 'SKILL.md'\)/)
+  assert.match(ui, /asar\.extractFile\(join\(dirname\(executable\), 'resources', 'app.asar'\), entry\)/)
   assert.match(ui, /both locally cataloged CAD skills/)
   assert.doesNotMatch(ui, /window\.workwise\s*=|innerHTML\s*=|mock\w*\(/)
 })
