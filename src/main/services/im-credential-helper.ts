@@ -12,10 +12,10 @@ const HELPER_INTERACTIVE_ARG = '--im-credential-helper-interactive'
 const HELPER_SOCKET_ARG = '--im-credential-helper-socket='
 const HELPER_SOCKET_ROOT_ARG = '--im-credential-helper-socket-root='
 const MAX_HELPER_MESSAGE_BYTES = 512 * 1024
-// The helper has no interactive authorization surface. A Keychain request
-// that has not completed within this window is waiting on unavailable system
-// authorization, so fail it before connection recovery appears hung.
+// Background reads are bounded so optional credentials cannot delay recovery.
+// Explicit retries give the user time to answer the system authorization prompt.
 export const IM_CREDENTIAL_HELPER_TIMEOUT_MS = 30_000
+export const IM_CREDENTIAL_HELPER_INTERACTIVE_TIMEOUT_MS = 120_000
 const HELPER_SOCKET_ROOT_NAME = `workwise-im-${process.pid}-${randomBytes(6).toString('hex')}`
 const activeCredentialHelperProcesses = new Set<ChildProcess>()
 let interactiveCredentialHelperRequested = false
@@ -270,12 +270,17 @@ export function stopCredentialHelperProcesses(): void {
   activeCredentialHelperProcesses.clear()
 }
 
+export function credentialHelperTimeoutMs(interactive: boolean): number {
+  return interactive ? IM_CREDENTIAL_HELPER_INTERACTIVE_TIMEOUT_MS : IM_CREDENTIAL_HELPER_TIMEOUT_MS
+}
+
 export function createCredentialHelperWatchdog(
-  exitProcess: (code: number) => void = (code) => process.exit(code)
+  exitProcess: (code: number) => void = (code) => process.exit(code),
+  interactive = isInteractiveImCredentialHelperProcess()
 ): ReturnType<typeof setTimeout> {
   const watchdog = setTimeout(
     () => exitProcess(1),
-    IM_CREDENTIAL_HELPER_TIMEOUT_MS - 1_000
+    credentialHelperTimeoutMs(interactive) - 1_000
   )
   watchdog.unref?.()
   return watchdog
@@ -389,7 +394,7 @@ async function requestCredentialHelper(request: CredentialHelperRequest): Promis
           'credential_helper_timeout',
           'IM credential helper timed out.'
         )),
-        IM_CREDENTIAL_HELPER_TIMEOUT_MS
+        credentialHelperTimeoutMs(interactive)
       )
     })
   })
@@ -524,7 +529,7 @@ export async function runImCredentialHelperProcess(): Promise<void> {
     }
     const request = await requestPromise
     if (!isCandidateCredentialAccessAllowed()) throw new Error('Candidate protected storage access is disabled.')
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('Protected storage unavailable.')
+    if (!await safeStorage.isAsyncEncryptionAvailable()) throw new Error('Protected storage unavailable.')
     const value = request.operation === 'encrypt'
       ? (await safeStorage.encryptStringAsync(
           Buffer.from(request.value, 'base64').toString('utf8')

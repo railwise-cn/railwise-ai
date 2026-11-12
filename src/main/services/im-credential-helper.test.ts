@@ -8,9 +8,11 @@ import {
   credentialHelperProcessConfig,
   credentialHelperUserDataPath,
   credentialHelperReadyPid,
+  credentialHelperTimeoutMs,
   createCredentialHelperWatchdog,
   createCredentialHelperRequestScheduler,
   IM_CREDENTIAL_HELPER_TIMEOUT_MS,
+  IM_CREDENTIAL_HELPER_INTERACTIVE_TIMEOUT_MS,
   imCredentialHelperSocketBase,
   isCredentialHelperAuthorizationFailure,
   isInteractiveImCredentialHelperProcess,
@@ -68,15 +70,23 @@ describe('IM credential helper', () => {
     expect(IM_CREDENTIAL_HELPER_TIMEOUT_MS).toBeLessThan(DEFAULT_CREDENTIAL_OPERATION_TIMEOUT_MS)
   })
 
-  it('forces a stuck credential helper process to exit before the parent request times out', () => {
+  it.each([false, true])('uses the same parent/child deadline and permits watchdog cancellation (interactive=%s)', (interactive) => {
     vi.useFakeTimers()
     const exitProcess = vi.fn()
-    const watchdog = createCredentialHelperWatchdog(exitProcess)
+    const timeout = credentialHelperTimeoutMs(interactive)
+    expect(timeout).toBe(interactive ? IM_CREDENTIAL_HELPER_INTERACTIVE_TIMEOUT_MS : IM_CREDENTIAL_HELPER_TIMEOUT_MS)
+    expect(timeout).toBe(interactive ? 120_000 : 30_000)
+    const watchdog = createCredentialHelperWatchdog(exitProcess, interactive)
     try {
-      vi.advanceTimersByTime(IM_CREDENTIAL_HELPER_TIMEOUT_MS - 1_001)
+      vi.advanceTimersByTime(timeout - 1_001)
       expect(exitProcess).not.toHaveBeenCalled()
       vi.advanceTimersByTime(1)
       expect(exitProcess).toHaveBeenCalledWith(1)
+      const cancelledExit = vi.fn()
+      const cancelledWatchdog = createCredentialHelperWatchdog(cancelledExit, interactive)
+      clearTimeout(cancelledWatchdog)
+      vi.advanceTimersByTime(timeout)
+      expect(cancelledExit).not.toHaveBeenCalled()
     } finally {
       clearTimeout(watchdog)
       vi.useRealTimers()
@@ -225,6 +235,9 @@ describe('IM credential helper', () => {
 
   it('uses asynchronous Safe Storage calls so the helper watchdog remains responsive', async () => {
     const source = await readFile(new URL('./im-credential-helper.ts', import.meta.url), 'utf8')
+    expect(source).toContain('await safeStorage.isAsyncEncryptionAvailable()')
+    expect(source).not.toContain('safeStorage.isEncryptionAvailable(')
+    expect(source).toContain('credentialHelperTimeoutMs(interactive)\n      )')
     expect(source).toContain('await safeStorage.encryptStringAsync(')
     expect(source).toContain('await safeStorage.decryptStringAsync(')
     expect(source).not.toContain('safeStorage.encryptString(')
