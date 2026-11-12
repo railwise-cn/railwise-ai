@@ -32,6 +32,8 @@ const CANDIDATE_HELPER_ENV_KEYS = [
 export type CredentialHelperRequest = {
   operation: 'encrypt' | 'decrypt'
   value: string
+  /** Local scheduling metadata, omitted from the helper socket protocol. */
+  interactive?: boolean
 }
 
 export type CredentialHelperErrorCode =
@@ -287,7 +289,7 @@ export function createCredentialHelperWatchdog(
 }
 
 async function requestCredentialHelper(request: CredentialHelperRequest): Promise<string> {
-  const interactive = consumeInteractiveCredentialHelperAccess()
+  const interactive = request.interactive === true
   const socketRoot = helperSocketRoot()
   await mkdir(helperRoot(), { recursive: true, mode: 0o700 })
   await mkdir(socketRoot, { recursive: true, mode: 0o700 })
@@ -346,7 +348,7 @@ async function requestCredentialHelper(request: CredentialHelperRequest): Promis
         'credential_helper_socket',
         'IM credential helper socket failed.'
       )))
-      socket.write(`${encodeMessage(request)}\n`)
+      socket.write(`${encodeMessage({ operation: request.operation, value: request.value })}\n`)
     })
 
     const cleanup = (): void => {
@@ -409,6 +411,7 @@ export function createCredentialHelperRequestScheduler(
   return (request) => {
     const key = createHash('sha256')
       .update(request.operation)
+      .update(request.interactive === true ? ':interactive' : ':background')
       .update('\0')
       .update(request.value)
       .digest('hex')
@@ -429,7 +432,11 @@ export function createCredentialHelperRequestScheduler(
 
 const scheduleCredentialHelperRequest = createCredentialHelperRequestScheduler(requestCredentialHelper)
 
-export async function encryptStringWithCredentialHelper(value: string): Promise<Buffer> {
+export async function encryptStringWithCredentialHelper(
+  value: string,
+  options?: { interactive?: boolean }
+): Promise<Buffer> {
+  const interactive = options?.interactive ?? consumeInteractiveCredentialHelperAccess()
   if (!isCandidateCredentialAccessAllowed()) {
     throw Object.assign(new Error('Candidate protected storage access is disabled.'), {
       code: 'credential_helper_access_denied'
@@ -437,12 +444,17 @@ export async function encryptStringWithCredentialHelper(value: string): Promise<
   }
   const encrypted = await scheduleCredentialHelperRequest({
     operation: 'encrypt',
-    value: Buffer.from(value, 'utf8').toString('base64')
+    value: Buffer.from(value, 'utf8').toString('base64'),
+    interactive
   })
   return Buffer.from(encrypted, 'base64')
 }
 
-export async function decryptStringWithCredentialHelper(value: Buffer): Promise<string> {
+export async function decryptStringWithCredentialHelper(
+  value: Buffer,
+  options?: { interactive?: boolean }
+): Promise<string> {
+  const interactive = options?.interactive ?? consumeInteractiveCredentialHelperAccess()
   if (!isCandidateCredentialAccessAllowed()) {
     throw Object.assign(new Error('Candidate protected storage access is disabled.'), {
       code: 'credential_helper_access_denied'
@@ -450,7 +462,8 @@ export async function decryptStringWithCredentialHelper(value: Buffer): Promise<
   }
   const decrypted = await scheduleCredentialHelperRequest({
     operation: 'decrypt',
-    value: value.toString('base64')
+    value: value.toString('base64'),
+    interactive
   })
   return Buffer.from(decrypted, 'base64').toString('utf8')
 }

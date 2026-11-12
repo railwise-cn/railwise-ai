@@ -243,13 +243,14 @@ describe('MarketplaceCatalogService', () => {
   it.each(['credential_helper_timeout', 'credential_helper_access_denied'])('isolates %s to its protected source while retaining bundled and cached catalogs', async (code) => {
     const rootDirectory = await tempRoot()
     let denied = false
-    const credentials = new CatalogCredentialService({ root: join(rootDirectory, 'credentials'), encryption: {
-      available: () => true, encrypt: async value => Buffer.from(value), storage: 'keychain',
-      decrypt: async value => {
+    const credentialOptions = { root: join(rootDirectory, 'credentials'), encryption: {
+      available: () => true, encrypt: async (value: string) => Buffer.from(value), storage: 'keychain' as const,
+      decrypt: async (value: Buffer) => {
         if (denied) throw Object.assign(new Error('synthetic protected-storage failure'), { code })
         return value.toString()
       }
-    } })
+    } }
+    let credentials = new CatalogCredentialService(credentialOptions)
     await credentials.set('catalog.protected.token', 'synthetic-token')
     const fetch = vi.fn(async () => jsonResponse(snapshot('protected-cache')))
     const options = { rootDirectory, fetch, resolveSecret: async (key: string) => (await credentials.resolve(key)) ?? null }
@@ -259,6 +260,7 @@ describe('MarketplaceCatalogService', () => {
     const before = await service.listPackages()
     expect(before.packages.some(entry => entry.sourceId === 'workwise-official')).toBe(true)
     denied = true
+    credentials = new CatalogCredentialService(credentialOptions)
     expect(await service.syncSource('protected-cache')).toMatchObject({ sourceId: 'protected-cache', status: 'failed', stale: true, error: expect.stringContaining('原凭据仍保留'), snapshot: { sourceId: 'protected-cache' } })
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(await service.listPackages()).toEqual(before)

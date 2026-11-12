@@ -21,7 +21,7 @@ import type {
 import { atomicWriteFile, readRecoveredFile, runSerialized } from './durable-file'
 import { canonicalizeContainmentRoot, resolveContainedPath } from './canonical-containment'
 import { isCandidateCredentialAccessAllowed } from '../candidate-runtime'
-import { decryptStringWithCredentialHelper, encryptStringWithCredentialHelper, requestInteractiveCredentialHelperAccess } from './im-credential-helper'
+import { decryptStringWithCredentialHelper, encryptStringWithCredentialHelper } from './im-credential-helper'
 
 const execFileAsync = promisify(execFile)
 const MAX_OAUTH_RESPONSE_BYTES = 1024 * 1024
@@ -45,10 +45,18 @@ type CredentialPayload = {
   tokenType?: string
 }
 
+type ResolvedMcpCredential = {
+  hash: string
+  storage: McpCredentialReferenceV1['storage']
+  value?: CredentialPayload
+}
+// Runtime assembly and IPC own separate services in the same main process.
+const processResolvedMcpCredentials = new Map<string, ResolvedMcpCredential>()
+
 type EncryptionAdapter = {
   available(): boolean | Promise<boolean>
-  encrypt(value: string): Buffer | Promise<Buffer>
-  decrypt(value: Buffer): string | Promise<string>
+  encrypt(value: string, interactive?: boolean): Buffer | Promise<Buffer>
+  decrypt(value: Buffer, interactive?: boolean): string | Promise<string>
   storage: McpCredentialReferenceV1['storage']
 }
 
@@ -143,8 +151,8 @@ function defaultEncryption(): EncryptionAdapter {
       // Keychain may wait for user authorization. The existing helper keeps
       // that wait off the GUI thread and bounds it with its watchdog.
       available: () => true,
-      encrypt: encryptStringWithCredentialHelper,
-      decrypt: decryptStringWithCredentialHelper,
+      encrypt: (value, interactive = false) => encryptStringWithCredentialHelper(value, { interactive }),
+      decrypt: (value, interactive = false) => decryptStringWithCredentialHelper(value, { interactive }),
       storage: 'keychain'
     }
   }
@@ -270,7 +278,7 @@ export class McpConfigService {
   private readonly legacyPath: string
   private readonly credentialRoot: string
   private readonly encryption: EncryptionAdapter
-  private readonly prepareProtectedStorageRetry: () => void
+  private readonly resolvedCredentials: Map<string, ResolvedMcpCredential>
   private readonly fetchImpl: typeof fetch
   private readonly now: () => Date
   private readonly oauthCallbackTimeoutMs: number
@@ -291,8 +299,7 @@ export class McpConfigService {
     this.legacyPath = resolve(options.legacyPath ?? join(dirname(this.manifestPath), 'mcp.json'))
     this.credentialRoot = resolve(options.credentialRoot ?? join(homedir(), '.workwise', 'credentials', 'mcp'))
     this.encryption = options.encryption ?? defaultEncryption()
-    this.prepareProtectedStorageRetry = options.encryption || process.platform !== 'darwin' || !isCandidateCredentialAccessAllowed()
-      ? () => undefined : requestInteractiveCredentialHelperAccess
+    this.resolvedCredentials = options.encryption ? new Map() : processResolvedMcpCredentials
     this.fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
     this.now = options.now ?? (() => new Date())
     this.oauthCallbackTimeoutMs = options.oauthCallbackTimeoutMs ?? OAUTH_CALLBACK_TIMEOUT_MS
@@ -473,6 +480,10 @@ export class McpConfigService {
       const mutationKeys = { ...manifest.mutationKeys, [request.idempotencyKey]: next.id }
       const trimmedKeys = Object.fromEntries(Object.entries(mutationKeys).slice(-256))
       await this.write({ ...manifest, revision: manifest.revision + 1, servers, mutationKeys: trimmedKeys })
+      if (current?.credentialRef && (!next.enabled || current.credentialRef.id !== next.credentialRef?.id ||
+          current.credentialRef.storage !== next.credentialRef?.storage)) {
+        this.resolvedCredentials.delete(join(this.credentialRoot, `${current.credentialRef.id}.json`))
+      }
       return next
     })
   }
@@ -480,8 +491,6 @@ export class McpConfigService {
   async test(serverId: string, workspaceRoot?: string): Promise<McpServerStatusV1> {
     const server = (await this.list(workspaceRoot)).find((entry) => entry.id === serverId)
     if (!server) return { id: serverId, state: 'error', authorized: false, message: 'MCP server was not found.' }
-    // This path follows the user's explicit connection-check action.
-    if (server.credentialRef && server.credentialRef.storage !== 'session') this.prepareProtectedStorageRetry()
     const result = await this.testConnection(server)
     return this.recordConnectionCheck(server, result)
   }
@@ -521,7 +530,7 @@ export class McpConfigService {
         await execFileAsync(lookup[0], lookup[1], { timeout: Math.min(server.timeoutMs, 10_000), windowsHide: true })
         return { id: server.id, state: 'connected', authorized: true, latencyMs: Date.now() - startedAt }
       }
-      const credential = await this.readCredential(server.credentialRef)
+      const credential = await this.readCredential(server.credentialRef, true)
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), server.timeoutMs)
       const response = await fetch(server.url!, {
@@ -551,7 +560,7 @@ export class McpConfigService {
 
   private async testGitHubConnector(server: McpServerConfigV2, startedAt: number): Promise<McpServerStatusV1> {
     const base = { id: server.id, latencyMs: Date.now() - startedAt }
-    const credential = await this.readCredential(server.credentialRef)
+    const credential = await this.readCredential(server.credentialRef, true)
     if (!credential) return { ...base, state: 'needs_authorization', authorized: false, errorCode: 'missing_credentials', message: '请在 GitHub 连接详情中创建并保存个人访问令牌，再检查连接。' }
     const client = new Client({ name: 'railwise-github-connection-check', version: '1.0.0' })
     let failedStatus: number | undefined
@@ -588,7 +597,7 @@ export class McpConfigService {
     const client = new Client({ name: 'railwise-connector-check', version: '1.0.0' })
     try {
       if (server.managedPreset === 'amap-readonly') {
-        const credential = await this.readCredential(server.credentialRef)
+        const credential = await this.readCredential(server.credentialRef, true)
         if (!credential) return { id: server.id, state: 'needs_authorization', authorized: false, errorCode: 'missing_credentials', message: '请填写高德 Web 服务 Key。' }
         const url = new URL('https://mcp.amap.com/mcp')
         url.searchParams.set('key', credential.accessToken)
@@ -1203,30 +1212,54 @@ export class McpConfigService {
       return { id, storage: 'session' }
     }
     await mkdir(this.credentialRoot, { recursive: true })
-    this.prepareProtectedStorageRetry()
-    const encrypted = (await this.encryption.encrypt(JSON.stringify(credential))).toString('base64')
-    await atomicWriteFile(join(this.credentialRoot, `${id}.json`), `${JSON.stringify({ version: 1, encrypted })}\n`)
+    const encrypted = await this.encryption.encrypt(JSON.stringify(credential), true)
+    const path = join(this.credentialRoot, `${id}.json`)
+    await atomicWriteFile(path, `${JSON.stringify({ version: 1, encrypted: encrypted.toString('base64') })}\n`)
+    this.resolvedCredentials.set(path, { hash: createHash('sha256').update(encrypted).digest('hex'), storage: this.encryption.storage, value: credential })
     return { id, storage: this.encryption.storage }
   }
 
   private async removeCredential(reference: McpCredentialReferenceV1): Promise<void> {
-    this.sessionCredentials.delete(reference.id)
-    if (reference.storage !== 'session') {
-      await rm(join(this.credentialRoot, `${reference.id}.json`), { force: true }).catch(() => undefined)
-    }
+    const path = join(this.credentialRoot, `${reference.id}.json`)
+    await runSerialized(`mcp-credential:${path}`, async () => {
+      this.sessionCredentials.delete(reference.id)
+      this.resolvedCredentials.delete(path)
+      if (reference.storage !== 'session') await rm(path, { force: true }).catch(() => undefined)
+    })
   }
 
-  private async readCredential(reference?: McpCredentialReferenceV1): Promise<CredentialPayload | null> {
+  private async readCredential(reference?: McpCredentialReferenceV1, interactive = false): Promise<CredentialPayload | null> {
     if (!reference) return null
     if (reference.storage === 'session') return this.sessionCredentials.get(reference.id) ?? null
-    if (!await this.encryption.available()) return null
-    try {
-      const raw = JSON.parse(await readRecoveredFile(join(this.credentialRoot, `${reference.id}.json`))) as { encrypted: string }
-      return JSON.parse(await this.encryption.decrypt(Buffer.from(raw.encrypted, 'base64'))) as CredentialPayload
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
-      throw credentialAccessError(error)
-    }
+    const path = join(this.credentialRoot, `${reference.id}.json`)
+    return runSerialized(`mcp-credential:${path}`, async () => {
+      try {
+        if (!await this.encryption.available()) {
+          this.resolvedCredentials.delete(path)
+          return null
+        }
+        const raw = JSON.parse(await readRecoveredFile(path)) as { encrypted: string }
+        const encrypted = Buffer.from(raw.encrypted, 'base64')
+        const hash = createHash('sha256').update(encrypted).digest('hex')
+        const cached = this.resolvedCredentials.get(path)
+        if (cached?.hash === hash && cached.storage === reference.storage && cached.value) return cached.value
+        // A pending marker lets save/disable invalidate this read immediately
+        // while the helper is still awaiting system authorization.
+        const pending: ResolvedMcpCredential = { hash, storage: reference.storage }
+        this.resolvedCredentials.set(path, pending)
+        const value = JSON.parse(await this.encryption.decrypt(encrypted, interactive)) as CredentialPayload
+        const current = JSON.parse(await readRecoveredFile(path)) as { encrypted: string }
+        if (this.resolvedCredentials.get(path) !== pending || !Buffer.from(current.encrypted, 'base64').equals(encrypted)) {
+          throw new Error('Credential changed while being read.')
+        }
+        this.resolvedCredentials.set(path, { hash, storage: reference.storage, value })
+        return value
+      } catch (error) {
+        this.resolvedCredentials.delete(path)
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+        throw credentialAccessError(error)
+      }
+    })
   }
 
   private async read(): Promise<McpManifestV2> {

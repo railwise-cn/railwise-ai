@@ -53,7 +53,7 @@ describe('IM credential helper', () => {
 
   it('transfers credential payloads through a local socket without logging them or adding them to argv', async () => {
     const source = await readFile(new URL('./im-credential-helper.ts', import.meta.url), 'utf8')
-    expect(source).toContain('socket.write(`${encodeMessage(request)}\\n`)')
+    expect(source).toContain('socket.write(`${encodeMessage({ operation: request.operation, value: request.value })}\\n`)')
     expect(source).toContain('socket must remain inside its private root')
     expect(source).not.toContain('console.')
     expect(source).not.toMatch(/helperArgs\([^)]*(value|secret|request)/)
@@ -269,6 +269,36 @@ describe('IM credential helper', () => {
     expect(maxActive).toBe(1)
     releases.shift()?.()
     await expect(second).resolves.toBe('cipher-b')
+  })
+
+  it('separates interactive retries from background in-flight work while deduplicating the same intent', async () => {
+    const releases: Array<() => void> = []
+    const runRequest = vi.fn(async (request: { operation: 'decrypt' | 'encrypt'; value: string; interactive?: boolean }) => {
+      await new Promise<void>(resolve => releases.push(resolve))
+      return String(request.interactive)
+    })
+    const schedule = createCredentialHelperRequestScheduler(runRequest)
+    const background = schedule({ operation: 'decrypt', value: 'synthetic-cipher', interactive: false })
+    const interactive = schedule({ operation: 'decrypt', value: 'synthetic-cipher', interactive: true })
+    const duplicateInteractive = schedule({ operation: 'decrypt', value: 'synthetic-cipher', interactive: true })
+    expect(interactive).not.toBe(background)
+    expect(duplicateInteractive).toBe(interactive)
+    await vi.waitFor(() => expect(runRequest).toHaveBeenCalledTimes(1))
+    expect(runRequest.mock.calls[0][0].interactive).toBe(false)
+    releases.shift()?.()
+    await background
+    await vi.waitFor(() => expect(runRequest).toHaveBeenCalledTimes(2))
+    expect(runRequest.mock.calls[1][0].interactive).toBe(true)
+    releases.shift()?.()
+    await expect(interactive).resolves.toBe('true')
+  })
+
+  it('captures legacy interaction intent at enqueue time and keeps it off the socket protocol', async () => {
+    const source = await readFile(new URL('./im-credential-helper.ts', import.meta.url), 'utf8')
+    const scheduledRead = source.slice(source.indexOf('async function requestCredentialHelper('), source.indexOf('export function createCredentialHelperRequestScheduler('))
+    expect(scheduledRead).not.toContain('consumeInteractiveCredentialHelperAccess()')
+    expect(source.match(/const interactive = options\?\.interactive \?\? consumeInteractiveCredentialHelperAccess\(\)/g)).toHaveLength(2)
+    expect(source).toContain('socket.write(`${encodeMessage({ operation: request.operation, value: request.value })}')
   })
 
   it('kills the complete detached helper process group on timeout', () => {
