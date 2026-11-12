@@ -648,6 +648,9 @@ describe('PluginMarketplaceView unified catalog', () => {
     const row = [...container.querySelectorAll('[role="button"]')].find(item => item.textContent?.includes('AutoCAD DWG 重绘'))
     if (!(row instanceof HTMLElement)) throw new Error('AutoCAD skill catalog row missing')
     await act(async () => row.click())
+    const drawer = container.querySelector('aside')
+    expect(drawer?.parentElement?.classList.contains('ds-connector-overlay')).toBe(true)
+    expect(drawer?.querySelector('header h2')?.textContent).toBe('AutoCAD DWG 重绘')
     expect(container.textContent).toContain('上游未声明分发许可证')
     expect(container.textContent).toContain('未保存文档')
     expect(container.textContent).toContain('pywin32')
@@ -657,6 +660,8 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(window.workwise.prepareCatalogPlugin).not.toHaveBeenCalled()
     expect(installPrepared).not.toHaveBeenCalled()
     expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+    await act(async () => iconButton('Close').click())
+    expect(container.querySelector('aside')).toBeNull()
   })
 
   it.each(['autocad-dwg-redraw', 'autocad-image-redraw'])('installs %s through the existing upstream preview and permission lifecycle', async id => {

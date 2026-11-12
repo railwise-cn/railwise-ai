@@ -1816,7 +1816,7 @@ function PluginRow({ entry, installed, server, reviewSha256, diagnostic, busy, t
 
 function Drawer({ title, closeLabel, onClose, children }: { title: string; closeLabel: string; onClose: () => void; children: ReactNode }): ReactElement {
   return (
-    <div className="fixed inset-0 z-40 bg-black/20" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div className="ds-connector-overlay fixed inset-0 z-40 bg-black/20" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <aside className="absolute inset-y-0 right-0 flex w-full max-w-[480px] flex-col border-l border-ds-border bg-ds-card shadow-2xl">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-ds-border px-5">
           <h2 className="truncate text-[15px] font-semibold">{title}</h2>
