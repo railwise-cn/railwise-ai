@@ -17,6 +17,20 @@
 | 真实模型三模板 | `04c85d07` 使用本机已配置官方 DeepSeek，真实返回 `deepseek-flash`，通过生产协调器、工具和 Electron 导出生成三组固定合成报告 | 3 项任务完成，40 次 HTTP 请求，累计 601149 token，实际计费未返回。DOCX SVG 与 PDF 续页边距修复后，真实 Electron 重新导出、六页 PDF 和 DOCX 内嵌图检查通过 |
 | 精确包及升级 | Windows 同一安装 EXE 的中文界面、离线帮助与更新状态验收，同轮 macOS 正式 0.5.4 到目标精确包的真实 updater smoke | `ccb3ad8b` 精确包、Windows 10 项实际 UI、macOS 签名公证及真实升级均通过。后续实际业务发现的修正继续进入新源码精确包验收 |
 
+### ce5b00cc 当前精确包及外部待验条件
+
+产品源码 `ce5b00cc41c3a53144144c85ecc772efe5872718` 的干净生产构建与 Web/Node 类型检查通过，Desktop 4463 项通过、8 项跳过，发行合同 503 项通过、1 项跳过。KUN 源码树保持一致，复用 3845 项通过、22 项跳过结果。双 Quality 与私有发行运行首轮全部成功。[精确包与原生升级](https://github.com/railwise-cn/railwise-ai/actions/runs/43142664059)
+
+Mac arm64 DMG SHA-256 为 `27ddbc81b909208125e222cba4fddc1b9a7e01ab53a64af595fbe0ac97329d21`，ASAR 为 `1cf3cb06df161768333aaf0d8b0bd59ce9989b8ae61a7f21947c9441fcebe115`。版本 0.5.6、正式 bundle 身份、源码、Team、严格签名、公证票据与原生 SQLite/三个 Canvas 调用均通过。本机下载核对所选 DMG 的 ZIP CRC、SHA-512 和 SHA-256；完整远端 ZIP 未全量下载。本机已有 Gatekeeper 策略覆盖单独记录，CI 四个 Mac 制品均通过正常策略检查。
+
+Windows 同源精确安装包的 13 项中文实际界面、安装、正常退出、卸载和资料保留通过，CAD 标题及关闭按钮正常。安装器 SHA-256 为 `978aba9f85290d78fd5f5495f48c630965ba3aedefdddcc495deda9f3948a62f`，ASAR 为 `97a508588f2700e96b06ad4f5654bd9d3a9de3a244882cd5783f55b3162808eb`。安装器与 EXE 为 NotSigned。正式 0.5.4 到该精确 Mac 包的原生升级通过，两次重启保留任务、输入、问题、草稿、会话、消息、回执及配置引用，安装 ASAR 与上述目标完全一致。
+
+同一包内 Electron/KUN/SQLite 的 13 项合成恢复场景全部通过，真实网络、模型、Provider、凭据和业务写入均为零。本机复用既有资料，原 11 项任务、73 项回执及原加密凭据文件保持一致。中文技能默认页签、连接器入口、等待授权状态及长状态下的操作按钮已实际查看，界面保持响应。
+
+高德启动读取在 30 秒后返回 `needs_authorization / credential_helper_timeout`，明确检查在 120 秒后同样等待系统存储返回。新 helper 的原生采样显示 2489 个主线程样本均处于正常 AppKit 事件循环，Keychain 等待位于线程池，前一版本的主线程阻塞已消除。该结果验证异步边界和失败恢复，成功读取及进程内复用的正向实包验收继续等待用户完成系统访问确认。窗口保留在“检查连接”入口，原凭据保留。
+
+当前尚待三项外部验收条件。其一为上述本机系统凭据读取确认，其二为用户仍在准备的飞书测试邮箱及明确发送确认，其三为尚不方便提供的钉钉转交接收人及合成实例授权。公开正式版本仍为 0.5.5，0.5.6 保持候选，条件满足后按已有发布授权继续推进。
+
 ### 9cdcef9a 精确包与凭据子进程现场核验
 
 `9cdcef9a2fbec64295ae86e4c04c97156ed6329e` 的干净生产构建、Web/Node 类型检查通过，Desktop 4449 项通过、8 项跳过，发行合同 503 项通过、1 项跳过。KUN 源码树与前一通过版本一致，保留 3845 项通过、22 项跳过的对应结果。两条 Quality 通过。发行运行首次因 GitHub DNS 解析失败中断 MarkItDown x64 下载，同源码第二次执行成功，失败记录保留。[同源包与升级运行](https://github.com/railwise-cn/railwise-ai/actions/runs/43130162157)
