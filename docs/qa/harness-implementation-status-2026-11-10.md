@@ -17,6 +17,22 @@
 | 真实模型三模板 | `04c85d07` 使用本机已配置官方 DeepSeek，真实返回 `deepseek-flash`，通过生产协调器、工具和 Electron 导出生成三组固定合成报告 | 3 项任务完成，40 次 HTTP 请求，累计 601149 token，实际计费未返回。DOCX SVG 与 PDF 续页边距修复后，真实 Electron 重新导出、六页 PDF 和 DOCX 内嵌图检查通过 |
 | 精确包及升级 | Windows 同一安装 EXE 的中文界面、离线帮助与更新状态验收，同轮 macOS 正式 0.5.4 到目标精确包的真实 updater smoke | `ccb3ad8b` 精确包、Windows 10 项实际 UI、macOS 签名公证及真实升级均通过。后续实际业务发现的修正继续进入新源码精确包验收 |
 
+### 9cdcef9a 精确包与凭据子进程现场核验
+
+`9cdcef9a2fbec64295ae86e4c04c97156ed6329e` 的干净生产构建、Web/Node 类型检查通过，Desktop 4449 项通过、8 项跳过，发行合同 503 项通过、1 项跳过。KUN 源码树与前一通过版本一致，保留 3845 项通过、22 项跳过的对应结果。两条 Quality 通过。发行运行首次因 GitHub DNS 解析失败中断 MarkItDown x64 下载，同源码第二次执行成功，失败记录保留。[同源包与升级运行](https://github.com/railwise-cn/railwise-ai/actions/runs/43130162157)
+
+Mac arm64 DMG SHA-256 为 `8aee5d95c65d9035da319800919b601b12c42b2c9ba3a8bd1cb16a6be566c74a`，ASAR 为 `615c39e09f2784931737058ed6351062338d72f5bbadcbb49de70f93f5504d10`。版本 0.5.6、正式 bundle 身份、Team、严格签名、公证票据、所选 DMG 的 ZIP CRC 及更新元数据 SHA-512 均已核对。两架构 CI 原生检查与本机 arm64 SQLite ABI 148、三个 Canvas 实际调用通过。完整远端 ZIP 未在本机全量计算哈希，本机已有 Gatekeeper 策略覆盖单独记录，CI 四个 Mac 制品均通过正常策略的 Notarized Developer ID 检查。
+
+Windows 同源安装器 SHA-256 为 `8a3e53372944f23dc012cec4654917de890b25ab8f4f4577a9b21539d73c30d5`，ASAR 为 `a1959d1265ef1cc01bb8b44dfae55fed1c9c7837881daf797f08e98d89ef582b`。实际安装、13 项中文界面、正常退出、卸载与资料保留通过，CAD 标题与关闭按钮已在截图中确认可见。安装器和 EXE 继续记录为 NotSigned。
+
+正式 0.5.4 到此精确 Mac 包的原生升级通过，安装 ASAR 与上述目标一致。两次独立重启后暂停及等待任务、两项待消费输入、问题、草稿、会话、消息、候选回执、停用 MCP、插件、Skill 与惰性凭据引用均保留。包内真实 Electron/KUN/SQLite 的 13 项合成恢复回放通过，真实 Provider、外部模型、业务写入及凭据使用均为零。
+
+本机复用既有隔离资料启动，主窗口在 Runtime 连接前已可打开技能目录，Runtime 就绪后恢复原会话。11 项任务的状态、目标、验收合同、最终回复及 73 项回执结果与原基线一致，原高德凭据密文哈希保持。此次启动及三次明确连接检查均发生凭据 helper 超时，界面保持响应，失败检查时间同步到列表。
+
+受控 helper 的原生采样确认 2465 个主线程样本停在系统 Keychain 读取链。固定 Electron 43.8.6 源码与本地类型声明确认，helper 在异步解密前仍先调用同步 `safeStorage.isEncryptionAvailable()`。同时明确授权重试沿用了 30 秒后台期限。该两处问题继续修复，系统授权成功和高德连接恢复仍待修复包实测。界面控制工具禁止操作 SecurityAgent，已请求用户本人核对系统提示。此次检查业务写入与模型调用均为零。[固定 Electron 实现](https://github.com/electron/electron/blob/v43.8.6/shell/browser/api/electron_api_safe_storage.cc)
+
+`7366cc0c` 将 helper 的前置检测改为 `await safeStorage.isAsyncEncryptionAvailable()`，明确用户重试采用 120 秒期限，后台读取保留 30 秒，父子进程使用同一期限计算。签名身份、原密文和系统访问控制继续沿用。7 个文件共 123 项聚焦测试、Web/Node 类型检查及针对性 ESLint 通过。新增 helper 生产入口测试验证异步等待期间事件循环保持响应、旧密文输入保持、失败回包和 watchdog 清理，同步检测一旦被调用即使测试失败。该修复需要新精确包正向读取验收。
+
 ### 2b187c78 精确包与后续现场修复
 
 `2b187c781fefcdc325f8f7e000a82cdfce0b60e7` 在 Node 22.22.0/npm 10.9.4 干净树完成生产构建，Web/Node/KUN 类型检查通过，Desktop 4435 项通过、8 项跳过，KUN 3845 项通过、22 项跳过，发行合同 503 项通过、1 项跳过。两条 Quality 及私有发行运行均成功。[签名包与升级](https://github.com/railwise-cn/railwise-ai/actions/runs/43117036168)
