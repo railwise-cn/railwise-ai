@@ -120,6 +120,18 @@ describe('ConnectorCatalog', () => {
     props.entries = [entry]
     await render()
     expect(container.textContent).toContain('Configured · verification pending')
+    props.status = () => 'Connection check passed (11 tools) · 2026/11/12 08:17:55'
+    await render()
+    const card = button('View Research Service connection').closest('article')!
+    const action = [...card.querySelectorAll('button')].at(-1)!
+    expect(action.classList.contains('shrink-0')).toBe(true)
+    expect(action.classList.contains('whitespace-nowrap')).toBe(true)
+    expect(action.previousElementSibling?.classList.contains('min-w-0')).toBe(true)
+    expect(action.previousElementSibling?.classList.contains('break-words')).toBe(true)
+    for (const nativeAction of [...container.querySelectorAll('article button')].filter(item => item.textContent?.trim() === 'Connect')) {
+      expect(nativeAction.classList.contains('shrink-0')).toBe(true)
+      expect(nativeAction.classList.contains('whitespace-nowrap')).toBe(true)
+    }
     await click('View Research Service connection')
     expect(props.onDetails).toHaveBeenCalledWith(entry)
     props.query = '钉钉'
