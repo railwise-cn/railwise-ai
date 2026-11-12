@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "private-exact-package-chinese-ui",
+  "platform": "win32",
+  "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+  "version": "0.5.6",
+  "provenance": {
+    "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+    "packageSourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+    "driverSourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+    "runId": "43142664059",
+    "runAttempt": "1"
+  },
+  "locale": "zh",
+  "theme": "dark",
+  "productionTouched": false,
+  "checks": [
+    "installed-chinese-renderer",
+    "skills-default-and-tab-order",
+    "packaged-skills-and-engineering-entries",
+    "autocad-fixed-upstream-entries",
+    "plugins-tab",
+    "connectors-tab",
+    "amap-zotero-actionable-setup",
+    "github-actionable-setup",
+    "no-update-control-hidden",
+    "offline-help-thirteen-chapters",
+    "personal-homepage-absent",
+    "offline-help-search-and-navigation",
+    "offline-help-images"
+  ],
+  "errors": [],
+  "installedAsarSha256": "97a508588f2700e96b06ad4f5654bd9d3a9de3a244882cd5783f55b3162808eb",
+  "profile": "D:\\a\\_temp\\railwise-windows-ui-B3EpzX\\profile",
+  "cleanExit": true,
+  "packageUnchanged": true,
+  "viewport": {
+    "width": 1024,
+    "height": 728,
+    "scale": 1
+  },
+  "tabs": [
+    "技能",
+    "插件",
+    "连接器"
+  ],
+  "resources": {
+    "defaultSkills": [
+      {
+        "id": "ppt-master",
+        "name": "PPT Master",
+        "root": "D:\\a\\_temp\\railwise-install-a5bb7288d9ab4ce7b2664c0c930c593c\\RailWise AI\\resources\\app.asar.unpacked\\src\\asset\\skills\\ppt-master",
+        "entryPath": "D:\\a\\_temp\\railwise-install-a5bb7288d9ab4ce7b2664c0c930c593c\\RailWise AI\\resources\\app.asar.unpacked\\src\\asset\\skills\\ppt-master\\SKILL.md",
+        "source": {
+          "type": "github",
+          "owner": "hugohe3",
+          "repo": "ppt-master",
+          "path": "skills/ppt-master",
+          "ref": "v6.8.0",
+          "installedSha": "5e8856be0da8e6bc85c4aa28acc614478f7b7137",
+          "overlaySkillId": "ppt-master",
+          "autoUpdate": false
+        },
+        "entryRelativePath": "resources/app.asar.unpacked/src/asset/skills/ppt-master/SKILL.md",
+        "entrySha256": "f724dd83bb1b2bd22ecc63fb946e52aa9454bf79cc5fe11ce923231165595c4f",
+        "entryRegisteredInAsar": true
+      },
+      {
+        "id": "tender-master",
+        "name": "Tender Master",
+        "root": "D:\\a\\_temp\\railwise-install-a5bb7288d9ab4ce7b2664c0c930c593c\\RailWise AI\\resources\\app.asar.unpacked\\src\\asset\\skills\\tender-master",
+        "entryPath": "D:\\a\\_temp\\railwise-install-a5bb7288d9ab4ce7b2664c0c930c593c\\RailWise AI\\resources\\app.asar.unpacked\\src\\asset\\skills\\tender-master\\SKILL.md",
+        "source": {
+          "type": "bundled",
+          "id": "tender-master",
+          "autoUpdate": false
+        },
+        "entryRelativePath": "resources/app.asar.unpacked/src/asset/skills/tender-master/SKILL.md",
+        "entrySha256": "79fefb450e34806d74afac061b3fdea5093abdd85b6a21eb7f6be44ad31d7820",
+        "entryRegisteredInAsar": true
+      },
+      {
+        "id": "di-bao-monitoring",
+        "name": "Di Bao Monitoring",
+        "root": "D:\\a\\_temp\\railwise-install-a5bb7288d9ab4ce7b2664c0c930c593c\\RailWise AI\\resources\\app.asar.unpacked\\src\\asset\\skills\\di-bao-monitoring",
+        "entryPath": "D:\\a\\_temp\\railwise-install-a5bb7288d9ab4ce7b2664c0c930c593c\\RailWise AI\\resources\\app.asar.unpacked\\src\\asset\\skills\\di-bao-monitoring\\SKILL.md",
+        "source": {
+          "type": "bundled",
+          "id": "di-bao-monitoring",
+          "autoUpdate": false
+        },
+        "entryRelativePath": "resources/app.asar.unpacked/src/asset/skills/di-bao-monitoring/SKILL.md",
+        "entrySha256": "34cba283848a912a5dcd18f9b542404bf86d7c8c6593f66abb7318611d131621",
+        "entryRegisteredInAsar": true
+      }
+    ],
+    "engineeringSkills": [
+      {
+        "name": "资料盘点与来源索引",
+        "installEnabled": true
+      },
+      {
+        "name": "监测质检与图表",
+        "installEnabled": true
+      },
+      {
+        "name": "工程文档差异审阅",
+        "installEnabled": true
+      },
+      {
+        "name": "会议纪要与待办",
+        "installEnabled": true
+      }
+    ],
+    "connectors": [
+      {
+        "id": "amap-maps",
+        "name": "高德地图",
+        "catalogSourceType": "built-in",
+        "sourceUrl": "https://developer.amap.com/api/mcp-server/gettingstarted",
+        "detailsReady": true
+      },
+      {
+        "id": "zotero-mcp",
+        "name": "Zotero 本机文献",
+        "catalogSourceType": "built-in",
+        "commit": "0.17.0",
+        "sourceUrl": "https://pypi.org/project/zotero-mcp-server/0.17.0/",
+        "archiveSha256": "80f1c67060176eeeb1473a790a3e973c828f9df2fb6cb9199e05e6d1d292c41f",
+        "detailsReady": true
+      }
+    ],
+    "cad": [
+      {
+        "id": "autocad-dwg-redraw",
+        "name": "AutoCAD DWG 重绘",
+        "catalogSourceType": "built-in",
+        "commit": "ed182ec5966caaaf1d82d6ad4015435a27a8a909",
+        "sourceUrl": "https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/ed182ec5966caaaf1d82d6ad4015435a27a8a909/skills/autocad-dwg-redraw",
+        "archiveSha256": "1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e",
+        "installEnabled": true,
+        "dependenciesVisible": true,
+        "licenseNoticeVisible": true,
+        "versionVisible": true,
+        "publisherVisible": true
+      },
+      {
+        "id": "autocad-image-redraw",
+        "name": "图片转 CAD 重绘",
+        "catalogSourceType": "built-in",
+        "commit": "ed182ec5966caaaf1d82d6ad4015435a27a8a909",
+        "sourceUrl": "https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/ed182ec5966caaaf1d82d6ad4015435a27a8a909/skills/autocad-image-redraw",
+        "archiveSha256": "1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e",
+        "installEnabled": true,
+        "dependenciesVisible": true,
+        "licenseNoticeVisible": true,
+        "versionVisible": true,
+        "publisherVisible": true
+      }
+    ],
+    "connectionsUnchanged": true
+  },
+  "update": {
+    "ok": true,
+    "hasUpdate": false,
+    "currentVersion": "0.5.6",
+    "latestVersion": "0.5.5"
+  },
+  "helpOffline": true,
+  "chapters": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+  ]
+}

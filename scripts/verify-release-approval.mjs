@@ -63,6 +63,8 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'kun/src/services/task-controller.test.ts',
   'docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md',
   'docs/runtime-architecture.md',
+  // Read only by the publication workflow, outside the application file sets.
+  'release/release-v0.5.6.md',
   'website/products/workwise/index.php',
   'scripts/workwise-product-public-verification.test.mjs',
   'openspec/changes/durable-task-document-workbench/tasks.md',

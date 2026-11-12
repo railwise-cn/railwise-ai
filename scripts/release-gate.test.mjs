@@ -818,6 +818,14 @@ test('exact build still rejects every later application or packaging edit', asyn
   })
 })
 
+test('curated 0.5.6 publication notes can follow an accepted package', t => {
+  const f = currentPolicyFixture(t, { exact: true })
+  f.put('release/release-v0.5.6.md', '# RailWise AI 0.5.6\n\nVerified release capabilities.\n')
+  f.commit('add publication notes outside the application file sets')
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
 test('current rename release accepts original same-run native smoke without inventing a frozen receipt', t => {
   const f = currentPolicyFixture(t, { exact: true })
   f.manifest.release.updaterPathChanged = true
