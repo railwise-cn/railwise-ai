@@ -1,0 +1,100 @@
+{
+  "product": "RailWise AI",
+  "version": "0.5.6",
+  "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+  "capturedDate": "2026-11-12",
+  "timezone": "Asia/Shanghai",
+  "locale": "zh-CN",
+  "theme": "light",
+  "captureMethod": "Native packaged application screenshots",
+  "imageProcessing": "Original screenshot bytes; JPEG extension matches the captured format",
+  "computerUseCursorVisible": false,
+  "macOSSharingBadgeVisible": true,
+  "survey": {
+    "format": "COSA IN2",
+    "networkType": "平面控制网",
+    "dataOrigin": "User-provided real rail control-network data, byte-identical local copy",
+    "points": 33,
+    "stations": 11,
+    "observations": 160,
+    "inputSha256": "3a01828c195bc6a7cee89d4293f21c1957b51ad150d16066980d1066a2b40500",
+    "datumDeclaration": "Original-file engineering plane coordinates; demonstration datum requires project review; height excluded from this 2D calculation",
+    "professionalApproval": "pending",
+    "outputs": [
+      "DOCX",
+      "PDF",
+      "XLSX"
+    ]
+  },
+  "notes": [
+    "The network diagram retains the application’s dense point labels.",
+    "The help screenshot shows offline reading with no model API key configured.",
+    "The writing example is an AI-assisted review-outline draft.",
+    "Connector and installation states are captured as displayed."
+  ],
+  "screenshots": [
+    {
+      "file": "01-survey-network.jpg",
+      "width": 2560,
+      "height": 1680,
+      "size": 317121,
+      "sha256": "c1e34f092398e8a0636397f324004366d974d2fcb983999af8cabc4de4d9d732"
+    },
+    {
+      "file": "02-survey-results.jpg",
+      "width": 2560,
+      "height": 1680,
+      "size": 405961,
+      "sha256": "7c0d0b1ba3be6963c33c9ab7b184362d92b1fe6c13c8e31f73110e3fe5b543e4"
+    },
+    {
+      "file": "03-survey-delivery.jpg",
+      "width": 2560,
+      "height": 1680,
+      "size": 227450,
+      "sha256": "5977ca053b234d58dc21c51ac0daa7e75a96dec660e41427c1eff3ec03e6962a"
+    },
+    {
+      "file": "04-task-evidence.jpg",
+      "width": 2560,
+      "height": 1680,
+      "size": 314876,
+      "sha256": "dbda5241e228aaddc2ef8dc3c1f03d07c71d26b0004d2d1f142c7df5449e0f69"
+    },
+    {
+      "file": "05-skills.jpg",
+      "width": 2560,
+      "height": 1680,
+      "size": 391130,
+      "sha256": "64022262122cddc8c8a063cdb78a4acd2f55db6132c196ca2f8e9ac36f50cad0"
+    },
+    {
+      "file": "06-connectors.jpg",
+      "width": 2560,
+      "height": 1680,
+      "size": 428261,
+      "sha256": "c42ea8667cb81e6b428d04dd2235c5cbdd1c793b3a96d999249f7994286221a4"
+    },
+    {
+      "file": "07-help.jpg",
+      "width": 2560,
+      "height": 1680,
+      "size": 363409,
+      "sha256": "2c66b0f2345acd7dd83af5ad8897f930edb36a17107e533e73a43d1bab2e7070"
+    },
+    {
+      "file": "08-write.jpg",
+      "width": 2560,
+      "height": 1680,
+      "size": 413915,
+      "sha256": "80e07b80a2b7f5bde021dd77ea944fd4c6fc8c3ed128ca654079d7b378989f03"
+    },
+    {
+      "file": "09-cad-skills.jpg",
+      "width": 2560,
+      "height": 1680,
+      "size": 457890,
+      "sha256": "091628be8febce110af0da60a0bdd5c946f0ae83bd87556b4b94a54b033ec1b4"
+    }
+  ]
+}

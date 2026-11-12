@@ -18,11 +18,58 @@
 
 ---
 
-RailWise AI 0.5.1 的界面以“编程 / 内业”为主入口。RailWise Survey 面向工程测量内业，将任务、原始资料、计算记录和候选成果组织在同一工作区；Write、Design、Flow、插件和定时任务继续提供辅助工具。
+RailWise AI 0.5.6 以“编程 / 内业”为主入口，支持持续任务、工程文档和外部平台协作。RailWise Survey 将原始测量资料、计算记录和候选成果组织在同一工作区，Write、Design、Flow、技能与连接器提供配套工具。
 
-**版本边界：**0.5.1 发布 RailWise AI 品牌与四阶段 Survey 工作区；高级试算和声明式质量记录保持各自适用范围，不能代替专业验收。仓库已迁移至 `railwise-cn/railwise-ai`；安装包名、存储和更新标识保留兼容，见[迁移矩阵](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md)。
+本版安装包统一使用 `RailWise-AI` 名称，沿用既有安装身份、`.workwise` 数据与配置读取。工程成果保留来源、计算和审阅记录，专业审定仍由工程人员完成。[发行身份与迁移说明](./docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md)
 
-**[下载最新稳定版本](https://github.com/railwise-cn/railwise-ai/releases/latest)**，或在已有应用内检查更新。[0.5.1 发布记录](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1)保留四阶段 Survey 工作区、精确成果追问和声明式审查记录等历史说明。
+**[下载最新稳定版本](https://github.com/railwise-cn/railwise-ai/releases/latest)**，或在已有应用内检查更新。本轮更新与验证范围见 [0.5.6 发布说明](./release/release-v0.5.6.md)。
+
+## 0.5.6 更新
+
+- **任务中心**汇总目标、进度、待办和成果。补充要求进入原任务，暂停期间保留输入。任务详情提供执行范围、操作回执和核验结果。
+- **技能、插件、连接器**按顺序排列，默认打开技能，可按来源与安装状态查找工程工具。飞书和钉钉分别连接与授权，外部写入经过目标确认并保存回执。
+- **工程办公资源**新增资料盘点、监测质检与图表、文档差异审阅、会议纪要与待办四项技能，提供高德地图、Zotero 和 AutoCAD 重绘技能的配置与安装入口。
+- **左下角升级入口**在有更新时出现，一次点击完成下载、安全保存、安装和重启。帮助中心内置完整 13 章中文手册，支持搜索与章节跳转。
+
+## 0.5.6 中文界面
+
+以下画面来自 RailWise AI 0.5.6 中文浅色界面实拍，分辨率为 2560 × 1680。Survey 使用真实 COSA 平面网资料的本地副本，包含 33 个点、11 个测站和 160 条观测，基准与成果处于待工程复核状态。写作文档使用演示样本。图片保留原始截图内容，左上角可见 macOS 共享标识。[截图来源与文件清单](./docs/images/v0.5.6/capture.json)
+
+结果页的**网形与已知点**展示控制网示意、已知点坐标与待复核基准。
+
+![RailWise Survey 0.5.6 网形与已知点](./docs/images/v0.5.6/01-survey-network.jpg)
+
+**平差残差与观测改正数**关联原始观测行，显示计算值、单位和异常筛查状态。
+
+![RailWise Survey 0.5.6 平差残差与观测改正数](./docs/images/v0.5.6/02-survey-results.jpg)
+
+**成果与审查**界面列出 DOCX、PDF、XLSX 审查稿及预览、导出入口，专业审查状态单独显示。
+
+![RailWise Survey 0.5.6 成果与审查](./docs/images/v0.5.6/03-survey-delivery.jpg)
+
+**任务详情**展示钉钉待办只读查询的任务权限、完成证据和操作回执。
+
+![RailWise AI 0.5.6 钉钉只读任务与执行证据](./docs/images/v0.5.6/04-task-evidence.jpg)
+
+浏览四项**工程技能**以及其他已索引技能，查看各项功能和安装状态。
+
+![RailWise AI 0.5.6 技能工作台](./docs/images/v0.5.6/05-skills.jpg)
+
+在**连接器**中分别配置外部平台，核对连接与授权状态。
+
+![RailWise AI 0.5.6 连接器工作台](./docs/images/v0.5.6/06-connectors.jpg)
+
+在**离线帮助**中通过章节目录和搜索查找完整中文使用说明。
+
+![RailWise AI 0.5.6 帮助中心](./docs/images/v0.5.6/07-help.jpg)
+
+在**写作工作台**中编辑演示复核草稿，以资料表和流程图组织待确认事项。
+
+![RailWise AI 0.5.6 写作工作台](./docs/images/v0.5.6/08-write.jpg)
+
+安装前可查看**CAD 重绘技能**的上游来源、固定版本、许可证状态和环境要求。右侧展示“图片转 CAD 重绘”的详情。
+
+![RailWise AI 0.5.6 CAD 重绘技能与安装条件](./docs/images/v0.5.6/09-cad-skills.jpg)
 
 ## DeepSeek V4.1 支持
 
@@ -58,7 +105,12 @@ COSA IN1/IN2、Leica GSI 水准数据需通过相应单位、基准和拓扑校�
 
 已完成与剩余范围按[执行台账](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_CONVERGENCE_STATUS.md)和[高级试算合同](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_ADVANCED_TRIALS_BACKEND.md)逐项记录，发布不代表完整跨功能矩阵、生产认证或专业签认已经完成。
 
-## 0.5.1 界面
+<details>
+<summary>0.5.1 历史界面与发布记录</summary>
+
+[0.5.1 发布记录](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1)保留四阶段 Survey 工作区、精确成果追问和声明式审查记录等历史说明。
+
+**版本边界：**0.5.1 发布 RailWise AI 品牌与四阶段 Survey 工作区；高级试算和声明式质量记录保持各自适用范围，不能代替专业验收。仓库已迁移至 `railwise-cn/railwise-ai`；安装包名、存储和更新标识保留兼容，见[迁移矩阵](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md)。
 
 以下为最终 0.5.1 候选包的中文浅色实拍，界面文件与正式版逐字节一致，使用公开合成平面控制网（4 点、1 测站、5 观测），依次展示平差结果、成果中心与通用设置。[截图清单](./website/products/screenshots/workwise/release-051-screenshots.json)记录包来源与文件哈希。
 
@@ -69,6 +121,8 @@ COSA IN1/IN2、Leica GSI 水准数据需通过相应单位、基准和拓扑校�
 ![RailWise AI 0.5.1 设置与外观](./website/products/screenshots/workwise/09-survey-051-settings.jpg)
 
 最终候选完成完整两小时稳定检查、三端构建与验证；本机完成签名公证、真实模型精确追问、重启数据保全和三格式导出。同源码隔离更新器完成真实下载、安装、重启与数据保留，不将其当作历史版本迁移认证。范围及正式发布工件见[0.5.1 发布验收](./docs/qa/RAILWISE_0.5.1_RELEASE_ACCEPTANCE.md)。
+
+</details>
 
 ## 其他工具（历史演示）
 
@@ -125,15 +179,17 @@ Flow 使用类型化端口连接触发器、Agent、知识检索、HTTP、条件
 
 Flow 默认可见并标注 Preview。未配置模型、外部账号或配套 CLI 的节点会说明缺失能力，依赖未满足的流程不能发布。代码节点采用受限子进程，Webhook 使用签名、重放窗口和限流保护。
 
-### Skills、MCP 与命令行工具
+### 技能、插件与连接器
 
-插件市场把能力分为三类，界面保持简单：
+从左侧“技能与连接器”进入，页签依次为“技能、插件、连接器”，默认展示技能。
 
-1. **Skills**：可复用的工作方法和专业流程。
-2. **MCP**：连接外部工具与数据源的标准接口。
-3. **命令行工具**：由 WorkWise 隔离管理，或引导安装配套应用。
+1. **技能**提供可复用的方法、模板和专业流程，可搜索并按来源浏览。
+2. **插件**提供工具扩展，详情显示来源、版本、安装条件和当前状态。
+3. **连接器**提供外部账号及数据源接入，详情展示安装、配置、登录和授权入口。
 
-从左侧“插件”进入市场，在“精选”中选择能力，打开详情查看功能、使用方法和安装条件；安装后在对应工作台说明任务即可使用。切换“技能”可查看本地推荐、搜索已索引 Skill 并按来源浏览。项目详情保留来源和安装方式；路径、体积或包结构有问题时会显示具体处理提示。
+工程技能包括资料盘点、监测质检与图表、文档差异审阅、会议纪要与待办。AutoCAD DWG 重绘和图片转 CAD 技能提供固定上游版本，DWG 流程需要 Windows 与 AutoCAD，macOS/Linux 可使用粗略 DXF 流程。
+
+飞书与钉钉各自提供待办和审批工具，飞书还提供消息发送与云盘上传。GitHub MCP 使用受保护令牌连接，高德地图需要配置 API Key，Zotero 使用本机文献只读接入。可执行范围由实际安装、账号授权和任务权限共同确定。外部写入需确认目标，任务保留回执与结果核验。
 
 内置 PPT Master 使用 6.8.0 固定提交快照，可根据 Markdown、报告、网页或已有 PPTX 制作和修改可编辑演示文稿。在写作或设计助手中说明资料、目标受众和页数即可开始。快照保留核心脚本、参考资料、工作流和轻量模板；大体积图标库、AI 对比图片、用户项目、生成导出和备份不随客户端分发。
 
@@ -157,20 +213,21 @@ Flow 默认可见并标注 Preview。未配置模型、外部账号或配套 CLI
 
 | 平台 | 架构 | 安装包 |
 | --- | --- | --- |
-| macOS | Apple Silicon | `WorkWise-*-mac-Apple-Silicon.dmg` |
-| macOS | Intel | `WorkWise-*-mac-Intel.dmg` |
-| Windows | x64 | `WorkWise-*-win-x64.exe` |
+| macOS | Apple Silicon | `RailWise-AI-0.5.6-mac-Apple-Silicon.dmg` |
+| macOS | Intel | `RailWise-AI-0.5.6-mac-Intel.dmg` |
+| Windows | x64 | `RailWise-AI-0.5.6-win-x64.exe` |
 
-当前不提供 Linux 桌面客户端和便携版。请始终从 [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases) 或 [WorkWise 产品主页](https://www.railwise.cn/products/workwise/)进入下载。
+当前不提供 Linux 桌面客户端和便携版。请始终从 [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases) 或 [RailWise AI 产品主页](https://www.railwise.cn/products/workwise/)进入下载。
 
 ## 更新与帮助
 
-RailWise AI 0.5.1 继续使用 `railwise.cn` 官方 Stable 更新源：
+RailWise AI 0.5.6 使用 `railwise.cn` 官方 Stable 更新源。
 
-- 启动后检查，并每 24 小时在后台复查；发现新版本时顶部显示蓝色更新图标。
-- 第一次点击只在后台下载并显示进度，不会退出应用；下载完成后变为“重启并更新”。
-- 重启更新前会保存编辑内容并检查正在运行的 Agent、Flow 和定时任务；确认后由平台更新程序替换应用并自动重新启动，不打开浏览器，也不要求重新拖拽安装。
+- 启动后检查，并每 24 小时在后台复查。有可用更新时，普通侧栏和写作侧栏左下角显示紧凑的“升级”入口，下载进度也显示在该位置。
+- 点击一次“升级”后，应用下载并校验安装包、保存编辑内容，并等待任务达到安全执行边界，再安装和重启。保存或停止失败时显示具体原因及重试入口。
+- 任务、草稿、历史资料及配置引用跨升级保存，已暂停或等待用户的任务保留相应状态。本版已完成正式 0.5.4 到精确 0.5.6 安装包的原生升级验证。
 - 可从“帮助 → 检查更新”或“设置 → 通用 → 软件更新”手动检查、切换通道、重试或查看诊断信息。
+- 帮助中心随包提供完整 13 章中文手册，支持离线阅读、全文搜索、章节目录和内部链接。正文也可在仓库阅读。[完整使用手册](./docs/USER_GUIDE.zh-CN.md)
 
 0.3.2 及更早版本没有内置可信的正式更新源，需要最后一次手动安装 0.3.3；从 0.3.3 开始，后续正式版均可走应用内更新。
 

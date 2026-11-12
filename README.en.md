@@ -4,9 +4,9 @@
 
 > Engineering survey processing and coding collaboration.
 
-RailWise AI is a local-first desktop platform. Version 0.5.1 has Code and Survey as the primary workspaces. RailWise Survey connects original observations, deterministic adjustment, precision evidence and reviewable deliverables. Write, Design, Flow, plugins and schedules remain supporting tools.
+RailWise AI 0.5.6 is a local-first desktop platform for persistent tasks, engineering documents and external-platform work. Code and Survey are the primary workspaces. RailWise Survey connects original observations, calculation records and reviewable deliverables, with Write, Design, Flow, skills and connectors providing supporting tools.
 
-**Version boundary:** 0.5.1 releases the RailWise AI branding and four-stage Survey workspace. Advanced trials and declared quality records retain their documented limits and do not replace professional acceptance. The repository is now `railwise-cn/railwise-ai`; WorkWise package, storage and update identifiers remain compatible; see the [migration matrix](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md).
+Installers use the `RailWise-AI` name while retaining the existing installation identity and `.workwise` data and configuration readers. Engineering deliverables retain source, calculation and review records for professional assessment. [Release identity and migration notes](./docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md)
 
 - Product page: [www.railwise.cn/products/workwise](https://www.railwise.cn/products/workwise/)
 - Direct mirror downloads: [Download and installation](https://www.railwise.cn/products/workwise/#download)
@@ -14,17 +14,64 @@ RailWise AI is a local-first desktop platform. Version 0.5.1 has Code and Survey
 - Public releases: [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases)
 - Latest stable version: [Download](https://github.com/railwise-cn/railwise-ai/releases/latest), or check for updates in the installed application.
 
-## 0.5.1 release background
+## Current release
 
-**[v0.5.1](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1)** introduced the four-stage Survey workspace, exact evidence questions and declared review records, with fixes for macOS startup, persisted tool-argument summaries and variance-scale explanations. Existing clients can check for updates in the application. Public releases have three user-facing installers:
+Version **[0.5.6](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.6)** improves persistent tasks, connector authorization, document delivery and in-app upgrades. [Release notes](./release/release-v0.5.6.md)
 
 | Platform | Installer | Download |
 | --- | --- | --- |
-| macOS Apple Silicon | `WorkWise-<version>-mac-Apple-Silicon.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
-| macOS Intel | `WorkWise-<version>-mac-Intel.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
-| Windows x64 | `WorkWise-<version>-win-x64.exe` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
+| macOS Apple Silicon | `RailWise-AI-0.5.6-mac-Apple-Silicon.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
+| macOS Intel | `RailWise-AI-0.5.6-mac-Intel.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
+| Windows x64 | `RailWise-AI-0.5.6-win-x64.exe` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
 
 GitHub Releases remains the public release log and manual installer source. Signed updater metadata and platform update artifacts are published through the official `railwise.cn` Stable channel. There is currently no Linux client, portable edition, or activation-code flow.
+
+## What changed in 0.5.6
+
+- The **task center** brings together goals, progress, pending actions and results. Follow-up requirements reach the original task, inputs remain queued while paused, and task details expose execution scope, operation receipts and verification results.
+- **Skills, Plugins, Connectors** appear in that order, with Skills open by default. Browse engineering tools by source and installation state, connect Feishu and DingTalk separately, and confirm external write targets before execution.
+- Four new **engineering skills** cover source inventories, monitoring quality checks and charts, document differences, and meeting notes with action items. The market also provides setup and installation entries for Amap, Zotero and AutoCAD redraw skills.
+- An **available update** appears in the lower-left corner. One click starts download, safe saving, installation and restart. The bundled Chinese manual has 13 chapters with search and chapter navigation.
+
+## 0.5.6 Chinese interface
+
+These images show the actual RailWise AI 0.5.6 Chinese light interface at 2560 × 1680. Survey uses a local copy of real COSA planar-network material with 33 points, 11 stations and 160 observations. The datum and results await engineering review. The writing screen uses a demonstration document. Original screenshot content includes the macOS sharing indicator in the upper-left corner. [Capture provenance and file inventory](./docs/images/v0.5.6/capture.json)
+
+The results page shows **network geometry and known points**, with control-network geometry, known-point coordinates and the datum awaiting review.
+
+![RailWise Survey 0.5.6 network geometry and known points](./docs/images/v0.5.6/01-survey-network.jpg)
+
+Inspect **adjustment residuals and observation corrections** with original observation rows, calculated values, units and screening status.
+
+![RailWise Survey 0.5.6 adjustment residuals and observation corrections](./docs/images/v0.5.6/02-survey-results.jpg)
+
+**Deliverables and review** lists DOCX, PDF and XLSX review drafts with preview and export actions and a separate professional-review status.
+
+![RailWise Survey 0.5.6 deliverables and review](./docs/images/v0.5.6/03-survey-delivery.jpg)
+
+**Task details** show the permissions, completion evidence and operation receipts for a read-only DingTalk task query.
+
+![RailWise AI 0.5.6 read-only DingTalk task and execution evidence](./docs/images/v0.5.6/04-task-evidence.jpg)
+
+Browse the four **engineering skills** and other indexed skills, with their capabilities and installation state.
+
+![RailWise AI 0.5.6 skills workbench](./docs/images/v0.5.6/05-skills.jpg)
+
+Configure each external platform and inspect its connection and authorization state in **Connectors**.
+
+![RailWise AI 0.5.6 connectors workbench](./docs/images/v0.5.6/06-connectors.jpg)
+
+Find the complete Chinese user guide through the chapter list and search in **offline help**.
+
+![RailWise AI 0.5.6 help center](./docs/images/v0.5.6/07-help.jpg)
+
+Edit a demonstration review draft in the **writing workbench**, using a source table and flowchart to organize items awaiting confirmation.
+
+![RailWise AI 0.5.6 writing workbench](./docs/images/v0.5.6/08-write.jpg)
+
+Inspect the upstream source, pinned version, license status and environment requirements of the **CAD redraw skills** before installation. The right panel shows the image-to-CAD skill details.
+
+![RailWise AI 0.5.6 CAD redraw skills and installation requirements](./docs/images/v0.5.6/09-cad-skills.jpg)
 
 ## RailWise Survey
 
@@ -45,7 +92,12 @@ Advanced trial workspaces include free leveling, generalized w, grouped VCE, fix
 
 Quality workspaces provide material retention, complete first-round sampling, limited declared-record scoring and linked assessments for up to eight sample units. Missing evidence and vetoes remain separate; these features do not authenticate evidence, resampling, professional signatures or full standards conformity. See the [implementation and acceptance ledger](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_CONVERGENCE_STATUS.md) and [advanced-trial contracts](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_ADVANCED_TRIALS_BACKEND.md). Publication does not establish complete cross-feature coverage, production certification or professional sign-off.
 
-## 0.5.1 interface
+<details>
+<summary>Historical 0.5.1 interface and release record</summary>
+
+**[v0.5.1](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1)** introduced the four-stage Survey workspace, exact evidence questions and declared review records, with fixes for macOS startup, persisted tool-argument summaries and variance-scale explanations.
+
+**Version boundary:** 0.5.1 releases the RailWise AI branding and four-stage Survey workspace. Advanced trials and declared quality records retain their documented limits and do not replace professional acceptance. The repository is now `railwise-cn/railwise-ai`; WorkWise package, storage and update identifiers remain compatible; see the [migration matrix](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md).
 
 These Chinese light-theme images were captured from the final 0.5.1 candidate, whose renderer is byte-for-byte identical to the formal release using a public synthetic network with four points, one station and five observations. The [screenshot manifest](./website/products/screenshots/workwise/release-051-screenshots.json) records package provenance and hashes.
 
@@ -56,6 +108,8 @@ These Chinese light-theme images were captured from the final 0.5.1 candidate, w
 ![RailWise AI 0.5.1 general settings](./website/products/screenshots/workwise/09-survey-051-settings.jpg)
 
 The final candidate passed the full two-hour stability gate and all three client builds. Local acceptance covered signing, notarization, real-model evidence questions, restart/data preservation and DOCX/PDF/XLSX export. A same-source isolated updater completed real download, installation, relaunch and data preservation; it does not certify historical-version migration. See the [0.5.1 release acceptance record](./docs/qa/RAILWISE_0.5.1_RELEASE_ACCEPTANCE.md).
+
+</details>
 
 ## DeepSeek V4.1
 
@@ -126,9 +180,13 @@ Build executable workflows by connecting typed trigger, Agent, retrieval, tool, 
 
 Flow is visible by default and labeled Preview. Nodes that require an unconfigured model, external account, or companion CLI show the missing capability, and flows with unresolved dependencies cannot be published. Restricted code execution and webhook signing, replay protection, and rate limits keep execution within explicit boundaries.
 
-### Skills and MCP
+### Skills, plugins and connectors
 
-Skills are reusable methods, writing rules, templates, and domain processes. Open **Plugins** in the sidebar and choose **Featured**; each detail page explains what the capability does, how to use it, and any setup needed. After installation, describe your task in the relevant workbench. The **Skills** tab provides local recommendations, search, and browsing by source.
+Open **Skills & Connectors** in the sidebar. The tabs are ordered **Skills, Plugins, Connectors**, with Skills selected by default. Skills provide reusable methods and workflows. Plugin details show sources, versions, installation requirements and current state. Connector details provide setup, login and authorization actions for external accounts and data sources.
+
+The engineering skills cover source inventories, monitoring quality checks and charts, document differences, and meeting notes with action items. The AutoCAD DWG redraw and image-to-CAD skills use pinned upstream versions. DWG workflows require Windows and AutoCAD. macOS/Linux can use the coarse DXF workflow.
+
+Feishu and DingTalk have separate task and approval tools. Feishu also supports confirmed message sending and cloud-drive uploads. GitHub MCP uses protected token storage, Amap requires an API key, and Zotero provides read-only access to local references. Available operations depend on installation, account authorization and task permissions. External writes require target confirmation and retain receipts and verification results.
 
 Bundled PPT Master uses a fixed 6.8.0 snapshot for creating and editing PowerPoint files from Markdown, reports, web pages, or an existing PPTX. Give the Write or Design assistant your source, audience, and slide count to begin. Core workflows, scripts, references, and lightweight templates are included; large asset libraries, user projects, generated exports, and backups are excluded.
 
@@ -172,7 +230,11 @@ Preview and directional items are not described as stable released features.
 
 ### In-app updates
 
-RailWise AI 0.5.1 checks the official `railwise.cn` Stable channel at startup and every 24 hours. The blue update icon first downloads in the background; after completion it changes to **Restart and update**. Before restarting, WorkWise saves edits and reports active Agent, Flow, and scheduled runs. The platform updater then replaces and relaunches the application without opening a browser or requiring another drag-and-drop installation.
+RailWise AI 0.5.6 checks the official `railwise.cn` Stable channel at startup and every 24 hours. When an update is available, a compact **Upgrade** control appears at the lower left of the standard and writing sidebars and displays download progress.
+
+One click starts download and verification, saves edited content, and waits for a safe execution boundary before installing and restarting. Save or shutdown failures show a reason and a retry action. Tasks, drafts, history and configuration references are preserved across upgrades, including paused and waiting tasks. The release completed a native upgrade test from formal 0.5.4 to the exact 0.5.6 package.
+
+Manual checking, channel selection and diagnostics remain available in Help or Settings. The Help center bundles the complete 13-chapter Chinese manual for offline reading, full-text search, chapter navigation and internal links. [Complete user guide](./docs/USER_GUIDE.zh-CN.md)
 
 Version 0.3.2 and earlier did not include the trusted production update channel, so those users need one final manual installation of 0.3.3. Subsequent stable releases can update in the application.
 
