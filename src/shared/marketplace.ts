@@ -17,6 +17,8 @@ export type CatalogCredentialStatusV1 = {
   sourceId: string
   configured: boolean
   storage?: 'keychain' | 'dpapi' | 'safe-storage' | 'session'
+  errorCode?: string
+  message?: string
 }
 
 export type CatalogSourceSyncV1 = {

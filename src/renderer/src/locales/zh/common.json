@@ -1900,6 +1900,7 @@
   "pluginUnifiedPrivateSource": "私有目录",
   "pluginUnifiedCatalogToken": "访问令牌",
   "pluginUnifiedConfigureCredential": "配置凭据",
+  "pluginUnifiedCredentialUnchecked": "凭据状态待检查",
   "pluginUnifiedCredentialConfigured": "凭据已配置",
   "pluginUnifiedCredentialMissing": "需要配置凭据",
   "pluginUnifiedCredentialSaved": "已安全保存 {{name}} 的凭据。",

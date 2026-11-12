@@ -134,10 +134,30 @@ export class CatalogCredentialService {
     const id = credentialId(normalizedSecretKey(secretKey))
     if (this.session.has(id)) return { sourceId, configured: true, storage: 'session' }
     if (!await this.encryption.available()) return { sourceId, configured: false }
-    const token = await this.resolve(secretKey)
-    return token
-      ? { sourceId, configured: true, storage: this.encryption.storage }
-      : { sourceId, configured: false }
+    try {
+      const token = await this.resolve(secretKey)
+      return token
+        ? { sourceId, configured: true, storage: this.encryption.storage }
+        : { sourceId, configured: false }
+    } catch (error) {
+      return {
+        sourceId, configured: false, storage: this.encryption.storage,
+        errorCode: String((error as { code?: unknown }).code ?? 'credential_unavailable'),
+        message: '已保存的市场凭据暂时无法读取。请处理系统凭据访问提示后刷新此来源；原凭据仍保留。'
+      }
+    }
+  }
+
+  async prepareRetry(secretKey: string): Promise<void> {
+    const id = credentialId(normalizedSecretKey(secretKey))
+    if (this.session.has(id)) return
+    try {
+      const value = JSON.parse(await readRecoveredFile(join(this.root, `${id}.json`))) as { encrypted?: unknown }
+      if (typeof value.encrypted === 'string' && value.encrypted) this.prepareProtectedStorageRetry()
+    } catch {
+      // The normal source sync reports missing or malformed records. It must
+      // not request system access when there is no stored token to retry.
+    }
   }
 
   async remove(secretKey: string): Promise<void> {

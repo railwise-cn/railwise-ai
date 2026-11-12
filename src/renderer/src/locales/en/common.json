@@ -1900,6 +1900,7 @@
   "pluginUnifiedPrivateSource": "Private catalog",
   "pluginUnifiedCatalogToken": "Access token",
   "pluginUnifiedConfigureCredential": "Configure credential",
+  "pluginUnifiedCredentialUnchecked": "Credential status not checked",
   "pluginUnifiedCredentialConfigured": "Credential configured",
   "pluginUnifiedCredentialMissing": "Credential required",
   "pluginUnifiedCredentialSaved": "{{name}} credential saved securely.",

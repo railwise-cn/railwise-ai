@@ -1224,7 +1224,8 @@ describe('registerAppIpcHandlers', () => {
       status: vi.fn(async (sourceId: string) => ({ sourceId, configured: true, storage: 'keychain' })),
       set: vi.fn(async () => 'keychain'),
       remove: vi.fn(async () => undefined),
-      resolve: vi.fn(async () => undefined)
+      resolve: vi.fn(async () => undefined),
+      prepareRetry: vi.fn(async () => undefined)
     }
     registerAppIpcHandlers(registerOptions({
       marketplaceCatalogService: catalogService as never,
@@ -1313,6 +1314,10 @@ describe('registerAppIpcHandlers', () => {
       configured: true,
       storage: 'keychain'
     }])
+    expect(catalogCredentialService.prepareRetry).not.toHaveBeenCalled()
+    await expect(handlers.get('catalog:sync-source')?.({}, { sourceId: 'private' })).resolves.toMatchObject({ sourceId: 'private', status: 'synced' })
+    expect(catalogCredentialService.prepareRetry).toHaveBeenCalledExactlyOnceWith('catalog.private.token')
+    expect(catalogService.syncSource).toHaveBeenCalledWith('private')
     await expect(handlers.get('catalog:clear-credential')?.({}, { sourceId: 'private' }))
       .resolves.toEqual({ sourceId: 'private', configured: false })
     expect(catalogCredentialService.remove).toHaveBeenCalledWith('catalog.private.token')

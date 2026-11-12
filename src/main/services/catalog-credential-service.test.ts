@@ -160,3 +160,27 @@ describe('catalog protected-storage startup isolation', () => {
     await expect(service.resolve('catalog.synthetic.token')).resolves.toBe('synthetic-original-token')
   })
 })
+
+
+it('keeps a failed status local and retries the saved token only after an explicit source retry', async () => {
+  const platform = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+  const helper = await import('./im-credential-helper')
+  try {
+    const service = new CatalogCredentialService({ root })
+    await service.set('catalog.retry.token', 'synthetic-saved-token')
+    const file = join(root, (await readdir(root))[0]!)
+    const ciphertext = await readFile(file)
+    vi.mocked(helper.requestInteractiveCredentialHelperAccess).mockClear()
+    vi.mocked(helper.decryptStringWithCredentialHelper).mockRejectedValueOnce(Object.assign(new Error('synthetic denied'), { code: 'credential_helper_access_denied' }))
+    await expect(service.status('private', 'catalog.retry.token')).resolves.toMatchObject({ sourceId: 'private', configured: false, storage: 'keychain', errorCode: 'credential_helper_access_denied', message: expect.stringContaining('刷新此来源') })
+    expect(helper.requestInteractiveCredentialHelperAccess).not.toHaveBeenCalled()
+    await service.prepareRetry('catalog.retry.token')
+    expect(helper.requestInteractiveCredentialHelperAccess).toHaveBeenCalledTimes(1)
+    await expect(service.resolve('catalog.retry.token')).resolves.toBe('synthetic-saved-token')
+    await expect(service.status('private', 'catalog.retry.token')).resolves.toMatchObject({ sourceId: 'private', configured: true })
+    expect(helper.requestInteractiveCredentialHelperAccess).toHaveBeenCalledTimes(1)
+    expect(await readFile(file)).toEqual(ciphertext)
+    await service.prepareRetry('catalog.missing.token')
+    expect(helper.requestInteractiveCredentialHelperAccess).toHaveBeenCalledTimes(1)
+  } finally { platform.mockRestore() }
+})

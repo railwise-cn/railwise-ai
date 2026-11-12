@@ -1058,6 +1058,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   ipcMain.handle('catalog:sync-source', async (_, payload: unknown) => {
     const request = parseIpcPayload('catalog:sync-source', catalogSourceIdPayloadSchema, payload)
+    const source = (await marketplaceCatalogService.listSources()).find(item => item.id === request.sourceId)
+    if (source?.auth.type === 'token') await catalogCredentialService.prepareRetry(source.auth.secretKey)
     return marketplaceCatalogService.syncSource(request.sourceId)
   })
   ipcMain.handle('plugin:list-installed', async () => pluginManagementService.listInstalled())

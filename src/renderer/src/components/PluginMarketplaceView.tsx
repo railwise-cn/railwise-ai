@@ -5,7 +5,7 @@ import { currentMcpConnectionCheck } from '@shared/mcp-connection-check'
 import { ENGINEERING_FEATURED_PACKAGE_IDS, OPTIONAL_ENGINEERING_SKILLS, isCatalogInstallable } from '@shared/engineering-marketplace'
 import { ProductIcon } from './ProductIcon'
 import type { ReactElement, ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Check,
@@ -343,6 +343,14 @@ function sourceAudience(source: CatalogSourceV1 | undefined, sourceId?: string):
   return 'team'
 }
 
+function catalogCredentialStatusLabel(status: CatalogCredentialStatusV1 | undefined, text: Text): string {
+  if (!status) return text('pluginUnifiedCredentialUnchecked', 'Credential status not checked')
+  if (status.message) return status.message
+  return status.configured
+    ? text('pluginUnifiedCredentialConfigured', 'Credential configured')
+    : text('pluginUnifiedCredentialMissing', 'Credential required')
+}
+
 function catalogSourceStateLabel(source: CatalogSourceV1, text: Text): string {
   if (source.id === 'workwise-official') {
     return text('pluginUnifiedSourceBundled', 'Built in and available offline')
@@ -417,6 +425,7 @@ export function PluginMarketplaceView(): ReactElement {
   const connectorTarget = useChatStore(state => state.pluginConnectorTarget)
   const [sources, setSources] = useState<CatalogSourceV1[]>([])
   const [catalogCredentials, setCatalogCredentials] = useState<CatalogCredentialStatusV1[]>([])
+  const credentialRefreshRevision = useRef(0)
   const [entries, setEntries] = useState<MarketplaceCatalogPackageEntryV1[]>([])
   const [installedPackages, setInstalledPackages] = useState<InstalledPackageV1[]>([])
   const [updateDiagnostics, setUpdateDiagnostics] = useState<PluginUpdateDiagnosticV1[]>([])
@@ -465,16 +474,26 @@ export function PluginMarketplaceView(): ReactElement {
 
   const refresh = useCallback(async (showSpinner = false): Promise<void> => {
     if (showSpinner) setLoading(true)
+    const credentialRevision = ++credentialRefreshRevision.current
+    // Protected storage can await a system prompt. Local catalogs remain
+    // usable while per-source credential statuses arrive independently.
+    void window.workwise.listCatalogCredentialStatuses().then(statuses => {
+      if (credentialRevision === credentialRefreshRevision.current) setCatalogCredentials(statuses)
+    }).catch(() => {
+      if (credentialRevision === credentialRefreshRevision.current) setNotice({
+        tone: 'info',
+        message: text('pluginUnifiedPartialOffline', 'Featured catalog remains available offline while some online sources are unavailable.')
+      })
+    })
     const results = await Promise.allSettled([
       window.workwise.listCatalogSources(),
       window.workwise.listCatalogPackages(),
       window.workwise.listInstalledPlugins(),
       window.workwise.listPluginUpdateDiagnostics?.() ?? Promise.resolve([]),
       window.workwise.listMcpServers(workspaceRoot || undefined),
-      window.workwise.listSkills(workspaceRoot || undefined),
-      window.workwise.listCatalogCredentialStatuses()
+      window.workwise.listSkills(workspaceRoot || undefined)
     ])
-    const [sourcesResult, catalogResult, packagesResult, diagnosticsResult, serversResult, skillsResult, credentialsResult] = results
+    const [sourcesResult, catalogResult, packagesResult, diagnosticsResult, serversResult, skillsResult] = results
     const failures: string[] = []
     if (sourcesResult.status === 'fulfilled') setSources(sourcesResult.value)
     else failures.push('sources')
@@ -493,9 +512,6 @@ export function PluginMarketplaceView(): ReactElement {
     } else if (skillsResult.status === 'rejected') {
       failures.push('skills')
     }
-    if (credentialsResult.status === 'fulfilled') setCatalogCredentials(credentialsResult.value)
-    else failures.push('credentials')
-
     const catalog = catalogResult.status === 'fulfilled' ? catalogResult.value : null
     const diagnostics = diagnosticsResult.status === 'fulfilled' ? diagnosticsResult.value : []
     const blocked = diagnostics.filter((item) => item.state === 'runtime-drift' || item.state === 'unavailable')
@@ -1987,7 +2003,7 @@ function SourceDrawer({ sources, credentialStatuses, busy, text, workspaceAvaila
               <div className="flex gap-1">{source.auth.type === 'token' ? <IconButton label={text('pluginUnifiedConfigureCredential', 'Configure credential')} disabled={busy === `credential:${source.id}`} onClick={() => { setCredentialSourceId(source.id); setCredentialToken('') }}>{busy === `credential:${source.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}</IconButton> : null}{source.sync.mode !== 'bundled' ? <IconButton label={text('pluginUnifiedSyncSource', 'Sync source')} disabled={busy === `source:${source.id}`} onClick={() => onSync(source)}>{busy === `source:${source.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}</IconButton> : null}{source.scope !== 'system' ? <IconButton label={text('pluginUnifiedRemoveSource', 'Remove source')} disabled={busy === `source:${source.id}`} onClick={() => onRemove(source)}><Trash2 className="h-4 w-4" /></IconButton> : null}</div>
             </div>
             <p className="mt-2 break-all text-[11px] leading-4 text-ds-muted">{source.location}</p>
-            {source.auth.type === 'token' ? <p className="mt-1 text-[10px] text-ds-faint">{credentialMap.get(source.id)?.configured ? text('pluginUnifiedCredentialConfigured', 'Credential configured') : text('pluginUnifiedCredentialMissing', 'Credential required')}</p> : null}
+            {source.auth.type === 'token' ? <p className="mt-1 text-[10px] text-ds-faint">{catalogCredentialStatusLabel(credentialMap.get(source.id), text)}</p> : null}
             {credentialSourceId === source.id ? <div className="mt-3 flex gap-2"><input type="password" autoFocus autoComplete="off" value={credentialToken} onChange={(event) => setCredentialToken(event.target.value)} placeholder={text('pluginUnifiedCatalogToken', 'Access token')} className="h-8 min-w-0 flex-1 rounded-md border border-ds-border bg-ds-card px-3 text-[11px] outline-none focus:border-accent/50" /><button type="button" disabled={!credentialToken.trim() || busy === `credential:${source.id}`} onClick={() => void onCredential(source, credentialToken).then((saved) => { if (saved) { setCredentialSourceId(''); setCredentialToken('') } })} className="h-8 rounded-md bg-ds-userbubble px-3 text-[11px] font-semibold text-ds-userbubbleFg disabled:opacity-50">{text('pluginUnifiedSave', 'Save')}</button>{credentialMap.get(source.id)?.configured ? <button type="button" disabled={busy === `credential:${source.id}`} onClick={() => void onCredential(source, '').then((saved) => { if (saved) { setCredentialSourceId(''); setCredentialToken('') } })} className="h-8 rounded-md border border-ds-border px-3 text-[11px] font-medium hover:bg-ds-hover">{text('pluginUnifiedClear', 'Clear')}</button> : null}</div> : null}
             {source.sync.error && source.id !== 'workwise-official' ? (
               <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">

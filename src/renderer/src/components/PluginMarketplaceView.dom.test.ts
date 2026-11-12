@@ -892,6 +892,47 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(window.workwise.syncCatalogSource).toHaveBeenCalledWith(savedSource?.id)
   })
 
+  it('renders bundled packages while credential checks are pending and ignores a stale credential response after retry', async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof window.workwise.listCatalogCredentialStatuses>>) => void
+    vi.mocked(window.workwise.listCatalogSources).mockResolvedValue([SOURCE, PRIVATE_SOURCE])
+    vi.mocked(window.workwise.listCatalogCredentialStatuses).mockReturnValueOnce(new Promise(resolve => { finishOld = resolve }))
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    expect(container.textContent).toContain('Browser Tools')
+    await act(async () => iconButton('Catalog sources').click())
+    expect(container.textContent).toContain('Credential status not checked')
+    expect(container.textContent).not.toContain('Credential required')
+    vi.mocked(window.workwise.listCatalogCredentialStatuses).mockResolvedValue([{ sourceId: PRIVATE_SOURCE.id, configured: true, storage: 'keychain' }])
+    await act(async () => iconButton('Sync source').click())
+    await settle()
+    expect(container.textContent).toContain('Credential configured')
+    await act(async () => finishOld([{ sourceId: PRIVATE_SOURCE.id, configured: false, errorCode: 'credential_helper_timeout', message: 'stale credential timeout' }]))
+    await settle()
+    expect(container.textContent).toContain('Credential configured')
+    expect(container.textContent).not.toContain('stale credential timeout')
+  })
+
+  it('keeps the catalog visible and retries one blocked source without replacing its saved token', async () => {
+    const message = '已保存的市场凭据暂时无法读取。请处理系统凭据访问提示后刷新此来源；原凭据仍保留。'
+    vi.mocked(window.workwise.listCatalogSources).mockResolvedValue([SOURCE, PRIVATE_SOURCE])
+    vi.mocked(window.workwise.listCatalogCredentialStatuses).mockResolvedValue([{ sourceId: PRIVATE_SOURCE.id, configured: false, storage: 'keychain', errorCode: 'credential_helper_timeout', message }])
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    expect(container.textContent).toContain('Browser Tools')
+    await act(async () => iconButton('Catalog sources').click())
+    expect(container.textContent).toContain(message)
+    expect(container.textContent).not.toContain('The plugin catalog is temporarily unavailable')
+    vi.mocked(window.workwise.listCatalogCredentialStatuses).mockResolvedValue([{ sourceId: PRIVATE_SOURCE.id, configured: true, storage: 'keychain' }])
+    await act(async () => iconButton('Sync source').click())
+    await settle()
+    expect(window.workwise.syncCatalogSource).toHaveBeenCalledWith(PRIVATE_SOURCE.id)
+    expect(window.workwise.setCatalogSourceCredential).not.toHaveBeenCalled()
+    expect(window.workwise.clearCatalogSourceCredential).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Credential configured')
+    expect(container.textContent).not.toContain(message)
+    expect(container.textContent).toContain('Browser Tools')
+  })
+
   it('updates and clears an existing private catalog credential', async () => {
     vi.mocked(window.workwise.listCatalogSources).mockResolvedValue([SOURCE, PRIVATE_SOURCE])
     vi.mocked(window.workwise.listCatalogCredentialStatuses).mockResolvedValue([{
