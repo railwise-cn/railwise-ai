@@ -16,7 +16,7 @@ function report() {
       defaultSkills: ['ppt-master', 'tender-master', 'di-bao-monitoring'].map(id => ({
         id, name: id,
         source: id === 'ppt-master'
-          ? { type: 'github', owner: 'hugohe3', repo: 'ppt-master', ref: 'v6.8.0', installedSha: '5e8856be0da8e6bc85c4aa28acc614478f7b7137', overlaySkillId: 'ppt-master', autoUpdate: false }
+          ? { type: 'github', owner: 'hugohe3', repo: 'ppt-master', path: 'skills/ppt-master', ref: 'v6.8.0', installedSha: '5e8856be0da8e6bc85c4aa28acc614478f7b7137', overlaySkillId: 'ppt-master', autoUpdate: false }
           : { type: 'bundled', id },
         entryRelativePath: `resources/app.asar.unpacked/src/asset/skills/${id}/SKILL.md`,
         entrySha256: 'd'.repeat(64), entryRegisteredInAsar: true
@@ -110,10 +110,10 @@ test('readonly connector DOM observations compile with their exact Chinese dialo
 
 test('default Skills retain the exact packaged PPT upstream overlay provenance', () => {
   const skills = report().resources.defaultSkills
-  skills[0].source = { type: 'github', owner: 'hugohe3', repo: 'ppt-master', ref: 'v6.8.0',
+  skills[0].source = { type: 'github', owner: 'hugohe3', repo: 'ppt-master', path: 'skills/ppt-master', ref: 'v6.8.0',
     installedSha: '5e8856be0da8e6bc85c4aa28acc614478f7b7137', overlaySkillId: 'ppt-master', autoUpdate: false }
   assert.deepEqual(validateDefaultSkillSources(skills), skills)
-  for (const patch of [{ installedSha: '0'.repeat(40) }, { repo: 'other' }, { autoUpdate: true }, { overlaySkillId: 'other' }]) {
+  for (const patch of [{ installedSha: '0'.repeat(40) }, { repo: 'other' }, { path: 'skills/other' }, { autoUpdate: true }, { overlaySkillId: 'other' }]) {
     const changed = structuredClone(skills)
     Object.assign(changed[0].source, patch)
     assert.throws(() => validateDefaultSkillSources(changed), /Unverified default Skill source/)

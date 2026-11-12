@@ -31,7 +31,7 @@ export function validateDefaultSkillSources(skills) {
     assert.ok(skill, `Missing installed default Skill: ${id}`)
     const source = skill.source
     const auditedPptOverlay = id === 'ppt-master' && source?.type === 'github' &&
-      source.owner === 'hugohe3' && source.repo === 'ppt-master' && source.ref === 'v6.8.0' &&
+      source.owner === 'hugohe3' && source.repo === 'ppt-master' && source.path === 'skills/ppt-master' && source.ref === 'v6.8.0' &&
       source.installedSha === '5e8856be0da8e6bc85c4aa28acc614478f7b7137' &&
       source.overlaySkillId === 'ppt-master' && source.autoUpdate === false
     assert.ok(id === 'ppt-master' ? auditedPptOverlay : source?.type === 'bundled' && source.id === id, `Unverified default Skill source: ${id}`)
@@ -265,7 +265,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     assert.deepEqual(report.resources.engineeringSkills.map(skill => skill.name), engineeringSkillNames)
     assert.ok(report.resources.engineeringSkills.every(skill => skill.installEnabled))
     const skills = await cdp.evaluate(`window.workwise.listSkills().then(result=>result.ok?result.skills.map(skill=>({id:skill.id,name:skill.name,root:skill.root,entryPath:skill.entryPath,
-      source:skill.source&&{type:skill.source.type,id:skill.source.id,owner:skill.source.owner,repo:skill.source.repo,ref:skill.source.ref,
+      source:skill.source&&{type:skill.source.type,id:skill.source.id,owner:skill.source.owner,repo:skill.source.repo,path:skill.source.path,ref:skill.source.ref,
         installedSha:skill.source.installedSha,overlaySkillId:skill.source.overlaySkillId,autoUpdate:skill.source.autoUpdate}})):[])`)
     report.resources.defaultSkills = skills.filter(skill => defaultSkillIds.includes(skill.id))
     const defaultSkills = validateDefaultSkillSources(skills)
