@@ -4,6 +4,7 @@ import { RuntimeErrorSeverity } from './errors.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
 import { DshUiBlock } from './dsh-ui.js'
 import { UiActionAudit } from './ui-actions.js'
+import { CapabilityPreflightSchema } from './harness.js'
 
 /**
  * Conversation items returned as part of a thread or turn.
@@ -30,6 +31,8 @@ export const TurnItemBase = z.object({
   threadId: z.string().min(1),
   role: TurnItemRole,
   status: TurnItemStatus,
+  /** Local coordination history; its grouping ID is not an execution Turn. */
+  conversationReceiptId: z.string().min(1).optional(),
   createdAt: z.string(),
   finishedAt: z.string().optional()
 })
@@ -58,6 +61,7 @@ export type UserTurnItem = z.infer<typeof UserTurnItem>
 export const AssistantTextTurnItem = TurnItemBase.extend({
   kind: z.literal('assistant_text'),
   text: z.string(),
+  capabilityCard: z.object({ threadId: z.string(), taskId: z.string(), attentionId: z.string().optional(), prompt: z.string(), capability: CapabilityPreflightSchema }).optional(),
   uiBlocks: z.array(DshUiBlock).max(20).optional()
 })
 export type AssistantTextTurnItem = z.infer<typeof AssistantTextTurnItem>
@@ -150,6 +154,13 @@ export const ErrorTurnItem = TurnItemBase.extend({
   severity: RuntimeErrorSeverity.optional()
 })
 export type ErrorTurnItem = z.infer<typeof ErrorTurnItem>
+
+/** Also recognizes the exact immutable shape written before the marker existed. */
+export function isConversationReceiptItem(item: Pick<z.infer<typeof TurnItemBase>, 'id' | 'turnId' | 'conversationReceiptId'> & { kind: string }): boolean {
+  if (!/^command_[a-f0-9]{32}$/.test(item.turnId)) return false
+  return item.kind === 'user_message' && item.id === `item_${item.turnId}_user` ||
+    item.kind === 'assistant_text' && item.id === `item_${item.turnId}_receipt`
+}
 
 export const TurnItem = z.discriminatedUnion('kind', [
   UserTurnItem,

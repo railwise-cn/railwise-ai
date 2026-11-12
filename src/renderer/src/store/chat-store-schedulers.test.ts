@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   armBusyWatchdog,
+  cancelStartupRuntimeProbe,
   clearBusyWatchdog,
   resetBusyRecoveryAttempts,
+  scheduleStartupRuntimeProbe,
   stopTurnCompletionPoll,
   syncTurnCompletionPoll
 } from './chat-store-schedulers'
@@ -45,6 +47,54 @@ function makeHarness(initial: Partial<ChatState> = {}): StoreApi {
     get: () => state
   }
 }
+
+describe('bounded startup health probing', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', new EventTarget())
+  })
+  afterEach(() => {
+    cancelStartupRuntimeProbe()
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('stops after five transient attempts', async () => {
+    const probe = vi.fn(async () => true)
+    scheduleStartupRuntimeProbe(probe)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(probe).toHaveBeenCalledTimes(5)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it.each(['cancel', 'beforeunload'])('ignores an in-flight retry after %s', async action => {
+    let finish!: (retry: boolean) => void
+    const probe = vi.fn((_signal: AbortSignal) => new Promise<boolean>(resolve => { finish = resolve }))
+    scheduleStartupRuntimeProbe(probe)
+    await vi.advanceTimersByTimeAsync(900)
+    if (action === 'cancel') cancelStartupRuntimeProbe()
+    else window.dispatchEvent(new Event('beforeunload'))
+    expect(probe.mock.calls[0]![0].aborted).toBe(true)
+    finish(true)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(probe).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('keeps a replaced startup sequence from scheduling another attempt', async () => {
+    let finish!: (retry: boolean) => void
+    const oldProbe = vi.fn((_signal: AbortSignal) => new Promise<boolean>(resolve => { finish = resolve }))
+    const currentProbe = vi.fn(async () => false)
+    scheduleStartupRuntimeProbe(oldProbe)
+    await vi.advanceTimersByTimeAsync(900)
+    scheduleStartupRuntimeProbe(currentProbe)
+    finish(true)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(oldProbe.mock.calls[0]![0].aborted).toBe(true)
+    expect(currentProbe).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+})
 
 describe('armBusyWatchdog (busyTimeout message contract)', () => {
   beforeEach(() => {

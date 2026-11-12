@@ -11,10 +11,11 @@ import {
   rm,
   writeFile
 } from 'node:fs/promises'
-import { basename, join, relative } from 'node:path'
+import { basename, dirname, join, relative } from 'node:path'
 import { promisify } from 'node:util'
 import JSZip from 'jszip'
 import type { MarketplacePackageV1, PypiPackageSourceV1 } from '../../shared/marketplace'
+import { isApprovedUpstreamPackage } from '../../shared/engineering-marketplace'
 import { readBoundedResponseBuffer } from './bounded-response'
 import { isCanonicalPathContained } from './canonical-containment'
 import {
@@ -32,6 +33,19 @@ const MAX_LICENSE_METADATA_BYTES = 3 * 1024 * 1024
 const SHA256 = /^[0-9a-f]{64}$/i
 const PACKAGE_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,198}[A-Za-z0-9])?$/
 const VERSION = /^[A-Za-z0-9](?:[A-Za-z0-9._+!-]{0,126}[A-Za-z0-9])?$/
+
+// Zotero 0.17.0 requires this source-only dependency. The allowance is bound
+// to its reviewed wheel, one exact upstream sdist and one exact build backend.
+export const ZOTERO_BIBTEX_BUILD = {
+  packageName: 'bibtexparser', version: '1.4.4',
+  url: 'https://files.pythonhosted.org/packages/44/1c/577d3ce406e88f370e80a6ebf76ae52a2866521e0b585e8ec612759894f1/bibtexparser-1.4.4.tar.gz',
+  sha256: '093b6c824f7a71d3a748867c4057b71f77c55b8dbc07efc993b781771520d8fb',
+  backend: {
+    packageName: 'setuptools', version: '84.2.1',
+    url: 'https://files.pythonhosted.org/packages/ef/55/6dc6d6bb953bdfc52519a0059592c52b6e3b8ad51cf8256dffceb55b0610/setuptools-84.2.1-py3-none-any.whl',
+    sha256: 'ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2'
+  }
+} as const
 
 type CommandResult = { stdout: string; stderr?: string }
 type CommandRunner = (
@@ -227,11 +241,21 @@ export async function preservePypiLicense(
   const zip = await JSZip.loadAsync(wheel, { checkCRC32: true })
   const entries = Object.values(zip.files)
   if (entries.length === 0 || entries.length > 20_000) throw new Error('PyPI wheel has an invalid entry count.')
-  const license = entries.find((entry) => {
+  const licenses = entries.filter((entry) => {
     const path = entry.name.replaceAll('\\', '/')
-    return !entry.dir && path.split('/').every((segment) => segment && segment !== '.' && segment !== '..') &&
+    return !entry.dir && !path.includes(':') && !path.includes('\0') && path.split('/').every((segment) => segment && segment !== '.' && segment !== '..') &&
       licenseName(path) && (path.includes('.dist-info/licenses/') || path.includes('.dist-info/'))
   })
+  let preservedBytes = 0
+  for (const entry of licenses) {
+    const content = await entry.async('nodebuffer')
+    preservedBytes += content.byteLength
+    if (content.byteLength === 0 || preservedBytes > MAX_LICENSE_BYTES) throw new Error('PyPI wheel license files exceed their safety limit.')
+    const destination = join(targetDirectory, 'licenses', ...entry.name.replaceAll('\\', '/').split('/'))
+    await mkdir(dirname(destination), { recursive: true, mode: 0o700 })
+    await writeFile(destination, content, { mode: 0o600, flag: 'wx' })
+  }
+  const license = licenses[0]
   let bytes: Buffer
   if (license) {
     bytes = await license.async('nodebuffer')
@@ -302,7 +326,7 @@ function logicalRequirements(text: string): string[] {
   return result
 }
 
-export function validatePythonDependencyLock(text: string, primarySha256: string): void {
+export function validatePythonDependencyLock(text: string, primarySha256: string, sourceBuild?: { packageName: string; url: string; sha256: string }): void {
   if (Buffer.byteLength(text) > MAX_LOCK_BYTES || /@latest|\blatest\b/i.test(text)) {
     throw new Error('Python dependency lock is oversized or contains a mutable version.')
   }
@@ -320,6 +344,10 @@ export function validatePythonDependencyLock(text: string, primarySha256: string
   }
   if (!text.toLowerCase().includes(primarySha256.toLowerCase())) {
     throw new Error('Python dependency lock does not include the catalog-pinned wheel hash.')
+  }
+  if (sourceBuild && !requirements.some(requirement => requirement.startsWith(`${sourceBuild.packageName} @ ${sourceBuild.url}#sha256=${sourceBuild.sha256} `)
+    && requirement.includes(`--hash=sha256:${sourceBuild.sha256}`))) {
+    throw new Error('Python dependency lock does not retain the reviewed source-build artifact.')
   }
 }
 
@@ -371,13 +399,27 @@ function commandEnvironment(runtime: ManagedUvRuntimeV1): NodeJS.ProcessEnv {
     UV_DEFAULT_INDEX: 'https://pypi.org/simple',
     UV_NO_CONFIG: '1',
     UV_NO_PROGRESS: '1',
-    UV_PYTHON_DOWNLOADS: 'never'
+    UV_PYTHON_DOWNLOADS: 'never',
+    UV_CONCURRENT_DOWNLOADS: '4',
+    UV_HTTP_TIMEOUT: '120'
   }
   for (const key of [
     'UV_INDEX',
     'UV_INDEX_URL',
     'UV_EXTRA_INDEX_URL',
     'UV_FIND_LINKS',
+    'UV_OVERRIDE',
+    'UV_CONSTRAINT',
+    'UV_BUILD_CONSTRAINT',
+    'UV_EXCLUDE',
+    'UV_NO_VERIFY_HASHES',
+    'UV_NO_BUILD_ISOLATION',
+    'UV_NO_BUILD_ISOLATION_PACKAGE',
+    'UV_CONFIG_FILE',
+    'UV_NO_BINARY',
+    'UV_NO_BINARY_PACKAGE',
+    'PYTHONPATH',
+    'PYTHONHOME',
     'PIP_INDEX_URL',
     'PIP_EXTRA_INDEX_URL',
     'PIP_FIND_LINKS',
@@ -411,7 +453,16 @@ export async function materializePypiPackage(
     const environment = commandEnvironment(runtime)
     const inputPath = join(targetDirectory, 'requirements.in')
     const lockPath = join(targetDirectory, 'requirements.lock')
-    await writeFile(inputPath, `${artifact.url}#sha256=${artifact.sha256}\n`, { mode: 0o600 })
+    const sourceBuild = isApprovedUpstreamPackage(item) ? ZOTERO_BIBTEX_BUILD : undefined
+    const buildOptions: string[] = []
+    let input = `${artifact.url}#sha256=${artifact.sha256}\n`
+    if (sourceBuild) {
+      const constraintsPath = join(targetDirectory, 'build-constraints.txt')
+      input += `${sourceBuild.packageName} @ ${sourceBuild.url}#sha256=${sourceBuild.sha256}\n`
+      await writeFile(constraintsPath, `${sourceBuild.backend.packageName} @ ${sourceBuild.backend.url}#sha256=${sourceBuild.backend.sha256}\n`, { mode: 0o600 })
+      buildOptions.push('--no-binary', sourceBuild.packageName, '--build-constraints', constraintsPath)
+    }
+    await writeFile(inputPath, input, { mode: 0o600 })
     await run(runtime.uvPath, [
       'pip', 'compile', inputPath,
       '--output-file', lockPath,
@@ -420,6 +471,7 @@ export async function materializePypiPackage(
       '--no-header',
       '--no-strip-extras',
       '--only-binary', ':all:',
+      ...buildOptions,
       '--python', runtime.pythonPath,
       '--no-python-downloads',
       '--exclude-newer', artifact.uploadedAt,
@@ -428,7 +480,7 @@ export async function materializePypiPackage(
       '--no-config'
     ], { cwd: targetDirectory, env: environment, timeoutMs: 15 * 60_000 })
     const lock = await readFile(lockPath, 'utf8')
-    validatePythonDependencyLock(lock, artifact.sha256)
+    validatePythonDependencyLock(lock, artifact.sha256, sourceBuild)
 
     const environmentRoot = join(targetDirectory, '.venv')
     await run(runtime.uvPath, [
@@ -447,6 +499,7 @@ export async function materializePypiPackage(
       '--require-hashes',
       '--strict',
       '--only-binary', ':all:',
+      ...buildOptions,
       '--link-mode', 'copy',
       '--python', python,
       '--no-python-downloads',
@@ -489,6 +542,7 @@ export async function materializePypiPackage(
       uvVersion: runtime.uvVersion,
       pythonVersion: runtime.pythonVersion,
       wheel: artifact,
+      ...(sourceBuild ? { sourceBuild } : {}),
       sitePackages,
       lockSha256: sha256(lock)
     }, null, 2)}\n`, { mode: 0o600 })

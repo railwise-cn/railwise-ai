@@ -2,22 +2,12 @@ function normalizePathForMatch(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
 }
 
-// WorkWise uses ~/.workwise. Older paths remain read-only identity aliases
-// during the 0.3.x compatibility window.
-// 避免同一个默认工作区在侧栏里出现两份。
-function isDefaultWorkspacePath(normalized: string): boolean {
-  return normalized === '~/.workwise/default_workspace'
-    || normalized.endsWith('/.workwise/default_workspace')
-    || isLegacyDefaultWorkspacePath(normalized)
-}
-
 export function workspaceRootIdentityKey(path?: string): string {
   const trimmed = path?.trim() ?? ''
   if (!trimmed) return ''
   const normalized = normalizePathForMatch(trimmed)
-  if (isDefaultWorkspacePath(normalized)) {
-    return '~/.workwise/default_workspace'
-  }
+  // Matching legacy names alone does not prove two directories are aliases.
+  // Keep distinct user content visible until a verified migration links them.
   return normalized
 }
 

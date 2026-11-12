@@ -8,7 +8,11 @@ import { createThreadRecord } from '../domain/thread.js'
 import { TaskController } from './task-controller.js'
 import { TaskLeaseLostError, TaskRunRepository } from './task-run-repository.js'
 import { RuntimeSpanService } from './runtime-span-service.js'
+import { createApprovalRequest } from '../domain/approval.js'
+import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { makeAssistantTextItem, makeToolResultItem } from '../domain/item.js'
+import type { ToolEffectResolver } from '../ports/tool-effect.js'
+import { externalOperationForTool } from './external-effect-evidence.js'
 
 const cleanup: string[] = []
 const PERSISTENCE_TEST_TIMEOUT_MS = 15_000
@@ -18,7 +22,7 @@ afterEach(async () => {
   await Promise.all(cleanup.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-async function fixture(prompt = '完成可靠性测试。') {
+async function fixture(prompt = '完成可靠性测试。', resolveToolEffect?: ToolEffectResolver) {
   const root = await mkdtemp(join(tmpdir(), 'workwise-task-controller-'))
   cleanup.push(root)
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite3'))
@@ -39,7 +43,8 @@ async function fixture(prompt = '完成可靠性测试。') {
     sessionStore,
     nowIso: () => now,
     ownerId: 'test-runtime',
-    spans
+    spans,
+    resolveToolEffect
   })
   const task = controller.ensureTask({
     thread,
@@ -60,6 +65,137 @@ async function fixture(prompt = '完成可靠性测试。') {
 }
 
 describe('TaskController reliability boundaries', () => {
+  it('completes a mixed task only after both persisted operation receipts are verified', async () => {
+    const f = await fixture('请先批准飞书审批，再上传测试文件。', name => name === 'lark_drive_upload'
+      ? { provider: 'lark', operation: 'upload', mutation: true, targetFields: ['folderToken'] } : externalOperationForTool(name))
+    try {
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      f.controller.confirmEffectScope('turn_reliability', 0, 'all-actions', ['approve', 'upload'].map(operation => ({
+        provider: 'lark', operation, target: operation === 'approve' ? 'approval-task' : 'folder', requiredScopes: [],
+        requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback'
+      })))
+      const record = (operation: 'approve' | 'upload') => {
+        const target = operation === 'approve' ? 'approval-task' : 'folder'
+        const toolName = operation === 'approve' ? 'lark_approval_approve' : 'lark_drive_upload'
+        const call = { callId: `mixed-${operation}`, toolName, arguments: operation === 'approve' ? { taskId: target } : { folderToken: target } }
+        const pending = f.controller.beginToolOperation('turn_reliability', call)!
+        f.controller.finishToolOperation(pending.token, pending.key, { approved: true, item: makeToolResultItem({
+          id: `result-${operation}`, threadId: f.thread.id, turnId: 'turn_reliability', callId: call.callId, toolName,
+          output: { ok: true, status: 'succeeded', evidence: { kind: 'external_operation', provider: 'lark', operation, target,
+            verified: true, status: 'done', resultHash: `hash-${operation}`, verifiedAt: '2026-07-18T00:00:00Z' } }
+        }) })
+      }
+      record('approve')
+      await f.sessionStore.appendItem(f.thread.id, makeAssistantTextItem({ id: 'mixed-final', threadId: f.thread.id,
+        turnId: 'turn_reliability', text: '组合任务处理结果。', status: 'completed' }))
+      expect(await f.controller.assessCandidate(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'waiting_user' })
+      expect(f.repository.events(f.task.id).some(event => event.kind === 'task_completed')).toBe(false)
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      record('upload')
+      expect(await f.controller.assessCandidate(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'completed' })
+      expect(f.repository.get(f.task.id)?.resultEvidence).toHaveLength(2)
+    } finally { f.repository.close() }
+  })
+
+  it('requires every explicitly requested operation in a mixed external scope', async () => {
+    const { controller, repository, thread, task } = await fixture('请先批准飞书审批，再上传测试文件。')
+    try {
+      controller.beginAttempt(thread.id, 'turn_reliability')
+      const approve = { provider: 'lark', operation: 'approve', target: 'approval-task', requiredScopes: [], requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback' as const }
+      const upload = { ...approve, operation: 'upload', target: 'drive-folder' }
+      expect(() => controller.confirmEffectScope('turn_reliability', 0, 'incomplete', [approve])).toThrow(/complete|全部|requested/)
+      expect(repository.operations(task.id, 'effect_scope')).toHaveLength(0)
+      expect(controller.confirmEffectScope('turn_reliability', 0, 'complete', [approve, upload]).acceptance.effect?.requiredEffects).toEqual([approve, upload])
+      expect(() => controller.confirmEffectScope('turn_reliability', 1, 'shorten', [approve])).toThrow()
+      const current = repository.get(task.id)!
+      repository.update(task.id, current.revision, value => ({ ...value, acceptance: { ...value.acceptance,
+        effect: { ...value.acceptance.effect!, requiredOperations: undefined, requiredEffects: [approve] } } }))
+      expect(() => controller.assertExternalTarget('turn_reliability', 'lark', 'approve', 'approval-task')).toThrow(/omits a requested operation/)
+      expect(repository.get(task.id)?.acceptance.effect?.requiredEffects).toEqual([approve])
+    } finally { repository.close() }
+  })
+
+  it.each([
+    ['请上传测试文件到飞书云盘。', 'upload'],
+    ['请通过飞书连接器，将已准备好的单个合成测试文件上传一次到我个人云盘根目录。用户已明确批准这一个测试文件的一次上传并回读。', 'upload'],
+    ['请发送一条合成测试消息到飞书。用户已明确同意这一次发送。', 'send'],
+    ['请先批准飞书审批，再上传测试文件。', 'approve']
+  ])('persists the same external effect as the action classifier (%s)', async (prompt, operation) => {
+    const { task, repository } = await fixture(prompt)
+    try {
+      expect(task.acceptance).toMatchObject({
+        requiresExternalEffects: true,
+        effect: { provider: 'lark', operation, requiresConfirmation: true, verification: 'provider_readback' }
+      })
+    } finally { repository.close() }
+  })
+
+  it.each(['exact', 'unknown', 'missing_hash', 'arguments', 'provider', 'target', 'account', 'backend', 'workspace', 'scope', 'denied', 'forged_transfer'])('transfers an undispatched approval only for the exact reviewed operation (%s)', async variation => {
+    const { repository, controller, task, thread } = await fixture()
+    try {
+      controller.beginAttempt(thread.id, 'turn_reliability')
+      const grant = ExecutionGrantSchema.parse({ id: 'new-grant', taskId: task.id, threadId: thread.id, turnId: 'turn_reliability',
+        workspaceRoot: thread.workspace, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', sandboxMode: 'workspace-write', approvalPolicy: 'on-request',
+        workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'new-grant', issuedAt: '2026-07-18T00:00:00.000Z',
+        expiresAt: '2026-07-18T00:15:00.000Z', connectorBackends: { dingtalk: 'dws' }, connectorIdentityFingerprints: { dingtalk: 'a'.repeat(64) } })
+      const current = controller.beginToolOperation('turn_reliability', { callId: 'new-call', toolName: 'write', arguments: { path: 'summary.md', content: 'reviewed' } }, grant)!
+      const request = repository.operation(task.id, current.key)!.request!
+      const oldGrant = { ...grant, id: 'old-grant', turnId: 'previous-turn', idempotencyKey: 'old-grant',
+        // Reauthorization uses a valid new Grant even if the interrupted Turn expired.
+        expiresAt: '2026-07-17T23:59:00.000Z' }
+      const oldRequest: Record<string, unknown> = { ...request, turnId: 'previous-turn', callId: 'old-call', executionGrant: oldGrant }
+      if (variation === 'missing_hash') delete oldRequest.approvalRequestHash
+      if (variation === 'arguments') oldRequest.argumentsHash = 'changed'
+      if (variation === 'provider') oldRequest.providerId = 'different-provider'
+      if (variation === 'target') oldRequest.target = 'different-target'
+      if (variation === 'account') oldGrant.connectorIdentityFingerprints = { dingtalk: 'b'.repeat(64) }
+      if (variation === 'backend') oldGrant.connectorBackends = { dingtalk: 'openapi' }
+      if (variation === 'workspace') oldGrant.workspaceRevision = 2
+      if (variation === 'scope') oldRequest.scopeRevision = 2
+      repository.beginOperation({ ownerId: task.id, idempotencyKey: 'old-operation', kind: 'tool', request: oldRequest, nowIso: '2026-07-17T23:30:00.000Z' })
+      repository.finishOperation(task.id, 'old-operation', { status: variation === 'unknown' ? 'outcome_unknown' : 'failed', result: {
+        approved: false, item: makeToolResultItem({ id: 'old-result', threadId: thread.id, turnId: 'previous-turn', callId: 'old-call', toolName: 'write',
+          isError: true, output: { code: 'operation_not_dispatched' } }) } }, '2026-07-17T23:31:00.000Z')
+      const oldApproval = createApprovalRequest({ id: 'appr_old-call', threadId: thread.id, turnId: 'previous-turn', toolName: 'write', summary: 'Write reviewed summary' })
+      repository.saveHumanRequest({ id: oldApproval.id, kind: 'approval', threadId: thread.id, turnId: oldApproval.turnId,
+        message: oldApproval.summary, payload: { approval: oldApproval, ...(variation === 'forged_transfer' ? { continuedFromApprovalId: 'unverified-parent' } : {}) }, status: 'answered', resolution: { decision: variation === 'denied' ? 'deny' : 'allow' },
+        createdAt: '2026-07-17T23:30:00.000Z', updatedAt: '2026-07-18T00:00:00.000Z' })
+      const approval = createApprovalRequest({ id: 'new-approval', threadId: thread.id, turnId: 'turn_reliability', toolName: 'write', summary: 'Write reviewed summary',
+        callId: 'new-call', requestHash: request.approvalRequestHash as string })
+      expect(controller.claimUndispatchedApproval(current.token, current.key, approval)).toBe(variation === 'exact')
+      expect(repository.operations(task.id, 'approval_transfer')).toHaveLength(variation === 'exact' ? 1 : 0)
+      expect(repository.inbox(undefined, true)).toHaveLength(0)
+      if (variation === 'exact') {
+        expect(controller.claimUndispatchedApproval(current.token, current.key, approval)).toBe(true)
+        const repeated = controller.beginToolOperation('turn_reliability', { callId: 'another-call', toolName: 'write', arguments: { path: 'summary.md', content: 'reviewed' } }, grant)!
+        expect(controller.claimUndispatchedApproval(repeated.token, repeated.key, { ...approval, id: 'another-approval', callId: 'another-call' })).toBe(false)
+        expect(repository.humanRequest(approval.id)?.payload.continuedFromApprovalId).toBe(oldApproval.id)
+      }
+    } finally { repository.close() }
+  })
+
+  it.each(['confirmed', 'dispatched', 'supplement', 'unsettled_unknown', 'unrecognized', 'legacy_denial'])('preserves historical write obligations when a query task has %s authority or work', async reason => {
+    const { repository, controller, task, thread } = await fixture('查询钉钉未完成的待办')
+    try {
+      const previous = repository.update(task.id, task.revision, current => ({ ...current, acceptance: { ...current.acceptance,
+        effect: { ...current.acceptance.effect!, operation: 'complete', target: undefined, requiresConfirmation: true,
+          ...(reason === 'confirmed' ? { scopeConfirmationId: 'reviewed-write-scope' } : {}) } } }))
+      if (reason === 'dispatched') {
+        repository.beginOperation({ ownerId: task.id, idempotencyKey: 'previous-write', kind: 'tool', request: {
+          toolName: 'dingtalk_complete_task', provider: 'dingtalk', operation: 'complete', mutation: true, turnId: 'old-turn', target: 'task-1'
+        }, nowIso: task.createdAt })
+        repository.finishOperation(task.id, 'previous-write', { status: 'succeeded', result: { approved: true } }, task.createdAt)
+      }
+      if (['unsettled_unknown', 'unrecognized', 'legacy_denial'].includes(reason)) {
+        repository.beginOperation({ ownerId: task.id, idempotencyKey: 'unrecognized-history', kind: 'tool', request: { toolName: 'unregistered_tool' }, nowIso: task.createdAt })
+        repository.finishOperation(task.id, 'unrecognized-history', { status: reason === 'unsettled_unknown' ? 'outcome_unknown' : reason === 'legacy_denial' ? 'failed' : 'succeeded', result: { approved: reason !== 'legacy_denial' } }, task.createdAt)
+      }
+      if (reason === 'supplement') controller.appendInput(task.id, previous.revision, 'write-supplement', '然后完成第一项待办')
+      controller.beginAttempt(thread.id, 'turn_reliability')
+      expect(repository.get(task.id)?.acceptance.effect).toMatchObject({ operation: 'complete', requiresConfirmation: true })
+    } finally { repository.close() }
+  })
+
   it('charges concurrent work against one root execution budget and aborts at the shared limit',async()=>{
     const {repository,controller,task,thread,setNow,threadStore,sessionStore}=await fixture()
     repository.update(task.id,task.revision,current=>({...current,budget:{...current.budget,version:2,maxExecutionMs:100}}))
@@ -117,6 +253,7 @@ describe('TaskController reliability boundaries', () => {
     const operation=controller.beginToolOperation('turn_reliability',{callId:'external',toolName:'send_message',arguments:{token:'secret-token',message:'private body'}})!
     expect(JSON.stringify(repository.operation(task.id,operation.key))).not.toContain('secret-token')
     expect(JSON.stringify(repository.operation(task.id,operation.key))).not.toContain('private body')
+    controller.recordToolDispatch(operation.token, operation.key)
     controller.finishToolOperation(operation.token,operation.key)
     const stalled=controller.recordAttemptFailure(thread.id,'turn_reliability','tool_exception','connection dropped')!
     expect(stalled.kind).toBe('stalled')
@@ -129,6 +266,46 @@ describe('TaskController reliability boundaries', () => {
     expect(JSON.stringify(repository.operation(task.id,operation.key)?.result)).not.toContain('private body')
     expect(repository.get(task.id)?.status).toBe('stalled')
     repository.close()
+  })
+
+  it('distinguishes a cancelled approval from a dispatched operation with a lost reply', async () => {
+    const { repository, controller, task } = await fixture()
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const waiting = controller.beginToolOperation('turn_reliability', { callId: 'awaiting-approval', toolName: 'pending_write', arguments: {} })!
+    expect(repository.operation(task.id, waiting.key)?.status).toBe('prepared')
+    controller.finishToolOperation(waiting.token, waiting.key)
+    expect(repository.operation(task.id, waiting.key)).toMatchObject({ status: 'failed', result: { approved: false, item: { output: { code: 'operation_not_dispatched' } } } })
+    const started = controller.beginToolOperation('turn_reliability', { callId: 'actual-dispatch', toolName: 'pending_write', arguments: { target: 'test' } })!
+    controller.recordToolDispatch(started.token, started.key)
+    expect(repository.operation(task.id, started.key)?.status).toBe('running')
+    controller.finishToolOperation(started.token, started.key)
+    expect(repository.operation(task.id, started.key)?.status).toBe('outcome_unknown')
+    repository.close()
+  })
+
+  it.each([false, true])('recovers a prepared receipt with host dispatch tracking=%s without replaying an uncertain legacy action', async tracked => {
+    const f = await fixture()
+    f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+    f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: 'prepared-before-restart', kind: 'tool',
+      request: { toolName: 'synthetic_write', callId: 'original', turnId: 'turn_reliability', ...(tracked ? { dispatchTracking: 'host-v1' } : {}) },
+      nowIso: '2026-07-18T00:00:00.000Z' })
+    expect(f.repository.unsettledOperations(f.task.id)).toHaveLength(tracked ? 0 : 1)
+    f.controller.endRun('turn_reliability')
+    f.repository.close()
+    const repository = new TaskRunRepository(join(f.root, 'tasks.sqlite3'))
+    const controller = new TaskController({ repository, threadStore: f.threadStore, sessionStore: f.sessionStore,
+      nowIso: () => '2026-07-18T00:02:00.000Z', ownerId: 'restarted-runtime' })
+    try {
+      const recovered = controller.reconcileStartup()
+      expect(recovered).toHaveLength(1)
+      expect(recovered[0].status).toBe(tracked ? 'retrying' : 'stalled')
+      expect(repository.operation(f.task.id, 'prepared-before-restart')?.status).toBe(tracked ? 'failed' : 'outcome_unknown')
+      if (!tracked) {
+        expect(() => controller.prepareResume(f.task.id, recovered[0].revision)).toThrow(/Verify outstanding/)
+        expect(repository.unsettledOperations(f.task.id)).toHaveLength(1)
+      }
+      expect(repository.operations(f.task.id, 'tool')).toHaveLength(1)
+    } finally { repository.close() }
   })
 
   it('counts cumulative usage once per model request and keeps child work in the root budget',async()=>{
@@ -347,6 +524,148 @@ describe('TaskController reliability boundaries', () => {
       reason: expect.stringContaining('web_access_exhausted')
     })
     expect(repository.events(task.id).filter((event) => event.kind === 'task_completed')).toHaveLength(0)
+    repository.close()
+  })
+
+  it('waits for a verified external-effect receipt instead of completing a prose-only approval task', async () => {
+    const { repository, sessionStore, controller, task, thread } = await fixture('连接钉钉并自动审批我的待办事项。')
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'item_effect_blocked',
+      threadId: task.threadId,
+      turnId: 'turn_reliability',
+      text: '当前没有钉钉连接或授权，因此无法执行审批。我可以先提供操作方案。',
+      status: 'completed'
+    }))
+
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    await expect(controller.assessCandidate(task.threadId, 'turn_reliability')).resolves.toMatchObject({
+      kind: 'waiting_user',
+      task: { status: 'waiting_user', acceptance: { kind: 'effect' } },
+      reason: expect.stringContaining('目标集合及逐项验证回执')
+    })
+    expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(0)
+    repository.close()
+  })
+
+  it('requires verified effects when the task also delivers files', async () => {
+    const { repository, sessionStore, controller, task } = await fixture('生成 Markdown 报告并发送到飞书。')
+    expect(task.acceptance).toMatchObject({ kind: 'files', requiresExternalEffects: true, effect: { provider: 'lark' } })
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'mixed-final', threadId: task.threadId, turnId: 'turn_reliability',
+      text: '报告已生成，包含来源和统计结果。', status: 'completed'
+    }))
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    await expect(controller.assessCandidate(task.threadId, 'turn_reliability')).resolves.toMatchObject({ kind: 'waiting_user' })
+    expect(repository.events(task.id).some(event => event.kind === 'task_completed')).toBe(false)
+    repository.close()
+  })
+
+  it.each(['current', 'previous_turn', 'unregistered', 'unsafe_code'])('preserves the cause of a failed external read (%s)', async variation => {
+    const { repository, sessionStore, controller, task } = await fixture('请查询我当前未完成的飞书待办。')
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'failed-read-final', threadId: task.threadId, turnId: 'turn_reliability',
+      text: '飞书返回的数据无法解析，当前读取失败。', status: 'completed'
+    }))
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const toolName = variation === 'unregistered' ? 'untrusted_read' : 'lark_task_list'
+    repository.beginOperation({ ownerId: task.id, idempotencyKey: 'failed-list', kind: 'tool',
+      request: { turnId: variation === 'previous_turn' ? 'previous-turn' : 'turn_reliability',
+        toolName, provider: 'lark', operation: 'list', target: 'current_user' }, nowIso: '2026-07-18T00:00:00Z' })
+    repository.finishOperation(task.id, 'failed-list', { status: 'failed', result: {
+      approved: true, item: makeToolResultItem({ id: 'failed-read', threadId: task.threadId, turnId: 'turn_reliability',
+        callId: 'failed-call', toolName, isError: true,
+        output: { code: 'connector_request_failed', data: { code: variation === 'unsafe_code' ? 'private response text' : 'invalid_connector_response' } } })
+    } }, '2026-07-18T00:00:01Z')
+    const decision = await controller.assessCandidate(task.threadId, 'turn_reliability')
+    expect(decision).toMatchObject({ kind: 'waiting_user', task: { status: 'waiting_user' } })
+    if (variation === 'current') expect(decision.task.waitingReason).toContain('外部操作执行失败（invalid_connector_response）')
+    else if (variation === 'unsafe_code') {
+      expect(decision.task.waitingReason).toContain('外部操作执行失败。')
+      expect(decision.task.waitingReason).not.toContain('private response text')
+    } else expect(decision.task.waitingReason).toContain('目标集合及逐项验证回执')
+    expect(repository.events(task.id).some(event => event.kind === 'task_completed')).toBe(false)
+    repository.close()
+  })
+
+  it('persists transport uncertainty and rejects the same mutation under a new call id', async () => {
+    const { repository, controller, task } = await fixture()
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const call = { callId: 'first', toolName: 'mcp_fixture_send', arguments: { target: 'test' } }
+    const operation = controller.beginToolOperation('turn_reliability', call)!
+    controller.finishToolOperation(operation.token, operation.key, {
+      approved: true,
+      item: makeToolResultItem({ id: 'uncertain', threadId: task.threadId, turnId: 'turn_reliability', callId: call.callId,
+        toolName: call.toolName, output: { code: 'outcome_unknown' }, isError: true })
+    })
+    expect(repository.operation(task.id, operation.key)?.status).toBe('outcome_unknown')
+    expect(() => controller.beginToolOperation('turn_reliability', { ...call, callId: 'second' })).toThrow(/unknown outcome/)
+    repository.close()
+  })
+
+  it('completes an external-effect task only after a successful effect receipt', async () => {
+    const { repository, sessionStore, controller, task, thread } = await fixture('同意钉钉审批。')
+    repository.update(task.id, task.revision, current => ({
+      ...current,
+      acceptance: { ...current.acceptance, effect: { provider: 'dingtalk', operation: 'approve', target: 'synthetic-task', requiredScopes: [], requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback' } }
+    }))
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'item_effect_done',
+      threadId: task.threadId,
+      turnId: 'turn_reliability',
+      text: '钉钉待办已审批完成。',
+      status: 'completed'
+    }))
+
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const operation = controller.beginToolOperation('turn_reliability', {
+      callId: 'call_dingtalk_approval',
+      toolName: 'dingtalk_approve',
+      arguments: { taskId: 'synthetic-task' }
+    })!
+    controller.finishToolOperation(operation.token, operation.key, {
+      approved: true,
+      item: makeToolResultItem({
+        id: 'item_dingtalk_result',
+        threadId: thread.id,
+        turnId: 'turn_reliability',
+        callId: 'call_dingtalk_approval',
+        toolName: 'dingtalk_approve',
+        output: { ok:true,status:'succeeded',evidence:{kind:'external_operation',provider:'dingtalk',operation:'approve',target:'synthetic-task',verified:true,verifiedAt:'2026-07-18T00:00:00Z',resultHash:'synthetic-hash',status:'approved',remoteOperationId:'synthetic-approval-1'} }
+      })
+    })
+
+    await expect(controller.assessCandidate(task.threadId, 'turn_reliability')).resolves.toMatchObject({
+      kind: 'completed',
+      task: { status: 'completed', acceptance: { kind: 'effect' } }
+    })
+    expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(1)
+    repository.close()
+  })
+
+  it('does not dispatch or complete a broad Lark task without a finite reviewed target set', async () => {
+    const { repository, sessionStore, controller, task } = await fixture('帮我处理飞书待办。')
+    expect(task.acceptance).toMatchObject({ kind: 'effect', effect: { provider: 'lark', operation: 'process', requiresConfirmation: true } })
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'item_lark_effect_done',
+      threadId: task.threadId,
+      turnId: 'turn_reliability',
+      text: '已完成飞书待办 task-42。',
+      status: 'completed'
+    }))
+
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    expect(() => controller.beginToolOperation('turn_reliability', {
+      callId: 'call_lark_complete',
+      toolName: 'lark_task_complete',
+      arguments: { taskId: 'task-42' }
+    })).toThrow(/confirm_external_effect_scope/)
+    expect(repository.operations(task.id, 'tool')).toHaveLength(0)
+
+    await expect(controller.assessCandidate(task.threadId, 'turn_reliability')).resolves.toMatchObject({
+      kind: 'waiting_user',
+      task: { status: 'waiting_user' }
+    })
+    expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(0)
     repository.close()
   })
 

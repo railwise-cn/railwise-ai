@@ -12,12 +12,12 @@ import type {
 } from '../../contracts/threads.js'
 import { ThreadSchema } from '../../contracts/threads.js'
 import type { RuntimeEvent } from '../../contracts/events.js'
-import type { TurnItem } from '../../contracts/items.js'
+import { isConversationReceiptItem, type TurnItem } from '../../contracts/items.js'
 import type { Turn } from '../../contracts/turns.js'
 import type { ApprovalPolicy, SandboxMode } from '../../contracts/policy.js'
 import type { ThreadStore, ThreadStoreListOptions } from '../../ports/thread-store.js'
 import type { SessionLatestUsageSnapshot, SessionUsageRecord } from '../../ports/session-store.js'
-import { countVisibleThreadMessages, previewFromThreadItems, toThreadSummary } from '../../domain/thread.js'
+import { toConversationThreadSummary, toThreadSummary } from '../../domain/thread.js'
 import { readJsonl } from '../file/file-thread-store.js'
 import {
   emptyUsageSnapshot,
@@ -78,6 +78,10 @@ type ThreadIndexRecord = {
   preview: string
 }
 
+function summaryFromIndexRecord(record: ThreadIndexRecord): ThreadSummary {
+  return { ...toThreadSummary(record.thread), messageCount: record.messageCount, preview: record.preview }
+}
+
 type UsageRuntimeEvent = Extract<RuntimeEvent, { kind: 'usage' }>
 
 type UsageRow = {
@@ -89,7 +93,7 @@ type UsageRow = {
   usage_json: string
 }
 
-const MESSAGE_COUNT_VERSION = 1
+const MESSAGE_COUNT_VERSION = 2
 
 /**
  * Hybrid store inspired by Codex: JSONL files are canonical and SQLite
@@ -116,6 +120,7 @@ export class HybridThreadStore implements ThreadStore {
   // Per-thread floor that keeps metadata compaction from re-running on every
   // append when a single snapshot is already larger than the threshold.
   private readonly metadataCompactFloor = new Map<string, number>()
+  private readonly conversationReceiptItems = new Map<string, TurnItem[]>()
 
   constructor(options: { dataDir: string; sqlitePath?: string; nowIso?: () => string }) {
     this.dataDir = resolve(options.dataDir, 'threads')
@@ -152,8 +157,9 @@ export class HybridThreadStore implements ThreadStore {
             if (row.message_count_version !== MESSAGE_COUNT_VERSION) {
               const thread = await this.readThreadFromDisk(row.id)
               if (thread) {
-                this.upsertIndexBestEffort(this.indexRecordForThread(thread))
-                summaries.push(toThreadSummary(thread))
+                const record = await this.indexRecordForThread(thread)
+                this.upsertIndexBestEffort(record)
+                summaries.push(summaryFromIndexRecord(record))
                 continue
               }
             }
@@ -181,7 +187,7 @@ export class HybridThreadStore implements ThreadStore {
 
     const thread = await this.readThreadFromDisk(threadId)
     if (thread && this.db) {
-      this.upsertIndexBestEffort(this.indexRecordForThread(thread))
+      this.upsertIndexBestEffort(await this.indexRecordForThread(thread))
     }
     return thread
   }
@@ -190,7 +196,7 @@ export class HybridThreadStore implements ThreadStore {
     await this.ready()
     await this.appendMetadata(thread)
     if (this.db) {
-      this.upsertIndexBestEffort(this.indexRecordForThread(thread))
+      this.upsertIndexBestEffort(await this.indexRecordForThread(thread))
     }
     return thread
   }
@@ -207,7 +213,17 @@ export class HybridThreadStore implements ThreadStore {
     this.deleteIndexRow(threadId)
     this.threadRecordCache.delete(threadId)
     this.metadataCompactFloor.delete(threadId)
+    this.conversationReceiptItems.delete(threadId)
     return true
+  }
+
+  /** Refresh only after canonical receipt writes, including replay/rewrite. */
+  async refreshConversationSummary(threadId: string): Promise<void> {
+    await this.ready()
+    this.threadRecordCache.delete(threadId)
+    this.conversationReceiptItems.delete(threadId)
+    const thread = await this.readThreadFromDisk(threadId)
+    if (thread && this.db) this.upsertIndexBestEffort(await this.indexRecordForThread(thread))
   }
 
   async noteEventSeq(threadId: string, seq: number): Promise<void> {
@@ -448,7 +464,7 @@ export class HybridThreadStore implements ThreadStore {
       if (!indexState?.messageCountCurrent) {
         const thread = await this.readThreadFromDisk(threadId)
         if (!thread) continue
-        this.upsertIndexBestEffort(this.indexRecordForThread(thread))
+        this.upsertIndexBestEffort(await this.indexRecordForThread(thread))
       }
       if (!indexState?.usageBackfilled) {
         const scan = await this.scanEventsForBackfill(threadId)
@@ -732,14 +748,27 @@ export class HybridThreadStore implements ThreadStore {
     }
   }
 
-  private indexRecordForThread(thread: ThreadRecord): ThreadIndexRecord {
-    const itemSource = thread.turns.flatMap((turn) => turn.items)
+  private async indexRecordForThread(thread: ThreadRecord): Promise<ThreadIndexRecord> {
+    const receipts = this.conversationReceiptItems.get(thread.id) ?? this.cacheConversationReceipts(thread.id, await this.loadItems(thread.id))
+    const summary = toConversationThreadSummary(thread, receipts)
     return {
-      thread,
-      messageCount: countVisibleThreadMessages(itemSource),
+      thread: { ...thread, updatedAt: summary.updatedAt },
+      messageCount: summary.messageCount ?? 0,
       eventSeqHighWater: 0,
-      preview: previewFromThreadItems(itemSource)
+      preview: summary.preview ?? ''
     }
+  }
+
+  private cacheConversationReceipts(threadId: string, items: TurnItem[]): TurnItem[] {
+    const receipts = items.filter(isConversationReceiptItem)
+    this.conversationReceiptItems.delete(threadId)
+    this.conversationReceiptItems.set(threadId, receipts)
+    while (this.conversationReceiptItems.size > THREAD_RECORD_CACHE_LIMIT) {
+      const oldest = this.conversationReceiptItems.keys().next().value
+      if (!oldest) break
+      this.conversationReceiptItems.delete(oldest)
+    }
+    return receipts
   }
 
   private async readThreadFromDisk(threadId: string): Promise<ThreadRecord | null> {
@@ -759,6 +788,7 @@ export class HybridThreadStore implements ThreadStore {
     const source = metadata ?? legacy
     if (!source) return null
     const items = await this.loadItems(threadId)
+    this.cacheConversationReceipts(threadId, items)
     // Records are treated as immutable by all callers (updates flow through
     // upsert with fresh objects), so caching the reference is safe.
     const record = hydrateThreadItems(source, items, {
@@ -838,7 +868,7 @@ export class HybridThreadStore implements ThreadStore {
     const summaries: ThreadSummary[] = []
     for (const threadId of await this.threadIdsFromFilesystem()) {
       const thread = await this.readThreadFromDisk(threadId)
-      if (thread) summaries.push(toThreadSummary(thread))
+      if (thread) summaries.push(summaryFromIndexRecord(await this.indexRecordForThread(thread)))
     }
     return summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   }
@@ -898,13 +928,17 @@ function hydrateThreadItems(
   }
   const itemsByTurn = new Map<string, TurnItem[]>()
   for (const item of items) {
+    if (isConversationReceiptItem(item)) continue
     const list = itemsByTurn.get(item.turnId) ?? []
     list.push(item)
     itemsByTurn.set(item.turnId, list)
   }
 
-  const knownTurnIds = new Set(thread.turns.map((turn) => turn.id))
-  const turns = thread.turns.map((turn): Turn => {
+  // Earlier readers could have hydrated local receipts into metadata. Keep
+  // their messages in JSONL while removing that execution-only projection.
+  const executionTurns = thread.turns.filter(turn => !/^command_[a-f0-9]{32}$/.test(turn.id))
+  const knownTurnIds = new Set(executionTurns.map((turn) => turn.id))
+  const turns = executionTurns.map((turn): Turn => {
     const turnItems = itemsByTurn.get(turn.id) ?? []
     const attachmentIds = turn.attachmentIds.length > 0
       ? turn.attachmentIds

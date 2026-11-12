@@ -35,13 +35,13 @@ describe('GUI update install preflight', () => {
     release()
   })
 
-  it('shows active work and passes explicit confirmation to main', async () => {
+  it('hands safe active work to main without a second confirmation', async () => {
     vi.mocked(window.workwise.preflightGuiUpdateInstall).mockResolvedValue({
       ok: true,
       activeWork: [{ kind: 'flow', id: 'run-1', label: 'Tender Flow', status: 'running', recoverable: true }]
     })
     await expect(preflightAndInstallGuiUpdate()).resolves.toEqual({ ok: true })
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Tender Flow'))
+    expect(window.confirm).not.toHaveBeenCalled()
     expect(window.workwise.installGuiUpdate).toHaveBeenCalledWith({ confirmActiveWork: true })
   })
 

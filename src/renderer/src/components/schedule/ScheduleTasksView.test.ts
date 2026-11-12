@@ -80,6 +80,7 @@ describe('ScheduleTasksView helpers', () => {
     expect(filterScheduledTasks([
       task('success', { lastStatus: 'success' }),
       task('error', { lastStatus: 'error' }),
+      task('waiting', { lastStatus: 'waiting_user' }),
       task('idle', { lastStatus: 'idle' })
     ], 'done').map((item) => item.id)).toEqual(['success', 'error'])
   })

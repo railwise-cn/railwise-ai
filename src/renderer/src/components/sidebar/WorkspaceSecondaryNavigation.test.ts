@@ -11,7 +11,7 @@ type ActiveRoute = ComponentProps<typeof WorkspaceSecondaryNavigation>['activeRo
 const labelsByRoute: Partial<Record<ActiveRoute, string>> = {
   write: 'Write',
   tasks: 'Tasks',
-  plugins: 'Plugins',
+  plugins: 'Skills &amp; connectors',
   schedule: 'Scheduled tasks',
   flow: 'Flow',
   design: 'Design'
@@ -22,6 +22,11 @@ function props(activeRoute: ActiveRoute): ComponentProps<typeof WorkspaceSeconda
     activeRoute,
     onWriteOpen: vi.fn(),
     onTasksOpen: vi.fn(),
+    toolCapabilities: {
+      flow: { enabled: true, available: true, status: 'available' },
+      schedule: { enabled: true, available: true, status: 'available' },
+      design: { enabled: true, available: true, status: 'available' }
+    },
     onOpenPlugins: vi.fn(),
     onScheduleOpen: vi.fn(),
     onFlowOpen: vi.fn(),
@@ -71,8 +76,24 @@ describe('WorkspaceSecondaryNavigation', () => {
   it('keeps Plugins visible as a sibling of the collapsible Tools group', () => {
     const html = renderToStaticMarkup(createElement(WorkspaceSecondaryNavigation, props('plugins')))
     const toolsMenu = html.match(/<div id="workspace-tools-menu"[\s\S]*?<\/div>/)?.[0] ?? ''
-    expect(toolsMenu).not.toContain('Plugins')
+    expect(toolsMenu).not.toContain('Skills &amp; connectors')
     expect(html).toContain('aria-current="page"')
-    expect(html.indexOf('id="workspace-tools-menu"')).toBeLessThan(html.indexOf('Plugins'))
+    expect(html.indexOf('id="workspace-tools-menu"')).toBeLessThan(html.indexOf('Skills &amp; connectors'))
+  })
+
+  it('hides unknown and unavailable execution entries while keeping configuration discoverable', () => {
+    const html = renderToStaticMarkup(createElement(WorkspaceSecondaryNavigation, {
+      ...props('chat'), toolCapabilities: { flow: { enabled: true, available: false, status: 'unavailable' } }
+    }))
+    expect(html).not.toContain('workspace-tools-menu')
+    expect(html).toContain('Skills &amp; connectors')
+    expect(html).toContain('Write')
+  })
+
+  it('preserves an unavailable deep-linked surface without advertising other tools', () => {
+    const html = renderToStaticMarkup(createElement(WorkspaceSecondaryNavigation, { ...props('flow'), toolCapabilities: undefined }))
+    expect(html).toContain('Flow')
+    expect(html).not.toContain('Scheduled tasks')
+    expect(html).not.toContain('>Design<')
   })
 })

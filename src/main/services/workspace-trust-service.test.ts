@@ -68,6 +68,21 @@ describe('WorkspaceTrustService', () => {
     })).resolves.toEqual(saved)
   })
 
+  it('rejects same-key changes and serializes concurrent trust revisions', async () => {
+    const base = await temp()
+    const workspace = join(base, 'workspace')
+    await mkdir(workspace)
+    const service = new WorkspaceTrustService(join(base, 'trust.json'))
+    await service.set({ workspaceRoot: workspace, level: 'workspace-write', expectedRevision: 0, confirmed: true, idempotencyKey: 'grant' })
+    await expect(service.set({ workspaceRoot: workspace, level: 'full-access', expectedRevision: 0, confirmed: true, idempotencyKey: 'grant' })).rejects.toMatchObject({ code: 'idempotency_conflict' })
+    const results = await Promise.allSettled([
+      service.set({ workspaceRoot: workspace, level: 'trusted', expectedRevision: 1, confirmed: true, idempotencyKey: 'a' }),
+      service.set({ workspaceRoot: workspace, level: 'full-access', expectedRevision: 1, confirmed: true, idempotencyKey: 'b' })
+    ])
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
+  })
+
   it('never lets an Agent exceed workspace trust', () => {
     expect(effectiveTrustLevel('workspace-write', 'full-access')).toBe('workspace-write')
     expect(effectiveTrustLevel('trusted', 'read-only')).toBe('read-only')

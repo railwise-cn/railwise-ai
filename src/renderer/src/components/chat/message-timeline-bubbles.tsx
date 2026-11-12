@@ -19,6 +19,7 @@ import { resolveGeneratedFileWorkspaceRoot } from '../../lib/generated-file-path
 import { safeMediaPreviewUrl } from '../../lib/safe-media-preview-url'
 import { projectDshUiText } from '../../lib/dsh-ui-stream'
 import { DshUiBlocks } from './DshUiBlocks'
+import { CapabilityRequiredCard } from './CapabilityRequiredCard'
 import { DiffView } from '../DiffView'
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { ModelMetaTag, WritePromptMetaDisclosure } from './message-timeline-cards'
@@ -1461,7 +1462,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
     return (
       <div className="group/message flex min-w-0 max-w-full flex-col">
         <div className="ds-markdown ds-chat-answer min-w-0 max-w-full text-ds-ink">
-          <AssistantMarkdown text={displayedText} streaming={streaming} />
+          {!streaming && block.capabilityCard ? <CapabilityRequiredCard card={block.capabilityCard} /> : <AssistantMarkdown text={displayedText} streaming={streaming} />}
           {uiBlocks?.length ? (
             <DshUiBlocks
               blocks={uiBlocks}
@@ -1525,7 +1526,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
             {t('approvalTool', { name: block.toolName })}
           </div>
         ) : null}
-        <p className="mt-2 whitespace-pre-wrap text-[14px] text-ds-ink">{block.summary}</p>
+        <p className="mt-2 max-h-96 overflow-y-auto whitespace-pre-wrap break-words text-[14px] text-ds-ink">{block.summary}</p>
         {block.errorMessage ? (
           <p className="mt-2 text-[12px] text-red-700 dark:text-red-300">{block.errorMessage}</p>
         ) : null}

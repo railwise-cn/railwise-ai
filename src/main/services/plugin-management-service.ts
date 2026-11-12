@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto'
+import { AUTOCAD_UPSTREAM, isApprovedAutocadUpstreamSkill, isApprovedUpstreamPackage, isCatalogInstallable } from '../../shared/engineering-marketplace'
+import { createHash, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { constants } from 'node:fs'
 import { copyFile, lstat, mkdir, open, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
@@ -185,7 +186,7 @@ export class PluginManagementService {
 
   async prepareCatalogPackage(item: MarketplacePackageV1): Promise<PreparedPluginImportV1> {
     await this.cleanupExpired()
-    if (item.availability.status !== 'available' || item.installation.mode !== 'direct-mirror') {
+    if (item.availability.status !== 'available' || !isCatalogInstallable(item)) {
       throw new Error('Catalog package is not eligible for direct installation.')
     }
     const targetDirectory = join(await this.ensureStagingRoot(), randomUUID())
@@ -207,7 +208,9 @@ export class PluginManagementService {
         preparedDirectory: targetDirectory,
         contentSha256: inspection.sha256,
         reviewSha256: marketplacePackageReviewSha256(item),
-        warnings: [],
+        warnings: isApprovedAutocadUpstreamSkill(item)
+          ? ['安装仅导入技能资料，完整保留脚本和参考文件。运行 Python/CAD 脚本需要相应依赖和任务权限。']
+          : isApprovedUpstreamPackage(item) ? ['Zotero MCP 0.17.0 采用 MIT AND AGPL-3.0-or-later。由用户独立从上游安装，保留完整许可证。仅启用本机只读工具，未启用附带的 Zotero 写入插件或 semantic 扩展。'] : [],
         compatibility: {
           workwiseCompatible:
             item.compatibility.platforms.includes(process.platform as 'darwin' | 'win32' | 'linux') &&
@@ -586,7 +589,7 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-async function copyLicense(sourceDirectory: string, targetDirectory: string): Promise<void> {
+async function copyLicense(sourceDirectory: string, targetDirectory: string, required = true): Promise<void> {
   const names = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'NOTICE', 'NOTICE.md', 'COPYING']
   if (await Promise.all(names.map((name) => exists(join(targetDirectory, name)))).then((values) => values.some(Boolean))) {
     return
@@ -597,7 +600,7 @@ async function copyLicense(sourceDirectory: string, targetDirectory: string): Pr
     await copyFile(source, join(targetDirectory, name))
     return
   }
-  throw new Error('Catalog package does not preserve a LICENSE, NOTICE, or COPYING file.')
+  if (required) throw new Error('Catalog package does not preserve a LICENSE, NOTICE, or COPYING file.')
 }
 
 function packageDirectory(root: string, packageName: string): string {
@@ -661,6 +664,10 @@ async function materializeGithubPackage(
   const source = item.source
   if (source.kind !== 'github' || !/^[0-9a-f]{40}$/i.test(source.resolvedRef)) {
     throw new Error('Catalog GitHub package must use an immutable commit.')
+  }
+  if (isApprovedAutocadUpstreamSkill(item)) {
+    await materializeGithubArchive(source.owner, source.repository, source.resolvedRef, targetDirectory, source.subpath, item)
+    return
   }
   const repository = `https://github.com/${source.owner}/${source.repository}.git`
   // GUI Electron processes do not inherit the interactive shell's proxy. Prefer
@@ -781,11 +788,21 @@ export async function materializeGithubArchive(
   repository: string,
   commit: string,
   targetDirectory: string,
-  subpath?: string
+  subpath?: string,
+  upstreamSkill?: MarketplacePackageV1
 ): Promise<void> {
   const archiveDirectory = `${targetDirectory}.archive`
   try {
+    const approvedUpstreamSkill = upstreamSkill !== undefined && isApprovedAutocadUpstreamSkill(upstreamSkill)
+    if (upstreamSkill && (!approvedUpstreamSkill || upstreamSkill.source.kind !== 'github'
+      || upstreamSkill.source.owner !== owner || upstreamSkill.source.repository !== repository
+      || upstreamSkill.source.resolvedRef !== commit || upstreamSkill.source.subpath !== subpath)) {
+      throw new Error('Upstream Skill source does not match the reviewed catalog artifact.')
+    }
     const archive = await downloadGithubArchive(owner, repository, commit)
+    if (approvedUpstreamSkill && createHash('sha256').update(archive).digest('hex') !== AUTOCAD_UPSTREAM.sha256) {
+      throw new Error('Upstream Skill archive SHA-256 does not match the reviewed catalog artifact.')
+    }
     // GitHub repositories may commit internal symlinks (for example a
     // workbench demo directory). The archive extractor resolves those links
     // into regular files/directories while continuing to reject links that
@@ -803,10 +820,10 @@ export async function materializeGithubArchive(
         throw new Error('Catalog package subpath escapes its repository.')
       }
       await stagePackageDirectory(selected, targetDirectory)
-      await copyLicense(repositoryRoot, targetDirectory)
+      await copyLicense(repositoryRoot, targetDirectory, !approvedUpstreamSkill)
     } else {
       await rename(repositoryRoot, targetDirectory)
-      await copyLicense(targetDirectory, targetDirectory)
+      await copyLicense(targetDirectory, targetDirectory, !approvedUpstreamSkill)
     }
   } finally {
     await rm(archiveDirectory, { recursive: true, force: true }).catch(() => undefined)

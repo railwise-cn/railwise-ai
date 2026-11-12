@@ -22,7 +22,13 @@ import type { ForkThreadOptions, ListThreadsOptions, ThreadService } from '../..
 import type { RuntimeError } from './runtime-error.js'
 import type { SessionStore } from '../../ports/session-store.js'
 import type { Turn } from '../../contracts/turns.js'
-import type { TurnItem } from '../../contracts/items.js'
+import { isConversationReceiptItem, TurnItem } from '../../contracts/items.js'
+
+/** Local conversation receipts remain visible without becoming completed executions. */
+export const ThreadDetailResponse = ThreadSchema.extend({
+  latestSeq: z.number().int().nonnegative(),
+  conversationItems: z.array(TurnItem).default([])
+})
 
 /**
  * Handlers for the thread CRUD endpoints. The handlers accept a
@@ -106,10 +112,11 @@ export async function getThread(
     sessionItems = await healSessionItemsForFinishedTurns(thread, sessionItems, sessionStore)
   }
   const hydratedThread = hydrateThreadItemsFromSession(thread, sessionItems)
-  return jsonResponse({
+  return jsonResponse(ThreadDetailResponse.parse({
     ...ThreadSchema.parse(hydratedThread),
-    latestSeq
-  })
+    latestSeq,
+    conversationItems: sessionItems.filter(isConversationReceiptItem)
+  }))
 }
 
 type FinishedTurnStatus = Extract<Turn['status'], 'completed' | 'failed' | 'aborted'>

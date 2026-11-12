@@ -85,6 +85,7 @@ import { clearComposerDraftAfterSuccessfulSend } from '../lib/composer-send-resu
 import { readFocusModePreference, writeFocusModePreference } from '../lib/focus-mode'
 import { WorkbenchRegistry } from './workbench-registry'
 import { WorkbenchPanelLoader } from './workbench-panel-loader'
+import { isWorkbenchCapabilityAvailable, WorkbenchCapabilityBoundary } from './WorkbenchCapabilityBoundary'
 import { builtinRightPanelLoaders } from './workbench-panel-loaders'
 import {
   createWorkbenchComposerDrafts,
@@ -317,6 +318,7 @@ export function Workbench(): ReactElement {
     pluginHostRoute,
     workspaceRoot,
     runtimeConnection,
+    runtimeCapabilities,
     setRoute,
     openCode,
     openWrite,
@@ -378,6 +380,7 @@ export function Workbench(): ReactElement {
       pluginHostRoute: s.pluginHostRoute,
       workspaceRoot: s.workspaceRoot,
       runtimeConnection: s.runtimeConnection,
+      runtimeCapabilities: s.runtimeCapabilities,
       setRoute: s.setRoute,
       openCode: s.openCode,
       openWrite: s.openWrite,
@@ -2016,6 +2019,11 @@ export function Workbench(): ReactElement {
     writeAssistantOpen
   })?.id ?? rightPanelMode
   const resolvedWorkbenchViewId = builtinWorkbenchViews.resolveTab({ route })?.id ?? null
+  const workbenchCapabilityAvailable = isWorkbenchCapabilityAvailable({
+    route,
+    capabilities: runtimeCapabilities,
+    runtimeReady: runtimeConnection === 'ready'
+  })
 
   useEffect(() => {
     if (!rightPanelVisible || !resolvedRightPanelId) return
@@ -2028,9 +2036,9 @@ export function Workbench(): ReactElement {
   }, [activeSddDraft, resolvedRightPanelId, rightPanelMode, rightPanelVisible, route, writeAssistantOpen])
 
   useEffect(() => {
-    if (!resolvedWorkbenchViewId) return
+    if (!resolvedWorkbenchViewId || !workbenchCapabilityAvailable) return
     return builtinWorkbenchViews.activateTab(resolvedWorkbenchViewId, { route })
-  }, [resolvedWorkbenchViewId, route])
+  }, [resolvedWorkbenchViewId, route, workbenchCapabilityAvailable])
 
   const rightPanelRenderers: Record<string, (module: unknown) => ReactElement | null> = {
     'sdd-ai': (module) => {
@@ -2174,7 +2182,7 @@ export function Workbench(): ReactElement {
         } else {
           window.dispatchEvent(new CustomEvent('kun:workspace-file-preview', { detail: { workspaceRoot: task.workspaceRoot, path } }))
         }
-      }} onOpenFlow={(flowId, flowRunId) => { requestFlowDetail({flowId,flowRunId}); openFlow() }} />
+      }} onOpenFlow={(flowId, flowRunId) => { requestFlowDetail({flowId,flowRunId}); openFlow() }} onConfigureReplyDelivery={() => openSettings('claw')} onConfigureProvider={provider => { setConnectPhoneSidebarOpen(false); openPlugins(sidebarView === 'claw' ? 'claw' : 'chat', provider === 'lark' || provider === 'feishu' ? 'lark' : provider === 'dingtalk' ? 'dingtalk' : undefined) }} />
     },
     plugins: (module) => {
       const View = (module as typeof import('./PluginMarketplaceView')).PluginMarketplaceView
@@ -2291,13 +2299,23 @@ export function Workbench(): ReactElement {
         }`}
       >
         {resolvedWorkbenchViewId ? (
-          <WorkbenchPanelLoader
-            registry={builtinWorkbenchViews}
-            panelId={resolvedWorkbenchViewId}
-            context={workbenchViewContext}
-            title={t('workbenchPanelErrorTitle')}
-            retryLabel={t('workbenchPanelRetry')}
-          />
+          <WorkbenchCapabilityBoundary
+            route={route}
+            capabilities={runtimeCapabilities}
+            runtimeReady={runtimeConnection === 'ready'}
+            refreshing={runtimeConnection === 'checking'}
+            onSettings={() => openSettings('general')}
+            onPlugins={openPluginsView}
+            onRefresh={() => void probeRuntime('user')}
+          >
+            <WorkbenchPanelLoader
+              registry={builtinWorkbenchViews}
+              panelId={resolvedWorkbenchViewId}
+              context={workbenchViewContext}
+              title={t('workbenchPanelErrorTitle')}
+              retryLabel={t('workbenchPanelRetry')}
+            />
+          </WorkbenchCapabilityBoundary>
         ) : route === 'write' ? (
           <>
             {writeRuntimeBannerMessage ? renderRuntimeBanner(writeRuntimeBannerMessage, runtimeErrorDetail) : null}

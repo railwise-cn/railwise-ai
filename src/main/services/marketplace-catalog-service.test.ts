@@ -22,6 +22,7 @@ import {
   getOfficialMarketplaceCatalog
 } from './official-marketplace-catalog'
 import { MarketplaceCatalogService } from './marketplace-catalog-service'
+import { CatalogCredentialService } from './catalog-credential-service'
 
 const roots: string[] = []
 const MAX_JSON_BYTES = 10 * 1024 * 1024
@@ -62,7 +63,7 @@ function localSource(
   } as CatalogSourceV1
 }
 
-function httpsSource(id: string, location = `https://${id}.catalog.test/v1.json`): CatalogSourceV1 {
+function httpsSource(id: string, location = `https://${id}.catalog.test/v1.json`): Extract<CatalogSourceV1, { type: 'https' }> {
   return {
     schemaVersion: 1,
     id,
@@ -237,6 +238,40 @@ describe('MarketplaceCatalogService', () => {
       lastModified: 'Sat, 08 Aug 2026 08:00:00 GMT',
       commit: 'a'.repeat(40)
     })
+  })
+
+  it.each(['credential_helper_timeout', 'credential_helper_access_denied'])('isolates %s to its protected source while retaining bundled and cached catalogs', async (code) => {
+    const rootDirectory = await tempRoot()
+    let denied = false
+    const credentialOptions = { root: join(rootDirectory, 'credentials'), encryption: {
+      available: () => true, encrypt: async (value: string) => Buffer.from(value), storage: 'keychain' as const,
+      decrypt: async (value: Buffer) => {
+        if (denied) throw Object.assign(new Error('synthetic protected-storage failure'), { code })
+        return value.toString()
+      }
+    } }
+    let credentials = new CatalogCredentialService(credentialOptions)
+    await credentials.set('catalog.protected.token', 'synthetic-token')
+    const fetch = vi.fn(async () => jsonResponse(snapshot('protected-cache')))
+    const options = { rootDirectory, fetch, resolveSecret: async (key: string) => (await credentials.resolve(key)) ?? null }
+    const service = new MarketplaceCatalogService(options)
+    await service.upsertSource({ ...httpsSource('protected-cache'), auth: { type: 'token', secretKey: 'catalog.protected.token' } })
+    expect(await service.syncSource('protected-cache')).toMatchObject({ status: 'synced' })
+    const before = await service.listPackages()
+    expect(before.packages.some(entry => entry.sourceId === 'workwise-official')).toBe(true)
+    denied = true
+    credentials = new CatalogCredentialService(credentialOptions)
+    expect(await service.syncSource('protected-cache')).toMatchObject({ sourceId: 'protected-cache', status: 'failed', stale: true, error: expect.stringContaining('原凭据仍保留'), snapshot: { sourceId: 'protected-cache' } })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(await service.listPackages()).toEqual(before)
+    const reopened = new MarketplaceCatalogService(options)
+    expect(await reopened.listPackages()).toEqual(before)
+    const sources = await reopened.listSources()
+    expect(sources.find(source => source.id === 'protected-cache')?.sync.state).toBe('error')
+    expect(sources.find(source => source.id === 'workwise-official')?.sync.state).not.toBe('error')
+    denied = false
+    expect(await reopened.syncSource('protected-cache')).toMatchObject({ status: 'synced' })
+    expect(await credentials.resolve('catalog.protected.token')).toBe('synthetic-token')
   })
 
   it('returns an explicit stale offline result while retaining a trusted HTTPS cache', async () => {

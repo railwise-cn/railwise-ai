@@ -1,4 +1,5 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { lstat, open, readdir, readFile, stat } from 'node:fs/promises'
 import { basename, extname, join, resolve, sep } from 'node:path'
 import { z } from 'zod'
 import type { SkillsCapabilityConfig } from '../contracts/capabilities.js'
@@ -7,6 +8,21 @@ const DEFAULT_ACTIVE_LIMIT = 3
 const DEFAULT_INSTRUCTION_BUDGET_BYTES = 24_000
 const MIN_BUDGETED_SKILL_BYTES = 500
 const DEFAULT_DISCOVERY_WAIT_MS = 5_000
+const MAX_CATALOG_METADATA_BYTES = 256_000
+const CatalogSkillRequirements = z.object({
+  schemaVersion: z.literal(1),
+  components: z.array(z.object({
+    type: z.string().max(64),
+    skillNames: z.array(z.string().min(1).max(200)).max(64).optional()
+  })).max(64),
+  dependencies: z.array(z.object({
+    id: z.string().min(1).max(128),
+    kind: z.enum(['package', 'runtime', 'system']),
+    requirement: z.string().min(1).max(512),
+    optional: z.boolean(),
+    managedBy: z.enum(['workwise', 'system', 'user']).optional()
+  })).max(16)
+})
 const GENERIC_KEYWORDS = new Set([
   '帮我',
   '我要',
@@ -67,6 +83,7 @@ export type LoadedSkill = {
   assets: string[]
   priority: number
   legacy: boolean
+  dependencyInstructions?: string
 }
 
 export type SkillActivation = {
@@ -352,6 +369,7 @@ async function discoverSkills(
           return null
         })
         if (loaded) {
+          loaded.dependencyInstructions = await loadCatalogDependencyInstructions(loaded, root)
           skills.push(loaded)
           onProgress({ skills: uniqueSkills(skills), validationErrors: [...validationErrors] })
         }
@@ -436,6 +454,48 @@ async function loadSkillPackage(root: string, allowLegacy: boolean): Promise<Loa
   }
 }
 
+/** Installed roots reach Runtime through Main's package-hash verification. */
+async function loadCatalogDependencyInstructions(skill: LoadedSkill, discoveryRoot: string): Promise<string | undefined> {
+  // Stay within this admitted root and its immediate skill package. Never walk
+  // upward into unrelated workspace or home-directory catalog metadata.
+  for (const directory of new Set([skill.root, discoveryRoot])) {
+    const path = join(directory, 'workwise.catalog.json')
+    try {
+      const initial = await lstat(path)
+      if (!initial.isFile() || initial.isSymbolicLink() || initial.size > MAX_CATALOG_METADATA_BYTES) continue
+      const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+      let raw: string
+      try {
+        const before = await handle.stat()
+        if (!before.isFile() || before.dev !== initial.dev || before.ino !== initial.ino || before.size !== initial.size || before.mtimeMs !== initial.mtimeMs) continue
+        const bytes = Buffer.alloc(MAX_CATALOG_METADATA_BYTES + 1)
+        let bytesRead = 0
+        while (bytesRead < before.size) {
+          const read = await handle.read(bytes, bytesRead, before.size - bytesRead, bytesRead)
+          if (!read.bytesRead) break
+          bytesRead += read.bytesRead
+        }
+        const after = await handle.stat()
+        const current = await lstat(path)
+        if (bytesRead !== before.size || bytesRead > MAX_CATALOG_METADATA_BYTES || after.size !== before.size ||
+            after.mtimeMs !== before.mtimeMs || current.isSymbolicLink() || current.dev !== after.dev || current.ino !== after.ino) continue
+        raw = bytes.subarray(0, bytesRead).toString('utf8')
+      } finally { await handle.close() }
+      const parsed = CatalogSkillRequirements.safeParse(JSON.parse(raw))
+      if (!parsed.success || !parsed.data.dependencies.length || !parsed.data.components.some(component =>
+        component.type === 'skill' && component.skillNames?.some(name => name === skill.id || name === skill.name))) continue
+      return [
+        'Catalog dependency requirements',
+        'Apply these version requirements to the Skill setup commands. Check actual dependency availability before execution. Installation and execution follow the current task authorization. User-managed dependencies use the existing environment or an explicitly authorized task-local environment.',
+        ...parsed.data.dependencies.map(dependency => `- ${JSON.stringify(dependency)}`)
+      ].join('\n')
+    } catch {
+      // Optional catalog metadata must preserve manual and legacy Skill loading.
+    }
+  }
+  return undefined
+}
+
 function buildInjection(
   active: Array<SkillActivation & { skill: LoadedSkill }>,
   budgetBytes: number
@@ -510,6 +570,7 @@ function skillInstructionHeader(match: SkillActivation & { skill: LoadedSkill })
     `Skill root: ${skill.root}`,
     `Skill entry: ${skill.entryPath}`,
     skill.allowedTools.length ? `Allowed tools: ${skill.allowedTools.join(', ')}` : '',
+    skill.dependencyInstructions ?? '',
     skill.assets.length ? `Assets:\n${skill.assets.map((asset) => `- ${asset}`).join('\n')}` : ''
   ].filter(Boolean).join('\n\n')
 }

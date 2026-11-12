@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { ManagedDwsResult } from '../../shared/managed-dws'
 import {
   mergeScheduleSettings,
   defaultClawSettings,
@@ -15,7 +16,38 @@ import {
 } from '../../shared/app-settings'
 
 const handlers = new Map<string, (event: unknown, payload?: unknown) => Promise<unknown>>()
+const desktopDingTalkMocks = vi.hoisted(() => ({ open: vi.fn(async () => ({ ok: true })) }))
+vi.mock('../services/dingtalk-desktop-service', () => ({ openDingTalkDesktop: desktopDingTalkMocks.open }))
+const dwsMocks = vi.hoisted(() => ({
+  diagnose: vi.fn(async () => ({ ok: true, status: { state: 'needs_login' } })),
+  install: vi.fn(async () => ({ ok: true, status: { state: 'needs_login' } })),
+  begin: vi.fn<() => Promise<ManagedDwsResult>>(async () => ({ ok: true, state: 'waiting', verificationUrl: 'https://login.dingtalk.com/device' })),
+  check: vi.fn(async () => ({ ok: true, state: 'succeeded', status: { state: 'installed', identityFingerprint: 'synthetic-fingerprint' } })),
+  cancel: vi.fn(async () => ({ ok: true, state: 'cancelled' }))
+}))
+const dwsReadCheck = vi.hoisted(() => vi.fn(async (_status: unknown) => ({
+  ok: true,
+  itemCount: 0,
+  checkedAt: '2026-11-11T00:00:00.000Z',
+  message: '待办读取已验证。'
+})))
+vi.mock('../services/dws-connection-check', () => ({
+  checkDingTalkTaskAccess: dwsReadCheck,
+  dwsTaskAccessFailure: (code: string) => ({ ok: false, code })
+}))
+vi.mock('../services/managed-dws-service', () => ({
+  diagnoseManagedDingTalk: dwsMocks.diagnose,
+  installManagedDingTalk: dwsMocks.install,
+  beginManagedDingTalkLogin: dwsMocks.begin,
+  checkManagedDingTalkLogin: dwsMocks.check,
+  cancelManagedDingTalkLogin: dwsMocks.cancel
+}))
 const managedToolMocks = vi.hoisted(() => ({
+  beginLogin: vi.fn(async () => ({ ok: true, verificationUrl: 'https://accounts.feishu.cn/device', expiresAt: '2026-11-10T00:00:00.000Z' })),
+  completeLogin: vi.fn(async () => ({ ok: true, status: { id: 'lark-cli', state: 'installed', scopes: ['task:task:read'], brand: 'feishu' } })),
+  beginAppSetup: vi.fn(async () => ({ ok: true, state: 'waiting', verificationUrl: 'https://accounts.feishu.cn/device' })),
+  checkAppSetup: vi.fn(async () => ({ ok: true, state: 'configured' })),
+  cancelAppSetup: vi.fn(async () => ({ ok: true, state: 'cancelled' })),
   list: vi.fn(async () => ({ ok: true, tools: [] })),
   install: vi.fn(async () => ({ ok: false, message: 'fixture' })),
   update: vi.fn(async () => ({ ok: false, message: 'fixture' })),
@@ -24,6 +56,11 @@ const managedToolMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../services/managed-tool-service', () => ({
+  beginManagedLarkLogin: managedToolMocks.beginLogin,
+  completeManagedLarkLogin: managedToolMocks.completeLogin,
+  beginManagedLarkAppSetup: managedToolMocks.beginAppSetup,
+  checkManagedLarkAppSetup: managedToolMocks.checkAppSetup,
+  cancelManagedLarkAppSetup: managedToolMocks.cancelAppSetup,
   listManagedTools: managedToolMocks.list,
   installManagedTool: managedToolMocks.install,
   updateManagedTool: managedToolMocks.update,
@@ -102,6 +139,29 @@ describe('registerAppIpcHandlers', () => {
   beforeEach(() => {
     handlers.clear()
     vi.clearAllMocks()
+  })
+
+  it('exposes an isolated legacy workspace report and requires explicit snapshot consent', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const { WorkspaceMigrationService } = await import('../services/workspace-migration-service')
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'workwise-migration-ipc-')))
+    const source = join(root, '.workgpt', 'default_workspace')
+    mkdirSync(source, { recursive: true })
+    writeFileSync(join(source, 'draft.md'), 'local data')
+    const service = new WorkspaceMigrationService({ home: root, stateRoot: join(root, 'state') })
+    registerAppIpcHandlers(registerOptions({ workspaceMigrationService: service }))
+    const report = await handlers.get('workspace-migration:scan')?.({ sender: { id: 1 } }) as Awaited<ReturnType<InstanceType<typeof WorkspaceMigrationService>['scan']>>
+    const legacy = report.entries.find(entry => entry.id === '.workgpt:default')!
+    expect(legacy.status).toBe('populated')
+    await expect(handlers.get('workspace-migration:import-snapshot')?.({ sender: { id: 1 } }, {
+      sourceId: legacy.id, expectedFingerprint: legacy.fingerprint, confirmed: false, idempotencyKey: 'blocked'
+    })).rejects.toMatchObject({ code: 'approval_required' })
+    const result = await handlers.get('workspace-migration:import-snapshot')?.({ sender: { id: 1 } }, {
+      sourceId: legacy.id, expectedFingerprint: legacy.fingerprint, confirmed: true, idempotencyKey: 'snapshot'
+    }) as Awaited<ReturnType<InstanceType<typeof WorkspaceMigrationService>['importSnapshot']>>
+    expect(result.status).toBe('completed')
+    expect(readFileSync(join(source, 'draft.md'), 'utf8')).toBe('local data')
+    rmSync(root, { recursive: true, force: true })
   })
 
   it('keeps the same workspace-watch IPC subscription across atomic saves and later deletion', async () => {
@@ -330,30 +390,91 @@ describe('registerAppIpcHandlers', () => {
     expect(showTurnCompleteNotification).toHaveBeenCalledWith(expect.objectContaining({ activeThread: true }))
   })
 
-  it('requires explicit confirmation when update preflight finds active Agent work', async () => {
+  it('requires the confirmed Runtime snapshot and performs one fenced install', async () => {
     const installGuiUpdate = vi.fn(async () => ({ ok: true as const }))
-    const runtimeRequest = vi.fn(async (path: string) => {
-      if (path.startsWith('/v1/tasks')) {
-        return { ok: true, status: 200, body: JSON.stringify([{ id: 'task-1', goal: '编制投标文件', status: 'running' }]) }
+    const snapshotId = 'a'.repeat(64)
+    const activeWork = [{ kind: 'agent', id: 'task-1', label: '编制投标文件', status: 'running', recoverable: true }]
+    const runtimeRequest = vi.fn(async (path: string, _method: string, body?: string) => {
+      if (path === '/v1/runtime/update') return { ok: true, status: 200, body: JSON.stringify({ ok: true, activeWork, snapshotId }) }
+      if (path === '/v1/runtime/update/prepare') {
+        const accepted = JSON.parse(body ?? '{}').confirmedSnapshotId === snapshotId
+        return { ok: accepted, status: accepted ? 200 : 409, body: JSON.stringify(accepted ? { ok: true, activeWork, snapshotId } : { message: 'Active work changed' }) }
       }
-      if (path === '/v1/flows') return { ok: true, status: 200, body: JSON.stringify({ flows: [] }) }
       return { ok: false, status: 404, body: '{}' }
     })
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     registerAppIpcHandlers(registerOptions({
       runtimeRequest: runtimeRequest as never,
-      loadGuiUpdaterModule: vi.fn(async () => ({ installGuiUpdate })) as never
+      loadGuiUpdaterModule: vi.fn(async () => ({ installGuiUpdate, getGuiUpdateState: () => ({ status: 'downloaded' }) })) as never
     }))
-
-    const preflight = await handlers.get('gui:update-install-preflight')?.({})
-    expect(preflight).toMatchObject({
-      ok: true,
-      activeWork: [{ kind: 'agent', id: 'task-1', status: 'running', recoverable: true }]
-    })
-    await expect(handlers.get('gui:update-install')?.({}, {})).resolves.toMatchObject({ ok: false })
+    await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toMatchObject({ ok: true, activeWork, snapshotId })
+    await expect(handlers.get('gui:update-install')?.({}, { confirmActiveWork: true })).resolves.toMatchObject({ ok: false })
     expect(installGuiUpdate).not.toHaveBeenCalled()
-    await expect(handlers.get('gui:update-install')?.({}, { confirmActiveWork: true })).resolves.toEqual({ ok: true })
+    await expect(handlers.get('gui:update-install')?.({}, { confirmActiveWork: true, confirmedSnapshotId: snapshotId })).resolves.toEqual({ ok: true })
     expect(installGuiUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects renderer-supplied paths at the task artifact opening boundary', async () => {
+    const runtimeRequest = vi.fn()
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ runtimeRequest }))
+    await expect(handlers.get('task-artifact:open')?.({}, { taskId: 'task', artifactId: 'artifact', absolutePath: '/arbitrary/file.md' })).rejects.toThrow('Invalid payload')
+    expect(runtimeRequest).not.toHaveBeenCalled()
+  })
+
+  it('applies saved MCP settings through a main-owned snapshot and blocks renderer config injection', async () => {
+    const snapshot = { revision: 1, servers: {}, environment: { SYNTHETIC_KEY: 'fixture-only' } }
+    const saved = { id: 'amap', revision: 1 }
+    const mcpConfigService = { save: vi.fn(async () => saved), runtimeSnapshot: vi.fn(async () => snapshot) }
+    const onMcpServersChanged = vi.fn(async () => undefined)
+    const runtimeRequest = vi.fn()
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ mcpConfigService: mcpConfigService as never, onMcpServersChanged, runtimeRequest }))
+    await expect(handlers.get('mcp-server:save')?.({}, {
+      config: { id: 'amap', name: 'Amap', scope: 'global', transport: 'http', url: 'https://mcp.amap.com/mcp', timeoutMs: 5000, source: 'managed-tool', managedPreset: 'amap-readonly', toolPolicy: {}, enabled: false },
+      expectedRevision: 0, idempotencyKey: 'save-synthetic-mcp'
+    })).resolves.toEqual(saved)
+    expect(onMcpServersChanged).toHaveBeenCalledWith(snapshot)
+    await expect(handlers.get('runtime:request')?.({}, { path: '/v1/runtime/mcp-config', method: 'POST', body: '{}' })).rejects.toThrow(/not allowed|仅能通过连接器设置/)
+    expect(runtimeRequest).not.toHaveBeenCalled()
+  })
+
+  it('reapplies the main-owned Runtime snapshot after an explicit credential retry succeeds', async () => {
+    const snapshot = { revision: 7, servers: { amap: { enabled: true } }, environment: { SYNTHETIC_KEY: 'fixture-only' } }
+    const result = { id: 'amap', state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: 11 }
+    const mcpConfigService = { test: vi.fn(async () => result), runtimeSnapshot: vi.fn(async () => snapshot) }
+    const onMcpServersChanged = vi.fn(async () => undefined)
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ mcpConfigService: mcpConfigService as never, onMcpServersChanged }))
+    await expect(handlers.get('mcp-server:test')?.({}, { serverId: 'amap' })).resolves.toEqual(result)
+    expect(onMcpServersChanged).toHaveBeenCalledWith(snapshot)
+    mcpConfigService.test.mockResolvedValueOnce({ ...result, state: 'needs_authorization', authorized: false })
+    await handlers.get('mcp-server:test')?.({}, { serverId: 'amap' })
+    expect(onMcpServersChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards real MCP check evidence and rejects renderer-injected verification fields', async () => {
+    const result = { id: 'amap', state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: 11, checkedAt: '2026-11-12T01:02:03.000Z' }
+    const mcpConfigService = { test: vi.fn(async () => result), save: vi.fn() }
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ mcpConfigService: mcpConfigService as never }))
+    await expect(handlers.get('mcp-server:test')?.({}, { serverId: 'amap' })).resolves.toEqual(result)
+    expect(mcpConfigService.test).toHaveBeenCalledWith('amap', undefined)
+    await expect(handlers.get('mcp-server:save')?.({}, {
+      config: { id: 'amap', name: 'Amap', scope: 'global', transport: 'http', url: 'https://mcp.amap.com/mcp', timeoutMs: 5000, source: 'managed-tool', toolPolicy: {}, enabled: true, connectionCheck: result },
+      expectedRevision: 1, idempotencyKey: 'spoof-check'
+    })).rejects.toThrow('Invalid payload')
+    expect(mcpConfigService.save).not.toHaveBeenCalled()
+  })
+
+  it('blocks update preflight on an unavailable or malformed Runtime snapshot', async () => {
+    const runtimeRequest = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, body: JSON.stringify({ message: 'Runtime unavailable' }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, body: JSON.stringify({ ok: true, activeWork: [] }) })
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ runtimeRequest }))
+    await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toMatchObject({ ok: false, message: 'Runtime unavailable' })
+    await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toMatchObject({ ok: false })
   })
 
   it('preserves heading, page, table, worksheet, and slide provenance in attachment sections', async () => {
@@ -942,12 +1063,29 @@ describe('registerAppIpcHandlers', () => {
     }))
   })
 
+  it('opens only the fixed DingTalk desktop target and rejects renderer-supplied paths', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions())
+    const handler = handlers.get('shell:open-dingtalk-desktop')!
+    expect(await handler({})).toEqual({ ok: true })
+    expect(desktopDingTalkMocks.open).toHaveBeenCalledOnce()
+    for (const payload of ['/Applications/Other.app', { path: '/tmp/Other.app' }, 'dingtalk://untrusted']) {
+      await expect(handler({}, payload)).rejects.toThrow(/Invalid payload/)
+    }
+    expect(desktopDingTalkMocks.open).toHaveBeenCalledOnce()
+  })
+
   it('registers every managed-tool IPC handler and validates tool ids', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
 
     registerAppIpcHandlers(registerOptions())
 
     for (const channel of [
+      'tool:lark-login:begin',
+      'tool:lark-login:complete',
+      'tool:lark-app-setup:begin',
+      'tool:lark-app-setup:check',
+      'tool:lark-app-setup:cancel',
       'tool:list-managed',
       'tool:install-managed',
       'tool:update-managed',
@@ -976,6 +1114,95 @@ describe('registerAppIpcHandlers', () => {
     expect(managedToolMocks.remove).toHaveBeenCalledWith('officecli')
   })
 
+  it('refreshes the trusted Runtime capability snapshot after managed user login', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const refresh = vi.fn(async () => undefined)
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedCapabilities: refresh })
+    expect(await handlers.get('tool:lark-app-setup:begin')?.({})).toMatchObject({ ok: true, state: 'waiting' })
+    expect(await handlers.get('tool:lark-app-setup:check')?.({})).toMatchObject({ ok: true, state: 'configured' })
+    expect(await handlers.get('tool:lark-app-setup:cancel')?.({})).toMatchObject({ ok: true, state: 'cancelled' })
+    expect(refresh).not.toHaveBeenCalled()
+    expect(await handlers.get('tool:lark-login:begin')?.({})).toMatchObject({ ok: true })
+    expect(await handlers.get('tool:lark-login:complete')?.({})).toMatchObject({ ok: true, status: { state: 'installed' } })
+    expect(refresh).toHaveBeenCalledWith(expect.objectContaining({ id: 'lark-cli', scopes: ['task:task:read'] }))
+  })
+
+  it('exposes independent DingTalk installation and scan flow without treating a waiting scan as connected', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const refresh = vi.fn(async () => undefined)
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: refresh })
+    expect(await handlers.get('tool:dingtalk:diagnose')?.({})).toMatchObject({ ok: true, status: { state: 'needs_login' } })
+    expect(await handlers.get('tool:dingtalk:install')?.({})).toMatchObject({ ok: true })
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(await handlers.get('tool:dingtalk:login-begin')?.({})).toMatchObject({ state: 'waiting' })
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(await handlers.get('tool:dingtalk:login-check')?.({})).toMatchObject({ state: 'succeeded' })
+    expect(refresh).toHaveBeenLastCalledWith(expect.objectContaining({ state: 'installed', identityFingerprint: 'synthetic-fingerprint' }))
+    expect(await handlers.get('tool:dingtalk:login-cancel')?.({})).toMatchObject({ state: 'cancelled' })
+  })
+
+  it('refreshes Runtime when DingTalk authorization finishes and verifies before returning its first page', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const status = { state: 'installed' as const, identityFingerprint: 'synthetic-fast-completion' }
+    dwsMocks.begin.mockResolvedValueOnce({ ok: true, state: 'succeeded', status })
+    const refresh = vi.fn(async () => ({ enabled: true }))
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: refresh })
+    expect(await handlers.get('tool:dingtalk:login-begin')?.({})).toMatchObject({ state: 'succeeded', status: { ...status, enabled: true } })
+    expect(refresh).toHaveBeenCalledExactlyOnceWith(status)
+    expect(dwsMocks.check).not.toHaveBeenCalled()
+  })
+
+  it('changes DingTalk enablement only through an explicit strict boolean command without reading accounts', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const setEnabled = vi.fn(async (enabled: boolean) => ({ ok: true as const, status: { state: 'needs_login' as const, enabled } }))
+    registerAppIpcHandlers({ ...registerOptions(), setManagedDingTalkEnabled: setEnabled })
+    expect(await handlers.get('tool:dingtalk:set-enabled')?.({}, true)).toEqual({ ok: true, status: { state: 'needs_login', enabled: true } })
+    expect(await handlers.get('tool:dingtalk:set-enabled')?.({}, false)).toEqual({ ok: true, status: { state: 'needs_login', enabled: false } })
+    for (const payload of ['true', 'false', 1, 0, null, { enabled: true }]) await expect(handlers.get('tool:dingtalk:set-enabled')?.({}, payload)).rejects.toThrow(/Invalid payload/)
+    expect(setEnabled.mock.calls).toEqual([[true], [false]])
+    expect(dwsMocks.diagnose).not.toHaveBeenCalled()
+    expect(dwsMocks.begin).not.toHaveBeenCalled()
+  })
+
+  it('offers a fixed read check after trusted diagnosis and rejects arbitrary input', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: async () => ({ enabled: true }) })
+    expect(await handlers.get('tool:dingtalk:check-task-access')?.({})).toMatchObject({ ok: true, itemCount: 0 })
+    expect(dwsReadCheck).toHaveBeenCalledWith({ state: 'needs_login', enabled: true })
+    for (const payload of [{ pageSize: 100 }, { command: 'approve' }, 'read', null]) {
+      await expect(handlers.get('tool:dingtalk:check-task-access')?.({}, payload)).rejects.toThrow(/Invalid payload/)
+    }
+    expect(dwsReadCheck).toHaveBeenCalledOnce()
+  })
+
+  it('stops the business read when connector Runtime refresh fails', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: async () => { throw new Error('refresh failed') } })
+    expect(await handlers.get('tool:dingtalk:check-task-access')?.({})).toMatchObject({ ok: false, code: 'connector_identity_unverified' })
+    expect(dwsReadCheck).not.toHaveBeenCalled()
+  })
+
+  it('shares a concurrent read diagnostic instead of dispatching a second query', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    let finish!: (value: Awaited<ReturnType<typeof dwsReadCheck>>) => void
+    dwsReadCheck.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: async () => ({ enabled: true }) })
+    const first = handlers.get('tool:dingtalk:check-task-access')?.({})
+    const second = handlers.get('tool:dingtalk:check-task-access')?.({})
+    await vi.waitFor(() => expect(dwsReadCheck).toHaveBeenCalledOnce())
+    finish({ ok: true, itemCount: 0, checkedAt: '2026-11-11T00:00:00.000Z', message: '待办读取已验证。' })
+    expect(await first).toEqual(await second)
+    expect(dwsMocks.diagnose).toHaveBeenCalledOnce()
+  })
+
+  it('returns persisted disabled state from a trusted refresh without replacing installation or identity diagnosis', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: async () => ({ enabled: false }) })
+    expect(await handlers.get('tool:dingtalk:diagnose')?.({})).toMatchObject({ ok: true, status: { state: 'needs_login', enabled: false } })
+    expect(await handlers.get('tool:dingtalk:login-check')?.({})).toMatchObject({ ok: true, status: { state: 'installed', enabled: false, identityFingerprint: 'synthetic-fingerprint' } })
+    expect(await handlers.get('tool:dingtalk:set-enabled')?.({}, true)).toMatchObject({ ok: false })
+  })
+
   it('routes unified catalog and plugin operations through validated IPC payloads', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const catalogService = {
@@ -997,7 +1224,8 @@ describe('registerAppIpcHandlers', () => {
       status: vi.fn(async (sourceId: string) => ({ sourceId, configured: true, storage: 'keychain' })),
       set: vi.fn(async () => 'keychain'),
       remove: vi.fn(async () => undefined),
-      resolve: vi.fn(async () => undefined)
+      resolve: vi.fn(async () => undefined),
+      withProtectedStorageRetry: vi.fn(async (_key: string, operation: () => Promise<unknown>) => operation())
     }
     registerAppIpcHandlers(registerOptions({
       marketplaceCatalogService: catalogService as never,
@@ -1086,6 +1314,10 @@ describe('registerAppIpcHandlers', () => {
       configured: true,
       storage: 'keychain'
     }])
+    expect(catalogCredentialService.withProtectedStorageRetry).not.toHaveBeenCalled()
+    await expect(handlers.get('catalog:sync-source')?.({}, { sourceId: 'private' })).resolves.toMatchObject({ sourceId: 'private', status: 'synced' })
+    expect(catalogCredentialService.withProtectedStorageRetry).toHaveBeenCalledExactlyOnceWith('catalog.private.token', expect.any(Function))
+    expect(catalogService.syncSource).toHaveBeenCalledWith('private')
     await expect(handlers.get('catalog:clear-credential')?.({}, { sourceId: 'private' }))
       .resolves.toEqual({ sourceId: 'private', configured: false })
     expect(catalogCredentialService.remove).toHaveBeenCalledWith('catalog.private.token')

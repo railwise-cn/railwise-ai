@@ -14,6 +14,7 @@ import {
 } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { basename, dirname, join, relative, sep } from 'node:path'
+import Database from 'better-sqlite3'
 
 /**
  * Read-only compatibility import for pre-V2 installations.
@@ -43,10 +44,14 @@ export const HOME_DATA_MIGRATION_MAPPINGS: readonly HomeDataMigrationMapping[] =
   { legacySegments: ['.kun', 'claw'], nextSegments: [NEW_HOME_DATA_ROOT, 'claw'] },
   { legacySegments: [LEGACY_HOME_DATA_ROOT, 'claw'], nextSegments: [NEW_HOME_DATA_ROOT, 'claw'] },
   { legacySegments: ['.kun', 'write_workspace'], nextSegments: [NEW_HOME_DATA_ROOT, 'write_workspace'] },
-  { legacySegments: [LEGACY_HOME_DATA_ROOT, 'write_workspace'], nextSegments: [NEW_HOME_DATA_ROOT, 'write_workspace'] }
+  { legacySegments: [LEGACY_HOME_DATA_ROOT, 'write_workspace'], nextSegments: [NEW_HOME_DATA_ROOT, 'write_workspace'] },
+  { legacySegments: ['.workgpt', 'data'], nextSegments: [NEW_HOME_DATA_ROOT, 'runtime'] },
+  { legacySegments: ['.workgpt', 'default_workspace'], nextSegments: [NEW_HOME_DATA_ROOT, 'default_workspace'] },
+  { legacySegments: ['.workgpt', 'write_workspace'], nextSegments: [NEW_HOME_DATA_ROOT, 'write_workspace'] },
+  { legacySegments: ['.workgpt', 'claw'], nextSegments: [NEW_HOME_DATA_ROOT, 'claw'] }
 ] as const
 
-export type HomeMappingOutcome = 'imported' | 'target-exists' | 'skipped-missing' | 'failed'
+export type HomeMappingOutcome = 'imported' | 'target-exists' | 'skipped-missing' | 'skipped-empty' | 'conflict' | 'failed'
 
 export type HomeDataMigrationResult = {
   mapping: HomeDataMigrationMapping
@@ -66,7 +71,7 @@ export type UserDataMigrationResult = {
   files?: ImportedFileEntry[]
 }
 
-export type ImportedFileEntry = { path: string; type: 'file' | 'symlink'; size: number; sha256: string }
+export type ImportedFileEntry = { path: string; type: 'file' | 'symlink'; size: number; sha256: string; database?: true }
 
 export type LegacyDataMigrationResult = {
   userData: UserDataMigrationResult
@@ -114,7 +119,7 @@ export function hasRecognizedUserData(path: string): boolean {
   })
 }
 
-function fileInventory(root: string, ignoreMarker = false): ImportedFileEntry[] {
+function fileInventory(root: string, ignoreMarker = false, consistentDatabases = true): ImportedFileEntry[] {
   const output: ImportedFileEntry[] = []
   const visit = (directory: string): void => {
     for (const name of readdirSync(directory).sort()) {
@@ -124,8 +129,11 @@ function fileInventory(root: string, ignoreMarker = false): ImportedFileEntry[] 
       const info = lstatSync(absolute)
       if (info.isDirectory()) { visit(absolute); continue }
       if (!info.isFile() && !info.isSymbolicLink()) throw new Error(`Unsupported profile entry: ${path}`)
-      const bytes = info.isSymbolicLink() ? Buffer.from(readlinkSync(absolute)) : readFileSync(absolute)
-      output.push({ path, type: info.isSymbolicLink() ? 'symlink' : 'file', size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') })
+      if (consistentDatabases && sqliteSidecar(absolute)) continue
+      let bytes: Buffer = info.isSymbolicLink() ? Buffer.from(readlinkSync(absolute)) : readFileSync(absolute)
+      const database = consistentDatabases && info.isFile() && bytes.subarray(0, 16).toString() === 'SQLite format 3\0'
+      if (database) bytes = snapshotSqlite(absolute)
+      output.push({ path, type: info.isSymbolicLink() ? 'symlink' : 'file', size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), ...(database ? { database: true } : {}) })
     }
   }
   visit(root)
@@ -135,22 +143,55 @@ function fileInventory(root: string, ignoreMarker = false): ImportedFileEntry[] 
 export function verifyImportedUserData(userDataPath: string): boolean {
   try {
     const marker = JSON.parse(readFileSync(join(userDataPath, USER_DATA_MIGRATION_MARKER), 'utf8')) as { files?: ImportedFileEntry[] }
-    return Array.isArray(marker.files) && JSON.stringify(marker.files) === JSON.stringify(fileInventory(userDataPath, true))
+    return Array.isArray(marker.files) && JSON.stringify(marker.files) === JSON.stringify(fileInventory(userDataPath, true, marker.files.some(file => file.database)))
   } catch { return false }
 }
 
 function copyDirectoryOnce(sourcePath: string, targetPath: string): boolean {
   if (!isDirectory(sourcePath)) return false
-  if (existsSync(targetPath) && !isEmptyDirectory(targetPath)) return false
+  if (existsSync(targetPath)) return false
   mkdirSync(dirname(targetPath), { recursive: true })
-  cpSync(sourcePath, targetPath, {
-    recursive: true,
-    force: false,
-    errorOnExist: true,
-    preserveTimestamps: true,
-    verbatimSymlinks: true
+  const stagingRoot = mkdtempSync(join(dirname(targetPath), '.railwise-home-import-'))
+  try {
+    const stagingPath = join(stagingRoot, 'data')
+    copyConsistentTree(sourcePath, stagingPath, fileInventory(sourcePath))
+    if (existsSync(targetPath)) return false
+    renameSync(stagingPath, targetPath)
+    return true
+  } finally { rmSync(stagingRoot, { recursive: true, force: true }) }
+}
+
+function sqliteSidecar(path: string): boolean {
+  if (!/-(?:wal|shm)$/.test(path)) return false
+  const main = path.replace(/-(?:wal|shm)$/, '')
+  if (!existsSync(main) || !lstatSync(main).isFile()) return false
+  return readFileSync(main).subarray(0, 16).toString() === 'SQLite format 3\0'
+}
+
+/** A read transaction pins committed SQLite/WAL pages for synchronous startup migration. */
+function snapshotSqlite(path: string): Buffer {
+  const database = new Database(path, { readonly: true, fileMustExist: true, timeout: 5_000 })
+  try {
+    return database.transaction(() => {
+      if (database.pragma('quick_check', { simple: true }) !== 'ok') throw new Error('Legacy SQLite integrity verification failed')
+      return database.serialize()
+    })()
+  } finally { database.close() }
+}
+
+function copyConsistentTree(sourcePath: string, targetPath: string, files: ImportedFileEntry[], ignoreMarker = false): void {
+  const databases = new Set(files.filter(file => file.database).map(file => file.path))
+  cpSync(sourcePath, targetPath, { recursive: true, force: false, errorOnExist: true, preserveTimestamps: true, verbatimSymlinks: true,
+    filter: source => !databases.has(relative(sourcePath, source).split(sep).join('/')) && !sqliteSidecar(source)
   })
-  return true
+  for (const file of files.filter(item => item.database)) {
+    const bytes = snapshotSqlite(join(sourcePath, file.path))
+    if (bytes.length !== file.size || createHash('sha256').update(bytes).digest('hex') !== file.sha256) throw new Error('Legacy database changed during migration')
+    const target = join(targetPath, file.path)
+    mkdirSync(dirname(target), { recursive: true })
+    writeFileSync(target, bytes, { flag: 'wx', mode: 0o600 })
+  }
+  if (JSON.stringify(files) !== JSON.stringify(fileInventory(targetPath, ignoreMarker)) || JSON.stringify(files) !== JSON.stringify(fileInventory(sourcePath, ignoreMarker))) throw new Error('Profile changed during import or copied bytes differ')
 }
 
 export function migrateLegacyUserDataDir(input: {
@@ -193,8 +234,7 @@ export function migrateLegacyUserDataDir(input: {
       const files = fileInventory(sourcePath, true)
       stagingRoot = mkdtempSync(join(appDataDir, '.railwise-profile-import-'))
       stagingPath = join(stagingRoot, 'profile')
-      cpSync(sourcePath, stagingPath, { recursive: true, force: false, errorOnExist: true, preserveTimestamps: true, verbatimSymlinks: true })
-      if (JSON.stringify(files) !== JSON.stringify(fileInventory(stagingPath, true)) || JSON.stringify(files) !== JSON.stringify(fileInventory(sourcePath, true))) throw new Error('Profile changed during import or copied bytes differ')
+      copyConsistentTree(sourcePath, stagingPath, files, true)
       const previousMarker = existsSync(join(stagingPath, USER_DATA_MIGRATION_MARKER)) ? readFileSync(join(stagingPath, USER_DATA_MIGRATION_MARKER), 'utf8') : undefined
       writeFileSync(
         join(stagingPath, USER_DATA_MIGRATION_MARKER),
@@ -227,7 +267,8 @@ export function migrateLegacyHomeDataDirs(input: {
 }): HomeDataMigrationResult[] {
   const log = input.log ?? noopLog
   const results: HomeDataMigrationResult[] = []
-  for (const mapping of input.mappings ?? HOME_DATA_MIGRATION_MAPPINGS) {
+  const mappings = input.mappings ?? HOME_DATA_MIGRATION_MAPPINGS
+  for (const mapping of mappings) {
     const legacyPath = join(input.homeDir, ...mapping.legacySegments)
     const nextPath = join(input.homeDir, ...mapping.nextSegments)
     const base = { mapping, legacyPath, nextPath, rewriteSafe: false as const }
@@ -242,6 +283,19 @@ export function migrateLegacyHomeDataDirs(input: {
       continue
     }
     try {
+      const candidates = mappings.filter(item => join(input.homeDir, ...item.nextSegments) === nextPath)
+        .map(item => join(input.homeDir, ...item.legacySegments)).filter(isDirectory)
+        .map(path => ({ path, files: fileInventory(path) }))
+      const populated = candidates.filter(candidate => candidate.files.length > 0)
+      if (new Set(populated.map(candidate => JSON.stringify(candidate.files))).size > 1) {
+        results.push({ ...base, outcome: 'conflict' })
+        log('legacy-import: conflicting home sources require selection; originals preserved', { nextPath, sources: populated.map(candidate => candidate.path) })
+        continue
+      }
+      if (populated.length && !populated.some(candidate => candidate.path === legacyPath)) {
+        results.push({ ...base, outcome: 'skipped-empty' })
+        continue
+      }
       const imported = copyDirectoryOnce(legacyPath, nextPath)
       results.push({ ...base, outcome: imported ? 'imported' : 'target-exists' })
       if (imported) log('legacy-import: copied home data into WorkWise', { legacyPath, nextPath })

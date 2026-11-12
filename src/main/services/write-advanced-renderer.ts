@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { renderWriteMath, WRITE_MATH_MAX_LENGTH } from '../../shared/write-advanced-markdown'
 import { sanitizeWriteMermaidSvg, validateWriteMermaidSource } from '../../shared/write-mermaid-policy'
+import { isPassiveWriteSvg } from './write-image-resource'
 
 const MAX_DIAGRAMS = 32
 const MAX_RENDER_MS = 20_000
@@ -21,6 +22,42 @@ export type WriteRenderedDiagram = {
 }
 
 export type WriteRenderedMath = { png: Buffer; width: number; height: number }
+
+/** Passive workspace SVG is decoded locally and rasterized for Word's image format support. */
+export async function renderWriteSvgImage(source: string): Promise<WriteRenderedMath | null> {
+  if (!isPassiveWriteSvg(source)) return null
+  const window = new BrowserWindow({
+    show: false, width: 1_200, height: 900, backgroundColor: '#ffffff',
+    webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false, partition: `railwise-svg-export-${randomUUID()}` }
+  })
+  try {
+    window.webContents.session.webRequest.onBeforeRequest({ urls: ['*://*/*', 'file:///*'] }, (_details, callback) => callback({ cancel: true }))
+    window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    window.webContents.on('will-navigate', event => event.preventDefault())
+    window.webContents.on('will-redirect', event => event.preventDefault())
+    await withRenderDeadline(window.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; connect-src \'none\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'"><style>html,body{margin:0;background:white}img{display:block}</style></head><body></body></html>')))
+    const url = `data:image/svg+xml;base64,${Buffer.from(source, 'utf8').toString('base64')}`
+    const size = await withRenderDeadline(window.webContents.executeJavaScript(`(async()=>{
+      const image=document.createElement('img');image.src=${JSON.stringify(url)};document.body.append(image);
+      await image.decode();
+      const naturalWidth=image.naturalWidth,naturalHeight=image.naturalHeight;
+      if(!naturalWidth||!naturalHeight)throw new Error('SVG dimensions are unavailable');
+      const scale=Math.min(2,${MAX_RENDER_WIDTH}/naturalWidth,${MAX_RENDER_HEIGHT}/naturalHeight);
+      const width=Math.min(${MAX_RENDER_WIDTH},Math.max(1,Math.ceil(naturalWidth*scale)));
+      const height=Math.min(${MAX_RENDER_HEIGHT},Math.max(1,Math.ceil(naturalHeight*scale)));
+      image.style.width=width+'px';image.style.height=height+'px';return {width:width,height:height};
+    })()`)) as { width: number; height: number }
+    if (!Number.isFinite(size.width) || !Number.isFinite(size.height) || size.width < 1 || size.height < 1 || size.width > MAX_RENDER_WIDTH || size.height > MAX_RENDER_HEIGHT) return null
+    window.setContentSize(size.width, size.height)
+    await withRenderDeadline(window.webContents.executeJavaScript('document.fonts.ready.then(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))'))
+    const image = await withRenderDeadline(window.webContents.capturePage({ x: 0, y: 0, ...size }))
+    const png = image.toPNG()
+    return png.length ? { png, ...size } : null
+  } catch {
+    return null
+  } finally { if (!window.isDestroyed()) window.destroy() }
+}
 
 async function readBundledDependencyAsset(path: string): Promise<Buffer> {
   // Packaged runs read only the shipped dependency tree. The development
@@ -149,10 +186,13 @@ export async function renderWriteMermaidDiagrams(sources: readonly string[]): Pr
           const box=diagram.viewBox.baseVal;
           const naturalWidth=box.width||Number.parseFloat(diagram.getAttribute('width'))||600;
           const naturalHeight=box.height||Number.parseFloat(diagram.getAttribute('height'))||400;
+          if(!Number.isFinite(naturalWidth)||!Number.isFinite(naturalHeight)||naturalWidth<=0||naturalHeight<=0)throw new Error('Invalid diagram dimensions.');
           const scale=Math.min(2,${MAX_RENDER_WIDTH}/naturalWidth,${MAX_RENDER_HEIGHT}/naturalHeight);
-          diagram.setAttribute('width',String(Math.max(1,Math.ceil(naturalWidth*scale))));
-          diagram.setAttribute('height',String(Math.max(1,Math.ceil(naturalHeight*scale))));
-          return {width:Math.ceil(naturalWidth*scale)+24,height:Math.ceil(naturalHeight*scale)+24};
+          const width=Math.min(${MAX_RENDER_WIDTH},Math.max(1,Math.ceil(naturalWidth*scale)));
+          const height=Math.min(${MAX_RENDER_HEIGHT},Math.max(1,Math.ceil(naturalHeight*scale)));
+          diagram.setAttribute('width',String(width));
+          diagram.setAttribute('height',String(height));
+          return {width:width+24,height:height+24};
         })()`)) as { width: number; height: number }
         if (!Number.isFinite(size.width) || !Number.isFinite(size.height) || size.width < 1 || size.height < 1 || size.width > MAX_RENDER_WIDTH + 24 || size.height > MAX_RENDER_HEIGHT + 24) {
           results.set(source, null)
@@ -163,7 +203,7 @@ export async function renderWriteMermaidDiagrams(sources: readonly string[]): Pr
         const image = await withRenderDeadline(window.webContents.capturePage({ x: 0, y: 0, width: size.width, height: size.height }))
         results.set(source, { svg, png: image.toPNG(), ...size })
       } catch {
-        // Export retains a visible source/error fallback for a malformed diagram.
+        // Export retains a visible source/error fallback when rendering fails.
         results.set(source, null)
       }
     }

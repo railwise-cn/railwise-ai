@@ -2,6 +2,7 @@ const { execFileSync } = require('node:child_process')
 const { dirname, join } = require('node:path')
 const { verifyAudit: verifySpecialistSkillAudit } = require('./specialist-skill-audit.cjs')
 const { verifyMarkdownPackagingFileSets } = require('./verify-markdown-packaging-filesets.cjs')
+const { ensureCanvasRuntimePackages } = require('./runtime-package-packaging.cjs')
 
 function normalizeArch(arch) {
   if (arch === 'x64' || arch === 'arm64') return arch
@@ -64,6 +65,8 @@ function rebuildManagedRuntimeSqlite(context) {
 
 async function beforePack(context) {
   verifySpecialistSkillAudit()
+  const canvas = await ensureCanvasRuntimePackages(join(__dirname, '..'), context.electronPlatformName, normalizeArch(context.arch))
+  console.log(`[before-pack] Locked canvas packages verified: ${canvas.packages} for ${canvas.platform}-${canvas.arch}.`)
   const markdownFiles = await verifyMarkdownPackagingFileSets()
   console.log(`[before-pack] Offline Markdown root FileSets verified: ${markdownFiles.collected} files.`)
   rebuildManagedRuntimeSqlite(context)

@@ -3,6 +3,7 @@ import { inspectProcess } from './process-identity.js'
 import { existsSync, mkdirSync } from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
+import type { ImDeliveryObservation } from '../contracts/im-delivery.js'
 import Database, { type Database as BetterSqliteDatabase } from 'better-sqlite3'
 import {
   AttentionItemSchema,
@@ -149,6 +150,27 @@ export class TaskRunRepository {
     return row?this.parseRun(row):null
   }
 
+  recordImDeliveryObservation(observation: ImDeliveryObservation): { linked: boolean; receiptId?: string } {
+    return this.transact(() => {
+      const row = this.db.prepare(`SELECT task_runs.* FROM task_runs
+        WHERE thread_id = ? AND (json_extract(data_json, '$.activeTurnId') = ? OR EXISTS
+          (SELECT 1 FROM execution_attempts WHERE task_id = task_runs.id AND turn_id = ?))
+        ORDER BY updated_at DESC LIMIT 1`).get(observation.runtimeThreadId, observation.runtimeTurnId, observation.runtimeTurnId) as TaskRunRow | undefined
+      if (!row) return { linked: false }
+      const task = this.parseRun(row)
+      const { status, observedAt, remoteOperationId, clientOperationId: _clientOperationId, ...request } = observation
+      const key = `im-delivery:${observation.operationId}`
+      const { receipt } = this.beginOperation({ ownerId: task.id, kind: 'im_delivery', idempotencyKey: key, request, nowIso: observedAt })
+      if (receipt.remoteOperationId && remoteOperationId && receipt.remoteOperationId !== remoteOperationId) throw Object.assign(new Error('IM operation has conflicting remote IDs.'), { code: 'idempotency_conflict' })
+      // A delayed start or failure notification cannot erase a known delivery.
+      if (receipt.status === 'succeeded' || status === 'started' && receipt.status !== 'prepared') return { linked: true, receiptId: receipt.id }
+      this.finishOperation(task.id, key, { status: status === 'started' ? 'running' : status,
+        ...(remoteOperationId ? { remoteOperationId } : {}), result: observation }, observedAt)
+      this.appendEventInternal(task.id, `${key}:${status}`, 'im_delivery_observed', observation, observedAt)
+      return { linked: true, receiptId: receipt.id }
+    })
+  }
+
   findActiveByOrigin(threadId: string): TaskRun | null {
     const row = this.db.prepare(`SELECT * FROM task_runs
       WHERE (thread_id = ? OR json_extract(data_json,'$.originThreadId') = ?)
@@ -197,6 +219,12 @@ export class TaskRunRepository {
       ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?
     `).all(...values) as TaskRunRow[]
     return rows.map((row) => this.parseRun(row))
+  }
+
+  /** Unbounded durable state for shutdown, independent of user-facing pagination. */
+  listUnfinished(): TaskRun[] {
+    const rows = this.db.prepare("SELECT * FROM task_runs WHERE status NOT IN ('completed', 'failed', 'cancelled') ORDER BY id").all() as TaskRunRow[]
+    return rows.map(row => this.parseRun(row))
   }
 
   update(
@@ -398,6 +426,11 @@ export class TaskRunRepository {
       ? this.db.prepare('SELECT * FROM shell_sessions WHERE task_id = ? ORDER BY updated_at DESC').all(taskId)
       : this.db.prepare('SELECT * FROM shell_sessions ORDER BY updated_at DESC LIMIT 500').all()) as ShellSessionRow[]
     return rows.map((row) => ShellSessionSchema.parse(JSON.parse(row.data_json)))
+  }
+
+  listActiveShellSessions(): ShellSession[] {
+    const rows = this.db.prepare("SELECT * FROM shell_sessions WHERE status IN ('starting', 'running') ORDER BY id").all() as ShellSessionRow[]
+    return rows.map(row => ShellSessionSchema.parse(JSON.parse(row.data_json)))
   }
 
   updateShellSession(
@@ -604,9 +637,9 @@ export class TaskRunRepository {
     return row ? OperationReceiptSchema.parse(JSON.parse(row.data_json)) : null
   }
 
-  finishOperation(ownerId: string, key: string, patch: { status: OperationReceipt['status']; result?: unknown; error?: string }, nowIso?: string): OperationReceipt
+  finishOperation(ownerId: string, key: string, patch: { status: OperationReceipt['status']; result?: unknown; error?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] }, nowIso?: string): OperationReceipt
   finishOperation(ownerId: string, key: string, status: OperationReceipt['status'], result?: unknown): OperationReceipt
-  finishOperation(ownerId: string, key: string, patchOrStatus: { status: OperationReceipt['status']; result?: unknown; error?: string } | OperationReceipt['status'], nowOrResult?: string | unknown): OperationReceipt {
+  finishOperation(ownerId: string, key: string, patchOrStatus: { status: OperationReceipt['status']; result?: unknown; error?: string; remoteOperationId?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] } | OperationReceipt['status'], nowOrResult?: string | unknown): OperationReceipt {
     const previous = this.operation(ownerId, key)
     if (!previous) throw Object.assign(new Error('operation not found'), { code: 'not_found' })
     const patch = typeof patchOrStatus === 'string'
@@ -619,7 +652,27 @@ export class TaskRunRepository {
   }
 
   unsettledOperations(ownerId: string): OperationReceipt[] {
-    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>).map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item => ['running', 'outcome_unknown'].includes(item.status))
+    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>)
+      .map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json)))
+      .filter(item => item.kind !== 'im_delivery' && (
+        ['running', 'outcome_unknown'].includes(item.status) ||
+        item.kind === 'tool' && item.status === 'prepared' && item.request?.dispatchTracking !== 'host-v1'
+      ) && !this.verifiedOperationResolution(item))
+  }
+  verifiedOperationResolution(receipt: OperationReceipt): OperationReceipt['resolution'] | undefined {
+    const resolution = receipt.resolution
+    if (!resolution) return undefined
+    const proof = this.operations(receipt.ownerId, 'effect_verification').find(item => item.id === resolution.receiptId)
+    if (proof?.status !== 'succeeded' || proof.request?.originalReceiptId !== receipt.id || proof.request?.originalFingerprint !== receipt.fingerprint) return undefined
+    const result = proof.result as { evidence?: unknown } | undefined
+    return operationFingerprint(result?.evidence) === operationFingerprint(resolution.evidence) ? resolution : undefined
+  }
+  resolveOperation(ownerId: string, key: string, resolution: NonNullable<OperationReceipt['resolution']>): void {
+    const receipt = this.operation(ownerId, key)
+    if (!receipt || receipt.status !== 'outcome_unknown') throw Object.assign(new Error('Unknown operation not found.'), { code: 'invalid_state' })
+    const next = OperationReceiptSchema.parse({ ...receipt, resolution })
+    if (!this.verifiedOperationResolution(next)) throw Object.assign(new Error('Verified readback proof is missing.'), { code: 'invalid_state' })
+    this.db.prepare('UPDATE operation_receipts SET data_json = ? WHERE owner_id = ? AND idempotency_key = ?').run(JSON.stringify(next), ownerId, key)
   }
   operations(ownerId: string, kind?: string): OperationReceipt[] {
     return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id=? ORDER BY rowid').all(ownerId) as Array<{data_json:string}>).map(row=>OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item=>!kind || item.kind===kind)
@@ -668,6 +721,8 @@ export class TaskRunRepository {
       const old = this.humanRequest(request.id)
       if (old) return old
       this.db.prepare('INSERT INTO human_requests(id, data_json) VALUES (?, ?)').run(request.id, JSON.stringify(request))
+      // A transferred answer is already settled and must not create another user todo.
+      if (request.status !== 'pending') return request
       const task = this.findActiveByThread(request.threadId)
       const now = request.createdAt
       if (task) {

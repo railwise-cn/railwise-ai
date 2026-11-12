@@ -1,5 +1,6 @@
 import type { TaskViewService } from '../../services/task-view-service.js'
 import type { TaskControlService } from '../../services/task-control-service.js'
+import type { TaskPermissionService } from '../../services/task-permission-service.js'
 import type { TaskCoordinator } from '../../services/task-coordinator.js'
 import type { TaskContextRuntime } from '../../services/task-context-runtime.js'
 import type { CapacityManager } from '../../services/capacity-manager.js'
@@ -17,6 +18,7 @@ import type { ApprovalGate } from '../../ports/approval-gate.js'
 import type { UserInputGate } from '../../ports/user-input-gate.js'
 import type { WorkspaceInspector } from '../../ports/workspace-inspector.js'
 import type { ToolHost, ToolProviderPolicy } from '../../ports/tool-host.js'
+import type { McpConfigurationUpdate, McpConfigurationResult } from '../../services/managed-mcp-runtime.js'
 import type { RuntimeEventRecorder } from '../../services/runtime-event-recorder.js'
 import type { RuntimeInfoResponse } from '../../contracts/runtime-info.js'
 import type { McpServerDiagnostic } from '../../adapters/tool/mcp-tool-provider.js'
@@ -34,6 +36,7 @@ import type { TaskRunRepository } from '../../services/task-run-repository.js'
 import type { RuntimeSpanService } from '../../services/runtime-span-service.js'
 import type { FlowRuntimeService } from '../../flow/service.js'
 import type { WorkspaceReferenceService } from '../../services/workspace-reference-service.js'
+import type { ExternalTaskPreflight } from '../../services/external-task-capability.js'
 import type { UiActionService } from '../../services/ui-action-service.js'
 import type { EngineeringService } from '../../engineering/engineering-service.js'
 import type { EngineeringContextService } from '../../engineering/engineering-context-service.js'
@@ -66,12 +69,23 @@ export type RuntimeToolDiagnostics = {
  * file-backed adapters without leaking concrete types into routes.
  */
 export type ServerRuntime = {
+  updateLifecycle?: import('../../services/runtime-update-lifecycle.js').RuntimeUpdateLifecycle
   threadService: ThreadService
   turnService: TurnService
   uiActionService?: UiActionService
   taskViewService?: TaskViewService
   taskCoordinator?: TaskCoordinator
   taskControlService?:TaskControlService
+  taskPermissionService?:TaskPermissionService
+  preflightExternalTask?: ExternalTaskPreflight
+  configureDingTalk?: (input: unknown) => Promise<unknown>
+  beginDingTalkOAuth?: () => Promise<unknown>
+  completeDingTalkOAuth?: (callbackUrl: string) => Promise<unknown>
+  authorizeDingTalkWorkflow?: (input: unknown) => Promise<unknown>
+  refreshDingTalk?: () => Promise<unknown>
+  refreshLark?: () => Promise<unknown>
+  refreshDws?: () => Promise<unknown>
+  verifyTaskOperationReceipt?: (taskId: string, receiptId: string, input: { expectedRevision: number; idempotencyKey: string }) => Promise<import('../../services/external-operation-verification.js').OperationVerificationResult>
   taskContextRuntime?: TaskContextRuntime
   capacityManager?: CapacityManager
   taskController?: TaskController
@@ -87,6 +101,7 @@ export type ServerRuntime = {
   workspaceInspector: WorkspaceInspector
   workspaceReferenceService: WorkspaceReferenceService
   toolHost?: ToolHost
+  refreshMcpConfiguration?: (request: McpConfigurationUpdate) => Promise<McpConfigurationResult>
   attachmentStore?: AttachmentStore
   memoryStore?: MemoryStore
   flowService?: FlowRuntimeService

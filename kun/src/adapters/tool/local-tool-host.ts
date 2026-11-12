@@ -5,6 +5,7 @@ import type {
   ToolCallLike,
   ToolExecutionUpdate
 } from '../../ports/tool-host.js'
+import { createHash } from 'node:crypto'
 import type { ApprovalRequest } from '../../domain/approval.js'
 import { createApprovalRequest } from '../../domain/approval.js'
 import { buildToolArgumentSummary } from '../../security/tool-persistence-security.js'
@@ -27,14 +28,17 @@ import {
   ReadTracker,
   type ReadTrackerOptions
 } from './read-tracker.js'
-import { sandboxBlockForTool, type SandboxBlock } from './sandbox-policy.js'
+import { effectiveApprovalPolicy, sandboxBlockForTool, type SandboxBlock } from './sandbox-policy.js'
 import { defineLocalTool } from './local-tool-definition.js'
+import type { ToolEffectDefinition } from '../../ports/tool-effect.js'
+import { waitForApprovalDecision } from '../../ports/approval-gate.js'
 
 /**
  * A single registered tool. Tools are pure functions that observe the
  * abort signal and may be guarded by an approval policy.
  */
 export type LocalTool = {
+  effect?: ToolEffectDefinition
   name: string
   description: string
   inputSchema: Record<string, unknown>
@@ -45,6 +49,8 @@ export type LocalTool = {
    * prompts unless the call is in an allow-list.
    */
   policy: 'auto' | 'on-request' | 'suggest' | 'never' | 'untrusted'
+  /** External writes must obtain a real user confirmation, even under legacy auto policy. */
+  requireExplicitApproval?: boolean
   /**
    * Optional gating predicate. When present, the tool is only listed
    * and only executed when `shouldAdvertise` returns true for the
@@ -52,6 +58,8 @@ export type LocalTool = {
    * `create_plan`.
    */
   shouldAdvertise?: (context: ToolHostContext) => boolean
+  /** Pure argument checks run before asking the user to approve a request. */
+  validateArguments?: (args: Record<string, unknown>, context: ToolHostContext) => void
   execute: (
     args: Record<string, unknown>,
     context: ToolHostContext,
@@ -106,6 +114,10 @@ export class LocalToolHost implements ToolHost {
     return this.registry.diagnostics()
   }
 
+  describeEffect(toolName: string): ToolEffectDefinition | undefined {
+    return this.registry.describeEffect(toolName)
+  }
+
   async execute(
     call: ToolCallLike,
     context: ToolHostContext,
@@ -114,7 +126,18 @@ export class LocalToolHost implements ToolHost {
     if (context.abortSignal.aborted) {
       throw new Error('tool call aborted before start')
     }
-    const { tool } = this.registry.resolveTool(call.toolName, context, call.providerId)
+    let tool: LocalTool
+    let originalProviderId: string
+    try {
+      await context.validateExecutionGrant?.()
+      const resolved = this.registry.resolveTool(call.toolName, context, call.providerId)
+      tool = resolved.tool
+      originalProviderId = resolved.provider.id
+    } catch (error) {
+      const code = (error as { code?: unknown })?.code
+      if (typeof code !== 'string' || !/^(sandbox_|execution_grant_|workspace_trust_)/.test(code)) throw error
+      return { item: this.errorToolResult(context, call, { toolKind: call.toolKind ?? 'tool_call' }, error instanceof Error ? error.message : String(error), code), approved: false }
+    }
     if (tool.policy === 'never') {
       throw new Error(`tool ${call.toolName} is disabled by policy`)
     }
@@ -149,6 +172,15 @@ export class LocalToolHost implements ToolHost {
       }
     }
     const activeCall = preHookDecision.call
+    try {
+      tool.validateArguments?.(activeCall.arguments, context)
+    } catch (error) {
+      const code = (error as { code?: unknown })?.code
+      return {
+        item: this.errorToolResult(context, activeCall, tool, error instanceof Error ? error.message : String(error), typeof code === 'string' ? code : 'invalid_tool_arguments'),
+        approved: false
+      }
+    }
     const readValidation = this.readTracker.validateBeforeTool({ context, call: activeCall })
     if (!readValidation.ok) {
       return {
@@ -170,16 +202,21 @@ export class LocalToolHost implements ToolHost {
       }
     }
     const needsApproval = this.requiresApproval(tool, activeCall, context)
+    const approvedRequestHash = createHash('sha256').update(JSON.stringify(activeCall.arguments)).digest('hex')
+    const approvalId = `appr_${createHash('sha256').update(JSON.stringify([context.threadId, context.turnId, activeCall.callId, activeCall.toolName, approvedRequestHash])).digest('hex')}`
     if (needsApproval) {
-      const approvalId = `appr_${activeCall.callId}`
       const approval: ApprovalRequest = createApprovalRequest({
         id: approvalId,
         threadId: context.threadId,
         turnId: context.turnId,
         toolName: activeCall.toolName,
+        requestHash: approvedRequestHash,
+        callId: activeCall.callId,
         summary: this.buildApprovalSummary(activeCall, context.workspace)
       })
-      const decision = await context.awaitApproval(approval)
+      const decision = context.claimUndispatchedApproval?.(approval)
+        ? 'allow'
+        : await waitForApprovalDecision(() => context.awaitApproval(approval), context.abortSignal)
       if (decision !== 'allow') {
         const item = makeApprovalItem({
           id: `item_${approvalId}`,
@@ -197,9 +234,33 @@ export class LocalToolHost implements ToolHost {
     }
     let result: Awaited<ReturnType<LocalTool['execute']>>
     try {
+      await context.validateExecutionGrant?.()
+      if (needsApproval && createHash('sha256').update(JSON.stringify(activeCall.arguments)).digest('hex') !== approvedRequestHash) {
+        throw Object.assign(new Error('Tool arguments changed after review. Request approval for the actual operation.'), { code: 'approval_request_changed' })
+      }
+      // A connector can be disabled, refreshed or rebound while approval is
+      // pending. Approval covers this exact tool instance, never its replacement.
+      let currentTool
+      try {
+        currentTool = this.registry.resolveTool(activeCall.toolName, context, activeCall.providerId)
+      } catch {
+        throw Object.assign(new Error('Tool availability changed while awaiting dispatch. Check capabilities and request approval again.'), { code: 'tool_catalog_changed' })
+      }
+      if (currentTool.tool !== tool || currentTool.provider.id !== originalProviderId) {
+        throw Object.assign(new Error('The approved tool was replaced. Check capabilities and request approval again.'), { code: 'tool_catalog_changed' })
+      }
       context.assertExecution?.()
+      if (needsApproval) context.recordExplicitApproval?.({ toolName: activeCall.toolName, requestHash: approvedRequestHash })
+      await context.claimTaskPermission?.()
+      context.assertExecution?.()
+      if (context.abortSignal.aborted) throw new Error('Tool call aborted before dispatch')
       const finishWork = context.beginExecutionWork?.()
-      try { result = await tool.execute(activeCall.arguments, context, async (update) => {
+      try {
+        context.recordToolDispatch?.()
+        result = await tool.execute(activeCall.arguments, {
+        ...context,
+        explicitApproval: needsApproval ? { approvalId, callId: activeCall.callId, toolName: activeCall.toolName, requestHash: approvedRequestHash } : undefined
+      }, async (update) => {
         if (!onUpdate) return
         const partialItem = makeToolResultItem({
           id: `item_${activeCall.callId}`,
@@ -221,7 +282,7 @@ export class LocalToolHost implements ToolHost {
       if (context.abortSignal.aborted) throw error
       const message = error instanceof Error ? error.message : String(error)
       return {
-        item: this.errorToolResult(context, activeCall, tool, message, 'tool_execution_failed'),
+        item: this.errorToolResult(context, activeCall, tool, message, typeof (error as { code?: unknown })?.code === 'string' ? (error as { code: string }).code : 'tool_execution_failed'),
         approved: true
       }
     }
@@ -262,7 +323,7 @@ export class LocalToolHost implements ToolHost {
       output,
       isError
     })
-    return { item, approved: !needsApproval }
+    return { item, approved: true }
   }
 
   clearReadTracker(threadId?: string): void {
@@ -280,7 +341,7 @@ export class LocalToolHost implements ToolHost {
     )
     if (sandboxBlock) return sandboxBlock
     if (this.isInteractiveGuiGateTool(call.toolName)) return null
-    if (context.approvalPolicy !== 'never') return null
+    if (effectiveApprovalPolicy(context) !== 'never') return null
     if (tool.policy === 'never') return null
     return {
       code: 'approval_policy_blocked',
@@ -290,8 +351,10 @@ export class LocalToolHost implements ToolHost {
 
   private requiresApproval(tool: LocalTool, call: ToolCallLike, context: ToolHostContext): boolean {
     if (this.isInteractiveGuiGateTool(call.toolName)) return false
-    if (tool.policy === 'never' || context.approvalPolicy === 'never') return false
-    switch (context.approvalPolicy) {
+    const approvalPolicy = effectiveApprovalPolicy(context)
+    if (tool.policy === 'never' || approvalPolicy === 'never') return false
+    if (tool.requireExplicitApproval || (context.executionGrant && tool.toolKind === 'command_execution')) return true
+    switch (approvalPolicy) {
       case 'auto':
         return false
       case 'on-request':
@@ -318,7 +381,7 @@ export class LocalToolHost implements ToolHost {
   private errorToolResult(
     context: ToolHostContext,
     call: ToolCallLike,
-    tool: LocalTool,
+    tool: Pick<LocalTool, 'toolKind'>,
     message: string,
     code: string
   ): TurnItem {

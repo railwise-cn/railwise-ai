@@ -28,7 +28,7 @@ describe('isolated Mermaid preview queue', () => {
     finish()
     const result = await first
     expect(result).toEqual({ ok: true, svg: '<svg/>', width: 200, height: 100 })
-    expect((await second).ok).toBe(false)
+    expect(await second).toEqual({ ok: false, message: 'Unable to render this Mermaid diagram.' })
     expect(await renderWriteMermaidPreview({ source: 'graph LR; A-->B' })).toEqual(result)
     expect(render).toHaveBeenCalledTimes(2)
   })

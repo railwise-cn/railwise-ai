@@ -1,13 +1,19 @@
 import { z } from 'zod'
 import { TaskControlService } from '../../services/task-control-service.js'
+import { TaskPermissionConfirmationSchema } from '../../contracts/permissions.js'
 import { jsonResponse, type JsonResponse } from '../response.js'
 import { readJsonBody } from '../read-json-body.js'
 import { TaskRunStatusSchema, type TaskRun } from '../../contracts/tasks.js'
 import { TaskSourceKindSchema } from '../../contracts/task-context.js'
+import { ResultEvidenceSchema } from '../../contracts/harness.js'
+import { externalOperationForTool, receiptEffectDefinition } from '../../services/external-effect-evidence.js'
 import { WorkspaceReferenceSchema } from '../../contracts/workspace-references.js'
 import { WorkspaceReferenceService } from '../../services/workspace-reference-service.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
+import { realpath } from 'node:fs/promises'
+import { authorizedArtifactWrites } from '../../services/task-artifact-proof.js'
+import { validateArtifactFile } from '../../services/artifact-validator.js'
 
 const TaskMutationRequest = z.object({
   expectedRevision: z.number().int().nonnegative(),
@@ -31,6 +37,93 @@ async function isEngineeringExecutionTask(runtime: ServerRuntime, task: TaskRun)
 export function getTask(runtime: ServerRuntime, taskId: string): JsonResponse {
   const task = runtime.taskRepository?.get(taskId)
   return task ? jsonResponse(task) : ERRORS.notFound(`task not found: ${taskId}`)
+}
+
+export async function getTaskArtifactProof(runtime: ServerRuntime, taskId: string, artifactId: string): Promise<JsonResponse> {
+  const task = runtime.taskRepository?.get(taskId)
+  const artifact = task?.artifacts.find(item => item.id === artifactId)
+  if (!task || !artifact) return ERRORS.notFound('Task artifact was not found.')
+  if (artifact.validation !== 'valid' || !artifact.absolutePath || !artifact.authorizedRoot || !artifact.executionGrantId || !artifact.sha256) {
+    return ERRORS.conflict('该成果尚未通过授权与内容验证。')
+  }
+  const canonical = await realpath(artifact.absolutePath).catch(() => '')
+  if (canonical !== artifact.absolutePath) return ERRORS.conflict('成果路径已变化，请重新核验。')
+  const thread = await runtime.threadService.get(task.threadId)
+  const proof = (await authorizedArtifactWrites(task, runtime.taskRepository!.operations(task.id, 'tool'), thread?.turns ?? [])).get(canonical)
+  if (!proof || proof.executionGrantId !== artifact.executionGrantId || proof.authorizedRoot !== artifact.authorizedRoot || proof.sha256 !== artifact.sha256) {
+    return ERRORS.conflict('无法核对该成果的写入回执与执行授权。')
+  }
+  const verified = await validateArtifactFile(canonical, artifact.format ?? '').catch(() => null)
+  if (!verified?.valid || verified.sha256 !== artifact.sha256) return ERRORS.conflict('成果内容在交付后已变化，请重新审阅。')
+  return jsonResponse({ taskId, artifactId, ...proof })
+}
+
+export async function getTaskPermissions(runtime:ServerRuntime,taskId:string):Promise<JsonResponse> {
+  if(!runtime.taskPermissionService)return ERRORS.unavailable('task permission service is unavailable')
+  try{return jsonResponse(await runtime.taskPermissionService.snapshot(taskId))}catch(error){return taskPermissionError(error)}
+}
+
+export async function confirmTaskPermissions(runtime:ServerRuntime,taskId:string,request:Request):Promise<JsonResponse|Response> {
+  if(!runtime.taskPermissionService)return ERRORS.unavailable('task permission service is unavailable')
+  const body=await readJsonBody(request)
+  if(!body.ok)return body.response
+  const parsed=TaskPermissionConfirmationSchema.safeParse(body.value)
+  if(!parsed.success)return ERRORS.validation('invalid scoped task permission confirmation',parsed.error.issues)
+  try{return jsonResponse(await runtime.taskPermissionService.confirm(taskId,parsed.data))}catch(error){return taskPermissionError(error)}
+}
+
+function taskPermissionError(error:unknown):JsonResponse {
+  const code=error&&typeof error==='object'&&'code'in error?String(error.code):'task_permission_error'
+  const message=error instanceof Error?error.message:String(error)
+  return jsonResponse({code,message},code==='not_found'?404:['stale_request','idempotency_conflict','outcome_unknown','task_permission_blocked','task_permission_revoked','task_permission_expired','task_permission_consumed','sandbox_read_only','workspace_path_blocked','network_scope_blocked','execution_grant_scope','external_target_blocked'].includes(code)?409:500)
+}
+
+/** User-facing receipt summary; never return raw tool output or authority/credential records. */
+export function getTaskOperationReceipts(runtime: ServerRuntime, taskId: string): JsonResponse {
+  if (!runtime.taskRepository?.get(taskId)) return ERRORS.notFound(`task not found: ${taskId}`)
+  const receipts = runtime.taskRepository.operations(taskId, 'tool').flatMap(receipt => {
+    const request = receipt.request ?? {}
+    const toolName = typeof request.toolName === 'string' ? request.toolName : ''
+    const operation = receiptEffectDefinition(receipt) ?? runtime.toolHost?.describeEffect?.(toolName) ?? externalOperationForTool(toolName)
+    if (!operation || request.provider !== operation.provider || request.operation !== operation.operation) return []
+    const result = receipt.result && typeof receipt.result === 'object' ? receipt.result as Record<string, unknown> : {}
+    const item = result.item && typeof result.item === 'object' ? result.item as Record<string, unknown> : {}
+    const output = item.output && typeof item.output === 'object' ? item.output as Record<string, unknown> : {}
+    const target = typeof request.target === 'string' ? request.target : undefined
+    const resolution = runtime.taskRepository!.verifiedOperationResolution(receipt)
+    const parsedEvidence = ResultEvidenceSchema.safeParse(output.evidence ?? receipt.evidence)
+    const mutating = operation.mutation
+    const evidence = receipt.status === 'succeeded' && item.isError !== true && output.ok === true && output.status === 'succeeded' &&
+      (!mutating || result.approved === true) && parsedEvidence.success && parsedEvidence.data.kind === 'external_operation' &&
+      parsedEvidence.data.verified && parsedEvidence.data.provider === operation.provider &&
+      parsedEvidence.data.operation === operation.operation && parsedEvidence.data.target === target
+      ? parsedEvidence.data : undefined
+    const errorCode = typeof output.code === 'string' && /^[a-z][a-z0-9_.:-]{0,99}$/i.test(output.code) ? output.code : undefined
+    return [{ id: receipt.id, taskId, ...operation, toolName, ...(target ? { target } : {}),
+      requestHash: receipt.fingerprint, status: receipt.status,
+      ...(evidence ? { evidence } : {}), ...(resolution ? { resolution } : {}),
+      ...(evidence?.remoteOperationId || receipt.remoteOperationId ? { remoteOperationId: evidence?.remoteOperationId ?? receipt.remoteOperationId } : {}),
+      ...(errorCode ? { errorCode } : {}), createdAt: receipt.createdAt, updatedAt: receipt.updatedAt }]
+  })
+  const deliveries = runtime.taskRepository.operations(taskId, 'im_delivery').flatMap(receipt => {
+    const request = receipt.request ?? {}
+    if (request.purpose !== 'assistant_reply' || !['feishu', 'weixin'].includes(String(request.provider))) return []
+    return [{ id: receipt.id, taskId, purpose: 'assistant_reply', provider: request.provider,
+      operation: 'deliver_reply', phase: request.phase, toolName: 'im_delivery', target: request.targetFingerprint,
+      requestHash: request.requestHash, status: receipt.status, ...(receipt.remoteOperationId ? { remoteOperationId: receipt.remoteOperationId } : {}),
+      createdAt: receipt.createdAt, updatedAt: receipt.updatedAt }]
+  })
+  return jsonResponse([...receipts, ...deliveries])
+}
+
+export async function verifyTaskOperationReceipt(runtime: ServerRuntime, taskId: string, receiptId: string, request: Request): Promise<JsonResponse | Response> {
+  if (!runtime.verifyTaskOperationReceipt) return ERRORS.unavailable('operation verification is unavailable')
+  const body = await readJsonBody(request)
+  if (!body.ok) return body.response
+  const parsed = TaskMutationRequest.pick({ expectedRevision: true, idempotencyKey: true }).strict().safeParse(body.value)
+  if (!parsed.success) return ERRORS.validation('invalid verification request', parsed.error.issues)
+  try { return jsonResponse(await runtime.verifyTaskOperationReceipt(taskId, receiptId, parsed.data)) }
+  catch (error) { return taskError(error) }
 }
 
 export function listTasks(runtime: ServerRuntime, request: Request): JsonResponse {
@@ -175,7 +268,7 @@ function taskError(error: unknown): JsonResponse {
   const message = error instanceof Error ? error.message : String(error)
   if (code === 'model_provider_unavailable') return jsonResponse({ code, message }, 400)
   if (code === 'not_found') return ERRORS.notFound(message)
-  if (['stale_request', 'invalid_state', 'turn_in_progress', 'idempotency_conflict','outcome_unknown'].includes(code)) return ERRORS.conflict(message)
+  if (['stale_request', 'invalid_state', 'turn_in_progress', 'idempotency_conflict','outcome_unknown','external_effect_retry_blocked'].includes(code)) return code==='external_effect_retry_blocked'?jsonResponse({code,message},409):ERRORS.conflict(message)
   if (code === 'resource_limit') return ERRORS.resourceLimit(message)
   return jsonResponse({ code: code || 'task_error', message }, 500)
 }

@@ -1,5 +1,5 @@
 /** Read-only workspace aliases kept through the 0.3.x migration window. */
-const legacyRoots = ['/.kun/', '/.deepseekgui/'] as const
+const legacyRoots = ['/.workgpt/', '/.kun/', '/.deepseekgui/'] as const
 
 export function isLegacyDefaultWorkspacePath(normalized: string): boolean {
   return legacyRoots.some((root) =>

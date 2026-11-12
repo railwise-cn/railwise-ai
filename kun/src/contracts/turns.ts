@@ -1,3 +1,4 @@
+import { ExecutionGrantSchema, HostShellAuthorizationSchema } from './permissions.js'
 import { z } from 'zod'
 import { TurnItem } from './items.js'
 import { isGuiPlanRelativePath } from '../shared/gui-plan.js'
@@ -5,6 +6,7 @@ import { ApprovalPolicySchema, SandboxModeSchema } from './policy.js'
 import { RUNTIME_RESOURCE_LIMITS_V1 } from './resource-limits.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
 import { UiActionAudit } from './ui-actions.js'
+import { ExternalTaskProviderSchema } from './harness.js'
 
 const byteLimitedString = (maxBytes: number) =>
   z.string().refine((value) => new TextEncoder().encode(value).byteLength <= maxBytes, {
@@ -76,6 +78,8 @@ export const TurnSchema = z.object({
   threadId: z.string().min(1),
   status: TurnStatus,
   prompt: z.string(),
+  /** Runtime-classified external provider for this task Turn; never caller-supplied. */
+  externalTaskProvider: ExternalTaskProviderSchema.optional(),
   model: z.string().optional(),
   providerId: z.string().trim().min(1).max(200).optional(),
   engineeringExecution: z.boolean().optional(),
@@ -94,6 +98,9 @@ export const TurnSchema = z.object({
   activeSkillIds: z.array(z.string().min(1)).default([]),
   injectedMemoryIds: z.array(z.string().min(1)).default([]),
   skillInjectionBytes: z.number().int().nonnegative().optional(),
+  executionGrant: ExecutionGrantSchema.optional(),
+  /** Persisted by the server after an exact command receives real user approval. */
+  hostShellAuthorizations: z.array(HostShellAuthorizationSchema).optional(),
   toolCatalogFingerprint: z.string().optional(),
   toolCatalogToolCount: z.number().int().nonnegative().optional(),
   toolCatalogDrift: z.boolean().optional(),

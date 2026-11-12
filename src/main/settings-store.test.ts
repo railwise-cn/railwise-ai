@@ -89,6 +89,22 @@ describe('JsonSettingsStore', () => {
     expect(current).toMatchObject({ revision: 2, locale: 'zh', theme: 'dark' })
   })
 
+  it('preserves an explicitly cleared workspace across saves and application restarts', async () => {
+    const userDataDir = await mkdtemp(join(tmpdir(), 'railwise-empty-workspace-'))
+    const workwiseHome = join(userDataDir, '.workwise')
+    const store = new JsonSettingsStore(userDataDir, { workwiseHome })
+    const initial = await store.load()
+    const userFile = join(initial.workspaceRoot, 'user-notes.md')
+    await writeFile(userFile, 'keep my data', 'utf8')
+
+    expect((await store.patch({ workspaceRoot: '' })).workspaceRoot).toBe('')
+    expect((await store.patch({ theme: 'dark' })).workspaceRoot).toBe('')
+    const reopened = await new JsonSettingsStore(userDataDir, { workwiseHome }).load()
+    expect(reopened.workspaceRoot).toBe('')
+    expect(await readFile(userFile, 'utf8')).toBe('keep my data')
+    expect(reopened.write.defaultWorkspaceRoot).toBe(initial.write.defaultWorkspaceRoot)
+  })
+
   it('preserves terminal notification filters across a partial toggle patch', async () => {
     const userDataDir = await mkdtemp(join(tmpdir(), 'workwise-settings-notifications-'))
     const store = new JsonSettingsStore(userDataDir, { workwiseHome: join(userDataDir, '.workwise') })

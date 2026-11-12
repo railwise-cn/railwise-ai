@@ -27,7 +27,6 @@ describe('application menu localization', () => {
     expect(Array.isArray(help) ? help.map((item) => item.label).filter(Boolean) : []).toEqual([
       '帮助中心',
       'RailWise AI 主页',
-      '个人主页',
       '软件介绍',
       'GitHub 项目',
       '版本与下载',

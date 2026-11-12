@@ -127,14 +127,18 @@ describe('chat-store Claw helpers', () => {
     ])
   })
 
-  it('deduplicates default workspace aliases while keeping legacy WorkWise paths compatible', () => {
+  it('deduplicates matching paths without hiding unverified legacy directories', () => {
     expect(
       compactCodeWorkspaceRoots([
         '~/.deepseekgui/default_workspace',
         'C:\\Users\\zxy\\.deepseekgui\\default_workspace',
         'C:\\Users\\zxy\\.deepseekgui\\default_workspace\\'
       ])
-    ).toEqual(['~/.deepseekgui/default_workspace'])
+    ).toEqual(['~/.deepseekgui/default_workspace', 'C:\\Users\\zxy\\.deepseekgui\\default_workspace'])
+    expect(compactCodeWorkspaceRoots([
+      '/Users/zxy/.workgpt/default_workspace',
+      '/Users/zxy/.workwise/default_workspace'
+    ])).toHaveLength(2)
   })
 
   it('caps code workspace roots while keeping the newest unique roots first', () => {

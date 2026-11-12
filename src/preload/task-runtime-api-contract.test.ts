@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { WorkWiseApi } from '../shared/workwise-api'
-import { runtimeRequestPayloadSchema, sseStartPayloadSchema } from '../main/ipc/app-ipc-schemas'
+import { mcpServerSavePayloadSchema, runtimeRequestPayloadSchema, sseStartPayloadSchema } from '../main/ipc/app-ipc-schemas'
 
 const bridge = vi.hoisted(() => ({ exposed: new Map<string, unknown>(), invoke: vi.fn() }))
 vi.mock('electron', () => ({
@@ -18,10 +18,28 @@ describe('production preload task API and main IPC contract', () => {
         return { ok: true, status: 200, body: '{}' }
       }
       if (channel === 'runtime:sse:start') return sseStartPayloadSchema.parse(payload)
+      if (channel === 'shell:open-dingtalk-desktop') return { ok: true }
+      if (channel === 'mcp-server:save') return mcpServerSavePayloadSchema.parse(payload).config
+      if (channel === 'mcp-server:test') return { id: 'amap', state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: 11, checkedAt: '2026-11-12T01:02:03.000Z' }
       throw new Error(`Unexpected task API channel: ${channel}`)
     })
     await import('./index')
     api = bridge.exposed.get('workwise') as WorkWiseApi
+  })
+
+  it('passes the fixed DingTalk desktop action without renderer-supplied launch arguments', async () => {
+    expect(await api.openDingTalkDesktop()).toEqual({ ok: true })
+    expect(bridge.invoke).toHaveBeenCalledWith('shell:open-dingtalk-desktop')
+  })
+
+  it('keeps main-owned connection evidence out of save payloads while forwarding actual diagnostic results', async () => {
+    const config = { id: 'amap', name: 'Amap', scope: 'global' as const, transport: 'http' as const, url: 'https://mcp.amap.com/mcp', timeoutMs: 1000, source: 'managed-tool' as const, toolPolicy: {}, enabled: true, revision: 2,
+      connectionCheck: { serverRevision: 2, configurationHash: 'a'.repeat(64), checkedAt: '2026-11-12T01:02:03.000Z', state: 'connected' as const, authorized: true } }
+    await api.saveMcpServer({ config, expectedRevision: 2, idempotencyKey: 'test-save' })
+    const sent = [...bridge.invoke.mock.calls].reverse().find(call => call[0] === 'mcp-server:save')![1] as { config: Record<string, unknown> }
+    expect(sent.config).not.toHaveProperty('connectionCheck')
+    expect(config.connectionCheck.authorized).toBe(true)
+    expect(await api.testMcpServer('amap')).toMatchObject({ verification: 'tool_discovery', toolCount: 11, checkedAt: '2026-11-12T01:02:03.000Z' })
   })
 
   it('passes actual task list, detail, mutation, inbox, template and Shell requests through the desktop boundary', async () => {
@@ -32,6 +50,8 @@ describe('production preload task API and main IPC contract', () => {
     await api.listTaskPage({ filter: 'ongoing', workspaceRoot: '/workspace', threadId: 'origin_1', search: '报告', limit: 50 })
     await api.listTaskRuns({ threadId: 'origin_1', status: 'running', workspaceRoot: '/workspace', search: '报告', limit: 100, offset: 2, cursor })
     await api.getTaskRun('task_1')
+    await api.listTaskOperationReceipts('task_1')
+    await api.verifyTaskOperationReceipt('task_1', 'receipt_1', mutation)
     await api.resumeTask('task_1', mutation)
     await api.retryTask('task_1', mutation)
     await api.cancelTask('task_1', mutation)
@@ -47,6 +67,8 @@ describe('production preload task API and main IPC contract', () => {
     await api.listShellSessions('task_1')
     await api.terminateShellSession('shell_1', { expectedRevision: 1, idempotencyKey: 'terminate-1' })
     expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks?pagination=cursor&filter=all&limit=200', method: 'GET' })
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task_1/receipts', method: 'GET' })
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task_1/receipts/receipt_1/verify', method: 'POST', body: JSON.stringify(mutation) })
   })
 
   it('passes real chat/model and candidate review commands, and the aggregate task stream, through their typed boundaries', async () => {

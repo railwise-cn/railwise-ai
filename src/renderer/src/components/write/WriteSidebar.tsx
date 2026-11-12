@@ -1,3 +1,4 @@
+import { SidebarUpdateControl } from '../sidebar/SidebarUpdateControl'
 import type { FormEvent, ReactElement } from 'react'
 import { useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -91,6 +92,7 @@ export function WriteSidebar({
   const deleteClawChannel = useChatStore((s) => s.deleteClawChannel)
   const ensureWriteThreadForWorkspace = useChatStore((s) => s.ensureWriteThreadForWorkspace)
   const runtimeConnection = useChatStore((s) => s.runtimeConnection)
+  const toolCapabilities = useChatStore((s) => s.runtimeCapabilities?.workspaces)
   const [entryDialog, setEntryDialog] = useState<EntryDialog | null>(null)
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Record<string, boolean>>({})
   // Field-level subscription: the sidebar must not re-render on fileContent or
@@ -294,6 +296,7 @@ export function WriteSidebar({
       onCollapse={onToggleSidebar}
       footer={
         <div className="space-y-1">
+          <SidebarUpdateControl />
           <SidebarCommandRow
             icon={<Smartphone className="h-4 w-4" strokeWidth={1.75} />}
             label={t('claw')}
@@ -321,6 +324,7 @@ export function WriteSidebar({
         />
 
         <WorkspaceSecondaryNavigation
+          toolCapabilities={toolCapabilities}
           activeRoute={navigationRoute}
           onWriteOpen={onWriteOpen}
           onOpenPlugins={onOpenPlugins}

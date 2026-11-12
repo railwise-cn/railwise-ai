@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -11,6 +11,7 @@ import { buildDocumentDeliveryToolProviders } from './document-delivery-tool-pro
 import { TaskContextRepository } from '../../services/task-context-repository.js'
 import { TaskContextRuntime } from '../../services/task-context-runtime.js'
 import { EngineeringService } from '../../engineering/engineering-service.js'
+import { ExecutionGrantSchema } from '../../contracts/permissions.js'
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))))
@@ -34,7 +35,87 @@ function context(workspace: string): ToolHostContext {
   }
 }
 
+function grantedContext(workspace: string, pathAllowlist = [workspace]): ToolHostContext {
+  return { ...context(workspace), executionGrant: ExecutionGrantSchema.parse({
+    id: 'delivery-grant', taskId: 'task-candidate', threadId: 'thread-candidate', turnId: 'turn-candidate',
+    workspaceRoot: workspace, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write',
+    approvalPolicy: 'auto', sandboxMode: 'workspace-write', pathAllowlist,
+    workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'delivery-grant', issuedAt: new Date().toISOString()
+  }) }
+}
+
 describe('document delivery tool provider', () => {
+  it('keeps the canonical Turn authority when a historical task uses a filesystem alias', async () => {
+    const outer = await mkdtemp(join(tmpdir(), 'railwise-delivery-alias-')); roots.push(outer)
+    const original = join(outer, 'original'); await mkdir(original)
+    const canonical = await realpath(original)
+    const alias = join(outer, 'alias'); await symlink(original, alias, 'dir')
+    await writeFile(join(canonical, 'source.md'), 'source content')
+    await writeFile(join(canonical, 'project.json'), JSON.stringify({ name: 'Synthetic monitoring', monitoringType: 'deformation', unit: 'mm', thresholds: { default: 10 } }))
+    await writeFile(join(canonical, 'data.csv'), 'point,time,value,unit\nP1,2026-11-01,1,mm\nP1,2026-11-02,3,mm\n')
+    const repository = new TaskRunRepository(join(outer, 'tasks.sqlite3')); repository.create(task(alias))
+    const engineeringService = new EngineeringService({ rootDir: join(outer, 'engineering') })
+    const tools = buildDocumentDeliveryToolProviders(repository, { engineeringService })[0]!.tools
+    const scoped = grantedContext(canonical)
+    const oldUrl = process.env.RAILWISE_DOCUMENT_EXPORT_URL; const oldToken = process.env.RAILWISE_DOCUMENT_EXPORT_TOKEN
+    const server = createServer(async (req, res) => {
+      const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(Buffer.from(chunk))
+      const body = JSON.parse(Buffer.concat(chunks).toString())
+      expect(body.workspaceRoot).toBe(canonical)
+      expect(body.sourcePath.startsWith(`${canonical}/`)).toBe(true)
+      expect(body.targetPath.startsWith(`${canonical}/`)).toBe(true)
+      const bytes = Buffer.from('synthetic canonical export')
+      await mkdir(join(canonical, '.workwise/delivery-exports/task-candidate'), { recursive: true }); await writeFile(body.targetPath, bytes)
+      res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, path: body.targetPath, sha256: createHash('sha256').update(bytes).digest('hex'), size: bytes.length }))
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address() as { port: number }
+    process.env.RAILWISE_DOCUMENT_EXPORT_URL = `http://127.0.0.1:${address.port}/export`; process.env.RAILWISE_DOCUMENT_EXPORT_TOKEN = 'synthetic-token'
+    try {
+      expect(await tools.find(tool => tool.name === 'read_delivery_sources')!.execute({ path: 'source.md' }, scoped)).toMatchObject({ output: { content: 'source content' } })
+      const proposed = (await tools.find(tool => tool.name === 'propose_document')!.execute({ path: 'report.md', content: '# Report', source_refs: [{ path: 'source.md' }], idempotency_key: 'alias-candidate' }, scoped)).output as { path: string }
+      expect(await readFile(join(canonical, proposed.path), 'utf8')).toBe('# Report')
+      const metadata = JSON.parse(await readFile(join(canonical, `${proposed.path}.sources.json`), 'utf8'))
+      expect(metadata.sources[0].workspaceRoot).toBe(canonical)
+      expect(await tools.find(tool => tool.name === 'analyze_delivery_monitoring')!.execute({ path: 'data.csv', project_path: 'project.json', idempotency_key: 'alias-analysis' }, scoped)).toMatchObject({ output: { status: 'analyzed' } })
+      expect(engineeringService.listProjects()[0]?.workspace).toBe(canonical)
+      expect(await tools.find(tool => tool.name === 'export_document')!.execute({ path: proposed.path, formats: ['docx'], idempotency_key: 'alias-export' }, scoped)).toMatchObject({ output: { status: 'exported' } })
+      expect(repository.get('task-candidate')?.workspaceRoot).toBe(alias)
+      expect(scoped.executionGrant?.pathAllowlist).toEqual([canonical])
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()))
+      if (oldUrl === undefined) delete process.env.RAILWISE_DOCUMENT_EXPORT_URL; else process.env.RAILWISE_DOCUMENT_EXPORT_URL = oldUrl
+      if (oldToken === undefined) delete process.env.RAILWISE_DOCUMENT_EXPORT_TOKEN; else process.env.RAILWISE_DOCUMENT_EXPORT_TOKEN = oldToken
+      await engineeringService.flush(); engineeringService.close(); repository.close()
+    }
+  })
+
+  it('rejects another workspace and retargeted aliases without broadening restricted paths', async () => {
+    const outer = await mkdtemp(join(tmpdir(), 'railwise-delivery-alias-boundary-')); roots.push(outer)
+    const first = join(outer, 'first'); const second = join(outer, 'second')
+    await mkdir(first); await mkdir(second); await mkdir(join(first, 'inputs'))
+    await writeFile(join(first, 'inputs/source.md'), 'permitted'); await writeFile(join(first, 'private.md'), 'private')
+    const canonical = await realpath(first); const other = await realpath(second)
+    const alias = join(outer, 'alias'); await symlink(first, alias, 'dir')
+    const repository = new TaskRunRepository(join(outer, 'tasks.sqlite3')); repository.create(task(alias))
+    const engineeringService = new EngineeringService({ rootDir: join(outer, 'engineering') })
+    try {
+      const tools = buildDocumentDeliveryToolProviders(repository, { engineeringService })[0]!.tools
+      const read = tools.find(tool => tool.name === 'read_delivery_sources')!
+      const propose = tools.find(tool => tool.name === 'propose_document')!
+      const limited = grantedContext(canonical, [join(canonical, 'inputs')])
+      expect(await read.execute({ path: 'inputs/source.md' }, limited)).toMatchObject({ output: { content: 'permitted' } })
+      await expect(read.execute({ path: 'private.md' }, limited)).rejects.toMatchObject({ code: 'workspace_path_blocked' })
+      await expect(propose.execute({ path: 'report.md', content: '# Denied', idempotency_key: 'restricted-candidate' }, limited)).rejects.toMatchObject({ code: 'workspace_path_blocked' })
+      for (const tool of tools) {
+        await expect(tool.execute({ path: 'source.md', content: '# Denied', project_path: 'project.json', formats: ['docx'], idempotency_key: `other-${tool.name}` }, grantedContext(other))).rejects.toMatchObject({ code: 'workspace_path_blocked' })
+      }
+      await rm(alias); await symlink(second, alias, 'dir')
+      await expect(read.execute({ path: 'inputs/source.md' }, grantedContext(canonical))).rejects.toMatchObject({ code: 'workspace_path_blocked' })
+      expect(repository.get('task-candidate')?.workspaceRoot).toBe(alias)
+    } finally { await engineeringService.flush(); engineeringService.close(); repository.close() }
+  })
+
   it('writes a task-owned candidate and replays the same result idempotently', async () => {
     const root = await mkdtemp(join(tmpdir(), 'railwise-delivery-tool-')); roots.push(root)
     await writeFile(join(root, 'source.md'), 'source content')
@@ -176,8 +257,9 @@ describe('document delivery tool provider', () => {
 
   it('runs the real deterministic monitoring service from scoped source files with immutable arithmetic evidence', async () => {
     const root = await mkdtemp(join(tmpdir(), 'railwise-delivery-monitoring-')); roots.push(root)
-    await writeFile(join(root, 'project.json'), JSON.stringify({ name: 'Synthetic monitoring', monitoringType: 'deformation', unit: 'mm', thresholds: { default: 10 }, taskContext: { standard: 'Synthetic only', standardVersion: 'test-v1' } }))
-    await writeFile(join(root, 'data.csv'), 'point,time,value,unit\nP1,2026-11-01,1,mm\nP1,2026-11-02,3,mm\nP1,2026-11-03,4,mm\n')
+    const sample = join(process.cwd(), '../src/asset/optional-skills/monitoring-data-check/samples')
+    await writeFile(join(root, 'project.json'), await readFile(join(sample, 'project.json')))
+    await writeFile(join(root, 'data.csv'), await readFile(join(sample, 'data.csv')))
     const repository = new TaskRunRepository(join(root, 'tasks.sqlite3')); repository.create(task(root))
     const engineeringService = new EngineeringService({ rootDir: join(root, 'engineering') })
     try {

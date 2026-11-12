@@ -21,6 +21,10 @@ vi.mock('../agent/registry', () => ({
 }))
 
 import { createThreadActions } from './chat-store-thread-actions'
+import { buildThreadEventSink } from './chat-store-runtime'
+import { dispatchRuntimeEvent } from '../agent/runtime-mapper'
+import type { CoreRuntimeEventJson } from '../agent/runtime-contract'
+import { clearBusyWatchdog } from './chat-store-schedulers'
 
 function thread(id: string): NormalizedThread {
   return {
@@ -37,6 +41,8 @@ function thread(id: string): NormalizedThread {
 function buildHarness(): {
   actions: ReturnType<typeof createThreadActions>
   state: ChatState
+  set: ChatStoreSet
+  get: ChatStoreGet
 } {
   let state: ChatState
   state = {
@@ -65,7 +71,7 @@ function buildHarness(): {
     sseAbortRef: { current: null }
   })
   state.sendMessage = actions.sendMessage
-  return { actions, state }
+  return { actions, state, set, get }
 }
 
 describe('chat-store-thread-actions queued messages', () => {
@@ -377,6 +383,59 @@ describe('task coordinator before ordinary chat turns', () => {
   beforeEach(() => {
     vi.spyOn(rendererRuntimeClient, 'getSettings').mockResolvedValue({ codePromptPrefix: '' } as WorkWiseSettingsV2)
   })
+  it.each([
+    {autoCreated:false,concurrentTurn:false},
+    {autoCreated:true,concurrentTurn:false},
+    {autoCreated:true,concurrentTurn:true}
+  ])('settles only the local connector request and preserves real execution (auto-created=$autoCreated, concurrent=$concurrentTurn)', async ({autoCreated,concurrentTurn}) => {
+    const harness = buildHarness()
+    const {actions,state} = harness
+    Object.assign(state,{busy:false,currentTurnId:null,currentTurnUserId:null,lastSeq:0,liveAssistant:'',liveReasoning:'',liveUsageByThreadId:{},
+      turnStartedAtByUserId:{},turnDurationByUserId:{},turnReasoningFirstAtByUserId:{},turnReasoningLastAtByUserId:{},codeWorkspaceRoots:[],
+      refreshThreads:vi.fn(async () => undefined),composerProviderId:'default',...(autoCreated?{activeThreadId:null,threads:[]}:{})})
+    vi.spyOn(rendererRuntimeClient,'getSettings').mockResolvedValue({codePromptPrefix:'',workspaceRoot:'/workspace/workwise'} as WorkWiseSettingsV2)
+    const turnId = `command_${'c'.repeat(32)}`
+    const targetThreadId = autoCreated?'thr_created':'thr_existing'
+    const receipt = {userMessageItemId:`item_${turnId}_user`,resultMessageItemId:`item_${turnId}_receipt`}
+    const capability = {provider:'lark',status:'not_installed',message:'飞书连接器尚未安装'}
+    const sink = buildThreadEventSink(harness.set,harness.get,{threadId:targetThreadId})
+    const replay = async ():Promise<void> => {
+      for (const [kind,suffix,role,text] of [['user_message','user','user','帮我处理飞书审批'],['assistant_text','receipt','assistant',capability.message]]) {
+        await dispatchRuntimeEvent({kind:'item_created',seq:2,timestamp:'2026-11-10T00:00:00Z',threadId:targetThreadId,turnId,
+          itemId:`item_${turnId}_${suffix}`,item:{kind,id:`item_${turnId}_${suffix}`,turnId,threadId:targetThreadId,conversationReceiptId:turnId,role,status:'completed',createdAt:'2026-11-10T00:00:00Z',text}
+        } as CoreRuntimeEventJson,sink,async () => undefined)
+      }
+    }
+    const coordinateTaskCommand = vi.fn(async () => {
+      if (concurrentTurn) {
+        await dispatchRuntimeEvent({kind:'item_created',seq:1,timestamp:'2026-11-10T00:00:00Z',threadId:targetThreadId,turnId:'turn_real',itemId:'item_real_user',
+          item:{kind:'user_message',id:'item_real_user',turnId:'turn_real',threadId:targetThreadId,role:'user',status:'completed',createdAt:'2026-11-10T00:00:00Z',text:'另一个真实执行'}
+        } as CoreRuntimeEventJson,sink,async () => undefined)
+      }
+      // SSE may arrive before the command HTTP response, then replay later.
+      await replay()
+      return {kind:'capability_required',task:{id:'waiting-task',status:'waiting_user'},capability,message:capability.message,receipt}
+    })
+    const createThread = vi.fn(async () => ({...thread(targetThreadId),status:'idle'}))
+    const sendUserMessage = vi.fn()
+    registryMock.getProvider.mockReturnValue({createThread,sendUserMessage})
+    vi.stubGlobal('window',{workwise:{coordinateTaskCommand}})
+    try {
+      expect(await actions.sendMessage('帮我处理飞书审批')).toBe(true)
+      await replay()
+      expect(createThread).toHaveBeenCalledTimes(autoCreated?1:0)
+      expect(coordinateTaskCommand).toHaveBeenCalledTimes(1)
+      expect(sendUserMessage).not.toHaveBeenCalled()
+      expect(state.busy).toBe(concurrentTurn)
+      expect(state.currentTurnId).toBe(concurrentTurn?'turn_real':null)
+      expect(state.currentTurnUserId).toBe(concurrentTurn?'item_real_user':null)
+      expect(Object.keys(state.turnStartedAtByUserId)).toEqual(concurrentTurn?['item_real_user']:[])
+      expect(state.blocks.filter(block => block.kind==='user')).toHaveLength(concurrentTurn?2:1)
+      expect(state.blocks.filter(block => block.kind==='assistant')).toHaveLength(1)
+      expect(state.queuedMessages).toEqual([])
+      expect(state.recoverActiveTurn).not.toHaveBeenCalled()
+    } finally {clearBusyWatchdog();vi.unstubAllGlobals()}
+  })
   it('answers status locally while busy without queueing, stopping or starting a model turn', async () => {
     const { actions, state } = buildHarness()
     const coordinateTaskCommand = vi.fn(async () => ({ kind: 'snapshot', task: { goal: '合成月报', status: 'running' } }))
@@ -402,5 +461,42 @@ describe('task coordinator before ordinary chat turns', () => {
       expect(state.busy).toBe(true)
       expect(coordinateTaskCommand).toHaveBeenCalledTimes(1)
     } finally { vi.unstubAllGlobals() }
+  })
+
+  it('routes Write requests through preflight and preserves an actionable capability card without creating a Turn', async () => {
+    const { actions, state } = buildHarness()
+    state.route = 'write'
+    state.ensureWriteThreadForWorkspace = vi.fn(async () => 'thr_existing')
+    state.composerProviderId = 'default'
+    const capability = {provider:'lark',status:'needs_authorization',message:'需要飞书登录授权'}
+    const coordinateTaskCommand = vi.fn(async () => ({kind:'capability_required',task:{id:'waiting-task'},attentionId:'waiting-attention',message:capability.message,capability}))
+    const sendUserMessage = vi.fn()
+    registryMock.getProvider.mockReturnValue({sendUserMessage})
+    vi.stubGlobal('window',{workwise:{coordinateTaskCommand}})
+    try {
+      expect(await actions.sendMessage('帮我处理飞书待办')).toBe(true)
+      expect(coordinateTaskCommand).toHaveBeenCalledWith(expect.objectContaining({threadId:'thr_existing',intent:'auto',request:expect.objectContaining({displayText:'帮我处理飞书待办'})}))
+      expect(state.blocks.at(-1)).toMatchObject({kind:'assistant',capabilityCard:{threadId:'thr_existing',taskId:'waiting-task',attentionId:'waiting-attention',capability}})
+      expect(state.queuedMessages).toEqual([])
+      expect(sendUserMessage).not.toHaveBeenCalled()
+      expect(state.recoverActiveTurn).not.toHaveBeenCalled()
+    } finally {vi.unstubAllGlobals()}
+  })
+
+  it('handles a Write platform decision as a durable local result rather than a fake Turn', async () => {
+    const { actions, state } = buildHarness()
+    state.route = 'write'
+    state.ensureWriteThreadForWorkspace = vi.fn(async () => 'thr_existing')
+    state.composerProviderId = 'default'
+    const coordinateTaskCommand = vi.fn(async () => ({kind:'attention_required',attentionId:'provider-choice',message:'请先选择本次执行的平台'}))
+    const sendUserMessage = vi.fn()
+    registryMock.getProvider.mockReturnValue({sendUserMessage})
+    vi.stubGlobal('window',{workwise:{coordinateTaskCommand}})
+    try {
+      expect(await actions.sendMessage('处理钉钉和飞书待办')).toBe(true)
+      expect(state.blocks.at(-1)).toMatchObject({kind:'assistant',text:'请先选择本次执行的平台'})
+      expect(sendUserMessage).not.toHaveBeenCalled()
+      expect(state.queuedMessages).toEqual([])
+    } finally {vi.unstubAllGlobals()}
   })
 })

@@ -1,3 +1,4 @@
+import type { WorkspaceTrustReader } from '../src/services/workspace-trust-reader.js'
 import { AgentLoop } from '../src/loop/agent-loop.js'
 import { InMemoryEventBus } from '../src/adapters/in-memory-event-bus.js'
 import { InMemoryApprovalGate } from '../src/adapters/in-memory-approval-gate.js'
@@ -72,6 +73,7 @@ export function makeSilentModel(): ModelClient {
 export function makeHarness(
   model: ModelClient,
   options: {
+    workspaceTrust?: WorkspaceTrustReader
     compactor?: ContextCompactor
     tools?: LocalTool[]
     skillRuntime?: SkillRuntime
@@ -132,6 +134,7 @@ export function makeHarness(
     ids,
     nowIso,
     nowMs,
+    ...(options.workspaceTrust ? { workspaceTrust: options.workspaceTrust } : {}),
     ...(options.skillRuntime ? { skillRuntime: options.skillRuntime } : {}),
     ...(options.attachmentStore ? { attachmentStore: options.attachmentStore } : {}),
     ...(options.visionEvidence ? { visionEvidence: options.visionEvidence } : {}),

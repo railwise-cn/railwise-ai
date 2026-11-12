@@ -1,12 +1,18 @@
+import { AMAP_READ_TOOLS, ZOTERO_READ_TOOLS } from '../../shared/engineering-marketplace'
+import { isGitHubMcpServer } from '../../shared/github-connector'
 import { createHash, randomBytes } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { createServer, type Server } from 'node:http'
 import { mkdir, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { promisify } from 'node:util'
+import { isDeepStrictEqual, promisify } from 'node:util'
 import { safeStorage } from 'electron'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import brand from '../../shared/product-brand.json'
+import { currentMcpConnectionCheck, mcpToolDiscoveryPassed } from '../../shared/mcp-connection-check'
 import type {
   McpCredentialReferenceV1,
   McpServerConfigV2,
@@ -15,6 +21,7 @@ import type {
 import { atomicWriteFile, readRecoveredFile, runSerialized } from './durable-file'
 import { canonicalizeContainmentRoot, resolveContainedPath } from './canonical-containment'
 import { isCandidateCredentialAccessAllowed } from '../candidate-runtime'
+import { decryptStringWithCredentialHelper, encryptStringWithCredentialHelper } from './im-credential-helper'
 
 const execFileAsync = promisify(execFile)
 const MAX_OAUTH_RESPONSE_BYTES = 1024 * 1024
@@ -38,10 +45,18 @@ type CredentialPayload = {
   tokenType?: string
 }
 
+type ResolvedMcpCredential = {
+  hash: string
+  storage: McpCredentialReferenceV1['storage']
+  value?: CredentialPayload
+}
+// Runtime assembly and IPC own separate services in the same main process.
+const processResolvedMcpCredentials = new Map<string, ResolvedMcpCredential>()
+
 type EncryptionAdapter = {
-  available(): boolean
-  encrypt(value: string): Buffer
-  decrypt(value: Buffer): string
+  available(): boolean | Promise<boolean>
+  encrypt(value: string, interactive?: boolean): Buffer | Promise<Buffer>
+  decrypt(value: Buffer, interactive?: boolean): string | Promise<string>
   storage: McpCredentialReferenceV1['storage']
 }
 
@@ -98,6 +113,7 @@ export type SetMcpServerCredentialRequest = {
 }
 
 export type McpRuntimeSnapshotV1 = {
+  revision: number
   servers: Record<string, Record<string, unknown>>
   environment: Record<string, string>
 }
@@ -130,6 +146,16 @@ function defaultEncryption(): EncryptionAdapter {
       storage: 'keychain'
     }
   }
+  if (process.platform === 'darwin') {
+    return {
+      // Keychain may wait for user authorization. The existing helper keeps
+      // that wait off the GUI thread and bounds it with its watchdog.
+      available: () => true,
+      encrypt: (value, interactive = false) => encryptStringWithCredentialHelper(value, { interactive }),
+      decrypt: (value, interactive = false) => decryptStringWithCredentialHelper(value, { interactive }),
+      storage: 'keychain'
+    }
+  }
   return {
     available: () => {
       try {
@@ -138,10 +164,24 @@ function defaultEncryption(): EncryptionAdapter {
         return false
       }
     },
-    encrypt: (value) => safeStorage.encryptString(value),
-    decrypt: (value) => safeStorage.decryptString(value),
-    storage: process.platform === 'darwin' ? 'keychain' : process.platform === 'win32' ? 'dpapi' : 'safe-storage'
+    encrypt: (value) => safeStorage.encryptStringAsync(value),
+    decrypt: async (value) => (await safeStorage.decryptStringAsync(value)).result,
+    storage: process.platform === 'win32' ? 'dpapi' : 'safe-storage'
   }
+}
+
+type CredentialAccessErrorCode = 'credential_unavailable' | 'credential_helper_timeout' | 'credential_helper_access_denied'
+
+function credentialAccessError(error: unknown): Error & { code: CredentialAccessErrorCode } {
+  const code = (error as { code?: unknown })?.code
+  const errorCode: CredentialAccessErrorCode = code === 'credential_helper_timeout' || code === 'credential_helper_access_denied'
+    ? code : 'credential_unavailable'
+  return Object.assign(new Error('无法读取已保存的连接凭据。请处理系统凭据访问提示后重新检查连接；原凭据仍保留。'), { code: errorCode })
+}
+
+function isCredentialAccessError(error: unknown): error is Error & { code: CredentialAccessErrorCode } {
+  const code = (error as { code?: unknown })?.code
+  return code === 'credential_unavailable' || code === 'credential_helper_timeout' || code === 'credential_helper_access_denied'
 }
 
 function assertHttpUrl(value: string, label: string): URL {
@@ -225,11 +265,20 @@ function normalizedManifest(value: unknown): McpManifestV2 {
   }
 }
 
+function connectionConfiguration(server: McpServerConfigV2): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(server).filter(([key]) => !['connectionCheck', 'revision', 'enabled'].includes(key)))
+}
+
+function connectionConfigurationHash(server: McpServerConfigV2): string {
+  return createHash('sha256').update(JSON.stringify(connectionConfiguration(server))).digest('hex')
+}
+
 export class McpConfigService {
   private readonly manifestPath: string
   private readonly legacyPath: string
   private readonly credentialRoot: string
   private readonly encryption: EncryptionAdapter
+  private readonly resolvedCredentials: Map<string, ResolvedMcpCredential>
   private readonly fetchImpl: typeof fetch
   private readonly now: () => Date
   private readonly oauthCallbackTimeoutMs: number
@@ -250,6 +299,7 @@ export class McpConfigService {
     this.legacyPath = resolve(options.legacyPath ?? join(dirname(this.manifestPath), 'mcp.json'))
     this.credentialRoot = resolve(options.credentialRoot ?? join(homedir(), '.workwise', 'credentials', 'mcp'))
     this.encryption = options.encryption ?? defaultEncryption()
+    this.resolvedCredentials = options.encryption ? new Map() : processResolvedMcpCredentials
     this.fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
     this.now = options.now ?? (() => new Date())
     this.oauthCallbackTimeoutMs = options.oauthCallbackTimeoutMs ?? OAUTH_CALLBACK_TIMEOUT_MS
@@ -260,7 +310,16 @@ export class McpConfigService {
     const canonicalWorkspace = workspaceRoot ? await canonicalizeContainmentRoot(workspaceRoot) : undefined
     return manifest.servers.filter((server) =>
       server.scope === 'global' || (canonicalWorkspace && server.workspaceRoot === canonicalWorkspace)
-    )
+    ).map(server => this.projectConnectionCheck(server))
+  }
+
+  private projectConnectionCheck(server: McpServerConfigV2): McpServerConfigV2 {
+    const check = currentMcpConnectionCheck(server)
+    const missingSession = server.credentialRef?.storage === 'session' && !this.sessionCredentials.has(server.credentialRef.id)
+    if (check && check.configurationHash === connectionConfigurationHash(server) && !missingSession) return server
+    const projected = { ...server }
+    delete projected.connectionCheck
+    return projected
   }
 
   async runtimeSnapshot(): Promise<McpRuntimeSnapshotV1> {
@@ -268,44 +327,85 @@ export class McpConfigService {
     const servers: Record<string, Record<string, unknown>> = {}
     const environment: Record<string, string> = {}
     for (const server of manifest.servers) {
-      const credential = await this.readCredential(server.credentialRef)
+      let credential: CredentialPayload | null = null
+      let enabled = server.enabled
+      if (enabled) {
+        try {
+          credential = await this.readCredential(server.credentialRef)
+        } catch (error) {
+          if (!isCredentialAccessError(error)) throw error
+          // Keep the saved configuration and encrypted record intact. A
+          // protected-storage failure affects this runtime connection only.
+          enabled = false
+          await this.recordConnectionCheck(server, {
+            id: server.id, state: 'needs_authorization', authorized: false,
+            errorCode: error.code, message: error.message
+          })
+        }
+      }
       const trust = server.scope === 'workspace' && server.workspaceRoot
         ? { trustScope: 'workspace', trustedWorkspaceRoots: [server.workspaceRoot] }
         : { trustScope: 'user', trustedWorkspaceRoots: [] }
+      const toolPolicy = server.toolPolicy['*'] === 'deny' ? {
+        allowedTools: Object.entries(server.toolPolicy).filter(([name, decision]) => name !== '*' && decision === 'allow').map(([name]) => name),
+        readOnlyTools: server.readOnlyTools ?? []
+      } : undefined
       if (server.transport === 'stdio') {
         const env: Record<string, string> = {}
+        let cwd = server.cwd
+        if (server.managedPreset === 'zotero-readonly') {
+          const profile = join(dirname(this.manifestPath), 'connector-profiles', 'zotero-readonly')
+          await mkdir(profile, { recursive: true, mode: 0o700 })
+          cwd = profile
+          Object.assign(env, {
+            HOME: profile, USERPROFILE: profile, APPDATA: profile, LOCALAPPDATA: profile,
+            XDG_CONFIG_HOME: join(profile, '.config'), XDG_CACHE_HOME: join(profile, '.cache'),
+            ZOTERO_LOCAL: 'true', ZOTERO_LOCAL_WRITE: 'false', ZOTERO_NO_CLAUDE: 'true', ZOTERO_MCP_TOOLSETS: 'none',
+            PYTHON_DOTENV_DISABLED: '1', ZOTERO_API_KEY: '', ZOTERO_LOCAL_API_KEY: '', ZOTERO_LOCAL_SERVER_ID: '',
+            ZOTERO_LIBRARY_ID: '', ZOTERO_WEBDAV_URL: '', ZOTERO_WEBDAV_USERNAME: '', ZOTERO_WEBDAV_PASSWORD: '',
+            OPENAI_API_KEY: '', GOOGLE_API_KEY: '', GEMINI_API_KEY: '', HF_TOKEN: ''
+          })
+        }
         for (const key of server.credentialEnvironmentVariables ?? []) {
           const variable = runtimeCredentialVariable(server.id, key)
           env[key] = `\${${variable}}`
           if (credential) environment[variable] = credential.accessToken
         }
         servers[server.id] = {
-          enabled: server.enabled,
+          enabled,
           transport: 'stdio',
           command: server.command,
           args: server.args ?? [],
+          cwd,
           env,
+          ...(toolPolicy ? { toolPolicy } : {}),
           ...trust,
           timeoutMs: server.timeoutMs
         }
         continue
       }
       const headers: Record<string, string> = {}
-      if (credential) {
+      let url = server.url
+      if (server.managedPreset === 'amap-readonly') {
+        const variable = runtimeCredentialVariable(server.id, 'amap_key')
+        url = `https://mcp.amap.com/mcp?key=\${${variable}}`
+        if (credential) environment[variable] = credential.accessToken
+      } else if (credential) {
         const variable = runtimeCredentialVariable(server.id, 'authorization')
         headers.Authorization = `\${${variable}}`
         environment[variable] = `${credential.tokenType ?? 'Bearer'} ${credential.accessToken}`
       }
       servers[server.id] = {
-        enabled: server.enabled,
+        enabled,
         transport: 'streamable-http',
-        url: server.url,
+        url,
         headers,
+        ...(toolPolicy ? { toolPolicy } : {}),
         ...trust,
         timeoutMs: server.timeoutMs
       }
     }
-    return { servers, environment }
+    return { revision: manifest.revision, servers, environment }
   }
 
   async save(request: SaveMcpServerRequest): Promise<McpServerConfigV2> {
@@ -343,7 +443,21 @@ export class McpConfigService {
         if (!request.config.url) throw Object.assign(new Error('HTTP MCP server requires a URL.'), { code: 'invalid_state' })
         assertHttpUrl(request.config.url, 'MCP server URL')
       }
-      const oauth = request.config.oauth ? await this.resolveOAuth(request.config.oauth) : undefined
+      if (request.config.managedPreset) {
+        const isAmap = request.config.managedPreset === 'amap-readonly'
+        const allowed = isAmap ? [...AMAP_READ_TOOLS] : [...ZOTERO_READ_TOOLS]
+        if (isAmap && (request.config.transport !== 'http' || request.config.url !== 'https://mcp.amap.com/mcp')) throw new Error('高德连接必须使用官方固定服务地址。')
+        if (!isAmap && (request.config.transport !== 'stdio' || request.config.credentialRef || request.config.credentialEnvironmentVariables?.length)) throw new Error('Zotero 只读连接使用隔离本机配置。')
+        request = { ...request, config: { ...request.config, toolPolicy: { '*': 'deny', ...Object.fromEntries(allowed.map(name => [name, 'allow' as const])) }, readOnlyTools: allowed } }
+      }
+      // Existing OAuth metadata may predate discovery/client registration.
+      // Updating a token or toggling the same connection preserves that setup
+      // without forcing an unrelated OAuth flow again.
+      const oauth = request.config.oauth
+        ? current?.oauth && isDeepStrictEqual(current.oauth, request.config.oauth)
+          ? current.oauth
+          : await this.resolveOAuth(request.config.oauth)
+        : undefined
       const next: McpServerConfigV2 = {
         ...request.config,
         ...(oauth ? { oauth } : {}),
@@ -352,12 +466,24 @@ export class McpConfigService {
         timeoutMs: Math.min(Math.max(request.config.timeoutMs, 1_000), 120_000),
         revision: revision + 1
       }
+      // Caller-provided evidence is never trusted. A successful check made
+      // immediately before enabling may survive that sole flag transition.
+      delete next.connectionCheck
+      const checked = current ? this.projectConnectionCheck(current) : undefined
+      if (checked && !current!.enabled && next.enabled && mcpToolDiscoveryPassed(checked) &&
+        isDeepStrictEqual(connectionConfiguration(current!), connectionConfiguration(next))) {
+        next.connectionCheck = { ...checked.connectionCheck!, serverRevision: next.revision, configurationHash: connectionConfigurationHash(next) }
+      }
       const servers = [...manifest.servers]
       if (index >= 0) servers[index] = next
       else servers.push(next)
       const mutationKeys = { ...manifest.mutationKeys, [request.idempotencyKey]: next.id }
       const trimmedKeys = Object.fromEntries(Object.entries(mutationKeys).slice(-256))
       await this.write({ ...manifest, revision: manifest.revision + 1, servers, mutationKeys: trimmedKeys })
+      if (current?.credentialRef && (!next.enabled || current.credentialRef.id !== next.credentialRef?.id ||
+          current.credentialRef.storage !== next.credentialRef?.storage)) {
+        this.resolvedCredentials.delete(join(this.credentialRoot, `${current.credentialRef.id}.json`))
+      }
       return next
     })
   }
@@ -365,8 +491,36 @@ export class McpConfigService {
   async test(serverId: string, workspaceRoot?: string): Promise<McpServerStatusV1> {
     const server = (await this.list(workspaceRoot)).find((entry) => entry.id === serverId)
     if (!server) return { id: serverId, state: 'error', authorized: false, message: 'MCP server was not found.' }
+    const result = await this.testConnection(server)
+    return this.recordConnectionCheck(server, result)
+  }
+
+  private async recordConnectionCheck(server: McpServerConfigV2, result: McpServerStatusV1): Promise<McpServerStatusV1> {
+    return runSerialized('mcp-config:' + this.manifestPath, async () => {
+      const manifest = await this.read()
+      const current = manifest.servers.find(entry => entry.id === server.id)
+      const checkedAt = this.now().toISOString()
+      if (!current || current.revision !== server.revision || connectionConfigurationHash(current) !== connectionConfigurationHash(server)) {
+        return { id: server.id, state: 'error', authorized: false, checkedAt, errorCode: 'configuration_changed', message: '连接配置已变化，请重新检查连接。' }
+      }
+      current.connectionCheck = {
+        serverRevision: current.revision, configurationHash: connectionConfigurationHash(current),
+        ...(current.credentialRef ? { credentialRefId: current.credentialRef.id } : {}),
+        checkedAt, state: result.state, authorized: result.authorized,
+        ...(result.verification ? { verification: result.verification } : {}),
+        ...(Number.isSafeInteger(result.toolCount) ? { toolCount: result.toolCount } : {}),
+        ...(result.errorCode ? { errorCode: result.errorCode } : {})
+      }
+      await this.write(manifest)
+      return { ...result, checkedAt }
+    })
+  }
+
+  private async testConnection(server: McpServerConfigV2): Promise<McpServerStatusV1> {
     const startedAt = Date.now()
     try {
+      if (isGitHubMcpServer(server)) return await this.testGitHubConnector(server, startedAt)
+      if (server.managedPreset) return await this.testReadonlyConnector(server, startedAt)
       if (server.transport === 'stdio') {
         if (server.cwd && server.workspaceRoot) {
           const cwd = await canonicalizeContainmentRoot(server.cwd)
@@ -376,7 +530,7 @@ export class McpConfigService {
         await execFileAsync(lookup[0], lookup[1], { timeout: Math.min(server.timeoutMs, 10_000), windowsHide: true })
         return { id: server.id, state: 'connected', authorized: true, latencyMs: Date.now() - startedAt }
       }
-      const credential = await this.readCredential(server.credentialRef)
+      const credential = await this.readCredential(server.credentialRef, true)
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), server.timeoutMs)
       const response = await fetch(server.url!, {
@@ -390,14 +544,94 @@ export class McpConfigService {
       }
       return { id: server.id, state: 'connected', authorized: Boolean(credential || !server.oauth), latencyMs: Date.now() - startedAt }
     } catch (error) {
+      if (isCredentialAccessError(error)) return {
+        id: server.id, state: 'needs_authorization', authorized: false,
+        latencyMs: Date.now() - startedAt, errorCode: error.code, message: error.message
+      }
       return {
         id: server.id,
-        state: server.oauth && !(await this.readCredential(server.credentialRef)) ? 'needs_authorization' : 'error',
+        state: server.oauth && !server.credentialRef ? 'needs_authorization' : 'error',
         authorized: false,
         latencyMs: Date.now() - startedAt,
         message: error instanceof Error ? error.message : String(error)
       }
     }
+  }
+
+  private async testGitHubConnector(server: McpServerConfigV2, startedAt: number): Promise<McpServerStatusV1> {
+    const base = { id: server.id, latencyMs: Date.now() - startedAt }
+    const credential = await this.readCredential(server.credentialRef, true)
+    if (!credential) return { ...base, state: 'needs_authorization', authorized: false, errorCode: 'missing_credentials', message: '请在 GitHub 连接详情中创建并保存个人访问令牌，再检查连接。' }
+    const client = new Client({ name: 'railwise-github-connection-check', version: '1.0.0' })
+    let failedStatus: number | undefined
+    try {
+      const transport = new StreamableHTTPClientTransport(new URL(server.url!), {
+        requestInit: { headers: { Authorization: `${credential.tokenType ?? 'Bearer'} ${credential.accessToken}` }, redirect: 'error' },
+        fetch: async (input, init) => {
+          const response = await fetch(input, { ...init, redirect: 'error', signal: AbortSignal.any([...(init?.signal ? [init.signal] : []), AbortSignal.timeout(server.timeoutMs)]) })
+          if (!response.ok) failedStatus = response.status
+          return response
+        }
+      })
+      await client.connect(transport, { timeout: server.timeoutMs })
+      const result = await client.listTools({}, { timeout: server.timeoutMs })
+      const tools = result.tools.filter(tool => server.toolPolicy[tool.name] !== 'deny'
+        && (server.toolPolicy['*'] !== 'deny' || server.toolPolicy[tool.name] === 'allow'))
+      if (!tools.length) return { ...base, state: 'error', authorized: false, errorCode: 'tool_manifest_mismatch', toolCount: 0, message: 'GitHub 已响应，但当前令牌或工具规则没有提供可用工具。请核对令牌权限、组织批准状态和工具规则。' }
+      return { ...base, latencyMs: Date.now() - startedAt, state: 'connected', authorized: true, toolCount: tools.length,
+        verification: 'tool_discovery',
+        message: `GitHub 认证及工具发现通过，发现 ${tools.length} 项可用工具。仓库访问范围由令牌和组织策略共同决定。` }
+    } catch (error) {
+      const status = failedStatus ?? (error as { code?: number }).code
+      if (status === 401) return { ...base, state: 'needs_authorization', authorized: false, errorCode: 'invalid_credentials', message: 'GitHub 令牌无效或已过期。请生成有效令牌并在此替换。' }
+      if (status === 403) return { ...base, state: 'needs_authorization', authorized: false, errorCode: 'insufficient_scope', message: 'GitHub 拒绝此访问。请核对令牌权限、仓库范围、组织审批或 SSO 授权。' }
+      if (typeof status === 'number' && (status === 429 || status >= 500)) return { ...base, state: 'error', authorized: false, errorCode: 'service_unavailable', message: 'GitHub 服务暂不可用或请求已限流，请稍后检查连接。' }
+      if (typeof status === 'number') return { ...base, state: 'error', authorized: false, errorCode: 'connection_failed', message: 'GitHub MCP 协议检查未通过，请核对服务配置后重试。' }
+      // SDK exceptions can contain response bodies. Keep credentials and remote
+      // content out of UI messages and logs.
+      return { ...base, state: 'error', authorized: false, errorCode: 'network_blocked', message: '无法连接 GitHub 官方 MCP 服务，请检查到 api.githubcopilot.com 的网络连接后重试。' }
+    } finally { await client.close().catch(() => undefined) }
+  }
+
+  private async testReadonlyConnector(server: McpServerConfigV2, startedAt: number): Promise<McpServerStatusV1> {
+    const client = new Client({ name: 'railwise-connector-check', version: '1.0.0' })
+    try {
+      if (server.managedPreset === 'amap-readonly') {
+        const credential = await this.readCredential(server.credentialRef, true)
+        if (!credential) return { id: server.id, state: 'needs_authorization', authorized: false, errorCode: 'missing_credentials', message: '请填写高德 Web 服务 Key。' }
+        const url = new URL('https://mcp.amap.com/mcp')
+        url.searchParams.set('key', credential.accessToken)
+        await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { redirect: 'error' } }), { timeout: server.timeoutMs })
+      } else {
+        const snapshot = await this.runtimeSnapshot()
+        const entry = snapshot.servers[server.id]
+        const local = await fetch('http://127.0.0.1:23119/api/users/0/collections?limit=1', { redirect: 'error', signal: AbortSignal.timeout(5_000) })
+        await local.body?.cancel()
+        if (!local.ok) throw Object.assign(new Error('Zotero 本机 API 尚未启用。请在 Zotero 高级设置中允许本机应用连接。'), { code: 'local_api_unavailable' })
+        await client.connect(new StdioClientTransport({
+          command: server.command!, args: server.args ?? [], cwd: entry.cwd as string,
+          env: entry.env as Record<string, string>, stderr: 'ignore'
+        }), { timeout: server.timeoutMs })
+      }
+      const tools = await client.listTools({}, { timeout: server.timeoutMs })
+      const allowed = new Set(server.readOnlyTools ?? [])
+      const count = tools.tools.filter(tool => allowed.has(tool.name)).length
+      if (!count) throw Object.assign(new Error('连接已建立，但没有发现已核对的只读工具。请检查服务版本和配置。'), { code: 'tool_manifest_mismatch' })
+      return { id: server.id, state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: count, latencyMs: Date.now() - startedAt, message: `已发现 ${count} 项只读工具。` }
+    } catch (error) {
+      if (isCredentialAccessError(error)) return {
+        id: server.id, state: 'needs_authorization', authorized: false,
+        latencyMs: Date.now() - startedAt, errorCode: error.code, message: error.message
+      }
+      // Transport exceptions may include the Amap URL with its query credential.
+      const code = (error as { code?: unknown }).code
+      if (code === 'tool_manifest_mismatch' || code === 'local_api_unavailable') {
+        return { id: server.id, state: 'error', authorized: false, errorCode: code, latencyMs: Date.now() - startedAt, message: (error as Error).message }
+      }
+      return { id: server.id, state: 'error', authorized: false, latencyMs: Date.now() - startedAt,
+        errorCode: 'connection_failed',
+        message: server.managedPreset === 'amap-readonly' ? '高德连接检查失败。请核对 Web 服务 Key、网络及高德控制台授权。' : 'Zotero 连接检查失败。请打开 Zotero、启用本机 API，并核对连接器安装结果。' }
+    } finally { await client.close().catch(() => undefined) }
   }
 
   async authorize(request: AuthorizeMcpServerRequest): Promise<McpServerStatusV1> {
@@ -973,33 +1207,59 @@ export class McpConfigService {
   private async writeCredential(serverId: string, credential: CredentialPayload): Promise<McpCredentialReferenceV1> {
     const id = `mcp_${createHash('sha256').update(serverId).digest('hex').slice(0, 16)}_` +
       base64Url(randomBytes(9))
-    if (!this.encryption.available()) {
+    if (!await this.encryption.available()) {
       this.sessionCredentials.set(id, credential)
       return { id, storage: 'session' }
     }
     await mkdir(this.credentialRoot, { recursive: true })
-    const encrypted = this.encryption.encrypt(JSON.stringify(credential)).toString('base64')
-    await atomicWriteFile(join(this.credentialRoot, `${id}.json`), `${JSON.stringify({ version: 1, encrypted })}\n`)
+    const encrypted = await this.encryption.encrypt(JSON.stringify(credential), true)
+    const path = join(this.credentialRoot, `${id}.json`)
+    await atomicWriteFile(path, `${JSON.stringify({ version: 1, encrypted: encrypted.toString('base64') })}\n`)
+    this.resolvedCredentials.set(path, { hash: createHash('sha256').update(encrypted).digest('hex'), storage: this.encryption.storage, value: credential })
     return { id, storage: this.encryption.storage }
   }
 
   private async removeCredential(reference: McpCredentialReferenceV1): Promise<void> {
-    this.sessionCredentials.delete(reference.id)
-    if (reference.storage !== 'session') {
-      await rm(join(this.credentialRoot, `${reference.id}.json`), { force: true }).catch(() => undefined)
-    }
+    const path = join(this.credentialRoot, `${reference.id}.json`)
+    await runSerialized(`mcp-credential:${path}`, async () => {
+      this.sessionCredentials.delete(reference.id)
+      this.resolvedCredentials.delete(path)
+      if (reference.storage !== 'session') await rm(path, { force: true }).catch(() => undefined)
+    })
   }
 
-  private async readCredential(reference?: McpCredentialReferenceV1): Promise<CredentialPayload | null> {
+  private async readCredential(reference?: McpCredentialReferenceV1, interactive = false): Promise<CredentialPayload | null> {
     if (!reference) return null
     if (reference.storage === 'session') return this.sessionCredentials.get(reference.id) ?? null
-    if (!this.encryption.available()) return null
-    try {
-      const raw = JSON.parse(await readRecoveredFile(join(this.credentialRoot, `${reference.id}.json`))) as { encrypted: string }
-      return JSON.parse(this.encryption.decrypt(Buffer.from(raw.encrypted, 'base64'))) as CredentialPayload
-    } catch {
-      return null
-    }
+    const path = join(this.credentialRoot, `${reference.id}.json`)
+    return runSerialized(`mcp-credential:${path}`, async () => {
+      try {
+        if (!await this.encryption.available()) {
+          this.resolvedCredentials.delete(path)
+          return null
+        }
+        const raw = JSON.parse(await readRecoveredFile(path)) as { encrypted: string }
+        const encrypted = Buffer.from(raw.encrypted, 'base64')
+        const hash = createHash('sha256').update(encrypted).digest('hex')
+        const cached = this.resolvedCredentials.get(path)
+        if (cached?.hash === hash && cached.storage === reference.storage && cached.value) return cached.value
+        // A pending marker lets save/disable invalidate this read immediately
+        // while the helper is still awaiting system authorization.
+        const pending: ResolvedMcpCredential = { hash, storage: reference.storage }
+        this.resolvedCredentials.set(path, pending)
+        const value = JSON.parse(await this.encryption.decrypt(encrypted, interactive)) as CredentialPayload
+        const current = JSON.parse(await readRecoveredFile(path)) as { encrypted: string }
+        if (this.resolvedCredentials.get(path) !== pending || !Buffer.from(current.encrypted, 'base64').equals(encrypted)) {
+          throw new Error('Credential changed while being read.')
+        }
+        this.resolvedCredentials.set(path, { hash, storage: reference.storage, value })
+        return value
+      } catch (error) {
+        this.resolvedCredentials.delete(path)
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+        throw credentialAccessError(error)
+      }
+    })
   }
 
   private async read(): Promise<McpManifestV2> {

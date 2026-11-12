@@ -17,9 +17,10 @@ import {
   Trash2
 } from 'lucide-react'
 import type { NormalizedThread } from '../../agent/types'
+import type { WorkspaceMigrationReport } from '@shared/workspace-migration'
 import { confirmDialog } from '../../lib/confirm-dialog'
 import { formatRelativeTime } from '../../lib/format-relative-time'
-import { workspaceLabelFromPath } from '../../lib/workspace-label'
+import { setWorkspaceDisplayLabel, WORKSPACE_LABELS_CHANGED, workspaceLabelFromPath } from '../../lib/workspace-label'
 import {
   isClawWorkspacePath,
   isInternalWriteWorkspace,
@@ -80,15 +81,21 @@ export function buildSidebarWorkspaceGroups(options: {
   showArchived: boolean
   workspaceRoot: string
   workspaceRoots: string[]
+  aliases?: WorkspaceMigrationReport['aliases']
 }): SidebarWorkspaceGroup[] {
   const map = new Map<string, { workspacePath: string, threads: NormalizedThread[] }>()
   const selectedWorkspace = normalizeWorkspaceRoot(options.workspaceRoot)
-  const selectedWorkspaceKey = workspaceRootIdentityKey(selectedWorkspace)
+  const identityKey = (path: string): string => {
+    const original = workspaceRootIdentityKey(path)
+    const alias = options.aliases?.find(item => workspaceRootIdentityKey(item.path) === original)
+    return workspaceRootIdentityKey(alias?.canonicalRoot ?? path)
+  }
+  const selectedWorkspaceKey = identityKey(selectedWorkspace)
   const query = options.searchQuery.trim().toLowerCase()
 
   const upsertWorkspace = (workspacePath: string, threads: NormalizedThread[] = []): void => {
     const normalized = normalizeWorkspaceRoot(workspacePath)
-    const key = workspaceRootIdentityKey(normalized)
+    const key = identityKey(normalized)
     if (!key) return
     const existing = map.get(key)
     if (existing) {
@@ -98,7 +105,8 @@ export function buildSidebarWorkspaceGroups(options: {
       }
       return
     }
-    map.set(key, { workspacePath: normalized, threads: [...threads] })
+    const canonical = options.aliases?.find(item => workspaceRootIdentityKey(item.path) === workspaceRootIdentityKey(normalized))?.canonicalRoot
+    map.set(key, { workspacePath: key === selectedWorkspaceKey && selectedWorkspace ? selectedWorkspace : canonical ?? normalized, threads: [...threads] })
   }
 
   for (const th of options.threads) {
@@ -129,7 +137,7 @@ export function buildSidebarWorkspaceGroups(options: {
   if (!query && !options.showArchived) {
     for (const workspacePath of options.workspaceRoots) {
       const key = normalizeWorkspaceRoot(workspacePath)
-      if (!key || map.has(workspaceRootIdentityKey(key))) continue
+      if (!key || map.has(identityKey(key))) continue
       if (isInternalTemporaryWorkspace(key)) continue
       if (isInternalWriteWorkspace(key)) continue
       if (isClawWorkspacePath(key)) continue
@@ -138,8 +146,8 @@ export function buildSidebarWorkspaceGroups(options: {
   }
 
   return Array.from(map.values()).map(({ workspacePath, threads }): SidebarWorkspaceGroup => [workspacePath, threads]).sort(([a], [b]) => {
-    const aKey = workspaceRootIdentityKey(a)
-    const bKey = workspaceRootIdentityKey(b)
+    const aKey = identityKey(a)
+    const bKey = identityKey(b)
     if (aKey === selectedWorkspaceKey && bKey !== selectedWorkspaceKey) return -1
     if (bKey === selectedWorkspaceKey && aKey !== selectedWorkspaceKey) return 1
     return a.localeCompare(b)
@@ -177,17 +185,36 @@ export function SidebarProjectsSection({
   const [searchOpen, setSearchOpen] = useState(false)
   const [threadContextMenu, setThreadContextMenu] = useState<ThreadContextMenuState | null>(null)
   const [renameThreadDialog, setRenameThreadDialog] = useState<RenameThreadDialogState | null>(null)
+  const [aliases, setAliases] = useState<WorkspaceMigrationReport['aliases']>([])
+  const [labelRevision, setLabelRevision] = useState(0)
+  const [renameWorkspace, setRenameWorkspace] = useState<{path: string; label: string; error?: string} | null>(null)
+  useEffect(() => {
+    const refresh = (): void => setLabelRevision(value => value + 1)
+    window.addEventListener(WORKSPACE_LABELS_CHANGED, refresh)
+    window.addEventListener('storage', refresh)
+    return () => { window.removeEventListener(WORKSPACE_LABELS_CHANGED, refresh); window.removeEventListener('storage', refresh) }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    // Recheck real directory identities when the workspace registry changes.
+    // Independent legacy folders remain separate even if their names match.
+    void (window.workwise.getLegacyWorkspaceAliases?.() ?? Promise.resolve([])).then(value => { if (active) setAliases(value) }).catch(() => { if (active) setAliases([]) })
+    return () => { active = false }
+  }, [workspaceRoot, workspaceRoots])
 
   const groups = useMemo(() => {
+    void labelRevision
     return buildSidebarWorkspaceGroups({
       threads,
       activeThreadId,
       searchQuery,
       showArchived,
       workspaceRoot,
-      workspaceRoots
+      workspaceRoots,
+      aliases
     })
-  }, [activeThreadId, searchQuery, showArchived, threads, workspaceRoot, workspaceRoots])
+  }, [activeThreadId, searchQuery, showArchived, threads, workspaceRoot, workspaceRoots, aliases, labelRevision])
 
   const searchVisible = searchOpen || searchQuery.trim().length > 0
   const allGroupsCollapsed = groups.length > 0 && groups.every(([workspacePath]) => collapsed[workspacePath] === true)
@@ -424,6 +451,9 @@ export function SidebarProjectsSection({
                 actionsLayout="overlay"
                 actions={
                   <>
+                    <SidebarIconButton onClick={() => setRenameWorkspace({ path: workspacePath, label: folderName })} title={t('sidebarWorkspaceRename')} ariaLabel={t('sidebarWorkspaceRename')} className="h-6 w-6" stopPropagation>
+                      <PencilLine className="h-3.5 w-3.5" strokeWidth={1.9} />
+                    </SidebarIconButton>
                     <SidebarIconButton
                       onClick={() => onCreateThreadInWorkspace(workspacePath)}
                       title={t('sidebarWorkspaceNewThread')}
@@ -543,6 +573,22 @@ export function SidebarProjectsSection({
         />
       ) : null}
 
+      {renameWorkspace ? <div role="dialog" aria-modal="true" aria-label={t('sidebarWorkspaceRename')} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4" onMouseDown={() => setRenameWorkspace(null)}>
+        <form className="w-full max-w-sm rounded-xl border border-ds-border bg-ds-card p-5 text-ds-ink shadow-xl" onMouseDown={event => event.stopPropagation()} onSubmit={event => {
+          event.preventDefault()
+          try {
+            const related = aliases.filter(alias => alias.path === renameWorkspace.path || alias.canonicalRoot === renameWorkspace.path)
+            setWorkspaceDisplayLabel([renameWorkspace.path, ...related.flatMap(alias => [alias.path, alias.canonicalRoot])], renameWorkspace.label)
+            setRenameWorkspace(null)
+          } catch (error) { setRenameWorkspace({ ...renameWorkspace, error: error instanceof Error ? error.message : String(error) }) }
+        }}>
+          <h2 className="text-base font-semibold">{t('sidebarWorkspaceRename')}</h2>
+          <p className="mt-2 text-sm text-ds-muted">{t('sidebarWorkspaceRenameDescription')}</p>
+          <input autoFocus aria-label={t('sidebarWorkspaceRename')} maxLength={80} value={renameWorkspace.label} onChange={event => setRenameWorkspace({ ...renameWorkspace, label: event.target.value })} className="mt-3 w-full rounded-md border border-ds-border bg-ds-main px-3 py-2" />
+          {renameWorkspace.error ? <p role="alert" className="mt-2 text-sm text-red-600">{renameWorkspace.error}</p> : null}
+          <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setRenameWorkspace(null)} className="rounded-md border border-ds-border px-3 py-2">{t('cancel')}</button><button type="submit" disabled={!renameWorkspace.label.trim()} className="rounded-md bg-accent px-3 py-2 text-white disabled:opacity-50">{t('confirm')}</button></div>
+        </form>
+      </div> : null}
       {renameThreadDialog ? (
         <ThreadRenameDialog
           state={renameThreadDialog}

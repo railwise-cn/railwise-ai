@@ -46,6 +46,9 @@ export type RevisionMutation = {
 export type TaskArtifactV1 = {
   id: string
   relativePath: string
+  absolutePath?: string
+  authorizedRoot?: string
+  executionGrantId?: string
   mediaType?: string
   format?: string
   sizeBytes?: number
@@ -56,12 +59,86 @@ export type TaskArtifactV1 = {
 }
 
 export type TaskAcceptanceV1 = {
-  kind: 'answer' | 'files'
+  kind: 'answer' | 'files' | 'effect'
   requiredNodeKinds: TaskNodeKind[]
   requiredFormats?: string[]
   minimumArtifacts?: number
   requireFinalResponse: boolean
   requireActionableArtifactCard: boolean
+  requiresExternalEffects?: boolean
+  effect?: Omit<TaskRequiredEffectV1, 'target'> & { target?: string; requiredEffects?: TaskRequiredEffectV1[] }
+}
+
+export type TaskRequiredEffectV1 = {
+  provider: string
+  operation: string
+  target: string
+  requiredScopes?: string[]
+  requiresConfirmation?: boolean
+  successStatus?: string[]
+  verification?: 'provider_readback'
+}
+
+export type TaskResultEvidenceV1 = {
+  kind: 'external_operation' | 'file' | 'tool_result' | 'human_confirmation'
+  provider: string
+  operation: string
+  target: string
+  status: string
+  verified: boolean
+  verifiedAt: string
+  remoteOperationId?: string
+  resultHash: string
+  sourceVersion?: string
+  targetVersion?: string
+}
+
+/** Read-only projection: raw requests, results, credentials and execution IDs stay in Runtime. */
+export type TaskOperationReceiptV1 = {
+  purpose?: 'assistant_reply'
+  phase?: 'upload' | 'send'
+  id: string
+  taskId: string
+  provider: string
+  operation: string
+  toolName: string
+  target?: string
+  requestHash: string
+  status: 'prepared' | 'running' | 'succeeded' | 'failed' | 'outcome_unknown'
+  remoteOperationId?: string
+  evidence?: TaskResultEvidenceV1
+  resolution?: { status: 'verified'; receiptId: string; evidence: TaskResultEvidenceV1; resolvedAt: string }
+  errorCode?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown'; evidence?: TaskResultEvidenceV1; errorCode?: string }
+
+export type TaskPermissionScopeV1 = {
+  readPaths?: string[]; writePaths?: string[]; networkOrigins?: string[]; providerIds?: string[]; externalTargets?: string[]
+}
+export type TaskExecutionPermissionV1 = {
+  turnId: string; workspaceRoot: string; workspaceTrust: WorkspaceTrustLevel; agentTrust: WorkspaceTrustLevel
+  sandboxMode: string; approvalPolicy: string; allowedToolNames?: string[]; allowedProviderIds?: string[]
+  pathAllowlist: string[]; readPathAllowlist?: string[]; writePathAllowlist?: string[]; networkAllowlist: string[]
+  connectorScopes: string[]; externalTargets: string[]; issuedAt: string; expiresAt?: string
+}
+export type TaskPermissionSnapshotV1 = {
+  taskId: string; taskRevision: number; taskTitle: string; scopeHash: string
+  workspaceRoot: string; workspaceTrust: WorkspaceTrustLevel; workspaceRevision: number; agentRevision: number
+  approvalPolicy: string; targetApprovalPolicy: 'on-request'; maxTtlSeconds: 900
+  /** Server-derived authority ceilings; these are not the current executable tool catalog. */
+  sandboxMode?: string; agentTrust?: WorkspaceTrustLevel; agentName?: string
+  toolAllowlist?: string[]; mcpAllowlist?: string[]; externalTargets?: string[]
+  connectorScopeSources?: Array<{ provider: string; scopes: string[]; source: 'task_requirements' | 'tool_catalog' | 'last_execution_grant'; issuedAt?: string; expiresAt?: string }>
+  canConfirm: boolean; reason?: string
+  executionGrants?: TaskExecutionPermissionV1[]
+  grant?: { id: string; status: 'active' | 'expired' | 'invalid' | 'prepared' | 'consumed'; confirmedAt: string; expiresAt: string; scope?: TaskPermissionScopeV1; duration?: 'task'|'next_operation' }
+}
+export type TaskPermissionConfirmationV1 = {
+  expectedRevision: number; idempotencyKey: string; scopeHash: string; confirmed: true; approvalPolicy: 'on-request'; ttlSeconds: number
+  scope?: TaskPermissionScopeV1; duration?: 'task'|'next_operation'
 }
 
 export type TaskNodeV1 = {
@@ -113,6 +190,7 @@ export type TaskRunV1 = {
   repositoryRoot?: string
   goal: string
   templateId?: string
+  deliveryFormats?: Array<'md' | 'docx' | 'pdf'>
   status: TaskRunStatus
   acceptance: TaskAcceptanceV1
   agentId: string
@@ -130,6 +208,7 @@ export type TaskRunV1 = {
   noProgressCount: number
   nodes: TaskNodeV1[]
   artifacts: TaskArtifactV1[]
+  resultEvidence?: TaskResultEvidenceV1[]
   finalResponse?: string
   stalledReason?: string
   waitingReason?: string
@@ -199,12 +278,14 @@ export type TaskTemplateV1 = {
   stages: string[]
   outputs: string[]
   requiredInputs: string[]
+  availability?: { draftAvailable: boolean; model?: string; exportStatus: 'configured' | 'unavailable' }
 }
 export type TaskTemplateStartV1 = {
   workspaceRoot: string
   goal: string
   sourcePaths?: string[]
   outputDirectory?: string
+  outputFormats?: Array<'md' | 'docx' | 'pdf'>
   model?: string
   providerId?: string
   idempotencyKey: string
@@ -279,6 +360,8 @@ export type McpServerConfigV2 = {
   source: 'user' | 'skill' | 'managed-tool' | 'migration'
   credentialRef?: McpCredentialReferenceV1
   credentialEnvironmentVariables?: string[]
+  managedPreset?: 'amap-readonly' | 'zotero-readonly'
+  readOnlyTools?: string[]
   oauth?: {
     resource?: string
     authorizationUrl?: string
@@ -298,14 +381,32 @@ export type McpServerConfigV2 = {
   toolPolicy: Record<string, 'allow' | 'ask' | 'deny'>
   enabled: boolean
   revision: number
+  /** Main-process connection evidence. Save requests cannot supply this field. */
+  connectionCheck?: McpConnectionCheckV1
+}
+
+export type McpConnectionCheckV1 = {
+  serverRevision: number
+  configurationHash: string
+  credentialRefId?: string
+  checkedAt: string
+  state: McpServerStatusV1['state']
+  authorized: boolean
+  verification?: 'tool_discovery'
+  toolCount?: number
+  errorCode?: McpServerStatusV1['errorCode']
 }
 
 export type McpServerStatusV1 = {
   id: string
   state: 'disconnected' | 'connecting' | 'connected' | 'needs_authorization' | 'error'
   authorized: boolean
+  checkedAt?: string
+  verification?: 'tool_discovery'
   latencyMs?: number
   message?: string
+  errorCode?: 'missing_credentials' | 'invalid_credentials' | 'insufficient_scope' | 'network_blocked' | 'service_unavailable' | 'connection_failed' | 'tool_manifest_mismatch' | 'local_api_unavailable' | 'configuration_changed' | 'credential_unavailable' | 'credential_helper_timeout' | 'credential_helper_access_denied'
+  toolCount?: number
   authorizationUrl?: string
   authorizationState?: string
   authorizationCallback?: 'loopback' | 'manual'

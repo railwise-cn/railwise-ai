@@ -1,3 +1,5 @@
+import type { WorkspaceMigrationReport, WorkspaceImportRequest, WorkspaceImportResult } from './workspace-migration'
+import type { ManagedDwsResult, ManagedDwsTaskAccessResult } from './managed-dws'
 import type {
   AppSettingsPatch,
   WorkWiseSettingsV2,
@@ -149,6 +151,7 @@ import type {
   RuntimeSpanV1,
   TaskRunListQuery,
   TaskRunV1,
+  TaskOperationReceiptV1,
   TaskInputV1,
   TaskEventV1,
   TaskAttentionV1,
@@ -161,6 +164,9 @@ import type {
 export type RuntimeRequestResult = { ok: boolean; status: number; body: string }
 export type WorkspacePickResult = { canceled: boolean; path: string | null }
 export type PathOpenResult = { ok: boolean; message?: string }
+export type DingTalkDesktopResult =
+  | { ok: true }
+  | { ok: false; code: 'not_installed' | 'unsupported' | 'invalid_app' | 'open_failed'; message: string }
 export const DESKTOP_COMMANDS = [
   'undo',
   'redo',
@@ -233,10 +239,24 @@ export type ManagedToolStatus = {
   latestVersion?: string
   executablePath?: string
   message?: string
+  skillWarning?: string
   externalUrl?: string
+  scopes?: string[]
+  brand?: 'feishu' | 'lark'
+  appId?: string
+  profile?: string
+  userOpenId?: string
+  identityFingerprint?: string
+  executableHash?: string
 }
 export type ManagedToolResult =
   | { ok: true; status: ManagedToolStatus }
+  | { ok: false; message: string }
+export type ManagedLarkLoginResult =
+  | { ok: true; verificationUrl: string; userCode?: string; expiresAt: string }
+  | { ok: false; message: string; reason?: 'app_configuration_required' | 'candidate_credentials_disabled' }
+export type ManagedLarkAppSetupResult =
+  | { ok: true; state: 'configured' | 'waiting' | 'succeeded' | 'failed' | 'cancelled' | 'expired'; verificationUrl?: string; expiresAt?: string }
   | { ok: false; message: string }
 export type ManagedToolListResult =
   | { ok: true; tools: ManagedToolStatus[] }
@@ -383,6 +403,10 @@ export type WorkWiseApi = {
   cancelOperation: (request: CancelOperationRequest) => Promise<CancelOperationResult>
   coordinateTaskCommand: (request: import('./task-command').TaskCommandRequest) => Promise<import('./task-command').TaskCommandResult>
   getTaskRun: (taskId: string) => Promise<TaskRunV1 | null>
+  listTaskOperationReceipts: (taskId: string) => Promise<TaskOperationReceiptV1[]>
+  getTaskPermissions: (taskId: string) => Promise<import('./agent-workbench').TaskPermissionSnapshotV1>
+  confirmTaskPermissions: (taskId: string, request: import('./agent-workbench').TaskPermissionConfirmationV1) => Promise<{ task: TaskRunV1; permission: import('./agent-workbench').TaskPermissionSnapshotV1; resumed: false }>
+  verifyTaskOperationReceipt: (taskId: string, receiptId: string, request: Pick<RevisionTaskAction, 'expectedRevision' | 'idempotencyKey'>) => Promise<import('./agent-workbench').TaskOperationVerificationV1>
   readDocumentCandidate: (payload: import('./document-delivery').CandidateReviewRequest) => Promise<import('./document-delivery').DocumentCandidateReview>
   decideDocumentCandidate: (payload: import('./document-delivery').CandidateDecisionRequest) => Promise<import('./document-delivery').CandidateDecisionResult>
   listTaskPage: (query?: import('./agent-workbench').TaskPageQuery) => Promise<import('./agent-workbench').TaskRunPage>
@@ -494,6 +518,18 @@ export type WorkWiseApi = {
   installManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   updateManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   diagnoseManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
+  beginManagedLarkLogin: (input?: { capability?: 'tasks' | 'mail' | 'im' | 'drive' }) => Promise<ManagedLarkLoginResult>
+  completeManagedLarkLogin: () => Promise<ManagedToolResult>
+  beginManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
+  checkManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
+  cancelManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
+  diagnoseManagedDingTalk: () => Promise<ManagedDwsResult>
+  checkManagedDingTalkTaskAccess: () => Promise<ManagedDwsTaskAccessResult>
+  installManagedDingTalk: () => Promise<ManagedDwsResult>
+  beginManagedDingTalkLogin: () => Promise<ManagedDwsResult>
+  checkManagedDingTalkLogin: () => Promise<ManagedDwsResult>
+  cancelManagedDingTalkLogin: () => Promise<ManagedDwsResult>
+  setManagedDingTalkEnabled: (enabled: boolean) => Promise<ManagedDwsResult>
   removeManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   listAgentProfiles: (workspaceRoot?: string) => Promise<AgentProfileSnapshotV1>
   saveAgentProfile: (request: {
@@ -509,6 +545,9 @@ export type WorkWiseApi = {
     idempotencyKey: string
   }) => Promise<ThreadAgentSelectionV1>
   getWorkspaceTrust: (workspaceRoot: string) => Promise<WorkspaceTrustV1>
+  scanLegacyWorkspaces: () => Promise<WorkspaceMigrationReport>
+  getLegacyWorkspaceAliases: () => Promise<WorkspaceMigrationReport['aliases']>
+  importLegacyWorkspaceSnapshot: (request: WorkspaceImportRequest) => Promise<WorkspaceImportResult>
   setWorkspaceTrust: (request: {
     workspaceRoot: string
     level: WorkspaceTrustLevel
@@ -523,6 +562,7 @@ export type WorkWiseApi = {
     idempotencyKey: string
   }) => Promise<McpServerConfigV2>
   testMcpServer: (serverId: string, workspaceRoot?: string) => Promise<McpServerStatusV1>
+  openTaskArtifact: (request: { taskId: string; artifactId: string }) => Promise<{ ok: true } | { ok: false; message: string }>
   authorizeMcpServer: (request: {
     serverId: string
     workspaceRoot?: string
@@ -715,6 +755,7 @@ export type WorkWiseApi = {
   ) => Promise<ScheduleTaskFromTextResult>
   runDesktopCommand: (command: DesktopCommand) => Promise<void>
   openExternal: (url: string) => Promise<void>
+  openDingTalkDesktop: () => Promise<DingTalkDesktopResult>
   showTurnCompleteNotification: (
     payload: TurnCompleteNotificationPayload
   ) => Promise<SystemNotificationResult>

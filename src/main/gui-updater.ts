@@ -457,6 +457,9 @@ function toGuiInfo(updateInfo: UpdateInfo, hasUpdate: boolean, manualOnly = fals
 }
 
 function emitGuiUpdateState(state: GuiUpdateState): void {
+  if (state.status === 'error' && downloaded && lastInfo?.downloaded && !lastInfo.withdrawn) {
+    state = { ...state, info: lastInfo }
+  }
   lastState = state
   const win = getMainWindow?.()
   if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
@@ -985,7 +988,19 @@ function shouldInstallSilently(platform: NodeJS.Platform): boolean {
   return platform === 'win32'
 }
 
-export async function installGuiUpdate(): Promise<GuiUpdateInstallResult> {
+let installationPromise: Promise<GuiUpdateInstallResult> | undefined
+
+export function installGuiUpdate(): Promise<GuiUpdateInstallResult> {
+  if (!installationPromise) {
+    installationPromise = performGuiUpdateInstall().then(result => {
+      if (!result.ok) installationPromise = undefined
+      return result
+    })
+  }
+  return installationPromise
+}
+
+async function performGuiUpdateInstall(): Promise<GuiUpdateInstallResult> {
   try {
     if (!downloaded) {
       return {

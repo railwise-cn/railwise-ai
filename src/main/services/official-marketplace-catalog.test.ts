@@ -1,3 +1,4 @@
+import { isApprovedUpstreamPackage, isCatalogInstallable, OPTIONAL_ENGINEERING_SKILLS, ZOTERO_PACKAGE } from '../../shared/engineering-marketplace'
 import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -48,6 +49,7 @@ const PINNED_NPM_COMPONENTS = {
 } as const
 
 const PINNED_WHEEL_COMPONENTS = {
+  'zotero-mcp-server': { version: ZOTERO_PACKAGE.version, sha256: ZOTERO_PACKAGE.sha256, executable: 'zotero-mcp' },
   'docling-mcp': {
     version: '3.0.0',
     sha256: '595da70b9de2265f1f14e575fad65ff4213c5c7e2dbb255184d606505fa49f23',
@@ -76,6 +78,7 @@ const PINNED_WHEEL_COMPONENTS = {
 } as const
 
 const PINNED_EXECUTABLES = {
+  'zotero-mcp-server': 'zotero-mcp',
   '@antv/mcp-server-chart': 'mcp-server-chart',
   '@bytebase/dbhub': 'dbhub',
   '@modelcontextprotocol/server-filesystem': 'mcp-server-filesystem',
@@ -163,6 +166,7 @@ describe('official marketplace catalog', () => {
 
   it('contains exactly the official recommended package set and tiers', () => {
     const expectedRecommendedIds = [
+      'amap-maps', ...OPTIONAL_ENGINEERING_SKILLS.map(item => item.id),
       'antv-chart-mcp',
       'context7-mcp',
       'dbhub',
@@ -195,6 +199,9 @@ describe('official marketplace catalog', () => {
 
   it('contains exactly the official advanced package set and tiers', () => {
     const expectedAdvancedIds = [
+      'autocad-dwg-redraw',
+      'autocad-image-redraw',
+      'zotero-mcp',
       'antv-chart-skill',
       'docling-mcp',
       'ego-browser',
@@ -297,6 +304,8 @@ describe('official marketplace catalog', () => {
     const github = getOfficialMarketplaceCatalog().find((item) => item.id === 'github-mcp')
 
     expect(github).toBeDefined()
+    expect(github?.productType).toBe('connector')
+    expect(github?.auth).toEqual({ type: 'token', provider: 'github', environmentVariables: [] })
     expect(github?.components).toContainEqual(expect.objectContaining({
       type: 'mcp',
       runtime: expect.objectContaining({
@@ -427,8 +436,8 @@ describe('official marketplace catalog', () => {
           requirement: '>=3.10'
         }))
       }
-      expect(item.license).toBe('MIT')
-      expect(item.installation.mode).toBe('direct-mirror')
+      expect(item.license).toBe(item.id === 'zotero-mcp' ? ZOTERO_PACKAGE.license : 'MIT')
+      expect(item.installation.mode).toBe(item.id === 'zotero-mcp' ? 'upstream-only' : 'direct-mirror')
       return [
         component.runtime.packageName,
         {
@@ -447,7 +456,7 @@ describe('official marketplace catalog', () => {
       )
     const executableCounts = new Map<string, number>()
 
-    expect(managedArtifactComponents).toHaveLength(15)
+    expect(managedArtifactComponents).toHaveLength(16)
     for (const runtime of managedArtifactComponents) {
       const expectedExecutable = PINNED_EXECUTABLES[
         runtime.packageName as keyof typeof PINNED_EXECUTABLES
@@ -508,6 +517,43 @@ describe('official marketplace catalog', () => {
       kind: 'github',
       resolvedCommit: '44c9b2d6e889982ac18c27d05a19fefe335194e1'
     })
+  })
+
+  it('provides both AutoCAD Skills as fixed user-initiated upstream installs with an honest unknown license', () => {
+    for (const id of ['autocad-dwg-redraw', 'autocad-image-redraw']) {
+      const item = packageById(id)
+      expect(item.productType).toBe('workflow')
+      expect(item.source).toMatchObject({ kind: 'github', owner: 'pengxiaoan', repository: 'autocad-dwg-redraw-skill',
+        requestedRef: 'ed182ec5966caaaf1d82d6ad4015435a27a8a909', resolvedRef: 'ed182ec5966caaaf1d82d6ad4015435a27a8a909', subpath: `skills/${id}`,
+        digest: { algorithm: 'sha256', value: '1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e' } })
+      expect(item.source.location).toBe(`https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/${item.version}/skills/${id}`)
+      expect(item.components).toMatchObject([{ type: 'skill', skillNames: [id] }])
+      expect(item.publisher).toMatchObject({ id: 'pengxiaoan', verified: false })
+      expect(item.license).toBeNull()
+      expect(item.licenseEvidence).toEqual([])
+      expect(item.installation).toEqual({ mode: 'upstream-only', installedByDefault: false, reinstallable: true })
+      expect(item.availability).toEqual({ status: 'available' })
+      expect(isCatalogInstallable(item)).toBe(true)
+      expect(evaluateMarketplaceLicense(item.license).disposition).toBe('external-only')
+      expect(item.dependencies.every(dependency => dependency.managedBy === 'user')).toBe(true)
+      expect(item.usage?.examples?.length).toBeGreaterThan(0)
+      expect(item.usage?.howToUse).toContain('上游未声明分发许可证')
+      expect(item.permissions.find(permission => permission.kind === 'process')).toMatchObject({ default: 'denied', reviewRequired: true })
+    }
+    const dwg = packageById('autocad-dwg-redraw')
+    expect(dwg.compatibility.platforms).toEqual(['darwin', 'win32', 'linux'])
+    expect(dwg.dependencies.find(dependency => dependency.id === 'autocad')?.requirement).toContain('Windows AutoCAD')
+    expect(dwg.usage?.howToUse).toContain('--restart-autocad')
+    expect(dwg.usage?.howToUse).toContain('未保存文档')
+    expect(dwg.dependencies.some(dependency => dependency.id === 'pywin32' && !dependency.optional)).toBe(true)
+    const image = packageById('autocad-image-redraw')
+    expect(image.compatibility.platforms).toEqual(['darwin', 'win32', 'linux'])
+    expect(image.usage?.howToUse).toContain('粗略 DXF 基线')
+    expect(image.dependencies.find(dependency => dependency.id === 'image-redraw-python')?.requirement).toContain('opencv-python-headless==4.14.0.94')
+    expect(image.usage?.howToUse).toContain('OpenCV 5.x')
+    expect(image.usage?.howToUse).toContain('毫米/像素标定比例')
+    expect(image.usage?.howToUse).toContain('尺寸精度需要权威尺寸和约束核验')
+    expect(image.usage?.howToUse).toContain('删除已有输出')
   })
 
   it('ships the five GitHub skills as pinned, installable packages with license evidence', () => {
@@ -827,6 +873,9 @@ describe('official marketplace catalog', () => {
         expect(item.availability.status).toBe('available')
         expect(item.installation.reinstallable).toBe(true)
         expect(evaluateMarketplaceLicense(item.license).disposition).toBe('direct-mirror')
+      } else if (item.installation.mode === 'upstream-only') {
+        expect(isApprovedUpstreamPackage(item)).toBe(true)
+        expect(evaluateMarketplaceLicense(item.license).disposition).toBe(item.license === null ? 'external-only' : 'rejected')
       } else {
         expect(item.installation.reinstallable).toBe(false)
       }

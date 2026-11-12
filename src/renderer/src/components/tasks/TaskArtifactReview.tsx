@@ -12,7 +12,7 @@ export function TaskArtifactReview({task,artifact,onOpen}:{task:TaskRunV1;artifa
   const [target,setTarget]=useState('');const [busy,setBusy]=useState(false);const [message,setMessage]=useState('')
   const [pending,setPending]=useState<CandidateDecisionRequest|null>(null)
   const [regenerationKey,setRegenerationKey]=useState<string|null>(null)
-  if(!/\.(?:md|mdx|markdown)$/i.test(artifact.relativePath)||!artifact.relativePath.includes('delivery-candidates'))return null
+  if(artifact.absolutePath||!/\.(?:md|mdx|markdown)$/i.test(artifact.relativePath)||!artifact.relativePath.includes('delivery-candidates'))return null
   const load=async()=>{
     if(busy)return;setBusy(true);setMessage('')
     try{const result=await window.workwise.readDocumentCandidate({workspaceRoot:task.workspaceRoot,path:artifact.relativePath,...(target.trim()?{targetPath:target.trim()}:{})});setReview(result);setTarget(result.targetPath??target);setPending(null)}catch(e){setMessage(e instanceof Error?e.message:String(e))}finally{setBusy(false)}

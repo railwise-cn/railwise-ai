@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  _internals,
   installManagedTool,
   managedToolsSkillRoot,
   removeManagedTool
@@ -30,7 +31,9 @@ describe.runIf(enabled)('managed-tool-service official upstreams', () => {
     if (!lark.ok) throw new Error(lark.message)
     expect(lark).toMatchObject({ ok: true, status: { id: 'lark-cli' } })
     expect(['installed', 'needs_login']).toContain(lark.status.state)
-    expect(existsSync(join(managedToolsSkillRoot(), 'lark-doc', 'SKILL.md'))).toBe(true)
+    for (const name of _internals.larkSkills) {
+      expect(existsSync(join(managedToolsSkillRoot(), name, 'SKILL.md')), `${name}: ${lark.status.message ?? 'companion Skill missing'}`).toBe(true)
+    }
 
     const office = await installManagedTool('officecli')
     if (!office.ok) throw new Error(office.message)

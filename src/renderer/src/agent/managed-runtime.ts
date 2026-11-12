@@ -206,7 +206,7 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
       'runtime returned an invalid thread response'
     )
     const turns = Array.isArray(thread.turns) ? thread.turns : []
-    const items = turns.flatMap((turn) =>
+    const executionItems = turns.flatMap((turn) =>
       (turn.items ?? []).map((item) => ({
         ...item,
         attachmentIds: turn.attachmentIds,
@@ -215,12 +215,14 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
         skillInjectionBytes: turn.skillInjectionBytes
       }))
     )
+    const items = [...executionItems, ...(thread.conversationItems ?? [])]
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     const blocks = mergeChatBlocks(items.flatMap((item) => {
       const block = chatBlockFromItem(item)
       return block ? [block] : []
     }))
     const latestTurn = turns.at(-1)
-    const latestUserMessageId = [...items].reverse().find((item) => item.kind === 'user_message')?.id
+    const latestUserMessageId = [...executionItems].reverse().find((item) => item.kind === 'user_message')?.id
     return {
       blocks,
       latestSeq: thread.latestSeq ?? 0,

@@ -2,9 +2,14 @@ import { z } from 'zod'
 import { StartTurnRequest } from './turns.js'
 import type { TaskInput, TaskRun } from './tasks.js'
 import type { StartTurnResponse } from './turns.js'
+import type { CapabilityPreflight } from './harness.js'
 
 export const ProcessIdentitySchema = z.object({ pid: z.number().int().positive(), fingerprint: z.string().min(1) })
 export type ProcessIdentity = z.infer<typeof ProcessIdentitySchema>
+
+export { ExecutionGrantSchema, WorkspaceTrustLevelSchema } from './permissions.js'
+export type { ExecutionGrant, WorkspaceTrustLevel } from './permissions.js'
+
 export const ExecutionSessionSchema = z.object({
   id: z.string(), taskId: z.string(), threadId: z.string(), originThreadId: z.string(),
   assignmentId: z.string().optional(), visibility: z.enum(['task', 'internal', 'legacy']),
@@ -33,6 +38,7 @@ export const TaskCommandSchema = z.object({
   intent: z.enum(['auto', 'status', 'supplement', 'new', 'chat', 'pause', 'resume', 'cancel']).default('auto'),
   idempotencyKey: z.string().trim().min(1).max(256), expectedRevision: z.number().int().nonnegative().optional(),
   resolveAttentionId: z.string().min(1).optional(),
+  selectedExternalProvider: z.enum(['dingtalk', 'lark']).optional(),
   request: StartTurnRequest
 })
 export type TaskCommand = z.input<typeof TaskCommandSchema>
@@ -42,4 +48,5 @@ export type TaskCommandResult = (
   | { kind:'task_updated';action:'pause'|'cancel';task:TaskRun }
   | { kind: 'task_started' | 'chat_started'; task?: TaskRun; turn: StartTurnResponse }
   | { kind: 'attention_required'; task?: TaskRun; message: string; attentionId?: string }
+  | { kind: 'capability_required'; task?: TaskRun; attentionId?: string; capability: CapabilityPreflight; message: string }
 ) & { receipt?: {userMessageItemId:string;resultMessageItemId:string} }

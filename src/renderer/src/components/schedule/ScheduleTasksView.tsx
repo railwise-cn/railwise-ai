@@ -201,7 +201,7 @@ function formatDateTime(value: string, fallback: string): string {
 }
 
 function statusTone(status: ScheduledTaskV1['lastStatus']): string {
-  if (status === 'running') return 'bg-amber-500/15 text-amber-900 dark:text-amber-100'
+  if (status === 'running' || status === 'waiting_user') return 'bg-amber-500/15 text-amber-900 dark:text-amber-100'
   if (status === 'success') return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-100'
   if (status === 'error') return 'bg-red-500/15 text-red-700 dark:text-red-100'
   return 'bg-ds-subtle text-ds-muted'
@@ -370,7 +370,7 @@ export function ScheduleTasksView({
   const runTask = async (taskId: string): Promise<void> => {
     if (typeof window.workwise?.runScheduleTask !== 'function') return
     const result = await window.workwise.runScheduleTask(taskId)
-    if (!result.ok) {
+    if (!result.ok && result.status !== 'waiting_user') {
       setError(result.message)
       return
     }
@@ -536,11 +536,11 @@ export function ScheduleTasksView({
                         ) : null}
                         <button
                           type="button"
-                          onClick={() => void runTask(task.id)}
+                          onClick={() => task.lastStatus === 'waiting_user' && lastThreadId ? onOpenThread?.(lastThreadId) : void runTask(task.id)}
                           disabled={running}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-45"
-                          title={t('scheduleRunNow')}
-                          aria-label={t('scheduleRunNow')}
+                          title={t(task.lastStatus === 'waiting_user' ? 'scheduleContinueInConversation' : 'scheduleRunNow')}
+                          aria-label={t(task.lastStatus === 'waiting_user' ? 'scheduleContinueInConversation' : 'scheduleRunNow')}
                         >
                           <Play className="h-4 w-4" strokeWidth={1.8} />
                         </button>
@@ -581,7 +581,7 @@ export function ScheduleTasksView({
                           <span className="min-w-0 truncate text-[12px] font-semibold text-ds-faint">
                             {task.lastStatus === 'error'
                               ? t('scheduleLastError')
-                              : task.lastStatus === 'running'
+                              : task.lastStatus === 'running' || task.lastStatus === 'waiting_user'
                                 ? t('scheduleCurrentStatus')
                                 : t('scheduleLastResult')}
                           </span>

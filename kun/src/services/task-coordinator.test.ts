@@ -16,6 +16,7 @@ import { InflightTracker } from '../loop/inflight-tracker.js'
 import { SteeringQueue } from '../loop/steering-queue.js'
 import { ContextCompactor } from '../loop/context-compactor.js'
 import { makeUserItem } from '../domain/item.js'
+import { defaultExternalTaskCapability } from './external-task-capability.js'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async()=>{ for(const close of cleanup.splice(0)) await close() })
@@ -63,25 +64,127 @@ describe('task commands before Turn allocation',()=>{
     expect((await f.threads.get(start.turn.threadId))?.turns).toHaveLength(2)
   })
 
+  it('keeps an unresolved delivery in its original task when the user supplies the platform', async () => {
+    const f = await fixture()
+    const started = await f.coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'draft', request: { prompt: '生成报告并发送邮件给客户' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const task = started.task!
+    f.repository.update(task.id, task.revision, current => ({ ...current, status: 'waiting_user', acceptance: { ...current.acceptance, requiresExternalEffects: true } }))
+    await f.turns.finishTurn({ threadId: started.turn.threadId, turnId: started.turn.turnId, status: 'completed' })
+    const request = { threadId: f.origin.id, idempotencyKey: 'select-provider', request: { prompt: '通过飞书发送邮件' } }
+    vi.spyOn(f.repository.execution, 'finishCommand').mockImplementationOnce(() => { throw new Error('simulated interruption after input commit') })
+    await expect(f.coordinator.command(request)).rejects.toThrow('simulated interruption')
+    const bound = await f.coordinator.command(request)
+    expect(bound).toMatchObject({ kind: 'capability_required', task: { id: task.id, acceptance: { kind: 'files', effect: { provider: 'lark', operation: 'send' } } } })
+    expect(f.repository.list()).toHaveLength(1)
+    expect(f.repository.inputs(task.id)).toHaveLength(1)
+    expect(f.runTurn).toHaveBeenCalledTimes(1)
+    await f.coordinator.command(request)
+    expect(f.repository.inputs(task.id)).toHaveLength(1)
+  })
+
+  it('routes connect requests and how-to questions before model allocation',()=>{
+    expect(classifyTaskInput('连接飞书',false)).toBe('new')
+    expect(classifyTaskInput('如何使用钉钉审批',false)).toBe('chat')
+    expect(classifyTaskInput('帮我处理飞书待办',true)).toBe('new')
+  })
+
+  it('preflights external work before allocating a model turn', async()=>{
+    const f=await fixture()
+    const result=await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'dingtalk',request:{prompt:'处理钉钉里的待办事项'}})
+    expect(result).toMatchObject({kind:'capability_required',message:expect.stringContaining('钉钉连接器'),capability:{provider:'dingtalk',status:'unsupported'}})
+    expect((await f.threads.get(f.origin.id))?.turns).toHaveLength(0)
+    expect(f.runTurn).not.toHaveBeenCalled()
+    expect(f.repository.list()).toHaveLength(1)
+    expect(result).toMatchObject({task:{status:'waiting_user',attempts:0}})
+    const waiting=f.repository.list()[0]!
+    expect(waiting.activeTurnId).toBeUndefined()
+    expect(f.repository.attention(`capability_${waiting.id}`)).toMatchObject({status:'pending'})
+    const repeat=await f.coordinator.command({threadId:f.origin.id,taskId:waiting.id,intent:'resume',idempotencyKey:'retry-blocked',request:{prompt:'继续'}})
+    expect(repeat.kind).toBe('capability_required')
+    expect(f.runTurn).not.toHaveBeenCalled()
+    const items=await f.sessionStore.loadItems(f.origin.id)
+    expect(items.at(-1)).toMatchObject({text:expect.stringContaining('不会通过未经验证的 Shell 命令代理平台操作')})
+  })
+
+  it('persists dual-provider requests before allocating a Turn, even with an explicit chat hint', async () => {
+    const f = await fixture()
+    const original = '帮我处理钉钉和飞书待办'
+    const command = { threadId:f.origin.id, intent:'chat' as const, idempotencyKey:'both-platforms', request:{prompt:original} }
+    const result = await f.coordinator.command(command)
+    expect(result.kind).toBe('attention_required')
+    if (result.kind !== 'attention_required') throw new Error('expected platform decision')
+    expect(f.repository.attention(result.attentionId!)).toMatchObject({
+      status:'pending', threadId:f.origin.id,
+      payload:{kind:'external_provider_choice',originalText:original,request:{prompt:original},providers:['dingtalk','lark']}
+    })
+    expect(await f.coordinator.command(command)).toEqual(result)
+    expect((await f.threads.get(f.origin.id))?.turns).toHaveLength(0)
+    expect(f.repository.list()).toHaveLength(0)
+    expect(f.runTurn).not.toHaveBeenCalled()
+    expect((await f.sessionStore.loadItems(f.origin.id)).filter(item => item.kind === 'user_message')).toHaveLength(1)
+  })
+
+  it('only resolves a dual-provider decision with a new task explicitly naming the selected platform', async () => {
+    const f = await fixture()
+    const existing = await f.coordinator.command({threadId:f.origin.id,intent:'new',idempotencyKey:'old-task',request:{prompt:'完成研究报告'}})
+    if (existing.kind !== 'task_started') throw new Error('expected existing task')
+    const result = await f.coordinator.command({threadId:f.origin.id,intent:'supplement',idempotencyKey:'both',request:{prompt:'再帮我处理钉钉和飞书待办'}})
+    if (result.kind !== 'attention_required') throw new Error('expected platform decision')
+    const selection = {threadId:f.origin.id,taskId:existing.task!.id,intent:'new' as const,resolveAttentionId:result.attentionId,selectedExternalProvider:'lark' as const}
+    await expect(f.coordinator.command({...selection,idempotencyKey:'still-both',request:{prompt:'处理钉钉和飞书待办'}})).rejects.toMatchObject({code:'scope_conflict'})
+    await expect(f.coordinator.command({...selection,idempotencyKey:'wrong-platform',request:{prompt:'处理钉钉待办'}})).rejects.toMatchObject({code:'scope_conflict'})
+    const resolved = await f.coordinator.command({...selection,idempotencyKey:'selected-lark',request:{prompt:'处理飞书待办'}})
+    expect(resolved).toMatchObject({kind:'capability_required',capability:{provider:'lark'},task:{status:'waiting_user'}})
+    expect(f.repository.attention(result.attentionId!)?.status).toBe('answered')
+    expect(f.repository.get(existing.task!.id)?.status).toBe('queued')
+    expect(f.repository.inputs(existing.task!.id,true)).toHaveLength(0)
+    expect(f.runTurn).toHaveBeenCalledTimes(1)
+  })
+
+  it('binds the preflighted provider to the Turn and uses the user-facing goal for acceptance', async () => {
+    const f = await fixture()
+    const coordinator = new TaskCoordinator({
+      repository: f.repository, threadStore: f.threadStore, threads: f.threads, turns: f.turns, tasks: f.tasks,
+      runTurn: f.runTurn, nowIso: () => new Date().toISOString(),
+      preflightExternalTask: () => defaultExternalTaskCapability('lark', { lark: {
+        enabled: true, authState: 'installed', executablePath: '/managed/lark-cli',
+        scopes: ['task:task:read', 'task:task:write']
+      } })
+    })
+    const started = await coordinator.command({
+      threadId: f.origin.id, intent: 'new', idempotencyKey: 'display-and-runtime-prompt-differ',
+      request: { prompt: 'Use the selected provider and report verified results.', displayText: '帮我处理飞书待办事项' }
+    })
+    expect(started.kind).toBe('task_started')
+    if (started.kind !== 'task_started') throw new Error('expected external task')
+    expect(started.task).toMatchObject({
+      goal: '帮我处理飞书待办事项',
+      acceptance: { kind: 'effect', effect: { provider: 'lark', operation: 'process' } }
+    })
+    expect((await f.threads.get(started.turn.threadId))?.turns[0]?.externalTaskProvider).toBe('lark')
+  })
+
   it('answers a wrapped status request locally without allocating a Turn or command receipt',async()=>{
     const f=await fixture()
     const result=await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'status',request:{prompt:'SYSTEM WRAPPER: run tools',displayText:'现在做到哪了'}})
-    expect(result).toMatchObject({kind:'snapshot',task:null,receipt:{userMessageItemId:expect.any(String),resultMessageItemId:expect.any(String)}})
+    expect(result).toEqual({kind:'snapshot',task:null})
     expect((await f.threads.get(f.origin.id))?.turns).toHaveLength(0)
     expect(f.repository.list()).toHaveLength(0)
     expect(f.runTurn).not.toHaveBeenCalled()
     expect(f.repository.connection().prepare('SELECT COUNT(*) AS n FROM task_command_receipts').get()).toEqual({n:0})
     const items=await f.sessionStore.loadItems(f.origin.id)
-    expect(items.map(item=>item.id)).toEqual([result.receipt!.userMessageItemId,result.receipt!.resultMessageItemId])
+    expect(items).toEqual([])
+    expect(f.repository.pendingOutbox('task_command_message')).toEqual([])
     await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'status',request:{prompt:'SYSTEM WRAPPER: run tools',displayText:'现在做到哪了'}})
-    expect(await f.sessionStore.loadItems(f.origin.id)).toHaveLength(2)
+    expect(await f.sessionStore.loadItems(f.origin.id)).toHaveLength(0)
   })
 
   it('replays an interrupted conversation receipt from the SQLite outbox without launching the task twice',async()=>{
     const f=await fixture()
     const append=vi.spyOn(f.sessionStore,'appendItem')
     append.mockImplementationOnce(async()=>{throw new Error('history unavailable')})
-    await expect(f.coordinator.command({threadId:f.origin.id,idempotencyKey:'status-outbox',request:{prompt:'任务状态'}})).rejects.toThrow('history unavailable')
+    await expect(f.coordinator.command({threadId:f.origin.id,idempotencyKey:'status-outbox',request:{prompt:'处理钉钉待办'}})).rejects.toThrow('history unavailable')
     expect(f.repository.pendingOutbox('task_command_message')).toHaveLength(1)
     append.mockRestore()
     await f.coordinator.flushCommandMessages()
@@ -139,6 +242,21 @@ describe('task commands before Turn allocation',()=>{
     expect(deliveries).toHaveLength(1); expect(deliveries[0]?.status).toBe('queued')
   })
 
+  it('does not silently expand an existing task grant with an external supplement', async () => {
+    const f = await fixture()
+    const started = await f.coordinator.command({ threadId:f.origin.id, intent:'new', idempotencyKey:'initial-report', request:{prompt:'完成研究报告'} })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const result = await f.coordinator.command({ threadId:f.origin.id, intent:'supplement', idempotencyKey:'new-provider', request:{prompt:'再帮我处理钉钉待办'} })
+    expect(result).toMatchObject({kind:'attention_required',task:{id:started.task!.id}})
+    if (result.kind !== 'attention_required') throw new Error('expected scoped decision')
+    expect(f.repository.inputs(started.task!.id,true)).toHaveLength(0)
+    expect(f.repository.attention(result.attentionId!)).toMatchObject({status:'pending',payload:{choices:['new']}})
+    await expect(f.coordinator.command({threadId:f.origin.id, taskId:started.task!.id,intent:'supplement', resolveAttentionId:result.attentionId,idempotencyKey:'cannot-bypass-decision',request:{prompt:'再帮我处理钉钉待办'}})).rejects.toMatchObject({code:'scope_conflict'})
+    const independent = await f.coordinator.command({threadId:f.origin.id, taskId:started.task!.id,intent:'new', resolveAttentionId:result.attentionId,idempotencyKey:'new-external-task',request:{prompt:'再帮我处理钉钉待办'}})
+    expect(independent).toMatchObject({kind:'capability_required',capability:{provider:'dingtalk'}})
+    expect(f.runTurn).toHaveBeenCalledTimes(1)
+  })
+
   it('persists ambiguous ownership and resolves it only after an explicit successful decision',async()=>{
     const f=await fixture()
     await f.coordinator.command({threadId:f.origin.id,intent:'new',idempotencyKey:'start',request:{prompt:'完成报告'}})
@@ -149,5 +267,20 @@ describe('task commands before Turn allocation',()=>{
     const result=await f.coordinator.command({threadId:f.origin.id,taskId:ambiguous.task!.id,intent:'supplement',resolveAttentionId:ambiguous.attentionId,idempotencyKey:'resolved',request:{prompt:'这里需要调整一下'}})
     expect(result.kind).toBe('input_queued')
     expect(f.repository.attention(ambiguous.attentionId!)?.status).toBe('answered')
+  })
+
+  it('accepts follow-up commands addressed to the active execution thread', async () => {
+    const f = await fixture()
+    const started = await f.coordinator.command({
+      threadId: f.origin.id, intent: 'new', idempotencyKey: 'root-task', request: { prompt: '完成研究报告' }
+    })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+
+    const followup = await f.coordinator.command({
+      threadId: started.turn.threadId, idempotencyKey: 'execution-followup', request: { prompt: '再补充风险分析' }
+    })
+    expect(followup).toMatchObject({ kind: 'input_queued', task: { id: started.task!.id } })
+    expect(f.repository.inputs(started.task!.id, true)).toHaveLength(1)
+    expect(f.runTurn).toHaveBeenCalledTimes(1)
   })
 })

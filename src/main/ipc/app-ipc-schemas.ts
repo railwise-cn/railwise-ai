@@ -11,6 +11,7 @@ import { SurveyQualityPlanCreateV1, SurveyQualityEvidenceCreateV1, SurveyQuality
 import { QUALITY_WORKFLOW_LIMITS, SurveyQualityWorkflowCreateV1, SurveyQualityWorkflowAppendV1, parseQualityWorkflowJson } from '../../shared/survey-quality-workflow'
 import { SurveyDraftCreateV1, SurveyDraftSealV1 } from '../../shared/survey-collaboration'
 import { TaskCommandSchema } from '../../../kun/src/contracts/execution'
+import { TaskPermissionConfirmationSchema } from '../../../kun/src/contracts/permissions'
 import {
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE,
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE,
@@ -36,6 +37,9 @@ import {
   RUNTIME_TASK_PAUSE_TEMPLATE,
   RUNTIME_TASK_INPUTS_TEMPLATE,
   RUNTIME_TASK_EVENTS_TEMPLATE,
+  RUNTIME_TASK_RECEIPTS_TEMPLATE,
+  RUNTIME_TASK_PERMISSIONS_TEMPLATE,
+  RUNTIME_TASK_RECEIPT_VERIFY_TEMPLATE,
   RUNTIME_TASK_SUMMARY_TEMPLATE,
   RUNTIME_INBOX_TEMPLATE,
   RUNTIME_TASK_TEMPLATES_TEMPLATE,
@@ -304,6 +308,9 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_TASK_PAUSE_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_INPUTS_TEMPLATE, ['GET', 'POST'], []),
   compileEndpoint(RUNTIME_TASK_EVENTS_TEMPLATE, ['GET'], ['afterSequence']),
+  compileEndpoint(RUNTIME_TASK_RECEIPTS_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_TASK_PERMISSIONS_TEMPLATE, ['GET', 'POST']),
+  compileEndpoint(RUNTIME_TASK_RECEIPT_VERIFY_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_SUMMARY_TEMPLATE, ['GET'], ['workspaceRoot', 'search', 'threadId']),
   compileEndpoint(RUNTIME_INBOX_TEMPLATE, ['GET'], ['workspaceRoot']),
   compileEndpoint(RUNTIME_TASK_TEMPLATES_TEMPLATE, ['GET'], []),
@@ -444,6 +451,14 @@ export const runtimeRequestPayloadSchema = z
         && (pagination !== 'cursor' || (!url.searchParams.has('status') && !url.searchParams.has('offset')
           && (limit === null || (/^[1-9]\d*$/.test(limit) && Number(limit) <= 200))))
       if (!valid) context.addIssue({ code: 'custom', message: 'invalid task list request' })
+    }
+    if (/^\/v1\/tasks\/[^/]+\/permissions$/.test(url.pathname)) {
+      const method = payload.method ?? 'GET'
+      let valid = method === 'GET' && payload.body === undefined && !url.search && !url.hash
+      if (method === 'POST' && payload.body !== undefined && !url.search && !url.hash && Buffer.byteLength(payload.body, 'utf8') <= 4096) {
+        try { valid = TaskPermissionConfirmationSchema.safeParse(JSON.parse(payload.body)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid scoped task permission request' })
     }
     if (url.pathname === '/v1/task-commands') {
       let valid = payload.method === 'POST' && !url.search && !url.hash && payload.body !== undefined
@@ -647,7 +662,7 @@ const kunCompactionSummaryModeSchema = z.enum(['heuristic', 'model'])
 const clawRunModeSchema = z.enum(['agent', 'plan'])
 const clawImProviderSchema = z.enum(['feishu', 'weixin'])
 const clawScheduleKindSchema = z.enum(['manual', 'interval', 'daily', 'at'])
-const clawTaskStatusSchema = z.enum(['idle', 'running', 'success', 'error'])
+const clawTaskStatusSchema = z.enum(['idle', 'running', 'waiting_user', 'success', 'error'])
 const clawModelSchema = z.enum(CLAW_MODEL_IDS)
 const scheduleReasoningEffortSchema = z.enum(SCHEDULE_REASONING_EFFORT_IDS)
 const writeInlineCompletionModelSchema = z.union([
@@ -1030,7 +1045,8 @@ const scheduledTaskPatchSchema = z.object({
   nextRunAt: z.string().max(128).optional(),
   lastStatus: clawTaskStatusSchema.optional(),
   lastMessage: z.string().max(MAX_CHANNEL_TEXT_LENGTH).optional(),
-  lastThreadId: z.string().max(MAX_ID_LENGTH).optional()
+  lastThreadId: z.string().max(MAX_ID_LENGTH).optional(),
+  runtimeTaskId: z.string().max(MAX_ID_LENGTH).optional()
 }).strict()
 
 const scheduleSettingsPatchSchema = z.object({
@@ -1782,6 +1798,13 @@ export const workspaceTrustGetPayloadSchema = z.object({
   workspaceRoot: trimmedString(MAX_PATH_LENGTH)
 }).strict()
 
+export const workspaceMigrationImportPayloadSchema = z.object({
+  sourceId: trimmedString(256),
+  expectedFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  confirmed: z.boolean(),
+  idempotencyKey: trimmedString(MAX_ID_LENGTH)
+}).strict()
+
 export const workspaceTrustSetPayloadSchema = z.object({
   workspaceRoot: trimmedString(MAX_PATH_LENGTH),
   level: trustLevelSchema,
@@ -1811,6 +1834,8 @@ const mcpServerConfigV2Schema = z.object({
     storage: z.enum(['keychain', 'dpapi', 'safe-storage', 'session'])
   }).strict().optional(),
   credentialEnvironmentVariables: z.array(trimmedString(128)).max(32).optional(),
+  managedPreset: z.enum(['amap-readonly', 'zotero-readonly']).optional(),
+  readOnlyTools: z.array(trimmedString(128)).max(128).optional(),
   oauth: z.object({
     resource: optionalTrimmedString(MAX_URL_LENGTH),
     authorizationUrl: optionalTrimmedString(MAX_URL_LENGTH),

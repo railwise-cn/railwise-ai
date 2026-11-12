@@ -32,5 +32,5 @@ export function redactSecretText(value: string): string {
       match.toLowerCase().startsWith('bearer ')
         ? `Bearer ${REDACTED_SECRET}`
         : `${key}=${REDACTED_SECRET}`
-    ), value)
+    ), value).replace(/([?&]key=)[^&#\s]+/gi, `$1${REDACTED_SECRET}`)
 }

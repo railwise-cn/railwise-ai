@@ -10,9 +10,11 @@ import type {
   PreparedPluginImportV1
 } from '@shared/marketplace'
 import type { SkillListItem } from '@shared/workwise-api'
+import type { McpServerConfigV2 } from '@shared/agent-workbench'
 import i18n from '../i18n'
 import { useChatStore } from '../store/chat-store'
 import { PluginMarketplaceView } from './PluginMarketplaceView'
+import { getOfficialMarketplaceCatalog } from '../../../main/services/official-marketplace-catalog'
 
 const SOURCE: CatalogSourceV1 = {
   schemaVersion: 1,
@@ -70,6 +72,7 @@ function catalogPackage(id: string, version: string): MarketplacePackageV1 {
         ? 'Document Tools'
         : 'Advanced Reasoning',
     summary: `Summary for ${id}`,
+    productType: 'utility',
     tier: 'recommended',
     categories: [id === 'browser-tools' ? 'browser' : 'documents'],
     version,
@@ -240,8 +243,9 @@ function setInput(input: HTMLInputElement, value: string): void {
 }
 
 beforeEach(async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   await i18n.changeLanguage('en')
-  useChatStore.setState({ workspaceRoot: '/tmp/workwise-marketplace-qa' })
+  useChatStore.setState({ workspaceRoot: '/tmp/workwise-marketplace-qa', pluginConnectorTarget: null })
   installPrepared = vi.fn(async () => INSTALLED)
   Object.defineProperty(window, 'workwise', {
     configurable: true,
@@ -321,6 +325,8 @@ beforeEach(async () => {
   root = createRoot(container)
   await act(async () => root.render(createElement(PluginMarketplaceView)))
   await settle()
+  // Existing package-management coverage remains on its explicit Plugins tab.
+  await act(async () => exactButton('Plugins').click())
 })
 
 afterEach(async () => {
@@ -331,10 +337,211 @@ afterEach(async () => {
 })
 
 describe('PluginMarketplaceView unified catalog', () => {
+  it('routes the GitHub connector to actionable token setup without attempting unregistered OAuth', async () => {
+    const github: MarketplacePackageV1 = { ...DOCUMENTS, id: 'github-mcp', name: 'GitHub MCP', productType: 'connector',
+      auth: { type: 'oauth', provider: 'github', discovery: 'ready' },
+      installation: { mode: 'external', installedByDefault: false, reinstallable: false },
+      components: [{ id: 'github-mcp-server', name: 'GitHub', sourceId: DOCUMENTS.source.id, type: 'mcp', runtime: { kind: 'remote', transport: 'streamable-http', endpoint: 'https://api.githubcopilot.com/mcp/' } }] }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({ packages: [{ key: `${SOURCE.id}:${github.id}`, sourceId: SOURCE.id, package: github, conflicted: false }], conflicts: [] })
+    const authorize = vi.fn(), save = vi.fn()
+    Object.assign(window.workwise, { authorizeMcpServer: authorize, saveMcpServer: save })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    expect(container.querySelector('button[aria-label="GitHub MCP"]')).toBeNull()
+    await act(async () => exactButton('Connectors').click())
+    await act(async () => iconButton('View GitHub MCP connection').click())
+    expect(container.querySelector('[role="dialog"][aria-label="GitHub 连接"]')).not.toBeNull()
+    expect(container.textContent).toContain('在 GitHub 创建令牌')
+    expect(container.querySelector('input[type="password"]')).not.toBeNull()
+    expect(authorize).not.toHaveBeenCalled()
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('opens Skills by default and orders connectors last while keeping connector deep links', async () => {
+    await act(async () => root.render(createElement(PluginMarketplaceView, { key: 'default-tabs' })))
+    await settle()
+    const tabs = [...container.querySelectorAll<HTMLButtonElement>('[role="tablist"][aria-label="Skills and connector sections"] > [role="tab"]')]
+    expect(tabs.map(tab => tab.textContent)).toEqual(['Skills', 'Plugins', 'Connectors'])
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
+    expect(container.textContent).toContain('资料盘点与来源索引')
+    expect(window.workwise.installPreparedPlugin).not.toHaveBeenCalled()
+  })
+
+  it('preserves installed Lark OpenAPI package source, permissions, and update details behind native setup', async () => {
+    const larkPackage: MarketplacePackageV1 = {
+      ...MANAGED_KB,
+      id: 'lark-openapi-mcp',
+      name: 'Lark OpenAPI MCP',
+      permissions: [{ id: 'network.connect', kind: 'network', access: 'connect', default: 'review', reviewRequired: true, description: 'Connect only to the selected Lark service.', resources: ['https://open.feishu.cn'] }],
+      auth: { type: 'tool-managed', provider: 'lark-cli' },
+      installation: { mode: 'system-managed', installedByDefault: false, reinstallable: false }
+    }
+    const installed = { ...INSTALLED, packageId: larkPackage.id, version: 'legacy-0.5.4', source: larkPackage.source, sources: larkPackage.sources }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({ packages: [{ key: `${SOURCE.id}:${larkPackage.id}`, sourceId: SOURCE.id, package: larkPackage, conflicted: false }], conflicts: [] })
+    vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([installed])
+    vi.mocked(window.workwise.listPluginUpdateDiagnostics).mockResolvedValue([{ packageId: larkPackage.id, installedVersion: installed.version, catalogVersion: larkPackage.version, state: 'metadata-refresh', message: 'Original metadata review remains visible.' }])
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => exactButton('Connectors').click())
+    await act(async () => iconButton('View Feishu / Lark connection').click())
+    const advanced = [...container.querySelectorAll('summary')].find(item => item.textContent === 'Advanced package management')
+    expect(advanced).toBeDefined()
+    await act(async () => advanced?.click())
+    await act(async () => exactButton('Manage Lark OpenAPI MCP package').click())
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect([...container.querySelectorAll('h2')].some(item => item.textContent === 'Lark OpenAPI MCP')).toBe(true)
+    expect(container.textContent).toContain('legacy-0.5.4 / managed')
+    expect(container.textContent).toContain('Update diagnosis')
+    expect(container.textContent).toContain('Review metadata changes')
+    expect(container.textContent).toContain('Source')
+    expect(container.textContent).toContain('RailWise AI')
+    expect(container.textContent).toContain('Permissions')
+    expect(container.textContent).toContain('https://open.feishu.cn')
+    expect(container.textContent).toContain('Update policy')
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+    expect(window.workwise.saveMcpServer).toBeUndefined()
+    expect(window.workwise.openExternal).not.toHaveBeenCalled()
+  })
+
+  it('opens task capability deep links on the matching connector and consumes the navigation target', async () => {
+    await act(async () => {
+      useChatStore.getState().openPlugins(undefined, 'dingtalk')
+      await Promise.resolve()
+    })
+    await settle()
+    expect(container.querySelector('[role="dialog"] h2')?.textContent).toBe('DingTalk')
+    expect(useChatStore.getState().pluginConnectorTarget).toBeNull()
+    expect(window.workwise.openExternal).not.toHaveBeenCalled()
+    await act(async () => iconButton('Close connector details').click())
+    await act(async () => {
+      useChatStore.getState().openPlugins()
+      await Promise.resolve()
+    })
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('keeps connectors, skills, and package management on separate surfaces in one hub', async () => {
+    await act(async () => exactButton('Connectors').click())
+    expect(container.textContent).toContain('Connect your services')
+    expect(container.textContent).toContain('Feishu / Lark')
+    expect(container.textContent).toContain('DingTalk')
+    expect(container.textContent).toContain('RailWise Knowledge Base')
+    expect(container.textContent).not.toContain('Browser Tools')
+    expect(container.textContent).not.toContain('arch-diagram-skill')
+    expect(container.querySelector('input[placeholder="Search connectors"]')).not.toBeNull()
+    await act(async () => exactButton('Custom connector').click())
+    expect(useChatStore.getState()).toMatchObject({ route: 'settings', settingsSection: 'mcp' })
+    await act(async () => exactButton('Skills').click())
+    expect(container.textContent).toContain('Discover skills')
+    expect(container.textContent).toContain('arch-diagram-skill')
+    expect(container.textContent).not.toContain('Connect your services')
+    await act(async () => exactButton('Plugins').click())
+    expect(container.textContent).toContain('Browser Tools')
+    expect(container.textContent).not.toContain('RailWise Knowledge Base')
+    expect(window.workwise.listInstalledPlugins).toHaveBeenCalled()
+    expect(window.workwise.listMcpServers).toHaveBeenCalledWith('/tmp/workwise-marketplace-qa')
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+  })
+
+  it('shows available-to-install readiness on a new package instead of its version number', () => {
+    const row = [...container.querySelectorAll('[role="button"]')].find((candidate) => candidate.textContent?.includes('Document Tools'))
+    expect(row?.textContent).toContain('Available to install')
+    expect(row?.textContent).not.toContain(DOCUMENTS.version)
+  })
+
+  it('keeps unavailable installed packages in Installed and reports availability consistently in details', async () => {
+    const unavailable: MarketplacePackageV1 = {
+      ...BROWSER,
+      availability: { status: 'unavailable', reasonCode: 'catalog_retired', message: 'The catalog no longer distributes this version.' }
+    }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({
+      packages: [{ key: `${SOURCE.id}:${BROWSER.id}`, sourceId: SOURCE.id, package: unavailable, conflicted: false }],
+      conflicts: []
+    })
+    vi.mocked(window.workwise.listPluginUpdateDiagnostics).mockResolvedValue([])
+    const saveServer = vi.fn()
+    Object.assign(window.workwise, { saveMcpServer: saveServer })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+
+    const row = [...container.querySelectorAll('[role="button"]')].find((candidate) => candidate.textContent?.includes('Browser Tools'))
+    expect(row?.textContent).toContain('Installed · currently unavailable')
+    expect(row?.querySelector('.text-emerald-700')).toBeNull()
+    await act(async () => exactButton('Open source').click())
+    expect(window.workwise.openExternal).toHaveBeenCalledWith(BROWSER.source.location)
+    expect(window.workwise.prepareCatalogPlugin).not.toHaveBeenCalled()
+    await act(async () => button('Installed').click())
+    expect(container.textContent).toContain('Browser Tools')
+    const installedRow = [...container.querySelectorAll('[role="button"]')].find((candidate) => candidate.textContent?.includes('Browser Tools'))
+    await act(async () => (installedRow as HTMLElement).click())
+    expect(container.textContent?.match(/Installed · currently unavailable/g)).toHaveLength(2)
+    expect(container.textContent).toContain('Installation health')
+    expect(container.textContent).toContain('healthy')
+    expect(window.workwise.listInstalledPlugins).toHaveBeenLastCalledWith()
+    expect(saveServer).not.toHaveBeenCalled()
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+    expect(installPrepared).not.toHaveBeenCalled()
+  })
+
+  it('includes unconfigured external services in configuration counts and never treats an OAuth reference as authorization', async () => {
+    const connector: MarketplacePackageV1 = {
+      ...DOCUMENTS,
+      id: 'service-connector',
+      name: 'Service Connector',
+      auth: { type: 'oauth', provider: 'service', discovery: 'ready' },
+      installation: { mode: 'external', installedByDefault: false, reinstallable: false },
+      components: [{ id: 'service-mcp', name: 'Service', sourceId: DOCUMENTS.source.id, type: 'mcp', runtime: { kind: 'remote', transport: 'streamable-http', endpoint: 'https://service.example/mcp' } }]
+    }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({
+      packages: [{ key: `${SOURCE.id}:${connector.id}`, sourceId: SOURCE.id, package: connector, conflicted: false }],
+      conflicts: []
+    })
+    vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([])
+    vi.mocked(window.workwise.listPluginUpdateDiagnostics).mockResolvedValue([])
+    const testServer = vi.fn()
+    Object.assign(window.workwise, { testMcpServer: testServer })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    expect(container.textContent).toContain('Needs configuration')
+    await act(async () => iconButton('Filters').click())
+    await act(async () => button('Needs configuration').click())
+    expect(container.textContent).toContain('Service Connector')
+
+    const server: McpServerConfigV2 = { id: connector.id, name: connector.name, scope: 'global', transport: 'http', url: 'https://service.example/mcp', timeoutMs: 30_000, source: 'managed-tool', enabled: true, toolPolicy: {}, revision: 1, credentialRef: { id: 'credential-reference', storage: 'keychain' } }
+    vi.mocked(window.workwise.listMcpServers).mockResolvedValue([server])
+    vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([{ ...INSTALLED, packageId: connector.id }])
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => button('Installed').click())
+    const row = [...container.querySelectorAll('[role="button"]')].find((candidate) => candidate.textContent?.includes('Service Connector'))
+    expect(row?.textContent).toContain('Configured · verification pending')
+    expect(row?.textContent).not.toContain('Authorized')
+    expect(row?.querySelector('.text-emerald-700')).toBeNull()
+    expect(server.enabled).toBe(true)
+    expect(testServer).not.toHaveBeenCalled()
+
+    await act(async () => i18n.changeLanguage('zh'))
+    await settle()
+    expect(container.textContent).toContain('已配置 · 待验证授权')
+    server.connectionCheck = { serverRevision: server.revision, credentialRefId: server.credentialRef!.id,
+      configurationHash: 'a'.repeat(64), checkedAt: '2026-11-12T01:02:03.000Z', state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: 11 }
+    await act(async () => iconButton(i18n.t('common:pluginUnifiedRefresh')).click())
+    await settle()
+    expect(container.textContent).toContain('连接检查通过（11 项工具）')
+    expect(container.textContent).toContain(new Date(server.connectionCheck.checkedAt).toLocaleString())
+    expect(container.textContent).not.toContain('已配置 · 待验证授权')
+    server.connectionCheck = { ...server.connectionCheck, state: 'error', authorized: false, errorCode: 'connection_failed' }
+    await act(async () => iconButton(i18n.t('common:pluginUnifiedRefresh')).click())
+    await settle()
+    expect(container.textContent).toContain('连接检查未通过')
+    expect(container.textContent).not.toContain('连接检查通过（')
+    expect(testServer).not.toHaveBeenCalled()
+  })
+
   it('keeps local Skill counts off the plugin surface and exposes installed product-level entries', () => {
     expect(container.textContent).not.toContain('local Skills indexed')
     expect(container.textContent).toContain('Installed')
-    expect(container.textContent).toContain('Connector')
+    expect(container.textContent).not.toContain('RailWise Knowledge Base')
     expect(container.textContent).not.toContain('MCP')
     expect(container.querySelector('button[aria-label="Browser Tools"]')).not.toBeNull()
     expect(container.querySelector('button[aria-label="Filters"]')).not.toBeNull()
@@ -357,7 +564,8 @@ describe('PluginMarketplaceView unified catalog', () => {
   })
 
   it('shows managed connectors as installed and managed in details', async () => {
-    const managed = container.querySelector('button[aria-label="RailWise Knowledge Base"]')
+    await act(async () => exactButton('Connectors').click())
+    const managed = container.querySelector('button[aria-label="View RailWise Knowledge Base connection"]')
     if (!(managed instanceof HTMLButtonElement)) throw new Error('Managed connector was not rendered.')
     await act(async () => managed.click())
 
@@ -422,6 +630,92 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(container.textContent).toContain('Featured recommendations')
     expect(container.textContent).toContain('PPT Master')
     expect(container.textContent).toContain('Report Writing')
+  })
+
+  it('shows installable AutoCAD skills with offline metadata and a fixed upstream source link', async () => {
+    const items = getOfficialMarketplaceCatalog().filter(item => item.id.startsWith('autocad-'))
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({ packages: items.map(item => ({
+      key: `${SOURCE.id}:${item.id}`, sourceId: SOURCE.id, package: item, conflicted: false
+    })), conflicts: [] })
+    vi.mocked(window.workwise.listCatalogSources).mockRejectedValueOnce(new Error('fetch failed'))
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => exactButton('Skills').click())
+    expect(container.textContent).toContain('AutoCAD DWG 重绘')
+    expect(container.textContent).toContain('图片转 CAD 重绘')
+    expect(container.textContent).toContain('Available to install')
+    expect([...container.querySelectorAll('button')].filter(item => item.textContent === 'Install from upstream')).toHaveLength(2)
+    const row = [...container.querySelectorAll('[role="button"]')].find(item => item.textContent?.includes('AutoCAD DWG 重绘'))
+    if (!(row instanceof HTMLElement)) throw new Error('AutoCAD skill catalog row missing')
+    await act(async () => row.click())
+    const drawer = container.querySelector('aside')
+    expect(drawer?.parentElement?.classList.contains('ds-connector-overlay')).toBe(true)
+    expect(drawer?.querySelector('header h2')?.textContent).toBe('AutoCAD DWG 重绘')
+    expect(container.textContent).toContain('上游未声明分发许可证')
+    expect(container.textContent).toContain('未保存文档')
+    expect(container.textContent).toContain('pywin32')
+    expect(container.textContent).toContain('The upstream repository has no declared license.')
+    await act(async () => exactButton('Open source').click())
+    expect(window.workwise.openExternal).toHaveBeenCalledWith(items[0]!.source.location)
+    expect(window.workwise.prepareCatalogPlugin).not.toHaveBeenCalled()
+    expect(installPrepared).not.toHaveBeenCalled()
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+    await act(async () => iconButton('Close').click())
+    expect(container.querySelector('aside')).toBeNull()
+  })
+
+  it.each(['autocad-dwg-redraw', 'autocad-image-redraw'])('installs %s through the existing upstream preview and permission lifecycle', async id => {
+    const item = getOfficialMarketplaceCatalog().find(candidate => candidate.id === id)!
+    const installed: InstalledPackageV1 = { ...INSTALLED, packageId: item.id, version: item.version,
+      license: item.license, source: item.source, sources: item.sources, updatePolicy: item.updatePolicy,
+      components: item.components.map(component => ({ componentId: component.id, sourceId: component.sourceId })) }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({ packages: [{ key: `${SOURCE.id}:${id}`, sourceId: SOURCE.id,
+      package: item, reviewSha256: 'd'.repeat(64), conflicted: false }], conflicts: [] })
+    vi.mocked(window.workwise.prepareCatalogPlugin).mockResolvedValue({ schemaVersion: 1, id: `prepared-${id}`,
+      createdAt: '2026-11-11T00:00:00.000Z', expiresAt: '2026-11-11T00:30:00.000Z', format: 'catalog', package: item,
+      contentSha256: item.source.digest!.value, reviewSha256: 'd'.repeat(64), warnings: [],
+      compatibility: { workwiseCompatible: true, reasons: [] } })
+    installPrepared.mockImplementation(async () => {
+      vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([INSTALLED, installed])
+      return installed
+    })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => exactButton('Skills').click())
+    await act(async () => { await i18n.changeLanguage('zh') })
+    const row = [...container.querySelectorAll<HTMLElement>('[role="button"]')].find(candidate => candidate.textContent?.includes(item.name))!
+    expect(row.textContent).toContain('可安装')
+    await act(async () => row.click())
+    expect(container.textContent).toContain('上游未声明许可证')
+    for (const dependency of item.dependencies) expect(container.textContent).toContain(dependency.requirement)
+    expect(container.textContent).toContain(item.usage!.examples![0])
+    const action = [...container.querySelectorAll('button')].filter(candidate => candidate.textContent === '从上游安装').at(-1)!
+    await act(async () => action.click())
+    await settle()
+    expect(window.workwise.prepareCatalogPlugin).toHaveBeenCalledExactlyOnceWith({ sourceId: SOURCE.id, packageId: id })
+    expect(container.textContent).toContain(item.source.digest!.value)
+    expect(container.textContent).toContain('上游未声明许可证')
+    expect(installPrepared).not.toHaveBeenCalled()
+    const permissions = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+    expect(permissions).toHaveLength(item.permissions.length)
+    expect(permissions.every(permission => !permission.checked)).toBe(true)
+    const readIndex = item.permissions.findIndex(permission => permission.id === 'filesystem.read')
+    await act(async () => permissions[readIndex]!.click())
+    const install = [...container.querySelectorAll('button')].filter(candidate => candidate.textContent === '从上游安装').at(-1)!
+    expect(install.disabled).toBe(false)
+    await act(async () => install.click())
+    await settle()
+    expect(installPrepared).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ preparedId: `prepared-${id}`,
+      reviewSha256: 'd'.repeat(64), expectedCurrentVersion: null, scope: 'workspace', workspaceRoot: '/tmp/workwise-marketplace-qa',
+      permissions: item.permissions.map(permission => ({ permissionId: permission.id, decision: permission.id === 'filesystem.read' ? 'granted' : 'denied' })) }))
+    expect(window.workwise.cancelPluginImport).toHaveBeenCalledWith(`prepared-${id}`)
+    expect(container.textContent).toContain(`已安装 ${item.name}`)
+    const installedRow = [...container.querySelectorAll<HTMLElement>('[role="button"]')].find(candidate => candidate.textContent?.includes(item.name))!
+    expect(installedRow.textContent).toContain('已安装')
+    expect(installedRow.textContent).toContain('权限')
+    expect(window.workwise.openExternal).not.toHaveBeenCalled()
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+    expect((await window.workwise.listInstalledPlugins()).find(record => record.packageId === INSTALLED.packageId)).toBe(INSTALLED)
   })
 
   it('shows a clear usage guide, requirements, and example in Skill details', async () => {
@@ -596,6 +890,47 @@ describe('PluginMarketplaceView unified catalog', () => {
       'private-renderer-token'
     )
     expect(window.workwise.syncCatalogSource).toHaveBeenCalledWith(savedSource?.id)
+  })
+
+  it('renders bundled packages while credential checks are pending and ignores a stale credential response after retry', async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof window.workwise.listCatalogCredentialStatuses>>) => void
+    vi.mocked(window.workwise.listCatalogSources).mockResolvedValue([SOURCE, PRIVATE_SOURCE])
+    vi.mocked(window.workwise.listCatalogCredentialStatuses).mockReturnValueOnce(new Promise(resolve => { finishOld = resolve }))
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    expect(container.textContent).toContain('Browser Tools')
+    await act(async () => iconButton('Catalog sources').click())
+    expect(container.textContent).toContain('Credential status not checked')
+    expect(container.textContent).not.toContain('Credential required')
+    vi.mocked(window.workwise.listCatalogCredentialStatuses).mockResolvedValue([{ sourceId: PRIVATE_SOURCE.id, configured: true, storage: 'keychain' }])
+    await act(async () => iconButton('Sync source').click())
+    await settle()
+    expect(container.textContent).toContain('Credential configured')
+    await act(async () => finishOld([{ sourceId: PRIVATE_SOURCE.id, configured: false, errorCode: 'credential_helper_timeout', message: 'stale credential timeout' }]))
+    await settle()
+    expect(container.textContent).toContain('Credential configured')
+    expect(container.textContent).not.toContain('stale credential timeout')
+  })
+
+  it('keeps the catalog visible and retries one blocked source without replacing its saved token', async () => {
+    const message = '已保存的市场凭据暂时无法读取。请处理系统凭据访问提示后刷新此来源；原凭据仍保留。'
+    vi.mocked(window.workwise.listCatalogSources).mockResolvedValue([SOURCE, PRIVATE_SOURCE])
+    vi.mocked(window.workwise.listCatalogCredentialStatuses).mockResolvedValue([{ sourceId: PRIVATE_SOURCE.id, configured: false, storage: 'keychain', errorCode: 'credential_helper_timeout', message }])
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    expect(container.textContent).toContain('Browser Tools')
+    await act(async () => iconButton('Catalog sources').click())
+    expect(container.textContent).toContain(message)
+    expect(container.textContent).not.toContain('The plugin catalog is temporarily unavailable')
+    vi.mocked(window.workwise.listCatalogCredentialStatuses).mockResolvedValue([{ sourceId: PRIVATE_SOURCE.id, configured: true, storage: 'keychain' }])
+    await act(async () => iconButton('Sync source').click())
+    await settle()
+    expect(window.workwise.syncCatalogSource).toHaveBeenCalledWith(PRIVATE_SOURCE.id)
+    expect(window.workwise.setCatalogSourceCredential).not.toHaveBeenCalled()
+    expect(window.workwise.clearCatalogSourceCredential).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Credential configured')
+    expect(container.textContent).not.toContain(message)
+    expect(container.textContent).toContain('Browser Tools')
   })
 
   it('updates and clears an existing private catalog credential', async () => {

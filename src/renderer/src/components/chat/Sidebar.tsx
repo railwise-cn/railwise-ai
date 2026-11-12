@@ -1,3 +1,4 @@
+import { SidebarUpdateControl } from '../sidebar/SidebarUpdateControl'
 import type { ReactElement } from 'react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -95,6 +96,7 @@ export function Sidebar({
 }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
+  const toolCapabilities = useChatStore((s) => s.runtimeCapabilities?.workspaces)
   const codeWorkspaceRoots = useChatStore((s) => s.codeWorkspaceRoots)
   const chooseWorkspace = useChatStore((s) => s.chooseWorkspace)
   const deleteWorkspace = useChatStore((s) => s.deleteWorkspace)
@@ -122,6 +124,7 @@ export function Sidebar({
       onCollapse={onToggleSidebar}
       footer={
         <div className="space-y-1">
+          <SidebarUpdateControl />
           <SidebarCommandRow
             icon={<Smartphone className="h-4 w-4" strokeWidth={1.75} />}
             label={t('claw')}
@@ -149,6 +152,7 @@ export function Sidebar({
         />
 
         <WorkspaceSecondaryNavigation
+          toolCapabilities={toolCapabilities}
           activeRoute={navigationRoute}
           onWriteOpen={onWriteOpen}
           onOpenPlugins={onOpenPlugins}

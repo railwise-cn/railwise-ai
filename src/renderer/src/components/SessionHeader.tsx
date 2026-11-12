@@ -4,7 +4,7 @@ import { GitFork } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useChatStore } from '../store/chat-store'
 import { formatRelativeTime } from '../lib/format-relative-time'
-import { workspaceLabelFromPath } from '../lib/workspace-label'
+import { WORKSPACE_LABELS_CHANGED, workspaceLabelFromPath } from '../lib/workspace-label'
 import { formatCompactNumber, formatCost, formatPercent, useThreadUsage } from '../hooks/use-thread-usage'
 
 type Props = {
@@ -20,6 +20,12 @@ export function SessionHeader({ compact = false, className = '' }: Props): React
   const runtimeConnection = useChatStore((s) => s.runtimeConnection)
   const workspaceLabel = useChatStore((s) => s.workspaceLabel)
   const renameActiveThread = useChatStore((s) => s.renameActiveThread)
+  const [, refreshLabels] = useState(0)
+  useEffect(() => {
+    const refresh = (): void => refreshLabels(value => value + 1)
+    window.addEventListener(WORKSPACE_LABELS_CHANGED, refresh)
+    return () => window.removeEventListener(WORKSPACE_LABELS_CHANGED, refresh)
+  }, [])
 
   const active = threads.find((th) => th.id === activeThreadId)
   const activeWorkspaceLabel = active?.workspace

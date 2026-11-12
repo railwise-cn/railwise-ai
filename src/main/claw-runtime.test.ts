@@ -29,6 +29,29 @@ import {
   IM_LEDGER_PROVIDER_DELIVERY_LEASE_MS
 } from '../shared/im-communication'
 
+function deliveryOperationStubs(record: () => { id: string; provider: string; chatId: string }) {
+  const operations = new Map<string, { operationId: string; recordId: string; phase: string; requestHash: string; status: string; remoteOperationId?: string }>()
+  return {
+    getById: vi.fn(record),
+    deliveryOperation: vi.fn((id: string) => operations.get(id)),
+    beginDeliveryOperation: vi.fn((recordId: string, operationId: string, phase: string, requestHash: string) => {
+      const existing = operations.get(operationId)
+      if (existing) return { operation: existing, created: false }
+      const operation = { operationId, recordId, phase, requestHash, status: 'started' }
+      operations.set(operationId, operation)
+      return { operation, created: true }
+    }),
+    finishDeliveryOperation: vi.fn((id: string, status: string, remoteOperationId?: string) => {
+      const operation = { ...operations.get(id)!, status, remoteOperationId }
+      operations.set(id, operation)
+      return operation
+    }),
+    pendingRuntimeObservations: vi.fn(() => []),
+    acknowledgeRuntimeObservation: vi.fn(),
+    markDeliveryUnknown: vi.fn()
+  }
+}
+
 function buildSettings(): AppSettingsV1 {
   return {
     version: 1,
@@ -1729,141 +1752,39 @@ describe('ClawRuntime', () => {
     )
   })
 
-  it('falls back to a plain Feishu chat message when replying to an inbound message fails', async () => {
-    const settings = buildSettings()
-    const logError = vi.fn()
-    const send = vi.fn()
-      .mockRejectedValueOnce(new Error('reply permission denied'))
-      .mockResolvedValueOnce({ messageId: 'om_fallback' })
-    const runtime = createClawRuntime({
-      store: { load: vi.fn(async () => settings), patch: vi.fn(async () => settings) } as never,
-      runtimeRequest: vi.fn() as never,
-      logError
-    })
-
-    const result = await (runtime as unknown as {
-      sendFeishuMessage: (
-        bridge: { send: typeof send },
-        to: string,
-        input: { markdown: string },
-        options: { replyTo?: string; replyInThread?: boolean },
-        context: Record<string, unknown>
-      ) => Promise<{ messageId: string }>
-    }).sendFeishuMessage(
-      { send },
-      'oc_chat_a',
-      { markdown: 'agent reply' },
-      { replyTo: 'om_inbound', replyInThread: true },
-      { purpose: 'agent-reply', channelId: 'channel_1' }
-    )
-
-    expect(result).toEqual({ messageId: 'om_fallback' })
-    expect(send).toHaveBeenNthCalledWith(
-      1,
-      'oc_chat_a',
-      { markdown: 'agent reply' },
-      { replyTo: 'om_inbound', replyInThread: true }
-    )
-    expect(send).toHaveBeenNthCalledWith(
-      2,
-      'oc_chat_a',
-      { markdown: 'agent reply' },
-      { replyTo: undefined, replyInThread: undefined }
-    )
-    expect(logError).toHaveBeenCalledWith(
-      'claw-feishu',
-      'Failed to send Feishu / Lark reply; falling back to plain chat message.',
-      expect.objectContaining({
-        channelId: 'channel_1',
-        message: 'reply permission denied',
-        purpose: 'agent-reply',
-        replyTo: 'om_inbound',
-        to: 'oc_chat_a'
-      })
-    )
+  it('keeps an ambiguous Feishu reply unknown without changing its target', async () => {
+    const send = vi.fn().mockRejectedValue(new Error('reply response lost'))
+    const runtime = createClawRuntime({ store: { load: async () => buildSettings() } as never, runtimeRequest: vi.fn(), logError: vi.fn() })
+    const pending = (runtime as unknown as { sendFeishuMessage: (...args: unknown[]) => Promise<unknown> }).sendFeishuMessage(
+      { send }, 'oc_chat_a', { markdown: 'agent reply' }, { replyTo: 'om_inbound', replyInThread: true }, { purpose: 'agent-reply' })
+    await expect(pending).rejects.toMatchObject({ code: 'im_delivery_outcome_unknown' })
+    expect(send).toHaveBeenCalledOnce()
+    expect(send.mock.calls[0][2]).toEqual({ replyTo: 'om_inbound', replyInThread: true })
   })
 
-  it('uses the same Feishu outbound UUID across delivery retries', async () => {
-    const settings = buildSettings()
-    const reply = vi.fn()
-      .mockRejectedValueOnce(new Error('temporary timeout'))
-      .mockResolvedValueOnce({ data: { message_id: 'om_stable' } })
+  it('retains the outbound UUID and stops after an ambiguous Feishu send', async () => {
+    const reply = vi.fn().mockRejectedValue(new Error('temporary timeout'))
     const create = vi.fn()
-    const runtime = createClawRuntime({
-      store: { load: vi.fn(async () => settings), patch: vi.fn(async () => settings) } as never,
-      runtimeRequest: vi.fn() as never,
-      logError: () => undefined
-    })
-
-    const result = await (runtime as unknown as {
-      sendFeishuMessage: (
-        bridge: unknown,
-        to: string,
-        input: { markdown: string },
-        options: { replyTo?: string; replyInThread?: boolean },
-        context: Record<string, unknown>,
-        outboundId: string
-      ) => Promise<{ messageId: string }>
-    }).sendFeishuMessage(
-      { rawClient: { im: { v1: { message: { reply, create } } } } },
-      'oc_chat_a',
-      { markdown: '**done**' },
-      { replyTo: 'om_inbound', replyInThread: true },
-      { purpose: 'agent-reply' },
-      'ww_stable_delivery'
-    )
-
-    expect(result).toEqual({ messageId: 'om_stable' })
-    expect(reply).toHaveBeenCalledTimes(2)
+    const runtime = createClawRuntime({ store: { load: async () => buildSettings() } as never, runtimeRequest: vi.fn(), logError: vi.fn() })
+    const pending = (runtime as unknown as { sendFeishuMessage: (...args: unknown[]) => Promise<unknown> }).sendFeishuMessage(
+      { rawClient: { im: { v1: { message: { reply, create } } } } }, 'oc_chat_a', { markdown: '**done**' },
+      { replyTo: 'om_inbound' }, {}, 'ww_stable_delivery')
+    await expect(pending).rejects.toMatchObject({ code: 'im_delivery_outcome_unknown' })
+    expect(reply).toHaveBeenCalledOnce()
     expect(reply.mock.calls[0][0].data.uuid).toBe('ww_stable_delivery')
-    expect(reply.mock.calls[1][0].data.uuid).toBe('ww_stable_delivery')
-    expect(reply.mock.calls[0][0].data.content).toContain('**done**')
     expect(create).not.toHaveBeenCalled()
   })
 
-  it('retries Feishu file upload and sends the attachment with one stable outbound UUID', async () => {
-    const settings = buildSettings()
-    const upload = vi.fn()
-      .mockRejectedValueOnce(new Error('temporary upload timeout'))
-      .mockResolvedValueOnce({ file_key: 'file_stable' })
+  it('does not replay a Feishu upload whose result is unknown', async () => {
+    const upload = vi.fn().mockRejectedValue(new Error('upload response lost'))
     const reply = vi.fn()
-      .mockRejectedValueOnce(new Error('temporary send timeout'))
-      .mockResolvedValueOnce({ data: { message_id: 'om_file_stable' } })
-    const create = vi.fn()
-    const runtime = createClawRuntime({
-      store: { load: vi.fn(async () => settings), patch: vi.fn(async () => settings) } as never,
-      runtimeRequest: vi.fn() as never,
-      logError: () => undefined
-    })
-
-    const result = await (runtime as unknown as {
-      sendFeishuMessage: (
-        bridge: unknown,
-        to: string,
-        input: { file: { source: Buffer; fileName: string } },
-        options: { replyTo?: string },
-        context: Record<string, unknown>,
-        outboundId: string
-      ) => Promise<{ messageId: string }>
-    }).sendFeishuMessage(
-      { rawClient: { im: { v1: { file: { create: upload }, message: { reply, create } } } } },
-      'oc_chat_a',
-      { file: { source: Buffer.from('pptx'), fileName: 'proposal.pptx' } },
-      { replyTo: 'om_inbound' },
-      { purpose: 'agent-file' },
-      'ww_stable_delivery-file-1'
-    )
-
-    expect(result).toEqual({ messageId: 'om_file_stable' })
-    expect(upload).toHaveBeenCalledTimes(2)
-    expect(reply).toHaveBeenCalledTimes(2)
-    expect(reply.mock.calls[0][0].data).toMatchObject({
-      msg_type: 'file',
-      content: JSON.stringify({ file_key: 'file_stable' }),
-      uuid: 'ww_stable_delivery-file-1'
-    })
-    expect(reply.mock.calls[1][0].data.uuid).toBe('ww_stable_delivery-file-1')
-    expect(create).not.toHaveBeenCalled()
+    const runtime = createClawRuntime({ store: { load: async () => buildSettings() } as never, runtimeRequest: vi.fn(), logError: vi.fn() })
+    const pending = (runtime as unknown as { sendFeishuMessage: (...args: unknown[]) => Promise<unknown> }).sendFeishuMessage(
+      { rawClient: { im: { v1: { file: { create: upload }, message: { reply, create: vi.fn() } } } } },
+      'oc_chat_a', { file: { source: Buffer.from('pptx'), fileName: 'proposal.pptx' } }, { replyTo: 'om_inbound' }, {}, 'ww_stable_file')
+    await expect(pending).rejects.toMatchObject({ code: 'im_delivery_outcome_unknown' })
+    expect(upload).toHaveBeenCalledOnce()
+    expect(reply).not.toHaveBeenCalled()
   })
 
   it('deduplicates a Feishu command and marks it delivered only after the provider send', async () => {
@@ -1884,6 +1805,7 @@ describe('ClawRuntime', () => {
     }
     const currentRecord = () => ({ ...baseRecord, status: state.status, resultJson: state.resultJson })
     const ledger = {
+      ...deliveryOperationStubs(currentRecord),
       receive: vi.fn(() => currentRecord()),
       claim: vi.fn(() => {
         if (state.leased || state.status === 'delivered') return undefined
@@ -2082,6 +2004,7 @@ describe('ClawRuntime', () => {
     }
     const record = () => ({ ...baseRecord, status, resultJson })
     const ledger = {
+      ...deliveryOperationStubs(record),
       receive: vi.fn(() => record()),
       claim: vi.fn(() => {
         if (leased || status === 'delivered') return undefined
@@ -2172,6 +2095,7 @@ describe('ClawRuntime', () => {
       retryCount: 0, createdAt: '2026-08-14T00:00:00.000Z', updatedAt: '2026-08-14T00:00:01.000Z'
     }
     const ledger = {
+      ...deliveryOperationStubs(() => ledgerRecord),
       listRecoverable: vi.fn(() => [ledgerRecord]),
       prune: vi.fn(),
       claim: vi.fn(() => ledgerRecord),
@@ -2384,7 +2308,7 @@ describe('ClawRuntime', () => {
 
       await runtime.recoverPendingMessages()
 
-      expect(runtimeRequest).not.toHaveBeenCalled()
+      expect(runtimeRequest.mock.calls.every(([, path]) => String(path).endsWith('/delivery-observations'))).toBe(true)
       expect(reply).toHaveBeenCalledTimes(2)
       expect(upload).toHaveBeenCalledTimes(1)
       expect(reply).toHaveBeenNthCalledWith(1, expect.objectContaining({
@@ -2479,6 +2403,7 @@ describe('ClawRuntime', () => {
       const markDelivering = vi.fn(() => ({ ...record, status: 'delivering' as const }))
       const markDelivered = vi.fn(() => ({ ...record, status: 'delivered' as const }))
       const ledger = {
+      ...deliveryOperationStubs(() => record),
         markDelivering,
         markDelivered,
         renewLease,
@@ -2654,6 +2579,7 @@ describe('ClawRuntime', () => {
       const markDelivered = vi.fn()
       const markDeliveryRetry = vi.fn()
       const ledger = {
+      ...deliveryOperationStubs(() => record),
         markDelivering: vi.fn(() => ({ ...record, status: 'delivering' as const })),
         markDelivered,
         markDeliveryRetry,
@@ -2947,6 +2873,7 @@ describe('ClawRuntime', () => {
     }
     const current = () => ({ ...baseRecord, status, resultJson })
     const ledger = {
+      ...deliveryOperationStubs(current),
       listRecoverable: vi.fn(() => [current()]),
       prune: vi.fn(),
       receive: vi.fn(() => current()),
@@ -3409,7 +3336,7 @@ describe('ClawRuntime', () => {
     }
   })
 
-  it('rejects stale delivery owners and requeues provider failures', async () => {
+  it('rejects stale delivery owners and preserves unknown provider failures', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-im-delivery-owner-'))
     const ledger = new ImDeliveryLedger(join(root, 'messages.sqlite3'))
     try {
@@ -3466,14 +3393,14 @@ describe('ClawRuntime', () => {
         leaseRunId: current.leaseRunId,
         ok: false,
         message: 'provider unavailable'
-      })).resolves.toMatchObject({ status: 200, body: { ok: true, status: 'result_ready' } })
+      })).resolves.toMatchObject({ status: 200, body: { ok: true, status: 'delivery_unknown' } })
 
       expect(ledger.getById(received.id)).toMatchObject({
-        status: 'result_ready',
-        retryCount: 1,
+        status: 'delivery_unknown',
+        retryCount: 0,
         errorMessage: 'provider unavailable',
         leaseRunId: undefined,
-        nextAttemptAt: expect.any(String)
+        nextAttemptAt: undefined
       })
     } finally {
       ledger.close()
@@ -5155,13 +5082,8 @@ describe('ClawRuntime', () => {
         '文件已完成。',
         'assistant',
         { turnId: 'turn_file', requestText: '请把 TXT 文件作为附件发送给我' }
-      )).resolves.toEqual({ ok: false, message: 'upload rejected' })
-      expect(createMessage).toHaveBeenCalledTimes(1)
-      expect(createMessage.mock.calls[0]?.[0].data).toMatchObject({
-        msg_type: 'post',
-        uuid: expect.stringMatching(/^ww_mirror_[0-9a-f]{32}-failure$/)
-      })
-      expect(createMessage.mock.calls[0]?.[0].data.content).toContain('当前任务尚未完成')
+      )).resolves.toMatchObject({ ok: false, message: expect.stringContaining('upload rejected') })
+      expect(createMessage).not.toHaveBeenCalled()
     } finally {
       await rm(workspaceRoot, { recursive: true, force: true })
     }
@@ -5914,47 +5836,14 @@ describe('ClawRuntime', () => {
     expect(textFormCall).toBeUndefined()
   })
 
-  it('falls back to markdown form when retrying without replyTo', async () => {
-    const settings = buildSettings()
-    const logError = vi.fn()
-    const send = vi.fn()
-      .mockRejectedValueOnce(new Error('reply permission denied'))
-      .mockResolvedValueOnce({ messageId: 'om_fallback' })
-    const runtime = createClawRuntime({
-      store: { load: vi.fn(async () => settings), patch: vi.fn(async () => settings) } as never,
-      runtimeRequest: vi.fn() as never,
-      logError
-    })
-
-    const result = await (runtime as unknown as {
-      sendFeishuMessage: (
-        bridge: { send: typeof send },
-        to: string,
-        input: { markdown: string },
-        options: { replyTo?: string; replyInThread?: boolean },
-        context: Record<string, unknown>
-      ) => Promise<{ messageId: string }>
-    }).sendFeishuMessage(
-      { send },
-      'oc_chat_a',
-      { markdown: '**hello**' },
-      { replyTo: 'om_inbound', replyInThread: true },
-      { purpose: 'agent-reply', channelId: 'channel_1' }
-    )
-
-    expect(result).toEqual({ messageId: 'om_fallback' })
-    expect(send).toHaveBeenNthCalledWith(
-      1,
-      'oc_chat_a',
-      { markdown: '**hello**' },
-      { replyTo: 'om_inbound', replyInThread: true }
-    )
-    expect(send).toHaveBeenNthCalledWith(
-      2,
-      'oc_chat_a',
-      { markdown: '**hello**' },
-      { replyTo: undefined, replyInThread: undefined }
-    )
+  it('preserves markdown and reply scope when an IM transport result is unknown', async () => {
+    const send = vi.fn().mockRejectedValue(new Error('lost response'))
+    const runtime = createClawRuntime({ store: { load: async () => buildSettings() } as never, runtimeRequest: vi.fn(), logError: vi.fn() })
+    const pending = (runtime as unknown as { sendFeishuMessage: (...args: unknown[]) => Promise<unknown> }).sendFeishuMessage(
+      { send }, 'oc_chat_a', { markdown: '**hello**' }, { replyTo: 'om_inbound', replyInThread: true }, {})
+    await expect(pending).rejects.toMatchObject({ code: 'im_delivery_outcome_unknown' })
+    expect(send).toHaveBeenCalledOnce()
+    expect(send.mock.calls[0][1]).toEqual({ markdown: '**hello**' })
   })
 
   it('continues agent flow when pending reaction add fails', async () => {

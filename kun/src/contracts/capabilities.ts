@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { DingTalkCapabilityConfig } from './dingtalk.js'
+import { DwsCapabilityConfig } from './dws.js'
 
 export const RUNTIME_CAPABILITY_CONTRACT_VERSION = 1
 
@@ -84,12 +86,17 @@ export const McpServerConfig = z
     enabled: z.boolean().default(true),
     transport: McpTransportKind,
     command: z.string().min(1).optional(),
+    cwd: z.string().min(1).optional(),
     args: z.array(z.string()).default([]),
     url: z.string().min(1).optional(),
     headers: StringRecord.default({}),
     env: StringRecord.default({}),
     trustScope: McpTrustScope.default('workspace'),
     trustedWorkspaceRoots: z.array(z.string().min(1)).default([]),
+    toolPolicy: z.object({
+      allowedTools: z.array(z.string().min(1)),
+      readOnlyTools: z.array(z.string().min(1)).default([])
+    }).optional(),
     timeoutMs: z.number().int().positive().default(30_000)
   })
   .strict()
@@ -204,17 +211,46 @@ export const ImageGenCapabilityConfig = CapabilityToggleConfig.extend({
 }).strict()
 export type ImageGenCapabilityConfig = z.infer<typeof ImageGenCapabilityConfig>
 
-export const KunCapabilitiesConfig = z
-  .object({
-    mcp: McpCapabilityConfig.default(() => McpCapabilityConfig.parse({})),
-    web: WebCapabilityConfig.default(() => WebCapabilityConfig.parse({})),
-    skills: SkillsCapabilityConfig.default(() => SkillsCapabilityConfig.parse({})),
-    subagents: SubagentsCapabilityConfig.default(() => SubagentsCapabilityConfig.parse({})),
-    attachments: AttachmentsCapabilityConfig.default(() => AttachmentsCapabilityConfig.parse({})),
-    memory: MemoryCapabilityConfig.default(() => MemoryCapabilityConfig.parse({})),
-    imageGen: ImageGenCapabilityConfig.default(() => ImageGenCapabilityConfig.parse({}))
-  })
-  .strict()
+export const LarkAuthState = z.enum(['not_installed', 'needs_login', 'installed', 'error'])
+export type LarkAuthState = z.infer<typeof LarkAuthState>
+
+export const LarkCapabilityConfig = CapabilityToggleConfig.extend({
+  executablePath: z.string().min(1).optional(),
+  executableVersion: z.string().min(1).optional(),
+  authState: LarkAuthState.default('not_installed'),
+  scopes: z.array(z.string().min(1)).default([]),
+  brand: z.enum(['feishu', 'lark']).optional(),
+  appId: z.string().min(1).optional(),
+  profile: z.string().min(1).optional(),
+  executableHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  userOpenId: z.string().min(1).optional(),
+  identityFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional()
+}).strict()
+export type LarkCapabilityConfig = z.infer<typeof LarkCapabilityConfig>
+
+export const KunCapabilitiesConfig = z.preprocess(input => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input
+  const raw = input as Record<string, unknown>
+  const legacy = raw.dingtalk
+  if (raw.dws === undefined && legacy && typeof legacy === 'object' && !Array.isArray(legacy) &&
+    (legacy as Record<string, unknown>).enabled === false) {
+    // Preserve an explicit historical platform disable when adding a backend.
+    return { ...raw, dws: { enabled: false } }
+  }
+  return input
+}, z.object({
+  mcp: McpCapabilityConfig.default(() => McpCapabilityConfig.parse({})),
+  web: WebCapabilityConfig.default(() => WebCapabilityConfig.parse({})),
+  skills: SkillsCapabilityConfig.default(() => SkillsCapabilityConfig.parse({})),
+  subagents: SubagentsCapabilityConfig.default(() => SubagentsCapabilityConfig.parse({})),
+  attachments: AttachmentsCapabilityConfig.default(() => AttachmentsCapabilityConfig.parse({})),
+  memory: MemoryCapabilityConfig.default(() => MemoryCapabilityConfig.parse({})),
+  imageGen: ImageGenCapabilityConfig.default(() => ImageGenCapabilityConfig.parse({})),
+  lark: LarkCapabilityConfig.default(() => LarkCapabilityConfig.parse({})),
+  dingtalk: DingTalkCapabilityConfig.default(() => DingTalkCapabilityConfig.parse({})),
+  dws: DwsCapabilityConfig.default(() => DwsCapabilityConfig.parse({}))
+}).strict())
+
 export type KunCapabilitiesConfig = z.infer<typeof KunCapabilitiesConfig>
 
 export const DEFAULT_KUN_CAPABILITIES_CONFIG: KunCapabilitiesConfig = KunCapabilitiesConfig.parse({})
@@ -274,6 +310,13 @@ export const RuntimeCapabilityManifest = z
       model: z.string().optional()
     }).strict(),
     visionEvidence: RuntimeCapabilityState.optional(),
+    workspaces: z.object({ flow: RuntimeCapabilityState, design: RuntimeCapabilityState, schedule: RuntimeCapabilityState }).optional(),
+    lark: RuntimeCapabilityState.extend({ authState: LarkAuthState }).optional(),
+    dingtalk: RuntimeCapabilityState.extend({
+      credentialState: z.enum(['missing', 'invalid', 'valid']),
+      identityVerified: z.boolean(),
+      scopes: z.array(z.string())
+    }).optional(),
     uiActions: RuntimeCapabilityState
   })
   .strict()
@@ -324,6 +367,18 @@ export function buildRuntimeCapabilityManifest(input: {
     enabled?: boolean
     available?: boolean
     reason?: string
+  }
+  lark?: {
+    available?: boolean
+    reason?: string
+    authState?: LarkAuthState
+  }
+  dingtalk?: {
+    available?: boolean
+    reason?: string
+    credentialState?: 'missing' | 'invalid' | 'valid'
+    identityVerified?: boolean
+    scopes?: string[]
   }
 }): RuntimeCapabilityManifest {
   const config = KunCapabilitiesConfig.parse(input.config ?? {})
@@ -429,6 +484,26 @@ export function buildRuntimeCapabilityManifest(input: {
       input.visionEvidence?.available === true,
       input.visionEvidence?.reason ?? 'vision evidence analyzer is not configured'
     ),
+    lark: {
+      ...providerCapabilityState(
+        config.lark.enabled,
+        'Lark integration is disabled by config',
+        input.lark?.available === true,
+        input.lark?.reason ?? 'Lark CLI is not installed or authorised'
+      ),
+      authState: input.lark?.authState ?? config.lark.authState
+    },
+    dingtalk: {
+      ...providerCapabilityState(
+        config.dingtalk.enabled,
+        'DingTalk integration is disabled by config',
+        input.dingtalk?.available === true,
+        input.dingtalk?.reason ?? 'DingTalk credentials or authorization are unavailable'
+      ),
+      credentialState: input.dingtalk?.credentialState ?? 'missing',
+      identityVerified: input.dingtalk?.identityVerified ?? false,
+      scopes: input.dingtalk?.scopes ?? []
+    },
     uiActions: available()
   })
 }

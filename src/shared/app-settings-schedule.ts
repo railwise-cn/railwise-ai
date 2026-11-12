@@ -59,7 +59,8 @@ export function normalizeScheduledTask(
     nextRunAt: typeof task.nextRunAt === 'string' ? task.nextRunAt : '',
     lastStatus: normalizeStatus(task.lastStatus),
     lastMessage: typeof task.lastMessage === 'string' ? task.lastMessage : '',
-    lastThreadId: typeof task.lastThreadId === 'string' ? task.lastThreadId : ''
+    lastThreadId: typeof task.lastThreadId === 'string' ? task.lastThreadId : '',
+    ...(typeof task.runtimeTaskId === 'string' && task.runtimeTaskId.trim() ? { runtimeTaskId: task.runtimeTaskId.trim() } : {})
   }
 }
 

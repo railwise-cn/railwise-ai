@@ -27,7 +27,7 @@ export function renderWriteMermaidPreview(request: WriteMermaidPreviewRequest): 
   const operation = tail.then(async (): Promise<WriteMermaidPreviewResult> => {
     try {
       const diagram = (await renderWriteMermaidDiagrams([source])).get(source)
-      if (!diagram) return { ok: false, message: 'Unable to render this Mermaid diagram. Check its syntax.' }
+      if (!diagram) return { ok: false, message: 'Unable to render this Mermaid diagram.' }
       const result = { ok: true as const, svg: diagram.svg, width: diagram.width, height: diagram.height }
       const bytes = Buffer.byteLength(source) + Buffer.byteLength(result.svg)
       if (bytes <= MAX_CACHE_BYTES) {

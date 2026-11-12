@@ -1,4 +1,5 @@
 import type { FlowNodeRegistryEntryV1, FlowPortTypeV1 } from '../contracts/flow.js'
+import { unavailableFlowNode } from './execution-policy.js'
 
 type CapabilityState = Record<string, { available: boolean; reason?: string; configurationRoute?: string }>
 const port = (id: string, label: string, type: FlowPortTypeV1, required = false) => ({ id, label, type, required, multiple: false })
@@ -61,6 +62,8 @@ export const FLOW_PORT_CONVERSIONS_V1 = Object.freeze<Record<string, { from: Flo
 
 export function buildFlowNodeRegistry(capabilities: CapabilityState = {}): FlowNodeRegistryEntryV1[] {
   return CATALOGUE.map((entry) => {
+    const blocked = unavailableFlowNode(entry.type)
+    if (blocked) return {...entry,available:false,disabledReason:blocked.reason,configurationRoute:blocked.configurationRoute}
     const missing = entry.requiredCapabilities.find((id) => capabilities[id]?.available === false)
     const capability = missing ? capabilities[missing] : undefined
     return {

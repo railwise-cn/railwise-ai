@@ -24,6 +24,11 @@ const diffHash = createHash('sha256').update(execFileSync('git', ['diff', 'HEAD'
 const report = { schemaVersion: 1, kind: 'actual-model-synthetic-acceptance', source, trackedDiffSha256: diffHash, runtimeEntrySha256:createHash('sha256').update(await readFile(join(repo,'kun/dist/server/runtime-factory.js'))).digest('hex'), modelRequested: 'deepseek-flash', startedAt: new Date().toISOString(), sampleCount: templateIds.length, samples: [], requests: [], cost: null, costNote: 'Provider-billed cost is not returned; no estimate substituted.' }
 const secretFile = join(root, '.export-bridge.json')
 const bridgeEntry = join(root, '.export-bridge.cjs')
+const trustEntry = join(root, '.workspace-trust.mjs')
+await build({ entryPoints: [join(repo, 'src/main/services/workspace-trust-service.ts')], outfile: trustEntry, bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' })
+const { WorkspaceTrustService } = await import(pathToFileURL(trustEntry))
+const workspaceTrustPath = join(root, 'workspace-trust.json')
+const workspaceTrust = new WorkspaceTrustService(workspaceTrustPath)
 await build({ stdin: { contents: `const {app}=require('electron');const fs=require('node:fs/promises');const {startTaskDocumentExportBridge}=require(${JSON.stringify(join(repo, 'src/main/services/task-document-export-service.ts'))});app.setPath('userData',${JSON.stringify(join(root, 'electron-profile'))});app.on('window-all-closed',()=>{});app.whenReady().then(async()=>{const bridge=await startTaskDocumentExportBridge();await fs.writeFile(${JSON.stringify(secretFile)},JSON.stringify({url:bridge.url,token:bridge.token}),{mode:0o600});});process.on('SIGTERM',()=>app.exit(0));`, resolveDir: repo, loader: 'ts' }, outfile: bridgeEntry, bundle: true, platform: 'node', format: 'cjs', packages: 'external', logLevel: 'silent' })
 report.exportBridgeSha256=createHash('sha256').update(await readFile(bridgeEntry)).digest('hex')
 // Dependencies resolve from this explicit private test link, not the user's profile.
@@ -81,6 +86,8 @@ try {
   for (const templateId of templateIds) {
     const workspace = join(root, templateId)
     await mkdir(workspace, { recursive: true })
+    const trust = await workspaceTrust.get(workspace)
+    await workspaceTrust.set({ workspaceRoot: workspace, level: 'workspace-write', expectedRevision: trust.revision, confirmed: true, idempotencyKey: `synthetic-acceptance:${templateId}` })
     await writeFile(join(workspace, 'source.md'), templateId === 'tender-document'
       ? '# 合成招标资料\n1. 技术文件须包含监测实施方法、质量控制与交付清单。\n2. 项目人员及资质未提供，须列待补。\n3. 本资料不含价格，不得推测报价。\n'
       : '# 合成研究资料\n观察A：本机文档保存为 Markdown 可供外部编辑器读取。\n观察B：任务等待用户时无需发送模型请求。\n限制：以上为合成验收事实，不构成实际效率提升数据。\n')
@@ -89,7 +96,7 @@ try {
     await writeFile(join(workspace, 'project.json'), JSON.stringify({ name: '合成监测验收项目', monitoringType: 'deformation', unit: 'mm', thresholds: { default: 10 }, reportPeriod: {start:'2026-11-01',end:'2026-11-02'}, taskContext: { standard: '合成验收规则，不作工程结论', standardVersion: 'fixture-v1' } }))
     }
     const route = { id: provider.id, baseUrl: 'https://api.deepseek.com', apiKey: provider.apiKey, endpointFormat: 'chat_completions', model: 'deepseek-flash' }
-    runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: join(root, 'runtimes',templateId), runtimeToken: 'synthetic-local-only', ...route, modelProviders: [route], defaultModelProviderId: provider.id, approvalPolicy: 'auto', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({}) })
+    runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: join(root, 'runtimes',templateId), workspaceTrustPath, runtimeToken: 'synthetic-local-only', ...route, modelProviders: [route], defaultModelProviderId: provider.id, approvalPolicy: 'auto', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({}) })
     const sample = { templateId, startedAt: new Date().toISOString(), elapsedMs: 0, userInterventions: 0, verified: false }
     report.samples.push(sample)
     const started = Date.now()
@@ -98,11 +105,10 @@ try {
     runtime.flowService.create(graph)
     if (!runtime.flowService.publish(graph.id).published) throw new Error(`Could not publish synthetic ${templateId} flow`)
     const flow = await runtime.flowService.run(graph.id, {})
-    const threadId = `thr_delivery_${createHash('sha256').update(`${flow.id}:delivery`).digest('hex').slice(0, 24)}`
     let task
     while (Date.now() - started < 300_000) {
       if (bridge.exitCode !== null) throw new Error(`Export Electron exited (${bridge.exitCode}): ${bridgeError}`)
-      task = runtime.taskRepository.list({ threadId, limit: 1 })[0]
+      task = runtime.taskRepository.list({ workspaceRoot: workspace }).find(task => task.flowRunId === flow.id)
       if (task && ['completed', 'failed', 'cancelled', 'waiting_user', 'waiting_approval', 'stalled'].includes(task.status)) break
       await delay(250)
     }
@@ -111,11 +117,12 @@ try {
     sample.flowRunId = flow.id
     sample.taskId = task.id
     sample.elapsedMs = Date.now() - started
+    sample.timing = runtime.taskViewService.page({ workspaceRoot: workspace, filter: 'all' }).items.find(item => item.id === task.id)?.timing ?? null
     sample.verification = verifyTaskDelivery(runtime.taskRepository, task)
     sample.artifacts = task.artifacts
     sample.verified = sample.verification.complete && task.status === 'completed'
     sample.finalResponse = task.finalResponse ?? null
-    if (!['completed','failed','cancelled'].includes(task.status) && task.activeTurnId) await runtime.turnService.interruptTurn({threadId,turnId:task.activeTurnId})
+    if (!['completed','failed','cancelled'].includes(task.status) && task.activeTurnId) await runtime.turnService.interruptTurn({threadId: task.threadId,turnId:task.activeTurnId})
     await runtime.shutdown?.(); runtime = undefined
     await writeFile(join(root, 'results.json'), JSON.stringify(report, null, 2))
     process.stdout.write(`${templateId}: ${sample.taskStatus}, verified=${sample.verified}\n`)

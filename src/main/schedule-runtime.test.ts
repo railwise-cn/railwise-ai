@@ -296,6 +296,145 @@ describe('ScheduleRuntime', () => {
     )
   })
 
+  it.each([
+    { ok: false, status: 409, body: { code: 'capability_required', taskId: 'task_blocked', attentionId: 'attention_1', message: '请先授权飞书。' } },
+    { ok: true, status: 202, body: { kind: 'attention_required', taskId: 'task_blocked', attentionId: 'attention_1', message: '请选择任务范围。' } },
+    { ok: true, status: 202, body: { kind: 'input_queued', taskId: 'task_blocked', message: '补充已保存。' } }
+  ])('preserves a coordinated no-Turn response as waiting, not an error or completed run ($status)', async (response) => {
+    const task = makeTask({
+      prompt: '帮我处理飞书待办',
+      schedule: { kind: 'at', everyMinutes: 60, timeOfDay: '09:00', atTime: '2099-06-03T09:00:00.000Z' }
+    })
+    const runtimeRequest = vi.fn(async (_settings, path, _init?: { body?: unknown }) => {
+      if (path === '/v1/threads') return { ok: true, status: 200, body: JSON.stringify({ id: 'thr_origin' }) }
+      if (path === '/v1/threads/thr_origin/turns') return { ...response, body: JSON.stringify(response.body) }
+      if (path === '/v1/tasks/task_blocked') return { ok: true, status: 200, body: JSON.stringify({ id: 'task_blocked', originThreadId: 'thr_origin', status: 'waiting_user' }) }
+      throw new Error(`unexpected path ${path}`)
+    })
+    const { runtime, store } = createRuntime(settingsWith([task]), runtimeRequest)
+    const monitor = vi.spyOn(runtime as unknown as { monitorTaskTurn: (...args: string[]) => Promise<void> }, 'monitorTaskTurn')
+
+    await expect(runtime.runTask(task.id)).resolves.toMatchObject({
+      ok: false,
+      status: 'waiting_user',
+      threadId: 'thr_origin',
+      taskId: 'task_blocked',
+      message: response.body.message
+    })
+    expect(store.read().schedule.tasks[0]).toMatchObject({
+      enabled: true,
+      lastStatus: 'waiting_user',
+      nextRunAt: '',
+      lastThreadId: 'thr_origin',
+      runtimeTaskId: 'task_blocked',
+      lastMessage: response.body.message
+    })
+    expect(monitor).not.toHaveBeenCalled()
+    expect((await runtime.status()).runningTaskIds).toEqual([])
+    const request = runtimeRequest.mock.calls.find(([, path]) => path === '/v1/threads/thr_origin/turns')?.[2]
+    expect(JSON.parse(String(request?.body))).toMatchObject({ displayText: '帮我处理飞书待办' })
+
+    await (runtime as unknown as { tick: () => Promise<void> }).tick()
+    expect(runtimeRequest).toHaveBeenCalledTimes(3)
+    expect(runtimeRequest.mock.calls.filter(([, path]) => path === '/v1/threads/thr_origin/turns')).toHaveLength(1)
+  })
+
+  it('reconciles a resumed task only after verified completion and restores the next occurrence', async () => {
+    const task = makeTask({
+      lastStatus: 'waiting_user', lastThreadId: 'thr_origin', runtimeTaskId: 'runtime_task',
+      schedule: { kind: 'interval', everyMinutes: 15, timeOfDay: '09:00', atTime: '' }
+    })
+    const runtimeRequest = vi.fn(async (_settings, path) => {
+      if (path !== '/v1/tasks/runtime_task') throw new Error(`unexpected path ${path}`)
+      return { ok: true, status: 200, body: JSON.stringify({
+        id: 'runtime_task', originThreadId: 'thr_origin', status: 'completed',
+        finalResponse: '待办已完成并验证。', finishedAt: '2026-11-10T00:00:00.000Z',
+        nodes: [{ kind: 'execute', status: 'completed' }, { kind: 'verify', status: 'completed' }],
+        acceptance: { kind: 'effect', requiredNodeKinds: ['execute', 'verify'], effect: { provider: 'lark', operation: 'complete', target: 'todo_1' } },
+        resultEvidence: [{ kind: 'external_operation', provider: 'lark', operation: 'complete', target: 'todo_1', verified: true, status: 'done', resultHash: 'sha256', verifiedAt: '2026-11-10T00:00:00.000Z' }]
+      }) }
+    })
+    const { runtime, store } = createRuntime(settingsWith([task]), runtimeRequest)
+    await (runtime as unknown as { tick: () => Promise<void> }).tick()
+    expect(store.read().schedule.tasks[0]).toMatchObject({
+      lastStatus: 'success', lastMessage: '待办已完成并验证。', lastThreadId: 'thr_origin', runtimeTaskId: 'runtime_task'
+    })
+    expect(Date.parse(store.read().schedule.tasks[0].nextRunAt)).toBeGreaterThan(Date.now())
+    expect(runtimeRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { requiredEffects: undefined, completedTargets: ['todo_1'], expected: 'waiting_user' },
+    { requiredEffects: [], completedTargets: ['todo_1', 'todo_2'], expected: 'waiting_user' },
+    { requiredEffects: ['todo_1', 'todo_2'], completedTargets: ['todo_1'], expected: 'waiting_user' },
+    { requiredEffects: ['todo_1', 'todo_2'], completedTargets: ['todo_1', 'todo_2'], expected: 'success' }
+  ])('requires every persisted target before reconciling a broad process goal ($expected)', async ({ requiredEffects, completedTargets, expected }) => {
+    const task = makeTask({ lastStatus: 'waiting_user', lastThreadId: 'thr_origin', runtimeTaskId: 'runtime_task' })
+    const runtimeRequest = vi.fn(async () => ({ ok: true, status: 200, body: JSON.stringify({
+      id: 'runtime_task', originThreadId: 'thr_origin', status: 'completed', finalResponse: '已处理待办。', finishedAt: '2026-11-10T00:00:00.000Z',
+      nodes: [{ kind: 'execute', status: 'completed' }],
+      acceptance: { kind: 'effect', requiredNodeKinds: ['execute'], effect: {
+        provider: 'lark', operation: 'process',
+        requiredEffects: requiredEffects?.map(target => ({ provider: 'lark', operation: 'complete', target }))
+      } },
+      resultEvidence: completedTargets.map(target => ({
+        kind: 'external_operation', provider: 'lark', operation: 'complete', target, verified: true,
+        status: 'done', resultHash: `sha256_${target}`, verifiedAt: '2026-11-10T00:00:00.000Z'
+      }))
+    }) }))
+    const { runtime, store } = createRuntime(settingsWith([task]), runtimeRequest)
+    await (runtime as unknown as { tick: () => Promise<void> }).tick()
+    expect(store.read().schedule.tasks[0].lastStatus).toBe(expected)
+    expect(runtimeRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { status: 'completed', resultEvidence: [] },
+    { status: 'running' },
+    { status: 'stalled' },
+    { status: 'failed', originThreadId: 'different_conversation' }
+  ])('keeps waiting for an unverified or nonterminal runtime snapshot ($status)', async (patch) => {
+    const task = makeTask({ lastStatus: 'waiting_user', lastThreadId: 'thr_origin', runtimeTaskId: 'runtime_task' })
+    const runtimeRequest = vi.fn(async () => ({ ok: true, status: 200, body: JSON.stringify({
+      id: 'runtime_task', originThreadId: 'thr_origin', finalResponse: '模型声称已完成', finishedAt: '2026-11-10T00:00:00.000Z',
+      nodes: [{ kind: 'execute', status: 'completed' }],
+      acceptance: { kind: 'effect', requiredNodeKinds: ['execute'], effect: { provider: 'lark', operation: 'complete', target: 'todo_1' } }, ...patch
+    }) }))
+    const { runtime, store } = createRuntime(settingsWith([task]), runtimeRequest)
+    await (runtime as unknown as { tick: () => Promise<void> }).tick()
+    expect(store.read().schedule.tasks[0].lastStatus).toBe('waiting_user')
+    expect(runtimeRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['failed', 'cancelled'])('reconciles terminal runtime %s without retrying the occurrence', async (status) => {
+    const task = makeTask({
+      lastStatus: 'waiting_user', lastThreadId: 'thr_origin', runtimeTaskId: 'runtime_task',
+      schedule: { kind: 'at', everyMinutes: 60, timeOfDay: '09:00', atTime: '2099-06-03T09:00:00.000Z' }
+    })
+    const runtimeRequest = vi.fn(async () => ({ ok: true, status: 200, body: JSON.stringify({
+      id: 'runtime_task', originThreadId: 'thr_origin', status, stalledReason: '用户取消或远端失败。'
+    }) }))
+    const { runtime, store } = createRuntime(settingsWith([task]), runtimeRequest)
+    await (runtime as unknown as { tick: () => Promise<void> }).tick()
+    expect(store.read().schedule.tasks[0]).toMatchObject({ lastStatus: 'error', enabled: false, nextRunAt: '' })
+    expect(runtimeRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('bounds waiting-task reconciliation and retains waiting state when Runtime cannot be read', async () => {
+    const tasks = Array.from({ length: 10 }, (_, index) => makeTask({
+      id: `scheduled_${index}`, lastStatus: 'waiting_user', lastThreadId: `origin_${index}`, runtimeTaskId: `runtime_${index}`
+    }))
+    const runtimeRequest = vi.fn(async (_settings: unknown, _path: string) => ({ ok: false, status: 503, body: '{}' }))
+    const { runtime, store } = createRuntime(settingsWith(tasks), runtimeRequest)
+    const tick = () => (runtime as unknown as { tick: () => Promise<void> }).tick()
+    await tick()
+    expect(runtimeRequest).toHaveBeenCalledTimes(8)
+    await tick()
+    expect(runtimeRequest).toHaveBeenCalledTimes(16)
+    expect(runtimeRequest.mock.calls.map(call => call[1])).toEqual(expect.arrayContaining(['/v1/tasks/runtime_8', '/v1/tasks/runtime_9']))
+    expect(store.read().schedule.tasks.every(task => task.lastStatus === 'waiting_user')).toBe(true)
+  })
+
   it('reads assistant text from the real WorkWise Runtime thread detail shape', async () => {
     const task = makeTask()
     const runtimeRequest = vi.fn(async (_settings, path, init) => {

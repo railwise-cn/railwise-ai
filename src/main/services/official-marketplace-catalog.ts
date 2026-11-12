@@ -1,3 +1,4 @@
+import { AUTOCAD_UPSTREAM, ZOTERO_PACKAGE, OPTIONAL_ENGINEERING_SKILLS, isApprovedUpstreamPackage } from '../../shared/engineering-marketplace'
 import type {
   CatalogSourceV1,
   GithubPackageSourceV1,
@@ -24,6 +25,8 @@ import { evaluateMarketplaceLicense } from '../../shared/marketplace'
 
 const OFFICIAL_CATALOG_SOURCE_ID = 'workwise-official'
 const SHA1_COMMIT = /^[0-9a-f]{40}$/
+const AUTOCAD_REDRAW_COMMIT = AUTOCAD_UPSTREAM.commit
+const AUTOCAD_REDRAW_ARCHIVE_SHA256 = AUTOCAD_UPSTREAM.sha256
 const MCP_SERVERS_PYTHON_LICENSE_COMMIT = '76d64c822f5125032f89eb71dbdb94e42b434821'
 
 const PINNED_UPDATE = {
@@ -112,6 +115,8 @@ const PACKAGE_ICON_OVERRIDES: Record<string, MarketplaceIconV1> = {
   'writing-agent': { kind: 'monogram', value: 'WA', tone: 'green', alt: 'Writing Agent' },
   'humanizer-zh': { kind: 'monogram', value: 'HZ', tone: 'violet', alt: 'Humanizer Chinese' },
   'nuwa-skill': { kind: 'monogram', value: 'NW', tone: 'orange', alt: 'Nuwa Skill' },
+  'autocad-dwg-redraw': { kind: 'monogram', value: 'DW', tone: 'blue', alt: 'AutoCAD DWG 重绘' },
+  'autocad-image-redraw': { kind: 'monogram', value: 'DX', tone: 'teal', alt: '图片转 CAD' },
   'arch-diagram-skill': { kind: 'monogram', value: 'AD', tone: 'violet', alt: 'Arch Diagram' }
 }
 
@@ -302,6 +307,7 @@ type WheelArtifact = {
   version: string
   sha256: string
   executable: string
+  args?: string[]
 }
 
 const NPM_ARTIFACTS = {
@@ -533,7 +539,7 @@ function wheelRuntime(artifact: WheelArtifact): UvPackageRuntimeV1 {
     packageName: artifact.packageName,
     version: artifact.version,
     executable: artifact.executable,
-    args: [],
+    args: artifact.args ?? [],
     install: {
       strategy: 'managed-wheel',
       verify: 'sha256-before-activation',
@@ -546,7 +552,8 @@ const officialPackages: MarketplacePackageV1[] = [
   definePackage({
     id: 'github-mcp',
     name: 'GitHub MCP',
-    summary: 'Use the official GitHub-hosted MCP service.',
+    productType: 'connector',
+    summary: 'Connect to the official GitHub MCP service with a securely stored personal access token and an explicit repository permission scope.',
     tier: 'recommended',
     categories: ['development'],
     version: 'remote',
@@ -564,11 +571,36 @@ const officialPackages: MarketplacePackageV1[] = [
       }
     }],
     permissions: [NETWORK_PERMISSION],
-    auth: { type: 'oauth', provider: 'github', discovery: 'ready' },
+    auth: { type: 'token', provider: 'github', environmentVariables: [] },
     updatePolicy: MANUAL_UPDATE,
     availability: { status: 'available' },
     installation: EXTERNAL_INSTALL
   }),
+  definePackage({
+    id: 'amap-maps', name: '高德地图', productType: 'connector',
+    summary: '通过高德官方 MCP 查询地点、路线、距离和天气。Key 在本机受保护存储中保存，仅开放已核对的只读工具。',
+    tier: 'recommended', categories: ['engineering'], version: 'official-http',
+    publisher: publisher('amap', '高德开放平台', 'https://developer.amap.com/api/mcp-server/gettingstarted', true),
+    license: null, source: simpleSource('remote', 'https://developer.amap.com/api/mcp-server/gettingstarted'),
+    components: [{ id: 'amap-maps-server', name: '高德地图', type: 'mcp', runtime: { kind: 'remote', transport: 'streamable-http', endpoint: 'https://mcp.amap.com/mcp' } }],
+    permissions: [{ id: 'amap.read', kind: 'network', access: 'read', default: 'review', reviewRequired: true, description: '查询高德官方地图服务。', resources: ['https://mcp.amap.com'] }],
+    auth: { type: 'token', provider: 'amap', environmentVariables: [] },
+    dependencies: [], updatePolicy: MANUAL_UPDATE, availability: { status: 'available' }, installation: EXTERNAL_INSTALL,
+    usage: { howToUse: '在连接器详情中填写高德 Web 服务 Key，检查连接后查询地点或规划路线。', requirements: ['高德 Web 服务 Key'], examples: ['查询指定项目地址附近的地铁站。'] }
+  }),
+  (() => {
+    const item = wheelMcpPackage({ id: ZOTERO_PACKAGE.id, name: 'Zotero 本机文献',
+      summary: '读取本机 Zotero 的文献、集合、笔记和全文。社区连接器独立安装，保留完整混合许可证，仅开放只读工具。',
+      artifact: { packageName: ZOTERO_PACKAGE.packageName, version: ZOTERO_PACKAGE.version, sha256: ZOTERO_PACKAGE.sha256, executable: 'zotero-mcp', args: ['serve'] },
+      publisher: publisher('54yyyu', 'Zotero MCP 社区', 'https://github.com/54yyyu/zotero-mcp', false),
+      license: ZOTERO_PACKAGE.license, categories: ['documents', 'engineering'], permissions: [{ id: 'zotero.local.read', kind: 'network', access: 'read', default: 'review', reviewRequired: true, description: '读取已开启本地 API 的 Zotero 文献库。', resources: ['http://127.0.0.1:23119'] }] })
+    return { ...item, productType: 'connector' as const, installation: { mode: 'upstream-only' as const, installedByDefault: false, reinstallable: true as const },
+      usage: { howToUse: '安装此固定版本后，打开 Zotero 并在高级设置中允许本机应用连接。随后在连接器详情中检查只读工具。', requirements: ['运行中的 Zotero 本地 API', 'MIT AND AGPL-3.0-or-later 上游许可证'], examples: ['搜索文献库中关于盾构施工监测的资料，并列出来源。'] } }
+  })(),
+  ...OPTIONAL_ENGINEERING_SKILLS.map(skill => managedSkillPackage({ ...skill,
+    publisher: publisher('railwise', 'RailWise AI', 'https://github.com/railwise-cn/railwise-ai', true),
+    location: 'https://github.com/railwise-cn/railwise-ai', license: 'MIT', category: 'engineering', tier: 'recommended', installedByDefault: false
+  })),
   npmMcpPackage({
     id: 'playwright-mcp',
     name: 'Playwright MCP',
@@ -1090,6 +1122,54 @@ const officialPackages: MarketplacePackageV1[] = [
     'https://linear.app',
     'collaboration'
   ),
+  ...([
+    {
+      id: 'autocad-dwg-redraw', name: 'AutoCAD DWG 重绘',
+      summary: '基于源 DWG 提取实体和绘图信息，生成重绘提示并核验新 DWG。可从固定上游安装技能，执行 DWG 流程依赖 Windows AutoCAD COM。',
+      compatibility: COMPATIBILITY,
+      dependencies: [
+        { id: 'python', kind: 'runtime', requirement: 'Python >=3.10', optional: false, managedBy: 'user' },
+        { id: 'autocad', kind: 'system', requirement: '用户已安装并许可的 Windows AutoCAD，支持 COM 自动化', optional: false, managedBy: 'user' },
+        { id: 'pywin32', kind: 'package', requirement: 'pywin32', optional: false, managedBy: 'user' }
+      ],
+      usage: {
+        howToUse: '点击“从上游安装”，核对来源、版本及权限后导入技能。安装保留完整脚本和参考资料，执行前按任务授权。执行前检查 Windows、AutoCAD COM、Python 与 pywin32，再选择源文件和独立输出目录并授权任务。源 DWG 模式可提取绘图信息、生成重绘提示、复制实体并对比 ModelSpace/PaperSpace、图层、块、文字、标注和引线。PDF 中间图需保留转换来源与限制。交付重绘 DWG、绘图提示 Markdown、源/目标实体核验记录及 AutoCAD 目视复核结果。\n上游未声明分发许可证，许可证状态保留为未知。由用户主动从固定上游下载，来源页可继续查看。脚本的 --restart-autocad 会强制结束 acad.exe，可能丢失未保存文档，需用户保存工作并单独确认重启。现有输出可能被覆盖，执行前须确认目标范围。',
+        requirements: ['Windows 10/11 x64 与用户许可的 AutoCAD', 'Python >=3.10、pywin32', '源 DWG 或标明来源的 PDF 中间 DWG', '主机进程和输出目录授权。安装技能后单独授权执行'],
+        examples: ['使用 autocad-dwg-redraw 读取我选定的源 DWG，生成重绘提示和实体清单。经确认后写入新的 outputs/redraw.dwg，并交付源/目标核验记录。']
+      }
+    },
+    {
+      id: 'autocad-image-redraw', name: '图片转 CAD 重绘',
+      summary: '把截图、扫描图和照片整理为带证据的 CAD 规格，检查并对比输出。DWG 依赖 Windows AutoCAD，macOS/Linux 提供粗略 DXF 基线流程。',
+      compatibility: COMPATIBILITY,
+      dependencies: [
+        { id: 'python', kind: 'runtime', requirement: 'Python >=3.10', optional: false, managedBy: 'user' },
+        { id: 'image-redraw-python', kind: 'package', requirement: 'Pillow、NumPy、opencv-python-headless==4.14.0.94、ezdxf、PyMuPDF', optional: false, managedBy: 'user' },
+        { id: 'autocad', kind: 'system', requirement: '生成/检查 DWG 时需要 Windows AutoCAD COM 与 pywin32', optional: true, managedBy: 'user' }
+      ],
+      usage: {
+        howToUse: '点击“从上游安装”，核对来源、版本及权限后导入技能。安装保留完整脚本和参考资料，执行前按任务授权。先保留原图并检查清晰度、单位和尺度锚点，按已知、标定、推断、不可读记录几何证据，再校验规格并授权输出。Windows AutoCAD COM 路径支持 DWG 生成和检查。macOS/Linux 可使用 Python 图像描线或矢量 PDF 提取形成粗略 DXF 基线，并生成预览和视觉对比。请在独立 Python 环境安装已验证的 opencv-python-headless==4.14.0.94。OpenCV 5.x 的直线检测结果结构与此固定上游脚本不兼容。该描线脚本写入毫米单位，执行前应提供明确的毫米/像素标定比例。尺寸精度需要权威尺寸和约束核验。\n交付可编辑 CAD 文件、规格与标定 JSON、输入检查和规格校验报告、PNG/PDF 预览、叠加/差异图、比较指标及来源/成果哈希清单。geometry-only 模式可省略注释。上游未声明分发许可证，许可证状态保留为未知。由用户主动从固定上游下载，来源页可继续查看。部分 DWG 转存脚本会删除已有输出，需确认覆盖范围或选择新路径。',
+        requirements: ['Python >=3.10、Pillow、NumPy、opencv-python-headless==4.14.0.94、ezdxf、PyMuPDF', 'DWG 生成/检查另需用户许可的 Windows AutoCAD 与 pywin32', 'macOS/Linux 的 DXF 粗略基线需进一步复核', '原图、可读单位与尺度依据、明确输出目录。脚本执行另行授权'],
+        examples: ['使用 autocad-image-redraw 检查这张图的单位、清晰度和尺度依据，生成 redraw-spec.json。授权后导出 CAD、预览与对比报告，并列出待确认尺寸。', '在 macOS 上对所选图片生成粗略 DXF 基线与 PNG/PDF 预览，保留推断标记和来源哈希，供后续人工复核。']
+      }
+    }
+  ] satisfies Array<{ id: string; name: string; summary: string; compatibility: PackageCompatibilityV1; dependencies: PackageDependencyV1[]; usage: NonNullable<MarketplacePackageV1['usage']> }>).map(item => definePackage({
+    ...item, tier: 'advanced', productType: 'workflow', categories: ['engineering'], version: AUTOCAD_REDRAW_COMMIT,
+    publisher: publisher('pengxiaoan', 'pengxiaoan', 'https://github.com/pengxiaoan/autocad-dwg-redraw-skill'),
+    license: null,
+    source: { kind: 'github', owner: 'pengxiaoan', repository: 'autocad-dwg-redraw-skill', defaultBranch: 'main',
+      location: `https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/${AUTOCAD_REDRAW_COMMIT}/skills/${item.id}`,
+      requestedRef: AUTOCAD_REDRAW_COMMIT, resolvedRef: AUTOCAD_REDRAW_COMMIT, subpath: `skills/${item.id}`,
+      digest: { algorithm: 'sha256', value: AUTOCAD_REDRAW_ARCHIVE_SHA256 } },
+    components: [{ id: `${item.id}-skill`, name: item.name, type: 'skill', skillNames: [item.id], runtime: { kind: 'github',
+      repository: 'https://github.com/pengxiaoan/autocad-dwg-redraw-skill', resolvedCommit: AUTOCAD_REDRAW_COMMIT, subpath: `skills/${item.id}`,
+      install: { strategy: 'managed-git', verifyBeforeActivation: true } } }],
+    permissions: [FILESYSTEM_READ_PERMISSION, FILESYSTEM_WRITE_PERMISSION, { ...PROCESS_EXECUTE_PERMISSION, id: 'autocad.process.execute', default: 'denied',
+      description: '执行用户选定的本机 Python/CAD 脚本。AutoCAD 重启与输出覆盖分别需要确认，重启前应保存未完成文档。' }],
+    auth: { type: 'none' }, updatePolicy: PINNED_UPDATE,
+    availability: { status: 'available' },
+    installation: { mode: 'upstream-only', installedByDefault: false, reinstallable: true }
+  })),
   githubSkillPackage({
     id: 'browser-skill',
     name: 'BrowserSkill',
@@ -1330,6 +1410,7 @@ function managedSkillPackage(options: {
   category: string
   tier: MarketplacePackageV1['tier']
   version?: string
+  installedByDefault?: boolean
   permissions?: PackagePermissionV1[]
 }): MarketplacePackageV1 {
   return definePackage({
@@ -1354,7 +1435,7 @@ function managedSkillPackage(options: {
     auth: { type: 'none' },
     updatePolicy: SYSTEM_UPDATE,
     availability: { status: 'managed', managedBy: 'RailWise AI' },
-    installation: { ...SYSTEM_MANAGED_INSTALL, installedByDefault: true }
+    installation: { ...SYSTEM_MANAGED_INSTALL, installedByDefault: options.installedByDefault ?? true }
   })
 }
 
@@ -1548,6 +1629,8 @@ function assertCatalogInvariants(): void {
       )) {
         throw new Error(`${item.id} has an install mode inconsistent with its runtime.`)
       }
+    } else if (installationMode === 'upstream-only') {
+      if (!isApprovedUpstreamPackage(item)) throw new Error(`${item.id} upstream installation is not approved.`)
     } else if (item.installation.reinstallable) {
       throw new Error(`${item.id} cannot be reinstallable in ${installationMode} mode.`)
     }

@@ -12,10 +12,10 @@ const HELPER_INTERACTIVE_ARG = '--im-credential-helper-interactive'
 const HELPER_SOCKET_ARG = '--im-credential-helper-socket='
 const HELPER_SOCKET_ROOT_ARG = '--im-credential-helper-socket-root='
 const MAX_HELPER_MESSAGE_BYTES = 512 * 1024
-// The helper has no interactive authorization surface. A Keychain request
-// that has not completed within this window is waiting on unavailable system
-// authorization, so fail it before connection recovery appears hung.
+// Background reads are bounded so optional credentials cannot delay recovery.
+// Explicit retries give the user time to answer the system authorization prompt.
 export const IM_CREDENTIAL_HELPER_TIMEOUT_MS = 30_000
+export const IM_CREDENTIAL_HELPER_INTERACTIVE_TIMEOUT_MS = 120_000
 const HELPER_SOCKET_ROOT_NAME = `workwise-im-${process.pid}-${randomBytes(6).toString('hex')}`
 const activeCredentialHelperProcesses = new Set<ChildProcess>()
 let interactiveCredentialHelperRequested = false
@@ -32,6 +32,8 @@ const CANDIDATE_HELPER_ENV_KEYS = [
 export type CredentialHelperRequest = {
   operation: 'encrypt' | 'decrypt'
   value: string
+  /** Local scheduling metadata, omitted from the helper socket protocol. */
+  interactive?: boolean
 }
 
 export type CredentialHelperErrorCode =
@@ -270,19 +272,24 @@ export function stopCredentialHelperProcesses(): void {
   activeCredentialHelperProcesses.clear()
 }
 
+export function credentialHelperTimeoutMs(interactive: boolean): number {
+  return interactive ? IM_CREDENTIAL_HELPER_INTERACTIVE_TIMEOUT_MS : IM_CREDENTIAL_HELPER_TIMEOUT_MS
+}
+
 export function createCredentialHelperWatchdog(
-  exitProcess: (code: number) => void = (code) => process.exit(code)
+  exitProcess: (code: number) => void = (code) => process.exit(code),
+  interactive = isInteractiveImCredentialHelperProcess()
 ): ReturnType<typeof setTimeout> {
   const watchdog = setTimeout(
     () => exitProcess(1),
-    IM_CREDENTIAL_HELPER_TIMEOUT_MS - 1_000
+    credentialHelperTimeoutMs(interactive) - 1_000
   )
   watchdog.unref?.()
   return watchdog
 }
 
 async function requestCredentialHelper(request: CredentialHelperRequest): Promise<string> {
-  const interactive = consumeInteractiveCredentialHelperAccess()
+  const interactive = request.interactive === true
   const socketRoot = helperSocketRoot()
   await mkdir(helperRoot(), { recursive: true, mode: 0o700 })
   await mkdir(socketRoot, { recursive: true, mode: 0o700 })
@@ -341,7 +348,7 @@ async function requestCredentialHelper(request: CredentialHelperRequest): Promis
         'credential_helper_socket',
         'IM credential helper socket failed.'
       )))
-      socket.write(`${encodeMessage(request)}\n`)
+      socket.write(`${encodeMessage({ operation: request.operation, value: request.value })}\n`)
     })
 
     const cleanup = (): void => {
@@ -389,7 +396,7 @@ async function requestCredentialHelper(request: CredentialHelperRequest): Promis
           'credential_helper_timeout',
           'IM credential helper timed out.'
         )),
-        IM_CREDENTIAL_HELPER_TIMEOUT_MS
+        credentialHelperTimeoutMs(interactive)
       )
     })
   })
@@ -404,6 +411,7 @@ export function createCredentialHelperRequestScheduler(
   return (request) => {
     const key = createHash('sha256')
       .update(request.operation)
+      .update(request.interactive === true ? ':interactive' : ':background')
       .update('\0')
       .update(request.value)
       .digest('hex')
@@ -424,7 +432,11 @@ export function createCredentialHelperRequestScheduler(
 
 const scheduleCredentialHelperRequest = createCredentialHelperRequestScheduler(requestCredentialHelper)
 
-export async function encryptStringWithCredentialHelper(value: string): Promise<Buffer> {
+export async function encryptStringWithCredentialHelper(
+  value: string,
+  options?: { interactive?: boolean }
+): Promise<Buffer> {
+  const interactive = options?.interactive ?? consumeInteractiveCredentialHelperAccess()
   if (!isCandidateCredentialAccessAllowed()) {
     throw Object.assign(new Error('Candidate protected storage access is disabled.'), {
       code: 'credential_helper_access_denied'
@@ -432,12 +444,17 @@ export async function encryptStringWithCredentialHelper(value: string): Promise<
   }
   const encrypted = await scheduleCredentialHelperRequest({
     operation: 'encrypt',
-    value: Buffer.from(value, 'utf8').toString('base64')
+    value: Buffer.from(value, 'utf8').toString('base64'),
+    interactive
   })
   return Buffer.from(encrypted, 'base64')
 }
 
-export async function decryptStringWithCredentialHelper(value: Buffer): Promise<string> {
+export async function decryptStringWithCredentialHelper(
+  value: Buffer,
+  options?: { interactive?: boolean }
+): Promise<string> {
+  const interactive = options?.interactive ?? consumeInteractiveCredentialHelperAccess()
   if (!isCandidateCredentialAccessAllowed()) {
     throw Object.assign(new Error('Candidate protected storage access is disabled.'), {
       code: 'credential_helper_access_denied'
@@ -445,7 +462,8 @@ export async function decryptStringWithCredentialHelper(value: Buffer): Promise<
   }
   const decrypted = await scheduleCredentialHelperRequest({
     operation: 'decrypt',
-    value: value.toString('base64')
+    value: value.toString('base64'),
+    interactive
   })
   return Buffer.from(decrypted, 'base64').toString('utf8')
 }
@@ -524,7 +542,7 @@ export async function runImCredentialHelperProcess(): Promise<void> {
     }
     const request = await requestPromise
     if (!isCandidateCredentialAccessAllowed()) throw new Error('Candidate protected storage access is disabled.')
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('Protected storage unavailable.')
+    if (!await safeStorage.isAsyncEncryptionAvailable()) throw new Error('Protected storage unavailable.')
     const value = request.operation === 'encrypt'
       ? (await safeStorage.encryptStringAsync(
           Buffer.from(request.value, 'base64').toString('utf8')

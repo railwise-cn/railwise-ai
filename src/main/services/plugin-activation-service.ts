@@ -1,3 +1,4 @@
+import { ZOTERO_READ_TOOLS, isApprovedUpstreamPackage } from '../../shared/engineering-marketplace'
 import { createHash } from 'node:crypto'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -318,8 +319,9 @@ export async function activatePluginPackage(options: ActivatePluginPackageOption
       credentialEnvironmentVariables: options.item.auth.type === 'token'
         ? options.item.auth.environmentVariables
         : undefined,
-      toolPolicy: {},
-      enabled: enabledByPermissions,
+      toolPolicy: isApprovedUpstreamPackage(options.item) ? { '*': 'deny' as const, ...Object.fromEntries(ZOTERO_READ_TOOLS.map(name => [name, 'allow' as const])) } : {},
+      ...(isApprovedUpstreamPackage(options.item) ? { managedPreset: 'zotero-readonly' as const, readOnlyTools: [...ZOTERO_READ_TOOLS] } : {}),
+      enabled: enabledByPermissions && (!isApprovedUpstreamPackage(options.item) || existing?.enabled === true),
       revision: existing?.revision
     }
     if (component.runtime.kind === 'remote') {

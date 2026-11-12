@@ -85,6 +85,16 @@ function terminalReason(
  * directly.
  */
 export class TurnService {
+  private admissionSuspended = false
+
+  setAdmissionSuspended(suspended: boolean): void { this.admissionSuspended = suspended }
+
+  async awaitPendingStarts(): Promise<void> { await Promise.allSettled([...this.startQueues.values()]) }
+
+  private assertAdmission(): void {
+    if (this.admissionSuspended) throw Object.assign(new Error('Runtime is preparing an update.'), { code: 'runtime_updating' })
+  }
+
   private readonly deps: TurnServiceDeps
   private readonly workspaceReferences: Pick<WorkspaceReferenceService, 'validateReferences'>
   private readonly inflightTurns = new Map<string, AbortController>()
@@ -112,10 +122,12 @@ export class TurnService {
   async startTurn(input: {
     threadId: string
     request: StartTurnRequest
+    externalTaskProvider?: 'dingtalk' | 'lark'
     engineeringExecution?: boolean
     engineeringPlanId?: string
     continuationTaskId?: string
   }): Promise<StartTurnResponse> {
+    this.assertAdmission()
     const previous = this.startQueues.get(input.threadId) ?? Promise.resolve()
     const run = previous.catch(() => undefined).then(() => this.startTurnInternal(input))
     const guard = run.then(() => undefined, () => undefined)
@@ -151,16 +163,19 @@ export class TurnService {
   }
 
   /** Conversation receipts are durable history, not model execution Turns. */
-  async recordCommandExchange(input: {threadId:string;commandId:string;userText:string;assistantText:string;createdAt:string}): Promise<void> {
+  async recordCommandExchange(input: {threadId:string;commandId:string;userText:string;assistantText:string;createdAt:string;capabilityCard?:import('../contracts/items.js').AssistantTextTurnItem['capabilityCard']}): Promise<void> {
     const turnId=`command_${input.commandId}`
     const existing = new Set((await this.deps.sessionStore.loadItems(input.threadId)).map(item=>item.id))
     const recorded = new Set((await this.deps.sessionStore.loadEventsSince(input.threadId,0)).filter(event=>event.kind==='item_created').map(event=>'itemId' in event?event.itemId:undefined))
     const items = [makeUserItem({id:`item_${turnId}_user`,turnId,threadId:input.threadId,text:input.userText}),makeAssistantTextItem({id:`item_${turnId}_receipt`,turnId,threadId:input.threadId,text:input.assistantText,status:'completed'})]
     for(const value of items) {
-      const item={...value,createdAt:input.createdAt,finishedAt:input.createdAt}
+      const item={...value,conversationReceiptId:turnId,createdAt:input.createdAt,finishedAt:input.createdAt,...(value.kind==='assistant_text'&&input.capabilityCard?{capabilityCard:input.capabilityCard}:{})}
       if (!existing.has(item.id)) await this.deps.sessionStore.appendItem(input.threadId,item)
       if (!recorded.has(item.id)) await this.deps.events.record({kind:'item_created',threadId:input.threadId,turnId,itemId:item.id,item})
     }
+    // Replay may find both JSONL items already durable after a crash before
+    // the summary index was updated. Reconcile before acknowledging outbox.
+    await this.deps.threadStore.refreshConversationSummary?.(input.threadId)
   }
 
   private async recordCompletedTurnInternal(input: {
@@ -439,10 +454,12 @@ export class TurnService {
   private async startTurnInternal(input: {
     threadId: string
     request: StartTurnRequest
+    externalTaskProvider?: 'dingtalk' | 'lark'
     engineeringExecution?: boolean
     engineeringPlanId?: string
     continuationTaskId?: string
   }): Promise<StartTurnResponse> {
+    this.assertAdmission()
     const thread = await this.deps.threadStore.get(input.threadId)
     if (!thread) throw new Error(`thread not found: ${input.threadId}`)
     if (input.request.taskIntent === 'status') throw Object.assign(new Error('Use task-commands status to read a task without starting a Turn.'), { code: 'task_intent_required' })
@@ -456,7 +473,7 @@ export class TurnService {
             code: 'idempotency_conflict'
           })
         }
-        if (!sameIdempotentTurnRequest(existing, input.request)) {
+        if (!sameIdempotentTurnRequest(existing, input.request, input.externalTaskProvider)) {
           throw Object.assign(new Error('idempotency key is already bound to a different Turn request'), {
             code: 'idempotency_conflict'
           })
@@ -500,6 +517,7 @@ export class TurnService {
       id: turnId,
       threadId: input.threadId,
       prompt: input.request.prompt,
+      externalTaskProvider: input.externalTaskProvider,
       engineeringExecution: input.engineeringExecution,
       engineeringPlanId: input.engineeringPlanId,
       model: input.request.model,
@@ -767,6 +785,8 @@ export class TurnService {
     turnId: string,
     patch: Pick<
       Partial<Turn>,
+      | 'executionGrant'
+      | 'hostShellAuthorizations'
       | 'activeSkillIds'
       | 'injectedMemoryIds'
       | 'skillInjectionBytes'
@@ -781,6 +801,8 @@ export class TurnService {
         turn.id === turnId
           ? {
               ...turn,
+              ...(patch.executionGrant ? { executionGrant: patch.executionGrant } : {}),
+              ...(patch.hostShellAuthorizations ? { hostShellAuthorizations: [...new Map([...(turn.hostShellAuthorizations ?? []), ...patch.hostShellAuthorizations].map(value => [value.id, value])).values()] } : {}),
               ...(patch.activeSkillIds ? { activeSkillIds: [...patch.activeSkillIds] } : {}),
               ...(patch.injectedMemoryIds ? { injectedMemoryIds: [...patch.injectedMemoryIds] } : {}),
               ...(patch.skillInjectionBytes !== undefined ? { skillInjectionBytes: patch.skillInjectionBytes } : {}),
@@ -998,6 +1020,7 @@ function uiActionTaskLabel(action: UiActionAudit): string {
 function sameIdempotentTurnRequest(
   existing: {
     prompt: string
+    externalTaskProvider?: 'dingtalk' | 'lark'
     model?: string
     providerId?: string
     reasoningEffort?: string
@@ -1008,12 +1031,14 @@ function sameIdempotentTurnRequest(
     mode?: string
     disableUserInput?: boolean
   },
-  request: StartTurnRequest
+  request: StartTurnRequest,
+  externalTaskProvider?: 'dingtalk' | 'lark'
 ): boolean {
   // These fields are persisted on the Turn and define the work a retry would
   // execute. displayText is intentionally excluded because it is presentation
   // metadata and does not change the requested operation.
   return existing.prompt === request.prompt
+    && (existing.externalTaskProvider ?? '') === (externalTaskProvider ?? '')
     && (request.model === undefined || existing.model === request.model)
     && (request.providerId === undefined || existing.providerId === request.providerId)
     && (request.reasoningEffort === undefined || (existing.reasoningEffort ?? 'auto') === request.reasoningEffort)

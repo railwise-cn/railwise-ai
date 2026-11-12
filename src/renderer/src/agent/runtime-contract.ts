@@ -1,4 +1,5 @@
 import { GUI_PLAN_CREATE_PLAN_TOOL_NAME } from '@shared/gui-plan'
+import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 
 export type CoreThreadStatus = 'idle' | 'running' | 'archived' | 'deleted'
 export type CoreTurnStatus = 'queued' | 'running' | 'completed' | 'failed' | 'aborted'
@@ -58,6 +59,8 @@ export type CoreThreadAgentProfileJson = {
 
 export type CoreThreadJson = CoreThreadSummaryJson & {
   turns?: CoreTurnJson[]
+  /** Local coordinator messages, never execution Turns or model usage. */
+  conversationItems?: CoreTurnItemJson[]
   latestSeq?: number
 }
 
@@ -254,6 +257,8 @@ export type CoreRuntimeCapabilityManifestJson = {
   visionEvidence?: CoreRuntimeCapabilityStateJson
   /** Optional so the GUI can disable persisted controls against older runtimes. */
   uiActions?: CoreRuntimeCapabilityStateJson
+  /** Navigation reflects executable workspaces, not preview surfaces. */
+  workspaces?: Partial<Record<'flow' | 'design' | 'schedule', CoreRuntimeCapabilityStateJson>>
 }
 
 export type CoreRuntimeInfoJson = {
@@ -371,6 +376,7 @@ export type CoreTurnJson = {
 export type CoreTurnItemJson = {
   id: string
   turnId: string
+  conversationReceiptId?: string
   threadId: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   status: CoreItemStatus
@@ -379,6 +385,7 @@ export type CoreTurnItemJson = {
   kind: string
   text?: string
   uiBlocks?: unknown[]
+  capabilityCard?: ExternalTaskCapabilityCard
   displayText?: string
   toolName?: string
   callId?: string

@@ -256,7 +256,9 @@ export async function installBundledSkill(
   source: BundledSkillSource
 ): Promise<BundledSkillInstallResult> {
   try {
-    const root = normalizeSkillRootPath(rootPath)
+    const root = rootPath === 'railwise:global-skills'
+      ? join(process.env.WORKWISE_TOOLS_ROOT?.trim() || join(homedir(), '.workwise', 'tools'), 'skills')
+      : normalizeSkillRootPath(rootPath)
     if (!root) return { ok: false, message: 'Skill directory is required.' }
     const bundleId = normalizeSkillFolderName(source.id)
     const skillName = normalizeSkillFolderName(source.skillName || bundleId)
@@ -944,7 +946,7 @@ function bundledSkillRootCandidates(): string[] {
 }
 
 export function resolveBundledSkillDirectory(bundleId: string): string | null {
-  for (const root of bundledSkillRootCandidates()) {
+  for (const root of bundledSkillRootCandidates().flatMap(root => [root, join(dirname(root), 'optional-skills')])) {
     const candidate = join(root, bundleId)
     if (existsSync(join(candidate, 'SKILL.md')) || existsSync(join(candidate, 'skill.json'))) {
       return candidate

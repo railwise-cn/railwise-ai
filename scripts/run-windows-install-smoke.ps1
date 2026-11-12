@@ -93,7 +93,7 @@ try {
   if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows') {
     throw 'Exact installer smoke requires a clean GitHub-hosted Windows runner'
   }
-  if ($env:GITHUB_SHA -ne $SourceHead) { throw 'Requested source differs from this workflow commit' }
+  $report.provenance = Invoke-NodeJson -Arguments @('provenance', $Version, $SourceHead)
   if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { throw 'RUNNER_TEMP is unavailable' }
   $EvidenceDir = [IO.Path]::GetFullPath($EvidenceDir)
   $tempPrefix = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\') + '\'
@@ -162,6 +162,14 @@ try {
       if (Test-Path -LiteralPath (Join-Path $location.directory $identity.shortcutName)) { throw 'Current-user install created an all-users shortcut' }
     }
   } finally { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) | Out-Null }
+  # Inspect the unchanged installed application through its real Chinese UI
+  # before uninstalling this same owned instance. The child creates a separate
+  # synthetic profile and uses the ordinary packaged renderer and IPC services.
+  $uiScript = Join-Path $PSScriptRoot 'run-windows-ui-smoke.mjs'
+  & node $uiScript $executable $Version $SourceHead $EvidenceDir
+  if ($LASTEXITCODE -ne 0) { throw "Installed Chinese UI smoke failed ($LASTEXITCODE)" }
+  $report.ui = Get-Content -LiteralPath (Join-Path $EvidenceDir 'windows-ui-smoke.json') -Raw | ConvertFrom-Json
+  if ($report.ui.status -ne 'passed') { throw 'Installed Chinese UI evidence is incomplete' }
 } catch {
   $report.errors.Add($_.Exception.Message)
 } finally {

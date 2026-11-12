@@ -1,3 +1,8 @@
+import { registerRuntimeUpdateRoutes } from './runtime-update.js'
+import { registerRuntimeMcpRoutes } from './runtime-mcp.js'
+import { recordImDelivery } from './im-delivery.js'
+import { randomUUID } from 'node:crypto'
+import { StartTurnRequest } from '../../contracts/turns.js'
 import { taskFeedResponse } from '../../services/task-view-service.js'
 import { taskCommand } from './task-commands.js'
 import { registerSurveyCollaborationRoutes } from './survey-collaboration.js'
@@ -6,6 +11,7 @@ import { registerSurveyContextMcpRoutes } from './survey-context-mcp.js'
 import { registerSurveyStandardBasisRoutes } from './survey-standard-basis.js'
 import { registerSurveyQualityScoringWorkspaceRoutes } from './survey-quality-scoring-workspace.js'
 import { Router } from '../router.js'
+import { jsonResponse } from '../response.js'
 import { registerSurveyMonitoringRoutes } from './survey-monitoring.js'
 import { getStatisticalDiagnostics } from './survey-statistics.js'
 import * as freeLevelingRoutes from './survey-free-leveling.js'
@@ -72,7 +78,9 @@ import { flowRoutes } from './flows.js'
 import { isAuthorized, bearerToken } from '../auth.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
-import { appendTaskInput, cancelTask, getTask, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
+import { appendTaskInput, cancelTask, getTask, getTaskArtifactProof, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
+import { externalProviderAmbiguity } from '../../services/external-task-capability.js'
+import { classifyTaskInput } from '../../services/task-coordinator.js'
 import { listShellSessions, terminateShellSession } from './shell-sessions.js'
 import { startUiAction } from './ui-actions.js'
 import * as engineeringRoutes from './engineering.js'
@@ -110,7 +118,17 @@ import { registerTaskDeliveryRoutes } from './task-delivery.js'
  * - `GET /v1/usage` (auth)
  */
 export function buildRouter(runtime: ServerRuntime): Router {
-  const router = new Router()
+  const router = new Router(request => {
+    if (runtime.updateLifecycle?.isSuspended() && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
+      && new URL(request.url).pathname !== '/v1/runtime/update/prepare') {
+      return ERRORS.unavailable('应用正在准备升级，已停止接收新的执行。')
+    }
+    return undefined
+  })
+  registerRuntimeUpdateRoutes(router, runtime, request => authorize(request, runtime))
+  registerRuntimeMcpRoutes(router, runtime, request => authorize(request, runtime))
+  router.add('POST', '/v1/threads/:id/delivery-observations', (request, ctx) => authorize(request, runtime)
+    ? recordImDelivery(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   registerTaskDeliveryRoutes(router, runtime, request => authorize(request, runtime))
   registerSurveyContextMcpRoutes(router, {
     getHost: () => runtime.surveyContextMcp,
@@ -147,6 +165,60 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('GET', '/v1/runtime/tools', async (request) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     return runtimeToolDiagnosticsJsonResponse(runtime)
+  })
+  router.add('POST', '/v1/connectors/dingtalk/configure', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.configureDingTalk) return ERRORS.unavailable('managed DingTalk connector configuration is unavailable')
+    try { return jsonResponse(await runtime.configureDingTalk(await request.json())) }
+    catch (error) { return jsonResponse({ code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'connector_configuration_invalid', message: '钉钉应用配置未保存，请检查输入和本机安全存储。' }, 400) }
+  })
+  router.add('POST', '/v1/connectors/dingtalk/oauth/start', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.beginDingTalkOAuth) return ERRORS.unavailable('managed DingTalk OAuth is unavailable')
+    if (request.body) return ERRORS.validation('DingTalk OAuth start does not accept a request body')
+    try { return jsonResponse(await runtime.beginDingTalkOAuth()) }
+    catch (error) { return jsonResponse({ code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'connector_oauth_failed', message: '无法开始钉钉授权，请检查应用配置和加密凭据。' }, 409) }
+  })
+  router.add('POST', '/v1/connectors/dingtalk/oauth/complete', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.completeDingTalkOAuth) return ERRORS.unavailable('managed DingTalk OAuth completion is unavailable')
+    try {
+      const body = await request.json() as { callbackUrl?: unknown }
+      if (typeof body?.callbackUrl !== 'string') return ERRORS.validation('callbackUrl is required')
+      return jsonResponse(await runtime.completeDingTalkOAuth(body.callbackUrl))
+    } catch (error) { return jsonResponse({ code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'connector_oauth_failed', message: '钉钉授权结果未能验证，请重新开始授权。' }, 409) }
+  })
+  router.add('POST', '/v1/connectors/dingtalk/workflow/authorize', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.authorizeDingTalkWorkflow) return ERRORS.unavailable('managed DingTalk workflow authorization is unavailable')
+    try { return jsonResponse(await runtime.authorizeDingTalkWorkflow(await request.json())) }
+    catch (error) { return jsonResponse({ code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'connector_authorization_failed', message: '企业审批应用授权未完成，请确认管理员授权信息和权限范围。' }, 409) }
+  })
+  router.add('POST', '/v1/connectors/dingtalk/refresh', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.refreshDingTalk) return ERRORS.unavailable('managed DingTalk connector refresh is unavailable')
+    if (request.headers.get('content-length') && Number(request.headers.get('content-length')) !== 0) {
+      return ERRORS.validation('DingTalk refresh does not accept a request body')
+    }
+    if (request.body) return ERRORS.validation('DingTalk refresh does not accept a request body')
+    try { return jsonResponse(await runtime.refreshDingTalk()) }
+    catch { return jsonResponse({ code: 'connector_refresh_failed', message: '无法读取或验证钉钉连接器配置，请检查本机配置和加密凭据后重试。' }, 409) }
+  })
+  router.add('POST','/v1/connectors/dws/refresh',async(request)=>{
+    if(!authorize(request,runtime))return ERRORS.unauthorized()
+    if(!runtime.refreshDws)return ERRORS.unavailable('managed DingTalk CLI refresh is unavailable')
+    if(request.body||Number(request.headers.get('content-length')||0)!==0)return ERRORS.validation('DingTalk CLI refresh does not accept a request body')
+    try{return jsonResponse(await runtime.refreshDws())}catch{return jsonResponse({code:'connector_refresh_failed',message:'无法读取钉钉连接状态，请重新诊断后继续。'},409)}
+  })
+  router.add('POST', '/v1/connectors/lark/refresh', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.refreshLark) return ERRORS.unavailable('managed Lark connector refresh is unavailable')
+    if (request.headers.get('content-length') && Number(request.headers.get('content-length')) !== 0) {
+      return ERRORS.validation('Lark refresh does not accept a request body')
+    }
+    if (request.body) return ERRORS.validation('Lark refresh does not accept a request body')
+    try { return jsonResponse(await runtime.refreshLark()) }
+    catch { return jsonResponse({ code: 'connector_refresh_failed', message: '无法读取飞书连接器配置，请检查本机配置后重试。' }, 409) }
   })
   router.add('GET', '/v1/engineering/projects', async (request) => authorize(request, runtime) ? engineeringRoutes.listProjects(runtime.engineeringService) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/projects', async (request) => authorize(request, runtime) ? engineeringRoutes.createProject(runtime.engineeringService, request) : ERRORS.unauthorized())
@@ -317,6 +389,11 @@ export function buildRouter(runtime: ServerRuntime): Router {
   })
   router.add('GET', '/v1/inbox', async request => authorize(request, runtime) ? getTaskInbox(runtime, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/events', async (request, ctx) => authorize(request, runtime) ? getTaskEvents(runtime, ctx.params.id, request) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/:id/receipts', async (request, ctx) => authorize(request, runtime) ? getTaskOperationReceipts(runtime, ctx.params.id) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/:id/artifacts/:artifact/proof', async (request, ctx) => authorize(request, runtime) ? getTaskArtifactProof(runtime, ctx.params.id, ctx.params.artifact) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? getTaskPermissions(runtime, ctx.params.id) : ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? confirmTaskPermissions(runtime, ctx.params.id, request) : ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/receipts/:receipt/verify', async (request, ctx) => authorize(request, runtime) ? verifyTaskOperationReceipt(runtime, ctx.params.id, ctx.params.receipt, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/stream', (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     if (!runtime.taskRepository?.get(ctx.params.id)) return ERRORS.notFound('task not found')
@@ -413,6 +490,36 @@ export function buildRouter(runtime: ServerRuntime): Router {
   })
   router.add('POST', '/v1/threads/:id/turns', async (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    const body = await request.clone().json().catch(() => undefined)
+    const parsed = StartTurnRequest.safeParse(body)
+    if (parsed.success) {
+      const prompt = parsed.data.displayText ?? parsed.data.prompt
+      const statusQuery = classifyTaskInput(prompt, false) === 'status'
+      const capability = statusQuery ? null : await runtime.preflightExternalTask?.(prompt)
+      const activeTask = runtime.taskRepository?.findActiveByOrigin(ctx.params.id)
+        ?? runtime.taskRepository?.findActiveByThread(ctx.params.id)
+      const explicitTaskCommand = parsed.data.taskIntent === 'new' || parsed.data.taskIntent === 'supplement'
+      if (statusQuery || capability || activeTask || explicitTaskCommand || externalProviderAmbiguity(prompt)) {
+        if (!runtime.taskCoordinator) return ERRORS.unavailable('task coordinator is unavailable for external work')
+        const result = await runtime.taskCoordinator.command({
+          threadId: ctx.params.id,
+          intent: statusQuery ? 'status' : parsed.data.taskIntent === 'new' || parsed.data.taskIntent === 'supplement' ? parsed.data.taskIntent : 'auto',
+          idempotencyKey: parsed.data.idempotencyKey ?? randomUUID(),
+          request: parsed.data
+        })
+        if (result.kind === 'task_started' || result.kind === 'chat_started') return jsonResponse(result.turn, 202)
+        if (result.kind === 'capability_required') return jsonResponse({
+          code: 'capability_required', message: result.message, taskId: result.task?.id,
+          attentionId: result.attentionId, capability: result.capability
+        }, 409)
+        const message = result.kind === 'snapshot'
+          ? result.task ? `${result.task.goal}\n${result.task.waitingReason ?? result.task.stalledReason ?? result.task.status}` : '当前没有进行中的任务。'
+          : result.kind === 'input_queued' ? result.task.status === 'paused' ? '补充已保存，将在你继续任务后送达。' : '补充已保存，将送达当前任务。'
+            : result.kind === 'task_updated' ? result.action === 'pause' ? '任务已暂停。' : '任务已取消。'
+              : 'message' in result ? result.message : '已接收任务。'
+        return jsonResponse({ kind: result.kind, message, taskId: result.task?.id, attentionId: result.kind === 'attention_required' ? result.attentionId : undefined }, result.kind === 'snapshot' ? 200 : 202)
+      }
+    }
     return startTurn(runtime.turnService, ctx.params.id, request, ({ threadId, turnId }) => {
       runtime.runTurn(threadId, turnId)
     })

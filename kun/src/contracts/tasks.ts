@@ -1,6 +1,8 @@
 import { z } from 'zod'
+import { TaskApprovalGrantSchema } from './permissions.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
 import type { ContextBundle, HandoffPacket } from './task-context.js'
+import { ResultEvidenceSchema } from './harness.js'
 
 export const TaskRunStatusSchema = z.enum([
   'queued',
@@ -29,6 +31,9 @@ export const TaskNodeStatusSchema = z.enum([
 export const TaskArtifactSchema = z.object({
   id: z.string().min(1),
   relativePath: z.string().min(1),
+  absolutePath: z.string().min(1).optional(),
+  authorizedRoot: z.string().min(1).optional(),
+  executionGrantId: z.string().min(1).optional(),
   mediaType: z.string().optional(),
   format: z.string().optional(),
   sizeBytes: z.number().int().nonnegative().optional(),
@@ -39,13 +44,38 @@ export const TaskArtifactSchema = z.object({
 })
 export type TaskArtifact = z.infer<typeof TaskArtifactSchema>
 
+export const RequiredEffectSchema = z.object({
+  provider: z.string().trim().min(1),
+  operation: z.string().trim().min(1),
+  target: z.string().trim().min(1),
+  requiredScopes: z.array(z.string()).default([]),
+  requiresConfirmation: z.boolean().default(true),
+  successStatus: z.array(z.string()).default(['succeeded']),
+  verification: z.literal('provider_readback').default('provider_readback')
+})
+export type RequiredEffect = z.infer<typeof RequiredEffectSchema>
+
 export const TaskAcceptanceSchema = z.object({
-  kind: z.enum(['answer', 'files']),
+  kind: z.enum(['answer', 'files', 'effect']),
   requiredNodeKinds: z.array(TaskNodeKindSchema),
   requiredFormats: z.array(z.string().min(1)).optional(),
   minimumArtifacts: z.number().int().nonnegative().optional(),
   requireFinalResponse: z.boolean(),
-  requireActionableArtifactCard: z.boolean()
+  requireActionableArtifactCard: z.boolean(),
+  requiresExternalEffects: z.boolean().optional(),
+  effect: z.object({
+    provider: z.string(),
+    operation: z.string(),
+    requiredOperations: z.array(z.string().min(1)).min(2).optional(),
+    target: z.string().optional(),
+    requiredScopes: z.array(z.string()).default([]),
+    requiresConfirmation: z.boolean(),
+    successStatus: z.array(z.string()).default(['succeeded']),
+    verification: z.literal('provider_readback'),
+    requiredEffects: z.array(RequiredEffectSchema).min(1).optional(),
+    scopeConfirmationId: z.string().optional(),
+    scopeRevision: z.number().int().nonnegative().optional()
+  }).optional()
 })
 export type TaskAcceptance = z.infer<typeof TaskAcceptanceSchema>
 
@@ -97,6 +127,7 @@ export const TaskAuthoritySchema = z.object({
   externalTargets: z.array(z.string()).default([]),
   grantedAt: z.string(),
   revokedAt: z.string().optional()
+  ,taskApprovalGrant: TaskApprovalGrantSchema.optional()
 })
 export type TaskAuthority = z.infer<typeof TaskAuthoritySchema>
 
@@ -123,10 +154,14 @@ export const AttentionItemSchema = z.object({
 export type AttentionItem = z.infer<typeof AttentionItemSchema>
 
 export const OperationReceiptSchema = z.object({
+  dispatchApproval: z.object({ toolName: z.string(), requestHash: z.string(), approvedAt: z.string() }).optional(),
   id: z.string(), ownerId: z.string(), idempotencyKey: z.string(), fingerprint: z.string(), kind: z.string(),
   status: z.enum(['prepared', 'running', 'succeeded', 'failed', 'outcome_unknown']),
   request: z.record(z.string(), z.unknown()).optional(), result: z.unknown().optional(),
   createdAt: z.string(), updatedAt: z.string(), error: z.string().optional()
+  ,taskId: z.string().optional(), turnId: z.string().optional(), provider: z.string().optional(), toolName: z.string().optional(),
+  remoteOperationId: z.string().optional(), target: z.string().optional(), evidence: ResultEvidenceSchema.optional(),
+  resolution: z.object({ status: z.literal('verified'), receiptId: z.string().min(1), evidence: ResultEvidenceSchema, resolvedAt: z.string() }).optional()
 })
 export type OperationReceipt = z.infer<typeof OperationReceiptSchema>
 
@@ -154,6 +189,7 @@ export const TaskRunSchema = z.object({
   flowRunId: z.string().optional(),
   flowId: z.string().optional(),
   templateId: z.string().optional(),
+  deliveryFormats: z.array(z.enum(['md', 'docx', 'pdf'])).min(1).optional(),
   authority: TaskAuthoritySchema.optional(),
   executionMs: z.number().nonnegative().optional(),
   executionStartedAt: z.string().optional(),
@@ -182,6 +218,7 @@ export const TaskRunSchema = z.object({
   nodes: z.array(TaskNodeSchema),
   artifacts: z.array(TaskArtifactSchema),
   finalResponse: z.string().optional(),
+  resultEvidence: z.array(ResultEvidenceSchema).optional(),
   stalledReason: z.string().optional(),
   waitingReason: z.string().optional(),
   createdAt: z.string().min(1),

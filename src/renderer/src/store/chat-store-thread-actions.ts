@@ -530,7 +530,7 @@ export function createThreadActions(
       }
     }
     let coordinatedTurn: {threadId:string;turnId:string;userMessageItemId?:string}|undefined
-    const canCoordinate = !queued && !overrides?.guiPlan && !overrides?.guiDesign && get().route === 'chat' && typeof window !== 'undefined' && typeof window.workwise?.coordinateTaskCommand === 'function'
+    const canCoordinate = !queued && !overrides?.guiPlan && !overrides?.guiDesign && ['chat', 'write'].includes(get().route) && typeof window !== 'undefined' && typeof window.workwise?.coordinateTaskCommand === 'function'
     const coordinate = async (threadId:string,prompt:string,appendUser=true,optimisticUserId?:string):Promise<boolean> => {
       const result=await window.workwise.coordinateTaskCommand({threadId,intent:'auto',idempotencyKey:crypto.randomUUID(),request:{prompt,displayText:overrides?.displayText??trimmedText,mode:mode??'agent',...(composerModel?{model:composerModel}:{}),...(providerId?{providerId}:{}),...(overrides?.reasoningEffort?{reasoningEffort:overrides.reasoningEffort}:{}),...((overrides?.attachmentIds?.length || messageAttachments.length)?{attachmentIds:overrides?.attachmentIds?.length?overrides.attachmentIds:messageAttachments.map(item=>item.id)}:{}),...(overrides?.workspaceReferences?.length?{workspaceReferences:overrides.workspaceReferences}:{})}})
       if(result.kind==='chat_started'){coordinatedTurn=result.turn;return false}
@@ -540,7 +540,7 @@ export function createThreadActions(
         const resultId=result.receipt?.resultMessageItemId??`task-command-result-${crypto.randomUUID()}`
         const optimistic=optimisticUserId?state.blocks.find(block=>block.id===optimisticUserId):undefined
         const blocks=state.blocks.filter(block=>block.id!==userId&&block.id!==resultId&&block.id!==optimisticUserId)
-        return {blocks:[...blocks,...(appendUser||optimistic?[optimistic?{...optimistic,id:userId}:{kind:'user' as const,id:userId,text:overrides?.displayText??trimmedText,createdAt:new Date().toISOString()}]:[]),{kind:'assistant' as const,id:resultId,text:localText,createdAt:new Date().toISOString()}],error:null}
+        return {blocks:[...blocks,...(appendUser||optimistic||result.receipt?[optimistic?{...optimistic,id:userId}:{kind:'user' as const,id:userId,text:overrides?.displayText??trimmedText,createdAt:new Date().toISOString()}]:[]),{kind:'assistant' as const,id:resultId,text:localText,createdAt:new Date().toISOString(),...(result.kind==='capability_required' && result.task ? {capabilityCard:{threadId,taskId:result.task.id,attentionId:result.attentionId,prompt,capability:result.capability}}:{})}],error:null}
       })
       return true
     }
@@ -761,7 +761,24 @@ export function createThreadActions(
       }
       const runtimeDisplayText = channel ? displayText : (userDisplayText ?? trimmedText)
       if(canCoordinate && !coordinatedTurn){
-        if(await coordinate(activeThreadId,runtimeText,false,userBlockId)){set({busy:false,currentTurnId:previousCurrentTurnId,currentTurnUserId:previousCurrentTurnUserId});return true}
+        if(await coordinate(activeThreadId,runtimeText,false,userBlockId)){
+          // Settle only this optimistic send. Another real Turn may have
+          // arrived through SSE while the local command was being admitted.
+          const settlesOptimisticSend = get().currentTurnUserId === userBlockId && get().currentTurnId === previousCurrentTurnId
+          if (settlesOptimisticSend) clearBusyWatchdog()
+          set(state => {
+            const withoutOptimistic = (values: Record<string, number>): Record<string, number> =>
+              Object.fromEntries(Object.entries(values).filter(([id]) => id !== userBlockId))
+            return {
+              ...(settlesOptimisticSend ? {busy:false,currentTurnId:previousCurrentTurnId,currentTurnUserId:previousCurrentTurnUserId} : {}),
+              turnStartedAtByUserId:withoutOptimistic(state.turnStartedAtByUserId),
+              turnDurationByUserId:withoutOptimistic(state.turnDurationByUserId),
+              turnReasoningFirstAtByUserId:withoutOptimistic(state.turnReasoningFirstAtByUserId),
+              turnReasoningLastAtByUserId:withoutOptimistic(state.turnReasoningLastAtByUserId)
+            }
+          })
+          return true
+        }
       }
       const { turnId, userMessageItemId } = coordinatedTurn ?? await p.sendUserMessage(activeThreadId, runtimeText, {
         mode,

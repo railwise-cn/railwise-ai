@@ -1,3 +1,4 @@
+import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import type { KunCapabilitiesConfig, WebCapabilityConfig } from '../../contracts/capabilities.js'
 import type { WebFetchResult, WebProvider, WebSearchResult } from '../../ports/web-provider.js'
 import { sourceIdFor, UnavailableWebProvider } from '../../ports/web-provider.js'
@@ -132,6 +133,7 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
       if (!rawUrl) return toolError('invalid_url', 'url is required')
       const policy = validateUrlPolicy(rawUrl, config)
       if (!policy.ok) return toolError('policy_blocked', policy.reason, telemetry({ startedAt, policy: 'blocked', url: rawUrl }))
+      assertGrantAllowsNetwork(policy.url.href, context)
       if (!provider.fetch) return toolError('provider_unavailable', 'web fetch provider is unavailable')
       const maxBytesCap = config.maxFetchBytes ?? DEFAULT_WEB_MAX_BYTES
       const maxBytes = boundedInt(
@@ -147,6 +149,7 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
           maxBytes,
           timeoutMs,
           signal: context.abortSignal
+          ,allowedOrigins: context.executionGrant?.networkAllowlist
         })
         return {
           output: fetchOutput(result, telemetry({
@@ -243,9 +246,11 @@ class FetchWebProvider implements WebProvider {
     maxBytes: number
     timeoutMs: number
     signal: AbortSignal
+    allowedOrigins?: string[]
   }): Promise<WebFetchResult> {
     const response = await safeWebFetch(request.url, {
       allowDomains: this.policy.allowDomains,
+      allowedOrigins: request.allowedOrigins,
       denyDomains: this.policy.denyDomains,
       maxBytes: request.maxBytes,
       totalTimeoutMs: Math.min(request.timeoutMs, DEFAULT_WEB_TIMEOUT_MS)

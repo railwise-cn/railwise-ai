@@ -1,0 +1,15 @@
+{
+  "request": "整理纪要和待办草稿。",
+  "inputs": [
+    "transcript.md"
+  ],
+  "expected": {
+    "actionItems": 2,
+    "knownAssignees": [
+      "李工"
+    ],
+    "unassignedItems": 1,
+    "pendingDecision": "降低报警阈值",
+    "externalWrites": 0
+  }
+}

@@ -522,6 +522,7 @@ export class ClawRuntime {
   private inboundActive = 0
   private readonly inboundWaiters: Array<() => void> = []
   private recoveringLedger = false
+  private flushingDeliveryObservations = false
 
   constructor(deps: ClawRuntimeDeps) {
     this.deps = deps
@@ -566,8 +567,13 @@ export class ClawRuntime {
     if (!ledger || this.recoveringLedger) return
     this.recoveringLedger = true
     try {
+      await this.flushImDeliveryObservations()
       ledger.prune()
       for (const record of ledger.listRecoverable()) {
+        if (record.status === 'delivering' && !ledger.hasDeliveryOperations(record.id)) {
+          ledger.markDeliveryUnknown(record.id, '旧投递缺少派发回执，需核验原平台结果。')
+          continue
+        }
         if (record.provider === 'feishu') {
           const message = recoverableFeishuMessage(record)
           if (!message) {
@@ -617,19 +623,19 @@ export class ClawRuntime {
         const leaseGuard = this.startInboundLeaseRenewal(claimed)
         try {
           leaseGuard.assertOwned()
-          const result = await this.deps.sendWeixinBridgeMessage({
-            accountId: claimed.accountId,
-            to: claimed.chatId,
-            text: delivery.reply,
-            clientId: delivery.outboundId,
-            files: delivery.files
-          })
+          await this.performImDeliveryOperation({ deliveryRecordId: claimed.id, deliveryProvider: 'weixin' }, delivery.outboundId, claimed.chatId, 'send',
+            { text: delivery.reply, files: delivery.files }, async () => {
+              const result = await this.deps.sendWeixinBridgeMessage!({ accountId: claimed.accountId, to: claimed.chatId,
+                text: delivery.reply, clientId: delivery.outboundId, files: delivery.files })
+              if (!result.ok) throw new Error(result.message)
+              return result.messageId
+            })
           leaseGuard.assertOwned()
-          if (result.ok) this.finishInboundDelivery(claimed, delivery)
-          else this.retryInboundDelivery(claimed, result.message)
+          this.finishInboundDelivery(claimed, delivery)
         } catch (error) {
           if (!isInboundLeaseLostError(error)) {
-            this.retryInboundDelivery(claimed, errorMessage(error))
+            if ((error as { code?: string })?.code === 'im_delivery_outcome_unknown') ledger.markDeliveryUnknown(claimed.id, errorMessage(error), claimed.leaseRunId)
+            else this.retryInboundDelivery(claimed, errorMessage(error))
           } else {
             this.deps.logError('claw-weixin', 'WeChat recovery stopped after losing the inbound delivery lease.', {
               channelId: claimed.channelId,
@@ -1169,25 +1175,39 @@ export class ClawRuntime {
       if (options.onThreadSelected) await options.onThreadSelected({ threadId: thread.id })
       turn = await this.startRuntimeTurn(settings, thread.id, turnBody)
     }
-    if (!turn.ok) return { ok: false, reason: 'failed', message: runtimeErrorMessage(turn, 'Failed to start turn.') }
+    if (!turn.ok) {
+      const failureBody = parseJsonObject(turn.body)
+      const message = asString(failureBody?.message) || runtimeErrorMessage(turn, 'Failed to start turn.')
+      return {
+        ok: false,
+        reason: failureBody?.code === 'capability_required' ? 'authorization_required' : 'failed',
+        message
+      }
+    }
 
     const parsedTurn = parseJsonObject(turn.body)
     const turnId = asString(parsedTurn?.turnId) || asString(nestedRecord(parsedTurn?.turn).id)
     if (!turnId) {
+      const kind = asString(parsedTurn?.kind)
+      const message = asString(parsedTurn?.message)
+      if (['snapshot', 'input_queued', 'task_updated', 'attention_required'].includes(kind ?? '') && message) {
+        return { ok: true, threadId: asString(parsedTurn?.threadId) || thread.id, text: message, message }
+      }
       return { ok: false, reason: 'failed', message: 'Failed to start turn: missing turn id.' }
     }
+    const executionThreadId = asString(parsedTurn?.threadId) || thread.id
     if (turnId && options.onTurnStarted) {
-      await options.onTurnStarted({ threadId: thread.id, turnId })
+      await options.onTurnStarted({ threadId: executionThreadId, turnId })
     }
     if (!options.waitForResult) {
-      return { ok: true, threadId: thread.id, turnId, message: 'Started' }
+      return { ok: true, threadId: executionThreadId, turnId, message: 'Started' }
     }
 
     let result: Awaited<ReturnType<ClawRuntime['waitForAssistantResult']>>
     try {
       result = await this.waitForAssistantResult(
         settings,
-        thread.id,
+        executionThreadId,
         turnId,
         options.responseTimeoutMs,
         workspace,
@@ -1202,12 +1222,12 @@ export class ClawRuntime {
       if (reason === 'timeout') {
         const interrupted = await this.deps.runtimeRequest(
           settings,
-          `/v1/threads/${encodeURIComponent(thread.id)}/turns/${encodeURIComponent(turnId)}/interrupt`,
+          `/v1/threads/${encodeURIComponent(executionThreadId)}/turns/${encodeURIComponent(turnId)}/interrupt`,
           { method: 'POST', body: JSON.stringify({ discard: false }) }
         )
         if (!interrupted.ok) {
           this.deps.logError('claw-runtime', 'Failed to interrupt timed-out IM Runtime turn.', {
-            threadId: thread.id,
+            threadId: executionThreadId,
             turnId,
             message: runtimeErrorMessage(interrupted, 'Runtime turn interrupt failed.')
           })
@@ -1221,7 +1241,7 @@ export class ClawRuntime {
     }
     return {
       ok: true,
-      threadId: thread.id,
+      threadId: executionThreadId,
       turnId,
       text: result.text,
       message: result.text || 'Completed',
@@ -1710,6 +1730,57 @@ export class ClawRuntime {
     })
   }
 
+  private async performImDeliveryOperation(
+    context: Record<string, unknown>,
+    outboundId: string | undefined,
+    to: string,
+    phase: 'upload' | 'send',
+    request: unknown,
+    dispatch: () => Promise<string>
+  ): Promise<string> {
+    const ledger = this.deps.imLedger
+    const recordId = typeof context.deliveryRecordId === 'string' ? context.deliveryRecordId : undefined
+    const record = recordId ? ledger?.getById(recordId) : undefined
+    if (recordId && (!record || record.provider !== (context.deliveryProvider ?? 'feishu') || record.chatId !== to)) throw new Error('IM delivery target changed.')
+    const operationId = record && outboundId ? `${outboundId}:${phase}` : undefined
+    if (record && operationId) {
+      const requestHash = createHash('sha256').update(JSON.stringify(request)).digest('hex')
+      const started = ledger!.beginDeliveryOperation(record.id, operationId, phase, requestHash)
+      if (!started.created) {
+        if (started.operation.status === 'succeeded' && started.operation.remoteOperationId) return started.operation.remoteOperationId
+        ledger!.finishDeliveryOperation(operationId, 'outcome_unknown')
+        throw Object.assign(new Error('原消息投递结果待核实，已停止自动重复发送。'), { code: 'im_delivery_outcome_unknown' })
+      }
+    }
+    try {
+      const remoteId = await dispatch()
+      if (!remoteId) throw new Error('Provider response has no remote operation identifier.')
+      if (operationId) ledger!.finishDeliveryOperation(operationId, 'succeeded', remoteId)
+      return remoteId
+    } catch (error) {
+      if (operationId) ledger!.finishDeliveryOperation(operationId, 'outcome_unknown')
+      throw Object.assign(new Error(`消息投递结果待核实：${errorMessage(error)}`), { code: 'im_delivery_outcome_unknown' })
+    } finally { void this.flushImDeliveryObservations() }
+  }
+
+  private async flushImDeliveryObservations(): Promise<void> {
+    const ledger = this.deps.imLedger
+    if (!ledger || this.flushingDeliveryObservations) return
+    this.flushingDeliveryObservations = true
+    try {
+      const settings = await this.deps.store.load()
+      for (const item of ledger.pendingRuntimeObservations()) {
+        const response = await this.deps.runtimeRequest(settings,
+          `/v1/threads/${encodeURIComponent(item.observation.runtimeThreadId)}/delivery-observations`,
+          { method: 'POST', body: JSON.stringify(item.observation) })
+        if (!response.ok) break
+        ledger.acknowledgeRuntimeObservation(item.id, item.fingerprint)
+      }
+    } catch (error) {
+      this.deps.logError('claw-im', 'Delivery observations remain queued for Runtime recovery.', { message: errorMessage(error) })
+    } finally { this.flushingDeliveryObservations = false }
+  }
+
   private async sendFeishuMessage(
     bridge: LarkChannel,
     to: string,
@@ -1719,152 +1790,35 @@ export class ClawRuntime {
     outboundId?: string,
     leaseGuard?: InboundLeaseGuard
   ): Promise<SendResult> {
-    if (isCandidateOutboundDisabled('feishu', to)) {
-      throw new Error('Candidate IM outbound is disabled.')
-    }
+    if (isCandidateOutboundDisabled('feishu', to)) throw new Error('Candidate IM outbound is disabled.')
     leaseGuard?.assertOwned()
     let stableContent = outboundId ? stableFeishuContent(input, options) : undefined
     if (outboundId && !stableContent && 'file' in input) {
       const source = input.file.source
       const buffer = Buffer.isBuffer(source) ? source : await readFile(source)
-      let lastError: unknown
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          leaseGuard?.assertOwned()
-          const uploaded = await bridge.rawClient.im.v1.file.create({
-            data: {
-              file_type: 'stream',
-              file_name: input.file.fileName,
-              file: buffer
-            }
-          }) as unknown as { file_key?: string; data?: { file_key?: string } } | null
-          leaseGuard?.assertOwned()
-          const fileKey = uploaded?.file_key || uploaded?.data?.file_key
-          if (!fileKey) throw new Error('file_key missing from Feishu upload response')
-          stableContent = { msgType: 'file', content: JSON.stringify({ file_key: fileKey }) }
-          break
-        } catch (error) {
-          if (isInboundLeaseLostError(error)) throw error
-          lastError = error
-          if (attempt < 2) await sleep(500 * (attempt + 1))
-        }
-      }
-      if (!stableContent) throw lastError
-    }
-    if (outboundId && stableContent) {
-      const sendWithRetry = async (operation: () => Promise<{ data?: { message_id?: string } } | null>): Promise<SendResult> => {
-        let lastError: unknown
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          try {
-            leaseGuard?.assertOwned()
-            const response = await operation()
-            leaseGuard?.assertOwned()
-            const messageId = response?.data?.message_id
-            if (!messageId) throw new Error('message_id missing from Feishu send response')
-            return { messageId }
-          } catch (error) {
-            if (isInboundLeaseLostError(error)) throw error
-            lastError = error
-            if (attempt < 2) await sleep(500 * (attempt + 1))
-          }
-        }
-        throw lastError
-      }
-      try {
-        if (options.replyTo) {
-          return await sendWithRetry(() => bridge.rawClient.im.v1.message.reply({
-            path: { message_id: options.replyTo! },
-            data: {
-              msg_type: stableContent.msgType,
-              content: stableContent.content,
-              reply_in_thread: options.replyInThread,
-              uuid: outboundId
-            }
-          }))
-        }
-        return await sendWithRetry(() => bridge.rawClient.im.v1.message.create({
-          params: { receive_id_type: feishuReceiveIdType(to) },
-          data: {
-            receive_id: to,
-            msg_type: stableContent.msgType,
-            content: stableContent.content,
-            uuid: outboundId
-          }
-        }))
-      } catch (error) {
-        if (isInboundLeaseLostError(error)) throw error
-        const initialMessage = errorMessage(error)
-        if (!options.replyTo) {
-          this.deps.logError('claw-feishu', 'Failed to send stable Feishu / Lark message', {
-            ...context,
-            message: initialMessage,
-            outboundId,
-            to
-          })
-          throw error
-        }
-        this.deps.logError('claw-feishu', 'Failed to send stable Feishu / Lark reply; retrying as a chat message.', {
-          ...context,
-          message: initialMessage,
-          outboundId,
-          replyTo: options.replyTo,
-          to
-        })
-        return sendWithRetry(() => bridge.rawClient.im.v1.message.create({
-          params: { receive_id_type: feishuReceiveIdType(to) },
-          data: {
-            receive_id: to,
-            msg_type: stableContent.msgType,
-            content: stableContent.content,
-            uuid: outboundId
-          }
-        }))
-      }
-    }
-    try {
-      leaseGuard?.assertOwned()
-      const result = await bridge.send(to, input, options)
-      leaseGuard?.assertOwned()
-      return result
-    } catch (error) {
-      if (isInboundLeaseLostError(error)) throw error
-      const initialMessage = errorMessage(error)
-      if (!options.replyTo) {
-        this.deps.logError('claw-feishu', 'Failed to send Feishu / Lark message', {
-          ...context,
-          message: initialMessage,
-          to
-        })
-        throw error
-      }
-
-      this.deps.logError('claw-feishu', 'Failed to send Feishu / Lark reply; falling back to plain chat message.', {
-        ...context,
-        message: initialMessage,
-        replyTo: options.replyTo,
-        replyInThread: options.replyInThread,
-        to
+      const request = { fileName: input.file.fileName, contentHash: createHash('sha256').update(buffer).digest('hex'), bytes: buffer.length }
+      const fileKey = await this.performImDeliveryOperation(context, outboundId, to, 'upload', request, async () => {
+        leaseGuard?.assertOwned()
+        const uploaded = await bridge.rawClient.im.v1.file.create({ data: { file_type: 'stream', file_name: input.file.fileName, file: buffer } }) as unknown as { file_key?: string; data?: { file_key?: string } } | null
+        return uploaded?.file_key || uploaded?.data?.file_key || ''
       })
-      try {
-        leaseGuard?.assertOwned()
-        const result = await bridge.send(to, input, {
-          ...options,
-          replyTo: undefined,
-          replyInThread: undefined
-        })
-        leaseGuard?.assertOwned()
-        return result
-      } catch (fallbackError) {
-        if (isInboundLeaseLostError(fallbackError)) throw fallbackError
-        this.deps.logError('claw-feishu', 'Failed to send Feishu / Lark fallback message', {
-          ...context,
-          initialMessage,
-          message: errorMessage(fallbackError),
-          to
-        })
-        throw fallbackError
-      }
+      stableContent = { msgType: 'file', content: JSON.stringify({ file_key: fileKey }) }
     }
+    const request = { to, replyTo: options.replyTo, replyInThread: options.replyInThread, content: stableContent ?? input }
+    const messageId = await this.performImDeliveryOperation(context, outboundId, to, 'send', request, async () => {
+      leaseGuard?.assertOwned()
+      if (!outboundId || !stableContent) return (await bridge.send(to, input, options)).messageId
+      const response = options.replyTo
+        ? await bridge.rawClient.im.v1.message.reply({ path: { message_id: options.replyTo }, data: {
+          msg_type: stableContent.msgType, content: stableContent.content, reply_in_thread: options.replyInThread, uuid: outboundId
+        } })
+        : await bridge.rawClient.im.v1.message.create({ params: { receive_id_type: feishuReceiveIdType(to) }, data: {
+          receive_id: to, msg_type: stableContent.msgType, content: stableContent.content, uuid: outboundId
+        } })
+      return response?.data?.message_id ?? ''
+    })
+    leaseGuard?.assertOwned()
+    return { messageId }
   }
 
   private async deliverFeishuReply(
@@ -1876,6 +1830,7 @@ export class ClawRuntime {
     context: Record<string, unknown>
   ): Promise<void> {
     if (!delivery || !this.beginInboundDelivery(record)) return
+    context = { ...context, ...(record ? { deliveryRecordId: record.id } : {}) }
     const leaseGuard = this.startInboundLeaseRenewal(record)
     try {
       leaseGuard.assertOwned()
@@ -1917,7 +1872,10 @@ export class ClawRuntime {
       this.finishInboundDelivery(record, delivery)
     } catch (error) {
       if (!isInboundLeaseLostError(error)) {
-        this.retryInboundDelivery(record, errorMessage(error))
+        if ((error as { code?: string })?.code === 'im_delivery_outcome_unknown' && record) {
+          this.deps.imLedger?.markDeliveryUnknown(record.id, errorMessage(error), record.leaseRunId)
+          this.updateInboundCounts(record)
+        } else this.retryInboundDelivery(record, errorMessage(error))
       }
       throw error
     } finally {
@@ -2054,7 +2012,7 @@ export class ClawRuntime {
         leaseGuard?.assertOwned()
         sent.push(file)
       } catch (error) {
-        if (isInboundLeaseLostError(error)) throw error
+        if (isInboundLeaseLostError(error) || (error as { code?: string })?.code === 'im_delivery_outcome_unknown') throw error
         const message = errorMessage(error)
         failed.push({ file, message })
         this.deps.logError('claw-feishu', 'Failed to send Feishu / Lark file attachment', {
@@ -2391,6 +2349,10 @@ export class ClawRuntime {
     const accountId = channel.platformCredential?.kind === 'feishu'
       ? channel.platformCredential.appId
       : channel.id
+    if (recoveryRecord && recoveryRecord.accountId !== accountId) {
+      this.deps.imLedger?.markDeliveryUnknown(recoveryRecord.id, '连接账号已变化，请核验原账号投递结果。')
+      return
+    }
     if (!recoveryRecord) this.deps.imHealth?.inbound(channelId)
     const ledgerRecord = recoveryRecord
       ? this.deps.imLedger?.claim(recoveryRecord.id, randomUUID()) ?? null
@@ -3086,6 +3048,19 @@ export class ClawRuntime {
               return
             }
           }
+          if (phase === 'start') {
+            const stored = parseStoredDelivery(record)
+            const requestHash = createHash('sha256').update(JSON.stringify({ text: stored?.reply, files: stored?.files })).digest('hex')
+            const started = this.deps.imLedger!.beginDeliveryOperation(record.id, `${outboundId}:send`, 'send', requestHash)
+            if (!started.created) {
+              if (started.operation.status !== 'succeeded') this.deps.imLedger!.finishDeliveryOperation(`${outboundId}:send`, 'outcome_unknown')
+              this.deps.imLedger!.markDeliveryUnknown(record.id, '投递已经派发，需核验原结果。', requestedLeaseRunId)
+              void this.flushImDeliveryObservations()
+              writeJson(res, 409, { ok: false, message: 'Delivery has already been dispatched; do not replay it.' })
+              return
+            }
+            void this.flushImDeliveryObservations()
+          }
           writeJson(res, 200, { ok: true, phase, leaseUntil: renewed.leaseUntil })
           return
         }
@@ -3119,9 +3094,13 @@ export class ClawRuntime {
           writeJson(res, 409, { ok: false, message: 'Delivery lease changed while completing.' })
           return
         }
+        const operationId = `${outboundId}:send`
+        const operation = this.deps.imLedger!.deliveryOperation(operationId)
+        if (operation) this.deps.imLedger!.finishDeliveryOperation(operationId, payload?.ok === true ? 'succeeded' : 'outcome_unknown', payload?.ok === true ? outboundId : undefined)
         const updated = payload?.ok === true
           ? this.finishInboundDelivery(current)
-          : this.retryInboundDelivery(current, asString(payload?.message) || 'Provider delivery failed.')
+          : this.deps.imLedger!.markDeliveryUnknown(current.id, asString(payload?.message) || 'Provider delivery outcome is unknown.', current.leaseRunId)
+        void this.flushImDeliveryObservations()
         if (!updated) {
           writeJson(res, 409, { ok: false, message: 'Delivery state changed before the receipt was applied.' })
           return

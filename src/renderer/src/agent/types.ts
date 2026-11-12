@@ -9,6 +9,7 @@ import type {
   CoreRuntimeToolDiagnosticsJson
 } from './runtime-contract'
 import type { ApprovalPolicy, SandboxMode } from '@shared/app-settings'
+import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 
 export type ToolItemKind = 'tool_call' | 'command_execution' | 'file_change'
 export type RuntimeErrorSeverity = 'info' | 'warning' | 'error'
@@ -255,7 +256,7 @@ export type ChatBlock =
       managedBy?: 'claw'
       meta?: RuntimeDisclosureMetadata
     }
-  | { kind: 'assistant'; id: string; createdAt?: string; text: string; uiBlocks?: unknown[] }
+  | { kind: 'assistant'; id: string; createdAt?: string; text: string; uiBlocks?: unknown[]; capabilityCard?: ExternalTaskCapabilityCard }
   | { kind: 'reasoning'; id: string; createdAt?: string; text: string }
   | ToolBlock
   | CompactionBlock
@@ -418,6 +419,8 @@ export type ThreadUsageSnapshot = {
 }
 
 export type ThreadEventSink = {
+  /** Durable local messages; these must not toggle execution state. */
+  onConversationItem?(block: ChatBlock): void
   onSeq(seq: number): void
   onReplayReset?(seq: number): void | Promise<void>
   onDeltas(deltas: ThreadDeltaEvent[]): void

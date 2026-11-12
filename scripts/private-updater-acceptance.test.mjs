@@ -112,6 +112,7 @@ test('release dispatch private mode excludes public jobs even with conflicting s
   const release = parse(readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8'))
   const evaluate = (expression, inputs) => Function('github', 'inputs', `return (${expression.slice(3, -2)})`)({ event_name: 'workflow_dispatch' }, inputs)
   const inputs = {
+    existing_windows_package_run_id: '',
     private_updater_acceptance: true, isolated_survey_candidate: true, run_updater_acceptance: true,
     cleanup_acceptance_run_id: '123', repair_website_cache: true, repair_website_cache_mode: 'apply',
     repair_website_cache_confirmation: 'REPAIR-WORKWISE-METADATA-CACHE', rollback_stable_tag: 'v0.5.0',

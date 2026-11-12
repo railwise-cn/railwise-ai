@@ -15,6 +15,16 @@ export class FlowRuntimeService {
   private flushSourcesRequested = false
   private backgroundDispatchEnabled = true
   private closed = false
+  private updateSuspended = false
+
+  setUpdateSuspended(suspended: boolean): void {
+    this.updateSuspended = suspended
+    this.executor.setAdmissionSuspended(suspended)
+    if (!suspended) void this.flushSourceEvents().catch(() => undefined)
+  }
+
+  async awaitSourceDispatch(): Promise<void> { await this.flushingSources }
+
   private readonly stopProjection: () => void
   constructor(readonly repository: FlowRepository, readonly registry: FlowNodeRegistryEntryV1[], adapters: ConstructorParameters<typeof FlowExecutor>[1], nowIso?: () => string, readonly webhooks?: FlowWebhookSecurity, defaultModelProviderId = 'deepseek', backgroundDispatchEnabled = true) {
     this.backgroundDispatchEnabled = backgroundDispatchEnabled
@@ -135,12 +145,13 @@ export class FlowRuntimeService {
     this.flushingSources = (async () => {
       do {
         this.flushSourcesRequested = false
-        if (this.backgroundDispatchEnabled) for (const item of this.repository.pendingOutbox('flow_source_dispatch')) {
+        if (this.backgroundDispatchEnabled && !this.updateSuspended) for (const item of this.repository.pendingOutbox('flow_source_dispatch')) {
           const payload = item.payload as { runId: string }
           this.executor.dispatchQueued(payload.runId)
           this.repository.acknowledgeOutbox(item.id)
         }
-        if (this.backgroundDispatchEnabled && this.sourceEventSink) for (const item of this.repository.pendingOutbox('task_source_event')) {
+        if (this.backgroundDispatchEnabled && !this.updateSuspended && this.sourceEventSink) for (const item of this.repository.pendingOutbox('task_source_event')) {
+          if (this.updateSuspended) break
           await this.sourceEventSink(item.payload as FlowSourceEvent)
           this.repository.acknowledgeOutbox(item.id)
         }
@@ -202,7 +213,7 @@ export class FlowRuntimeService {
   archive(flowId: string): FlowDefinitionV1 { const current = this.repository.get(flowId); if (!current) throw new Error(`flow not found: ${flowId}`); const archived = this.repository.update({ ...current, variables: { ...current.variables, archived: true }, revision: current.revision }, current.revision); for (const trigger of this.repository.listTriggerStates(flowId)) this.repository.saveTriggerState({ ...trigger, enabled: false }); return archived }
   startSchedules(intervalMs = 30_000): void { if (this.scheduleTimer) return; this.scheduleTimer = setInterval(() => { void this.tickSchedules().catch(() => undefined) }, intervalMs); this.scheduleTimer.unref?.(); void this.tickSchedules().catch(() => undefined) }
   async tickSchedules(now = new Date()): Promise<number> {
-    if (!this.backgroundDispatchEnabled) return 0
+    if (!this.backgroundDispatchEnabled || this.updateSuspended) return 0
     let started = 0
     for (const trigger of this.repository.listAllTriggerStates().filter((item) => item.enabled)) {
       const flow = this.repository.get(trigger.flowId); const node = flow?.nodes.find((item) => item.id === trigger.nodeId && item.type === 'schedule_trigger'); if (!flow?.publishedVersionId || !node || flow.variables.archived === true) continue

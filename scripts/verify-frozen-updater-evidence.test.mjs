@@ -273,3 +273,22 @@ test('source fallback, unbound or changed services and unsafe dependency identit
     assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.4'), /updater-service/)
   })
 })
+
+
+test('current native smoke requires paused/waiting tasks, pending inputs, file history and draft readback twice', () => {
+  const head = 'a'.repeat(40)
+  const machine = { ...serviceEvidence(head, '0.5.6'), arch: 'arm64', baseVersion: '0.5.4' }
+  machine.dataSeed.serviceIdentity.packageVersion = '0.5.4'
+  const taskContinuity = { status: 'passed', taskStates: ['paused', 'waiting_user'], pendingInputs: 2, pendingQuestions: 1,
+    drafts: 1, readableThreads: 2, preservedMessages: 2, candidateReceiptStatus: 'succeeded', draftSha256: 'd'.repeat(64), baselineSha256: 'b'.repeat(64) }
+  for (const key of ['dataSeed', 'dataReadback', 'dataRestartReadback']) machine[key].taskContinuity = structuredClone(taskContinuity)
+  const expected = { sourceHead: head, version: '0.5.6', baseVersion: '0.5.4', requireTaskContinuity: true }
+  assert.equal(validateUpdaterServiceEvidence(machine, expected), machine)
+  for (const change of [value => { delete value.dataReadback.taskContinuity },
+    value => { value.dataRestartReadback.taskContinuity.taskStates = ['completed', 'waiting_user'] },
+    value => { value.dataRestartReadback.taskContinuity.draftSha256 = 'f'.repeat(64) },
+    value => { value.dataSeed.taskContinuity.pendingInputs = 0 }]) {
+    const changed = structuredClone(machine); change(changed)
+    assert.throws(() => validateUpdaterServiceEvidence(changed, expected), /Task|task|continuity/)
+  }
+})

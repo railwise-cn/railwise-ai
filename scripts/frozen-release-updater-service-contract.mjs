@@ -57,7 +57,7 @@ function validateIdentity(identity, label) {
 
 // Pure evidence checks: neither a matching version string nor a source-tree
 // readback can replace services and dependencies from the frozen target ZIP.
-export function validateUpdaterServiceEvidence(machine, { sourceHead, version, baseVersion = FROZEN_BASE_VERSION } = {}) {
+export function validateUpdaterServiceEvidence(machine, { sourceHead, version, baseVersion = FROZEN_BASE_VERSION, requireTaskContinuity = false } = {}) {
   validateFrozenTargetVersion(version, baseVersion)
   object(machine, 'machine report')
   sha(sourceHead, 'frozen source', 40)
@@ -93,6 +93,17 @@ export function validateUpdaterServiceEvidence(machine, { sourceHead, version, b
   } else {
     if (!PACKAGED_LAYOUTS.includes(seed.serviceIdentity.layout)) fail('dataSeed baseline services must be packaged')
     equal(seed.serviceIdentity.serviceSourceHead, seed.serviceIdentity.packageSourceHead, 'dataSeed baseline service source')
+  }
+  if (requireTaskContinuity) {
+    const expected = machine.dataSeed.taskContinuity
+    object(expected, 'Task continuity seed')
+    for (const [key, value] of Object.entries({ status: 'passed', taskStates: ['paused', 'waiting_user'], pendingInputs: 2,
+      pendingQuestions: 1, drafts: 1, readableThreads: 2, preservedMessages: 2, candidateReceiptStatus: 'succeeded' })) {
+      equal(expected[key], value, `Task continuity ${key}`)
+    }
+    sha(expected.draftSha256, 'Task draft fingerprint')
+    sha(expected.baselineSha256, 'Task target baseline fingerprint')
+    for (const key of ['dataReadback', 'dataRestartReadback']) equal(machine[key].taskContinuity, expected, `${key} Task/draft continuity`)
   }
   return machine
 }

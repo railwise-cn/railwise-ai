@@ -4,7 +4,9 @@ import type {
   ToolProviderPolicy
 } from '../../ports/tool-host.js'
 import type { LocalTool } from './local-tool-host.js'
-import { isToolAdvertisedInSandbox } from './sandbox-policy.js'
+import type { ToolEffectDefinition } from '../../ports/tool-effect.js'
+import { externalOperationForTool } from '../../services/external-effect-evidence.js'
+import { executionGrantBlock, isToolAdvertisedInSandbox, sandboxBlockForTool } from './sandbox-policy.js'
 
 export type CapabilityToolRecord = {
   provider: ToolProviderPolicy
@@ -69,6 +71,34 @@ export class CapabilityRegistry {
     }
   }
 
+  /** Atomically replace one managed provider after trusted configuration refresh. */
+  replaceProvider(id: string, replacement?: CapabilityToolProvider): void {
+    if (replacement && replacement.id !== id) throw new Error('provider replacement identity mismatch')
+    for (const tool of replacement?.tools ?? []) {
+      const owner = this.tools.get(tool.name)?.provider.id
+      if (owner && owner !== id) throw new Error(`duplicate tool name: ${tool.name}`)
+    }
+    const previous = this.providers.get(id)
+    for (const tool of previous?.tools ?? []) this.tools.delete(tool.name)
+    this.providers.delete(id)
+    if (replacement) this.registerProvider(replacement)
+  }
+
+  /** Validate a complete provider generation before publishing either index. */
+  validateMcpProviders(replacements: readonly CapabilityToolProvider[]): CapabilityRegistry {
+    if (replacements.some(provider => provider.kind !== 'mcp' || !provider.id.startsWith('mcp:'))) throw new Error('MCP replacement contains another provider kind')
+    const retained = [...this.providers.values()].filter(provider => provider.kind !== 'mcp')
+    return new CapabilityRegistry([...retained, ...replacements])
+  }
+
+  replaceMcpProviders(replacements: readonly CapabilityToolProvider[]): void {
+    const next = this.validateMcpProviders(replacements)
+    this.providers.clear()
+    this.tools.clear()
+    for (const [id, provider] of next.providers) this.providers.set(id, provider)
+    for (const [name, tool] of next.tools) this.tools.set(name, tool)
+  }
+
   listTools(context?: ToolHostContext): CapabilityToolSpec[] {
     const specs: CapabilityToolSpec[] = []
     for (const record of this.tools.values()) {
@@ -92,6 +122,8 @@ export class CapabilityRegistry {
 
   resolveTool(toolName: string, context: ToolHostContext, providerId?: string): CapabilityToolRecord {
     const record = this.tools.get(toolName)
+    const grantBlock = executionGrantBlock(context)
+    if (grantBlock) throw Object.assign(new Error(grantBlock.message), { code: grantBlock.code })
     if (!record) {
       throw new Error(`unknown tool: ${toolName}`)
     }
@@ -104,6 +136,10 @@ export class CapabilityRegistry {
     if (!this.canUseTool(toolName, context)) {
       throw new Error(`tool ${toolName} is not advertised by active tool policy`)
     }
+    const sandboxBlock = sandboxBlockForTool(record.tool, context)
+    if (sandboxBlock) {
+      throw Object.assign(new Error(`tool ${toolName} is not advertised in the active sandbox: ${sandboxBlock.message}`), { code: sandboxBlock.code })
+    }
     if (record.tool.shouldAdvertise && !record.tool.shouldAdvertise(context)) {
       throw new Error(`tool ${toolName} is not advertised in this turn context`)
     }
@@ -114,12 +150,35 @@ export class CapabilityRegistry {
     return [...this.providers.values()].map(providerPolicy)
   }
 
+  describeEffect(toolName: string): ToolEffectDefinition | undefined {
+    const record = this.tools.get(toolName)
+    if (!record) return undefined
+    const effect = record.tool.effect ?? externalOperationForTool(toolName)
+    if (!effect) return undefined
+    const expectedProvider = effect.providerId ?? (effect.provider === 'lark' ? 'lark-cli' : effect.provider)
+    if (record.provider.id !== expectedProvider) return undefined
+    return { ...effect, providerId: record.provider.id }
+  }
+
+  describeAllEffects(): ToolEffectDefinition[] {
+    return [...this.tools.keys()].flatMap(name => {
+      const effect = this.describeEffect(name)
+      return effect ? [effect] : []
+    })
+  }
+
   private canUseProvider(provider: ToolProviderPolicy, context?: ToolHostContext): boolean {
     if (!provider.enabled || !provider.available) return false
     const allowed = context?.allowedProviderIds
     if (allowed && !allowed.includes(provider.id)) return false
+    const granted = context?.executionGrant?.allowedProviderIds
+    if (granted && !granted.includes(provider.id)) return false
+    // Search routes to individual servers, where both MCP allowlists and the
+    // immutable server fingerprint are checked again before lookup or dispatch.
     const allowedMcp = context?.allowedMcpProviderIds
-    if (provider.kind === 'mcp' && allowedMcp && !allowedMcp.includes(provider.id)) return false
+    if (provider.kind === 'mcp' && allowedMcp && (provider.id === 'mcp:search' ? allowedMcp.length === 0 : !allowedMcp.includes(provider.id))) return false
+    const grantedMcp = context?.executionGrant?.allowedMcpProviderIds
+    if (provider.kind === 'mcp' && grantedMcp && (provider.id === 'mcp:search' ? grantedMcp.length === 0 : !grantedMcp.includes(provider.id))) return false
     return true
   }
 
@@ -128,7 +187,9 @@ export class CapabilityRegistry {
       return false
     }
     const allowed = context?.allowedToolNames
-    return !allowed || allowed.includes(toolName)
+    if (allowed && !allowed.includes(toolName)) return false
+    const granted = context?.executionGrant?.allowedToolNames
+    return !granted || granted.includes(toolName)
   }
 }
 

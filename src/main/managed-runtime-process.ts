@@ -29,6 +29,7 @@ import {
 import {
   AttachmentsCapabilityConfig,
   ImageGenCapabilityConfig,
+  LarkCapabilityConfig,
   McpCapabilityConfig,
   McpServerConfig,
   MemoryCapabilityConfig,
@@ -36,6 +37,13 @@ import {
   SubagentsCapabilityConfig,
   WebCapabilityConfig
 } from '../../kun/src/contracts/capabilities.js'
+import { diagnoseManagedTool } from './services/managed-tool-service'
+import { diagnoseManagedDingTalk } from './services/managed-dws-service'
+import type { ManagedDwsStatus } from '../shared/managed-dws'
+import { DwsCapabilityConfig } from '../../kun/src/contracts/dws.js'
+import { DingTalkCapabilityConfig } from '../../kun/src/contracts/dingtalk.js'
+import { resolveLarkCliEnvironment } from '../../kun/src/services/lark-cli-environment.js'
+import { resolveDwsEnvironment } from '../../kun/src/services/dws-cli-environment.js'
 import {
   buildClawScheduleMcpArgs,
   GUI_SCHEDULE_MCP_SERVER_NAME,
@@ -64,6 +72,7 @@ import { McpConfigService } from './services/mcp-config-service'
 import type { TaskDocumentExportBridge } from './services/task-document-export-service'
 
 let child: ChildProcess | null = null
+let lastManagedRuntimeExit: { code: number | null; signal: NodeJS.Signals | null } | undefined
 let childLogCapture: RuntimeLogCapture | null = null
 let lastResolvedBinary: string | null = null
 let actualManagedRuntimePort: number | null = null
@@ -449,10 +458,34 @@ export async function startManagedRuntimeChild(
     legacyPath: mcpConfigPath,
     credentialRoot: join(workwiseHome, 'credentials', 'mcp')
   } : {}).runtimeSnapshot()
+  const larkDiagnosis = await diagnoseManagedTool('lark-cli')
+  const dwsDiagnosis=await diagnoseManagedDingTalk()
+  const larkCli = larkDiagnosis.ok
+    ? {
+        state: larkDiagnosis.status.state === 'installed'
+          ? 'installed' as const
+          : larkDiagnosis.status.state === 'needs_login'
+            ? 'needs_login' as const
+            : larkDiagnosis.status.state === 'error'
+              ? 'error' as const
+              : 'not_installed' as const,
+        ...(larkDiagnosis.status.executablePath ? { executablePath: larkDiagnosis.status.executablePath } : {}),
+        ...(larkDiagnosis.status.installedVersion ? { executableVersion: larkDiagnosis.status.installedVersion } : {}),
+        scopes: larkDiagnosis.status.scopes ?? [],
+        ...(larkDiagnosis.status.identityFingerprint ? {identityFingerprint:larkDiagnosis.status.identityFingerprint} : {}),
+        ...(larkDiagnosis.status.appId ? {appId:larkDiagnosis.status.appId} : {}),
+        ...(larkDiagnosis.status.profile ? {profile:larkDiagnosis.status.profile} : {}),
+        ...(larkDiagnosis.status.executableHash ? {executableHash:larkDiagnosis.status.executableHash} : {}),
+        ...(larkDiagnosis.status.userOpenId ? {userOpenId:larkDiagnosis.status.userOpenId} : {}),
+        ...(larkDiagnosis.status.brand ? { brand: larkDiagnosis.status.brand } : {})
+      }
+    : { state: 'error' as const }
   await syncManagedRuntimeConfig(dataDir, runtime, {
     mcpConfigPath,
     mcpV2Servers: mcpV2.servers,
     skillRoots: options.skillRoots,
+    larkCli,
+    dws:dwsDiagnosis.status??{state:'error'},
     scheduleMcp: {
       settings,
       launch: {
@@ -479,6 +512,16 @@ export async function startManagedRuntimeChild(
     insecure: isManagedRuntimeInsecure(runtime)
   })
   const pptMasterSidecarExecutable = resolvePptMasterSidecarExecutable()
+  const runtimeEnvironment = resolveDwsEnvironment(resolveLarkCliEnvironment({
+    ...process.env,
+    ...mcpV2.environment,
+    ...(candidateRoot ? {
+      WORKWISE_CANDIDATE: '1',
+      WORKWISE_CANDIDATE_ROOT: candidateRoot,
+      WORKWISE_CANDIDATE_HOME: homeDir,
+      WORKWISE_CANDIDATE_CREDENTIAL_ACCESS: process.env.WORKWISE_CANDIDATE_CREDENTIAL_ACCESS === '1' ? '1' : '0'
+    } : {})
+  }))
   const flowSecretStoreKey = options.flowSecretStoreKey ?? await loadOrCreateFlowSecretStoreKey()
   const { startTaskDocumentExportBridge } = await import('./services/task-document-export-service')
   await documentExportBridge?.close()
@@ -487,8 +530,7 @@ export async function startManagedRuntimeChild(
   try {
     child = await safeSpawn(resolution.command, args, {
     env: {
-      ...process.env,
-      ...mcpV2.environment,
+      ...runtimeEnvironment,
       [MCP_PATH_ENV_KEY]: resolveMcpToolPath(process.env, homeDir),
       ELECTRON_RUN_AS_NODE: '1',
       WORKWISE_RUNTIME_TOKEN: runtime.runtimeToken,
@@ -527,12 +569,14 @@ export async function startManagedRuntimeChild(
     throw error
   }
   const startedChild = child
+  lastManagedRuntimeExit = undefined
   const startedLogCapture = createRuntimeLogCapture(startedChild.pid)
   childLogCapture = startedLogCapture
   startedLogCapture.logLifecycle(`spawned on port ${runtime.port} using data dir ${dataDir}`)
   startedChild.stdout?.on('data', startedLogCapture.captureStdout)
   startedChild.stderr?.on('data', startedLogCapture.captureStderr)
   child.on('exit', (code, signal) => {
+    if (child === startedChild) lastManagedRuntimeExit = { code, signal }
     void startedExportBridge.close()
     if (documentExportBridge === startedExportBridge) documentExportBridge = null
     startedLogCapture.logLifecycle(
@@ -607,6 +651,110 @@ async function ensureBundledSpecialistSkillsForRuntime(
   }
 }
 
+// Connector diagnoses can finish concurrently. Serialize the full read/merge/write
+// per config file so connecting one platform cannot discard the other platform.
+const connectorConfigWrites = new Map<string, Promise<void>>()
+
+async function updateManagedConnectorConfig(
+  dataDir: string,
+  update: (existing: Record<string, unknown>) => Record<string, unknown>
+): Promise<void> {
+  const configPath = resolve(dataDir, 'config.json')
+  const previous = connectorConfigWrites.get(configPath) ?? Promise.resolve()
+  const pending = previous.catch(() => undefined).then(async () => {
+    const existing = (await readJsonObjectIfExists(configPath)) ?? {}
+    const next = update(existing)
+    await mkdir(dirname(configPath), { recursive: true })
+    await durableWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`)
+  })
+  connectorConfigWrites.set(configPath, pending)
+  try {
+    await pending
+  } finally {
+    if (connectorConfigWrites.get(configPath) === pending) connectorConfigWrites.delete(configPath)
+  }
+}
+
+/** Update only main-process diagnosed connector state without restarting active work. */
+export async function syncManagedLarkCapability(dataDir: string, status: {
+  state: string
+  executablePath?: string
+  installedVersion?: string
+  scopes?: string[]
+  brand?: 'feishu' | 'lark'
+  identityFingerprint?: string
+  appId?: string
+  profile?: string
+  executableHash?: string
+  userOpenId?: string
+}): Promise<void> {
+  await updateManagedConnectorConfig(dataDir, existing => {
+    const capabilities = objectValue(existing.capabilities)
+    const lark = objectValue(capabilities.lark)
+    return { ...existing, capabilities: { ...capabilities, lark: {
+      enabled: lark.enabled !== false,
+      authState: ['installed', 'needs_login', 'error'].includes(status.state) ? status.state : 'not_installed',
+      ...(status.executablePath ? { executablePath: status.executablePath } : {}),
+      ...(status.installedVersion ? { executableVersion: status.installedVersion } : {}),
+      scopes: status.state === 'installed' ? status.scopes ?? [] : [],
+      ...(status.state === 'installed' && status.identityFingerprint ? {
+        identityFingerprint: status.identityFingerprint,
+        appId: status.appId,
+        profile: status.profile,
+        executableHash: status.executableHash,
+        userOpenId: status.userOpenId
+      } : {}),
+      ...(status.brand ? { brand: status.brand } : {})
+    } } }
+  })
+}
+
+function dwsCapabilityFromStatus(status: ManagedDwsStatus, enabled: boolean) {
+  return DwsCapabilityConfig.parse({
+    enabled,
+    authState: status.state,
+    executablePath: status.executablePath,
+    executableHash: status.executableHash,
+    ...(status.state === 'installed' ? {
+      profile: status.profile,
+      corpId: status.corpId,
+      userId: status.userId,
+      identityFingerprint: status.identityFingerprint
+    } : {}),
+    scopes: []
+  })
+}
+
+// A legacy explicit DingTalk disable applies to the new backend until a user
+// explicitly configures dws.enabled. A diagnosis must not change that choice.
+function managedDwsEnabled(capabilities: Record<string, unknown>): boolean {
+  const dws = objectValue(capabilities.dws)
+  return typeof dws.enabled === 'boolean' ? dws.enabled : objectValue(capabilities.dingtalk).enabled !== false
+}
+
+export async function syncManagedDwsCapability(dataDir: string, status: ManagedDwsStatus): Promise<boolean> {
+  let enabled = false
+  await updateManagedConnectorConfig(dataDir, existing => {
+    const capabilities = objectValue(existing.capabilities)
+    enabled = managedDwsEnabled(capabilities)
+    const dws = dwsCapabilityFromStatus(status, enabled)
+    return { ...existing, capabilities: { ...capabilities, dws } }
+  })
+  return enabled
+}
+
+/** Explicit UI action only; never diagnose an account or resume a task here. */
+export async function setManagedDwsEnabled(dataDir: string, enabled: boolean): Promise<ManagedDwsStatus> {
+  let updated = DwsCapabilityConfig.parse({ enabled })
+  await updateManagedConnectorConfig(dataDir, existing => {
+    const capabilities = objectValue(existing.capabilities)
+    updated = DwsCapabilityConfig.parse({ ...objectValue(capabilities.dws), enabled })
+    return { ...existing, capabilities: { ...capabilities, dws: updated } }
+  })
+  const { authState, ...status } = updated
+  return { ...status, state: authState }
+}
+
 export async function syncManagedRuntimeConfig(
   dataDir: string,
   runtime: Pick<
@@ -621,6 +769,19 @@ export async function syncManagedRuntimeConfig(
     mcpConfigPath?: string
     mcpV2Servers?: Record<string, Record<string, unknown>>
     skillRoots?: string[]
+    dws?:ManagedDwsStatus
+    larkCli?: {
+      state: 'not_installed' | 'needs_login' | 'installed' | 'error'
+      executablePath?: string
+      executableVersion?: string
+      scopes?: string[]
+      brand?: 'feishu' | 'lark'
+      identityFingerprint?:string
+      appId?:string
+      profile?:string
+      executableHash?:string
+      userOpenId?:string
+    }
   }
 ): Promise<void> {
   const configPath = join(dataDir, 'config.json')
@@ -645,6 +806,7 @@ export async function syncManagedRuntimeConfig(
   const web = objectValue(capabilities.web)
   const skills = objectValue(capabilities.skills)
   const imageGen = objectValue(capabilities.imageGen)
+  const lark = objectValue(capabilities.lark)
   const storage = storageConfigForRuntime(runtime.storage)
   const mcpSearch = runtime.mcpSearch
   const skillCapability = await skillCapabilityConfigForRuntime(
@@ -695,6 +857,22 @@ export async function syncManagedRuntimeConfig(
       },
       skills: skillCapability,
       imageGen: imageGenConfigForRuntime(runtime.imageGeneration, imageGen),
+      dws: dwsCapabilityFromStatus(options?.dws ?? { state: 'not_installed' }, managedDwsEnabled(capabilities)),
+      lark: {
+        ...lark,
+        enabled: lark.enabled === false ? false : true,
+        authState: options?.larkCli?.state ?? 'not_installed',
+        // Diagnosis is authoritative. Never revive stale executable/auth/scope config.
+        executablePath: options?.larkCli?.executablePath,
+        executableVersion: options?.larkCli?.executableVersion,
+        scopes: options?.larkCli?.state === 'installed' ? options.larkCli.scopes ?? [] : [],
+        identityFingerprint: options?.larkCli?.state === 'installed' ? options.larkCli.identityFingerprint : undefined,
+        appId: options?.larkCli?.state === 'installed' ? options.larkCli.appId : undefined,
+        profile: options?.larkCli?.state === 'installed' ? options.larkCli.profile : undefined,
+        executableHash: options?.larkCli?.state === 'installed' ? options.larkCli.executableHash : undefined,
+        userOpenId: options?.larkCli?.state === 'installed' ? options.larkCli.userOpenId : undefined,
+        brand: options?.larkCli?.brand
+      },
       mcp: {
         ...mcp,
         ...(options?.scheduleMcp || mcpSearch.enabled || hasImportedEnabledMcpServer
@@ -811,6 +989,17 @@ async function readGuiManagedMcpServers(path: string): Promise<Record<string, un
     .filter((entry): entry is readonly [string, Record<string, unknown>] => entry !== null)
 
   return Object.fromEntries(normalizedEntries)
+}
+
+export async function loadManagedMcpConfigForRefresh(
+  dataDir: string,
+  mcpConfigPath: string,
+  servers: Record<string, Record<string, unknown>>
+): Promise<import('../../kun/src/contracts/capabilities.js').McpCapabilityConfig> {
+  const saved = sanitizeRuntimeConfigSections(await readJsonObjectIfExists(join(dataDir, 'config.json')))
+  const current = objectValue(objectValue(saved?.capabilities).mcp)
+  const merged = { ...objectValue(current.servers), ...await readGuiManagedMcpServers(mcpConfigPath), ...servers }
+  return McpCapabilityConfig.parse({ ...current, enabled: Object.values(merged).some(server => objectValue(server).enabled !== false), servers: merged })
 }
 
 function mcpServersFromGuiConfig(config: Record<string, unknown>): Record<string, unknown> {
@@ -1165,6 +1354,9 @@ function sanitizeRuntimeCapabilitiesConfig(value: unknown): Record<string, unkno
   }
   if ('memory' in raw) next.memory = parseRuntimeConfigSection(MemoryCapabilityConfig, raw.memory)
   if ('imageGen' in raw) next.imageGen = parseRuntimeConfigSection(ImageGenCapabilityConfig, raw.imageGen)
+  if ('lark' in raw) next.lark = parseRuntimeConfigSection(LarkCapabilityConfig, raw.lark)
+  if ('dws' in raw) next.dws=parseRuntimeConfigSection(DwsCapabilityConfig,raw.dws)
+  if ('dingtalk' in raw) next.dingtalk=parseRuntimeConfigSection(DingTalkCapabilityConfig,raw.dingtalk)
   return next
 }
 
@@ -1191,8 +1383,11 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {}
 }
 
-export async function stopManagedRuntimeChildAndWait(): Promise<void> {
+export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit?: boolean; timeoutMs?: number } = {}): Promise<void> {
   if (!child) {
+    if (options.requireCleanExit && (!lastManagedRuntimeExit || lastManagedRuntimeExit.code !== 0 || lastManagedRuntimeExit.signal)) {
+      throw new Error('无法确认 Runtime 已正常保存并退出，更新包已保留。')
+    }
     await documentExportBridge?.close()
     documentExportBridge = null
     actualManagedRuntimePort = null
@@ -1213,14 +1408,21 @@ export async function stopManagedRuntimeChildAndWait(): Promise<void> {
       /* already gone */
     }
   }
-  const exited = await waitForChildExit(stoppingChild, RUNTIME_STOP_GRACE_MS)
+  const exited = await waitForChildExit(stoppingChild, options.timeoutMs ?? RUNTIME_STOP_GRACE_MS)
+  if (options.requireCleanExit && !exited) {
+    throw new Error('Runtime 仍在保存并停止，更新包已保留，请稍后重试。')
+  }
   if (!exited) {
     try {
       if (pid) process.kill(pid, 'SIGKILL')
     } catch {
       /* already gone */
     }
-    await waitForChildExit(stoppingChild, RUNTIME_STOP_FORCE_MS)
+    const forcedExit = await waitForChildExit(stoppingChild, RUNTIME_STOP_FORCE_MS)
+    if (!forcedExit) throw new Error('Runtime process exit could not be confirmed.')
+  }
+  if (options.requireCleanExit && stoppingChild.exitCode !== 0) {
+    throw new Error('Runtime 未正常退出，更新已停止。请检查日志后重试。')
   }
   if (child === stoppingChild) child = null
   await documentExportBridge?.close()

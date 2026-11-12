@@ -66,10 +66,10 @@ export async function exportTaskDocument(raw: TaskDocumentExportRequest): Promis
     if (input.format === 'docx') {
       const { buildDocxFromMarkdown } = await import('./write-docx-service')
       const { resolveExportTemplate } = await import('./write-docx-styles')
-      output = await buildDocxFromMarkdown({ sourcePath: source, workspaceRoot: root, content: content.toString('utf8'), title: source.split(sep).at(-1)!.replace(/\.[^.]+$/, ''), template: resolveExportTemplate(undefined) })
+      output = await buildDocxFromMarkdown({ sourcePath: source, workspaceRoot: root, strictImages: true, content: content.toString('utf8'), title: source.split(sep).at(-1)!.replace(/\.[^.]+$/, ''), template: resolveExportTemplate(undefined) })
     } else {
-      const html = await buildWriteExportHtmlDocument({ sourcePath: source, workspaceRoot: root, content: content.toString('utf8'), title: source.split(sep).at(-1)! })
-      output = input.format === 'pdf' ? await renderWriteExportHtmlToPdf(html) : Buffer.from(html)
+      const html = await buildWriteExportHtmlDocument({ sourcePath: source, workspaceRoot: root, strictImages: true, content: content.toString('utf8'), title: source.split(sep).at(-1)! })
+      output = input.format === 'pdf' ? await renderWriteExportHtmlToPdf(html, { strictImages: true }) : Buffer.from(html)
     }
     await mkdir(dirname(target), { recursive: true })
     await recheckContainedParent(root, target)

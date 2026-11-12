@@ -750,7 +750,8 @@ function assistantTextBlockFromItem(item: CoreTurnItemJson): ChatBlock | null {
     id: item.id,
     createdAt: itemCreatedAt(item),
     text: item.text,
-    ...(Array.isArray(item.uiBlocks) ? { uiBlocks: item.uiBlocks } : {})
+    ...(Array.isArray(item.uiBlocks) ? { uiBlocks: item.uiBlocks } : {}),
+    ...(item.capabilityCard ? { capabilityCard: item.capabilityCard } : {})
   }
 }
 
@@ -1051,6 +1052,16 @@ function emitItem(
   sink: ThreadEventSink,
   child?: CoreChildRuntimeMetadataJson
 ): void {
+  // Coordinator messages are local conversation history. Older persisted
+  // records have the same exact IDs but predate conversationReceiptId.
+  const conversationReceipt = /^command_[a-f0-9]{32}$/.test(item.turnId) &&
+    (item.kind === 'user_message' && item.id === `item_${item.turnId}_user` ||
+      item.kind === 'assistant_text' && item.id === `item_${item.turnId}_receipt`)
+  if (conversationReceipt) {
+    const block = chatBlockFromItem(item)
+    if (block) sink.onConversationItem?.(block)
+    return
+  }
   switch (item.kind) {
     case 'user_message':
       sink.onUserMessage(userMessageEventFromItem(item))

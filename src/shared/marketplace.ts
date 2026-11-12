@@ -17,6 +17,8 @@ export type CatalogCredentialStatusV1 = {
   sourceId: string
   configured: boolean
   storage?: 'keychain' | 'dpapi' | 'safe-storage' | 'session'
+  errorCode?: string
+  message?: string
 }
 
 export type CatalogSourceSyncV1 = {
@@ -368,7 +370,7 @@ export type PackageAvailabilityV1 =
 
 export type PackageInstallationV1 =
   | {
-      mode: 'direct-mirror'
+      mode: 'direct-mirror' | 'upstream-only'
       installedByDefault: boolean
       reinstallable: true
     }

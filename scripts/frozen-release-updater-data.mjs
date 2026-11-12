@@ -4,6 +4,7 @@ import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, re
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { exerciseUpdaterTaskData } from './updater-task-data.mjs'
 import { FROZEN_BASE_VERSION, readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 const sha = value => createHash('sha256').update(value).digest('hex')
@@ -186,6 +187,8 @@ async function main() {
   const engineering = new EngineeringService({ rootDir: directory })
   const survey = new SurveyService({ rootDir: directory, getProject: id => engineering.getProject(id) })
   let identity
+  let taskContinuity
+  let taskSnapshot
   try {
     if (mode === 'seed') {
       if (engineering.listProjects().length || survey.listNetworks().length) throw new Error('Refusing to seed an existing professional data store.')
@@ -211,19 +214,33 @@ async function main() {
     }
     await Promise.all([engineering.flush(), survey.flush()])
   } finally { survey.close(); engineering.close() }
+  const { TaskRunRepository } = await import(pathToFileURL(join(selection.root, 'dist/services/task-run-repository.js')).href)
+  const { buildDocumentDeliveryToolProviders } = await import(pathToFileURL(join(selection.root, 'dist/adapters/tool/document-delivery-tool-provider.js')).href)
+  const { FileThreadStore, FileSessionStore } = await import(pathToFileURL(join(selection.root, 'dist/adapters/file/index.js')).href)
+  const { createThreadRecord } = await import(pathToFileURL(join(selection.root, 'dist/domain/thread.js')).href)
+  const { createTurnRecord } = await import(pathToFileURL(join(selection.root, 'dist/domain/turn.js')).href)
+  const { makeUserItem } = await import(pathToFileURL(join(selection.root, 'dist/domain/item.js')).href)
+  const runtimeData = dirname(directory)
+  const tasks = new TaskRunRepository(join(runtimeData, 'tasks.sqlite3'))
+  try {
+    const result = await exerciseUpdaterTaskData({ mode, repository: tasks, buildProviders: buildDocumentDeliveryToolProviders, workspace,
+      threadStore: new FileThreadStore({ dataDir: runtimeData }), sessionStore: new FileSessionStore({ dataDir: runtimeData }), createThreadRecord, createTurnRecord, makeUserItem,
+      baseline: mode === 'seed' ? undefined : JSON.parse(readFileSync(snapshotPath, 'utf8')).taskSnapshot })
+    taskContinuity = result.evidence; taskSnapshot = result.snapshot
+  } finally { tasks.close() }
   const rows = snapshotRows(Database, directory)
   const files = { data: snapshotFiles(directory), workspace: snapshotFiles(workspace) }
   if (mode === 'seed') {
     if (existsSync(snapshotPath)) throw new Error('Fixture snapshot must be a new file.')
     mkdirSync(dirname(snapshotPath), { recursive: true })
-    writeFileSync(snapshotPath, JSON.stringify({ schemaVersion: 1, identity, rows, files }) + '\n', { mode: 0o600, flag: 'wx' })
+    writeFileSync(snapshotPath, JSON.stringify({ schemaVersion: 1, identity, rows, files, taskSnapshot }) + '\n', { mode: 0o600, flag: 'wx' })
   } else {
     const baseline = JSON.parse(readFileSync(snapshotPath, 'utf8'))
     assertHistoricalRowsPreserved(baseline.rows, rows)
     assertRetainedFiles(baseline.files.data, files.data); assertRetainedFiles(baseline.files.workspace, files.workspace)
   }
   writeFileSync(reportPath, JSON.stringify({ schemaVersion: 1, mode, status: 'passed', projects: 1, networks: 1, adjustments: 1, monitoringDatasets: 1, sourceSha256: identity.sourceSha256,
-    serviceSource, serviceIdentity, scope: `Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official ${baseVersion} Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary ${baseVersion} schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution.` }) + '\n', { mode: 0o600 })
+    serviceSource, serviceIdentity, taskContinuity, scope: `Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official ${baseVersion} Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary ${baseVersion} schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution.` }) + '\n', { mode: 0o600 })
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(`[updater-data] ${error.message}`); process.exitCode = 1 })

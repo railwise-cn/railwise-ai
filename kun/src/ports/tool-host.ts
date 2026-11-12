@@ -2,6 +2,8 @@ import type { ApprovalPolicy, SandboxMode } from '../contracts/policy.js'
 import type { ApprovalRequest } from '../domain/approval.js'
 import type { TurnItem } from '../contracts/items.js'
 import type { ModelCapabilityMetadata } from '../contracts/capabilities.js'
+import type { ExecutionGrant } from '../contracts/permissions.js'
+import type { ToolEffectDefinition } from './tool-effect.js'
 import type {
   UserInputRequest,
   UserInputResolution
@@ -100,9 +102,25 @@ export type ToolHostContext = {
   approvalPolicy: ApprovalPolicy
   /** Filesystem/command sandbox selected for this turn. Defaults at execution time for old callers. */
   sandboxMode?: SandboxMode
+  /** Immutable effective workspace/agent grant for this execution attempt. */
+  executionGrant?: ExecutionGrant
+  /** Supplied by LocalToolHost only after this exact call received an allow decision. */
+  explicitApproval?: { approvalId?: string; callId: string; toolName: string; requestHash: string }
+  /** Claim an exact, durably approved operation that was proven undispatched before restart. */
+  claimUndispatchedApproval?: (approval: ApprovalRequest) => boolean
+  /** Persist proof of a real allow decision before dispatching the approved action. */
+  recordExplicitApproval?: (approval: { toolName: string; requestHash: string }) => void
+  /** Persist the dispatch boundary after approval and before invoking the tool. */
+  recordToolDispatch?: () => void
   abortSignal: AbortSignal
   /** Recheck the immutable task lease immediately before dispatch, after approvals. */
   assertExecution?: () => void
+  /** Recheck the persisted, user-reviewed action scope for this exact task/attempt. */
+  assertExternalTarget?: (provider: string, operation: string, target: string) => void
+  /** Recheck persisted workspace trust/revocation immediately before dispatch, including after approval. */
+  validateExecutionGrant?: () => Promise<void>
+  /** Atomically reserve a one-operation permission after all approval checks. */
+  claimTaskPermission?: () => Promise<void>
   beginExecutionWork?: () => (() => void) | undefined
   /** Resolves a pending approval with the user's decision. */
   awaitApproval: (approval: ApprovalRequest) => Promise<'allow' | 'deny'>
@@ -138,6 +156,7 @@ export type ToolHostResult = {
  */
 export interface ToolHost {
   readonly id: string
+  describeEffect?(toolName: string): ToolEffectDefinition | undefined
   /**
    * List tools available for the current turn. Tool hosts MAY scope
    * the list by mode/GUI plan context (e.g. only expose `create_plan`

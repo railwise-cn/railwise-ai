@@ -21,13 +21,20 @@ describe('local survey runtime without a model provider credential', () => {
     expect(body).toContain('await probeThreadApi(settings)')
   })
 
-  it.each([
-    ['async function restartManagedRuntimeForSettingsChange(', 'async function restartManagedRuntimeForMcpConfigChange('],
-    ['async function restartManagedRuntimeForMcpConfigChange(', 'async function waitForManagedRuntimeReadyBeforeStop(']
-  ])('keeps a credential-free local runtime available after %s', (start, end) => {
-    const body = bodyBetween(start, end)
+  it('keeps a credential-free local runtime available after settings changes', () => {
+    const body = bodyBetween('async function restartManagedRuntimeForSettingsChange(', 'async function waitForManagedRuntimeReadyBeforeStop(')
     expect(body).not.toContain('resolveConfiguredApiKey')
     expect(body).toContain('if (!runtime.autoStart) return')
     expect(body).toContain('if (!wasRunning) return')
+  })
+
+  it('hot-applies main-owned MCP snapshots without a model key or runtime restart', () => {
+    const body = bodyBetween('const applyMcpServers = ', '  registerAppIpcHandlers({')
+    expect(body).not.toContain('resolveConfiguredApiKey')
+    expect(body).not.toContain('stopAndWait')
+    expect(body).not.toContain('restartManagedRuntime')
+    expect(body).toContain('loadManagedMcpConfigForRefresh')
+    expect(body).toContain("'/v1/runtime/mcp-config'")
+    expect(body).toContain('result?.ok !== true')
   })
 })

@@ -402,7 +402,8 @@ for item in downloads:
     seen.add(name)
     validated.append((name, url, size))
 
-chunk_size = 16 * 1024 * 1024
+chunk_size = int(sys.argv[3]) if len(sys.argv) > 3 else 16 * 1024 * 1024
+if chunk_size < 256 * 1024 or chunk_size > 16 * 1024 * 1024: raise RuntimeError('Invalid R2 download chunk size')
 jobs = []
 parts_by_name = {}
 for name, url, size in validated:
@@ -464,6 +465,8 @@ manifest.unlink()
 const START_R2_STAGE_DOWNLOAD_SCRIPT = String.raw`set -euo pipefail
 manifest="$1"
 payload="$2"
+chunk_size=16777216
+if [[ $# -ge 3 ]]; then chunk_size="$3"; fi
 worker="$payload/.r2-download-worker.py"
 status="$payload/.r2-download.status"
 log="$payload/.r2-download.log"
@@ -480,14 +483,15 @@ nohup setsid bash -c '
   payload="$3"
   log="$4"
   status="$5"
-  python3 "$worker" "$manifest" "$payload" >"$log" 2>&1
+  chunk_size="$6"
+  python3 "$worker" "$manifest" "$payload" "$chunk_size" >"$log" 2>&1
   code=$?
   state=failure
   if [[ "$code" -eq 0 ]]; then state=success; fi
   temporary="$status.tmp.$$"
   printf "%s %s\n" "$state" "$code" >"$temporary"
   mv -- "$temporary" "$status"
-' workwise-r2-download "$worker" "$manifest" "$payload" "$log" "$status" </dev/null >/dev/null 2>&1 &
+' workwise-r2-download "$worker" "$manifest" "$payload" "$log" "$status" "$chunk_size" </dev/null >/dev/null 2>&1 &
 pid=$!
 if ! [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then exit 70; fi
 printf '%s\n' "$pid" >"$pid_file"
@@ -509,7 +513,7 @@ if [[ -f "$status" ]]; then
     printf 'success\n'
     exit 0
   fi
-  printf 'failure %s\n' "\${code:-unknown}"
+  printf 'failure %s\n' "$code"
   if [[ -f "$log" ]]; then tail -n 50 -- "$log"; fi
   exit 0
 fi
@@ -552,6 +556,7 @@ async function waitForRemoteR2Download(config, payload, options = {}) {
     if (!output.startsWith('running')) {
       throw new Error(`Remote R2 download failed: ${output || 'empty status'}`)
     }
+    if (options.onProgress) await options.onProgress().catch(() => undefined)
     await delay(pollIntervalMs)
   }
   throw new Error(`Remote R2 download timed out after ${Math.round(timeoutMs / 60_000)} minutes.`)
@@ -1073,4 +1078,12 @@ export const _internals = {
   FINALIZE_STAGE_SCRIPT,
   PROMOTE_SCRIPT,
   CLEANUP_ACCEPTANCE_SCRIPT
+}
+
+/** Shared pinned SSH transport for immutable public dependency assets. */
+export const websiteStaticTransport = {
+  readSshConfig, runRemote, copyFile, ensurePublicDownloadAlias,
+  r2DownloadWorker: R2_DOWNLOAD_WORKER,
+  startR2DownloadScript: START_R2_STAGE_DOWNLOAD_SCRIPT,
+  waitForRemoteR2Download
 }

@@ -276,28 +276,28 @@ export function registerRuntimeSseIpc(options: {
     }
     stateRef.current = state
     sseControllers.set(id, state)
-    const base = getRuntimeBaseUrlForSettings(s)
 
     ;(async () => {
       const wc = event.sender
-      const headers: Record<string, string> = { Accept: 'text/event-stream' }
-      runtimeAuthHeaders(s).forEach((value, key) => {
-        headers[key] = value
-      })
       let nextSinceSeq = request.sinceSeq
       let reconnectDelayMs = SSE_RECONNECT_BASE_MS
       try {
         while (!state.stoppedByClient && !ac.signal.aborted) {
-          const url = new URL(`${base}${request.scope === 'tasks' ? '/v1/tasks/stream' : runtimeThreadEventsPath(request.threadId)}`)
-          url.searchParams.set('since_seq', String(nextSinceSeq))
-          if (request.scope === 'tasks') headers['Last-Event-ID'] = String(nextSinceSeq)
-          const requestHeaders = { ...headers }
-          if (nextSinceSeq > 0) {
-            requestHeaders['Last-Event-ID'] = String(nextSinceSeq)
-          } else {
-            delete requestHeaders['Last-Event-ID']
-          }
           try {
+            // A settings restart can rotate the managed port and token without
+            // replacing the renderer's subscription. Resolve both per attempt.
+            const currentSettings = await store.load()
+            if (state.stoppedByClient || ac.signal.aborted) return
+            await ensureRuntime(currentSettings)
+            if (state.stoppedByClient || ac.signal.aborted) return
+            const base = getRuntimeBaseUrlForSettings(currentSettings)
+            const url = new URL(`${base}${request.scope === 'tasks' ? '/v1/tasks/stream' : runtimeThreadEventsPath(request.threadId)}`)
+            url.searchParams.set('since_seq', String(nextSinceSeq))
+            const requestHeaders: Record<string, string> = { Accept: 'text/event-stream' }
+            runtimeAuthHeaders(currentSettings).forEach((value, key) => {
+              requestHeaders[key] = value
+            })
+            if (nextSinceSeq > 0) requestHeaders['Last-Event-ID'] = String(nextSinceSeq)
             const res = await fetchSseWithStartTimeout(url, requestHeaders, ac.signal, SSE_START_TIMEOUT_MS)
             if (!res.ok || !res.body) {
               if (isFatalSseStatus(res.status)) {

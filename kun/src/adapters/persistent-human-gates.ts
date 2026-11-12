@@ -5,14 +5,24 @@ import type { DurableHumanRequest, TaskRunRepository } from '../services/task-ru
 
 /** SQLite is authoritative; these maps only wake a currently live tool call. */
 export class PersistentApprovalGate implements ApprovalGate {
-  private readonly resolvers = new Map<string, (decision: 'allow' | 'deny') => void>()
+  private readonly resolvers = new Map<string, { promise: Promise<'allow' | 'deny'>; resolve: (decision: 'allow' | 'deny') => void }>()
   constructor(private readonly repository: TaskRunRepository, private readonly nowIso: () => string) {}
 
   request(approval: ApprovalRequest): Promise<'allow' | 'deny'> {
     const saved = this.repository.saveHumanRequest({ id: approval.id, kind: 'approval', threadId: approval.threadId, turnId: approval.turnId,
       message: approval.summary, payload: { approval }, status: 'pending', createdAt: approval.createdAt, updatedAt: approval.createdAt })
+    const previous = saved.payload.approval as ApprovalRequest | undefined
+    if (saved.kind !== 'approval' || !previous || previous.threadId !== approval.threadId || previous.turnId !== approval.turnId ||
+        previous.toolName !== approval.toolName || previous.summary !== approval.summary || previous.requestHash !== approval.requestHash || previous.callId !== approval.callId) {
+      return Promise.reject(Object.assign(new Error('Approval identity belongs to a different operation.'), { code: 'approval_request_conflict' }))
+    }
     if (saved.status !== 'pending') return Promise.resolve(approvalDecision(saved))
-    return new Promise(resolve => this.resolvers.set(approval.id, resolve))
+    const live = this.resolvers.get(approval.id)
+    if (live) return live.promise
+    let resolve!: (decision: 'allow' | 'deny') => void
+    const promise = new Promise<'allow' | 'deny'>(settle => { resolve = settle })
+    this.resolvers.set(approval.id, { promise, resolve })
+    return promise
   }
   decide(id: string, decision: 'allow' | 'deny', reason?: string): boolean {
     const saved = this.repository.humanRequest(id)
@@ -37,7 +47,7 @@ export class PersistentApprovalGate implements ApprovalGate {
     for (const item of this.repository.humanRequests('approval')) {
       if (item.turnId !== turnId) continue
       this.repository.resolveHumanRequest(item.id, { decision: 'deny', reason }, 'expired', this.nowIso())
-      this.resolvers.get(item.id)?.('deny')
+      this.resolvers.get(item.id)?.resolve('deny')
       this.resolvers.delete(item.id)
       count++
     }
@@ -49,14 +59,14 @@ export class PersistentApprovalGate implements ApprovalGate {
   }
   hasLiveResolver(id: string): boolean { return this.resolvers.has(id) }
   flush(): void {
-    for (const [id, resolve] of this.resolvers) {
+    for (const [id, live] of this.resolvers) {
       const saved = this.repository.humanRequest(id)
       if (!saved || saved.status === 'pending') continue
       const task = this.repository.findActiveByThread(saved.threadId)
       if (task?.status === 'paused') continue
       this.markDelivered(saved)
       this.resolvers.delete(id)
-      resolve(approvalDecision(saved))
+      live.resolve(approvalDecision(saved))
     }
   }
   private markDelivered(saved: DurableHumanRequest): void {

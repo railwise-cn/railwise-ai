@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LocalToolHost, defaultLocalTools } from '../src/adapters/tool/local-tool-host.js'
+import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
 import {
   allBuiltinToolNames,
   allToolNames,
@@ -107,6 +108,29 @@ describe('Kun built-in tools', () => {
     const tools = await host.listTools(buildContext(workspace))
     const toolNames = new Set(tools.map((tool) => tool.name))
     expect([...allBuiltinToolNames].every((name) => toolNames.has(name))).toBe(true)
+  })
+
+  it('writes an explicitly authorized external path while denying reads and symlink escapes outside its scope', async () => {
+    const external = await realpath(await mkdtemp(join(tmpdir(), 'kun-granted-output-')))
+    try {
+      const root = await realpath(workspace)
+      const context = buildContext(root, { sandboxMode: 'workspace-write' })
+      context.executionGrant = ExecutionGrantSchema.parse({ id: 'grant-paths', threadId: context.threadId, turnId: context.turnId,
+        workspaceRoot: root, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', approvalPolicy: 'on-request', sandboxMode: 'workspace-write',
+        pathAllowlist: [root, external], readPathAllowlist: [root], writePathAllowlist: [external], networkAllowlist: [], connectorScopes: [], externalTargets: [],
+        workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'grant-paths', issuedAt: new Date().toISOString() })
+      const output = join(external, 'report.md')
+      const written = await host.execute({ callId: 'write-authorized', toolName: 'write', arguments: { path: output, content: 'synthetic report' } }, context)
+      expect(written.item).toMatchObject({ kind: 'tool_result', isError: false })
+      expect(await readFile(output, 'utf8')).toBe('synthetic report')
+      const read = await host.execute({ callId: 'read-denied', toolName: 'read', arguments: { path: output } }, context)
+      expect(read.item).toMatchObject({ kind: 'tool_result', isError: true })
+      if (process.platform !== 'win32') {
+        await symlink(root, join(external, 'escape'))
+        const blocked = await host.execute({ callId: 'write-escape', toolName: 'write', arguments: { path: join(external, 'escape', 'unsafe.md'), content: 'blocked' } }, context)
+        expect(blocked.item).toMatchObject({ kind: 'tool_result', isError: true })
+      }
+    } finally { await rm(external, { recursive: true, force: true }) }
   })
 
   it('converts a throwing tool execute into an error tool result instead of failing the turn', async () => {

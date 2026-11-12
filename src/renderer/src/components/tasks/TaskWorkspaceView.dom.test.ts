@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskOperationReceiptV1, TaskRunV1 } from '@shared/agent-workbench'
 import i18n from '../../i18n'
 import { TaskWorkspaceView, filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from './TaskWorkspaceView'
 import { resetTaskStateForTests, refreshTaskState } from '../../store/task-live-store'
@@ -93,9 +93,11 @@ beforeEach(async () => {
       notifyTask: vi.fn(async () => undefined),
       listTaskRuns: vi.fn(async () => tasks),
       listTaskInbox: vi.fn(async () => inbox),
-      listTaskTemplates: vi.fn(async () => ({ templates: [{ id: 'research-document', name: 'Research', description: 'Research docs', stages: [], outputs: [], requiredInputs: [] }] })),
+      listTaskTemplates: vi.fn(async () => ({ templates: [{ id: 'research-document', name: 'Research', description: 'Research docs', stages: [], outputs: [], requiredInputs: [], availability: { draftAvailable: true, model: 'synthetic-model', exportStatus: 'unavailable' } }] })),
       listTaskInputs: vi.fn(async () => []),
       listTaskEvents: vi.fn(async () => []),
+      listTaskOperationReceipts: vi.fn(async () => []),
+      verifyTaskOperationReceipt: vi.fn(async () => ({ status: 'outcome_unknown' })),
       appendTaskInput: vi.fn(async (_id: string, request: { text: string }) => ({ input: { id: 'input1', text: request.text }, task: tasks[0] })),
       pauseTask: vi.fn(async () => { tasks = [{ ...tasks[0], status: 'paused', revision: 2 }, tasks[1]]; return tasks[0] }),
       resumeTask: vi.fn(async () => ({ task: tasks[0], turn: {} })),
@@ -124,6 +126,146 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('opens an authorized external artifact by task identity and displays its file name', async () => {
+    const openTaskArtifact = vi.fn(async () => ({ ok: true as const }))
+    Object.assign(window.workwise, { openTaskArtifact })
+    tasks[0].artifacts = [{ id: 'artifact-external', relativePath: 'reports/result.md', absolutePath: '/authorized-private/reports/result.md', authorizedRoot: '/authorized-private', executionGrantId: 'grant-private', validation: 'valid', sha256: 'a'.repeat(64), createdAt: now }]
+    await act(async () => refreshTaskState())
+    await settle()
+    await click('Monthly report')
+    await click('result.md')
+    expect(openTaskArtifact).toHaveBeenCalledWith({ taskId: 't1', artifactId: 'artifact-external' })
+    expect(onOpenArtifact).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain('/authorized-private')
+    expect(container.textContent).not.toContain('grant-private')
+  })
+
+  it('keeps Markdown draft delivery available when the document export bridge is unconfigured', async () => {
+    await click('Research and documents')
+    expect(container.textContent).toContain('The export service is unconfigured')
+    const form = container.querySelector<HTMLFormElement>('form[role="dialog"]')!
+    await input(form.querySelectorAll('textarea')[0], 'Prepare a cited synthetic draft')
+    for (const format of ['DOCX', 'PDF']) {
+      const label = [...form.querySelectorAll('label')].find(item => item.textContent === format)!
+      await act(async () => label.querySelector<HTMLInputElement>('input')!.click())
+    }
+    await click('Start task')
+    expect(window.workwise.startTaskTemplate).toHaveBeenCalledWith('research-document', expect.objectContaining({ outputFormats: ['md'] }))
+  })
+  it('requires an explicit single-platform request before resolving a dual-provider decision', async () => {
+    tasks = []
+    inbox = [{id:'provider-choice',ownerKind:'task',ownerId:'original-conversation',threadId:'original-conversation',workspaceRoot:'/workspace',
+      kind:'question',title:'选择本次执行的平台',message:'这条请求同时涉及钉钉和飞书',status:'pending',revision:0,createdAt:now,updatedAt:now,
+      payload:{kind:'external_provider_choice',providers:['dingtalk','lark'],originalText:'帮我处理钉钉和飞书待办',request:{prompt:'帮我处理钉钉和飞书待办'}}}]
+    const coordinateTaskCommand = vi.fn(async () => ({kind:'capability_required'}))
+    Object.assign(window.workwise,{coordinateTaskCommand})
+    await act(async () => {await refreshTaskState()})
+    await click('Needs you')
+    expect([...container.querySelectorAll('button')].find(button => button.textContent === 'Create independent platform task')?.disabled).toBe(true)
+    const select = container.querySelector<HTMLSelectElement>('select[aria-label="Platform for this task"]')!
+    await act(async () => {select.value='lark';select.dispatchEvent(new Event('change',{bubbles:true}))})
+    await input(container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Request for the selected platform"]')!,'列出飞书待办')
+    await click('Create independent platform task')
+    expect(coordinateTaskCommand).toHaveBeenCalledWith(expect.objectContaining({threadId:'original-conversation',intent:'new',resolveAttentionId:'provider-choice',selectedExternalProvider:'lark',request:{prompt:'列出飞书待办',displayText:'列出飞书待办'}}))
+    expect(inbox[0].payload?.originalText).toBe('帮我处理钉钉和飞书待办')
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+  it('renders a usable capability card in task attention without opening the hidden execution conversation', async () => {
+    tasks = [{...task('blocked-connector','waiting_user','处理飞书待办'),threadId:'hidden-execution-thread',originThreadId:'original-conversation'}]
+    inbox = [{id:'connector-attention',ownerKind:'task',ownerId:'blocked-connector',taskId:'blocked-connector',threadId:'original-conversation',
+      workspaceRoot:'/workspace',kind:'blocked',title:'连接目标服务',message:'未安装飞书连接器',status:'pending',revision:0,createdAt:now,updatedAt:now,
+      payload:{kind:'capability_required',request:{prompt:'帮我处理飞书待办'},capability:{provider:'lark',status:'not_installed',message:'未安装飞书连接器'}}}]
+    const installManagedTool = vi.fn(async () => ({ok:true,status:{id:'lark-cli',state:'needs_login'}}))
+    Object.assign(window.workwise,{installManagedTool})
+    await act(async () => {await refreshTaskState()})
+    await click('Needs you')
+    expect(container.textContent).toContain('Install Lark CLI')
+    expect(container.textContent).not.toContain('hidden-execution-thread')
+    await click('Install Lark CLI')
+    expect(installManagedTool).toHaveBeenCalledExactlyOnceWith('lark-cli')
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(onOpenThread).not.toHaveBeenCalled()
+  })
+
+  it('explains an explicit new attempt for failed actions while preserving their receipts', async () => {
+    tasks = [{...task('failed-action','stalled','处理飞书待办'),acceptance:{kind:'effect',requiredNodeKinds:[],requireFinalResponse:true,requireActionableArtifactCard:false,effect:{provider:'lark',operation:'complete',target:'todo-failed'}}}]
+    inbox = []
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([{id:'failed-receipt',taskId:'failed-action',provider:'lark',operation:'complete',toolName:'lark_task_complete',target:'todo-failed',requestHash:'request-hash',status:'failed',errorCode:'network_failed',createdAt:now,updatedAt:now}])
+    await act(async () => {await refreshTaskState()})
+    await click('Needs you')
+    expect(container.textContent).toContain('The failure record is preserved')
+    expect(container.textContent).toContain('unknown outcome must be verified')
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+  it.each([
+    { language: 'zh', completed: '已完成', provider: '飞书 / Lark', execution: '外部执行与核验', verified: '已执行并验证', receipts: '操作回执' },
+    { language: 'en', completed: 'Completed', provider: 'Feishu / Lark', execution: 'External execution and verification', verified: 'Executed and verified', receipts: 'Operation receipts' }
+  ])('shows the provider, target and verified receipt without internal execution IDs in $language', async ({ language, completed, provider, execution, verified, receipts }) => {
+    const evidence = { kind: 'external_operation' as const, provider: 'lark', operation: 'complete', target: 'todo-042', status: 'done', verified: true, verifiedAt: now, resultHash: 'result-sha256', remoteOperationId: 'remote-operation-42' }
+    tasks = [{ ...task('effect-task', 'completed', '处理飞书待办'),
+      threadId: 'hidden-thread-identifier', executionSessionId: 'hidden-session-identifier', activeTurnId: 'hidden-turn-identifier',
+      acceptance: { kind: 'effect', requireFinalResponse: true, requireActionableArtifactCard: false, requiredNodeKinds: [],
+        effect: { provider: 'lark', operation: 'complete', target: 'todo-042' } }, resultEvidence: [evidence]
+    }]
+    const receipt: TaskOperationReceiptV1 = { id: 'receipt-42', taskId: 'effect-task', provider: 'lark', operation: 'complete', toolName: 'lark_task_complete', target: 'todo-042', requestHash: 'request-sha256', status: 'succeeded', evidence, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([receipt])
+    inbox = []
+    await act(async () => { await i18n.changeLanguage(language); await refreshTaskState() })
+    await click(completed)
+    const section = container.querySelector(`[aria-label="${execution}"]`)!
+    expect(section.textContent).toContain(provider)
+    expect(section.textContent).toContain('todo-042')
+    expect(section.textContent).toContain(verified)
+    expect(section.textContent).toContain(receipts)
+    expect(section.textContent).toContain('remote-operation-42')
+    expect(section.textContent).toContain('result-sha256')
+    expect(section.textContent).not.toMatch(/hidden-(?:thread|session|turn)-identifier|lark_task_complete/)
+    expect(window.workwise.listTaskOperationReceipts).toHaveBeenCalledWith('effect-task')
+  })
+
+  it('shows an unknown external outcome without claiming verified execution or replaying it', async () => {
+    tasks = [{ ...task('unknown-effect', 'waiting_user', '处理钉钉待办'), acceptance: {
+      kind: 'effect', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: false,
+      effect: { provider: 'dingtalk', operation: 'complete', target: 'todo-unknown' }
+    } }]
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([{
+      id: 'receipt-unknown', taskId: 'unknown-effect', provider: 'dingtalk', operation: 'complete', toolName: 'dingtalk_complete_task',
+      target: 'todo-unknown', requestHash: 'request-sha256', status: 'outcome_unknown', errorCode: 'external_outcome_unknown', createdAt: now, updatedAt: now
+    }])
+    inbox = []
+    await act(async () => { await refreshTaskState() })
+    await click('Needs you')
+    const section = container.querySelector('[aria-label="External execution and verification"]')!
+    expect(section.textContent).toContain('DingTalk')
+    expect(section.textContent).toContain('Outcome needs verification')
+    expect(section.textContent).toContain('will not replay automatically')
+    expect(section.textContent).not.toContain('Executed and verified')
+    await click('Verify result')
+    expect(window.workwise.verifyTaskOperationReceipt).toHaveBeenCalledWith('unknown-effect', 'receipt-unknown', { expectedRevision: 1, idempotencyKey: expect.any(String) })
+    expect(container.textContent).toContain('The result is still unknown')
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('shows verified readback while preserving the original unknown receipt and keeping execution paused', async () => {
+    tasks = [{ ...task('resolved-effect', 'paused', '处理飞书待办'), acceptance: {
+      kind: 'effect', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: false,
+      effect: { provider: 'lark', operation: 'complete', target: 'todo-resolved' }
+    } }]
+    const evidence = { kind: 'external_operation' as const, provider: 'lark', operation: 'complete', target: 'todo-resolved', status: 'done', verified: true, verifiedAt: now, resultHash: 'verified-hash' }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([{
+      id: 'receipt-resolved', taskId: 'resolved-effect', provider: 'lark', operation: 'complete', toolName: 'lark_task_complete', target: 'todo-resolved', requestHash: 'request-hash', status: 'outcome_unknown',
+      resolution: { status: 'verified', receiptId: 'verification-receipt', evidence, resolvedAt: now }, createdAt: now, updatedAt: now
+    }])
+    inbox = []
+    await act(async () => { await refreshTaskState() })
+    const section = container.querySelector('[aria-label="External execution and verification"]')!
+    expect(section.textContent).toContain('Remote result verified')
+    expect(section.textContent).toContain('original unknown dispatch is preserved')
+    expect(section.textContent).not.toContain('Verify result')
+    expect(window.workwise.verifyTaskOperationReceipt).not.toHaveBeenCalled()
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
   it.each([{ language: 'zh', completed: '已完成', details: '任务详情' }, { language: 'en', completed: 'Completed', details: 'Task details' }])('shows only the user goal for historical completed templates in $language', async ({ language, completed, details }) => {
     const goal = '总结监测资料，保留待确认项。'
     tasks = [{ ...task('legacy-template', 'completed', `完成研究与文档任务，持续推进到可审阅成果。\n\n用户目标：${goal}\n\n工作区：/workspace\n\n执行步骤：整理资料\n\n使用 propose_document，source_refs 保存来源；导出 API 仅用于内部执行。`), templateId: 'research-document' }]

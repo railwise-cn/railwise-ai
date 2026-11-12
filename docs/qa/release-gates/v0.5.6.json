@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 2,
+  "scope": "public-release",
+  "status": "passed",
+  "release": {
+    "tag": "v0.5.6",
+    "version": "0.5.6",
+    "previousTag": "v0.5.5",
+    "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+    "updaterPathChanged": true,
+    "visualChange": true,
+    "scopeExclusions": [
+      {
+        "capability": "飞书邮件",
+        "status": "excluded",
+        "decisionDate": "2026-11-12",
+        "decisionSource": "explicit user instruction",
+        "reason": "用户将该需求移出 0.5.6 版本范围。"
+      },
+      {
+        "capability": "钉钉审批转交",
+        "status": "excluded",
+        "decisionDate": "2026-11-12",
+        "decisionSource": "explicit user instruction",
+        "reason": "用户将该需求移出 0.5.6 版本范围。"
+      }
+    ]
+  },
+  "package": {
+    "version": "0.5.6",
+    "sourceVersion": "0.5.6",
+    "buildVersion": "0.5.6",
+    "identity": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "artifactSha256": "27ddbc81b909208125e222cba4fddc1b9a7e01ab53a64af595fbe0ac97329d21",
+      "asarSha256": "1cf3cb06df161768333aaf0d8b0bd59ce9989b8ae61a7f21947c9441fcebe115"
+    },
+    "installedMetadata": {
+      "version": "0.5.6",
+      "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+      "packageName": "workwise",
+      "productName": "RailWise AI",
+      "asarSha256": "1cf3cb06df161768333aaf0d8b0bd59ce9989b8ae61a7f21947c9441fcebe115"
+    },
+    "reviewedBuild": {
+      "schemaVersion": 1,
+      "mode": "exact-build",
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/release.yml",
+      "headRef": "refs/heads/codex/harness-connector-closure",
+      "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/harness-connector-closure",
+      "workflowSha": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+      "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+      "runId": 43142664059,
+      "runAttempt": 1,
+      "publicIdentity": {
+        "bundleId": "com.wangjiawei508.workgpt",
+        "packageName": "workwise",
+        "productName": "RailWise AI"
+      },
+      "artifacts": [
+        {
+          "id": 13911702522,
+          "name": "release-mac",
+          "digest": "sha256:c7605b1df8c9061905c74f90d1aac48aa936de01895f568fec3d3d7dfbb79669"
+        },
+        {
+          "id": 13910049434,
+          "name": "release-win",
+          "digest": "sha256:662747d2cbc6337d24aeaa6e9f46d8895c2dcc89278dd0f519025927e1f17779"
+        }
+      ],
+      "files": [
+        {
+          "name": "RailWise-AI-0.5.6-mac-arm64.dmg",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 395569874,
+          "sha256": "27ddbc81b909208125e222cba4fddc1b9a7e01ab53a64af595fbe0ac97329d21"
+        },
+        {
+          "name": "RailWise-AI-0.5.6-mac-arm64.zip",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 402304679,
+          "sha256": "942287550101644bfc6b1d34f0523401f7ec94a4ff6cb942055a7a9e783454c0"
+        },
+        {
+          "name": "RailWise-AI-0.5.6-mac-x64.dmg",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 406107895,
+          "sha256": "31daae24204bd0976f875407556c5925118f13b2382f39242f200cfaf5b1a08d"
+        },
+        {
+          "name": "RailWise-AI-0.5.6-mac-x64.zip",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 413124663,
+          "sha256": "23c99c9c5b8efff1e1ad69bd7ffc827986a7dfe811df1c16f7241007f67e4a83"
+        },
+        {
+          "name": "latest-mac.yml",
+          "platform": "darwin",
+          "artifact": "release-mac",
+          "size": 839,
+          "sha256": "f2e8710cab5281b4beb0df394c455cfe3c6b3e72e849a5a092d80fb3bbb22b0c"
+        },
+        {
+          "name": "RailWise-AI-0.5.6-win-x64.exe",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 317196763,
+          "sha256": "978aba9f85290d78fd5f5495f48c630965ba3aedefdddcc495deda9f3948a62f"
+        },
+        {
+          "name": "latest.yml",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 355,
+          "sha256": "b14fd93e8475b04b9f12fcc72ae54540a88ecc2f3e145c418d28545fb31c948f"
+        },
+        {
+          "name": "RailWise-AI-0.5.6-win-x64.exe.blockmap",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 325195,
+          "sha256": "275173dc826871e6cc7ceab1feeb396cb79b78e99c60304b9c61b705925a15a0"
+        }
+      ]
+    },
+    "signature": {
+      "status": "passed",
+      "scope": "macOS applications",
+      "teamIdentifier": "R35G7F4A9U",
+      "windowsAuthenticode": "NotSigned",
+      "windowsSigning": "not-configured"
+    },
+    "notarization": {
+      "status": "passed",
+      "scope": "macOS application staple and same-run native Gatekeeper validation",
+      "dmgStapleClaimed": false
+    },
+    "limitations": [
+      "Windows Authenticode is not configured. The installer and installed executable are NotSigned.",
+      "Intel UI was not run on the local Apple Silicon host.",
+      "The local Gatekeeper security override is recorded in the installation evidence. Enabled-policy Gatekeeper verification comes from the same-run native updater reports."
+    ]
+  },
+  "checks": {
+    "productionBuild": {
+      "status": "passed",
+      "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+      "path": "docs/qa/release-gates/v0.5.6/acceptance.md"
+    },
+    "focusedTests": {
+      "status": "passed",
+      "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+      "path": "docs/qa/release-gates/v0.5.6/acceptance.md"
+    },
+    "requiredCI": {
+      "status": "passed",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/quality.yml",
+        "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+        "runId": 43142616886,
+        "runAttempt": 1
+      }
+    }
+  },
+  "acceptance": {
+    "installedPackage": {
+      "status": "passed",
+      "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+      "path": "docs/qa/release-gates/v0.5.6/acceptance.md"
+    },
+    "packagedUI": {
+      "status": "passed",
+      "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+      "path": "docs/qa/release-gates/v0.5.6/acceptance.md"
+    },
+    "updaterRoundTrip": {
+      "status": "passed",
+      "mode": "exact-build",
+      "path": "docs/qa/release-gates/v0.5.6/acceptance.md",
+      "machineReportPath": "docs/qa/release-gates/v0.5.6/frozen-updater.json",
+      "nativeReportPath": "docs/qa/release-gates/v0.5.6/native-updater.json",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/release.yml",
+        "headRef": "refs/heads/codex/harness-connector-closure",
+        "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/harness-connector-closure",
+        "workflowSha": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+        "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+        "runId": 43142664059,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 13911504933,
+          "name": "exact-package-updater-43142664059",
+          "digest": "sha256:abe3a2165c041a69c65afdebd71c4b1db0537a964cf13e18b5e875c27938dab1"
+        }
+      }
+    }
+  }
+}

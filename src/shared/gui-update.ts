@@ -90,10 +90,12 @@ export type GuiUpdateActiveWorkItem = {
 export type GuiUpdateInstallPreflight = {
   ok: boolean
   activeWork: GuiUpdateActiveWorkItem[]
+  snapshotId?: string
   message?: string
 }
 
 export type GuiUpdateInstallRequest = {
-  /** The renderer may only set this after showing the current active-work list. */
+  /** Compatibility flag. The snapshot token binds the safe handoff to checked work. */
   confirmActiveWork?: boolean
+  confirmedSnapshotId?: string
 }

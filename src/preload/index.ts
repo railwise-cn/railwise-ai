@@ -17,6 +17,9 @@ import {
   runtimeTaskPausePath,
   runtimeTaskInputsPath,
   runtimeTaskEventsPath,
+  runtimeTaskReceiptsPath,
+  runtimeTaskPermissionsPath,
+  runtimeTaskReceiptVerifyPath,
   runtimeTaskTemplateStartPath,
   runtimeTaskTemplateSavePath,
   runtimeThreadAgentPath,
@@ -93,6 +96,10 @@ const api = {
   cancelOperation: (request) => ipcRenderer.invoke('operation:cancel', request),
   coordinateTaskCommand: (request) => runtimeJson('/v1/task-commands','POST',request),
   getTaskRun: (taskId) => runtimeJson(runtimeTaskPath(taskId)),
+  listTaskOperationReceipts: (taskId) => runtimeJson(runtimeTaskReceiptsPath(taskId)),
+  getTaskPermissions: (taskId) => runtimeJson(runtimeTaskPermissionsPath(taskId)),
+  confirmTaskPermissions: (taskId, request) => runtimeJson(runtimeTaskPermissionsPath(taskId), 'POST', request),
+  verifyTaskOperationReceipt: (taskId, receiptId, request) => runtimeJson(runtimeTaskReceiptVerifyPath(taskId, receiptId), 'POST', request),
   readDocumentCandidate: (payload) => ipcRenderer.invoke('write:read-candidate', payload),
   decideDocumentCandidate: (payload) => ipcRenderer.invoke('write:decide-candidate',payload),
   startTaskSse: (sinceSeq,streamId) => ipcRenderer.invoke('runtime:sse:start',{scope:'tasks',sinceSeq,streamId}),
@@ -198,6 +205,18 @@ const api = {
   installManagedTool: (id) => ipcRenderer.invoke('tool:install-managed', id),
   updateManagedTool: (id) => ipcRenderer.invoke('tool:update-managed', id),
   diagnoseManagedTool: (id) => ipcRenderer.invoke('tool:diagnose-managed', id),
+  beginManagedLarkLogin: (input) => ipcRenderer.invoke('tool:lark-login:begin', input),
+  completeManagedLarkLogin: () => ipcRenderer.invoke('tool:lark-login:complete'),
+  beginManagedLarkAppSetup: () => ipcRenderer.invoke('tool:lark-app-setup:begin'),
+  checkManagedLarkAppSetup: () => ipcRenderer.invoke('tool:lark-app-setup:check'),
+  cancelManagedLarkAppSetup: () => ipcRenderer.invoke('tool:lark-app-setup:cancel'),
+  diagnoseManagedDingTalk: () => ipcRenderer.invoke('tool:dingtalk:diagnose'),
+  checkManagedDingTalkTaskAccess: () => ipcRenderer.invoke('tool:dingtalk:check-task-access'),
+  installManagedDingTalk: () => ipcRenderer.invoke('tool:dingtalk:install'),
+  beginManagedDingTalkLogin: () => ipcRenderer.invoke('tool:dingtalk:login-begin'),
+  checkManagedDingTalkLogin: () => ipcRenderer.invoke('tool:dingtalk:login-check'),
+  cancelManagedDingTalkLogin: () => ipcRenderer.invoke('tool:dingtalk:login-cancel'),
+  setManagedDingTalkEnabled: (enabled) => ipcRenderer.invoke('tool:dingtalk:set-enabled', enabled),
   removeManagedTool: (id) => ipcRenderer.invoke('tool:remove-managed', id),
   listAgentProfiles: (workspaceRoot) => ipcRenderer.invoke('agent-profile:list', { workspaceRoot }),
   saveAgentProfile: (request) => ipcRenderer.invoke('agent-profile:save', request),
@@ -217,9 +236,16 @@ const api = {
     })
   },
   getWorkspaceTrust: (workspaceRoot) => ipcRenderer.invoke('workspace-trust:get', { workspaceRoot }),
+  scanLegacyWorkspaces: () => ipcRenderer.invoke('workspace-migration:scan'),
+  getLegacyWorkspaceAliases: () => ipcRenderer.invoke('workspace-migration:aliases'),
+  importLegacyWorkspaceSnapshot: (request) => ipcRenderer.invoke('workspace-migration:import-snapshot', request),
   setWorkspaceTrust: (request) => ipcRenderer.invoke('workspace-trust:set', request),
   listMcpServers: (workspaceRoot) => ipcRenderer.invoke('mcp-server:list', { workspaceRoot }),
-  saveMcpServer: (request) => ipcRenderer.invoke('mcp-server:save', request),
+  saveMcpServer: (request) => {
+    const config = { ...request.config }
+    delete config.connectionCheck
+    return ipcRenderer.invoke('mcp-server:save', { ...request, config })
+  },
   testMcpServer: (serverId, workspaceRoot) => ipcRenderer.invoke('mcp-server:test', { serverId, workspaceRoot }),
   authorizeMcpServer: (request) => ipcRenderer.invoke('mcp-server:authorize', request),
   waitForMcpAuthorization: (serverId, state) =>
@@ -227,6 +253,7 @@ const api = {
   cancelMcpAuthorization: (serverId, state) =>
     ipcRenderer.invoke('mcp-server:cancel-authorization', { serverId, state }),
   setMcpServerCredential: (request) => ipcRenderer.invoke('mcp-server:set-credential', request),
+  openTaskArtifact: (request) => ipcRenderer.invoke('task-artifact:open', request),
   listDocumentEngines: () => ipcRenderer.invoke('document-engine:list'),
   installDocumentEngine: (id) => ipcRenderer.invoke('document-engine:install', id),
   diagnoseDocumentEngine: (id) => ipcRenderer.invoke('document-engine:diagnose', id),
@@ -439,6 +466,7 @@ const api = {
   runDesktopCommand: (command) =>
     ipcRenderer.invoke('desktop:command', command),
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
+  openDingTalkDesktop: () => ipcRenderer.invoke('shell:open-dingtalk-desktop'),
   showTurnCompleteNotification: (payload) => ipcRenderer.invoke('notification:turn-complete', payload),
   getAppVersion: () => ipcRenderer.invoke('app:version'),
   getGuiUpdateState: () => ipcRenderer.invoke('gui:update-state'),

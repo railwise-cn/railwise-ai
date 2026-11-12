@@ -1,4 +1,8 @@
+import { RuntimeUpdateLifecycle, type UpdateActiveWork } from '../services/runtime-update-lifecycle.js'
+import { FileWorkspaceTrustReader } from '../services/workspace-trust-reader.js'
+import { ExternalOperationVerificationService } from '../services/external-operation-verification.js'
 import { TaskControlService } from '../services/task-control-service.js'
+import { TaskPermissionService } from '../services/task-permission-service.js'
 import { TaskCoordinator } from '../services/task-coordinator.js'
 import { CapacityManager } from '../services/capacity-manager.js'
 import { TaskViewService } from '../services/task-view-service.js'
@@ -24,11 +28,12 @@ import { FileSessionStore, FileThreadStore } from '../adapters/file/index.js'
 import { HybridSessionStore, HybridThreadStore } from '../adapters/hybrid/index.js'
 import { DeepseekCompatModelClient } from '../adapters/model/deepseek-compat-model-client.js'
 import { ProviderRoutingModelClient, unavailableModelProvider, type ModelProviderRoutes } from '../adapters/model/provider-routing-model-client.js'
-import { CapabilityRegistry } from '../adapters/tool/capability-registry.js'
+import { CapabilityRegistry, type CapabilityToolProvider } from '../adapters/tool/capability-registry.js'
 import { buildGoalLocalTools } from '../adapters/tool/goal-tools.js'
 import { buildTodoLocalTools } from '../adapters/tool/todo-tools.js'
 import { LocalToolHost, buildDefaultLocalTools } from '../adapters/tool/local-tool-host.js'
 import { buildMcpToolProviders } from '../adapters/tool/mcp-tool-provider.js'
+import { ManagedMcpRuntime } from '../services/managed-mcp-runtime.js'
 import { buildMemoryToolProviders } from '../adapters/tool/memory-tool-provider.js'
 import { buildAttachmentToolProviders } from '../adapters/tool/attachment-tool-provider.js'
 import { buildFlowToolProviders } from '../adapters/tool/flow-tool-provider.js'
@@ -42,6 +47,8 @@ import { buildImageGenToolProviders } from '../adapters/tool/image-gen-tool-prov
 import { buildPptMasterToolProviders } from '../adapters/tool/ppt-master-tool-provider.js'
 import { buildDesignToolProviders } from '../adapters/tool/design-tool-provider.js'
 import { buildDocumentDeliveryToolProviders } from '../adapters/tool/document-delivery-tool-provider.js'
+import { buildExternalEffectScopeToolProviders } from '../adapters/tool/external-effect-scope-tool-provider.js'
+import { buildScopedHostShellToolProviders } from '../adapters/tool/scoped-host-shell-tool-provider.js'
 import { LocalWorkspaceInspector } from '../adapters/workspace/local-workspace-inspector.js'
 import { WorkspaceReferenceService } from '../services/workspace-reference-service.js'
 import { createImmutablePrefix } from '../cache/immutable-prefix.js'
@@ -54,9 +61,11 @@ import { buildCoreFlowAdapters } from '../flow/core-adapters.js'
 import { buildFlowNodeRegistry } from '../flow/node-registry.js'
 import { FlowRepository } from '../flow/repository.js'
 import { FlowRuntimeService } from '../flow/service.js'
-import { buildTaskDeliveryAdapters, TaskDeliveryCoordinator } from '../delivery/runtime.js'
+import { assertFlowTaskRetryAllowed, buildTaskDeliveryAdapters, TaskDeliveryCoordinator } from '../delivery/runtime.js'
 import { EncryptedFileFlowSecretStore, FlowWebhookSecurity, UnavailableFlowSecretStore } from '../flow/webhook-security.js'
 import type { ApprovalPolicy, SandboxMode } from '../contracts/policy.js'
+import type { ExecutionScope } from '../contracts/permissions.js'
+import { externalTargetGrantKey } from '../adapters/tool/sandbox-policy.js'
 import { AgentLoop } from '../loop/agent-loop.js'
 import { ContextCompactor } from '../loop/context-compactor.js'
 import type { TokenEconomyConfig } from '../loop/token-economy.js'
@@ -107,6 +116,12 @@ import { EngineeringAiOrchestrator } from '../engineering/engineering-ai-orchest
 import { buildEngineeringConversationTools } from '../adapters/tool/engineering-conversation-tools.js'
 import { EngineeringAiRepository } from '../engineering/engineering-ai-repository.js'
 import { buildRailwiseToolProviders } from '../adapters/tool/railwise-tool-provider.js'
+import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provider.js'
+import { ManagedDingTalkRuntime } from '../services/managed-dingtalk-runtime.js'
+import { ManagedLarkRuntime } from '../services/managed-lark-runtime.js'
+import { ManagedDwsRuntime } from '../services/managed-dws-runtime.js'
+import { externalTaskIntent } from '../services/external-task-capability.js'
+import { contextualExternalTaskPreflight } from '../services/contextual-external-task-preflight.js'
 import { SurveyService } from '../engineering/survey-service.js'
 import { SurveyAdvancedTrialsWorkspaceService } from '../engineering/survey-advanced-trials-workspace.js'
 import { SurveySamplingWorkspaceService } from '../engineering/survey-sampling-workspace.js'
@@ -118,6 +133,7 @@ export type KunServeRuntimeOptions = {
   port: number
   configPath?: string
   dataDir: string
+  workspaceTrustPath?: string
   runtimeToken: string
   apiKey: string
   baseUrl: string
@@ -170,6 +186,13 @@ export async function createKunServeRuntime(
   const taskContextRuntime = new TaskContextRuntime(taskContextRepository, taskRepository)
   const approvalGate = new PersistentApprovalGate(taskRepository, () => new Date().toISOString())
   const userInputGate = new PersistentUserInputGate(taskRepository, () => new Date().toISOString())
+  const workspaceTrust = new FileWorkspaceTrustReader(options.workspaceTrustPath)
+  const taskPermissionService = new TaskPermissionService({repository:taskRepository,toolEffects:()=>activeToolRegistry?.describeAllEffects()??[],threads:{get:id=>threadStore.get(id),update:async(id,patch)=>{
+    const current=await threadStore.get(id)
+    if(!current)throw Object.assign(new Error('task execution context not found'),{code:'not_found'})
+    await threadStore.upsert({...current,...patch,updatedAt:new Date().toISOString()})
+    return (await threadStore.get(id))!
+  }},workspaceTrust,nowIso:()=>new Date().toISOString()})
   const workspaceInspector = new LocalWorkspaceInspector()
   const workspaceReferenceService = new WorkspaceReferenceService()
   const usageService = new UsageService()
@@ -192,6 +215,7 @@ export async function createKunServeRuntime(
     sessionStore,
     nowIso,
     spans: spanService,
+    resolveToolEffect: name => activeToolRegistry?.describeEffect(name),
     completionGuard: input => engineeringAi.assessCompletion(input)
   })
   taskRepository.reconcileShellSessionsStartup(nowIso())
@@ -481,6 +505,24 @@ export async function createKunServeRuntime(
   const flowSecretStore = flowSecretKey && /^[A-Za-z0-9_-]{43}$/.test(flowSecretKey)
     ? new EncryptedFileFlowSecretStore(join(options.dataDir, 'flow-secrets'), Buffer.from(flowSecretKey, 'base64url'))
     : new UnavailableFlowSecretStore()
+  let activeToolRegistry: CapabilityRegistry | undefined
+  let activeChildToolRegistry: CapabilityRegistry | undefined
+  const dingtalkRuntime = new ManagedDingTalkRuntime(options.capabilities?.dingtalk, flowSecretStore, options.configPath ?? (options.dataDir ? join(options.dataDir, 'config.json') : undefined))
+  await dingtalkRuntime.initialize()
+  const dwsRuntime = new ManagedDwsRuntime(options.capabilities?.dws, options.configPath ?? join(options.dataDir,'config.json'),()=>applyDingTalkProvider())
+  function applyDingTalkProvider(legacyUpdate?: { provider: CapabilityToolProvider | undefined }) {
+    // Legacy refresh invokes apply before assigning its internal provider. Use
+    // the diagnosed argument, including explicit removal, instead of stale state.
+    const provider = dwsRuntime.toolProvider() ?? (legacyUpdate ? legacyUpdate.provider : dingtalkRuntime.toolProvider())
+    activeToolRegistry?.replaceProvider('dingtalk', provider)
+    activeChildToolRegistry?.replaceProvider('dingtalk', provider)
+  }
+  dingtalkRuntime.setApply(provider => applyDingTalkProvider({ provider }))
+  const useDws=()=>Boolean(dwsRuntime.toolProvider())
+  const larkRuntime = new ManagedLarkRuntime(options.capabilities?.lark, options.configPath ?? join(options.dataDir, 'config.json'), provider => {
+    activeToolRegistry?.replaceProvider('lark-cli', provider)
+    activeChildToolRegistry?.replaceProvider('lark-cli', provider)
+  })
   let flowDelegationRuntime: DelegationRuntime | undefined
   const flowAdapters = buildCoreFlowAdapters(surveyCollaborationService.adapters(flowRepository), {
       model: modelClient,
@@ -525,6 +567,8 @@ export async function createKunServeRuntime(
     beforeMutation: (input: { absolutePath: string; relativePath: string; workspaceRoot: string; threadId: string }) =>
       gitCheckpointCoordinator.beforeMutation(input)
   })
+  const larkProvider = buildLarkCliToolProvider(larkRuntime.state())
+  const dingtalkProvider = dwsRuntime.toolProvider()??dingtalkRuntime.toolProvider()
   const baseToolProviders = [
     {
       id: 'builtin',
@@ -538,13 +582,17 @@ export async function createKunServeRuntime(
     ...buildMemoryToolProviders(memoryStore),
     ...buildAttachmentToolProviders(attachmentStore),
     ...buildDocumentDeliveryToolProviders(taskRepository, { contextRuntime: taskContextRuntime, engineeringService }),
+    ...buildExternalEffectScopeToolProviders(taskController),
     ...buildFlowToolProviders(flowService),
     ...imageGenProviders.providers,
     ...pptMasterProviders.providers,
     ...designProviders.providers,
+    ...(larkProvider ? [larkProvider] : []),
+    ...(dingtalkProvider ? [dingtalkProvider] : []),
     ...buildRailwiseToolProviders(engineeringService, surveyService, () => engineeringAi)
   ]
   const childRegistry = new CapabilityRegistry(baseToolProviders)
+  activeChildToolRegistry = childRegistry
   const childToolHost = new LocalToolHost({ registry: childRegistry, readTracker: true })
   const delegationRuntime = options.capabilities?.subagents.enabled
     ? new DelegationRuntime({
@@ -581,6 +629,10 @@ export async function createKunServeRuntime(
           tokenEconomy,
           ...(options.runtime ? { runtime: options.runtime } : {}),
           ...(memoryStore ? { memoryStore } : {}),
+          workspaceTrust,
+          executionScope: executionScopeForTurn,
+          validateTaskPermission: (threadId, permissionId) => taskPermissionService.executionRestriction(threadId, permissionId),
+          claimTaskPermission: (threadId, permissionId, operationId) => taskPermissionService.claimOperation(threadId, permissionId, operationId),
           nowIso
         }),
         recordExternalUsage: (threadId, usage) => {
@@ -591,9 +643,8 @@ export async function createKunServeRuntime(
       })
     : undefined
   flowDelegationRuntime = delegationRuntime
-  if(backgroundTaskScheduling)flowService.startSchedules()
   const capabilities = buildRuntimeCapabilityManifest({
-    config: options.capabilities,
+    config: useDws()&&options.capabilities?{...options.capabilities,dingtalk:{...options.capabilities.dingtalk,enabled:true}}:options.capabilities,
     model: modelCapabilitiesForModel(defaultModelClient.model, modelProfiles),
     mcp: {
       configuredServers: Object.keys(options.capabilities?.mcp.servers ?? {}).length,
@@ -634,10 +685,22 @@ export async function createKunServeRuntime(
       enabled: visionEvidenceRuntime.enabled,
       available: Boolean(visionEvidence),
       reason: visionEvidenceRuntime.reason
-    }
+    },
+    lark: {
+      available: Boolean(larkProvider),
+      authState: options.capabilities?.lark.authState,
+      reason: larkProvider ? undefined : options.capabilities?.lark.authState === 'needs_login'
+        ? 'Lark CLI requires authorization.'
+        : 'Lark CLI is not installed or unavailable.'
+    },
+    dingtalk: useDws()?{available:true,credentialState:'valid',identityVerified:true,scopes:[]}:dingtalkRuntime.state()
   })
   const registry = new CapabilityRegistry([
     ...baseToolProviders,
+    ...buildScopedHostShellToolProviders({
+      repository: taskRepository, tasks: taskController, bashTool: shellTools.find(tool => tool.name === 'bash')!, nowIso,
+      onAuthorized: authorization => turnService.updateTurnMetadata(authorization.threadId, authorization.turnId, { hostShellAuthorizations: [authorization] })
+    }),
     {
       id: 'goal',
       kind: 'gui' as const,
@@ -654,15 +717,61 @@ export async function createKunServeRuntime(
     },
     ...buildDelegationToolProviders(delegationRuntime)
   ])
+  activeToolRegistry = registry
+  const mcpRuntime = new ManagedMcpRuntime(mcpProviders, options.capabilities?.mcp, [registry, childRegistry])
   let engineeringAi: EngineeringAiOrchestrator
   const toolHost = new LocalToolHost({ registry, readTracker: true })
+  const operationVerification = new ExternalOperationVerificationService({ repository: taskRepository, controller: taskController,
+    toolHost, threadStore, workspaceTrust, nowIso, refreshProvider: async (provider,originalGrant) => {
+      if(provider==='lark')return larkRuntime.refresh()
+      const originalDws = originalGrant?.connectorBackends?.dingtalk
+        ? originalGrant.connectorBackends.dingtalk === 'dws' : Boolean(originalGrant?.connectorIdentityFingerprints?.dingtalk)
+      if(originalDws!==useDws())throw Object.assign(new Error('Reconnect the original DingTalk backend before verifying this operation.'),{code:'connector_backend_changed'})
+      return originalDws?dwsRuntime.refresh():dingtalkRuntime.refresh()
+    } })
   let loop: AgentLoop
   registry.registerProvider(buildEngineeringConversationTools(threadStore, () => engineeringAi, new SurveyEvidenceReader({
     engineering: engineeringService, survey: surveyService, advanced: surveyAdvancedTrialsWorkspaceService,
     scoring: surveyQualityScoringWorkspaceService, retention: surveyQualityWorkspaceService,
     sampling: surveySamplingWorkspaceService, assessment: surveyQualityAssessmentService
   })))
+  async function executionScopeForTurn(threadId: string, turnId: string): Promise<ExecutionScope> {
+    const restriction = await taskPermissionService.executionRestriction(threadId)
+    const turn = (await threadStore.get(threadId))?.turns.find(item => item.id === turnId)
+    const intent = turn?.externalTaskProvider
+      ? { kind: 'external_task' as const, provider: turn.externalTaskProvider }
+      : turn ? externalTaskIntent(turn.prompt) : null
+    const selectedProviderId = intent?.kind === 'external_task'
+      ? intent.provider === 'lark' ? 'lark-cli' : intent.provider === 'dingtalk' ? 'dingtalk' : undefined
+      : undefined
+    const task = taskController.activeTask(threadId)
+    const accepted = task?.activeTurnId === turnId ? task.acceptance.effect : undefined
+    const effects = accepted?.requiredEffects ?? (accepted?.target
+      ? [{ provider: accepted.provider, operation: accepted.operation, target: accepted.target }] : [])
+    const externalTargets = effects.map(effect => externalTargetGrantKey(effect.provider, effect.operation, effect.target))
+    const externalProviderIds = new Set(['lark-cli', 'dingtalk'])
+    const allowedProviderIds = toolHost.diagnostics()
+      .filter(provider => provider.enabled && provider.available)
+      .map(provider => provider.id)
+      .filter(providerId => !externalProviderIds.has(providerId) || providerId === selectedProviderId)
+    let providerScope: ExecutionScope = { networkAllowlist: ['*'], connectorScopes: [], externalTargets: [] }
+    if (selectedProviderId === 'lark-cli') providerScope = larkRuntime.scope(externalTargets)
+    else if (selectedProviderId === 'dingtalk') providerScope = useDws() ? dwsRuntime.scope(externalTargets) : dingtalkRuntime.scope(externalTargets)
+    return { ...providerScope, connectorIdentityFingerprints: { ...mcpRuntime.state().authorityFingerprints, ...providerScope.connectorIdentityFingerprints }, allowedProviderIds, ...restriction }
+  }
   loop = new AgentLoop({
+    workspaceTrust,
+    executionScope: executionScopeForTurn,
+    validateTaskPermission: (threadId, permissionId) => taskPermissionService.executionRestriction(threadId, permissionId),
+    claimTaskPermission: (threadId, permissionId, operationId) => taskPermissionService.claimOperation(threadId, permissionId, operationId),
+    onExecutionGrant: grant => {
+      if (!grant.taskId) return
+      const task = taskRepository.get(grant.taskId)
+      if (!task || task.activeTurnId !== grant.turnId) return
+      taskRepository.update(task.id, task.revision, current => ({ ...current, updatedAt: nowIso() }), {
+        key: `execution-grant:${grant.id}`, kind: 'execution_grant_created', payload: { turnId: grant.turnId }, createdAt: nowIso()
+      })
+    },
     threadStore,
     sessionStore,
     approvalGate,
@@ -719,8 +828,19 @@ export async function createKunServeRuntime(
     events,
     nowIso
   })
-  const taskControlService=new TaskControlService({repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>delegationRuntime?.abortParent(threadId,reason),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
-  const taskCoordinator = new TaskCoordinator({ controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore,
+  const externalPreflight = contextualExternalTaskPreflight({
+    providerPreflight: async (text: string) => {
+      if (externalTaskIntent(text)?.provider === 'dingtalk') {
+        return useDws() || !dingtalkRuntime.state().enabled ? dwsRuntime.preflight(text) : dingtalkRuntime.preflight(text)
+      }
+      return larkRuntime.preflight(text)
+    },
+    workspaceTrust,
+    toolHost,
+    validateTaskPermission: threadId => taskPermissionService.executionRestriction(threadId)
+  })
+  const taskControlService=new TaskControlService({repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>delegationRuntime?.abortParent(threadId,reason),preflightExternalTask:externalPreflight,validateTaskPermission:threadId=>taskPermissionService.executionRestriction(threadId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
+  const taskCoordinator = new TaskCoordinator({ preflightExternalTask:externalPreflight, controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore,
     async classifyIntent(text, task) {
       const abort = new AbortController()
       const timer = setTimeout(() => abort.abort(),8_000)
@@ -749,6 +869,8 @@ export async function createKunServeRuntime(
     taskController,
     taskCoordinator,
     taskControlService,
+    taskPermissionService,
+    preflightExternalTask: externalPreflight,
     taskViewService,
     capacityManager,
     taskContextRuntime,
@@ -764,6 +886,7 @@ export async function createKunServeRuntime(
     workspaceInspector,
     workspaceReferenceService,
     toolHost,
+    refreshMcpConfiguration: request => mcpRuntime.refresh(request),
     ...(attachmentStore ? { attachmentStore } : {}),
     ...(memoryStore ? { memoryStore } : {}),
     flowService,
@@ -792,6 +915,14 @@ export async function createKunServeRuntime(
     runReview(input) {
       return reviewService.runReview(input)
     },
+    configureDingTalk(input) { return dingtalkRuntime.configure(input) },
+    beginDingTalkOAuth() { return dingtalkRuntime.beginOAuth() },
+    completeDingTalkOAuth(callbackUrl) { return dingtalkRuntime.completeOAuth(callbackUrl) },
+    authorizeDingTalkWorkflow(input) { return dingtalkRuntime.authorizeWorkflow(input) },
+    refreshDingTalk() { return dingtalkRuntime.refresh() },
+    refreshLark() { return larkRuntime.refresh() },
+    refreshDws() { return dwsRuntime.refresh() },
+    verifyTaskOperationReceipt(taskId, receiptId, input) { return operationVerification.verify(taskId, receiptId, input) },
     runtimeToken: options.runtimeToken,
     insecure: options.insecure,
     allocateSeq,
@@ -809,13 +940,41 @@ export async function createKunServeRuntime(
       insecure: options.insecure,
       startedAt,
       pid: process.pid,
-      capabilities,
+      capabilities: { ...capabilities, mcp: buildRuntimeCapabilityManifest({
+        config: { ...options.capabilities, mcp: mcpRuntime.configuration() } as KunCapabilitiesConfig,
+        model: capabilities.model,
+        mcp: { configuredServers: Object.keys(mcpRuntime.configuration()?.servers ?? {}).length,
+          connectedServers: mcpRuntime.state().connectedServers, toolCount: mcpRuntime.state().toolCount,
+          lastError: mcpRuntime.state().diagnostics.find(server => server.lastError)?.lastError,
+          search: mcpRuntime.state().search }
+      }).mcp, lark: {
+        status: larkRuntime.state().enabled
+          ? registry.diagnostics().some(provider => provider.id === 'lark-cli' && provider.enabled && provider.available) ? 'available' : 'unavailable'
+          : 'disabled',
+        enabled: larkRuntime.state().enabled,
+        available: registry.diagnostics().some(provider => provider.id === 'lark-cli' && provider.enabled && provider.available),
+        authState: larkRuntime.state().authState
+      }, dingtalk: useDws()?{
+        status:'available',enabled:true,available:true,credentialState:'valid',identityVerified:true,scopes:[]
+      }: {
+        status: dingtalkRuntime.state().enabled ? dingtalkRuntime.state().available ? 'available' : 'unavailable' : 'disabled',
+        enabled: dingtalkRuntime.state().enabled,
+        available: dingtalkRuntime.state().available,
+        ...(dingtalkRuntime.state().reason ? { reason: dingtalkRuntime.state().reason } : {}),
+        credentialState: dingtalkRuntime.state().credentialState,
+        identityVerified: dingtalkRuntime.state().identityVerified,
+        scopes: dingtalkRuntime.state().scopes
+      }, workspaces: {
+        flow: { status: 'available', enabled: true, available: Boolean(flowService) },
+        design: { status: designProviders.available ? 'available' : 'unavailable', enabled: true, available: designProviders.available, ...(designProviders.reason?{reason:designProviders.reason}:{}) },
+        schedule: { status: backgroundTaskScheduling ? 'available' : 'disabled', enabled: backgroundTaskScheduling, available: backgroundTaskScheduling }
+      } },
       resourceLimits: RUNTIME_RESOURCE_LIMITS_V1
     }),
     toolDiagnostics: async () => ({
       providers: registry.diagnostics(),
-      mcpServers: mcpProviders.diagnostics,
-      mcpSearch: mcpProviders.search,
+      mcpServers: mcpRuntime.state().diagnostics,
+      mcpSearch: mcpRuntime.state().search,
       webProviders: webProviders.diagnostics,
       skills: skillRuntime.diagnostics(),
       attachments: attachmentStore
@@ -837,6 +996,7 @@ export async function createKunServeRuntime(
     },
     shutdown: async () => {
       deliveryCoordinator.shutdown()
+      dingtalkRuntime.close()
       stopContextObserver()
       taskContextRepository.close()
       taskController.stopWatchdog()
@@ -849,7 +1009,7 @@ export async function createKunServeRuntime(
       await loop.awaitIdle()
       await delegationRuntime?.awaitIdle()
       try {
-        await mcpProviders.close()
+        await mcpRuntime.close()
       } finally {
         try {
           flowService.shutdown()
@@ -875,7 +1035,63 @@ export async function createKunServeRuntime(
   }
   runtimeRef = runtime
   const deliveryCoordinator = new TaskDeliveryCoordinator(runtime)
-  if(backgroundTaskScheduling)deliveryCoordinator.start()
+  runtime.updateLifecycle = new RuntimeUpdateLifecycle({
+    snapshot: () => {
+      const tasks = taskRepository.listUnfinished()
+      const active: UpdateActiveWork[] = []
+      for (const task of tasks) {
+        const pendingWrite = taskRepository.operations(task.id, 'tool').some(receipt => receipt.status === 'running' && receipt.request?.mutation === true)
+        if (['queued', 'running', 'retrying'].includes(task.status) || pendingWrite) {
+          active.push({ kind: 'agent', id: task.id, label: task.goal, status: task.status, recoverable: !pendingWrite })
+        }
+      }
+      for (const shell of taskRepository.listActiveShellSessions()) {
+        const owner = active.find(item => item.id === shell.taskId)
+        if (owner) { owner.recoverable = false; continue }
+        const task = tasks.find(item => item.id === shell.taskId)
+        active.push({ kind: 'agent', id: shell.id, label: task?.goal ?? '正在运行的命令', status: shell.status, recoverable: false })
+      }
+      for (const run of flowRepository.listRunsByStatus(['queued', 'running'])) {
+        const definition = flowRepository.getVersion(run.versionId)?.definition
+        const runningNodes = flowRepository.listNodeRuns(run.id).filter(node => node.status === 'running')
+        active.push({
+          kind: definition?.nodes.some(node => node.type === 'schedule_trigger') ? 'schedule' : 'flow',
+          id: run.id, label: definition?.name ?? run.flowId, status: run.status,
+          recoverable: run.status === 'queued' || Boolean(definition && runningNodes.every(node => definition.nodes.find(item => item.id === node.nodeId)?.policy.resumable === true))
+        })
+      }
+      return active
+    },
+    suspend: async () => {
+      turnService.setAdmissionSuspended(true)
+      taskController.setAdmissionSuspended(true)
+      flowService.setUpdateSuspended(true)
+      deliveryCoordinator.shutdown()
+      await turnService.awaitPendingStarts()
+      await flowService.awaitSourceDispatch()
+    },
+    resume: () => {
+      turnService.setAdmissionSuspended(false)
+      taskController.setAdmissionSuspended(false)
+      flowService.setUpdateSuspended(false)
+      if (backgroundTaskScheduling) deliveryCoordinator.start()
+    },
+    stop: async () => {
+      flowService.executor.checkpointActiveRuns()
+      turnService.abortAll('application_exit')
+      delegationRuntime?.abortAll('application_exit')
+      approvalGate.expireAll('application_exit')
+      userInputGate.reset()
+      await stopAllBashSessions('application_exit')
+      await loop.awaitIdle()
+      await delegationRuntime?.awaitIdle()
+      await flowService.executor.awaitIdle()
+    }
+  })
+  if (backgroundTaskScheduling) {
+    flowService.startSchedules()
+    deliveryCoordinator.start()
+  }
   taskController.startWatchdog({
     intervalMs: 20_000,
     leaseMs: 60_000,

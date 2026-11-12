@@ -1,0 +1,15 @@
+{
+  "request": "对合成数据质检并出趋势图。",
+  "inputs": [
+    "data.csv",
+    "project.json"
+  ],
+  "expected": {
+    "currentValue": 4,
+    "previousValue": 3,
+    "cumulativeChange": 3,
+    "changeRate": 1,
+    "unit": "mm",
+    "validObservations": 3
+  }
+}

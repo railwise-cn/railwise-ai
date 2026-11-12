@@ -1,6 +1,11 @@
+import { ManagedDocumentTool } from './connectors/ManagedDocumentTool'
+import { GitHubConnectorSetup } from './connectors/GitHubConnectorSetup'
+import { isGitHubMcpServer } from '@shared/github-connector'
+import { currentMcpConnectionCheck } from '@shared/mcp-connection-check'
+import { ENGINEERING_FEATURED_PACKAGE_IDS, OPTIONAL_ENGINEERING_SKILLS, isCatalogInstallable } from '@shared/engineering-marketplace'
 import { ProductIcon } from './ProductIcon'
 import type { ReactElement, ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Check,
@@ -48,11 +53,13 @@ import brand from '@shared/product-brand.json'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useChatStore } from '../store/chat-store'
 import { friendlyMarketplaceError, skillValidationWarning } from './plugin-marketplace-compat'
+import { marketplaceNeedsConfiguration, marketplacePackageStatus } from './plugin-marketplace-status'
+import { ConnectorCatalog } from './connectors/ConnectorCatalog'
 
 export * from './plugin-marketplace-compat'
 
 type StatusFilter = 'recommended' | 'all' | 'installed' | 'updates' | 'configuration'
-type MarketplaceView = 'plugins' | 'skills'
+type MarketplaceView = 'connectors' | 'skills' | 'plugins'
 type AudienceFilter = 'official' | 'personal' | 'team'
 type SkillBrowseFilter = 'overview' | 'workwise' | 'personal' | 'project' | 'integrations' | 'attention'
 type SkillGroupCounts = Record<Exclude<SkillBrowseFilter, 'overview'>, number>
@@ -128,6 +135,7 @@ function installedServerForPackage(
   item: MarketplacePackageV1,
   servers: McpServerConfigV2[]
 ): McpServerConfigV2 | undefined {
+  if (item.id === 'github-mcp') return servers.find(server => server.id === item.id && isGitHubMcpServer(server)) ?? servers.find(isGitHubMcpServer)
   const mcpIds = new Set(item.components.filter((component) => component.type === 'mcp').map((component) => component.id))
   return servers.find((server) => server.id === item.id || mcpIds.has(server.id))
 }
@@ -150,7 +158,7 @@ function hasUpdate(
   _reviewSha256?: string,
   diagnostic?: PluginUpdateDiagnosticV1
 ): boolean {
-  if (!record || item.availability.status !== 'available' || item.installation.mode !== 'direct-mirror') return false
+  if (!record || item.availability.status !== 'available' || !isCatalogInstallable(item)) return false
   return diagnostic?.state === 'metadata-refresh' || diagnostic?.state === 'update-available'
 }
 
@@ -171,12 +179,7 @@ function needsConfiguration(
   record: InstalledPackageV1 | undefined,
   server: McpServerConfigV2 | undefined
 ): boolean {
-  if (!record && !server && !isManagedInstalled(item)) return false
-  if (server?.enabled === false) return true
-  if (record?.health.status === 'degraded' || record?.health.status === 'unhealthy') return true
-  if (item.auth.type === 'token') return !server?.credentialRef
-  if (item.auth.type === 'oauth') return !server?.credentialRef
-  return Boolean(item.configuration?.some((field) => field.required && field.defaultValue === undefined))
+  return marketplaceNeedsConfiguration(item, record, server)
 }
 
 function permissionExpanded(
@@ -340,6 +343,14 @@ function sourceAudience(source: CatalogSourceV1 | undefined, sourceId?: string):
   return 'team'
 }
 
+function catalogCredentialStatusLabel(status: CatalogCredentialStatusV1 | undefined, text: Text): string {
+  if (!status) return text('pluginUnifiedCredentialUnchecked', 'Credential status not checked')
+  if (status.message) return status.message
+  return status.configured
+    ? text('pluginUnifiedCredentialConfigured', 'Credential configured')
+    : text('pluginUnifiedCredentialMissing', 'Credential required')
+}
+
 function catalogSourceStateLabel(source: CatalogSourceV1, text: Text): string {
   if (source.id === 'workwise-official') {
     return text('pluginUnifiedSourceBundled', 'Built in and available offline')
@@ -410,8 +421,11 @@ export function PluginMarketplaceView(): ReactElement {
     return typeof translated === 'string' ? translated : fallback
   }, [t])
   const workspaceRoot = normalizeWorkspaceRoot(useChatStore((state) => state.workspaceRoot))
+  const openSettings = useChatStore(state => state.openSettings)
+  const connectorTarget = useChatStore(state => state.pluginConnectorTarget)
   const [sources, setSources] = useState<CatalogSourceV1[]>([])
   const [catalogCredentials, setCatalogCredentials] = useState<CatalogCredentialStatusV1[]>([])
+  const credentialRefreshRevision = useRef(0)
   const [entries, setEntries] = useState<MarketplaceCatalogPackageEntryV1[]>([])
   const [installedPackages, setInstalledPackages] = useState<InstalledPackageV1[]>([])
   const [updateDiagnostics, setUpdateDiagnostics] = useState<PluginUpdateDiagnosticV1[]>([])
@@ -431,6 +445,7 @@ export function PluginMarketplaceView(): ReactElement {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedKey, setSelectedKey] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [githubOpen, setGithubOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [prepared, setPrepared] = useState<PreparedPluginImportV1 | null>(null)
@@ -443,8 +458,13 @@ export function PluginMarketplaceView(): ReactElement {
     code: string
     callback: 'loopback' | 'manual'
   } | null>(null)
-  const [viewMode, setViewMode] = useState<MarketplaceView>('plugins')
+  const [viewMode, setViewMode] = useState<MarketplaceView>('skills')
+  const [connectionRefresh, setConnectionRefresh] = useState(0)
   const [skillFilter, setSkillFilter] = useState<SkillBrowseFilter>('overview')
+
+  useEffect(() => {
+    if (connectorTarget) { setViewMode('connectors'); setQuery(''); setDetailsOpen(false) }
+  }, [connectorTarget])
 
   const installed = useMemo(
     () => new Map(installedPackages.map((item) => [item.packageId, item])),
@@ -454,16 +474,26 @@ export function PluginMarketplaceView(): ReactElement {
 
   const refresh = useCallback(async (showSpinner = false): Promise<void> => {
     if (showSpinner) setLoading(true)
+    const credentialRevision = ++credentialRefreshRevision.current
+    // Protected storage can await a system prompt. Local catalogs remain
+    // usable while per-source credential statuses arrive independently.
+    void window.workwise.listCatalogCredentialStatuses().then(statuses => {
+      if (credentialRevision === credentialRefreshRevision.current) setCatalogCredentials(statuses)
+    }).catch(() => {
+      if (credentialRevision === credentialRefreshRevision.current) setNotice({
+        tone: 'info',
+        message: text('pluginUnifiedPartialOffline', 'Featured catalog remains available offline while some online sources are unavailable.')
+      })
+    })
     const results = await Promise.allSettled([
       window.workwise.listCatalogSources(),
       window.workwise.listCatalogPackages(),
       window.workwise.listInstalledPlugins(),
       window.workwise.listPluginUpdateDiagnostics?.() ?? Promise.resolve([]),
       window.workwise.listMcpServers(workspaceRoot || undefined),
-      window.workwise.listSkills(workspaceRoot || undefined),
-      window.workwise.listCatalogCredentialStatuses()
+      window.workwise.listSkills(workspaceRoot || undefined)
     ])
-    const [sourcesResult, catalogResult, packagesResult, diagnosticsResult, serversResult, skillsResult, credentialsResult] = results
+    const [sourcesResult, catalogResult, packagesResult, diagnosticsResult, serversResult, skillsResult] = results
     const failures: string[] = []
     if (sourcesResult.status === 'fulfilled') setSources(sourcesResult.value)
     else failures.push('sources')
@@ -482,9 +512,6 @@ export function PluginMarketplaceView(): ReactElement {
     } else if (skillsResult.status === 'rejected') {
       failures.push('skills')
     }
-    if (credentialsResult.status === 'fulfilled') setCatalogCredentials(credentialsResult.value)
-    else failures.push('credentials')
-
     const catalog = catalogResult.status === 'fulfilled' ? catalogResult.value : null
     const diagnostics = diagnosticsResult.status === 'fulfilled' ? diagnosticsResult.value : []
     const blocked = diagnostics.filter((item) => item.state === 'runtime-drift' || item.state === 'unavailable')
@@ -508,7 +535,7 @@ export function PluginMarketplaceView(): ReactElement {
       })
     }
     setLoading(false)
-  }, [t, text, workspaceRoot])
+  }, [text, workspaceRoot])
 
   useEffect(() => {
     void refresh(true)
@@ -526,19 +553,20 @@ export function PluginMarketplaceView(): ReactElement {
       .catch(() => undefined)
   }), [workspaceRoot])
 
+  const pluginEntries = useMemo(() => entries.filter(entry => productType(entry.package) !== 'connector'), [entries])
   const categories = useMemo(() => {
     const available = new Set(
-      entries
+      pluginEntries
         .flatMap((entry) => [marketplaceCollection(entry.package)])
     )
     return [
       ...MARKETPLACE_CATEGORY_ORDER.filter((category) => available.delete(category)),
       ...[...available].sort()
     ]
-  }, [entries])
+  }, [pluginEntries])
   const visibleEntries = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return entries.filter((entry) => {
+    return pluginEntries.filter((entry) => {
       const item = entry.package
       const record = installed.get(item.id)
       const server = installedServerForPackage(item, mcpServers)
@@ -569,15 +597,22 @@ export function PluginMarketplaceView(): ReactElement {
       if (left.package.tier !== right.package.tier) return left.package.tier === 'recommended' ? -1 : 1
       return left.package.name.localeCompare(right.package.name)
     })
-  }, [diagnosticMap, audienceFilter, categoryFilter, entries, installed, mcpServers, query, sourceFilter, sourceMap, statusFilter, text])
+  }, [diagnosticMap, audienceFilter, categoryFilter, pluginEntries, installed, mcpServers, query, sourceFilter, sourceMap, statusFilter, text])
 
   const installedEntries = useMemo(
-    () => entries.filter((entry) => isInstalled(entry.package, installed, mcpServers)),
-    [entries, installed, mcpServers]
+    () => pluginEntries.filter((entry) => isInstalled(entry.package, installed, mcpServers)),
+    [pluginEntries, installed, mcpServers]
   )
+  const connectorEntries = useMemo(() => entries.filter(entry => productType(entry.package) === 'connector'), [entries])
+  const skillCatalogEntries = useMemo(() => entries.filter(entry => {
+    if (!entry.package.components.some(component => component.type === 'skill')) return false
+    const needle = query.trim().toLowerCase()
+    return !needle || [packageDisplayName(entry.package, text), packageDisplaySummary(entry.package, text), entry.package.id]
+      .some(value => value.toLowerCase().includes(needle))
+  }), [entries, query, text])
 
   const statusCounts = useMemo<Record<StatusFilter, number>>(() => {
-    const scoped = entries.filter((entry) => {
+    const scoped = pluginEntries.filter((entry) => {
       if (sourceAudience(sourceMap.get(entry.sourceId), entry.sourceId) !== audienceFilter) return false
       return sourceFilter === 'all' || entry.sourceId === sourceFilter
     })
@@ -597,17 +632,19 @@ export function PluginMarketplaceView(): ReactElement {
         installedServerForPackage(entry.package, mcpServers)
       )).length
     }
-  }, [diagnosticMap, audienceFilter, entries, installed, mcpServers, sourceFilter, sourceMap])
+  }, [diagnosticMap, audienceFilter, pluginEntries, installed, mcpServers, sourceFilter, sourceMap])
 
   const visibleEntryGroups = useMemo(() => {
     const showFeatured = categoryFilter === 'all' && statusFilter === 'recommended' && !query.trim()
+    const showEngineering = showFeatured && audienceFilter === 'official' && sourceFilter === 'all'
+    const groupedEntries = showEngineering ? visibleEntries.filter(entry => !ENGINEERING_FEATURED_PACKAGE_IDS.some(id => id === entry.package.id)) : visibleEntries
     const preferred = showFeatured
-      ? visibleEntries.filter((entry) => isFeaturedPackage(entry.package))
+      ? groupedEntries.filter((entry) => isFeaturedPackage(entry.package))
       : []
-    const featured = preferred.length ? preferred : showFeatured ? visibleEntries.slice(0, 2) : []
+    const featured = preferred.length ? preferred : showFeatured ? groupedEntries.slice(0, 2) : []
     const featuredKeys = new Set(featured.map(packageKey))
     const grouped = new Map<string, MarketplaceCatalogPackageEntryV1[]>()
-    for (const entry of visibleEntries.filter((entry) => !featuredKeys.has(packageKey(entry)))) {
+    for (const entry of groupedEntries.filter((entry) => !featuredKeys.has(packageKey(entry)))) {
       const category = marketplaceCollection(entry.package)
       const group = grouped.get(category) ?? []
       group.push(entry)
@@ -624,7 +661,7 @@ export function PluginMarketplaceView(): ReactElement {
       return packages?.length ? [{ category, packages }] : []
     })
     return featured.length ? [{ category: 'featured', packages: featured }, ...categoryGroups] : categoryGroups
-  }, [categoryFilter, query, statusFilter, visibleEntries])
+  }, [audienceFilter, sourceFilter, categoryFilter, query, statusFilter, visibleEntries])
 
   const duplicateSkillNames = useMemo(() => {
     const counts = new Map<string, number>()
@@ -772,6 +809,7 @@ export function PluginMarketplaceView(): ReactElement {
       })
       await refresh()
     } catch (error) {
+      await refresh()
       setNotice({ tone: 'error', message: friendlyMarketplaceError(error instanceof Error ? error.message : String(error), t) })
     } finally {
       setBusy('')
@@ -796,6 +834,10 @@ export function PluginMarketplaceView(): ReactElement {
   }
 
   const connectRemote = async (item: MarketplacePackageV1): Promise<void> => {
+    if (item.id === 'github-mcp') {
+      setViewMode('connectors'); setDetailsOpen(false); setGithubOpen(true)
+      return
+    }
     const component = item.components.find((candidate) =>
       candidate.type === 'mcp' && candidate.runtime.kind === 'remote'
     )
@@ -847,7 +889,7 @@ export function PluginMarketplaceView(): ReactElement {
               saved.id,
               authorization.authorizationState
             )
-            if (result.state !== 'connected') {
+            if (result.state !== 'connected' || !result.authorized) {
               throw new Error(result.message || 'OAuth authorization failed.')
             }
             setOauth(null)
@@ -858,7 +900,8 @@ export function PluginMarketplaceView(): ReactElement {
           }
         }
       }
-      setNotice({ tone: 'success', message: text('pluginUnifiedConnected', '{{name}} connected to MCP V2.', { name: item.name }) })
+      // Saving a server is configuration, not a successful remote connection or an authorization check.
+      setNotice({ tone: 'info', message: text('settings:pluginConfiguredUnverified', 'Configured · verification pending') })
       await refresh()
     } catch (error) {
       setNotice({ tone: 'error', message: friendlyMarketplaceError(error instanceof Error ? error.message : String(error), t) })
@@ -876,7 +919,7 @@ export function PluginMarketplaceView(): ReactElement {
         state: oauth.state,
         authorizationCode: oauth.code.trim()
       })
-      if (result.state !== 'connected') throw new Error(result.message || 'OAuth authorization failed.')
+      if (result.state !== 'connected' || !result.authorized) throw new Error(result.message || 'OAuth authorization failed.')
       setOauth(null)
       setNotice({ tone: 'success', message: text('pluginUnifiedAuthorized', 'Authorization completed.') })
       await refresh()
@@ -887,15 +930,30 @@ export function PluginMarketplaceView(): ReactElement {
     }
   }
 
+  const installEngineeringSkill = async (id: string): Promise<void> => {
+    setBusy(`skill:${id}`)
+    try {
+      const result = await window.workwise.installBundledSkill('railwise:global-skills', { id })
+      if (!result.ok) throw new Error(result.message)
+      await refresh()
+      setNotice({ tone: 'success', message: text('engineeringSkillInstalled', 'Skill installed and available for task selection.') })
+    } catch (error) { setNotice({ tone: 'error', message: error instanceof Error ? error.message : String(error) }) }
+    finally { setBusy('') }
+  }
+
   const invokePrimaryAction = async (entry: MarketplaceCatalogPackageEntryV1): Promise<void> => {
     const item = entry.package
+    if (item.availability.status === 'unavailable') {
+      if (isHttpUrl(item.source.location)) await window.workwise.openExternal(item.source.location)
+      return
+    }
     const diagnostic = diagnosticMap.get(item.id)
     if (diagnostic && ['runtime-drift', 'unavailable'].includes(diagnostic.state)) {
       setSelectedKey(packageKey(entry))
       setDetailsOpen(true)
       return
     }
-    if (item.installation.mode === 'direct-mirror') {
+    if (isCatalogInstallable(item)) {
       await prepareCatalog(entry)
       return
     }
@@ -912,43 +970,44 @@ export function PluginMarketplaceView(): ReactElement {
       <header className="shrink-0 border-b border-ds-border bg-ds-page px-5 py-4 md:px-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-[20px] font-semibold">{text('pluginUnifiedTitle', 'Plugins')}</h1>
+            <h1 className="text-[20px] font-semibold">{text('connectorHubHeading', 'Skills & connectors')}</h1>
             <p className="mt-0.5 text-[12px] text-ds-muted">
               {text('pluginUnifiedSummary', `Connect ${brand.platform} to the tools you use every day`, { productName: brand.platform })}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <IconButton
+            {viewMode === 'plugins' ? <IconButton
               label={text('pluginUnifiedFilters', 'Filters')}
               onClick={() => setFiltersOpen((value) => !value)}
             >
               <SlidersHorizontal className="h-4 w-4" />
-            </IconButton>
+            </IconButton> : null}
             <IconButton
               label={text('pluginUnifiedSources', 'Catalog sources')}
               onClick={() => setSourcesOpen(true)}
             >
               <Settings2 className="h-4 w-4" />
             </IconButton>
-            <IconButton label={text('pluginUnifiedRefresh', 'Refresh')} onClick={() => void refresh(true)} disabled={loading}>
+            <IconButton label={text('pluginUnifiedRefresh', 'Refresh')} onClick={() => { void refresh(true); setConnectionRefresh(value => value + 1) }} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </IconButton>
             <button
               type="button"
-              onClick={() => setImportOpen(true)}
+              onClick={() => viewMode === 'connectors' ? openSettings('mcp') : setImportOpen(true)}
               className="inline-flex h-9 items-center gap-2 rounded-md bg-ds-userbubble px-3 text-[13px] font-semibold text-ds-userbubbleFg hover:opacity-90"
             >
-              <Import className="h-4 w-4" />
-              {text('pluginUnifiedAddPlugin', 'Add plugin')}
-              <ChevronDown className="h-3.5 w-3.5" />
+              {viewMode === 'connectors' ? <Plus className="h-4 w-4" /> : <Import className="h-4 w-4" />}
+              {viewMode === 'connectors' ? text('connectorHubCustom', 'Custom connector') : text('pluginUnifiedAddPlugin', 'Add plugin')}
+              {viewMode !== 'connectors' ? <ChevronDown className="h-3.5 w-3.5" /> : null}
             </button>
           </div>
         </div>
 
-        <div className="mt-3 flex w-fit items-center gap-1 rounded-md border border-ds-border bg-ds-subtle p-1">
+        <div role="tablist" aria-label={text('connectorHubSections', 'Skills and connector sections')} className="mt-3 flex w-fit items-center gap-1 rounded-md border border-ds-border bg-ds-subtle p-1">
           {([
+            ['skills', text('pluginUnifiedSkillsTab', 'Skills')],
             ['plugins', text('pluginUnifiedPluginsTab', 'Plugins')],
-            ['skills', text('pluginUnifiedSkillsTab', 'Skills')]
+            ['connectors', text('connectorHubTab', 'Connectors')]
           ] as Array<[MarketplaceView, string]>).map(([value, label]) => (
             <button
               key={value}
@@ -958,6 +1017,7 @@ export function PluginMarketplaceView(): ReactElement {
               onClick={() => {
                 setViewMode(value)
                 setQuery('')
+                setDetailsOpen(false)
                 if (value === 'skills') setSkillFilter('overview')
               }}
               className={`h-7 rounded px-2.5 text-[12px] font-medium transition ${viewMode === value ? 'bg-ds-card text-ds-ink shadow-sm' : 'text-ds-muted hover:text-ds-ink'}`}
@@ -967,7 +1027,7 @@ export function PluginMarketplaceView(): ReactElement {
           ))}
         </div>
 
-        <div className={`mt-3 grid gap-2 ${viewMode === 'plugins' ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(260px,1fr)_auto]'}`}>
+        <div className={`mt-3 grid gap-2 ${viewMode !== 'skills' ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(260px,1fr)_auto]'}`}>
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ds-faint" />
             <input
@@ -981,11 +1041,12 @@ export function PluginMarketplaceView(): ReactElement {
               }}
               placeholder={viewMode === 'skills'
                 ? text('pluginUnifiedSearchSkills', 'Search indexed Skills by name or capability')
+                : viewMode === 'connectors' ? text('connectorHubSearch', 'Search connectors')
                 : text('pluginUnifiedSearch', 'Search plugins, publishers, and capabilities')}
               className="h-10 w-full rounded-md border border-ds-border bg-ds-card pl-10 pr-3 text-[13px] outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
             />
           </label>
-          {viewMode === 'plugins' ? null : (
+          {viewMode !== 'skills' ? null : (
             <div className="flex h-10 items-center gap-2 rounded-md border border-ds-border bg-ds-card px-3 text-[12px] text-ds-muted">
               <Sparkles className="h-4 w-4 text-accent" />
               {text('pluginUnifiedSkillsRootCount', '{{count}} Skills indexed', { count: skills.length })}
@@ -1056,7 +1117,34 @@ export function PluginMarketplaceView(): ReactElement {
       ) : null}
 
       <main className="min-h-0 flex-1 overflow-y-auto">
-        {viewMode === 'skills' ? (
+        {viewMode === 'connectors' ? <ConnectorCatalog
+          onInstall={entry => void invokePrimaryAction(entry)}
+          entries={connectorEntries}
+          query={query}
+          refreshKey={connectionRefresh}
+          target={connectorTarget}
+          onTargetOpened={() => useChatStore.setState({ pluginConnectorTarget: null })}
+          name={entry => packageDisplayName(entry.package, text)}
+          summary={entry => packageDisplaySummary(entry.package, text)}
+          status={entry => packageStatusLabel(entry.package, installed.get(entry.package.id), installedServerForPackage(entry.package, mcpServers), diagnosticMap.get(entry.package.id), text, entry.reviewSha256)}
+          onDetails={entry => {
+            if (entry.package.id === 'github-mcp') { setGithubOpen(true); return }
+            setSelectedKey(packageKey(entry)); setDetailsOpen(true)
+          }}
+          onRefresh={() => refresh()}
+        /> : viewMode === 'skills' ? (
+          <>
+          <section className="mx-auto w-full max-w-[1040px] px-5 pt-5 md:px-7" aria-label={text('engineeringSkillSelection', 'Engineering skills')}>
+            <h2 className="mb-2 text-[14px] font-semibold">{text('engineeringSkillSelection', 'Engineering skills')}</h2>
+            <div className="grid gap-3 md:grid-cols-2">{OPTIONAL_ENGINEERING_SKILLS.filter(skill => !query || `${skill.name} ${skill.summary}`.toLowerCase().includes(query.toLowerCase())).map(skill => {
+              const added = skills.some(item => item.id === skill.id || item.name === skill.id)
+              return <article key={skill.id} className="rounded-lg border border-ds-border bg-ds-card p-4"><h3 className="text-sm font-semibold">{skill.name}</h3><p className="mt-1 text-xs leading-5 text-ds-muted">{skill.summary}</p><button type="button" disabled={added || busy === `skill:${skill.id}`} onClick={() => void installEngineeringSkill(skill.id)} className="mt-3 rounded-md border border-ds-border px-3 py-1.5 text-xs hover:bg-ds-hover disabled:opacity-50">{added ? text('pluginInstalled', 'Installed') : busy === `skill:${skill.id}` ? text('pluginInstalling', 'Installing…') : text('pluginUnifiedInstall', 'Install')}</button></article>
+            })}</div>
+          </section>
+          {skillCatalogEntries.length ? <section className="mx-auto w-full max-w-[1040px] px-5 pt-5 md:px-7" aria-label={text('connectorHubSkillCatalog', 'Discover skills')}>
+            <h2 className="mb-2 text-[14px] font-semibold">{text('connectorHubSkillCatalog', 'Discover skills')}</h2>
+            <div className="grid gap-x-9 md:grid-cols-2">{skillCatalogEntries.filter(entry => !OPTIONAL_ENGINEERING_SKILLS.some(skill => skill.id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div>
+          </section> : null}
           <LocalSkillsList
             skills={visibleSkills}
             allSkills={skills}
@@ -1075,6 +1163,7 @@ export function PluginMarketplaceView(): ReactElement {
               if (url) void window.workwise.openExternal(url)
             }}
           />
+          </>
         ) : loading && entries.length === 0 ? (
           <div className="flex h-full items-center justify-center text-ds-muted">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -1086,6 +1175,7 @@ export function PluginMarketplaceView(): ReactElement {
           </div>
         ) : (
           <div className="mx-auto w-full max-w-[1040px] px-5 pb-8 md:px-7">
+            {!query && statusFilter === 'recommended' && categoryFilter === 'all' && audienceFilter === 'official' && sourceFilter === 'all' ? <section className="pt-5" aria-label={text('engineeringPluginSelection', 'Engineering essentials')}><h2 className="border-b border-ds-border pb-2 text-[13px] font-semibold">{text('engineeringPluginSelection', 'Engineering essentials')}</h2><div className="grid gap-x-9 md:grid-cols-2">{entries.filter(entry => ENGINEERING_FEATURED_PACKAGE_IDS.some(id => id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div></section> : null}
             {visibleEntryGroups.map((group) => (
               <section key={group.category} className="pt-5">
                 <div className="flex h-8 items-center justify-between border-b border-ds-border">
@@ -1257,6 +1347,7 @@ export function PluginMarketplaceView(): ReactElement {
         />
       ) : null}
 
+      {githubOpen ? <GitHubConnectorSetup workspaceRoot={workspaceRoot || undefined} onClose={() => setGithubOpen(false)} onChanged={() => refresh()} onAdvanced={() => { setGithubOpen(false); openSettings('mcp') }} /> : null}
       {oauth ? (
         <Modal title={text('pluginUnifiedOauthTitle', 'Complete authorization')} onClose={() => {
           const current = oauth
@@ -1622,6 +1713,35 @@ function InstalledPluginStrip({ entries, text, onSelect }: {
   )
 }
 
+function packageStatusLabel(
+  item: MarketplacePackageV1,
+  installed: InstalledPackageV1 | undefined,
+  server: McpServerConfigV2 | undefined,
+  diagnostic: PluginUpdateDiagnosticV1 | undefined,
+  text: Text,
+  reviewSha256?: string
+): string {
+  const check = currentMcpConnectionCheck(server)
+  const checkedAt = check ? new Date(check.checkedAt).toLocaleString() : ''
+  switch (marketplacePackageStatus(item, installed, server, diagnostic).state) {
+    case 'available': return text('settings:pluginAvailableToInstall', 'Available to install')
+    case 'installed': return text('pluginFilterInstalled', 'Installed')
+    case 'configuration': return text('pluginUnifiedNeedsConfig', 'Needs configuration')
+    case 'configured_unverified': return text('settings:pluginConfiguredUnverified', 'Configured · verification pending')
+    case 'connection_checked': return `${text('settings:pluginConnectionChecked', 'Connection check passed ({{count}} tools)', { count: check?.toolCount ?? 0 })} · ${checkedAt}`
+    case 'connection_failed': return `${text('settings:pluginConnectionFailed', 'Connection check failed')} · ${checkedAt}`
+    case 'installed_unavailable': return text('settings:pluginInstalledUnavailable', 'Installed · currently unavailable')
+    case 'installed_source_unavailable': return text('settings:pluginInstalledSourceUnavailable', 'Installed · source unavailable')
+    case 'source_unavailable': return text('pluginUpdateUnavailable', 'Source unavailable')
+    case 'unavailable': return text('pluginUnifiedUnavailable', 'Currently unavailable')
+    case 'runtime_drift': return text('pluginUpdateFull', 'Complete update required')
+    case 'metadata_refresh': return text('pluginUpdateReview', 'Review metadata changes')
+    case 'update_available': return permissionExpanded(item, installed, reviewSha256)
+      ? text('pluginUnifiedPermissionsChanged', 'Permissions changed')
+      : text('pluginUnifiedUpdateAvailable', 'Update available')
+  }
+}
+
 function PackageStatus({ item, installed, server, reviewSha256, diagnostic, text }: {
   item: MarketplacePackageV1
   installed?: InstalledPackageV1
@@ -1630,13 +1750,13 @@ function PackageStatus({ item, installed, server, reviewSha256, diagnostic, text
   diagnostic?: PluginUpdateDiagnosticV1
   text: Text
 }): ReactElement {
-  if (diagnostic && diagnostic.state !== 'current') return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{diagnosticLabel(diagnostic, text)}</span>
-  if (hasUpdate(item, installed, reviewSha256, diagnostic)) return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedPermissionsChanged', 'Permissions changed') : text('pluginUnifiedUpdateAvailable', 'Update available')}</span>
-  if (needsConfiguration(item, installed, server)) return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{text('pluginUnifiedNeedsConfig', 'Needs configuration')}</span>
-  if (installed || server || isManagedInstalled(item)) return <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />{text('pluginFilterInstalled', 'Installed')}</span>
-  if (item.availability.status === 'unavailable') return <span className="text-[11px] font-medium text-ds-faint">{text('pluginUnifiedUnavailable', 'Unavailable')}</span>
-  if (item.installation.mode === 'external') return <span className="text-[11px] font-medium text-ds-muted">{text('pluginUnifiedExternal', 'External service')}</span>
-  return <span className="text-[11px] font-medium text-ds-faint">{item.version}</span>
+  const status = marketplacePackageStatus(item, installed, server, diagnostic)
+  const tone = status.tone === 'success' ? 'text-emerald-700 dark:text-emerald-300'
+    : status.tone === 'attention' ? 'text-amber-700 dark:text-amber-300' : 'text-ds-muted'
+  return <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${tone}`}>
+    {status.state === 'installed' || status.state === 'connection_checked' ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+    {packageStatusLabel(item, installed, server, diagnostic, text, reviewSha256)}
+  </span>
 }
 
 function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy, text, onClick }: {
@@ -1650,22 +1770,26 @@ function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy
   onClick: () => void
 }): ReactElement | null {
   if (item.installation.mode === 'system-managed') return null
+  const sourceOnly = item.availability.status === 'unavailable'
+  if (sourceOnly && !isHttpUrl(item.source.location)) return null
   const added = Boolean(installed || server || isManagedInstalled(item))
   const update = hasUpdate(item, installed, reviewSha256, diagnostic)
   const blocked = diagnostic && ['runtime-drift', 'unavailable'].includes(diagnostic.state)
-  const managesPermissions = item.installation.mode === 'direct-mirror' && added && !update
+  const managesPermissions = isCatalogInstallable(item) && added && !update
   const remote = item.components.some((component) => component.type === 'mcp' && component.runtime.kind === 'remote')
-  const canAct = item.installation.mode === 'direct-mirror' || remote || isHttpUrl(item.source.location)
+  const canAct = isCatalogInstallable(item) || remote || isHttpUrl(item.source.location)
   if (!canAct) return null
-  const label = blocked ? diagnosticLabel(diagnostic!, text) : update
+  const installLabel = item.installation.mode === 'upstream-only'
+    ? text('pluginUnifiedInstallUpstream', 'Install from upstream') : text('pluginUnifiedInstall', 'Install')
+  const label = sourceOnly ? text('pluginOpenSource', 'Open source') : blocked ? diagnosticLabel(diagnostic!, text) : update
     ? permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedReviewUpdate', 'Review update') : text('pluginUnifiedUpdate', 'Update')
-    : item.installation.mode === 'direct-mirror' && !added ? text('pluginUnifiedInstall', 'Install')
+    : isCatalogInstallable(item) && !added ? installLabel
     : remote && !added ? text('pluginUnifiedConnect', 'Connect')
     : managesPermissions ? text('pluginUnifiedPermissions', 'Permissions')
     : text('pluginOpenSource', 'Open source')
   return (
-    <button type="button" disabled={busy || Boolean(blocked) || (item.availability.status === 'unavailable' && !isHttpUrl(item.source.location))} onClick={(event) => { event.stopPropagation(); onClick() }} className="inline-flex h-8 min-w-[92px] items-center justify-center gap-1.5 rounded-md border border-ds-border bg-ds-card px-3 text-[11px] font-semibold hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-50">
-      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : item.installation.mode === 'external' ? <ExternalLink className="h-3.5 w-3.5" /> : update ? <RefreshCw className="h-3.5 w-3.5" /> : managesPermissions ? <SlidersHorizontal className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+    <button type="button" disabled={busy || (!sourceOnly && Boolean(blocked))} onClick={(event) => { event.stopPropagation(); onClick() }} className="inline-flex h-8 min-w-[92px] items-center justify-center gap-1.5 rounded-md border border-ds-border bg-ds-card px-3 text-[11px] font-semibold hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-50">
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : sourceOnly || item.installation.mode === 'external' ? <ExternalLink className="h-3.5 w-3.5" /> : update ? <RefreshCw className="h-3.5 w-3.5" /> : managesPermissions ? <SlidersHorizontal className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
       {label}
     </button>
   )
@@ -1708,7 +1832,7 @@ function PluginRow({ entry, installed, server, reviewSha256, diagnostic, busy, t
 
 function Drawer({ title, closeLabel, onClose, children }: { title: string; closeLabel: string; onClose: () => void; children: ReactNode }): ReactElement {
   return (
-    <div className="fixed inset-0 z-40 bg-black/20" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div className="ds-connector-overlay fixed inset-0 z-40 bg-black/20" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <aside className="absolute inset-y-0 right-0 flex w-full max-w-[480px] flex-col border-l border-ds-border bg-ds-card shadow-2xl">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-ds-border px-5">
           <h2 className="truncate text-[15px] font-semibold">{title}</h2>
@@ -1757,6 +1881,7 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
           ) : null}
         </div>
       </div>
+      {item.id === 'officecli' || item.id === 'markitdown' ? <div className="px-5"><ManagedDocumentTool id={item.id} /></div> : null}
       {diagnostic ? <DetailSection title={text('pluginUpdateDiagnosis', 'Update diagnosis')}><p className="text-[13px] font-medium">{diagnosticLabel(diagnostic, text)}</p>{diagnostic.state === 'runtime-drift' ? <p className="mt-2 text-[12px] text-ds-muted">{text('pluginUpdateFullReason', 'Runtime or source verification changed. Install a verified new package version; metadata review cannot replace runtime validation.')}</p> : null}</DetailSection> : null}
       <DetailSection title={text('pluginUnifiedPackageInfo', 'Package')}>
         <DefinitionList values={[
@@ -1767,6 +1892,7 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
           [text('pluginUnifiedSource', 'Source'), sourceLabel(source, entry.sourceId, text)],
           [text('pluginUnifiedUpdatePolicy', 'Update policy'), updatePolicyLabel(item, text)]
         ]} />
+        {item.installation.mode === 'upstream-only' && !item.license ? <p className="mt-3 text-[12px] leading-5 text-amber-700 dark:text-amber-300">{text('pluginUnifiedUndeclaredLicenseNotice', 'The upstream repository has no declared license. Installation uses its pinned source version.')}</p> : null}
         {isHttpUrl(item.source.location) ? <button type="button" onClick={onOpenSource} className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"><ExternalLink className="h-3.5 w-3.5" />{text('pluginOpenSource', 'Open source')}</button> : null}
       </DetailSection>
       {item.usage ? (
@@ -1792,7 +1918,9 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
       </DetailSection>
       <DetailSection title={text('pluginUnifiedHealth', 'Health')}>
         <DefinitionList values={[
-          [text('pluginUnifiedStatus', 'Status'), packageHealthLabel(installed?.health.status ?? (server ? (server.enabled ? 'configured' : 'disabled') : isManagedInstalled(item) ? 'managed' : 'not installed'), text)],
+          [text('pluginUnifiedStatus', 'Status'), packageStatusLabel(item, installed, server, diagnostic, text, entry.reviewSha256)],
+          ...(installed ? [[text('settings:pluginInstallationHealth', 'Installation health'), packageHealthLabel(installed.health.status, text)] as [string, string]] : []),
+          ...(isManagedInstalled(item) ? [[text('pluginUnifiedImplementation', 'Implementation'), packageHealthLabel('managed', text)] as [string, string]] : []),
           [text('pluginUnifiedLastCheck', 'Last check'), installed?.health.checkedAt ?? installed?.timestamps.lastCheckedAt ?? (isManagedInstalled(item) ? text('pluginUnifiedManagedCheck', `Managed with ${brand.platform} releases`, { productName: brand.platform }) : text('pluginUnifiedNever', 'Never'))]
         ]} />
       </DetailSection>
@@ -1875,7 +2003,7 @@ function SourceDrawer({ sources, credentialStatuses, busy, text, workspaceAvaila
               <div className="flex gap-1">{source.auth.type === 'token' ? <IconButton label={text('pluginUnifiedConfigureCredential', 'Configure credential')} disabled={busy === `credential:${source.id}`} onClick={() => { setCredentialSourceId(source.id); setCredentialToken('') }}>{busy === `credential:${source.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}</IconButton> : null}{source.sync.mode !== 'bundled' ? <IconButton label={text('pluginUnifiedSyncSource', 'Sync source')} disabled={busy === `source:${source.id}`} onClick={() => onSync(source)}>{busy === `source:${source.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}</IconButton> : null}{source.scope !== 'system' ? <IconButton label={text('pluginUnifiedRemoveSource', 'Remove source')} disabled={busy === `source:${source.id}`} onClick={() => onRemove(source)}><Trash2 className="h-4 w-4" /></IconButton> : null}</div>
             </div>
             <p className="mt-2 break-all text-[11px] leading-4 text-ds-muted">{source.location}</p>
-            {source.auth.type === 'token' ? <p className="mt-1 text-[10px] text-ds-faint">{credentialMap.get(source.id)?.configured ? text('pluginUnifiedCredentialConfigured', 'Credential configured') : text('pluginUnifiedCredentialMissing', 'Credential required')}</p> : null}
+            {source.auth.type === 'token' ? <p className="mt-1 text-[10px] text-ds-faint">{catalogCredentialStatusLabel(credentialMap.get(source.id), text)}</p> : null}
             {credentialSourceId === source.id ? <div className="mt-3 flex gap-2"><input type="password" autoFocus autoComplete="off" value={credentialToken} onChange={(event) => setCredentialToken(event.target.value)} placeholder={text('pluginUnifiedCatalogToken', 'Access token')} className="h-8 min-w-0 flex-1 rounded-md border border-ds-border bg-ds-card px-3 text-[11px] outline-none focus:border-accent/50" /><button type="button" disabled={!credentialToken.trim() || busy === `credential:${source.id}`} onClick={() => void onCredential(source, credentialToken).then((saved) => { if (saved) { setCredentialSourceId(''); setCredentialToken('') } })} className="h-8 rounded-md bg-ds-userbubble px-3 text-[11px] font-semibold text-ds-userbubbleFg disabled:opacity-50">{text('pluginUnifiedSave', 'Save')}</button>{credentialMap.get(source.id)?.configured ? <button type="button" disabled={busy === `credential:${source.id}`} onClick={() => void onCredential(source, '').then((saved) => { if (saved) { setCredentialSourceId(''); setCredentialToken('') } })} className="h-8 rounded-md border border-ds-border px-3 text-[11px] font-medium hover:bg-ds-hover">{text('pluginUnifiedClear', 'Clear')}</button> : null}</div> : null}
             {source.sync.error && source.id !== 'workwise-official' ? (
               <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
@@ -1918,14 +2046,17 @@ function ReviewModal({ prepared, selections, scope, permissionUpdate, workspaceA
   onInstall: () => void
 }): ReactElement {
   const item = prepared.package
+  const installLabel = item.installation.mode === 'upstream-only'
+    ? text('pluginUnifiedInstallUpstream', 'Install from upstream') : text('pluginUnifiedInstall', 'Install')
   return (
     <Modal title={text('pluginUnifiedReviewTitle', 'Review {{name}}', { name: item.name })} onClose={onClose}>
       <div className="flex items-start gap-3 rounded-md border border-ds-border bg-ds-subtle p-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><div className="text-[12px] font-semibold">{text('pluginUnifiedVerifiedReview', 'Content and metadata review')}</div><p className="mt-1 break-all text-[10px] leading-4 text-ds-muted">SHA-256 {prepared.contentSha256}</p></div></div>
+      {item.installation.mode === 'upstream-only' && !item.license ? <p className="mt-3 text-[12px] leading-5 text-amber-700 dark:text-amber-300">{text('pluginUnifiedUndeclaredLicenseNotice', 'The upstream repository has no declared license. Installation uses its pinned source version.')}</p> : null}
       {!prepared.compatibility.workwiseCompatible ? <div className="mt-3 flex gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-[12px] text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"><CircleAlert className="h-4 w-4 shrink-0" /><span>{prepared.compatibility.reasons.join(' ')}</span></div> : null}
       <div className="mt-4"><h3 className="text-[11px] font-semibold uppercase text-ds-faint">{text('pluginUnifiedPermissions', 'Permissions')}</h3><div className="mt-2 max-h-[230px] space-y-2 overflow-y-auto">{item.permissions.length ? item.permissions.map((permission) => <label key={permission.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-ds-border p-3"><input type="checkbox" checked={Boolean(selections[permission.id])} onChange={(event) => onSelection(permission.id, event.target.checked)} className="mt-0.5 h-4 w-4" /><div><div className="text-[12px] font-medium">{permissionKindLabel(permission.kind, text)} · {permissionAccessLabel(permission.access, text)}</div><p className="mt-0.5 text-[11px] leading-4 text-ds-muted">{permissionDescription(permission, text)}</p></div></label>) : <p className="text-[12px] text-ds-faint">{text('pluginUnifiedNoPermissions', 'No additional permissions declared.')}</p>}</div></div>
       <div className="mt-4"><h3 className="text-[11px] font-semibold uppercase text-ds-faint">{text('pluginUnifiedScope', 'Install scope')}</h3><div className="mt-2 inline-flex rounded-md bg-ds-subtle p-1">{(['user', 'workspace', 'team'] as const).map((value) => <button key={value} type="button" disabled={permissionUpdate || (value === 'workspace' && !workspaceAvailable)} onClick={() => onScope(value)} className={`h-8 rounded px-3 text-[11px] font-medium ${scope === value ? 'bg-ds-card shadow-sm' : 'text-ds-muted'} disabled:opacity-40`}>{text(`pluginUnifiedScope${value[0]!.toUpperCase()}${value.slice(1)}`, value)}</button>)}</div></div>
       {prepared.warnings.length ? <div className="mt-4 text-[11px] leading-4 text-amber-700 dark:text-amber-300">{prepared.warnings.join(' ')}</div> : null}
-      <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="h-9 rounded-md border border-ds-border px-3 text-[12px] font-medium hover:bg-ds-hover">{text('pluginUnifiedCancel', 'Cancel')}</button><button type="button" disabled={busy || !prepared.compatibility.workwiseCompatible} onClick={onInstall} className="inline-flex h-9 min-w-[96px] items-center justify-center gap-2 rounded-md bg-ds-userbubble px-3 text-[12px] font-semibold text-ds-userbubbleFg disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" />{permissionUpdate ? text('pluginUnifiedApplyPermissions', 'Apply') : text('pluginUnifiedInstall', 'Install')}</>}</button></div>
+      <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="h-9 rounded-md border border-ds-border px-3 text-[12px] font-medium hover:bg-ds-hover">{text('pluginUnifiedCancel', 'Cancel')}</button><button type="button" disabled={busy || !prepared.compatibility.workwiseCompatible} onClick={onInstall} className="inline-flex h-9 min-w-[96px] items-center justify-center gap-2 rounded-md bg-ds-userbubble px-3 text-[12px] font-semibold text-ds-userbubbleFg disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" />{permissionUpdate ? text('pluginUnifiedApplyPermissions', 'Apply') : installLabel}</>}</button></div>
     </Modal>
   )
 }

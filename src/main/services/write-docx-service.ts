@@ -46,7 +46,7 @@ import { createWriteMarkdownIt } from '../../shared/write-advanced-markdown'
 import { buildWriteMathOmml } from './write-math-omml'
 import { writeMathImageTransformation } from './write-math-image-layout'
 import { assignWriteExportHeadings, resolveWriteExportLink } from './write-export-link'
-import { renderWriteMathImage, renderWriteMermaidDiagrams, type WriteRenderedDiagram } from './write-advanced-renderer'
+import { renderWriteMathImage, renderWriteMermaidDiagrams, renderWriteSvgImage, type WriteRenderedDiagram } from './write-advanced-renderer'
 
 type InlineToken = {
   type: string
@@ -178,6 +178,7 @@ type WriteDocxRenderContext = {
   template: ExportStyleTemplate
   inlineElementType: ExportElementType
   workspaceRoot?: string
+  strictImages?: boolean
   diagrams: Map<string, WriteRenderedDiagram | null>
   footnoteReferences: Set<number>
   headingBookmarks: Map<string, string>
@@ -250,6 +251,12 @@ async function loadImage(src: string, sourcePath: string): Promise<ImageInfo | n
   const resource = await readWriteImageResource({ src, sourcePath, workspaceRoot: writeDocxRenderContext.getStore()?.workspaceRoot })
   if (!resource) return null
   const extension = resource.extension
+  if (extension === 'svg') {
+    try {
+      const rendered = await renderWriteSvgImage(resource.data.toString('utf8'))
+      return rendered && safeImageSize(rendered.png) ? { data: rendered.png, width: rendered.width, height: rendered.height, extension: 'png' } : null
+    } catch { return null }
+  }
   if (!['png', 'jpg', 'jpeg', 'gif', 'bmp'].includes(extension)) return null
 
   try {
@@ -454,6 +461,7 @@ async function parseInlineTokens(tokens: InlineToken[], sourcePath: string): Pro
           })
         )
       } else {
+        if (writeDocxRenderContext.getStore()?.strictImages) throw Object.assign(new Error('A document image could not be read or rendered within the authorized workspace.'), { code: 'write_export_image_unavailable' })
         push(textRun(`[Image: ${alt}]`, { italics: true, color: '9B1C1C' }))
       }
     } else if (token.type === 'softbreak') {
@@ -702,6 +710,7 @@ export async function buildDocxFromMarkdown(options: {
   content: string
   title?: string
   workspaceRoot?: string
+  strictImages?: boolean
   /**
    * 导出模板。若提供，标题/正文/表格/代码块的字体、字号、颜色、行距、缩进、
    * 对齐和页边距均由模板驱动；缺省时回退到 0.3.0 硬编码默认值（向后兼容）。
@@ -713,6 +722,7 @@ export async function buildDocxFromMarkdown(options: {
       template: options.template ?? resolveExportTemplate(undefined),
       inlineElementType: 'p',
       workspaceRoot: options.workspaceRoot,
+      strictImages: options.strictImages,
       diagrams: new Map(),
       footnoteReferences: new Set(),
       headingBookmarks: new Map(),

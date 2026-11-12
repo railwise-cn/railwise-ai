@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
-import { mkdir, open } from 'node:fs/promises'
+import { mkdir, open, realpath } from 'node:fs/promises'
 import { basename, dirname, relative, resolve, sep } from 'node:path'
 import type { TaskRunRepository } from '../../services/task-run-repository.js'
 import type { TaskContextRuntime } from '../../services/task-context-runtime.js'
@@ -19,6 +19,16 @@ type DocumentSnapshot = { path: string; content: string; revision: { fingerprint
 type SourceReference = { path: string; sha256: string; revision: string; workspaceRoot: string; location?: string; excerpt?: string; sections?: string[] }
 type ExportFormat = 'docx' | 'pdf' | 'html'
 type ExportItem = { format: ExportFormat; status: 'exported' | 'failed' | 'outcome_unknown' | 'pending_export'; path?: string; sha256?: string; size?: number; message?: string }
+
+/** Historical task roots may be aliases; filesystem authority belongs to this Turn. */
+async function deliveryWorkspaceContext(taskWorkspace: string, context: ToolHostContext): Promise<ToolHostContext> {
+  if (!taskWorkspace.trim() || !context.workspace.trim() || await realpath(taskWorkspace) !== await realpath(context.workspace)) {
+    throw Object.assign(new Error('Delivery task belongs to a different authorized workspace.'), { code: 'workspace_path_blocked' })
+  }
+  // Do not replace the canonical Runtime root with the task's original alias,
+  // or rewrite the immutable Grant to make that alias pass its path checks.
+  return context
+}
 
 /** Open the checked file itself without following a final symlink, and reject a racing read. */
 async function readBounded(path: string, context: ToolHostContext, limit = MAX_DOCUMENT_BYTES): Promise<{ bytes: Buffer; snapshot: DocumentSnapshot }> {
@@ -127,8 +137,8 @@ export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository
       if (!rawPath || !key) return { output: { error: 'path and idempotency_key are required' }, isError: true }
       if (!/\.(?:md|mdx|markdown)$/i.test(rawPath)) return { output: { error: 'Delivery candidates must be Markdown files.' }, isError: true }
       if (Buffer.byteLength(content, 'utf8') > MAX_DOCUMENT_BYTES) return { output: { error: 'Candidate is too large.' }, isError: true }
-      const root = resolve(task.workspaceRoot)
-      const scopedContext = { ...context, workspace: root }
+      const scopedContext = await deliveryWorkspaceContext(task.workspaceRoot, context)
+      const root = resolve(scopedContext.workspace)
       const sidecar = resolve(root, '.workwise', 'delivery-candidates', task.id)
       const target = resolve(sidecar, rawPath)
       const rel = relative(sidecar, target)
@@ -261,7 +271,7 @@ export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository
       const path = typeof args.path === 'string' ? args.path : ''
       const task = repository.findActiveByThread(context.threadId)
       if (!task || task.authority?.revokedAt) return { output: { error: 'No authorized active delivery task.' }, isError: true }
-      const scopedContext = { ...context, workspace: task.workspaceRoot }
+      const scopedContext = await deliveryWorkspaceContext(task.workspaceRoot, context)
       const resolved = await resolveWorkspacePath(path, scopedContext)
       const maxBytes = typeof args.max_bytes === 'number' ? Math.min(200_000, Math.max(1, Math.trunc(args.max_bytes))) : 100_000
       const read = await readBounded(resolved.relativePath, scopedContext, maxBytes)
@@ -274,7 +284,7 @@ export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository
     execute: async (args, context) => {
       const task = repository.findActiveByThread(context.threadId)
       if (!task || task.authority?.revokedAt) return { output: { error: 'No authorized active delivery task.' }, isError: true }
-      const scopedContext = { ...context, workspace: task.workspaceRoot }
+      const scopedContext = await deliveryWorkspaceContext(task.workspaceRoot, context)
       const source = await resolveWorkspacePath(String(args.path ?? ''), scopedContext)
       const sidecar = `.workwise/delivery-candidates/${task.id}/`
       if (!source.relativePath.startsWith(sidecar) || !/\.(?:md|mdx|markdown)$/i.test(source.relativePath)) throw new Error('Only this task’s Markdown candidates can be exported.')
@@ -291,7 +301,7 @@ export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository
       for (const format of formats) {
         const targetPath = `.workwise/delivery-exports/${task.id}/${source.relativePath.slice(sidecar.length).replace(/\.(?:md|mdx|markdown)$/i, `.${format}`)}`
         const operationKey = `${key}:${format}`
-        const request = { workspaceRoot: task.workspaceRoot, sourcePath: source.absolutePath, targetPath: resolve(task.workspaceRoot, targetPath), format, expectedHash, idempotencyKey: `${task.id}:${operationKey}` }
+        const request = { workspaceRoot: scopedContext.workspace, sourcePath: source.absolutePath, targetPath: resolve(scopedContext.workspace, targetPath), format, expectedHash, idempotencyKey: `${task.id}:${operationKey}` }
         const verifyReceipt = async (receipt: { path?: string; sha256?: string; size?: number }): Promise<ExportItem> => {
           const safePath = await resolveWorkspacePath(receipt.path ?? '', scopedContext)
           if (safePath.relativePath !== targetPath) throw new Error('Export bridge returned a different destination.')
@@ -348,7 +358,7 @@ export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository
       const service = options.engineeringService
       const task = repository.findActiveByThread(context.threadId)
       if (!service || !task || task.authority?.revokedAt) return { output: { error: 'Authorized engineering delivery is unavailable.' }, isError: true }
-      const scopedContext = { ...context, workspace: task.workspaceRoot }
+      const scopedContext = await deliveryWorkspaceContext(task.workspaceRoot, context)
       const dataPath = await resolveWorkspacePath(String(args.path ?? ''), scopedContext)
       if (!/\.(?:csv|xlsx|json)$/i.test(dataPath.relativePath)) throw new Error('Monitoring source must be CSV, XLSX or JSON.')
       const source = await readBounded(dataPath.relativePath, scopedContext, 32 * 1024 * 1024)
@@ -364,12 +374,12 @@ export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository
       try {
         // Only file-supplied business values are accepted. Runtime identity and workspace cannot be supplied by the model or file.
         const { workspace: _workspace, idempotencyKey: _key, expectedRevision: _revision, ...business } = supplied
-        const project = service.createProject(EngineeringProjectCreateRequest.parse({ ...business, workspace: task.workspaceRoot, expectedRevision: 0, idempotencyKey: `delivery-project:${sourceKey}` }))
+        const project = service.createProject(EngineeringProjectCreateRequest.parse({ ...business, workspace: scopedContext.workspace, expectedRevision: 0, idempotencyKey: `delivery-project:${sourceKey}` }))
         const imported = await service.importDataset({ projectId: project.id, expectedRevision: project.revision, name: basename(dataPath.absolutePath), dataBase64: source.bytes.toString('base64'), fieldMapping: args.field_mapping ? FieldMappingV1.parse(args.field_mapping) : undefined, idempotencyKey: `delivery-import:${sourceKey}` })
         const checked = service.validateDataset({ datasetId: imported.id, expectedRevision: imported.revision, idempotencyKey: `delivery-validate:${sourceKey}` })
         const analysis = service.createAnalysis({ projectId: project.id, datasetId: checked.id, expectedRevision: checked.revision, idempotencyKey: `delivery-analysis:${sourceKey}` })
         const chart = await service.createChart({ analysisId: analysis.id, chartType: 'trend', expectedRevision: 0, idempotencyKey: `delivery-chart:${sourceKey}` })
-        const result = { status: checked.findings.some(item => item.severity === 'blocking' && item.status === 'open') ? 'blocked' : 'analyzed', projectId: project.id, datasetId: checked.id, analysis, findings: checked.findings, chart, sources: [{ path: dataPath.relativePath, sha256: source.snapshot.revision.fingerprint }, { path: relative(resolve(task.workspaceRoot), projectSource.snapshot.path), sha256: projectSource.snapshot.revision.fingerprint }], generatedFiles: [{ relativePath: chart.relativePath, format: 'svg', sha256: chart.sha256 }] }
+        const result = { status: checked.findings.some(item => item.severity === 'blocking' && item.status === 'open') ? 'blocked' : 'analyzed', projectId: project.id, datasetId: checked.id, analysis, findings: checked.findings, chart, sources: [{ path: dataPath.relativePath, sha256: source.snapshot.revision.fingerprint }, { path: relative(resolve(scopedContext.workspace), projectSource.snapshot.path), sha256: projectSource.snapshot.revision.fingerprint }], generatedFiles: [{ relativePath: chart.relativePath, format: 'svg', sha256: chart.sha256 }] }
         repository.finishOperation(task.id, key, { status: 'succeeded', result }, new Date().toISOString())
         return { output: result, ...(result.status === 'blocked' ? { isError: true } : {}) }
       } catch (error) { repository.finishOperation(task.id, key, { status: 'failed', error: error instanceof Error ? error.message : String(error) }, new Date().toISOString()); throw error }
@@ -381,6 +391,7 @@ export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository
     execute: async (args, context) => {
       const task = repository.findActiveByThread(context.threadId)
       if (!task || task.authority?.revokedAt || !options.contextRuntime) return { output: { error: 'Authorized task context recall is unavailable.' }, isError: true }
+      await deliveryWorkspaceContext(task.workspaceRoot, context)
       const bytes = options.contextRuntime.readObject(task.id, String(args.bundle_id ?? ''), String(args.object_id ?? ''))
       const offset = typeof args.offset === 'number' ? Math.max(0, Math.trunc(args.offset)) : 0
       const maxBytes = typeof args.max_bytes === 'number' ? Math.min(65536, Math.max(1, Math.trunc(args.max_bytes))) : 32768

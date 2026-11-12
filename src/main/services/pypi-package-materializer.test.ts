@@ -8,12 +8,14 @@ import type { MarketplacePackageV1 } from '../../shared/marketplace'
 import {
   materializePypiPackage,
   preservePypiLicense,
-  validatePythonDependencyLock
+  validatePythonDependencyLock,
+  ZOTERO_BIBTEX_BUILD
 } from './pypi-package-materializer'
 
 const roots: string[] = []
 
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -142,6 +144,9 @@ describe('materializePypiPackage', () => {
   })
 
   it('verifies the primary wheel, locks every dependency hash, and creates an isolated runtime', async () => {
+    vi.stubEnv('UV_OVERRIDE', '/untrusted/overrides.txt')
+    vi.stubEnv('UV_NO_VERIFY_HASHES', '1')
+    vi.stubEnv('UV_NO_BUILD_ISOLATION', '1')
     const root = await tempRoot()
     const target = join(root, 'target')
     const uvPath = join(root, 'uv')
@@ -247,10 +252,26 @@ describe('materializePypiPackage', () => {
     expect(compileEnvironment).toMatchObject({
       UV_DEFAULT_INDEX: 'https://pypi.org/simple',
       UV_NO_CONFIG: '1',
-      UV_PYTHON_DOWNLOADS: 'never'
+      UV_PYTHON_DOWNLOADS: 'never',
+      UV_CONCURRENT_DOWNLOADS: '4',
+      UV_HTTP_TIMEOUT: '120'
     })
     expect(compileEnvironment).not.toHaveProperty('PIP_INDEX_URL')
     expect(compileEnvironment).not.toHaveProperty('UV_EXTRA_INDEX_URL')
+    expect(compileEnvironment).not.toHaveProperty('UV_OVERRIDE')
+    expect(compileEnvironment).not.toHaveProperty('UV_NO_VERIFY_HASHES')
+    expect(compileEnvironment).not.toHaveProperty('UV_NO_BUILD_ISOLATION')
+    for (const [, args] of run.mock.calls) expect(args).not.toContain('--no-binary')
+  })
+
+  it('requires the exact approved source archive and hash in a Zotero dependency lock', () => {
+    const primary = 'a'.repeat(64)
+    const source = ZOTERO_BIBTEX_BUILD
+    const lock = `zotero-mcp-server==0.17.0 --hash=sha256:${primary}\n${source.packageName} @ ${source.url}#sha256=${source.sha256} --hash=sha256:${source.sha256}\n`
+    expect(() => validatePythonDependencyLock(lock, primary, source)).not.toThrow()
+    expect(() => validatePythonDependencyLock(lock.replace(source.url, `${source.url}.changed`), primary, source)).toThrow('reviewed source-build')
+    expect(() => validatePythonDependencyLock(lock.replaceAll(source.sha256, 'b'.repeat(64)), primary, source)).toThrow('reviewed source-build')
+    expect(() => validatePythonDependencyLock(`zotero-mcp-server==0.17.0 --hash=sha256:${primary}\n`, primary, source)).toThrow('reviewed source-build')
   })
 
   it('rejects locks with any unhashed dependency', () => {
@@ -288,5 +309,19 @@ describe('materializePypiPackage', () => {
       runtime: { ensure: vi.fn() }
     })).rejects.toThrow(/SHA-256 or size verification failed/i)
     expect(run).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('mixed upstream license preservation', () => {
+  it('keeps every license from the exact wheel alongside the compatibility LICENSE file', async () => {
+    const root = await tempRoot()
+    const zip = new JSZip()
+    zip.file('fixture-1.0.0.dist-info/licenses/LICENSE', 'MIT License')
+    zip.file('fixture-1.0.0.dist-info/licenses/plugin/LICENSE', 'GNU AFFERO GENERAL PUBLIC LICENSE')
+    const bytes = await zip.generateAsync({ type: 'nodebuffer' })
+    await preservePypiLicense({ ...item(createHash('sha256').update(bytes).digest('hex')), license: 'MIT AND AGPL-3.0-or-later' }, root, bytes, vi.fn() as never)
+    expect(await readFile(join(root, 'LICENSE'), 'utf8')).toBe('MIT License')
+    expect(await readFile(join(root, 'licenses/fixture-1.0.0.dist-info/licenses/plugin/LICENSE'), 'utf8')).toBe('GNU AFFERO GENERAL PUBLIC LICENSE')
   })
 })

@@ -5,6 +5,7 @@ import type {
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { LocalToolHost, type LocalTool } from './local-tool-host.js'
+import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 
 const MCP_SEARCH_TOOL_NAME = 'mcp_search'
 const MCP_DESCRIBE_TOOL_NAME = 'mcp_describe'
@@ -59,7 +60,7 @@ const ACTION_SYNONYMS: Record<string, string[]> = {
 export type McpSearchClientLike = {
   callTool(
     input: { name: string; arguments: Record<string, unknown> },
-    options?: { signal?: AbortSignal; timeout?: number }
+    options?: { signal?: AbortSignal; timeout?: number; context?: ToolHostContext }
   ): Promise<unknown>
 }
 
@@ -82,6 +83,7 @@ export type McpSearchToolDescriptor = {
 }
 
 export type McpSearchCatalogRecord = {
+  isAvailable?: (context: ToolHostContext) => boolean
   toolId: string
   serverId: string
   server: McpServerConfig
@@ -282,7 +284,7 @@ function createMcpSearchTools(options: McpSearchProviderOptions): LocalTool[] {
         const callArgs = objectArg(args.arguments)
         const result = await record.client.callTool(
           { name: record.descriptor.name, arguments: callArgs },
-          { signal: context.abortSignal, timeout: record.server.timeoutMs }
+          { signal: context.abortSignal, timeout: record.server.timeoutMs, context }
         )
         return {
           output: {
@@ -319,7 +321,15 @@ function createMcpSearchTools(options: McpSearchProviderOptions): LocalTool[] {
 }
 
 function trustedRecords(options: McpSearchProviderOptions, context: ToolHostContext): McpSearchCatalogRecord[] {
-  return options.state.records.filter((record) => options.isServerTrusted(record.server, context.workspace))
+  return options.state.records.filter(record => {
+    if (record.isAvailable && !record.isAvailable(context)) return false
+    if (!options.isServerTrusted(record.server, context.workspace)) return false
+    if (record.server.toolPolicy && !record.server.toolPolicy.allowedTools.includes(record.descriptor.name)) return false
+    try {
+      if (record.server.url) assertGrantAllowsNetwork(record.server.url, context)
+      return true
+    } catch { return false }
+  })
 }
 
 function resolveTrustedRecord(

@@ -28,6 +28,7 @@ export const TASK_DELIVERY_TEMPLATES = [
 export type TaskDeliveryTemplateId = typeof TASK_DELIVERY_TEMPLATES[number]['id']
 export type TaskDeliveryParameters = {
   workspaceRoot: string; goal: string; sourcePaths?: string[]; outputDirectory?: string; model?: string; providerId?: string
+  outputFormats?: Array<'md' | 'docx' | 'pdf'>
 }
 
 export function taskDeliveryTemplate(id: string) {
@@ -38,6 +39,7 @@ export function taskDeliveryTemplate(id: string) {
 
 export function deliveryPrompt(id: string, parameters: TaskDeliveryParameters): string {
   const template = taskDeliveryTemplate(id)
+  const exportFormats = (parameters.outputFormats ?? ['md', 'docx', 'pdf']).filter(format => format !== 'md')
   return [
     `完成${template.name}任务，持续推进到可审阅成果。`,
     `用户目标：${parameters.goal}`,
@@ -51,7 +53,8 @@ export function deliveryPrompt(id: string, parameters: TaskDeliveryParameters): 
     '使用 propose_document 工具保存 Markdown 成果和来源；该工具会保护已有正文并生成可审阅候选。所有正文写入通过该工具完成。',
     'source_refs 可用 sections 标注该来源支持的具体标题（或工具返回的 section ID）；未标注时保守关联全部章节。来源更新后先重新读取，只重新生成受影响部分：propose_document 使用 base_candidate_path、expected_candidate_hash 和 section_patches[{heading,content}] 写入新候选路径，content 是章节正文，保留原标题及子标题。工具保留未选章节和原目标基线；旧候选不删除。不要用整篇覆盖替代局部修订。',
     '用户已有正文的候选修改在用户接受前不算已应用。可独立完成的内容先交付，明确列出未完成项。',
-    'Markdown 候选写入后调用 export_document 将其导出为 DOCX/PDF；工具复用写作工作台的真实渲染器。按每种格式的实际回执报告，pending_export、partial 或 outcome_unknown 不算完成；仍可交付已生成的草稿和明确待办。不要用临时脚本代替正式渲染。',
+    exportFormats.length ? `Markdown 候选写入后调用 export_document，将其导出为用户选定格式 ${exportFormats.join(' / ').toUpperCase()}。工具复用写作工作台的真实渲染器。按每种格式的实际回执报告，pending_export、partial 或 outcome_unknown 保持待处理。可先交付已生成的草稿和明确待办。`
+      : '用户本次选择 Markdown 草稿交付。完成候选正文、来源与验证后交付可审阅的 Markdown 文件。',
     '最终给出可点击的本地成果链接、验证结果、引用来源和待确认项。'
   ].join('\n\n')
 }

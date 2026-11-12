@@ -13,6 +13,15 @@ function body(...chunks: string[]): AsyncIterable<Uint8Array> {
 }
 
 describe('safeWebFetch', () => {
+  it('checks the task origin scope before following a public redirect', async () => {
+    const seen: string[] = []
+    await expect(safeWebFetch('https://example.com/start', { allowedOrigins: ['https://example.com'] }, undefined, {
+      lookup: async () => [{ address: '93.184.216.34', family: 4 }],
+      transport: async ({ url }) => { seen.push(url.origin); return { status: 302, headers: { location: 'https://other.example.com/private' }, body: body() } }
+    })).rejects.toMatchObject({ code: 'redirect_blocked' })
+    expect(seen).toEqual(['https://example.com'])
+    expect(() => validateSafeWebUrl('http://example.com', { allowedOrigins: ['https://example.com'] })).toThrow()
+  })
   it('rejects private, special, and IPv4-mapped addresses', () => {
     for (const address of [
       '127.0.0.1', '10.0.0.1', '172.16.0.1', '192.168.1.1', '169.254.1.1',

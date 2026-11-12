@@ -3,7 +3,7 @@ import type { AppSettingsV1 } from '@shared/app-settings'
 import { rendererRuntimeClient } from '../agent/runtime-client'
 import { persistComposerSelection, readStoredComposerSelection } from './chat-store-helpers'
 import { normalizeComposerModelForProvider } from '@shared/default-composer-models'
-import type { ChatState, ChatStoreGet, ChatStoreSet, InitialSetupMode, PluginHostRoute, SettingsRouteSection } from './chat-store-types'
+import type { ChatState, ChatStoreGet, ChatStoreSet, InitialSetupMode, SettingsRouteSection } from './chat-store-types'
 
 type CreateAppActionsOptions = {
   set: ChatStoreSet
@@ -119,10 +119,11 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
         settingsReturnRoute: state.route === 'settings' ? state.settingsReturnRoute : state.route
       })),
 
-    openPlugins: (host?: PluginHostRoute) =>
+    openPlugins: (host, connector) =>
       set((state) => ({
         route: 'plugins',
-        pluginHostRoute: host ?? (state.route === 'claw' ? 'claw' : 'chat')
+        pluginHostRoute: host ?? (state.route === 'claw' ? 'claw' : 'chat'),
+        pluginConnectorTarget: connector ?? null
       })),
 
     openClaw: () => {

@@ -787,6 +787,19 @@ describe('schedule settings', () => {
     expect(merged.tasks[0].schedule.atTime).toBe('')
     expect(merged.tasks[0].reasoningEffort).toBe('medium')
   })
+
+  it('preserves a scheduled task waiting for authorization through normalization', () => {
+    const normalized = normalizeScheduleSettings({ tasks: [{
+      id: 'blocked-task',
+      lastStatus: 'waiting_user',
+      lastThreadId: 'thr_origin',
+      runtimeTaskId: ' runtime_task ',
+      lastMessage: '请先授权飞书。'
+    }] })
+    expect(normalized.tasks[0]).toMatchObject({
+      lastStatus: 'waiting_user', lastThreadId: 'thr_origin', runtimeTaskId: 'runtime_task', lastMessage: '请先授权飞书。'
+    })
+  })
 })
 
 describe('claw runtime prompts', () => {

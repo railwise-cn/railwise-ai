@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { CapabilityRegistry } from '../src/adapters/tool/capability-registry.js'
 import { LocalToolHost, defaultLocalTools } from '../src/adapters/tool/local-tool-host.js'
 import { modelCapabilitiesForModel } from '../src/loop/model-context-profile.js'
@@ -82,6 +82,38 @@ describe('CapabilityRegistry', () => {
       )
     ).rejects.toThrow(/not advertised/)
     expect(executed).toBe(false)
+  })
+
+  it.each(['remove', 'replace'] as const)('blocks a late approval after its connector tool is %s', async change => {
+    const originalExecute = vi.fn(async () => ({ output: { ok: true } }))
+    const replacementExecute = vi.fn(async () => ({ output: { ok: true } }))
+    const tool = LocalToolHost.defineTool({
+      name: 'dingtalk_complete_task', description: 'Complete one approved task',
+      inputSchema: { type: 'object' }, policy: 'on-request', requireExplicitApproval: true,
+      execute: originalExecute
+    })
+    const provider = { id: 'dingtalk', kind: 'skill' as const, enabled: true, available: true, tools: [tool] }
+    const registry = new CapabilityRegistry([provider])
+    const host = new LocalToolHost({ registry })
+    let allow!: (decision: 'allow' | 'deny') => void
+    let waiting!: () => void
+    const approvalRequested = new Promise<void>(resolve => { waiting = resolve })
+    const approvalDecision = new Promise<'allow' | 'deny'>(resolve => { allow = resolve })
+    const recordExplicitApproval = vi.fn()
+    const beginExecutionWork = vi.fn()
+    const context = buildContext({
+      awaitApproval: async () => { waiting(); return approvalDecision },
+      recordExplicitApproval, beginExecutionWork
+    })
+    const result = host.execute({ callId: 'complete-once', providerId: 'dingtalk', toolName: tool.name, arguments: { taskId: 'todo-1' } }, context)
+    await approvalRequested
+    registry.replaceProvider('dingtalk', change === 'remove' ? undefined : { ...provider, tools: [{ ...tool, execute: replacementExecute }] })
+    allow('allow')
+    expect(await result).toMatchObject({ approved: true, item: { kind: 'tool_result', isError: true, output: { code: 'tool_catalog_changed' } } })
+    expect(originalExecute).not.toHaveBeenCalled()
+    expect(replacementExecute).not.toHaveBeenCalled()
+    expect(recordExplicitApproval).not.toHaveBeenCalled()
+    expect(beginExecutionWork).not.toHaveBeenCalled()
   })
 
   it('honors provider allow-lists before executing a tool', async () => {
