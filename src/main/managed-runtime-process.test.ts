@@ -4,6 +4,8 @@ import { homedir, tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { configureLogger } from './logger'
+import { McpConfigService } from './services/mcp-config-service'
+import { decryptStringWithCredentialHelper } from './services/im-credential-helper'
 import { loadOrCreateFlowSecretStoreKey } from './services/flow-secret-store-key'
 import {
   defaultClawSettings,
@@ -23,6 +25,12 @@ vi.mock('electron', () => ({
     getAppPath: () => '/tmp/workwise-test-app',
     getPath: () => '/tmp/workwise-test-user-data'
   }
+}))
+
+vi.mock('./services/im-credential-helper', () => ({
+  encryptStringWithCredentialHelper: vi.fn(async (value: string) => Buffer.from(value)),
+  decryptStringWithCredentialHelper: vi.fn(async (value: Buffer) => value.toString()),
+  requestInteractiveCredentialHelperAccess: vi.fn()
 }))
 
 vi.mock('./services/flow-secret-store-key', () => ({
@@ -86,6 +94,9 @@ async function readRuntimeLog(): Promise<string> {
 beforeEach(() => {
   vi.mocked(loadOrCreateFlowSecretStoreKey).mockReset().mockResolvedValue('managed-runtime-test-flow-key')
   tempRoot = mkdtempSync(join(tmpdir(), 'managed-runtime-process-'))
+  // Runtime assembly must never read a developer's real MCP credentials.
+  vi.stubEnv('HOME', tempRoot)
+  vi.stubEnv('USERPROFILE', tempRoot)
   configureLogger({ dir: tempRoot, enabled: true, retentionDays: 7 })
 })
 
@@ -101,6 +112,34 @@ afterEach(async () => {
 })
 
 describe('startManagedRuntimeChild', () => {
+  it.skipIf(process.platform !== 'darwin')('starts the real child assembly after a protected MCP credential timeout while preserving the saved configuration', async () => {
+    const homeDir = join(tempRoot!, 'home')
+    const workwiseHome = join(homeDir, '.workwise')
+    const credentialRoot = join(workwiseHome, 'credentials', 'mcp')
+    const service = new McpConfigService({ manifestPath: join(workwiseHome, 'mcp-v2.json'), credentialRoot,
+      encryption: { available: () => true, encrypt: value => Buffer.from(value), decrypt: value => value.toString(), storage: 'keychain' }
+    })
+    let server = await service.save({ config: { id: 'protected-synthetic', name: 'Synthetic credential', scope: 'global', transport: 'http', url: 'https://synthetic.example.test/mcp', timeoutMs: 1000, source: 'user', toolPolicy: {}, enabled: true }, expectedRevision: 0, idempotencyKey: 'synthetic-server' })
+    server = await service.setCredential({ serverId: server.id, accessToken: 'synthetic-original-key', expectedRevision: server.revision, idempotencyKey: 'synthetic-key' })
+    const credentialPath = join(credentialRoot, `${server.credentialRef!.id}.json`)
+    const ciphertext = readFileSync(credentialPath)
+    vi.mocked(decryptStringWithCredentialHelper).mockRejectedValueOnce(Object.assign(new Error('synthetic timeout'), { code: 'credential_helper_timeout' }))
+    const script = writeScript('protected-storage-runtime.js', [
+      "process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 43129 }) + '\\n')",
+      'setInterval(() => {}, 1000)'
+    ].join('\n'))
+    const module = await import('./managed-runtime-process')
+    await expect(module.startManagedRuntimeChild(createSettings(script), {
+      candidateRoot: tempRoot!, homeDir, workwiseHome, mcpConfigPath: join(workwiseHome, 'mcp.json'),
+      autoInstallBundledAgentPack: false, autoInstallBundledSpecialistSkills: false, skillRoots: []
+    })).resolves.toBeUndefined()
+    expect(module.isManagedRuntimeChildRunning()).toBe(true)
+    const runtimeConfig = JSON.parse(readFileSync(join(workwiseHome, 'runtime', 'config.json'), 'utf8'))
+    expect(runtimeConfig.capabilities.mcp.servers[server.id].enabled).toBe(false)
+    expect((await service.list())[0]).toMatchObject({ enabled: true, credentialRef: server.credentialRef, connectionCheck: { state: 'needs_authorization', errorCode: 'credential_helper_timeout' } })
+    expect(readFileSync(credentialPath)).toEqual(ciphertext)
+  })
+
   it('keeps a slow clean shutdown alive after update timeout and verifies it on retry', async () => {
     const script = writeScript('slow-update-stop.js', [
       "process.on('SIGTERM', () => setTimeout(() => process.exit(0), 200))",

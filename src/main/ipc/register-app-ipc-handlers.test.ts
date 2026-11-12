@@ -439,6 +439,20 @@ describe('registerAppIpcHandlers', () => {
     expect(runtimeRequest).not.toHaveBeenCalled()
   })
 
+  it('reapplies the main-owned Runtime snapshot after an explicit credential retry succeeds', async () => {
+    const snapshot = { revision: 7, servers: { amap: { enabled: true } }, environment: { SYNTHETIC_KEY: 'fixture-only' } }
+    const result = { id: 'amap', state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: 11 }
+    const mcpConfigService = { test: vi.fn(async () => result), runtimeSnapshot: vi.fn(async () => snapshot) }
+    const onMcpServersChanged = vi.fn(async () => undefined)
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ mcpConfigService: mcpConfigService as never, onMcpServersChanged }))
+    await expect(handlers.get('mcp-server:test')?.({}, { serverId: 'amap' })).resolves.toEqual(result)
+    expect(onMcpServersChanged).toHaveBeenCalledWith(snapshot)
+    mcpConfigService.test.mockResolvedValueOnce({ ...result, state: 'needs_authorization', authorized: false })
+    await handlers.get('mcp-server:test')?.({}, { serverId: 'amap' })
+    expect(onMcpServersChanged).toHaveBeenCalledTimes(1)
+  })
+
   it('forwards real MCP check evidence and rejects renderer-injected verification fields', async () => {
     const result = { id: 'amap', state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: 11, checkedAt: '2026-11-12T01:02:03.000Z' }
     const mcpConfigService = { test: vi.fn(async () => result), save: vi.fn() }

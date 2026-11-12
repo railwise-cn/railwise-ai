@@ -6,13 +6,19 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { McpConfigService } from './mcp-config-service'
 import { AMAP_READ_TOOLS, ZOTERO_READ_TOOLS } from '../../shared/engineering-marketplace'
 
+vi.mock('./im-credential-helper', () => ({
+  encryptStringWithCredentialHelper: vi.fn(async (value: string) => Buffer.from(value)),
+  decryptStringWithCredentialHelper: vi.fn(async (value: Buffer) => value.toString()),
+  requestInteractiveCredentialHelperAccess: vi.fn()
+}))
+
 vi.mock('electron', () => ({ safeStorage: { isEncryptionAvailable: () => false, encryptString: () => Buffer.alloc(0), decryptString: () => '' } }))
 const roots: string[] = []
 afterEach(async () => { vi.restoreAllMocks(); await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 async function fixture(persistent = false) {
   const root = await mkdtemp(join(tmpdir(), 'railwise-readonly-mcp-')); roots.push(root)
   const options = { manifestPath: join(root, 'mcp.json'), legacyPath: join(root, 'old.json'), credentialRoot: join(root, 'credentials'),
-    ...(persistent ? { encryption: { available: () => true, encrypt: (value:string) => Buffer.from(value), decrypt: (value:Buffer) => value.toString(), storage: 'safe-storage' as const } } : {}) }
+    encryption: { available: () => persistent, encrypt: (value:string) => Buffer.from(value), decrypt: (value:Buffer) => value.toString(), storage: 'safe-storage' as const } }
   return { root, options, service: new McpConfigService(options) }
 }
 function amap() {
@@ -28,7 +34,7 @@ describe('readonly connector configuration', () => {
     expect(JSON.stringify(snapshot.servers)).not.toContain('synthetic-amap-secret')
     expect(await readFile(join(root, 'mcp.json'), 'utf8')).not.toContain('synthetic-amap-secret')
     expect(snapshot.servers[saved.id].url).toMatch(/^https:\/\/mcp\.amap\.com\/mcp\?key=\$\{WORKWISE_MCP_SECRET_[A-F0-9]+\}$/)
-    expect(Object.values(snapshot.environment)).toContain('synthetic-amap-secret')
+    expect(snapshot.environment).toEqual({})
     expect(snapshot.servers[saved.id].toolPolicy).toEqual({ allowedTools: [...AMAP_READ_TOOLS], readOnlyTools: [...AMAP_READ_TOOLS] })
     await expect(service.save({ config: { ...amap(), id: 'bad', url: 'https://other.example/mcp' }, expectedRevision: 0, idempotencyKey: 'bad' })).rejects.toThrow('官方固定')
   })
@@ -120,4 +126,18 @@ describe('readonly connector configuration', () => {
     await writeFile(options.manifestPath, JSON.stringify(edited))
     expect((await service.list())[0].connectionCheck).toBeUndefined()
   })
+})
+
+
+it('distinguishes a saved Amap credential access denial from a missing key or network failure', async () => {
+  const { options, service } = await fixture(true)
+  const saved = await service.save({ config: amap(), expectedRevision: 0, idempotencyKey: 'create-denied-amap' })
+  await service.setCredential({ serverId: saved.id, accessToken: 'synthetic-preserved-key', expectedRevision: saved.revision, idempotencyKey: 'denied-amap-key' })
+  const denied = new McpConfigService({ ...options, encryption: { ...options.encryption,
+    decrypt: async () => { throw Object.assign(new Error('synthetic denied'), { code: 'credential_helper_access_denied' }) }
+  } })
+  const connect = vi.spyOn(Client.prototype, 'connect')
+  expect(await denied.test(saved.id)).toMatchObject({ state: 'needs_authorization', authorized: false, errorCode: 'credential_helper_access_denied', message: expect.stringContaining('重新检查连接') })
+  expect(connect).not.toHaveBeenCalled()
+  expect((await denied.list())[0].credentialRef).toEqual((await service.list())[0].credentialRef)
 })

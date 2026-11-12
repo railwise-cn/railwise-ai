@@ -969,7 +969,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   ipcMain.handle('mcp-server:test', async (_, payload: unknown) => {
     const request = parseIpcPayload('mcp-server:test', mcpServerActionPayloadSchema, payload)
-    return mcpConfigService.test(request.serverId, request.workspaceRoot)
+    const result = await mcpConfigService.test(request.serverId, request.workspaceRoot)
+    if (result.state === 'connected' && result.authorized) await notifyMcpServersChanged()
+    return result
   })
   ipcMain.handle('mcp-server:authorize', async (_, payload: unknown) => {
     const request = parseIpcPayload('mcp-server:authorize', mcpServerAuthorizePayloadSchema, payload)

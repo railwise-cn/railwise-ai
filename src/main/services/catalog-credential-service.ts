@@ -6,14 +6,15 @@ import { safeStorage } from 'electron'
 import type { CatalogCredentialStatusV1 } from '../../shared/marketplace'
 import { atomicWriteFile, readRecoveredFile } from './durable-file'
 import { isCandidateCredentialAccessAllowed } from '../candidate-runtime'
+import { decryptStringWithCredentialHelper, encryptStringWithCredentialHelper, requestInteractiveCredentialHelperAccess } from './im-credential-helper'
 
 const MAX_SECRET_KEY_BYTES = 512
 const MAX_TOKEN_BYTES = 64 * 1024
 
 export type CatalogCredentialEncryption = {
-  available(): boolean
-  encrypt(value: string): Buffer
-  decrypt(value: Buffer): string
+  available(): boolean | Promise<boolean>
+  encrypt(value: string): Buffer | Promise<Buffer>
+  decrypt(value: Buffer): string | Promise<string>
   storage: NonNullable<CatalogCredentialStatusV1['storage']>
 }
 
@@ -26,6 +27,14 @@ function defaultEncryption(): CatalogCredentialEncryption {
       storage: 'keychain'
     }
   }
+  if (process.platform === 'darwin') {
+    return {
+      available: () => true,
+      encrypt: encryptStringWithCredentialHelper,
+      decrypt: decryptStringWithCredentialHelper,
+      storage: 'keychain'
+    }
+  }
   return {
     available: () => {
       try {
@@ -34,11 +43,9 @@ function defaultEncryption(): CatalogCredentialEncryption {
         return false
       }
     },
-    encrypt: (value) => safeStorage.encryptString(value),
-    decrypt: (value) => safeStorage.decryptString(value),
-    storage: process.platform === 'darwin'
-      ? 'keychain'
-      : process.platform === 'win32' ? 'dpapi' : 'safe-storage'
+    encrypt: (value) => safeStorage.encryptStringAsync(value),
+    decrypt: async (value) => (await safeStorage.decryptStringAsync(value)).result,
+    storage: process.platform === 'win32' ? 'dpapi' : 'safe-storage'
   }
 }
 
@@ -65,6 +72,7 @@ function credentialId(secretKey: string): string {
 export class CatalogCredentialService {
   private readonly root: string
   private readonly encryption: CatalogCredentialEncryption
+  private readonly prepareProtectedStorageRetry: () => void
   private readonly session = new Map<string, string>()
 
   constructor(options: {
@@ -73,19 +81,22 @@ export class CatalogCredentialService {
   } = {}) {
     this.root = resolve(options.root ?? join(homedir(), '.workwise', 'credentials', 'catalog'))
     this.encryption = options.encryption ?? defaultEncryption()
+    this.prepareProtectedStorageRetry = options.encryption || process.platform !== 'darwin' || !isCandidateCredentialAccessAllowed()
+      ? () => undefined : requestInteractiveCredentialHelperAccess
   }
 
   async set(secretKey: string, accessToken: string): Promise<NonNullable<CatalogCredentialStatusV1['storage']>> {
     const key = normalizedSecretKey(secretKey)
     const token = normalizedToken(accessToken)
     const id = credentialId(key)
-    if (!this.encryption.available()) {
+    if (!await this.encryption.available()) {
       await rm(join(this.root, `${id}.json`), { force: true }).catch(() => undefined)
       this.session.set(id, token)
       return 'session'
     }
     await mkdir(this.root, { recursive: true, mode: 0o700 })
-    const encrypted = this.encryption.encrypt(token).toString('base64')
+    this.prepareProtectedStorageRetry()
+    const encrypted = (await this.encryption.encrypt(token)).toString('base64')
     await atomicWriteFile(
       join(this.root, `${id}.json`),
       `${JSON.stringify({ schema: 'workwise.catalog-credential', version: 1, encrypted })}\n`
@@ -98,7 +109,7 @@ export class CatalogCredentialService {
     const id = credentialId(normalizedSecretKey(secretKey))
     const session = this.session.get(id)
     if (session) return session
-    if (!this.encryption.available()) return undefined
+    if (!await this.encryption.available()) return undefined
     try {
       const value = JSON.parse(await readRecoveredFile(join(this.root, `${id}.json`))) as {
         schema?: unknown
@@ -109,16 +120,20 @@ export class CatalogCredentialService {
           typeof value.encrypted !== 'string') {
         return undefined
       }
-      return normalizedToken(this.encryption.decrypt(Buffer.from(value.encrypted, 'base64')))
-    } catch {
-      return undefined
+      return normalizedToken(await this.encryption.decrypt(Buffer.from(value.encrypted, 'base64')))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+      const code = (error as { code?: unknown }).code
+      throw Object.assign(new Error('无法读取已保存的市场凭据。请处理系统凭据访问提示后重试；原凭据仍保留。'), {
+        code: typeof code === 'string' && code.startsWith('credential_helper_') ? code : 'credential_unavailable'
+      })
     }
   }
 
   async status(sourceId: string, secretKey: string): Promise<CatalogCredentialStatusV1> {
     const id = credentialId(normalizedSecretKey(secretKey))
     if (this.session.has(id)) return { sourceId, configured: true, storage: 'session' }
-    if (!this.encryption.available()) return { sourceId, configured: false }
+    if (!await this.encryption.available()) return { sourceId, configured: false }
     const token = await this.resolve(secretKey)
     return token
       ? { sourceId, configured: true, storage: this.encryption.storage }

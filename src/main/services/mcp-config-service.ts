@@ -21,6 +21,7 @@ import type {
 import { atomicWriteFile, readRecoveredFile, runSerialized } from './durable-file'
 import { canonicalizeContainmentRoot, resolveContainedPath } from './canonical-containment'
 import { isCandidateCredentialAccessAllowed } from '../candidate-runtime'
+import { decryptStringWithCredentialHelper, encryptStringWithCredentialHelper, requestInteractiveCredentialHelperAccess } from './im-credential-helper'
 
 const execFileAsync = promisify(execFile)
 const MAX_OAUTH_RESPONSE_BYTES = 1024 * 1024
@@ -45,9 +46,9 @@ type CredentialPayload = {
 }
 
 type EncryptionAdapter = {
-  available(): boolean
-  encrypt(value: string): Buffer
-  decrypt(value: Buffer): string
+  available(): boolean | Promise<boolean>
+  encrypt(value: string): Buffer | Promise<Buffer>
+  decrypt(value: Buffer): string | Promise<string>
   storage: McpCredentialReferenceV1['storage']
 }
 
@@ -137,6 +138,16 @@ function defaultEncryption(): EncryptionAdapter {
       storage: 'keychain'
     }
   }
+  if (process.platform === 'darwin') {
+    return {
+      // Keychain may wait for user authorization. The existing helper keeps
+      // that wait off the GUI thread and bounds it with its watchdog.
+      available: () => true,
+      encrypt: encryptStringWithCredentialHelper,
+      decrypt: decryptStringWithCredentialHelper,
+      storage: 'keychain'
+    }
+  }
   return {
     available: () => {
       try {
@@ -145,10 +156,24 @@ function defaultEncryption(): EncryptionAdapter {
         return false
       }
     },
-    encrypt: (value) => safeStorage.encryptString(value),
-    decrypt: (value) => safeStorage.decryptString(value),
-    storage: process.platform === 'darwin' ? 'keychain' : process.platform === 'win32' ? 'dpapi' : 'safe-storage'
+    encrypt: (value) => safeStorage.encryptStringAsync(value),
+    decrypt: async (value) => (await safeStorage.decryptStringAsync(value)).result,
+    storage: process.platform === 'win32' ? 'dpapi' : 'safe-storage'
   }
+}
+
+type CredentialAccessErrorCode = 'credential_unavailable' | 'credential_helper_timeout' | 'credential_helper_access_denied'
+
+function credentialAccessError(error: unknown): Error & { code: CredentialAccessErrorCode } {
+  const code = (error as { code?: unknown })?.code
+  const errorCode: CredentialAccessErrorCode = code === 'credential_helper_timeout' || code === 'credential_helper_access_denied'
+    ? code : 'credential_unavailable'
+  return Object.assign(new Error('无法读取已保存的连接凭据。请处理系统凭据访问提示后重新检查连接；原凭据仍保留。'), { code: errorCode })
+}
+
+function isCredentialAccessError(error: unknown): error is Error & { code: CredentialAccessErrorCode } {
+  const code = (error as { code?: unknown })?.code
+  return code === 'credential_unavailable' || code === 'credential_helper_timeout' || code === 'credential_helper_access_denied'
 }
 
 function assertHttpUrl(value: string, label: string): URL {
@@ -245,6 +270,7 @@ export class McpConfigService {
   private readonly legacyPath: string
   private readonly credentialRoot: string
   private readonly encryption: EncryptionAdapter
+  private readonly prepareProtectedStorageRetry: () => void
   private readonly fetchImpl: typeof fetch
   private readonly now: () => Date
   private readonly oauthCallbackTimeoutMs: number
@@ -265,6 +291,8 @@ export class McpConfigService {
     this.legacyPath = resolve(options.legacyPath ?? join(dirname(this.manifestPath), 'mcp.json'))
     this.credentialRoot = resolve(options.credentialRoot ?? join(homedir(), '.workwise', 'credentials', 'mcp'))
     this.encryption = options.encryption ?? defaultEncryption()
+    this.prepareProtectedStorageRetry = options.encryption || process.platform !== 'darwin' || !isCandidateCredentialAccessAllowed()
+      ? () => undefined : requestInteractiveCredentialHelperAccess
     this.fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
     this.now = options.now ?? (() => new Date())
     this.oauthCallbackTimeoutMs = options.oauthCallbackTimeoutMs ?? OAUTH_CALLBACK_TIMEOUT_MS
@@ -292,7 +320,22 @@ export class McpConfigService {
     const servers: Record<string, Record<string, unknown>> = {}
     const environment: Record<string, string> = {}
     for (const server of manifest.servers) {
-      const credential = await this.readCredential(server.credentialRef)
+      let credential: CredentialPayload | null = null
+      let enabled = server.enabled
+      if (enabled) {
+        try {
+          credential = await this.readCredential(server.credentialRef)
+        } catch (error) {
+          if (!isCredentialAccessError(error)) throw error
+          // Keep the saved configuration and encrypted record intact. A
+          // protected-storage failure affects this runtime connection only.
+          enabled = false
+          await this.recordConnectionCheck(server, {
+            id: server.id, state: 'needs_authorization', authorized: false,
+            errorCode: error.code, message: error.message
+          })
+        }
+      }
       const trust = server.scope === 'workspace' && server.workspaceRoot
         ? { trustScope: 'workspace', trustedWorkspaceRoots: [server.workspaceRoot] }
         : { trustScope: 'user', trustedWorkspaceRoots: [] }
@@ -322,7 +365,7 @@ export class McpConfigService {
           if (credential) environment[variable] = credential.accessToken
         }
         servers[server.id] = {
-          enabled: server.enabled,
+          enabled,
           transport: 'stdio',
           command: server.command,
           args: server.args ?? [],
@@ -346,7 +389,7 @@ export class McpConfigService {
         environment[variable] = `${credential.tokenType ?? 'Bearer'} ${credential.accessToken}`
       }
       servers[server.id] = {
-        enabled: server.enabled,
+        enabled,
         transport: 'streamable-http',
         url,
         headers,
@@ -437,7 +480,13 @@ export class McpConfigService {
   async test(serverId: string, workspaceRoot?: string): Promise<McpServerStatusV1> {
     const server = (await this.list(workspaceRoot)).find((entry) => entry.id === serverId)
     if (!server) return { id: serverId, state: 'error', authorized: false, message: 'MCP server was not found.' }
+    // This path follows the user's explicit connection-check action.
+    if (server.credentialRef && server.credentialRef.storage !== 'session') this.prepareProtectedStorageRetry()
     const result = await this.testConnection(server)
+    return this.recordConnectionCheck(server, result)
+  }
+
+  private async recordConnectionCheck(server: McpServerConfigV2, result: McpServerStatusV1): Promise<McpServerStatusV1> {
     return runSerialized('mcp-config:' + this.manifestPath, async () => {
       const manifest = await this.read()
       const current = manifest.servers.find(entry => entry.id === server.id)
@@ -486,9 +535,13 @@ export class McpConfigService {
       }
       return { id: server.id, state: 'connected', authorized: Boolean(credential || !server.oauth), latencyMs: Date.now() - startedAt }
     } catch (error) {
+      if (isCredentialAccessError(error)) return {
+        id: server.id, state: 'needs_authorization', authorized: false,
+        latencyMs: Date.now() - startedAt, errorCode: error.code, message: error.message
+      }
       return {
         id: server.id,
-        state: server.oauth && !(await this.readCredential(server.credentialRef)) ? 'needs_authorization' : 'error',
+        state: server.oauth && !server.credentialRef ? 'needs_authorization' : 'error',
         authorized: false,
         latencyMs: Date.now() - startedAt,
         message: error instanceof Error ? error.message : String(error)
@@ -534,8 +587,6 @@ export class McpConfigService {
   private async testReadonlyConnector(server: McpServerConfigV2, startedAt: number): Promise<McpServerStatusV1> {
     const client = new Client({ name: 'railwise-connector-check', version: '1.0.0' })
     try {
-      const snapshot = await this.runtimeSnapshot()
-      const entry = snapshot.servers[server.id]
       if (server.managedPreset === 'amap-readonly') {
         const credential = await this.readCredential(server.credentialRef)
         if (!credential) return { id: server.id, state: 'needs_authorization', authorized: false, errorCode: 'missing_credentials', message: '请填写高德 Web 服务 Key。' }
@@ -543,6 +594,8 @@ export class McpConfigService {
         url.searchParams.set('key', credential.accessToken)
         await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { redirect: 'error' } }), { timeout: server.timeoutMs })
       } else {
+        const snapshot = await this.runtimeSnapshot()
+        const entry = snapshot.servers[server.id]
         const local = await fetch('http://127.0.0.1:23119/api/users/0/collections?limit=1', { redirect: 'error', signal: AbortSignal.timeout(5_000) })
         await local.body?.cancel()
         if (!local.ok) throw Object.assign(new Error('Zotero 本机 API 尚未启用。请在 Zotero 高级设置中允许本机应用连接。'), { code: 'local_api_unavailable' })
@@ -557,6 +610,10 @@ export class McpConfigService {
       if (!count) throw Object.assign(new Error('连接已建立，但没有发现已核对的只读工具。请检查服务版本和配置。'), { code: 'tool_manifest_mismatch' })
       return { id: server.id, state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: count, latencyMs: Date.now() - startedAt, message: `已发现 ${count} 项只读工具。` }
     } catch (error) {
+      if (isCredentialAccessError(error)) return {
+        id: server.id, state: 'needs_authorization', authorized: false,
+        latencyMs: Date.now() - startedAt, errorCode: error.code, message: error.message
+      }
       // Transport exceptions may include the Amap URL with its query credential.
       const code = (error as { code?: unknown }).code
       if (code === 'tool_manifest_mismatch' || code === 'local_api_unavailable') {
@@ -1141,12 +1198,13 @@ export class McpConfigService {
   private async writeCredential(serverId: string, credential: CredentialPayload): Promise<McpCredentialReferenceV1> {
     const id = `mcp_${createHash('sha256').update(serverId).digest('hex').slice(0, 16)}_` +
       base64Url(randomBytes(9))
-    if (!this.encryption.available()) {
+    if (!await this.encryption.available()) {
       this.sessionCredentials.set(id, credential)
       return { id, storage: 'session' }
     }
     await mkdir(this.credentialRoot, { recursive: true })
-    const encrypted = this.encryption.encrypt(JSON.stringify(credential)).toString('base64')
+    this.prepareProtectedStorageRetry()
+    const encrypted = (await this.encryption.encrypt(JSON.stringify(credential))).toString('base64')
     await atomicWriteFile(join(this.credentialRoot, `${id}.json`), `${JSON.stringify({ version: 1, encrypted })}\n`)
     return { id, storage: this.encryption.storage }
   }
@@ -1161,12 +1219,13 @@ export class McpConfigService {
   private async readCredential(reference?: McpCredentialReferenceV1): Promise<CredentialPayload | null> {
     if (!reference) return null
     if (reference.storage === 'session') return this.sessionCredentials.get(reference.id) ?? null
-    if (!this.encryption.available()) return null
+    if (!await this.encryption.available()) return null
     try {
       const raw = JSON.parse(await readRecoveredFile(join(this.credentialRoot, `${reference.id}.json`))) as { encrypted: string }
-      return JSON.parse(this.encryption.decrypt(Buffer.from(raw.encrypted, 'base64'))) as CredentialPayload
-    } catch {
-      return null
+      return JSON.parse(await this.encryption.decrypt(Buffer.from(raw.encrypted, 'base64'))) as CredentialPayload
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw credentialAccessError(error)
     }
   }
 

@@ -405,7 +405,7 @@ export type McpServerStatusV1 = {
   verification?: 'tool_discovery'
   latencyMs?: number
   message?: string
-  errorCode?: 'missing_credentials' | 'invalid_credentials' | 'insufficient_scope' | 'network_blocked' | 'service_unavailable' | 'connection_failed' | 'tool_manifest_mismatch' | 'local_api_unavailable' | 'configuration_changed'
+  errorCode?: 'missing_credentials' | 'invalid_credentials' | 'insufficient_scope' | 'network_blocked' | 'service_unavailable' | 'connection_failed' | 'tool_manifest_mismatch' | 'local_api_unavailable' | 'configuration_changed' | 'credential_unavailable' | 'credential_helper_timeout' | 'credential_helper_access_denied'
   toolCount?: number
   authorizationUrl?: string
   authorizationState?: string

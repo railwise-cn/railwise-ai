@@ -4,6 +4,12 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CatalogCredentialService } from './catalog-credential-service'
 
+vi.mock('./im-credential-helper', () => ({
+  encryptStringWithCredentialHelper: vi.fn(async (value: string) => Buffer.from(value)),
+  decryptStringWithCredentialHelper: vi.fn(async (value: Buffer) => value.toString()),
+  requestInteractiveCredentialHelperAccess: vi.fn()
+}))
+
 vi.mock('electron', () => ({
   safeStorage: {
     isEncryptionAvailable: () => false,
@@ -109,5 +115,48 @@ describe('CatalogCredentialService', () => {
     const service = new CatalogCredentialService({ root })
     await expect(service.set('catalog.token', '')).rejects.toThrow(/invalid/i)
     await expect(service.set('catalog.token', 'x'.repeat(64 * 1024 + 1))).rejects.toThrow(/64 KiB/i)
+  })
+})
+
+describe('catalog protected-storage startup isolation', () => {
+  it('uses the production helper without blocking the event loop, preserves ciphertext on timeout, and reads the same record on retry', async () => {
+    const platform = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const helper = await import('./im-credential-helper')
+    const { safeStorage } = await import('electron')
+    const syncAvailability = vi.spyOn(safeStorage, 'isEncryptionAvailable')
+    const syncDecrypt = vi.spyOn(safeStorage, 'decryptString')
+    try {
+      const service = new CatalogCredentialService({ root })
+      await service.set('catalog.synthetic.token', 'synthetic-original-token')
+      const file = join(root, (await readdir(root))[0]!)
+      const originalCiphertext = await readFile(file)
+      let rejectDecrypt!: (error: Error) => void
+      vi.mocked(helper.decryptStringWithCredentialHelper).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectDecrypt = reject }))
+      const reopened = new CatalogCredentialService({ root })
+      const pending = reopened.resolve('catalog.synthetic.token')
+      const rejected = expect(pending).rejects.toMatchObject({ code: 'credential_helper_timeout', message: expect.stringContaining('重试') })
+      await vi.waitFor(() => expect(rejectDecrypt).toBeTypeOf('function'))
+      await new Promise<void>(resolve => setImmediate(resolve))
+      rejectDecrypt(Object.assign(new Error('synthetic helper timeout'), { code: 'credential_helper_timeout' }))
+      await rejected
+      expect(await readFile(file)).toEqual(originalCiphertext)
+      await expect(reopened.resolve('catalog.synthetic.token')).resolves.toBe('synthetic-original-token')
+      expect(syncAvailability).not.toHaveBeenCalled()
+      expect(syncDecrypt).not.toHaveBeenCalled()
+    } finally { platform.mockRestore(); syncAvailability.mockRestore(); syncDecrypt.mockRestore() }
+  })
+
+  it('preserves the old token when a protected-storage replacement is denied', async () => {
+    const encrypt = vi.fn(async (value: string) => Buffer.from(value))
+    const service = new CatalogCredentialService({ root, encryption: {
+      available: () => true, encrypt, decrypt: async value => value.toString(), storage: 'keychain'
+    } })
+    await service.set('catalog.synthetic.token', 'synthetic-original-token')
+    const file = join(root, (await readdir(root))[0]!)
+    const originalCiphertext = await readFile(file)
+    encrypt.mockRejectedValueOnce(Object.assign(new Error('synthetic denied'), { code: 'credential_helper_access_denied' }))
+    await expect(service.set('catalog.synthetic.token', 'synthetic-replacement')).rejects.toMatchObject({ code: 'credential_helper_access_denied' })
+    expect(await readFile(file)).toEqual(originalCiphertext)
+    await expect(service.resolve('catalog.synthetic.token')).resolves.toBe('synthetic-original-token')
   })
 })

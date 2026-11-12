@@ -7,11 +7,19 @@ import type { McpServerConfigV2 } from '../../shared/agent-workbench'
 import { McpConfigService } from './mcp-config-service'
 import brand from '../../shared/product-brand.json'
 
+vi.mock('./im-credential-helper', () => ({
+  encryptStringWithCredentialHelper: vi.fn(async (value: string) => Buffer.from(value)),
+  decryptStringWithCredentialHelper: vi.fn(async (value: Buffer) => value.toString()),
+  requestInteractiveCredentialHelperAccess: vi.fn()
+}))
+
 vi.mock('electron', () => ({
   safeStorage: {
     isEncryptionAvailable: () => false,
     encryptString: () => Buffer.alloc(0),
-    decryptString: () => ''
+    decryptString: () => '',
+    encryptStringAsync: async (value: string) => Buffer.from(value),
+    decryptStringAsync: async (value: Buffer) => ({ result: value.toString() })
   }
 }))
 
@@ -618,5 +626,104 @@ describe('McpConfigService', () => {
     })
     expect(await readFile(manifestPath, 'utf8')).toContain(legacyCommand)
     expect(await readFile(legacyPath, 'utf8')).toContain(legacyCommand)
+  })
+})
+
+describe('MCP protected-storage startup isolation', () => {
+  it('uses asynchronous platform storage outside macOS', async () => {
+    const platform = vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    const { safeStorage } = await import('electron')
+    const available = vi.spyOn(safeStorage, 'isEncryptionAvailable').mockReturnValue(true)
+    const encrypt = vi.spyOn(safeStorage, 'encryptStringAsync')
+    const decrypt = vi.spyOn(safeStorage, 'decryptStringAsync')
+    const syncEncrypt = vi.spyOn(safeStorage, 'encryptString')
+    const syncDecrypt = vi.spyOn(safeStorage, 'decryptString')
+    try {
+      const service = new McpConfigService({ manifestPath: join(root, 'mcp-v2.json'), credentialRoot: join(root, 'credentials') })
+      let server = await service.save({ config: config({ scope: 'global', transport: 'http', url: 'https://mcp.example.test' }), expectedRevision: 0, idempotencyKey: 'async-platform-server' })
+      server = await service.setCredential({ serverId: server.id, accessToken: 'synthetic-platform-token', expectedRevision: server.revision, idempotencyKey: 'async-platform-token' })
+      expect(server.credentialRef?.storage).toBe('dpapi')
+      expect(Object.values((await service.runtimeSnapshot()).environment)).toContain('Bearer synthetic-platform-token')
+      expect(encrypt).toHaveBeenCalledTimes(1)
+      expect(decrypt).toHaveBeenCalledTimes(1)
+      expect(syncEncrypt).not.toHaveBeenCalled()
+      expect(syncDecrypt).not.toHaveBeenCalled()
+    } finally {
+      for (const mock of [platform, available, encrypt, decrypt, syncEncrypt, syncDecrypt]) mock.mockRestore()
+    }
+  })
+
+  it('keeps the event loop responsive while the production helper waits, preserves old ciphertext on timeout, and recovers on an explicit check', async () => {
+    const platform = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const helper = await import('./im-credential-helper')
+    const { safeStorage } = await import('electron')
+    const syncAvailability = vi.spyOn(safeStorage, 'isEncryptionAvailable')
+    const syncDecrypt = vi.spyOn(safeStorage, 'decryptString')
+    try {
+      const options = { manifestPath: join(root, 'mcp-v2.json'), credentialRoot: join(root, 'credentials') }
+      const service = new McpConfigService(options)
+      let server = await service.save({ config: config({ scope: 'global', transport: 'http', url: 'https://mcp.example.test' }), expectedRevision: 0, idempotencyKey: 'helper-server' })
+      server = await service.setCredential({ serverId: server.id, accessToken: 'synthetic-legacy-value', expectedRevision: server.revision, idempotencyKey: 'helper-token' })
+      const credentialPath = join(root, 'credentials', `${server.credentialRef!.id}.json`)
+      const originalCiphertext = await readFile(credentialPath)
+      const reopened = new McpConfigService(options)
+      let rejectDecrypt!: (error: Error) => void
+      vi.mocked(helper.decryptStringWithCredentialHelper).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectDecrypt = reject }))
+      const pending = reopened.runtimeSnapshot()
+      await vi.waitFor(() => expect(rejectDecrypt).toBeTypeOf('function'))
+      await new Promise<void>(resolve => setImmediate(resolve))
+      expect((await reopened.list())[0].credentialRef).toEqual(server.credentialRef)
+      rejectDecrypt(Object.assign(new Error('synthetic helper timeout'), { code: 'credential_helper_timeout' }))
+      const failed = await pending
+      expect(failed.servers.docs.enabled).toBe(false)
+      expect(failed.environment).toEqual({})
+      const stored = (await reopened.list())[0]
+      expect(stored).toMatchObject({ enabled: true, credentialRef: server.credentialRef, connectionCheck: { state: 'needs_authorization', authorized: false, errorCode: 'credential_helper_timeout' } })
+      expect(await readFile(credentialPath)).toEqual(originalCiphertext)
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))
+      const checked = await reopened.test(server.id)
+      expect(checked).toMatchObject({ state: 'connected', authorized: true })
+      const recovered = await reopened.runtimeSnapshot()
+      expect(recovered.servers.docs.enabled).toBe(true)
+      expect(Object.values(recovered.environment)).toContain('Bearer synthetic-legacy-value')
+      expect(helper.requestInteractiveCredentialHelperAccess).toHaveBeenCalled()
+      expect(syncAvailability).not.toHaveBeenCalled()
+      expect(syncDecrypt).not.toHaveBeenCalled()
+      expect(await readFile(credentialPath)).toEqual(originalCiphertext)
+    } finally { platform.mockRestore(); syncAvailability.mockRestore(); syncDecrypt.mockRestore() }
+  })
+
+  it('does not decrypt disabled connections and keeps their saved references', async () => {
+    const decrypt = vi.fn((value: Buffer) => value.toString())
+    const service = new McpConfigService({ manifestPath: join(root, 'mcp-v2.json'), credentialRoot: join(root, 'credentials'), encryption: {
+      available: () => true, encrypt: async value => Buffer.from(value), decrypt, storage: 'keychain'
+    } })
+    let server = await service.save({ config: config({ enabled: false }), expectedRevision: 0, idempotencyKey: 'disabled-server' })
+    server = await service.setCredential({ serverId: server.id, workspaceRoot: workspace, accessToken: 'synthetic-disabled-token', expectedRevision: server.revision, idempotencyKey: 'disabled-token' })
+    const snapshot = await service.runtimeSnapshot()
+    expect(snapshot.servers.docs.enabled).toBe(false)
+    expect(snapshot.environment).toEqual({})
+    expect(decrypt).not.toHaveBeenCalled()
+    expect((await service.list(workspace))[0].credentialRef).toEqual(server.credentialRef)
+  })
+
+  it('reports credential denial distinctly and preserves the reference and ciphertext when a replacement fails', async () => {
+    const encrypt = vi.fn(async (value: string) => Buffer.from(value))
+    const decrypt = vi.fn(async (value: Buffer) => value.toString())
+    const service = new McpConfigService({ manifestPath: join(root, 'mcp-v2.json'), credentialRoot: join(root, 'credentials'), encryption: { available: () => true, encrypt, decrypt, storage: 'keychain' } })
+    let server = await service.save({ config: config({ scope: 'global', transport: 'http', url: 'https://mcp.example.test' }), expectedRevision: 0, idempotencyKey: 'denied-server' })
+    server = await service.setCredential({ serverId: server.id, accessToken: 'synthetic-original-token', expectedRevision: server.revision, idempotencyKey: 'original-token' })
+    const credentialPath = join(root, 'credentials', `${server.credentialRef!.id}.json`)
+    const originalCiphertext = await readFile(credentialPath)
+    decrypt.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'credential_helper_access_denied' }))
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    expect(await service.test(server.id)).toMatchObject({ state: 'needs_authorization', authorized: false, errorCode: 'credential_helper_access_denied', message: expect.stringContaining('重新检查连接') })
+    expect(fetch).not.toHaveBeenCalled()
+    encrypt.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'credential_helper_access_denied' }))
+    await expect(service.setCredential({ serverId: server.id, accessToken: 'synthetic-replacement', expectedRevision: server.revision, idempotencyKey: 'denied-replacement' })).rejects.toMatchObject({ code: 'credential_helper_access_denied' })
+    expect((await service.list())[0].credentialRef).toEqual(server.credentialRef)
+    expect(await readFile(credentialPath)).toEqual(originalCiphertext)
+    expect(Object.values((await service.runtimeSnapshot()).environment)).toContain('Bearer synthetic-original-token')
   })
 })

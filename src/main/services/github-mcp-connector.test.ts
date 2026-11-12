@@ -52,7 +52,7 @@ describe('official GitHub connection checks', () => {
     expect(await readFile(join(root, 'mcp.json'), 'utf8')).not.toContain('synthetic-github-token')
     const snapshot = await service.runtimeSnapshot()
     expect(JSON.stringify(snapshot.servers)).not.toContain('synthetic-github-token')
-    expect(Object.values(snapshot.environment)).toContain('Bearer synthetic-github-token')
+    expect(snapshot.environment).toEqual({})
     expect(snapshot.servers[saved.id].enabled).toBe(false)
   })
 
