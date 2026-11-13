@@ -560,6 +560,7 @@ export function Workbench(): ReactElement {
   // Task/Flow artifacts can have no user chat. Keep manual previews separate
   // from the active conversation so opening another task cannot replace it.
   const workspaceArtifactPreview = useTaskArtifactPreview(null, runtimeConnection === 'ready' && route === 'tasks')
+  const lastWorkspaceArtifactRequest = useRef<{ taskId: string; artifactId: string } | null>(null)
   const taskArtifactPreview = route === 'tasks' ? workspaceArtifactPreview : conversationArtifactPreview
   const artifactPreviewRouteRef = useRef(route)
   artifactPreviewRouteRef.current = route
@@ -1994,6 +1995,16 @@ export function Workbench(): ReactElement {
     setFilePreviewTarget(null)
   }
 
+  const openWorkspaceArtifact = async (request: { taskId: string; artifactId: string }): Promise<void> => {
+    lastWorkspaceArtifactRequest.current = request
+    try {
+      await workspaceArtifactPreview.open(request)
+      if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
+    } catch {
+      // The preview hook retains the error for the task workspace retry card.
+    }
+  }
+
   const startNewWriteAssistantConversation = (): void => {
     const writeState = useWriteWorkspaceStore.getState()
     const writeWorkspaceRoot = writeState.workspaceRoot || workspaceRoot
@@ -2191,10 +2202,15 @@ export function Workbench(): ReactElement {
       const View = (module as typeof import('./tasks/TaskWorkspaceView')).TaskWorkspaceView
       return <div className="flex min-h-0 min-w-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {workspaceArtifactPreview.error ? <div role="alert" className="ds-no-drag m-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <p>{workspaceArtifactPreview.error}</p>
+          <button type="button" className="mt-2 text-accent" onClick={() => {
+            if (lastWorkspaceArtifactRequest.current) void openWorkspaceArtifact(lastWorkspaceArtifactRequest.current)
+          }}>重新打开网页成果</button>
+        </div> : null}
         <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {
         if (/\.html?$/i.test(path) && artifactId) {
-          await workspaceArtifactPreview.open({ taskId: task.id, artifactId })
-          if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
+          await openWorkspaceArtifact({ taskId: task.id, artifactId })
         } else if (/\.(?:md|mdx|markdown)$/i.test(path)) {
           await useWriteWorkspaceStore.getState().openFile(task.workspaceRoot, path)
           setRoute('write')

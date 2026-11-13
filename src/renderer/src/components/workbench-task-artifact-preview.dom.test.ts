@@ -42,18 +42,26 @@ async function mount(activeThreadId: string | null = 'chat-a') {
   function Probe({ route }: { route: 'chat' | 'tasks' }) {
     const conversation = useTaskArtifactPreview(activeThreadId, true)
     const workspace = useTaskArtifactPreview(null, route === 'tasks')
+    const lastRequest = useRef<{ taskId: string; artifactId: string } | null>(null)
     const preview = route === 'tasks' ? workspace : conversation
     const routeRef = useRef(route)
     routeRef.current = route
     const layout = useWorkbenchLayout({ activeThreadId: route === 'tasks' ? 'task-workspace-preview' : activeThreadId,
       latestAutoOpenDevPreviewKey: preview.key, latestAutoOpenDevPreviewUrl: preview.url,
       latestDevPreviewUrl: preview.url, route, workspaceRoot: '', writeAssistantOpen: false })
+    const openArtifact = async (request: { taskId: string; artifactId: string }) => {
+      lastRequest.current = request
+      try {
+        await workspace.open(request)
+        if (routeRef.current === 'tasks') layout.setRightPanelMode('browser')
+      } catch { /* The task workspace renders the hook's error and retry action. */ }
+    }
     return createElement('div', { className: 'flex min-h-0 min-w-0 flex-1' },
       createElement('section', { 'aria-label': route === 'tasks' ? '任务工作台' : '聊天' },
-        ...tasks.map(item => createElement('button', { key: item.id, onClick: async () => {
-          await workspace.open({ taskId: item.id, artifactId: 'html' })
-          if (routeRef.current === 'tasks') layout.setRightPanelMode('browser')
-        } }, `打开${item.id}`))),
+        route === 'tasks' && workspace.error ? createElement('div', { role: 'alert' }, workspace.error,
+          createElement('button', { onClick: () => { if (lastRequest.current) void openArtifact(lastRequest.current) } }, '重新打开网页成果')) : null,
+        ...tasks.map(item => createElement('button', { key: item.id,
+          onClick: () => void openArtifact({ taskId: item.id, artifactId: 'html' }) }, `打开${item.id}`))),
       layout.rightPanelVisible && layout.rightPanelMode === 'browser'
         ? createElement(DevBrowserPanel, { blocks: [], preferredUrl: preview.url, onCollapse: layout.closeDevPreview })
         : null)
@@ -77,7 +85,10 @@ it('mounts the task workspace beside its preview and keeps task URLs outside con
   const source = await readFile(resolve('src/renderer/src/components/Workbench.tsx'), 'utf8')
   const taskRenderer = source.slice(source.indexOf('const workbenchViewRenderers'), source.indexOf('    plugins: (module)'))
   expect(taskRenderer).toContain('{renderRightPanel()}')
-  expect(taskRenderer).toContain('await workspaceArtifactPreview.open({ taskId: task.id, artifactId })')
+  expect(taskRenderer).toContain('await openWorkspaceArtifact({ taskId: task.id, artifactId })')
+  expect(taskRenderer).toContain('workspaceArtifactPreview.error')
+  expect(taskRenderer).toContain('void openWorkspaceArtifact(lastWorkspaceArtifactRequest.current)')
+  expect(taskRenderer).not.toContain('workspaceArtifactPreview.retry(')
   expect(taskRenderer).not.toContain('selectThread(')
   expect(taskRenderer).not.toContain('await taskArtifactPreview.open(')
   expect(source).toContain("activeThreadId: route === 'tasks' ? 'task-workspace-preview' : activeThreadId")
@@ -127,4 +138,29 @@ it('keeps a dismissed chat preview closed after a separate task preview and igno
   await view.render('chat')
   await act(async () => completeTaskPreview({ ok: true, title: '报告', url: `http://127.0.0.1:1234/task-preview/${'a'.repeat(48)}/selected.html` }))
   expect(view.browser()).toBeNull()
+})
+
+it.each(['business', 'transport'])('shows a %s preview error and retries the exact manual artifact without a chat', async failure => {
+  tasks = [task('flow-artifact')]
+  const message = failure === 'business' ? '成果版本已变化，请重新打开。' : '预览服务暂时不可用。'
+  const previewTaskArtifact = vi.fn()
+  if (failure === 'business') previewTaskArtifact.mockResolvedValueOnce({ ok: false, message })
+  else previewTaskArtifact.mockRejectedValueOnce(new Error(message))
+  previewTaskArtifact.mockResolvedValueOnce({ ok: true, title: '报告',
+    url: `http://127.0.0.1:1234/task-preview/${'a'.repeat(48)}/flow-artifact.html` })
+  Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact, openExternal: vi.fn() } })
+  const view = await mount(null)
+  await view.render('tasks')
+  await view.click('打开flow-artifact')
+  expect(container!.querySelector('[role="alert"]')?.textContent).toContain(message)
+  expect(view.browser()).toBeNull()
+  await view.render('chat')
+  expect(container!.querySelector('[role="alert"]')).toBeNull()
+  await view.render('tasks')
+  await view.click('重新打开网页成果')
+  expect(container!.querySelector('[role="alert"]')).toBeNull()
+  expect(view.browser()?.getAttribute('src')).toContain('/flow-artifact.html')
+  expect(previewTaskArtifact.mock.calls).toEqual([
+    [{ taskId: 'flow-artifact', artifactId: 'html' }], [{ taskId: 'flow-artifact', artifactId: 'html' }]
+  ])
 })
