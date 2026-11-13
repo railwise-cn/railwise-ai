@@ -42,6 +42,13 @@ test('only the exact undistributed execution QA and opt-in live test are allowed
   }
 })
 
+test('publication approval verification does not require rebuilding an unchanged application', () => {
+  assert.doesNotThrow(() => validateWindowsSmokeSource({ ...source(), changedFiles: ['scripts/verify-release-approval.mjs'] }))
+  for (const file of ['scripts/verify-release-approval.cjs', 'scripts/prepare-runtime.cjs', 'electron-builder.cjs', 'src/main/index.ts']) {
+    assert.throws(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }), /application or build source changed/)
+  }
+})
+
 for (const [field, value] of [['windowsBuildConclusion', 'failure'], ['artifactExpired', true],
   ['artifactName', 'release-mac'], ['artifactDigest', ''], ['workflow', '.github/workflows/other.yml']]) {
   test(`existing artifact rejects invalid ${field}`, () => {
