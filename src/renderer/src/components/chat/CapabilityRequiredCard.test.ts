@@ -3,9 +3,11 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
+import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
 import i18n from '../../i18n'
 import { takeRequestedFlow } from '../../store/flow-navigation'
 import { CapabilityRequiredCard } from './CapabilityRequiredCard'
+import { refreshTaskState, resetTaskStateForTests } from '../../store/task-live-store'
 
 const state = vi.hoisted(() => ({
   openFlow: vi.fn(), openPlugins: vi.fn(), openSettings: vi.fn(), chooseWorkspace: vi.fn(),
@@ -21,6 +23,19 @@ const card: ExternalTaskCapabilityCard = {
 }
 let root: Root
 let container: HTMLDivElement
+let tasks: TaskRunV1[]
+let inbox: TaskAttentionV1[]
+let watermark: number
+let taskEvent: (payload: { streamId: string; events: unknown[] }) => void
+function attentionFor(value: ExternalTaskCapabilityCard): TaskAttentionV1 {
+  return { id: value.attentionId!, ownerKind: 'task', ownerId: value.taskId, taskId: value.taskId, threadId: value.threadId,
+    kind: 'blocked', title: '确认任务权限', message: value.capability.message, status: 'pending', revision: 0,
+    createdAt: '2026-11-13T00:00:00Z', updatedAt: '2026-11-13T00:00:00Z',
+    payload: { kind: 'capability_required', capability: value.capability, request: { prompt: value.prompt } } }
+}
+const browserCard: ExternalTaskCapabilityCard = { ...card, capability: { provider: 'browser-skill', status: 'needs_authorization',
+  message: '请核对浏览器和站点范围', errorCode: 'browser_binding_changed', checkedAt: '2026-11-13T00:00:00Z',
+  resolution: { kind: 'grant', route: 'task/browser-binding', label: '确认当前任务的浏览器范围' } } }
 const api = {
   installManagedTool: vi.fn(), diagnoseManagedTool: vi.fn(), beginManagedLarkLogin: vi.fn(),
   completeManagedLarkLogin: vi.fn(), coordinateTaskCommand: vi.fn(), openExternal: vi.fn(async () => undefined),
@@ -32,15 +47,29 @@ const api = {
     approvalPolicy: 'never', targetApprovalPolicy: 'on-request', maxTtlSeconds: 900, canConfirm: true })),
   getTaskRun: vi.fn(async () => ({ id: 'task-original', threadId: 'hidden-execution', status: 'waiting_user' })),
   listAgentProfiles: vi.fn(async () => ({ profiles: [] })), runtimeRequest: vi.fn(async () => ({ ok: true, body: '{}' })),
-  confirmTaskPermissions: vi.fn(async () => ({ resumed: false, permission: { canConfirm: false, taskTitle: '处理飞书待办' } }))
+  confirmTaskPermissions: vi.fn(async () => ({ resumed: false, permission: { canConfirm: false, taskTitle: '处理飞书待办' } })),
+  listTaskPage: vi.fn(async () => ({ items: tasks, relatedTasks: [], attention: inbox, eventWatermark: watermark })),
+  startTaskSse: vi.fn(async (_after: number, _streamId: string) => undefined), stopSse: vi.fn(async () => undefined),
+  onSseEvent: vi.fn(callback => { taskEvent = callback; return () => undefined }),
+  onSseEnd: vi.fn(() => () => undefined), onSseError: vi.fn(() => () => undefined), notifyTask: vi.fn(async () => undefined),
+  diagnoseBrowserSkill: vi.fn(async () => ({ ok: true, status: { enabled: true, state: 'ready', revision: 3,
+    browserInstanceId: 'browser-instance', origins: ['https://example.com'], interaction: 'interact', browsers: [] } })),
+  getBrowserTaskBinding: vi.fn(async () => ({ taskId: card.taskId, taskRevision: 5, browserRevision: 3, browserInstanceId: 'browser-instance',
+    browserLabel: '测试 Chrome', origins: ['https://example.com'], interaction: 'interact' })),
+  confirmBrowserTaskBinding: vi.fn()
 }
 function button(label: string): HTMLButtonElement {
   const result = [...container.querySelectorAll('button')].find(item => item.textContent === label)
   if (!result) throw new Error(`Missing button: ${label}`)
   return result
 }
-async function render(value = card, workspaceRoot?: string): Promise<void> {
-  await act(async () => { root.render(createElement(CapabilityRequiredCard, { key: JSON.stringify(value.capability), card: value, workspaceRoot })) })
+async function render(value = card, workspaceRoot?: string, attention = [attentionFor(value)]): Promise<void> {
+  inbox = attention
+  watermark += 1
+  await act(async () => {
+    await refreshTaskState()
+    root.render(createElement(CapabilityRequiredCard, { key: JSON.stringify(value.capability), card: value, workspaceRoot }))
+  })
 }
 async function click(label: string): Promise<void> {
   await act(async () => { button(label).click(); await Promise.resolve(); await Promise.resolve() })
@@ -49,6 +78,13 @@ async function click(label: string): Promise<void> {
 describe('capability waiting card', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    resetTaskStateForTests()
+    watermark = 0
+    inbox = []
+    tasks = [{ id: card.taskId, threadId: card.threadId, childTaskIds: [], workspaceRoot: '/workspace/project', goal: card.prompt,
+      status: 'waiting_user', acceptance: { kind: 'answer', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: false },
+      agentId: 'general', budget: { maxAttempts: 8, maxDurationMs: 600000 }, attempts: 1, replans: 0, noProgressCount: 0,
+      nodes: [], artifacts: [], revision: 1, createdAt: '2026-11-13T00:00:00Z', updatedAt: '2026-11-13T00:00:00Z' }]
     state.activeThreadId = 'thread-original'
     await i18n.changeLanguage('zh')
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -57,7 +93,88 @@ describe('capability waiting card', () => {
     document.body.append(container)
     root = createRoot(container)
   })
-  afterEach(async () => { await act(async () => root.unmount()); container.remove() })
+  afterEach(async () => { await act(async () => root.unmount()); resetTaskStateForTests(); container.remove() })
+
+  it('keeps a resolved browser card historical after remount and opens configuration only on request', async () => {
+    tasks[0].status = 'running'
+    await render(browserCard, undefined, [])
+    expect(container.textContent).toContain('能力处理记录')
+    expect(container.textContent).toContain(browserCard.capability.message)
+    expect(container.textContent).toContain('当时状态')
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    expect(container.querySelector('select')).toBeNull()
+    await act(async () => root.render(null))
+    await render(browserCard, undefined, [])
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    await click('查看配置')
+    expect(state.openPlugins).toHaveBeenCalledWith(undefined, 'browser-skill')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.getBrowserTaskBinding).not.toHaveBeenCalled()
+    expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+  })
+
+  it('keeps a current pending browser request interactive and removes its connector when the real attention stream resolves it', async () => {
+    await render(browserCard)
+    expect(api.diagnoseBrowserSkill).toHaveBeenCalledOnce()
+    expect(container.querySelector('select')).not.toBeNull()
+    await click('确认当前任务的浏览器范围')
+    expect(api.getBrowserTaskBinding).toHaveBeenCalledWith(card.taskId)
+    expect(container.textContent).toContain('所选浏览器')
+    expect(container.textContent).not.toContain('browserSkillInstance')
+    const streamId = api.startTaskSse.mock.calls.at(-1)![1]
+    await act(async () => taskEvent({ streamId, events: [{ seq: ++watermark, kind: 'attention_changed',
+      payload: { ...attentionFor(browserCard), status: 'answered', revision: 1 } }] }))
+    expect(container.textContent).toContain('能力处理记录')
+    expect(container.querySelector('select')).toBeNull()
+    expect(container.textContent).not.toContain('重新检查并继续原任务')
+    expect(api.diagnoseBrowserSkill).toHaveBeenCalledOnce()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
+
+  it('refreshes cached pending attention before remounting a historical browser connector', async () => {
+    await render(browserCard)
+    expect(api.diagnoseBrowserSkill).toHaveBeenCalledOnce()
+    await act(async () => root.render(null))
+    api.diagnoseBrowserSkill.mockClear()
+    api.listTaskPage.mockClear()
+    let resolve!: (page: Awaited<ReturnType<typeof api.listTaskPage>>) => void
+    api.listTaskPage.mockImplementationOnce(() => new Promise(accept => { resolve = accept }))
+    await act(async () => root.render(createElement(CapabilityRequiredCard, { card: browserCard })))
+    expect(api.listTaskPage).toHaveBeenCalledOnce()
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    expect(container.querySelector('select')).toBeNull()
+    await act(async () => resolve({ items: tasks, relatedTasks: [], attention: [], eventWatermark: ++watermark }))
+    expect(container.textContent).toContain('能力处理记录')
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+  })
+
+  it('does not mount an old request when its attention ID now belongs to a later capability check', async () => {
+    const latest = { ...browserCard, capability: { ...browserCard.capability, checkedAt: '2026-11-13T00:01:00Z' } }
+    inbox = [attentionFor(latest)]
+    await act(async () => {
+      root.render(createElement(CapabilityRequiredCard, { card: browserCard }))
+    })
+    expect(container.textContent).toContain('能力处理记录')
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    await act(async () => root.render(createElement(CapabilityRequiredCard, { card: latest })))
+    expect(api.diagnoseBrowserSkill).toHaveBeenCalledOnce()
+    expect(container.querySelector('select')).not.toBeNull()
+  })
+
+  it('keeps configuration explicit while the persisted attention state is loading or unavailable', async () => {
+    let reject!: (error: Error) => void
+    api.listTaskPage.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+    await act(async () => root.render(createElement(CapabilityRequiredCard, { card: browserCard })))
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    expect(container.querySelector('select')).toBeNull()
+    expect(button('查看配置')).toBeTruthy()
+    await act(async () => reject(new Error('synthetic task store failure')))
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain('能力处理记录')
+    await click('查看配置')
+    expect(state.openPlugins).toHaveBeenCalledWith(undefined, 'browser-skill')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
 
   it('shows the owner task workspace for historical cards without workspace metadata', async () => {
     const historical = { ...card, capability: { provider: 'workspace' as const, status: 'needs_authorization' as const,

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { BrowserCapabilityConfig, browserTaskOrigins, isBrowserTask, type BrowserExecutionScope, type BrowserTaskBindingConfirmation, type BrowserTaskBindingSnapshot } from '../contracts/browser-skill.js'
 import type { CapabilityPreflight } from '../contracts/harness.js'
 import type { ExecutionScope } from '../contracts/permissions.js'
@@ -12,6 +13,10 @@ import { object, runBrowserCommand, parseBrowserStatus, compatibleBrowserProtoco
 
 export class ManagedBrowserSkillRuntime {
   private config: BrowserCapabilityConfig
+  private configurationFingerprint: string
+  private providerGeneration = 0
+  private appliedGeneration = 0
+  private currentProvider?: CapabilityToolProvider
   private readonly sessions = new Map<string, { taskId: string; threadId: string; config: BrowserCapabilityConfig }>()
   constructor(private readonly options: {
     config?: BrowserCapabilityConfig
@@ -22,17 +27,26 @@ export class ManagedBrowserSkillRuntime {
     hasActiveAttempt?: (turnId: string) => boolean
     run?: BrowserCommandRunner
     resolveSchedule?: (context: ToolHostContext, sourceActionId?: string) => Promise<BrowserScheduleResolution | undefined>
-  }) { this.config = BrowserCapabilityConfig.parse(options.config ?? {}) }
+  }) {
+    this.config = BrowserCapabilityConfig.parse(options.config ?? {})
+    this.configurationFingerprint = browserConfigurationFingerprint(this.config)
+  }
 
   state(): BrowserCapabilityConfig { return structuredClone(this.config) }
+  identityFingerprint(): string { return this.configurationFingerprint }
 
   provider(): CapabilityToolProvider {
-    const provider = buildBrowserSkillToolProvider({ config: () => this.config, repository: this.options.repository, dataDir: this.options.dataDir, run: this.options.run, resolveSchedule: this.options.resolveSchedule,
+    if (this.currentProvider) return this.currentProvider
+    const generation = this.providerGeneration
+    const provider = buildBrowserSkillToolProvider({ config: () => this.config,
+      configurationFingerprint: this.configurationFingerprint, isCurrentConfiguration: () => generation === this.providerGeneration,
+      repository: this.options.repository, dataDir: this.options.dataDir, run: this.options.run, resolveSchedule: this.options.resolveSchedule,
       onSession: (taskId, sessionId, threadId, signal) => {
         this.sessions.set(sessionId, { taskId, threadId, config: this.state() })
         signal.addEventListener('abort', () => { void this.stopThread(threadId) }, { once: true })
       } })
-    return { ...provider, enabled: this.config.enabled, available: this.config.state === 'ready' }
+    this.currentProvider = { ...provider, enabled: this.config.enabled, available: this.config.state === 'ready' }
+    return this.currentProvider
   }
 
   async preflight(text: string, thread?: ThreadRecord): Promise<CapabilityPreflight | null> {
@@ -94,7 +108,9 @@ export class ManagedBrowserSkillRuntime {
       origins, interaction: inherited?.interaction ?? config.interaction,
       revision: inherited?.revision ?? config.revision
     } : undefined
-    return { networkAllowlist: origins, connectorScopes: [], externalTargets: [], ...(scope ? { browserScope: scope } : {}) }
+    return { networkAllowlist: origins, connectorScopes: [], externalTargets: [], ...(scope ? {
+      browserScope: scope, connectorIdentityFingerprints: { 'browser-skill': this.configurationFingerprint }
+    } : {}) }
   }
 
   bindingSnapshot(taskId: string): BrowserTaskBindingSnapshot {
@@ -154,8 +170,18 @@ export class ManagedBrowserSkillRuntime {
   async refresh(): Promise<BrowserCapabilityConfig> {
     const fresh = readOptionalKunConfigFile(this.options.configPath)?.config.capabilities.browserSkill
     if (!fresh) throw new Error('browser_configuration_unavailable')
+    const fingerprint = browserConfigurationFingerprint(fresh)
+    const changed = fingerprint !== this.configurationFingerprint
     this.config = fresh
-    this.options.apply(this.provider())
+    if (changed) {
+      this.configurationFingerprint = fingerprint
+      this.providerGeneration += 1
+      this.currentProvider = undefined
+    }
+    if (this.appliedGeneration !== this.providerGeneration) {
+      this.options.apply(this.provider())
+      this.appliedGeneration = this.providerGeneration
+    }
     return this.state()
   }
 
@@ -175,4 +201,16 @@ export class ManagedBrowserSkillRuntime {
   async close(): Promise<void> {
     await Promise.all([...new Set([...this.sessions.values()].map(item => item.threadId))].map(threadId => this.stopThread(threadId)))
   }
+}
+
+function browserConfigurationFingerprint(config: BrowserCapabilityConfig): string {
+  const selected = config.browsers.find(browser => browser.id === config.browserInstanceId)
+  return createHash('sha256').update(JSON.stringify({
+    enabled: config.enabled, state: config.state, revision: config.revision,
+    browserInstanceId: config.browserInstanceId, origins: [...config.origins].sort(), interaction: config.interaction,
+    executablePath: config.executablePath, executableHash: config.executableHash, version: config.version,
+    homeDirectory: config.homeDirectory, daemonProtocolVersion: config.daemonProtocolVersion,
+    selectedBrowser: selected ? { id: selected.id, connected: selected.connected, extensionVersion: selected.extensionVersion,
+      protocolVersion: selected.protocolVersion, versionSkew: selected.versionSkew } : undefined
+  })).digest('hex')
 }

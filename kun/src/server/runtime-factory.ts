@@ -913,6 +913,7 @@ export async function createKunServeRuntime(
     browserState: () => browserRuntime.state(),
     coordinator: taskCoordinator, threads: threadStore, workspaceTrust, nowIso,
     connectorIdentities: () => ({ ...mcpRuntime.state().authorityFingerprints,
+      'browser-skill': browserRuntime.identityFingerprint(),
       ...larkRuntime.scope([]).connectorIdentityFingerprints,
       ...(useDws() ? dwsRuntime.scope([]) : dingtalkRuntime.scope([])).connectorIdentityFingerprints }) })
   flowService.setTaskScheduleDispatcher(input => taskScheduleService!.dispatch(input))

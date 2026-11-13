@@ -41,6 +41,8 @@ const failure = (code: string): Error => Object.assign(new Error(code === 'brows
 /** Fixed argv operations; page data cannot choose executables, scripts or another browser profile. */
 export function buildBrowserSkillToolProvider(options: {
   config: () => BrowserCapabilityConfig
+  configurationFingerprint?: string
+  isCurrentConfiguration?: () => boolean
   repository: TaskRunRepository
   dataDir: string
   run?: BrowserCommandRunner
@@ -51,6 +53,11 @@ export function buildBrowserSkillToolProvider(options: {
   const scheduleAuthority = new BrowserScheduleActionAuthority(options)
   const queues = new Map<string, Promise<unknown>>()
   const observations = new Map<string, { contextId: string; sourceUrl: string; tabId: number }>()
+  const configurationChanged = (context: ToolHostContext): boolean => options.isCurrentConfiguration?.() === false ||
+    (options.configurationFingerprint !== undefined && context.executionGrant?.connectorIdentityFingerprints?.['browser-skill'] !== options.configurationFingerprint)
+  const assertCurrentConfiguration = (context: ToolHostContext): void => {
+    if (configurationChanged(context)) throw failure('browser_binding_changed')
+  }
   const descriptions: Record<Action, string> = {
     request_interaction: '当前任务仅可读取网页。如果搜索框、点击或填写才能继续，调用本工具说明原因，生成当前任务的浏览器交互授权卡。不会执行网页动作；请等待用户审阅后继续。',
     start: '为当前任务在已授权浏览器实例创建独立浏览器窗口。返回sessionId。缺少站点权限时先请求任务范围授权。',
@@ -71,6 +78,7 @@ export function buildBrowserSkillToolProvider(options: {
   }
 
   const contextBlock = (context: ToolHostContext, interaction: boolean, action?: Action) => {
+    if (configurationChanged(context)) return { code: 'browser_binding_changed', message: '浏览器配置已变化，请确认当前任务的浏览器范围后继续。' }
     if (action === 'press' && isRecurring(context)) return { code: 'browser_schedule_action_scope_required', message: '周期任务的按键操作不支持持续授权，请重新观察页面并审阅明确的点击或填写动作。' }
     const config = options.config()
     const scope = context.executionGrant?.browserScope
@@ -86,6 +94,7 @@ export function buildBrowserSkillToolProvider(options: {
 
   const assertContext = async (context: ToolHostContext, mutation = false) => {
     context.abortSignal.throwIfAborted()
+    assertCurrentConfiguration(context)
     context.assertExecution?.()
     await context.validateExecutionGrant?.()
     const config = options.config()
@@ -96,6 +105,7 @@ export function buildBrowserSkillToolProvider(options: {
     if (mutation && (scope.data.interaction !== 'interact' || config.interaction !== 'interact')) throw failure('browser_interaction_scope_required')
 
     const status = await run(config, ['status'], context.abortSignal)
+    assertCurrentConfiguration(context)
     if (!status.ok) throw failure(status.code ?? 'browser_connection_failed')
     const parsed = parseBrowserStatus(status.output)
     const browser = parsed.browsers.find(item => item.id === scope.data.browserInstanceId && item.connected)
@@ -106,7 +116,9 @@ export function buildBrowserSkillToolProvider(options: {
   const command = async (config: BrowserCapabilityConfig, args: string[], context: ToolHostContext): Promise<Json> => {
     await context.validateExecutionGrant?.()
     context.assertExecution?.()
+    assertCurrentConfiguration(context)
     const result = await run(config, args, context.abortSignal)
+    assertCurrentConfiguration(context)
     if (!result.ok) throw failure(result.outcomeUnknown ? 'outcome_unknown' : result.code ?? 'browser_command_failed')
     return object(result.output)
   }

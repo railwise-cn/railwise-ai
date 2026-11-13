@@ -136,6 +136,7 @@ it('keeps a task created without Browser capability unbound until preview, confi
   const turn = (await f.runtime.threadService.get(f.worker.id))!.turns.find(item => item.id === started.turn!.turnId)!
   expect(turn.executionGrant?.browserScope).toMatchObject({ browserInstanceId: snapshot.browserInstanceId,
     origins: snapshot.origins, revision: snapshot.browserRevision, interaction: snapshot.interaction })
+  expect(turn.executionGrant?.connectorIdentityFingerprints?.['browser-skill']).toMatch(/^[a-f0-9]{64}$/)
 })
 
 it('persists a blocked browser resume across restart, confirms its scope while paused, and starts a Turn only on a separate resume', async () => {

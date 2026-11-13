@@ -29,6 +29,8 @@ describe('browser task reauthorization', () => {
     try {
       await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: 'task', onConfirmed: confirmed })))
       expect(element.textContent).toContain('测试 Chrome')
+      expect(element.querySelector('dt')?.textContent).toBe('所选浏览器')
+      expect(element.textContent).not.toContain('browserSkillInstance')
       expect(element.textContent).toContain('https://example.com')
       if (interaction === 'interact') expect(element.textContent).toContain('从仅阅读扩大为允许网页交互')
       expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
@@ -57,6 +59,8 @@ describe('browser task reauthorization', () => {
       expect(api.getBrowserTaskBinding.mock.calls).toEqual([['task'], ['task']])
       expect(element.querySelector('[role="alert"]')).toBeNull()
       expect(element.textContent).toContain('测试 Chrome')
+      expect(element.querySelector('dt')?.textContent).toBe(language === 'zh' ? '所选浏览器' : 'Selected browser')
+      expect(element.textContent).not.toContain('browserSkillInstance')
       expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
       expect(button(element, 'browserTaskBindingConfirm').disabled).toBe(false)
       await act(async () => button(element, 'browserTaskBindingConfirm').click())
