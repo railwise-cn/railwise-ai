@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
@@ -379,4 +379,23 @@ test('failed task evidence retains status and codes without exporting prompts, a
   assert.equal(summary.turns[0].toolResults[0].code, 'browser_scope_required')
   assert.equal(summary.receipts[0].status, 'failed')
   assert.doesNotMatch(JSON.stringify(summary), /private prompt|private-key|private page/)
+})
+
+test('manual preview failure permits later diagnostics while keeping the complete acceptance failed', async () => {
+  const evidence = report()
+  const observations = []
+  const passed = await inspectWindowsManualPreview(evidence, async () => {
+    observations.push('manual preview')
+    throw new Error('The actual task route has no preview body')
+  }).then(value => { observations.push('later due diagnostic'); return value })
+  assert.equal(passed, false)
+  assert.deepEqual(observations, ['manual preview', 'later due diagnostic'])
+  assert.equal(evidence.taskExecution.preview.manualEntryVerified, false)
+  assert.match(evidence.errors[0], /actual task route has no preview body/)
+  assert.throws(() => validateWindowsTaskEvidence(evidence.taskExecution))
+  assert.throws(() => validateWindowsUiReport(evidence, identity))
+  const successful = report()
+  delete successful.taskExecution.preview.manualEntryVerified
+  assert.equal(await inspectWindowsManualPreview(successful, async () => undefined), true)
+  assert.equal(successful.taskExecution.preview.manualEntryVerified, true)
 })

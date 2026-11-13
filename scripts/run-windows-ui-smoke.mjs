@@ -316,6 +316,18 @@ export function summarizeWindowsTaskFailure(task, thread, receipts) {
       status: receipt.status, errorCode: code(receipt.errorCode) })) }
 }
 
+export async function inspectWindowsManualPreview(report, inspect) {
+  try {
+    await inspect()
+    report.taskExecution.preview.manualEntryVerified = true
+    return true
+  } catch (error) {
+    report.taskExecution.preview.manualEntryVerified = false
+    report.errors.push(`Manual task artifact preview failed: ${error instanceof Error ? error.message : String(error)}`)
+    return false
+  }
+}
+
 function contained(root, path) {
   const part = relative(root, path)
   return Boolean(part && part !== '..' && !part.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) && !isAbsolute(part))
@@ -800,19 +812,20 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       report.taskExecution.preview = { ...automaticPreview, automatic: true, originThreadId: task.originThreadId }
       const automaticScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
       await writeFile(join(evidenceDir, 'windows-task-html-auto-preview-zh-dark.png'), Buffer.from(automaticScreenshot.data, 'base64'))
-      await cdp.click('nav[aria-label="工作区工具"] button', '任务')
-      await cdp.wait(`Boolean(document.querySelector('section[aria-label="任务"] [aria-label="任务筛选"]'))`, 'the real task workspace')
-      const completedFilter = await cdp.evaluate(`Array.from(document.querySelectorAll('[aria-label="任务筛选"] button')).find(button=>button.textContent.trim().startsWith('已完成'))?.textContent.trim()`)
-      assert.ok(completedFilter, 'The completed-task filter must be available')
-      await cdp.click('[aria-label="任务筛选"] button', completedFilter)
-      await cdp.wait(`Boolean(Array.from(document.querySelectorAll('[aria-label="任务列表"] button')).find(button=>button.textContent.includes(${JSON.stringify(task.goal)})))`, 'the actual completed task')
-      await cdp.click('[aria-label="任务列表"] button', task.goal)
-      await cdp.click('article[aria-label="任务详情"] button', '每日网页报告.html')
-      const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
-      assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
-      report.taskExecution.preview.manualEntryVerified = true
+      const manualPreviewPassed = await inspectWindowsManualPreview(report, async () => {
+        await cdp.click('nav[aria-label="工作区工具"] button', '任务')
+        await cdp.wait(`Boolean(document.querySelector('section[aria-label="任务"] [aria-label="任务筛选"]'))`, 'the real task workspace')
+        const completedFilter = await cdp.evaluate(`Array.from(document.querySelectorAll('[aria-label="任务筛选"] button')).find(button=>button.textContent.trim().startsWith('已完成'))?.textContent.trim()`)
+        assert.ok(completedFilter, 'The completed-task filter must be available')
+        await cdp.click('[aria-label="任务筛选"] button', completedFilter)
+        await cdp.wait(`Boolean(Array.from(document.querySelectorAll('[aria-label="任务列表"] button')).find(button=>button.textContent.includes(${JSON.stringify(task.goal)})))`, 'the actual completed task')
+        await cdp.click('[aria-label="任务列表"] button', task.goal)
+        await cdp.click('article[aria-label="任务详情"] button', '每日网页报告.html')
+        const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
+        assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
+      })
       const taskScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
-      await writeFile(join(evidenceDir, 'windows-task-html-preview-zh-dark.png'), Buffer.from(taskScreenshot.data, 'base64'))
+      await writeFile(join(evidenceDir, manualPreviewPassed ? 'windows-task-html-preview-zh-dark.png' : 'windows-task-html-manual-failure.png'), Buffer.from(taskScreenshot.data, 'base64'))
       // Use the normal Flow edit/publish path for one real near-term test occurrence.
       // The original daily schedule and readback above remain separate evidence.
       const originalDefinition = flow.flow
