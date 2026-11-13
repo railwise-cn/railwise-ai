@@ -10,7 +10,7 @@ import { browserEnvironment, compatibleBrowserProtocol, object, parseBrowserStat
 import type { BrowserSkillConfigureRequest, ManagedBrowserSkillResult, ManagedBrowserSkillStatus } from '../../shared/managed-browser-skill'
 import { atomicWriteFile, runSerialized } from './durable-file'
 import { downloadManagedDependency, managedDependency, type ManagedDependency } from './managed-dependency-download'
-import { processIdentity } from '../../../kun/src/services/process-identity.js'
+import { processIdentityAsync, type ProcessIdentityProbeOptions } from '../../../kun/src/services/process-identity.js'
 import type { ProcessIdentity } from '../../../kun/src/contracts/execution.js'
 
 const executeFile = promisify(execFile)
@@ -26,7 +26,7 @@ type Dependencies = {
   run?: BrowserCommandRunner
   download?: (asset: ManagedDependency) => Promise<Buffer>
   start?: (path: string, args: string[], env: NodeJS.ProcessEnv) => ChildProcess
-  identity?: (pid: number) => ProcessIdentity | null
+  identity?: (pid: number, options?: ProcessIdentityProbeOptions) => ProcessIdentity | null | Promise<ProcessIdentity | null>
   signal?: (pid: number, signal: NodeJS.Signals) => void
   version?: (path: string) => Promise<string>
   wait?: () => Promise<void>
@@ -61,7 +61,7 @@ export class ManagedBrowserSkillService {
     this.run = deps.run ?? runBrowserCommand
     this.download = deps.download ?? downloadManagedDependency
     this.start = deps.start ?? ((path, args, env) => spawn(path, args, { env, shell: false, windowsHide: true, detached: true, stdio: 'ignore' }))
-    this.identity = deps.identity ?? processIdentity
+    this.identity = deps.identity ?? processIdentityAsync
     this.signal = deps.signal ?? ((pid, signal) => { process.kill(pid, signal) })
     this.version = deps.version ?? (async path => String((await executeFile(path, ['--version'], { shell: false, windowsHide: true, timeout: 10_000, maxBuffer: 64 * 1024 })).stdout).trim())
     this.wait = deps.wait ?? (() => new Promise(resolveWait => setTimeout(resolveWait, 500)))
@@ -71,6 +71,14 @@ export class ManagedBrowserSkillService {
   private path(): string { return join(this.root, 'connection.json') }
   private ownershipPath(): string { return join(this.root, 'owned-daemon.json') }
 
+  private async readIdentity(pid: number, options?: ProcessIdentityProbeOptions): Promise<ProcessIdentity | null> {
+    try {
+      const identity = await this.identity(pid, options)
+      return identity?.pid === pid && typeof identity.fingerprint === 'string' && identity.fingerprint &&
+        !identity.fingerprint.startsWith('unverified:') ? identity : null
+    } catch { return null }
+  }
+
   private async verifiedOwner(config: BrowserCapabilityConfig, candidate: unknown, expectedPid?: number): Promise<DaemonOwnership | undefined> {
     const value = object(candidate)
     if (!Number.isSafeInteger(value.pid) || Number(value.pid) < 1 || typeof value.fingerprint !== 'string' ||
@@ -78,8 +86,8 @@ export class ManagedBrowserSkillService {
       value.executablePath !== config.executablePath || value.executableHash !== config.executableHash ||
       value.homeDirectory !== (config.homeDirectory ?? this.homeDirectory) || value.homeDirectory !== this.homeDirectory ||
       typeof value.executablePath !== 'string' || typeof value.executableHash !== 'string') return undefined
-    const current = this.identity(Number(value.pid))
-    if (!current || current.fingerprint !== value.fingerprint) return undefined
+    const current = await this.readIdentity(Number(value.pid))
+    if (!current || current.pid !== value.pid || current.fingerprint !== value.fingerprint) return undefined
     try {
       if (digest(await readFile(value.executablePath)) !== value.executableHash) return undefined
     } catch { return undefined }
@@ -90,7 +98,8 @@ export class ManagedBrowserSkillService {
     if (this.disposed) return
     let saved: unknown
     try { saved = JSON.parse(await readFile(this.ownershipPath(), 'utf8')) } catch { return }
-    this.ownedDaemon = await this.verifiedOwner(config, saved, pid)
+    const owned = await this.verifiedOwner(config, saved, pid)
+    if (!this.disposed) this.ownedDaemon = owned
   }
 
   async configuration(): Promise<BrowserCapabilityConfig> {
@@ -215,9 +224,22 @@ export class ManagedBrowserSkillService {
       }
       child.once('close', clear)
       child.once('error', clear)
-      let identity = child.pid ? this.identity(child.pid) : null
-      if (!identity) { await this.wait(); identity = child.pid ? this.identity(child.pid) : null }
-      if (!identity || identity.fingerprint.startsWith('unverified:')) {
+      // The Windows birth query may cold-start PowerShell. Await it without
+      // blocking Main, and share one bounded budget across the existing retry.
+      const deadline = Date.now() + 10_000
+      const liveChild = (): boolean => this.daemonChild === child && child.exitCode === null && child.signalCode === null
+      const identify = async (): Promise<ProcessIdentity | null> => {
+        const timeoutMs = deadline - Date.now()
+        if (!child.pid || timeoutMs <= 0 || !liveChild()) return null
+        const identity = await this.readIdentity(child.pid, { timeoutMs })
+        return Date.now() <= deadline && liveChild() ? identity : null
+      }
+      let identity = await identify()
+      if (!identity && !this.disposed && liveChild() && Date.now() < deadline) {
+        await this.wait()
+        identity = await identify()
+      }
+      if (!identity || identity.pid !== child.pid || !identity.fingerprint || identity.fingerprint.startsWith('unverified:') || !liveChild()) {
         child.unref()
         throw new Error('browser_daemon_identity_unverified')
       }
@@ -225,6 +247,7 @@ export class ManagedBrowserSkillService {
       this.ownedDaemon = ownership
       await atomicWriteFile(this.ownershipPath(), JSON.stringify(ownership, null, 2) + '\n')
     }
+    if (this.disposed) return result
     for (let attempt = 0; attempt < 10; attempt += 1) {
       if (this.disposed) break
       await this.wait()
@@ -250,7 +273,8 @@ export class ManagedBrowserSkillService {
         if (!await this.verifiedOwner(config, owned)) return
         // Verify the birth fingerprint again immediately before signalling a
         // PID that may have been recycled during the executable read.
-        if (this.identity(owned.pid)?.fingerprint !== owned.fingerprint) return
+        const current = await this.readIdentity(owned.pid)
+        if (current?.pid !== owned.pid || current.fingerprint !== owned.fingerprint) return
         if (child?.pid === owned.pid && child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
         else this.signal(owned.pid, 'SIGTERM')
       } finally {
