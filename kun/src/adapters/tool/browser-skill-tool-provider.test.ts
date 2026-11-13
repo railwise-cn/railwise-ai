@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto'
+import type { BrowserScheduleResolution } from '../../contracts/browser-schedule-actions.js'
+import { listApprovedBrowserScheduleActions } from '../../services/browser-schedule-action-authority.js'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -36,7 +39,7 @@ function fixture() {
     if (args[0] === 'status') return { ok: true, output: { daemon_version: '0.4.0', protocol_version: '1.7', pid: 10,
       browsers: [{ instance_id: 'browser-one', browser_name: 'Chrome', label: 'Test', extension_version: '0.4.0', extension_protocol_version: '1.7' }],
       sessions: started ? [{ session_id: sessionId, browser_instance_id: 'browser-one' }] : [] } }
-    if (args[0] === 'session' && args[1] === 'start') { started = true; starts += 1; sessionId = starts === 1 ? 'session-one' : 'session-two'; return { ok: true, output: { session_id: sessionId, browser_instance_id: 'browser-one' } } }
+    if (args[0] === 'session' && args[1] === 'start') { started = true; url = 'about:blank'; title = ''; starts += 1; sessionId = starts === 1 ? 'session-one' : 'session-two'; return { ok: true, output: { session_id: sessionId, browser_instance_id: 'browser-one' } } }
     if (args[0] === 'session' && args[1] === 'request') return { ok: true, output: { state: 'ready', session: { session_id: sessionId, browser_instance_id: 'browser-one' } } }
     if (args[0] === 'session' && args[1] === 'stop') return { ok: true, output: { stopped: [sessionId], failed: [] } }
     if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: 7, active: true, url, title, scope: 'agent' }] } }
@@ -45,7 +48,9 @@ function fixture() {
     if (args[0] === 'cooperate') return { ok: true, output: { ready: true, context_id: 'context-one', observation: { text: 'Synthetic page content @e1' } } }
     return { ok: true, output: { tab_id: 7 } }
   })
-  const provider = buildBrowserSkillToolProvider({ config: () => config, repository, dataDir: root, run: runner })
+  let scheduleResolution: BrowserScheduleResolution | undefined
+  let scheduleFailure: string | undefined
+  const provider = buildBrowserSkillToolProvider({ config: () => config, repository, dataDir: root, run: runner, resolveSchedule: async () => { if (scheduleFailure) throw Object.assign(new Error(scheduleFailure), { code: scheduleFailure }); return scheduleResolution } })
   const context: ToolHostContext = { threadId: 'thread', turnId: 'turn', workspace: root, approvalPolicy: 'on-request', sandboxMode: 'read-only',
     abortSignal: new AbortController().signal, awaitApproval: async () => 'allow',
     executionGrant: ExecutionGrantSchema.parse({ id: 'grant', taskId: 'task', threadId: 'thread', turnId: 'turn', workspaceRoot: root,
@@ -53,7 +58,7 @@ function fixture() {
       browserScope: { browserInstanceId: 'browser-one', origins: ['https://example.com'], interaction: 'interact', revision: 1 },
       workspaceRevision: 0, agentRevision: 0, revision: 0, idempotencyKey: 'grant', issuedAt: new Date().toISOString() }) }
   const execute = (name: string, args = {}, ctx = context) => provider.tools.find(tool => tool.name === name)!.execute(args, ctx)
-  return { repository, config, runner, provider, context, execute, setTitle: (next: string) => { title = next }, setElement: (html: string) => { elementHtml = html }, setUrl: (next: string) => { url = next } }
+  return { repository, config, runner, provider, context, execute, setSchedule: (value: BrowserScheduleResolution | undefined) => { scheduleResolution = value }, failSchedule: (code: string) => { scheduleFailure = code }, setTitle: (next: string) => { title = next }, setElement: (html: string) => { elementHtml = html }, setUrl: (next: string) => { url = next } }
 }
 
 describe('typed BrowserSkill production provider', () => {
@@ -313,6 +318,104 @@ describe('typed BrowserSkill production provider', () => {
     expect(summary).not.toContain('previous-secret')
     expect(result).toMatchObject({ item: { isError: true, output: { code: 'approval_target_changed' } } })
     expect(f.runner.mock.calls.some(([, args]) => args[0] === 'fill')).toBe(false)
+  })
+
+  it('requires an actual recurring source task and explicit public-query scope before durable authorization', async () => {
+    const f = fixture()
+    const approval = vi.fn(async () => 'allow' as const)
+    f.context.awaitApproval = approval
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/' })
+    expect(await f.execute('browser_authorize_action', { sessionId: 'session-one', contextId: 'context-one', target: '@e1', action: 'click', scope: 'schedule', scheduleAccess: 'public_query' }))
+      .toMatchObject({ isError: true, output: { code: 'browser_schedule_authorization_unavailable' } })
+    expect(approval).not.toHaveBeenCalled()
+    expect(f.repository.operations('task', 'browser_schedule_action_authorization')).toHaveLength(0)
+  })
+
+  it('derives a fresh occurrence authorization beyond 15 minutes and blocks target drift or a disabled schedule before dispatch', async () => {
+    const f = fixture()
+    f.repository.update('task', 0, task => ({ ...task, acceptance: { ...task.acceptance, schedule: { kind: 'daily', times: ['09:00'], timezone: 'Asia/Shanghai' } },
+      authority: { source: 'user', workspaceRoot: task.workspaceRoot, grantedAt: new Date().toISOString(), externalTargets: [], browserScope: f.context.executionGrant!.browserScope } }))
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input type="search" aria-label="采购关键词">')
+    const approved = vi.fn(async (_request: Parameters<ToolHostContext['awaitApproval']>[0]) => 'allow' as const)
+    f.context.awaitApproval = approved
+    const arguments_ = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', action: 'fill', value: '轨道监测', scope: 'schedule', scheduleAccess: 'public_query' }
+    expect(await f.execute('browser_authorize_action', arguments_)).toMatchObject({ output: { status: 'succeeded', scope: 'schedule', accountState: 'unknown' } })
+    expect(approved).toHaveBeenCalledOnce()
+    expect(approved.mock.calls[0][0].summary).toContain('持续到计划停用或授权撤销')
+    expect(approved.mock.calls[0][0].summary).toContain('仅授权无需账号的公开查询')
+    const actions = listApprovedBrowserScheduleActions(f.repository, f.repository.get('task')!)
+    expect(actions).toHaveLength(1)
+    const initialReceipt = f.repository.operations('task', 'browser_action_authorization')[0]
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    expect(await host.execute({ callId: 'initial-fill', toolName: 'browser_fill', arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '轨道监测' } }, f.context))
+      .toMatchObject({ item: { output: { status: 'succeeded' } } })
+    expect(approved).toHaveBeenCalledOnce()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + 2 * 86400000)
+    try {
+      const binding = { scheduleId: 'schedule_task', versionId: 'published-v1', sourceTaskId: 'task', scopeHash: 'a'.repeat(64),
+        actionsHash: createHash('sha256').update(JSON.stringify(actions)).digest('hex') }
+      f.setSchedule({ binding, actions })
+      const original = f.repository.get('task')!
+      f.repository.create({ ...original, id: 'occurrence', threadId: 'due-thread', activeTurnId: 'due-turn', scheduledBy: { scheduleId: binding.scheduleId, dueAt: new Date().toISOString() } })
+      const noApproval = vi.fn(async () => { throw new Error('The confirmed plan must derive an exact short authorization') })
+      const context = { ...f.context, threadId: 'due-thread', turnId: 'due-turn', awaitApproval: noApproval,
+        executionGrant: { ...f.context.executionGrant!, id: 'due-grant', taskId: 'occurrence', threadId: 'due-thread', turnId: 'due-turn', issuedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 60000).toISOString(), scheduleScopeHash: binding.scopeHash, browserScheduleBinding: binding } }
+      await f.execute('browser_session_start', {}, context)
+      await f.execute('browser_navigate', { sessionId: 'session-two', url: 'https://example.com/search' }, context)
+      const args = { sessionId: 'session-two', contextId: 'context-one', target: '@e1', value: '轨道监测' }
+      expect(await host.execute({ callId: 'due-fill', toolName: 'browser_fill', arguments: args }, context)).toMatchObject({ item: { output: { status: 'succeeded' } } })
+      expect(noApproval).not.toHaveBeenCalled()
+      expect(f.repository.operations('occurrence', 'browser_derived_action_authorization')).toHaveLength(1)
+      expect(f.repository.operations('task', 'browser_action_authorization')[0]).toEqual(initialReceipt)
+      const writes = f.runner.mock.calls.filter(([, args]) => args[0] === 'fill').length
+      f.setElement('<input type="search" aria-label="另一目标">')
+      expect(await host.execute({ callId: 'changed-fill', toolName: 'browser_fill', arguments: args }, context))
+        .toMatchObject({ item: { isError: true, output: { code: 'browser_schedule_action_scope_changed' } } })
+      f.failSchedule('schedule_authority_changed')
+      expect(await host.execute({ callId: 'disabled-fill', toolName: 'browser_fill', arguments: args }, context))
+        .toMatchObject({ item: { isError: true, output: { code: 'browser_schedule_authority_changed' } } })
+      expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'fill')).toHaveLength(writes)
+      expect(noApproval).not.toHaveBeenCalled()
+      f.failSchedule('')
+      f.setElement('<input type="search" aria-label="采购关键词">')
+      const originalRunner = f.runner.getMockImplementation()!
+      f.runner.mockImplementation((config, argv, signal) => argv[0] === 'fill'
+        ? Promise.resolve({ ok: false, output: {}, code: 'connection_lost', outcomeUnknown: true }) : originalRunner(config, argv, signal))
+      expect(await host.execute({ callId: 'unknown-fill', toolName: 'browser_fill', arguments: args }, context))
+        .toMatchObject({ item: { isError: true, output: { status: 'outcome_unknown' } } })
+      expect(f.repository.operations('task', 'browser_schedule_action_outcome')[0]?.status).toBe('outcome_unknown')
+      await f.execute('browser_observe', { sessionId: 'session-two' }, context)
+      expect(await host.execute({ callId: 'must-not-replay', toolName: 'browser_fill', arguments: args }, context))
+        .toMatchObject({ item: { isError: true, output: { code: 'browser_schedule_outcome_unknown' } } })
+      expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'fill')).toHaveLength(writes + 1)
+
+    } finally { vi.useRealTimers() }
+  })
+
+  it('retains an unknown initial schedule action before any plan or occurrence exists', async () => {
+    const f = fixture()
+    f.repository.update('task', 0, task => ({ ...task, acceptance: { ...task.acceptance, schedule: { kind: 'daily', times: ['09:00'], timezone: 'Asia/Shanghai' } } }))
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input type="search" aria-label="公开查询">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '轨道监测' }
+    await f.execute('browser_authorize_action', { ...args, action: 'fill', scope: 'schedule', scheduleAccess: 'public_query' })
+    const originalRunner = f.runner.getMockImplementation()!
+    f.runner.mockImplementation((config, argv, signal) => argv[0] === 'fill'
+      ? Promise.resolve({ ok: false, output: {}, code: 'connection_lost', outcomeUnknown: true }) : originalRunner(config, argv, signal))
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    expect(await host.execute({ callId: 'initial-unknown', toolName: 'browser_fill', arguments: args }, f.context))
+      .toMatchObject({ item: { isError: true, output: { status: 'outcome_unknown' } } })
+    expect(f.repository.operations('task', 'browser_schedule_action_outcome')[0]).toMatchObject({ status: 'outcome_unknown', request: { scheduleId: 'schedule_task' } })
+    await f.execute('browser_observe', { sessionId: 'session-one' })
+    expect(await host.execute({ callId: 'no-initial-replay', toolName: 'browser_fill', arguments: args }, f.context))
+      .toMatchObject({ item: { isError: true, output: { code: 'browser_schedule_outcome_unknown' } } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(1)
   })
 
 })

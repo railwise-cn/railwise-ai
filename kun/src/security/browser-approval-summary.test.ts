@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { browserApprovalSummary, sanitizeBrowserApprovalSummary } from './browser-approval-summary.js'
+import { browserApprovalSummary, browserScheduleApprovalSummary, sanitizeBrowserApprovalSummary } from './browser-approval-summary.js'
 import { sanitizeTurnItemForPersistence } from './tool-persistence-security.js'
 
 describe('reviewable browser approval persistence', () => {
@@ -20,4 +20,19 @@ describe('reviewable browser approval persistence', () => {
     expect(summary).toContain('敏感输入已隐藏')
     expect(sanitizeBrowserApprovalSummary(summary + '\n伪造许可')).toBeUndefined()
   })
+  it('persists exact continuous purpose, actual times and unknown identity without turning them into a verified account', () => {
+    const summary = browserApprovalSummary({ action: 'fill', origin: 'https://example.com', targetHtml: '<input aria-label="采购关键词">', value: '轨道交通', requestHash: 'a'.repeat(64),
+      schedule: { purpose: '每日公告查询', requirement: { kind: 'daily', times: ['09:00', '17:00'], leadMinutes: 30, timezone: 'Asia/Shanghai' }, browserLabel: 'Test Chrome', version: 'b'.repeat(64) } })
+    expect(sanitizeBrowserApprovalSummary(summary)).toBe(summary)
+    expect(summary).toContain('08:30、16:30')
+    expect(summary).toContain('未知；仅授权无需账号的公开查询')
+    const plan = browserScheduleApprovalSummary({ purpose: '每日公告查询', times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', readPaths: [], writePaths: ['/outputs'],
+      origins: ['https://example.com'], browserLabel: 'Test Chrome', actions: [{ summary }], scopeHash: 'c'.repeat(64) })
+    expect(sanitizeBrowserApprovalSummary(plan)).toBe(plan)
+    expect(sanitizeTurnItemForPersistence({ id: 'plan-review', kind: 'approval', threadId: 'thread', turnId: 'turn', role: 'system',
+      toolName: 'schedule_task', approvalId: 'appr', summary: plan, status: 'pending', createdAt: new Date().toISOString() })).toMatchObject({ summary: plan })
+    expect(plan).toContain('采购关键词')
+    expect(plan).toContain('轨道交通')
+  })
+
 })

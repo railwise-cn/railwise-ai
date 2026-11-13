@@ -5,6 +5,8 @@ import type { ThreadRecord } from '../contracts/threads.js'
 import { readOptionalKunConfigFile } from '../config/kun-config.js'
 import { buildBrowserSkillToolProvider } from '../adapters/tool/browser-skill-tool-provider.js'
 import type { CapabilityToolProvider } from '../adapters/tool/capability-registry.js'
+import type { ToolHostContext } from '../ports/tool-host.js'
+import type { BrowserScheduleResolution } from '../contracts/browser-schedule-actions.js'
 import type { TaskRunRepository } from './task-run-repository.js'
 import { object, runBrowserCommand, parseBrowserStatus, compatibleBrowserProtocol, type BrowserCommandRunner } from './browser-skill-cli.js'
 
@@ -19,12 +21,13 @@ export class ManagedBrowserSkillRuntime {
     apply: (provider: CapabilityToolProvider) => void
     hasActiveAttempt?: (turnId: string) => boolean
     run?: BrowserCommandRunner
+    resolveSchedule?: (context: ToolHostContext, sourceActionId?: string) => Promise<BrowserScheduleResolution | undefined>
   }) { this.config = BrowserCapabilityConfig.parse(options.config ?? {}) }
 
   state(): BrowserCapabilityConfig { return structuredClone(this.config) }
 
   provider(): CapabilityToolProvider {
-    const provider = buildBrowserSkillToolProvider({ config: () => this.config, repository: this.options.repository, dataDir: this.options.dataDir, run: this.options.run,
+    const provider = buildBrowserSkillToolProvider({ config: () => this.config, repository: this.options.repository, dataDir: this.options.dataDir, run: this.options.run, resolveSchedule: this.options.resolveSchedule,
       onSession: (taskId, sessionId, threadId, signal) => {
         this.sessions.set(sessionId, { taskId, threadId, config: this.state() })
         signal.addEventListener('abort', () => { void this.stopThread(threadId) }, { once: true })

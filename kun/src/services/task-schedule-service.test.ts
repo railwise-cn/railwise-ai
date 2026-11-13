@@ -13,6 +13,9 @@ import { ThreadSchema } from '../contracts/threads.js'
 import { TaskScheduleService } from './task-schedule-service.js'
 import { buildTaskScheduleToolProvider } from '../adapters/tool/task-schedule-tool-provider.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
+import { BrowserCapabilityConfig } from '../contracts/browser-skill.js'
+import { BrowserScheduleActionAuthority } from './browser-schedule-action-authority.js'
+import { browserApprovalSummary } from '../security/browser-approval-summary.js'
 
 const cleanup: Array<() => void> = []
 afterEach(() => { cleanup.splice(0).forEach(close => close()); vi.useRealTimers() })
@@ -36,6 +39,8 @@ function fixture() {
     pathAllowlist: ['/workspace'], networkAllowlist: ['https://example.test'], connectorIdentityFingerprints: { 'mcp:test': 'a'.repeat(64) },
     workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'grant', issuedAt: new Date().toISOString() })
   const identities = { 'mcp:test': 'a'.repeat(64) }
+  const browser = BrowserCapabilityConfig.parse({ enabled: true, state: 'ready', browserInstanceId: 'browser-one', revision: 1,
+    origins: ['https://example.test'], interaction: 'interact' })
   const workspace = { canonicalRoot: '/workspace', level: 'workspace-write', revision: 1 }
   const execution = ThreadSchema.parse({ id: 'execution', title: 'test', workspace: '/workspace', model: 'test', mode: 'agent', status: 'idle',
     agentRevision: 1, agentProfile: { id: 'general', name: 'General', role: 'General', color: 'blue', systemPrompt: 'Test', toolAllowlist: ['*'], mcpAllowlist: ['*'], trustLevel: 'workspace-write', budget: { maxAttempts: 10, maxDurationMs: 600000 }, revision: 1 }, approvalPolicy: 'on-request', sandboxMode: 'workspace-write', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
@@ -44,7 +49,7 @@ function fixture() {
   const coordinator = { command: vi.fn(async (_command: unknown, _options?: unknown) => ({ kind: 'task_started' })) }
   const service = new TaskScheduleService({ flows, repository, tasks: { activeTask: () => repository.get(task.id) } as never,
     coordinator: coordinator as never, threads: { get: async (id: string) => threads.get(id), upsert: async (value: typeof execution) => { threads.set(value.id, value); return value } } as never,
-    workspaceTrust: { get: async () => workspace } as never, connectorIdentities: () => identities, nowIso: () => new Date().toISOString() })
+    workspaceTrust: { get: async () => workspace } as never, connectorIdentities: () => identities, browserState: () => browser, nowIso: () => new Date().toISOString() })
   flows.setTaskScheduleDispatcher(input => service.dispatch(input))
   const context = { threadId: 'execution', turnId: 'turn', workspace: '/workspace', executionGrant: grant, validateExecutionGrant: vi.fn(), abortSignal: new AbortController().signal, awaitApproval: vi.fn(async () => 'allow') } as unknown as ToolHostContext
   function temporaryPaths() {
@@ -55,7 +60,20 @@ function fixture() {
     grant.readPathAllowlist = ['/workspace']
     grant.writePathAllowlist = ['/workspace/reports']
   }
-  return { service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths }
+  function approveBrowserAction(action: 'click' | 'fill') {
+    grant.browserScope = { browserInstanceId: 'browser-one', revision: 1, origins: ['https://example.test'], interaction: 'interact' }
+    const current = repository.get(task.id)!
+    if (!current.authority?.browserScope) repository.update(current.id, current.revision, value => ({ ...value, authority: {
+      source: 'user', workspaceRoot: '/workspace', externalTargets: [], grantedAt: new Date().toISOString(), browserScope: grant.browserScope
+    } }))
+    const browserAuthority = new BrowserScheduleActionAuthority({ repository })
+    const candidate = browserAuthority.prepare(task.id, grant.browserScope, { action, pageUrl: 'https://example.test/search',
+      elementHash: (action === 'click' ? 'a' : 'b').repeat(64), ...(action === 'fill' ? { valueHash: 'c'.repeat(64) } : {}) })
+    return browserAuthority.save(candidate, `approved-${action}`, browserApprovalSummary({ action, origin: 'https://example.test',
+      targetHtml: action === 'click' ? '<button>查询公告</button>' : '<input aria-label="关键词">', value: action === 'fill' ? '工程监测' : undefined,
+      requestHash: candidate.id }))
+  }
+  return { service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths, approveBrowserAction }
 }
 
 describe('task-owned recurring execution', () => {
@@ -159,5 +177,72 @@ describe('task-owned recurring execution', () => {
     authority.scope.writePathAllowlist = ['*']
     f.flows.update({ ...flow, variables: { ...flow.variables, taskSchedule: authority } }, flow.revision)
     await expect(f.service.create(f.context)).rejects.toThrow('原始确认不一致')
+  })
+  it('explicitly versions added browser actions, preserves disabled state and old receipts, and rejects an old occurrence', async () => {
+    const f = fixture()
+    f.approveBrowserAction('click')
+    const original = await f.service.create(f.context)
+    const previous = f.flows.get(original.id)!
+    expect(f.context.awaitApproval).toHaveBeenCalledOnce()
+    expect(vi.mocked(f.context.awaitApproval).mock.calls[0]![0].summary).toContain('确认周期浏览器权限')
+    await f.service.dispatch({ scheduleId: original.id, versionId: previous.publishedVersionId!, dueAt: '2026-11-13T00:30:00.000Z' })
+    const hooks = f.coordinator.command.mock.calls[0]![1] as { prepareExecutionThread(thread: unknown): Promise<void> }
+    const occurrence = { ...f.threads.get('origin')!, id: 'occurrence', turns: [] }
+    f.threads.set(occurrence.id, occurrence)
+    await hooks.prepareExecutionThread(occurrence)
+    const originalReceipt = f.repository.operations(f.task.id, 'schedule_authority')[0]!
+    const firstScope = await f.service.executionScopeForThread(occurrence.id)
+    expect(firstScope?.browserScheduleBinding).toMatchObject({ scheduleId: original.id, versionId: previous.publishedVersionId })
+    f.flows.update({ ...previous, variables: { ...previous.variables, enabled: false } }, previous.revision)
+    f.approveBrowserAction('fill')
+    const updated = await f.service.create(f.context)
+    expect(updated.enabled).toBe(false)
+    expect(updated.scope.browserScheduleActions).toHaveLength(2)
+    expect(f.flows.list()).toHaveLength(1)
+    expect(f.flows.get(original.id)!.publishedVersionId).not.toBe(previous.publishedVersionId)
+    expect(f.context.awaitApproval).toHaveBeenCalledTimes(2)
+    expect(f.repository.operations(f.task.id, 'schedule_authority')).toHaveLength(2)
+    expect(f.repository.operation(f.task.id, originalReceipt.idempotencyKey)).toEqual(originalReceipt)
+    expect(await f.service.create(f.context)).toEqual(updated)
+    expect(f.context.awaitApproval).toHaveBeenCalledTimes(2)
+    await expect(f.service.executionScopeForThread(occurrence.id)).rejects.toThrow('计划已禁用或范围已变化')
+  })
+  it('does not silently promote an old temporary browser action into recurring authority', async () => {
+    const f = fixture()
+    f.repository.beginOperation({ ownerId: f.task.id, kind: 'browser_action_authorization', idempotencyKey: 'old-15-minutes', request: { action: 'click' }, nowIso: new Date().toISOString() })
+    f.repository.finishOperation(f.task.id, 'old-15-minutes', { status: 'succeeded', result: { expiresAt: '2026-11-13T00:15:00.000Z' } })
+    const saved = await f.service.create(f.context)
+    expect(saved.scope.browserScheduleActions).toBeUndefined()
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+    expect(f.repository.operations(f.task.id, 'browser_action_authorization')).toHaveLength(1)
+  })
+  it('recovers an approved managed draft after publication fails without another approval or receipt', async () => {
+    const f = fixture()
+    f.approveBrowserAction('click')
+    vi.spyOn(f.flows, 'publish').mockImplementationOnce(() => { throw new Error('Synthetic crash before Flow publication') })
+    await expect(f.service.create(f.context)).rejects.toThrow('Synthetic crash')
+    expect(f.service.readback(f.context).schedules).toHaveLength(0)
+    const receipt = f.repository.operations(f.task.id, 'schedule_authority')[0]!
+    const recovered = await f.service.create(f.context)
+    expect(recovered.enabled).toBe(true)
+    expect(f.context.awaitApproval).toHaveBeenCalledOnce()
+    expect(f.repository.operations(f.task.id, 'schedule_authority')).toEqual([receipt])
+    expect(f.flows.list()).toHaveLength(1)
+  })
+  it.each(['revoked', 'unknown'])('does not dispatch when recurring browser authorization is %s', async condition => {
+    const f = fixture()
+    f.approveBrowserAction('click')
+    const saved = await f.service.create(f.context)
+    if (condition === 'revoked') {
+      const approval = f.repository.operations(f.task.id, 'browser_schedule_action_authorization')[0]!
+      f.repository.finishOperation(f.task.id, approval.idempotencyKey, { status: 'failed', error: 'Synthetic revoked authorization' })
+    } else {
+      f.repository.beginOperation({ ownerId: f.task.id, kind: 'browser_schedule_action_outcome', idempotencyKey: 'unknown-action', request: { scheduleId: saved.id }, nowIso: new Date().toISOString() })
+      f.repository.finishOperation(f.task.id, 'unknown-action', { status: 'outcome_unknown', error: 'Synthetic unknown result' })
+    }
+    const versionId = f.flows.get(saved.id)!.publishedVersionId!
+    await expect(f.service.dispatch({ scheduleId: saved.id, versionId, dueAt: '2026-11-13T00:30:00.000Z' })).rejects.toThrow()
+    expect(f.coordinator.command).not.toHaveBeenCalled()
+    expect(f.repository.attention(`schedule:${saved.id}`)?.status).toBe('pending')
   })
 })

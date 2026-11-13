@@ -94,6 +94,27 @@ it('creates the browser scope card when a model failure leaves no final explanat
   expect(f.network).not.toHaveBeenCalled()
 })
 
+it.each(['browser_schedule_authority_changed', 'browser_schedule_action_scope_changed', 'browser_schedule_outcome_unknown'])('persists one actionable %s plan blocker without waking a paused task', async code => {
+  const f = await fixture()
+  const current = f.runtime.taskRepository!.get(f.task.id)!
+  f.runtime.taskRepository!.update(current.id, current.revision, task => ({ ...task, scheduledBy: { scheduleId: 'schedule-source', dueAt: '2026-11-13T01:00:00.000Z' } }))
+  await f.toolFailure(code)
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'waiting_user' })
+  await f.runtime.taskCoordinator!.flushCommandMessages()
+  const attention = f.runtime.taskRepository!.attention(`capability_${f.task.id}`)!
+  expect(attention).toMatchObject({ status: 'pending', payload: { capability: { provider: 'schedule', status: 'blocked', errorCode: code,
+    resolution: { kind: 'grant', route: 'flow/schedule-source', label: '查看并核对定时计划' } } } })
+  if (code === 'browser_schedule_outcome_unknown') expect(attention.message).toContain('结果待核实')
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'waiting_user' })
+  expect(f.runtime.taskRepository!.attention(attention.id)).toEqual(attention)
+  const waiting = f.runtime.taskRepository!.get(f.task.id)!
+  const paused = f.runtime.taskController!.pauseTask(waiting.id, waiting.revision, '用户暂停周期任务')
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ task: { status: 'paused' } })
+  expect(f.runtime.taskRepository!.get(f.task.id)).toEqual(paused)
+  expect((await f.runtime.sessionStore.loadItems(f.origin.id)).filter(item => item.kind === 'assistant_text' && item.capabilityCard)).toHaveLength(1)
+  expect(f.network).not.toHaveBeenCalled()
+})
+
 it.each(['browser_interaction_scope_required', 'browser_binding_changed'])('keeps a paused task paused when a late %s result is assessed', async code => {
   const f = await fixture()
   const current = f.runtime.taskRepository!.get(f.task.id)!

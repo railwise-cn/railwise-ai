@@ -15,6 +15,8 @@ import { browserEnvironment, parseBrowserStatus, runBrowserCommand } from '../sr
 import { buildBrowserSkillToolProvider } from '../src/adapters/tool/browser-skill-tool-provider.js'
 import { CapabilityRegistry } from '../src/adapters/tool/capability-registry.js'
 import { LocalToolHost } from '../src/adapters/tool/local-tool-host.js'
+import { listApprovedBrowserScheduleActions } from '../src/services/browser-schedule-action-authority.js'
+import type { BrowserScheduleResolution } from '../src/contracts/browser-schedule-actions.js'
 import { ManagedBrowserSkillRuntime } from '../src/services/managed-browser-skill-runtime.js'
 const executeFile = promisify(execFile)
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
@@ -25,7 +27,8 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
     const executable = process.env.RAILWISE_BROWSER_CLI!
     const extensionZip = process.env.RAILWISE_BROWSER_EXTENSION_ZIP!
     const chromePath = process.env.RAILWISE_BROWSER_TEST_CHROME!
-    const interactionAcceptance = process.env.RAILWISE_BROWSER_INTERACTION_ACCEPTANCE === '1'
+    const scheduleAcceptance = process.env.RAILWISE_BROWSER_SCHEDULE_ACCEPTANCE === '1'
+    const interactionAcceptance = scheduleAcceptance || process.env.RAILWISE_BROWSER_INTERACTION_ACCEPTANCE === '1'
     const publicUrl = process.env.RAILWISE_BROWSER_PUBLIC_URL
     if (interactionAcceptance) expect(publicUrl).toBeUndefined()
     const publicOrigin = publicUrl ? new URL(publicUrl).origin : undefined
@@ -55,7 +58,7 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
     const repository = new TaskRunRepository(join(root, 'tasks.sqlite'))
     const now = new Date().toISOString()
     repository.create(TaskRunSchema.parse({ id: 'synthetic-browser', threadId: 'thread', activeTurnId: 'turn', childTaskIds: [], workspaceRoot: root,
-      goal: `浏览器读取 ${origin} 两页`, status: 'running', agentId: 'default', acceptance: { kind: 'answer', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: false },
+      goal: `浏览器读取 ${origin} 两页`, status: 'running', agentId: 'default', acceptance: { kind: 'answer', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: false, ...(scheduleAcceptance ? { schedule: { kind: 'daily', times: ['09:00'], timezone: 'Asia/Shanghai' } } : {}) },
       budget: { maxAttempts: 1, maxDurationMs: 180000 }, attempts: 0, replans: 0, noProgressCount: 0, nodes: [], artifacts: [], revision: 0, createdAt: now, updatedAt: now }))
     const workerEvents: unknown[] = []
     let lastStatus: unknown
@@ -98,15 +101,16 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
       const status = parseBrowserStatus((lastStatus as { output: unknown }).output)
       config.browserInstanceId = status.browsers[0].id
       config.origins = publicOrigin ? [origin, publicOrigin] : [origin]
-      const provider = buildBrowserSkillToolProvider({ config: () => config, repository, dataDir: root })
+      let scheduleResolution: BrowserScheduleResolution | undefined
+      const provider = buildBrowserSkillToolProvider({ config: () => config, repository, dataDir: root, resolveSchedule: async () => scheduleResolution })
       const context: ToolHostContext = { threadId: 'thread', turnId: 'turn', workspace: root, approvalPolicy: 'on-request', sandboxMode: 'read-only', abortSignal: new AbortController().signal,
         awaitApproval: async () => { throw new Error('Read-only navigation must reuse the reviewed site scope') },
         executionGrant: ExecutionGrantSchema.parse({ id: 'grant', taskId: 'synthetic-browser', threadId: 'thread', turnId: 'turn', workspaceRoot: root,
           workspaceTrust: 'read-only', agentTrust: 'read-only', sandboxMode: 'read-only', approvalPolicy: 'on-request', networkAllowlist: config.origins,
           browserScope: { browserInstanceId: config.browserInstanceId, origins: config.origins, interaction: 'observe', revision: 1 },
           workspaceRevision: 0, agentRevision: 0, revision: 0, idempotencyKey: 'grant', issuedAt: now }) }
-      const call = async (name: string, args: Record<string, unknown>) => {
-        const result = await provider.tools.find(tool => tool.name === name)!.execute(args, context)
+      const call = async (name: string, args: Record<string, unknown>, activeContext = context) => {
+        const result = await provider.tools.find(tool => tool.name === name)!.execute(args, activeContext)
         if (result.isError) throw Object.assign(new Error(JSON.stringify(result.output)), { toolOutput: result.output })
         return result.output as Record<string, any>
       }
@@ -120,6 +124,7 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
       const html = await call('browser_get_html', { sessionId: session.sessionId })
       expect(html.html).toContain('href="/two"')
       let interactionEvidence: unknown
+      let scheduledInteractionEvidence: unknown
       let nextContextId = first.observation.context_id
       if (interactionAcceptance) {
         const host = new LocalToolHost({ registry: new CapabilityRegistry([provider]) })
@@ -148,6 +153,10 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
         let approvals = 0
         let summary = ''
         context.awaitApproval = async approval => { approvals += 1; summary = approval.summary; return 'allow' }
+        if (scheduleAcceptance) {
+          await call('browser_authorize_action', { sessionId: session.sessionId, contextId: fresh.observation.context_id,
+            target, action: 'fill', value: '轨道交通监测验收', scope: 'schedule', scheduleAccess: 'public_query' })
+        }
         const filled = await host.execute({ callId: 'synthetic-fill', toolName: 'browser_fill', arguments: {
           sessionId: session.sessionId, contextId: fresh.observation.context_id, target, value: '轨道交通监测验收'
         } }, context)
@@ -161,6 +170,37 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
         nextContextId = after.observation.context_id
         interactionEvidence = { scopeConfirmed: true, sameTask: true, approvals, action: 'fill', count: 1, readbackVerified: true,
           summaryHash: hash(Buffer.from(summary)), readbackHash: readback.resultHash, externalWrites: 0 }
+        if (scheduleAcceptance) {
+          expect(approvals).toBe(1)
+          const source = repository.get('synthetic-browser')!
+          const actions = listApprovedBrowserScheduleActions(repository, source)
+          expect(actions).toHaveLength(1)
+          const binding = { scheduleId: 'schedule_synthetic-browser', versionId: 'synthetic-published-version', sourceTaskId: source.id,
+            scopeHash: 'a'.repeat(64), actionsHash: hash(Buffer.from(JSON.stringify(actions))) }
+          scheduleResolution = { binding, actions }
+          repository.create({ ...source, id: 'synthetic-occurrence', threadId: 'due-thread', activeTurnId: 'due-turn',
+            scheduledBy: { scheduleId: binding.scheduleId, dueAt: new Date().toISOString() } })
+          const dueContext: ToolHostContext = { ...context, threadId: 'due-thread', turnId: 'due-turn',
+            executionGrant: { ...context.executionGrant!, id: 'due-grant', taskId: 'synthetic-occurrence', threadId: 'due-thread', turnId: 'due-turn',
+              scheduleScopeHash: binding.scopeHash, browserScheduleBinding: binding, expiresAt: new Date(Date.now() + 60000).toISOString() },
+            awaitApproval: async () => { throw new Error('The finite schedule action must derive its own short authorization') } }
+          const dueSession = await call('browser_session_start', {}, dueContext)
+          expect(dueSession.sessionId).not.toBe(session.sessionId)
+          const duePage = await call('browser_navigate', { sessionId: dueSession.sessionId, url: origin + '/one' }, dueContext)
+          const dueLine = JSON.stringify(duePage.observation).split(/\\n|\n/).find(line => line.includes('采购检索')) ?? ''
+          const dueTarget = /@?e\d+/.exec(dueLine)?.[0]
+          expect(dueTarget).toBeTruthy()
+          expect(await host.execute({ callId: 'due-fill', toolName: 'browser_fill', arguments: { sessionId: dueSession.sessionId,
+            contextId: duePage.observation.context_id, target: dueTarget, value: '轨道交通监测验收' } }, dueContext))
+            .toMatchObject({ item: { isError: false, output: { status: 'succeeded' } } })
+          const dueRead = await call('browser_get_html', { sessionId: dueSession.sessionId }, dueContext)
+          expect(dueRead.html).toContain('id="result">轨道交通监测验收')
+          expect(repository.operations('synthetic-occurrence', 'browser_derived_action_authorization')).toHaveLength(1)
+          await call('browser_session_stop', { sessionId: dueSession.sessionId }, dueContext)
+          scheduledInteractionEvidence = { independentTask: true, independentSession: true, actualCliWrites: 1, addedApprovals: 0,
+            readbackVerified: true, readbackHash: dueRead.resultHash, scopeResolution: 'synthetic-published-plan-fixture', actualFlowDispatch: false }
+        }
+
       }
       const second = await call('browser_navigate', { sessionId: session.sessionId, url: origin + '/two', contextId: nextContextId })
       expect(JSON.stringify(second.observation)).toContain('PAGE TWO RAILWISE')
@@ -189,7 +229,7 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
       await call('browser_session_stop', { sessionId: session.sessionId })
       await writeFile(join(root, 'evidence.json'), JSON.stringify({ passed: true, testedAt: new Date().toISOString(), cliVersion: '0.4.0', extensionVersion: manifest.version,
         credentialStore: 'isolated-test-mock-keychain', protocol: status.protocolVersion, browserVersion: (await executeFile(chromePath, ['--version'])).stdout.trim(), pagesRead: 2, htmlRead: true,
-        tabListShape: { keys: Object.keys(realTab), title: realTab.title }, publicPage, pageEvidenceHashes: [first.resultHash, second.resultHash], screenshotHash: shot.sha256, approvals: interactionAcceptance ? 1 : 0, interactionEvidence,
+        tabListShape: { keys: Object.keys(realTab), title: realTab.title }, publicPage, pageEvidenceHashes: [first.resultHash, second.resultHash], screenshotHash: shot.sha256, approvals: interactionAcceptance ? 1 : 0, interactionEvidence, scheduledInteractionEvidence,
         sessionStopped: repository.operations('synthetic-browser', 'browser_session').every(item => (item.result as { stopped?: boolean }).stopped) }, null, 2))
     } catch (error) {
       await writeFile(join(root, 'failure.json'), JSON.stringify({ error: String(error), lastStatus, daemonLog, chromeLog, workerEvents }, null, 2))

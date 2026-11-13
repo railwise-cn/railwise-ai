@@ -533,6 +533,7 @@ export async function createKunServeRuntime(
   const useDws=()=>Boolean(dwsRuntime.toolProvider())
   const browserRuntime = new ManagedBrowserSkillRuntime({ config: options.capabilities?.browserSkill,
     configPath: options.configPath ?? join(options.dataDir, 'config.json'), dataDir: options.dataDir, repository: taskRepository,
+    resolveSchedule: (context, sourceActionId) => taskScheduleService?.resolveBrowserActions(context, sourceActionId) ?? Promise.resolve(undefined),
     hasActiveAttempt: turnId => Boolean(taskController.tokenForTurn(turnId)),
     apply: provider => { activeToolRegistry?.replaceProvider('browser-skill', provider); activeChildToolRegistry?.replaceProvider('browser-skill', provider) } })
   const larkRuntime = new ManagedLarkRuntime(options.capabilities?.lark, options.configPath ?? join(options.dataDir, 'config.json'), provider => {
@@ -756,7 +757,16 @@ export async function createKunServeRuntime(
   })))
   async function taskExecutionRestriction(threadId: string, permissionId?: string, sourceTaskId?: string) {
     const restriction = await taskPermissionService.executionRestriction(threadId, permissionId, sourceTaskId)
-    const scheduledScope = await taskScheduleService?.executionScopeForThread(threadId)
+    let scheduledScope: ExecutionScope | undefined
+    try {
+      scheduledScope = await taskScheduleService?.executionScopeForThread(threadId)
+    } catch (error) {
+      const task = taskRepository.findActiveByThread(threadId)
+      if (task?.scheduledBy && task.authority?.browserScope && (error as { code?: string }).code === 'schedule_authority_changed') {
+        throw Object.assign(new Error('browser_schedule_authority_changed'), { code: 'browser_schedule_authority_changed' })
+      }
+      throw error
+    }
     return { ...restriction, ...scheduledScope }
   }
   async function executionScopeForTurn(threadId: string, turnId: string): Promise<ExecutionScope> {

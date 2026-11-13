@@ -4,10 +4,11 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import i18n from '../../i18n'
+import { takeRequestedFlow } from '../../store/flow-navigation'
 import { CapabilityRequiredCard } from './CapabilityRequiredCard'
 
 const state = vi.hoisted(() => ({
-  openPlugins: vi.fn(), openSettings: vi.fn(), chooseWorkspace: vi.fn(),
+  openFlow: vi.fn(), openPlugins: vi.fn(), openSettings: vi.fn(), chooseWorkspace: vi.fn(),
   refreshThreads: vi.fn(async () => undefined), selectThread: vi.fn(async () => undefined),
   activeThreadId: 'thread-original'
 }))
@@ -57,6 +58,16 @@ describe('capability waiting card', () => {
     root = createRoot(container)
   })
   afterEach(async () => { await act(async () => root.unmount()); container.remove() })
+
+  it('routes a periodic browser scope blocker to its actual plan without resuming it', async () => {
+    await render({ ...card, capability: { provider: 'schedule', status: 'needs_authorization', errorCode: 'browser_schedule_action_scope_changed',
+      message: '周期网页动作需要重新核对', action: { kind: 'grant', route: 'flow/schedule_original', label: '查看并核对定时计划' } } })
+    await click('查看并核对定时计划')
+    expect(state.openFlow).toHaveBeenCalledOnce()
+    expect(takeRequestedFlow()).toEqual({ flowId: 'schedule_original' })
+    expect(state.openSettings).not.toHaveBeenCalled()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
 
   it('opens the dedicated DingTalk connection hub without executing the task', async () => {
     await render({ ...card, capability: { provider: 'dingtalk', status: 'unsupported', message: '尚无钉钉连接器' } })

@@ -6,11 +6,13 @@ import { ManagedDingTalkConnection } from '../connectors/ManagedDingTalkConnecti
 import { BrowserTaskBindingPanel } from '../connectors/BrowserTaskBindingPanel'
 import { ManagedBrowserSkillConnection } from '../connectors/ManagedBrowserSkillConnection'
 import { TaskPermissionPanel } from './TaskPermissionPanel'
+import { requestFlowDetail } from '../../store/flow-navigation'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
 
 /** A capability failure is a durable waiting task, never a completed answer. */
 export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityCard }): ReactElement {
   const { t } = useTranslation('common')
+  const openFlow = useChatStore((state) => state.openFlow)
   const openPlugins = useChatStore((state) => state.openPlugins)
   const openSettings = useChatStore((state) => state.openSettings)
   const chooseWorkspace = useChatStore((state) => state.chooseWorkspace)
@@ -32,6 +34,11 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       return
     }
     const route = action?.route ?? ''
+    if (capability.provider === 'schedule' && route.startsWith('flow/')) {
+      requestFlowDetail({ flowId: route.slice('flow/'.length) })
+      openFlow()
+      return
+    }
     if (isBrowser && capability.errorCode === 'browser_origin_scope_required') {
       openPlugins(undefined, 'browser-skill')
       return

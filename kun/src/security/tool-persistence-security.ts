@@ -333,7 +333,7 @@ export function summarizeBashCommandForPersistence(command: string): string {
 }
 
 function normalizeArgumentSummary(toolName: string, summary: string | undefined): string {
-  if (['browser_click', 'browser_fill', 'browser_press', 'browser_authorize_action'].includes(toolName)) {
+  if (['browser_click', 'browser_fill', 'browser_press', 'browser_authorize_action'].includes(toolName) || toolName === 'schedule_task' && summary?.startsWith('确认周期浏览器权限\n')) {
     return sanitizeBrowserApprovalSummary(summary ?? '') ?? '浏览器操作详情不可核验，请重新发起操作确认。'
   }
   if (!summary?.trim()) {

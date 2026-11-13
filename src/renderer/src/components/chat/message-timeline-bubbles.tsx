@@ -19,7 +19,7 @@ import { resolveGeneratedFileWorkspaceRoot } from '../../lib/generated-file-path
 import { safeMediaPreviewUrl } from '../../lib/safe-media-preview-url'
 import { projectDshUiText } from '../../lib/dsh-ui-stream'
 import { DshUiBlocks } from './DshUiBlocks'
-import { BrowserApprovalDetails } from './BrowserApprovalDetails'
+import { BrowserApprovalDetails, browserApprovalFields } from './BrowserApprovalDetails'
 import { CapabilityRequiredCard } from './CapabilityRequiredCard'
 import { TaskIntentChoiceCard } from './TaskIntentChoiceCard'
 import { DiffView } from '../DiffView'
@@ -1524,7 +1524,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
       >
         <div className="font-semibold text-accent">{t('approvalTitle')}</div>
         <p className="mt-2 text-[14px] text-ds-ink">{t('approvalScopeSummary')}</p>
-        {block.toolName?.startsWith('browser_') ? <BrowserApprovalDetails summary={block.summary} /> : <details className="mt-2 text-[12px] text-ds-muted"><summary className="cursor-pointer">{t('approvalScopeDetails')}</summary>
+        {(block.toolName?.startsWith('browser_') || block.toolName === 'schedule_task' && browserApprovalFields(block.summary)) ? <BrowserApprovalDetails summary={block.summary} /> : <details className="mt-2 text-[12px] text-ds-muted"><summary className="cursor-pointer">{t('approvalScopeDetails')}</summary>
           <p className="mt-2 max-h-96 overflow-y-auto whitespace-pre-wrap break-words">{block.summary}</p>
         </details>}
         {block.errorMessage ? (

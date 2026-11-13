@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ApprovalPolicySchema, SandboxModeSchema } from './policy.js'
 import { BrowserExecutionScope } from './browser-skill.js'
+import { BrowserScheduleBindingSchema, type BrowserScheduleAction } from './browser-schedule-actions.js'
 
 export const WorkspaceTrustLevelSchema = z.enum(['read-only', 'workspace-write', 'trusted', 'full-access'])
 export type WorkspaceTrustLevel = z.infer<typeof WorkspaceTrustLevelSchema>
@@ -36,6 +37,7 @@ export const ExecutionGrantSchema = z.object({
   managedArtifactRoot: z.string().min(1).optional(),
   scheduleScopeHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   browserScope: BrowserExecutionScope.optional(),
+  browserScheduleBinding: BrowserScheduleBindingSchema.optional(),
   workspaceWriteException: z.boolean().optional(),
   networkAllowlist: z.array(z.string()).default([]),
   connectorScopes: z.array(z.string()).default([]),
@@ -92,10 +94,10 @@ export const TaskPermissionConfirmationSchema = z.object({
 export type TaskPermissionConfirmation = z.infer<typeof TaskPermissionConfirmationSchema>
 
 export type ExecutionScope = Pick<ExecutionGrant, 'networkAllowlist' | 'connectorScopes' | 'externalTargets'> &
-  Pick<Partial<ExecutionGrant>, 'connectorIdentityFingerprints' | 'connectorBackends' | 'browserScope' | 'scheduleScopeHash'> &
+  Pick<Partial<ExecutionGrant>, 'connectorIdentityFingerprints' | 'connectorBackends' | 'browserScope' | 'browserScheduleBinding' | 'scheduleScopeHash'> &
   Pick<Partial<ExecutionGrant>, 'allowedToolNames'> &
   Pick<Partial<ExecutionGrant>, 'allowedProviderIds' | 'pathAllowlist' | 'readPathAllowlist' | 'writePathAllowlist' | 'expiresAt' | 'taskPermissionId' | 'permissionDuration'> &
-  { permissionScope?: TaskPermissionScope; workspaceWriteException?: boolean }
+  { permissionScope?: TaskPermissionScope; workspaceWriteException?: boolean; browserScheduleActions?: BrowserScheduleAction[] }
 
 export const TaskPermissionRevocationSchema = z.object({expectedRevision:z.number().int().nonnegative(),permissionId:z.string().min(1),idempotencyKey:z.string().trim().min(1).max(256)}).strict()
 export type TaskPermissionRevocation = z.infer<typeof TaskPermissionRevocationSchema>

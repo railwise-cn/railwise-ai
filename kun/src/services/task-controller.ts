@@ -642,12 +642,20 @@ export class TaskController {
   private waitForToolPermission(task: TaskRun, items: TurnItem[], turnId: string): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null {
     const denied = [...items].reverse().find(item => item.kind === 'tool_result' && item.isError && item.output && typeof item.output === 'object' &&
       ['sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
-        'browser_interaction_scope_required', 'browser_binding_changed'].includes(String((item.output as Record<string, unknown>).code)))
+        'browser_interaction_scope_required', 'browser_binding_changed', 'browser_schedule_authority_changed',
+        'browser_schedule_action_scope_changed', 'browser_schedule_outcome_unknown'].includes(String((item.output as Record<string, unknown>).code)))
     if (!denied || denied.kind !== 'tool_result') return null
     const code = String((denied.output as Record<string, unknown>).code)
     const browserBlock = code === 'browser_interaction_scope_required' || code === 'browser_binding_changed'
     let capability: CapabilityPreflight
-    if (browserBlock) {
+    if (code.startsWith('browser_schedule_')) {
+      const resolution = { kind: 'grant' as const, route: `flow/${task.scheduledBy?.scheduleId ?? `schedule_${task.id}`}`, label: '查看并核对定时计划' }
+      capability = { provider: 'schedule', status: 'blocked', errorCode: code,
+        message: code === 'browser_schedule_outcome_unknown' ? '上次计划的网页动作结果待核实。请查看原操作记录并核验结果后继续。'
+          : '计划的浏览器、页面目标、输入内容或授权范围已变化，请审阅定时计划后继续。',
+        credentialState: 'unknown', networkState: 'unknown', workspaceState: 'unknown', sandboxState: 'allowed',
+        approvalState: 'required', action: resolution, resolution, checkedAt: this.nowIso() }
+    } else if (browserBlock) {
       const resolution = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认当前任务的浏览器范围' }
       capability = { provider: 'browser-skill', status: 'needs_authorization', errorCode: code,
         message: code === 'browser_binding_changed'
