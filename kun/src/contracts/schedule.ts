@@ -81,11 +81,14 @@ export function nextScheduleOccurrence(value: Record<string, unknown>, from: Dat
 
 /** Extract explicit daily times. Ambiguous recurrence remains available to ordinary clarification. */
 export function extractScheduleRequirement(prompt: string): ScheduleRequirement | undefined {
-  if (!/(?:每天|每日|daily|every day)/i.test(prompt)) return undefined
-  const times = [...prompt.matchAll(/(?<![\d一二三四五六七八九十])([01]?\d|2[0-3]|二十[一二三]?|十[一二三四五六七八九]?|[零〇一二两三四五六七八九])(?:[:：]([0-5]\d)|\s*点(?:\s*([0-5]?\d)\s*分|半)?)/g)]
+  // Resource URLs may contain ports, clock values and instruction-like query text.
+  // Preserve span lengths so removing a URL cannot move a period qualifier closer to a time.
+  const schedulePrompt = prompt.replace(/\b[a-z][a-z\d+.-]*:\/\/[^\s<>"'`，。；！？、（）【】「」『』]+/gi, url => ' '.repeat(url.length))
+  if (!/(?:每天|每日|daily|every day)/i.test(schedulePrompt)) return undefined
+  const times = [...schedulePrompt.matchAll(/(?<![\d一二三四五六七八九十])([01]?\d|2[0-3]|二十[一二三]?|十[一二三四五六七八九]?|[零〇一二两三四五六七八九])(?:[:：]([0-5]\d)(?!\d)|\s*点(?:\s*([0-5]?\d)\s*分|半)?)/g)]
     .map(match => {
       let hour = chineseNumber(match[1]!)
-      const preceding = prompt.slice(Math.max(0, (match.index ?? 0) - 12), match.index)
+      const preceding = schedulePrompt.slice(Math.max(0, (match.index ?? 0) - 12), match.index)
       const period = [...preceding.matchAll(/上午|早上|凌晨|下午|晚上|中午/g)].at(-1)?.[0]
       if (period && (['下午', '晚上'].includes(period) && hour < 12 || period === '中午' && hour < 6)) hour += 12
       if (period === '凌晨' && hour === 12) hour = 0
@@ -93,15 +96,15 @@ export function extractScheduleRequirement(prompt: string): ScheduleRequirement 
       return `${String(hour).padStart(2, '0')}:${minute.padStart(2, '0')}`
     })
   if (!times.length) {
-    const paired = prompt.match(/(?:每天|每日)\s*(\d{1,2})\s*[/、和及]\s*(\d{1,2})(?!\d)/)
+    const paired = schedulePrompt.match(/(?:每天|每日)\s*(\d{1,2})\s*[/、和及]\s*(\d{1,2})(?!\d)/)
     if (paired) times.push(...paired.slice(1).map(hour => `${hour.padStart(2, '0')}:00`))
   }
   if (!times.length) return undefined
-  const lead = prompt.match(/提前\s*(\d+)\s*分钟|提前半小时/)
-  const leadMinutes = lead ? Number(lead[1] ?? 30) : /(?:点|\d{2})\s*(?:之)?前/.test(prompt) ? 30 : undefined
+  const lead = schedulePrompt.match(/提前\s*(\d+)\s*分钟|提前半小时/)
+  const leadMinutes = lead ? Number(lead[1] ?? 30) : /(?:点|\d{2})\s*(?:之)?前/.test(schedulePrompt) ? 30 : undefined
   // Paths such as /tmp/report-ABCdef/workspace are not timezone declarations.
   // Only recognized IANA identifiers may override the local product default.
-  const timezone = [...prompt.matchAll(/(?<![\w/\\.-])([A-Z][A-Za-z_]+\/[A-Za-z0-9_+-]+(?:\/[A-Za-z0-9_+-]+)?)(?![\w/\\-])/g)]
+  const timezone = [...schedulePrompt.matchAll(/(?<![\w/\\.-])([A-Z][A-Za-z_]+\/[A-Za-z0-9_+-]+(?:\/[A-Za-z0-9_+-]+)?)(?![\w/\\-])/g)]
     .map(match => match[1]!).find(candidate => TimezoneSchema.safeParse(candidate).success) ?? 'Asia/Shanghai'
   const parsed = ScheduleRequirementSchema.safeParse({ kind: 'daily', times, timezone, ...(leadMinutes !== undefined ? { leadMinutes } : {}) })
   return parsed.success ? parsed.data : undefined

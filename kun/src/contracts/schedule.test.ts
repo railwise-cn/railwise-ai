@@ -15,6 +15,31 @@ describe('daily schedule contract', () => {
     expect(extractScheduleRequirement('每天09:00、17:00执行')).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai' })
     expect(extractScheduleRequirement('查看09:00和17:00的新闻')).toBeUndefined()
   })
+  it.each([50035, 49152, 49999, 65235])('does not turn resource URL port %i into a daily time', port => {
+    const requirement = extractScheduleRequirement(`使用broswer-skill，读取 http://127.0.0.1:${port}/fixture，将网页实际内容生成HTML报告并交付。每天09:00和17:00前提前30分钟执行。`)!
+    expect(requirement).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai', leadMinutes: 30 })
+    expect(scheduleForRequirement(requirement)).toEqual({ kind: 'daily', times: ['08:30', '16:30'], timezone: 'Asia/Shanghai' })
+  })
+  it('ignores times in multiple resource URL paths and queries', () => {
+    expect(extractScheduleRequirement('每天09:00和17:00执行，读取 http://127.0.0.1:50035/archive/02:15?at=09:00&until=21:45 和 https://example.com:49152/report/10:00?check=03:30。')).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai' })
+    expect(extractScheduleRequirement('每天读取 http://127.0.0.1:50035/report/09:00?check=17:00。')).toBeUndefined()
+    expect(extractScheduleRequirement('09:00读取 https://example.com/daily/report。')).toBeUndefined()
+  })
+  it.each([
+    'https://example.com/Asia/Tokyo?timezone=America/New_York&note=提前90分钟',
+    'https://example.com/report?at=09:00前&timezone=America/New_York'
+  ])('ignores timezone and lead instructions inside resource URL %s', url => {
+    expect(extractScheduleRequirement(`读取 ${url}。每天09:00和17:00执行。`)).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai' })
+    expect(extractScheduleRequirement(`读取 ${url}。每天09:00和17:00执行，提前15分钟，时区 Europe/London。`)).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Europe/London', leadMinutes: 15 })
+  })
+  it('keeps independent Chinese deadlines beside resource URLs', () => {
+    const requirement = extractScheduleRequirement('读取 http://127.0.0.1:50035/fixture。每天早上9点前、下午5点前执行，时区 Asia/Tokyo。')!
+    expect(requirement).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Tokyo', leadMinutes: 30 })
+    expect(scheduleForRequirement(requirement)).toEqual({ kind: 'daily', times: ['08:30', '16:30'], timezone: 'Asia/Tokyo' })
+  })
+  it('does not extract partial numeric clock values', () => {
+    expect(extractScheduleRequirement('每天记录109:00、09:000和19:001的数据，在17:00执行。')).toEqual({ kind: 'daily', times: ['17:00'], timezone: 'Asia/Shanghai' })
+  })
   it('keeps recurrence when output paths resemble timezone identifiers', () => {
     for (const path of ['/tmp/report-ABCdef/workspace/report.html', 'F:/Projects/Reports/report.html']) {
       expect(extractScheduleRequirement(`生成HTML到 ${path}。每天09:00和17:00执行。`)).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai' })
