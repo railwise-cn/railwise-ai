@@ -499,7 +499,7 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
   let uiNames
   let action
   if (index < 2) {
-    assert.deepEqual(Object.keys(fields), ['站点', '动作', '目标', '输入内容', '输入摘要', '目标摘要', '请求摘要', '授权期限', '操作说明', '计划目的', '执行时刻', '时区', '浏览器', '账号状态', '授权版本'])
+    assert.deepEqual(Object.keys(fields), ['站点', '动作', '目标', '输入内容', '输入摘要', '目标摘要', '请求摘要', '授权期限', '操作说明', '页面摘要', '计划目的', '执行时刻', '时区', '浏览器', '账号状态', '授权版本'])
     assert.equal(header, '确认浏览器操作')
     assert.equal(approval.toolName, 'browser_authorize_action')
     action = index === 0 ? 'fill' : 'click'
@@ -514,6 +514,8 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
     assert.equal(fields.输入内容, action === 'fill' ? fixture.query : '')
     assert.equal(fields.输入摘要, createHash('sha256').update(fields.输入内容).digest('hex'))
     assert.equal(fields.目标摘要, createHash('sha256').update(targetHtml).digest('hex'))
+    assert.match(fields.页面摘要, /^[a-f0-9]{64}$/)
+    assert.equal(fields.页面摘要, createHash('sha256').update(targetRead.output.sourceUrl).digest('hex'), 'The reviewed action must bind the exact page URL read by the actual Browser tool')
     assert.match(fields.请求摘要, /^[a-f0-9]{64}$/)
     assert.equal(fields.请求摘要, approval.requestHash, 'The exact pending request must own this reviewed summary')
     assert.equal(fields.授权期限, '持续到计划停用或授权撤销')
@@ -538,7 +540,7 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
   }
   return { approvalId: approval.approvalId, toolName: approval.toolName, action, scope: 'schedule',
     requestHash: approval.requestHash,
-    summarySha256: createHash('sha256').update(approval.summary).digest('hex'), targetSha256: fields.目标摘要,
+    summarySha256: createHash('sha256').update(approval.summary).digest('hex'), targetSha256: fields.目标摘要, pageSha256: fields.页面摘要,
     uiValues: uiNames.map(name => fields[name] || '无输入') }
 }
 

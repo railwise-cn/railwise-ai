@@ -226,3 +226,21 @@ Main 的退出协调也新增修复：Runtime 停止后，根据持久未知回�
 继续只改原有两项 QA 文件：滚动后逐帧重查实际目标、几何和滚动状态，连续稳定后才取最终落点并立即发送真实鼠标；事件现场同时保存新的几何与命中。没有用任意长 sleep、DOM click 或 IPC 代替业务界面输入，所有持久验收条件保持。Node 回归 118 项通过、1 项 Windows 专属跳过；应用及精确包仍保持 a415，未改发布规则。下一次真实回放单独记录，前两次失败保持原样。
 
 官网页面由其他开发机维护。本轮代码范围为桌面、Runtime、依赖目录和验收资料。
+
+### 03382584 Windows 范围确认通过，审批摘要 QA 断言仍阻断
+
+稳定帧驱动 `03382584fabc527e6dba98a4aeb304223ffc5fd1` 复用 `a4156c0bd004ce8be5ca43c07326686ace0bee80` 私有构建 `43491472211` 的同一 Windows 安装包，唯一完整回放 `43501038476` 仍按失败保留。实际三帧测量形成两个稳定区间；trusted pointerdown 与当时 elementFromPoint 均命中原确认按钮，事件时的矩形和滚动位置与最终测点一致。同一 Runtime host 的只读探查为 200，实际 browser-binding POST 为 200，订阅随后停止；持久确认成功后原任务仍暂停、零 Turn／零模型调用，单独继续才建立一个首 Turn。该截图及结构化证据已实际核看。
+
+继续后真实官方 CLI／扩展完成 session_start、navigate 和目标 HTML 回读，在第一张填写授权进入 `waiting_approval`。QA 的旧摘要字段白名单没有包含 a415 已有的“页面摘要”，严格 deepEqual 因多出此字段而拒绝，尚未点击任何允许按钮，没有填写／点击、未知结果、成果、计划或到期执行通过的主张。原生产摘要函数以完整 pageUrl 生成 SHA256，Provider 已传入实际回读页面地址；本轮仅补齐 QA 对该字段的非空 SHA256 及实际完整页面地址摘要一致性检查。旧组件夹具补传 pageUrl，并拒绝缺字段、畸形摘要、相同 origin 的其他路径／查询／片段和错误摘要；未知额外字段仍拒绝。四个 Windows 验收脚本的 focused 检查为 118 项通过、1 项 Windows 专属 PowerShell 解析跳过；这些是本机 QA 回归，修正后的完整实包链仍待重验。
+
+六项已安装 Runtime 权限检查、正常退出、ASAR 不变、卸载清理与两份旧资料标记保留通过。安装 EXE SHA256 为 `18eac182bc6c4be6c687dfdf84a81d26659f9b321bce2c59578718da570379e3`，ASAR 为 `ce78ee377bff4cf691abfa2b9215f07506b4476b1dd1dcbfa8e82d8aa632ffb0`；EXE 与安装程序仍为 NotSigned。原始证据 artifact `14073704440` ZIP SHA256 `fdfc09b20d718e88e489b2acbcbc28423ae4c7d3444474f43f2c4583bc6267b3` 已与官方摘要核对，同一官方包 ZIP 与 EXE 字节亦复核一致。完整摘要位于 `/private/tmp/railwise-windows-057-43501038476/verified-acceptance-summary.json`。前两次失败分别保留，模型仍为本机确定性协议夹具，不是实际模型业务交付验收。
+
+### a415 精确 macOS 包已打开；真实业务仍被阻断
+
+私有构建 `43491472211` 的 arm64 DMG 实际下载、校验并安装，SHA256 为 `5462ad0e743b2edef1a8f6def9ac1b1e2dd5c6b48dff76505abc1de6bf508b81`，ASAR 为 `6c933f3748b25df2834a29cd477e87190faabbedd2e2603d9b8b97c921f264ce`。通过原生界面启动该精确文件，“关于”实际显示 0.5.7；进程路径、隔离 userData 和 renderer URL 均核对。中文浅色界面检查通过技能／插件／连接器顺序及 BrowserSkill 连接检查。签名与公证校验通过；本机 Gatekeeper 因现有系统覆盖策略单独记为未评估，不将其计作独立通过。
+
+从新聊天提交截图同类原始组合请求，实际 DeepSeek 与官方 BrowserSkill 完成会话、导航、页面读取，并在任务工作台确认限定搜索框和“工程测量”的持续公开查询授权。填写动作返回 `permission_denied`、`cooperation_sync_required` 和明确的 `effect_state=unknown`，任务保持停滞，未自动重放、未假报完成。只读“检查原网页结果”也未成功；没有本轮 HTML、自动预览或计划创建的通过结论。正常退出后核实该候选主进程确已退出，旧任务、历史及原始未知回执保留。实际版本与阻断截图、只读 SQLite 记录及模型使用记录均保存于本机私有证据目录；此项仍须查明根因并重验。
+
+### 同一 a415 包的真实升级通过
+
+同一私有构建的唯一真实升级 job `132143137355` 已成功：正式 0.5.6 → 精确 0.5.7，bundle `com.wangjiawei508.workgpt`，安装后 ASAR 与上述包一致。原始 native 报告及服务数据验证确认首次和重启后的任务与资料回读通过；签名、公证与该 CI 机器上的 Gatekeeper 通过。官方证据 artifact `14075470302` ZIP SHA256 `22db04eb938f9a0713443b48490d0916e184866c19b4e4b55b27d007614ba94a` 与官方摘要一致。真实升级仅证明该包升级及数据连续性，不替代仍失败的业务任务或新 Main 生命周期场景。没有公开发布或官网页面部署。

@@ -514,7 +514,7 @@ test('fixture approval review rejects altered actual targets, inputs, origins, t
     const origin = new URL(fixture.fixtureUrl).origin
     const prompt = '合成组件测试：本地公开查询，每天09:00和17:00前提前30分钟执行。'
     const workspace = join(root, windowsSmokeWorkspaceName)
-    const makeSummary = (action, change = {}) => browserApprovalSummary({ action, origin, targetHtml: action === 'fill' ? fixture.inputHtml : fixture.buttonHtml,
+    const makeSummary = (action, change = {}) => browserApprovalSummary({ action, origin, pageUrl: fixture.fixtureUrl, targetHtml: action === 'fill' ? fixture.inputHtml : fixture.buttonHtml,
       value: action === 'fill' ? fixture.query : undefined, requestHash: 'a'.repeat(64), schedule: { purpose: prompt,
         requirement: { kind: 'daily', times: ['09:00', '17:00'], leadMinutes: 30, timezone: 'Asia/Shanghai' }, browserLabel: '合成组件浏览器', version: 'b'.repeat(64) }, ...change })
     const thread = { turns: [{ items: ['fill', 'click'].map(action => ({ kind: 'tool_result', callId: `smoke-read-${action}-target`, isError: false,
@@ -523,10 +523,11 @@ test('fixture approval review rejects altered actual targets, inputs, origins, t
     const approval = { approvalId: 'synthetic-review', toolName: 'browser_authorize_action', requestHash: 'a'.repeat(64), status: 'pending', summary: makeSummary('fill') }
     assert.equal(reviewWindowsFixtureApproval(approval, options).scope, 'schedule')
     assert.throws(() => reviewWindowsFixtureApproval({ ...approval, requestHash: 'd'.repeat(64) }, options))
-    for (const change of [{ origin: 'https://unreviewed.example.test' }, { value: fixture.query + '扩大' }, { targetHtml: '<input type="password" aria-label="合成公告关键词">' }, { schedule: undefined }]) {
+    for (const change of [{ origin: 'https://unreviewed.example.test' }, { value: fixture.query + '扩大' }, { targetHtml: '<input type="password" aria-label="合成公告关键词">' }, { schedule: undefined },
+      { pageUrl: undefined }, { pageUrl: fixture.fixtureUrl + '/other' }, { pageUrl: fixture.fixtureUrl + '?different=1' }, { pageUrl: fixture.fixtureUrl + '#other' }]) {
       assert.throws(() => reviewWindowsFixtureApproval({ ...approval, summary: makeSummary('fill', change) }, options))
     }
-    for (const [field, value] of [['执行时刻', '01:20、08:30、16:30'], ['账号状态', '已登录'], ['计划目的', prompt + '扩大范围']]) {
+    for (const [field, value] of [['执行时刻', '01:20、08:30、16:30'], ['账号状态', '已登录'], ['计划目的', prompt + '扩大范围'], ['页面摘要', ''], ['页面摘要', 'malformed'], ['页面摘要', '0'.repeat(64)]]) {
       const summary = approval.summary.replace(new RegExp(`^${field} .+$`, 'm'), `${field} ${JSON.stringify(value)}`)
       assert.throws(() => reviewWindowsFixtureApproval({ ...approval, summary }, options))
     }
