@@ -194,6 +194,7 @@ export function buildBrowserSkillToolProvider(options: {
         }
         options.repository.finishOperation(taskId, key, { status: 'running' })
         try {
+          await command(config, ['session', 'request', requestId, '--prepare'], context)
           const result = await command(config, ['session', 'start', '--browser', scope.browserInstanceId, '--no-focus', '--request-id', requestId], context)
           if (typeof result.session_id !== 'string' || result.browser_instance_id !== scope.browserInstanceId) throw failure('browser_session_identity_unverified')
           const session: Session = { sessionId: result.session_id, browserInstanceId: scope.browserInstanceId }

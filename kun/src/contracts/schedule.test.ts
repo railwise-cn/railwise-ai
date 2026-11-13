@@ -15,6 +15,13 @@ describe('daily schedule contract', () => {
     expect(extractScheduleRequirement('每天09:00、17:00执行')).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai' })
     expect(extractScheduleRequirement('查看09:00和17:00的新闻')).toBeUndefined()
   })
+  it('keeps recurrence when output paths resemble timezone identifiers', () => {
+    for (const path of ['/tmp/report-ABCdef/workspace/report.html', 'F:/Projects/Reports/report.html']) {
+      expect(extractScheduleRequirement(`生成HTML到 ${path}。每天09:00和17:00执行。`)).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai' })
+      expect(extractScheduleRequirement(`生成HTML到 ${path}。每天09:00和17:00执行，时区 America/New_York。`)).toMatchObject({ timezone: 'America/New_York' })
+    }
+    expect(extractScheduleRequirement('Run every day at 09:00 in America/Port-au-Prince.')).toMatchObject({ timezone: 'America/Port-au-Prince' })
+  })
   it('recognizes the original Chinese morning and afternoon deadlines', () => {
     expect(extractScheduleRequirement('每天执行两次，早上九点前一次，下午五点前一次。')).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai', leadMinutes: 30 })
     expect(extractScheduleRequirement('每天9点/17点执行')).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai' })

@@ -99,7 +99,10 @@ export function extractScheduleRequirement(prompt: string): ScheduleRequirement 
   if (!times.length) return undefined
   const lead = prompt.match(/提前\s*(\d+)\s*分钟|提前半小时/)
   const leadMinutes = lead ? Number(lead[1] ?? 30) : /(?:点|\d{2})\s*(?:之)?前/.test(prompt) ? 30 : undefined
-  const timezone = prompt.match(/\b[A-Z][A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?\b/)?.[0] ?? 'Asia/Shanghai'
+  // Paths such as /tmp/report-ABCdef/workspace are not timezone declarations.
+  // Only recognized IANA identifiers may override the local product default.
+  const timezone = [...prompt.matchAll(/(?<![\w/\\.-])([A-Z][A-Za-z_]+\/[A-Za-z0-9_+-]+(?:\/[A-Za-z0-9_+-]+)?)(?![\w/\\-])/g)]
+    .map(match => match[1]!).find(candidate => TimezoneSchema.safeParse(candidate).success) ?? 'Asia/Shanghai'
   const parsed = ScheduleRequirementSchema.safeParse({ kind: 'daily', times, timezone, ...(leadMinutes !== undefined ? { leadMinutes } : {}) })
   return parsed.success ? parsed.data : undefined
 }
