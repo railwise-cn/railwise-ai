@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { createServer } from 'node:net'
@@ -299,19 +299,31 @@ export function windowsTaskPreviewLayoutExpression() {
     const workspace=document.querySelector('section[aria-label="任务"]'),details=workspace?.querySelector('article[aria-label="任务详情"]'),list=workspace?.querySelector('[aria-label="任务列表"]'),columns=workspace?.querySelector('.ds-task-workspace-columns');
     if(!workspace || !details || !list || !columns || !details.getClientRects().length)return null;
     const rect=node=>{const box=node.getBoundingClientRect();return {x:box.x,y:box.y,width:box.width,height:box.height,bottom:box.bottom};};
-    const css=getComputedStyle(columns);
-    return {workspace:rect(workspace),details:rect(details),list:rect(list),stackThresholdPx:44*parseFloat(getComputedStyle(document.documentElement).fontSize),availableWidth:columns.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight),
+    const css=getComputedStyle(columns),workspaceCss=getComputedStyle(workspace),scale=columns.getBoundingClientRect().width/columns.offsetWidth,workspaceScale=workspace.getBoundingClientRect().width/workspace.offsetWidth;
+    return {coordinateUnit:'viewport-css-px',scale,workspace:rect(workspace),details:rect(details),list:rect(list),
+      workspaceInlineSize:(workspace.clientWidth-parseFloat(workspaceCss.paddingLeft)-parseFloat(workspaceCss.paddingRight))*workspaceScale,
+      stackThresholdPx:44*parseFloat(getComputedStyle(document.documentElement).fontSize)*workspaceScale,readableWidth:400*scale,
+      availableWidth:(columns.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight))*scale,
       overflow:{workspace:workspace.scrollWidth-workspace.clientWidth,columns:columns.scrollWidth-columns.clientWidth,details:details.scrollWidth-details.clientWidth}};
   })()`
 }
 
 export function validateWindowsTaskPreviewLayout(layout) {
   assert.ok(layout, 'The actual manual-preview task layout must be measured')
+  assert.equal(layout.coordinateUnit, 'viewport-css-px')
+  assert.ok(Number.isFinite(layout.scale) && layout.scale > 0)
+  assert.ok(Number.isFinite(layout.workspaceInlineSize) && layout.workspaceInlineSize > 0)
+  assert.ok(Number.isFinite(layout.readableWidth) && layout.readableWidth > 0)
   assert.ok(Number.isFinite(layout.availableWidth) && layout.availableWidth > 0)
   assert.ok(Number.isFinite(layout.stackThresholdPx) && layout.stackThresholdPx > 0)
-  assert.ok(layout.details.width >= Math.min(400, layout.availableWidth), 'The task detail must remain readable beside the actual preview')
-  for (const value of Object.values(layout.overflow)) assert.ok(value <= 1, 'The task surface must not overflow horizontally')
-  if (layout.workspace.width <= layout.stackThresholdPx) {
+  for (const box of [layout.details, layout.list]) for (const field of ['x', 'y', 'width', 'bottom']) assert.ok(Number.isFinite(box[field]), 'Actual task rectangles must be finite')
+  assert.ok(layout.details.width >= Math.min(layout.readableWidth, layout.availableWidth) - 1, 'The task detail must remain readable beside the actual preview')
+  for (const value of Object.values(layout.overflow)) assert.ok(Number.isFinite(value) && value <= 1, 'The task surface must not overflow horizontally')
+  // Rectangles share viewport coordinates, including the renderer's UI zoom.
+  const overlapWidth = Math.min(layout.details.x + layout.details.width, layout.list.x + layout.list.width) - Math.max(layout.details.x, layout.list.x)
+  const overlapHeight = Math.min(layout.details.bottom, layout.list.bottom) - Math.max(layout.details.y, layout.list.y)
+  assert.ok(overlapWidth <= 1 || overlapHeight <= 1, 'The actual task list and details must not overlap')
+  if (layout.workspaceInlineSize <= layout.stackThresholdPx) {
     assert.ok(layout.details.width >= layout.availableWidth - 2, 'A narrow task detail must use its available width after padding')
     assert.ok(layout.details.y >= layout.list.bottom - 1, 'The narrow task list and details must stack vertically')
     assert.ok(Math.abs(layout.details.x - layout.list.x) <= 1)
@@ -680,18 +692,99 @@ async function readWindowsQueryAuthorizations(root, sourceId, occurrenceId) {
   } finally { database.close() }
 }
 
-export function summarizeWindowsTaskFailure(task, thread, receipts) {
+export function summarizeWindowsTaskFailure(task = {}, thread = {}, receipts = [], operations = [], events = [], spans = []) {
   const code = value => typeof value === 'string' && /^[a-z][a-z0-9_.:-]{0,99}$/i.test(value) ? value : undefined
-  const error = value => typeof value === 'string' ? value.replace(/https?:\/\/\S+/gi, '<url>')
-    .replace(/\b(?:Bearer|api[_-]?key|authorization|token|secret)\s*[:=]?\s*[^\s,;]+/gi, '<redacted>')
-    .replace(/[A-Za-z0-9_+/-]{32,}/g, '<redacted>').slice(0, 1000) : undefined
-  return { task: { id: task.id, threadId: task.threadId, status: task.status, activeTurnId: task.activeTurnId,
-    stalledReason: error(task.stalledReason), artifactCount: task.artifacts?.length },
-    turns: (thread.turns ?? []).map(turn => ({ id: turn.id, status: turn.status, error: error(turn.error),
-      toolResults: (turn.items ?? []).filter(item => item.kind === 'tool_result').map(item => ({ callId: item.callId,
-        toolName: item.toolName, isError: item.isError, status: code(item.output?.status), code: code(item.output?.code) })) })),
-    receipts: (Array.isArray(receipts) ? receipts : []).map(receipt => ({ id: receipt.id, toolName: receipt.toolName,
-      status: receipt.status, errorCode: code(receipt.errorCode) })) }
+  const id = value => typeof value === 'string' && /^[a-z0-9_.:-]{1,160}$/i.test(value) ? value : undefined
+  const time = value => typeof value === 'string' && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(value) ? value : undefined
+  const error = value => {
+    const message = typeof value === 'string' ? value : typeof value?.message === 'string' ? value.message : undefined
+    return message === undefined ? undefined : /\b(?:Bearer|api[_-]?key|authorization|(?:access[_-]?|refresh[_-]?)?token|secret|cookies?|headers|request[_ ]?body|password|credentials?|x-auth)\b/i.test(message) ? '<redacted-sensitive-error>' : message
+      .replace(/https?:\/\/\S+/gi, '<url>').replace(/[A-Za-z0-9_+/-]{32,}/g, '<redacted>').slice(0, 1000)
+  }
+  const safeFields = value => Object.fromEntries(['taskId', 'turnId', 'callId', 'toolName', 'operationId', 'operationReceiptId', 'sourceTaskId', 'scheduleId', 'action', 'dispatchTracking', 'status', 'code', 'errorCode']
+    .map(key => [key, id(value?.[key])]).filter(([, value]) => value !== undefined))
+  return { task: { id: id(task.id), threadId: id(task.threadId), status: code(task.status), activeTurnId: id(task.activeTurnId),
+    createdAt: time(task.createdAt), updatedAt: time(task.updatedAt), waitingReason: error(task.waitingReason),
+    stalledReason: error(task.stalledReason), artifactCount: task.artifacts?.length,
+    scheduledBy: task.scheduledBy ? { scheduleId: id(task.scheduledBy.scheduleId), sourceTaskId: id(task.scheduledBy.sourceTaskId), dueAt: time(task.scheduledBy.dueAt) } : undefined },
+    thread: { id: id(thread.id), status: code(thread.status) },
+    turns: (thread.turns ?? []).slice(-20).map(turn => ({ id: id(turn.id), status: code(turn.status), error: error(turn.error),
+      createdAt: time(turn.createdAt), startedAt: time(turn.startedAt), finishedAt: time(turn.finishedAt),
+      errorCode: code(turn.errorCode), errorMessage: error(turn.errorMessage),
+      toolCalls: (turn.items ?? []).filter(item => item.kind === 'tool_call').slice(-100).map(item => ({ callId: id(item.callId), toolName: code(item.toolName) })),
+      toolResults: (turn.items ?? []).filter(item => item.kind === 'tool_result').slice(-100).map(item => ({ callId: id(item.callId),
+        toolName: code(item.toolName), isError: typeof item.isError === 'boolean' ? item.isError : undefined, status: code(item.output?.status), code: code(item.output?.code),
+        error: error(item.output?.error), message: error(item.output?.message), detail: error(item.output?.detail),
+        outputErrorDetail: code(item.output?.code) ? undefined : error(item.output?.code) })) })),
+    receipts: (Array.isArray(receipts) ? receipts : []).slice(-200).map(receipt => ({ id: id(receipt.id), toolName: code(receipt.toolName),
+      status: code(receipt.status), errorCode: code(receipt.errorCode) })),
+    operations: operations.map(receipt => ({ id: id(receipt.id), ownerId: id(receipt.ownerId), kind: code(receipt.kind), status: code(receipt.status),
+      createdAt: time(receipt.createdAt), updatedAt: time(receipt.updatedAt), error: error(receipt.error), request: safeFields(receipt.request),
+      result: { approved: typeof receipt.result?.approved === 'boolean' ? receipt.result.approved : undefined,
+        status: code(receipt.result?.status), code: code(receipt.result?.code),
+        isError: typeof receipt.result?.item?.isError === 'boolean' ? receipt.result.item.isError : undefined,
+        outputStatus: code(receipt.result?.item?.output?.status), outputCode: code(receipt.result?.item?.output?.code),
+        outputError: error(receipt.result?.item?.output?.error), outputMessage: error(receipt.result?.item?.output?.message), outputDetail: error(receipt.result?.item?.output?.detail),
+        outputErrorDetail: code(receipt.result?.item?.output?.code) ? undefined : error(receipt.result?.item?.output?.code),
+        expiresAt: time(receipt.result?.expiresAt) } })),
+    events: events.map(event => ({ sequence: Number.isSafeInteger(event.sequence) ? event.sequence : undefined, kind: code(event.kind), createdAt: time(event.createdAt),
+      payload: { ...safeFields(event.payload), operationIds: Array.isArray(event.payload?.operationIds) ? event.payload.operationIds.map(id).filter(Boolean).slice(0, 100) : undefined } })),
+    spans: spans.map(span => ({ id: id(span.id), turnId: id(span.turnId), kind: code(span.kind), status: code(span.status),
+      startedAt: time(span.startedAt), finishedAt: time(span.finishedAt), durationMs: Number.isFinite(span.durationMs) ? span.durationMs : undefined,
+      errorCode: code(span.errorCode), errorMessage: error(span.attributes?.['error.message'] ?? span.attributes?.errorMessage), attributes: safeFields(span.attributes) })) }
+}
+
+export async function collectWindowsTaskFailure(taskId, read) {
+  const failures = []
+  const get = async (path, fallback) => { try { return await read(path) } catch { failures.push(path.endsWith('/receipts') ? 'receipts' : path.includes('/threads/') ? 'thread' : 'task'); return fallback } }
+  const task = await get(`/v1/tasks/${encodeURIComponent(taskId)}`, { id: taskId })
+  const thread = task.threadId ? await get(`/v1/threads/${encodeURIComponent(task.threadId)}`, {}) : {}
+  const receipts = await get(`/v1/tasks/${encodeURIComponent(taskId)}/receipts`, [])
+  return { ...summarizeWindowsTaskFailure(task, thread, receipts), readFailures: failures }
+}
+
+export async function readWindowsTaskFailureStore(root, taskId) {
+  // The only database eligible for this diagnostic belongs to this fresh synthetic UI profile.
+  const path = join(root, 'runtime', 'tasks.sqlite3')
+  assert.ok(contained(await realpath(root), await realpath(path)), 'Diagnostic database must remain inside the owned profile')
+  const { DatabaseSync } = await import('node:sqlite')
+  const database = new DatabaseSync(path, { readOnly: true })
+  try {
+    const task = JSON.parse(database.prepare('SELECT data_json FROM task_runs WHERE id=?').get(taskId)?.data_json ?? '{}')
+    const operations = database.prepare('SELECT data_json FROM operation_receipts WHERE owner_id=? ORDER BY rowid DESC LIMIT 200').all(taskId).reverse().map(row => JSON.parse(row.data_json))
+    const events = database.prepare('SELECT sequence,kind,payload_json,created_at FROM task_events WHERE task_id=? ORDER BY sequence DESC LIMIT 200').all(taskId).reverse()
+      .map(row => ({ sequence: row.sequence, kind: row.kind, createdAt: row.created_at, payload: JSON.parse(row.payload_json) }))
+    const spans = database.prepare('SELECT data_json FROM runtime_spans WHERE task_id=? ORDER BY started_at DESC LIMIT 100').all(taskId).reverse().map(row => JSON.parse(row.data_json))
+    const counts = Object.fromEntries([['operations', 'operation_receipts', 'owner_id'], ['events', 'task_events', 'task_id'], ['spans', 'runtime_spans', 'task_id']]
+      .map(([name, table, column]) => [name, database.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE ${column}=?`).get(taskId).count]))
+    return { ...summarizeWindowsTaskFailure(task, {}, [], operations, events, spans), counts, readOnly: true }
+  } finally { database.close() }
+}
+
+export function summarizeWindowsFailureLogs(text) {
+  // Never export log messages, JSON bodies, headers, URLs or argv. Only structured exception/code hints.
+  const lines = String(text).split(/\r?\n/).filter(Boolean)
+  return { lineCount: lines.length, entries: lines.filter(line => !/\b(?:Bearer|api[_-]?key|authorization|(?:access[_-]?|refresh[_-]?)?token|secret|cookies?|headers|request[_ ]?body|password|credentials?|x-auth)\b/i.test(line)).map(line => ({
+    timestamp: line.match(/\[(\d{4}-\d\d-\d\dT[\d:.]+Z)\]/)?.[1],
+    stream: line.match(/\[(STDOUT|STDERR|LIFECYCLE|ERROR|WARN)\]/)?.[1],
+    exception: line.match(/\b(AbortError|TimeoutError|TypeError|RangeError|SyntaxError|ReferenceError)\b/)?.[1],
+    codes: [...new Set(line.match(/\b(?:browser|execution_grant|task_lease|operation_not|outcome_unknown|approval|scope)_[a-z_]{2,80}\b/g) ?? [])]
+  })).filter(entry => entry.exception || entry.codes.length).slice(-100) }
+}
+
+async function readWindowsFailureLogs(profile, output) {
+  const logs = join(profile, 'logs'), files = []
+  for (const name of (await readdir(logs).catch(() => [])).filter(name => /^(?:runtime|workwise)-\d{4}-\d\d-\d\d\.log$/.test(name)).sort().slice(-4)) {
+    const path = join(logs, name)
+    if (!contained(await realpath(profile), await realpath(path))) continue
+    const file = await open(path, 'r')
+    try {
+      const size = (await file.stat()).size, buffer = Buffer.alloc(Math.min(size, 200_000))
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, Math.max(0, size - buffer.length))
+      files.push({ file: name, bytes: size, tailOnly: size > buffer.length, ...summarizeWindowsFailureLogs(buffer.toString('utf8', 0, bytesRead)) })
+    } finally { await file.close() }
+  }
+  return { installedProcess: summarizeWindowsFailureLogs(output), managedRuntime: files }
 }
 
 export async function inspectWindowsManualPreview(report, inspect) {
@@ -1679,17 +1772,25 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
             return {info:{status:info.status,ok:info.ok,pid:info.body.pid,port:info.body.port,startedAt:info.body.startedAt},
               tools:{status:tools.status,ok:tools.ok,mcpServers:tools.body.mcpServers,skills:tools.body.skills}};
           })()`)
-          if (report.taskAttemptId) {
-            report.taskFailure = await cdp.evaluate(`(async()=>{
-              const read=async path=>{const response=await window.workwise.runtimeRequest(path,'GET');if(!response.ok)throw new Error('Diagnostic read failed '+response.status);return JSON.parse(response.body)};
-              const task=await read(${JSON.stringify(`/v1/tasks/${encodeURIComponent(report.taskAttemptId)}`)});
-              const thread=await read('/v1/threads/'+encodeURIComponent(task.threadId));
-              const receipts=await read('/v1/tasks/'+encodeURIComponent(task.id)+'/receipts');
-              return (${summarizeWindowsTaskFailure.toString()})(task,thread,receipts);
-            })()`)
-          }
         }
       } catch { /* Preserve the original UI failure if its renderer has closed. */ }
+    }
+    if (taskSmoke) {
+      for (const [key, taskId] of [['taskFailure', report.taskAttemptId], ['dueTaskFailure', report.dueTaskAttemptId]]) {
+        if (!taskId) continue
+        report[key] = { task: { id: taskId } }
+        if (cdp) {
+          try {
+            report[key] = await cdp.evaluate(`(async()=>{
+              const summarizeWindowsTaskFailure=${summarizeWindowsTaskFailure.toString()};
+              const read=async path=>{const response=await window.workwise.runtimeRequest(path,'GET');if(!response.ok)throw new Error('Diagnostic read failed');return JSON.parse(response.body)};
+              return (${collectWindowsTaskFailure.toString()})(${JSON.stringify(taskId)},read);
+            })()`)
+          } catch { report[key].runtimeReadUnavailable = true }
+        }
+        try { report[key].store = await readWindowsTaskFailureStore(root, taskId) } catch { report[key].storeReadUnavailable = true }
+      }
+      try { report.failureLogs = await readWindowsFailureLogs(profile, output) } catch { report.failureLogs = { readUnavailable: true } }
     }
   } finally {
     realBrowser?.cdp.close()

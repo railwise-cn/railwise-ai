@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
@@ -38,7 +38,7 @@ function report() {
     taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', sha256: 'a'.repeat(64), byteHashMatches: true },
       schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true },
       preview: { automatic: true, contentVerified: true, manualEntryVerified: true,
-        layout: { workspace: { width: 560 }, availableWidth: 520, stackThresholdPx: 704, details: { width: 520, x: 20, y: 300 }, list: { x: 20, y: 20, bottom: 280 }, overflow: { workspace: 0, columns: 0, details: 0 } } },
+        layout: { coordinateUnit: 'viewport-css-px', scale: 1, workspace: { width: 560 }, workspaceInlineSize: 560, readableWidth: 400, availableWidth: 520, stackThresholdPx: 704, details: { width: 520, x: 20, y: 300, bottom: 800 }, list: { width: 520, x: 20, y: 20, bottom: 280 }, overflow: { workspace: 0, columns: 0, details: 0 } } },
       dueOccurrence: { clock: 'real', status: 'completed', independentTask: true, independentArtifact: true, byteHashMatches: true,
         dueAt: '2026-11-13T00:00:00Z', createdAt: '2026-11-13T00:00:10Z' } },
     resources: {
@@ -646,14 +646,46 @@ test('browser binding UI selection requires the actual task card, complete previ
 test('manual-preview layout keeps task details readable and stacks narrow containers using the actual rem threshold', () => {
   const valid = report().taskExecution.preview.layout
   assert.equal(validateWindowsTaskPreviewLayout(valid), true)
-  const smallFont = { ...structuredClone(valid), workspace: { width: 630 }, stackThresholdPx: 616, details: { width: 410, x: 220, y: 20 } }
+  const smallFont = { ...structuredClone(valid), workspace: { width: 630 }, workspaceInlineSize: 630, stackThresholdPx: 616,
+    details: { width: 410, x: 220, y: 20, bottom: 600 }, list: { ...valid.list, width: 180 } }
   assert.equal(validateWindowsTaskPreviewLayout(smallFont), true, 'A 44rem threshold must follow actual root font size')
   for (const change of [{ details: { ...valid.details, width: 20 } }, { details: { ...valid.details, y: 20 } },
-    { overflow: { workspace: 1, columns: 2, details: 0 } }, { stackThresholdPx: Number.NaN }, { availableWidth: 0 }]) {
+    { overflow: { workspace: 1, columns: 2, details: 0 } }, { stackThresholdPx: Number.NaN }, { availableWidth: 0 }, { scale: 0 }, { readableWidth: Number.NaN }]) {
     assert.throws(() => validateWindowsTaskPreviewLayout({ ...valid, ...change }))
   }
   assert.match(windowsTaskPreviewLayoutExpression(), /44\*parseFloat\(getComputedStyle\(document\.documentElement\)\.fontSize\)/)
   assert.doesNotMatch(windowsTaskPreviewLayoutExpression(), /704/)
+  assert.throws(() => validateWindowsTaskPreviewLayout({ ...smallFont, list: { ...smallFont.list, width: 300 } }), /must not overlap/, 'Wide layouts must also reject actual overlapping paint')
+})
+
+test('manual-preview measurement uses one viewport coordinate unit at the actual small UI zoom and still rejects the observed overlap', async () => {
+  const { Window } = await import('happy-dom')
+  const window = new Window()
+  try {
+    window.document.documentElement.style.fontSize = '16px'
+    window.document.body.innerHTML = '<section aria-label="任务" style="padding:0px"><div class="ds-task-workspace-columns" style="padding:20px"><div aria-label="任务列表"></div><article aria-label="任务详情"></article></div></section>'
+    const workspace = window.document.querySelector('section'), columns = workspace.querySelector('.ds-task-workspace-columns'), list = workspace.querySelector('[aria-label="任务列表"]'), details = workspace.querySelector('article')
+    for (const [node, width, box] of [
+      [workspace, 368, { x: 260, y: 36, width: 331.2, height: 692, bottom: 728 }],
+      [columns, 358, { x: 269, y: 280, width: 322.2, height: 650, bottom: 930 }],
+      [list, 318, { x: 278, y: 294, width: 286.2, height: 207, bottom: 501 }],
+      [details, 318, { x: 278, y: 502, width: 286.2, height: 600, bottom: 1102 }]
+    ]) {
+      for (const field of ['offsetWidth', 'clientWidth', 'scrollWidth']) Object.defineProperty(node, field, { configurable: true, value: width })
+      node.getBoundingClientRect = () => box
+      node.getClientRects = () => [box]
+    }
+    const measure = () => JSON.parse(JSON.stringify(window.eval(windowsTaskPreviewLayoutExpression())))
+    const layout = measure()
+    assert.ok(Math.abs(layout.scale - 0.9) < 0.00001)
+    assert.ok(Math.abs(layout.availableWidth - 286.2) < 0.00001)
+    assert.ok(Math.abs(layout.stackThresholdPx - 633.6) < 0.00001)
+    assert.equal(validateWindowsTaskPreviewLayout(layout), true, 'A visually full-width detail must pass at 90% UI zoom')
+    details.getBoundingClientRect = () => ({ x: 278, y: 308.75, width: 286.2, height: 1208, bottom: 1517 })
+    assert.throws(() => validateWindowsTaskPreviewLayout(measure()), /must not overlap/, 'The failed run painted details over the actual list')
+    details.getBoundingClientRect = () => ({ x: 278, y: 502, width: 200, height: 600, bottom: 1102 })
+    assert.throws(() => validateWindowsTaskPreviewLayout(measure()), /remain readable/)
+  } finally { await window.happyDOM.close() }
 })
 
 test('the production gate, repository projection and inbox route expose pending task approval payloads without transcript approval items', async () => {
@@ -731,6 +763,82 @@ test('failed task evidence retains status and codes without exporting prompts, a
   assert.equal(summary.turns[0].toolResults[0].code, 'browser_scope_required')
   assert.equal(summary.receipts[0].status, 'failed')
   assert.doesNotMatch(JSON.stringify(summary), /private prompt|private-key|private page/)
+  const output = { code: 'TypeError: CLI connection closed unexpectedly', error: { message: 'TypeError: Cannot read properties of undefined', request: { body: 'private page' } },
+    message: 'CLI exited with code 1', detail: 'Authorization: private-key' }
+  const providerFailure = summarizeWindowsTaskFailure({}, { turns: [{ items: [{ kind: 'tool_result', output }] }] }, [],
+    [{ result: { item: { output } } }], [], [{ attributes: { 'error.message': 'TypeError: CLI child closed', body: 'private page' } }, { attributes: { errorMessage: 'headers: private-key' } }])
+  assert.equal(providerFailure.turns[0].toolResults[0].outputErrorDetail, output.code, 'The real Browser provider uses error.message as output.code when no typed code exists')
+  assert.equal(providerFailure.turns[0].toolResults[0].error, output.error.message)
+  assert.equal(providerFailure.turns[0].toolResults[0].message, output.message)
+  assert.equal(providerFailure.operations[0].result.outputErrorDetail, output.code)
+  assert.equal(providerFailure.operations[0].result.outputError, output.error.message)
+  assert.equal(providerFailure.operations[0].result.outputMessage, output.message)
+  assert.equal(providerFailure.spans[0].errorMessage, 'TypeError: CLI child closed')
+  assert.doesNotMatch(JSON.stringify(providerFailure), /private|Authorization|headers|body/)
+  assert.deepEqual(providerFailure.operations[0].request, {})
+})
+
+test('failure collection reads each due task and its own thread even when external receipt projection is empty or unavailable', async () => {
+  const reads = []
+  const read = async path => {
+    reads.push(path)
+    if (path === '/v1/tasks/source') return { id: 'source', threadId: 'source-thread', status: 'completed' }
+    if (path === '/v1/tasks/due') return { id: 'due', threadId: 'due-thread', activeTurnId: 'due-turn', status: 'stalled' }
+    if (path === '/v1/threads/source-thread') return { id: 'source-thread', turns: [] }
+    if (path === '/v1/threads/due-thread') return { id: 'due-thread', turns: [{ id: 'due-turn', status: 'failed', error: 'browser_context_stale',
+      items: [{ kind: 'tool_call', toolName: 'browser_fill', callId: 'due-fill', arguments: { value: 'private page' } }] }] }
+    if (path === '/v1/tasks/source/receipts') return []
+    throw new Error('Authorization: private-key')
+  }
+  const source = await collectWindowsTaskFailure('source', read), due = await collectWindowsTaskFailure('due', read)
+  assert.equal(source.task.status, 'completed')
+  assert.equal(due.task.status, 'stalled')
+  assert.equal(due.turns[0].id, 'due-turn')
+  assert.equal(due.turns[0].toolCalls[0].callId, 'due-fill')
+  assert.deepEqual(due.readFailures, ['receipts'])
+  assert.deepEqual(reads, ['/v1/tasks/source', '/v1/threads/source-thread', '/v1/tasks/source/receipts', '/v1/tasks/due', '/v1/threads/due-thread', '/v1/tasks/due/receipts'])
+  assert.doesNotMatch(JSON.stringify(due), /private-key|private page|Authorization/)
+})
+
+test('owned SQLite diagnostics preserve browser dispatch, derived authorization, unknown outcome, events and spans without exporting authority or payloads', async () => {
+  const { DatabaseSync } = await import('node:sqlite')
+  const root = await mkdtemp(join(tmpdir(), 'railwise-due-diagnostic-'))
+  const stamp = '2026-11-13T06:00:00.000Z'
+  try {
+    await mkdir(join(root, 'runtime'))
+    const database = new DatabaseSync(join(root, 'runtime', 'tasks.sqlite3'))
+    try {
+      database.exec('CREATE TABLE task_runs(id TEXT PRIMARY KEY,data_json TEXT); CREATE TABLE operation_receipts(owner_id TEXT,data_json TEXT); CREATE TABLE task_events(task_id TEXT,sequence INTEGER,kind TEXT,payload_json TEXT,created_at TEXT); CREATE TABLE runtime_spans(task_id TEXT,started_at TEXT,data_json TEXT)')
+      database.prepare('INSERT INTO task_runs VALUES(?,?)').run('due', JSON.stringify({ id: 'due', status: 'stalled', goal: 'private prompt', threadId: 'due-thread', activeTurnId: 'due-turn', scheduledBy: { scheduleId: 'schedule_source', dueAt: stamp } }))
+      for (const [index, kind, status] of [[1, 'tool', 'running'], [2, 'browser_action_dispatch', 'prepared'], [3, 'browser_derived_action_authorization', 'succeeded'], [4, 'browser_schedule_action_outcome', 'outcome_unknown']]) {
+        database.prepare('INSERT INTO operation_receipts VALUES(?,?)').run('due', JSON.stringify({ id: `operation_${index}`, ownerId: 'due', kind, status, createdAt: stamp, updatedAt: stamp,
+          request: { toolName: 'browser_fill', callId: 'smoke-fill', turnId: 'due-turn', dispatchTracking: 'host-v1', arguments: { value: 'private page' }, executionGrant: { token: 'private-token' }, headers: { Authorization: 'private-key' } },
+          result: { approved: true, item: { isError: true, output: { code: 'operation_not_dispatched', status: 'failed', html: 'private page' } }, token: 'private-token' }, error: 'Authorization: private-key with spaces' }))
+      }
+      database.prepare('INSERT INTO operation_receipts VALUES(?,?)').run('unrelated', JSON.stringify({ id: 'unrelated-operation', kind: 'tool' }))
+      database.prepare('INSERT INTO task_events VALUES(?,?,?,?,?)').run('due', 1, 'task_stalled', JSON.stringify({ operationIds: ['operation_2'], message: 'private prompt', headers: { cookie: 'private-cookie' } }), stamp)
+      database.prepare('INSERT INTO runtime_spans VALUES(?,?,?)').run('due', stamp, JSON.stringify({ id: 'span_due', turnId: 'due-turn', kind: 'tool', status: 'error', errorCode: 'browser_context_stale', startedAt: stamp, attributes: { toolName: 'browser_fill', body: 'private page', token: 'private-token' } }))
+      const summary = await readWindowsTaskFailureStore(root, 'due')
+      assert.equal(summary.readOnly, true)
+      assert.deepEqual(summary.counts, { operations: 4, events: 1, spans: 1 })
+      assert.deepEqual(summary.operations.map(item => item.kind), ['tool', 'browser_action_dispatch', 'browser_derived_action_authorization', 'browser_schedule_action_outcome'])
+      assert.equal(summary.operations[0].request.dispatchTracking, 'host-v1')
+      assert.equal(summary.operations[0].result.outputCode, 'operation_not_dispatched')
+      assert.deepEqual(summary.events[0].payload.operationIds, ['operation_2'])
+      assert.equal(summary.spans[0].errorCode, 'browser_context_stale')
+      assert.equal(database.prepare('SELECT COUNT(*) AS count FROM operation_receipts').get().count, 5, 'Failure diagnostics must not finish, recover or redispatch operations')
+      assert.doesNotMatch(JSON.stringify(summary), /private|Authorization|headers|executionGrant|unrelated-operation/)
+    } finally { database.close() }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('failure logs export only timestamps, stream, exception names and codes, never raw messages, headers, tokens or body', () => {
+  const logs = summarizeWindowsFailureLogs('[2026-11-13T06:00:00.000Z] [STDERR] TypeError: browser_context_stale at https://private.example/body\nAuthorization: Bearer browser_private_token\nheaders={"cookie":"private-cookie"}; browser_cookie_secret\nrequest body=private page browser_private_body\nprivate prompt with no code')
+  assert.equal(logs.lineCount, 5)
+  assert.equal(logs.entries.length, 1)
+  assert.equal(logs.entries[0].exception, 'TypeError')
+  assert.deepEqual(logs.entries[0].codes, ['browser_context_stale'])
+  assert.doesNotMatch(JSON.stringify(logs), /private|Authorization|Bearer|headers|cookie|https|body/)
 })
 
 test('manual preview failure permits later diagnostics while keeping the complete acceptance failed', async () => {
