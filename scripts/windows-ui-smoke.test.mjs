@@ -2,11 +2,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
@@ -185,6 +186,38 @@ test('only the exact installed di-bao agent-pack component with matching package
     const changedProof = structuredClone(valid)
     changedProof.agentPackSource.entrySha256 = '0'.repeat(64)
     assert.throws(() => validateDefaultSkillSources([report().resources.defaultSkills[0], report().resources.defaultSkills[1], changedProof]))
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('the normal Tender Master installed copy requires its owned path, bundled metadata and actual ASAR bytes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-bundled-copy-proof-'))
+  const applicationRoot = join(root, 'application')
+  const isolatedRoot = join(root, 'profile')
+  const sourceRoot = join(root, 'archive-source', 'src', 'asset', 'skills', 'tender-master')
+  const skillRoot = join(isolatedRoot, 'home', '.workwise', 'skills', 'tender-master')
+  const metadata = { type: 'bundled', id: 'tender-master', autoUpdate: false }
+  const skill = () => ({ id: 'tender-master', source: metadata, root: skillRoot, entryPath: join(skillRoot, 'SKILL.md') })
+  try {
+    await Promise.all([sourceRoot, skillRoot, join(applicationRoot, 'resources')].map(path => mkdir(path, { recursive: true })))
+    await writeFile(join(sourceRoot, 'SKILL.md'), 'synthetic exact ASAR source\n')
+    await createRequire(import.meta.url)('@electron/asar').createPackage(join(root, 'archive-source'), join(applicationRoot, 'resources', 'app.asar'))
+    await writeFile(join(skillRoot, 'SKILL.md'), 'synthetic exact ASAR source\n')
+    await writeFile(join(skillRoot, '.workwise-skill-source.json'), JSON.stringify(metadata))
+    const valid = skill()
+    await verifyInstalledBundledSkillCopy(valid, { applicationRoot, isolatedRoot })
+    const evidence = report()
+    evidence.resources.defaultSkills[1] = valid
+    assert.equal(validateWindowsUiReport(evidence, identity), true)
+    await writeFile(join(skillRoot, 'SKILL.md'), 'same name, changed bytes')
+    await assert.rejects(verifyInstalledBundledSkillCopy(skill(), { applicationRoot, isolatedRoot }))
+    await writeFile(join(skillRoot, 'SKILL.md'), 'synthetic exact ASAR source\n')
+    await writeFile(join(skillRoot, '.workwise-skill-source.json'), JSON.stringify({ ...metadata, id: 'untrusted' }))
+    await assert.rejects(verifyInstalledBundledSkillCopy(skill(), { applicationRoot, isolatedRoot }))
+    await writeFile(join(skillRoot, '.workwise-skill-source.json'), JSON.stringify(metadata))
+    await assert.rejects(verifyInstalledBundledSkillCopy({ ...skill(), root: join(root, 'unrelated') }, { applicationRoot, isolatedRoot }))
+    await assert.rejects(verifyInstalledBundledSkillCopy({ ...skill(), id: 'ppt-master' }, { applicationRoot, isolatedRoot }))
+    evidence.resources.defaultSkills[1].bundledCopySource.entrySha256 = '0'.repeat(64)
+    assert.throws(() => validateWindowsUiReport(evidence, identity))
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
