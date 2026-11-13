@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, validateWindowsUiReport, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, validateWindowsUiReport, validateWindowsTaskEvidence, startWindowsTaskModelFixture, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
 function report() {
@@ -12,6 +12,8 @@ function report() {
     locale: 'zh', theme: 'dark', productionTouched: false, packageUnchanged: true, cleanExit: true,
     errors: [], tabs: ['技能', '插件', '连接器'], chapters: Array.from({ length: 13 }, (_, index) => index + 1),
     update: { ok: true, hasUpdate: false }, helpOffline: true,
+    taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', sha256: 'a'.repeat(64), byteHashMatches: true },
+      schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true } },
     resources: {
       defaultSkills: ['ppt-master', 'tender-master', 'di-bao-monitoring'].map(id => ({
         id, name: id,
@@ -34,7 +36,7 @@ function report() {
     checks: ['installed-chinese-renderer', 'skills-default-and-tab-order', 'plugins-tab',
       'connectors-tab', 'github-actionable-setup', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
       'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent',
-      'packaged-skills-and-engineering-entries', 'amap-zotero-actionable-setup', 'autocad-fixed-upstream-entries']
+      'packaged-skills-and-engineering-entries', 'amap-zotero-actionable-setup', 'autocad-fixed-upstream-entries', 'runtime-task-html-and-daily-schedule']
   }
 }
 
@@ -146,4 +148,27 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   assert.match(ui, /asar\.extractFile\(join\(dirname\(executable\), 'resources', 'app.asar'\), entry\)/)
   assert.match(ui, /both locally cataloged CAD skills/)
   assert.doesNotMatch(ui, /window\.workwise\s*=|innerHTML\s*=|mock\w*\(/)
+})
+
+for (const [name, change] of [
+  ['prose-only completion', evidence => { evidence.artifact.byteHashMatches = false }],
+  ['missing afternoon schedule', evidence => { evidence.schedule.times.pop() }],
+  ['wrong timezone', evidence => { evidence.schedule.timezone = 'UTC' }],
+  ['unverified schedule claim', evidence => { evidence.schedule.readBackFromTool = false }]
+]) test(`task acceptance rejects ${name}`, () => {
+  const evidence = report().taskExecution
+  change(evidence)
+  assert.throws(() => validateWindowsTaskEvidence(evidence))
+})
+
+test('the local model protocol fixture requests real tools and never impersonates a browser result', async () => {
+  const fixture = await startWindowsTaskModelFixture()
+  try {
+    const tools = ['publish_artifact', 'schedule_task', 'list_schedules'].map(name => ({ type: 'function', function: { name } }))
+    const first = await fetch(`${fixture.baseUrl}/chat/completions`, { method: 'POST', body: JSON.stringify({ tools, messages: [] }) })
+    const payload = await first.text()
+    assert.ok(payload.includes('publish_artifact'))
+    assert.ok(!payload.includes('browser_navigate'))
+    assert.equal(fixture.observed.catalogs.length, 1)
+  } finally { await fixture.close() }
 })

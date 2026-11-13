@@ -3109,6 +3109,7 @@
   "conversationViewMode_developer": "Developer",
   "taskRunRetryModel": "Model for resume or retry",
   "taskRunNodes": "Task nodes",
+  "taskArtifactManagedStorage": "Saved in task outputs",
   "taskRunArtifacts": "Artifacts",
   "taskRunNoArtifacts": "No verified artifacts yet.",
   "taskNodeStatus_pending": "Pending",
@@ -4614,5 +4615,7 @@
   "engineeringSkillSelection": "Engineering skills",
   "engineeringPluginSelection": "Engineering essentials",
   "engineeringSkillInstalled": "Skill installed and available for task selection.",
-  "taskTemplateExportUnknown": "Document export service status has not been checked."
+  "taskTemplateExportUnknown": "Document export service status has not been checked.",
+  "approvalScopeSummary": "Review the scope of this operation.",
+  "approvalScopeDetails": "View scope and technical details"
 }

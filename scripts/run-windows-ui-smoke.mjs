@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto'
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
+import { createServer as createHttpServer } from 'node:http'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
@@ -14,7 +15,8 @@ const requiredChecks = [
   'installed-chinese-renderer', 'skills-default-and-tab-order', 'plugins-tab',
   'connectors-tab', 'github-actionable-setup', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
   'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent',
-  'packaged-skills-and-engineering-entries', 'amap-zotero-actionable-setup', 'autocad-fixed-upstream-entries'
+  'packaged-skills-and-engineering-entries', 'amap-zotero-actionable-setup', 'autocad-fixed-upstream-entries',
+  'runtime-task-html-and-daily-schedule'
 ]
 const defaultSkillIds = ['ppt-master', 'tender-master', 'di-bao-monitoring']
 const engineeringSkillNames = ['资料盘点与来源索引', '监测质检与图表', '工程文档差异审阅', '会议纪要与待办']
@@ -74,6 +76,7 @@ export function validateWindowsUiReport(report, identity) {
   assert.equal(report.update.ok, true)
   assert.equal(report.update.hasUpdate, false)
   assert.equal(report.helpOffline, true)
+  validateWindowsTaskEvidence(report.taskExecution)
   for (const check of requiredChecks) assert.ok(report.checks.includes(check), `Missing actual UI observation: ${check}`)
   assert.deepEqual(validateDefaultSkillSources(report.resources.defaultSkills).map(skill => skill.id), defaultSkillIds)
   for (const skill of report.resources.defaultSkills) {
@@ -97,6 +100,59 @@ export function validateWindowsUiReport(report, identity) {
     assert.equal(item.licenseNoticeVisible, true)
   }
   return true
+}
+
+export function validateWindowsTaskEvidence(evidence) {
+  assert.equal(evidence.model, 'local-protocol-fixture')
+  assert.equal(evidence.status, 'completed')
+  assert.equal(evidence.artifact.format, 'html')
+  assert.equal(evidence.artifact.validation, 'valid')
+  assert.equal(evidence.artifact.byteHashMatches, true)
+  assert.match(evidence.artifact.sha256, /^[a-f0-9]{64}$/)
+  assert.deepEqual(evidence.schedule.times, ['08:30', '16:30'])
+  assert.equal(evidence.schedule.timezone, 'Asia/Shanghai')
+  assert.equal(evidence.schedule.enabled, true)
+  assert.ok(Number.isFinite(Date.parse(evidence.schedule.nextRunAt)))
+  assert.equal(evidence.schedule.readBackFromTool, true)
+}
+
+/** A protocol fixture drives the installed Runtime's real task, tools, files and schedule store. */
+export async function startWindowsTaskModelFixture() {
+  const observed = { catalogs: [], scheduleReadback: undefined }
+  const server = createHttpServer(async (request, response) => {
+    if (request.method === 'GET') {
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ data: [{ id: 'windows-task-fixture', object: 'model' }] }))
+      return
+    }
+    const chunks = []
+    for await (const chunk of request) chunks.push(chunk)
+    try {
+      const body = JSON.parse(Buffer.concat(chunks).toString())
+      const names = body.tools?.map(tool => tool.function.name) ?? []
+      observed.catalogs.push(names)
+      const called = new Set(body.messages?.flatMap(message => message.tool_calls?.map(call => call.function.name) ?? []))
+      for (const message of body.messages ?? []) {
+        if (message.role !== 'tool' || typeof message.content !== 'string') continue
+        try {
+          const output = JSON.parse(message.content)
+          if (Array.isArray(output.schedules)) observed.scheduleReadback = output.schedules
+        } catch { /* Other tool content is outside this fixture's readback evidence. */ }
+      }
+      const next = ['publish_artifact', 'schedule_task', 'list_schedules'].find(name => names.includes(name) && !called.has(name))
+      const args = next === 'publish_artifact' ? { path: '每日网页报告.html', content: '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Windows 合成验收报告</title></head><body><h1>每日网页报告</h1><p>这是隔离验收生成的合成内容。</p></body></html>' } : {}
+      const delta = next ? { tool_calls: [{ index: 0, id: `smoke-${next}`, type: 'function', function: { name: next, arguments: JSON.stringify(args) } }] }
+        : { content: 'HTML 报告已保存并核验，每日计划已创建并读回，可在任务成果中查看。' }
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(`data: ${JSON.stringify({ id: 'windows-task-fixture', choices: [{ index: 0, delta, finish_reason: next ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\ndata: [DONE]\n\n`)
+    } catch {
+      response.writeHead(400)
+      response.end('Invalid synthetic model request')
+    }
+  })
+  await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
+  return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, observed,
+    close: () => new Promise(done => { server.close(done); server.closeAllConnections() }) }
 }
 
 function contained(root, path) {
@@ -199,11 +255,13 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const workspace = join(root, 'workspace')
   const environment = windowsUiEnvironment(process.env, root)
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
+  const taskModel = await startWindowsTaskModelFixture()
   const settingsPath = join(profile, 'workwise-settings.json')
   await writeFile(settingsPath, JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: 'zh', theme: 'dark', workspaceRoot: workspace, uiFontScale: 'small',
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
-    agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime') } } }))
+    provider: { providers: [{ id: 'windows-task-fixture', name: '本机验收协议模型', apiKey: 'synthetic-local-only', baseUrl: taskModel.baseUrl, endpointFormat: 'chat_completions', models: ['windows-task-fixture'] }] },
+    agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'), providerId: 'windows-task-fixture', model: 'windows-task-fixture', approvalPolicy: 'auto', sandboxMode: 'read-only' } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
     sourceHead, version, provenance, locale: 'zh', theme: 'dark', productionTouched: false, checks: [], errors: [],
     installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
@@ -378,6 +436,36 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     await cdp.click('[aria-label="手册目录"] button', '1.4 现有界面截图')
     await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="用户使用手册"] img')).some(image=>image.complete && image.naturalWidth>0)`, 'a packaged manual image offline')
     report.checks.push('offline-help-images')
+    await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
+    const runtimeRequest = (path, method = 'GET', body) => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},${JSON.stringify(method)},${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'}).then(result=>{if(!result.ok)throw new Error(result.body);return JSON.parse(result.body)})`)
+    const thread = await runtimeRequest('/v1/threads', 'POST', { workspace, mode: 'agent', model: 'windows-task-fixture', title: 'Windows 实包任务验收' })
+    const command = await runtimeRequest('/v1/task-commands', 'POST', { threadId: thread.id, intent: 'new', idempotencyKey: 'windows-html-daily',
+      request: { prompt: '请生成并交付一份HTML网页报告，每天09:00和17:00前提前30分钟执行。', model: 'windows-task-fixture', mode: 'agent' } })
+    assert.ok(command.task?.id, 'The installed Runtime must admit a normal task')
+    let task = command.task
+    const taskDeadline = Date.now() + 90_000
+    while (Date.now() < taskDeadline && !['completed', 'failed', 'stalled', 'waiting_user'].includes(task.status)) {
+      await sleep(250)
+      task = await runtimeRequest(`/v1/tasks/${encodeURIComponent(task.id)}`)
+    }
+    assert.equal(task.status, 'completed', task.stalledReason ?? task.waitingReason ?? 'Installed task did not complete')
+    const artifact = task.artifacts.find(file => file.format === 'html' && file.validation === 'valid')
+    assert.ok(artifact?.absolutePath && contained(root, artifact.absolutePath), 'The actual HTML must belong to the isolated task output directory')
+    const bytes = await readFile(artifact.absolutePath)
+    assert.ok(bytes.toString('utf8').includes('合成内容'))
+    const execution = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
+    const readback = execution.turns.flatMap(turn => turn.items).find(item => item.kind === 'tool_result' && item.toolName === 'list_schedules' && item.isError !== true)
+    const schedule = readback?.output?.schedules?.[0]
+    assert.ok(schedule, 'A real schedule tool readback must be present in the persisted conversation')
+    const flow = await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`)
+    assert.deepEqual(flow.flow?.nodes?.[0]?.config, schedule.schedule)
+    report.taskExecution = { model: 'local-protocol-fixture', status: task.status, taskId: task.id,
+      artifact: { format: artifact.format, validation: artifact.validation, sizeBytes: bytes.length, sha256: artifact.sha256,
+        byteHashMatches: createHash('sha256').update(bytes).digest('hex') === artifact.sha256 },
+      schedule: { ...schedule.schedule, id: schedule.id, enabled: schedule.enabled, nextRunAt: schedule.nextRunAt, readBackFromTool: true },
+      browserSkill: { status: 'not_exercised', reason: 'A real connected BrowserSkill extension requires a separate installed-browser session.' } }
+    validateWindowsTaskEvidence(report.taskExecution)
+    report.checks.push('runtime-task-html-and-daily-schedule')
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error))
     if (cdp) {
@@ -410,6 +498,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       }
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
+    await taskModel.close()
     try { validateWindowsUiReport(report, identity); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)

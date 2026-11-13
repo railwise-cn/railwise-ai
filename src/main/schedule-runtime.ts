@@ -218,7 +218,9 @@ export class ScheduleRuntime {
         kind: input.schedule.kind,
         everyMinutes: typeof input.schedule.everyMinutes === 'number' ? input.schedule.everyMinutes : 60,
         timeOfDay: input.schedule.timeOfDay?.trim() || '09:00',
-        atTime: input.schedule.atTime?.trim() || ''
+        atTime: input.schedule.atTime?.trim() || '',
+        ...(input.schedule.times ? { times: input.schedule.times } : {}),
+        ...(input.schedule.timezone ? { timezone: input.schedule.timezone } : {})
       },
       createdAt: now,
       updatedAt: now,
@@ -832,7 +834,9 @@ export class ScheduleRuntime {
             kind,
             everyMinutes: Number(schedule.everyMinutes),
             timeOfDay: asString(schedule.timeOfDay),
-            atTime: asString(schedule.atTime)
+            atTime: asString(schedule.atTime),
+            ...(Array.isArray(schedule.times) ? { times: schedule.times.map(asString) } : {}),
+            ...(asString(schedule.timezone) ? { timezone: asString(schedule.timezone) } : {})
           }
         })
         writeJson(res, 200, { ok: true, task: saved })

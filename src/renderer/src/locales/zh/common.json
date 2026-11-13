@@ -3109,6 +3109,7 @@
   "conversationViewMode_developer": "开发者",
   "taskRunRetryModel": "继续或重试时使用的模型",
   "taskRunNodes": "任务节点",
+  "taskArtifactManagedStorage": "应用任务成果",
   "taskRunArtifacts": "成果",
   "taskRunNoArtifacts": "尚未产生可验证成果。",
   "taskNodeStatus_pending": "待执行",
@@ -4614,5 +4615,7 @@
   "engineeringSkillSelection": "工程技能",
   "engineeringPluginSelection": "工程常用插件",
   "engineeringSkillInstalled": "技能已安装，可在任务中选择使用。",
-  "taskTemplateExportUnknown": "文档导出服务状态尚未核验。"
+  "taskTemplateExportUnknown": "文档导出服务状态尚未核验。",
+  "approvalScopeSummary": "请核对本次操作的授权范围。",
+  "approvalScopeDetails": "查看操作范围和技术详情"
 }

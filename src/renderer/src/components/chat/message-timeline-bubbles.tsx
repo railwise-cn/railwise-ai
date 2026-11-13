@@ -1521,12 +1521,10 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
         }`}
       >
         <div className="font-semibold text-accent">{t('approvalTitle')}</div>
-        {block.toolName ? (
-          <div className="mt-1 text-[12px] text-ds-muted">
-            {t('approvalTool', { name: block.toolName })}
-          </div>
-        ) : null}
-        <p className="mt-2 max-h-96 overflow-y-auto whitespace-pre-wrap break-words text-[14px] text-ds-ink">{block.summary}</p>
+        <p className="mt-2 text-[14px] text-ds-ink">{t('approvalScopeSummary')}</p>
+        <details className="mt-2 text-[12px] text-ds-muted"><summary className="cursor-pointer">{t('approvalScopeDetails')}</summary>
+          <p className="mt-2 max-h-96 overflow-y-auto whitespace-pre-wrap break-words">{block.summary}</p>
+        </details>
         {block.errorMessage ? (
           <p className="mt-2 text-[12px] text-red-700 dark:text-red-300">{block.errorMessage}</p>
         ) : null}
