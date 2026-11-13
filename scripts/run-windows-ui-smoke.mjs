@@ -599,6 +599,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.checks.push('offline-help-images')
     if (taskSmoke) {
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
+      await cdp.click('.ds-settings-sidebar button', '返回')
+      await cdp.wait(`!document.querySelector('.ds-settings-sidebar')`, 'the main workspace after leaving help')
       const runtimeRequest = (path, method = 'GET', body) => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},${JSON.stringify(method)},${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'}).then(result=>{if(!result.ok)throw new Error(result.body);return JSON.parse(result.body)})`)
       const previousThreads = new Set((await runtimeRequest('/v1/threads')).threads.map(thread => thread.id))
       const prompt = `${browserSmoke ? `使用broswer-skill，读取 ${taskModel.fixtureUrl}，将网页实际内容生成HTML报告并交付。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
