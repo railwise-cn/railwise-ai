@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
@@ -340,69 +340,181 @@ test('installed acceptance uses the real marketplace and checks the existing Run
   assert.match(runtimeRoute, /return jsonResponse\(runtime\.taskRepository\.list\(/)
 })
 
-test('browser protocol model asks for real navigation and refuses to invent missing page HTML', async () => {
+// These protocol-component tests supply synthetic results only; they are not Windows business acceptance evidence.
+const browserToolNames = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_authorize_action', 'browser_fill', 'browser_click', 'browser_session_stop', 'publish_artifact', 'schedule_task', 'list_schedules']
+const fixtureMessages = (id, name, output) => [
+  { role: 'assistant', tool_calls: [{ id: `smoke-${id}`, function: { name, arguments: '{}' } }] },
+  ...(output === undefined ? [] : [{ role: 'tool', tool_call_id: `smoke-${id}`, content: JSON.stringify(output) }])
+]
+const fixtureResultHtml = (page, query) => page.replace('<output id="query-result" aria-live="polite"></output>', `<output id="query-result" aria-live="polite" data-query="${query}">本地查询结果：${query}；已完成合成公开检索</output>`)
+const fixtureRequest = (fixture, names, messages) => fetch(`${fixture.baseUrl}/chat/completions`, { method: 'POST', body: JSON.stringify({ tools: names.map(name => ({ type: 'function', function: { name } })), messages }) })
+const fixtureCall = async response => {
+  assert.equal(response.status, 200)
+  const data = (await response.text()).split('\n').find(line => line.startsWith('data: {'))
+  return JSON.parse(data.slice(6)).choices[0].delta.tool_calls?.[0]
+}
+
+test('browser protocol obtains fresh real refs, asks exact persistent actions, and omits approvals for a new scheduled conversation', async () => {
   const fixture = await startWindowsTaskModelFixture({ browser: true })
-  const names = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop', 'publish_artifact', 'schedule_task', 'list_schedules']
-  const tools = names.map(name => ({ type: 'function', function: { name } }))
-  const request = messages => fetch(`${fixture.baseUrl}/chat/completions`, { method: 'POST', body: JSON.stringify({ tools, messages }) })
   try {
-    assert.ok((await (await request([])).text()).includes('browser_session_start'))
-    const messages = names.slice(0, 4).map(name => ({ role: 'assistant', tool_calls: [{ id: name, function: { name, arguments: '{}' } }] }))
-    assert.equal((await request(messages)).status, 400)
     const page = await (await fetch(fixture.fixtureUrl)).text()
-    assert.ok(page.includes(fixture.marker))
-    const withHtml = [...messages, { role: 'tool', tool_call_id: 'browser_get_html', content: JSON.stringify({ html: page }) }]
-    const response = await request(withHtml)
-    assert.equal(response.status, 200)
-    const body = await response.text()
-    assert.ok(body.includes('publish_artifact') && body.includes(fixture.marker))
-    // A later scheduled task uses a fresh conversation. Completed calls from
-    // the previous request never become mutable state in this protocol model.
-    const nextTask = await (await request([])).text()
-    assert.ok(nextTask.includes('browser_session_start'))
-    const freshHistory = [
-      { role: 'assistant', tool_calls: [{ id: 'fresh-start', function: { name: 'browser_session_start', arguments: '{}' } }] },
-      { role: 'tool', tool_call_id: 'fresh-start', content: JSON.stringify({ sessionId: 'fresh-task-session' }) }
-    ]
-    const navigation = await (await request(freshHistory)).text()
-    assert.ok(navigation.includes('browser_navigate') && navigation.includes('fresh-task-session'))
+    assert.ok(page.includes(fixture.inputHtml) && page.includes(fixture.buttonHtml))
+    assert.ok(!page.includes('fetch(') && !page.includes('<form'))
+    assert.throws(() => validateWindowsFixtureQueryHtml(page, fixture), /actual DOM/)
+    for (const initial of [true, false]) {
+      const names = initial ? browserToolNames : browserToolNames.filter(name => !['schedule_task', 'list_schedules'].includes(name))
+      const messages = []
+      const authorizations = []
+      const ids = []
+      for (let count = 0; count < 15; count++) {
+        const call = await fixtureCall(await fixtureRequest(fixture, names, messages))
+        assert.ok(call)
+        ids.push(call.id)
+        const args = JSON.parse(call.function.arguments)
+        if (call.function.name === 'publish_artifact') {
+          assert.ok(args.content.includes(`data-query="${fixture.query}"`))
+          break
+        }
+        let output = { status: 'succeeded' }
+        if (call.id === 'smoke-start') output.sessionId = initial ? 'synthetic-source-session' : 'synthetic-due-session'
+        if (call.id === 'smoke-navigate') output = { observation: { context_id: 'synthetic-navigation-context', observation: { text: '@e1 input 合成公告关键词\n@e2 button 查询合成公告' } } }
+        if (call.id === 'smoke-read-fill-target') assert.equal(args.target, '@e1')
+        if (call.id === 'smoke-read-click-target') assert.equal(args.target, '@e12')
+        if (call.function.name === 'browser_authorize_action') {
+          authorizations.push(args)
+          assert.equal(args.scope, 'schedule')
+          assert.equal(args.scheduleAccess, 'public_query')
+        }
+        if (call.id === 'smoke-fill') {
+          assert.equal(args.value, fixture.query)
+          assert.equal(args.contextId, 'synthetic-navigation-context')
+          output = { observation: { context_id: 'synthetic-post-fill-context', observation: { text: '@e11 input 合成公告关键词\n@e12 button 查询合成公告' } } }
+        }
+        if (call.id === 'smoke-click') {
+          assert.equal(args.contextId, 'synthetic-post-fill-context')
+          assert.equal(args.target, '@e12')
+        }
+        if (call.id === 'smoke-read-results') output = { html: fixtureResultHtml(page, fixture.query) }
+        messages.push(...fixtureMessages(call.id.slice(6), call.function.name, output))
+      }
+      assert.equal(authorizations.length, initial ? 2 : 0)
+      assert.ok(ids.includes('smoke-artifact'))
+    }
+    const missing = fixtureMessages('start', 'browser_session_start', { sessionId: 'synthetic' })
+    missing.push(...fixtureMessages('navigate', 'browser_navigate', {}))
+    assert.equal((await fixtureRequest(fixture, browserToolNames, missing)).status, 400)
+    assert.match(fixture.observed.requests.at(-1).error, /fresh actual observed element/)
+    const finished = ['start', 'navigate', 'read-fill-target', 'authorize-fill', 'fill', 'read-click-target', 'authorize-click', 'click', 'read-results', 'stop']
+      .flatMap(id => fixtureMessages(id, 'synthetic-component-call'))
+    assert.equal((await fixtureRequest(fixture, browserToolNames, finished)).status, 400)
+    assert.match(fixture.observed.requests.at(-1).error, /requires actual browser HTML/)
   } finally { await fixture.close() }
 })
 
-test('the fixture reads session and HTML results using the production model client framing', async () => {
+test('the query fixture reads session and DOM HTML using the production model client framing', async () => {
   const root = await mkdtemp(join(tmpdir(), 'railwise-model-framing-'))
   const fixture = await startWindowsTaskModelFixture({ browser: true })
   try {
     const output = join(root, 'model-client.mjs')
-    await build({ entryPoints: [fileURLToPath(new URL('../kun/src/adapters/model/deepseek-compat-model-client.ts', import.meta.url))],
-      outfile: output, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' })
+    await build({ entryPoints: [fileURLToPath(new URL('../kun/src/adapters/model/deepseek-compat-model-client.ts', import.meta.url))], outfile: output, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' })
     const { DeepseekCompatModelClient } = await import(pathToFileURL(output).href)
     const client = new DeepseekCompatModelClient({ baseUrl: fixture.baseUrl, apiKey: 'synthetic', model: 'synthetic' })
-    const framed = (name, value) => client.toolResultToMessage({ kind: 'tool_result', callId: name, output: value },
-      { kind: 'tool_call', callId: name, toolName: name, arguments: {}, argumentSummary: 'Original arguments omitted' })
-    const names = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop', 'publish_artifact']
-    const calls = names.slice(0, 4).map(name => ({ role: 'assistant', tool_calls: [{ id: name, function: { name, arguments: '{}' } }] }))
-    const tools = names.map(name => ({ type: 'function', function: { name } }))
-    const request = messages => fetch(`${fixture.baseUrl}/chat/completions`, { method: 'POST', body: JSON.stringify({ tools, messages }) })
-    const session = framed('browser_session_start', { sessionId: 'actual-framed-session' })
-    assert.throws(() => JSON.parse(session.content), 'The old plain-JSON fixture parser cannot read the production framing')
-    const navigation = await request([calls[0], session])
-    assert.equal(navigation.status, 200)
-    assert.ok((await navigation.text()).includes('actual-framed-session'))
-    const html = await (await fetch(fixture.fixtureUrl)).text()
+    const framed = (id, name, value) => client.toolResultToMessage({ kind: 'tool_result', callId: `smoke-${id}`, output: value },
+      { kind: 'tool_call', callId: `smoke-${id}`, toolName: name, arguments: {}, argumentSummary: 'Original arguments omitted' })
+    const first = fixtureMessages('start', 'browser_session_start')
+    const session = framed('start', 'browser_session_start', { sessionId: 'synthetic-framed-session' })
+    assert.throws(() => JSON.parse(session.content))
+    const navigation = await fixtureCall(await fixtureRequest(fixture, browserToolNames, [...first, session]))
+    assert.equal(JSON.parse(navigation.function.arguments).sessionId, 'synthetic-framed-session')
+    const html = fixtureResultHtml(await (await fetch(fixture.fixtureUrl)).text(), fixture.query)
+    const calls = ['start', 'navigate', 'read-fill-target', 'authorize-fill', 'fill', 'read-click-target', 'authorize-click', 'click', 'read-results', 'stop']
+      .flatMap(id => fixtureMessages(id, 'synthetic-component-call'))
     for (const untrusted of [false, true]) {
-      const result = await request([...calls, framed('browser_get_html', { html, untrusted })])
-      assert.equal(result.status, 200)
-      assert.ok((await result.text()).includes(fixture.marker))
+      const result = await fixtureCall(await fixtureRequest(fixture, browserToolNames, [...calls, framed('read-results', 'browser_get_html', { html, untrusted })]))
+      assert.ok(result.function.arguments.includes(fixture.query))
     }
-    const invalid = await request([...calls, { role: 'tool', tool_call_id: 'browser_get_html',
-      content: `<html>Recorded result:\n${JSON.stringify({ html })}</html>` }])
+    const invalid = await fixtureRequest(fixture, browserToolNames, [...calls, { role: 'tool', tool_call_id: 'smoke-read-results', content: `<html>Recorded result:\n${JSON.stringify({ html })}</html>` }])
     assert.equal(invalid.status, 400)
-    assert.match(fixture.observed.requests.at(-1).error, /requires actual browser HTML/)
-  } finally {
-    await fixture.close()
-    await rm(root, { recursive: true, force: true })
+  } finally { await fixture.close(); await rm(root, { recursive: true, force: true }) }
+})
+
+test('fixture approval review rejects altered actual targets, inputs, origins, times, paths and extra approvals', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-query-review-component-'))
+  const fixture = await startWindowsTaskModelFixture({ browser: true })
+  try {
+    const output = join(root, 'summaries.mjs')
+    await build({ entryPoints: [fileURLToPath(new URL('../kun/src/security/browser-approval-summary.ts', import.meta.url))], outfile: output, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' })
+    const { browserApprovalSummary, browserScheduleApprovalSummary } = await import(pathToFileURL(output).href)
+    const origin = new URL(fixture.fixtureUrl).origin
+    const prompt = '合成组件测试：本地公开查询，每天09:00和17:00前提前30分钟执行。'
+    const workspace = join(root, 'workspace')
+    const makeSummary = (action, change = {}) => browserApprovalSummary({ action, origin, targetHtml: action === 'fill' ? fixture.inputHtml : fixture.buttonHtml,
+      value: action === 'fill' ? fixture.query : undefined, requestHash: 'a'.repeat(64), schedule: { purpose: prompt,
+        requirement: { kind: 'daily', times: ['09:00', '17:00'], leadMinutes: 30, timezone: 'Asia/Shanghai' }, browserLabel: '合成组件浏览器', version: 'b'.repeat(64) }, ...change })
+    const thread = { turns: [{ items: ['fill', 'click'].map(action => ({ kind: 'tool_result', callId: `smoke-read-${action}-target`, isError: false,
+      output: { sourceUrl: fixture.fixtureUrl, html: action === 'fill' ? fixture.inputHtml : fixture.buttonHtml } })) }] }
+    const options = { fixture, prompt, workspace, browserLabel: '合成组件浏览器', thread, index: 0 }
+    const approval = { approvalId: 'synthetic-review', toolName: 'browser_authorize_action', status: 'pending', summary: makeSummary('fill') }
+    assert.equal(reviewWindowsFixtureApproval(approval, options).scope, 'schedule')
+    for (const change of [{ origin: 'https://unreviewed.example.test' }, { value: fixture.query + '扩大' }, { targetHtml: '<input type="password" aria-label="合成公告关键词">' }, { schedule: undefined }]) {
+      assert.throws(() => reviewWindowsFixtureApproval({ ...approval, summary: makeSummary('fill', change) }, options))
+    }
+    for (const [field, value] of [['执行时刻', '01:20、08:30、16:30'], ['账号状态', '已登录'], ['计划目的', prompt + '扩大范围']]) {
+      const summary = approval.summary.replace(new RegExp(`^${field} .+$`, 'm'), `${field} ${JSON.stringify(value)}`)
+      assert.throws(() => reviewWindowsFixtureApproval({ ...approval, summary }, options))
+    }
+    const changedThread = structuredClone(thread)
+    changedThread.turns[0].items[0].output.html += '<!-- changed actual DOM -->'
+    assert.throws(() => reviewWindowsFixtureApproval(approval, { ...options, thread: changedThread }))
+    const click = { ...approval, summary: makeSummary('click') }
+    assert.equal(reviewWindowsFixtureApproval(click, { ...options, index: 1 }).action, 'click')
+    const planSummary = browserScheduleApprovalSummary({ purpose: prompt, times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', readPaths: [workspace], writePaths: [],
+      origins: [origin], browserLabel: options.browserLabel, actions: [{ summary: approval.summary }, { summary: click.summary }], scopeHash: 'c'.repeat(64) })
+    const plan = { ...approval, toolName: 'schedule_task', summary: planSummary }
+    assert.equal(reviewWindowsFixtureApproval(plan, { ...options, index: 2 }).toolName, 'schedule_task')
+    assert.throws(() => reviewWindowsFixtureApproval(plan, { ...options, index: 3 }))
+    assert.throws(() => reviewWindowsFixtureApproval(plan, { ...options, index: 2, workspace: join(root, 'other') }))
+    const writes = planSummary.replace(/^写入路径 .+$/m, `写入路径 ${JSON.stringify(workspace)}`)
+    assert.throws(() => reviewWindowsFixtureApproval({ ...plan, summary: writes }, { ...options, index: 2 }))
+  } finally { await fixture.close(); await rm(root, { recursive: true, force: true }) }
+})
+
+test('UI approval targeting selects exactly the reviewed visible fields and never an unrelated or ambiguous allow card', async () => {
+  const { Window } = await import('happy-dom')
+  const window = new Window()
+  try {
+    // DOM component contract only. Actual approvals must later be clicked in the exact packaged Windows application.
+    const values = ['合成站点', '精确合成输入', '08:30、16:30']
+    const card = entries => `<div><section><dl>${entries.map(value => `<dd>${value}</dd>`).join('')}</dl></section><div><button>允许</button></div></div>`
+    window.document.body.innerHTML = card(['其他站点', ...values.slice(1)]) + card(values)
+    for (const node of window.document.querySelectorAll('button')) node.getClientRects = () => [{}]
+    const button = window.document.querySelectorAll('button')[1]
+    button.scrollIntoView = () => undefined
+    button.getBoundingClientRect = () => ({ x: 10, y: 20, width: 20, height: 10 })
+    window.document.elementFromPoint = () => button
+    const expression = windowsFixtureApprovalUiExpression(values)
+    assert.deepEqual(JSON.parse(JSON.stringify(window.eval(expression))), { x: 20, y: 25 })
+    assert.equal(window.eval(windowsFixtureApprovalUiExpression(['无关扩大输入'])), null)
+    window.document.body.insertAdjacentHTML('beforeend', card(values))
+    window.document.querySelectorAll('button')[2].getClientRects = () => [{}]
+    assert.equal(window.eval(expression), null)
+  } finally { await window.happyDOM.close() }
+})
+
+test('scheduled query validation requires source UI reviews and independent derived authority without extra due approvals', () => {
+  // Synthetic validator input; never emitted as actual business evidence.
+  const query = { domReadbackVerified: true, htmlReadbackVerified: true, actions: 2, unknownOutcomes: 0, accountState: 'unknown', access: 'public_query' }
+  const evidence = { browserSkill: { publicQuery: { ...query, uiApprovals: ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'].map(toolName => ({ toolName, status: 'allowed', uiFieldsVerified: true })), persistentActionAuthorizations: 2 } },
+    dueOccurrence: { publicQuery: { ...query, addedApprovals: 0, derivedActionAuthorizations: 2, publishedPlanVersionVerified: true, enabledPlanVerified: true, shortAuthorizationVerified: true } } }
+  assert.doesNotThrow(() => validateWindowsScheduledQueryEvidence(evidence))
+  for (const [field, value] of [['addedApprovals', 1], ['derivedActionAuthorizations', 0], ['publishedPlanVersionVerified', false], ['enabledPlanVerified', false], ['shortAuthorizationVerified', false], ['unknownOutcomes', 1], ['domReadbackVerified', false], ['htmlReadbackVerified', false]]) {
+    const changed = structuredClone(evidence)
+    changed.dueOccurrence.publicQuery[field] = value
+    assert.throws(() => validateWindowsScheduledQueryEvidence(changed))
   }
+  const noReview = structuredClone(evidence)
+  noReview.browserSkill.publicQuery.uiApprovals.pop()
+  assert.throws(() => validateWindowsScheduledQueryEvidence(noReview))
 })
 
 test('failed task evidence retains status and codes without exporting prompts, arguments or tool content', () => {
