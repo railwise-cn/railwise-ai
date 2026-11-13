@@ -7,18 +7,34 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
+function permissionRuntimeEvidence() {
+  // Validator input only; the real worker is never run by the ordinary Node suite.
+  return { schemaVersion: 1, scope: 'compiled-runtime-owned-file-permission', status: 'passed', platform: 'win32',
+    actualSystemClock: true, actualOsJunction: true, installedPackageRuntime: true, realModel: false, uiAuthorizationClaimed: false,
+    productionTouched: false, externalModelCalls: 0, unexpectedApprovals: 0,
+    checks: ['read-only-chinese-space-workspace-managed-artifact', 'explicit-task-grant-exports-to-chinese-space-directory',
+      'changed-os-junction-cannot-reuse-original-task-path-grant', 'real-expiry-blocks-captured-old-execution-grant',
+      'replacement-does-not-revive-the-old-immutable-grant', 'http-revocation-invalidates-captured-live-grant'],
+    managedArtifact: { validated: true, workspaceFiles: 0, sha256: 'a'.repeat(64) },
+    exportedArtifact: { matchedInputHtml: true, sha256: 'a'.repeat(64), file: '指定 中文导出/验收 报告.html', workspaceTrust: 'read-only',
+      sandboxMode: 'workspace-write', workspaceWriteException: true, writeReceipts: 1 },
+    junction: { initialTargetVerified: true, changedTargetVerified: true, forbiddenFiles: 0, code: 'workspace_path_blocked' },
+    expiry: { elapsedThroughRealExpiry: true, code: 'task_permission_expired' }, replacedGrant: { oldPermissionRejected: 'task_permission_revoked' },
+    revocation: { taskPaused: true, code: 'task_permission_revoked' } }
+}
 function report() {
   // Validator fixtures do not supply actual Windows UI acceptance evidence.
   return {
     schemaVersion: 1, scope: 'private-exact-package-chinese-ui', platform: 'win32', ...identity,
-    locale: 'zh', theme: 'dark', productionTouched: false, packageUnchanged: true, cleanExit: true,
+    locale: 'zh', theme: 'dark', workspaceRoot: `D:\\owned\\${windowsSmokeWorkspaceName}`, productionTouched: false, packageUnchanged: true, cleanExit: true,
     errors: [], tabs: ['技能', '插件', '连接器'], chapters: Array.from({ length: 13 }, (_, index) => index + 1),
     update: { ok: true, hasUpdate: false }, helpOffline: true,
     taskSmokeRequested: true,
+    permissionRuntime: permissionRuntimeEvidence(),
     taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', sha256: 'a'.repeat(64), byteHashMatches: true },
       schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true },
       preview: { automatic: true, contentVerified: true, manualEntryVerified: true },
@@ -46,11 +62,13 @@ function report() {
     checks: ['installed-chinese-renderer', 'skills-default-and-tab-order', 'plugins-tab',
       'connectors-tab', 'github-actionable-setup', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
       'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent',
-      'packaged-skills-and-engineering-entries', 'amap-zotero-actionable-setup', 'autocad-fixed-upstream-entries', 'runtime-task-html-and-daily-schedule']
+      'packaged-skills-and-engineering-entries', 'amap-zotero-actionable-setup', 'autocad-fixed-upstream-entries', 'runtime-task-html-and-daily-schedule', 'installed-runtime-file-permission']
   }
 }
 
 test('isolated ordinary package environment keeps public identity and removes account and updater overrides', () => {
+  assert.match(windowsSmokeWorkspaceName, /\p{Script=Han}/u)
+  assert.ok(windowsSmokeWorkspaceName.includes(' '))
   const root = join('owned-runner-temp', 'ui')
   const result = windowsUiEnvironment({ PATH: 'system', SYSTEMROOT: 'windows', DEEPSEEK_API_KEY: 'secret', GH_TOKEN: 'secret',
     WORKWISE_CANDIDATE: '1', WORKWISE_UPDATE_PROVIDER: 'none', RELEASE_CHANNEL: 'frontier', NODE_OPTIONS: '--require arbitrary' }, root)
@@ -68,8 +86,52 @@ test('Windows Chinese UI evidence requires every actual production surface obser
   for (const check of report().checks) {
     const missing = report()
     missing.checks = missing.checks.filter(value => value !== check)
-    assert.throws(() => validateWindowsUiReport(missing, identity), /Missing actual UI observation/)
+    assert.throws(() => validateWindowsUiReport(missing, identity), check === 'installed-runtime-file-permission'
+      ? /Missing actual installed Runtime permission evidence/ : /Missing actual UI observation/)
   }
+})
+
+test('installed Windows permission acceptance requires every actual OS and grant observation without substituting local or UI claims', () => {
+  const valid = permissionRuntimeEvidence()
+  assert.equal(validateWindowsPermissionRuntimeEvidence(valid), true)
+  assert.throws(() => validateWindowsPermissionRuntimeEvidence(undefined))
+  for (const check of valid.checks) {
+    const missing = structuredClone(valid)
+    missing.checks = missing.checks.filter(item => item !== check)
+    assert.throws(() => validateWindowsPermissionRuntimeEvidence(missing))
+  }
+  for (const [field, value] of [['status', 'failed'], ['platform', 'darwin'], ['actualOsJunction', false], ['installedPackageRuntime', false],
+    ['actualSystemClock', false], ['realModel', true], ['uiAuthorizationClaimed', true], ['productionTouched', true], ['externalModelCalls', 1], ['unexpectedApprovals', 1]]) {
+    assert.throws(() => validateWindowsPermissionRuntimeEvidence({ ...valid, [field]: value }))
+  }
+  for (const [part, field, value] of [['managedArtifact', 'workspaceFiles', 1], ['exportedArtifact', 'sha256', 'b'.repeat(64)],
+    ['exportedArtifact', 'writeReceipts', 0], ['exportedArtifact', 'workspaceWriteException', false], ['junction', 'forbiddenFiles', 1],
+    ['junction', 'changedTargetVerified', false], ['expiry', 'elapsedThroughRealExpiry', false], ['expiry', 'code', 'succeeded'],
+    ['replacedGrant', 'oldPermissionRejected', 'succeeded'], ['revocation', 'taskPaused', false], ['revocation', 'code', 'succeeded']]) {
+    const missing = structuredClone(valid); missing[part][field] = value
+    assert.throws(() => validateWindowsPermissionRuntimeEvidence(missing))
+  }
+  const omitted = report(); delete omitted.permissionRuntime
+  assert.throws(() => validateWindowsUiReport(omitted, identity, { requireTaskExecution: true }))
+})
+
+test('installed permission wrapper uses the exact EXE and packaged Runtime with bounded owned cleanup before business UI actions', () => {
+  const ui = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+  const wrapper = runInstalledWindowsPermissionAcceptance.toString()
+  assert.match(wrapper, /spawn\(executable, \[workerFile\]/)
+  assert.match(wrapper, /ELECTRON_RUN_AS_NODE: '1'/)
+  assert.match(wrapper, /'app\.asar\.unpacked', 'kun', 'dist'/)
+  assert.match(wrapper, /fs\.mkdtemp\(path\.join\(temporaryRoot,/)
+  assert.match(wrapper, /installedPermissionWorker\.toString\(\)/)
+  assert.match(wrapper, /150_000/)
+  assert.match(wrapper, /if \(childExited\) await fs\.rm\(ownedRoot/)
+  assert.doesNotMatch(wrapper, /Date\.now\s*=|setSystemTime|--ignore-certificate-errors/)
+  assert.doesNotThrow(() => new Function(`return (${installedPermissionWorker.toString()})`))
+  const call = ui.indexOf('report.permissionRuntime = await runInstalledWindowsPermissionAcceptance(')
+  assert.ok(call > ui.indexOf('const before = inspectInstalledPackage('))
+  assert.ok(call < ui.indexOf("report.checks.push('installed-chinese-renderer')"))
+  assert.match(ui.slice(call, call + 250), /temporaryRoot: tmpdir\(\)/)
+  assert.match(ui.slice(call, call + 400), /validateWindowsPermissionRuntimeEvidence\(report\.permissionRuntime\)/)
 })
 
 for (const [label, mutate] of [
@@ -77,6 +139,7 @@ for (const [label, mutate] of [
   ['changed package', value => { value.packageUnchanged = false }],
   ['forced cleanup', value => { value.cleanExit = false }],
   ['wrong locale', value => { value.locale = 'en' }],
+  ['workspace missing the required Chinese and space path', value => { value.workspaceRoot = 'D:\\owned\\workspace' }],
   ['old tab order', value => { value.tabs = ['连接器', '技能', '插件'] }],
   ['incomplete manual', value => { value.chapters.pop() }],
   ['network-only help', value => { value.helpOffline = false }],
@@ -447,15 +510,16 @@ test('fixture approval review rejects altered actual targets, inputs, origins, t
     const { browserApprovalSummary, browserScheduleApprovalSummary } = await import(pathToFileURL(output).href)
     const origin = new URL(fixture.fixtureUrl).origin
     const prompt = '合成组件测试：本地公开查询，每天09:00和17:00前提前30分钟执行。'
-    const workspace = join(root, 'workspace')
+    const workspace = join(root, windowsSmokeWorkspaceName)
     const makeSummary = (action, change = {}) => browserApprovalSummary({ action, origin, targetHtml: action === 'fill' ? fixture.inputHtml : fixture.buttonHtml,
       value: action === 'fill' ? fixture.query : undefined, requestHash: 'a'.repeat(64), schedule: { purpose: prompt,
         requirement: { kind: 'daily', times: ['09:00', '17:00'], leadMinutes: 30, timezone: 'Asia/Shanghai' }, browserLabel: '合成组件浏览器', version: 'b'.repeat(64) }, ...change })
     const thread = { turns: [{ items: ['fill', 'click'].map(action => ({ kind: 'tool_result', callId: `smoke-read-${action}-target`, isError: false,
       output: { sourceUrl: fixture.fixtureUrl, html: action === 'fill' ? fixture.inputHtml : fixture.buttonHtml } })) }] }
     const options = { fixture, prompt, workspace, browserLabel: '合成组件浏览器', thread, index: 0 }
-    const approval = { approvalId: 'synthetic-review', toolName: 'browser_authorize_action', status: 'pending', summary: makeSummary('fill') }
+    const approval = { approvalId: 'synthetic-review', toolName: 'browser_authorize_action', requestHash: 'a'.repeat(64), status: 'pending', summary: makeSummary('fill') }
     assert.equal(reviewWindowsFixtureApproval(approval, options).scope, 'schedule')
+    assert.throws(() => reviewWindowsFixtureApproval({ ...approval, requestHash: 'd'.repeat(64) }, options))
     for (const change of [{ origin: 'https://unreviewed.example.test' }, { value: fixture.query + '扩大' }, { targetHtml: '<input type="password" aria-label="合成公告关键词">' }, { schedule: undefined }]) {
       assert.throws(() => reviewWindowsFixtureApproval({ ...approval, summary: makeSummary('fill', change) }, options))
     }
@@ -470,7 +534,7 @@ test('fixture approval review rejects altered actual targets, inputs, origins, t
     assert.equal(reviewWindowsFixtureApproval(click, { ...options, index: 1 }).action, 'click')
     const planSummary = browserScheduleApprovalSummary({ purpose: prompt, times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', readPaths: [workspace], writePaths: [],
       origins: [origin], browserLabel: options.browserLabel, actions: [{ summary: approval.summary }, { summary: click.summary }], scopeHash: 'c'.repeat(64) })
-    const plan = { ...approval, toolName: 'schedule_task', summary: planSummary }
+    const plan = { ...approval, toolName: 'schedule_task', requestHash: 'c'.repeat(64), summary: planSummary }
     assert.equal(reviewWindowsFixtureApproval(plan, { ...options, index: 2 }).toolName, 'schedule_task')
     assert.throws(() => reviewWindowsFixtureApproval(plan, { ...options, index: 3 }))
     assert.throws(() => reviewWindowsFixtureApproval(plan, { ...options, index: 2, workspace: join(root, 'other') }))
@@ -479,32 +543,98 @@ test('fixture approval review rejects altered actual targets, inputs, origins, t
   } finally { await fixture.close(); await rm(root, { recursive: true, force: true }) }
 })
 
-test('UI approval targeting selects exactly the reviewed visible fields and never an unrelated or ambiguous allow card', async () => {
+test('UI approval targeting requires the mounted task workspace, actual Chinese allow label and original technical summary', async () => {
   const { Window } = await import('happy-dom')
   const window = new Window()
   try {
     // DOM component contract only. Actual approvals must later be clicked in the exact packaged Windows application.
     const values = ['合成站点', '精确合成输入', '08:30、16:30']
-    const card = entries => `<div><section><dl>${entries.map(value => `<dd>${value}</dd>`).join('')}</dl></section><div><button>允许</button></div></div>`
-    window.document.body.innerHTML = card(['其他站点', ...values.slice(1)]) + card(values)
-    for (const node of window.document.querySelectorAll('button')) node.getClientRects = () => [{}]
+    const originalSummary = '确认浏览器操作\n请求摘要 "original-request"'
+    const zh = JSON.parse(readFileSync(new URL('../src/renderer/src/locales/zh/common.json', import.meta.url), 'utf8'))
+    assert.equal(zh.taskWorkspaceAllow, '允许此操作')
+    const card = (entries, text = zh.taskWorkspaceAllow) => `<div><section><dl>${entries.map(value => `<dd>${value}</dd>`).join('')}</dl><details><summary>原始技术详情</summary><pre>${originalSummary}</pre></details></section><div><button>${text}</button></div></div>`
+    const cards = card(['其他站点', ...values.slice(1)]) + card(values)
+    window.document.body.innerHTML = cards
+    assert.equal(window.eval(windowsFixtureApprovalUiExpression(values, originalSummary)), null, 'A chat screen without the task card cannot satisfy this review')
+    window.document.body.innerHTML = `<article aria-label="任务详情">${cards}</article>`
+    for (const node of window.document.querySelectorAll('button, summary, article')) {
+      node.getClientRects = () => [{}]
+      node.scrollIntoView = () => undefined
+      node.getBoundingClientRect = () => ({ x: 10, y: 20, width: 20, height: 10 })
+    }
     const button = window.document.querySelectorAll('button')[1]
-    button.scrollIntoView = () => undefined
-    button.getBoundingClientRect = () => ({ x: 10, y: 20, width: 20, height: 10 })
+    const details = button.parentElement.parentElement.querySelector('details')
+    const summary = details.querySelector('summary')
+    window.document.elementFromPoint = () => summary
+    assert.deepEqual(JSON.parse(JSON.stringify(window.eval(windowsFixtureApprovalUiExpression(values, originalSummary, { openDetails: true })))), { x: 20, y: 25 })
+    assert.equal(window.eval(windowsFixtureApprovalUiExpression(values, originalSummary)), null, 'Collapsed technical evidence cannot verify the request')
+    details.open = true
     window.document.elementFromPoint = () => button
-    const expression = windowsFixtureApprovalUiExpression(values)
+    const expression = windowsFixtureApprovalUiExpression(values, originalSummary)
     assert.deepEqual(JSON.parse(JSON.stringify(window.eval(expression))), { x: 20, y: 25 })
-    assert.equal(window.eval(windowsFixtureApprovalUiExpression(['无关扩大输入'])), null)
-    window.document.body.insertAdjacentHTML('beforeend', card(values))
+    assert.equal(window.eval(windowsFixtureApprovalUiExpression(values, originalSummary + ' changed')), null)
+    details.open = false
+    assert.deepEqual(JSON.parse(JSON.stringify(window.eval(windowsFixtureApprovalUiExpression(values, originalSummary, { businessOnly: true })))), { x: 20, y: 25 })
+    assert.equal(window.eval(expression), null, 'The business-only observation must never replace original-summary verification before clicking')
+    details.open = true
+    assert.equal(window.eval(windowsFixtureApprovalUiExpression(['无关扩大输入'], originalSummary)), null)
+    button.textContent = '允许'
+    assert.equal(window.eval(expression), null, 'The obsolete chat approval label must not match the task control')
+    button.textContent = zh.taskWorkspaceAllow
+    window.document.querySelector('article').insertAdjacentHTML('beforeend', card(values))
     window.document.querySelectorAll('button')[2].getClientRects = () => [{}]
     assert.equal(window.eval(expression), null)
   } finally { await window.happyDOM.close() }
 })
 
+test('the production gate, repository projection and inbox route expose pending task approval payloads without transcript approval items', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-inbox-contract-'))
+  try {
+    const output = join(root, 'production-inbox.cjs')
+    await build({ stdin: { contents: `export { TaskRunRepository } from './kun/src/services/task-run-repository.ts'; export { PersistentApprovalGate } from './kun/src/adapters/persistent-human-gates.ts'; export { getTaskInbox } from './kun/src/server/routes/tasks.ts';`,
+      resolveDir: fileURLToPath(new URL('..', import.meta.url)), loader: 'ts' }, outfile: output, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent' })
+    const { TaskRunRepository, PersistentApprovalGate, getTaskInbox } = createRequire(import.meta.url)(output)
+    // Persistence is an in-memory SQL facade; production saveHumanRequest,
+    // putAttention, inbox serialization and HTTP response code run unchanged.
+    const human = new Map(), attention = new Map()
+    const task = { id: 'synthetic-task', threadId: 'synthetic-worker', activeTurnId: 'synthetic-turn', status: 'running', revision: 1 }
+    const repository = Object.create(TaskRunRepository.prototype)
+    repository.changeListeners = new Set()
+    repository.db = { prepare(sql) { return {
+      get(id) { const value = human.get(id); return value ? { data_json: value } : undefined },
+      run(id, ...args) { if (sql.startsWith('INSERT INTO human_requests')) human.set(id, args[0]); else if (sql.startsWith('INSERT INTO inbox_items')) attention.set(id, args.at(-1)); else throw new Error(`Unexpected synthetic SQL: ${sql}`) },
+      all() { return [...(sql.includes('FROM inbox_items') ? attention : human).values()].map(data_json => ({ data_json })) }
+    } } }
+    repository.transaction = operation => operation()
+    repository.findActiveByThread = id => id === task.threadId ? task : null
+    repository.update = (_id, _revision, update) => Object.assign(task, update(task))
+    const gate = new PersistentApprovalGate(repository, () => '2026-11-13T00:00:00Z')
+    const approval = { id: 'synthetic-request', threadId: task.threadId, turnId: task.activeTurnId, toolName: 'browser_authorize_action',
+      summary: '原始合成审批摘要', requestHash: 'a'.repeat(64), status: 'pending', createdAt: '2026-11-13T00:00:00Z' }
+    void gate.request(approval)
+    const thread = { turns: [{ id: task.activeTurnId, items: [] }] }
+    assert.equal(thread.turns.flatMap(turn => turn.items).filter(item => item.kind === 'approval').length, 0)
+    const response = getTaskInbox({ taskRepository: repository }, new Request('http://synthetic/v1/inbox'))
+    const inbox = JSON.parse(response.body)
+    const [pending] = windowsFixturePendingApprovals(inbox, task)
+    assert.equal(pending.approvalId, approval.id)
+    assert.equal(pending.summary, approval.summary)
+    assert.equal(pending.requestHash, approval.requestHash)
+    for (const change of [{ taskId: 'other' }, { ownerId: 'other' }, { threadId: 'other' }, { requestId: 'other' }, { message: 'changed' },
+      { payload: { approval: { ...approval, turnId: 'other' } } }]) assert.throws(() => windowsFixturePendingApprovals([{ ...inbox[0], ...change }], task))
+    assert.throws(() => windowsFixturePendingApprovals([inbox[0], inbox[0]], task))
+    assert.equal(windowsFixtureApprovalResolution([], pending, task.id), undefined)
+    const resolution = { taskId: task.id, kind: 'approval_resolution', sourceId: approval.id, text: JSON.stringify({ request: approval.summary, resolution: { decision: 'allow' } }) }
+    assert.equal(windowsFixtureApprovalResolution([resolution], pending, task.id).status, 'allowed')
+    assert.throws(() => windowsFixtureApprovalResolution([{ ...resolution, text: JSON.stringify({ request: 'changed', resolution: { decision: 'allow' } }) }], pending, task.id))
+    assert.throws(() => windowsFixtureApprovalResolution([{ ...resolution, text: JSON.stringify({ request: approval.summary, resolution: { decision: 'deny' } }) }], pending, task.id))
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test('scheduled query validation requires source UI reviews and independent derived authority without extra due approvals', () => {
   // Synthetic validator input; never emitted as actual business evidence.
   const query = { domReadbackVerified: true, htmlReadbackVerified: true, actions: 2, unknownOutcomes: 0, accountState: 'unknown', access: 'public_query' }
-  const evidence = { browserSkill: { publicQuery: { ...query, uiApprovals: ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'].map(toolName => ({ toolName, status: 'allowed', uiFieldsVerified: true })), persistentActionAuthorizations: 2 } },
+  const evidence = { browserSkill: { publicQuery: { ...query, uiApprovals: ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'].map(toolName => ({ toolName, status: 'allowed', uiFieldsVerified: true, businessCardDisplayedVerified: true, originalSummaryVerified: true, cardDisplayedVerified: true, buttonOperableVerified: true })), persistentActionAuthorizations: 2 } },
     dueOccurrence: { publicQuery: { ...query, addedApprovals: 0, derivedActionAuthorizations: 2, publishedPlanVersionVerified: true, enabledPlanVerified: true, shortAuthorizationVerified: true } } }
   assert.doesNotThrow(() => validateWindowsScheduledQueryEvidence(evidence))
   for (const [field, value] of [['addedApprovals', 1], ['derivedActionAuthorizations', 0], ['publishedPlanVersionVerified', false], ['enabledPlanVerified', false], ['shortAuthorizationVerified', false], ['unknownOutcomes', 1], ['domReadbackVerified', false], ['htmlReadbackVerified', false]]) {
@@ -515,6 +645,11 @@ test('scheduled query validation requires source UI reviews and independent deri
   const noReview = structuredClone(evidence)
   noReview.browserSkill.publicQuery.uiApprovals.pop()
   assert.throws(() => validateWindowsScheduledQueryEvidence(noReview))
+  for (const field of ['businessCardDisplayedVerified', 'originalSummaryVerified', 'cardDisplayedVerified', 'buttonOperableVerified']) {
+    const missing = structuredClone(evidence)
+    missing.browserSkill.publicQuery.uiApprovals[0][field] = false
+    assert.throws(() => validateWindowsScheduledQueryEvidence(missing))
+  }
 })
 
 test('failed task evidence retains status and codes without exporting prompts, arguments or tool content', () => {

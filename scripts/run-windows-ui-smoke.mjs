@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
 import { createServer } from 'node:net'
 import { createServer as createHttpServer } from 'node:http'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
@@ -12,6 +13,7 @@ import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
+export const windowsSmokeWorkspaceName = '中文 验收工作区'
 const requiredChecks = [
   'installed-chinese-renderer', 'skills-default-and-tab-order', 'plugins-tab',
   'connectors-tab', 'github-actionable-setup', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
@@ -151,6 +153,7 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.version, identity.version)
   assert.equal(report.locale, 'zh')
   assert.equal(report.theme, 'dark')
+  assert.equal(report.workspaceRoot?.split(/[\\/]/).at(-1), windowsSmokeWorkspaceName)
   assert.equal(report.productionTouched, false)
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
@@ -162,6 +165,8 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.helpOffline, true)
   if (requireTaskExecution || report.taskSmokeRequested) {
     assert.equal(report.taskSmokeRequested, true)
+    validateWindowsPermissionRuntimeEvidence(report.permissionRuntime)
+    assert.ok(report.checks.includes('installed-runtime-file-permission'), 'Missing actual installed Runtime permission evidence')
     validateWindowsTaskEvidence(report.taskExecution)
     assert.ok(report.checks.includes('runtime-task-html-and-daily-schedule'), 'Missing actual UI observation: runtime-task-html-and-daily-schedule')
   }
@@ -200,6 +205,41 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.equal(item.dependenciesVisible, true)
     assert.equal(item.licenseNoticeVisible, true)
   }
+  return true
+}
+
+export function validateWindowsPermissionRuntimeEvidence(evidence) {
+  assert.ok(evidence, 'The exact installed Windows Runtime permission evidence is required')
+  assert.equal(evidence.schemaVersion, 1)
+  assert.equal(evidence.scope, 'compiled-runtime-owned-file-permission')
+  assert.equal(evidence.status, 'passed')
+  assert.equal(evidence.platform, 'win32')
+  for (const field of ['actualSystemClock', 'actualOsJunction', 'installedPackageRuntime']) assert.equal(evidence[field], true)
+  for (const field of ['realModel', 'uiAuthorizationClaimed', 'productionTouched']) assert.equal(evidence[field], false)
+  assert.equal(evidence.externalModelCalls, 0)
+  assert.equal(evidence.unexpectedApprovals, 0)
+  assert.deepEqual(evidence.checks, ['read-only-chinese-space-workspace-managed-artifact', 'explicit-task-grant-exports-to-chinese-space-directory',
+    'changed-os-junction-cannot-reuse-original-task-path-grant', 'real-expiry-blocks-captured-old-execution-grant',
+    'replacement-does-not-revive-the-old-immutable-grant', 'http-revocation-invalidates-captured-live-grant'])
+  assert.equal(evidence.managedArtifact.validated, true)
+  assert.equal(evidence.managedArtifact.workspaceFiles, 0)
+  assert.match(evidence.managedArtifact.sha256, /^[a-f0-9]{64}$/)
+  assert.equal(evidence.exportedArtifact.matchedInputHtml, true)
+  assert.equal(evidence.exportedArtifact.sha256, evidence.managedArtifact.sha256)
+  assert.equal(evidence.exportedArtifact.file, '指定 中文导出/验收 报告.html')
+  assert.equal(evidence.exportedArtifact.workspaceTrust, 'read-only')
+  assert.equal(evidence.exportedArtifact.sandboxMode, 'workspace-write')
+  assert.equal(evidence.exportedArtifact.workspaceWriteException, true)
+  assert.equal(evidence.exportedArtifact.writeReceipts, 1)
+  assert.equal(evidence.junction.initialTargetVerified, true)
+  assert.equal(evidence.junction.changedTargetVerified, true)
+  assert.equal(evidence.junction.forbiddenFiles, 0)
+  assert.equal(evidence.junction.code, 'workspace_path_blocked')
+  assert.equal(evidence.expiry.elapsedThroughRealExpiry, true)
+  assert.ok(['task_permission_expired', 'execution_grant_expired'].includes(evidence.expiry.code))
+  assert.ok(['task_permission_revoked', 'execution_grant_expired'].includes(evidence.replacedGrant.oldPermissionRejected))
+  assert.equal(evidence.revocation.taskPaused, true)
+  assert.equal(evidence.revocation.code, 'task_permission_revoked')
   return true
 }
 
@@ -384,6 +424,7 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
   const { header, fields } = fixtureSummaryFields(approval.summary)
   const origin = new URL(fixture.fixtureUrl).origin
   assert.equal(approval.status, 'pending')
+  assert.match(approval.requestHash, /^[a-f0-9]{64}$/)
   assert.equal(fields.计划目的, prompt)
   assert.equal(fields.执行时刻, '08:30、16:30')
   assert.equal(fields.时区, 'Asia/Shanghai')
@@ -409,6 +450,7 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
     assert.equal(fields.输入摘要, createHash('sha256').update(fields.输入内容).digest('hex'))
     assert.equal(fields.目标摘要, createHash('sha256').update(targetHtml).digest('hex'))
     assert.match(fields.请求摘要, /^[a-f0-9]{64}$/)
+    assert.equal(fields.请求摘要, approval.requestHash, 'The exact pending request must own this reviewed summary')
     assert.equal(fields.授权期限, '持续到计划停用或授权撤销')
     assert.match(fields.操作说明, /^持续授权仅覆盖这里列出的站点、真实元素和精确输入。/)
     uiNames = ['站点', '动作', '目标', '输入内容', '授权期限', '操作说明', '计划目的', '执行时刻', '时区', '浏览器', '账号状态']
@@ -425,21 +467,66 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
     const blocks = fields.网页动作.split('\n\n').map(block => block.replace(/^\d+\. /, ''))
     assert.deepEqual(blocks.sort(), actions.map(block => block.replace(/^\d+\. /, '')).sort())
     assert.equal(fields.授权期限, '持续到计划停用或原授权撤销')
+    assert.equal(fields.授权版本, approval.requestHash, 'The plan request must bind its reviewed scope version')
     assert.match(fields.操作说明, /^每次执行核对原计划版本、浏览器与有限动作范围。/)
     uiNames = ['计划目的', '执行时刻', '时区', '读取路径', '写入路径', '站点', '网页动作', '浏览器', '账号状态', '授权期限', '操作说明']
   }
   return { approvalId: approval.approvalId, toolName: approval.toolName, action, scope: 'schedule',
+    requestHash: approval.requestHash,
     summarySha256: createHash('sha256').update(approval.summary).digest('hex'), targetSha256: fields.目标摘要,
     uiValues: uiNames.map(name => fields[name] || '无输入') }
 }
 
-export function windowsFixtureApprovalUiExpression(values) {
+/** Pending task decisions live in the durable inbox, not in transcript TurnItems. */
+export function windowsFixturePendingApprovals(inbox, task) {
+  assert.ok(Array.isArray(inbox), 'The actual inbox API must return an array')
+  const candidates = inbox.filter(item => item.kind === 'approval' && item.status === 'pending' &&
+    (item.taskId === task.id || item.ownerId === task.id || item.threadId === task.threadId))
+  assert.ok(candidates.length <= 1, 'Only one reviewed fixture approval may be pending at once')
+  return candidates.map(item => {
+    assert.equal(item.ownerKind, 'task')
+    assert.equal(item.ownerId, task.id)
+    assert.equal(item.taskId, task.id)
+    assert.equal(item.threadId, task.threadId)
+    const approval = item.payload?.approval
+    assert.ok(approval, 'The original pending approval payload is required')
+    assert.equal(item.id, item.requestId)
+    assert.equal(approval.id, item.requestId)
+    assert.equal(approval.threadId, task.threadId)
+    assert.equal(approval.turnId, task.activeTurnId)
+    assert.equal(approval.status, 'pending')
+    assert.equal(item.message, approval.summary)
+    return { ...approval, approvalId: approval.id }
+  })
+}
+
+export function windowsFixtureApprovalResolution(inputs, approval, taskId) {
+  assert.ok(Array.isArray(inputs), 'The actual task inputs API must return an array')
+  const matching = inputs.filter(item => item.kind === 'approval_resolution' && item.sourceId === approval.approvalId)
+  assert.ok(matching.length <= 1, 'The original approval must have exactly one durable resolution')
+  if (!matching.length) return undefined
+  assert.equal(matching[0].taskId, taskId)
+  const saved = JSON.parse(matching[0].text)
+  assert.equal(saved.request, approval.summary, 'The UI must resolve the original reviewed request')
+  assert.equal(saved.resolution?.decision, 'allow', 'The actual UI must allow this exact approval')
+  return { status: 'allowed' }
+}
+
+export function windowsFixtureApprovalUiExpression(values, summary, { openDetails = false, businessOnly = false } = {}) {
   return `(() => {
-    const candidates = Array.from(document.querySelectorAll('button')).filter(button => button.textContent.trim()==='允许' && !button.disabled && button.getClientRects().length)
+    const detail = document.querySelector('article[aria-label="任务详情"]');
+    if(!detail || !detail.getClientRects().length)return null;
+    const candidates = Array.from(detail.querySelectorAll('button')).filter(button => button.textContent.trim()==='允许此操作' && !button.disabled && button.getClientRects().length)
       .map(button => ({button,root:button.parentElement?.parentElement})).filter(({root}) => root?.querySelector('section dl'))
       .filter(({root}) => JSON.stringify(Array.from(root.querySelectorAll('dl dd')).map(node=>node.textContent))===${JSON.stringify(JSON.stringify(values))});
     if(candidates.length!==1)return null;
-    const {button}=candidates[0];button.scrollIntoView({block:'center'});
+    const {button:allow,root}=candidates[0];
+    const technical=root.querySelector('section details');
+    const button=${openDetails ? "technical && !technical.open ? technical.querySelector('summary') : null" : 'allow'};
+    if(!button || !button.getClientRects().length)return null;
+    ${openDetails || businessOnly ? '' : `if(!technical?.open || root.querySelector('section pre')?.textContent!==${JSON.stringify(summary)})return null;`}
+    ${businessOnly ? 'if(technical?.open)return null;' : ''}
+    button.scrollIntoView({block:'center'});
     const box=button.getBoundingClientRect();const point={x:box.x+box.width/2,y:box.y+box.height/2};
     if(!button.contains(document.elementFromPoint(point.x,point.y)))return null;
     return point;
@@ -459,7 +546,7 @@ export function validateWindowsScheduledQueryEvidence(evidence) {
   }
   assert.equal(source.uiApprovals.length, 3)
   assert.deepEqual(source.uiApprovals.map(item => item.toolName), ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'])
-  assert.ok(source.uiApprovals.every(item => item.uiFieldsVerified && item.status === 'allowed'))
+  assert.ok(source.uiApprovals.every(item => item.uiFieldsVerified && item.businessCardDisplayedVerified && item.originalSummaryVerified && item.cardDisplayedVerified && item.buttonOperableVerified && item.status === 'allowed'))
   assert.equal(source.persistentActionAuthorizations, 2)
   assert.equal(due.addedApprovals, 0)
   assert.equal(due.derivedActionAuthorizations, 2)
@@ -720,6 +807,252 @@ async function installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeReq
     originThreadId, installationAuthorization: 'explicit-acceptance-in-owned-synthetic-profile' }
 }
 
+/** Package-external acceptance helper. No production patch, keys, app profile or external network. */
+export async function installedPermissionWorker({ moduleRoot, ownedRoot, requireWindows = true }) {
+  const assert = (await import('node:assert/strict')).default
+  const fs = await import('node:fs/promises')
+  const path = await import('node:path')
+  const { pathToFileURL } = await import('node:url')
+  const { createServer } = await import('node:http')
+  const { createHash, randomUUID } = await import('node:crypto')
+  if (requireWindows) assert.equal(process.platform, 'win32')
+  const load = relative => import(pathToFileURL(path.join(moduleRoot, relative)).href)
+  const [{ createKunServeRuntime }, { KunCapabilitiesConfig }, { buildRouter }, { startNodeHttpServer }] = await Promise.all([
+    load('server/runtime-factory.js'), load('contracts/capabilities.js'), load('server/routes/index.js'), load('server/node-http-server.js')
+  ])
+  const root = await fs.realpath(ownedRoot)
+  const workspace = path.join(root, '只读 工作区')
+  const destination = path.join(root, '指定 中文导出')
+  const forbidden = path.join(root, '禁止写入 目标')
+  const link = path.join(destination, '导出 目录联接')
+  const initialLinkTarget = path.join(destination, '联接 初始目标')
+  await Promise.all([workspace, destination, forbidden].map(value => fs.mkdir(value)))
+  await fs.mkdir(initialLinkTarget)
+  await fs.symlink(initialLinkTarget, link, process.platform === 'win32' ? 'junction' : 'dir')
+  assert.equal(await fs.realpath(link), await fs.realpath(initialLinkTarget))
+  const exportFile = path.join(destination, '验收 报告.html')
+  const html = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>权限验收报告</title></head><body><h1>权限验收合成资料</h1><p>仅用于本机文件范围验证。</p></body></html>'
+  const sha = value => createHash('sha256').update(value).digest('hex')
+  let exportContent = html
+  const token = randomUUID()
+  let modelRequests = 0, unexpectedApprovals = 0, runtime, transport
+  const held = new Set()
+  const model = createServer(async (request, response) => {
+    try {
+      const chunks = []; for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      modelRequests++
+      const text = body.messages.map(item => typeof item.content === 'string' ? item.content : '').join('\n')
+      const exporting = text.includes('权限验收导出')
+      const toolName = exporting ? 'write' : 'publish_artifact'
+      const called = body.messages.some(item => item.tool_calls?.some(call => call.function.name === toolName))
+      if (exporting && called) {
+        response.writeHead(200, { 'content-type': 'text/event-stream' })
+        response.write(': owned acceptance holds before the final answer\n\n')
+        held.add(response); response.on('close', () => held.delete(response)); return
+      }
+      const delta = called ? { content: '合成报告已保存到本任务成果并核验。' } : { tool_calls: [{ index: 0, id: `permission-${toolName}`, type: 'function', function: {
+        name: toolName, arguments: JSON.stringify({ path: exporting ? exportFile : '权限验收报告.html', content: exporting ? exportContent : html })
+      } }] }
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(`data: ${JSON.stringify({ id: `permission-fixture-${modelRequests}`, choices: [{ index: 0, delta, finish_reason: called ? 'stop' : 'tool_calls' }] })}\n\ndata: [DONE]\n\n`)
+    } catch (error) { response.writeHead(500); response.end(String(error.message)) }
+  })
+  await new Promise(done => model.listen(0, '127.0.0.1', done))
+  const poll = async (read, label, timeout = 20_000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) { const result = await read(); if (result) return result; await new Promise(done => setTimeout(done, 50)) }
+    throw new Error(`Permission acceptance timed out: ${label}`)
+  }
+  const exists = file => fs.stat(file).then(() => true, () => false)
+  const report = { schemaVersion: 1, status: 'running', scope: 'compiled-runtime-owned-file-permission', platform: process.platform,
+    actualSystemClock: true, actualOsJunction: process.platform === 'win32', realModel: false, uiAuthorizationClaimed: false, productionTouched: false, checks: [] }
+  try {
+    // Default workspace trust is read-only. The Agent/sandbox can accept a finite task exception.
+    runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: path.join(root, 'runtime'), workspaceTrustPath: path.join(root, 'owned-workspace-trust.json'),
+      runtimeToken: token, apiKey: 'synthetic-local-only', baseUrl: `http://127.0.0.1:${model.address().port}/v1`, endpointFormat: 'chat_completions',
+      model: 'permission-fixture', approvalPolicy: 'auto', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false,
+      storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({}) })
+    transport = await startNodeHttpServer({ router: buildRouter(runtime), host: '127.0.0.1', port: 0 })
+    const api = async (suffix, method = 'GET', body, expected = 200) => {
+      const response = await fetch(`http://127.0.0.1:${transport.port}${suffix}`, { method, headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(15_000) })
+      const value = await response.json()
+      assert.equal(response.status, expected, JSON.stringify({ suffix, status: response.status, code: value.code, message: value.message }))
+      return value
+    }
+    const origin = await runtime.threadService.create({ workspace, mode: 'agent', model: 'permission-fixture' })
+    const managed = await api('/v1/task-commands', 'POST', { threadId: origin.id, intent: 'new', idempotencyKey: 'managed-report', request: { prompt: '生成一份 HTML 网页报告，报告写入本任务成果。' } }, 202)
+    assert.ok(managed.task?.id)
+    const managedTask = await poll(() => { const task = runtime.taskRepository.get(managed.task.id); return task?.status === 'completed' && task }, 'managed artifact completion')
+    const artifact = managedTask.artifacts.find(item => item.format === 'html')
+    assert.ok(artifact?.absolutePath)
+    const actualHtml = await fs.readFile(artifact.absolutePath, 'utf8')
+    assert.ok(actualHtml.includes('权限验收合成资料'))
+    exportContent = actualHtml
+    assert.equal((await fs.readdir(workspace)).length, 0)
+    await api(`/v1/tasks/${managedTask.id}/artifacts/${artifact.id}/proof`)
+    report.managedArtifact = { taskId: managedTask.id, sha256: sha(actualHtml), validated: artifact.validation === 'valid', workspaceFiles: 0 }
+    assert.equal(report.managedArtifact.validated, true)
+    report.checks.push('read-only-chinese-space-workspace-managed-artifact')
+
+    const beforeBlocked = modelRequests
+    const command = { threadId: origin.id, intent: 'new', idempotencyKey: 'export-report', request: { prompt: `权限验收导出：请将 HTML 报告保存到 "${exportFile}"。` } }
+    const blocked = await api('/v1/task-commands', 'POST', command, 202)
+    assert.equal(blocked.kind, 'capability_required')
+    assert.equal(blocked.capability?.errorCode, 'workspace_path_blocked')
+    assert.equal(modelRequests, beforeBlocked)
+    const taskId = blocked.task.id
+    const getTask = () => runtime.taskRepository.get(taskId)
+    const snapshot = await api(`/v1/tasks/${taskId}/permissions`)
+    assert.equal(snapshot.workspaceTrust, 'read-only')
+    assert.equal(snapshot.canWritePaths, true)
+    const granted = await api(`/v1/tasks/${taskId}/permissions`, 'POST', { expectedRevision: snapshot.taskRevision, scopeHash: snapshot.scopeHash,
+      idempotencyKey: 'allow-export-for-60-seconds', confirmed: true, approvalPolicy: 'on-request', ttlSeconds: 60, duration: 'task', scope: { readPaths: [workspace], writePaths: [destination] } })
+    assert.equal(granted.resumed, false)
+    assert.equal(modelRequests, beforeBlocked)
+    assert.deepEqual(granted.permission.grant.scope.writePaths, [await fs.realpath(destination)])
+    const permissionId = granted.permission.grant.id
+    const resume = await api(`/v1/tasks/${taskId}/resume`, 'POST', { expectedRevision: getTask().revision, idempotencyKey: 'run-export' }, 202)
+    assert.ok(resume.turn?.turnId)
+    await poll(() => exists(exportFile), 'actual exported file')
+    assert.equal(await fs.readFile(exportFile, 'utf8'), actualHtml)
+    const turn = (await runtime.threadService.get(getTask().threadId)).turns.find(item => item.id === resume.turn.turnId)
+    const grant = turn.executionGrant
+    assert.equal(grant.taskPermissionId, permissionId)
+    assert.equal(grant.workspaceTrust, 'read-only')
+    assert.equal(grant.workspaceWriteException, true)
+    assert.equal(grant.sandboxMode, 'workspace-write')
+    assert.deepEqual(grant.writePathAllowlist, [await fs.realpath(destination)])
+    const successfulWrites = await poll(() => { const receipts = runtime.taskRepository.operations(taskId, 'tool').filter(receipt => receipt.request.toolName === 'write' && receipt.status === 'succeeded'); return receipts.length && receipts }, 'committed successful write receipt')
+    assert.equal(successfulWrites.length, 1)
+    report.exportedArtifact = { taskId, file: '指定 中文导出/验收 报告.html', sha256: sha(await fs.readFile(exportFile)), matchedInputHtml: true,
+      grantId: grant.id, taskPermissionId: permissionId, workspaceTrust: grant.workspaceTrust, sandboxMode: grant.sandboxMode, workspaceWriteException: true, writeReceipts: 1 }
+    report.checks.push('explicit-task-grant-exports-to-chinese-space-directory')
+
+    await api(`/v1/tasks/${taskId}/pause`, 'POST', { expectedRevision: getTask().revision, idempotencyKey: 'pause-after-file-settled' })
+    await poll(() => held.size === 0, 'held local model interrupted')
+    const negativeWrite = async (capturedGrant, file, expectedCodes) => {
+      let result
+      try {
+        result = await runtime.toolHost.execute({ callId: `negative-${randomUUID()}`, toolName: 'write', arguments: { path: file, content: 'MUST NOT BE WRITTEN' } }, {
+          threadId: getTask().threadId, turnId: capturedGrant.turnId, workspace, threadMode: 'agent', approvalPolicy: capturedGrant.approvalPolicy,
+          sandboxMode: capturedGrant.sandboxMode, executionGrant: capturedGrant, abortSignal: new AbortController().signal,
+          awaitApproval: async () => { unexpectedApprovals++; throw new Error('No approval is allowed for negative writes') },
+          validateExecutionGrant: async () => { await runtime.taskPermissionService.executionRestriction(getTask().threadId, capturedGrant.taskPermissionId) }
+        })
+      } catch (error) { result = { item: { isError: true, output: { code: error.code ?? error.message } } } }
+      assert.equal(result.item.isError, true)
+      assert.ok(expectedCodes.includes(result.item.output?.code), JSON.stringify(result.item))
+      assert.equal(await exists(file), false)
+      return result.item.output.code
+    }
+    assert.equal((await fs.lstat(link)).isSymbolicLink(), true)
+    await fs.unlink(link)
+    await fs.symlink(forbidden, link, process.platform === 'win32' ? 'junction' : 'dir')
+    assert.equal(await fs.realpath(link), await fs.realpath(forbidden))
+    report.junction = { initialTargetVerified: true, changedTargetVerified: true,
+      code: await negativeWrite(grant, path.join(link, '越界.html'), ['workspace_path_blocked']), forbiddenFiles: (await fs.readdir(forbidden)).length }
+    assert.equal(report.junction.forbiddenFiles, 0)
+    report.checks.push('changed-os-junction-cannot-reuse-original-task-path-grant')
+    await fs.unlink(link)
+    await fs.symlink(initialLinkTarget, link, process.platform === 'win32' ? 'junction' : 'dir')
+
+    // Exercise the actual minimum TTL without changing system time or production clock functions.
+    const delay = Math.max(0, Date.parse(granted.permission.grant.expiresAt) - Date.now() + 100)
+    if (delay) await new Promise(done => setTimeout(done, delay))
+    report.expiry = { elapsedThroughRealExpiry: Date.now() >= Date.parse(granted.permission.grant.expiresAt),
+      code: await negativeWrite(grant, path.join(destination, '过期.html'), ['task_permission_expired', 'execution_grant_expired']) }
+    report.checks.push('real-expiry-blocks-captured-old-execution-grant')
+
+    const replacementSnapshot = await api(`/v1/tasks/${taskId}/permissions`)
+    const replaced = await api(`/v1/tasks/${taskId}/permissions`, 'POST', { expectedRevision: replacementSnapshot.taskRevision, scopeHash: replacementSnapshot.scopeHash,
+      idempotencyKey: 'replace-expired-export-scope', confirmed: true, approvalPolicy: 'on-request', ttlSeconds: 900, duration: 'task', scope: { readPaths: [workspace], writePaths: [destination] } })
+    assert.notEqual(replaced.permission.grant.id, permissionId)
+    report.replacedGrant = { oldPermissionRejected: await negativeWrite(grant, path.join(destination, '旧授权.html'), ['task_permission_revoked', 'execution_grant_expired']) }
+    report.checks.push('replacement-does-not-revive-the-old-immutable-grant')
+    const resumedAgain = await api(`/v1/tasks/${taskId}/resume`, 'POST', { expectedRevision: getTask().revision, idempotencyKey: 'capture-replacement-grant' }, 202)
+    await poll(() => held.size > 0, 'resumed local fixture')
+    const renewed = (await runtime.threadService.get(getTask().threadId)).turns.find(item => item.id === resumedAgain.turn.turnId).executionGrant
+    assert.equal(renewed.taskPermissionId, replaced.permission.grant.id)
+    await api(`/v1/tasks/${taskId}/permissions`, 'DELETE', { expectedRevision: getTask().revision, permissionId: renewed.taskPermissionId, idempotencyKey: 'revoke-export-scope' })
+    report.revocation = { taskPaused: getTask().status === 'paused', code: await negativeWrite(renewed, path.join(destination, '撤销.html'), ['task_permission_revoked']) }
+    assert.equal(report.revocation.taskPaused, true)
+    report.checks.push('http-revocation-invalidates-captured-live-grant')
+    assert.equal(unexpectedApprovals, 0)
+    assert.deepEqual((await fs.readdir(destination)).filter(name => name.endsWith('.html')), ['验收 报告.html'])
+    assert.deepEqual(await fs.readdir(initialLinkTarget), [])
+    report.unexpectedApprovals = 0
+    report.externalModelCalls = 0
+    report.status = 'passed'
+    return report
+  } catch (error) {
+    error.message += `; completed permission checks: ${report.checks.join(',')}`
+    throw error
+  } finally {
+    if (runtime) await runtime.shutdown?.()
+    transport?.server.closeAllConnections()
+    if (transport) await transport.close()
+    model.closeAllConnections()
+    await new Promise(done => model.close(done))
+  }
+}
+
+/** Invoke the unchanged installed EXE, so native SQLite ABI matches the reviewed package. */
+export async function runInstalledWindowsPermissionAcceptance({ executable, evidenceDir, temporaryRoot, environment = process.env }) {
+  const assert = (await import('node:assert/strict')).default
+  const fs = await import('node:fs/promises')
+  const path = await import('node:path')
+  const { spawn } = await import('node:child_process')
+  assert.equal(process.platform, 'win32')
+  const packageRoot = path.dirname(executable)
+  const moduleRoot = path.join(packageRoot, 'resources', 'app.asar.unpacked', 'kun', 'dist')
+  assert.equal((await fs.stat(path.join(moduleRoot, 'server', 'runtime-factory.js'))).isFile(), true)
+  const ownedRoot = await fs.mkdtemp(path.join(temporaryRoot, 'railwise-permission-'))
+  const workerFile = path.join(ownedRoot, 'installed-permission-worker.mjs')
+  await fs.writeFile(workerFile, `const report=await (${installedPermissionWorker.toString()})(${JSON.stringify({ moduleRoot, ownedRoot })}); console.log('RAILWISE_PERMISSION_EVIDENCE '+JSON.stringify(report));\n`)
+  let childExited = true
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const child = spawn(executable, [workerFile], { cwd: ownedRoot, env: { ...environment, ELECTRON_RUN_AS_NODE: '1', RAILWISE_TASK_SCHEDULING_DISABLED: '1' }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+      childExited = false
+      let output = '', error = '', timedOut = false, exitWaitTimer
+      child.stdout.on('data', chunk => { output = (output + chunk).slice(-200_000) })
+      child.stderr.on('data', chunk => { error = (error + chunk).slice(-100_000) })
+      const timer = setTimeout(() => {
+        timedOut = true
+        child.kill()
+        exitWaitTimer = setTimeout(() => reject(new Error(`Installed permission acceptance timed out; exit not confirmed; owned evidence retained: ${ownedRoot}`)), 5000)
+      }, 150_000)
+      child.once('error', error => {
+        if (!child.pid) childExited = true // Spawn failure; a running-child error is not exit confirmation.
+        clearTimeout(timer); clearTimeout(exitWaitTimer)
+        if (!childExited) error.message += `; owned directory retained because exit was not confirmed: ${ownedRoot}`
+        reject(error)
+      })
+      child.once('exit', () => { childExited = true })
+      child.once('close', code => {
+        clearTimeout(timer); clearTimeout(exitWaitTimer)
+        if (timedOut) reject(new Error('Installed permission acceptance timed out after confirmed child exit'))
+        else if (code === 0) resolve(output)
+        else reject(new Error(`Installed permission acceptance exited ${code}: ${error.slice(-5000)}`))
+      })
+    })
+    const line = result.split(/\r?\n/).find(value => value.startsWith('RAILWISE_PERMISSION_EVIDENCE '))
+    assert.ok(line, 'The exact installed Runtime must return its own structured acceptance evidence')
+    const report = JSON.parse(line.slice('RAILWISE_PERMISSION_EVIDENCE '.length))
+    assert.equal(report.status, 'passed')
+    assert.equal(report.platform, 'win32')
+    assert.equal(report.actualOsJunction, true)
+    report.installedPackageRuntime = true
+    await fs.writeFile(path.join(evidenceDir, 'windows-permission-runtime.json'), JSON.stringify(report, null, 2) + '\n')
+    return report
+  } finally {
+    // Only an mkdtemp-owned directory, after the child exited; no production path is selected.
+    if (childExited) await fs.rm(ownedRoot, { recursive: true, force: true })
+  }
+}
+
 export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true' }) {
   taskSmoke ||= browserSmoke
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
@@ -733,7 +1066,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const before = inspectInstalledPackage(dirname(executable), identity)
   const root = await mkdtemp(join(temporary, 'railwise-windows-ui-'))
   const profile = join(root, 'profile')
-  const workspace = join(root, 'workspace')
+  const workspace = join(root, windowsSmokeWorkspaceName)
   const environment = windowsUiEnvironment(process.env, root)
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
   const taskModel = taskSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke }) : undefined
@@ -744,7 +1077,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     ...(taskModel ? { provider: { providers: [{ id: 'windows-task-fixture', name: '本机验收协议模型', apiKey: 'synthetic-local-only', baseUrl: taskModel.baseUrl, endpointFormat: 'chat_completions', models: ['windows-task-fixture'] }] } } : {}),
     agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'), ...(taskModel ? { providerId: 'windows-task-fixture', model: 'windows-task-fixture', approvalPolicy: 'auto', sandboxMode: 'read-only' } : {}) } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
-    sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', productionTouched: false, checks: [], errors: [],
+    sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', workspaceRoot: workspace, productionTouched: false, checks: [], errors: [],
     installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
   // Electron's supported --user-data-dir overrides chrome::DIR_USER_DATA
   // before application startup. The installed EXE/ASAR and public identity
@@ -780,6 +1113,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     assert.equal(actualSettings.locale, 'zh')
     assert.equal(actualSettings.theme, 'dark')
     assert.equal(actualSettings.workspaceRoot, workspace)
+    if (taskSmoke) {
+      report.permissionRuntime = await runInstalledWindowsPermissionAcceptance({ executable, evidenceDir, temporaryRoot: tmpdir(), environment })
+      validateWindowsPermissionRuntimeEvidence(report.permissionRuntime)
+      report.checks.push('installed-runtime-file-permission')
+    }
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
@@ -963,31 +1301,42 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       report.taskAttemptId = task.id
       assert.equal(task.originThreadId, originThreadId, 'Installing the Skill must preserve the already open conversation')
       const uiApprovals = []
+      const reviewedRequests = []
       if (browserSmoke) report.sourceUiApprovals = uiApprovals
       const taskDeadline = Date.now() + 150_000
       while (Date.now() < taskDeadline && !['completed', 'failed', 'stalled', 'waiting_user'].includes(task.status)) {
         if (browserSmoke) {
           const thread = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
-          const pending = thread.turns.flatMap(turn => turn.items).filter(item => item.kind === 'approval' && item.status === 'pending')
-          assert.ok(pending.length <= 1, 'Only one reviewed fixture approval may be pending at once')
+          const pending = windowsFixturePendingApprovals(await runtimeRequest('/v1/inbox'), task)
           for (const approval of pending) {
             assert.ok(!uiApprovals.some(item => item.approvalId === approval.approvalId), 'An allowed approval must not be replayed')
             const review = reviewWindowsFixtureApproval(approval, { fixture: taskModel, prompt, workspace,
               browserLabel: realBrowser.browserLabel, planBrowserLabel: realBrowser.planBrowserLabel, thread, index: uiApprovals.length })
-            const point = await cdp.wait(windowsFixtureApprovalUiExpression(review.uiValues), 'the exact reviewed fixture approval card')
+            await cdp.click('button', '打开任务工作台')
+            await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes(${JSON.stringify(task.goal)}))`, 'the original task details')
+            await cdp.wait(windowsFixtureApprovalUiExpression(review.uiValues, approval.summary, { businessOnly: true }), 'the ordinary business approval card and visible allow button')
+            const businessScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+            await writeFile(join(evidenceDir, `windows-task-approval-${uiApprovals.length + 1}-business-zh-dark.png`), Buffer.from(businessScreenshot.data, 'base64'))
+            const detailPoint = await cdp.wait(windowsFixtureApprovalUiExpression(review.uiValues, approval.summary, { openDetails: true }), 'the exact reviewed task approval card')
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...detailPoint })
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...detailPoint })
+            const point = await cdp.wait(windowsFixtureApprovalUiExpression(review.uiValues, approval.summary), 'the original request hash and actionable allow button')
+            const reviewScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+            await writeFile(join(evidenceDir, `windows-task-approval-${uiApprovals.length + 1}-zh-dark.png`), Buffer.from(reviewScreenshot.data, 'base64'))
             await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point })
             await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point })
             const deadline = Date.now() + 15_000
             let saved
             while (Date.now() < deadline) {
-              const updated = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
-              saved = updated.turns.flatMap(turn => turn.items).find(item => item.kind === 'approval' && item.approvalId === approval.approvalId)
-              if (saved?.status !== 'pending') break
+              saved = windowsFixtureApprovalResolution(await runtimeRequest(`/v1/tasks/${encodeURIComponent(task.id)}/inputs`), approval, task.id)
+              if (saved) break
               await sleep(100)
             }
             assert.equal(saved?.status, 'allowed', 'The actual UI must resolve this exact approval as allowed')
             const { uiValues: _values, ...record } = review
-            uiApprovals.push({ ...record, uiFieldsVerified: true, status: saved.status })
+            reviewedRequests.push(approval)
+            uiApprovals.push({ ...record, uiFieldsVerified: true, businessCardDisplayedVerified: true, originalSummaryVerified: true, cardDisplayedVerified: true, buttonOperableVerified: true, status: saved.status })
+            await cdp.click('article[aria-label="任务详情"] button', '打开原会话')
           }
         }
         await sleep(250)
@@ -1029,10 +1378,10 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           status: 'passed', fixturePageRead: true, htmlFromBrowserTool: true,
           sessionId: session?.sessionId, sessionStopped: stopped?.stopped === true && stopped?.sessionId === session?.sessionId,
           sourceUrl: html.sourceUrl, htmlSha256: createHash('sha256').update(html.html).digest('hex') }
-        const approvals = execution.turns.flatMap(turn => turn.items).filter(item => item.kind === 'approval')
-        assert.equal(approvals.length, 3)
-        assert.deepEqual(approvals.map(item => item.approvalId).sort(), uiApprovals.map(item => item.approvalId).sort())
-        assert.ok(approvals.every(item => item.status === 'allowed'))
+        const resolutions = await runtimeRequest(`/v1/tasks/${encodeURIComponent(task.id)}/inputs`)
+        assert.equal(resolutions.filter(item => item.kind === 'approval_resolution').length, 3)
+        assert.equal(reviewedRequests.length, 3)
+        for (const approval of reviewedRequests) assert.equal(windowsFixtureApprovalResolution(resolutions, approval, task.id)?.status, 'allowed')
         const actions = flow.flow.variables.taskSchedule.scope.browserScheduleActions
         assert.equal(actions.length, 2)
         assert.deepEqual(actions.map(item => item.action).sort(), ['click', 'fill'])
@@ -1129,6 +1478,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         report.taskExecution.dueOccurrence.browserHtmlSha256 = createHash('sha256').update(freshHtml.html).digest('hex')
         assert.equal(occurrenceThread.turns.flatMap(turn => turn.items).filter(item => item.kind === 'approval').length, 0,
           'The due task must derive the confirmed finite actions without any new approval')
+        assert.equal(windowsFixturePendingApprovals(await runtimeRequest('/v1/inbox'), occurrence).length, 0)
+        assert.equal((await runtimeRequest(`/v1/tasks/${encodeURIComponent(occurrence.id)}/inputs`)).filter(item => item.kind === 'approval_resolution').length, 0)
         const receipts = await readWindowsQueryAuthorizations(root, task.id, occurrence.id)
         const persistent = receipts.filter(item => item.ownerId === task.id && item.kind === 'browser_schedule_action_authorization')
         const derived = receipts.filter(item => item.ownerId === occurrence.id && item.kind === 'browser_derived_action_authorization')
