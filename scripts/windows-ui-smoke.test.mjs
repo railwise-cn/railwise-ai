@@ -12,8 +12,92 @@ import { build } from 'esbuild'
 import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { clickWindowsBrowserBinding, selectWindowsBrowserPolicy, windowsBindingPostAudit, inspectWindowsBrowserPolicy, windowsTaskPrompt } from './run-windows-ui-smoke.mjs'
+import { observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState } from './run-windows-ui-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
+
+test('successful connect is single-shot and reads markers without warming PowerShell', async () => {
+  const calls = []; let clock = 10
+  const result = await observeWindowsBrowserConnect({ now: () => clock++,
+    readState: async () => { calls.push('state'); return { owner: { exists: false } } },
+    connect: async () => { calls.push('connect'); return { ok: true } },
+    diagnose: async () => { throw new Error('Unexpected diagnosis') },
+    readFailureProcesses: async () => { throw new Error('PowerShell must not run on success') } })
+  assert.deepEqual(calls, ['state', 'connect', 'state'])
+  assert.equal(result.result.ok, true)
+  assert.equal(result.audit.durationMs, 1)
+  assert.equal(result.audit.failureDiagnostics, undefined)
+})
+
+test('failed connect retains its original error and diagnoses once before bounded process reads', async () => {
+  const calls = [], original = new Error('browser_daemon_identity_unverified'); let clock = 100
+  await assert.rejects(observeWindowsBrowserConnect({ now: () => clock++,
+    readState: async () => { calls.push('state'); return { owner: { exists: false } } },
+    connect: async () => { calls.push('connect'); throw original },
+    diagnose: async () => { calls.push('diagnose'); return { ok: true, status: { state: 'needs_extension', revision: 1, message: 'SECRET', browsers: [] } } },
+    readFailureProcesses: async deadline => { calls.push('processes'); assert.equal(deadline, 20_102); throw Object.assign(new Error('SECRET'), { code: 'ETIMEDOUT' }) }
+  }), error => error === original)
+  assert.deepEqual(calls, ['state', 'connect', 'diagnose', 'processes', 'state'])
+  const audit = original.browserConnectAudit
+  assert.equal(audit.failureDiagnostics.budgetMs, 20_000)
+  assert.equal(audit.failureDiagnostics.diagnosis.state, 'needs_extension')
+  assert.equal(audit.failureDiagnostics.processes.errorCategory, 'ETIMEDOUT')
+  assert.equal(JSON.stringify(audit).includes('SECRET'), false)
+})
+
+test('failure process diagnostics query only the exact binary and production ticks expression', async () => {
+  const executablePath = "D:\\owned's tools\\browser-skill\\versions\\fixed\\bsk.exe", calls = []
+  const raw = { exitCode: 0, signal: null, durationMs: 12, stdout: JSON.stringify([
+    { pid: 3324, executablePath, creationDate: '2026-11-13T22:57:16.1234567Z', commandLine: 'SECRET', environment: 'SECRET' },
+    { pid: 9999, executablePath: 'D:\\another\\bsk.exe', creationDate: '2026-11-13T22:57:16Z' }
+  ]) }
+  const result = await readWindowsBrowserFailureProcesses({ executablePath, deadline: 20_000, now: () => 0,
+    query: async (command, timeout) => {
+      calls.push({ command, timeout })
+      return calls.length === 1 ? raw : calls.length === 2
+        ? { exitCode: null, signal: 'SIGKILL', durationMs: 3000, timedOut: true, stdout: 'SECRET', stderr: 'SECRET' }
+        : { exitCode: 0, signal: null, durationMs: 22, stdout: '638986138361234567\r\n', stderr: '' }
+    } })
+  assert.match(calls[0].command, /Get-CimInstance/)
+  assert.ok(calls[0].command.includes("owned''s tools"))
+  assert.doesNotMatch(calls[0].command, /CommandLine|Environment|Invoke|Start-Process/i)
+  assert.deepEqual(calls.slice(1).map(call => call.command), Array(2).fill('(Get-Process -Id 3324 -ErrorAction Stop).StartTime.ToUniversalTime().Ticks'))
+  assert.deepEqual(calls.map(call => call.timeout), [4000, 3000, 3000])
+  assert.equal(result.processes.length, 1)
+  assert.equal(result.processes[0].identityAttempts[0].errorCategory, 'timeout')
+  assert.equal(result.processes[0].identityAttempts[0].signal, 'SIGKILL')
+  assert.equal(result.processes[0].identityAttempts[1].ticks, '638986138361234567')
+  assert.equal(JSON.stringify(result).includes('SECRET'), false)
+})
+
+test('process diagnostics stop at the read-only budget and redact non-tick output and errors', async () => {
+  let calls = 0
+  assert.deepEqual(await readWindowsBrowserFailureProcesses({ executablePath: 'D:\\owned\\bsk.exe', deadline: 2, now: () => 3,
+    query: async () => { calls++; throw new Error('Must not run') } }), { budgetExhausted: true, processes: [] })
+  assert.equal(calls, 0)
+  const invalid = sanitizeWindowsBrowserProcessQuery({ stdout: 'ticks SECRET', stderr: '', exitCode: 0, durationMs: 3 }, { ticks: true })
+  assert.equal(invalid.errorCategory, 'invalid_output')
+  assert.equal(JSON.stringify(invalid).includes('SECRET'), false)
+  const denied = sanitizeWindowsBrowserProcessQuery({ stdout: 'SECRET', stderr: 'AccessDenied SECRET', exitCode: 1, signal: null, durationMs: 3 }, { executablePath: 'D:\\owned\\bsk.exe' })
+  assert.equal(denied.errorCategory, 'access_denied')
+  assert.deepEqual(denied.processes, [])
+})
+
+test('owned daemon diagnostics hash the marker without retaining its contents or credentials', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'windows-owner-diagnostic-'))
+  try {
+    const directory = join(root, 'browser-skill'), executablePath = join(directory, 'versions', 'fixed', 'bsk.exe')
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, 'owned-daemon.json'), JSON.stringify({ pid: 3324, fingerprint: 'win32:123', unexpected: 'SECRET' }))
+    await writeFile(join(directory, 'connection.json'), JSON.stringify({ state: 'daemon_stopped', version: '0.4.0', revision: 1, executablePath, executableHash: 'a'.repeat(64), unexpected: 'SECRET' }))
+    const state = await readWindowsBrowserOwnedState({ toolsRoot: root, executablePath })
+    assert.equal(state.connection.configuration.matchesFixedExecutable, true)
+    assert.match(state.owner.sha256, /^[a-f0-9]{64}$/)
+    assert.equal(JSON.stringify(state).includes('SECRET'), false)
+    await assert.rejects(readWindowsBrowserOwnedState({ toolsRoot: root, executablePath: join(root, 'external', 'bsk.exe') }))
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 function permissionRuntimeEvidence() {
   // Validator input only; the real worker is never run by the ordinary Node suite.
   return { schemaVersion: 1, scope: 'compiled-runtime-owned-file-permission', status: 'passed', platform: 'win32',

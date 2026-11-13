@@ -1081,6 +1081,124 @@ async function connectCdp(url) {
   return { send, evaluate, wait, click, fill, close: () => socket.close() }
 }
 
+const browserDiagnosticBudgetMs = 20_000
+const diagnosticError = value => {
+  const code = String(value?.code ?? '')
+  return /^[A-Z][A-Z0-9_]{1,39}$/.test(code) ? code : 'diagnostic_unavailable'
+}
+const browserStatusScalars = result => {
+  const status = result?.status ?? {}
+  return { ok: result?.ok === true, state: status.state, code: status.code, revision: status.revision,
+    daemonProtocolVersion: status.daemonProtocolVersion, ownedDaemon: status.ownedDaemon,
+    connectedBrowsers: status.browsers?.filter(item => item.connected).length }
+}
+
+/** Read only the known acceptance connection and owner marker; never inspect BSK credentials. */
+export async function readWindowsBrowserOwnedState({ toolsRoot, executablePath }) {
+  const directory = join(toolsRoot, 'browser-skill')
+  assert.ok(contained(resolve(directory), resolve(executablePath)), 'Diagnostic executable must be inside the owned managed directory')
+  const files = {}
+  for (const [name, file] of [['connection', 'connection.json'], ['owner', 'owned-daemon.json']]) {
+    try {
+      const path = join(directory, file), stat = await lstat(path)
+      assert.ok(stat.isFile() && !stat.isSymbolicLink() && stat.size < 64 * 1024)
+      const bytes = await readFile(path)
+      files[name] = { exists: true, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }
+      if (name === 'connection') {
+        const config = JSON.parse(bytes.toString())
+        files[name].configuration = { state: config.state, version: config.version, revision: config.revision,
+          executablePath: config.executablePath === executablePath ? executablePath : undefined,
+          executableHash: /^[a-f0-9]{64}$/.test(config.executableHash ?? '') ? config.executableHash : undefined,
+          matchesFixedExecutable: config.executablePath === executablePath }
+      }
+    } catch (error) { files[name] = { exists: error.code === 'ENOENT' ? false : undefined, errorCategory: diagnosticError(error) } }
+  }
+  return files
+}
+
+/** An owned, bounded read-only PowerShell child. Raw text stays inside the sanitizer below. */
+async function runWindowsBrowserDiagnosticQuery(command, timeoutMs, environment) {
+  const startedAt = Date.now()
+  return new Promise(done => {
+    const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command],
+      { env: environment, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = '', stderr = '', timedOut = false, errorCode
+    for (const [stream, receive] of [[child.stdout, value => { stdout = (stdout + value).slice(-16_384) }], [child.stderr, value => { stderr = (stderr + value).slice(-16_384) }]]) stream.on('data', receive)
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL') }, timeoutMs)
+    child.once('error', error => { errorCode = diagnosticError(error) })
+    child.once('close', (exitCode, signal) => {
+      clearTimeout(timer)
+      done({ stdout, stderr, exitCode, signal, timedOut, errorCode, durationMs: Date.now() - startedAt })
+    })
+  })
+}
+
+export function sanitizeWindowsBrowserProcessQuery(result, { executablePath, ticks = false } = {}) {
+  const errorCategory = result.timedOut ? 'timeout' : result.errorCode ? diagnosticError({ code: result.errorCode })
+    : /AccessDenied|PermissionDenied|UnauthorizedAccess/i.test(result.stderr ?? '') ? 'access_denied'
+      : /NoProcessFoundForGivenId|ProcessCommandException/i.test(result.stderr ?? '') ? 'process_not_found'
+        : result.exitCode !== 0 ? 'query_failed' : undefined
+  const evidence = { durationMs: result.durationMs, exitCode: result.exitCode, signal: result.signal ?? null,
+    timedOut: result.timedOut === true, ...(errorCategory ? { errorCategory } : {}) }
+  if (ticks) {
+    const value = String(result.stdout ?? '').trim()
+    return { ...evidence, ...(!errorCategory && /^\d{1,30}$/.test(value) ? { ticks: value } : { errorCategory: errorCategory ?? 'invalid_output' }) }
+  }
+  if (errorCategory) return { ...evidence, processes: [] }
+  let values
+  try { const parsed = JSON.parse(result.stdout); values = Array.isArray(parsed) ? parsed : [parsed] } catch { return { ...evidence, errorCategory: errorCategory ?? 'invalid_output', processes: [] } }
+  return { ...evidence, processes: values.filter(value => Number.isSafeInteger(value?.pid) && value.pid > 0 &&
+    typeof value.executablePath === 'string' && value.executablePath.toLowerCase() === executablePath.toLowerCase()).map(value => ({
+    pid: value.pid, executablePath: value.executablePath,
+    creationDate: typeof value.creationDate === 'string' && /^\d{4}-\d\d-\d\dT[\d:.]+(?:Z|[+-]\d\d:\d\d)$/.test(value.creationDate) ? value.creationDate : null })) }
+}
+
+export async function readWindowsBrowserFailureProcesses({ executablePath, environment, deadline,
+  query = (command, timeout) => runWindowsBrowserDiagnosticQuery(command, timeout, environment), now = Date.now }) {
+  const remaining = limit => Math.max(0, Math.min(limit, deadline - now()))
+  if (!remaining(4000)) return { budgetExhausted: true, processes: [] }
+  const quoted = executablePath.replaceAll("'", "''")
+  const command = `$ErrorActionPreference='Stop'; ConvertTo-Json -Compress -InputObject @(Get-CimInstance -ClassName Win32_Process -Filter "Name = 'bsk.exe'" | Where-Object { $_.ExecutablePath -eq '${quoted}' } | ForEach-Object { [pscustomobject]@{ pid=[int]$_.ProcessId; executablePath=[string]$_.ExecutablePath; creationDate=if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().ToString('o') } else { $null } } })`
+  const result = sanitizeWindowsBrowserProcessQuery(await query(command, remaining(4000)), { executablePath })
+  for (const process of result.processes) {
+    process.identityAttempts = []
+    for (let attempt = 0; attempt < 2 && remaining(3000); attempt += 1) {
+      // Exactly the production processIdentity query; this runs only AFTER the failed connect.
+      const ticks = `(Get-Process -Id ${process.pid} -ErrorAction Stop).StartTime.ToUniversalTime().Ticks`
+      process.identityAttempts.push(sanitizeWindowsBrowserProcessQuery(await query(ticks, remaining(3000)), { ticks: true }))
+    }
+  }
+  return { ...result, budgetExhausted: now() >= deadline }
+}
+
+/** Never retry connect or warm PowerShell before it; diagnostic failure cannot replace its error. */
+export async function observeWindowsBrowserConnect({ connect, diagnose, readState, readFailureProcesses, now = Date.now }) {
+  const safeState = async () => { try { return await readState() } catch (error) { return { errorCategory: diagnosticError(error) } } }
+  const audit = { beforeState: await safeState(), startedAt: now() }
+  try {
+    const result = await connect()
+    audit.finishedAt = now(); audit.durationMs = audit.finishedAt - audit.startedAt
+    audit.afterState = await safeState()
+    return { result, audit }
+  } catch (error) {
+    audit.finishedAt = now(); audit.durationMs = audit.finishedAt - audit.startedAt
+    const startedAt = now(), deadline = startedAt + browserDiagnosticBudgetMs
+    audit.failureDiagnostics = { budgetMs: browserDiagnosticBudgetMs, startedAt }
+    const diagnostic = audit.failureDiagnostics
+    const diagnosisStartedAt = now()
+    try { diagnostic.diagnosis = browserStatusScalars(await diagnose()) }
+    catch (failure) { diagnostic.diagnosis = { errorCategory: diagnosticError(failure) } }
+    diagnostic.diagnosis.durationMs = now() - diagnosisStartedAt
+    try { diagnostic.processes = await readFailureProcesses(deadline) }
+    catch (failure) { diagnostic.processes = { errorCategory: diagnosticError(failure) } }
+    audit.afterState = await safeState()
+    diagnostic.durationMs = now() - startedAt
+    diagnostic.budgetExhausted = now() >= deadline
+    error.browserConnectAudit = audit
+    throw error
+  }
+}
+
 async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
   const prepared = await prepareBrowserSkillSmoke(join(root, 'browser-dependencies'))
   const profile = join(root, 'browser-profile')
@@ -1088,6 +1206,7 @@ async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
   const browser = launchBrowserSkillSmoke(prepared, profile, environment)
   let browserCdp
   let diagnosis
+  let connectAudit
   try {
     const deadline = Date.now() + 30_000
     while (!browserCdp && Date.now() < deadline) {
@@ -1108,7 +1227,13 @@ async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
     const installed = await cdp.evaluate('window.workwise.installBrowserSkill()', 180_000)
     assert.equal(installed.ok, true, installed.message)
     assert.equal(installed.status.version, '0.4.0')
-    await cdp.evaluate('window.workwise.connectBrowserSkill()')
+    const connection = await observeWindowsBrowserConnect({
+      connect: () => cdp.evaluate('window.workwise.connectBrowserSkill()'),
+      diagnose: () => cdp.evaluate('window.workwise.diagnoseBrowserSkill()', 6000),
+      readState: () => readWindowsBrowserOwnedState({ toolsRoot: environment.WORKWISE_TOOLS_ROOT, executablePath: installed.status.executablePath }),
+      readFailureProcesses: deadline => readWindowsBrowserFailureProcesses({ executablePath: installed.status.executablePath, environment, deadline })
+    })
+    connectAudit = connection.audit
     const connectDeadline = Date.now() + 45_000
     while (Date.now() < connectDeadline) {
       diagnosis = await cdp.evaluate('window.workwise.diagnoseBrowserSkill()')
@@ -1124,12 +1249,15 @@ async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
     assert.equal(configured.status.state, 'ready')
     const selected = configured.status.browsers.find(item => item.id === connected[0].id)
     return { ...browser, cdp: browserCdp, browserLabel: selected?.label || '已选择的浏览器实例', planBrowserLabel: selected?.label || selected?.name || '已选择的浏览器实例', bindingBrowserLabel: selected?.label || selected?.name || connected[0].id, browserRevision: configured.status.revision, evidence: { ...prepared.evidence, browserInstanceId: connected[0].id, cliVersion: installed.status.version,
-      cliSha256: installed.status.executableHash, protocolVersion: connected[0].protocolVersion, isolatedTestCredentialStore: true, extensionId: extension.id } }
+      cliSha256: installed.status.executableHash, protocolVersion: connected[0].protocolVersion, isolatedTestCredentialStore: true, extensionId: extension.id, connectAudit } }
   } catch (error) {
     const failure = error instanceof Error ? error : new Error(String(error))
-    failure.browserBootstrap = { ...prepared.evidence, status: 'failed', diagnosis: diagnosis?.status, process: browser.diagnostics() }
+    failure.browserBootstrap = { ...prepared.evidence, status: 'failed', diagnosis: diagnosis?.status,
+      connectAudit: failure.browserConnectAudit ?? connectAudit,
+      process: { ...browser.diagnostics(), pid: browser.child.pid, signal: browser.child.signalCode } }
     browserCdp?.close()
     await browser.stop()
+    failure.browserBootstrap.process.afterOwnedStop = { exitCode: browser.child.exitCode, signal: browser.child.signalCode }
     throw failure
   }
 }
@@ -2059,6 +2187,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     mainCdp?.close()
     realBrowser?.cdp.close()
     await realBrowser?.stop()
+    if (realBrowser) report.browserProcessExit = { pid: realBrowser.child.pid, exitCode: realBrowser.child.exitCode, signal: realBrowser.child.signalCode }
     if (cdp) {
       await cdp.send('Page.close').catch(() => undefined)
       cdp.close()
@@ -2066,6 +2195,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     const deadline = Date.now() + 30_000
     while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) await sleep(200)
     report.cleanExit = child.exitCode === 0
+    report.installedProcessExit = { exitCode: child.exitCode, signal: child.signalCode }
     if (!report.cleanExit) {
       report.errors.push('The owned installed application did not exit cleanly')
       if (child.exitCode === null && child.signalCode === null && child.pid) {

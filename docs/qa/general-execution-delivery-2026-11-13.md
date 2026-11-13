@@ -284,3 +284,10 @@ Main 的退出协调也新增修复：Runtime 停止后，根据持久未知回�
 源码 `21a6487f03d7394ad592a4b3f74860d451fc244f` 的唯一私有 Release `43518948758` 已启动，公开发布与官网部署均关闭，真实升级基线为 0.5.6。两条 Quality `43518795389`／`43518802949` 在 lint 阶段发现 Windows 测试脚本一行中的两个多余转义，保留原始失败日志；Electron production 与 Windows 专项 job 通过，不能将整条 Quality 标为通过。修正只移除 `scripts/windows-ui-smoke.test.mjs:722` 两个无效反斜杠，另更新本验收文档，属于既有发行门禁明确允许的包外 QA 差异，App、依赖、构建输入和许可清单不变。
 
 修后固定 Node22 的 Windows 脚本聚焦 122 项通过、1 项平台跳过，完整 root lint 零错误（仅两条既有 TaskPermissionPanel 警告）。继续等待新 QA 源码的实际完整 CI；同一 21a6487f 精确包保持唯一，不因这项包外修正重复打包或重复真实升级，不放宽现有来源门禁。证据在私有 `railwise-windows-057-build-43518948758/qa-lint-fix-validation.json`，新包安装与真实业务仍未验收。
+
+
+### 21a6487f Windows 实包连接阻断
+
+私有构建 `43518948758` 的 Windows 包已真实安装，版本 0.5.7、ASAR `f4b84eb5753d22cb6b3c552cccca03095e4b80f646c03362698154df3c50ac26`，基础安装检查及六项已安装 Runtime 权限用例通过。完整回放 `43522719932` 仍为失败：主进程连接 BrowserSkill 时返回 `browser_daemon_identity_unverified`，原任务保持暂停，尚未进入任务范围选择；Turn、模型请求、网页动作、HTML、计划和到期运行均为零。该失败不是新公开查询方式的断言失败，不能以基础安装通过替代完整任务通过。官方原始证据 artifact `14083552411` 的 ZIP SHA256 为 `b53974cf764087ea79746e8c898649bc5e5aa6754683347a9ad5047e435d0e52`，已本机核验。
+
+进程身份服务和 BrowserSkill 主进程代码与先前 a415 包字节相同；runner 清理时仍发现 bsk 进程，但原记录缺少身份探针输出和耗时，因此尚不能认定为进程退出或 PowerShell 超时。后续仅在包外验收脚本增加只读诊断：不预热 PowerShell、不重试连接，失败后保留原异常，依次记录一次连接诊断、精确已核 CLI 的进程身份查询及有限时间预算；不读取凭据、环境或命令行。此 QA 改动不修改安装包，后续同包诊断结果另记。
