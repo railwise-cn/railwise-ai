@@ -47,7 +47,7 @@ export type BrowserCapabilityConfig = z.infer<typeof BrowserCapabilityConfig>
 
 export function isBrowserTask(text: string): boolean {
   if (/^(?:如何|怎么|怎样|什么是|介绍|解释|how\s+to\b|what\s+is\b)/i.test(text.trim())) return false
-  return /browser[-_ ]?skill|浏览器|网页.*(?:点击|填写|填表|操作|截图|提取|打开)|(?:点击|填写|填表|操作|截图|提取).*网页|\b(?:chrome|edge)\b/i.test(text)
+  return /(?:browser|broswer|browse)[-_ ]?skill|浏览器|网页.*(?:点击|填写|填表|操作|截图|提取|打开)|(?:点击|填写|填表|操作|截图|提取).*网页|\b(?:chrome|edge)\b/i.test(text)
 }
 
 export function browserTaskOrigins(text: string): string[] {

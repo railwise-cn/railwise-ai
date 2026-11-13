@@ -294,7 +294,7 @@ describe('task commands before Turn allocation',()=>{
 
 
 describe('Windows browser-to-HTML task regression', () => {
-  const request = '使用browser-skill，帮我去政采云、阳光采购平台等平台去获取一些招标信息，我们主要是做工程测量、工程监测类的业务，所以需要找的是这一类招标信息，并以html形式将获取到的信息给我汇报，每天执行两次，早上九点前一次，下午五点前一次。'
+  const request = '使用broswer-skill，帮我去政采云、阳光采购平台等平台去获取一些招标信息，我们主要是做工程测量、工程监测类的业务，所以需要找的是这一类招标信息，并以html形式将获取到的信息给我汇报，每天执行两次，早上九点前一次，下午五点前一次。'
   it('creates a stable delivery task with HTML and recurring acceptance from the original Chinese request', async () => {
     const f = await fixture()
     const result = await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'original-windows-request',request:{prompt:request}})

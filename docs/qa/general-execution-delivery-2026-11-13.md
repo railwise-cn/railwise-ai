@@ -15,10 +15,13 @@
 | 网络能力 | 实际可用工具目录、来源级重试、正文编码 | 聚焦及本机全量回归通过，真实采集待验证 |
 | BrowserSkill | 固定 CLI、扩展诊断、类型化 Provider、Skill 热同步 | 官方 CLI／扩展 0.4.0 与 CfT 151 的 Provider 正向实测通过，初始化 prepare／start 接线已修复，精确包待验证 |
 | 默认呈现 | 工作进度、授权与成果，执行详情手动展开 | 聚焦 DOM 回归通过，精确包 UI 待验证 |
+| 普通退出 | Turn／Task／Flow admission fence、派发与执行 drain、持久命令历史 | 两项真实 Runtime／SQLite 并发退出回归通过，Flow 检查点与未消费回答保留 |
 | 权限撤销与恢复 | DELETE 权限路由、Main IPC、持久撤销回执、暂停和 Turn 中断 | 真实 Runtime／SQLite 的 10 项合成场景通过，覆盖幂等、并发、崩溃、继承授权与过期重试 |
 | 中途输入与归属选择 | 原请求及附件持久入队、检查点确认、聊天意图选择卡 | 旧等待任务恢复、暂停期间附图、原请求绑定和重复选择回归通过 |
 
 模型协议回放使用本机合成服务，底层经过生产装配、真实工具、SQLite 和文件服务。这些结果仅证明对应工程链路。真实模型、浏览器扩展和精确安装包的验收分别记录。
+
+原截图的 `broswer-skill` 拼写和用户描述中的 `browse skill` 均按已知 BrowserSkill 别名处理，能力预检与已安装 Skill 激活使用一致规则。原请求、安装后激活和轻量问答排除的 29 项聚焦回归通过。Windows 实包驱动保留原拼写，继续验证真实市场安装、热加载和原会话执行。
 
 ## 本机完整验证
 
@@ -26,17 +29,19 @@
 
 | 检查 | 结果 |
 | --- | --- |
-| Desktop 全量测试 | 4489 项通过，10 项跳过 |
-| KUN 全量测试 | 3e5c2714 源码 3918 项通过、23 项跳过，298 个文件通过、3 个文件跳过 |
+| Desktop 全量测试 | e82850b6 本机 4496 项通过，10 项跳过 |
+| KUN 全量测试 | b6da6d0d 本机 3929 项通过、23 项跳过，300 个文件通过、3 个文件跳过 |
 | Web、Node 与 KUN 类型检查 | 通过 |
 | Lint | 0 个错误 |
-| 生产构建 | 3e5c2714 源码本机通过 |
+| 生产构建 | e82850b6 本机通过，普通退出修复后重跑待完成 |
 
 本机验证使用固定 Node 22.22.0 与 npm 10.9.4。跳过项目保留在测试报告中，真实浏览器和安装包验证继续单独执行。
 
-随机临时目录 `ABCdef/workspace` 被误识别为时区的问题已修复，时区有效性与路径匹配边界回归通过，并完成上表中的 KUN 全量重跑。对应本机日志为 `/tmp/railwise-kun-post-live-fixes.log` 与 `/tmp/railwise-build-3e5c2714.log`。
+随机临时目录 `ABCdef/workspace` 被误识别为时区的问题已修复，时区有效性与路径匹配边界回归通过，对应 3e5c2714 的 KUN 全量曾通过 3918 项、跳过 23 项。对应本机日志为 `/tmp/railwise-kun-post-live-fixes.log` 与 `/tmp/railwise-build-3e5c2714.log`。
 
 预览补充回归覆盖切换会话后重新校验并呈现原 HTML、手动关闭同版本后保持关闭，以及 CSS／JS 等已验证资源变化后重新生成预览快照。旧快照继续拒绝变化后的资源。相关预览与 Desktop 兼容测试共 13 项通过，Web／Node 类型检查与定向 Lint 通过。
+
+普通退出的独立回放复现了两个实际问题。Flow 正在派发业务任务时退出，以及持久人工回答的消费回调已经启动时退出，均曾在 SQLite 关闭后继续访问数据库。修复将入场阻断、Flow 检查点与已开始派发的等待接入普通 SIGTERM／退出路径，并在关闭数据库前等待执行与命令历史写入。两项修复回归验证 Flow 保持 interrupted／resumable、人工回答保留待消费、无新执行 attempt，数据库完整性检查通过。与原 Flow 重试、更新及 0.5.6 读取回归合计 17 项通过，KUN 类型检查通过。原 fixture 也改为等待实际 Flow 派发边界后断言状态及清理。
 
 ## 远端 CI 与精确包进度
 
@@ -47,7 +52,11 @@
 
 修复后的相关 3 个测试文件共 129 项通过，全量 Desktop 结果见上表。后续 Quality 已通过 Desktop 质量检查、Electron production smoke 和 Windows path／spawn／persistence 三个 job。[Quality 通过记录](https://github.com/railwise-cn/railwise-ai/actions/runs/43367773054)
 
+e82850b6 的 push Quality 三个 job 通过。相同源码的 PR Quality 在 HTML 回放中出现一项等待条件错误，原判断“状态不是 running”可在初始 queued 时立即结束，尚无模型调用便检查 completed。b6da6d0d 已改为等待实际完成状态，本机 KUN 全量重跑通过。[e828 push Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43373918052) [e828 PR Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43373923500)
+
 已取得官方 CLI／扩展 0.4.0 与 Chrome for Testing 151 的生产 Provider 正向实测，覆盖 prepare、start、claim、两页读取、HTML 与 PNG 摘要核验以及 stop，证据标识为 `connected-provider-15`。该真测同时确认初始化须先执行 `session request <requestId> --prepare` 再 start，相关产品接线已修复并纳入 3e5c2714。
+
+e82850b6 的官方 BrowserSkill Provider 已实测原任务中的浙江政府采购网 `zfcg.czt.zj.gov.cn`，页面标题为“浙江政府采购网”，正文读取确认成功，HTML SHA-256 为 `676ff038e7cb9691cd7ab868c882ddec0ccbdcab66a0043fd13ec72bea803fd8`，本机证据为 `verified-zhejiang/evidence.json`。这次验证未调用真实模型。macOS 精确包将以浙江政府采购网和宁波阳光采购完成原任务采集验收。
 
 此前已确认 macOS 隔离 Chrome for Testing 访问 Keychain 受阻。当前隔离环境完成了上述正向读取，精确安装包中的用户流程仍待验证。后续原始来源实测发现 403 页面曾被标记为成功读取，已补充正文阻断识别。候选构建 `43367794641`、`43368850405` 与 `43369704622` 已取消，等待源码收敛后重新构建。精确 Windows／macOS 包的采集、HTML 自动预览和同包计划到期执行仍保留为待验收。[原始来源修复前候选记录](https://github.com/railwise-cn/railwise-ai/actions/runs/43368850405)
 
@@ -63,6 +72,8 @@
 - 审批恢复输入使用明确来源。历史 JSON 气泡只有在 SQLite 投递位点与原审批匹配时才转换为审批状态，原 JSONL 保留。
 - 任务级写入授权仅作用于确认的路径和期限。工作区、Agent 或显式沙箱硬限制按执行时状态复核。应用任务成果拥有独立的输出目录。
 - 旧计划的单时刻字段与无时区记录有兼容读取。每日时区、提前量和下次执行在界面与后台使用同一合同。应用运行期间执行，退出与休眠遵循持久恢复规则。
+
+本轮 0.5.7 产品源码为 `b6da6d0db922ebc15013ec3171c0d5b22a5eac89`。最终本机 KUN 日志为 `/tmp/railwise-kun-shutdown-final.log`，远端 Quality 与精确候选包结果继续按该源码核对。
 
 ## 关闭条件
 

@@ -621,6 +621,9 @@ async function exists(path: string): Promise<boolean> {
 }
 
 function explicitSkillMention(skill: LoadedSkill, prompt: string): string | undefined {
+  // Keep the known BrowserSkill spellings from the reported task aligned with
+  // capability preflight; do not fuzzy-match other installed skill names.
+  if (skill.name === 'browser-skill') prompt = prompt.replace(/(?:broswer|browse)[-_ ]?skill/gi, 'browser-skill')
   const lower = prompt.toLowerCase()
   const id = skill.id.toLowerCase()
   const name = skill.name.toLowerCase()

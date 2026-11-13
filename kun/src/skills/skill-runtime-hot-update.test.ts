@@ -17,6 +17,13 @@ async function skillRoot(name: string) {
 }
 
 describe('Skill installation runtime acknowledgement', () => {
+  it.each(['broswer-skill', 'browse skill'])('loads the installed BrowserSkill for the reported %s spelling', async spelling => {
+    const root = await skillRoot('browser-skill')
+    const runtime = await SkillRuntime.create({ enabled: true, roots: [root], legacySkillMd: true })
+    const resolution = runtime.resolveTurn({ workspace: '', prompt: `使用${spelling}，帮我采集政采云和阳光采购并生成HTML报告` })
+    expect(resolution.activeSkillIds).toContain('browser-skill')
+    expect(resolution.activations).toContainEqual(expect.objectContaining({ skillId: 'browser-skill', reason: 'explicit:natural-name' }))
+  })
   it('activates a newly admitted immutable root in the existing Runtime and matches Chinese browser tasks', async () => {
     const runtime = await SkillRuntime.create({ enabled: true, roots: [], legacySkillMd: true })
     const root = await skillRoot('browser-skill')

@@ -601,7 +601,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
       const runtimeRequest = (path, method = 'GET', body) => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},${JSON.stringify(method)},${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'}).then(result=>{if(!result.ok)throw new Error(result.body);return JSON.parse(result.body)})`)
       const previousThreads = new Set((await runtimeRequest('/v1/threads')).threads.map(thread => thread.id))
-      const prompt = `${browserSmoke ? `请用已安装的 BrowserSkill（$browser-skill）浏览器读取 ${taskModel.fixtureUrl}，将网页实际内容生成HTML报告并交付。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
+      const prompt = `${browserSmoke ? `使用broswer-skill，读取 ${taskModel.fixtureUrl}，将网页实际内容生成HTML报告并交付。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
       await cdp.hover('button[aria-label="新建会话"]')
       await cdp.wait(`(()=>{const node=document.querySelector('button[aria-label="新建会话"]');if(!node)return false;const r=node.getBoundingClientRect();return node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))})()`, 'the visible new-conversation action')
       await cdp.click('button[aria-label="新建会话"]')

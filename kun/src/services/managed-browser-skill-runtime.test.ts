@@ -20,6 +20,11 @@ function fixture() {
   return { runtime, repository, old }
 }
 describe('Browser task authority rebinding', () => {
+  it.each(['browser-skill', 'broswer-skill', 'browse skill'])('preflights the requested %s capability before a model Turn', async spelling => {
+    const f = fixture()
+    expect(await f.runtime.preflight(`使用${spelling}，帮我读取 https://example.com`)).toMatchObject({ status: 'available', toolId: 'browser-skill' })
+    expect(await f.runtime.preflight(`如何使用${spelling}`)).toBeNull()
+  })
   it('accepts the real General wildcard and blocks a changed browser pending explicit task confirmation', async () => {
     const f = fixture()
     const thread = { id: 'thread', mode: 'agent', agentProfile: { toolAllowlist: ['*'] } } as ThreadRecord
