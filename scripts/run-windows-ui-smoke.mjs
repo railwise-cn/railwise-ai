@@ -306,7 +306,7 @@ export function summarizeWindowsTaskFailure(task, thread, receipts) {
   const code = value => typeof value === 'string' && /^[a-z][a-z0-9_.:-]{0,99}$/i.test(value) ? value : undefined
   const error = value => typeof value === 'string' ? value.replace(/https?:\/\/\S+/gi, '<url>')
     .replace(/\b(?:Bearer|api[_-]?key|authorization|token|secret)\s*[:=]?\s*[^\s,;]+/gi, '<redacted>')
-    .replace(/[A-Za-z0-9_+\/-]{32,}/g, '<redacted>').slice(0, 1000) : undefined
+    .replace(/[A-Za-z0-9_+/-]{32,}/g, '<redacted>').slice(0, 1000) : undefined
   return { task: { id: task.id, threadId: task.threadId, status: task.status, activeTurnId: task.activeTurnId,
     stalledReason: error(task.stalledReason), artifactCount: task.artifacts?.length },
     turns: (thread.turns ?? []).map(turn => ({ id: turn.id, status: turn.status, error: error(turn.error),
@@ -410,11 +410,7 @@ async function connectCdp(url) {
     if (text) await send('Input.insertText', { text })
     await wait(`document.querySelector(${JSON.stringify(selector)})?.value === ${JSON.stringify(text)}`, 'the typed resource query')
   }
-  const hover = async selector => {
-    const point = await wait(`(()=>{const node=document.querySelector(${JSON.stringify(selector)});if(!node||!node.getClientRects().length)return null;const r=node.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`, selector)
-    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point })
-  }
-  return { send, evaluate, wait, click, fill, hover, close: () => socket.close() }
+  return { send, evaluate, wait, click, fill, close: () => socket.close() }
 }
 
 async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
@@ -728,9 +724,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const runtimeRequest = (path, method = 'GET', body) => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},${JSON.stringify(method)},${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'}).then(result=>{if(!result.ok)throw new Error(result.body);return JSON.parse(result.body)})`)
       const previousThreads = new Set((await runtimeRequest('/v1/threads')).threads.map(thread => thread.id))
       const prompt = `${browserSmoke ? `使用broswer-skill，读取 ${taskModel.fixtureUrl}，将网页实际内容生成HTML报告并交付。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
-      await cdp.hover('button[aria-label="新建会话"]')
-      await cdp.wait(`(()=>{const node=document.querySelector('button[aria-label="新建会话"]');if(!node)return false;const r=node.getBoundingClientRect();return node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))})()`, 'the visible new-conversation action')
-      await cdp.click('button[aria-label="新建会话"]')
+      await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
       await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]:not(:disabled)'))`, 'the active conversation composer')
       const newThreads = (await runtimeRequest('/v1/threads')).threads.filter(thread => !previousThreads.has(thread.id))
       assert.equal(newThreads.length, 1, 'The normal UI must create one existing conversation before Skill installation')
