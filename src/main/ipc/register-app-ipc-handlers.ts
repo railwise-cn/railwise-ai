@@ -726,6 +726,13 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     return skillCatalogGeneration
   }
 
+  const notifyPluginCapabilitiesChanged = async (mcpChanged: boolean): Promise<void> => {
+    const results = await Promise.allSettled([notifySkillsChanged(), mcpChanged ? notifyMcpServersChanged() : undefined])
+    const errors = results.filter(result => result.status === 'rejected').map(result => result.reason)
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, '插件已保存，但技能与连接器均未能完成 Runtime 更新。请重试刷新。')
+  }
+
   const loadSkillCatalog = async (workspaceRoot?: string) => {
     const settings = await store.load()
     const result = await listGuiSkills(settings, workspaceRoot)
@@ -1123,34 +1130,40 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   ipcMain.handle('plugin:install', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:install', pluginInstallPayloadSchema, payload)
+    let mcpChanged = false
     const installed = await pluginManagementService.installPrepared(
       request,
-      async (record, item) => activatePluginPackage({
-        item,
-        installed: record,
-        workspaceRoot: record.workspaceRoot,
-        mcpConfigService,
-        idempotencyKey: request.idempotencyKey
-      })
+      async (record, item) => {
+        const applied = await activatePluginPackage({
+          item,
+          installed: record,
+          workspaceRoot: record.workspaceRoot,
+          mcpConfigService,
+          idempotencyKey: request.idempotencyKey
+        })
+        mcpChanged = applied.mcpChanged
+      }
     )
-    await notifySkillsChanged()
-    await notifyMcpServersChanged()
+    await notifyPluginCapabilitiesChanged(mcpChanged)
     return installed
   })
   ipcMain.handle('plugin:rollback', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:rollback', pluginRollbackPayloadSchema, payload)
+    let mcpChanged = false
     const installed = await pluginManagementService.rollback(
       request,
-      async (record, item) => activatePluginPackage({
-        item,
-        installed: record,
-        workspaceRoot: record.workspaceRoot,
-        mcpConfigService,
-        idempotencyKey: `${request.idempotencyKey}:activate`
-      })
+      async (record, item) => {
+        const applied = await activatePluginPackage({
+          item,
+          installed: record,
+          workspaceRoot: record.workspaceRoot,
+          mcpConfigService,
+          idempotencyKey: `${request.idempotencyKey}:activate`
+        })
+        mcpChanged = applied.mcpChanged
+      }
     )
-    await notifySkillsChanged()
-    await notifyMcpServersChanged()
+    await notifyPluginCapabilitiesChanged(mcpChanged)
     return installed
   })
   ipcMain.handle('plugin:update-permissions', async (_, payload: unknown) => {
@@ -1163,17 +1176,23 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       candidate.package.id === request.packageId && candidate.package.source.id === installed.source.id
     )
     if (!entry) throw new Error('Installed package is not available in the current catalog.')
-    return pluginManagementService.updatePermissions(
+    let mcpChanged = false
+    const updated = await pluginManagementService.updatePermissions(
       entry.package,
       request,
-      async (record, item) => activatePluginPackage({
-        item,
-        installed: record,
-        workspaceRoot: record.workspaceRoot,
-        mcpConfigService,
-        idempotencyKey: `${request.idempotencyKey}:activate`
-      })
+      async (record, item) => {
+        const applied = await activatePluginPackage({
+          item,
+          installed: record,
+          workspaceRoot: record.workspaceRoot,
+          mcpConfigService,
+          idempotencyKey: `${request.idempotencyKey}:activate`
+        })
+        mcpChanged = applied.mcpChanged
+      }
     )
+    await notifyPluginCapabilitiesChanged(mcpChanged)
+    return updated
   })
   ipcMain.handle('document-engine:list', async () => {
     const settings = await store.load()

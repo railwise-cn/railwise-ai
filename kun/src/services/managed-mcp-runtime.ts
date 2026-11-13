@@ -11,6 +11,8 @@ export const McpConfigurationUpdateSchema = z.object({
 }).strict()
 export type McpConfigurationUpdate = z.infer<typeof McpConfigurationUpdateSchema>
 export type McpConfigurationResult = {
+  /** The requested revision is installed. `ok` separately reports connection health. */
+  applied: boolean
   ok: boolean; changed: boolean; revision: number; configuredServers: number; connectedServers: number; toolCount: number
   errors: Array<{ id: string; message: string }>
 }
@@ -79,7 +81,7 @@ export class ManagedMcpRuntime {
   private result(changed: boolean): McpConfigurationResult {
     const errors = this.current.diagnostics.filter(server => server.enabled && server.status !== 'connected')
       .map(server => ({ id: server.id, message: server.lastError ?? 'The configured server could not connect.' }))
-    return { ok: errors.length === 0, changed, revision: this.revision, configuredServers: Object.keys(this.config?.servers ?? {}).length,
+    return { applied: true, ok: errors.length === 0, changed, revision: this.revision, configuredServers: Object.keys(this.config?.servers ?? {}).length,
       connectedServers: this.current.connectedServers, toolCount: this.current.toolCount, errors }
   }
 

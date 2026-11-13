@@ -74,7 +74,7 @@ describe('managed MCP configuration generations', () => {
       const originalContext = context(first.authorityFingerprints)
       const active = host.execute({ callId: 'old', toolName: 'mcp_docs_update', arguments: {} }, originalContext)
       await vi.waitFor(() => expect(calls).toBe(1))
-      expect(await runtime.refresh({ config, environment: { SYNTHETIC_TOKEN: 'second' }, revision: 2 })).toMatchObject({ ok: true, changed: true, toolCount: 1 })
+      expect(await runtime.refresh({ config, environment: { SYNTHETIC_TOKEN: 'second' }, revision: 2 })).toMatchObject({ applied: true, ok: true, changed: true, revision: 2, toolCount: 1 })
       expect(closeOld).not.toHaveBeenCalled()
       expect(await host.listTools(originalContext)).toEqual([])
       await expect(host.execute({ callId: 'stale', toolName: 'mcp_docs_update', arguments: {} }, originalContext)).rejects.toThrow(/not advertised/)
@@ -86,12 +86,70 @@ describe('managed MCP configuration generations', () => {
       await vi.waitFor(() => expect(closeOld).toHaveBeenCalledTimes(1))
       await expect(runtime.refresh({ config, environment: { SYNTHETIC_TOKEN: 'other' }, revision: 2 })).rejects.toMatchObject({ code: 'mcp_configuration_conflict' })
       await expect(runtime.refresh({ config, environment: { SYNTHETIC_TOKEN: 'first' }, revision: 1 })).rejects.toMatchObject({ code: 'mcp_configuration_conflict' })
-      expect(await runtime.refresh({ config, environment: { SYNTHETIC_TOKEN: 'second' }, revision: 3 })).toMatchObject({ changed: false, revision: 3 })
+      const current = runtime.state()
+      expect(await runtime.refresh({ config, environment: { SYNTHETIC_TOKEN: 'second' }, revision: 2 })).toMatchObject({ applied: true, ok: true, changed: false, revision: 2 })
+      expect(runtime.state()).toBe(current)
+      expect(await runtime.refresh({ config, environment: { SYNTHETIC_TOKEN: 'second' }, revision: 3 })).toMatchObject({ applied: true, changed: false, revision: 3 })
       expect(clientFactory).toHaveBeenCalledTimes(2)
-      expect(await runtime.refresh({ config: configuration(false), environment: {}, revision: 4 })).toMatchObject({ ok: true, toolCount: 0 })
+      expect(await runtime.refresh({ config: configuration(false), environment: {}, revision: 4 })).toMatchObject({ applied: true, ok: true, revision: 4, toolCount: 0 })
       expect(await host.listTools()).toEqual([])
       expect(calls).toBe(1)
     } finally { finishOld({}); await runtime.close() }
+  })
+
+  it('acknowledges an installed revision while preserving an unrelated server connection failure', async () => {
+    const clientFactory = vi.fn(async (id: string): Promise<McpClientLike> => {
+      if (id === 'offline') throw new Error('Synthetic server is offline')
+      return { listTools: async () => ({ tools: [{ name: 'read', annotations: { readOnlyHint: true } }] }),
+        callTool: async () => ({ content: [] }), close: async () => undefined }
+    })
+    const config = configuration()
+    config.servers.offline = { ...config.servers.docs!, command: 'synthetic-offline' }
+    const initial = await buildMcpToolProviders(undefined)
+    const root = new CapabilityRegistry(), child = new CapabilityRegistry()
+    const runtime = new ManagedMcpRuntime(initial, undefined, [root, child], { clientFactory })
+    const request = { config, environment: { SYNTHETIC_TOKEN: 'synthetic' }, revision: 0 }
+    try {
+      const result = await runtime.refresh(request)
+      expect(result).toMatchObject({ applied: true, ok: false, changed: true, revision: 0,
+        configuredServers: 2, connectedServers: 1, toolCount: 1, errors: [{ id: 'offline', message: 'Synthetic server is offline' }] })
+      expect(runtime.configuration()).toEqual(config)
+      expect(runtime.state().diagnostics).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'docs', status: 'connected' }),
+        expect.objectContaining({ id: 'offline', status: 'error' })
+      ]))
+      const grant = context(runtime.state().authorityFingerprints)
+      expect(root.listTools(grant).map(tool => tool.name)).toEqual(['mcp_docs_read'])
+      expect(child.listTools(grant).map(tool => tool.name)).toEqual(['mcp_docs_read'])
+
+      // An unhealthy exact retry retains the existing reconnect behavior. Its
+      // acknowledgement still identifies precisely the accepted configuration.
+      expect(await runtime.refresh(request)).toMatchObject({ applied: true, ok: false, revision: 0, errors: [{ id: 'offline' }] })
+      expect(await runtime.refresh({ ...request, revision: 2 })).toMatchObject({ applied: true, ok: false, revision: 2 })
+      const calls = clientFactory.mock.calls.length
+      const current = runtime.state()
+      await expect(runtime.refresh({ ...request, revision: 1 })).rejects.toMatchObject({ code: 'mcp_configuration_conflict' })
+      await expect(runtime.refresh({ ...request, config: configuration(false), revision: 2 })).rejects.toMatchObject({ code: 'mcp_configuration_conflict' })
+      expect(clientFactory).toHaveBeenCalledTimes(calls)
+      expect(runtime.state()).toBe(current)
+      expect(runtime.configuration()).toEqual(config)
+    } finally { await runtime.close() }
+  })
+
+  it('rejects catalog application failure and acknowledges the same revision only after its valid retry', async () => {
+    const clientFactory = vi.fn(async (): Promise<McpClientLike> => ({ listTools: async () => ({ tools: [{ name: 'read' }] }),
+      callTool: async () => ({ content: [] }), close: async () => undefined }))
+    const initial = await buildMcpToolProviders(undefined)
+    const registry = new CapabilityRegistry()
+    const validate = vi.spyOn(registry, 'validateMcpProviders').mockImplementationOnce(() => { throw new Error('Synthetic catalog conflict') })
+    const runtime = new ManagedMcpRuntime(initial, undefined, [registry], { clientFactory })
+    const request = { config: configuration(), environment: { SYNTHETIC_TOKEN: 'synthetic' }, revision: 1 }
+    try {
+      await expect(runtime.refresh(request)).rejects.toMatchObject({ code: 'mcp_catalog_conflict' })
+      expect(runtime.state().providers).toEqual([])
+      expect(await runtime.refresh(request)).toMatchObject({ applied: true, ok: true, changed: true, revision: 1, toolCount: 1 })
+      expect(clientFactory).toHaveBeenCalledTimes(2)
+    } finally { validate.mockRestore(); await runtime.close() }
   })
 
   it('reports an enabled preset with no reviewed tools as unavailable and skips disabled credential resolution', async () => {
@@ -100,10 +158,10 @@ describe('managed MCP configuration generations', () => {
     const initial = await buildMcpToolProviders(undefined)
     const runtime = new ManagedMcpRuntime(initial, undefined, [new CapabilityRegistry()], { clientFactory: factory })
     try {
-      expect(await runtime.refresh({ config, environment: {}, revision: 1 })).toMatchObject({ ok: true, connectedServers: 0 })
+      expect(await runtime.refresh({ config, environment: {}, revision: 1 })).toMatchObject({ applied: true, ok: true, revision: 1, connectedServers: 0 })
       expect(factory).not.toHaveBeenCalled()
       config.servers.preset!.enabled = true
-      expect(await runtime.refresh({ config, environment: { MISSING: 'synthetic-secret' }, revision: 2 })).toMatchObject({ ok: false, toolCount: 0, errors: [{ id: 'preset' }] })
+      expect(await runtime.refresh({ config, environment: { MISSING: 'synthetic-secret' }, revision: 2 })).toMatchObject({ applied: true, ok: false, revision: 2, toolCount: 0, errors: [{ id: 'preset' }] })
       expect(runtime.state().providers).toEqual([])
     } finally { await runtime.close() }
   })

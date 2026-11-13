@@ -35,6 +35,6 @@ describe('local survey runtime without a model provider credential', () => {
     expect(body).not.toContain('restartManagedRuntime')
     expect(body).toContain('loadManagedMcpConfigForRefresh')
     expect(body).toContain("'/v1/runtime/mcp-config'")
-    expect(body).toContain('result?.ok !== true')
+    expect(body).toContain('assertMcpConfigurationApplied(response, revision)')
   })
 })

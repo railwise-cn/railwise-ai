@@ -282,7 +282,7 @@ async function stdioLaunch(
   return null
 }
 
-export async function activatePluginPackage(options: ActivatePluginPackageOptions): Promise<void> {
+export async function activatePluginPackage(options: ActivatePluginPackageOptions): Promise<{ mcpChanged: boolean }> {
   const enabledByPermissions = permissionGranted(options.item, options.installed)
   const managedUvRuntime = options.managedUvRuntime ?? new ManagedUvRuntimeService()
   const workspaceRoot = options.installed.scope === 'workspace'
@@ -292,6 +292,9 @@ export async function activatePluginPackage(options: ActivatePluginPackageOption
       (!workspaceRoot || (options.workspaceRoot &&
         resolve(options.workspaceRoot) !== resolve(workspaceRoot)))) {
     throw new Error('Workspace plugin activation must use its installed workspace.')
+  }
+  if (!options.item.components.some(component => component.type === 'mcp') && !options.installed.rollback.available) {
+    return { mcpChanged: false }
   }
   const scope = options.installed.scope === 'workspace' ? 'workspace' as const : 'global' as const
   const existingServers = await options.mcpConfigService.list(workspaceRoot)
@@ -423,4 +426,5 @@ export async function activatePluginPackage(options: ActivatePluginPackageOption
     }
     throw error
   }
+  return { mcpChanged: operations.length > 0 }
 }

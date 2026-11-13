@@ -1,4 +1,5 @@
 import { McpConfigService, type McpRuntimeSnapshotV1 } from './services/mcp-config-service'
+import { assertMcpConfigurationApplied } from './services/runtime-mcp-application'
 import { loadManagedMcpConfigForRefresh } from './managed-runtime-process'
 import { createGuiUpdateShutdown } from './gui-update-shutdown'
 import brand from '../shared/product-brand.json'
@@ -1491,11 +1492,11 @@ app.whenReady().then(async () => {
       const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime') : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
       const path = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'mcp.json') : resolveRuntimeMcpJsonPath()
       const config = await loadManagedMcpConfigForRefresh(dataDir, path, snapshot.servers)
+      const revision = ++mcpApplyRevision
       const response = await runtimeRequest(settings, '/v1/runtime/mcp-config', {
-        method: 'POST', body: JSON.stringify({ config, environment: snapshot.environment, revision: ++mcpApplyRevision })
+        method: 'POST', body: JSON.stringify({ config, environment: snapshot.environment, revision })
       })
-      const result = response.ok ? JSON.parse(response.body) as { ok?: unknown } : undefined
-      if (!response.ok || result?.ok !== true) throw new Error('连接配置已保存，但 Runtime 尚未完成更新。请重试检查或启用。')
+      assertMcpConfigurationApplied(response, revision)
     })
     mcpApplyQueue = apply
     return apply
