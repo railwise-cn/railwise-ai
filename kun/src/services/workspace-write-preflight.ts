@@ -9,19 +9,23 @@ import { containedArtifact } from './task-artifact-proof.js'
 /** A requested output filename alone is compatible with the managed task directory. */
 export function explicitWorkspaceWrite(text: string): { target?: string; edit: boolean } | null {
   if (/^(?:(?:请|帮我)\s*)?(?:如何|怎么|怎样|介绍|解释|how\s|what\s|explain\b)/i.test(text.trim())) return null
-  const save = /(?:保存|导出|输出|放置|写)(?:[^。！？\n]{0,12}?)(?:到|至|进|入)\s*|(?:save|write|export)\b[^.!?\n]{0,25}?\b(?:to|into)\s+/i.exec(text)
-  const edit = /(?:修改|编辑|覆盖|替换|更新)[^。！？\n]{0,35}(?:文件|工作区|当前目录|\.\w{1,8})|\b(?:edit|modify|overwrite|replace)\b[^.!?\n]{0,35}(?:file|workspace|\.\w{1,8})/i.test(text)
-  if (!save && !edit) return null
-  const editVerb = /(?:修改|编辑|覆盖|替换|更新|\b(?:edit|modify|overwrite|replace)\b)\s*/i.exec(text)
-  const targetText = (save ? text.slice(save.index + save[0].length) : editVerb ? text.slice(editVerb.index + editVerb[0].length) : text)
-    .trim().replace(/^(?:(?:当前|本)(?:工作区|目录|项目)(?:中的|的|中|下)?|(?:工作区|目录|项目)(?:中的|的|中|下))\s*/, '')
-  if (/^(?:飞书|钉钉|Lark|Feishu|DingTalk|云盘|网盘|云端|远端|GitHub|Notion|腾讯文档)/i.test(targetText)) return null
-  const quoted = /["'`“]([^"'`”\n]+)["'`”]/.exec(targetText)?.[1]
-  const absolute = /(?:^|\s)((?:[A-Za-z]:[\\/]|\/)[^\s，。；！？"'`<>]+)/.exec(targetText)?.[1]
-  const relative = /^(?:\.\.?[\\/])?[\w\p{L}.-]+(?:[\\/][\w\p{L}.-]+)*(?:\.[\w]+)?/u.exec(targetText)?.[0]
-  const target = quoted ?? absolute ?? relative
-  if (target && /^(?:https?:|\/\/)/i.test(target)) return null
-  return { ...(target && !/^(?:当前|本|工作区|目录|项目|the|this)$/i.test(target) ? { target } : {}), edit }
+  const saves = text.matchAll(/(?:保存|导出|输出|放置|写)(?:[^。！？\n]{0,12}?)(?:到|至|进|入)\s*|(?:save|write|export)\b[^.!?\n]{0,25}?\b(?:to|into)\s+/gi)
+  const edit = /(?:修改|编辑|覆盖|替换|更新)[^。！？\n]{0,35}(?:文件|工作区|当前目录|\.\w{1,8})|\b(?:edit|modify|overwrite|replace)\b[^.!?\n]{0,35}(?:file|workspace|\.\w{1,8})/i.exec(text)
+  const destinations = Array.from(saves, match => ({ text: text.slice(match.index + match[0].length), managedOutput: true }))
+  if (edit) destinations.push({ text: text.slice(edit.index).replace(/^(?:修改|编辑|覆盖|替换|更新|edit|modify|overwrite|replace)\s*/i, ''), managedOutput: false })
+  for (const destination of destinations) {
+    const rawTarget = destination.text.trim()
+    if (destination.managedOutput && /^(?:(?:本|当前)任务的?(?:成果(?:目录|区)?|输出目录)|任务成果(?:目录|区)?)(?=$|[，,。；;！？\n]|并(?:自动)?(?:打开|预览|展示|显示|交付))/u.test(rawTarget)) continue
+    const targetText = rawTarget.replace(/^(?:(?:当前|本)(?:工作区|目录|项目)(?:中的|的|中|下)?|(?:工作区|目录|项目)(?:中的|的|中|下))\s*/, '')
+    if (/^(?:飞书|钉钉|Lark|Feishu|DingTalk|云盘|网盘|云端|远端|GitHub|Notion|腾讯文档)/i.test(targetText)) continue
+    const quoted = /["'`“]([^"'`”\n]+)["'`”]/.exec(targetText)?.[1]
+    const absolute = /(?:^|\s)((?:[A-Za-z]:[\\/]|\/)[^\s，。；！？"'`<>]+)/.exec(targetText)?.[1]
+    const relative = /^(?:\.\.?[\\/])?[\w\p{L}.-]+(?:[\\/][\w\p{L}.-]+)*(?:\.[\w]+)?/u.exec(targetText)?.[0]
+    const target = quoted ?? absolute ?? relative
+    if (target && /^(?:https?:|\/\/)/i.test(target)) continue
+    return { ...(target && !/^(?:当前|本|工作区|目录|项目|the|this)$/i.test(target) ? { target } : {}), edit: Boolean(edit) }
+  }
+  return null
 }
 
 export function workspacePermissionCapability(code: string, message: string, executionContext?: CapabilityPreflight['executionContext']): CapabilityPreflight {
