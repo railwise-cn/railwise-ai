@@ -31,6 +31,19 @@ import {
 } from '../../shared/design-document'
 
 describe('app-ipc-schemas', () => {
+  it('allows only a scoped explicit browser result confirmation and rejects replay or scope overrides', () => {
+    const path = '/v1/tasks/task-1/receipts/receipt-1/browser-confirm'
+    const body = { expectedRevision: 4, idempotencyKey: 'verify-once', reviewId: 'review-1', decision: 'confirmed_complete' }
+    expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify(body) }).success).toBe(true)
+    for (const request of [
+      { path, method: 'GET' }, { path, method: 'POST' }, { path, method: 'POST', body: '{' },
+      ...['GET', 'PUT', 'PATCH', 'DELETE'].map(method => ({ path, method, body: JSON.stringify(body) })),
+      ...[`${path}?force=true`, `${path}#force`, path.replace('task-1', 'task-1%2Fother'), path.replace('receipt-1', '%252Fother'),
+        path.replace('receipt-1', '..'), `//elsewhere${path}`].map(path => ({ path, method: 'POST', body: JSON.stringify(body) })),
+      ...[{ expectedRevision: -1 }, { decision: 'retry' }, { reviewId: '' }, { force: true }, { taskId: 'other' }, { allowedTools: ['bash'] }]
+        .map(extra => ({ path, method: 'POST', body: JSON.stringify({ ...body, ...extra }) }))
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(false)
+  })
   it('allows only exact task browser previews and strictly scoped confirmations', () => {
     const path = '/v1/tasks/task-1/browser-binding'
     const confirmation = { expectedTaskRevision: 2, expectedBrowserRevision: 4, browserInstanceId: 'chrome-test',

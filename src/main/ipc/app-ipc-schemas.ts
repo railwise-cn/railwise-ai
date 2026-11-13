@@ -12,7 +12,7 @@ import { QUALITY_WORKFLOW_LIMITS, SurveyQualityWorkflowCreateV1, SurveyQualityWo
 import { SurveyDraftCreateV1, SurveyDraftSealV1 } from '../../shared/survey-collaboration'
 import { TaskCommandSchema } from '../../../kun/src/contracts/execution'
 import { TaskPermissionRevocationSchema, TaskPermissionConfirmationSchema } from '../../../kun/src/contracts/permissions'
-import { BrowserTaskBindingConfirmation } from '../../../kun/src/contracts/browser-skill'
+import { BrowserOperationConfirmation, BrowserTaskBindingConfirmation } from '../../../kun/src/contracts/browser-skill'
 import {
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE,
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE,
@@ -42,6 +42,7 @@ import {
   RUNTIME_TASK_PERMISSIONS_TEMPLATE,
   RUNTIME_TASK_BROWSER_BINDING_TEMPLATE,
   RUNTIME_TASK_RECEIPT_VERIFY_TEMPLATE,
+  RUNTIME_TASK_BROWSER_CONFIRM_TEMPLATE,
   RUNTIME_TASK_SUMMARY_TEMPLATE,
   RUNTIME_INBOX_TEMPLATE,
   RUNTIME_TASK_TEMPLATES_TEMPLATE,
@@ -314,6 +315,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_TASK_PERMISSIONS_TEMPLATE, ['GET', 'POST', 'DELETE']),
   compileEndpoint(RUNTIME_TASK_BROWSER_BINDING_TEMPLATE, ['GET', 'POST'], []),
   compileEndpoint(RUNTIME_TASK_RECEIPT_VERIFY_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_TASK_BROWSER_CONFIRM_TEMPLATE, ['POST'], []),
   compileEndpoint(RUNTIME_TASK_SUMMARY_TEMPLATE, ['GET'], ['workspaceRoot', 'search', 'threadId']),
   compileEndpoint(RUNTIME_INBOX_TEMPLATE, ['GET'], ['workspaceRoot']),
   compileEndpoint(RUNTIME_TASK_TEMPLATES_TEMPLATE, ['GET'], []),
@@ -469,6 +471,18 @@ export const runtimeRequestPayloadSchema = z
         try { valid = BrowserTaskBindingConfirmation.safeParse(JSON.parse(payload.body)).success } catch { valid = false }
       }
       if (!valid) context.addIssue({ code: 'custom', message: 'invalid scoped browser binding request' })
+    }
+    const browserConfirmation = /^\/v1\/tasks\/([^/]+)\/receipts\/([^/]+)\/browser-confirm$/.exec(url.pathname)
+    if (browserConfirmation) {
+      let valid = payload.path === url.pathname && url.origin === 'http://localhost'
+        && payload.method === 'POST' && payload.body !== undefined && Buffer.byteLength(payload.body, 'utf8') <= 4096
+      try {
+        valid = valid && browserConfirmation.slice(1).every(raw => {
+          const id = decodeURIComponent(raw)
+          return !!id.trim() && !/[/\\?#%\s]/u.test(id) && !id.includes('\0') && !['.', '..'].includes(id)
+        }) && BrowserOperationConfirmation.safeParse(JSON.parse(payload.body!)).success
+      } catch { valid = false }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid browser operation confirmation request' })
     }
     if (/^\/v1\/tasks\/[^/]+\/permissions$/.test(url.pathname)) {
       const method = payload.method ?? 'GET'

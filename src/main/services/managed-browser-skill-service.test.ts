@@ -1,20 +1,21 @@
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
-import type { ChildProcessWithoutNullStreams } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import JSZip from 'jszip'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ManagedBrowserSkillService } from './managed-browser-skill-service'
 import type { ManagedDependency } from './managed-dependency-download'
 import type { BrowserCommandResult } from '../../../kun/src/services/browser-skill-cli.js'
+import type { ProcessIdentity } from '../../../kun/src/contracts/execution.js'
 
 const roots: string[] = []
 const services: ManagedBrowserSkillService[] = []
 afterEach(async () => {
-  services.splice(0).forEach(service => service.dispose())
+  await Promise.all(services.splice(0).map(service => service.dispose()))
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
@@ -29,13 +30,16 @@ async function fixture() {
   let online = false
   const run = vi.fn(async (): Promise<BrowserCommandResult> => online ? { ok: true, output: { daemon_version: '0.4.0', protocol_version: '1.7', pid: 7,
     browsers: [{ instance_id: 'chrome-synthetic', browser_name: 'Chrome', label: 'Test profile', extension_version: '0.4.0', extension_protocol_version: '1.7' }] } } : absent)
-  const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null, kill: vi.fn() })
-  const start = vi.fn((_path: string, _args: string[], _env: NodeJS.ProcessEnv) => { online = true; return child as unknown as ChildProcessWithoutNullStreams })
+  const child = Object.assign(new EventEmitter(), { pid: 7, stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null, kill: vi.fn(), unref: vi.fn() })
+  const start = vi.fn((_path: string, _args: string[], _env: NodeJS.ProcessEnv) => { online = true; return child as unknown as ChildProcess })
+  const identity = vi.fn((pid: number): ProcessIdentity | null => ({ pid, fingerprint: 'synthetic-owned-birth' }))
+  const signal = vi.fn()
   const download = vi.fn(async (item: ManagedDependency) => item.id === asset.id ? bytes : Buffer.from('MIT synthetic'))
-  const service = new ManagedBrowserSkillService({ root, homeDirectory: join(root, 'browser-state'), target: { platform: 'win32', arch: 'x64' },
-    asset, run, start, download, version: async () => 'bsk 0.4.0', wait: async () => undefined })
+  const deps = { root, homeDirectory: join(root, 'browser-state'), target: { platform: 'win32', arch: 'x64' },
+    asset, run, start, identity, signal, download, version: async () => 'bsk 0.4.0', wait: async () => undefined }
+  const service = new ManagedBrowserSkillService(deps)
   services.push(service)
-  return { root, service, run, start, child, download, setOnline: () => { online = true } }
+  return { root, service, run, start, child, identity, signal, download, deps, setOnline: () => { online = true } }
 }
 
 describe('managed BrowserSkill lifecycle', () => {
@@ -49,28 +53,124 @@ describe('managed BrowserSkill lifecycle', () => {
     await f.service.install()
     expect(f.download).toHaveBeenCalledTimes(2)
   })
-  it('starts one owned foreground daemon then requires an explicit browser selection', async () => {
+  it('starts one owned foreground daemon with a thirty-minute session idle window and requires explicit browser selection', async () => {
     const f = await fixture()
     await f.service.install()
     const [first, second] = await Promise.all([f.service.connect(), f.service.connect()])
     expect(first.status.state).toBe('needs_browser_selection')
     expect(second.status.state).toBe(first.status.state)
     expect(f.start).toHaveBeenCalledOnce()
-    expect(f.start.mock.calls[0][1]).toEqual(['daemon', 'start', '--foreground'])
+    expect(f.start.mock.calls[0][1]).toEqual(['daemon', 'start', '--foreground', '--session-idle', '30m'])
     expect(f.start.mock.calls[0][2]).toMatchObject({ BSK_AUTO_START: '0', BSK_HOME: join(f.root, 'browser-state') })
     const configured = await f.service.configure({ enabled: true, browserInstanceId: 'chrome-synthetic', origins: ['https://example.com'], interaction: 'observe', expectedRevision: first.status.revision })
     expect(configured.status).toMatchObject({ state: 'ready', enabled: true, browserInstanceId: 'chrome-synthetic', origins: ['https://example.com'] })
-    f.service.dispose()
+    await f.service.dispose()
     expect(f.child.kill).toHaveBeenCalledWith('SIGTERM')
   })
-  it('reuses a reachable shared daemon and never claims its process', async () => {
+  it('reuses a reachable shared daemon without starting, changing idle settings or claiming its process', async () => {
     const f = await fixture()
     await f.service.install()
     f.setOnline()
     expect((await f.service.connect()).status.state).toBe('needs_browser_selection')
-    f.service.dispose()
+    expect(f.run).toHaveBeenCalledTimes(2)
+    expect(f.run).toHaveBeenNthCalledWith(1, expect.anything(), ['status'])
+    expect(f.run).toHaveBeenNthCalledWith(2, expect.anything(), ['status'])
+    await f.service.dispose()
     expect(f.start).not.toHaveBeenCalled()
     expect(f.child.kill).not.toHaveBeenCalled()
+    expect(f.signal).not.toHaveBeenCalled()
+    await expect(readFile(join(f.root, 'owned-daemon.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+  it('preserves only the detached CLI process and records its exact ownership for the next launch', async () => {
+    const f = await fixture()
+    await f.service.install()
+    await f.service.connect()
+    const config = await f.service.configuration()
+    const ownership = JSON.parse(await readFile(join(f.root, 'owned-daemon.json'), 'utf8'))
+    expect(ownership).toEqual({ pid: 7, fingerprint: 'synthetic-owned-birth', executablePath: config.executablePath,
+      executableHash: config.executableHash, homeDirectory: join(f.root, 'browser-state') })
+    await f.service.dispose({ preserveDaemon: true })
+    expect(f.child.kill).not.toHaveBeenCalled()
+    expect(f.signal).not.toHaveBeenCalled()
+    expect(f.child.unref).toHaveBeenCalledOnce()
+    expect(f.child.stdout.destroyed).toBe(true)
+    expect(f.child.stderr.destroyed).toBe(true)
+    expect(JSON.parse(await readFile(join(f.root, 'owned-daemon.json'), 'utf8'))).toEqual(ownership)
+    await expect(f.service.connect()).rejects.toThrow('browser_service_disposed')
+    await f.service.dispose()
+    expect(f.child.kill).not.toHaveBeenCalled()
+  })
+  it.each([false, true])('recovers exact ownership across service instances with preserveDaemon=%s', async preserveDaemon => {
+    const f = await fixture()
+    await f.service.install()
+    await f.service.connect()
+    await f.service.dispose({ preserveDaemon: true })
+    const next = new ManagedBrowserSkillService(f.deps)
+    services.push(next)
+    expect(await next.connect()).toMatchObject({ status: { ownedDaemon: true } })
+    expect(f.start).toHaveBeenCalledOnce()
+    await next.dispose({ preserveDaemon })
+    if (preserveDaemon) expect(f.signal).not.toHaveBeenCalled()
+    else expect(f.signal).toHaveBeenCalledWith(7, 'SIGTERM')
+    expect(f.child.kill).not.toHaveBeenCalled()
+  })
+  it.each(['fingerprint', 'homeDirectory', 'executablePath', 'executableHash', 'pid'])('does not adopt or signal a persisted daemon with mismatched %s', async field => {
+    const f = await fixture()
+    await f.service.install()
+    await f.service.connect()
+    await f.service.dispose({ preserveDaemon: true })
+    const path = join(f.root, 'owned-daemon.json')
+    const ownership = JSON.parse(await readFile(path, 'utf8'))
+    ownership[field] = field === 'pid' ? 8 : 'mismatched'
+    await writeFile(path, JSON.stringify(ownership))
+    const next = new ManagedBrowserSkillService(f.deps)
+    services.push(next)
+    expect(await next.connect()).toMatchObject({ status: { ownedDaemon: false } })
+    await next.dispose()
+    expect(f.signal).not.toHaveBeenCalled()
+    expect(f.child.kill).not.toHaveBeenCalled()
+    expect(f.start).toHaveBeenCalledOnce()
+  })
+  it('does not signal a PID recycled after ownership was restored', async () => {
+    const f = await fixture()
+    await f.service.install()
+    await f.service.connect()
+    f.identity.mockImplementation(pid => ({ pid, fingerprint: 'another-process-birth' }))
+    await f.service.dispose()
+    expect(f.child.kill).not.toHaveBeenCalled()
+    expect(f.signal).not.toHaveBeenCalled()
+  })
+  it('does not claim or signal a daemon whose birth fingerprint could not be verified', async () => {
+    const f = await fixture()
+    await f.service.install()
+    f.identity.mockReturnValue(null)
+    await expect(f.service.connect()).rejects.toThrow('browser_daemon_identity_unverified')
+    await f.service.dispose()
+    expect(f.child.kill).not.toHaveBeenCalled()
+    expect(f.signal).not.toHaveBeenCalled()
+    expect(f.child.unref).toHaveBeenCalled()
+    await expect(readFile(join(f.root, 'owned-daemon.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+  it('does not signal an owned process when the executable bytes have changed', async () => {
+    const f = await fixture()
+    const installed = await f.service.install()
+    await f.service.connect()
+    await writeFile(installed.status.executablePath!, 'different executable')
+    await f.service.dispose()
+    expect(f.child.kill).not.toHaveBeenCalled()
+    expect(f.signal).not.toHaveBeenCalled()
+  })
+  it('does not start a daemon when disposal begins during initial diagnosis', async () => {
+    const f = await fixture()
+    await f.service.install()
+    let finish!: (value: BrowserCommandResult) => void
+    f.run.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const connection = f.service.connect()
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+    const disposal = f.service.dispose({ preserveDaemon: true })
+    finish({ ok: false, output: { message: 'automatic daemon startup is disabled (BSK_AUTO_START=0)' } })
+    await Promise.all([connection, disposal])
+    expect(f.start).not.toHaveBeenCalled()
   })
   it('rejects stale revisions and keeps the previous scope', async () => {
     const f = await fixture()

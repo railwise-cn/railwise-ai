@@ -269,18 +269,39 @@ export class TaskScheduleService {
   private validateBrowserDispatches(task: TaskRun, actions: BrowserScheduleAction[]) {
     const receipts = this.deps.repository.operations(task.id)
     const dispatches = receipts.filter(receipt => receipt.kind === 'browser_action_dispatch')
-    if (receipts.some(receipt => receipt.kind === 'browser_schedule_action_outcome' && receipt.status === 'outcome_unknown')) browserOutcomeUnknown()
+    if (receipts.some(receipt => receipt.kind === 'browser_schedule_action_outcome' && receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
     const matches = (target: Record<string, unknown>) => actions.some(action => action.action === target.action && action.pageUrl === target.pageUrl &&
       action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === target.browserInstanceId &&
       action.browserRevision === target.browserRevision)
     for (const dispatch of dispatches) {
+      if (record(dispatch.result).readbackPending === true) throw Object.assign(new Error('浏览器已确认动作，但页面结果尚未读取，不能保存计划。请只读观察原页面。'), { code: 'browser_readback_blocked' })
+      if (this.deps.repository.verifiedOperationResolution(dispatch)?.evidence.kind === 'human_confirmation') {
+        if (!matches(dispatch.request ?? {})) browserScopeRequired('已核对的浏览器动作已离开持续授权范围。')
+        continue
+      }
       if (dispatch.status === 'failed') continue
       if (dispatch.status !== 'succeeded') browserOutcomeUnknown()
       if (!matches(dispatch.request ?? {})) browserScopeRequired('已执行的浏览器动作缺少匹配的持续授权。')
     }
     for (const [index, receipt] of receipts.entries()) {
       if (receipt.kind !== 'tool' || !['browser_click', 'browser_fill', 'browser_press'].includes(String(receipt.request?.toolName))) continue
+      if (this.deps.repository.verifiedOperationResolution(receipt)?.evidence.kind === 'human_confirmation') {
+        const dispatch = dispatches.find(candidate => candidate.request?.turnId === receipt.request?.turnId && candidate.request?.toolName === receipt.request?.toolName &&
+          candidate.request?.argumentsHash === receipt.request?.argumentsHash && this.deps.repository.verifiedOperationResolution(candidate)?.evidence.kind === 'human_confirmation')
+        if (!dispatch || !matches(dispatch.request ?? {})) browserScopeRequired('已核对的浏览器回执与原始动作范围不一致。')
+        continue
+      }
       const output = browserOutput(receipt)
+      if (output.recovered === true && record(output.evidence).kind === 'human_confirmation') {
+        const dispatch = dispatches.find(candidate => candidate.id === output.dispatchReceiptId)
+        const resolution = dispatch && this.deps.repository.verifiedOperationResolution(dispatch)
+        const reuse = receipts.find(candidate => candidate.id === output.reuseReceiptId && candidate.kind === 'browser_action_reuse' && candidate.status === 'succeeded' &&
+          candidate.request?.dispatchId === dispatch?.id && candidate.request?.turnId === receipt.request?.turnId &&
+          candidate.request?.toolName === receipt.request?.toolName && candidate.request?.argumentsHash === receipt.request?.argumentsHash)
+        if (!dispatch || !matches(dispatch.request ?? {}) || !reuse || !resolution ||
+          fingerprint(record(reuse.result).evidence) !== fingerprint(resolution.evidence) || fingerprint(output.evidence) !== fingerprint(resolution.evidence)) browserScopeRequired('已核对动作的复用凭据与当前工具请求不一致。')
+        continue
+      }
       if (receipt.status === 'outcome_unknown' || output.status === 'outcome_unknown' || receipt.status === 'running') browserOutcomeUnknown()
       if (receipt.status === 'prepared' && receipt.request?.dispatchTracking === 'host-v1') continue
       if (receipt.status === 'failed' && (record(receipt.result).approved === false ||
@@ -352,7 +373,7 @@ export class TaskScheduleService {
       const approved = listApprovedBrowserScheduleActions(this.deps.repository, source)
       if (authority.scope.browserScheduleActions.some(action => !approved.some(candidate => fingerprint(candidate) === fingerprint(action)))) fail('计划浏览器动作已撤销或范围已变化，请重新审阅。')
       if (this.deps.repository.operations(source.id, 'browser_schedule_action_outcome').some(receipt =>
-        receipt.status === 'outcome_unknown' && receipt.request?.scheduleId === `schedule_${source.id}`)) {
+        receipt.status === 'outcome_unknown' && receipt.request?.scheduleId === `schedule_${source.id}` && !this.deps.repository.verifiedOperationResolution(receipt))) {
         throw Object.assign(new Error('browser_schedule_outcome_unknown'), { code: 'browser_schedule_outcome_unknown' })
       }
     }

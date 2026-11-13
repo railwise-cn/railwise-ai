@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
@@ -10,6 +10,8 @@ import { browserEnvironment, compatibleBrowserProtocol, object, parseBrowserStat
 import type { BrowserSkillConfigureRequest, ManagedBrowserSkillResult, ManagedBrowserSkillStatus } from '../../shared/managed-browser-skill'
 import { atomicWriteFile, runSerialized } from './durable-file'
 import { downloadManagedDependency, managedDependency, type ManagedDependency } from './managed-dependency-download'
+import { processIdentity } from '../../../kun/src/services/process-identity.js'
+import type { ProcessIdentity } from '../../../kun/src/contracts/execution.js'
 
 const executeFile = promisify(execFile)
 export const BROWSER_SKILL_VERSION = '0.4.0'
@@ -23,12 +25,15 @@ type Dependencies = {
   target?: { platform: string; arch: string }
   run?: BrowserCommandRunner
   download?: (asset: ManagedDependency) => Promise<Buffer>
-  start?: (path: string, args: string[], env: NodeJS.ProcessEnv) => ChildProcessWithoutNullStreams
+  start?: (path: string, args: string[], env: NodeJS.ProcessEnv) => ChildProcess
+  identity?: (pid: number) => ProcessIdentity | null
+  signal?: (pid: number, signal: NodeJS.Signals) => void
   version?: (path: string) => Promise<string>
   wait?: () => Promise<void>
   asset?: ManagedDependency
 }
 const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
+type DaemonOwnership = ProcessIdentity & { executablePath: string; executableHash: string; homeDirectory: string }
 
 /** Main owns installation and the daemon it starts. Existing shared daemons remain externally owned. */
 export class ManagedBrowserSkillService {
@@ -41,8 +46,13 @@ export class ManagedBrowserSkillService {
   private readonly version: NonNullable<Dependencies['version']>
   private readonly wait: () => Promise<void>
   private readonly asset?: ManagedDependency
-  private ownedDaemon?: ChildProcessWithoutNullStreams
+  private readonly identity: NonNullable<Dependencies['identity']>
+  private readonly signal: NonNullable<Dependencies['signal']>
+  private ownedDaemon?: DaemonOwnership
+  private daemonChild?: ChildProcess
   private connection?: Promise<ManagedBrowserSkillResult>
+  private disposal?: Promise<void>
+  private disposed = false
 
   constructor(deps: Dependencies = {}) {
     this.root = resolve(deps.root ?? join(process.env.WORKWISE_TOOLS_ROOT || join(homedir(), '.workwise', 'tools'), 'browser-skill'))
@@ -50,13 +60,38 @@ export class ManagedBrowserSkillService {
     this.target = deps.target ?? { platform: process.platform, arch: process.arch }
     this.run = deps.run ?? runBrowserCommand
     this.download = deps.download ?? downloadManagedDependency
-    this.start = deps.start ?? ((path, args, env) => spawn(path, args, { env, shell: false, windowsHide: true, stdio: 'pipe' }))
+    this.start = deps.start ?? ((path, args, env) => spawn(path, args, { env, shell: false, windowsHide: true, detached: true, stdio: 'ignore' }))
+    this.identity = deps.identity ?? processIdentity
+    this.signal = deps.signal ?? ((pid, signal) => { process.kill(pid, signal) })
     this.version = deps.version ?? (async path => String((await executeFile(path, ['--version'], { shell: false, windowsHide: true, timeout: 10_000, maxBuffer: 64 * 1024 })).stdout).trim())
     this.wait = deps.wait ?? (() => new Promise(resolveWait => setTimeout(resolveWait, 500)))
     this.asset = deps.asset
   }
 
   private path(): string { return join(this.root, 'connection.json') }
+  private ownershipPath(): string { return join(this.root, 'owned-daemon.json') }
+
+  private async verifiedOwner(config: BrowserCapabilityConfig, candidate: unknown, expectedPid?: number): Promise<DaemonOwnership | undefined> {
+    const value = object(candidate)
+    if (!Number.isSafeInteger(value.pid) || Number(value.pid) < 1 || typeof value.fingerprint !== 'string' ||
+      value.fingerprint.startsWith('unverified:') || expectedPid !== undefined && value.pid !== expectedPid ||
+      value.executablePath !== config.executablePath || value.executableHash !== config.executableHash ||
+      value.homeDirectory !== (config.homeDirectory ?? this.homeDirectory) || value.homeDirectory !== this.homeDirectory ||
+      typeof value.executablePath !== 'string' || typeof value.executableHash !== 'string') return undefined
+    const current = this.identity(Number(value.pid))
+    if (!current || current.fingerprint !== value.fingerprint) return undefined
+    try {
+      if (digest(await readFile(value.executablePath)) !== value.executableHash) return undefined
+    } catch { return undefined }
+    return { ...current, executablePath: value.executablePath, executableHash: value.executableHash, homeDirectory: this.homeDirectory }
+  }
+
+  private async restoreOwnership(config: BrowserCapabilityConfig, pid: number): Promise<void> {
+    if (this.disposed) return
+    let saved: unknown
+    try { saved = JSON.parse(await readFile(this.ownershipPath(), 'utf8')) } catch { return }
+    this.ownedDaemon = await this.verifiedOwner(config, saved, pid)
+  }
 
   async configuration(): Promise<BrowserCapabilityConfig> {
     try { return BrowserCapabilityConfig.parse(JSON.parse(await readFile(this.path(), 'utf8'))) }
@@ -128,8 +163,9 @@ export class ManagedBrowserSkillService {
             message: absent ? '浏览器服务尚未启动，请点击连接浏览器。' : '无法核验浏览器连接，请检查诊断后重试。' }
         } else {
           const status = parseBrowserStatus(response.output)
+          await this.restoreOwnership(config, status.pid)
           const selected = status.browsers.find(browser => browser.id === config.browserInstanceId)
-          next = { ...next, daemonProtocolVersion: status.protocolVersion, browsers: status.browsers,
+          next = { ...next, ownedDaemon: Boolean(this.ownedDaemon), daemonProtocolVersion: status.protocolVersion, browsers: status.browsers,
             state: !compatibleBrowserProtocol(status.protocolVersion) ? 'protocol_mismatch'
               : !status.browsers.some(browser => browser.connected) ? 'needs_extension'
                 : !selected?.connected ? 'needs_browser_selection'
@@ -155,6 +191,7 @@ export class ManagedBrowserSkillService {
   }
 
   connect(): Promise<ManagedBrowserSkillResult> {
+    if (this.disposed) return Promise.reject(new Error('browser_service_disposed'))
     if (this.connection) return this.connection
     const connection = this.connectOnce().finally(() => { if (this.connection === connection) this.connection = undefined })
     this.connection = connection
@@ -163,20 +200,33 @@ export class ManagedBrowserSkillService {
 
   private async connectOnce(): Promise<ManagedBrowserSkillResult> {
     let result = await this.diagnose()
-    if (result.status.state !== 'daemon_stopped') return result
+    if (this.disposed || result.status.state !== 'daemon_stopped') return result
     if (!this.ownedDaemon) {
       const config = result.status
       // Diagnose verified the fixed executable before this explicit launch.
       if (!config.executablePath || digest(await readFile(config.executablePath)) !== config.executableHash) throw new Error('browser_executable_changed')
-      const child = this.start(config.executablePath, ['daemon', 'start', '--foreground'], browserEnvironment(config.homeDirectory))
-      this.ownedDaemon = child
-      child.stdout.resume()
-      child.stderr.resume()
-      const clear = (): void => { if (this.ownedDaemon === child) this.ownedDaemon = undefined }
+      if (this.disposed) return result
+      const child = this.start(config.executablePath, ['daemon', 'start', '--foreground', '--session-idle', '30m'], browserEnvironment(config.homeDirectory))
+      this.daemonChild = child
+      child.stdout?.resume()
+      child.stderr?.resume()
+      const clear = (): void => {
+        if (this.daemonChild === child) { this.daemonChild = undefined; this.ownedDaemon = undefined }
+      }
       child.once('close', clear)
       child.once('error', clear)
+      let identity = child.pid ? this.identity(child.pid) : null
+      if (!identity) { await this.wait(); identity = child.pid ? this.identity(child.pid) : null }
+      if (!identity || identity.fingerprint.startsWith('unverified:')) {
+        child.unref()
+        throw new Error('browser_daemon_identity_unverified')
+      }
+      const ownership = { ...identity, executablePath: config.executablePath, executableHash: config.executableHash!, homeDirectory: this.homeDirectory }
+      this.ownedDaemon = ownership
+      await atomicWriteFile(this.ownershipPath(), JSON.stringify(ownership, null, 2) + '\n')
     }
     for (let attempt = 0; attempt < 10; attempt += 1) {
+      if (this.disposed) break
       await this.wait()
       result = await this.diagnose()
       if (result.status.state !== 'daemon_stopped') return result
@@ -185,10 +235,32 @@ export class ManagedBrowserSkillService {
     return result
   }
 
-  dispose(): void {
-    const child = this.ownedDaemon
-    this.ownedDaemon = undefined
-    if (child && child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
+  dispose(options: { preserveDaemon?: boolean } = {}): Promise<void> {
+    if (this.disposal) return this.disposal
+    this.disposed = true
+    this.disposal = (async () => {
+      await this.connection?.catch(() => undefined)
+      const child = this.daemonChild
+      const owned = this.ownedDaemon
+      this.daemonChild = undefined
+      this.ownedDaemon = undefined
+      try {
+        if (options.preserveDaemon || !owned) return
+        const config = await this.configuration()
+        if (!await this.verifiedOwner(config, owned)) return
+        // Verify the birth fingerprint again immediately before signalling a
+        // PID that may have been recycled during the executable read.
+        if (this.identity(owned.pid)?.fingerprint !== owned.fingerprint) return
+        if (child?.pid === owned.pid && child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
+        else this.signal(owned.pid, 'SIGTERM')
+      } finally {
+        child?.stdin?.destroy()
+        child?.stdout?.destroy()
+        child?.stderr?.destroy()
+        child?.unref()
+      }
+    })()
+    return this.disposal
   }
 }
 

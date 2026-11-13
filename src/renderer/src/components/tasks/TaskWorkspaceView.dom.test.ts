@@ -126,6 +126,13 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('keeps detailed task permissions closed until the user opens them', async () => {
+    await click('Monthly report')
+    const summary = [...container.querySelectorAll('details > summary')].find(item => item.textContent === i18n.t('common:taskPermissionReview'))
+    expect(summary).toBeTruthy()
+    expect((summary!.parentElement as HTMLDetailsElement).open).toBe(false)
+  })
+
   it('opens an authorized external artifact by task identity and displays its file name', async () => {
     const openTaskArtifact = vi.fn(async () => ({ ok: true as const }))
     Object.assign(window.workwise, { openTaskArtifact })
@@ -311,11 +318,47 @@ describe('TaskWorkspaceView', () => {
     expect(onOpenThread).not.toHaveBeenCalled()
   })
 
+  it('uses the browser review command and preserves a paused task after explicit human confirmation', async () => {
+    const pending = { ...task('browser-review', 'paused', 'Review original query'), revision: 7 }
+    tasks = [pending]; inbox = []
+    const receipt: TaskOperationReceiptV1 = { id: 'browser-receipt', taskId: pending.id, purpose: 'browser_action',
+      provider: 'browser-skill', operation: 'click', toolName: 'browser_click', requestHash: 'a'.repeat(64), status: 'outcome_unknown',
+      browser: { action: 'click', pageUrl: 'https://example.com/notices', canReview: true }, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([receipt])
+    vi.mocked(window.workwise.verifyTaskOperationReceipt).mockResolvedValue({ taskId: pending.id, receiptId: receipt.id, status: 'outcome_unknown',
+      browserReview: { id: 'review-1', action: 'click', pageUrl: 'https://example.com/notices', observationText: 'Public query completed', expiresAt: new Date(Date.now() + 120_000).toISOString() } })
+    const runtimeRequest = vi.mocked(window.workwise.runtimeRequest)
+    runtimeRequest.mockImplementation(async path => {
+      if (path.endsWith('/browser-confirm')) {
+        tasks = [{ ...pending, revision: 8 }]
+        return { ok: true, status: 200, body: JSON.stringify({ taskId: pending.id, receiptId: receipt.id, status: 'verified', evidence: { kind: 'human_confirmation', provider: 'browser-skill', operation: 'click', target: 'https://example.com/notices', status: 'public_query_confirmed_by_user', verified: true, verifiedAt: new Date().toISOString(), resultHash: 'b'.repeat(64) } }) }
+      }
+      return { ok: true, status: 200, body: '{}' }
+    })
+    await act(async () => { await refreshTaskState() })
+    await click('In progress')
+    await click('Check the original page')
+    const checkbox = container.querySelector<HTMLInputElement>('[aria-label="Review this browser operation"] input[type="checkbox"]')!
+    expect(checkbox).toBeTruthy()
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    await act(async () => checkbox.click())
+    await click('Save my confirmation')
+    const request = runtimeRequest.mock.calls.find(([path]) => path.endsWith('/browser-confirm'))!
+    expect(request[0]).toBe('/v1/tasks/browser-review/receipts/browser-receipt/browser-confirm')
+    expect(request[1]).toBe('POST')
+    expect(JSON.parse(request[2]!)).toEqual({ expectedRevision: 7, idempotencyKey: expect.any(String), reviewId: 'review-1', decision: 'confirmed_complete' })
+    expect(tasks[0].status).toBe('paused')
+    expect(tasks[0].revision).toBe(8)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.appendTaskInput).not.toHaveBeenCalled()
+  })
+
   it('uses the browser business review without exposing technical fingerprints in task attention', async () => {
     const summary = ['确认浏览器操作', '站点 "https://example.com"', '动作 "填写网页输入框"', '目标 "采购关键词"',
       '输入内容 "轨道交通监测"', `输入摘要 "${'a'.repeat(64)}"`, `目标摘要 "${'b'.repeat(64)}"`, `请求摘要 "${'c'.repeat(64)}"`,
       '授权期限 "仅本次操作"', '操作说明 "执行后读取页面核验。"'].join('\n')
     inbox = [{ ...approval, message: summary }]
+    tasks = tasks.map(item => item.id === approval.taskId ? { ...item, waitingReason: summary } : item)
     await act(async () => refreshTaskState())
     await click('Needs you')
     expect(container.textContent).toContain('采购关键词')

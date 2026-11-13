@@ -1,5 +1,10 @@
 import type { TaskRunV1 } from './agent-workbench'
 
+/** Approval packets belong to the review card, never to compact progress surfaces. */
+export function taskProgressReason(task: Pick<TaskRunV1, 'status' | 'waitingReason' | 'stalledReason'>, approvalHint: string): string | undefined {
+  return task.status === 'waiting_approval' ? approvalHint : task.stalledReason || task.waitingReason
+}
+
 /** Older delivery tasks stored execution instructions as their visible goal. */
 export function taskDisplayGoal(task: Pick<TaskRunV1, 'goal' | 'templateId'>): string {
   if (task.templateId && /^完成(?:监测报告|招投标技术文件|研究与文档)任务，持续推进到可审阅成果。\r?\n\r?\n用户目标：/.test(task.goal)) {

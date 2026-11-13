@@ -1,4 +1,5 @@
-import { BrowserTaskBindingConfirmation } from '../../contracts/browser-skill.js'
+import { BrowserTaskBindingConfirmation, BrowserOperationConfirmation } from '../../contracts/browser-skill.js'
+import { browserReceiptProjection } from '../../services/browser-operation-verification.js'
 import { hostShellReceiptProjection } from '../../services/host-shell-verification.js'
 import { z } from 'zod'
 import { TaskControlService } from '../../services/task-control-service.js'
@@ -149,7 +150,18 @@ export function getTaskOperationReceipts(runtime: ServerRuntime, taskId: string)
       createdAt: receipt.createdAt, updatedAt: receipt.updatedAt }]
   })
   const hostShell = runtime.taskRepository.operations(taskId, 'host_shell').map(hostShellReceiptProjection)
-  return jsonResponse([...receipts, ...deliveries, ...hostShell])
+  const browser = runtime.taskRepository.operations(taskId, 'tool').flatMap(receipt => browserReceiptProjection(runtime.taskRepository!, receipt))
+  return jsonResponse([...receipts, ...deliveries, ...hostShell, ...browser])
+}
+
+export async function confirmBrowserOperationReceipt(runtime: ServerRuntime, taskId: string, receiptId: string, request: Request): Promise<JsonResponse | Response> {
+  if (!runtime.confirmBrowserOperationReceipt) return ERRORS.unavailable('browser verification is unavailable')
+  const body = await readJsonBody(request)
+  if (!body.ok) return body.response
+  const parsed = BrowserOperationConfirmation.safeParse(body.value)
+  if (!parsed.success) return ERRORS.validation('invalid browser confirmation request', parsed.error.issues)
+  try { return jsonResponse(await runtime.confirmBrowserOperationReceipt(taskId, receiptId, parsed.data)) }
+  catch (error) { return taskError(error) }
 }
 
 export async function verifyTaskOperationReceipt(runtime: ServerRuntime, taskId: string, receiptId: string, request: Request): Promise<JsonResponse | Response> {
@@ -303,6 +315,7 @@ function numericQuery(url: URL, key: string, fallback: number, max: number): num
 function taskError(error: unknown): JsonResponse {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
   const message = error instanceof Error ? error.message : String(error)
+  if (/^browser_review_/.test(code) || ['browser_binding_changed', 'browser_review_task_not_waiting', 'execution_grant_revoked', 'execution_grant_scope', 'workspace_trust_changed', 'network_scope_blocked', 'task_permission_revoked', 'task_permission_expired'].includes(code)) return jsonResponse({ code, message }, 409)
   if (code === 'model_provider_unavailable') return jsonResponse({ code, message }, 400)
   if (code === 'not_found') return ERRORS.notFound(message)
   if (['stale_request', 'invalid_state', 'turn_in_progress', 'idempotency_conflict','outcome_unknown','external_effect_retry_blocked'].includes(code)) return code==='external_effect_retry_blocked'?jsonResponse({code,message},409):ERRORS.conflict(message)

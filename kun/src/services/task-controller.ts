@@ -482,6 +482,9 @@ export class TaskController {
       task = this.updateExecution(task.id, task.revision, current => ({ ...current, artifacts, updatedAt: this.nowIso() }))
     }
     if (unsettled.length) return this.stallUnknown(task, unsettled.map(operation => operation.id))
+    if (this.repository.operations(task.id, 'browser_action_dispatch').some(receipt => receipt.status === 'succeeded' && (receipt.result as { readbackPending?: boolean } | undefined)?.readbackPending === true)) {
+      return this.waitForCapability(task, turnId, browserRecoveryCapability('browser_readback_blocked', this.nowIso()), 'browser_readback_blocked')
+    }
     const permissionBlock = this.waitForToolPermission(task, items.filter(item => item.turnId === turnId), turnId)
     if (permissionBlock) return permissionBlock
     if (hostShell.pending.length) return this.retry(task,'已授权命令仍有待核验回执，请使用 host_shell_session 只读轮询原命令，不能重新执行或仅用文字交付。',`host-shell-pending:${hostShell.pending.map(operation => operation.id).join(',')}`,turnId)
@@ -644,14 +647,18 @@ export class TaskController {
     const denied = [...items].reverse().find(item => item.kind === 'tool_result' && item.isError && item.output && typeof item.output === 'object' &&
       ['sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
         'browser_interaction_scope_required', 'browser_binding_changed', 'browser_schedule_authority_changed',
-        'browser_schedule_action_scope_changed', 'browser_schedule_action_scope_required', 'browser_schedule_outcome_unknown'].includes(String((item.output as Record<string, unknown>).code)) &&
+        'browser_schedule_action_scope_changed', 'browser_schedule_action_scope_required', 'browser_schedule_outcome_unknown',
+        'browser_control_required', 'browser_sync_blocked', 'browser_sync_target_changed', 'browser_readback_blocked'].includes(String((item.output as Record<string, unknown>).code)) &&
+      !((item.output as Record<string, unknown>).code === 'browser_readback_blocked' && !this.repository.operations(task.id, 'browser_action_dispatch').some(receipt => (receipt.result as { readbackPending?: boolean } | undefined)?.readbackPending === true)) &&
       !this.resolvedBrowserScopeRequest(task, item, items, turnId))
     if (!denied || denied.kind !== 'tool_result') return null
     const code = String((denied.output as Record<string, unknown>).code)
     const legacyBrowserEvidenceMissing = code === 'browser_schedule_action_scope_required' && String((denied.output as { error?: string }).error ?? '').startsWith('旧操作缺少可核对的执行前页面或逐次目标审批凭据')
     const browserBlock = code === 'browser_interaction_scope_required' || code === 'browser_binding_changed'
     let capability: CapabilityPreflight
-    if (code.startsWith('browser_schedule_')) {
+    if (['browser_control_required', 'browser_sync_blocked', 'browser_sync_target_changed', 'browser_readback_blocked'].includes(code)) {
+      capability = browserRecoveryCapability(code, this.nowIso())
+    } else if (code.startsWith('browser_schedule_')) {
       const resolution = task.scheduledBy
         ? { kind: 'grant' as const, route: `flow/${task.scheduledBy.scheduleId}`, label: '查看并核对定时计划' }
         : { kind: 'retry' as const, route: 'task/schedule-review', label: '继续原任务并审阅周期动作' }
@@ -673,6 +680,10 @@ export class TaskController {
     } else {
       capability = workspacePermissionCapability(code, code === 'network_scope_blocked' ? '本次操作的网络目标超出当前任务授权，请确认所需的网络范围后继续原任务。' : '本次文件操作缺少对应的任务权限，请确认目标路径的读写范围后继续原任务。')
     }
+    return this.waitForCapability(task, turnId, capability, code)
+  }
+
+  private waitForCapability(task: TaskRun, turnId: string, capability: CapabilityPreflight, code: string): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> {
     const attentionId = `capability_${task.id}`
     const fingerprint = `permission:${turnId}:${code}`
     const now = this.nowIso()
@@ -700,7 +711,7 @@ export class TaskController {
     const request = this.repository.operations(task.id, 'browser_action_scope_request').find(receipt => receipt.status === 'succeeded' &&
       receipt.request?.turnId === turnId && receipt.request?.toolName === denied.toolName &&
       receipt.request?.argumentsHash === operation?.request?.argumentsHash)?.request
-    if (!request || this.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown')) return false
+    if (!request || this.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !this.repository.verifiedOperationResolution(receipt))) return false
     const sameTarget = (candidate: Record<string, unknown>) => ['action', 'pageUrl', 'elementHash', 'valueHash', 'browserInstanceId', 'browserRevision']
       .every(key => candidate[key] === request[key])
     const approved = listApprovedBrowserScheduleActions(this.repository, task).find(action => sameTarget(action))
@@ -919,6 +930,13 @@ export class TaskController {
       this.assertToken(token)
       const key = `tool:${turnId}:${call.callId}`
       const argumentsHash = operationFingerprint(call.arguments)
+      if (['browser_click', 'browser_fill'].includes(call.toolName)) {
+        const resolved = this.repository.operations(token.taskId, 'tool').find(receipt => receipt.request?.toolName === call.toolName &&
+          receipt.request?.argumentsHash === argumentsHash && this.repository.verifiedOperationResolution(receipt)?.evidence.kind === 'human_confirmation')
+        const proof = resolved && this.repository.verifiedOperationResolution(resolved)
+        if (resolved && proof) return { key: resolved.idempotencyKey, token, prior: { approved: true,
+          item: makeToolResultForVerifiedResolution(this.repository.get(token.taskId)!, turnId, call, proof.evidence) } }
+      }
       const unresolved = this.repository.operations(token.taskId, 'tool').find(receipt =>
         receipt.idempotencyKey !== key && receipt.status === 'outcome_unknown' &&
         receipt.request?.toolName === call.toolName && receipt.request?.argumentsHash === argumentsHash &&
@@ -1087,6 +1105,7 @@ export class TaskController {
     // An already-dispatched result is immutable evidence even after lease loss.
     const prior = this.repository.operation(token.taskId, key)
     if (!prior || prior.status === 'succeeded') return
+    if (!result && prior.status === 'failed' && prior.result) return
     if (!result && prior.status === 'prepared' && prior.request?.dispatchTracking === 'host-v1') {
       const task = this.repository.get(token.taskId)!
       result = { approved: false, item: makeToolResultItem({ id: `item_${prior.request.callId}`, threadId: task.threadId,
@@ -1808,4 +1827,14 @@ function activeExecutionMs(task: TaskRun, now: string): number {
 function approvalAuthorityFingerprint(grant: ExecutionGrant): string {
   const { id: _id, turnId: _turnId, idempotencyKey: _idempotencyKey, issuedAt: _issuedAt, expiresAt: _expiresAt, ...authority } = grant
   return operationFingerprint(authority)
+}
+
+function browserRecoveryCapability(code: string, checkedAt: string): CapabilityPreflight {
+  const resolution = { kind: 'connect' as const, route: 'marketplace', label: '查看浏览器连接与控制状态' }
+  return { provider: 'browser-skill', status: 'blocked', errorCode: code,
+    message: code === 'browser_control_required' ? '浏览器当前由你控制或已暂停自动操作。请在原浏览器的 BrowserSkill 控制条交还控制，检查连接后再单独继续原任务；系统不会抢占控制或重复动作。'
+      : code === 'browser_readback_blocked' ? '浏览器已确认网页动作，但后续页面读取失败。请检查原浏览器与连接后继续，系统将只读核对原页面，不能重复动作或交付为已完成。'
+        : '原网页观察已失效，系统已进行一次有限刷新并停止继续尝试。请检查原浏览器页面和连接，再单独继续任务；目标或输入变化需重新审阅。',
+    credentialState: 'unknown', networkState: 'unknown', workspaceState: 'allowed', sandboxState: 'allowed', approvalState: 'required',
+    action: resolution, resolution, checkedAt }
 }

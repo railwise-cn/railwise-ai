@@ -385,6 +385,7 @@ export function isManagedRuntimeChildRunning(): boolean {
 }
 
 export type StartManagedRuntimeChildOptions = {
+  allowStart?: () => boolean
   autoInstallBundledAgentPack?: boolean
   autoInstallBundledSpecialistSkills?: boolean
   candidateRoot?: string
@@ -417,6 +418,10 @@ export async function startManagedRuntimeChild(
   settings: AppSettingsV1,
   options: StartManagedRuntimeChildOptions = {}
 ): Promise<void> {
+  const assertStartAllowed = (): void => {
+    if (options.allowStart?.() === false) throw new Error('runtime_shutdown_in_progress')
+  }
+  assertStartAllowed()
   const candidateRoot = options.candidateRoot?.trim()
   const runtime = {
     ...resolveManagedRuntimeForStart(settings, Boolean(candidateRoot), options.runtimeToken),
@@ -538,6 +543,7 @@ export async function startManagedRuntimeChild(
   documentExportBridge = startedExportBridge
   try {
     child = await safeSpawn(resolution.command, args, {
+    beforeSpawn: assertStartAllowed,
     env: {
       ...runtimeEnvironment,
       [MCP_PATH_ENV_KEY]: resolveMcpToolPath(process.env, homeDir),
@@ -1481,7 +1487,8 @@ function waitForChildExit(process: ChildProcess, timeoutMs: number): Promise<boo
       resolve(exited)
     }
     const onExit = (): void => settle(true)
-    const onError = (): void => settle(true)
+    // A failed kill or IPC operation is not a process-exit acknowledgement.
+    const onError = (): void => settle(false)
     process.once('exit', onExit)
     process.once('error', onError)
   })

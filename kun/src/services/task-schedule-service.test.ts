@@ -100,6 +100,39 @@ function fixture() {
 }
 
 describe('task-owned recurring execution', () => {
+  it.each([false, true])('keeps original action scope checks for human-confirmed unknown dispatches (drift=%s)', async drift => {
+    const f = fixture()
+    f.approveBrowserAction('fill')
+    const argumentsHash = 'f'.repeat(64)
+    const dispatch = f.browserDispatch('fill', 'outcome_unknown', { argumentsHash,
+      ...(drift ? { pageUrl: 'https://example.test/changed' } : {}) })
+    const tool = f.browserTool('browser_fill', { status: 'outcome_unknown', request: { argumentsHash } })
+    const evidence = { kind: 'human_confirmation' as const, provider: 'browser-skill', operation: 'fill', target: String(dispatch.request!.pageUrl),
+      status: 'public_query_confirmed_by_user', verified: true, verifiedAt: new Date().toISOString(), resultHash: 'human-proof' }
+    for (const original of [dispatch, tool]) {
+      const key = `human-proof-${original.id}`
+      const proof = f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: key, kind: 'effect_verification',
+        request: { originalReceiptId: original.id, originalFingerprint: original.fingerprint }, nowIso: new Date().toISOString() }).receipt
+      f.repository.finishOperation(f.task.id, key, { status: 'succeeded', result: { evidence } })
+      f.repository.resolveOperation(f.task.id, original.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, resolvedAt: new Date().toISOString() })
+    }
+    if (drift) await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+    else await expect(f.service.create(f.context)).resolves.toMatchObject({ enabled: true })
+  })
+  it('does not persist a plan while an acknowledged browser action still lacks page readback', async () => {
+    const f = fixture()
+    f.approveBrowserAction('fill')
+    const dispatch = f.browserDispatch('fill')
+    f.repository.finishOperation(f.task.id, dispatch.idempotencyKey, { status: 'succeeded', result: {
+      actionAcknowledged: true, acknowledgementHash: 'ack-hash', readbackPending: true } })
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_readback_blocked' })
+    expect(f.flows.list()).toHaveLength(0)
+    expect(f.service.assessCompletion(f.task)).not.toBeNull()
+    f.repository.finishOperation(f.task.id, dispatch.idempotencyKey, { status: 'succeeded', result: {
+      actionAcknowledged: true, acknowledgementHash: 'ack-hash', readbackPending: false, readbackHash: 'page-hash' } })
+    await expect(f.service.create(f.context)).resolves.toMatchObject({ enabled: true })
+  })
+
   it('uses discoverable tools to create and read back both times before accepting completion', async () => {
     const f = fixture()
     const tools = buildTaskScheduleToolProvider(() => f.service).tools

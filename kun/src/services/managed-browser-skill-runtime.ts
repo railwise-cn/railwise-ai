@@ -187,6 +187,14 @@ export class ManagedBrowserSkillRuntime {
 
   async stopThread(threadId: string): Promise<void> {
     await Promise.all([...this.sessions].filter(([, owned]) => owned.threadId === threadId).map(async ([sessionId, owned]) => {
+      const task = this.options.repository.get(owned.taskId)
+      // Aborting a Turn must not destroy the only readback surface of an
+      // in-flight/unknown action. The external browser remains idle across an
+      // ordinary Runtime exit; explicit task cancellation still closes it.
+      const pending = this.options.repository.operations(owned.taskId, 'browser_action_dispatch').some(receipt =>
+        ['running', 'prepared', 'outcome_unknown'].includes(receipt.status) && !this.options.repository.verifiedOperationResolution(receipt) &&
+        (!receipt.request?.sessionId || receipt.request.sessionId === sessionId))
+      if (task?.status !== 'cancelled' && pending) return
       try {
         const response = await runBrowserCommand(owned.config, ['session', 'stop', sessionId])
         const result = object(response.output)

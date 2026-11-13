@@ -89,7 +89,8 @@ export type ServerRuntime = {
   confirmBrowserTaskBinding?(taskId: string, input: import('../../contracts/browser-skill.js').BrowserTaskBindingConfirmation): { binding: import('../../contracts/browser-skill.js').BrowserTaskBindingSnapshot; resumed: false }
   refreshBrowserSkill?: () => Promise<unknown>
   refreshSkills?: () => Promise<unknown>
-  verifyTaskOperationReceipt?: (taskId: string, receiptId: string, input: { expectedRevision: number; idempotencyKey: string }) => Promise<import('../../services/external-operation-verification.js').OperationVerificationResult | import('../../services/host-shell-verification.js').HostShellVerificationResult>
+  verifyTaskOperationReceipt?: (taskId: string, receiptId: string, input: { expectedRevision: number; idempotencyKey: string }) => Promise<import('../../services/external-operation-verification.js').OperationVerificationResult | import('../../services/host-shell-verification.js').HostShellVerificationResult | import('../../services/browser-operation-verification.js').BrowserVerificationResult>
+  confirmBrowserOperationReceipt?: (taskId: string, receiptId: string, input: import('../../contracts/browser-skill.js').BrowserOperationConfirmation) => Promise<import('../../services/browser-operation-verification.js').BrowserVerificationResult>
   taskContextRuntime?: TaskContextRuntime
   capacityManager?: CapacityManager
   taskController?: TaskController

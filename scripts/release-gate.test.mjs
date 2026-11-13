@@ -327,6 +327,9 @@ test('release Electron mirror is scoped to the checksummed runtime preparation s
 
 test('private exact updater smoke consumes this run’s package once without a rebuild or publication', () => {
   assert.equal(input('exact_package_updater_smoke').default, false)
+  assert.doesNotMatch(input('exact_package_updater_smoke').description, /0\.5\.4/)
+  assert.equal(input('exact_updater_base_version').type, 'string')
+  assert.equal(input('exact_updater_base_version').default, '0.5.6')
   const smoke = jobs['exact-package-updater-smoke']
   assert.deepEqual(smoke.needs, ['prepare', 'build-macos'])
   assert.match(smoke.if, /inputs\.exact_package_updater_smoke == true/)
@@ -336,7 +339,8 @@ test('private exact updater smoke consumes this run’s package once without a r
   assert.equal(download.with.name, 'release-mac')
   assert.equal(download.with['run-id'], undefined, 'artifact must belong to this run')
   const launch = smoke.steps.find(step => /--target-dist=/.test(step.run ?? ''))
-  assert.match(launch.run, /--base-version=0\.5\.4/)
+  assert.equal(launch.env.BASE_VERSION, '${{ inputs.exact_updater_base_version }}')
+  assert.match(launch.run, /--base-version="\$\{BASE_VERSION\}"/)
   assert.match(launch.run, /--target-version="\$\{TARGET_VERSION\}"/)
   assert.doesNotMatch(JSON.stringify(smoke), /npm run dist|electron-builder|publish-r2|gh release|deploy-website-release|REVIEWED_BUILD_JSON/)
   const signing = jobs['build-macos'].steps.find(step => step.name === 'Resolve signing mode')
@@ -754,15 +758,14 @@ test('evidence paths reject line breaks before writing workflow outputs', t => {
   f.verify(f.tagRelease(), /must not contain line breaks/)
 })
 
-function currentPolicyFixture(t, { changedFiles = {}, sourceVersion = '0.5.5', exact = false } = {}) {
-  const version = '0.5.5'
-  const f = releaseFixture(t, sourceVersion, version, { previousTag: 'v0.5.4', changedFiles,
+function currentPolicyFixture(t, { changedFiles = {}, version = '0.5.5', sourceVersion = version, previousTag = 'v0.5.4', exact = false } = {}) {
+  const f = releaseFixture(t, sourceVersion, version, { previousTag, changedFiles,
     sourceFiles: {
       '.github/workflows/release.yml': 'jobs:\n  build:\n    env:\n      WORKWISE_APP_VERSION: ${{ needs.prepare.outputs.version }}\n',
       'electron-builder.cjs': 'const releaseAppVersion = process.env.WORKWISE_APP_VERSION; module.exports = { extraMetadata: { version: releaseAppVersion } }\n',
     } })
   f.manifest.schemaVersion = 2
-  f.manifest.release.previousTag = 'v0.5.4'
+  f.manifest.release.previousTag = previousTag
   delete f.manifest.package.screenshots
   f.manifest.acceptance = { installedPackage: { status: 'passed', path: `${f.base}/installed-package.md`, sourceHead: f.reviewedSourceHead } }
   f.manifest.checks = {
@@ -908,16 +911,15 @@ test('curated 0.5.6 publication notes can follow an accepted package', t => {
   assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
 })
 
-test('current rename release accepts original same-run native smoke without inventing a frozen receipt', t => {
-  const f = currentPolicyFixture(t, { exact: true })
+function addExactUpdaterEvidence(f, baseVersion) {
   f.manifest.release.updaterPathChanged = true
   const build = f.manifest.package.reviewedBuild
-  f.machineReport.baseVersion = '0.5.4'
-  f.machineReport.baselineIdentity.version = '0.5.4'
-  f.machineReport.baselineAsset = { tag: 'v0.5.4', ...resolveUpdaterBaseline('0.5.4').pins.arm64 }
-  f.machineReport.dataSeed.serviceIdentity.packageVersion = '0.5.4'
-  f.nativeReport.baseVersion = '0.5.4'
-  f.nativeReport.stages.at(-1).detail = '0.5.4'
+  f.machineReport.baseVersion = baseVersion
+  f.machineReport.baselineIdentity.version = baseVersion
+  f.machineReport.baselineAsset = { tag: `v${baseVersion}`, ...resolveUpdaterBaseline(baseVersion).pins.arm64 }
+  f.machineReport.dataSeed.serviceIdentity.packageVersion = baseVersion
+  f.nativeReport.baseVersion = baseVersion
+  f.nativeReport.stages.at(-1).detail = baseVersion
   delete f.machineReport.reviewedBuild
   f.machineReport.privatePackage = { sourceHead: build.sourceHead, artifactRunId: build.runId, artifactName: 'release-mac', files: structuredClone(build.files.filter(file => file.artifact === 'release-mac')) }
   f.machineReport.provenance = { repository: build.repository, workflowPath: build.workflowPath, workflowRef: build.workflowRef,
@@ -926,8 +928,38 @@ test('current rename release accepts original same-run native smoke without inve
     workflowRun: { repository: build.repository, workflowPath: build.workflowPath, headRef: build.headRef, workflowRef: build.workflowRef,
       workflowSha: build.workflowSha, sourceHead: build.sourceHead, runId: build.runId, runAttempt: build.runAttempt,
       artifact: { id: 88, name: `exact-package-updater-${build.runId}`, digest: `sha256:${'d'.repeat(64)}` } } }
+}
+
+test('current rename release accepts original same-run native smoke without inventing a frozen receipt', t => {
+  const f = currentPolicyFixture(t, { exact: true })
+  addExactUpdaterEvidence(f, '0.5.4')
   f.recordEvidence()
   assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('0.5.7 exact smoke binds the independently declared 0.5.6 baseline through machine and native reports', async t => {
+  const changes = {
+    passed: () => {},
+    missingDeclaration: f => { delete f.manifest.acceptance.updaterRoundTrip.baseVersion },
+    mismatchedDeclaration: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = '0.5.4' },
+    unpinnedBaseline: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = '0.5.9' },
+    remoteBaseline: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = 'https://example.invalid/baseline.dmg' },
+    machineBaseline: f => { f.machineReport.baseVersion = '0.5.4' },
+    nativeBaseline: f => { f.nativeReport.baseVersion = '0.5.4' },
+    nonceBaseline: f => { f.nativeReport.stages.at(-1).detail = '0.5.4' },
+    otherInstaller: f => { f.machineReport.baselineAsset.name = 'https://example.invalid/installer.dmg' },
+    installerHash: f => { f.machineReport.baselineAsset.sha256 = '0'.repeat(64) }
+  }
+  for (const [name, change] of Object.entries(changes)) await t.test(name, t => {
+    const f = currentPolicyFixture(t, { exact: true, version: '0.5.7', previousTag: 'v0.5.6' })
+    addExactUpdaterEvidence(f, '0.5.6')
+    f.manifest.acceptance.updaterRoundTrip.baseVersion = '0.5.6'
+    change(f)
+    f.recordEvidence()
+    const releaseHead = f.tagRelease()
+    if (name === 'passed') assert.match(f.verify(releaseHead), /verified v0\.5\.7/)
+    else assert.throws(() => f.verify(releaseHead))
+  })
 })
 
 test('required CI verifies actual API source, repository, run attempt and successful quality job', async t => {

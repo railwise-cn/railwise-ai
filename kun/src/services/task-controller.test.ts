@@ -805,6 +805,60 @@ describe('TaskController reliability boundaries', () => {
     }
   })
 
+  it.each(['browser_control_required', 'browser_sync_blocked', 'browser_sync_target_changed'])('stops a browser recovery loop and keeps one actionable card for %s', async code => {
+    const f = await fixture('使用浏览器查询公告。')
+    try {
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      await f.sessionStore.appendItem(f.thread.id, makeToolResultItem({ id: `blocked-${code}`, threadId: f.thread.id,
+        turnId: 'turn_reliability', callId: 'blocked', toolName: 'browser_fill', isError: true, output: { status: 'failed', code } }))
+      expect(await f.controller.assessNonRetryableBlock(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'waiting_user' })
+      expect(await f.controller.assessNonRetryableBlock(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'waiting_user' })
+      expect(f.repository.attention(`capability_${f.task.id}`)?.payload).toMatchObject({ kind: 'capability_required',
+        capability: { provider: 'browser-skill', errorCode: code, resolution: { route: 'marketplace' } } })
+      expect(f.repository.events(f.task.id).filter(event => event.kind === 'task_waiting_user')).toHaveLength(1)
+      expect(f.repository.get(f.task.id)?.status).toBe('waiting_user')
+    } finally { f.repository.close() }
+  })
+
+  it('keeps an unscheduled browser report waiting after action ACK until a new readback completes', async () => {
+    const f = await fixture('使用浏览器核对公告正文并生成和交付 report.html 网页文件。')
+    try {
+      const current = f.repository.get(f.task.id)!
+      f.repository.update(current.id, current.revision, task => ({ ...task, acceptance: { kind: 'files',
+        requiredNodeKinds: ['execute', 'verify', 'deliver'], requireFinalResponse: true, requireActionableArtifactCard: true,
+        requiredFormats: ['html'], minimumArtifacts: 1, requiresWebEvidence: true, requiredSourceOrigins: ['https://example.test'] } }))
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      await writeFile(join(f.root, 'report.html'), '<!doctype html><html lang="zh-CN"><head><title>公告核对报告</title></head><body><h1>公告核对报告</h1><p>原文来源已核对。</p></body></html>')
+      await f.sessionStore.appendItem(f.thread.id, makeToolResultItem({ id: 'write-report', threadId: f.thread.id,
+        turnId: 'turn_reliability', callId: 'write-report', toolName: 'write', output: { path: join(f.root, 'report.html') } }))
+      const readCall = { callId: 'previous-read', toolName: 'browser_get_html', arguments: { sessionId: 'original-session' } }
+      const read = f.controller.beginToolOperation('turn_reliability', readCall)!
+      const readResult = { approved: true, item: makeToolResultItem({ id: 'previous-read-result', threadId: f.thread.id,
+        turnId: 'turn_reliability', callId: readCall.callId, toolName: readCall.toolName, output: { status: 'succeeded',
+          sourceUrl: 'https://example.test/search', resultHash: 'previous-page-hash', evidence: { verified: true, contentRead: true } } }) }
+      f.controller.finishToolOperation(read.token, read.key, readResult)
+      await f.sessionStore.appendItem(f.thread.id, readResult.item)
+      f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: 'acked-action', kind: 'browser_action_dispatch',
+        request: { turnId: 'turn_reliability', toolName: 'browser_fill', sessionId: 'original-session' }, nowIso: '2026-07-18T00:00:00.000Z' })
+      f.repository.finishOperation(f.task.id, 'acked-action', { status: 'succeeded', result: {
+        actionAcknowledged: true, acknowledgementHash: 'ack-hash', readbackPending: true } })
+      await f.sessionStore.appendItem(f.thread.id, makeAssistantTextItem({ id: 'report-final', threadId: f.thread.id,
+        turnId: 'turn_reliability', text: '公告正文已核对，HTML 报告已生成并交付。', status: 'completed' }))
+      const waiting = await f.controller.assessCandidate(f.thread.id, 'turn_reliability')
+      expect(waiting).toMatchObject({ kind: 'waiting_user', task: { status: 'waiting_user', artifacts: [{ relativePath: 'report.html', validation: 'valid' }] } })
+      expect(f.repository.attention(`capability_${f.task.id}`)?.payload).toMatchObject({ kind: 'capability_required',
+        capability: { errorCode: 'browser_readback_blocked', resolution: { route: 'marketplace' } } })
+      expect(f.repository.events(f.task.id).some(event => event.kind === 'task_completed')).toBe(false)
+      expect(f.repository.operations(f.task.id, 'browser_action_dispatch')).toMatchObject([{ status: 'succeeded', result: { readbackPending: true } }])
+      // Provider coverage proves only a successful full read of this original session clears the flag.
+      f.repository.finishOperation(f.task.id, 'acked-action', { status: 'succeeded', result: {
+        actionAcknowledged: true, acknowledgementHash: 'ack-hash', readbackPending: false, readbackHash: 'new-page-hash' } })
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      expect(await f.controller.assessCandidate(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'completed' })
+      expect(f.repository.operations(f.task.id, 'browser_action_dispatch')).toHaveLength(1)
+    } finally { f.repository.close() }
+  })
+
   it('records task, turn, and artifact validation spans without storing the absolute artifact path', async () => {
     const { root, repository, sessionStore, spans, controller, task } = await fixture(
       '请生成并交付 result.md Markdown 文件。'

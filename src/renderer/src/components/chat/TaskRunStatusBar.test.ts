@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskRunV1 } from '@shared/agent-workbench'
 import { taskNeedsAttention, taskProgress } from './TaskRunStatusBar'
+import { taskProgressReason } from '@shared/task-presentation'
 
 function task(status: TaskRunV1['status']): TaskRunV1 {
   return {
@@ -15,6 +16,11 @@ function task(status: TaskRunV1['status']): TaskRunV1 {
 }
 
 describe('task run presentation', () => {
+  it('keeps raw approval commands and hashes out of compact progress while preserving actionable non-approval reasons', () => {
+    const packet = `确认浏览器操作\n输入摘要 "${'a'.repeat(64)}"\nrequest_host_shell {"command":"private command"}`
+    expect(taskProgressReason({ ...task('waiting_approval'), waitingReason: packet }, 'Review the pending operation')).toBe('Review the pending operation')
+    expect(taskProgressReason({ ...task('stalled'), stalledReason: 'Check the original page' }, 'Review')).toBe('Check the original page')
+  })
   it('reports deterministic node progress', () => expect(taskProgress(task('running'))).toEqual({ completed: 1, total: 2 }))
   it('draws attention to stalled and failed tasks', () => {
     expect(taskNeedsAttention(task('stalled'))).toBe(true)

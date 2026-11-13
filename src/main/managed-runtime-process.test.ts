@@ -7,6 +7,7 @@ import { configureLogger } from './logger'
 import { McpConfigService } from './services/mcp-config-service'
 import { decryptStringWithCredentialHelper } from './services/im-credential-helper'
 import { loadOrCreateFlowSecretStoreKey } from './services/flow-secret-store-key'
+import { createConfirmedQuit, stopRuntimeAfterCleanup } from './runtime/confirmed-shutdown'
 import {
   defaultClawSettings,
   defaultKeyboardShortcuts,
@@ -112,6 +113,33 @@ afterEach(async () => {
 })
 
 describe('startManagedRuntimeChild', () => {
+  it('prevents a late Runtime spawn when shutdown closes admission during asynchronous preparation', async () => {
+    const marker = join(tempRoot!, 'late-runtime-started')
+    const script = writeScript('late-runtime.js', [
+      `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`,
+      "process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 43129 }) + '\\n')",
+      'setInterval(() => {}, 1000)'
+    ].join('\n'))
+    let release!: (key: string) => void
+    vi.mocked(loadOrCreateFlowSecretStoreKey).mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    const module = await import('./managed-runtime-process')
+    let allowed = true
+    const starting = module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false, allowStart: () => allowed })
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    allowed = false
+    release('synthetic-flow-key')
+    await expect(starting).rejects.toMatchObject({ cause: { message: 'runtime_shutdown_in_progress' } })
+    expect(module.isManagedRuntimeChildRunning()).toBe(false)
+    expect(readdirSync(tempRoot!)).not.toContain('late-runtime-started')
+    await expect(module.startManagedRuntimeChild(createSettings(script), { allowStart: () => false })).rejects.toThrow('runtime_shutdown_in_progress')
+    // A failed update preparation can reopen its existing state-based guard.
+    // The process layer must not turn that temporary state into a permanent latch.
+    allowed = true
+    await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false, allowStart: () => allowed })
+    expect(module.isManagedRuntimeChildRunning()).toBe(true)
+    expect(readFileSync(marker, 'utf8')).toBe('started')
+  })
+
   it.skipIf(process.platform !== 'darwin')('starts the real child assembly after a protected MCP credential timeout while preserving the saved configuration', async () => {
     const homeDir = join(tempRoot!, 'home')
     const workwiseHome = join(homeDir, '.workwise')
@@ -152,6 +180,83 @@ describe('startManagedRuntimeChild', () => {
     expect(module.isManagedRuntimeChildRunning()).toBe(true)
     await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true, timeoutMs: 1000 })).resolves.toBeUndefined()
     expect(module.isManagedRuntimeChildRunning()).toBe(false)
+  })
+
+  it('keeps the application alive until a real owned Runtime exits after the former five-second GUI deadline', async () => {
+    const marker = join(tempRoot!, 'runtime-stopped')
+    const script = writeScript('slow-normal-stop.js', [
+      "process.on('SIGTERM', () => setTimeout(() => {",
+      `  require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'stopped')`,
+      '  process.exit(0)',
+      '}, 5200))',
+      "process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }) + '\\n')",
+      'setInterval(() => {}, 1000)'
+    ].join('\n'))
+    const module = await import('./managed-runtime-process')
+    await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
+    const quit = vi.fn(() => {
+      expect(module.isManagedRuntimeChildRunning()).toBe(false)
+      expect(readFileSync(marker, 'utf8')).toBe('stopped')
+    })
+    const onFailure = vi.fn()
+    const requestQuit = createConfirmedQuit({
+      stop: () => stopRuntimeAfterCleanup({
+        cleanup: async () => {},
+        // Exercise the same normal stop implementation with room for the
+        // fixture's explicit delayed exit, without a second GUI deadline.
+        stopRuntime: () => module.stopManagedRuntimeChildAndWait({ timeoutMs: 6500 }),
+        isRuntimeRunning: module.isManagedRuntimeChildRunning
+      }), quit, onFailure
+    })
+    const startedAt = Date.now()
+    await expect(requestQuit()).resolves.toBe(true)
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(5000)
+    expect(quit).toHaveBeenCalledTimes(1)
+    expect(onFailure).not.toHaveBeenCalled()
+  }, 15_000)
+
+  it('keeps a live Runtime tracked and blocks quit when signalling fails without an exit event', async () => {
+    const spawnModule = await import('./services/safe-spawn')
+    const realSpawn = spawnModule.safeSpawn
+    let owned: Awaited<ReturnType<typeof realSpawn>> | undefined
+    const spawnSpy = vi.spyOn(spawnModule, 'safeSpawn').mockImplementationOnce(async (...args) => {
+      owned = await realSpawn(...args)
+      return owned
+    })
+    const script = writeScript('signal-failure.js', [
+      "process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }) + '\\n')",
+      'setInterval(() => {}, 1000)'
+    ].join('\n'))
+    const module = await import('./managed-runtime-process')
+    await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
+    spawnSpy.mockRestore()
+    const realKill = process.kill.bind(process)
+    const forceKill = vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid === owned!.pid && signal === 'SIGKILL') throw new Error('synthetic signal failure')
+      return realKill(pid, signal)
+    })
+    const kill = vi.spyOn(owned!, 'kill').mockImplementation(() => {
+      queueMicrotask(() => owned!.emit('error', new Error('synthetic signal failure')))
+      return false
+    })
+    try {
+      const quit = vi.fn()
+      const onFailure = vi.fn()
+      const requestQuit = createConfirmedQuit({
+        stop: () => module.stopManagedRuntimeChildAndWait({ timeoutMs: 25 }), quit, onFailure
+      })
+      await expect(requestQuit()).resolves.toBe(false)
+      expect(module.isManagedRuntimeChildRunning()).toBe(true)
+      expect(quit).not.toHaveBeenCalled()
+      expect(onFailure.mock.calls[0][0].message).toContain('exit could not be confirmed')
+    } finally {
+      forceKill.mockRestore()
+      kill.mockRestore()
+      await new Promise<void>(resolve => {
+        owned!.once('exit', () => resolve())
+        owned!.kill('SIGKILL')
+      })
+    }
   })
 
   it('blocks update installation when Runtime reports a failed shutdown', async () => {

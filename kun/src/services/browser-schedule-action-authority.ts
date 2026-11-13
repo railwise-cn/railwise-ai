@@ -70,7 +70,7 @@ export class BrowserScheduleActionAuthority {
       action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === scope?.browserInstanceId &&
       action.browserRevision === scope.revision && scope.origins.includes(action.origin))
     if (!approved) fail('browser_schedule_action_scope_required')
-    if (this.options.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown')) fail('browser_schedule_outcome_unknown')
+    if (this.options.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !this.options.repository.verifiedOperationResolution(receipt))) fail('browser_schedule_outcome_unknown')
     if (!this.options.resolveSchedule) fail('browser_schedule_authority_changed')
     try { await this.options.resolveSchedule(context, approved.id) }
     catch (error) { fail((error as { code?: string }).code === 'browser_schedule_outcome_unknown' ? 'browser_schedule_outcome_unknown' : 'browser_schedule_authority_changed') }
@@ -94,7 +94,7 @@ export class BrowserScheduleActionAuthority {
     if (!resolved || JSON.stringify(BrowserScheduleBindingSchema.parse(resolved.binding)) !== JSON.stringify(BrowserScheduleBindingSchema.parse(captured)) || context.executionGrant?.scheduleScopeHash !== captured.scopeHash ||
       hash(resolved.actions) !== captured.actionsHash) fail('browser_schedule_action_scope_changed')
     const unresolved = this.options.repository.operations(captured.sourceTaskId, 'browser_schedule_action_outcome')
-      .some(receipt => receipt.status === 'outcome_unknown' && receipt.request?.scheduleId === captured.scheduleId)
+      .some(receipt => receipt.status === 'outcome_unknown' && receipt.request?.scheduleId === captured.scheduleId && !this.options.repository.verifiedOperationResolution(receipt))
     if (unresolved) fail('browser_schedule_outcome_unknown')
     const scope = context.executionGrant!.browserScope!
     const matched = resolved.actions.find(action => action.action === target.action && action.pageUrl === target.pageUrl &&

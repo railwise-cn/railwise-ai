@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { access, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -32,5 +32,19 @@ describe('safeSpawn', () => {
   it('returns a diagnosable error for a missing executable', async () => {
     await expect(safeSpawn('workwise-command-that-does-not-exist', []))
       .rejects.toMatchObject({ code: 'executable_unavailable' } satisfies Partial<SafeSpawnError>)
+  })
+
+  it('checks the admission fence after asynchronous path preparation and before spawning', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'workwise-spawn-fence-'))
+    temporaryPaths.push(workspace)
+    const marker = join(workspace, 'spawned.txt')
+    let allowed = true
+    const starting = safeSpawn(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], "started")', marker], {
+      workspaceRoot: workspace,
+      beforeSpawn: () => { if (!allowed) throw new Error('runtime_shutdown_in_progress') }
+    })
+    allowed = false
+    await expect(starting).rejects.toMatchObject({ cause: { message: 'runtime_shutdown_in_progress' } })
+    await expect(access(marker)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

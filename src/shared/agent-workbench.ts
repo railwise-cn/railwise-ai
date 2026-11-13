@@ -96,9 +96,10 @@ export type TaskResultEvidenceV1 = {
 
 /** Read-only projection: raw requests, results, credentials and execution IDs stay in Runtime. */
 export type TaskOperationReceiptV1 = {
-  purpose?: 'assistant_reply' | 'host_shell'
+  purpose?: 'assistant_reply' | 'host_shell' | 'browser_action'
   phase?: 'upload' | 'send'
   shell?: { canPoll?: boolean; exitCode?: number; outputSha256?: string; message?: string }
+  browser?: { action: 'click' | 'fill'; pageUrl?: string; canReview: boolean }
   id: string
   taskId: string
   provider: string
@@ -115,7 +116,9 @@ export type TaskOperationReceiptV1 = {
   updatedAt: string
 }
 
-export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown' | 'running' | 'failed'; evidence?: TaskResultEvidenceV1; errorCode?: string; shell?: { status: 'verified' | 'running' | 'failed' | 'outcome_unknown'; message: string; exitCode?: number; outputSha256?: string } }
+export type BrowserOperationReviewV1 = { id: string; expiresAt: string; action: 'click' | 'fill'; pageUrl: string; observationText: string; targetLabel?: string; value?: string }
+export type BrowserOperationConfirmationV1 = { expectedRevision: number; idempotencyKey: string; reviewId: string; decision: 'confirmed_complete' }
+export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown' | 'running' | 'failed'; evidence?: TaskResultEvidenceV1; errorCode?: string; browserReview?: BrowserOperationReviewV1; shell?: { status: 'verified' | 'running' | 'failed' | 'outcome_unknown'; message: string; exitCode?: number; outputSha256?: string } }
 
 export type TaskPermissionScopeV1 = {
   readPaths?: string[]; writePaths?: string[]; networkOrigins?: string[]; providerIds?: string[]; externalTargets?: string[]

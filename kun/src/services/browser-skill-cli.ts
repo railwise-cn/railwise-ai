@@ -6,7 +6,16 @@ import { promisify } from 'node:util'
 import { BrowserInstance, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 
 const executeFile = promisify(execFile)
-export type BrowserCommandResult = { ok: boolean; output: unknown; code?: string; outcomeUnknown?: boolean }
+export type BrowserCommandResult = { ok: boolean; output: unknown; code?: string; outcomeUnknown?: boolean;
+  vendorReason?: string; effectState?: 'none' | 'unknown' | 'committed' }
+/** Fixed vendor diagnostic scalars only; messages/recovery text can contain page data. */
+export function browserCommandDiagnostics(result: BrowserCommandResult): Pick<BrowserCommandResult, 'vendorReason' | 'effectState'> {
+  const data = object(object(result.output).data)
+  const reason = result.vendorReason ?? data.reason
+  const effect = result.effectState ?? data.effect_state
+  return { ...(typeof reason === 'string' && /^[a-z][a-z0-9_]{0,99}$/.test(reason) ? { vendorReason: reason } : {}),
+    ...(['none', 'unknown', 'committed'].includes(String(effect)) ? { effectState: effect as 'none' | 'unknown' | 'committed' } : {}) }
+}
 export type BrowserCommandRunner = (config: Pick<BrowserCapabilityConfig, 'executablePath' | 'executableHash' | 'homeDirectory'>, args: readonly string[], signal?: AbortSignal) => Promise<BrowserCommandResult>
 
 export function browserEnvironment(homeDirectory?: string): NodeJS.ProcessEnv {
@@ -29,8 +38,9 @@ export const runBrowserCommand: BrowserCommandRunner = async (config, args, sign
     let output: unknown
     try { output = JSON.parse(String(failure.stdout ?? '')) } catch { output = undefined }
     const code = object(output).code
-    return { ok: false, output, code: typeof code === 'string' ? code : failure.killed || failure.name === 'AbortError' ? 'browser_request_timeout' : 'browser_command_failed',
+    const result = { ok: false, output, code: typeof code === 'string' ? code : failure.killed || failure.name === 'AbortError' ? 'browser_request_timeout' : 'browser_command_failed',
       outcomeUnknown: Boolean(failure.killed || failure.name === 'AbortError' || failure.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') }
+    return { ...result, ...browserCommandDiagnostics(result) }
   }
 }
 

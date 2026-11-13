@@ -7,7 +7,7 @@ import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { TaskArtifactReview } from './TaskArtifactReview'
 import { TaskExecutionEvidence } from './TaskExecutionEvidence'
 import { currentTaskBranch } from '@shared/task-projection'
-import { taskDisplayGoal } from '@shared/task-presentation'
+import { taskDisplayGoal, taskProgressReason } from '@shared/task-presentation'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { BrowserApprovalDetails, browserApprovalFields } from '../chat/BrowserApprovalDetails'
 import { CapabilityRequiredCard } from '../chat/CapabilityRequiredCard'
@@ -435,8 +435,9 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
             const current = group ? currentTaskBranch(group.all, task).current : task
             const progress = group ? taskGroupProgress(group) : { completed: 0, total: task.nodes.length }
             const artifactCount = group ? taskGroupArtifacts(group).length : task.artifacts.length
+            const reason = taskProgressReason(current, t('taskApprovalReviewHint'))
             const hasChildAttention = group ? taskNeedsUser(task, inbox, group.children) && !taskNeedsUser(task, inbox) : false
-            return <button type="button" key={task.id} aria-pressed={selectedId === task.id} onClick={() => setSelectedId(task.id)} className={`w-full rounded-xl border bg-ds-card p-3 text-left ${selectedId === task.id ? 'border-accent ring-1 ring-accent/20' : 'border-ds-border'}`}><div className="flex items-start gap-2"><span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm font-medium">{taskDisplayGoal(task)}</span>{current.status === 'completed' && !hasChildAttention ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <ChevronRight className="h-4 w-4 shrink-0 text-ds-faint" />}</div><div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ds-muted"><span>{t(`taskRunStatus_${current.status}`)}</span><span>{progress.completed}/{progress.total}</span>{artifactCount ? <span>{t('taskWorkspaceArtifactCount', { count: artifactCount })}</span> : null}{group && group.children.length ? <span>{t('taskWorkspaceSubtaskCount', { count: group.children.length })}</span> : null}</div>{task.waitingReason || task.stalledReason ? <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{task.waitingReason || task.stalledReason}</p> : null}{allWorkspaces ? <p className="mt-2 truncate text-[11px] text-ds-faint">{task.workspaceRoot}</p> : null}</button>
+            return <button type="button" key={task.id} aria-pressed={selectedId === task.id} onClick={() => setSelectedId(task.id)} className={`w-full rounded-xl border bg-ds-card p-3 text-left ${selectedId === task.id ? 'border-accent ring-1 ring-accent/20' : 'border-ds-border'}`}><div className="flex items-start gap-2"><span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm font-medium">{taskDisplayGoal(task)}</span>{current.status === 'completed' && !hasChildAttention ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <ChevronRight className="h-4 w-4 shrink-0 text-ds-faint" />}</div><div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ds-muted"><span>{t(`taskRunStatus_${current.status}`)}</span><span>{progress.completed}/{progress.total}</span>{artifactCount ? <span>{t('taskWorkspaceArtifactCount', { count: artifactCount })}</span> : null}{group && group.children.length ? <span>{t('taskWorkspaceSubtaskCount', { count: group.children.length })}</span> : null}</div>{reason ? <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{reason}</p> : null}{allWorkspaces ? <p className="mt-2 truncate text-[11px] text-ds-faint">{task.workspaceRoot}</p> : null}</button>
           })}
           {(filter === 'attention' || filter === 'all') ? standaloneAttention.map(item => <AttentionCard key={item.id} item={item} conversationThreadId={conversationForAttention(item)} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />) : null}
           {!visible.length && !(standaloneAttention.length && (filter === 'attention' || filter === 'all')) ? <div className="rounded-xl border border-dashed border-ds-border p-7 text-center text-sm text-ds-muted">{loading ? t('taskWorkspaceLoading') : search ? t('taskWorkspaceNoMatches') : t('taskWorkspaceEmpty')}</div> : null}
@@ -457,15 +458,26 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
             {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('cancel')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Square className="h-3.5 w-3.5" />{t('taskRunCancel')}</button> : null}
           </div>
           {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} conversationThreadId={conversationForAttention(item)} workspaceRoot={selectedGroup?.all.find(task => task.id === item.taskId)?.workspaceRoot} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
-          <div className="mb-4"><TaskPermissionPanel key={(currentExecution ?? selected).id} taskId={(currentExecution ?? selected).id} revision={(currentExecution ?? selected).revision} autoLoad onConfirmed={() => void refresh()} /></div>
+          <details key={`permissions:${(currentExecution ?? selected).id}`} className="mb-4 rounded-lg border border-ds-border p-3 text-xs"><summary className="cursor-pointer font-medium">{t('taskPermissionReview')}</summary><TaskPermissionPanel key={(currentExecution ?? selected).id} taskId={(currentExecution ?? selected).id} revision={(currentExecution ?? selected).revision} autoLoad onConfirmed={() => void refresh()} /></details>
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunNodes')}</h3>
           <ol className="mb-4 space-y-1.5">{(currentExecution ?? selected).nodes.map(node => <li key={node.id} className="flex items-center gap-2 rounded-lg bg-ds-main px-3 py-2 text-xs"><span className="min-w-0 flex-1">{node.title}</span><span className="shrink-0 text-ds-muted">{t(`taskNodeStatus_${node.status}`)}</span></li>)}</ol>
           <TaskExecutionEvidence task={currentExecution ?? selected} relatedTasks={selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).members : [selected]} receipts={receipts.filter(receipt => (selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).members : [selected]).some(task => task.id === receipt.taskId))} onConfigureProvider={onConfigureProvider} onConfigureReplyDelivery={onConfigureReplyDelivery} onVerify={async receipt => {
             const owner = selectedGroup?.all.find(task => task.id === receipt.taskId)
             if (!owner) throw new Error(t('taskEffectReadbackUnconfirmed'))
             const result = await window.workwise.verifyTaskOperationReceipt(owner.id, receipt.id, { expectedRevision: owner.revision, idempotencyKey: operationKey() })
-            await refresh()
+            if (!result.browserReview) await refresh()
             return result
+          }} onConfirmBrowser={async (receipt, reviewId) => {
+            const owner = selectedGroup?.all.find(task => task.id === receipt.taskId)
+            if (!owner) throw new Error(t('taskBrowserReviewUnavailable'))
+            const response = await window.workwise.runtimeRequest(`/v1/tasks/${encodeURIComponent(owner.id)}/receipts/${encodeURIComponent(receipt.id)}/browser-confirm`, 'POST', JSON.stringify({ expectedRevision: owner.revision, idempotencyKey: operationKey(), reviewId, decision: 'confirmed_complete' }))
+            if (!response.ok) {
+              let code = 'browser_review_unavailable'
+              try { const body = JSON.parse(response.body); if (/^[a-z][a-z0-9_]{0,99}$/.test(body.message)) code = body.message } catch { /* Keep the safe scoped failure code. */ }
+              return { taskId: owner.id, receiptId: receipt.id, status: 'outcome_unknown' as const, errorCode: code }
+            }
+            await refresh()
+            return JSON.parse(response.body)
           }} />
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunArtifacts')}</h3>
           {artifactOpenError ? <p role="alert" className="mb-3 text-xs text-red-600">{artifactOpenError}</p> : null}

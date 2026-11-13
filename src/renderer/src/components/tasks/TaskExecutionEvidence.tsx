@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TaskOperationReceiptV1, TaskOperationVerificationV1, TaskResultEvidenceV1, TaskRunV1 } from '@shared/agent-workbench'
+import { BrowserOperationEvidence } from './BrowserOperationEvidence'
 
 function dateLabel(value: string): string {
   const date = new Date(value)
   return Number.isFinite(date.getTime()) ? date.toLocaleString() : value
 }
 
-export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, onConfigureProvider, onConfigureReplyDelivery }: {
+export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, onConfirmBrowser, onConfigureProvider, onConfigureReplyDelivery }: {
   task: TaskRunV1
   relatedTasks: TaskRunV1[]
   receipts: TaskOperationReceiptV1[]
   onVerify?: (receipt: TaskOperationReceiptV1) => Promise<TaskOperationVerificationV1>
+  onConfirmBrowser?: (receipt: TaskOperationReceiptV1, reviewId: string) => Promise<TaskOperationVerificationV1>
   onConfigureProvider?: (provider: string) => void
   onConfigureReplyDelivery?: () => void
 }): ReactElement | null {
@@ -41,9 +43,10 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
   }, [receipts, verifying, onVerify, verify])
   const hostShell = receipts.filter(receipt => receipt.purpose === 'host_shell')
   const deliveries = receipts.filter(receipt => receipt.purpose === 'assistant_reply')
-  const effects = receipts.filter(receipt => receipt.purpose !== 'assistant_reply' && receipt.purpose !== 'host_shell')
+  const browser = receipts.filter(receipt => receipt.purpose === 'browser_action' && (receipt.status === 'outcome_unknown' || receipt.resolution))
+  const effects = receipts.filter(receipt => receipt.purpose !== 'assistant_reply' && receipt.purpose !== 'host_shell' && receipt.purpose !== 'browser_action')
   const effect = task.acceptance.effect
-  const evidence = [...new Map(relatedTasks.flatMap(item => item.resultEvidence ?? []).map(item =>
+  const evidence = [...new Map(relatedTasks.flatMap(item => item.resultEvidence ?? []).filter(item => !(item.provider === 'browser-skill' && item.kind === 'human_confirmation')).map(item =>
     [JSON.stringify([item.provider, item.operation, item.target, item.resultHash]), item] as const)).values()]
   if (!effect && !evidence.length && !receipts.length) return null
   const provider = (name: string) => t(`taskEffectProvider_${name}`, { defaultValue: name })
@@ -58,7 +61,7 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
       {item.targetVersion ? <div><dt className="inline font-medium">{t('taskEffectTargetVersion')}: </dt><dd className="inline">{item.targetVersion}</dd></div> : null}
     </dl>
   </details>
-  return <>{hostShell.length ? <section aria-label={t('taskHostShellEvidence')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
+  return <>{browser.length ? <section aria-label={t('taskBrowserEvidence')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3"><h3 className="text-xs font-semibold">{t('taskBrowserEvidence')}</h3><ul className="mt-2 space-y-2">{browser.map(receipt => <BrowserOperationEvidence key={receipt.id} receipt={receipt} ended={['completed', 'failed', 'cancelled'].includes(relatedTasks.find(item => item.id === receipt.taskId)?.status ?? task.status)} onVerify={onVerify} onConfirm={onConfirmBrowser} onConfigure={onConfigureProvider ? () => onConfigureProvider('browser-skill') : undefined} />)}</ul></section> : null}{hostShell.length ? <section aria-label={t('taskHostShellEvidence')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
     <h3 className="text-xs font-semibold">{t('taskHostShellEvidence')}</h3>
     <ul className="mt-2 space-y-2">{hostShell.map(receipt => <li key={receipt.id} className="rounded-lg bg-ds-main p-2 text-xs">
       <p className={receipt.status === 'failed' ? 'text-red-700 dark:text-red-300' : 'text-ds-muted'}>{t(receipt.status === 'succeeded' && receipt.shell?.exitCode === 0 ? 'taskHostShellSucceeded' : `taskReceiptStatus_${receipt.status}`)}{receipt.shell?.exitCode !== undefined ? ` · ${t('taskHostShellExitCode')} ${receipt.shell.exitCode}` : ''}</p>

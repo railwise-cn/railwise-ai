@@ -62,6 +62,175 @@ function fixture() {
 }
 
 describe('typed BrowserSkill production provider', () => {
+  it('refreshes once only after an explicit vendor none rejection, reuses the reviewed target/input and then fills with the fresh context', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input aria-label="公开查询">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测' }
+    await f.execute('browser_authorize_action', { ...args, action: 'fill' })
+    const original = f.runner.getMockImplementation()!
+    let sent = 0
+    let fresh = false
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] === 'fill' && ++sent === 1) return { ok: false, output: { code: 'permission_denied', data: { reason: 'cooperation_sync_required', effect_state: 'none' } }, code: 'permission_denied' }
+      if (argv[0] === 'cooperate' && argv[1] === 'wait') { fresh = true; return { ok: true, output: { ready: true } } }
+      if (argv[0] === 'cooperate' && fresh) return { ok: true, output: { context_id: 'context-two', observation: { text: 'Fresh public search @e1' } } }
+      return original(config, argv, signal)
+    })
+    expect(await f.execute('browser_fill', args)).toMatchObject({ output: { status: 'succeeded', action: 'fill' } })
+    const calls = f.runner.mock.calls.map(([, argv]) => argv).filter(argv => argv[0] === 'fill')
+    expect(calls).toHaveLength(2)
+    expect(calls[0]).toEqual(expect.arrayContaining(['context-one', '工程监测', '@e1']))
+    expect(calls[1]).toEqual(expect.arrayContaining(['context-two', '工程监测', '@e1']))
+    expect(f.repository.operations('task', 'browser_action_dispatch').map(item => ({ status: item.status, result: item.result })))
+      .toMatchObject([{ status: 'failed', result: { notDispatched: true, effectState: 'none', vendorReason: 'cooperation_sync_required' } }, { status: 'succeeded', result: { actionAcknowledged: true, readbackPending: false } }])
+  })
+
+  it.each(['unknown', undefined] as const)('does not retry an uncertain vendor effect (%s) despite a sync-required reason', async effect => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input aria-label="公开查询">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测' }
+    await f.execute('browser_authorize_action', { ...args, action: 'fill' })
+    const original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation((config, argv, signal) => argv[0] === 'fill'
+      ? Promise.resolve({ ok: false, output: { data: { reason: 'cooperation_sync_required', ...(effect ? { effect_state: effect } : {}) } }, code: 'permission_denied' }) : original(config, argv, signal))
+    expect(await f.execute('browser_fill', args)).toMatchObject({ isError: true, output: { status: 'outcome_unknown', stage: 'action', vendorReason: 'cooperation_sync_required' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(1)
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'cooperate' && argv[1] === 'wait')).toBe(false)
+  })
+
+  it('bounds repeated vendor none rejections and gives control rejection its own durable reason without taking control', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input aria-label="公开查询">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测' }
+    await f.execute('browser_authorize_action', { ...args, action: 'fill' })
+    const original = f.runner.getMockImplementation()!
+    let reason = 'cooperation_sync_required'
+    f.runner.mockImplementation((config, argv, signal) => argv[0] === 'fill'
+      ? Promise.resolve({ ok: false, output: { data: { reason, effect_state: 'none' } }, code: 'permission_denied' }) : original(config, argv, signal))
+    expect(await f.execute('browser_fill', args)).toMatchObject({ isError: true, output: { status: 'failed', code: 'browser_sync_blocked', effectState: 'none' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(2)
+    await f.execute('browser_observe', { sessionId: 'session-one' })
+    expect(await f.execute('browser_fill', args)).toMatchObject({ isError: true, output: { code: 'browser_sync_blocked' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(2)
+    // A different input is a different reviewed action, and never inherits the old approval.
+    reason = 'control_authority_required'
+    const changed = { ...args, value: '新查询' }
+    await f.execute('browser_authorize_action', { ...changed, action: 'fill' })
+    expect(await f.execute('browser_fill', changed)).toMatchObject({ isError: true, output: { status: 'failed', code: 'browser_control_required', effectState: 'none' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(3)
+  })
+
+  it('retains an acknowledged action when readback fails, does not repeat it, and settles only after an actual readonly observation', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input aria-label="公开查询">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测' }
+    await f.execute('browser_authorize_action', { ...args, action: 'fill' })
+    const original = f.runner.getMockImplementation()!
+    let sent = false, broken = true
+    f.runner.mockImplementation((config, argv, signal) => {
+      if (argv[0] === 'fill') sent = true
+      if (sent && broken && argv[0] === 'cooperate') return Promise.resolve({ ok: false, output: { data: { reason: 'control_authority_required', effect_state: 'none' } }, code: 'permission_denied' })
+      return original(config, argv, signal)
+    })
+    expect(await f.execute('browser_fill', args)).toMatchObject({ isError: true, output: { status: 'failed', code: 'browser_readback_blocked', actionAcknowledged: true, stage: 'readback', readbackPending: true } })
+    const dispatch = f.repository.operations('task', 'browser_action_dispatch')[0]
+    expect(dispatch).toMatchObject({ status: 'succeeded', result: { actionAcknowledged: true, readbackPending: true } })
+    expect(await f.execute('browser_fill', args)).toMatchObject({ isError: true, output: { code: 'browser_readback_blocked' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(1)
+    broken = false
+    await f.execute('browser_observe', { sessionId: 'session-one' })
+    expect(f.repository.operation('task', dispatch.idempotencyKey)).toMatchObject({ status: 'succeeded', result: { readbackPending: false } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(1)
+  })
+  it('stops with an actionable sync block when the one readonly refresh fails before another page action', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input aria-label="公开查询">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测' }
+    await f.execute('browser_authorize_action', { ...args, action: 'fill' })
+    const original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation((config, argv, signal) => argv[0] === 'fill'
+      ? Promise.resolve({ ok: false, output: { data: { reason: 'cooperation_sync_required', effect_state: 'none' } }, code: 'permission_denied' })
+      : argv[0] === 'cooperate' && argv[1] === 'wait' ? Promise.resolve({ ok: false, output: {}, code: 'browser_request_timeout' }) : original(config, argv, signal))
+    expect(await f.execute('browser_fill', args)).toMatchObject({ isError: true, output: { status: 'failed', stage: 'preflight', code: 'browser_sync_blocked' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(1)
+    expect(f.repository.operations('task', 'browser_action_dispatch')).toMatchObject([{ status: 'failed', result: { notDispatched: true, effectState: 'none' } }])
+  })
+
+  it('does not settle an acknowledged action from an unchanged snapshot or an empty HTML result', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'ack-before-read', kind: 'browser_action_dispatch',
+      request: { action: 'click', sessionId: 'session-one', pageUrl: 'https://example.com/search', tabId: 7 }, nowIso: new Date().toISOString() })
+    f.repository.finishOperation('task', 'ack-before-read', { status: 'succeeded', result: { actionAcknowledged: true, readbackPending: true } })
+    const original = f.runner.getMockImplementation()!
+    let html = ''
+    f.runner.mockImplementation((config, argv, signal) => argv[0] === 'cooperate'
+      ? Promise.resolve({ ok: true, output: { context_id: 'unchanged-context', unchanged: true } })
+      : argv[0] === 'get-html' ? Promise.resolve({ ok: true, output: { tab_id: 7, html, truncated: false } }) : original(config, argv, signal))
+    expect(await f.execute('browser_observe', { sessionId: 'session-one' })).toMatchObject({ isError: true, output: { code: 'browser_readback_blocked' } })
+    await f.execute('browser_get_html', { sessionId: 'session-one' })
+    expect(f.repository.operation('task', 'ack-before-read')).toMatchObject({ status: 'succeeded', result: { readbackPending: true } })
+    // A different target cannot bypass the pending read and send another input.
+    expect(await f.execute('browser_fill', { sessionId: 'session-one', contextId: 'unchanged-context', target: '@e2', value: 'another' })).toMatchObject({ isError: true, output: { code: 'browser_readback_blocked' } })
+    html = '<html><body>当前原页面内容</body></html>'
+    expect(await f.execute('browser_observe', { sessionId: 'session-one' })).toMatchObject({ output: { status: 'succeeded', evidence: { contentRead: true } } })
+    expect(f.repository.operation('task', 'ack-before-read')).toMatchObject({ status: 'succeeded', result: { readbackPending: false } })
+    expect(f.runner.mock.calls.some(([, argv]) => ['click', 'fill', 'press'].includes(argv[0]))).toBe(false)
+  })
+
+  it('does not settle a pending action by reading or navigating to a different same-origin page', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/original' })
+    f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'original-ack', kind: 'browser_action_dispatch',
+      request: { action: 'click', sessionId: 'session-one', pageUrl: 'https://example.com/original', tabId: 7 }, nowIso: new Date().toISOString() })
+    f.repository.finishOperation('task', 'original-ack', { status: 'succeeded', result: { actionAcknowledged: true, readbackPending: true } })
+    await f.execute('browser_navigate', { sessionId: 'session-one', contextId: 'context-one', url: 'https://example.com/different' })
+    await f.execute('browser_get_html', { sessionId: 'session-one' })
+    await f.execute('browser_observe', { sessionId: 'session-one' })
+    expect(f.repository.operation('task', 'original-ack')).toMatchObject({ status: 'succeeded', result: { readbackPending: true } })
+    f.setUrl('https://example.com/original')
+    await f.execute('browser_get_html', { sessionId: 'session-one' })
+    expect(f.repository.operation('task', 'original-ack')).toMatchObject({ status: 'succeeded', result: { readbackPending: false } })
+    expect(f.runner.mock.calls.some(([, argv]) => ['click', 'fill', 'press'].includes(argv[0]))).toBe(false)
+  })
+
+  it('binds task and single-operation approval fingerprints to the full page URL on the same origin', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/first' })
+    f.setElement('<button>确认处理</button>')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1' }
+    const click = f.provider.tools.find(tool => tool.name === 'browser_click')!
+    const firstSummary = await click.approvalSummary!(args, f.context)
+    await f.execute('browser_authorize_action', { ...args, action: 'click' })
+    expect(await click.hasScopedApproval!(args, f.context)).toBe(true)
+    expect(f.repository.operations('task', 'browser_action_authorization')[0]?.request?.pageUrl).toBe('https://example.com/first')
+    await f.execute('browser_navigate', { sessionId: 'session-one', contextId: 'context-one', url: 'https://example.com/second' })
+    expect(await click.hasScopedApproval!(args, f.context)).toBe(false)
+    expect(await click.approvalSummary!(args, f.context)).not.toBe(firstSummary)
+    expect(await f.execute('browser_click', args)).toMatchObject({ isError: true, output: { code: 'browser_operation_approval_required' } })
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'click')).toBe(false)
+    // Legacy origin-only records remain readable but never authorize the new page binding.
+    const old = f.repository.operations('task', 'browser_action_authorization')[0]!
+    const { pageUrl: _pageUrl, ...legacy } = old.request!
+    f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'legacy-origin-only', kind: 'browser_action_authorization', request: legacy, nowIso: new Date().toISOString() })
+    f.repository.finishOperation('task', 'legacy-origin-only', { status: 'succeeded', result: old.result })
+    expect(await click.hasScopedApproval!(args, f.context)).toBe(false)
+    expect(f.repository.operation('task', 'legacy-origin-only')).toBeTruthy()
+  })
+
   it('persists a recoverable request before one session start and reuses the same task session', async () => {
     const f = fixture()
     expect(await f.execute('browser_session_start')).toMatchObject({ output: { sessionId: 'session-one', status: 'succeeded' } })
@@ -299,6 +468,47 @@ describe('typed BrowserSkill production provider', () => {
     expect(reviewed.summary).toContain(reviewed.requestHash)
     expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'fill')).toHaveLength(1)
   })
+  it('rejects a same-origin page change during single-operation review even when the button and arguments are identical', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/approval-one' })
+    f.setElement('<button>确认处理</button>')
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    expect(await host.execute({ callId: 'click-reviewed-page', toolName: 'browser_click', arguments: {
+      sessionId: 'session-one', contextId: 'context-one', target: '@e1'
+    } }, { ...f.context, awaitApproval: async approval => {
+      expect(approval.summary).toContain('https://example.com')
+      expect(approval.summary).toContain('页面摘要')
+      f.setUrl('https://example.com/approval-two')
+      await f.execute('browser_observe', { sessionId: 'session-one' })
+      return 'allow'
+    } })).toMatchObject({ item: { isError: true, output: { code: 'approval_target_changed' } } })
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'click')).toBe(false)
+  })
+
+  it('hashes the full page query for review drift without exposing query credentials in approval summaries', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search?code=private-code-for-review&access_token=private-token-for-review' })
+    f.setElement('<button>公开查询</button>')
+    const tool = f.provider.tools.find(item => item.name === 'browser_click')!
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1' }
+    const summary = await tool.approvalSummary!(args, f.context)
+    expect(summary).toContain('页面摘要')
+    expect(summary).not.toContain('private-code-for-review')
+    expect(summary).not.toContain('private-token-for-review')
+    expect(summary).not.toContain('access_token=')
+    f.setUrl('https://example.com/search?code=another-code&access_token=another-token')
+    await f.execute('browser_observe', { sessionId: 'session-one' })
+    expect(await tool.approvalSummary!(args, f.context)).not.toBe(summary)
+    let taskSummary = ''
+    await f.execute('browser_authorize_action', { ...args, action: 'click' }, { ...f.context, awaitApproval: async approval => { taskSummary = approval.summary; return 'allow' } })
+    expect(taskSummary).toContain('页面摘要')
+    expect(taskSummary).not.toContain('another-code')
+    expect(taskSummary).not.toContain('another-token')
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'click')).toBe(false)
+  })
+
   it('masks a password input and rejects target drift after approval without dispatch', async () => {
     const f = fixture()
     await f.execute('browser_session_start')

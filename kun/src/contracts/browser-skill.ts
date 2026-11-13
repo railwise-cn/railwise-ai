@@ -72,3 +72,11 @@ export type BrowserTaskBindingSnapshot = {
   taskId: string; taskRevision: number; browserRevision: number; browserInstanceId: string;
   browserLabel: string; previousBrowserInstanceId?: string; origins: string[]; interaction: 'observe' | 'interact'; previousInteraction?: 'observe' | 'interact'
 }
+
+export const BrowserOperationConfirmation = z.object({
+  expectedRevision: z.number().int().nonnegative(), idempotencyKey: z.string().trim().min(1).max(256),
+  reviewId: z.string().min(1).max(200), decision: z.literal('confirmed_complete')
+}).strict()
+export type BrowserOperationConfirmation = z.infer<typeof BrowserOperationConfirmation>
+export type BrowserOperationReview = { id: string; expiresAt: string; action: 'click' | 'fill'; pageUrl: string;
+  observationText: string; targetLabel?: string; value?: string }

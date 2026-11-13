@@ -28,6 +28,6 @@ describe.runIf(process.env.RAILWISE_BROWSER_INSTALL_ACCEPTANCE === '1')('officia
       expect(connected.status.daemonProtocolVersion).toBe('1.7')
       expect(connected.status.browsers).toEqual([])
       expect(await readFile(join(root, 'connection.json'), 'utf8')).toContain('0.4.0')
-    } finally { service.dispose() }
+    } finally { await service.dispose() }
   }, 300_000)
 })

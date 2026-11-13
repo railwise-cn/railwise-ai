@@ -12,7 +12,7 @@ const digest = (value: string) => createHash('sha256').update(value).digest('hex
 /** Page HTML supplies a label only. Attribute values and field contents are never copied wholesale. */
 export function browserApprovalSummary(input: {
   action: 'click' | 'fill' | 'press'; origin: string; targetHtml?: string; key?: string; value?: string;
-  requestHash: string; expiresAt?: string
+  requestHash: string; expiresAt?: string; pageUrl?: string
   schedule?: { purpose: string; requirement: ScheduleRequirement; browserLabel: string; version: string }
 }): string {
   const html = input.targetHtml ?? ''
@@ -30,6 +30,7 @@ export function browserApprovalSummary(input: {
     input.expiresAt ? '仅在本任务内对同一站点、元素和输入复用授权。页面动作可能修改网站数据，执行后读取页面核验。'
       : '页面动作可能提交或修改网站数据。授权绑定本次实际目标和输入，执行后读取页面核验。']
   const names = [...fields]
+  if (input.pageUrl) { names.push('页面摘要'); values.push(digest(input.pageUrl)) }
   if (input.schedule) {
     names.push(...actionScheduleFields)
     const execution = scheduleForRequirement(input.schedule.requirement) as { times: string[] }
@@ -42,8 +43,10 @@ export function browserApprovalSummary(input: {
 
 export function sanitizeBrowserApprovalSummary(value: string): string | undefined {
   const lines = value.split('\n')
+  const hasPageHash = lines.some(line => line.startsWith('页面摘要 '))
+  const base = [...fields, ...(hasPageHash ? ['页面摘要'] : [])]
   const names = lines[0] === '确认周期浏览器权限' ? planFields : lines[0] === HEADER
-    ? lines.length === fields.length + 1 ? fields : [...fields, ...actionScheduleFields] : []
+    ? lines.length === base.length + 1 ? base : [...base, ...actionScheduleFields] : []
   if (value.length > 400_000 || !names.length || lines.length !== names.length + 1) return undefined
   const output = [lines[0]!]
   for (const [index, name] of names.entries()) {
@@ -52,7 +55,7 @@ export function sanitizeBrowserApprovalSummary(value: string): string | undefine
     let decoded: unknown
     try { decoded = JSON.parse(lines[index + 1]!.slice(prefix.length)) } catch { return undefined }
     if (typeof decoded !== 'string') return undefined
-    if (['输入摘要', '目标摘要', '请求摘要', '授权版本'].includes(name) && !/^[a-f0-9]{64}$/.test(decoded)) return undefined
+    if (['输入摘要', '目标摘要', '请求摘要', '页面摘要', '授权版本'].includes(name) && !/^[a-f0-9]{64}$/.test(decoded)) return undefined
     output.push(`${prefix}${JSON.stringify(redactSecretText(decoded))}`)
   }
   return output.join('\n')

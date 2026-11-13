@@ -20,7 +20,7 @@ import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW, githubApi, valid
 import { reportSha256, validateUpdaterEvidenceRun, verifyRemoteUpdaterEvidence } from './verify-frozen-updater-evidence.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 import { FROZEN_BASE_VERSION, resolveUpdaterBaseline } from './frozen-release-version.mjs'
-import { validateExactUpdaterEvidenceRun, verifyRemoteExactUpdaterEvidence } from './verify-exact-updater-evidence.mjs'
+import { EXACT_UPDATER_BASE_VERSION, validateExactUpdaterEvidenceRun, verifyRemoteExactUpdaterEvidence } from './verify-exact-updater-evidence.mjs'
 
 const ROOT = process.cwd()
 
@@ -242,7 +242,7 @@ function readCommittedJson(relativePath, releaseHead, label) {
 
 function requireUpdaterEvidence(evidence, reviewedBuild, packageIdentity, version, releaseHead) {
   const exactBuild = evidence.mode === 'exact-build'
-  const baseVersion = exactBuild ? '0.5.4' : FROZEN_BASE_VERSION
+  const baseVersion = exactBuild ? evidence.baseVersion ?? EXACT_UPDATER_BASE_VERSION : FROZEN_BASE_VERSION
   const baseline = resolveUpdaterBaseline(baseVersion)
   // A prose summary or a green declaration cannot substitute for the native
   // runner's two reports, bound to the exact frozen public package bytes.
@@ -322,7 +322,7 @@ function requireUpdaterEvidence(evidence, reviewedBuild, packageIdentity, versio
   if (native.failure) fail('native updater evidence retains a failure')
   equal(reportSha256(nativeBytes), machine.nativeReportSha256, 'retained native report digest')
   const run = exactBuild
-    ? validateExactUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild, version)
+    ? validateExactUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild, version, baseVersion)
     : validateUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild.sourceHead, version)
   return { run, machineBytes, nativeBytes, mode: exactBuild ? 'exact-build' : 'frozen-public-release' }
 }

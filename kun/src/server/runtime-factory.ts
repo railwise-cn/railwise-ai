@@ -98,6 +98,7 @@ import { TurnService } from '../services/turn-service.js'
 import { UiActionService } from '../services/ui-action-service.js'
 import { TaskController } from '../services/task-controller.js'
 import { TaskRunRepository } from '../services/task-run-repository.js'
+import { BrowserOperationVerificationService } from '../services/browser-operation-verification.js'
 import { RuntimeSpanService } from '../services/runtime-span-service.js'
 import { GitCheckpointCoordinator } from '../services/git-checkpoint-coordinator.js'
 import { ReviewService } from '../services/review-service.js'
@@ -741,6 +742,9 @@ export async function createKunServeRuntime(
   const mcpRuntime = new ManagedMcpRuntime(mcpProviders, options.capabilities?.mcp, [registry, childRegistry])
   let engineeringAi: EngineeringAiOrchestrator
   const toolHost = new LocalToolHost({ registry, readTracker: true })
+  const browserVerification = new BrowserOperationVerificationService({ repository: taskRepository, controller: taskController,
+    toolHost, threadStore, workspaceTrust, flows: flowService, nowIso, browserState: () => browserRuntime.state(), browserIdentity: () => browserRuntime.identityFingerprint(),
+    validatePermission: (threadId, permissionId) => taskPermissionService.executionRestriction(threadId, permissionId) })
   const operationVerification = new ExternalOperationVerificationService({ repository: taskRepository, controller: taskController,
     toolHost, threadStore, workspaceTrust, nowIso, refreshProvider: async (provider,originalGrant) => {
       if(provider==='lark')return larkRuntime.refresh()
@@ -986,7 +990,8 @@ export async function createKunServeRuntime(
       if (!saved) throw new Error('Skill configuration is unavailable')
       return skillRuntime.updateConfiguration(saved)
     },
-    verifyTaskOperationReceipt(taskId, receiptId, input) { return hostShellVerification.handles(taskId, receiptId) ? hostShellVerification.verify(taskId, receiptId, input) : operationVerification.verify(taskId, receiptId, input) },
+    verifyTaskOperationReceipt(taskId, receiptId, input) { return browserVerification.handles(taskId, receiptId) ? browserVerification.verify(taskId, receiptId, input) : hostShellVerification.handles(taskId, receiptId) ? hostShellVerification.verify(taskId, receiptId, input) : operationVerification.verify(taskId, receiptId, input) },
+    confirmBrowserOperationReceipt(taskId, receiptId, input) { return browserVerification.confirm(taskId, receiptId, input) },
     runtimeToken: options.runtimeToken,
     insecure: options.insecure,
     allocateSeq,
