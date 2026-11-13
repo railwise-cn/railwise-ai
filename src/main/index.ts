@@ -82,6 +82,7 @@ import { migrateSchedulesToFlows } from './schedule-flow-migration'
 import { runClawScheduleMcpServerFromArgv } from './claw-schedule-mcp-server'
 import {
   clawScheduleMcpSettingsChanged,
+  restoreManagedScheduleMcpEnvironment,
   resolveRuntimeMcpJsonPath,
   syncClawScheduleMcpConfig,
   type ClawScheduleMcpLaunchConfig
@@ -1491,10 +1492,11 @@ app.whenReady().then(async () => {
       const settings = await store.load()
       const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime') : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
       const path = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'mcp.json') : resolveRuntimeMcpJsonPath()
-      const config = await loadManagedMcpConfigForRefresh(dataDir, path, snapshot.servers)
+      const managedSnapshot = restoreManagedScheduleMcpEnvironment(snapshot, await mcpConfigService.list(), settings, getClawScheduleMcpLaunchConfig())
+      const config = await loadManagedMcpConfigForRefresh(dataDir, path, managedSnapshot.servers)
       const revision = ++mcpApplyRevision
       const response = await runtimeRequest(settings, '/v1/runtime/mcp-config', {
-        method: 'POST', body: JSON.stringify({ config, environment: snapshot.environment, revision })
+        method: 'POST', body: JSON.stringify({ config, environment: managedSnapshot.environment, revision })
       })
       assertMcpConfigurationApplied(response, revision)
     })
