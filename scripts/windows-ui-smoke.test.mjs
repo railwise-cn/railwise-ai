@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
@@ -37,7 +37,8 @@ function report() {
     permissionRuntime: permissionRuntimeEvidence(),
     taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', sha256: 'a'.repeat(64), byteHashMatches: true },
       schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true },
-      preview: { automatic: true, contentVerified: true, manualEntryVerified: true },
+      preview: { automatic: true, contentVerified: true, manualEntryVerified: true,
+        layout: { workspace: { width: 560 }, availableWidth: 520, stackThresholdPx: 704, details: { width: 520, x: 20, y: 300 }, list: { x: 20, y: 20, bottom: 280 }, overflow: { workspace: 0, columns: 0, details: 0 } } },
       dueOccurrence: { clock: 'real', status: 'completed', independentTask: true, independentArtifact: true, byteHashMatches: true,
         dueAt: '2026-11-13T00:00:00Z', createdAt: '2026-11-13T00:00:10Z' } },
     resources: {
@@ -585,6 +586,74 @@ test('UI approval targeting requires the mounted task workspace, actual Chinese 
     window.document.querySelectorAll('button')[2].getClientRects = () => [{}]
     assert.equal(window.eval(expression), null)
   } finally { await window.happyDOM.close() }
+})
+
+test('browser recovery keeps the exact original task at zero Turns and model requests until a separate resume', () => {
+  const task = { id: 'task-fixture', threadId: 'thread-worker', originThreadId: 'thread-origin', goal: '合成原请求', status: 'waiting_user' }
+  const thread = { id: task.threadId, turns: [] }
+  const options = { task, thread, originThreadId: task.originThreadId, taskId: task.id, prompt: task.goal, modelRequests: 0, status: 'waiting_user' }
+  const initial = inspectWindowsBrowserRecoveryState(options)
+  for (const change of [{ modelRequests: 1 }, { task: { ...task, activeTurnId: 'unexpected' } }, { thread: { ...thread, turns: [{ id: 'old-turn' }] } },
+    { taskId: 'different' }, { originThreadId: 'different' }, { prompt: 'changed goal' }]) assert.throws(() => inspectWindowsBrowserRecoveryState({ ...options, ...change }))
+  const paused = inspectWindowsBrowserRecoveryState({ ...options, task: { ...task, status: 'paused' }, status: 'paused' })
+  const binding = { browserInstanceId: 'browser-fixed', revision: 2, origins: ['http://127.0.0.1:1234'], interaction: 'interact' }
+  const confirmed = inspectWindowsBrowserRecoveryState({ ...options, task: { ...task, status: 'paused', authority: { browserScope: binding } }, status: 'paused', binding })
+  const evidence = { taskId: task.id, threadId: task.threadId, originThreadId: task.originThreadId, fixtureOrigin: binding.origins[0],
+    initial, pausedBeforeConfiguration: paused, blockedResume: paused, confirmed, initialCapability: 'browser_disabled', blockedCapability: 'browser_task_scope_required', blockedRoute: 'task/browser-binding',
+    uiPreviewVerified: true, uiConfirmVerified: true, resumed: { taskId: task.id, threadId: task.threadId, turns: 1, firstTurnId: 'first-turn' } }
+  assert.equal(validateWindowsBrowserRecoveryEvidence(evidence, binding.browserInstanceId), true)
+  for (const key of ['initial', 'pausedBeforeConfiguration', 'blockedResume', 'confirmed']) {
+    const changed = structuredClone(evidence); changed[key].turns = 1
+    assert.throws(() => validateWindowsBrowserRecoveryEvidence(changed, binding.browserInstanceId))
+  }
+  for (const change of [{ uiPreviewVerified: false }, { uiConfirmVerified: false }, { blockedRoute: 'marketplace' }, { resumed: { ...evidence.resumed, turns: 2 } }]) {
+    assert.throws(() => validateWindowsBrowserRecoveryEvidence({ ...evidence, ...change }, binding.browserInstanceId))
+  }
+  const script = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+  const start = script.indexOf('const initial = await readRecovery(')
+  const end = script.indexOf('const uiApprovals = []', start)
+  const flow = script.slice(start, end)
+  assert.ok(flow.indexOf("'暂停'") < flow.indexOf('await installMarketplaceBrowserSkill('))
+  assert.ok(flow.indexOf('await startRealBrowserSmoke(') < flow.indexOf("'确认当前任务的浏览器范围'"))
+  assert.ok(flow.indexOf('const confirmed = await readRecovery(') < flow.lastIndexOf("'继续任务'"))
+  assert.doesNotMatch(flow, /confirmBrowserTaskBinding|runtimeRequest\([^\n]*browser-binding[^\n]*POST|authority\s*=/)
+})
+
+test('browser binding UI selection requires the actual task card, complete preview and enabled real confirmation control', async () => {
+  const { Window } = await import('happy-dom')
+  const window = new Window()
+  try {
+    const zh = JSON.parse(readFileSync(new URL('../src/renderer/src/locales/zh/common.json', import.meta.url), 'utf8'))
+    const panel = `<section aria-label="${zh.capabilityRequiredTitle}"><div><p>${zh.browserTaskBindingReview}</p><dl><dd>browser-fixed</dd><dd>http://127.0.0.1:1234</dd><dd>${zh.browserSkillAllowInteraction}</dd></dl><button>${zh.browserTaskBindingConfirm}</button></div></section>`
+    window.document.body.innerHTML = panel
+    assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
+    window.document.body.innerHTML = `<article aria-label="任务详情">${panel}</article>`
+    const detail = window.document.querySelector('article'), button = detail.querySelector('button')
+    detail.getClientRects = button.getClientRects = () => [{}]
+    button.scrollIntoView = () => undefined
+    button.getBoundingClientRect = () => ({ x: 10, y: 20, width: 20, height: 10 })
+    window.document.elementFromPoint = () => button
+    const result = JSON.parse(JSON.stringify(window.eval(windowsBrowserBindingUiExpression())))
+    assert.deepEqual(result, { point: { x: 20, y: 25 }, values: ['browser-fixed', 'http://127.0.0.1:1234', zh.browserSkillAllowInteraction] })
+    button.disabled = true
+    assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
+    button.disabled = false
+    detail.querySelector('dd').remove()
+    assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
+  } finally { await window.happyDOM.close() }
+})
+
+test('manual-preview layout keeps task details readable and stacks narrow containers using the actual rem threshold', () => {
+  const valid = report().taskExecution.preview.layout
+  assert.equal(validateWindowsTaskPreviewLayout(valid), true)
+  const smallFont = { ...structuredClone(valid), workspace: { width: 630 }, stackThresholdPx: 616, details: { width: 410, x: 220, y: 20 } }
+  assert.equal(validateWindowsTaskPreviewLayout(smallFont), true, 'A 44rem threshold must follow actual root font size')
+  for (const change of [{ details: { ...valid.details, width: 20 } }, { details: { ...valid.details, y: 20 } },
+    { overflow: { workspace: 1, columns: 2, details: 0 } }, { stackThresholdPx: Number.NaN }, { availableWidth: 0 }]) {
+    assert.throws(() => validateWindowsTaskPreviewLayout({ ...valid, ...change }))
+  }
+  assert.match(windowsTaskPreviewLayoutExpression(), /44\*parseFloat\(getComputedStyle\(document\.documentElement\)\.fontSize\)/)
+  assert.doesNotMatch(windowsTaskPreviewLayoutExpression(), /704/)
 })
 
 test('the production gate, repository projection and inbox route expose pending task approval payloads without transcript approval items', async () => {

@@ -174,6 +174,7 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.equal(report.browserSmokeRequested, true)
     assert.equal(report.taskSmokeRequested, true)
     validateWindowsBrowserEvidence(report.taskExecution?.browserSkill)
+    validateWindowsBrowserRecoveryEvidence(report.taskSetup?.browserRecovery, report.taskSetup?.browser?.browserInstanceId)
     validateWindowsScheduledQueryEvidence(report.taskExecution)
     assert.ok(report.taskExecution.dueOccurrence.browserSessionId)
     assert.notEqual(report.taskExecution.dueOccurrence.browserSessionId, report.taskExecution.browserSkill.sessionId)
@@ -243,6 +244,32 @@ export function validateWindowsPermissionRuntimeEvidence(evidence) {
   return true
 }
 
+export function validateWindowsBrowserRecoveryEvidence(evidence, browserInstanceId) {
+  assert.ok(evidence, 'The original browser task must exercise first-Turn capability recovery through its real UI')
+  for (const [key, status] of [['initial', 'waiting_user'], ['pausedBeforeConfiguration', 'paused'], ['blockedResume', 'paused'], ['confirmed', 'paused']]) {
+    const state = evidence[key]
+    assert.equal(state.taskId, evidence.taskId)
+    assert.equal(state.threadId, evidence.threadId)
+    assert.equal(state.originThreadId, evidence.originThreadId)
+    assert.equal(state.status, status)
+    assert.equal(state.turns, 0)
+    assert.equal(state.modelRequests, 0)
+  }
+  assert.equal(evidence.initialCapability, 'browser_disabled')
+  assert.equal(evidence.blockedCapability, 'browser_task_scope_required')
+  assert.equal(evidence.blockedRoute, 'task/browser-binding')
+  assert.equal(evidence.uiPreviewVerified, true)
+  assert.equal(evidence.uiConfirmVerified, true)
+  assert.equal(evidence.confirmed.binding.browserInstanceId, browserInstanceId)
+  assert.equal(evidence.confirmed.binding.interaction, 'interact')
+  assert.deepEqual(evidence.confirmed.binding.origins, [evidence.fixtureOrigin])
+  assert.equal(evidence.resumed.taskId, evidence.taskId)
+  assert.equal(evidence.resumed.threadId, evidence.threadId)
+  assert.equal(evidence.resumed.turns, 1)
+  assert.ok(evidence.resumed.firstTurnId)
+  return true
+}
+
 export function validateWindowsTaskEvidence(evidence) {
   assert.equal(evidence.model, 'local-protocol-fixture')
   assert.equal(evidence.status, 'completed')
@@ -258,12 +285,38 @@ export function validateWindowsTaskEvidence(evidence) {
   assert.equal(evidence.preview.automatic, true)
   assert.equal(evidence.preview.contentVerified, true)
   assert.equal(evidence.preview.manualEntryVerified, true)
+  validateWindowsTaskPreviewLayout(evidence.preview.layout)
   assert.equal(evidence.dueOccurrence.clock, 'real')
   assert.equal(evidence.dueOccurrence.status, 'completed')
   assert.equal(evidence.dueOccurrence.independentTask, true)
   assert.equal(evidence.dueOccurrence.independentArtifact, true)
   assert.equal(evidence.dueOccurrence.byteHashMatches, true)
   assert.ok(Date.parse(evidence.dueOccurrence.createdAt) >= Date.parse(evidence.dueOccurrence.dueAt))
+}
+
+export function windowsTaskPreviewLayoutExpression() {
+  return `(() => {
+    const workspace=document.querySelector('section[aria-label="任务"]'),details=workspace?.querySelector('article[aria-label="任务详情"]'),list=workspace?.querySelector('[aria-label="任务列表"]'),columns=workspace?.querySelector('.ds-task-workspace-columns');
+    if(!workspace || !details || !list || !columns || !details.getClientRects().length)return null;
+    const rect=node=>{const box=node.getBoundingClientRect();return {x:box.x,y:box.y,width:box.width,height:box.height,bottom:box.bottom};};
+    const css=getComputedStyle(columns);
+    return {workspace:rect(workspace),details:rect(details),list:rect(list),stackThresholdPx:44*parseFloat(getComputedStyle(document.documentElement).fontSize),availableWidth:columns.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight),
+      overflow:{workspace:workspace.scrollWidth-workspace.clientWidth,columns:columns.scrollWidth-columns.clientWidth,details:details.scrollWidth-details.clientWidth}};
+  })()`
+}
+
+export function validateWindowsTaskPreviewLayout(layout) {
+  assert.ok(layout, 'The actual manual-preview task layout must be measured')
+  assert.ok(Number.isFinite(layout.availableWidth) && layout.availableWidth > 0)
+  assert.ok(Number.isFinite(layout.stackThresholdPx) && layout.stackThresholdPx > 0)
+  assert.ok(layout.details.width >= Math.min(400, layout.availableWidth), 'The task detail must remain readable beside the actual preview')
+  for (const value of Object.values(layout.overflow)) assert.ok(value <= 1, 'The task surface must not overflow horizontally')
+  if (layout.workspace.width <= layout.stackThresholdPx) {
+    assert.ok(layout.details.width >= layout.availableWidth - 2, 'A narrow task detail must use its available width after padding')
+    assert.ok(layout.details.y >= layout.list.bottom - 1, 'The narrow task list and details must stack vertically')
+    assert.ok(Math.abs(layout.details.x - layout.list.x) <= 1)
+  }
+  return true
 }
 
 /** A protocol fixture drives the installed Runtime's real task, tools, files and schedule store. */
@@ -512,6 +565,37 @@ export function windowsFixtureApprovalResolution(inputs, approval, taskId) {
   return { status: 'allowed' }
 }
 
+export function inspectWindowsBrowserRecoveryState({ task, thread, originThreadId, taskId, prompt, modelRequests, status, binding }) {
+  assert.equal(task.id, taskId)
+  assert.equal(task.goal, prompt)
+  assert.equal(task.originThreadId, originThreadId)
+  assert.equal(thread.id, task.threadId)
+  assert.equal(task.status, status)
+  assert.equal(task.activeTurnId, undefined, 'Browser recovery must finish before this task creates its first Turn')
+  assert.equal(thread.turns.length, 0)
+  assert.equal(modelRequests, 0)
+  if (binding) assert.deepEqual(task.authority?.browserScope, binding)
+  return { taskId, threadId: task.threadId, originThreadId, status, turns: 0, modelRequests: 0, ...(binding ? { binding } : {}) }
+}
+
+export function windowsBrowserBindingUiExpression() {
+  return `(() => {
+    const detail=document.querySelector('article[aria-label="任务详情"]');
+    if(!detail || !detail.getClientRects().length)return null;
+    const candidates=Array.from(detail.querySelectorAll('section[aria-label="等待连接或授权，尚未执行"] button'))
+      .filter(button=>button.textContent.trim()==='确认本任务的浏览器范围' && !button.disabled && button.getClientRects().length);
+    if(candidates.length!==1)return null;
+    const button=candidates[0],root=button.parentElement;
+    if(!root?.textContent.includes('请核对本任务将使用的浏览器和原有站点范围。确认后可继续原任务。'))return null;
+    const values=Array.from(root.querySelectorAll('dl dd')).map(node=>node.textContent);
+    if(values.length!==3)return null;
+    button.scrollIntoView({block:'center'});
+    const box=button.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
+    if(!button.contains(document.elementFromPoint(point.x,point.y)))return null;
+    return {point,values};
+  })()`
+}
+
 export function windowsFixtureApprovalUiExpression(values, summary, { openDetails = false, businessOnly = false } = {}) {
   return `(() => {
     const detail = document.querySelector('article[aria-label="任务详情"]');
@@ -749,7 +833,7 @@ async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
     assert.equal(configured.ok, true, configured.message)
     assert.equal(configured.status.state, 'ready')
     const selected = configured.status.browsers.find(item => item.id === connected[0].id)
-    return { ...browser, cdp: browserCdp, browserLabel: selected?.label || '已选择的浏览器实例', planBrowserLabel: selected?.label || selected?.name || '已选择的浏览器实例', evidence: { ...prepared.evidence, browserInstanceId: connected[0].id, cliVersion: installed.status.version,
+    return { ...browser, cdp: browserCdp, browserLabel: selected?.label || '已选择的浏览器实例', planBrowserLabel: selected?.label || selected?.name || '已选择的浏览器实例', bindingBrowserLabel: selected?.label || selected?.name || connected[0].id, browserRevision: configured.status.revision, evidence: { ...prepared.evidence, browserInstanceId: connected[0].id, cliVersion: installed.status.version,
       cliSha256: installed.status.executableHash, protocolVersion: connected[0].protocolVersion, isolatedTestCredentialStore: true, extensionId: extension.id } }
   } catch (error) {
     const failure = error instanceof Error ? error : new Error(String(error))
@@ -1279,14 +1363,6 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       assert.equal(newThreads.length, 1, 'The normal UI must create one existing conversation before Skill installation')
       const originThreadId = newThreads[0].id
       let skillInstallation
-      if (browserSmoke) {
-        skillInstallation = await installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeRequest, originThreadId })
-        realBrowser = await startRealBrowserSmoke({ cdp, root, environment, fixtureUrl: taskModel.fixtureUrl })
-        const runtimeAfter = await runtimeRequest('/v1/runtime/info')
-        assert.equal(runtimeAfter.pid, skillInstallation.runtimePid)
-        assert.equal(runtimeAfter.startedAt, skillInstallation.runtimeStartedAt)
-        report.taskSetup = { originThreadId, skillInstallation, browser: realBrowser.evidence }
-      }
       await cdp.fill('textarea[placeholder="向智能体提问…"]', prompt)
       await cdp.click('button[aria-label="发送"]')
       let task
@@ -1300,6 +1376,73 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       assert.ok(task?.id, 'The actual composer must create the ordinary task and origin conversation')
       report.taskAttemptId = task.id
       assert.equal(task.originThreadId, originThreadId, 'Installing the Skill must preserve the already open conversation')
+      if (browserSmoke) {
+        const taskId = task.id
+        const readRecovery = async status => inspectWindowsBrowserRecoveryState({ task: await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`),
+          thread: await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`), originThreadId, taskId, prompt,
+          modelRequests: taskModel.observed.requests.length, status })
+        const initial = await readRecovery('waiting_user')
+        const browserRecovery = { taskId, threadId: task.threadId, originThreadId, fixtureOrigin: new URL(taskModel.fixtureUrl).origin, initial }
+        report.taskSetup = { originThreadId, browserRecovery }
+        const initialAttention = (await runtimeRequest('/v1/inbox')).find(item => item.taskId === taskId && item.kind === 'blocked')
+        assert.equal(initialAttention?.payload?.capability?.provider, 'browser-skill')
+        assert.equal(initialAttention.payload.capability.errorCode, 'browser_disabled')
+        await cdp.click('button', '打开任务工作台')
+        await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes(${JSON.stringify(prompt)}))`, 'the original blocked browser task')
+        await cdp.click('article[aria-label="任务详情"] button', '暂停')
+        await cdp.wait(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/tasks/${encodeURIComponent(taskId)}`)},'GET').then(result=>JSON.parse(result.body).status==='paused')`, 'the original task paused before its first Turn')
+        const pausedBeforeConfiguration = await readRecovery('paused')
+        browserRecovery.pausedBeforeConfiguration = pausedBeforeConfiguration
+        skillInstallation = await installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeRequest, originThreadId })
+        realBrowser = await startRealBrowserSmoke({ cdp, root, environment, fixtureUrl: taskModel.fixtureUrl })
+        const runtimeAfter = await runtimeRequest('/v1/runtime/info')
+        assert.equal(runtimeAfter.pid, skillInstallation.runtimePid)
+        assert.equal(runtimeAfter.startedAt, skillInstallation.runtimeStartedAt)
+        Object.assign(report.taskSetup, { skillInstallation, browser: realBrowser.evidence })
+        await cdp.click('article[aria-label="任务详情"] button', '继续任务')
+        await cdp.wait(`Boolean(Array.from(document.querySelectorAll('article[aria-label="任务详情"] section[aria-label="等待连接或授权，尚未执行"] button')).find(button=>button.textContent.trim()==='确认当前任务的浏览器范围'))`, 'the durable browser-scope preflight card')
+        const blockedResume = await readRecovery('paused')
+        browserRecovery.blockedResume = blockedResume
+        const attention = (await runtimeRequest('/v1/inbox')).find(item => item.taskId === taskId && item.kind === 'blocked')
+        assert.equal(attention?.payload?.capability?.provider, 'browser-skill')
+        assert.equal(attention.payload.capability.errorCode, 'browser_task_scope_required')
+        const resolution = attention.payload.capability.resolution ?? attention.payload.capability.action
+        assert.equal(resolution?.route, 'task/browser-binding')
+        await cdp.click('article[aria-label="任务详情"] section[aria-label="等待连接或授权，尚未执行"] button', '确认当前任务的浏览器范围')
+        const panel = await cdp.wait(windowsBrowserBindingUiExpression(), 'the real browser binding panel loaded through main-process IPC')
+        // Corroborate the displayed preview through the same main-process read boundary.
+        // Confirmation is performed only by the visible panel button below.
+        const previewSnapshot = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}/browser-binding`)
+        assert.equal(previewSnapshot.taskId, taskId)
+        assert.equal(previewSnapshot.browserInstanceId, realBrowser.evidence.browserInstanceId)
+        assert.equal(previewSnapshot.browserRevision, realBrowser.browserRevision)
+        assert.equal(previewSnapshot.interaction, 'interact')
+        assert.deepEqual(previewSnapshot.origins, [new URL(taskModel.fixtureUrl).origin])
+        assert.deepEqual(panel.values, [previewSnapshot.browserLabel, new URL(taskModel.fixtureUrl).origin, '允许网页交互。可能修改网站数据的操作仍按任务范围审阅。'])
+        const bindingScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+        await writeFile(join(evidenceDir, 'windows-task-browser-binding-before-confirm-zh-dark.png'), Buffer.from(bindingScreenshot.data, 'base64'))
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...panel.point })
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...panel.point })
+        await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes('浏览器范围已确认。点击继续原任务。'))`, 'the actual UI confirmation without starting the task')
+        const binding = { browserInstanceId: realBrowser.evidence.browserInstanceId, origins: [new URL(taskModel.fixtureUrl).origin], interaction: 'interact', revision: realBrowser.browserRevision }
+        const confirmed = await readRecovery('paused')
+        const confirmedTask = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`)
+        assert.deepEqual(confirmedTask.authority.browserScope, binding)
+        confirmed.binding = binding
+        const confirmedScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+        await writeFile(join(evidenceDir, 'windows-task-browser-binding-confirmed-paused-zh-dark.png'), Buffer.from(confirmedScreenshot.data, 'base64'))
+        await cdp.click('article[aria-label="任务详情"] button', '继续任务')
+        await cdp.wait(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/threads/${encodeURIComponent(task.threadId)}`)},'GET').then(result=>JSON.parse(result.body).turns.length===1)`, 'one first Turn from a separate explicit resume')
+        const resumedThread = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
+        assert.equal(resumedThread.turns.length, 1)
+        task = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`)
+        assert.equal(task.id, taskId)
+        Object.assign(browserRecovery, { confirmed, initialCapability: 'browser_disabled', blockedCapability: 'browser_task_scope_required', blockedRoute: resolution.route,
+          uiPreviewVerified: true, uiConfirmVerified: true, resumed: { taskId, threadId: task.threadId, turns: 1, firstTurnId: resumedThread.turns[0].id } })
+        validateWindowsBrowserRecoveryEvidence(browserRecovery, realBrowser.evidence.browserInstanceId)
+        report.taskSetup = { originThreadId, skillInstallation, browser: realBrowser.evidence, browserRecovery }
+        await cdp.click('article[aria-label="任务详情"] button', '打开原会话')
+      }
       const uiApprovals = []
       const reviewedRequests = []
       if (browserSmoke) report.sourceUiApprovals = uiApprovals
@@ -1424,6 +1567,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         await cdp.click('article[aria-label="任务详情"] button', '每日网页报告.html')
         const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
         assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
+        const layout = await cdp.wait(windowsTaskPreviewLayoutExpression(), 'the measured task workspace beside its manual preview')
+        report.taskExecution.preview.layout = layout
+        validateWindowsTaskPreviewLayout(layout)
       })
       const taskScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
       await writeFile(join(evidenceDir, manualPreviewPassed ? 'windows-task-html-preview-zh-dark.png' : 'windows-task-html-manual-failure.png'), Buffer.from(taskScreenshot.data, 'base64'))
