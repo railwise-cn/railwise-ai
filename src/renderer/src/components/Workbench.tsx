@@ -556,9 +556,15 @@ export function Workbench(): ReactElement {
     () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
     [activeSkillWorkspace, timelineBlocks]
   )
-  const taskArtifactPreview = useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready')
-  const latestDevPreviewUrl = taskArtifactPreview.url ?? detectedDevPreviewUrls[0] ?? null
-  const latestAutoOpenDevPreviewUrl = taskArtifactPreview.url ?? autoOpenDevPreviewUrls[0] ?? null
+  const conversationArtifactPreview = useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready')
+  // Task/Flow artifacts can have no user chat. Keep manual previews separate
+  // from the active conversation so opening another task cannot replace it.
+  const workspaceArtifactPreview = useTaskArtifactPreview(null, runtimeConnection === 'ready' && route === 'tasks')
+  const taskArtifactPreview = route === 'tasks' ? workspaceArtifactPreview : conversationArtifactPreview
+  const artifactPreviewRouteRef = useRef(route)
+  artifactPreviewRouteRef.current = route
+  const latestDevPreviewUrl = taskArtifactPreview.url ?? (route === 'tasks' ? null : detectedDevPreviewUrls[0]) ?? null
+  const latestAutoOpenDevPreviewUrl = taskArtifactPreview.url ?? (route === 'tasks' ? null : autoOpenDevPreviewUrls[0]) ?? null
   const currentSideConversations = useMemo(
     () =>
       Object.values(sideConversations)
@@ -642,7 +648,7 @@ export function Workbench(): ReactElement {
     toggleLeftSidebar,
     toggleRightPanelMode,
   } = useWorkbenchLayout({
-    activeThreadId,
+    activeThreadId: route === 'tasks' ? 'task-workspace-preview' : activeThreadId,
     latestAutoOpenDevPreviewKey: taskArtifactPreview.key,
     latestAutoOpenDevPreviewUrl,
     latestDevPreviewUrl,
@@ -2137,7 +2143,7 @@ export function Workbench(): ReactElement {
     },
     browser: (module) => {
       const Panel = (module as typeof import('./DevBrowserPanel')).DevBrowserPanel
-      return <Panel blocks={devPreviewBlocks} preferredUrl={latestDevPreviewUrl} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
+      return <Panel blocks={route === 'tasks' ? [] : devPreviewBlocks} preferredUrl={latestDevPreviewUrl} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
     },
     plan: (module) => {
       const Panel = (module as typeof import('./plan/PlanPanel')).PlanPanel
@@ -2183,10 +2189,12 @@ export function Workbench(): ReactElement {
   const workbenchViewRenderers: Record<string, (module: unknown) => ReactElement | null> = {
     tasks: (module) => {
       const View = (module as typeof import('./tasks/TaskWorkspaceView')).TaskWorkspaceView
-      return <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {
+      return <div className="flex min-h-0 min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {
         if (/\.html?$/i.test(path) && artifactId) {
-          await taskArtifactPreview.open({ taskId: task.id, artifactId })
-          setRightPanelMode('browser')
+          await workspaceArtifactPreview.open({ taskId: task.id, artifactId })
+          if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
         } else if (/\.(?:md|mdx|markdown)$/i.test(path)) {
           await useWriteWorkspaceStore.getState().openFile(task.workspaceRoot, path)
           setRoute('write')
@@ -2194,6 +2202,9 @@ export function Workbench(): ReactElement {
           window.dispatchEvent(new CustomEvent('kun:workspace-file-preview', { detail: { workspaceRoot: task.workspaceRoot, path } }))
         }
       }} onOpenFlow={(flowId, flowRunId) => { requestFlowDetail({flowId,flowRunId}); openFlow() }} onConfigureReplyDelivery={() => openSettings('claw')} onConfigureProvider={provider => { setConnectPhoneSidebarOpen(false); openPlugins(sidebarView === 'claw' ? 'claw' : 'chat', provider === 'lark' || provider === 'feishu' ? 'lark' : provider === 'dingtalk' ? 'dingtalk' : undefined) }} />
+        </div>
+        {renderRightPanel()}
+      </div>
     },
     plugins: (module) => {
       const View = (module as typeof import('./PluginMarketplaceView')).PluginMarketplaceView
