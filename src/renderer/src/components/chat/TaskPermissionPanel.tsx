@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AgentProfileV1, TaskPermissionSnapshotV1, TaskRunV1 } from '@shared/agent-workbench'
-import { runtimeThreadPath } from '@shared/runtime-endpoints'
+import { runtimeTaskPermissionsPath, runtimeThreadPath } from '@shared/runtime-endpoints'
 
 /** Explicit task-scoped confirmation. Reading this panel never changes authority or resumes work. */
 export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, revision }: { taskId: string; onConfirmed: (message: string) => void; autoLoad?: boolean; revision?: number }): ReactElement {
@@ -33,7 +33,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
     setSnapshot(permission); setTask(current); setConfirmed(false)
     const scope = permission.grant?.scope
     setScopeFields({ readPaths: (scope?.readPaths ?? (permission.workspaceRoot ? [permission.workspaceRoot] : [])).join('\n'),
-      writePaths: permission.sandboxMode === 'read-only' ? '' : (scope?.writePaths ?? (permission.workspaceRoot ? [permission.workspaceRoot] : [])).join('\n'),
+      writePaths: permission.sandboxMode === 'read-only' && !permission.canWritePaths ? '' : (scope?.writePaths ?? (permission.workspaceRoot ? [permission.workspaceRoot] : [])).join('\n'),
       networkOrigins: scope?.networkOrigins?.join('\n') ?? '', providerIds: scope?.providerIds?.join('\n') ?? '', externalTargets: scope?.externalTargets?.join('\n') ?? '' })
     const [agents, thread] = await Promise.all([
       window.workwise.listAgentProfiles(permission.workspaceRoot),
@@ -62,6 +62,13 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
     })
     setSnapshot(result.permission); setConfirmed(false)
     onConfirmed(t('taskPermissionSaved'))
+  }
+  const revoke = async ():Promise<void> => {
+    if(!snapshot?.grant)return
+    const response=await window.workwise.runtimeRequest(runtimeTaskPermissionsPath(taskId),'DELETE',JSON.stringify({expectedRevision:snapshot.taskRevision,permissionId:snapshot.grant.id,idempotencyKey:crypto.randomUUID()}))
+    if(!response.ok)throw new Error(JSON.parse(response.body).message || t('taskPermissionReadFailed'))
+    await load()
+    onConfirmed(t('taskPermissionRevoked'))
   }
   const selectAgent = async (): Promise<void> => {
     if (!task || !agentId || !confirmed || !['waiting_user', 'stalled', 'paused'].includes(task.status)) return
@@ -105,6 +112,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
       </details> : null}
       {snapshot.grant ? <p>{t('taskPermissionExpires', { at: new Date(snapshot.grant.expiresAt).toLocaleString() })}</p> : null}
       {!terminal ? <>
+      {snapshot.grant?.status === 'active' ? <button type="button" disabled={pending} onClick={() => void run(revoke)} className="rounded-md border border-ds-border px-3 py-1.5">{t('taskPermissionRevoke')}</button> : null}
       {snapshot.reason ? <p className="text-ds-muted">{snapshot.reason}</p> : null}
       <label className="flex items-start gap-2"><input type="checkbox" checked={confirmed} disabled={pending} onChange={event => setConfirmed(event.target.checked)} /><span>{t('taskPermissionConfirmScope')}</span></label>
       {snapshot.canConfirm ? <div className="space-y-2">
@@ -115,7 +123,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
         {editScope ? <div className="space-y-2"><p className="text-ds-muted">{t('taskPermissionScopeHint')}</p>{([
           ['readPaths', 'taskPermissionScopeRead'], ['writePaths', 'taskPermissionScopeWrite'], ['networkOrigins', 'taskPermissionScopeNetwork'],
           ['providerIds', 'taskPermissionScopeProviders'], ['externalTargets', 'taskPermissionTargets']
-        ] as const).map(([field, label]) => <label key={field} className="block">{t(label)}<textarea rows={2} value={scopeFields[field]} disabled={field === 'writePaths' && snapshot.sandboxMode === 'read-only'} onChange={event => { setScopeFields(current => ({ ...current, [field]: event.target.value })); setConfirmed(false) }} className="mt-1 block w-full rounded border border-ds-border bg-ds-main p-2" /></label>)}</div> : null}
+        ] as const).map(([field, label]) => <label key={field} className="block">{t(label)}<textarea rows={2} value={scopeFields[field]} disabled={field === 'writePaths' && snapshot.sandboxMode === 'read-only' && !snapshot.canWritePaths} onChange={event => { setScopeFields(current => ({ ...current, [field]: event.target.value })); setConfirmed(false) }} className="mt-1 block w-full rounded border border-ds-border bg-ds-main p-2" /></label>)}</div> : null}
       </div> : null}
       <button type="button" disabled={pending || !confirmed || !snapshot.canConfirm} onClick={() => void run(allow)} className="rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('taskPermissionAllow')}</button>
       {profiles.length && task && ['waiting_user', 'stalled', 'paused'].includes(task.status) ? <div className="flex flex-wrap gap-2">

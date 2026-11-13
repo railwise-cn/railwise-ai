@@ -1,5 +1,5 @@
 import { createServer } from 'node:http'
-import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -7,6 +7,7 @@ import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
 import { makeAssistantTextItem } from '../src/domain/item.js'
 import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
+import { getTaskArtifactProof } from '../src/server/routes/tasks.js'
 
 const cleanup: Array<() => Promise<unknown>> = []
 afterEach(async () => { while (cleanup.length) await cleanup.pop()!() })
@@ -66,6 +67,11 @@ describe('workspace permission production admission and recovery', () => {
     await expect.poll(() => f.runtime.taskRepository!.get(task.id)?.status, { timeout: 10_000 }).toBe('completed')
     expect(f.runtime.approvalGate.pending()).toHaveLength(0)
     expect(await readFile(join(f.workspace, 'report.html'), 'utf8')).toContain('LOCAL-EVIDENCE-42')
+    const completed = f.runtime.taskRepository!.get(task.id)!
+    const alias = join(f.root, 'workspace-alias')
+    await symlink(f.workspace, alias, process.platform === 'win32' ? 'junction' : 'dir')
+    f.runtime.taskRepository!.update(task.id, completed.revision, task => ({ ...task, workspaceRoot: alias }))
+    expect((await getTaskArtifactProof(f.runtime, task.id, completed.artifacts[0]!.id)).status).toBe(200)
     expect(JSON.stringify(f.requests)).toContain(original)
     const input = f.runtime.taskRepository!.inputs(task.id)[0]!
     expect(input.consumedAt).toBeDefined()

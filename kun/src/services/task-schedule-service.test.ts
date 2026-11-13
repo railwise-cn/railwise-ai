@@ -9,6 +9,7 @@ import { buildFlowNodeRegistry } from '../flow/node-registry.js'
 import { TaskRunRepository } from './task-run-repository.js'
 import { TaskRunSchema } from '../contracts/tasks.js'
 import { ExecutionGrantSchema } from '../contracts/permissions.js'
+import { ThreadSchema } from '../contracts/threads.js'
 import { TaskScheduleService } from './task-schedule-service.js'
 import { buildTaskScheduleToolProvider } from '../adapters/tool/task-schedule-tool-provider.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
@@ -36,13 +37,25 @@ function fixture() {
     workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'grant', issuedAt: new Date().toISOString() })
   const identities = { 'mcp:test': 'a'.repeat(64) }
   const workspace = { canonicalRoot: '/workspace', level: 'workspace-write', revision: 1 }
+  const execution = ThreadSchema.parse({ id: 'execution', title: 'test', workspace: '/workspace', model: 'test', mode: 'agent', status: 'idle',
+    agentRevision: 1, agentProfile: { id: 'general', name: 'General', role: 'General', color: 'blue', systemPrompt: 'Test', toolAllowlist: ['*'], mcpAllowlist: ['*'], trustLevel: 'workspace-write', budget: { maxAttempts: 10, maxDurationMs: 600000 }, revision: 1 }, approvalPolicy: 'on-request', sandboxMode: 'workspace-write', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+  const origin = { ...execution, id: 'origin', approvalPolicy: 'never' as const }
+  const threads = new Map([['execution', execution], ['origin', origin]])
   const coordinator = { command: vi.fn(async (_command: unknown, _options?: unknown) => ({ kind: 'task_started' })) }
-  const service = new TaskScheduleService({ flows, repository, tasks: { activeTask: () => task } as never,
-    coordinator: coordinator as never, threads: { get: async () => ({ workspace: '/workspace', agentRevision: 1, agentProfile: { trustLevel: 'workspace-write' }, approvalPolicy: 'on-request' }) } as never,
+  const service = new TaskScheduleService({ flows, repository, tasks: { activeTask: () => repository.get(task.id) } as never,
+    coordinator: coordinator as never, threads: { get: async (id: string) => threads.get(id), upsert: async (value: typeof execution) => { threads.set(value.id, value); return value } } as never,
     workspaceTrust: { get: async () => workspace } as never, connectorIdentities: () => identities, nowIso: () => new Date().toISOString() })
   flows.setTaskScheduleDispatcher(input => service.dispatch(input))
-  const context = { threadId: 'execution', turnId: 'turn', workspace: '/workspace', executionGrant: grant, validateExecutionGrant: vi.fn() } as unknown as ToolHostContext
-  return { service, flows, flowRepository, repository, task, context, coordinator, identities, workspace }
+  const context = { threadId: 'execution', turnId: 'turn', workspace: '/workspace', executionGrant: grant, validateExecutionGrant: vi.fn(), abortSignal: new AbortController().signal, awaitApproval: vi.fn(async () => 'allow') } as unknown as ToolHostContext
+  function temporaryPaths() {
+    const current = repository.get(task.id)!
+    repository.update(task.id, current.revision, value => ({ ...value, authority: { source: 'user', workspaceRoot: '/workspace', externalTargets: [], grantedAt: new Date().toISOString(),
+      taskApprovalGrant: { id: 'temporary', taskId: task.id, threadId: 'execution', previousPolicy: 'never', approvalPolicy: 'on-request', workspaceRoot: '/workspace', workspaceRevision: 1, workspaceTrust: 'workspace-write', agentRevision: 1, scopeFingerprint: 'a'.repeat(64), status: 'active', confirmed: true, confirmedAt: new Date().toISOString(), expiresAt: '2026-11-13T00:15:00.000Z', idempotencyKey: 'temporary', scope: { readPaths: ['/workspace'], writePaths: ['/workspace/reports'] }, workspaceWriteException: true, duration: 'task' } } }))
+    grant.workspaceWriteException = true
+    grant.readPathAllowlist = ['/workspace']
+    grant.writePathAllowlist = ['/workspace/reports']
+  }
+  return { service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths }
 }
 
 describe('task-owned recurring execution', () => {
@@ -89,5 +102,60 @@ describe('task-owned recurring execution', () => {
     f.flows.update({ ...flow, nodes: flow.nodes.map(node => ({ ...node, config: { kind: 'daily', times: ['10:15'], timezone: 'Asia/Shanghai' } })) }, flow.revision)
     f.flows.publish(flow.id)
     expect(f.flowRepository.getTriggerState(flow.id, 'schedule')?.nextRunAt).toBe('2026-11-13T02:15:00.000Z')
+  })
+  it('keeps an explicitly confirmed recurring path scope after the temporary task grant expires', async () => {
+    const f = fixture()
+    f.temporaryPaths()
+    const saved = await f.service.create(f.context)
+    expect(f.context.awaitApproval).toHaveBeenCalledOnce()
+    expect(vi.mocked(f.context.awaitApproval).mock.calls[0]?.[0].summary).toContain('/workspace/reports')
+    expect(saved.authorization).toMatchObject({ kind: 'confirmed_scope', until: 'disabled', expiresAt: null })
+    expect(saved.scope).toMatchObject({ workspaceWriteException: true, permissionScope: { writePaths: ['/workspace/reports'] } })
+    expect(saved.scope.expiresAt).toBeUndefined()
+    vi.setSystemTime(new Date('2026-11-14T00:30:00Z'))
+    await f.flows.tickSchedules(new Date())
+    expect(f.coordinator.command).toHaveBeenCalledOnce()
+    const hooks = f.coordinator.command.mock.calls[0]?.[1] as { prepareExecutionThread(thread: unknown): Promise<void> }
+    const occurrence = { ...f.threads.get('origin')!, id: 'occurrence', turns: [] }
+    f.threads.set('occurrence', occurrence)
+    await hooks.prepareExecutionThread(occurrence)
+    expect(f.threads.get('origin')?.approvalPolicy).toBe('never')
+    expect(f.threads.get('occurrence')?.approvalPolicy).toBe('on-request')
+    expect(await f.service.executionScopeForThread('occurrence')).toMatchObject({ workspaceWriteException: true, writePathAllowlist: ['/workspace/reports'] })
+    await hooks.prepareExecutionThread(f.threads.get('occurrence'))
+    expect(f.repository.operations('occurrence', 'scheduled_task_prepare')).toHaveLength(1)
+    f.threads.get('occurrence')!.approvalPolicy = 'never'
+    await expect(hooks.prepareExecutionThread(f.threads.get('occurrence'))).rejects.toThrow('权限已变化')
+  })
+  it('does not create or complete a plan when durable path scope is denied', async () => {
+    const f = fixture()
+    f.temporaryPaths()
+    vi.mocked(f.context.awaitApproval).mockResolvedValue('deny')
+    await expect(f.service.create(f.context)).rejects.toThrow('持续计划权限未获确认')
+    expect(f.flows.list()).toHaveLength(0)
+    expect(f.service.assessCompletion(f.task)).not.toBeNull()
+  })
+  it.each(['origin', 'execution', 'revoked', 'scope'])('blocks recurrence when its %s authority changes', async change => {
+    const f = fixture()
+    f.temporaryPaths()
+    await f.service.create(f.context)
+    if (change === 'origin' || change === 'execution') f.threads.get(change)!.agentRevision += 1
+    else {
+      const current = f.repository.get(f.task.id)!
+      f.repository.update(current.id, current.revision, value => ({ ...value, authority: { ...value.authority!, taskApprovalGrant: { ...value.authority!.taskApprovalGrant!,
+        ...(change === 'revoked' ? { revokedAt: new Date().toISOString() } : { scope: { writePaths: ['/other'] } }) } } }))
+    }
+    await f.flows.tickSchedules(new Date('2026-11-14T00:30:00Z'))
+    expect(f.coordinator.command).not.toHaveBeenCalled()
+    expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(1)
+  })
+  it('rejects a scope forged through editable Flow variables', async () => {
+    const f = fixture()
+    await f.service.create(f.context)
+    const flow = f.flows.get('schedule_task-test')!
+    const authority = flow.variables.taskSchedule as { scope: { writePathAllowlist?: string[] } }
+    authority.scope.writePathAllowlist = ['*']
+    f.flows.update({ ...flow, variables: { ...flow.variables, taskSchedule: authority } }, flow.revision)
+    await expect(f.service.create(f.context)).rejects.toThrow('原始确认不一致')
   })
 })

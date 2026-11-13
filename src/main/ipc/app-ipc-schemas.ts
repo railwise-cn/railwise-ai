@@ -11,7 +11,7 @@ import { SurveyQualityPlanCreateV1, SurveyQualityEvidenceCreateV1, SurveyQuality
 import { QUALITY_WORKFLOW_LIMITS, SurveyQualityWorkflowCreateV1, SurveyQualityWorkflowAppendV1, parseQualityWorkflowJson } from '../../shared/survey-quality-workflow'
 import { SurveyDraftCreateV1, SurveyDraftSealV1 } from '../../shared/survey-collaboration'
 import { TaskCommandSchema } from '../../../kun/src/contracts/execution'
-import { TaskPermissionConfirmationSchema } from '../../../kun/src/contracts/permissions'
+import { TaskPermissionRevocationSchema, TaskPermissionConfirmationSchema } from '../../../kun/src/contracts/permissions'
 import {
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE,
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE,
@@ -457,6 +457,9 @@ export const runtimeRequestPayloadSchema = z
       let valid = method === 'GET' && payload.body === undefined && !url.search && !url.hash
       if (method === 'POST' && payload.body !== undefined && !url.search && !url.hash && Buffer.byteLength(payload.body, 'utf8') <= 4096) {
         try { valid = TaskPermissionConfirmationSchema.safeParse(JSON.parse(payload.body)).success } catch { valid = false }
+      }
+      if (method === 'DELETE' && payload.body !== undefined && !url.search && !url.hash && Buffer.byteLength(payload.body,'utf8') <= 4096) {
+        try { valid = TaskPermissionRevocationSchema.safeParse(JSON.parse(payload.body)).success } catch { valid = false }
       }
       if (!valid) context.addIssue({ code: 'custom', message: 'invalid scoped task permission request' })
     }

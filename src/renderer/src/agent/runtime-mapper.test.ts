@@ -672,6 +672,11 @@ describe('user input mapping', () => {
 })
 
 describe('approval mapping', () => {
+  it('keeps durable approval consumption records out of ordinary chat bubbles', () => {
+    expect(chatBlockFromItem({id:'delivery-control',threadId:'task-thread',turnId:'turn',role:'system',kind:'approval',status:'allowed',approvalId:'approval',toolName:'request_host_shell',summary:'已允许本次操作',createdAt:'2026-11-13T00:00:00Z',taskInputId:'input',sourceRequestId:'approval'})).toBeNull()
+    expect(chatBlockFromItem({id:'user',threadId:'task-thread',turnId:'turn',role:'user',kind:'user_message',status:'completed',text:'请保留这条正常输入',createdAt:'2026-11-13T00:00:00Z'})).toMatchObject({kind:'user',text:'请保留这条正常输入'})
+  })
+
   it('does not emit duplicate approval cards from generic item events', async () => {
     let called = false
     const sink: ThreadEventSink = {

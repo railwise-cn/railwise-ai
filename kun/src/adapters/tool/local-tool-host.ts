@@ -51,6 +51,8 @@ export type LocalTool = {
   policy: 'auto' | 'on-request' | 'suggest' | 'never' | 'untrusted'
   /** External writes must obtain a real user confirmation, even under legacy auto policy. */
   requireExplicitApproval?: boolean
+  /** Trusted Provider verifies a persisted, task-scoped authorization against the current target. */
+  hasScopedApproval?: (args: Record<string, unknown>, context: ToolHostContext) => Promise<boolean>
   /**
    * Optional gating predicate. When present, the tool is only listed
    * and only executed when `shouldAdvertise` returns true for the
@@ -201,7 +203,7 @@ export class LocalToolHost implements ToolHost {
         approved: false
       }
     }
-    const needsApproval = this.requiresApproval(tool, activeCall, context)
+    const needsApproval = await this.requiresApproval(tool, activeCall, context)
     const approvedRequestHash = createHash('sha256').update(JSON.stringify(activeCall.arguments)).digest('hex')
     const approvalId = `appr_${createHash('sha256').update(JSON.stringify([context.threadId, context.turnId, activeCall.callId, activeCall.toolName, approvedRequestHash])).digest('hex')}`
     if (needsApproval) {
@@ -349,11 +351,23 @@ export class LocalToolHost implements ToolHost {
     }
   }
 
-  private requiresApproval(tool: LocalTool, call: ToolCallLike, context: ToolHostContext): boolean {
+  private async requiresApproval(tool: LocalTool, call: ToolCallLike, context: ToolHostContext): Promise<boolean> {
     if (this.isInteractiveGuiGateTool(call.toolName)) return false
     const approvalPolicy = effectiveApprovalPolicy(context)
     if (tool.policy === 'never' || approvalPolicy === 'never') return false
-    if (tool.requireExplicitApproval || (context.executionGrant && tool.toolKind === 'command_execution')) return true
+    if (tool.requireExplicitApproval) {
+      const provider = this.registry.resolveTool(call.toolName, context, call.providerId).provider
+      if (provider.id === 'browser-skill' && ['browser_click', 'browser_fill'].includes(tool.name) &&
+        await tool.hasScopedApproval?.(call.arguments, context)) return false
+      return true
+    }
+    if (context.executionGrant && tool.toolKind === 'command_execution') return true
+    // The user already reviewed this task's exact file scope. The file tools
+    // still canonicalize the target and validate the immutable Grant at write.
+    const grant = context.executionGrant
+    if (['write', 'edit'].includes(tool.name) && tool.toolKind === 'file_change' &&
+      (grant?.taskPermissionId || grant?.scheduleScopeHash) && grant.writePathAllowlist?.length &&
+      this.registry.resolveTool(call.toolName, context, call.providerId).provider.kind === 'built-in') return false
     switch (approvalPolicy) {
       case 'auto':
         return false

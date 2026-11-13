@@ -748,7 +748,7 @@ export class TaskRunRepository {
         this.putAttention({ ...attention, status, updatedAt: nowIso, revision: attention.revision + 1 })
         const task = attention.taskId ? this.get(attention.taskId) : null
         if (task && !TERMINAL_TASK_STATUSES.has(task.status)) {
-          this.appendInput({ taskId: task.id, expectedRevision: task.revision, idempotencyKey: `human:${id}`, kind: 'user_answer', sourceId: id, text: JSON.stringify({ request: request.message, resolution }), nowIso })
+          this.appendInput({ taskId: task.id, expectedRevision: task.revision, idempotencyKey: `human:${id}`, kind: request.kind === 'approval' ? 'approval_resolution' : 'user_answer', sourceId: id, text: JSON.stringify({ request: request.message, resolution }), nowIso })
           this.enqueueOutbox({ id: `human:${id}`, ownerId: task.id, kind: 'human_answer', payload: { taskId: task.id, requestId: id }, createdAt: nowIso })
         }
       }

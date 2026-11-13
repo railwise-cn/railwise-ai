@@ -16,6 +16,7 @@ import { InflightTracker } from '../loop/inflight-tracker.js'
 import { SteeringQueue } from '../loop/steering-queue.js'
 import { ContextCompactor } from '../loop/context-compactor.js'
 import { makeUserItem } from '../domain/item.js'
+import type { AttachmentStore } from '../attachments/attachment-store.js'
 import { defaultExternalTaskCapability } from './external-task-capability.js'
 
 const cleanup: Array<() => Promise<void>> = []
@@ -264,9 +265,15 @@ describe('task commands before Turn allocation',()=>{
     expect(ambiguous.kind).toBe('attention_required')
     if(ambiguous.kind!=='attention_required') throw new Error('expected decision')
     expect(f.repository.attention(ambiguous.attentionId!)).toMatchObject({status:'pending',payload:{choices:['supplement','new']}})
+    expect(ambiguous.intentCard).toMatchObject({ threadId: f.origin.id, attentionId: ambiguous.attentionId, request: { prompt: '这里需要调整一下' }, choices: ['supplement', 'new'] })
+    const history = await f.sessionStore.loadItems(f.origin.id)
+    expect(history.some(item => item.kind === 'assistant_text' && item.intentCard?.attentionId === ambiguous.attentionId)).toBe(true)
+    await expect(f.coordinator.command({threadId:f.origin.id,taskId:ambiguous.task!.id,intent:'supplement',resolveAttentionId:ambiguous.attentionId,idempotencyKey:'changed-request',request:{prompt:'不同的请求'}})).rejects.toMatchObject({ code: 'scope_conflict' })
     const result=await f.coordinator.command({threadId:f.origin.id,taskId:ambiguous.task!.id,intent:'supplement',resolveAttentionId:ambiguous.attentionId,idempotencyKey:'resolved',request:{prompt:'这里需要调整一下'}})
     expect(result.kind).toBe('input_queued')
     expect(f.repository.attention(ambiguous.attentionId!)?.status).toBe('answered')
+    await expect(f.coordinator.command({threadId:f.origin.id,taskId:ambiguous.task!.id,intent:'new',resolveAttentionId:ambiguous.attentionId,idempotencyKey:'second-choice',request:{prompt:'这里需要调整一下'}})).rejects.toMatchObject({ code: 'stale_request' })
+    expect((await f.coordinator.command({threadId:f.origin.id,taskId:ambiguous.task!.id,intent:'supplement',resolveAttentionId:ambiguous.attentionId,idempotencyKey:'resolved',request:{prompt:'这里需要调整一下'}})).kind).toBe('input_queued')
   })
 
   it('accepts follow-up commands addressed to the active execution thread', async () => {
@@ -282,5 +289,48 @@ describe('task commands before Turn allocation',()=>{
     expect(followup).toMatchObject({ kind: 'input_queued', task: { id: started.task!.id } })
     expect(f.repository.inputs(started.task!.id, true)).toHaveLength(1)
     expect(f.runTurn).toHaveBeenCalledTimes(1)
+  })
+})
+
+
+describe('Windows browser-to-HTML task regression', () => {
+  const request = '使用browser-skill，帮我去政采云、阳光采购平台等平台去获取一些招标信息，我们主要是做工程测量、工程监测类的业务，所以需要找的是这一类招标信息，并以html形式将获取到的信息给我汇报，每天执行两次，早上九点前一次，下午五点前一次。'
+  it('creates a stable delivery task with HTML and recurring acceptance from the original Chinese request', async () => {
+    const f = await fixture()
+    const result = await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'original-windows-request',request:{prompt:request}})
+    expect(result).toMatchObject({kind:'task_started',task:{goal:request,acceptance:{kind:'files',requiredFormats:['html','htm'],schedule:{kind:'daily',times:['09:00','17:00'],leadMinutes:30}}}})
+    expect(result.task?.originThreadId).toBe(f.origin.id)
+    expect(result.task?.threadId).not.toBe(f.origin.id)
+  })
+  it('persists image-only input in the paused original task using attachment metadata', async () => {
+    const f = await fixture()
+    const started = await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'start-image-task',request:{prompt:'生成一份HTML报告'}})
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'pause-image-task',request:{prompt:'暂停'}})
+    const grantTaskReference = vi.fn()
+    const coordinator = new TaskCoordinator({...f,nowIso:()=>new Date().toISOString(),attachments:{grantTaskReference} as unknown as AttachmentStore})
+    const result = await coordinator.command({threadId:f.origin.id,idempotencyKey:'image-followup',request:{prompt:'请根据已附加的图片继续处理。',displayText:'已附加图片',attachmentIds:['screenshot-1']}})
+    expect(result).toMatchObject({kind:'input_queued',task:{id:started.task!.id,status:'paused'},input:{attachmentIds:['screenshot-1']}})
+    expect(grantTaskReference).toHaveBeenCalledOnce()
+    expect(f.runTurn).toHaveBeenCalledTimes(1)
+  })
+  it('projects only persisted approval-linked history as a control while retaining the original transcript', async () => {
+    const f = await fixture()
+    const started = await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'approval-task',request:{prompt:'生成HTML报告'}})
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const task = started.task!, now = new Date().toISOString()
+    const approval = {id:'reviewed-command',threadId:task.threadId,turnId:started.turn.turnId,toolName:'request_host_shell',summary:'reviewed scope',status:'pending' as const,createdAt:now}
+    f.repository.saveHumanRequest({id:approval.id,threadId:task.threadId,turnId:approval.turnId,kind:'approval',message:approval.summary,payload:{approval},status:'pending',createdAt:now,updatedAt:now})
+    f.repository.resolveHumanRequest(approval.id,{decision:'allow'},'answered',now)
+    const input = f.repository.inputs(task.id).find(input=>input.sourceId===approval.id)!
+    expect(input.kind).toBe('approval_resolution')
+    expect(f.tasks.approvalForInput(input)).toMatchObject({status:'allowed'})
+    const session = f.repository.execution.sessionForTask(task.id)!
+    const delivery = f.repository.execution.enqueue(input.id,task.id,session.id)
+    const legacy = makeUserItem({id:delivery.messageItemId,threadId:task.threadId,turnId:approval.turnId,text:input.text})
+    await f.sessionStore.appendItem(task.threadId,legacy)
+    expect(f.tasks.projectApprovalHistory(task.threadId,[legacy])).toMatchObject([{kind:'approval',role:'system',summary:'已允许本次操作',sourceRequestId:approval.id}])
+    expect(f.tasks.projectApprovalHistory(task.threadId,[legacy])[0]).not.toHaveProperty('text')
+    expect((await f.sessionStore.loadItems(task.threadId)).at(-1)).toMatchObject({kind:'user_message',text:input.text})
   })
 })

@@ -59,7 +59,7 @@ test('Windows provenance keeps the actual workflow SHA and requires source evide
 
 test('Windows acceptance workflow downloads the original artifact and performs no packaging or publication', () => {
   const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
-  assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), ['package_run_id'])
+  assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), ['package_run_id', 'run_task_execution'])
   assert.deepEqual(workflow.on.workflow_call.inputs, workflow.on.workflow_dispatch.inputs)
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   const steps = workflow.jobs['windows-install'].steps
@@ -84,4 +84,16 @@ test('existing Windows package routing excludes every other release action and h
     assert.ok(job.if.endsWith(" && inputs.existing_windows_package_run_id == '' }}"), `${name} must skip during existing-package inspection`)
   }
   assert.match(workflow.concurrency.group, /inputs.existing_windows_package_run_id != '' && format\('windows-package-\{0\}', github.run_id\)/)
+})
+
+test('existing-package task execution is explicitly opted in without changing release publishing', () => {
+  const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
+  for (const trigger of ['workflow_call', 'workflow_dispatch']) {
+    assert.deepEqual(workflow.on[trigger].inputs.run_task_execution, {
+      description: 'Run real installed task tools, HTML file verification and daily schedule readback with a local model protocol fixture',
+      type: 'boolean', required: false, default: false
+    })
+  }
+  const install = workflow.jobs['windows-install'].steps.find(step => step.name === 'Install, inspect the Chinese UI and uninstall the temporary instance')
+  assert.equal(install.env.RAILWISE_WINDOWS_TASK_SMOKE, '${{ inputs.run_task_execution }}')
 })

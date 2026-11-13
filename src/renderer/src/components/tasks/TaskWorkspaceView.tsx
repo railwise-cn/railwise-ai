@@ -147,7 +147,7 @@ function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, o
   const capabilityCard: ExternalTaskCapabilityCard | null = item.payload?.kind === 'capability_required' && item.taskId &&
     (conversationThreadId || item.threadId) && originalRequest && typeof originalRequest === 'object' &&
     'prompt' in originalRequest && typeof originalRequest.prompt === 'string' && capability && typeof capability === 'object' &&
-    'provider' in capability && ['dingtalk','lark','feishu'].includes(String(capability.provider)) &&
+    'provider' in capability && ['dingtalk','lark','feishu','browser-skill','workspace','schedule'].includes(String(capability.provider)) &&
     'status' in capability && ['available','not_installed','needs_authorization','unsupported','blocked'].includes(String(capability.status)) &&
     'message' in capability && typeof capability.message === 'string'
       ? {threadId:(conversationThreadId || item.threadId)!,taskId:item.taskId,attentionId:item.id,prompt:originalRequest.prompt,capability:capability as ExternalTaskCapabilityCard['capability']}

@@ -1,6 +1,7 @@
 import { isAbsolute, resolve } from 'node:path'
 import type { CapabilityPreflight } from '../contracts/harness.js'
 import type { ThreadRecord } from '../contracts/threads.js'
+import type { TaskRun } from '../contracts/tasks.js'
 import type { TaskExecutionRestriction } from './task-permission-service.js'
 import { canonicalTrustRoot, type WorkspaceTrustReader } from './workspace-trust-reader.js'
 import { containedArtifact } from './task-artifact-proof.js'
@@ -11,13 +12,16 @@ export function explicitWorkspaceWrite(text: string): { target?: string; edit: b
   const save = /(?:保存|导出|输出|放置|写)(?:[^。！？\n]{0,12}?)(?:到|至|进|入)\s*|(?:save|write|export)\b[^.!?\n]{0,25}?\b(?:to|into)\s+/i.exec(text)
   const edit = /(?:修改|编辑|覆盖|替换|更新)[^。！？\n]{0,35}(?:文件|工作区|当前目录|\.\w{1,8})|\b(?:edit|modify|overwrite|replace)\b[^.!?\n]{0,35}(?:file|workspace|\.\w{1,8})/i.test(text)
   if (!save && !edit) return null
-  const targetText = save ? text.slice(save.index + save[0].length) : text
+  const editVerb = /(?:修改|编辑|覆盖|替换|更新|\b(?:edit|modify|overwrite|replace)\b)\s*/i.exec(text)
+  const targetText = (save ? text.slice(save.index + save[0].length) : editVerb ? text.slice(editVerb.index + editVerb[0].length) : text)
+    .trim().replace(/^(?:(?:当前|本)(?:工作区|目录|项目)(?:中的|的|中|下)?|(?:工作区|目录|项目)(?:中的|的|中|下))\s*/, '')
+  if (/^(?:飞书|钉钉|Lark|Feishu|DingTalk|云盘|网盘|云端|远端|GitHub|Notion|腾讯文档)/i.test(targetText)) return null
   const quoted = /["'`“]([^"'`”\n]+)["'`”]/.exec(targetText)?.[1]
   const absolute = /(?:^|\s)((?:[A-Za-z]:[\\/]|\/)[^\s，。；！？"'`<>]+)/.exec(targetText)?.[1]
-  const relative = save ? /^(?:\.\.?[\\/])?[\w\p{L}.-]+(?:[\\/][\w\p{L}.-]+)*(?:\.[\w]+)?/u.exec(targetText.trim())?.[0] : undefined
+  const relative = /^(?:\.\.?[\\/])?[\w\p{L}.-]+(?:[\\/][\w\p{L}.-]+)*(?:\.[\w]+)?/u.exec(targetText)?.[0]
   const target = quoted ?? absolute ?? relative
   if (target && /^(?:https?:|\/\/)/i.test(target)) return null
-  return { ...(target && !/^(?:当前|本|工作区|项目|the |this )/i.test(target) ? { target } : {}), edit }
+  return { ...(target && !/^(?:当前|本|工作区|目录|项目|the|this)$/i.test(target) ? { target } : {}), edit }
 }
 
 export function workspacePermissionCapability(code: string, message: string, executionContext?: CapabilityPreflight['executionContext']): CapabilityPreflight {
@@ -27,8 +31,8 @@ export function workspacePermissionCapability(code: string, message: string, exe
     ...(executionContext ? { executionContext } : {}) }
 }
 
-export function workspaceWritePreflight(deps: { workspaceTrust: WorkspaceTrustReader; restriction(threadId: string): Promise<TaskExecutionRestriction> }) {
-  return async (text: string, thread?: ThreadRecord): Promise<CapabilityPreflight | null> => {
+export function workspaceWritePreflight(deps: { workspaceTrust: WorkspaceTrustReader; restriction(threadId: string, sourceTaskId?: string): Promise<TaskExecutionRestriction> }) {
+  return async (text: string, thread?: ThreadRecord, sourceTask?: TaskRun): Promise<CapabilityPreflight | null> => {
     const requested = explicitWorkspaceWrite(text)
     if (!requested || !thread) return null
     let executionContext: CapabilityPreflight['executionContext']
@@ -43,7 +47,7 @@ export function workspaceWritePreflight(deps: { workspaceTrust: WorkspaceTrustRe
       if (thread.approvalPolicy === 'never') return block('approval_policy_blocked', '当前任务策略禁止工具执行，请先确认任务权限。')
       const tools = thread.agentProfile?.toolAllowlist
       if (tools && !tools.includes('*') && !tools.includes('write') && !(requested.edit && tools.includes('edit'))) return block('agent_tool_blocked', '当前 Agent 没有文件写入工具，请为此任务选择具备文件编辑能力的 Agent。')
-      const restriction = await deps.restriction(thread.id)
+      const restriction = await deps.restriction(thread.id, sourceTask?.id)
       if (restriction.workspaceWriteException || (workspace.level !== 'full-access' && thread.sandboxMode === 'danger-full-access')) executionContext.sandboxMode = 'workspace-write'
       if (!workspace.canonicalRoot) return block('workspace_path_blocked', '请先选择要保存成果的工作区，并确认本任务的目标路径。')
       if (requested.target && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(requested.target) && process.platform !== 'win32') return block('workspace_path_blocked', '所指定的 Windows 路径在当前系统不可用，请选择本机目标路径。')

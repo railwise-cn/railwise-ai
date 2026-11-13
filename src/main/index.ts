@@ -70,7 +70,8 @@ import {
   runtimeAuthHeaders,
   runtimeRequestViaHost
 } from './runtime/managed-runtime-adapter'
-import { getManagedRuntimeActualPort, resolveManagedRuntimeDataDir, setManagedDwsEnabled, syncManagedDwsCapability, syncManagedLarkCapability } from './managed-runtime-process'
+import { getManagedRuntimeActualPort, resolveManagedRuntimeDataDir, setManagedDwsEnabled, syncManagedDwsCapability, syncManagedLarkCapability, syncManagedBrowserSkillCapability, syncManagedSkillCapability } from './managed-runtime-process'
+import { getManagedBrowserSkillService } from './services/managed-browser-skill-service'
 import { waitForRuntimeTurnsIdle } from './runtime/managed-runtime-idle'
 import { configureLogger, logError, logWarn, pruneOnStartup } from './logger'
 import { createClawRuntime, type ClawRuntime } from './claw-runtime'
@@ -1504,6 +1505,20 @@ app.whenReady().then(async () => {
     store,
     mcpConfigService,
     onMcpServersChanged: applyMcpServers,
+    onSkillsChanged: async () => {
+      const settings = await store.load()
+      const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime') : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
+      await syncManagedSkillCapability(dataDir, settings)
+      const response = await runtimeRequest(settings, '/v1/runtime/skills/refresh', { method: 'POST' })
+      if (!response.ok) throw new Error('技能资料已保存，Runtime 尚未确认加载。请点击刷新技能重试。')
+    },
+    refreshBrowserSkill: async status => {
+      const settings = await store.load()
+      const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime') : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
+      await syncManagedBrowserSkillCapability(dataDir, status)
+      const response = await runtimeRequest(settings, '/v1/connectors/browser-skill/refresh', { method: 'POST' })
+      if (!response.ok) throw new Error('浏览器状态已保存，Runtime 刷新失败。')
+    },
     onGuiUpdatePrepared: () => { updateRuntimePrepared = true },
     getMainWindow: () => mainWindow,
     applySettingsPatch,
@@ -1685,6 +1700,7 @@ if (!runningImCredentialHelper) {
         managedRuntimesStoppedForQuit = true
       })
       .finally(() => {
+        getManagedBrowserSkillService().dispose()
         app.quit()
       })
   })

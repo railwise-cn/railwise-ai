@@ -44,6 +44,7 @@ export type RevisionMutation = {
 }
 
 export type TaskArtifactV1 = {
+  storage?: 'task'
   id: string
   relativePath: string
   absolutePath?: string
@@ -95,8 +96,9 @@ export type TaskResultEvidenceV1 = {
 
 /** Read-only projection: raw requests, results, credentials and execution IDs stay in Runtime. */
 export type TaskOperationReceiptV1 = {
-  purpose?: 'assistant_reply'
+  purpose?: 'assistant_reply' | 'host_shell'
   phase?: 'upload' | 'send'
+  shell?: { canPoll?: boolean; exitCode?: number; outputSha256?: string; message?: string }
   id: string
   taskId: string
   provider: string
@@ -113,7 +115,7 @@ export type TaskOperationReceiptV1 = {
   updatedAt: string
 }
 
-export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown'; evidence?: TaskResultEvidenceV1; errorCode?: string }
+export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown' | 'running' | 'failed'; evidence?: TaskResultEvidenceV1; errorCode?: string; shell?: { status: 'verified' | 'running' | 'failed' | 'outcome_unknown'; message: string; exitCode?: number; outputSha256?: string } }
 
 export type TaskPermissionScopeV1 = {
   readPaths?: string[]; writePaths?: string[]; networkOrigins?: string[]; providerIds?: string[]; externalTargets?: string[]
@@ -132,6 +134,7 @@ export type TaskPermissionSnapshotV1 = {
   sandboxMode?: string; agentTrust?: WorkspaceTrustLevel; agentName?: string
   toolAllowlist?: string[]; mcpAllowlist?: string[]; externalTargets?: string[]
   connectorScopeSources?: Array<{ provider: string; scopes: string[]; source: 'task_requirements' | 'tool_catalog' | 'last_execution_grant'; issuedAt?: string; expiresAt?: string }>
+  canWritePaths?: boolean
   canConfirm: boolean; reason?: string
   executionGrants?: TaskExecutionPermissionV1[]
   grant?: { id: string; status: 'active' | 'expired' | 'invalid' | 'prepared' | 'consumed'; confirmedAt: string; expiresAt: string; scope?: TaskPermissionScopeV1; duration?: 'task'|'next_operation' }
@@ -231,7 +234,7 @@ export type TaskRunListQuery = {
 export type TaskInputV1 = {
   id: string
   taskId: string
-  kind: 'supplement' | 'user_answer' | 'tool_result' | 'handoff'
+  kind: 'supplement' | 'user_answer' | 'approval_resolution' | 'tool_result' | 'handoff'
   text: string
   createdAt: string
   deliveredAt?: string

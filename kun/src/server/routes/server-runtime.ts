@@ -85,7 +85,11 @@ export type ServerRuntime = {
   refreshDingTalk?: () => Promise<unknown>
   refreshLark?: () => Promise<unknown>
   refreshDws?: () => Promise<unknown>
-  verifyTaskOperationReceipt?: (taskId: string, receiptId: string, input: { expectedRevision: number; idempotencyKey: string }) => Promise<import('../../services/external-operation-verification.js').OperationVerificationResult>
+  browserTaskBinding?(taskId: string): import('../../contracts/browser-skill.js').BrowserTaskBindingSnapshot
+  confirmBrowserTaskBinding?(taskId: string, input: import('../../contracts/browser-skill.js').BrowserTaskBindingConfirmation): { binding: import('../../contracts/browser-skill.js').BrowserTaskBindingSnapshot; resumed: false }
+  refreshBrowserSkill?: () => Promise<unknown>
+  refreshSkills?: () => Promise<unknown>
+  verifyTaskOperationReceipt?: (taskId: string, receiptId: string, input: { expectedRevision: number; idempotencyKey: string }) => Promise<import('../../services/external-operation-verification.js').OperationVerificationResult | import('../../services/host-shell-verification.js').HostShellVerificationResult>
   taskContextRuntime?: TaskContextRuntime
   capacityManager?: CapacityManager
   taskController?: TaskController

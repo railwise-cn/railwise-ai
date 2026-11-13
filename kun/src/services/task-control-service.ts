@@ -1,5 +1,6 @@
 import type { TaskRun } from '../contracts/tasks.js'
 import type { StartTurnResponse } from '../contracts/turns.js'
+import { StartTurnRequest } from '../contracts/turns.js'
 import type { TaskController } from './task-controller.js'
 import type { TaskRunRepository } from './task-run-repository.js'
 import type { ThreadService } from './thread-service.js'
@@ -36,7 +37,18 @@ export class TaskControlService {
       repository.beginOperation({ownerId:taskId,idempotencyKey:data.idempotencyKey,kind:action,request:data,nowIso:nowIso()})
       if(prior.status==='succeeded') {
         const result=prior.result as TaskControlResult|TaskRun
-        return 'task' in result ? result : {task:result}
+        const resolved='task' in result ? result : {task:result}
+        if ((action==='pause' || action==='cancel') && resolved.task.activeTurnId && current.id===resolved.task.id && current.activeTurnId===resolved.task.activeTurnId) {
+          // The DB receipt may commit before the in-process cancellation is delivered.
+          // Replay the cancellation for that exact Turn without repeating the state change.
+          const thread=await threads.get(resolved.task.threadId)
+          const turn=thread?.turns.find(turn=>turn.id===resolved.task.activeTurnId)
+          if(turn && ['running','pending'].includes(turn.status)) {
+            if(action==='cancel')this.deps.cancelChildRuns?.(resolved.task.threadId,data.reason ?? '用户取消了任务。')
+            await turns.interruptTurn({threadId:resolved.task.threadId,turnId:resolved.task.activeTurnId})
+          }
+        }
+        return resolved
       }
       if(prior.status==='failed'||prior.status==='outcome_unknown')throw Object.assign(new Error(prior.error ?? 'previous operation requires inspection'),{code:'outcome_unknown'})
       if(action==='retry')this.assertRetrySafe(current)
@@ -46,10 +58,15 @@ export class TaskControlService {
       if(action==='retry'&&!['failed','cancelled'].includes(current.status))throw Object.assign(new Error('retry is only valid for failed or cancelled tasks'),{code:'invalid_state'})
       if(action==='retry')this.assertRetrySafe(current)
       if(action==='resume'||action==='retry') {
+        if (action === 'resume' && !current.activeTurnId && !repository.inputs(current.id).some(input => input.sourceId === 'capability-original')) {
+          const original = StartTurnRequest.safeParse(repository.attention(`capability_${current.id}`)?.payload?.request)
+          if (original.success) current = tasks.appendInput(current.id, current.revision, `capability-original:${current.id}`, original.data.prompt, 'supplement', 'capability-original',
+            { attachmentIds: original.data.attachmentIds, workspaceReferences: original.data.workspaceReferences }).task
+        }
         const executionThread = await threads.get(current.threadId)
         if (!executionThread) throw Object.assign(new Error('task execution thread not found'), { code: 'not_found' })
-        const capabilities = [current.goal, ...tasks.taskInputs(current.id, true).map(input => input.text)]
-          .map(text => this.deps.preflightExternalTask ? this.deps.preflightExternalTask(text, externalPreflightThreadContext(executionThread, { mode: 'agent' })) : preflightExternalTask(text))
+        const capabilities = [current.goal, ...tasks.taskInputs(current.id, true).filter(input => !tasks.approvalForInput(input)).map(input => input.text)]
+          .map(text => this.deps.preflightExternalTask ? this.deps.preflightExternalTask(text, externalPreflightThreadContext(executionThread, { mode: 'agent' }), action === 'retry' ? current! : undefined) : preflightExternalTask(text))
         const checked = await Promise.all(capabilities)
         const requiredCapabilities = checked.filter((capability): capability is ExternalTaskCapability => capability !== null)
         const capability = requiredCapabilities.find(item => item.status !== 'available')
@@ -58,7 +75,7 @@ export class TaskControlService {
           // operation as executed. A fresh command can recheck after connection.
           return {task:current,capability}
         }
-        const providers = [...new Set(requiredCapabilities.map(item => item.provider))]
+        const providers = [...new Set(requiredCapabilities.map(item => item.provider).filter((provider): provider is 'lark' | 'dingtalk' => provider === 'lark' || provider === 'dingtalk'))]
         if (providers.length > 1) {
           const first = requiredCapabilities[0]!
           return { task:current, capability:{...first,status:'blocked',errorCode:'multiple_external_providers',

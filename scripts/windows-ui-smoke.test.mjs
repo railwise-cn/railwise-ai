@@ -12,6 +12,7 @@ function report() {
     locale: 'zh', theme: 'dark', productionTouched: false, packageUnchanged: true, cleanExit: true,
     errors: [], tabs: ['技能', '插件', '连接器'], chapters: Array.from({ length: 13 }, (_, index) => index + 1),
     update: { ok: true, hasUpdate: false }, helpOffline: true,
+    taskSmokeRequested: true,
     taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', sha256: 'a'.repeat(64), byteHashMatches: true },
       schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true } },
     resources: {
@@ -171,4 +172,13 @@ test('the local model protocol fixture requests real tools and never impersonate
     assert.ok(!payload.includes('browser_navigate'))
     assert.equal(fixture.observed.catalogs.length, 1)
   } finally { await fixture.close() }
+})
+
+test('task execution is opt-in and cannot be omitted when explicitly requested', () => {
+  const evidence = report()
+  delete evidence.taskExecution
+  evidence.taskSmokeRequested = false
+  evidence.checks = evidence.checks.filter(check => check !== 'runtime-task-html-and-daily-schedule')
+  assert.equal(validateWindowsUiReport(evidence, identity), true)
+  assert.throws(() => validateWindowsUiReport(evidence, identity, { requireTaskExecution: true }))
 })

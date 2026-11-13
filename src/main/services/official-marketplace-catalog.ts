@@ -1182,9 +1182,9 @@ const officialPackages: MarketplacePackageV1[] = [
     skillNames: ['browser-skill'],
     license: 'MIT',
     categories: ['browser-automation'],
-    usage: { howToUse: '安装后，让 RailWise AI 操作已登录的 Chrome 或 Edge 页面；先说明要查看或执行的网页任务，再让它读取页面、点击控件或整理结果。', requirements: ['BrowserSkill CLI', 'Chrome 或 Edge 扩展'], examples: ['读取当前浏览器页面，把可见表格整理成摘要。'] },
+    usage: { howToUse: '安装技能资料后，在“连接器 → BrowserSkill 浏览器”安装 CLI、连接官方扩展并选择浏览器与站点范围。连接检查通过后，在任务中说明网页地址和目标，再读取页面、点击控件或整理结果。', requirements: ['受管理的 BrowserSkill CLI 0.4.0', '用户在 Chrome 或 Edge 中安装官方扩展并启用本机连接', '明确选择浏览器实例与任务站点范围'], examples: ['使用 BrowserSkill 打开 https://example.com，读取页面并保留资料来源。'] },
     dependencies: [
-      { id: 'bsk-cli', kind: 'system', requirement: 'BrowserSkill CLI', optional: false, managedBy: 'user' },
+      { id: 'bsk-cli', kind: 'system', requirement: 'BrowserSkill CLI 0.4.0（连接器中安装）', optional: false, managedBy: 'workwise' },
       { id: 'browser-extension', kind: 'system', requirement: 'Chrome or Edge extension', optional: false, managedBy: 'user' }
     ]
   }),

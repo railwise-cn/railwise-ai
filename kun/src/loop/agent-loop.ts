@@ -768,15 +768,18 @@ export class AgentLoop {
     const deliveries = this.opts.tasks?.pendingDeliveries(threadId, turnId) ?? []
     const durableIds = new Set(deliveries.map(entry => entry.input.id))
     const hints = this.opts.steering.drainEntries(turnId).filter(entry => !entry.inputId || !durableIds.has(entry.inputId))
-    const entries = [...deliveries.map(entry => ({ text: entry.input.text, inputId: entry.input.id, itemId: entry.delivery.messageItemId,attachmentIds:entry.input.attachmentIds,workspaceReferences:entry.input.workspaceReferences })),
-      ...hints.filter(entry => !entry.inputId).map(entry => ({ ...entry, itemId: this.opts.ids.next('item_steered'),attachmentIds:undefined,workspaceReferences:undefined }))]
+    const entries = [...deliveries.map(entry => ({ text: entry.input.text, inputId: entry.input.id, itemId: entry.delivery.messageItemId, approval: this.opts.tasks?.approvalForInput(entry.input), sourceId: entry.input.sourceId, attachmentIds:entry.input.attachmentIds,workspaceReferences:entry.input.workspaceReferences })),
+      ...hints.filter(entry => !entry.inputId).map(entry => ({ ...entry, itemId: this.opts.ids.next('item_steered'), approval: undefined, sourceId: undefined, attachmentIds:undefined,workspaceReferences:undefined }))]
     if (!entries.length) return
     // Stable IDs bridge the JSONL/SQLite boundary. appendItem flushes before resolving.
     const persisted = await this.opts.sessionStore.loadItems(threadId)
     const present = new Set(persisted.map(item => item.id))
     for (const entry of entries) {
       if (present.has(entry.itemId)) continue
-      const item: TurnItem = { id: entry.itemId, turnId, threadId, role: 'user', status: 'completed', createdAt: this.opts.nowIso(), finishedAt: this.opts.nowIso(), kind: 'user_message', text: entry.text,attachmentIds:entry.attachmentIds,workspaceReferences:entry.workspaceReferences }
+      const base = { id: entry.itemId, turnId, threadId, createdAt: this.opts.nowIso(), finishedAt: this.opts.nowIso(), taskInputId: entry.inputId, sourceRequestId: entry.sourceId }
+      const item: TurnItem = entry.approval
+        ? { ...base, role: 'system', kind: 'approval', approvalId: entry.approval.id, toolName: entry.approval.toolName, status: entry.approval.status, summary: entry.approval.status === 'allowed' ? '已允许本次操作' : entry.approval.status === 'expired' ? '本次授权已过期' : '已拒绝本次操作' }
+        : { ...base, role: 'user', status: 'completed', kind: 'user_message', text: entry.text,attachmentIds:entry.attachmentIds,workspaceReferences:entry.workspaceReferences }
       await this.opts.turns.applyItem(threadId, item)
       present.add(item.id)
     }
@@ -1147,11 +1150,13 @@ export class AgentLoop {
       ...(workspaceReferences.length ? [workspaceReferenceInstruction(workspaceReferences)] : []),
       ...formatWorkspaceInstructions(workspaceInstructions),
       ...skillResolution.instructions,
+      ...(this.opts.tasks?.activeTask(threadId)?.scheduledBy ? ['This is one occurrence of a persisted schedule. Perform the original business task and deliver this occurrence’s artifacts. The schedule is already stored.'] : []),
+      ...(executionGrant?.managedArtifactRoot ? ['For requested HTML or file deliverables, use publish_artifact with a relative filename and complete content to save a verified task artifact. The app previews HTML automatically. This output namespace is available independently of workspace write permission. Deliver artifact references in the final response.'] : []),
       ...(userInputDisabled ? [userInputUnavailableInstruction()] : []),
       ...(completionRecoveryInstruction ? [completionRecoveryInstruction] : []),
       ...optionalInstruction(webSearchCapabilityInstruction(workflowPrompt, toolSpecs)),
       ...optionalInstruction(webFailureGuard?.recoveryInstruction()),
-      ...(effectiveToolSpecs.some((tool) => tool.name === 'bash') ? [shellRuntimeInstruction()] : []),
+      ...(effectiveToolSpecs.some((tool) => tool.name === 'bash' || tool.name === 'request_host_shell') ? [shellRuntimeInstruction()] : []),
       ...(toolCatalogDriftMessage ? [toolCatalogDriftMessage] : [])
     ]
     await this.recordPipelineStage(threadId, turnId, 'input_remembered', {
@@ -1841,7 +1846,9 @@ export class AgentLoop {
     const scope = await this.opts.executionScope?.(thread.id, turnId)
     const agentTrust = thread.agentProfile?.trustLevel ?? 'full-access'
     const trustOrder = ['read-only', 'workspace-write', 'trusted', 'full-access'] as const
-    const trust = trustOrder[Math.min(trustOrder.indexOf(workspace.level), trustOrder.indexOf(agentTrust))]!
+    const workspaceWriteException = Boolean(scope?.workspaceWriteException && scope.permissionScope?.writePaths?.length && agentTrust !== 'read-only' && context.sandboxMode !== 'read-only' && context.sandboxMode !== 'external-sandbox')
+    const workspaceCeiling = workspaceWriteException ? 'workspace-write' : workspace.level
+    const trust = trustOrder[Math.min(trustOrder.indexOf(workspaceCeiling), trustOrder.indexOf(agentTrust))]!
     const sandboxMode = effectiveAgentSandboxMode(context.sandboxMode ?? DEFAULT_SANDBOX_MODE, trust)
     const task = this.opts.tasks?.activeTask(thread.id)
     const permission = scope?.permissionScope
@@ -1849,19 +1856,13 @@ export class AgentLoop {
     const readPaths = intersectGrantedPaths(permission?.readPaths ?? scope?.readPathAllowlist ?? scope?.pathAllowlist ?? defaultPaths, scope?.readPathAllowlist ?? scope?.pathAllowlist)
     const writePaths = sandboxMode === 'read-only' ? [] : intersectGrantedPaths(permission?.writePaths ?? scope?.writePathAllowlist ?? scope?.pathAllowlist ?? defaultPaths, scope?.writePathAllowlist ?? scope?.pathAllowlist)
     const providerIds = intersectGrantValues(scope?.allowedProviderIds, permission?.providerIds)
-    const catalog = await this.opts.toolHost.listTools({
-      ...context,
-      workspace: workspace.canonicalRoot,
-      sandboxMode,
-      ...(providerIds !== undefined ? { allowedProviderIds: providerIds } : {})
-    })
     const grant = ExecutionGrantSchema.parse({
       id: `grant:${turnId}:${workspace.revision}:${thread.agentRevision ?? 0}`,
-      ...(task ? { taskId: task.id } : {}),
+      ...(task ? { taskId: task.id, managedArtifactRoot: this.opts.tasks?.managedArtifactRoot(task.id) } : {}),
       threadId: thread.id, turnId, workspaceRoot: workspace.canonicalRoot,
-      workspaceTrust: workspace.level, agentTrust, approvalPolicy: context.approvalPolicy,
+      workspaceTrust: workspace.level, ...(workspaceWriteException ? {workspaceWriteException:true} : {}), agentTrust, approvalPolicy: context.approvalPolicy,
       sandboxMode,
-      allowedToolNames: catalog.map(tool => tool.name).filter(name => !scope?.allowedToolNames || scope.allowedToolNames.includes(name)),
+      ...(scope?.allowedToolNames ? {allowedToolNames: scope.allowedToolNames} : {}),
       ...(context.allowedMcpProviderIds ? { allowedMcpProviderIds: [...context.allowedMcpProviderIds] } : {}),
       ...(providerIds !== undefined ? { allowedProviderIds: providerIds } : {}),
       pathAllowlist: [...new Set([...readPaths, ...writePaths])],
@@ -1870,6 +1871,8 @@ export class AgentLoop {
       connectorScopes: scope?.connectorScopes ?? [], externalTargets: intersectGrantValues(scope?.externalTargets ?? [], permission?.externalTargets),
       ...(scope?.connectorIdentityFingerprints ? {connectorIdentityFingerprints:scope.connectorIdentityFingerprints} : {}),
       ...(scope?.connectorBackends ? { connectorBackends: scope.connectorBackends } : {}),
+      ...(scope?.browserScope ? {browserScope: scope.browserScope} : {}),
+      ...(scope?.scheduleScopeHash ? {scheduleScopeHash: scope.scheduleScopeHash} : {}),
       workspaceRevision: workspace.revision, agentRevision: thread.agentRevision ?? 0,
       revision: workspace.revision, idempotencyKey: `grant:${turnId}`, issuedAt: this.opts.nowIso(),
       ...(scope?.taskPermissionId ? { taskPermissionId: scope.taskPermissionId } : {}),
@@ -2105,7 +2108,8 @@ export class AgentLoop {
   ): void {
     this.webToolFailureGuards.get(turnId)?.observe(
       call,
-      result.item.kind === 'tool_result' && result.item.isError === true
+      result.item.kind === 'tool_result' && result.item.isError === true,
+      result.item.kind === 'tool_result' ? result.item.output : undefined
     )
   }
 

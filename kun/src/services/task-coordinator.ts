@@ -2,8 +2,11 @@ import { createHash } from 'node:crypto'
 import type { TaskCommand, TaskCommandResult } from '../contracts/execution.js'
 import { TaskCommandSchema } from '../contracts/execution.js'
 import type { TaskRun } from '../contracts/tasks.js'
+import type { ThreadRecord } from '../contracts/threads.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import type { TaskRunRepository } from './task-run-repository.js'
+import { operationFingerprint } from './task-run-repository.js'
+import { StartTurnRequest } from '../contracts/turns.js'
 import type { ThreadService } from './thread-service.js'
 import type { TurnService } from './turn-service.js'
 import type { TaskController } from './task-controller.js'
@@ -13,15 +16,19 @@ import { WorkspaceReferenceService } from './workspace-reference-service.js'
 import { TaskControlService } from './task-control-service.js'
 import { preflightExternalTask, externalTaskIntent, externalProviderAmbiguity, type ExternalTaskPreflight } from './external-task-capability.js'
 import { externalPreflightThreadContext } from './contextual-external-task-preflight.js'
+import { explicitWorkspaceWrite } from './workspace-write-preflight.js'
+import { promptRequiresFileDeliverable } from '../loop/turn-completion-guard.js'
 
 export type TaskCommandDispatchOptions = {
+  /** Server-only preparation of a durable recurrence context before capability admission. */
+  prepareExecutionThread?: (thread: ThreadRecord) => Promise<void>
   /** Internal integration hook. Persist source linkage and outbox before any worker dispatch. */
   prepareTask?: (task: TaskRun) => Promise<void> | void
 }
 
 export class TaskCoordinator {
   private readonly pending = new Map<string, Promise<TaskCommandResult>>()
-  private flushingMessages = false
+  private flushingMessages?: Promise<void>
   private readonly controls:TaskControlService
   constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
   async command(raw: TaskCommand, options: TaskCommandDispatchOptions = {}): Promise<TaskCommandResult> {
@@ -42,12 +49,15 @@ export class TaskCoordinator {
     if(!origin) throw Object.assign(new Error('thread not found'),{code:'not_found'})
     const task = this.resolveTask(command.threadId,command.taskId)
     if(task && task.workspaceRoot !== origin.workspace) throw Object.assign(new Error('task belongs to another workspace'),{code:'scope_conflict'})
-    const userText = command.request.displayText ?? command.request.prompt
+    const attachmentLabel = /^(?:已附加图片|attached images?)[。.!！\s]*$/i.test(command.request.displayText?.trim() ?? '')
+    const userText = attachmentLabel && command.request.attachmentIds?.length ? command.request.prompt : command.request.displayText ?? command.request.prompt
     let intent = command.intent === 'auto' ? classifyTaskInput(userText,Boolean(task)) : command.intent
+    if (command.intent === 'auto' && task && command.request.attachmentIds?.length &&
+      /^(?:请根据已附加的图片继续处理[。.!！]?|已附加图片|attached images?)[。.!！\s]*$/i.test(userText.trim())) intent = 'supplement'
     if (command.intent === 'auto' && task?.acceptance.requiresExternalEffects && (!task.acceptance.effect || this.deps.repository.inputs(task.id).some(input => input.sourceId === 'provider-selection' && input.idempotencyKey === command.idempotencyKey)) &&
       ['waiting_user', 'paused', 'stalled'].includes(task.status) && /^(?:请)?(?:使用|用|通过|在).*(?:钉钉|飞书|dingtalk|lark|feishu)/i.test(userText)) intent = 'supplement'
     // An explicit chat hint cannot bypass provider admission for an action.
-    if (intent === 'chat' && externalTaskIntent(userText)) intent = 'new'
+    if (intent === 'chat' && (externalTaskIntent(userText) || explicitWorkspaceWrite(userText))) intent = 'new'
     if(intent==='status') return {kind:'snapshot',task}
     const resolving = command.resolveAttentionId ? this.deps.repository.attention(command.resolveAttentionId) : null
     if (command.resolveAttentionId && (!resolving || resolving.threadId !== origin.id ||
@@ -64,6 +74,10 @@ export class TaskCoordinator {
       if (result.task) await options.prepareTask?.(this.deps.repository.get(result.task.id) ?? result.task)
       await this.recordResult(command, result)
       return result
+    }
+    if (resolving?.status !== undefined && resolving.status !== 'pending') throw Object.assign(new Error('这条待处理选择已经完成，请刷新当前任务。'), { code: 'stale_request' })
+    if (resolving?.payload?.kind === 'task_input_intent' && operationFingerprint(StartTurnRequest.parse(resolving.payload.request)) !== operationFingerprint(command.request)) {
+      throw Object.assign(new Error('任务选择必须使用原始请求及附件，请重新打开该待办。'), { code: 'scope_conflict' })
     }
     if (externalProviderAmbiguity(userText) && !['pause', 'resume', 'cancel'].includes(intent)) {
       const id = `provider_choice_${createHash('sha256').update(`${command.threadId}:${command.idempotencyKey}`).digest('hex').slice(0,32)}`
@@ -110,6 +124,20 @@ export class TaskCoordinator {
         const priorBinding = this.deps.repository.inputs(task.id).find(input => input.sourceId === 'provider-selection' && input.idempotencyKey === command.idempotencyKey)
         const supplementText = unresolvedEffect || priorBinding ? `${task.goal}\n${userText}` : userText
         const capability = this.deps.preflightExternalTask ? await this.deps.preflightExternalTask(supplementText, executionThread) : preflightExternalTask(supplementText)
+        if (capability?.provider === 'workspace' && capability.status !== 'available') {
+          await this.validateReferences(command, origin.workspace, task.threadId)
+          const saved = this.deps.tasks.appendInput(task.id, command.expectedRevision ?? task.revision, command.idempotencyKey, userText, 'supplement', undefined,
+            { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences })
+          const attentionId = `capability_${task.id}`, now = this.deps.nowIso()
+          const prior = this.deps.repository.attention(attentionId)
+          this.deps.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: origin.id, workspaceRoot: origin.workspace,
+            kind: 'blocked', title: '确认任务执行权限', message: capability.message, status: 'pending', revision: (prior?.revision ?? -1) + 1, createdAt: prior?.status === 'pending' ? prior.createdAt : now, updatedAt: now,
+            payload: { kind: 'capability_required', capability, request: command.request } })
+          result = { kind: 'capability_required', task: saved.task, attentionId, capability, message: capability.message }
+          this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
+          await this.recordResult(command, result)
+          return result
+        }
         if (capability && (unresolvedEffect || priorBinding) && ['waiting_user', 'paused', 'stalled'].includes(task.status)) {
           await this.validateReferences(command, origin.workspace, task.threadId)
           const selected = externalTaskIntent(supplementText)!
@@ -167,6 +195,7 @@ export class TaskCoordinator {
         const created=await this.deps.threads.create({workspace:origin.workspace,model:command.request.model ?? origin.model,mode:origin.mode,approvalPolicy:origin.approvalPolicy,sandboxMode:origin.sandboxMode,domain:origin.domain,projectId:origin.projectId},{id:executionThreadId,title:command.request.prompt.slice(0,100)})
         await this.deps.threadStore.upsert({...created,relation:'side',parentThreadId:origin.id,agentId:origin.agentId,agentRevision:origin.agentRevision,agentProfile:origin.agentProfile})
       }
+      if (isTask && options.prepareExecutionThread) await options.prepareExecutionThread((await this.deps.threads.get(executionThreadId))!)
       const executionThread = (await this.deps.threads.get(executionThreadId))!
       const capability = isTask ? this.deps.preflightExternalTask ? await this.deps.preflightExternalTask(userText, externalPreflightThreadContext(executionThread, command.request)) : preflightExternalTask(userText) : null
       if (capability && capability.status !== 'available') {
@@ -175,7 +204,7 @@ export class TaskCoordinator {
         const attentionId = `capability_${waiting.id}`
         const now = this.deps.nowIso()
         this.deps.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: waiting.id, taskId: waiting.id,
-          threadId: origin.id, workspaceRoot: origin.workspace, kind: 'blocked', title: '连接并授权目标服务', message: capability.message,
+          threadId: origin.id, workspaceRoot: origin.workspace, kind: 'blocked', title: capability.provider === 'workspace' ? '确认任务执行权限' : '连接并授权目标服务', message: capability.message,
           status: 'pending', revision: 0, createdAt: now, updatedAt: now,
           payload: { kind: 'capability_required', capability, request: command.request } })
         await options.prepareTask?.(waiting)
@@ -187,7 +216,8 @@ export class TaskCoordinator {
       }
       const turnKey=`command:${command.idempotencyKey}`
       const oldTurn=(await this.deps.threads.get(executionThreadId))?.turns.find(turn=>turn.idempotencyKey===turnKey)
-      const turn=await this.deps.turns.startTurn({threadId:executionThreadId,...(capability?.status==='available'?{externalTaskProvider:capability.provider}:{}),request:{...command.request,idempotencyKey:turnKey,taskIntent:isTask?'new':undefined,taskVisibility:isTask?'task':'chat',...(isTask?{taskOriginThreadId:origin.id}:{})}})
+      const externalProvider = capability?.provider === 'dingtalk' || capability?.provider === 'lark' ? capability.provider : undefined
+      const turn=await this.deps.turns.startTurn({threadId:executionThreadId,...(capability?.status==='available' && externalProvider ? {externalTaskProvider:externalProvider}:{}),request:{...command.request,idempotencyKey:turnKey,taskIntent:isTask?'new':undefined,taskVisibility:isTask?'task':'chat',...(isTask?{taskOriginThreadId:origin.id}:{})}})
       const linked=this.deps.repository.findByTurn(turn.turnId)
       if (linked && isTask) {
         await options.prepareTask?.(linked)
@@ -219,22 +249,32 @@ export class TaskCoordinator {
 
   private async recordResult(command:ReturnType<typeof TaskCommandSchema.parse>,result:TaskCommandResult):Promise<void> {
     if (result.kind === 'chat_started') return
+    const attention = result.kind === 'attention_required' && result.attentionId ? this.deps.repository.attention(result.attentionId) : null
+    if (attention?.payload?.kind === 'task_input_intent') {
+      const request = StartTurnRequest.parse(attention.payload.request)
+      const choices = Array.isArray(attention.payload.choices) ? attention.payload.choices.filter((choice): choice is 'supplement' | 'new' => choice === 'supplement' || choice === 'new') : ['supplement', 'new'] as const
+      result.intentCard = { threadId: command.threadId, ...(attention.taskId ? { taskId: attention.taskId } : {}), attentionId: attention.id, request, choices: [...choices] }
+    }
     const commandId=createHash('sha256').update(`${command.threadId}:${command.idempotencyKey}`).digest('hex').slice(0,32)
     result.receipt={userMessageItemId:`item_command_${commandId}_user`,resultMessageItemId:`item_command_${commandId}_receipt`}
     const assistantText=result.kind==='snapshot' ? result.task ? `${result.task.goal}\n${result.task.waitingReason ?? result.task.stalledReason ?? ({queued:'已接收任务',running:'正在执行',retrying:'正在继续',paused:'已暂停',waiting_user:'等待你补充',waiting_approval:'等待必要授权',completed:'已完成',stalled:'需要处理阻塞',failed:'执行失败',cancelled:'已取消'} as const)[result.task.status]}` : '当前没有进行中的任务。' : result.kind==='input_queued' ? result.task.status==='paused'?'补充已保存，将在你继续任务后送达。':'补充已保存，将送达当前任务。' : result.kind==='task_updated'?result.action==='pause'?'任务已暂停，补充会继续保存。':'任务已取消，已有成果和记录已保留。': result.kind==='attention_required'?result.message:result.kind==='capability_required'?result.capability.message:`已接收任务：${result.task?.goal ?? command.request.displayText ?? command.request.prompt}`
-    this.deps.repository.enqueueOutbox({id:`command-message:${commandId}`,ownerId:command.threadId,kind:'task_command_message',payload:{threadId:command.threadId,commandId,userText:command.request.displayText ?? command.request.prompt,assistantText,...(result.kind==='capability_required'&&result.task?{capabilityCard:{threadId:command.threadId,taskId:result.task.id,attentionId:result.attentionId,prompt:command.request.prompt,capability:result.capability}}:{}),createdAt:this.deps.nowIso()},createdAt:this.deps.nowIso()})
+    this.deps.repository.enqueueOutbox({id:`command-message:${commandId}`,ownerId:command.threadId,kind:'task_command_message',payload:{threadId:command.threadId,commandId,userText:command.request.displayText ?? command.request.prompt,assistantText,...(result.intentCard ? { intentCard: result.intentCard } : {}),...(result.kind==='capability_required'&&result.task?{capabilityCard:{threadId:command.threadId,taskId:result.task.id,attentionId:result.attentionId,prompt:command.request.prompt,capability:result.capability}}:{}),createdAt:this.deps.nowIso()},createdAt:this.deps.nowIso()})
     await this.flushCommandMessages()
   }
 
   async flushCommandMessages():Promise<void> {
-    if(this.flushingMessages) return
-    this.flushingMessages=true
-    try {
-      for(const message of this.deps.repository.pendingOutbox('task_command_message')) {
-        await this.deps.turns.recordCommandExchange(message.payload as Parameters<TurnService['recordCommandExchange']>[0])
-        this.deps.repository.acknowledgeOutbox(message.id,this.deps.nowIso())
+    if(this.flushingMessages) return this.flushingMessages
+    this.flushingMessages = (async () => {
+      for (;;) {
+        const messages = this.deps.repository.pendingOutbox('task_command_message')
+        if (!messages.length) return
+        for(const message of messages) {
+          await this.deps.turns.recordCommandExchange(message.payload as Parameters<TurnService['recordCommandExchange']>[0])
+          this.deps.repository.acknowledgeOutbox(message.id,this.deps.nowIso())
+        }
       }
-    } finally { this.flushingMessages=false }
+    })()
+    try { await this.flushingMessages } finally { this.flushingMessages=undefined }
   }
 }
 export function classifyTaskInput(text:string,hasTask:boolean):'status'|'supplement'|'new'|'chat'|'ambiguous'|'pause'|'resume'|'cancel' {
@@ -246,7 +286,9 @@ export function classifyTaskInput(text:string,hasTask:boolean):'status'|'supplem
   if(/^(?:新建(?:一个)?任务|另(?:起|开)(?:一个)?任务|独立任务|new task)/i.test(value)) return 'new'
   if(hasTask && /^(?:再(?:加|补)|补充|另外(?:加|补)|继续|请继续|还需要|把.*(?:也|一并)|also |add |continue\b)/i.test(value)) return 'supplement'
   if(externalTaskIntent(value)) return 'new'
+  if(explicitWorkspaceWrite(value)) return 'new'
   if(/^(?:(?:请|帮我)\s*)?(?:如何|怎么|怎样|介绍|解释|什么是|对比|比较|how\s|what\s|explain|compare\b)/i.test(value)) return 'chat'
+  if (promptRequiresFileDeliverable(value) || /(?:使用|用|通过).{0,30}(?:browser[-\s]?skill|浏览器).{0,80}(?:获取|读取|采集|抓取|查询|搜索|检索|打开)|(?:每天|每日|定时|daily|every day).{0,80}(?:执行|运行|采集|汇报|报告|run|collect)/i.test(value)) return 'new'
   if(!hasTask) return /(?:报告|投标|交付|文档|实现|完成.*计划|调研|research|implement|deliver|report|钉钉|飞书|dingtalk|lark|feishu).*(?:待办|审批|任务|工单|处理|todo|approval|task)|(?:处理|完成|查询|列出).*(?:钉钉|飞书|dingtalk|lark|feishu)/i.test(value)?'new':/(?:报告|投标|交付|文档|实现|完成.*计划|调研|research|implement|deliver|report)/i.test(value)?'new':'chat'
   return 'ambiguous'
 }

@@ -1,4 +1,7 @@
+import { isBrowserTask, browserTaskOrigins } from '../contracts/browser-skill.js'
+import { extractScheduleRequirement } from '../contracts/schedule.js'
 import { authorizedArtifactWrites } from './task-artifact-proof.js'
+import { workspacePermissionCapability } from './workspace-write-preflight.js'
 import type { ToolEffectResolver } from '../ports/tool-effect.js'
 import { externalTaskIntent } from './external-task-capability.js'
 import { verifiedEffectReceipts, externalOperationForTool, externalTarget, requestedEffectOperations } from './external-effect-evidence.js'
@@ -11,6 +14,7 @@ import { makeToolResultItem } from '../domain/item.js'
 import type { ApprovalRequest } from '../domain/approval.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import { extname, isAbsolute, relative, resolve } from 'node:path'
 import type { TurnItem } from '../contracts/items.js'
 import type { ThreadRecord } from '../contracts/threads.js'
@@ -61,6 +65,7 @@ export type TaskCandidateDecision =
   | { kind: 'failed'; task: TaskRun; reason: string }
 
 export type TaskControllerDeps = {
+  dataDir?: string
   repository: TaskRunRepository
   threadStore: ThreadStore
   sessionStore: SessionStore
@@ -68,6 +73,7 @@ export type TaskControllerDeps = {
   ownerId?: string
   resolveToolEffect?: ToolEffectResolver
   spans?: RuntimeSpanService
+  reconcileHostShell?: (taskId: string) => Promise<void>
   completionGuard?: (input: { thread?: ThreadRecord; turn?: Turn; task: TaskRun }) => { reason: string; fingerprint: string; retryable?: boolean } | null
 }
 
@@ -88,12 +94,14 @@ export class TaskController {
   setAdmissionSuspended(suspended: boolean): void { this.admissionSuspended = suspended }
 
   private readonly repository: TaskRunRepository
+  private readonly artifactDataDir?: string
   private readonly threadStore: ThreadStore
   private readonly sessionStore: SessionStore
   private readonly nowIso: () => string
   private readonly ownerId: string
   private readonly resolveToolEffect: ToolEffectResolver
   private readonly spans?: RuntimeSpanService
+  private readonly reconcileHostShell?: TaskControllerDeps['reconcileHostShell']
   private readonly completionGuard?: TaskControllerDeps['completionGuard']
   private readonly leases = new Map<string, { leaseRevision: number; turnId?: string }>()
   private readonly attemptTokens = new Map<string, ExecutionToken>()
@@ -109,6 +117,7 @@ export class TaskController {
 
   constructor(deps: TaskControllerDeps) {
     this.repository = deps.repository
+    this.artifactDataDir = deps.dataDir ? realpathSync(deps.dataDir) : undefined
     let sharedBudget=sharedWorkBudgets.get(deps.repository)
     if(!sharedBudget){sharedBudget={aborts:new Map(),active:new Map(),timers:new Map()};sharedWorkBudgets.set(deps.repository,sharedBudget)}
     this.executionAborts=sharedBudget.aborts;this.activeWork=sharedBudget.active;this.rootBudgetTimers=sharedBudget.timers
@@ -118,7 +127,13 @@ export class TaskController {
     this.ownerId = deps.ownerId ?? `runtime-${process.pid}-${randomUUID()}`
     this.spans = deps.spans
     this.completionGuard = deps.completionGuard
+    this.reconcileHostShell = deps.reconcileHostShell
     this.resolveToolEffect = deps.resolveToolEffect ?? externalOperationForTool
+  }
+
+  managedArtifactRoot(taskId: string): string | undefined {
+    if (!this.artifactDataDir || !this.repository.get(taskId)) return undefined
+    return resolve(this.artifactDataDir, 'task-artifacts', createHash('sha256').update(taskId).digest('hex'))
   }
 
   ensureTask(input: {
@@ -167,10 +182,13 @@ export class TaskController {
     if (existing) return existing
     return this.repository.transact(() => {
       const task = this.createTask(input)
-      return this.repository.update(task.id, task.revision, current => ({
+      const waiting = this.repository.update(task.id, task.revision, current => ({
         ...current, status: 'waiting_user', waitingReason: input.reason,
         nodes: current.nodes.map(node => ({ ...node, status: 'blocked' as const }))
       }), { key: 'capability-blocked', kind: 'capability_required', payload: { reason: input.reason } })
+      return this.repository.appendInput({ taskId: waiting.id, expectedRevision: waiting.revision, idempotencyKey: `capability-original:${waiting.id}`,
+        text: input.request.prompt, kind: 'supplement', sourceId: 'capability-original', attachmentIds: input.request.attachmentIds,
+        workspaceReferences: input.request.workspaceReferences, nowIso: this.nowIso() }).task
     })
   }
 
@@ -443,6 +461,8 @@ export class TaskController {
       throw Object.assign(new Error(`active task not found for thread ${threadId}`), { code: 'not_found' })
     }
     if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
+    await this.reconcileHostShell?.(task.id)
+    task = this.repository.get(task.id)!
     const hostShell = this.hostShellState(task)
     const unsettled = [...this.repository.unsettledOperations(task.id).filter(operation => operation.kind === 'tool'), ...hostShell.unknown]
     const [thread, items] = await Promise.all([
@@ -460,6 +480,8 @@ export class TaskController {
       task = this.updateExecution(task.id, task.revision, current => ({ ...current, artifacts, updatedAt: this.nowIso() }))
     }
     if (unsettled.length) return this.stallUnknown(task, unsettled.map(operation => operation.id))
+    const permissionBlock = this.waitForToolPermission(task, items.filter(item => item.turnId === turnId), turnId)
+    if (permissionBlock) return permissionBlock
     if (hostShell.pending.length) return this.retry(task,'已授权命令仍有待核验回执，请使用 host_shell_session 只读轮询原命令，不能重新执行或仅用文字交付。',`host-shell-pending:${hostShell.pending.map(operation => operation.id).join(',')}`,turnId)
     if (this.repository.listShellSessions(task.id).some(session => ['running','starting','outcome_unknown'].includes(session.status))) return this.retry(task,'命令进程尚未确认完成，请轮询已有命令并核实其结果后交付。',`shell-pending:${task.attempts}`,turnId)
     const turn = thread?.turns.find((candidate) => candidate.id === turnId)
@@ -497,6 +519,23 @@ export class TaskController {
         'web_access_exhausted: 在线搜索连续失败，无法核实当前资讯。'
       )
     }
+    if (task.acceptance.requiresWebEvidence) {
+      const origins = new Set<string>()
+      const reads = this.repository.operations(task.id, 'tool').filter(receipt => receipt.status === 'succeeded')
+      for (const item of items) {
+        if (!taskTurns.has(item.turnId) || item.kind !== 'tool_result' || item.isError || !item.output || typeof item.output !== 'object') continue
+        if (!reads.some(receipt => receipt.request?.callId === item.callId && receipt.request?.turnId === item.turnId && receipt.request?.toolName === item.toolName)) continue
+        const output = item.output as Record<string, unknown>
+        const evidence = output.evidence && typeof output.evidence === 'object' ? output.evidence as Record<string,unknown> : {}
+        const source = item.toolName === 'web_fetch' && typeof output.text === 'string' && output.text.trim()
+          ? output.finalUrl ?? output.url
+          : /^browser_(?:navigate|observe|get_html|read|extract)$/.test(item.toolName) && output.status === 'succeeded' && evidence.verified === true && evidence.contentRead === true && typeof output.resultHash === 'string'
+            ? output.sourceUrl : undefined
+        if (typeof source === 'string') { try { const url = new URL(source); if (['http:', 'https:'].includes(url.protocol)) origins.add(url.origin) } catch { /* Invalid source metadata is not evidence. */ } }
+      }
+      const missing = task.acceptance.requiredSourceOrigins?.filter(origin => !origins.has(origin)) ?? []
+      if (!origins.size || missing.length) return this.retry(task, `网页采集尚缺实际正文来源证据${missing.length ? `（${missing.join('、')}）` : ''}，请使用已授权浏览器或网页读取工具核验后交付。`, `web-evidence:${[...origins].sort().join(',')}:${missing.join(',')}`, turnId)
+    }
     if (task.templateId) {
       const delivery = verifyTaskDelivery(this.repository,task)
       if (!delivery.complete) return this.waitForUser(task,delivery.reasons.join('；'),finalResponse,`delivery:${task.revision}`,turnId)
@@ -532,7 +571,7 @@ export class TaskController {
     }
 
     if (task.acceptance.kind === 'files') {
-      const validArtifacts = artifacts.filter((artifact) => artifact.validation === 'valid')
+      const validArtifacts = artifacts.filter((artifact) => artifact.validation === 'valid' && (!task.acceptance.requiredFormats?.length || task.acceptance.requiredFormats.includes(artifact.format ?? '')))
       const minimum = task.acceptance.minimumArtifacts ?? 1
       if (validArtifacts.length < minimum) {
         const required = task.acceptance.requiredFormats?.map((value) => `.${value}`).join(' / ')
@@ -590,10 +629,36 @@ export class TaskController {
     if (!task || task.activeTurnId !== turnId) return null
     const thread = await this.threadStore.get(threadId)
     const turn = thread?.turns.find(candidate => candidate.id === turnId)
+    const items = (await this.sessionStore.loadItems(threadId)).filter(item => item.turnId === turnId)
+    const permissionBlock = this.waitForToolPermission(task, items, turnId)
+    if (permissionBlock) return permissionBlock
     const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
     if (blocked?.retryable !== false) return null
-    const items = (await this.sessionStore.loadItems(threadId)).filter(item => item.turnId === turnId)
     return this.waitForUser(task, blocked.reason, latestAssistantText(turn, items), blocked.fingerprint, turnId)
+  }
+
+  private waitForToolPermission(task: TaskRun, items: TurnItem[], turnId: string): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null {
+    const denied = [...items].reverse().find(item => item.kind === 'tool_result' && item.isError && item.output && typeof item.output === 'object' &&
+      ['sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked'].includes(String((item.output as Record<string, unknown>).code)))
+    if (!denied || denied.kind !== 'tool_result') return null
+    const code = String((denied.output as Record<string, unknown>).code)
+    const capability = workspacePermissionCapability(code, code === 'network_scope_blocked' ? '本次操作的网络目标超出当前任务授权，请确认所需的网络范围后继续原任务。' : '本次文件操作缺少对应的任务权限，请确认目标路径的读写范围后继续原任务。')
+    const attentionId = `capability_${task.id}`
+    const fingerprint = `permission:${turnId}:${code}`
+    const now = this.nowIso()
+    return this.repository.transact(() => {
+      const result = this.waitForUser(task, capability.message, '', fingerprint, turnId)
+      const prior = this.repository.attention(attentionId)
+      if (prior?.status === 'pending' && prior.payload?.fingerprint === fingerprint) return result
+      this.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: task.originThreadId ?? task.threadId,
+        workspaceRoot: task.workspaceRoot, kind: 'blocked', title: '确认任务执行权限', message: capability.message, status: 'pending', revision: (prior?.revision ?? -1) + 1,
+        createdAt: prior?.status === 'pending' ? prior.createdAt : now, updatedAt: now, payload: { kind: 'capability_required', capability, fingerprint, request: { prompt: task.goal } } })
+      const commandId = createHash('sha256').update(`${task.id}:${fingerprint}`).digest('hex').slice(0, 32)
+      this.repository.enqueueOutbox({ id: `command-message:${commandId}`, ownerId: task.originThreadId ?? task.threadId, kind: 'task_command_message', createdAt: now,
+        payload: { threadId: task.originThreadId ?? task.threadId, commandId, assistantText: capability.message, createdAt: now,
+          capabilityCard: { threadId: task.originThreadId ?? task.threadId, taskId: task.id, attentionId, prompt: task.goal, capability } } })
+      return result
+    })
   }
 
   recordAttemptFailure(threadId: string, turnId: string, code: string, message: string): TaskCandidateDecision | null {
@@ -712,6 +777,42 @@ export class TaskController {
     for (const input of pending) this.repository.execution.enqueue(input.id, task.id, token.sessionId)
     const inputs = new Map(pending.map(input => [input.id, input]))
     return this.repository.execution.pending(token.sessionId).flatMap(delivery => inputs.has(delivery.inputId) ? [{ delivery, input: inputs.get(delivery.inputId)! }] : [])
+  }
+
+  /** Resolve control provenance against SQLite, including inputs written by older clients. */
+  approvalForInput(input: TaskInput): ApprovalRequest | undefined {
+    if (!input.sourceId || !['approval_resolution', 'user_answer'].includes(input.kind)) return undefined
+    const request = this.repository.humanRequest(input.sourceId)
+    const task = this.repository.get(input.taskId)
+    if (!request || request.kind !== 'approval' || request.status === 'pending' || request.threadId !== task?.threadId) return undefined
+    const approval = request.payload.approval as ApprovalRequest | undefined
+    if (!approval || approval.id !== request.id) return undefined
+    const resolution = request.resolution as { decision?: string }
+    return { ...approval, status: request.status === 'expired' ? 'expired' : resolution?.decision === 'allow' ? 'allowed' : 'denied', decidedAt: request.updatedAt }
+  }
+
+  /** Only DB-linked historical controls are projected; the original transcript stays intact. */
+  projectApprovalHistory(threadId: string, items: TurnItem[]): TurnItem[] {
+    const deliveries = new Map(this.repository.execution.deliveriesForThread(threadId).map(delivery => [delivery.messageItemId, delivery]))
+    return items.map(item => {
+      if (item.kind === 'approval' && !item.taskInputId) {
+        const request = this.repository.humanRequest(item.approvalId)
+        if (request?.kind === 'approval' && request.threadId === threadId && request.status !== 'pending') {
+          const resolution = request.resolution as {decision?: string}
+          return {...item, status: request.status === 'expired' ? 'expired' : resolution?.decision === 'allow' ? 'allowed' : 'denied'}
+        }
+      }
+      if (item.kind !== 'user_message') return item
+      const delivery = deliveries.get(item.id)
+      if (!delivery) return item
+      const input = this.repository.inputs(delivery.taskId).find(input => input.id === delivery.inputId)
+      const approval = input ? this.approvalForInput(input) : undefined
+      if (!approval) return item
+      const {text: _text, displayText: _displayText, ...base} = item
+      return {...base, kind:'approval', role:'system', approvalId:approval.id, toolName:approval.toolName,
+        status:approval.status, summary:approval.status === 'allowed' ? '已允许本次操作' : '本次操作未获授权',
+        taskInputId:input!.id, sourceRequestId:approval.id}
+    })
   }
 
   markInputsDelivered(turnId:string,deliveries:InputDelivery[],sessionItemId:string,sessionHash:string):void {
@@ -1452,7 +1553,8 @@ export class TaskController {
       const externalWrite = !inside ? authorizedWrites.get(canonical) : undefined
       const allowed = inside || Boolean(externalWrite)
       const info = canonical && allowed ? await stat(canonical).catch(() => null) : null
-      const validFormat = !required || required.includes(extension)
+      const managedOutput = externalWrite?.authorizedRoot === this.managedArtifactRoot(task.id)
+      const validFormat = !required || required.includes(extension) || Boolean(externalWrite && managedOutput)
       const validationSpanId = artifactValidationSpanId(task.id, rawPath)
       this.spans?.start({
         id: validationSpanId,
@@ -1497,6 +1599,7 @@ export class TaskController {
         }
       })
       artifacts.push({
+        ...(managedOutput && externalWrite ? { storage: 'task' as const } : previous?.storage ? { storage: previous.storage } : {}),
         id: previous?.id ?? `artifact_${createHash('sha256').update(`${task.id}:${inside ? relativePath : absolutePath}`).digest('hex').slice(0, 16)}`,
         relativePath: inside ? relativePath : externalWrite ? relative(externalWrite.authorizedRoot, canonical) || canonical.split(/[\\/]/).at(-1)! : previous?.relativePath ?? rawPath,
         ...(!inside && (externalWrite || previous?.absolutePath) ? {
@@ -1562,14 +1665,17 @@ function makeToolResultForVerifiedResolution(task: TaskRun, turnId: string, call
 
 function acceptanceForPrompt(prompt: string): TaskAcceptance {
   const files = promptRequiresFileDeliverable(prompt)
+  const web = isBrowserTask(prompt) || /(?:采集|抓取|检索|获取).{0,60}(?:网页|网站|平台).{0,60}(?:信息|公告|正文)|(?:网页|网站|平台).{0,60}(?:采集|抓取|检索|获取)/i.test(prompt)
   const effect = promptRequiresExternalEffect(prompt)
   const intent = effect ? externalTaskIntent(prompt) : null
   const requiredFormats = requiredFileExtensionsForPrompt(prompt)
   return {
+    schedule: extractScheduleRequirement(prompt),
     kind: files ? 'files' : effect ? 'effect' : 'answer',
     requiredNodeKinds: files || effect ? ['execute', 'verify', 'deliver'] : ['deliver'],
     ...(requiredFormats ? { requiredFormats: [...requiredFormats] } : {}),
     ...(files ? { minimumArtifacts: 1 } : {}),
+    ...(web ? {requiresWebEvidence:true,requiredSourceOrigins:browserTaskOrigins(prompt)} : {}),
     requireFinalResponse: true,
     requireActionableArtifactCard: files,
     ...(effect ? { requiresExternalEffects: true } : {}),

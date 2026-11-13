@@ -1,5 +1,6 @@
 import type { WorkspaceMigrationReport, WorkspaceImportRequest, WorkspaceImportResult } from './workspace-migration'
 import type { ManagedDwsResult, ManagedDwsTaskAccessResult } from './managed-dws'
+import type { BrowserSkillConfigureRequest, ManagedBrowserSkillResult } from './managed-browser-skill'
 import type {
   AppSettingsPatch,
   WorkWiseSettingsV2,
@@ -404,6 +405,8 @@ export type WorkWiseApi = {
   coordinateTaskCommand: (request: import('./task-command').TaskCommandRequest) => Promise<import('./task-command').TaskCommandResult>
   getTaskRun: (taskId: string) => Promise<TaskRunV1 | null>
   listTaskOperationReceipts: (taskId: string) => Promise<TaskOperationReceiptV1[]>
+  getBrowserTaskBinding: (taskId: string) => Promise<import('../../kun/src/contracts/browser-skill').BrowserTaskBindingSnapshot>
+  confirmBrowserTaskBinding: (taskId: string, input: import('../../kun/src/contracts/browser-skill').BrowserTaskBindingConfirmation) => Promise<{ binding: import('../../kun/src/contracts/browser-skill').BrowserTaskBindingSnapshot; resumed: false }>
   getTaskPermissions: (taskId: string) => Promise<import('./agent-workbench').TaskPermissionSnapshotV1>
   confirmTaskPermissions: (taskId: string, request: import('./agent-workbench').TaskPermissionConfirmationV1) => Promise<{ task: TaskRunV1; permission: import('./agent-workbench').TaskPermissionSnapshotV1; resumed: false }>
   verifyTaskOperationReceipt: (taskId: string, receiptId: string, request: Pick<RevisionTaskAction, 'expectedRevision' | 'idempotencyKey'>) => Promise<import('./agent-workbench').TaskOperationVerificationV1>
@@ -524,6 +527,11 @@ export type WorkWiseApi = {
   checkManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
   cancelManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
   diagnoseManagedDingTalk: () => Promise<ManagedDwsResult>
+  diagnoseBrowserSkill: () => Promise<ManagedBrowserSkillResult>
+  installBrowserSkill: () => Promise<ManagedBrowserSkillResult>
+  connectBrowserSkill: () => Promise<ManagedBrowserSkillResult>
+  configureBrowserSkill: (request: BrowserSkillConfigureRequest) => Promise<ManagedBrowserSkillResult>
+  openBrowserSkillExtension: (browser: 'chrome' | 'edge') => Promise<void>
   checkManagedDingTalkTaskAccess: () => Promise<ManagedDwsTaskAccessResult>
   installManagedDingTalk: () => Promise<ManagedDwsResult>
   beginManagedDingTalkLogin: () => Promise<ManagedDwsResult>

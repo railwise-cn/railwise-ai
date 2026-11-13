@@ -9,6 +9,8 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { startWorkspaceFileWatch, type WorkspaceFileWatch } from '../services/workspace-file-watch-service'
 import { z } from 'zod'
+import { BrowserOrigin } from '../../../kun/src/contracts/browser-skill.js'
+import { BROWSER_EXTENSION_URLS, getManagedBrowserSkillService } from '../services/managed-browser-skill-service'
 import {
   type AppSettingsPatch,
   type AppSettingsV1,
@@ -319,6 +321,8 @@ type RegisterAppIpcHandlersOptions = {
   refreshManagedDingTalkCapabilities?: (status: import('../../shared/managed-dws').ManagedDwsStatus) => Promise<void | { enabled: boolean }>
   setManagedDingTalkEnabled?: (enabled: boolean) => Promise<import('../../shared/managed-dws').ManagedDwsResult>
   onMcpServersChanged?: (snapshot: import('../services/mcp-config-service').McpRuntimeSnapshotV1) => Promise<void>
+  onSkillsChanged?: () => Promise<void>
+  refreshBrowserSkill?: (status: import('../../../kun/src/contracts/browser-skill.js').BrowserCapabilityConfig) => Promise<void>
   onRuntimeMcpConfigWritten?: (path: string, content: string) => Promise<void> | void
   showTurnCompleteNotification: (
     payload: TurnCompleteNotificationPayload
@@ -715,9 +719,10 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ;(app as typeof app & { once?: typeof app.once }).once?.('before-quit', () => mcpConfigService.dispose())
   let skillCatalogGeneration = 1
 
-  const notifySkillsChanged = (): number => {
+  const notifySkillsChanged = async (): Promise<number> => {
     skillCatalogGeneration += 1
     getMainWindow()?.webContents.send('skills:changed', skillCatalogGeneration)
+    await options.onSkillsChanged?.()
     return skillCatalogGeneration
   }
 
@@ -1128,7 +1133,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         idempotencyKey: request.idempotencyKey
       })
     )
-    notifySkillsChanged()
+    await notifySkillsChanged()
     await notifyMcpServersChanged()
     return installed
   })
@@ -1144,7 +1149,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         idempotencyKey: `${request.idempotencyKey}:activate`
       })
     )
-    notifySkillsChanged()
+    await notifySkillsChanged()
     await notifyMcpServersChanged()
     return installed
   })
@@ -1663,7 +1668,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         const filePath = join(skillDir, 'SKILL.md')
         await mkdir(skillDir, { recursive: true })
         await durableWriteFile(filePath, request.content)
-        notifySkillsChanged()
+        await notifySkillsChanged()
         return { ok: true as const, path: filePath }
       } catch (error) {
         return {
@@ -1681,20 +1686,21 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
 
   ipcMain.handle('skill:refresh', async (_, payload: unknown) => {
     const request = parseIpcPayload('skill:refresh', skillListPayloadSchema, payload)
+    await notifySkillsChanged()
     return loadSkillCatalog(request.workspaceRoot)
   })
 
   ipcMain.handle('skill:install-github', async (_, payload: unknown) => {
     const request = parseIpcPayload('skill:install-github', githubSkillInstallPayloadSchema, payload)
     const result = await installGithubSkill(request.rootPath, request.source)
-    if (result.ok) notifySkillsChanged()
+    if (result.ok) await notifySkillsChanged()
     return result
   })
 
   ipcMain.handle('skill:install-bundled', async (_, payload: unknown) => {
     const request = parseIpcPayload('skill:install-bundled', bundledSkillInstallPayloadSchema, payload)
     const result = await installBundledSkill(request.rootPath, request.source)
-    if (result.ok) notifySkillsChanged()
+    if (result.ok) await notifySkillsChanged()
     return result
   })
 
@@ -1707,7 +1713,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const request = parseIpcPayload('skill:sync-github', githubSkillSyncPayloadSchema, payload)
     const settings = await store.load()
     const result = await syncGithubManagedSkills(settings, request.workspaceRoot)
-    if (result.ok && result.updated > 0) notifySkillsChanged()
+    if (result.ok && result.updated > 0) await notifySkillsChanged()
     return result
   })
 
@@ -1721,6 +1727,40 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     }
     return result
   }
+  const refreshBrowser = async (result: import('../../shared/managed-browser-skill').ManagedBrowserSkillResult) => {
+    const { ownedDaemon: _owned, skillInstalled: _skill, ...status } = result.status
+    try { await options.refreshBrowserSkill?.(status) }
+    catch { return { ...result, ok: false, message: '浏览器状态已保存，Runtime 刷新失败。请重新检查连接。' } }
+    return result
+  }
+  ipcMain.handle('tool:browser-skill:diagnose', async () => refreshBrowser(await getManagedBrowserSkillService().diagnose()))
+  ipcMain.handle('tool:browser-skill:connect', async () => refreshBrowser(await getManagedBrowserSkillService().connect()))
+  ipcMain.handle('tool:browser-skill:configure', async (_, payload: unknown) => {
+    const request = parseIpcPayload('tool:browser-skill:configure', z.object({
+      enabled: z.boolean(), browserInstanceId: z.string().min(1).max(512).optional(),
+      origins: z.array(BrowserOrigin).max(64), interaction: z.enum(['observe', 'interact']),
+      expectedRevision: z.number().int().nonnegative()
+    }).strict(), payload)
+    return refreshBrowser(await getManagedBrowserSkillService().configure(request))
+  })
+  ipcMain.handle('tool:browser-skill:extension', async (_, payload: unknown) => {
+    const browser = parseIpcPayload('tool:browser-skill:extension', z.enum(['chrome', 'edge']), payload)
+    await shell.openExternal(BROWSER_EXTENSION_URLS[browser])
+  })
+  ipcMain.handle('tool:browser-skill:install', async () => {
+    const result = await getManagedBrowserSkillService().install()
+    if (!result.ok) return result
+    const installed = await pluginManagementService.listInstalled()
+    if (!installed.some(item => item.packageId === 'browser-skill')) {
+      const entry = (await marketplaceCatalogService.listPackages()).packages.find(item => item.package.id === 'browser-skill')
+      if (!entry) throw new Error('BrowserSkill 技能来源当前不可用。CLI 已保留，可稍后重试安装配套技能。')
+      const prepared = await pluginManagementService.prepareCatalogPackage(entry.package)
+      await pluginManagementService.installPrepared({ preparedId: prepared.id, reviewSha256: prepared.reviewSha256,
+        expectedCurrentVersion: null, scope: 'user', permissions: [], idempotencyKey: 'browser-skill-companion-' + prepared.reviewSha256 })
+    }
+    await notifySkillsChanged()
+    return refreshBrowser({ ...result, status: { ...result.status, skillInstalled: true } })
+  })
   ipcMain.handle('tool:dingtalk:diagnose', async () => refreshDingTalk(await diagnoseManagedDingTalk()))
   let taskAccessCheck: Promise<import('../../shared/managed-dws').ManagedDwsTaskAccessResult> | undefined
   ipcMain.handle('tool:dingtalk:check-task-access', async (_, payload: unknown) => {
@@ -1750,7 +1790,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('tool:lark-login:complete', async () => {
     const result = await completeManagedLarkLogin()
     if (result.ok) {
-      notifySkillsChanged()
+      await notifySkillsChanged()
       try { await refreshManagedCapabilities?.(result.status) } catch { return { ok: false, message: 'Account connected, but Runtime capabilities could not refresh. Retry the capability check.' } }
     }
     return result
@@ -1760,7 +1800,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const id = parseIpcPayload('tool:install-managed', managedToolIdSchema, payload)
     const result = await installManagedTool(id)
     if (result.ok) {
-      notifySkillsChanged()
+      await notifySkillsChanged()
       if (id === 'lark-cli') await refreshManagedCapabilities?.(result.status).catch(() => undefined)
     }
     return result
@@ -1770,7 +1810,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const id = parseIpcPayload('tool:update-managed', managedToolIdSchema, payload)
     const result = await updateManagedTool(id)
     if (result.ok) {
-      notifySkillsChanged()
+      await notifySkillsChanged()
       if (id === 'lark-cli') await refreshManagedCapabilities?.(result.status).catch(() => undefined)
     }
     return result
@@ -1789,7 +1829,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const id = parseIpcPayload('tool:remove-managed', managedToolIdSchema, payload)
     const result = await removeManagedTool(id)
     if (result.ok) {
-      notifySkillsChanged()
+      await notifySkillsChanged()
       if (id === 'lark-cli') await refreshManagedCapabilities?.(result.status).catch(() => undefined)
     }
     return result

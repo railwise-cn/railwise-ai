@@ -572,7 +572,8 @@ function toolBlockFromItem(item: CoreTurnItemJson, child?: CoreChildRuntimeMetad
   const meta: Record<string, unknown> = {
     sourceItemId: item.id,
     ...(item.callId ? { callId: item.callId } : {}),
-    ...(item.toolName ? { toolName: item.toolName } : {})
+    ...(item.toolName ? { toolName: item.toolName } : {}),
+    ...(item.output && typeof item.output === 'object' && (item.output as { code?: unknown }).code === 'outcome_unknown' ? { outcomeUnknown: true } : {})
   }
   applyRuntimeDisclosureMeta(meta, item, child)
   const sources = extractToolSources(item)
@@ -751,7 +752,8 @@ function assistantTextBlockFromItem(item: CoreTurnItemJson): ChatBlock | null {
     createdAt: itemCreatedAt(item),
     text: item.text,
     ...(Array.isArray(item.uiBlocks) ? { uiBlocks: item.uiBlocks } : {}),
-    ...(item.capabilityCard ? { capabilityCard: item.capabilityCard } : {})
+    ...(item.capabilityCard ? { capabilityCard: item.capabilityCard } : {}),
+    ...(item.intentCard ? { intentCard: item.intentCard } : {})
   }
 }
 
@@ -979,6 +981,7 @@ function errorForRuntimeEvent(payload: RuntimeErrorEventPayload): Error {
  * live event dispatcher maps onto sink callbacks.
  */
 export function chatBlockFromItem(item: CoreTurnItemJson, child?: CoreChildRuntimeMetadataJson): ChatBlock | null {
+  if (item.kind === 'approval' && item.taskInputId && item.sourceRequestId) return null
   switch (item.kind) {
     case 'user_message':
       return userMessageBlockFromItem(item)

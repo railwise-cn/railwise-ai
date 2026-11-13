@@ -70,6 +70,10 @@ export class ExecutionStore {
     this.db.prepare('INSERT INTO input_deliveries(id,input_id,session_id,sequence,status,data_json) VALUES(?,?,?,?,?,?)').run(delivery.id,inputId,sessionId,delivery.sequence,delivery.status,JSON.stringify(delivery))
     return delivery
   }
+  deliveriesForThread(threadId: string): InputDelivery[] {
+    const rows = this.db.prepare('SELECT d.data_json FROM input_deliveries d JOIN execution_sessions s ON s.id=d.session_id WHERE s.thread_id=? ORDER BY d.rowid').all(threadId) as Array<{data_json:string}>
+    return rows.map(row => InputDeliverySchema.parse(JSON.parse(row.data_json)))
+  }
   pending(sessionId: string): InputDelivery[] {
     return (this.db.prepare("SELECT data_json FROM input_deliveries WHERE session_id=? AND status!='consumed' ORDER BY sequence").all(sessionId) as Array<{data_json:string}>).map(row => InputDeliverySchema.parse(JSON.parse(row.data_json)))
   }

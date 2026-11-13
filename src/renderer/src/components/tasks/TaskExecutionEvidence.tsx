@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TaskOperationReceiptV1, TaskOperationVerificationV1, TaskResultEvidenceV1, TaskRunV1 } from '@shared/agent-workbench'
 
@@ -18,18 +18,30 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
   const { t } = useTranslation('common')
   const [verifying, setVerifying] = useState<string | null>(null)
   const [messages, setMessages] = useState<Record<string, string>>({})
-  const verify = async (receipt: TaskOperationReceiptV1): Promise<void> => {
+  const pollAttempts = useRef(new Map<string, number>())
+  const verify = useCallback(async (receipt: TaskOperationReceiptV1): Promise<void> => {
     if (!onVerify || verifying) return
     setVerifying(receipt.id)
     setMessages(current => ({ ...current, [receipt.id]: '' }))
     try {
       const result = await onVerify(receipt)
-      setMessages(current => ({ ...current, [receipt.id]: result.status === 'verified' ? t('taskEffectReadbackVerified') : `${t('taskEffectReadbackUnconfirmed')}${result.errorCode ? ` (${result.errorCode})` : ''}` }))
+      setMessages(current => ({ ...current, [receipt.id]: result.shell?.message ?? (result.status === 'verified' ? t('taskEffectReadbackVerified') : `${t('taskEffectReadbackUnconfirmed')}${result.errorCode ? ` (${result.errorCode})` : ''}`) }))
     } catch (error) { setMessages(current => ({ ...current, [receipt.id]: error instanceof Error ? error.message : String(error) })) }
     finally { setVerifying(null) }
-  }
+  }, [onVerify, t, verifying])
+  useEffect(() => {
+    if (verifying || !onVerify) return
+    const receipt = receipts.find(item => item.purpose === 'host_shell' && item.shell?.canPoll && ['running', 'outcome_unknown'].includes(item.status) && (pollAttempts.current.get(item.id) ?? 0) < 10)
+    if (!receipt) return
+    const timer = window.setTimeout(() => {
+      pollAttempts.current.set(receipt.id, (pollAttempts.current.get(receipt.id) ?? 0) + 1)
+      void verify(receipt)
+    }, 2000)
+    return () => window.clearTimeout(timer)
+  }, [receipts, verifying, onVerify, verify])
+  const hostShell = receipts.filter(receipt => receipt.purpose === 'host_shell')
   const deliveries = receipts.filter(receipt => receipt.purpose === 'assistant_reply')
-  const effects = receipts.filter(receipt => receipt.purpose !== 'assistant_reply')
+  const effects = receipts.filter(receipt => receipt.purpose !== 'assistant_reply' && receipt.purpose !== 'host_shell')
   const effect = task.acceptance.effect
   const evidence = [...new Map(relatedTasks.flatMap(item => item.resultEvidence ?? []).map(item =>
     [JSON.stringify([item.provider, item.operation, item.target, item.resultHash]), item] as const)).values()]
@@ -46,7 +58,15 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
       {item.targetVersion ? <div><dt className="inline font-medium">{t('taskEffectTargetVersion')}: </dt><dd className="inline">{item.targetVersion}</dd></div> : null}
     </dl>
   </details>
-  return <>{effect || evidence.length || effects.length ? <section aria-label={t('taskEffectExecution')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
+  return <>{hostShell.length ? <section aria-label={t('taskHostShellEvidence')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
+    <h3 className="text-xs font-semibold">{t('taskHostShellEvidence')}</h3>
+    <ul className="mt-2 space-y-2">{hostShell.map(receipt => <li key={receipt.id} className="rounded-lg bg-ds-main p-2 text-xs">
+      <p className={receipt.status === 'failed' ? 'text-red-700 dark:text-red-300' : 'text-ds-muted'}>{t(receipt.status === 'succeeded' && receipt.shell?.exitCode === 0 ? 'taskHostShellSucceeded' : `taskReceiptStatus_${receipt.status}`)}{receipt.shell?.exitCode !== undefined ? ` · ${t('taskHostShellExitCode')} ${receipt.shell.exitCode}` : ''}</p>
+      {messages[receipt.id] || receipt.shell?.message ? <p role="status" className="mt-1 text-ds-muted">{messages[receipt.id] || receipt.shell?.message}</p> : null}
+      {onVerify && ['running', 'outcome_unknown', 'prepared'].includes(receipt.status) ? <button type="button" disabled={verifying !== null} onClick={() => { pollAttempts.current.set(receipt.id, 0); void verify(receipt) }} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t(verifying === receipt.id ? 'taskEffectVerifying' : 'taskHostShellReadback')}</button> : null}
+      <details className="mt-2 text-ds-muted"><summary className="cursor-pointer">{t('taskEffectReceiptDetails')}</summary><p className="mt-1 break-all">{receipt.id}</p>{receipt.shell?.outputSha256 ? <p className="break-all">SHA256 {receipt.shell.outputSha256}</p> : null}</details>
+    </li>)}</ul>
+  </section> : null}{effect || evidence.length || effects.length ? <section aria-label={t('taskEffectExecution')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
     <h3 className="text-xs font-semibold">{t('taskEffectExecution')}</h3>
     {effect ? <div className="mt-2 text-xs">
       <p><span className="text-ds-muted">{t('taskEffectProvider')}: </span>{provider(effect.provider)}</p>

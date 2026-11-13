@@ -215,7 +215,7 @@ export class FlowRuntimeService {
     })
   }
   createLegacySchedule(task: LegacyScheduledTaskInput): LegacyScheduledTaskInput {
-    task = { ...task, nextRunAt: task.enabled ? task.nextRunAt || nextScheduleOccurrence(task.schedule, new Date()) || '' : '' }
+    task = { ...task, nextRunAt: task.enabled ? task.nextRunAt || (task.schedule.kind === 'at' ? task.schedule.atTime : nextScheduleOccurrence(task.schedule, new Date())) || '' : '' }
     const migration = this.scheduleMigration(); if (migration.mappings.some((item) => item.taskId === task.id)) throw new Error(`schedule task already exists: ${task.id}`)
     const flowId = `flow_schedule_${task.id.replace(/[^A-Za-z0-9_-]/g, '_')}`; const definition = this.repository.create(legacyScheduleFlow(flowId, task)); const validation = this.validate(definition); if (!validation.valid) throw new Error(validation.issues.map((issue) => issue.message).join('; ')); this.repository.publish(flowId)
     this.repository.saveTriggerState({ flowId, nodeId: 'schedule', enabled: task.enabled, ...(task.nextRunAt ? { nextRunAt: task.nextRunAt } : {}), ...(task.lastRunAt ? { lastRunAt: task.lastRunAt } : {}), state: { legacyTaskId: task.id, lastStatus: task.lastStatus, lastMessage: task.lastMessage, lastThreadId: task.lastThreadId } })

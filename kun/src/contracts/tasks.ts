@@ -3,6 +3,8 @@ import { TaskApprovalGrantSchema } from './permissions.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
 import type { ContextBundle, HandoffPacket } from './task-context.js'
 import { ResultEvidenceSchema } from './harness.js'
+import { ScheduleRequirementSchema } from './schedule.js'
+import { BrowserExecutionScope } from './browser-skill.js'
 
 export const TaskRunStatusSchema = z.enum([
   'queued',
@@ -29,6 +31,7 @@ export const TaskNodeStatusSchema = z.enum([
 ])
 
 export const TaskArtifactSchema = z.object({
+  storage: z.literal('task').optional(),
   id: z.string().min(1),
   relativePath: z.string().min(1),
   absolutePath: z.string().min(1).optional(),
@@ -56,10 +59,13 @@ export const RequiredEffectSchema = z.object({
 export type RequiredEffect = z.infer<typeof RequiredEffectSchema>
 
 export const TaskAcceptanceSchema = z.object({
+  schedule: ScheduleRequirementSchema.optional(),
   kind: z.enum(['answer', 'files', 'effect']),
   requiredNodeKinds: z.array(TaskNodeKindSchema),
   requiredFormats: z.array(z.string().min(1)).optional(),
   minimumArtifacts: z.number().int().nonnegative().optional(),
+  requiresWebEvidence: z.boolean().optional(),
+  requiredSourceOrigins: z.array(z.string()).optional(),
   requireFinalResponse: z.boolean(),
   requireActionableArtifactCard: z.boolean(),
   requiresExternalEffects: z.boolean().optional(),
@@ -118,6 +124,7 @@ export const TaskCheckpointSchema = z.object({
 export type TaskCheckpoint = z.infer<typeof TaskCheckpointSchema>
 
 export const TaskAuthoritySchema = z.object({
+  browserScope: BrowserExecutionScope.optional(),
   source: z.enum(['user', 'inherited', 'legacy']),
   workspaceRoot: z.string().min(1),
   toolAllowlist: z.array(z.string()).optional(),
@@ -133,7 +140,7 @@ export type TaskAuthority = z.infer<typeof TaskAuthoritySchema>
 
 export const TaskInputSchema = z.object({
   id: z.string().min(1), taskId: z.string().min(1),
-  kind: z.enum(['supplement', 'user_answer', 'tool_result', 'handoff']),
+  kind: z.enum(['supplement', 'user_answer', 'approval_resolution', 'tool_result', 'handoff']),
   text: z.string().min(1), idempotencyKey: z.string().min(1),
   sourceId: z.string().optional(), createdAt: z.string(), deliveredAt: z.string().optional(), consumedAt: z.string().optional()
   ,attachmentIds: z.array(z.string().min(1)).max(32).optional()
@@ -177,6 +184,7 @@ export type TaskAssignment = {
 }
 
 export const TaskRunSchema = z.object({
+  scheduledBy: z.object({ scheduleId: z.string().min(1), dueAt: z.string().min(1) }).optional(),
   id: z.string().min(1),
   threadId: z.string().min(1),
   activeTurnId: z.string().optional(),

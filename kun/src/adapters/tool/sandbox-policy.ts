@@ -30,7 +30,11 @@ export function effectiveSandboxMode(
   const parsed = SandboxModeSchema.safeParse(requested)
   const mode = parsed.success ? parsed.data : DEFAULT_SANDBOX_MODE
   const trust = context?.executionGrant?.workspaceTrust
-  if (trust === 'read-only') return 'read-only'
+  if (trust === 'read-only') {
+    const grant = context?.executionGrant
+    if (grant?.workspaceWriteException && grant.taskPermissionId && grant.agentTrust !== 'read-only' && mode === 'workspace-write' && grant.writePathAllowlist?.length) return 'workspace-write'
+    return 'read-only'
+  }
   if (trust !== undefined && trust !== 'full-access' && mode === 'danger-full-access') {
     return 'workspace-write'
   }
@@ -74,6 +78,8 @@ export function sandboxBlockForTool(
     return { code: 'execution_grant_scope', message: 'Delegation requires a task-duration permission because child execution contains multiple operations.' }
   }
   const mode = effectiveSandboxMode(context)
+  // This tool owns a separate task output namespace and never writes workspace files.
+  if (tool.name === 'publish_artifact' && context.executionGrant?.taskId && context.executionGrant.managedArtifactRoot && mode !== 'external-sandbox') return null
   if (mode === 'danger-full-access') {
     const grant = context.executionGrant
     if (tool.toolKind === 'command_execution' && grant && (!(grant.readPathAllowlist ?? grant.pathAllowlist).includes('*') || !(grant.writePathAllowlist ?? grant.pathAllowlist).includes('*') || !grant.networkAllowlist.includes('*'))) return { code: 'sandbox_command_blocked', message: 'Host Shell cannot enforce a restricted path/network grant; use a typed tool or explicitly authorize full host access.' }

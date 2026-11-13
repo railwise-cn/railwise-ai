@@ -182,6 +182,7 @@ export function sanitizeTurnItemForPersistence(item: TurnItem): TurnItem {
     }
   }
   if (item.kind === 'approval') {
+    if (item.taskInputId && item.sourceRequestId) return { ...item, summary: item.status === 'allowed' ? '已允许本次操作' : '本次操作未获授权' }
     return { ...item, summary: sanitizeApprovalSummary(item.toolName, item.summary) }
   }
   return item

@@ -11,15 +11,16 @@ export function TaskIntentChoiceCard({ card, message }: { card: TaskIntentCard; 
   const [resolved, setResolved] = useState(false)
   const [error, setError] = useState('')
   const submitting = useRef(false)
-  const settled = resolved || (state.ready && !state.attention.some(item => item.id === card.attentionId && item.status === 'pending'))
+  const settled = resolved || (state.ready && !state.error && !state.attention.some(item => item.id === card.attentionId && item.status === 'pending'))
   const choose = async (intent: 'supplement' | 'new') => {
     if (submitting.current || settled || !card.choices.includes(intent)) return
     submitting.current = true
     setBusy(true); setError('')
     try {
-      await window.workwise.coordinateTaskCommand({ threadId: card.threadId, taskId: card.taskId, resolveAttentionId: card.attentionId,
+      const result = await window.workwise.coordinateTaskCommand({ threadId: card.threadId, taskId: card.taskId, resolveAttentionId: card.attentionId,
         intent, idempotencyKey: `attention:${card.attentionId}:${intent}`, request: card.request })
-      setResolved(true)
+      setResolved(result.kind !== 'attention_required')
+      if (result.kind === 'attention_required') setError(result.message)
       await refreshTaskState()
       const store = useChatStore.getState()
       await store.refreshThreads()

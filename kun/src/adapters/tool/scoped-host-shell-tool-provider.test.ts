@@ -14,6 +14,9 @@ import { CapabilityRegistry } from './capability-registry.js'
 import { LocalToolHost } from './local-tool-host.js'
 import { createBashLocalTool, stopAllBashSessions } from './builtin-bash-tool.js'
 import { buildScopedHostShellToolProviders } from './scoped-host-shell-tool-provider.js'
+import { HostShellVerificationService } from '../../services/host-shell-verification.js'
+import { getTaskOperationReceipts } from '../../server/routes/tasks.js'
+import { buildRouter } from '../../server/routes/index.js'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => { await stopAllBashSessions('test_cleanup'); for (const close of cleanup.splice(0)) await close() })
@@ -40,7 +43,7 @@ async function fixture(prompt = '在工作区运行一次本地检查命令。')
     },
     onFinished(input) {
       const session = repository.getShellSession(input.sessionId)
-      if (session) repository.updateShellSession(input.sessionId, session.revision, current => ({ ...current, status: input.status, finishedAt: input.finishedAt, exitCode: input.exitCode }))
+      if (session) repository.updateShellSession(input.sessionId, session.revision, current => ({ ...current, status: input.status, finishedAt: input.finishedAt, exitCode: input.exitCode, outputBytes: input.outputBytes }))
     }
   } })
   const execute = vi.spyOn(bashTool, 'execute'), onAuthorized = vi.fn(async () => {})
@@ -165,4 +168,89 @@ describe('one-shot, explicitly reviewed host shell', () => {
     expect(stopped.item).toMatchObject({ output: { status: 'stopped', stop_sent: true } })
     expect(f.gate.pending()).toHaveLength(0)
   })
+})
+
+describe('read-only host command outcome verification', () => {
+  it('recovers a lost response from the real session and settles both receipts without another command', async () => {
+    const f = await fixture()
+    await f.run('lost-response')
+    const original = f.repository.operations(f.task.id, 'host_shell')[0]!
+    const saved = original.result as { authorization: { requestHash: string; turnId: string }; sessionId: string }
+    expect(saved.sessionId).toBe(f.repository.listShellSessions(f.task.id)[0]!.id)
+    f.repository.finishOperation(f.task.id, original.idempotencyKey, { status: 'outcome_unknown', result: { authorization: saved.authorization, sessionId: saved.sessionId } })
+    f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: 'outer-tool', kind: 'tool', request: { toolName: 'request_host_shell', callId: 'lost-response', turnId: saved.authorization.turnId, approvalRequestHash: saved.authorization.requestHash }, nowIso: new Date().toISOString() })
+    f.repository.finishOperation(f.task.id, 'outer-tool', { status: 'outcome_unknown', result: { approved: true, item: { kind: 'tool_result', output: { code: 'outcome_unknown' }, isError: true } } })
+    f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: 'denied-repeat', kind: 'tool', request: { toolName: 'request_host_shell', callId: 'another-call', turnId: saved.authorization.turnId, approvalRequestHash: saved.authorization.requestHash }, nowIso: new Date().toISOString() })
+    f.repository.finishOperation(f.task.id, 'denied-repeat', { status: 'failed', result: { approved: false } })
+    const service = new HostShellVerificationService(f.repository, join(f.root, 'shell-output'), () => new Date().toISOString())
+    const router = buildRouter({ runtimeToken: 'synthetic', insecure: false, taskRepository: f.repository,
+      verifyTaskOperationReceipt: service.verify.bind(service) } as never)
+    const path = `/v1/tasks/${f.task.id}/receipts/${original.id}/verify`
+    const route = router.match('POST', path)!
+    const response = await route.handler(new Request(`http://runtime${path}`, { method: 'POST', headers: { authorization: 'Bearer synthetic', 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedRevision: f.repository.get(f.task.id)!.revision, idempotencyKey: 'readback' }) }), { params: route.params }) as { status: number; body: string }
+    expect(response.status).toBe(200)
+    const result = JSON.parse(response.body)
+    expect(result).toMatchObject({ status: 'verified', shell: { status: 'verified', exitCode: 0 } })
+    expect(result.shell.outputSha256).toMatch(/^[a-f0-9]{64}$/)
+    expect(f.execute).toHaveBeenCalledOnce()
+    expect(f.repository.operation(f.task.id, 'outer-tool')).toMatchObject({ status: 'succeeded', result: { originalOutcome: { status: 'outcome_unknown' } } })
+    expect(f.repository.operation(f.task.id, 'denied-repeat')).toMatchObject({ status: 'failed', result: { approved: false } })
+    expect(f.repository.unsettledOperations(f.task.id)).toEqual([])
+    const projection = getTaskOperationReceipts({ taskRepository: f.repository } as never, f.task.id)
+    expect(JSON.parse(projection.body)).toEqual(expect.arrayContaining([expect.objectContaining({ purpose: 'host_shell', status: 'succeeded', shell: expect.objectContaining({ exitCode: 0 }) })]))
+    expect(JSON.stringify(projection.body)).not.toMatch(/approved-once|commandHash|authorization|executionGrant|workspaceRoot/)
+    expect(f.repository.operations(f.task.id, 'effect_verification')).toEqual([])
+  })
+
+  it('reports a real nonzero exit as a command failure', async () => {
+    const f = await fixture()
+    const command = `"${process.execPath.replaceAll('"', '\\"')}" -e "process.exit(7)"`
+    await f.run('failed-command', { ...f.args, command })
+    const receipt = f.repository.operations(f.task.id, 'host_shell')[0]!
+    const service = new HostShellVerificationService(f.repository, join(f.root, 'shell-output'), () => new Date().toISOString())
+    const result = await service.verify(f.task.id, receipt.id, { expectedRevision: f.repository.get(f.task.id)!.revision, idempotencyKey: 'readback' })
+    expect(result).toMatchObject({ status: 'failed', shell: { status: 'failed', exitCode: 7 }, errorCode: 'host_shell_failed_exit' })
+    expect(f.repository.operation(f.task.id, receipt.idempotencyKey)?.status).toBe('failed')
+    expect(f.execute).toHaveBeenCalledOnce()
+  })
+
+  it('keeps an unlinked historical command unknown with a specific reason', async () => {
+    const f = await fixture()
+    await f.run('historical')
+    const receipt = f.repository.operations(f.task.id, 'host_shell')[0]!
+    const saved = receipt.result as { authorization: unknown }
+    f.repository.finishOperation(f.task.id, receipt.idempotencyKey, { status: 'outcome_unknown', result: { authorization: saved.authorization } })
+    const service = new HostShellVerificationService(f.repository, join(f.root, 'shell-output'), () => new Date().toISOString())
+    expect(await service.verify(f.task.id, receipt.id, { expectedRevision: f.repository.get(f.task.id)!.revision, idempotencyKey: 'readback' })).toMatchObject({ status: 'outcome_unknown', errorCode: 'host_shell_session_missing' })
+    expect(f.repository.operation(f.task.id, receipt.idempotencyKey)?.status).toBe('outcome_unknown')
+    expect(f.execute).toHaveBeenCalledOnce()
+  })
+
+  it('polls a known running command without dispatching another tool call', async () => {
+    const f = await fixture()
+    const command = `"${process.execPath.replaceAll('"', '\\"')}" -e "setTimeout(()=>process.stdout.write('finished'),1600)"`
+    await f.run('long-command', { ...f.args, command })
+    const service = new HostShellVerificationService(f.repository, join(f.root, 'shell-output'), () => new Date().toISOString())
+    await service.reconcile(f.task.id)
+    expect(f.repository.operations(f.task.id, 'host_shell')[0]).toMatchObject({ status: 'succeeded', result: { verification: { exitCode: 0 } } })
+    expect(f.execute).toHaveBeenCalledOnce()
+  })
+})
+
+it('keeps an exited or reused PID unknown when the original session has no exit evidence and never signals it', async () => {
+  const f = await fixture()
+  await f.run('pid-reuse')
+  const receipt = f.repository.operations(f.task.id, 'host_shell')[0]!
+  const saved = receipt.result as { authorization: unknown; sessionId: string }
+  const session = f.repository.getShellSession(saved.sessionId)!
+  f.repository.updateShellSession(session.id, session.revision, value => ({ ...value, status: 'interrupted', exitCode: undefined, pid: process.pid, processFingerprint: 'previous-process-fingerprint' }))
+  f.repository.finishOperation(f.task.id, receipt.idempotencyKey, { status: 'outcome_unknown', result: { authorization: saved.authorization, sessionId: saved.sessionId } })
+  const kill = vi.spyOn(process, 'kill')
+  try {
+    const service = new HostShellVerificationService(f.repository, join(f.root, 'shell-output'), () => new Date().toISOString())
+    expect(await service.verify(f.task.id, receipt.id, { expectedRevision: f.repository.get(f.task.id)!.revision, idempotencyKey: 'readback' })).toMatchObject({ status: 'outcome_unknown', errorCode: 'host_shell_exit_unknown' })
+    expect(kill).not.toHaveBeenCalled()
+    expect(f.execute).toHaveBeenCalledOnce()
+  } finally { kill.mockRestore() }
 })

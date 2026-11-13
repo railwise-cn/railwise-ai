@@ -93,7 +93,7 @@ export function extractScheduleRequirement(prompt: string): ScheduleRequirement 
       return `${String(hour).padStart(2, '0')}:${minute.padStart(2, '0')}`
     })
   if (!times.length) {
-    const paired = prompt.match(/(?:每天|每日)\s*(\d{1,2})\s*[\/、和及]\s*(\d{1,2})(?!\d)/)
+    const paired = prompt.match(/(?:每天|每日)\s*(\d{1,2})\s*[/、和及]\s*(\d{1,2})(?!\d)/)
     if (paired) times.push(...paired.slice(1).map(hour => `${hour.padStart(2, '0')}:00`))
   }
   if (!times.length) return undefined

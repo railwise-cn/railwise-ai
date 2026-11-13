@@ -537,6 +537,54 @@
         "office-source"
       ],
       "mirrorPath": "officecli/1.0.160/c590ca9d464f2b03362825b0f2615efcae33ce3fc0edaeeef29f7ddacb4c5424/officecli-win-x64.exe"
+    },
+    {
+      "id": "browser-skill-darwin-arm64",
+      "component": "browser-skill",
+      "version": "0.4.0",
+      "role": "binary",
+      "name": "bsk-v0.4.0-aarch64-apple-darwin.tar.gz",
+      "sourceUrl": "https://github.com/Tencent/BrowserSkill/releases/download/cli-v0.4.0/bsk-v0.4.0-aarch64-apple-darwin.tar.gz",
+      "license": "MIT",
+      "size": 5716049,
+      "sha256": "cbe6e6e29c1e215c3e445477c4855a03f43c63973ca578337c4281e6eea29aaf",
+      "mirrorPath": "browser-skill/0.4.0/cbe6e6e29c1e215c3e445477c4855a03f43c63973ca578337c4281e6eea29aaf/bsk-v0.4.0-aarch64-apple-darwin.tar.gz"
+    },
+    {
+      "id": "browser-skill-darwin-x64",
+      "component": "browser-skill",
+      "version": "0.4.0",
+      "role": "binary",
+      "name": "bsk-v0.4.0-x86_64-apple-darwin.tar.gz",
+      "sourceUrl": "https://github.com/Tencent/BrowserSkill/releases/download/cli-v0.4.0/bsk-v0.4.0-x86_64-apple-darwin.tar.gz",
+      "license": "MIT",
+      "size": 6383411,
+      "sha256": "10fcb8dd7fea96f471a11e3492c4d1d7846de630d3668136bfc5c59690afa95e",
+      "mirrorPath": "browser-skill/0.4.0/10fcb8dd7fea96f471a11e3492c4d1d7846de630d3668136bfc5c59690afa95e/bsk-v0.4.0-x86_64-apple-darwin.tar.gz"
+    },
+    {
+      "id": "browser-skill-win32-x64",
+      "component": "browser-skill",
+      "version": "0.4.0",
+      "role": "binary",
+      "name": "bsk-v0.4.0-x86_64-pc-windows-msvc.zip",
+      "sourceUrl": "https://github.com/Tencent/BrowserSkill/releases/download/cli-v0.4.0/bsk-v0.4.0-x86_64-pc-windows-msvc.zip",
+      "license": "MIT",
+      "size": 6820462,
+      "sha256": "6feeb22e608e63e3049b2611cf48fce73daac2420945c35174c16e784cdb2677",
+      "mirrorPath": "browser-skill/0.4.0/6feeb22e608e63e3049b2611cf48fce73daac2420945c35174c16e784cdb2677/bsk-v0.4.0-x86_64-pc-windows-msvc.zip"
+    },
+    {
+      "id": "browser-skill-license",
+      "component": "browser-skill",
+      "version": "0.4.0",
+      "role": "license",
+      "name": "LICENSE",
+      "sourceUrl": "https://raw.githubusercontent.com/Tencent/BrowserSkill/7e300ff6a35b326ac9abd03f315f30769ad01861/LICENSE",
+      "license": "MIT",
+      "size": 1064,
+      "sha256": "45426ad9507fe1b922121f5af6a4669096e721980b4426609a4384da410f5114",
+      "mirrorPath": "browser-skill/0.4.0/45426ad9507fe1b922121f5af6a4669096e721980b4426609a4384da410f5114/LICENSE"
     }
   ],
   "pythonDownloads": {

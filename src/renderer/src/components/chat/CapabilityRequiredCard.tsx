@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { ManagedLarkConnection } from '../connectors/ManagedLarkConnection'
 import { ManagedDingTalkConnection } from '../connectors/ManagedDingTalkConnection'
+import { BrowserTaskBindingPanel } from '../connectors/BrowserTaskBindingPanel'
+import { ManagedBrowserSkillConnection } from '../connectors/ManagedBrowserSkillConnection'
 import { TaskPermissionPanel } from './TaskPermissionPanel'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
 
@@ -17,7 +19,11 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
   const [settled, setSettled] = useState(false)
   const [capability, setCapability] = useState(card.capability)
   const [showPermissions, setShowPermissions] = useState(false)
+  const [showBrowserBinding, setShowBrowserBinding] = useState(false)
   const isLark = capability.provider === 'lark' || capability.provider === 'feishu'
+  const isDingTalk = capability.provider === 'dingtalk'
+  const isBrowser = capability.provider === 'browser-skill'
+  const connector = isBrowser ? 'browser-skill' : isLark ? 'lark' : isDingTalk ? 'dingtalk' : undefined
   const action = capability.resolution ?? capability.action
   const configure = (): void => {
     if (action?.kind === 'switch_workspace') {
@@ -25,12 +31,17 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       return
     }
     const route = action?.route ?? ''
+    if (isBrowser && capability.errorCode === 'browser_origin_scope_required') {
+      openPlugins(undefined, 'browser-skill')
+      return
+    }
+    if (isBrowser && capability.errorCode === 'browser_binding_changed') { setShowBrowserBinding(true); return }
     if (action?.kind === 'grant') {
       setShowPermissions(true)
       return
     }
     if (action?.kind === 'connect' || action?.kind === 'install' || (!action && capability.provider === 'dingtalk')) {
-      openPlugins(undefined, isLark ? 'lark' : 'dingtalk')
+      openPlugins(undefined, connector)
       return
     }
     if (route === 'settings' || route.startsWith('settings/')) {
@@ -42,7 +53,7 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
           : capability.errorCode === 'agent_tool_blocked' ? 'agents' : 'general')
       return
     }
-    if (route === 'marketplace' || isLark) openPlugins(undefined, isLark ? 'lark' : 'dingtalk')
+    if (route === 'marketplace' || connector) openPlugins(undefined, connector)
     else openSettings('general')
   }
   const execution = capability.executionContext
@@ -85,7 +96,7 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       <div className="font-semibold">{t(settled ? 'capabilityStateChecked' : 'capabilityRequiredTitle')}</div>
       <p className="mt-1 whitespace-pre-wrap">{capability.message}</p>
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-        <dt className="text-ds-muted">{t('capabilityProvider')}</dt><dd>{isLark ? t('capabilityLark') : t('capabilityDingTalk')}</dd>
+        <dt className="text-ds-muted">{t('capabilityProvider')}</dt><dd>{t(isLark ? 'capabilityLark' : isDingTalk ? 'capabilityDingTalk' : isBrowser ? 'connectorHubBrowserSkill' : capability.provider === 'schedule' ? 'capabilitySchedule' : 'capabilityWorkspaceFiles')}</dd>
         <dt className="text-ds-muted">{t('capabilityCurrentStatus')}</dt><dd>{t(`capabilityStatus_${capability.status}`)}</dd>
         <dt className="text-ds-muted">{t('capabilityWorkspace')}</dt><dd className="break-all">{execution?.workspaceRoot || capability.workspaceRoot || t('capabilityWorkspaceUnknown')}</dd>
         <dt className="text-ds-muted">{t('capabilityRequestedScope')}</dt><dd>{capability.requiredScopes?.join(', ') || t('capabilityScopeNotGranted')}</dd>
@@ -98,11 +109,13 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       </dl>
       {execution?.availableTools ? <details className="mt-2 text-xs text-ds-muted"><summary className="cursor-pointer">{t('capabilityAvailableTools', { count: execution.availableTools.length })}</summary><p className="mt-1 break-all">{execution.availableTools.join(', ') || t('capabilityNoTools')}</p></details> : null}
       {isLark && !settled && action?.kind !== 'grant' ? <ManagedLarkConnection compact initialState={capability.status === 'not_installed' ? 'not_installed' : undefined} /> : null}
-      {!isLark && !settled && action?.kind !== 'grant' ? <div className="mt-3"><ManagedDingTalkConnection /></div> : null}
+      {isDingTalk && !settled && action?.kind !== 'grant' ? <div className="mt-3"><ManagedDingTalkConnection /></div> : null}
+      {isBrowser && !settled ? <ManagedBrowserSkillConnection /> : null}
+      {showBrowserBinding && !settled ? <BrowserTaskBindingPanel taskId={card.taskId} onConfirmed={setMessage} /> : null}
       {showPermissions && !settled ? <TaskPermissionPanel taskId={card.taskId} autoLoad onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
       {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {!settled ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
-        <button type="button" disabled={pending} onClick={configure}>{isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isLark ? 'capabilityOpenMarketplace' : 'capabilityConfigureDingTalk')}</button>
+        <button type="button" disabled={pending} onClick={configure}>{isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isDingTalk ? 'capabilityConfigureDingTalk' : 'capabilityOpenMarketplace')}</button>
         <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
         <button type="button" disabled={pending} onClick={() => void run(decline)}>{t('capabilityDecline')}</button>
       </div> : null}

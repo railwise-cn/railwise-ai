@@ -152,6 +152,8 @@ export function summarizeTaskResult(text: string): string {
 
 export function computeScheduleNextRunAt(task: ScheduledTaskV1, from: Date): string {
   if (!task.enabled) return ''
+  // Legacy one-shot tasks catch up once when their saved deadline has passed.
+  if (task.schedule.kind === 'at') return task.schedule.atTime.trim()
   return nextScheduleOccurrence(task.schedule, from) ?? ''
 }
 

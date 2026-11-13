@@ -1,3 +1,4 @@
+import type { TaskController } from '../../services/task-controller.js'
 import { z } from 'zod'
 import {
   CreateThreadRequest,
@@ -93,7 +94,8 @@ export async function createThread(
 export async function getThread(
   service: ThreadService,
   threadId: string,
-  sessionStore?: SessionStore
+  sessionStore?: SessionStore,
+  taskController?: TaskController
 ): Promise<JsonResponse> {
   const thread = await service.get(threadId)
   if (!thread) {
@@ -111,6 +113,7 @@ export async function getThread(
     ])
     sessionItems = await healSessionItemsForFinishedTurns(thread, sessionItems, sessionStore)
   }
+  if (taskController) sessionItems = taskController.projectApprovalHistory(threadId, sessionItems)
   const hydratedThread = hydrateThreadItemsFromSession(thread, sessionItems)
   return jsonResponse(ThreadDetailResponse.parse({
     ...ThreadSchema.parse(hydratedThread),
