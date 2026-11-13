@@ -256,4 +256,63 @@ describe('typed BrowserSkill production provider', () => {
       .toMatchObject({ output: { sourceUrl: 'https://example.com/readable', evidence: { verified: true, contentRead: true } } })
   })
 
+  it('advertises a scope request while hiding interactive tools, and blocks legacy dispatch before approval', async () => {
+    const f = fixture()
+    f.context.executionGrant!.browserScope!.interaction = 'observe'
+    const approval = vi.fn(async () => 'allow' as const)
+    f.context.awaitApproval = approval
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    const names = (await host.listTools(f.context)).map(item => item.name)
+    expect(names).toContain('browser_request_interaction')
+    expect(names).toContain('browser_navigate')
+    for (const toolName of ['browser_click', 'browser_fill', 'browser_press', 'browser_authorize_action']) {
+      expect(names).not.toContain(toolName)
+      const result = await host.execute({ callId: toolName, toolName, arguments: {} }, f.context)
+      expect(result).toMatchObject({ approved: false, item: { isError: true, output: { code: 'browser_interaction_scope_required' } } })
+    }
+    expect(await host.execute({ callId: 'scope-request', toolName: 'browser_request_interaction', arguments: { reason: '需要填写搜索框' } }, f.context))
+      .toMatchObject({ item: { isError: true, output: { code: 'browser_interaction_scope_required' } } })
+    expect(approval).not.toHaveBeenCalled()
+    expect(f.runner.mock.calls.some(([, args]) => ['click', 'fill', 'press'].includes(args[0]))).toBe(false)
+  })
+  it('reviews the actual site, target and complete safe input with the original argument fingerprint', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input type="search" aria-label="采购公告关键词">')
+    const approval = vi.fn(async (_approval: Parameters<ToolHostContext['awaitApproval']>[0]) => 'allow' as const)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '轨道交通监测' }
+    expect(await host.execute({ callId: 'fill-search', toolName: 'browser_fill', arguments: args }, { ...f.context, awaitApproval: approval }))
+      .toMatchObject({ item: { output: { status: 'succeeded' } } })
+    const reviewed = approval.mock.calls[0][0] as { summary: string; requestHash: string }
+    expect(reviewed.summary).toContain('https://example.com')
+    expect(reviewed.summary).toContain('采购公告关键词')
+    expect(reviewed.summary).toContain('轨道交通监测')
+    expect(reviewed.summary).not.toContain('browser_fill')
+    expect(reviewed.summary).not.toContain('session-one')
+    expect(reviewed.summary).toContain(reviewed.requestHash)
+    expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'fill')).toHaveLength(1)
+  })
+  it('masks a password input and rejects target drift after approval without dispatch', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/login-form' })
+    f.setElement('<input type="password" aria-label="密码" value="previous-secret">')
+    let summary = ''
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    const result = await host.execute({ callId: 'fill-secret', toolName: 'browser_fill', arguments: {
+      sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: 'private-credential-value'
+    } }, { ...f.context, awaitApproval: async approval => {
+      summary = approval.summary
+      f.setElement('<input type="password" aria-label="另一账户密码">')
+      return 'allow'
+    } })
+    expect(summary).toContain('敏感输入已隐藏')
+    expect(summary).not.toContain('private-credential-value')
+    expect(summary).not.toContain('previous-secret')
+    expect(result).toMatchObject({ item: { isError: true, output: { code: 'approval_target_changed' } } })
+    expect(f.runner.mock.calls.some(([, args]) => args[0] === 'fill')).toBe(false)
+  })
+
 })

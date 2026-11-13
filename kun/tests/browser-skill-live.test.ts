@@ -13,6 +13,9 @@ import type { ToolHostContext } from '../src/ports/tool-host.js'
 import { TaskRunRepository } from '../src/services/task-run-repository.js'
 import { browserEnvironment, parseBrowserStatus, runBrowserCommand } from '../src/services/browser-skill-cli.js'
 import { buildBrowserSkillToolProvider } from '../src/adapters/tool/browser-skill-tool-provider.js'
+import { CapabilityRegistry } from '../src/adapters/tool/capability-registry.js'
+import { LocalToolHost } from '../src/adapters/tool/local-tool-host.js'
+import { ManagedBrowserSkillRuntime } from '../src/services/managed-browser-skill-runtime.js'
 const executeFile = promisify(execFile)
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
 
@@ -22,7 +25,9 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
     const executable = process.env.RAILWISE_BROWSER_CLI!
     const extensionZip = process.env.RAILWISE_BROWSER_EXTENSION_ZIP!
     const chromePath = process.env.RAILWISE_BROWSER_TEST_CHROME!
+    const interactionAcceptance = process.env.RAILWISE_BROWSER_INTERACTION_ACCEPTANCE === '1'
     const publicUrl = process.env.RAILWISE_BROWSER_PUBLIC_URL
+    if (interactionAcceptance) expect(publicUrl).toBeUndefined()
     const publicOrigin = publicUrl ? new URL(publicUrl).origin : undefined
     expect([root, executable, extensionZip, chromePath].every(value => value?.startsWith('/'))).toBe(true)
     expect(await lstat(join(root, 'chrome-profile')).catch(() => undefined), 'Acceptance requires a fresh isolated browser profile').toBeUndefined()
@@ -43,7 +48,7 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
     chrome.stderr.on('data', bytes => { chromeLog = (chromeLog + String(bytes)).slice(-6000) })
     const server = createServer((request, response) => {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      response.end(request.url === '/two' ? '<!doctype html><html><head><title>RailWise controlled source two</title></head><body><h1>PAGE TWO RAILWISE</h1><p>Second controlled source.</p></body></html>' : '<!doctype html><html><head><title>RailWise controlled source one</title></head><body><h1>PAGE ONE RAILWISE</h1><a href="/two">Next page</a></body></html>')
+      response.end(request.url === '/two' ? '<!doctype html><html><head><title>RailWise controlled source two</title></head><body><h1>PAGE TWO RAILWISE</h1><p>Second controlled source.</p></body></html>' : '<!doctype html><html><head><title>RailWise controlled source one</title></head><body><h1>PAGE ONE RAILWISE</h1><a href="/two">Next page</a><input type="search" aria-label="采购检索" oninput="document.getElementById(&quot;result&quot;).textContent=this.value"><p id="result"></p></body></html>')
     })
     await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
     const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
@@ -114,7 +119,50 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
       expect(realTab.title).toBe('RailWise controlled source one')
       const html = await call('browser_get_html', { sessionId: session.sessionId })
       expect(html.html).toContain('href="/two"')
-      const second = await call('browser_navigate', { sessionId: session.sessionId, url: origin + '/two', contextId: first.observation.context_id })
+      let interactionEvidence: unknown
+      let nextContextId = first.observation.context_id
+      if (interactionAcceptance) {
+        const host = new LocalToolHost({ registry: new CapabilityRegistry([provider]) })
+        expect((await host.listTools(context)).some(tool => tool.name === 'browser_fill')).toBe(false)
+        expect(await host.execute({ callId: 'request-interaction', toolName: 'browser_request_interaction', arguments: { reason: '填写本地合成搜索框' } }, context))
+          .toMatchObject({ item: { isError: true, output: { code: 'browser_interaction_scope_required' } } })
+        repository.update('synthetic-browser', 0, task => ({ ...task, status: 'waiting_user', activeTurnId: undefined,
+          authority: { source: 'user', workspaceRoot: root, externalTargets: [], grantedAt: now, browserScope: context.executionGrant!.browserScope! } }))
+        config.interaction = 'interact'
+        config.revision = 2
+        config.browsers = status.browsers
+        const runtime = new ManagedBrowserSkillRuntime({ config, repository, dataDir: root, configPath: join(root, 'unused-config'), apply: () => undefined })
+        const binding = runtime.bindingSnapshot('synthetic-browser')
+        expect(binding).toMatchObject({ interaction: 'interact', previousInteraction: 'observe' })
+        runtime.confirmBinding('synthetic-browser', { confirmed: true, expectedTaskRevision: binding.taskRevision,
+          expectedBrowserRevision: binding.browserRevision, browserInstanceId: binding.browserInstanceId,
+          origins: binding.origins, interaction: 'interact', idempotencyKey: 'explicit-synthetic-interaction' })
+        const confirmed = repository.get('synthetic-browser')!
+        repository.update(confirmed.id, confirmed.revision, task => ({ ...task, status: 'running', activeTurnId: 'turn' }))
+        context.executionGrant = { ...context.executionGrant!, revision: 1, browserScope: confirmed.authority!.browserScope! }
+        const fresh = await call('browser_observe', { sessionId: session.sessionId })
+        await writeFile(join(root, 'synthetic-input-observation.json'), JSON.stringify({ first: first.observation, fresh: fresh.observation }, null, 2))
+        const targetLine = JSON.stringify(first.observation).split(/\\n|\n/).find(line => line.includes('采购检索')) ?? ''
+        const target = /@?e\d+/.exec(targetLine)?.[0]
+        expect(target, 'Actual extension observation must expose the labelled input reference').toBeTruthy()
+        let approvals = 0
+        let summary = ''
+        context.awaitApproval = async approval => { approvals += 1; summary = approval.summary; return 'allow' }
+        const filled = await host.execute({ callId: 'synthetic-fill', toolName: 'browser_fill', arguments: {
+          sessionId: session.sessionId, contextId: fresh.observation.context_id, target, value: '轨道交通监测验收'
+        } }, context)
+        expect(filled.item).toMatchObject({ isError: false, output: { status: 'succeeded' } })
+        expect(summary).toContain('采购检索')
+        expect(summary).toContain('轨道交通监测验收')
+        expect(summary).not.toContain('browser_fill')
+        const readback = await call('browser_get_html', { sessionId: session.sessionId })
+        expect(readback.html).toContain('id="result">轨道交通监测验收')
+        const after = await call('browser_observe', { sessionId: session.sessionId })
+        nextContextId = after.observation.context_id
+        interactionEvidence = { scopeConfirmed: true, sameTask: true, approvals, action: 'fill', count: 1, readbackVerified: true,
+          summaryHash: hash(Buffer.from(summary)), readbackHash: readback.resultHash, externalWrites: 0 }
+      }
+      const second = await call('browser_navigate', { sessionId: session.sessionId, url: origin + '/two', contextId: nextContextId })
       expect(JSON.stringify(second.observation)).toContain('PAGE TWO RAILWISE')
       const shot = await call('browser_screenshot', { sessionId: session.sessionId })
       expect(hash(await readFile(shot.imagePath))).toBe(shot.sha256)
@@ -141,7 +189,7 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
       await call('browser_session_stop', { sessionId: session.sessionId })
       await writeFile(join(root, 'evidence.json'), JSON.stringify({ passed: true, testedAt: new Date().toISOString(), cliVersion: '0.4.0', extensionVersion: manifest.version,
         credentialStore: 'isolated-test-mock-keychain', protocol: status.protocolVersion, browserVersion: (await executeFile(chromePath, ['--version'])).stdout.trim(), pagesRead: 2, htmlRead: true,
-        tabListShape: { keys: Object.keys(realTab), title: realTab.title }, publicPage, pageEvidenceHashes: [first.resultHash, second.resultHash], screenshotHash: shot.sha256, approvals: 0,
+        tabListShape: { keys: Object.keys(realTab), title: realTab.title }, publicPage, pageEvidenceHashes: [first.resultHash, second.resultHash], screenshotHash: shot.sha256, approvals: interactionAcceptance ? 1 : 0, interactionEvidence,
         sessionStopped: repository.operations('synthetic-browser', 'browser_session').every(item => (item.result as { stopped?: boolean }).stopped) }, null, 2))
     } catch (error) {
       await writeFile(join(root, 'failure.json'), JSON.stringify({ error: String(error), lastStatus, daemonLog, chromeLog, workerEvents }, null, 2))

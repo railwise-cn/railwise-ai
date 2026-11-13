@@ -20,6 +20,7 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
   const [capability, setCapability] = useState(card.capability)
   const [showPermissions, setShowPermissions] = useState(false)
   const [showBrowserBinding, setShowBrowserBinding] = useState(false)
+  const [browserBindingGeneration, setBrowserBindingGeneration] = useState(0)
   const isLark = capability.provider === 'lark' || capability.provider === 'feishu'
   const isDingTalk = capability.provider === 'dingtalk'
   const isBrowser = capability.provider === 'browser-skill'
@@ -35,7 +36,7 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       openPlugins(undefined, 'browser-skill')
       return
     }
-    if (isBrowser && capability.errorCode === 'browser_binding_changed') { setShowBrowserBinding(true); return }
+    if (isBrowser && (action?.route === 'task/browser-binding' || ['browser_binding_changed', 'browser_interaction_scope_required'].includes(capability.errorCode ?? ''))) { setShowBrowserBinding(true); return }
     if (action?.kind === 'grant') {
       setShowPermissions(true)
       return
@@ -110,8 +111,8 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       {execution?.availableTools ? <details className="mt-2 text-xs text-ds-muted"><summary className="cursor-pointer">{t('capabilityAvailableTools', { count: execution.availableTools.length })}</summary><p className="mt-1 break-all">{execution.availableTools.join(', ') || t('capabilityNoTools')}</p></details> : null}
       {isLark && !settled && action?.kind !== 'grant' ? <ManagedLarkConnection compact initialState={capability.status === 'not_installed' ? 'not_installed' : undefined} /> : null}
       {isDingTalk && !settled && action?.kind !== 'grant' ? <div className="mt-3"><ManagedDingTalkConnection /></div> : null}
-      {isBrowser && !settled ? <ManagedBrowserSkillConnection /> : null}
-      {showBrowserBinding && !settled ? <BrowserTaskBindingPanel taskId={card.taskId} onConfirmed={setMessage} /> : null}
+      {isBrowser && !settled ? <ManagedBrowserSkillConnection onChanged={() => setBrowserBindingGeneration(value => value + 1)} /> : null}
+      {showBrowserBinding && !settled ? <BrowserTaskBindingPanel key={browserBindingGeneration} taskId={card.taskId} onConfirmed={setMessage} /> : null}
       {showPermissions && !settled ? <TaskPermissionPanel taskId={card.taskId} autoLoad onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
       {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {!settled ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">

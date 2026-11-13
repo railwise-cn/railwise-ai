@@ -17,7 +17,7 @@ function fixture() {
   const old = { browserInstanceId: 'browser-old', revision: 1, origins: ['https://example.com'], interaction: 'observe' as const }
   repository.create(TaskRunSchema.parse({ id: 'task', threadId: 'thread', childTaskIds: [], workspaceRoot: root, goal: '浏览器 https://example.com', status: 'waiting_user', agentId: 'default', acceptance: { kind: 'answer', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: false }, budget: { maxAttempts: 3, maxDurationMs: 600000 }, attempts: 0, replans: 0, noProgressCount: 0, nodes: [], artifacts: [], revision: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), authority: { source: 'user', workspaceRoot: root, grantedAt: new Date().toISOString(), browserScope: old } }))
   const runtime = new ManagedBrowserSkillRuntime({ config, configPath: join(root, 'config.json'), dataDir: root, repository, run: async () => ({ ok: true, output: { protocol_version: '1.7', pid: 7, browsers: [{ instance_id: 'browser-new', browser_name: 'Chrome', label: 'Test', extension_version: '0.4.0', extension_protocol_version: '1.7' }] } }), apply: () => undefined })
-  return { runtime, repository, old }
+  return { runtime, repository, old, config }
 }
 describe('Browser task authority rebinding', () => {
   it.each(['browser-skill', 'broswer-skill', 'browse skill'])('preflights the requested %s capability before a model Turn', async spelling => {
@@ -50,4 +50,37 @@ describe('Browser task authority rebinding', () => {
     expect(() => f.runtime.bindingSnapshot('task')).toThrow('browser_task_not_waiting')
     expect(f.repository.get('task')?.authority?.browserScope).toEqual(f.old)
   })
+  it('widens a root task interaction only after explicit reviewed confirmation and preserves origins', () => {
+    const f = fixture()
+    const snapshot = f.runtime.bindingSnapshot('task')
+    expect(snapshot).toMatchObject({ interaction: 'interact', previousInteraction: 'observe' })
+    expect(f.repository.get('task')?.authority?.browserScope).toEqual(f.old)
+    const input = { confirmed: true as const, expectedTaskRevision: snapshot.taskRevision, expectedBrowserRevision: snapshot.browserRevision,
+      browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction: 'interact' as const, idempotencyKey: 'widen-review' }
+    expect(f.runtime.confirmBinding('task', input).binding.interaction).toBe('interact')
+    expect(f.runtime.confirmBinding('task', input).binding.interaction).toBe('interact')
+    expect(f.repository.get('task')?.authority?.browserScope).toMatchObject({ interaction: 'interact', origins: f.old.origins })
+    expect(f.repository.get('task')?.status).toBe('waiting_user')
+    expect(() => f.runtime.confirmBinding('task', { ...input, interaction: 'observe' })).toThrow()
+  })
+  it('keeps a child within its current parent browser authority', () => {
+    const f = fixture()
+    const original = f.repository.get('task')!
+    f.repository.create({ ...original, id: 'parent', threadId: 'parent-thread', authority: { ...original.authority!, browserScope: {
+      ...f.old, browserInstanceId: 'browser-new', revision: 3
+    } } })
+    f.repository.update('task', 0, task => ({ ...task, parentTaskId: 'parent' }))
+    const snapshot = f.runtime.bindingSnapshot('task')
+    expect(snapshot.interaction).toBe('observe')
+    expect(() => f.runtime.confirmBinding('task', { confirmed: true, expectedTaskRevision: snapshot.taskRevision,
+      expectedBrowserRevision: snapshot.browserRevision, browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins,
+      interaction: 'interact', idempotencyKey: 'child-widen' })).toThrow('browser_interaction_scope_required')
+    expect(f.repository.get('task')?.authority?.browserScope).toEqual(f.old)
+  })
+  it('does not rebind a paused task held by another live Runtime lease', () => {
+    const f = fixture()
+    f.repository.acquireLease('task', 'other-runtime', new Date().toISOString(), new Date(Date.now() + 60000).toISOString())
+    expect(() => f.runtime.bindingSnapshot('task')).toThrow('browser_task_not_waiting')
+  })
+
 })

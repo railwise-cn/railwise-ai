@@ -9,6 +9,7 @@ import { TaskExecutionEvidence } from './TaskExecutionEvidence'
 import { currentTaskBranch } from '@shared/task-projection'
 import { taskDisplayGoal } from '@shared/task-presentation'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
+import { BrowserApprovalDetails, browserApprovalFields } from '../chat/BrowserApprovalDetails'
 import { CapabilityRequiredCard } from '../chat/CapabilityRequiredCard'
 import { TaskPermissionPanel } from '../chat/TaskPermissionPanel'
 import { useChatStore } from '../../store/chat-store'
@@ -213,7 +214,7 @@ function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, o
   }
   return <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
     <h4 className="text-sm font-semibold">{item.title}</h4>
-    <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed">{item.message}</p>
+    {item.kind === 'approval' && browserApprovalFields(item.message) ? <BrowserApprovalDetails summary={item.message} /> : <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed">{item.message}</p>}
     {capabilityCard ? <CapabilityRequiredCard card={capabilityCard} /> : null}
     {item.payload?.kind === 'external_provider_choice' ? <div className="mt-3 space-y-2">
       <label className="block text-xs">{t('taskCommandProvider')}<select aria-label={t('taskCommandProvider')} value={selectedProvider} onChange={event => setSelectedProvider(event.target.value as 'dingtalk' | 'lark')} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink"><option value="dingtalk">{t('taskEffectProvider_dingtalk')}</option><option value="lark">{t('taskEffectProvider_lark')}</option></select></label>

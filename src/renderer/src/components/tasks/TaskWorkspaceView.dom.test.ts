@@ -311,6 +311,19 @@ describe('TaskWorkspaceView', () => {
     expect(onOpenThread).not.toHaveBeenCalled()
   })
 
+  it('uses the browser business review without exposing technical fingerprints in task attention', async () => {
+    const summary = ['确认浏览器操作', '站点 "https://example.com"', '动作 "填写网页输入框"', '目标 "采购关键词"',
+      '输入内容 "轨道交通监测"', `输入摘要 "${'a'.repeat(64)}"`, `目标摘要 "${'b'.repeat(64)}"`, `请求摘要 "${'c'.repeat(64)}"`,
+      '授权期限 "仅本次操作"', '操作说明 "执行后读取页面核验。"'].join('\n')
+    inbox = [{ ...approval, message: summary }]
+    await act(async () => refreshTaskState())
+    await click('Needs you')
+    expect(container.textContent).toContain('采购关键词')
+    expect(container.textContent).toContain('轨道交通监测')
+    expect(container.textContent).not.toContain('a'.repeat(64))
+    expect(container.textContent).not.toContain('输入摘要')
+  })
+
   it('shows pending decisions and resolves them through the original approval API', async () => {
     const button = [...container.querySelectorAll<HTMLButtonElement>('nav[aria-label="Task filters"] button')].find(item => item.textContent?.includes('Needs you'))!
     await act(async () => button.click())

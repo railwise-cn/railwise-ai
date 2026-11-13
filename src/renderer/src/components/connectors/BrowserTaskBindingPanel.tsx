@@ -21,7 +21,7 @@ export function BrowserTaskBindingPanel({ taskId, onConfirmed }: { taskId: strin
     try {
       await window.workwise.confirmBrowserTaskBinding(taskId, { confirmed: true, expectedTaskRevision: snapshot.taskRevision,
         expectedBrowserRevision: snapshot.browserRevision, browserInstanceId: snapshot.browserInstanceId,
-        origins: snapshot.origins, idempotencyKey: crypto.randomUUID() })
+        origins: snapshot.origins, interaction: snapshot.interaction, idempotencyKey: crypto.randomUUID() })
       setConfirmed(true)
       onConfirmed(t('browserTaskBindingConfirmed'))
     } catch (error) { setError(String(error)) }
@@ -34,6 +34,7 @@ export function BrowserTaskBindingPanel({ taskId, onConfirmed }: { taskId: strin
       <dt>{t('browserSkillOrigins')}</dt><dd className="break-all whitespace-pre-wrap">{snapshot.origins.join('\n')}</dd>
       <dt>{t('capabilityRequestedScope')}</dt><dd>{t(snapshot.interaction === 'interact' ? 'browserSkillAllowInteraction' : 'browserTaskReadOnly')}</dd>
     </dl> : null}
+    {snapshot?.previousInteraction === 'observe' && snapshot.interaction === 'interact' ? <p className="mt-2">{t('browserTaskInteractionExpansion')}</p> : null}
     {error ? <p role="alert" className="mt-2 break-all">{error}</p> : null}
     <button className="mt-3 rounded border border-ds-border px-3 py-1.5 disabled:opacity-50" disabled={!snapshot || pending || confirmed} onClick={() => void confirm()}>{t('browserTaskBindingConfirm')}</button>
   </div>

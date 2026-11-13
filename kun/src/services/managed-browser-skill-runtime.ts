@@ -92,16 +92,24 @@ export class ManagedBrowserSkillRuntime {
     const task = this.options.repository.get(taskId)
     if (!task || !['paused', 'waiting_user', 'stalled'].includes(task.status) || task.authority?.revokedAt ||
       (task.activeTurnId && this.options.hasActiveAttempt?.(task.activeTurnId))) throw new Error('browser_task_not_waiting')
+    const lease = this.options.repository.getLease(taskId)
+    if (lease && Date.parse(lease.expiresAt) > Date.now()) throw new Error('browser_task_not_waiting')
     const config = this.config
     if (!config.enabled || config.state !== 'ready' || !config.browserInstanceId) throw new Error('browser_connection_unavailable')
     const previous = task.authority?.browserScope
     const taskOrigins = previous?.origins ?? browserTaskOrigins(task.goal)
     const origins = taskOrigins.filter(origin => !config.origins.length || config.origins.includes(origin))
     if (!origins.length) throw new Error('browser_original_origins_not_allowed')
+    const parent = task.parentTaskId ? this.options.repository.get(task.parentTaskId) : undefined
+    const parentScope = parent?.authority?.browserScope
+    if (task.parentTaskId && (!parentScope || parent?.authority?.revokedAt ||
+      parentScope.browserInstanceId !== config.browserInstanceId || parentScope.revision !== config.revision ||
+      origins.some(origin => !parentScope.origins.includes(origin)))) throw new Error('browser_parent_scope_blocked')
+    const interaction = config.interaction === 'interact' && (!task.parentTaskId || parentScope?.interaction === 'interact') ? 'interact' : 'observe'
     const browser = config.browsers.find(item => item.id === config.browserInstanceId)
     return { taskId, taskRevision: task.revision, browserRevision: config.revision, browserInstanceId: config.browserInstanceId,
       browserLabel: browser?.label || browser?.name || config.browserInstanceId, previousBrowserInstanceId: previous?.browserInstanceId,
-      origins, interaction: previous?.interaction === 'observe' ? 'observe' : config.interaction }
+      origins, interaction, previousInteraction: previous?.interaction }
   }
 
   confirmBinding(taskId: string, input: BrowserTaskBindingConfirmation): { binding: BrowserTaskBindingSnapshot; resumed: false } {
@@ -112,18 +120,22 @@ export class ManagedBrowserSkillRuntime {
       if (previous.status !== 'succeeded') throw new Error('browser_binding_outcome_unknown')
       return { binding: previous.result as BrowserTaskBindingSnapshot, resumed: false }
     }
-    const snapshot = this.bindingSnapshot(taskId)
-    if (snapshot.taskRevision !== input.expectedTaskRevision || snapshot.browserRevision !== input.expectedBrowserRevision ||
-      snapshot.browserInstanceId !== input.browserInstanceId || JSON.stringify(snapshot.origins) !== JSON.stringify(input.origins)) throw new Error('browser_binding_changed')
-    this.options.repository.transact(() => {
+    return this.options.repository.transact(() => {
+      const snapshot = this.bindingSnapshot(taskId)
+      if (snapshot.taskRevision !== input.expectedTaskRevision || snapshot.browserRevision !== input.expectedBrowserRevision ||
+        snapshot.browserInstanceId !== input.browserInstanceId || JSON.stringify(snapshot.origins) !== JSON.stringify(input.origins)) throw new Error('browser_binding_changed')
+      // Old clients may rebind the browser, but cannot implicitly widen interaction.
+      const interaction = input.interaction ?? snapshot.previousInteraction ?? 'observe'
+      if (interaction === 'interact' && snapshot.interaction !== 'interact') throw new Error('browser_interaction_scope_required')
+      const confirmed = { ...snapshot, interaction }
       this.options.repository.beginOperation({ ownerId: taskId, idempotencyKey: key, kind: 'browser_binding', request: input, nowIso: new Date().toISOString() })
       this.options.repository.update(taskId, snapshot.taskRevision, task => ({ ...task, authority: {
         ...(task.authority ?? { source: 'user', workspaceRoot: task.workspaceRoot, externalTargets: [], grantedAt: new Date().toISOString() }),
-        browserScope: { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction: snapshot.interaction, revision: snapshot.browserRevision }
-      } }), { key, kind: 'browser_binding_confirmed', payload: { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, browserRevision: snapshot.browserRevision } })
-      this.options.repository.finishOperation(taskId, key, { status: 'succeeded', result: snapshot })
+        browserScope: { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction, revision: snapshot.browserRevision }
+      } }), { key, kind: 'browser_binding_confirmed', payload: { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, browserRevision: snapshot.browserRevision, interaction } })
+      this.options.repository.finishOperation(taskId, key, { status: 'succeeded', result: confirmed })
+      return { binding: confirmed, resumed: false as const }
     })
-    return { binding: snapshot, resumed: false }
   }
 
   async refresh(): Promise<BrowserCapabilityConfig> {

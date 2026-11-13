@@ -53,6 +53,10 @@ export type LocalTool = {
   requireExplicitApproval?: boolean
   /** Trusted Provider verifies a persisted, task-scoped authorization against the current target. */
   hasScopedApproval?: (args: Record<string, unknown>, context: ToolHostContext) => Promise<boolean>
+  /** A trusted Provider checks hard scope limits before approval or dispatch. */
+  contextBlock?: (context: ToolHostContext) => { code: string; message: string } | undefined
+  /** A trusted Provider reads and describes the actual target before user review. */
+  approvalSummary?: (args: Record<string, unknown>, context: ToolHostContext) => Promise<string>
   /**
    * Optional gating predicate. When present, the tool is only listed
    * and only executed when `shouldAdvertise` returns true for the
@@ -137,7 +141,7 @@ export class LocalToolHost implements ToolHost {
       originalProviderId = resolved.provider.id
     } catch (error) {
       const code = (error as { code?: unknown })?.code
-      if (typeof code !== 'string' || !/^(sandbox_|execution_grant_|workspace_trust_)/.test(code)) throw error
+      if (typeof code !== 'string' || !/^(sandbox_|execution_grant_|workspace_trust_|browser_)/.test(code)) throw error
       return { item: this.errorToolResult(context, call, { toolKind: call.toolKind ?? 'tool_call' }, error instanceof Error ? error.message : String(error), code), approved: false }
     }
     if (tool.policy === 'never') {
@@ -203,7 +207,17 @@ export class LocalToolHost implements ToolHost {
         approved: false
       }
     }
-    const needsApproval = await this.requiresApproval(tool, activeCall, context)
+    let needsApproval: boolean
+    let reviewedSummary: string | undefined
+    try {
+      needsApproval = await this.requiresApproval(tool, activeCall, context)
+      if (needsApproval) reviewedSummary = await tool.approvalSummary?.(activeCall.arguments, context)
+    } catch (error) {
+      if (context.abortSignal.aborted) throw error
+      const code = (error as { code?: unknown })?.code
+      return { item: this.errorToolResult(context, activeCall, tool, error instanceof Error ? error.message : String(error),
+        typeof code === 'string' ? code : 'tool_preflight_failed'), approved: false }
+    }
     const approvedRequestHash = createHash('sha256').update(JSON.stringify(activeCall.arguments)).digest('hex')
     const approvalId = `appr_${createHash('sha256').update(JSON.stringify([context.threadId, context.turnId, activeCall.callId, activeCall.toolName, approvedRequestHash])).digest('hex')}`
     if (needsApproval) {
@@ -214,7 +228,7 @@ export class LocalToolHost implements ToolHost {
         toolName: activeCall.toolName,
         requestHash: approvedRequestHash,
         callId: activeCall.callId,
-        summary: this.buildApprovalSummary(activeCall, context.workspace)
+        summary: reviewedSummary ?? this.buildApprovalSummary(activeCall, context.workspace)
       })
       const decision = context.claimUndispatchedApproval?.(approval)
         ? 'allow'
@@ -252,6 +266,9 @@ export class LocalToolHost implements ToolHost {
         throw Object.assign(new Error('The approved tool was replaced. Check capabilities and request approval again.'), { code: 'tool_catalog_changed' })
       }
       context.assertExecution?.()
+      if (needsApproval && reviewedSummary && await tool.approvalSummary?.(activeCall.arguments, context) !== reviewedSummary) {
+        throw Object.assign(new Error('浏览器目标在审阅后发生变化，请重新确认实际操作。'), { code: 'approval_target_changed' })
+      }
       if (needsApproval) context.recordExplicitApproval?.({ toolName: activeCall.toolName, requestHash: approvedRequestHash })
       await context.claimTaskPermission?.()
       context.assertExecution?.()

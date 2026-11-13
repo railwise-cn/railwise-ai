@@ -63,11 +63,12 @@ export const BrowserTaskBindingConfirmation = z.object({
   expectedBrowserRevision: z.number().int().nonnegative(),
   browserInstanceId: z.string().min(1),
   origins: z.array(BrowserOrigin).min(1).max(64),
+  interaction: z.enum(['observe', 'interact']).optional(),
   confirmed: z.literal(true),
   idempotencyKey: z.string().min(1).max(200)
 }).strict()
 export type BrowserTaskBindingConfirmation = z.infer<typeof BrowserTaskBindingConfirmation>
 export type BrowserTaskBindingSnapshot = {
   taskId: string; taskRevision: number; browserRevision: number; browserInstanceId: string;
-  browserLabel: string; previousBrowserInstanceId?: string; origins: string[]; interaction: 'observe' | 'interact'
+  browserLabel: string; previousBrowserInstanceId?: string; origins: string[]; interaction: 'observe' | 'interact'; previousInteraction?: 'observe' | 'interact'
 }
