@@ -261,6 +261,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const [allWorkspaces, setAllWorkspaces] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [controlNotice, setControlNotice] = useState('')
   const [actionBusy, setActionBusy] = useState(false)
   const [inputs, setInputs] = useState<TaskInputV1[]>([])
   const [events, setEvents] = useState<TaskEventV1[]>([])
@@ -345,10 +346,20 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     mutationRequests.current.set(key, request)
     setActionBusy(true)
     setError('')
+    setControlNotice('')
     try {
       if (action === 'pause') await window.workwise.pauseTask(task.id, request)
-      else if (action === 'resume') await window.workwise.resumeTask(task.id, request)
-      else if (action === 'retry') await window.workwise.retryTask(task.id, request)
+      else if (action === 'resume' || action === 'retry') {
+        const result = action === 'resume' ? await window.workwise.resumeTask(task.id, request) : await window.workwise.retryTask(task.id, request)
+        if (result.capability) {
+          mutationRequests.current.delete(key)
+          setControlNotice(result.capability.message)
+          await refresh()
+          setFilter('attention')
+          setSelectedId(selected.id)
+          return
+        }
+      }
       else if (action === 'cancel') await window.workwise.cancelTask(task.id, request)
       else {
         await window.workwise.appendTaskInput(task.id, { ...request, text: text!, kind: 'supplement' })
@@ -407,6 +418,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     </header>
     {!runtimeReady ? <p role="status" className="m-5 rounded-xl border border-ds-border bg-ds-card p-4 text-sm text-ds-muted">{t('runtimeActionNeedsConnection')}</p> : null}
     {error || live.error ? <div role="alert" className="mx-5 mt-3 rounded-xl border border-red-300 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-100">{error || live.error}</div> : null}
+    {controlNotice ? <p role="status" className="mx-5 mt-3 text-sm text-ds-ink">{controlNotice}</p> : null}
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="px-5 pt-4">
         <div className="grid gap-2 md:grid-cols-3">{templates.map(template => <button type="button" key={template.id} disabled={!runtimeReady || !workspaceRoot} onClick={() => { setTemplateId(template.id); setTemplateMessage('') }} className="rounded-xl border border-ds-border bg-ds-card p-3 text-left transition hover:border-accent disabled:opacity-50"><div className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4 text-accent" />{t(`taskTemplate_${template.id}`, { defaultValue: template.name })}</div><p className="mt-1 text-xs leading-relaxed text-ds-muted">{t(`taskTemplateDescription_${template.id}`, { defaultValue: template.description })}</p></button>)}</div>

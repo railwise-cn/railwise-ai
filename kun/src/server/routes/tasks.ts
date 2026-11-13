@@ -291,6 +291,7 @@ async function mutateTask(runtime: ServerRuntime, taskId: string, request: Reque
       fallbackControls.set(runtime,controls)
     }
     const result=await controls.mutate(taskId,action,parsed.data)
+    if (result.capability) await runtime.taskCoordinator?.flushCommandMessages()
     return jsonResponse(action==='resume'||action==='retry'?result:result.task,action==='resume'||action==='retry'?202:200)
   } catch(error) { return taskError(error) }
 }

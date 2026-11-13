@@ -324,6 +324,42 @@ describe('TaskWorkspaceView', () => {
     expect(container.textContent).not.toContain('输入摘要')
   })
 
+  it('projects a blocked resume into its durable actionable card while preserving pause', async () => {
+    const capability = { provider: 'browser-skill', status: 'needs_authorization', errorCode: 'browser_binding_changed',
+      message: '请确认当前任务的浏览器范围。', action: { kind: 'grant', route: 'task/browser-binding', label: '确认当前任务的浏览器范围' } }
+    tasks = [{ ...tasks[0], status: 'paused' }]
+    inbox = []
+    const original = tasks[0]
+    const binding = { taskId: original.id, taskRevision: original.revision, browserRevision: 3, browserInstanceId: 'new-browser',
+      browserLabel: 'Chrome 验收', origins: ['https://example.com'], interaction: 'interact', previousInteraction: 'observe' }
+    Object.assign(window.workwise, {
+      diagnoseBrowserSkill: vi.fn(async () => ({ status: { enabled: true, state: 'ready', origins: binding.origins, interaction: 'interact', revision: 3, browsers: [] } })),
+      getBrowserTaskBinding: vi.fn(async () => binding),
+      confirmBrowserTaskBinding: vi.fn(async () => ({ binding, resumed: false })),
+      resumeTask: vi.fn(async () => {
+        inbox = [{ ...approval, id: `capability_${original.id}`, ownerId: original.id, taskId: original.id, threadId: original.threadId,
+          kind: 'blocked', title: '继续原任务前需要处理', message: capability.message, requestId: undefined,
+          payload: { kind: 'capability_required', capability, request: { prompt: original.goal } } }]
+        return { task: original, capability, attentionId: inbox[0].id }
+      })
+    })
+    await act(async () => refreshTaskState())
+    await settle()
+    await click('Resume')
+    expect(window.workwise.resumeTask).toHaveBeenCalledOnce()
+    expect(tasks[0]).toEqual(original)
+    expect(container.textContent).toContain(capability.message)
+    expect(container.querySelector('nav[aria-label="Task filters"] button[aria-pressed="true"]')?.textContent).toContain('Needs you')
+    await click('确认当前任务的浏览器范围')
+    expect(window.workwise.getBrowserTaskBinding).toHaveBeenCalledWith(original.id)
+    expect(container.textContent).toContain('Chrome 验收')
+    await click('Confirm browser scope for this task')
+    expect(window.workwise.confirmBrowserTaskBinding).toHaveBeenCalledWith(original.id, expect.objectContaining({ interaction: 'interact', expectedTaskRevision: original.revision }))
+    expect(window.workwise.resumeTask).toHaveBeenCalledOnce()
+    await act(async () => refreshTaskState())
+    expect(container.textContent).toContain('继续原任务前需要处理')
+  })
+
   it('shows pending decisions and resolves them through the original approval API', async () => {
     const button = [...container.querySelectorAll<HTMLButtonElement>('nav[aria-label="Task filters"] button')].find(item => item.textContent?.includes('Needs you'))!
     await act(async () => button.click())

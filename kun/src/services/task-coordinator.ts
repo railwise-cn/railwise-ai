@@ -107,7 +107,7 @@ export class TaskCoordinator {
       else {
         const changed=await this.controls.mutate(task.id,intent,{expectedRevision:command.expectedRevision ?? task.revision,idempotencyKey:`command:${command.idempotencyKey}`,model:command.request.model})
         if(intent==='resume') {
-          if(changed.capability) result={kind:'capability_required',task:changed.task,attentionId:`capability_${changed.task.id}`,capability:changed.capability,message:changed.capability.message}
+          if(changed.capability) result={kind:'capability_required',task:changed.task,attentionId:`capability_${changed.task.id}`,capability:changed.capability,message:changed.capability.message,...(changed.receipt ? {receipt:changed.receipt} : {})}
           else {
             if(!changed.turn)throw new Error('task resume did not create a Turn')
             result={kind:'task_started',task:changed.task,turn:changed.turn}
@@ -249,6 +249,16 @@ export class TaskCoordinator {
 
   private async recordResult(command:ReturnType<typeof TaskCommandSchema.parse>,result:TaskCommandResult):Promise<void> {
     if (result.kind === 'chat_started') return
+    if (result.kind === 'capability_required' && result.task) {
+      const pending = this.deps.repository.attention(result.attentionId ?? `capability_${result.task.id}`)
+      if (typeof pending?.payload?.resumeCommandId === 'string') {
+        const commandId = pending.payload.resumeCommandId
+        result.receipt ??= { userMessageItemId: `item_command_${commandId}_user`, resultMessageItemId: `item_command_${commandId}_receipt` }
+        // TaskControl already persisted the same capability card for HTTP and chat resume.
+        await this.flushCommandMessages()
+        return
+      }
+    }
     const attention = result.kind === 'attention_required' && result.attentionId ? this.deps.repository.attention(result.attentionId) : null
     if (attention?.payload?.kind === 'task_input_intent') {
       const request = StartTurnRequest.parse(attention.payload.request)

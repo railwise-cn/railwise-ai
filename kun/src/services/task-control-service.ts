@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto'
 
 export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel'
 export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string }
-export type TaskControlResult = { task:TaskRun; turn?:StartTurnResponse; capability?:ExternalTaskCapability }
+export type TaskControlResult = { task:TaskRun; turn?:StartTurnResponse; capability?:ExternalTaskCapability; attentionId?:string; receipt?:{userMessageItemId:string;resultMessageItemId:string} }
 
 /** One deterministic mutation path for chat commands and the task HTTP API. */
 export class TaskControlService {
@@ -74,7 +74,7 @@ export class TaskControlService {
       const requiredCapabilities = checked.filter((capability): capability is ExternalTaskCapability => capability !== null)
       const capability = requiredCapabilities.find(item => item.status !== 'available')
       if(capability) {
-        if (action === 'resume') return { task: current, capability }
+        if (action === 'resume') return this.persistResumeCapability(taskId, current, data, capability)
         blockedCapability = capability
       }
       const providers = [...new Set(requiredCapabilities.map(item => item.provider).filter((provider): provider is 'lark' | 'dingtalk' => provider === 'lark' || provider === 'dingtalk'))]
@@ -82,7 +82,7 @@ export class TaskControlService {
         const first = requiredCapabilities[0]!
         const ambiguity: ExternalTaskCapability = {...first,status:'blocked',errorCode:'multiple_external_providers',
           message:'一个任务的执行授权只能绑定一个外部平台。请将钉钉和飞书请求拆分为两个独立任务。'}
-        if (action === 'resume') return { task: current, capability: ambiguity }
+        if (action === 'resume') return this.persistResumeCapability(taskId, current, data, ambiguity)
         blockedCapability = ambiguity
       }
       externalTaskProvider = providers[0]
@@ -165,6 +165,38 @@ export class TaskControlService {
       if(receipt&&receipt.status!=='succeeded')repository.finishOperation(taskId,data.idempotencyKey,{status:'failed',error:error instanceof Error?error.message:String(error)},nowIso())
       throw error
     }
+  }
+
+  private persistResumeCapability(taskId: string, current: TaskRun, request: TaskControlRequest, capability: ExternalTaskCapability): TaskControlResult {
+    const { repository, nowIso } = this.deps
+    return repository.transact(() => {
+      const latest = repository.currentExecution(taskId)
+      if (!latest || latest.id !== current.id || latest.revision !== current.revision) {
+        throw Object.assign(new Error('task revision conflict'), { code: 'stale_request' })
+      }
+      const now = nowIso()
+      const attentionId = `capability_${current.id}`
+      // Probe timestamps do not create new user work. A changed blocker replaces its pending card.
+      const fingerprint = createHash('sha256').update(JSON.stringify({ taskId: current.id, capability: { ...capability, checkedAt: undefined } })).digest('hex')
+      const previous = repository.attention(attentionId)
+      const same = previous?.status === 'pending' && previous.payload?.resumeFingerprint === fingerprint
+      const attentionRevision = same ? previous.revision : (previous?.revision ?? -1) + 1
+      const commandId = createHash('sha256').update(`resume-capability:${current.id}:${fingerprint}:${attentionRevision}`).digest('hex').slice(0, 32)
+      const threadId = current.originThreadId ?? current.threadId
+      repository.beginOperation({ ownerId: taskId, idempotencyKey: request.idempotencyKey, kind: 'resume', request, nowIso: now })
+      if (!same) {
+        repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: current.id, taskId: current.id, threadId,
+          workspaceRoot: current.workspaceRoot, kind: 'blocked', title: '继续原任务前需要处理', message: capability.message,
+          status: 'pending', revision: attentionRevision, createdAt: previous?.status === 'pending' ? previous.createdAt : now, updatedAt: now,
+          payload: { kind: 'capability_required', capability, resumeFingerprint: fingerprint, resumeCommandId: commandId, request: { prompt: current.goal } } })
+        repository.enqueueOutbox({ id: `command-message:${commandId}`, ownerId: threadId, kind: 'task_command_message', createdAt: now,
+          payload: { threadId, commandId, userText: '继续任务', assistantText: capability.message, createdAt: now,
+            capabilityCard: { threadId, taskId: current.id, attentionId, prompt: current.goal, capability } } })
+      }
+      const result = { task: latest, capability, attentionId, receipt: { userMessageItemId: `item_command_${commandId}_user`, resultMessageItemId: `item_command_${commandId}_receipt` } }
+      repository.finishOperation(taskId, request.idempotencyKey, { status: 'succeeded', result }, now)
+      return result
+    })
   }
 
   /** A new TaskRun must never erase the old operation ledger's uncertainty or repeat writes. */
