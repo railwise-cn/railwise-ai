@@ -277,6 +277,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const activeTemplate = templates.find(template => template.id === templateId)
   const [templateMessage, setTemplateMessage] = useState('')
   const detailGeneration = useRef(0)
+  const detailRootId = useRef<string | null>(null)
   const scope = allWorkspaces ? undefined : workspaceRoot
   const tasks=useMemo(()=>{
     const roots=live.tasks.filter(task=>!task.parentTaskId && (!task.rootTaskId || task.rootTaskId===task.id) && task.visible!==false && !['chat','internal'].includes(task.visibility??'') && (!scope||task.workspaceRoot===scope))
@@ -317,9 +318,15 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
 
   useEffect(() => {
     const generation = ++detailGeneration.current
-    setInputs([])
-    setEvents([])
-    setReceipts([])
+    const nextRootId = runtimeReady ? selectedGroup?.root.id ?? null : null
+    if (detailRootId.current !== nextRootId) {
+      detailRootId.current = nextRootId
+      setInputs([])
+      setEvents([])
+      setReceipts([])
+    }
+    // A same-task refresh must not unmount receipt cards while they report a
+    // verification result. Replace their data only when the fresh read arrives.
     if (!selectedGroup || !runtimeReady) return
     void Promise.all(selectedGroup.all.map(async task => {
       const [nextInputs, nextEvents, nextReceipts] = await Promise.all([window.workwise.listTaskInputs(task.id), window.workwise.listTaskEvents(task.id), window.workwise.listTaskOperationReceipts(task.id)])

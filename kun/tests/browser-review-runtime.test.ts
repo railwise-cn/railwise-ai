@@ -13,7 +13,8 @@ import type { ExecutionGrant } from '../src/contracts/permissions.js'
 import { operationFingerprint } from '../src/services/task-run-repository.js'
 
 const page = vi.hoisted(() => ({ session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0,
-  htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false, lastFill: {} as Record<string, unknown> }))
+  htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false,
+  largePage: false, emptyObservation: false, emptyPage: false, targetTruncated: false, lastFill: {} as Record<string, unknown> }))
 vi.mock('../src/services/browser-skill-cli.js', async original => ({
   ...await original<typeof import('../src/services/browser-skill-cli.js')>(),
   runBrowserCommand: vi.fn(async (_config: unknown, args: readonly string[]) => {
@@ -27,16 +28,19 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
     if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: 1, url: page.url, title: '合成公开查询' }] } }
     if (args[0] === 'navigate') { page.url = args[1]!; return { ok: true, output: {} } }
     if (args[0] === 'cooperate' && page.writes && page.readbackBroken) return { ok: false, code: 'readback_temporarily_unavailable' }
-    if (args[0] === 'cooperate') { page.reads++; return { ok: true, output: { context_id: `review-context-${++page.context}`, observation: { text: '@e1 公开关键词输入框。仅供合成公开查询，已填写轨道监测。' } } } }
-    if (args[0] === 'get-html') { page.reads++; return { ok: true, output: { tab_id: 1, truncated: false,
+    if (args[0] === 'cooperate') { page.reads++; return { ok: true, output: { context_id: `review-context-${++page.context}`, observation: { text: page.emptyObservation ? ' ' : '@e1 公开关键词输入框。仅供合成公开查询，已填写轨道监测。' } } } }
+    if (args[0] === 'get-html') { page.reads++; return { ok: true, output: { tab_id: 1, truncated: args.includes('--ref') ? page.targetTruncated : page.largePage,
       html: args.includes('--ref') ? page.targetChanged ? '<input name="password">' : '<input aria-label="公开关键词">'
-        : `<html><title>合成公开查询</title><body>${page.htmlChanged ? '页面已改变' : '公开查询结果'}<input aria-label="公开关键词"></body></html>` } } }
+        : page.emptyPage ? '' : page.largePage ? '<html><head><title>合成公开查询</title><script>' + 'x'.repeat(524000)
+          : `<html><title>合成公开查询</title><body>${page.htmlChanged ? '页面已改变' : '公开查询结果'}<input aria-label="公开关键词"></body></html>`,
+      byte_size: page.largePage && !args.includes('--ref') ? 3_283_929 : undefined } } }
     if (args[0] === 'fill') { page.writes++; return page.acknowledge ? { ok: true, output: { filled: true } } : { ok: false, code: 'simulated_lost_ack', outcomeUnknown: true } }
     throw new Error('Unexpected synthetic browser command')
   })
 }))
 const cleanup: Array<() => Promise<unknown>> = []
-afterEach(async () => { while (cleanup.length) await cleanup.pop()!(); vi.useRealTimers(); vi.unstubAllEnvs(); Object.assign(page, { session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0, htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false, lastFill: {} }) })
+afterEach(async () => { while (cleanup.length) await cleanup.pop()!(); vi.useRealTimers(); vi.unstubAllEnvs(); Object.assign(page, { session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0, htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false,
+  largePage: false, emptyObservation: false, emptyPage: false, targetTruncated: false, lastFill: {} }) })
 
 async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown') {
   page.acknowledge = mode === 'ack_pending'; page.readbackBroken = mode === 'ack_pending'
@@ -196,6 +200,47 @@ it('retains an unknown browser surface across pause/restart, reads without mutat
   expect(logicalReplay).toMatchObject({ item: { output: { recovered: true, evidence: { kind: 'human_confirmation' } } } })
   expect(page.writes).toBe(1)
 }, 30000)
+
+it('reviews a large page using a fresh visible observation and exact target without claiming a full-page scan or resolving automatically', async () => {
+  const f = await fixture()
+  await f.api(`/v1/tasks/${f.task().id}/pause`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'large-page-paused' })
+  page.largePage = true
+  const before = f.modelCalls()
+  const review = await f.verify('large-page-review')
+  expect(review.status).toBe('outcome_unknown')
+  expect(review.browserReview?.observationText).toContain('未读取整页')
+  expect(review.browserReview?.observationText).toContain('不证明原操作已成功')
+  expect(review.browserReview?.observationText).toContain('已填写轨道监测')
+  expect(review.browserReview?.observationText).not.toContain('x'.repeat(100))
+  const saved = f.runtime.taskRepository!.operations(f.task().id, 'browser_action_review').find(item => item.status === 'succeeded')!
+  expect(saved.result).toMatchObject({ coverage: { source: 'visible_observation', htmlTruncated: true, textTruncated: false } })
+  expect(f.runtime.taskRepository!.verifiedOperationResolution(f.unknown)).toBeUndefined()
+  expect(f.task().status).toBe('paused'); expect(page.writes).toBe(1); expect(f.modelCalls()).toBe(before)
+  const response = await f.confirm(review, 'large-page-confirm')
+  expect(response.status, await response.clone().text()).toBe(200)
+  expect(f.task().status).toBe('paused'); expect(page.writes).toBe(1); expect(f.modelCalls()).toBe(before)
+  const original = f.runtime.taskRepository!.operation(f.task().id, f.unknown.idempotencyKey)!
+  expect(original.status).toBe('outcome_unknown')
+  expect(f.runtime.taskRepository!.verifiedOperationResolution(original)?.evidence.kind).toBe('human_confirmation')
+}, 20000)
+
+it.each(['missing-observation', 'empty', 'target-truncated', 'target-changed', 'different-url', 'revoked'] as const)('refuses unsafe %s large-page review and leaves the original unknown', async condition => {
+  const f = await fixture()
+  page.largePage = true
+  if (condition === 'missing-observation') page.emptyObservation = true
+  if (condition === 'empty') { page.emptyObservation = true; page.emptyPage = true }
+  if (condition === 'target-truncated') page.targetTruncated = true
+  if (condition === 'target-changed') page.targetChanged = true
+  if (condition === 'different-url') page.url = 'https://public.example.test/another-page'
+  if (condition === 'revoked') f.runtime.taskRepository!.update(f.task().id, f.task().revision, task => ({ ...task, authority: { ...task.authority!, revokedAt: new Date().toISOString() } }))
+  const before = f.modelCalls()
+  const response = await f.api(`/v1/tasks/${f.task().id}/receipts/${f.unknown.id}/verify`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: `unsafe-${condition}` })
+  expect(response.status, await response.clone().text()).toBe(200)
+  expect(await response.json()).toMatchObject({ status: 'outcome_unknown', errorCode: expect.any(String) })
+  const original = f.runtime.taskRepository!.operation(f.task().id, f.unknown.idempotencyKey)!
+  expect(original.status).toBe('outcome_unknown'); expect(original.resolution).toBeUndefined()
+  expect(f.task().status).toBe('stalled'); expect(page.writes).toBe(1); expect(f.modelCalls()).toBe(before)
+}, 20000)
 
 it.each(['expired', 'target', 'page', 'revoked', 'cancelled', 'browser'] as const)('keeps %s review unknown without replay or resumption', async condition => {
   const f = await fixture()

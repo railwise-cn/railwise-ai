@@ -342,6 +342,7 @@ describe('TaskWorkspaceView', () => {
     expect(checkbox).toBeTruthy()
     expect(window.workwise.resumeTask).not.toHaveBeenCalled()
     await act(async () => checkbox.click())
+    const refreshes = vi.mocked(window.workwise.listTaskPage).mock.calls.length
     await click('Save my confirmation')
     const request = runtimeRequest.mock.calls.find(([path]) => path.endsWith('/browser-confirm'))!
     expect(request[0]).toBe('/v1/tasks/browser-review/receipts/browser-receipt/browser-confirm')
@@ -349,8 +350,74 @@ describe('TaskWorkspaceView', () => {
     expect(JSON.parse(request[2]!)).toEqual({ expectedRevision: 7, idempotencyKey: expect.any(String), reviewId: 'review-1', decision: 'confirmed_complete' })
     expect(tasks[0].status).toBe('paused')
     expect(tasks[0].revision).toBe(8)
+    expect(vi.mocked(window.workwise.listTaskPage).mock.calls.length).toBeGreaterThan(refreshes)
     expect(window.workwise.resumeTask).not.toHaveBeenCalled()
     expect(window.workwise.appendTaskInput).not.toHaveBeenCalled()
+  })
+
+  it('keeps a failed browser review reason visible through its refresh and later updates of the same root', async () => {
+    const pending = { ...task('browser-failure', 'paused', '核对原网页'), revision: 7 }
+    tasks = [pending]; inbox = []
+    const receipt: TaskOperationReceiptV1 = { id: 'failed-browser-receipt', taskId: pending.id, purpose: 'browser_action',
+      provider: 'browser-skill', operation: 'fill', toolName: 'browser_fill', requestHash: 'a'.repeat(64), status: 'outcome_unknown',
+      browser: { action: 'fill', pageUrl: 'https://example.com/notices', canReview: true }, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([receipt])
+    vi.mocked(window.workwise.verifyTaskOperationReceipt).mockResolvedValue({ taskId: pending.id, receiptId: receipt.id,
+      status: 'outcome_unknown', errorCode: 'browser_review_read_failed' })
+    await act(async () => { await i18n.changeLanguage('zh'); await refreshTaskState() })
+    await click('进行中')
+    const originalCard = container.querySelector('[aria-label="网页操作核验"] li')!
+    expect(originalCard).toBeTruthy()
+    const refreshes = vi.mocked(window.workwise.listTaskPage).mock.calls.length
+    await click('检查原网页结果')
+    const message = i18n.t('common:taskBrowserReviewUnavailable')
+    expect(container.textContent).toContain(message)
+    expect(container.querySelector('[aria-label="网页操作核验"] li')).toBe(originalCard)
+    expect(vi.mocked(window.workwise.listTaskPage).mock.calls.length).toBeGreaterThan(refreshes)
+    const event = vi.mocked(window.workwise.onSseEvent).mock.calls.at(-1)![0]
+    const streamId = vi.mocked(window.workwise.startTaskSse).mock.calls.at(-1)![1]!
+    tasks = [{ ...pending, revision: 8 }]
+    await act(async () => event({ streamId, events: [{ seq: 1, taskId: pending.id, kind: 'task_changed', payload: tasks[0], createdAt: now }] }))
+    await settle()
+    expect(container.textContent).toContain(message)
+    expect(container.querySelector('[aria-label="网页操作核验"] li')).toBe(originalCard)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.appendTaskInput).not.toHaveBeenCalled()
+    expect(tasks[0].status).toBe('paused')
+  })
+
+  it('clears the previous root review immediately when switching tasks and ignores its late detail response', async () => {
+    const first = task('browser-first', 'paused', '第一个公开查询')
+    const second = task('browser-second', 'paused', '另一个独立任务')
+    tasks = [first, second]; inbox = []
+    const receipt: TaskOperationReceiptV1 = { id: 'first-browser-receipt', taskId: first.id, purpose: 'browser_action',
+      provider: 'browser-skill', operation: 'click', toolName: 'browser_click', requestHash: 'a'.repeat(64), status: 'outcome_unknown',
+      browser: { action: 'click', pageUrl: 'https://example.com/first', canReview: true }, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockImplementation(async id => id === first.id ? [receipt] : [])
+    vi.mocked(window.workwise.verifyTaskOperationReceipt).mockResolvedValue({ taskId: first.id, receiptId: receipt.id, status: 'outcome_unknown',
+      browserReview: { id: 'first-private-review', action: 'click', pageUrl: 'https://example.com/first', observationText: '只属于第一个任务的观察内容', expiresAt: new Date(Date.now() + 120_000).toISOString() } })
+    await act(async () => { await i18n.changeLanguage('zh'); await refreshTaskState() })
+    await click('进行中')
+    await click('第一个公开查询')
+    await click('检查原网页结果')
+    expect(container.textContent).toContain('只属于第一个任务的观察内容')
+    let finishOldRead: ((value: TaskOperationReceiptV1[]) => void) | undefined
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockImplementation(id => id === first.id
+      ? new Promise(resolve => { finishOldRead = resolve }) : new Promise(() => undefined))
+    tasks = [{ ...first, revision: 2 }, second]
+    await act(async () => refreshTaskState())
+    expect(finishOldRead).toBeTypeOf('function')
+    expect(container.textContent).toContain('只属于第一个任务的观察内容')
+    await click('另一个独立任务')
+    expect(container.querySelector('[aria-label="任务详情"] h2')?.textContent).toBe('另一个独立任务')
+    expect(container.textContent).not.toContain('只属于第一个任务的观察内容')
+    expect(container.textContent).not.toContain('https://example.com/first')
+    expect(container.querySelector('[aria-label="网页操作核验"]')).toBeNull()
+    await act(async () => finishOldRead!([receipt]))
+    await settle()
+    expect(container.textContent).not.toContain('只属于第一个任务的观察内容')
+    expect(container.querySelector('[aria-label="网页操作核验"]')).toBeNull()
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
   })
 
   it('uses the browser business review without exposing technical fingerprints in task attention', async () => {

@@ -58,7 +58,7 @@ export class BrowserOperationVerificationService {
         observationText: snapshot.text, targetLabel: summary['目标'],
         ...(binding.action.action === 'fill' && operationFingerprint(summary['输入内容']) === operationFingerprint(binding.value) ? { value: binding.value } : {}) }
       this.deps.repository.finishOperation(taskId, key, { status: 'succeeded', result: { review, snapshotHash: snapshot.hash,
-        bindingHash: binding.hash, dispatchId: binding.dispatch.id } }, this.deps.nowIso())
+        coverage: snapshot.coverage, bindingHash: binding.hash, dispatchId: binding.dispatch.id } }, this.deps.nowIso())
       return { ...result, browserReview: review }
     } catch (error) {
       const prior = this.deps.repository.operation(taskId, key)
@@ -239,10 +239,17 @@ export class BrowserOperationVerificationService {
     if (target.truncated || typeof target.html !== 'string' || sha(target.html) !== action.elementHash) fail('browser_review_target_changed')
     const page = await read('browser_get_html', { sessionId, maxBytes: 524288 })
     const observedText = object(object(observation.observation).observation).text
-    const text = (typeof observedText === 'string' && observedText.trim() ? observedText
-      : typeof page.html === 'string' ? page.html.replace(/<(?:script|style)\b[^>]*>[\s\S]*?<\/(?:script|style)>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : '').slice(0, 12000)
-    if (!text || page.truncated || typeof page.html !== 'string') fail('browser_review_read_failed')
-    return { text, hash: operationFingerprint({ pageUrl: action.pageUrl, html: page.html, text, elementHash: action.elementHash }) }
+    const hasObservation = typeof observedText === 'string' && Boolean(observedText.trim())
+    // A large page can still supply a fresh visible observation and the exact
+    // authorized target. Never derive review text from an incomplete HTML prefix.
+    if (typeof page.html !== 'string' || page.truncated && !hasObservation) fail('browser_review_read_failed')
+    const sourceText = hasObservation ? observedText as string
+      : page.html.replace(/<(?:script|style)\b[^>]*>[\s\S]*?<\/(?:script|style)>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    if (!sourceText.trim()) fail('browser_review_read_failed')
+    const coverage = { source: hasObservation ? 'visible_observation' : 'html', htmlTruncated: page.truncated === true,
+      textTruncated: sourceText.length > 12000 }
+    const text = `只读核验范围：当前页面摘要与原目标。${coverage.htmlTruncated ? '页面 HTML 超出读取上限，未读取整页。' : ''}${coverage.textTruncated ? '摘要仅展示前 12000 个字符。' : ''}这不是完整页面扫描，也不证明原操作已成功；请核对下面的实际内容后再决定是否确认。\n\n${sourceText.slice(0, 12000)}`
+    return { text, coverage, hash: operationFingerprint({ pageUrl: action.pageUrl, html: page.html, text, coverage, elementHash: action.elementHash }) }
   }
 }
 
