@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
@@ -9,6 +9,7 @@ import { createServer as createHttpServer } from 'node:http'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
+import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 const requiredChecks = [
@@ -51,14 +52,14 @@ export function readonlyConnectorSetupExpression(connector) {
 export function windowsUiEnvironment(environment, root) {
   const clean = { ...environment }
   for (const name of Object.keys(clean)) {
-    if (/SECRET|TOKEN|PASSWORD|PRIVATE_KEY|API_KEY|^(?:CSC_|APPLE_|R2_|S3_|WORKWISE_|ELECTRON_RUN_AS_NODE|NODE_OPTIONS|RELEASE_CHANNEL)/i.test(name)) delete clean[name]
+    if (/SECRET|TOKEN|PASSWORD|PRIVATE_KEY|API_KEY|^(?:BSK_|CSC_|APPLE_|R2_|S3_|WORKWISE_|ELECTRON_RUN_AS_NODE|NODE_OPTIONS|RELEASE_CHANNEL)/i.test(name)) delete clean[name]
   }
   const home = join(root, 'home')
   return { ...clean, USERPROFILE: home, APPDATA: join(home, 'AppData', 'Roaming'),
-    LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools') }
+    LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -79,6 +80,14 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.equal(report.taskSmokeRequested, true)
     validateWindowsTaskEvidence(report.taskExecution)
     assert.ok(report.checks.includes('runtime-task-html-and-daily-schedule'), 'Missing actual UI observation: runtime-task-html-and-daily-schedule')
+  }
+  if (requireBrowserExecution || report.browserSmokeRequested) {
+    assert.equal(report.browserSmokeRequested, true)
+    assert.equal(report.taskSmokeRequested, true)
+    validateWindowsBrowserEvidence(report.taskExecution?.browserSkill)
+    assert.ok(report.taskExecution.dueOccurrence.browserSessionId)
+    assert.notEqual(report.taskExecution.dueOccurrence.browserSessionId, report.taskExecution.browserSkill.sessionId)
+    assert.ok(report.checks.includes('real-browser-skill-html-and-schedule'), 'Missing actual UI observation: real-browser-skill-html-and-schedule')
   }
   for (const check of requiredChecks) assert.ok(report.checks.includes(check), `Missing actual UI observation: ${check}`)
   assert.deepEqual(validateDefaultSkillSources(report.resources.defaultSkills).map(skill => skill.id), defaultSkillIds)
@@ -117,12 +126,42 @@ export function validateWindowsTaskEvidence(evidence) {
   assert.equal(evidence.schedule.enabled, true)
   assert.ok(Number.isFinite(Date.parse(evidence.schedule.nextRunAt)))
   assert.equal(evidence.schedule.readBackFromTool, true)
+  assert.equal(evidence.preview.automatic, true)
+  assert.equal(evidence.preview.contentVerified, true)
+  assert.equal(evidence.preview.manualEntryVerified, true)
+  assert.equal(evidence.dueOccurrence.clock, 'real')
+  assert.equal(evidence.dueOccurrence.status, 'completed')
+  assert.equal(evidence.dueOccurrence.independentTask, true)
+  assert.equal(evidence.dueOccurrence.independentArtifact, true)
+  assert.equal(evidence.dueOccurrence.byteHashMatches, true)
+  assert.ok(Date.parse(evidence.dueOccurrence.createdAt) >= Date.parse(evidence.dueOccurrence.dueAt))
 }
 
 /** A protocol fixture drives the installed Runtime's real task, tools, files and schedule store. */
-export async function startWindowsTaskModelFixture() {
+export function validateWindowsBrowserEvidence(evidence) {
+  assert.equal(evidence.status, 'passed')
+  assert.equal(evidence.fixturePageRead, true)
+  assert.equal(evidence.htmlFromBrowserTool, true)
+  assert.equal(evidence.sessionStopped, true)
+  assert.equal(evidence.cliVersion, '0.4.0')
+  assert.equal(evidence.extension.version, browserSmokeDependency.extensionVersion)
+  assert.equal(evidence.extension.sha256, browserSmokeDependency.extensionSha256)
+  assert.equal(evidence.browser.version, browserSmokeDependency.chromeVersion)
+  assert.ok(evidence.browserInstanceId)
+  assert.ok(evidence.sessionId)
+  assert.match(evidence.htmlSha256, /^[a-f0-9]{64}$/)
+}
+
+export async function startWindowsTaskModelFixture({ browser = false } = {}) {
   const observed = { catalogs: [] }
+  const marker = `RAILWISE_BROWSER_${randomUUID()}`
+  let fixtureUrl
   const server = createHttpServer(async (request, response) => {
+    if (browser && request.method === 'GET' && request.url === '/fixture') {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      response.end(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>受控网页验收</title></head><body><h1>真实浏览器合成页面</h1><p>${marker}</p></body></html>`)
+      return
+    }
     if (request.method === 'GET') {
       response.writeHead(200, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ data: [{ id: 'windows-task-fixture', object: 'model' }] }))
@@ -135,8 +174,23 @@ export async function startWindowsTaskModelFixture() {
       const names = body.tools?.map(tool => tool.function.name) ?? []
       observed.catalogs.push(names)
       const called = new Set(body.messages?.flatMap(message => message.tool_calls?.map(call => call.function.name) ?? []))
-      const next = ['publish_artifact', 'schedule_task', 'list_schedules'].find(name => names.includes(name) && !called.has(name))
-      const args = next === 'publish_artifact' ? { path: '每日网页报告.html', content: '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Windows 合成验收报告</title></head><body><h1>每日网页报告</h1><p>这是隔离验收生成的合成内容。</p></body></html>' } : {}
+      const toolOutput = name => {
+        const call = body.messages?.flatMap(message => message.tool_calls ?? []).find(call => call.function.name === name)
+        const result = body.messages?.find(message => message.role === 'tool' && message.tool_call_id === call?.id)
+        if (!result) return undefined
+        try { return JSON.parse(result.content) } catch { return undefined }
+      }
+      const steps = [...(browser ? ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop'] : []), 'publish_artifact', 'schedule_task', 'list_schedules']
+      const next = steps.find(name => names.includes(name) && !called.has(name))
+      const session = toolOutput('browser_session_start')
+      let args = {}
+      if (next === 'browser_navigate') args = { sessionId: session?.sessionId, url: fixtureUrl }
+      if (next === 'browser_get_html' || next === 'browser_session_stop') args = { sessionId: session?.sessionId }
+      if (next === 'publish_artifact') {
+        const content = browser ? toolOutput('browser_get_html')?.html : '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Windows 合成验收报告</title></head><body><h1>每日网页报告</h1><p>这是隔离验收生成的合成内容。</p></body></html>'
+        if (browser) assert.ok(typeof content === 'string' && content.includes(marker), 'The protocol fixture requires actual browser HTML before publishing')
+        args = { path: '每日网页报告.html', content }
+      }
       const delta = next ? { tool_calls: [{ index: 0, id: `smoke-${next}`, type: 'function', function: { name: next, arguments: JSON.stringify(args) } }] }
         : { content: 'HTML 报告已保存并核验，每日计划已创建并读回，可在任务成果中查看。' }
       response.writeHead(200, { 'content-type': 'text/event-stream' })
@@ -147,7 +201,8 @@ export async function startWindowsTaskModelFixture() {
     }
   })
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
-  return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, observed,
+  fixtureUrl = `http://127.0.0.1:${server.address().port}/fixture`
+  return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, fixtureUrl, marker, observed,
     close: () => new Promise(done => { server.close(done); server.closeAllConnections() }) }
 }
 
@@ -186,14 +241,14 @@ async function connectCdp(url) {
     for (const entry of pending.values()) { clearTimeout(entry.timer); entry.reject(new Error('Installed renderer closed')) }
     pending.clear()
   })
-  const send = (method, params = {}) => new Promise((done, reject) => {
+  const send = (method, params = {}, timeout = 60_000) => new Promise((done, reject) => {
     const id = ++sequence
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out`)) }, 60_000)
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out`)) }, timeout)
     pending.set(id, { done, reject, timer, method })
     socket.send(JSON.stringify({ id, method, params }))
   })
-  const evaluate = async expression => {
-    const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
+  const evaluate = async (expression, timeout) => {
+    const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, timeout)
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text)
     return result.result?.value
   }
@@ -233,10 +288,67 @@ async function connectCdp(url) {
     if (text) await send('Input.insertText', { text })
     await wait(`document.querySelector(${JSON.stringify(selector)})?.value === ${JSON.stringify(text)}`, 'the typed resource query')
   }
-  return { send, evaluate, wait, click, fill, close: () => socket.close() }
+  const hover = async selector => {
+    const point = await wait(`(()=>{const node=document.querySelector(${JSON.stringify(selector)});if(!node||!node.getClientRects().length)return null;const r=node.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`, selector)
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point })
+  }
+  return { send, evaluate, wait, click, fill, hover, close: () => socket.close() }
 }
 
-export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true' }) {
+async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
+  const prepared = await prepareBrowserSkillSmoke(join(root, 'browser-dependencies'))
+  const profile = join(root, 'browser-profile')
+  await mkdir(profile, { recursive: true })
+  const browser = launchBrowserSkillSmoke(prepared, profile, environment)
+  let browserCdp
+  let diagnosis
+  try {
+    const deadline = Date.now() + 30_000
+    while (!browserCdp && Date.now() < deadline) {
+      const diagnostics = browser.diagnostics()
+      if (diagnostics.launchError || diagnostics.exitCode !== null) throw new Error(`Isolated Chrome launch failed: ${diagnostics.launchError ?? diagnostics.exitCode}`)
+      const port = await readFile(join(profile, 'DevToolsActivePort'), 'utf8').then(value => value.split('\n')[0]).catch(() => undefined)
+      if (port && /^\d+$/.test(port)) {
+        const version = await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(3000) }).then(response => response.json())
+        browserCdp = await connectCdp(version.webSocketDebuggerUrl)
+      }
+      if (!browserCdp) await sleep(100)
+    }
+    assert.ok(browserCdp, 'The isolated Chrome for Testing must expose its own CDP endpoint')
+    const version = await browserCdp.send('Browser.getVersion')
+    assert.ok(version.product.endsWith(`/${browserSmokeDependency.chromeVersion}`), 'The running browser must match the pinned distribution')
+    const extension = await browserCdp.send('Extensions.loadUnpacked', { path: prepared.extensionDirectory })
+    assert.match(extension.id, /^[a-p]{32}$/)
+    const installed = await cdp.evaluate('window.workwise.installBrowserSkill()', 180_000)
+    assert.equal(installed.ok, true, installed.message)
+    assert.equal(installed.status.version, '0.4.0')
+    await cdp.evaluate('window.workwise.connectBrowserSkill()')
+    const connectDeadline = Date.now() + 45_000
+    while (Date.now() < connectDeadline) {
+      diagnosis = await cdp.evaluate('window.workwise.diagnoseBrowserSkill()')
+      if (diagnosis.status.browsers.some(item => item.connected)) break
+      await sleep(500)
+    }
+    const connected = diagnosis?.status.browsers.filter(item => item.connected) ?? []
+    assert.equal(connected.length, 1, `Expected one real isolated extension connection (${diagnosis?.status.state})`)
+    assert.equal(connected[0].extensionVersion, browserSmokeDependency.extensionVersion)
+    const configured = await cdp.evaluate(`window.workwise.configureBrowserSkill(${JSON.stringify({ enabled: true, expectedRevision: diagnosis.status.revision,
+      browserInstanceId: connected[0].id, origins: [new URL(fixtureUrl).origin], interaction: 'observe' })})`)
+    assert.equal(configured.ok, true, configured.message)
+    assert.equal(configured.status.state, 'ready')
+    return { ...browser, cdp: browserCdp, evidence: { ...prepared.evidence, browserInstanceId: connected[0].id, cliVersion: installed.status.version,
+      cliSha256: installed.status.executableHash, protocolVersion: connected[0].protocolVersion, isolatedTestCredentialStore: true, extensionId: extension.id } }
+  } catch (error) {
+    const failure = error instanceof Error ? error : new Error(String(error))
+    failure.browserBootstrap = { ...prepared.evidence, status: 'failed', diagnosis: diagnosis?.status, process: browser.diagnostics() }
+    browserCdp?.close()
+    await browser.stop()
+    throw failure
+  }
+}
+
+export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true' }) {
+  taskSmoke ||= browserSmoke
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
   }
@@ -251,7 +363,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const workspace = join(root, 'workspace')
   const environment = windowsUiEnvironment(process.env, root)
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
-  const taskModel = taskSmoke ? await startWindowsTaskModelFixture() : undefined
+  const taskModel = taskSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke }) : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
   await writeFile(settingsPath, JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: 'zh', theme: 'dark', workspaceRoot: workspace, uiFontScale: 'small',
@@ -259,7 +371,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     ...(taskModel ? { provider: { providers: [{ id: 'windows-task-fixture', name: '本机验收协议模型', apiKey: 'synthetic-local-only', baseUrl: taskModel.baseUrl, endpointFormat: 'chat_completions', models: ['windows-task-fixture'] }] } } : {}),
     agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'), ...(taskModel ? { providerId: 'windows-task-fixture', model: 'windows-task-fixture', approvalPolicy: 'auto', sandboxMode: 'read-only' } : {}) } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
-    sourceHead, version, provenance, taskSmokeRequested: taskSmoke, locale: 'zh', theme: 'dark', productionTouched: false, checks: [], errors: [],
+    sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', productionTouched: false, checks: [], errors: [],
     installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
   // Electron's supported --user-data-dir overrides chrome::DIR_USER_DATA
   // before application startup. The installed EXE/ASAR and public identity
@@ -271,6 +383,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   child.once('error', error => { launchError = error })
   for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => { output = (output + bytes).slice(-50_000) })
   let cdp
+  let realBrowser
   try {
     const deadline = Date.now() + 90_000
     while (!cdp && Date.now() < deadline) {
@@ -434,12 +547,23 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.checks.push('offline-help-images')
     if (taskSmoke) {
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
+      if (browserSmoke) realBrowser = await startRealBrowserSmoke({ cdp, root, environment, fixtureUrl: taskModel.fixtureUrl })
       const runtimeRequest = (path, method = 'GET', body) => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},${JSON.stringify(method)},${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'}).then(result=>{if(!result.ok)throw new Error(result.body);return JSON.parse(result.body)})`)
-      const thread = await runtimeRequest('/v1/threads', 'POST', { workspace, mode: 'agent', model: 'windows-task-fixture', title: 'Windows 实包任务验收' })
-      const command = await runtimeRequest('/v1/task-commands', 'POST', { threadId: thread.id, intent: 'new', idempotencyKey: 'windows-html-daily',
-        request: { prompt: '请生成并交付一份HTML网页报告，每天09:00和17:00前提前30分钟执行。', model: 'windows-task-fixture', mode: 'agent' } })
-      assert.ok(command.task?.id, 'The installed Runtime must admit a normal task')
-      let task = command.task
+      const prompt = `${browserSmoke ? `请用 BrowserSkill 浏览器读取 ${taskModel.fixtureUrl}，将网页实际内容生成HTML报告并交付。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
+      await cdp.hover('button[aria-label="新建会话"]')
+      await cdp.wait(`(()=>{const node=document.querySelector('button[aria-label="新建会话"]');if(!node)return false;const r=node.getBoundingClientRect();return node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))})()`, 'the visible new-conversation action')
+      await cdp.click('button[aria-label="新建会话"]')
+      await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]:not(:disabled)'))`, 'the active conversation composer')
+      await cdp.fill('textarea[placeholder="向智能体提问…"]', prompt)
+      await cdp.click('button[aria-label="发送"]')
+      let task
+      const admissionDeadline = Date.now() + 30_000
+      while (!task && Date.now() < admissionDeadline) {
+        const tasks = await runtimeRequest('/v1/tasks?limit=100')
+        task = tasks.tasks.find(item => item.goal === prompt && !item.scheduledBy)
+        if (!task) await sleep(200)
+      }
+      assert.ok(task?.id, 'The actual composer must create the ordinary task and origin conversation')
       const taskDeadline = Date.now() + 90_000
       while (Date.now() < taskDeadline && !['completed', 'failed', 'stalled', 'waiting_user'].includes(task.status)) {
         await sleep(250)
@@ -449,7 +573,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const artifact = task.artifacts.find(file => file.format === 'html' && file.validation === 'valid')
       assert.ok(artifact?.absolutePath && contained(root, artifact.absolutePath), 'The actual HTML must belong to the isolated task output directory')
       const bytes = await readFile(artifact.absolutePath)
-      assert.ok(bytes.toString('utf8').includes('合成内容'))
+      assert.ok(bytes.toString('utf8').includes(browserSmoke ? taskModel.marker : '合成内容'))
       const execution = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
       const readback = execution.turns.flatMap(turn => turn.items).find(item => item.kind === 'tool_result' && item.toolName === 'list_schedules' && item.isError !== true)
       const schedule = readback?.output?.schedules?.[0]
@@ -461,11 +585,104 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           byteHashMatches: createHash('sha256').update(bytes).digest('hex') === artifact.sha256 },
         schedule: { ...schedule.schedule, id: schedule.id, enabled: schedule.enabled, nextRunAt: schedule.nextRunAt, readBackFromTool: true },
         browserSkill: { status: 'not_exercised', reason: 'A real connected BrowserSkill extension requires a separate installed-browser session.' } }
+      if (browserSmoke) {
+        const outputs = execution.turns.flatMap(turn => turn.items).filter(item => item.kind === 'tool_result' && item.isError !== true)
+        const output = name => outputs.find(item => item.toolName === name)?.output
+        const session = output('browser_session_start')
+        const html = output('browser_get_html')
+        const stopped = output('browser_session_stop')
+        assert.equal(html?.sourceUrl, taskModel.fixtureUrl)
+        assert.ok(html?.html?.includes(taskModel.marker), 'The actual browser HTML tool must return the controlled page marker')
+        report.taskExecution.browserSkill = { ...realBrowser.evidence, status: 'passed', fixturePageRead: true, htmlFromBrowserTool: true,
+          sessionId: session?.sessionId, sessionStopped: stopped?.stopped === true && stopped?.sessionId === session?.sessionId,
+          sourceUrl: html.sourceUrl, htmlSha256: createHash('sha256').update(html.html).digest('hex') }
+        validateWindowsBrowserEvidence(report.taskExecution.browserSkill)
+        report.checks.push('real-browser-skill-html-and-schedule')
+      }
+      const previewExpression = `(async()=>{
+        const view=document.querySelector('webview[src*="/task-preview/"]');
+        if(!view || !view.getClientRects().length)return null;
+        try {
+          if(view.isLoading())return null;
+          const page=await view.executeJavaScript('({title:document.title,text:document.body.innerText,state:document.readyState})');
+          return page.state==='complete' && page.text.includes(${JSON.stringify(browserSmoke ? taskModel.marker : '合成内容')}) ? {title:page.title,contentVerified:true,partition:view.getAttribute('partition')} : null;
+        } catch { return null; }
+      })()`
+      const automaticPreview = await cdp.wait(previewExpression, 'automatic task HTML preview in the active conversation', 30_000)
+      assert.ok(automaticPreview.partition?.startsWith('railwise-artifact-'), 'The automatic task preview must use its isolated partition')
+      report.taskExecution.preview = { ...automaticPreview, automatic: true, originThreadId: task.originThreadId }
+      const automaticScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+      await writeFile(join(evidenceDir, 'windows-task-html-auto-preview-zh-dark.png'), Buffer.from(automaticScreenshot.data, 'base64'))
+      await cdp.click('nav[aria-label="工作区工具"] button', '任务')
+      await cdp.wait(`Boolean(document.querySelector('section[aria-label="任务"] [aria-label="任务筛选"]'))`, 'the real task workspace')
+      const completedFilter = await cdp.evaluate(`Array.from(document.querySelectorAll('[aria-label="任务筛选"] button')).find(button=>button.textContent.trim().startsWith('已完成'))?.textContent.trim()`)
+      assert.ok(completedFilter, 'The completed-task filter must be available')
+      await cdp.click('[aria-label="任务筛选"] button', completedFilter)
+      await cdp.wait(`Boolean(Array.from(document.querySelectorAll('[aria-label="任务列表"] button')).find(button=>button.textContent.includes(${JSON.stringify(task.goal)})))`, 'the actual completed task')
+      await cdp.click('[aria-label="任务列表"] button', task.goal)
+      await cdp.click('article[aria-label="任务详情"] button', '每日网页报告.html')
+      const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
+      assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
+      report.taskExecution.preview.manualEntryVerified = true
+      const taskScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+      await writeFile(join(evidenceDir, 'windows-task-html-preview-zh-dark.png'), Buffer.from(taskScreenshot.data, 'base64'))
+      // Use the normal Flow edit/publish path for one real near-term test occurrence.
+      // The original daily schedule and readback above remain separate evidence.
+      const originalDefinition = flow.flow
+      const dueAt = new Date(Date.now() + 20_000).toISOString()
+      const dueDefinition = { ...originalDefinition, nodes: originalDefinition.nodes.map(node => node.id === 'schedule' ? { ...node, config: { kind: 'at', atTime: dueAt } } : node) }
+      await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`, 'PUT', { definition: dueDefinition, expectedRevision: originalDefinition.revision })
+      assert.equal((await runtimeRequest('/v1/flows/publish', 'POST', { id: schedule.id })).published, true)
+      const dueReadback = await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`)
+      assert.deepEqual(dueReadback.flow.nodes.find(node => node.id === 'schedule').config, { kind: 'at', atTime: dueAt })
+      assert.equal(dueReadback.flow.variables.taskSchedule.authorization.scopeHash, originalDefinition.variables.taskSchedule.authorization.scopeHash,
+        'The explicitly requested synthetic trigger edit must preserve its authorized scope')
+      let occurrence
+      const occurrenceDeadline = Date.now() + 150_000
+      while (Date.now() < occurrenceDeadline) {
+        const list = await runtimeRequest('/v1/tasks?limit=100')
+        const matching = list.tasks.filter(item => item.scheduledBy?.scheduleId === schedule.id && item.scheduledBy?.dueAt === dueAt)
+        assert.ok(matching.length <= 1, 'A due occurrence must create at most one task')
+        occurrence = matching[0]
+        if (occurrence && ['completed', 'failed', 'stalled', 'waiting_user'].includes(occurrence.status)) break
+        await sleep(500)
+      }
+      assert.equal(occurrence?.status, 'completed', occurrence?.waitingReason ?? occurrence?.stalledReason ?? 'The real background schedule did not complete')
+      const occurrenceArtifact = occurrence.artifacts.find(file => file.format === 'html' && file.validation === 'valid' && file.absolutePath)
+      assert.ok(occurrenceArtifact?.absolutePath && contained(root, occurrenceArtifact.absolutePath))
+      const occurrenceBytes = await readFile(occurrenceArtifact.absolutePath)
+      assert.ok(occurrenceBytes.toString('utf8').includes(browserSmoke ? taskModel.marker : '合成内容'))
+      report.taskExecution.dueOccurrence = { clock: 'real', trigger: { kind: 'at', atTime: dueAt }, taskId: occurrence.id, status: occurrence.status,
+        triggerEditAuthorization: { source: 'explicit-windows-acceptance-request', actor: process.env.GITHUB_TRIGGERING_ACTOR ?? process.env.GITHUB_ACTOR,
+          profileScope: 'owned-synthetic-profile', api: 'Flow PUT and publish', authorizedScopeUnchanged: true },
+        dueAt: occurrence.scheduledBy.dueAt, createdAt: occurrence.createdAt, independentTask: occurrence.id !== task.id,
+        independentArtifact: occurrenceArtifact.absolutePath !== artifact.absolutePath, artifactSha256: occurrenceArtifact.sha256,
+        byteHashMatches: createHash('sha256').update(occurrenceBytes).digest('hex') === occurrenceArtifact.sha256 }
+      if (browserSmoke) {
+        const occurrenceThread = await runtimeRequest(`/v1/threads/${encodeURIComponent(occurrence.threadId)}`)
+        const outputs = occurrenceThread.turns.flatMap(turn => turn.items).filter(item => item.kind === 'tool_result' && item.isError !== true)
+        const freshSession = outputs.find(item => item.toolName === 'browser_session_start')?.output
+        const freshHtml = outputs.find(item => item.toolName === 'browser_get_html')?.output
+        const freshStop = outputs.find(item => item.toolName === 'browser_session_stop')?.output
+        assert.ok(freshSession?.sessionId && freshSession.sessionId !== report.taskExecution.browserSkill.sessionId)
+        assert.equal(freshHtml?.sourceUrl, taskModel.fixtureUrl)
+        assert.ok(freshHtml?.html?.includes(taskModel.marker))
+        assert.equal(freshStop?.stopped, true)
+        report.taskExecution.dueOccurrence.browserSessionId = freshSession.sessionId
+        report.taskExecution.dueOccurrence.browserHtmlSha256 = createHash('sha256').update(freshHtml.html).digest('hex')
+      }
+      const afterOccurrence = (await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`)).flow
+      await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`, 'PUT', { definition: { ...afterOccurrence, nodes: originalDefinition.nodes }, expectedRevision: afterOccurrence.revision })
+      assert.equal((await runtimeRequest('/v1/flows/publish', 'POST', { id: schedule.id })).published, true)
+      const restored = (await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`)).flow
+      assert.deepEqual(restored.nodes.find(node => node.id === 'schedule').config, schedule.schedule)
+      report.taskExecution.dueOccurrence.originalDailyScheduleRestored = true
       validateWindowsTaskEvidence(report.taskExecution)
       report.checks.push('runtime-task-html-and-daily-schedule')
     }
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error))
+    if (error.browserBootstrap) report.browserBootstrap = error.browserBootstrap
     if (cdp) {
       try {
         const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
@@ -480,6 +697,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       } catch { /* Preserve the original UI failure if its renderer has closed. */ }
     }
   } finally {
+    realBrowser?.cdp.close()
+    await realBrowser?.stop()
     if (cdp) {
       await cdp.send('Page.close').catch(() => undefined)
       cdp.close()
@@ -497,7 +716,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke }); report.status = 'passed' } catch (error) {
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
@@ -509,5 +728,5 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [executable, version, sourceHead, evidenceDir, taskFlag] = process.argv.slice(2)
-  await runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, ...(taskFlag === '--task-smoke' ? { taskSmoke: true } : {}) })
+  await runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, ...(taskFlag === '--task-smoke' ? { taskSmoke: true } : {}), ...(taskFlag === '--browser-smoke' ? { browserSmoke: true } : {}) })
 }

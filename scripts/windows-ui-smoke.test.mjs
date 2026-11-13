@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, validateWindowsUiReport, validateWindowsTaskEvidence, startWindowsTaskModelFixture, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
 function report() {
@@ -14,7 +15,10 @@ function report() {
     update: { ok: true, hasUpdate: false }, helpOffline: true,
     taskSmokeRequested: true,
     taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', sha256: 'a'.repeat(64), byteHashMatches: true },
-      schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true } },
+      schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true },
+      preview: { automatic: true, contentVerified: true, manualEntryVerified: true },
+      dueOccurrence: { clock: 'real', status: 'completed', independentTask: true, independentArtifact: true, byteHashMatches: true,
+        dueAt: '2026-11-13T00:00:00Z', createdAt: '2026-11-13T00:00:10Z' } },
     resources: {
       defaultSkills: ['ppt-master', 'tender-master', 'di-bao-monitoring'].map(id => ({
         id, name: id,
@@ -50,6 +54,7 @@ test('isolated ordinary package environment keeps public identity and removes ac
   assert.equal(result.USERPROFILE, join(root, 'home'))
   assert.equal(result.APPDATA, join(root, 'home', 'AppData', 'Roaming'))
   assert.equal(result.WORKWISE_TOOLS_ROOT, join(root, 'home', '.workwise', 'tools'))
+  assert.equal(result.BSK_HOME, join(root, 'home', '.bsk'))
   for (const key of ['DEEPSEEK_API_KEY', 'GH_TOKEN', 'WORKWISE_CANDIDATE', 'WORKWISE_UPDATE_PROVIDER', 'RELEASE_CHANNEL', 'NODE_OPTIONS']) assert.equal(result[key], undefined)
 })
 
@@ -148,6 +153,9 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   assert.match(ui, /const entry = join\('src', 'asset', 'skills', skill.id, 'SKILL.md'\)/)
   assert.match(ui, /asar\.extractFile\(join\(dirname\(executable\), 'resources', 'app.asar'\), entry\)/)
   assert.match(ui, /both locally cataloged CAD skills/)
+  assert.match(ui, /nav\[aria-label="工作区工具"\]/)
+  assert.match(ui, /view\.executeJavaScript\('.*document\.body\.innerText/)
+  assert.match(ui, /windows-task-html-preview-zh-dark\.png/)
   assert.doesNotMatch(ui, /window\.workwise\s*=|innerHTML\s*=|mock\w*\(/)
 })
 
@@ -155,7 +163,12 @@ for (const [name, change] of [
   ['prose-only completion', evidence => { evidence.artifact.byteHashMatches = false }],
   ['missing afternoon schedule', evidence => { evidence.schedule.times.pop() }],
   ['wrong timezone', evidence => { evidence.schedule.timezone = 'UTC' }],
-  ['unverified schedule claim', evidence => { evidence.schedule.readBackFromTool = false }]
+  ['unverified schedule claim', evidence => { evidence.schedule.readBackFromTool = false }],
+  ['manual preview presented as automatic', evidence => { evidence.preview.automatic = false }],
+  ['mock clock presented as an actual due occurrence', evidence => { evidence.dueOccurrence.clock = 'mock' }],
+  ['same task reused for a due occurrence', evidence => { evidence.dueOccurrence.independentTask = false }],
+  ['same artifact reused for a due occurrence', evidence => { evidence.dueOccurrence.independentArtifact = false }],
+  ['task created before the real due time', evidence => { evidence.dueOccurrence.createdAt = '2026-11-12T00:00:00Z' }]
 ]) test(`task acceptance rejects ${name}`, () => {
   const evidence = report().taskExecution
   change(evidence)
@@ -181,4 +194,34 @@ test('task execution is opt-in and cannot be omitted when explicitly requested',
   evidence.checks = evidence.checks.filter(check => check !== 'runtime-task-html-and-daily-schedule')
   assert.equal(validateWindowsUiReport(evidence, identity), true)
   assert.throws(() => validateWindowsUiReport(evidence, identity, { requireTaskExecution: true }))
+})
+
+test('browser evidence requires the actual extension, HTML tool output and closed session', () => {
+  // Only exercises the evidence validator, never substitutes for a real extension session.
+  const evidence = { status: 'passed', fixturePageRead: true, htmlFromBrowserTool: true, sessionStopped: true, cliVersion: '0.4.0',
+    extension: { version: '0.4.0', sha256: browserSmokeDependency.extensionSha256 }, browser: { version: browserSmokeDependency.chromeVersion },
+    browserInstanceId: 'synthetic-validation-id', sessionId: 'synthetic-validation-session', htmlSha256: 'a'.repeat(64) }
+  assert.doesNotThrow(() => validateWindowsBrowserEvidence(evidence))
+  for (const field of ['fixturePageRead', 'htmlFromBrowserTool', 'sessionStopped']) assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, [field]: false }))
+  assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, status: 'not_exercised' }))
+  assert.throws(() => validateWindowsUiReport(report(), identity, { requireBrowserExecution: true }))
+})
+
+test('browser protocol model asks for real navigation and refuses to invent missing page HTML', async () => {
+  const fixture = await startWindowsTaskModelFixture({ browser: true })
+  const names = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop', 'publish_artifact', 'schedule_task', 'list_schedules']
+  const tools = names.map(name => ({ type: 'function', function: { name } }))
+  const request = messages => fetch(`${fixture.baseUrl}/chat/completions`, { method: 'POST', body: JSON.stringify({ tools, messages }) })
+  try {
+    assert.ok((await (await request([])).text()).includes('browser_session_start'))
+    const messages = names.slice(0, 4).map(name => ({ role: 'assistant', tool_calls: [{ id: name, function: { name, arguments: '{}' } }] }))
+    assert.equal((await request(messages)).status, 400)
+    const page = await (await fetch(fixture.fixtureUrl)).text()
+    assert.ok(page.includes(fixture.marker))
+    const withHtml = [...messages, { role: 'tool', tool_call_id: 'browser_get_html', content: JSON.stringify({ html: page }) }]
+    const response = await request(withHtml)
+    assert.equal(response.status, 200)
+    const body = await response.text()
+    assert.ok(body.includes('publish_artifact') && body.includes(fixture.marker))
+  } finally { await fixture.close() }
 })

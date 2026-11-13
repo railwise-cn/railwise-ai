@@ -11,7 +11,7 @@ import JSZip from 'jszip'
 
 const execute = promisify(execFile)
 export const browserSmokeDependency = Object.freeze({
-  chromeVersion: '157.0.8103.78',
+  chromeVersion: '151.0.7922.34',
   extensionVersion: '0.4.0',
   extensionUrl: 'https://github.com/Tencent/BrowserSkill/releases/download/ext-v0.4.0/browser-skill-extension-v0.4.0-chrome.zip',
   extensionSha256: 'ebb28abf4d18e8983e416647145d2acdbd3aa0a3b70320bf39401e27b5d4f16e'
@@ -51,7 +51,7 @@ async function download(url, path, expectedHash) {
 }
 
 /** Installs only test dependencies under an explicitly owned temporary directory. */
-export async function prepareBrowserSkillSmoke(root, { platform = process.platform, arch = process.arch } = {}) {
+export async function prepareBrowserSkillSmoke(root, { platform = process.platform, arch = process.arch, existingExecutable } = {}) {
   assert.ok(isAbsolute(root), 'Use an absolute owned browser acceptance directory')
   const directory = resolve(root)
   await mkdir(directory, { recursive: true })
@@ -59,7 +59,7 @@ export async function prepareBrowserSkillSmoke(root, { platform = process.platfo
   const chromeZip = join(directory, `chrome-${chrome.target}-${browserSmokeDependency.chromeVersion}.zip`)
   const extensionZip = join(directory, `browser-skill-extension-${browserSmokeDependency.extensionVersion}.zip`)
   const [chromeArchive, extensionArchive] = await Promise.all([
-    download(chrome.url, chromeZip),
+    existingExecutable ? Promise.resolve(undefined) : download(chrome.url, chromeZip),
     download(browserSmokeDependency.extensionUrl, extensionZip, browserSmokeDependency.extensionSha256)
   ])
   const extension = await JSZip.loadAsync(await readFile(extensionZip))
@@ -74,24 +74,35 @@ export async function prepareBrowserSkillSmoke(root, { platform = process.platfo
   assert.equal(manifest.manifest_version, 3)
   const extensionRoot = join(directory, 'extension')
   await mkdir(extensionRoot, { recursive: true })
-  await execute('tar', ['-xf', extensionZip, '-C', extensionRoot], { windowsHide: true })
+  const tar = platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : '/usr/bin/tar'
+  await execute(tar, ['-xf', extensionZip, '-C', extensionRoot], { windowsHide: true })
   const chromeRoot = join(directory, 'chrome')
   await mkdir(chromeRoot, { recursive: true })
-  const executable = join(chromeRoot, chrome.executable)
-  if (!(await stat(executable).catch(() => undefined))) await execute('tar', ['-xf', chromeZip, '-C', chromeRoot], { windowsHide: true, maxBuffer: 1024 * 1024 })
-  if (platform !== 'win32') await chmod(executable, 0o755)
+  const executable = existingExecutable ?? join(chromeRoot, chrome.executable)
+  if (existingExecutable) {
+    assert.equal(platform, 'darwin', 'Existing local test browser reuse is limited to macOS development verification')
+    assert.ok(isAbsolute(existingExecutable))
+    const version = await execute(existingExecutable, ['--version'])
+    assert.ok(version.stdout.includes(`Google Chrome for Testing ${browserSmokeDependency.chromeVersion}`), 'Existing test browser must have the fixed official version')
+  } else if (!(await stat(executable).catch(() => undefined))) await execute(tar, ['-xf', chromeZip, '-C', chromeRoot], { windowsHide: true, maxBuffer: 1024 * 1024 })
+  if (!existingExecutable && platform !== 'win32') await chmod(executable, 0o755)
   return { executable, extensionDirectory: join(extensionRoot, dirname(manifests[0].name)),
-    evidence: { browser: { version: browserSmokeDependency.chromeVersion, source: chrome.url, ...chromeArchive },
+    evidence: { browser: { version: browserSmokeDependency.chromeVersion, source: existingExecutable ? 'existing-local-Chrome-for-Testing' : chrome.url, ...chromeArchive, executableSha256: await fileHash(executable) },
       extension: { version: manifest.version, source: browserSmokeDependency.extensionUrl, ...extensionArchive } } }
 }
 
-export function launchBrowserSkillSmoke(prepared, profile) {
+export function browserSmokeArguments(profile) {
   assert.ok(isAbsolute(profile), 'Use an owned isolated browser profile')
-  const child = spawn(prepared.executable, [
+  return [
     '--headless=new', '--no-first-run', '--no-default-browser-check', '--disable-background-networking',
-    `--user-data-dir=${profile}`, `--disable-extensions-except=${prepared.extensionDirectory}`, `--load-extension=${prepared.extensionDirectory}`,
+    '--password-store=basic', '--use-mock-keychain',
+    `--user-data-dir=${profile}`, '--enable-unsafe-extension-debugging', '--no-proxy-server',
     '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', 'about:blank'
-  ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+  ]
+}
+
+export function launchBrowserSkillSmoke(prepared, profile, environment = process.env) {
+  const child = spawn(prepared.executable, browserSmokeArguments(profile), { env: environment, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
   let log = ''
   for (const stream of [child.stdout, child.stderr]) stream.on('data', data => { log = (log + data.toString()).slice(-16000) })
   let launchError

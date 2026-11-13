@@ -11,8 +11,11 @@ const driverFiles = new Set([
   'scripts/prepare-windows-install-smoke.mjs',
   'scripts/run-windows-install-smoke.ps1',
   'scripts/run-windows-ui-smoke.mjs',
+  'scripts/prepare-browser-skill-smoke.mjs',
   'scripts/verify-windows-install-smoke.mjs',
   'scripts/deploy-website-release.mjs',
+  'docs/qa/general-execution-delivery-2026-11-13.md',
+  'kun/tests/browser-skill-live.test.ts',
   'src/renderer/src/components/connectors/ManagedLarkConnection.test.ts'
 ])
 
