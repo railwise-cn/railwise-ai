@@ -13,7 +13,7 @@ import type { ExecutionGrant } from '../src/contracts/permissions.js'
 import { operationFingerprint } from '../src/services/task-run-repository.js'
 
 const page = vi.hoisted(() => ({ session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0,
-  htmlChanged: false, targetChanged: false, lastFill: {} as Record<string, unknown> }))
+  htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false, lastFill: {} as Record<string, unknown> }))
 vi.mock('../src/services/browser-skill-cli.js', async original => ({
   ...await original<typeof import('../src/services/browser-skill-cli.js')>(),
   runBrowserCommand: vi.fn(async (_config: unknown, args: readonly string[]) => {
@@ -26,39 +26,47 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
     if (!page.session) return { ok: false, code: 'session_not_found' }
     if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: 1, url: page.url, title: '合成公开查询' }] } }
     if (args[0] === 'navigate') { page.url = args[1]!; return { ok: true, output: {} } }
+    if (args[0] === 'cooperate' && page.writes && page.readbackBroken) return { ok: false, code: 'readback_temporarily_unavailable' }
     if (args[0] === 'cooperate') { page.reads++; return { ok: true, output: { context_id: `review-context-${++page.context}`, observation: { text: '@e1 公开关键词输入框。仅供合成公开查询，已填写轨道监测。' } } } }
     if (args[0] === 'get-html') { page.reads++; return { ok: true, output: { tab_id: 1, truncated: false,
       html: args.includes('--ref') ? page.targetChanged ? '<input name="password">' : '<input aria-label="公开关键词">'
         : `<html><title>合成公开查询</title><body>${page.htmlChanged ? '页面已改变' : '公开查询结果'}<input aria-label="公开关键词"></body></html>` } } }
-    if (args[0] === 'fill') { page.writes++; return { ok: false, code: 'simulated_lost_ack', outcomeUnknown: true } }
+    if (args[0] === 'fill') { page.writes++; return page.acknowledge ? { ok: true, output: { filled: true } } : { ok: false, code: 'simulated_lost_ack', outcomeUnknown: true } }
     throw new Error('Unexpected synthetic browser command')
   })
 }))
 const cleanup: Array<() => Promise<unknown>> = []
-afterEach(async () => { while (cleanup.length) await cleanup.pop()!(); vi.useRealTimers(); vi.unstubAllEnvs(); Object.assign(page, { session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0, htmlChanged: false, targetChanged: false, lastFill: {} }) })
+afterEach(async () => { while (cleanup.length) await cleanup.pop()!(); vi.useRealTimers(); vi.unstubAllEnvs(); Object.assign(page, { session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0, htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false, lastFill: {} }) })
 
-async function fixture() {
+async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown') {
+  page.acknowledge = mode === 'ack_pending'; page.readbackBroken = mode === 'ack_pending'
   vi.stubEnv('RAILWISE_TASK_SCHEDULING_DISABLED', '1')
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-browser-review-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
   const workspace = join(root, '只读 中文 工作区'); await mkdir(workspace)
   let modelCalls = 0
   let hold = false
+  let holdReadback = false
   const model = createServer(async (request, response) => {
     const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk))
     modelCalls++
     if (hold) { response.writeHead(200, { 'content-type': 'text/event-stream' }); response.write(': waiting for controlled acceptance shutdown\n\n'); return }
     const body = JSON.parse(Buffer.concat(chunks).toString())
     const called = new Set((body.messages ?? []).flatMap((m: { tool_calls?: Array<{ id: string }> }) => m.tool_calls?.map(t => t.id) ?? []))
-    const steps = [['start', 'browser_session_start'], ['navigate', 'browser_navigate'], ['authorize', 'browser_authorize_action'], ['fill', 'browser_fill']]
-    const next = steps.find(([id]) => !called.has(`review-${id}`))
+    const steps = [['start', 'browser_session_start'], ['navigate', 'browser_navigate'], ['authorize', 'browser_authorize_action'], ['fill', 'browser_fill'],
+      ...(mode === 'ack_pending' ? [['reuse', 'browser_session_start'], ['read-after-ack', 'browser_observe'], ['artifact', 'publish_artifact']] : [])]
+    const next = mode === 'ack_pending' && page.writes > 0 && page.readbackBroken && !holdReadback ? undefined
+      : steps.find(([id]) => !called.has(`review-${id}`))
+    if (holdReadback && next?.[0] === 'read-after-ack') { response.writeHead(200, { 'content-type': 'text/event-stream' }); response.write(': waiting before explicit cancel\n\n'); return }
     let args: Record<string, unknown> = {}
     if (next?.[0] === 'navigate') args = { sessionId: 'review-session', url: 'https://public.example.test/query' }
     if (next?.[0] === 'authorize' || next?.[0] === 'fill') args = { sessionId: 'review-session', contextId: `review-context-${page.context}`,
-      target: '@e1', value: '轨道监测', ...(next[0] === 'authorize' ? { action: 'fill', scope: 'schedule', scheduleAccess: 'public_query' } : {}) }
+      target: '@e1', value: '轨道监测', ...(next[0] === 'authorize' ? { action: 'fill', scope: mode === 'ack_pending' ? 'task' : 'schedule', ...(mode === 'unknown' ? { scheduleAccess: 'public_query' } : {}) } : {}) }
+    if (next?.[0] === 'read-after-ack') args = { sessionId: 'review-session' }
+    if (next?.[0] === 'artifact') args = { path: 'report.html', content: '<!doctype html><html lang="zh-CN"><head><title>回读报告</title></head><body><h1>原查询页面已回读</h1><a href="https://public.example.test/query">来源</a></body></html>' }
     if (next?.[0] === 'fill') page.lastFill = args
     const delta = next ? { tool_calls: [{ index: 0, id: `review-${next[0]}`, type: 'function', function: { name: next[1], arguments: JSON.stringify(args) } }] }
-      : { content: '原公开查询动作结果待核实，未重放。' }
+      : { content: mode === 'ack_pending' ? '已只读核对原公开查询页面，HTML报告已保存并交付。' : '原公开查询动作结果待核实，未重放。' }
     response.writeHead(200, { 'content-type': 'text/event-stream' })
     response.end(`data: ${JSON.stringify({ id: 'review-model', choices: [{ index: 0, delta, finish_reason: next ? 'tool_calls' : 'stop' }] })}\n\ndata: [DONE]\n\n`)
   })
@@ -71,7 +79,9 @@ async function fixture() {
       executablePath: join(root, 'synthetic-cli'), executableHash: 'a'.repeat(64), version: '0.4.0', browserInstanceId: 'review-browser',
       origins: ['https://public.example.test'], interaction: 'interact', revision: 1 } }) }
   let runtime = await createKunServeRuntime(options)
-  cleanup.push(async () => runtime.shutdown?.())
+  let closed = false
+  const closeRuntime = async () => { if (!closed) { closed = true; await runtime.shutdown?.() } }
+  cleanup.push(closeRuntime)
   let router = buildRouter(runtime)
   const api = (path: string, method = 'POST', body?: unknown) => dispatchRequest(router, new Request(`http://localhost${path}`, {
     method, headers: { authorization: 'Bearer review-test', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) }))
@@ -80,11 +90,11 @@ async function fixture() {
   cleanup.push(async () => { clearInterval(approvalTimer) })
   const origin = await runtime.threadService.create({ workspace, mode: 'agent', model: 'review-model', approvalPolicy: 'on-request' })
   const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'review-source',
-    request: { prompt: '使用BrowserSkill读取 https://public.example.test/query ，在公开查询框填写轨道监测，生成HTML报告，每天09:00执行。' } })
+    request: { prompt: `使用BrowserSkill读取 https://public.example.test/query ，在公开查询框填写轨道监测，生成HTML报告${mode === 'unknown' ? '，每天09:00执行。' : '。'}` } })
   const id = started.task!.id
-  await expect.poll(() => runtime.taskRepository!.get(id)?.status, { timeout: 10000 }).toBe('stalled')
+  await expect.poll(() => runtime.taskRepository!.get(id)?.status, { timeout: 10000 }).toBe(mode === 'ack_pending' ? 'waiting_user' : 'stalled')
   const task = () => runtime.taskRepository!.get(id)!
-  const unknown = runtime.taskRepository!.operations(id, 'tool').find(item => item.status === 'outcome_unknown')!
+  const unknown = runtime.taskRepository!.operations(id, 'tool').find(item => item.request?.toolName === 'browser_fill' && item.status === (mode === 'ack_pending' ? 'failed' : 'outcome_unknown'))!
   expect(unknown.request?.toolName).toBe('browser_fill')
   expect(page.writes).toBe(1)
   const verify = async (key = 'review-once') => {
@@ -96,7 +106,7 @@ async function fixture() {
   }
   const confirm = (review: BrowserVerificationResult, key = 'confirm-once', revision = task().revision) => api(`/v1/tasks/${id}/receipts/${unknown.id}/browser-confirm`, 'POST',
     { expectedRevision: revision, idempotencyKey: key, reviewId: review.browserReview?.id, decision: 'confirmed_complete' })
-  const restart = async () => { restarting = true; await runtime.shutdown?.(); runtime = await createKunServeRuntime(options); router = buildRouter(runtime); restarting = false }
+  const restart = async () => { restarting = true; await closeRuntime(); runtime = await createKunServeRuntime(options); closed = false; router = buildRouter(runtime); restarting = false }
   const expireOriginalGrant = async () => {
     // Persistence-boundary fixture: the historical short Turn grant expired;
     // current task/browser authorization remains independently active.
@@ -107,8 +117,39 @@ async function fixture() {
       .run(JSON.stringify({ ...receipt, request, fingerprint: operationFingerprint(request) }), id, receipt.idempotencyKey)
     await runtime.turnService.updateTurnMetadata(task().threadId, task().activeTurnId!, { executionGrant: grant })
   }
-  return { get runtime() { return runtime }, task, unknown, api, verify, confirm, restart, expireOriginalGrant, modelCalls: () => modelCalls, options, holdModel: () => { hold = true } }
+  return { get runtime() { return runtime }, task, unknown, api, verify, confirm, restart, closeRuntime, expireOriginalGrant, modelCalls: () => modelCalls, options, holdModel: () => { hold = true }, holdBeforeReadback: () => { holdReadback = true }, repairReadback: () => { page.readbackBroken = false } }
 }
+
+it.each([false, true])('preserves an ACK-pending original session across Runtime restart, then closes it after readback or cancel (cancel=%s)', async cancel => {
+  const f = await fixture('ack_pending')
+  const id = f.task().id
+  const pending = () => f.runtime.taskRepository!.operations(id, 'browser_action_dispatch')
+  expect(pending()).toMatchObject([{ status: 'succeeded', result: { actionAcknowledged: true, readbackPending: true } }])
+  expect(page.writes).toBe(1)
+  await f.restart()
+  expect(page.session).toBe(true); expect(page.stopped).toBe(0)
+  expect(pending()).toMatchObject([{ status: 'succeeded', result: { readbackPending: true } }])
+  if (cancel) f.holdBeforeReadback()
+  else f.repairReadback()
+  const resumed = await f.api(`/v1/tasks/${id}/resume`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'resume-ack-readback' })
+  expect(resumed.status, await resumed.clone().text()).toBe(202)
+  if (cancel) {
+    await expect.poll(() => f.runtime.taskRepository!.operations(id, 'tool').filter(receipt => receipt.request?.toolName === 'browser_session_start' && receipt.status === 'succeeded').length, { timeout: 10000 }).toBe(2)
+    const response = await f.api(`/v1/tasks/${id}/cancel`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'cancel-ack-pending' })
+    expect(response.status, await response.clone().text()).toBe(200)
+    await expect.poll(() => page.stopped).toBeGreaterThan(0)
+    expect(pending()).toMatchObject([{ status: 'succeeded', result: { readbackPending: true } }])
+    expect(f.task().status).toBe('cancelled')
+  } else {
+    await expect.poll(() => f.task().status, { timeout: 10000 }).toBe('completed')
+    expect(pending()).toMatchObject([{ status: 'succeeded', result: { actionAcknowledged: true, readbackPending: false } }])
+    expect(f.task().artifacts).toMatchObject([{ relativePath: 'report.html', validation: 'valid' }])
+    await f.closeRuntime()
+    expect(page.stopped).toBe(1)
+  }
+  expect(page.writes).toBe(1)
+  expect(page.session).toBe(false)
+}, 30000)
 
 it('retains an unknown browser surface across pause/restart, reads without mutation, and requires human confirmation before separate resume', async () => {
   const f = await fixture()

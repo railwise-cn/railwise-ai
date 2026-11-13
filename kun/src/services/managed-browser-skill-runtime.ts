@@ -192,7 +192,8 @@ export class ManagedBrowserSkillRuntime {
       // in-flight/unknown action. The external browser remains idle across an
       // ordinary Runtime exit; explicit task cancellation still closes it.
       const pending = this.options.repository.operations(owned.taskId, 'browser_action_dispatch').some(receipt =>
-        ['running', 'prepared', 'outcome_unknown'].includes(receipt.status) && !this.options.repository.verifiedOperationResolution(receipt) &&
+        (['running', 'prepared', 'outcome_unknown'].includes(receipt.status) && !this.options.repository.verifiedOperationResolution(receipt) ||
+          receipt.status === 'succeeded' && object(receipt.result).readbackPending === true) &&
         (!receipt.request?.sessionId || receipt.request.sessionId === sessionId))
       if (task?.status !== 'cancelled' && pending) return
       try {

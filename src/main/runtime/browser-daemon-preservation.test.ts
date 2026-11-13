@@ -50,6 +50,27 @@ describe('post-exit browser daemon preservation', () => {
     expect(browserDaemonPreservation(f.path, true)).toEqual({ preserveDaemon: true, reason: 'unsettled_browser_action' })
   })
 
+  it.each(['prepared', 'running', 'outcome_unknown'] as const)('preserves %s session creation by its request ID beyond the thread-list page size', status => {
+    const f = fixture()
+    for (let index = 0; index < 550; index += 1) f.operation('succeeded', 'tool', { toolName: 'read' }, `read-${index}`)
+    f.operation(status, 'browser_session', { browserInstanceId: 'isolated-browser', revision: 1, threadId: 'thread', requestId: 'synthetic-session-request' })
+    f.close()
+    expect(browserDaemonPreservation(f.path, true)).toEqual({ preserveDaemon: true, reason: 'unsettled_browser_action' })
+  })
+
+  it.each(['cancelled', 'stopped'] as const)('cleans session creation history after explicit %s confirmation', state => {
+    const f = fixture()
+    const receipt = f.operation('outcome_unknown', 'browser_session', {
+      browserInstanceId: 'isolated-browser', revision: 1, threadId: 'thread', requestId: 'synthetic-session-request'
+    })
+    if (state === 'cancelled') f.repository.update('task', 0, task => ({ ...task, status: 'cancelled' }))
+    else f.repository.finishOperation('task', receipt.idempotencyKey, {
+      status: 'succeeded', result: { sessionId: 'recovered-session', browserInstanceId: 'isolated-browser', stopped: true }
+    }, now)
+    f.close()
+    expect(browserDaemonPreservation(f.path, true)).toEqual({ preserveDaemon: false, reason: 'clear' })
+  })
+
   it('allows normal cleanup for fully acknowledged actions and explicit cancellation', () => {
     const f = fixture()
     f.operation('succeeded')
@@ -58,6 +79,32 @@ describe('post-exit browser daemon preservation', () => {
     f.repository.update('task', 0, task => ({ ...task, status: 'cancelled' }))
     const cancelled = f.repository.operation('task', 'cancelled-action')!
     f.replace({ ...cancelled, fingerprint: 'historical-fingerprint-unavailable' })
+    f.close()
+    expect(browserDaemonPreservation(f.path, true)).toEqual({ preserveDaemon: false, reason: 'clear' })
+  })
+
+  it('preserves acknowledged actions until their pending page readback is cleared', () => {
+    const f = fixture()
+    const receipt = f.operation('succeeded')
+    const acknowledged = { actionAcknowledged: true, acknowledgementHash: 'a'.repeat(64), readbackPending: true }
+    f.repository.finishOperation('task', receipt.idempotencyKey, { status: 'succeeded', result: acknowledged }, now)
+    const before = f.repository.operation('task', receipt.idempotencyKey)
+    expect(browserDaemonPreservation(f.path, true)).toEqual({ preserveDaemon: true, reason: 'unsettled_browser_action' })
+    expect(f.repository.operation('task', receipt.idempotencyKey)).toEqual(before)
+    f.repository.finishOperation('task', receipt.idempotencyKey, {
+      status: 'succeeded', result: { ...acknowledged, readbackPending: false, resultHash: 'b'.repeat(64) }
+    }, now)
+    f.close()
+    expect(browserDaemonPreservation(f.path, true)).toEqual({ preserveDaemon: false, reason: 'clear' })
+  })
+
+  it('allows explicit cancellation to close an acknowledged action awaiting page readback', () => {
+    const f = fixture()
+    const receipt = f.operation('succeeded')
+    f.repository.finishOperation('task', receipt.idempotencyKey, {
+      status: 'succeeded', result: { actionAcknowledged: true, acknowledgementHash: 'a'.repeat(64), readbackPending: true }
+    }, now)
+    f.repository.update('task', 0, task => ({ ...task, status: 'cancelled' }))
     f.close()
     expect(browserDaemonPreservation(f.path, true)).toEqual({ preserveDaemon: false, reason: 'clear' })
   })

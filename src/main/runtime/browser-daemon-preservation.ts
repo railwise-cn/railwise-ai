@@ -27,9 +27,11 @@ export function browserDaemonPreservation(databasePath: string, runtimeStopped: 
         }
         const receipt = parsed.data
         const toolName = String(receipt.request?.toolName ?? receipt.toolName ?? '')
-        const relevant = receipt.kind === 'browser_action_dispatch' || receipt.kind === 'browser_schedule_action_outcome' ||
+        const relevant = receipt.kind === 'browser_session' || receipt.kind === 'browser_action_dispatch' || receipt.kind === 'browser_schedule_action_outcome' ||
           receipt.kind === 'tool' && browserWrites.has(toolName)
-        if (!relevant || !pending.has(receipt.status) ||
+        const result = receipt.result as { readbackPending?: unknown } | undefined
+        const awaitingReadback = receipt.kind === 'browser_action_dispatch' && receipt.status === 'succeeded' && result?.readbackPending === true
+        if (!relevant || !pending.has(receipt.status) && !awaitingReadback ||
           receipt.kind === 'tool' && receipt.status === 'prepared' && receipt.request?.dispatchTracking === 'host-v1') continue
         const taskRow = taskById.get(receipt.ownerId) as { id: string; status: string; data_json: string } | undefined
         const task = taskRow ? TaskRunSchema.safeParse(JSON.parse(taskRow.data_json)) : undefined
@@ -38,6 +40,7 @@ export function browserDaemonPreservation(databasePath: string, runtimeStopped: 
         }
         if (task.data.status === 'cancelled') continue
         if (receipt.fingerprint !== operationFingerprint(receipt.request ?? {})) return { preserveDaemon: true, reason: 'unverified_history' }
+        if (awaitingReadback) return { preserveDaemon: true, reason: 'unsettled_browser_action' }
         const resolution = receipt.resolution
         const proofRow = resolution ? proofById.get(receipt.ownerId, resolution.receiptId) as { idempotency_key: string; data_json: string } | undefined : undefined
         const proof = proofRow ? OperationReceiptSchema.parse(JSON.parse(proofRow.data_json)) : undefined
