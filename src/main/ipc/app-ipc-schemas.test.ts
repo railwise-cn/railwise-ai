@@ -35,6 +35,9 @@ describe('app-ipc-schemas', () => {
     const payload={path:'/v1/tasks/task-1/permissions',method:'DELETE',body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'revoke'})}
     expect(runtimeRequestPayloadSchema.safeParse(payload).success).toBe(true)
     expect(runtimeRequestPayloadSchema.safeParse({...payload,body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'revoke',allowedTools:['bash']})}).success).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,path:`${payload.path}?force=true`}).success).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,body:undefined}).success).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,path:'/v1/tasks/task-1'}).success).toBe(false)
   })
   it('validates explicit legacy workspace snapshot requests and SHA-256 baselines', () => {
     expect(workspaceMigrationImportPayloadSchema.safeParse({ sourceId: '.workgpt:default', expectedFingerprint: 'a'.repeat(64), confirmed: true, idempotencyKey: 'migration-1' }).success).toBe(true)

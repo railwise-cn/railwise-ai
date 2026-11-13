@@ -585,6 +585,18 @@
       "size": 1064,
       "sha256": "45426ad9507fe1b922121f5af6a4669096e721980b4426609a4384da410f5114",
       "mirrorPath": "browser-skill/0.4.0/45426ad9507fe1b922121f5af6a4669096e721980b4426609a4384da410f5114/LICENSE"
+    },
+    {
+      "id": "browser-skill-source",
+      "component": "browser-skill",
+      "version": "0.4.0",
+      "role": "source",
+      "name": "browser-skill-source-9cfba535.zip",
+      "sourceUrl": "https://codeload.github.com/Tencent/BrowserSkill/zip/9cfba53582cb04d48da36aabd0a5017987d4daea",
+      "license": "MIT",
+      "size": 11994966,
+      "sha256": "a26f14e40fddc11a3c3407e10637ee4d6c9c6997164ded24a516b4690f50648d",
+      "mirrorPath": "browser-skill/0.4.0/a26f14e40fddc11a3c3407e10637ee4d6c9c6997164ded24a516b4690f50648d/browser-skill-source-9cfba535.zip"
     }
   ],
   "pythonDownloads": {

@@ -124,6 +124,7 @@ export class TaskScheduleService {
     const flow = this.deps.flows.get(`schedule_${task.id}`)
     const current = flow ? this.snapshot(flow) : undefined
     const verified = current?.enabled && current.nextRunAt && fingerprint(current.requirement) === fingerprint(task.acceptance.schedule) &&
+      fingerprint(current.schedule) === fingerprint(scheduleForRequirement(task.acceptance.schedule)) &&
       this.deps.repository.operations(task.id, 'schedule_readback').some(receipt => receipt.status === 'succeeded' &&
         fingerprint((receipt.result as { schedules?: unknown[] })?.schedules) === fingerprint([current]))
     return verified ? null : { reason: '请用 schedule_task 建立本任务的每日计划，再用 list_schedules 读回并核对执行时刻、时区和下一次执行时间。', fingerprint: `schedule:${fingerprint(current ?? task.acceptance.schedule)}` }

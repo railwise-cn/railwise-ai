@@ -8,6 +8,10 @@ import { ExecutionGrantSchema } from '../../contracts/permissions.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import { TaskRunRepository } from '../../services/task-run-repository.js'
 import type { BrowserCommandRunner } from '../../services/browser-skill-cli.js'
+import { TaskController } from '../../services/task-controller.js'
+import { InMemoryThreadStore } from '../in-memory-thread-store.js'
+import { InMemorySessionStore } from '../in-memory-session-store.js'
+import { PersistentApprovalGate } from '../persistent-human-gates.js'
 import { LocalToolHost } from './local-tool-host.js'
 import { CapabilityRegistry } from './capability-registry.js'
 import { buildBrowserSkillToolProvider } from './browser-skill-tool-provider.js'
@@ -179,6 +183,33 @@ describe('typed BrowserSkill production provider', () => {
     const resumed = { ...f.context, turnId: 'resumed-turn', executionGrant: { ...f.context.executionGrant!, turnId: 'resumed-turn' } }
     expect(await f.execute('browser_session_start', {}, resumed)).toMatchObject({ output: { status: 'succeeded' } })
     expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'session' && args[1] === 'start')).toHaveLength(2)
+  })
+
+  it('keeps internal browser scope approval separate from the actual TaskController outer operation hash', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/' })
+    const tasks = new TaskController({ repository: f.repository, threadStore: new InMemoryThreadStore(), sessionStore: new InMemorySessionStore(), nowIso: () => new Date().toISOString() })
+    tasks.beginAttempt('thread', 'turn')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', action: 'click' }
+    const call = { callId: 'authorize-model-call', toolName: 'browser_authorize_action', toolKind: 'tool_call' as const, arguments: args }
+    const operation = tasks.beginToolOperation('turn', call, f.context.executionGrant)!
+    const gate = new PersistentApprovalGate(f.repository, () => new Date().toISOString())
+    const recordApproval = vi.fn((approval: { toolName: string; requestHash: string }) => tasks.recordToolApproval(operation.token, operation.key, approval))
+    const context = { ...f.context, recordExplicitApproval: recordApproval, assertExecution: () => tasks.assertToken(operation.token),
+      awaitApproval: async (approval: Parameters<ToolHostContext['awaitApproval']>[0]) => {
+        const pending = gate.request(approval)
+        expect(gate.decide(approval.id, 'allow')).toBe(true)
+        return pending
+      } }
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    const result = await host.execute(call, context)
+    expect(result.item).toMatchObject({ output: { status: 'succeeded' } })
+    tasks.finishToolOperation(operation.token, operation.key, result)
+    expect(recordApproval).not.toHaveBeenCalled()
+    expect(f.repository.operation('task', operation.key)?.status).toBe('succeeded')
+    const authorization = f.repository.operations('task', 'browser_action_authorization')[0]
+    expect(gate.get((authorization.result as { approvalId: string }).approvalId)?.status).toBe('allowed')
   })
 
 })

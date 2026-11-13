@@ -309,7 +309,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_TASK_INPUTS_TEMPLATE, ['GET', 'POST'], []),
   compileEndpoint(RUNTIME_TASK_EVENTS_TEMPLATE, ['GET'], ['afterSequence']),
   compileEndpoint(RUNTIME_TASK_RECEIPTS_TEMPLATE, ['GET']),
-  compileEndpoint(RUNTIME_TASK_PERMISSIONS_TEMPLATE, ['GET', 'POST']),
+  compileEndpoint(RUNTIME_TASK_PERMISSIONS_TEMPLATE, ['GET', 'POST', 'DELETE']),
   compileEndpoint(RUNTIME_TASK_RECEIPT_VERIFY_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_SUMMARY_TEMPLATE, ['GET'], ['workspaceRoot', 'search', 'threadId']),
   compileEndpoint(RUNTIME_INBOX_TEMPLATE, ['GET'], ['workspaceRoot']),

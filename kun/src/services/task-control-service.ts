@@ -7,6 +7,7 @@ import type { ThreadService } from './thread-service.js'
 import type { TurnService } from './turn-service.js'
 import { preflightExternalTask, type ExternalTaskCapability, type ExternalTaskPreflight } from './external-task-capability.js'
 import { externalPreflightThreadContext } from './contextual-external-task-preflight.js'
+import { workspacePermissionCapability } from './workspace-write-preflight.js'
 import { externalOperationForTool } from './external-effect-evidence.js'
 import { toolCanProveExternalEffect } from '../loop/turn-completion-guard.js'
 import { createHash } from 'node:crypto'
@@ -31,6 +32,7 @@ export class TaskControlService {
     const {repository,tasks,threads,turns,nowIso}=this.deps
     let current=repository.currentExecution(taskId)
     let externalTaskProvider: 'dingtalk' | 'lark' | undefined
+    let blockedCapability: ExternalTaskCapability | undefined
     if(!current)throw Object.assign(new Error('task not found'),{code:'not_found'})
     const prior=repository.operation(taskId,data.idempotencyKey)
     if(prior) {
@@ -57,34 +59,35 @@ export class TaskControlService {
       if((action==='resume'||action==='retry')&&await this.deps.isEngineeringTask?.(current))throw Object.assign(new Error('engineering_plan_typed_resume_required: continue or replan from the approved engineering plan'),{code:'invalid_state'})
       if(action==='retry'&&!['failed','cancelled'].includes(current.status))throw Object.assign(new Error('retry is only valid for failed or cancelled tasks'),{code:'invalid_state'})
       if(action==='retry')this.assertRetrySafe(current)
-      if(action==='resume'||action==='retry') {
-        if (action === 'resume' && !current.activeTurnId && !repository.inputs(current.id).some(input => input.sourceId === 'capability-original')) {
-          const original = StartTurnRequest.safeParse(repository.attention(`capability_${current.id}`)?.payload?.request)
-          if (original.success) current = tasks.appendInput(current.id, current.revision, `capability-original:${current.id}`, original.data.prompt, 'supplement', 'capability-original',
-            { attachmentIds: original.data.attachmentIds, workspaceReferences: original.data.workspaceReferences }).task
-        }
-        const executionThread = await threads.get(current.threadId)
-        if (!executionThread) throw Object.assign(new Error('task execution thread not found'), { code: 'not_found' })
-        const capabilities = [current.goal, ...tasks.taskInputs(current.id, true).filter(input => !tasks.approvalForInput(input)).map(input => input.text)]
-          .map(text => this.deps.preflightExternalTask ? this.deps.preflightExternalTask(text, externalPreflightThreadContext(executionThread, { mode: 'agent' }), action === 'retry' ? current! : undefined) : preflightExternalTask(text))
-        const checked = await Promise.all(capabilities)
-        const requiredCapabilities = checked.filter((capability): capability is ExternalTaskCapability => capability !== null)
-        const capability = requiredCapabilities.find(item => item.status !== 'available')
-        if(capability) {
-          // A blocked recheck is durable but does not allocate a Turn or mark an
-          // operation as executed. A fresh command can recheck after connection.
-          return {task:current,capability}
-        }
-        const providers = [...new Set(requiredCapabilities.map(item => item.provider).filter((provider): provider is 'lark' | 'dingtalk' => provider === 'lark' || provider === 'dingtalk'))]
-        if (providers.length > 1) {
-          const first = requiredCapabilities[0]!
-          return { task:current, capability:{...first,status:'blocked',errorCode:'multiple_external_providers',
-            message:'一个任务的执行授权只能绑定一个外部平台。请将钉钉和飞书请求拆分为两个独立任务。'} }
-        }
-        externalTaskProvider = providers[0]
-      }
-      repository.beginOperation({ownerId:taskId,idempotencyKey:data.idempotencyKey,kind:action,request:data,nowIso:nowIso()})
     }
+    if(action==='resume'||action==='retry') {
+      if (action === 'resume' && !current.retryOfTaskId && !current.activeTurnId && !repository.inputs(current.id).some(input => input.sourceId === 'capability-original')) {
+        const original = StartTurnRequest.safeParse(repository.attention(`capability_${current.id}`)?.payload?.request)
+        if (original.success) current = tasks.appendInput(current.id, current.revision, `capability-original:${current.id}`, original.data.prompt, 'supplement', 'capability-original',
+          { attachmentIds: original.data.attachmentIds, workspaceReferences: original.data.workspaceReferences }).task
+      }
+      const executionThread = await threads.get(current.threadId)
+      if (!executionThread) throw Object.assign(new Error('task execution thread not found'), { code: 'not_found' })
+      const capabilities = [current.goal, ...tasks.taskInputs(current.id, true).filter(input => !tasks.approvalForInput(input)).map(input => input.text)]
+        .map(text => this.deps.preflightExternalTask ? this.deps.preflightExternalTask(text, externalPreflightThreadContext(executionThread, { mode: 'agent' }), action === 'retry' ? current! : undefined) : preflightExternalTask(text))
+      const checked = await Promise.all(capabilities)
+      const requiredCapabilities = checked.filter((capability): capability is ExternalTaskCapability => capability !== null)
+      const capability = requiredCapabilities.find(item => item.status !== 'available')
+      if(capability) {
+        if (action === 'resume') return { task: current, capability }
+        blockedCapability = capability
+      }
+      const providers = [...new Set(requiredCapabilities.map(item => item.provider).filter((provider): provider is 'lark' | 'dingtalk' => provider === 'lark' || provider === 'dingtalk'))]
+      if (providers.length > 1) {
+        const first = requiredCapabilities[0]!
+        const ambiguity: ExternalTaskCapability = {...first,status:'blocked',errorCode:'multiple_external_providers',
+          message:'一个任务的执行授权只能绑定一个外部平台。请将钉钉和飞书请求拆分为两个独立任务。'}
+        if (action === 'resume') return { task: current, capability: ambiguity }
+        blockedCapability = ambiguity
+      }
+      externalTaskProvider = providers[0]
+    }
+    if (!prior) repository.beginOperation({ownerId:taskId,idempotencyKey:data.idempotencyKey,kind:action,request:data,nowIso:nowIso()})
     let preparedRetryId:string|undefined
     let preparedResume:{previous:TaskRun;revision:number}|undefined
     try {
@@ -112,14 +115,26 @@ export class TaskControlService {
         current=tasks.createRetryTask({id:retryId,sourceTaskId:current.id,expectedRevision:current.revision,thread,
           request:{prompt:current.goal,model:data.model ?? current.model,providerId:current.providerId,reasoningEffort:current.reasoningEffort}})
         preparedRetryId=current.id
-        try { await this.deps.validateTaskPermission?.(thread.id) }
+        try { if (!blockedCapability) await this.deps.validateTaskPermission?.(thread.id) }
         catch(error) {
           const reason=error instanceof Error?error.message:String(error)
-          const blocked=repository.update(current.id,current.revision,task=>({...task,status:'waiting_user',waitingReason:reason,updatedAt:nowIso()}),
-            {key:`retry-permission:${data.idempotencyKey}`,kind:'task_waiting_user',payload:{reason,code:(error as {code?:string}).code}})
-          const result={task:blocked}
-          repository.finishOperation(taskId,data.idempotencyKey,{status:'succeeded',result},nowIso())
-          return result
+          blockedCapability = workspacePermissionCapability((error as {code?:string}).code ?? 'task_permission_revoked', reason)
+        }
+        if (blockedCapability) {
+          const capability = blockedCapability
+          return repository.transact(() => {
+            const latest = repository.get(current!.id)!
+            const now = nowIso()
+            const waiting = repository.update(latest.id, latest.revision, task => ({ ...task, status: 'waiting_user', waitingReason: capability.message, updatedAt: now }),
+              { key: `retry-permission:${data.idempotencyKey}`, kind: 'task_waiting_user', payload: { reason: capability.message, code: capability.errorCode } })
+            repository.putAttention({ id: `capability_${waiting.id}`, ownerKind: 'task', ownerId: waiting.id, taskId: waiting.id,
+              threadId: waiting.originThreadId ?? waiting.threadId, workspaceRoot: waiting.workspaceRoot, kind: 'blocked', title: '继续原任务前需要处理',
+              message: capability.message, status: 'pending', revision: 0, createdAt: now, updatedAt: now,
+              payload: { kind: 'capability_required', capability, request: { prompt: waiting.goal } } })
+            const result = { task: waiting, capability }
+            repository.finishOperation(taskId, data.idempotencyKey, { status: 'succeeded', result }, now)
+            return result
+          })
         }
       }
       const oldTurn=thread?.turns.find(turn=>turn.idempotencyKey===turnKey)

@@ -103,7 +103,7 @@ describe('task permission authority overview',()=>{
   it('only loads on request and distinguishes ceilings, task requirements and historical scopes from executable tools',async()=>{
     expect(api.getTaskPermissions).not.toHaveBeenCalled()
     await click('查看当前任务权限')
-    for(const value of ['任务权限上限','本次执行目录和服务端授权','工作区信任','项目审阅 Agent','执行沙箱','从不执行','lark_task_list','未允许任何项目','task-42','任务要求；尚不代表已授权','上次服务端执行授权记录；须重新核验当前状态'])expect(container.textContent).toContain(value)
+    for(const value of ['实际执行权限由任务范围、工作区、Agent 和沙箱共同计算','工作区信任','Agent 权限上限','项目审阅 Agent','执行沙箱','从不执行','lark_task_list','未允许任何项目','task-42','任务要求；尚不代表已授权','上次服务端执行授权记录；须重新核验当前状态'])expect(container.textContent).toContain(value)
     expect(container.textContent).not.toContain('当前可用工具')
     expect(container.textContent).not.toContain('hidden-1')
     expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
@@ -117,7 +117,8 @@ describe('task permission authority overview',()=>{
     await act(async()=>{container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click()})
     await click('允许当前任务请求审批')
     expect(api.confirmTaskPermissions).toHaveBeenCalledWith('task-1',expect.objectContaining({expectedRevision:4,scopeHash:'reviewed-scope',confirmed:true,approvalPolicy:'on-request',ttlSeconds:900}))
-    expect(onConfirmed).toHaveBeenCalledWith(expect.stringContaining('尚未执行任何外部操作'))
+    expect(onConfirmed).toHaveBeenCalledWith('当前任务权限已保存。点击“继续原任务”执行。')
+    expect(api.runtimeRequest).toHaveBeenCalledExactlyOnceWith('/v1/threads/hidden-1', 'GET')
     expect(api.setThreadAgent).not.toHaveBeenCalled()
   })
 

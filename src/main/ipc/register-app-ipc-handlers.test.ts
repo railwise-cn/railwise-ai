@@ -347,6 +347,20 @@ describe('registerAppIpcHandlers', () => {
     expect(runtimeRequest).toHaveBeenCalledTimes(calls)
   })
 
+  it('forwards a scoped permission revocation and rejects widening fields before reaching Runtime', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const response = { ok: true, status: 200, body: '{"task":{"status":"paused"},"resumed":false}' }
+    const runtimeRequest = vi.fn(async () => response)
+    registerAppIpcHandlers(registerOptions({ runtimeRequest: runtimeRequest as never }))
+    const path = '/v1/tasks/task-1/permissions'
+    const request = { expectedRevision: 3, permissionId: 'reviewed-permission', idempotencyKey: 'revoke' }
+    const body = JSON.stringify(request)
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'DELETE', body })).resolves.toEqual(response)
+    expect(runtimeRequest).toHaveBeenCalledExactlyOnceWith(path, 'DELETE', body)
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'DELETE', body: JSON.stringify({ ...request, allowedTools: ['bash'] }) })).rejects.toThrow(/Invalid payload for runtime:request/)
+    expect(runtimeRequest).toHaveBeenCalledTimes(1)
+  })
+
   it('registers native PPTX revision IPC channels and rejects malformed payloads', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     registerAppIpcHandlers(registerOptions())

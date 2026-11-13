@@ -102,6 +102,8 @@ describe('task-owned recurring execution', () => {
     f.flows.update({ ...flow, nodes: flow.nodes.map(node => ({ ...node, config: { kind: 'daily', times: ['10:15'], timezone: 'Asia/Shanghai' } })) }, flow.revision)
     f.flows.publish(flow.id)
     expect(f.flowRepository.getTriggerState(flow.id, 'schedule')?.nextRunAt).toBe('2026-11-13T02:15:00.000Z')
+    f.service.readback(f.context)
+    expect(f.service.assessCompletion(f.task)).not.toBeNull()
   })
   it('keeps an explicitly confirmed recurring path scope after the temporary task grant expires', async () => {
     const f = fixture()

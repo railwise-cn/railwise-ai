@@ -10,7 +10,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { websiteStaticTransport } from './deploy-website-release.mjs'
 
 const manifestPath = fileURLToPath(new URL('../src/shared/managed-dependencies.json', import.meta.url))
-const sourceHosts = new Set(['github.com', 'api.github.com', 'raw.githubusercontent.com', 'files.pythonhosted.org', 'www.python.org'])
+const sourceHosts = new Set(['github.com', 'api.github.com', 'codeload.github.com', 'raw.githubusercontent.com', 'files.pythonhosted.org', 'www.python.org'])
 const responseHosts = new Set([...sourceHosts, 'codeload.github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com', 'www.railwise.cn'])
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
 

@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -142,7 +143,7 @@ describe('task permission revocation through authenticated production routes', (
     await expect(f.runtime.taskPermissionService!.executionRestriction(current.threadId, f.permissionId)).rejects.toMatchObject({ code: 'task_permission_revoked' })
   })
 
-  it('keeps an expired failed-task retry reauthorizable without allocating a model Turn', async () => {
+  it.each([false, true])('keeps an expired failed-task retry reauthorizable without a Turn (recovered partial retry %s)', async recovered => {
     const f = await fixture()
     const first = await f.start()
     f.runtime.taskController!.recordAttemptFailure(f.task.threadId, first.id, 'max_tokens', 'Synthetic failure before retry')
@@ -150,7 +151,15 @@ describe('task permission revocation through authenticated production routes', (
     await expect.poll(f.closed, { timeout: 5_000 }).toBe(1)
     const source = f.current()
     f.runtime.taskRepository!.update(source.id, source.revision, task => ({ ...task, authority: { ...task.authority!, taskApprovalGrant: { ...task.authority!.taskApprovalGrant!, expiresAt: new Date(Date.now() - 1_000).toISOString() } } }))
-    const response = await f.api(`/v1/tasks/${source.id}/retry`, 'POST', { expectedRevision: f.current().revision, idempotencyKey: 'expired-source' })
+    const retryRequest = { expectedRevision: f.current().revision, idempotencyKey: 'expired-source' }
+    if (recovered) {
+      // Reproduce a process exit after the retry record committed and before its waiting outcome committed.
+      f.runtime.taskRepository!.beginOperation({ ownerId: source.id, idempotencyKey: retryRequest.idempotencyKey, kind: 'retry', request: retryRequest, nowIso: f.runtime.nowIso() })
+      const id = `task_retry_${createHash('sha256').update(`task:${source.id}:retry:${retryRequest.idempotencyKey}`).digest('hex')}`
+      f.runtime.taskController!.createRetryTask({ id, sourceTaskId: source.id, expectedRevision: retryRequest.expectedRevision,
+        thread: (await f.runtime.threadService.get(source.threadId))!, request: { prompt: source.goal } })
+    }
+    const response = await f.api(`/v1/tasks/${source.id}/retry`, 'POST', retryRequest)
     expect(response.status).toBe(202)
     const retried = await response.json() as { task: TaskRun; turn?: { turnId: string } }
     expect(retried.turn).toBeUndefined()
@@ -159,6 +168,18 @@ describe('task permission revocation through authenticated production routes', (
     expect(permission.canConfirm).toBe(true)
     expect(f.requests()).toBe(1)
     expect((await f.runtime.threadService.get(source.threadId))!.turns).toHaveLength(1)
+    const replay = await (await f.api(`/v1/tasks/${source.id}/retry`, 'POST', retryRequest)).json() as { task: TaskRun }
+    expect(replay.task.id).toBe(retried.task.id)
+    const granted = await f.api(`/v1/tasks/${retried.task.id}/permissions`, 'POST', { expectedRevision: permission.taskRevision, scopeHash: permission.scopeHash,
+      idempotencyKey: 'new-retry-scope', confirmed: true, approvalPolicy: 'on-request', ttlSeconds: 900, duration: 'task', scope: { readPaths: [f.workspace], writePaths: [f.workspace] } })
+    expect(granted.status, await granted.clone().text()).toBe(200)
+    expect(f.requests()).toBe(1)
+    const resumed = await f.api(`/v1/tasks/${retried.task.id}/resume`, 'POST', { expectedRevision: f.current().revision, idempotencyKey: 'resume-authorized-retry' })
+    expect(resumed.status, await resumed.clone().text()).toBe(202)
+    await expect.poll(f.requests, { timeout: 5_000 }).toBe(2)
+    expect(f.current().id).toBe(retried.task.id)
+    expect(f.runtime.taskRepository!.list({ workspaceRoot: f.workspace }).filter(task => task.retryOfTaskId === source.id)).toHaveLength(1)
+    await expect(f.runtime.taskPermissionService!.executionRestriction(source.threadId, f.permissionId)).rejects.toMatchObject({ code: 'task_permission_revoked' })
   })
 
   it('recovers after revocation commits but the response snapshot is interrupted', async () => {
