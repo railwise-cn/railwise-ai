@@ -28,6 +28,11 @@ on:
         required: false
         type: boolean
         default: false
+      publish_product_page:
+        description: 'Publish the product page and its download data after release promotion.'
+        required: false
+        type: boolean
+        default: true
       release_confirmation:
         description: 'Type PUBLISH-STABLE-vX.Y.Z for the exact tag being published.'
         required: false
@@ -1207,6 +1212,7 @@ jobs:
         run: node scripts/release-promotion-recovery.mjs publish --tag="${TAG_NAME}" --state="${RUNNER_TEMP}/official-promotion-state.json" --result="${RUNNER_TEMP}/official-promotion-result.json"
 
       - name: Generate product download data from the publication manifest
+        if: ${{ inputs.publish_product_page == true }}
         run: |
           set -euo pipefail
           node scripts/generate-website-product-manifest.cjs website-release-assets/publication-manifest.json website/data/workwise-product.json
@@ -1214,14 +1220,16 @@ jobs:
 
       - name: Deploy the generated product download page
         id: product_page_deploy
+        if: ${{ inputs.publish_product_page == true }}
         run: node scripts/deploy-workwise-product-page.mjs deploy --source website --version "${RELEASE_VERSION}" --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Verify the generated public product download page
         id: product_page_verify
+        if: ${{ inputs.publish_product_page == true }}
         run: node scripts/deploy-workwise-product-page.mjs verify-public --source website --version "${RELEASE_VERSION}"
 
       - name: Restore only the previous product page if its public verification fails
-        if: ${{ always() && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}
+        if: ${{ always() && inputs.publish_product_page == true && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}
         run: node scripts/deploy-workwise-product-page.mjs rollback --source website --version "${RELEASE_VERSION}" --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Restore the previous official pointers if this promotion attempt fails

@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { parse } from 'yaml'
-import { classifyReleaseChanges, verifyReleaseApproval, verifyRequiredCI } from './verify-release-approval.mjs'
+import { parse, stringify as stringifyYaml } from 'yaml'
+import { classifyReleaseChanges, isProductPagePublicationOnlyChange, verifyReleaseApproval, verifyRequiredCI } from './verify-release-approval.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, UPDATER_WORKFLOW, UPDATER_WORKFLOW_REF } from './verify-frozen-updater-evidence.mjs'
 import { FROZEN_BASE_VERSION, FROZEN_BASELINE_PINS, resolveUpdaterBaseline } from './frozen-release-version.mjs'
@@ -195,6 +195,66 @@ test('stable publication requires an explicit opt-in and a review evidence path'
   assert.equal(environment, 'production-release', 'stable publication must use the protected production environment')
   assert.ok(Array.isArray(publishJob.needs), 'publish must declare its upstream jobs')
   assert.ok(publishJob.needs.some((name) => /release[-_]approval[-_]gate|verify[-_]release[-_]approval/.test(String(name))), 'approval gate must be an upstream publish dependency')
+})
+
+const productPageSteps = [
+  'Generate product download data from the publication manifest',
+  'Deploy the generated product download page',
+  'Verify the generated public product download page',
+  'Restore only the previous product page if its public verification fails'
+]
+const originalProductRollback = "${{ always() && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}"
+
+function legacyPublicationWorkflow() {
+  const previous = structuredClone(workflow)
+  delete previous.on.workflow_dispatch.inputs.publish_product_page
+  for (const name of productPageSteps.slice(0, 3)) delete previous.jobs.publish.steps.find(step => step.name === name).if
+  previous.jobs.publish.steps.find(step => step.name === productPageSteps[3]).if = originalProductRollback
+  return previous
+}
+
+test('product page opt-out gates every page operation and retains the existing rollback conditions', () => {
+  assert.deepEqual(input('publish_product_page'), {
+    description: 'Publish the product page and its download data after release promotion.',
+    required: false, type: 'boolean', default: true
+  })
+  const pageSteps = jobs.publish.steps.filter(step => productPageSteps.includes(step.name))
+  assert.equal(pageSteps.length, 4)
+  for (const step of pageSteps.slice(0, 3)) assert.equal(step.if, '${{ inputs.publish_product_page == true }}')
+  assert.equal(pageSteps[3].if, "${{ always() && inputs.publish_product_page == true && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}")
+  for (const step of jobs.publish.steps.filter(step => !productPageSteps.includes(step.name))) {
+    assert.doesNotMatch(String(step.if ?? ''), /publish_product_page/)
+  }
+  assert.equal(isProductPagePublicationOnlyChange(stringifyYaml(legacyPublicationWorkflow()), workflowSource), true)
+  assert.equal(isProductPagePublicationOnlyChange(workflowSource, '# Formatting-only comment\n' + workflowSource), true)
+})
+
+test('publication-only workflow equivalence rejects all unrelated execution changes', async t => {
+  const before = stringifyYaml(legacyPublicationWorkflow())
+  const mutations = {
+    'default-disabled': value => { value.on.workflow_dispatch.inputs.publish_product_page.default = false },
+    'missing-page-generation-gate': value => { delete value.jobs.publish.steps.find(step => step.name === productPageSteps[0]).if },
+    'broad-page-gate': value => { value.jobs.publish.steps.find(step => step.name === productPageSteps[1]).if = '${{ always() }}' },
+    'removed-rollback-failure-condition': value => { value.jobs.publish.steps.find(step => step.name === productPageSteps[3]).if = '${{ inputs.publish_product_page == true }}' },
+    'changed-product-page-command': value => { value.jobs.publish.steps.find(step => step.name === productPageSteps[1]).run += '\necho changed deployment' },
+    'changed-build-command': value => { value.jobs['build-macos'].steps.push({ name: 'Change package', run: 'echo changed package bytes' }) },
+    'changed-signing-environment': value => { value.jobs['build-macos'].env.CSC_IDENTITY_AUTO_DISCOVERY = 'false' },
+    'changed-artifact-source': value => { value.jobs.publish.steps.find(step => step.name === 'Download immutable reviewed release artifacts').with['run-id'] = '1' },
+    'removed-byte-verification': value => { value.jobs.publish.steps.find(step => step.name === 'Verify every reviewed installer and updater byte before publication').run = 'true' },
+    'changed-r2-upload': value => { value.jobs.publish.steps.find(step => String(step.run).includes('publish-r2.mjs upload')).run += '\necho changed upload' },
+    'changed-feed-promotion': value => { value.jobs.publish.steps.find(step => step.id === 'stable_promotion').run += '\necho changed feed' },
+    'disabled-recovery': value => { value.jobs.publish.steps.find(step => String(step.run).includes('release-promotion-recovery.mjs restore')).if = '${{ false }}' },
+    'additional-unreviewed-download': value => { value.jobs.publish.steps.push({ name: 'Replace installer', run: 'curl -fsS https://example.invalid/unreviewed -o public-release-assets/installer.exe' }) },
+    'broader-token-permissions': value => { value.permissions.contents = 'write' },
+    'unrelated-workflow-input': value => { value.on.workflow_dispatch.inputs.skip_verification = { type: 'boolean', default: true } }
+  }
+  for (const [name, mutate] of Object.entries(mutations)) await t.test(name, () => {
+    const changed = structuredClone(workflow)
+    mutate(changed)
+    assert.equal(isProductPagePublicationOnlyChange(before, stringifyYaml(changed)), false)
+  })
+  assert.equal(isProductPagePublicationOnlyChange(before, workflowSource + '\njobs: {}\n'), false)
+  assert.equal(isProductPagePublicationOnlyChange(before, 'invalid: [yaml'), false)
 })
 
 test('release workflow verifies the recorded approval evidence before side effects', () => {
@@ -801,7 +861,7 @@ test('effective version evidence cannot disguise a source-version or installed p
 
 test('package-external policy, test harness and evidence edits can follow the exact package without a second build', t => {
   const f = currentPolicyFixture(t, { exact: true })
-  for (const path of ['scripts/verify-release-approval.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/run-task-delivery-live.mjs', 'scripts/macos-updater-trust.test.mjs', 'kun/src/services/task-controller.test.ts', 'docs/runtime-architecture.md', 'website/products/workwise/index.php', 'scripts/workwise-product-public-verification.test.mjs', 'openspec/changes/durable-task-document-workbench/tasks.md']) f.put(path, 'package-external correction\n')
+  for (const path of ['scripts/verify-release-approval.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/run-task-delivery-live.mjs', 'scripts/run-windows-ui-smoke.mjs', 'scripts/windows-ui-smoke.test.mjs', 'scripts/macos-updater-trust.test.mjs', 'kun/src/services/task-controller.test.ts', 'docs/runtime-architecture.md', 'website/products/workwise/index.php', 'scripts/workwise-product-public-verification.test.mjs', 'openspec/changes/durable-task-document-workbench/tasks.md']) f.put(path, 'package-external correction\n')
   const policyHead = f.commit('record nonshipped policy and evidence harness changes')
   f.manifest.checks.requiredCI.workflowRun.sourceHead = policyHead
   f.manifest.checks.focusedTests.sourceHead = policyHead
@@ -810,12 +870,34 @@ test('package-external policy, test harness and evidence edits can follow the ex
 })
 
 test('exact build still rejects every later application or packaging edit', async t => {
-  for (const path of ['src/runtime.js', 'kun/src/services/task-controller.ts', 'kun/src/other.test.ts', 'package.json', 'electron-builder.cjs', 'scripts/before-pack.cjs', '.github/workflows/release.yml']) await t.test(path, t => {
+  for (const path of ['src/runtime.js', 'kun/src/services/task-controller.ts', 'kun/src/other.test.ts', 'package.json', 'electron-builder.cjs', 'scripts/before-pack.cjs', 'scripts/prepare-windows-install-smoke.mjs', '.github/workflows/release.yml']) await t.test(path, t => {
     const f = currentPolicyFixture(t, { exact: true })
     f.put(path, path === 'package.json' ? JSON.stringify({ version: '0.5.5', changed: true }) : 'changed application/build inputs\n')
     f.commit('change package inputs after build'); f.recordEvidence()
     f.verify(f.tagRelease(), /changes after the reviewed package/)
   })
+})
+
+test('exact package evidence accepts the product-page switch and the two Windows QA scripts', t => {
+  const f = currentPolicyFixture(t, { exact: true, changedFiles: { [RELEASE_WORKFLOW]: stringifyYaml(legacyPublicationWorkflow()) } })
+  f.put(RELEASE_WORKFLOW, workflowSource)
+  f.put('scripts/run-windows-ui-smoke.mjs', 'exact-package QA driver\n')
+  f.put('scripts/windows-ui-smoke.test.mjs', 'QA driver regression\n')
+  f.commit('add scoped product publication opt-out and QA driver evidence')
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('reverting a post-build workflow packaging change still requires a newly accepted package', t => {
+  const f = currentPolicyFixture(t, { exact: true, changedFiles: { [RELEASE_WORKFLOW]: stringifyYaml(legacyPublicationWorkflow()) } })
+  const changed = legacyPublicationWorkflow()
+  changed.jobs['build-macos'].steps.push({ name: 'Change package', run: 'echo changed package bytes' })
+  f.put(RELEASE_WORKFLOW, stringifyYaml(changed))
+  f.commit('change packaging after the accepted build')
+  f.put(RELEASE_WORKFLOW, workflowSource)
+  f.commit('restore packaging while adding publication opt-out')
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /changes after the reviewed package/)
 })
 
 test('curated 0.5.6 publication notes can follow an accepted package', t => {
