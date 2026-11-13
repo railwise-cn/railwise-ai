@@ -7,6 +7,7 @@ import ipaddr from 'ipaddr.js'
 type LookupAddress = { address: string; family: number }
 
 export type SafeWebFetchErrorCode =
+  | 'invalid_response'
   | 'unsafe_url'
   | 'dns_blocked'
   | 'redirect_blocked'

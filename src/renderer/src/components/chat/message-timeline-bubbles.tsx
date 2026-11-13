@@ -20,6 +20,7 @@ import { safeMediaPreviewUrl } from '../../lib/safe-media-preview-url'
 import { projectDshUiText } from '../../lib/dsh-ui-stream'
 import { DshUiBlocks } from './DshUiBlocks'
 import { CapabilityRequiredCard } from './CapabilityRequiredCard'
+import { TaskIntentChoiceCard } from './TaskIntentChoiceCard'
 import { DiffView } from '../DiffView'
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { ModelMetaTag, WritePromptMetaDisclosure } from './message-timeline-cards'
@@ -1462,7 +1463,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
     return (
       <div className="group/message flex min-w-0 max-w-full flex-col">
         <div className="ds-markdown ds-chat-answer min-w-0 max-w-full text-ds-ink">
-          {!streaming && block.capabilityCard ? <CapabilityRequiredCard card={block.capabilityCard} /> : <AssistantMarkdown text={displayedText} streaming={streaming} />}
+          {!streaming && block.capabilityCard ? <CapabilityRequiredCard card={block.capabilityCard} /> : !streaming && block.intentCard ? <TaskIntentChoiceCard card={block.intentCard} message={displayedText} /> : <AssistantMarkdown text={displayedText} streaming={streaming} />}
           {uiBlocks?.length ? (
             <DshUiBlocks
               blocks={uiBlocks}

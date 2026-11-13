@@ -288,7 +288,7 @@ describe('turn completion guard', () => {
 
   it('keeps PPT as the required output when HTML is the source format', () => {
     expect(requiredFileExtensionsForPrompt('请把这个 HTML 页面转换成 PPT。')).toEqual(['ppt', 'pptx'])
-    expect(requiredFileExtensionsForPrompt('Create a self-contained HTML presentation.')).toBeUndefined()
+    expect(requiredFileExtensionsForPrompt('Create a self-contained HTML presentation.')).toEqual(['html', 'htm'])
   })
 
   it('builds recovery guidance for incomplete delivery and progress-only replies', () => {

@@ -11,6 +11,9 @@ const DELIVERABLE_EXTENSIONS = new Set([
 const DELIVERY_ACTION_PATTERN =
   /(?:形成|生成|创建|制作|编写|撰写|导出|保存|交付|转换).{0,40}(?:文档|文件|报告|方案|表格|演示|幻灯片|PPT|PDF|Word|Excel|Markdown)|(?:文档|文件|报告|方案|表格|演示|幻灯片|PPT|PDF|Word|Excel|Markdown).{0,40}(?:形成|生成|创建|制作|编写|撰写|导出|保存|交付|转换)|(?:create|write|draft|generate|export|save|deliver|convert).{0,60}(?:document|report|spreadsheet|presentation|markdown|pdf|docx|xlsx|pptx|csv)/i
 
+const WEB_DELIVERY_PATTERN = /(?:生成|制作|创建|保存|导出|交付|汇报|输出).{0,60}(?:网页|html\b)|(?:网页|html\b).{0,60}(?:生成|制作|创建|保存|导出|交付|汇报|报告)|(?:generate|create|save|export|deliver).{0,60}(?:html|web\s*page)/i
+const CODE_ONLY_PATTERN = /(?:只|仅).{0,8}(?:要|给|提供|输出|展示).{0,8}(?:示例|源码|代码)|(?:解释|讲解|如何|怎么|怎样).{0,30}(?:html|网页)|(?:show|explain).{0,20}(?:code|example)/i
+
 const WRITE_USER_REQUEST_HEADING = '[用户请求]'
 
 const EXPLICIT_FILE_ACTION_PATTERN =
@@ -184,7 +187,8 @@ export function promptRequiresFileDeliverable(prompt: string): boolean {
     .replace(NEGATED_FILE_DELIVERY_PATTERN, ' ')
     .trim()
   if (!normalized) return false
-  return DELIVERY_ACTION_PATTERN.test(normalized) || EXPLICIT_FILE_ACTION_PATTERN.test(normalized)
+  if (CODE_ONLY_PATTERN.test(normalized)) return false
+  return DELIVERY_ACTION_PATTERN.test(normalized) || EXPLICIT_FILE_ACTION_PATTERN.test(normalized) || WEB_DELIVERY_PATTERN.test(normalized)
 }
 
 export function promptRequiresExternalEffect(prompt: string): boolean {
@@ -203,7 +207,7 @@ export function requiredFileExtensionsForPrompt(prompt: string): readonly string
     .replace(NEGATED_FILE_DELIVERY_PATTERN, ' ')
     .trim()
   if (HTML_DELIVERABLE_PATTERN.test(normalized) && !PPT_SPECIFIC_DELIVERABLE_PATTERN.test(normalized)) {
-    return undefined
+    return ['html', 'htm']
   }
   if (PPT_DELIVERABLE_PATTERN.test(normalized)) return ['ppt', 'pptx']
   return undefined
