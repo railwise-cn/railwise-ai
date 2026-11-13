@@ -6,7 +6,11 @@ import type { ToolHostContext } from '../ports/tool-host.js'
 import type { TaskRunRepository } from './task-run-repository.js'
 
 const hash = (value: unknown) => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex')
-function fail(code: string): never { throw Object.assign(new Error(code), { code }) }
+function fail(code: string): never {
+  const message = code === 'browser_schedule_action_scope_required'
+    ? '当前周期任务缺少匹配的持续动作授权。重新观察目标后，调用 browser_authorize_action 并明确 scope=schedule、scheduleAccess=public_query，审阅真实元素与完整输入；不能改用单次授权。' : code
+  throw Object.assign(new Error(message), { code })
+}
 type Candidate = Omit<BrowserScheduleAction, 'approvalId' | 'summary'>
 export type BrowserActionTarget = {
   action: 'click' | 'fill'; pageUrl: string; elementHash: string; valueHash?: string
@@ -55,6 +59,30 @@ export class BrowserScheduleActionAuthority {
       this.options.repository.finishOperation(candidate.sourceTaskId, key, { status: 'succeeded', result })
     })
     return result
+  }
+
+  async deriveSource(target: BrowserActionBinding, context: ToolHostContext): Promise<boolean> {
+    const task = this.options.repository.get(target.taskId)
+    if (!task || task.scheduledBy || !task.acceptance.schedule) fail('browser_schedule_action_scope_required')
+    const scope = context.executionGrant?.browserScope
+    const actions = listApprovedBrowserScheduleActions(this.options.repository, task)
+    const approved = actions.find(action => action.action === target.action && action.pageUrl === target.pageUrl &&
+      action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === scope?.browserInstanceId &&
+      action.browserRevision === scope.revision && scope.origins.includes(action.origin))
+    if (!approved) fail('browser_schedule_action_scope_required')
+    if (this.options.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown')) fail('browser_schedule_outcome_unknown')
+    if (!this.options.resolveSchedule) fail('browser_schedule_authority_changed')
+    try { await this.options.resolveSchedule(context, approved.id) }
+    catch (error) { fail((error as { code?: string }).code === 'browser_schedule_outcome_unknown' ? 'browser_schedule_outcome_unknown' : 'browser_schedule_authority_changed') }
+    const expiry = Math.min(Date.now() + 15 * 60_000, Date.parse(context.executionGrant!.expiresAt ?? new Date(Date.now() + 15 * 60_000).toISOString()))
+    if (expiry <= Date.now()) fail('execution_grant_expired')
+    const request = { ...target, actionId: approved.id, grantId: context.executionGrant!.id, turnId: context.turnId }
+    const key = `browser-source-action:${hash(request)}`
+    this.options.repository.transact(() => {
+      this.options.repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'browser_derived_action_authorization', request, nowIso: new Date().toISOString() })
+      this.options.repository.finishOperation(task.id, key, { status: 'succeeded', result: { expiresAt: new Date(expiry).toISOString(), sourceApprovalId: approved.approvalId, accountState: 'unknown' } })
+    })
+    return true
   }
 
   async derive(target: BrowserActionBinding, context: ToolHostContext): Promise<boolean> {

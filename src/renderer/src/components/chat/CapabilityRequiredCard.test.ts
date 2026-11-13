@@ -59,6 +59,19 @@ describe('capability waiting card', () => {
   })
   afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
+  it('continues the original source task to obtain a real periodic action review without opening a nonexistent plan', async () => {
+    api.coordinateTaskCommand.mockResolvedValue({ kind: 'task_started', task: { id: card.taskId }, turn: { threadId: 'worker', turnId: 'new-turn' } })
+    await render({ ...card, capability: { provider: 'schedule', status: 'blocked', errorCode: 'browser_schedule_action_scope_required',
+      message: '重新观察页面并审阅周期动作', action: { kind: 'retry', route: 'task/schedule-review', label: '继续原任务并审阅周期动作' } } })
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    await click('继续原任务并审阅周期动作')
+    expect(api.coordinateTaskCommand).toHaveBeenCalledWith(expect.objectContaining({ threadId: card.threadId, taskId: card.taskId,
+      resolveAttentionId: card.attentionId, intent: 'resume' }))
+    expect(state.openFlow).not.toHaveBeenCalled()
+    expect(state.openSettings).not.toHaveBeenCalled()
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+  })
+
   it('routes a periodic browser scope blocker to its actual plan without resuming it', async () => {
     await render({ ...card, capability: { provider: 'schedule', status: 'needs_authorization', errorCode: 'browser_schedule_action_scope_changed',
       message: '周期网页动作需要重新核对', action: { kind: 'grant', route: 'flow/schedule_original', label: '查看并核对定时计划' } } })

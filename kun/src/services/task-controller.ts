@@ -1,4 +1,5 @@
 import { isBrowserTask, browserTaskOrigins } from '../contracts/browser-skill.js'
+import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { extractScheduleRequirement } from '../contracts/schedule.js'
 import { authorizedArtifactWrites } from './task-artifact-proof.js'
 import { workspacePermissionCapability } from './workspace-write-preflight.js'
@@ -643,15 +644,21 @@ export class TaskController {
     const denied = [...items].reverse().find(item => item.kind === 'tool_result' && item.isError && item.output && typeof item.output === 'object' &&
       ['sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
         'browser_interaction_scope_required', 'browser_binding_changed', 'browser_schedule_authority_changed',
-        'browser_schedule_action_scope_changed', 'browser_schedule_outcome_unknown'].includes(String((item.output as Record<string, unknown>).code)))
+        'browser_schedule_action_scope_changed', 'browser_schedule_action_scope_required', 'browser_schedule_outcome_unknown'].includes(String((item.output as Record<string, unknown>).code)) &&
+      !this.resolvedBrowserScopeRequest(task, item, items, turnId))
     if (!denied || denied.kind !== 'tool_result') return null
     const code = String((denied.output as Record<string, unknown>).code)
+    const legacyBrowserEvidenceMissing = code === 'browser_schedule_action_scope_required' && String((denied.output as { error?: string }).error ?? '').startsWith('旧操作缺少可核对的执行前页面或逐次目标审批凭据')
     const browserBlock = code === 'browser_interaction_scope_required' || code === 'browser_binding_changed'
     let capability: CapabilityPreflight
     if (code.startsWith('browser_schedule_')) {
-      const resolution = { kind: 'grant' as const, route: `flow/${task.scheduledBy?.scheduleId ?? `schedule_${task.id}`}`, label: '查看并核对定时计划' }
+      const resolution = task.scheduledBy
+        ? { kind: 'grant' as const, route: `flow/${task.scheduledBy.scheduleId}`, label: '查看并核对定时计划' }
+        : { kind: 'retry' as const, route: 'task/schedule-review', label: '继续原任务并审阅周期动作' }
       capability = { provider: 'schedule', status: 'blocked', errorCode: code,
-        message: code === 'browser_schedule_outcome_unknown' ? '上次计划的网页动作结果待核实。请查看原操作记录并核验结果后继续。'
+        message: legacyBrowserEvidenceMissing ? '旧浏览器操作缺少执行前页面或逐次审批的目标凭据，当前记录无法核验。原记录已保留。请核对原始凭据；无法补齐时，从原会话新建独立来源任务，重新执行公开查询并审阅周期范围。'
+          : code === 'browser_schedule_action_scope_required' ? '这项周期任务尚缺已核对的持续网页动作范围。继续原任务后，智能体会重新观察页面，并展示具体站点、目标、输入和计划范围供你审阅。'
+          : code === 'browser_schedule_outcome_unknown' ? '上次计划的网页动作结果待核实。请查看原操作记录并核验结果后继续。'
           : '计划的浏览器、页面目标、输入内容或授权范围已变化，请审阅定时计划后继续。',
         credentialState: 'unknown', networkState: 'unknown', workspaceState: 'unknown', sandboxState: 'allowed',
         approvalState: 'required', action: resolution, resolution, checkedAt: this.nowIso() }
@@ -684,6 +691,30 @@ export class TaskController {
         payload: { threadId: task.originThreadId ?? task.threadId, commandId, assistantText: capability.message, createdAt: now,
           capabilityCard: { threadId: task.originThreadId ?? task.threadId, taskId: task.id, attentionId, prompt: task.goal, capability } } })
       return result
+    })
+  }
+
+  private resolvedBrowserScopeRequest(task: TaskRun, denied: TurnItem, items: TurnItem[], turnId: string): boolean {
+    if (denied.kind !== 'tool_result' || (denied.output as { code?: string })?.code !== 'browser_schedule_action_scope_required') return false
+    const operation = this.repository.operation(task.id, `tool:${turnId}:${denied.callId}`)
+    const request = this.repository.operations(task.id, 'browser_action_scope_request').find(receipt => receipt.status === 'succeeded' &&
+      receipt.request?.turnId === turnId && receipt.request?.toolName === denied.toolName &&
+      receipt.request?.argumentsHash === operation?.request?.argumentsHash)?.request
+    if (!request || this.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown')) return false
+    const sameTarget = (candidate: Record<string, unknown>) => ['action', 'pageUrl', 'elementHash', 'valueHash', 'browserInstanceId', 'browserRevision']
+      .every(key => candidate[key] === request[key])
+    const approved = listApprovedBrowserScheduleActions(this.repository, task).find(action => sameTarget(action))
+    if (!approved) return false
+    const dispatches = this.repository.operations(task.id, 'browser_action_dispatch')
+    return items.slice(items.indexOf(denied) + 1).some(item => {
+      if (item.kind !== 'tool_result' || item.isError || !['browser_click', 'browser_fill'].includes(item.toolName)) return false
+      const output = item.output as { dispatchReceiptId?: string; resultHash?: string } | undefined
+      const dispatch = dispatches.find(receipt => receipt.id === output?.dispatchReceiptId)
+      const actual = this.repository.operation(task.id, `tool:${turnId}:${item.callId}`)
+      return dispatch?.status === 'succeeded' && dispatch.request?.turnId === turnId && dispatch.request?.scheduleActionId === approved.id &&
+        sameTarget(dispatch.request) && actual?.status === 'succeeded' && actual.request?.toolName === item.toolName &&
+        actual.request.argumentsHash === dispatch.request.argumentsHash && typeof output?.resultHash === 'string' &&
+        (dispatch.result as { resultHash?: string } | undefined)?.resultHash === output.resultHash
     })
   }
 

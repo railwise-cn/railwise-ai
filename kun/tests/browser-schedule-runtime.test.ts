@@ -72,7 +72,7 @@ it('runs two independent scheduled browser tasks after expiry and restart withou
     const called = new Set(body.messages?.flatMap(message => message.tool_calls?.map(call => call.id) ?? []))
     const steps = [
       ['start', 'browser_session_start'], ['navigate', 'browser_navigate'],
-      ...(initial ? [['authorize-fill', 'browser_authorize_action']] : []), ['fill', 'browser_fill'],
+      ...(initial ? [['missing-fill-scope', 'browser_fill'], ['authorize-fill', 'browser_authorize_action']] : []), ['fill', 'browser_fill'],
       ...(initial ? [['authorize-click', 'browser_authorize_action']] : []), ['click', 'browser_click'],
       ['artifact', 'publish_artifact'], ...(initial ? [['schedule', 'schedule_task'], ['verify-schedule', 'list_schedules']] : [])
     ]
@@ -86,7 +86,7 @@ it('runs two independent scheduled browser tasks after expiry and restart withou
     const contextId = browser.sessions.get(sessionId)?.context
     let args: Record<string, unknown> = {}
     if (next?.[0] === 'navigate') args = { sessionId, url: 'https://public.example.test/search' }
-    if (next?.[0] === 'fill' || next?.[0] === 'authorize-fill') args = { sessionId, contextId, target: '@e1', value: '工程监测',
+    if (next?.[0] === 'fill' || next?.[0] === 'missing-fill-scope' || next?.[0] === 'authorize-fill') args = { sessionId, contextId, target: '@e1', value: '工程监测',
       ...(next[0] === 'authorize-fill' ? { action: 'fill', scope: 'schedule', scheduleAccess: 'public_query' } : {}) }
     if (next?.[0] === 'click' || next?.[0] === 'authorize-click') args = { sessionId, contextId, target: '@e2',
       ...(next[0] === 'authorize-click' ? { action: 'click', scope: 'schedule', scheduleAccess: 'public_query' } : {}) }
@@ -136,6 +136,8 @@ it('runs two independent scheduled browser tasks after expiry and restart withou
   await waitCompleted(started.task!.id)
   expect(approvals).toEqual(['browser_authorize_action', 'browser_authorize_action', 'schedule_task'])
   const source = runtime.taskRepository!.get(started.task!.id)!
+  expect(runtime.taskRepository!.operations(source.id, 'browser_action_scope_request')).toHaveLength(1)
+  expect(runtime.taskRepository!.attention(`capability_${source.id}`)).toBeNull()
   const flow = runtime.flowService!.get(`schedule_${source.id}`)!
   expect((flow.variables.taskSchedule as { scope: { browserScheduleActions: unknown[] } }).scope.browserScheduleActions).toHaveLength(2)
   const dueAt = runtime.flowService!.repository.getTriggerState(flow.id, 'schedule')!.nextRunAt!

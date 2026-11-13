@@ -34,6 +34,10 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       return
     }
     const route = action?.route ?? ''
+    if (capability.provider === 'schedule' && route === 'task/schedule-review') {
+      void run(recheck)
+      return
+    }
     if (capability.provider === 'schedule' && route.startsWith('flow/')) {
       requestFlowDetail({ flowId: route.slice('flow/'.length) })
       openFlow()

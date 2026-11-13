@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FlowRepository } from '../flow/repository.js'
 import { FlowRuntimeService } from '../flow/service.js'
@@ -16,8 +17,11 @@ import type { ToolHostContext } from '../ports/tool-host.js'
 import { BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 import { BrowserScheduleActionAuthority } from './browser-schedule-action-authority.js'
 import { browserApprovalSummary } from '../security/browser-approval-summary.js'
+import type { OperationReceipt } from '../contracts/tasks.js'
 
 const cleanup: Array<() => void> = []
+const digest = (value: string) => createHash('sha256').update(value).digest('hex')
+const browserTargetHtml = { click: '<button>查询公告</button>', fill: '<input aria-label="关键词">' }
 afterEach(() => { cleanup.splice(0).forEach(close => close()); vi.useRealTimers() })
 
 function fixture() {
@@ -68,12 +72,31 @@ function fixture() {
     } }))
     const browserAuthority = new BrowserScheduleActionAuthority({ repository })
     const candidate = browserAuthority.prepare(task.id, grant.browserScope, { action, pageUrl: 'https://example.test/search',
-      elementHash: (action === 'click' ? 'a' : 'b').repeat(64), ...(action === 'fill' ? { valueHash: 'c'.repeat(64) } : {}) })
+      elementHash: digest(browserTargetHtml[action]), ...(action === 'fill' ? { valueHash: digest('工程监测') } : {}) })
     return browserAuthority.save(candidate, `approved-${action}`, browserApprovalSummary({ action, origin: 'https://example.test',
-      targetHtml: action === 'click' ? '<button>查询公告</button>' : '<input aria-label="关键词">', value: action === 'fill' ? '工程监测' : undefined,
+      targetHtml: browserTargetHtml[action], value: action === 'fill' ? '工程监测' : undefined,
       requestHash: candidate.id }))
   }
-  return { service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths, approveBrowserAction }
+  function browserTool(toolName: string, options: { status?: OperationReceipt['status']; output?: Record<string, unknown>; request?: Record<string, unknown>; approved?: boolean } = {}) {
+    grant.browserScope ??= { browserInstanceId: 'browser-one', revision: 1, origins: ['https://example.test'], interaction: 'interact' }
+    const key = `tool-${repository.operations(task.id).length}`
+    repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'tool', nowIso: new Date().toISOString(), request: {
+      toolName, callId: key, turnId: 'turn', argumentsHash: digest(key), approvalRequestHash: digest(key), executionGrant: grant, ...options.request
+    } })
+    return repository.finishOperation(task.id, key, { status: options.status ?? 'succeeded', result: { approved: options.approved ?? true,
+      item: { kind: 'tool_result', toolName, output: { status: options.status ?? 'succeeded', provider: 'browser-skill', sessionId: 'session-one', ...options.output } }
+    } })
+  }
+  function browserDispatch(action: 'click' | 'fill', status: OperationReceipt['status'] = 'succeeded', request: Record<string, unknown> = {}) {
+    const key = `dispatch-${repository.operations(task.id).length}`
+    repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'browser_action_dispatch', nowIso: new Date().toISOString(), request: {
+      action, toolName: `browser_${action}`, turnId: 'turn', argumentsHash: digest(key), pageUrl: 'https://example.test/search',
+      elementHash: digest(browserTargetHtml[action]), ...(action === 'fill' ? { valueHash: digest('工程监测') } : {}),
+      browserInstanceId: 'browser-one', browserRevision: 1, ...request
+    } })
+    return repository.finishOperation(task.id, key, { status })
+  }
+  return { service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths, approveBrowserAction, browserTool, browserDispatch }
 }
 
 describe('task-owned recurring execution', () => {
@@ -195,6 +218,7 @@ describe('task-owned recurring execution', () => {
     expect(firstScope?.browserScheduleBinding).toMatchObject({ scheduleId: original.id, versionId: previous.publishedVersionId })
     f.flows.update({ ...previous, variables: { ...previous.variables, enabled: false } }, previous.revision)
     f.approveBrowserAction('fill')
+    f.browserDispatch('fill')
     const updated = await f.service.create(f.context)
     expect(updated.enabled).toBe(false)
     expect(updated.scope.browserScheduleActions).toHaveLength(2)
@@ -215,6 +239,108 @@ describe('task-owned recurring execution', () => {
     expect(saved.scope.browserScheduleActions).toBeUndefined()
     expect(f.context.awaitApproval).not.toHaveBeenCalled()
     expect(f.repository.operations(f.task.id, 'browser_action_authorization')).toHaveLength(1)
+  })
+  it.each(['browser_click', 'browser_fill', 'browser_press'])('blocks legacy successful %s before plan approval or publication', async toolName => {
+    const f = fixture()
+    f.browserTool(toolName)
+    const publish = vi.spyOn(f.flows, 'publish')
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+    expect(publish).not.toHaveBeenCalled()
+    expect(f.repository.operations(f.task.id, 'schedule_authority')).toHaveLength(0)
+  })
+  it('requires an exact continuous review for a dispatched action and then creates its plan idempotently', async () => {
+    const f = fixture()
+    const dispatch = f.browserDispatch('fill')
+    f.browserTool('browser_fill', { request: { argumentsHash: dispatch.request!.argumentsHash }, output: { dispatchReceiptId: dispatch.id } })
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+    f.approveBrowserAction('fill')
+    const publish = vi.spyOn(f.flows, 'publish')
+    const saved = await f.service.create(f.context)
+    expect(saved.scope.browserScheduleActions).toHaveLength(1)
+    expect(await f.service.create(f.context)).toEqual(saved)
+    expect(publish).toHaveBeenCalledOnce()
+    expect(f.context.awaitApproval).toHaveBeenCalledOnce()
+    expect(f.repository.operations(f.task.id, 'browser_action_dispatch')).toEqual([dispatch])
+  })
+  it.each(['browser_navigate', 'browser_observe', 'browser_get_html'])('allows a read-only %s history without action descriptors', async toolName => {
+    const f = fixture()
+    f.browserTool(toolName)
+    expect((await f.service.create(f.context)).scope.browserScheduleActions).toBeUndefined()
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+  })
+  it('ignores an explicitly nondispatched browser attempt', async () => {
+    const f = fixture()
+    f.browserTool('browser_fill', { status: 'failed', output: { status: 'failed', code: 'browser_schedule_action_scope_required' } })
+    f.browserTool('browser_click', { status: 'failed', approved: false, request: { dispatchTracking: 'host-v1' }, output: { code: 'operation_not_dispatched' } })
+    expect((await f.service.create(f.context)).scope.browserScheduleActions).toBeUndefined()
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+  })
+  it.each(['tool', 'journal'])('blocks an unknown %s outcome even after explicit continuous review', async kind => {
+    const f = fixture()
+    f.approveBrowserAction('click')
+    if (kind === 'tool') f.browserTool('browser_click', { status: 'outcome_unknown' })
+    else f.browserDispatch('click', 'outcome_unknown')
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_outcome_unknown' })
+    expect(f.flows.list()).toHaveLength(0)
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+    expect(f.coordinator.command).not.toHaveBeenCalled()
+  })
+  it.each(['pageUrl', 'elementHash', 'valueHash', 'browserInstanceId', 'browserRevision'])('rejects a dispatched fill with a different %s', async field => {
+    const f = fixture()
+    f.approveBrowserAction('fill')
+    f.browserDispatch('fill', 'succeeded', { [field]: field === 'browserRevision' ? 2 : 'different' })
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+  })
+  it('rejects a tool result linked to a different dispatch request', async () => {
+    const f = fixture()
+    f.approveBrowserAction('fill')
+    const dispatch = f.browserDispatch('fill')
+    f.browserTool('browser_fill', { output: { dispatchReceiptId: dispatch.id } })
+    await expect(f.service.create(f.context)).rejects.toThrow('执行凭据与原工具请求不匹配')
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+  })
+  it.each(['matched', 'missing_observation', 'wrong_request', 'wrong_target'])('migrates a legacy action only with provable %s target evidence', async variant => {
+    const f = fixture()
+    if (variant !== 'missing_observation') f.browserTool('browser_observe', { output: { sourceUrl: 'https://example.test/search', observation: { context_id: 'context-one' } } })
+    const operation = f.browserTool('browser_click', { output: { sourceUrl: 'https://example.test/redirected' } })
+    const requestHash = String(operation.request!.approvalRequestHash)
+    const summary = browserApprovalSummary({ action: 'click', origin: 'https://example.test',
+      targetHtml: variant === 'wrong_target' ? '<button>删除</button>' : browserTargetHtml.click, requestHash })
+    f.repository.saveHumanRequest({ id: `appr_${operation.request!.callId}`, kind: 'approval', threadId: f.task.threadId, turnId: 'turn',
+      message: summary, payload: { approval: { toolName: 'browser_click', callId: operation.request!.callId,
+        requestHash: variant === 'wrong_request' ? digest('wrong') : requestHash, summary } }, status: 'answered', resolution: { decision: 'allow' },
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+    f.approveBrowserAction('click')
+    if (variant === 'matched') {
+      expect((await f.service.create(f.context)).scope.browserScheduleActions?.[0]?.pageUrl).toBe('https://example.test/search')
+      expect(f.context.awaitApproval).toHaveBeenCalledOnce()
+    } else {
+      await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+      expect(f.context.awaitApproval).not.toHaveBeenCalled()
+    }
+    expect(f.repository.operation(f.task.id, operation.idempotencyKey)).toEqual(operation)
+  })
+  it('rechecks browser evidence after plan approval before persisting or publishing', async () => {
+    const f = fixture()
+    f.approveBrowserAction('click')
+    vi.mocked(f.context.awaitApproval).mockImplementation(async () => { f.browserDispatch('click', 'outcome_unknown'); return 'allow' })
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_outcome_unknown' })
+    expect(f.repository.operations(f.task.id, 'schedule_authority')).toHaveLength(0)
+    expect(f.flows.list()).toHaveLength(0)
+  })
+  it('blocks recurrence of a previously published plan after an unreviewed browser action', async () => {
+    const f = fixture()
+    f.browserTool('browser_observe')
+    const saved = await f.service.create(f.context)
+    const versionId = f.flows.get(saved.id)!.publishedVersionId!
+    f.browserDispatch('click')
+    await expect(f.service.dispatch({ scheduleId: saved.id, versionId, dueAt: '2026-11-13T00:30:00.000Z' }))
+      .rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+    expect(f.coordinator.command).not.toHaveBeenCalled()
+    expect(f.repository.attention(`schedule:${saved.id}`)?.status).toBe('pending')
   })
   it('recovers an approved managed draft after publication fails without another approval or receipt', async () => {
     const f = fixture()

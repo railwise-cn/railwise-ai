@@ -356,6 +356,9 @@ describe('typed BrowserSkill production provider', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(Date.now() + 2 * 86400000)
     try {
+      expect(await host.execute({ callId: 'source-renewed-derived', toolName: 'browser_fill', arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '轨道监测' } }, f.context))
+        .toMatchObject({ item: { output: { status: 'succeeded' } } })
+      expect(approved).toHaveBeenCalledOnce()
       const binding = { scheduleId: 'schedule_task', versionId: 'published-v1', sourceTaskId: 'task', scopeHash: 'a'.repeat(64),
         actionsHash: createHash('sha256').update(JSON.stringify(actions)).digest('hex') }
       f.setSchedule({ binding, actions })
@@ -416,6 +419,44 @@ describe('typed BrowserSkill production provider', () => {
     expect(await host.execute({ callId: 'no-initial-replay', toolName: 'browser_fill', arguments: args }, f.context))
       .toMatchObject({ item: { isError: true, output: { code: 'browser_schedule_outcome_unknown' } } })
     expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(1)
+  })
+
+  it('blocks omitted periodic scope and old temporary approvals before any ordinary approval or page write', async () => {
+    const f = fixture()
+    const approval = vi.fn(async () => 'allow' as const)
+    f.context.awaitApproval = approval
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '轨道监测' }
+    await f.execute('browser_authorize_action', { ...args, action: 'fill' })
+    expect(approval).toHaveBeenCalledOnce()
+    f.repository.update('task', 0, task => ({ ...task, acceptance: { ...task.acceptance, schedule: { kind: 'daily', times: ['09:00'], timezone: 'Asia/Shanghai' } } }))
+    approval.mockClear()
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    expect((await host.listTools(f.context)).some(tool => tool.name === 'browser_press')).toBe(false)
+    for (const [name, parameters] of [['browser_fill', args], ['browser_click', { ...args, value: undefined }],
+      ['browser_authorize_action', { ...args, action: 'fill' }], ['browser_press', { sessionId: 'session-one', contextId: 'context-one', key: 'Enter' }]] as const) {
+      const input = Object.fromEntries(Object.entries(parameters).filter(([, value]) => value !== undefined))
+      expect(await host.execute({ callId: name, toolName: name, arguments: input }, f.context))
+        .toMatchObject({ item: { isError: true, output: { code: 'browser_schedule_action_scope_required' } } })
+    }
+    expect(await f.execute('browser_fill', args, { ...f.context, explicitApproval: { callId: 'legacy', toolName: 'browser_fill', requestHash: 'a'.repeat(64) } }))
+      .toMatchObject({ isError: true, output: { code: 'browser_schedule_action_scope_required' } })
+    expect(approval).not.toHaveBeenCalled()
+    expect(f.runner.mock.calls.some(([, argv]) => ['fill', 'click', 'press'].includes(argv[0]))).toBe(false)
+    expect(f.repository.operations('task', 'browser_action_dispatch')).toHaveLength(0)
+  })
+
+  it('blocks an old recurring occurrence without continuous action binding instead of asking for one-time approval', async () => {
+    const f = fixture()
+    f.repository.update('task', 0, task => ({ ...task, scheduledBy: { scheduleId: 'existing-plan', dueAt: new Date().toISOString() } }))
+    const approval = vi.fn(async () => 'allow' as const)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    expect(await host.execute({ callId: 'legacy-occurrence', toolName: 'browser_fill', arguments: {
+      sessionId: 'new-session', contextId: 'fresh-context', target: '@e1', value: 'query'
+    } }, { ...f.context, awaitApproval: approval })).toMatchObject({ item: { isError: true, output: { code: 'browser_schedule_action_scope_required' } } })
+    expect(approval).not.toHaveBeenCalled()
+    expect(f.runner).not.toHaveBeenCalled()
   })
 
 })

@@ -1,3 +1,4 @@
+import { BrowserScheduleActionAuthority } from '../src/services/browser-schedule-action-authority.js'
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -94,7 +95,22 @@ it('creates the browser scope card when a model failure leaves no final explanat
   expect(f.network).not.toHaveBeenCalled()
 })
 
-it.each(['browser_schedule_authority_changed', 'browser_schedule_action_scope_changed', 'browser_schedule_outcome_unknown'])('persists one actionable %s plan blocker without waking a paused task', async code => {
+it('keeps a new periodic source scope requirement on the original task without inventing a Flow', async () => {
+  const f = await fixture()
+  await f.toolFailure('browser_schedule_action_scope_required')
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'waiting_user' })
+  const attention = f.runtime.taskRepository!.attention(`capability_${f.task.id}`)!
+  expect(attention).toMatchObject({ payload: { capability: { provider: 'schedule', errorCode: 'browser_schedule_action_scope_required',
+    resolution: { kind: 'retry', route: 'task/schedule-review', label: '继续原任务并审阅周期动作' } } } })
+  expect(attention.message).toContain('重新观察页面')
+  await f.runtime.taskCoordinator!.flushCommandMessages()
+  await f.restart()
+  expect(f.runtime.taskRepository!.attention(attention.id)).toEqual(attention)
+  expect(f.runtime.taskRepository!.get(f.task.id)?.status).toBe('waiting_user')
+  expect(f.network).not.toHaveBeenCalled()
+})
+
+it.each(['browser_schedule_authority_changed', 'browser_schedule_action_scope_changed', 'browser_schedule_action_scope_required', 'browser_schedule_outcome_unknown'])('persists one actionable %s plan blocker without waking a paused task', async code => {
   const f = await fixture()
   const current = f.runtime.taskRepository!.get(f.task.id)!
   f.runtime.taskRepository!.update(current.id, current.revision, task => ({ ...task, scheduledBy: { scheduleId: 'schedule-source', dueAt: '2026-11-13T01:00:00.000Z' } }))
@@ -148,5 +164,45 @@ it.each(['browser_interaction_scope_required', 'browser_binding_changed'])('keep
   expect(f.runtime.taskRepository!.get(f.task.id)).toEqual(cancelled)
   expect(f.runtime.taskRepository!.inbox(f.workspace)).toHaveLength(0)
   expect(f.runtime.taskRepository!.pendingOutbox('task_command_message')).toHaveLength(0)
+  expect(f.network).not.toHaveBeenCalled()
+})
+
+
+it.each(['different-target', 'failed', 'unknown', 'revoked'])('retains a missing periodic scope blocker after %s evidence in the same Turn', async scenario => {
+  const f = await fixture()
+  const repository = f.runtime.taskRepository!
+  const initial = repository.get(f.task.id)!
+  const browserScope = { browserInstanceId: 'reviewed-browser', revision: 1, interaction: 'interact' as const, origins: ['https://example.test'] }
+  const task = repository.update(initial.id, initial.revision, current => ({ ...current,
+    acceptance: { ...current.acceptance, schedule: { kind: 'daily', times: ['09:00'], timezone: 'Asia/Shanghai' } },
+    authority: { source: 'user', workspaceRoot: f.workspace, externalTargets: [], grantedAt: f.runtime.nowIso(), browserScope } }))
+  const target = { action: 'fill' as const, pageUrl: 'https://example.test/search', elementHash: 'a'.repeat(64), valueHash: 'b'.repeat(64),
+    browserInstanceId: browserScope.browserInstanceId, browserRevision: browserScope.revision }
+  repository.beginOperation({ ownerId: task.id, idempotencyKey: `tool:${f.turn.turnId}:missing`, kind: 'tool',
+    request: { toolName: 'browser_fill', argumentsHash: 'c'.repeat(64) }, nowIso: f.runtime.nowIso() })
+  repository.finishOperation(task.id, `tool:${f.turn.turnId}:missing`, { status: 'failed' })
+  repository.beginOperation({ ownerId: task.id, idempotencyKey: 'scope-request', kind: 'browser_action_scope_request',
+    request: { ...target, toolName: 'browser_fill', turnId: f.turn.turnId, argumentsHash: 'c'.repeat(64) }, nowIso: f.runtime.nowIso() })
+  repository.finishOperation(task.id, 'scope-request', { status: 'succeeded' })
+  await f.runtime.sessionStore.appendItem(f.worker.id, makeToolResultItem({ id: 'missing', threadId: f.worker.id, turnId: f.turn.turnId,
+    callId: 'missing', toolName: 'browser_fill', isError: true, output: { code: 'browser_schedule_action_scope_required' } }))
+  const authority = new BrowserScheduleActionAuthority({ repository })
+  const actual = { ...target, ...(scenario === 'different-target' ? { elementHash: 'd'.repeat(64) } : {}) }
+  const approved = authority.save(authority.prepare(task.id, browserScope, actual), 'explicit-review', 'trusted synthetic review')
+  const journal = repository.beginOperation({ ownerId: task.id, idempotencyKey: 'later-dispatch', kind: 'browser_action_dispatch',
+    request: { ...actual, scheduleActionId: approved.id, turnId: f.turn.turnId, argumentsHash: 'f'.repeat(64) }, nowIso: f.runtime.nowIso() }).receipt
+  repository.finishOperation(task.id, 'later-dispatch', { status: scenario === 'failed' ? 'failed' : 'succeeded', result: { resultHash: 'e'.repeat(64) } })
+  repository.beginOperation({ ownerId: task.id, idempotencyKey: `tool:${f.turn.turnId}:later`, kind: 'tool',
+    request: { toolName: 'browser_fill', argumentsHash: 'f'.repeat(64) }, nowIso: f.runtime.nowIso() })
+  repository.finishOperation(task.id, `tool:${f.turn.turnId}:later`, { status: scenario === 'failed' ? 'failed' : 'succeeded' })
+  await f.runtime.sessionStore.appendItem(f.worker.id, makeToolResultItem({ id: 'later', threadId: f.worker.id, turnId: f.turn.turnId,
+    callId: 'later', toolName: 'browser_fill', isError: scenario === 'failed', output: { dispatchReceiptId: journal.id, resultHash: 'e'.repeat(64) } }))
+  if (scenario === 'unknown') {
+    repository.beginOperation({ ownerId: task.id, idempotencyKey: 'unknown', kind: 'browser_schedule_action_outcome', request: { scheduleId: `schedule_${task.id}` }, nowIso: f.runtime.nowIso() })
+    repository.finishOperation(task.id, 'unknown', { status: 'outcome_unknown' })
+  }
+  if (scenario === 'revoked') repository.update(task.id, task.revision, current => ({ ...current, authority: { ...current.authority!, revokedAt: f.runtime.nowIso() } }))
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'waiting_user' })
+  expect(repository.attention(`capability_${task.id}`)).toMatchObject({ status: 'pending', payload: { capability: { errorCode: 'browser_schedule_action_scope_required' } } })
   expect(f.network).not.toHaveBeenCalled()
 })

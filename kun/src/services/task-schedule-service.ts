@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 import type { ExecutionGrant, ExecutionScope } from '../contracts/permissions.js'
-import type { TaskRun } from '../contracts/tasks.js'
+import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
 import type { FlowDefinitionV1 } from '../contracts/flow.js'
 import { scheduleForRequirement, type ScheduleRequirement } from '../contracts/schedule.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
@@ -16,7 +16,7 @@ import type { TaskCoordinator } from './task-coordinator.js'
 import type { WorkspaceTrustReader } from './workspace-trust-reader.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import type { BrowserScheduleAction, BrowserScheduleBinding } from '../contracts/browser-schedule-actions.js'
-import { browserScheduleApprovalSummary } from '../security/browser-approval-summary.js'
+import { browserScheduleApprovalSummary, sanitizeBrowserApprovalSummary } from '../security/browser-approval-summary.js'
 
 type ThreadAuthority = Pick<ThreadRecord, 'workspace' | 'agentId' | 'agentRevision' | 'agentProfile' | 'approvalPolicy' | 'sandboxMode' | 'mode'>
 type ScheduledTaskAuthority = {
@@ -41,6 +41,14 @@ function threadAuthority(thread: ThreadRecord): ThreadAuthority {
     approvalPolicy: thread.approvalPolicy, sandboxMode: thread.sandboxMode, mode: thread.mode }
 }
 function fail(message: string): never { throw Object.assign(new Error(message), { code: 'schedule_authority_changed' }) }
+const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+const browserOutput = (receipt: OperationReceipt) => record(record(record(receipt.result).item).output)
+function browserScopeRequired(detail: string): never {
+  throw Object.assign(new Error(`${detail} 请重新观察目标，使用 browser_authorize_action 的 scope=schedule、scheduleAccess=public_query 审阅真实元素与精确输入，再保存计划。`), { code: 'browser_schedule_action_scope_required' })
+}
+function browserOutcomeUnknown(): never {
+  throw Object.assign(new Error('浏览器操作结果尚未核验，请核验原操作结果后处理计划，不能自动重放或发布。'), { code: 'browser_schedule_outcome_unknown' })
+}
 
 /** Uses Flow's durable trigger/outbox while running each occurrence through the ordinary task harness. */
 export class TaskScheduleService {
@@ -66,6 +74,7 @@ export class TaskScheduleService {
     const permission = task.authority?.taskApprovalGrant
     if (task.authority?.revokedAt || permission?.revokedAt || permission && (permission.status !== 'active' || Date.parse(permission.expiresAt) <= Date.parse(this.deps.nowIso()))) fail('任务的临时权限已变化，请重新确认后建立计划。')
     const browserActions = listApprovedBrowserScheduleActions(this.deps.repository, task)
+    this.validateBrowserDispatches(task, browserActions)
     const scope: ExecutionScope = { allowedToolNames: grant.allowedToolNames, allowedProviderIds: grant.allowedProviderIds,
       pathAllowlist: grant.pathAllowlist, readPathAllowlist: grant.readPathAllowlist, writePathAllowlist: grant.writePathAllowlist,
       networkAllowlist: grant.networkAllowlist, connectorScopes: grant.connectorScopes, externalTargets: grant.externalTargets,
@@ -85,7 +94,7 @@ export class TaskScheduleService {
     if (existing) {
       const saved = this.authority(existing)
       if (saved.taskId !== task.id || fingerprint(saved.requirement) !== fingerprint(authority.requirement)) fail('已有计划与当前要求不同，请先更新原计划。')
-      await this.validateAuthority(saved)
+      await this.validateAuthority(saved, browserActions)
       const previous = saved.scope.browserScheduleActions ?? []
       if (fingerprint(previous) === fingerprint(browserActions)) return this.snapshot(existing)
       if (browserActions.length <= previous.length || previous.some(action => !browserActions.some(candidate => fingerprint(candidate) === fingerprint(action)))) fail('已有浏览器动作范围已变化，请先核对原计划授权。')
@@ -257,7 +266,74 @@ export class TaskScheduleService {
     }
   }
 
-  private async validateAuthority(authority: ScheduledTaskAuthority) {
+  private validateBrowserDispatches(task: TaskRun, actions: BrowserScheduleAction[]) {
+    const receipts = this.deps.repository.operations(task.id)
+    const dispatches = receipts.filter(receipt => receipt.kind === 'browser_action_dispatch')
+    if (receipts.some(receipt => receipt.kind === 'browser_schedule_action_outcome' && receipt.status === 'outcome_unknown')) browserOutcomeUnknown()
+    const matches = (target: Record<string, unknown>) => actions.some(action => action.action === target.action && action.pageUrl === target.pageUrl &&
+      action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === target.browserInstanceId &&
+      action.browserRevision === target.browserRevision)
+    for (const dispatch of dispatches) {
+      if (dispatch.status === 'failed') continue
+      if (dispatch.status !== 'succeeded') browserOutcomeUnknown()
+      if (!matches(dispatch.request ?? {})) browserScopeRequired('已执行的浏览器动作缺少匹配的持续授权。')
+    }
+    for (const [index, receipt] of receipts.entries()) {
+      if (receipt.kind !== 'tool' || !['browser_click', 'browser_fill', 'browser_press'].includes(String(receipt.request?.toolName))) continue
+      const output = browserOutput(receipt)
+      if (receipt.status === 'outcome_unknown' || output.status === 'outcome_unknown' || receipt.status === 'running') browserOutcomeUnknown()
+      if (receipt.status === 'prepared' && receipt.request?.dispatchTracking === 'host-v1') continue
+      if (receipt.status === 'failed' && (record(receipt.result).approved === false ||
+        output.provider === 'browser-skill' && output.status === 'failed' ||
+        receipt.request?.dispatchTracking === 'host-v1' && output.code === 'operation_not_dispatched')) continue
+      if (receipt.status !== 'succeeded') browserOutcomeUnknown()
+      const dispatch = dispatches.find(candidate => candidate.id === output.dispatchReceiptId)
+      if (dispatch) {
+        if (dispatch.status !== 'succeeded' || dispatch.request?.turnId !== receipt.request?.turnId ||
+          dispatch.request?.toolName !== receipt.request?.toolName || dispatch.request?.argumentsHash !== receipt.request?.argumentsHash) browserScopeRequired('浏览器执行凭据与原工具请求不匹配。')
+        continue
+      }
+      if (output.dispatchReceiptId) browserScopeRequired('浏览器操作缺少对应的持久执行凭据。')
+      const target = this.legacyBrowserTarget(task, receipt, receipts.slice(0, index))
+      if (!target) browserScopeRequired('旧操作缺少可核对的执行前页面或逐次目标审批凭据。旧记录已保留，请先核验原始凭据，无法补齐时需在新来源任务中建立计划。')
+      if (!matches(target)) browserScopeRequired('旧操作的真实页面、元素、输入或浏览器与持续授权不匹配。')
+    }
+  }
+
+  /** Legacy approvals contain an origin and target digests, never a pre-action page URL. */
+  private legacyBrowserTarget(task: TaskRun, receipt: OperationReceipt, earlier: OperationReceipt[]): Record<string, unknown> | undefined {
+    const output = browserOutput(receipt)
+    if (output.provider !== 'browser-skill' || output.status !== 'succeeded' || typeof output.sessionId !== 'string') return undefined
+    const action = receipt.request?.toolName === 'browser_click' ? 'click' : receipt.request?.toolName === 'browser_fill' ? 'fill' : undefined
+    if (!action || typeof receipt.request?.approvalRequestHash !== 'string' || typeof receipt.request?.callId !== 'string') return undefined
+    const approved = this.deps.repository.humanRequests('approval', false).find(request => {
+      const approval = record(request.payload.approval)
+      return request.status === 'answered' && record(request.resolution).decision === 'allow' && request.threadId === task.threadId &&
+        request.turnId === receipt.request?.turnId && approval.toolName === receipt.request?.toolName &&
+        (approval.callId === receipt.request?.callId || request.id === `appr_${receipt.request?.callId}`) &&
+        approval.requestHash === receipt.request?.approvalRequestHash
+    })
+    const summary = record(approved?.payload.approval).summary
+    if (typeof summary !== 'string' || !summary.startsWith('确认浏览器操作\n') || !sanitizeBrowserApprovalSummary(summary)) return undefined
+    const fields = Object.fromEntries(summary.split('\n').slice(1).map(line => {
+      const separator = line.indexOf(' ')
+      return [line.slice(0, separator), JSON.parse(line.slice(separator + 1)) as string]
+    }))
+    if (fields['请求摘要'] !== receipt.request?.approvalRequestHash || fields['动作'] !== (action === 'click' ? '点击网页元素' : '填写网页输入框')) return undefined
+    // Only a provider observation that populated the same session's context can
+    // establish the earlier URL. A post-click URL may already be a redirect.
+    const previous = earlier.filter(candidate => candidate.kind === 'tool' && candidate.status === 'succeeded' &&
+      browserOutput(candidate).provider === 'browser-skill' && browserOutput(candidate).sessionId === output.sessionId &&
+      typeof record(browserOutput(candidate).observation).context_id === 'string').at(-1)
+    const pageUrl = previous && browserOutput(previous).sourceUrl
+    if (typeof pageUrl !== 'string' || !URL.canParse(pageUrl) || new URL(pageUrl).origin !== fields['站点']) return undefined
+    const scope = record(record(receipt.request?.executionGrant).browserScope)
+    if (typeof scope.browserInstanceId !== 'string' || typeof scope.revision !== 'number') return undefined
+    return { action, pageUrl, elementHash: fields['目标摘要'], ...(action === 'fill' ? { valueHash: fields['输入摘要'] } : {}),
+      browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision }
+  }
+
+  private async validateAuthority(authority: ScheduledTaskAuthority, browserActions = authority.scope.browserScheduleActions ?? []) {
     const { grant } = authority
     const source = this.deps.repository.get(authority.taskId)
     const origin = await this.deps.threads.get(authority.originThreadId)
@@ -271,6 +347,7 @@ export class TaskScheduleService {
       (execution.agentRevision ?? 0) !== grant.agentRevision || (execution.agentProfile?.trustLevel ?? 'full-access') !== grant.agentTrust ||
       execution.approvalPolicy !== grant.approvalPolicy) fail('原计划的工作区、Agent 或授权范围已变化，请核对后再执行。')
     if ((source.authority?.taskApprovalGrant?.scope || grant.workspaceWriteException) && authority.authorization.kind !== 'confirmed_scope') fail('持续路径权限尚未确认。')
+    this.validateBrowserDispatches(source, browserActions)
     if (authority.scope.browserScheduleActions?.length) {
       const approved = listApprovedBrowserScheduleActions(this.deps.repository, source)
       if (authority.scope.browserScheduleActions.some(action => !approved.some(candidate => fingerprint(candidate) === fingerprint(action)))) fail('计划浏览器动作已撤销或范围已变化，请重新审阅。')
