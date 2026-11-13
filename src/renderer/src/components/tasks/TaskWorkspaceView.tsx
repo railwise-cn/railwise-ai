@@ -428,7 +428,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
         </div>
         <nav aria-label={t('taskWorkspaceFilters')} className="flex flex-wrap gap-1 border-b border-ds-border">{FILTERS.map(tab => <button type="button" key={tab} aria-pressed={filter === tab} onClick={() => setFilter(tab)} className={`border-b-2 px-3 py-2 text-xs font-medium ${filter === tab ? 'border-accent text-accent' : 'border-transparent text-ds-muted'}`}>{t(`taskWorkspaceFilter_${tab}`)} <span className="ml-1 tabular-nums">{count(tab)}</span></button>)}</nav>
       </div>
-      <div className="ds-task-workspace-columns grid min-h-[360px] flex-1 gap-4 p-5">
+      <div className="ds-task-workspace-columns grid min-h-[360px] flex-none gap-4 p-5">
         <div className="ds-task-workspace-list min-w-0 space-y-2" aria-label={t('taskWorkspaceTaskList')}>
           {visible.map(task => {
             const group = taskGroupForTask(task.id, tasks)
