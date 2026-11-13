@@ -70,6 +70,7 @@ vi.mock('../services/managed-tool-service', () => ({
 
 vi.mock('electron', () => ({
   app: {
+    once: vi.fn(),
     quit: vi.fn(),
     getPath: vi.fn(() => '/tmp')
   },

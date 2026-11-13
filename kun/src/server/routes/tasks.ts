@@ -12,6 +12,7 @@ import { WorkspaceReferenceService } from '../../services/workspace-reference-se
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
 import { realpath } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { authorizedArtifactWrites } from '../../services/task-artifact-proof.js'
 import { validateArtifactFile } from '../../services/artifact-validator.js'
 
@@ -43,14 +44,15 @@ export async function getTaskArtifactProof(runtime: ServerRuntime, taskId: strin
   const task = runtime.taskRepository?.get(taskId)
   const artifact = task?.artifacts.find(item => item.id === artifactId)
   if (!task || !artifact) return ERRORS.notFound('Task artifact was not found.')
-  if (artifact.validation !== 'valid' || !artifact.absolutePath || !artifact.authorizedRoot || !artifact.executionGrantId || !artifact.sha256) {
+  if (artifact.validation !== 'valid' || !artifact.sha256) {
     return ERRORS.conflict('该成果尚未通过授权与内容验证。')
   }
-  const canonical = await realpath(artifact.absolutePath).catch(() => '')
-  if (canonical !== artifact.absolutePath) return ERRORS.conflict('成果路径已变化，请重新核验。')
+  const path = artifact.absolutePath ?? resolve(task.workspaceRoot, artifact.relativePath)
+  const canonical = await realpath(path).catch(() => '')
+  if (!canonical || canonical !== path) return ERRORS.conflict('成果路径已变化，请重新核验。')
   const thread = await runtime.threadService.get(task.threadId)
   const proof = (await authorizedArtifactWrites(task, runtime.taskRepository!.operations(task.id, 'tool'), thread?.turns ?? [])).get(canonical)
-  if (!proof || proof.executionGrantId !== artifact.executionGrantId || proof.authorizedRoot !== artifact.authorizedRoot || proof.sha256 !== artifact.sha256) {
+  if (!proof || (artifact.executionGrantId && proof.executionGrantId !== artifact.executionGrantId) || (artifact.authorizedRoot && proof.authorizedRoot !== artifact.authorizedRoot) || proof.sha256 !== artifact.sha256) {
     return ERRORS.conflict('无法核对该成果的写入回执与执行授权。')
   }
   const verified = await validateArtifactFile(canonical, artifact.format ?? '').catch(() => null)

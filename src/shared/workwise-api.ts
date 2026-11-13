@@ -563,6 +563,7 @@ export type WorkWiseApi = {
   }) => Promise<McpServerConfigV2>
   testMcpServer: (serverId: string, workspaceRoot?: string) => Promise<McpServerStatusV1>
   openTaskArtifact: (request: { taskId: string; artifactId: string }) => Promise<{ ok: true } | { ok: false; message: string }>
+  previewTaskArtifact: (request: { taskId: string; artifactId: string }) => Promise<{ ok: true; url: string; title: string } | { ok: false; message: string }>
   authorizeMcpServer: (request: {
     serverId: string
     workspaceRoot?: string

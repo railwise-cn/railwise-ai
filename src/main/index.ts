@@ -2,6 +2,7 @@ import { McpConfigService, type McpRuntimeSnapshotV1 } from './services/mcp-conf
 import { loadManagedMcpConfigForRefresh } from './managed-runtime-process'
 import { createGuiUpdateShutdown } from './gui-update-shutdown'
 import brand from '../shared/product-brand.json'
+import { taskArtifactPreviewScope } from '../shared/task-artifact-preview'
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, shell, Tray, type MessageBoxOptions } from 'electron'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, openAsBlob } from 'node:fs'
@@ -535,11 +536,14 @@ function installDevPreviewWebviewGuards(): void {
 
     contents.on('will-navigate', (event, navigationUrl) => {
       if (contents.getType() !== 'webview') return
+      const artifactScope = taskArtifactPreviewScope(contents.getURL())
+      if (artifactScope && taskArtifactPreviewScope(navigationUrl) !== artifactScope) { event.preventDefault(); return }
       if (!isAllowedDevPreviewUrl(navigationUrl)) event.preventDefault()
     })
 
     contents.setWindowOpenHandler(({ url }) => {
       if (contents.getType() !== 'webview') return { action: 'allow' }
+      if (taskArtifactPreviewScope(contents.getURL())) return { action: 'deny' }
       return isAllowedDevPreviewUrl(url) ? { action: 'allow' } : { action: 'deny' }
     })
   })

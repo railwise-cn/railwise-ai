@@ -254,6 +254,7 @@ const api = {
     ipcRenderer.invoke('mcp-server:cancel-authorization', { serverId, state }),
   setMcpServerCredential: (request) => ipcRenderer.invoke('mcp-server:set-credential', request),
   openTaskArtifact: (request) => ipcRenderer.invoke('task-artifact:open', request),
+  previewTaskArtifact: (request) => ipcRenderer.invoke('task-artifact:preview', request),
   listDocumentEngines: () => ipcRenderer.invoke('document-engine:list'),
   installDocumentEngine: (id) => ipcRenderer.invoke('document-engine:install', id),
   diagnoseDocumentEngine: (id) => ipcRenderer.invoke('document-engine:diagnose', id),

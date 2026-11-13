@@ -1,4 +1,5 @@
 import { requestTaskDetail } from '../store/task-live-store'
+import { useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -555,8 +556,9 @@ export function Workbench(): ReactElement {
     () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
     [activeSkillWorkspace, timelineBlocks]
   )
-  const latestDevPreviewUrl = detectedDevPreviewUrls[0] ?? null
-  const latestAutoOpenDevPreviewUrl = autoOpenDevPreviewUrls[0] ?? null
+  const taskArtifactPreview = useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready')
+  const latestDevPreviewUrl = taskArtifactPreview.url ?? detectedDevPreviewUrls[0] ?? null
+  const latestAutoOpenDevPreviewUrl = taskArtifactPreview.url ?? autoOpenDevPreviewUrls[0] ?? null
   const currentSideConversations = useMemo(
     () =>
       Object.values(sideConversations)
@@ -2175,8 +2177,11 @@ export function Workbench(): ReactElement {
   const workbenchViewRenderers: Record<string, (module: unknown) => ReactElement | null> = {
     tasks: (module) => {
       const View = (module as typeof import('./tasks/TaskWorkspaceView')).TaskWorkspaceView
-      return <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path) => {
-        if (/\.(?:md|mdx|markdown)$/i.test(path)) {
+      return <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {
+        if (/\.html?$/i.test(path) && artifactId) {
+          await taskArtifactPreview.open({ taskId: task.id, artifactId })
+          setRightPanelMode('browser')
+        } else if (/\.(?:md|mdx|markdown)$/i.test(path)) {
           await useWriteWorkspaceStore.getState().openFile(task.workspaceRoot, path)
           setRoute('write')
         } else {
@@ -2415,7 +2420,12 @@ export function Workbench(): ReactElement {
               onBuildPlan={() => void buildGuiPlan()}
               onOpenPlan={openGuiPlanPanel}
               devPreviewCard={
-                showDevPreviewCard ? (
+                taskArtifactPreview.error ? (
+                  <div role="status" className="rounded-xl border border-ds-border bg-ds-card px-4 py-3 text-sm text-ds-ink">
+                    <p>{taskArtifactPreview.error}</p>
+                    <button type="button" className="mt-2 text-accent" onClick={() => void taskArtifactPreview.retry().catch(() => undefined)}>重新打开网页成果</button>
+                  </div>
+                ) : showDevPreviewCard ? (
                   <DevPreviewLaunchCard
                     url={latestDevPreviewUrl}
                     opened={rightPanelMode === 'browser'}

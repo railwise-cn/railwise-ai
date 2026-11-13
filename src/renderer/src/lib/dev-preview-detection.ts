@@ -1,5 +1,6 @@
 import type { ChatBlock } from '../agent/types'
 import { normalizeDevPreviewUrlInput } from '@shared/dev-preview-url'
+import { taskArtifactPreviewScope } from '@shared/task-artifact-preview'
 
 const MAX_DETECTED_URLS = 4
 const NEARBY_URL_CONTEXT_CHARS = 120
@@ -177,6 +178,9 @@ export function extractLatestTurnAutoOpenDevPreviewUrls(blocks: ChatBlock[]): st
 }
 
 export function formatDevPreviewUrlLabel(url: string): string {
+  if (taskArtifactPreviewScope(url)) {
+    try { return decodeURIComponent(new URL(url).pathname.split('/').at(-1)!) } catch { return 'HTML' }
+  }
   try {
     const parsed = new URL(url)
     return parsed.host

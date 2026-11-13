@@ -243,6 +243,7 @@ import { McpConfigService } from '../services/mcp-config-service'
 import { CatalogCredentialService } from '../services/catalog-credential-service'
 import { activatePluginPackage } from '../services/plugin-activation-service'
 import { openVerifiedTaskArtifact } from '../services/task-artifact-open'
+import { TaskArtifactPreviewService } from '../services/task-artifact-preview-service'
 import { MarketplaceCatalogService } from '../services/marketplace-catalog-service'
 import { PluginManagementService } from '../services/plugin-management-service'
 import type { CatalogSourceV1 } from '../../shared/marketplace'
@@ -684,6 +685,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     resolveLogDirectory,
     logError
   } = options
+  const taskArtifactPreview = new TaskArtifactPreviewService(runtimeRequest)
+  app.once('before-quit', () => { void taskArtifactPreview.dispose() })
   const workspaceFileWatchers = new Map<string, WorkspaceFileWatchRecord>()
   const agentProfileService = new AgentProfileService()
   const workspaceTrustService = new WorkspaceTrustService()
@@ -954,6 +957,11 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('task-artifact:open', async (_, payload: unknown) => {
     const request = parseIpcPayload('task-artifact:open', z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict(), payload)
     return openVerifiedTaskArtifact(request, { runtimeRequest, openPath: path => shell.openPath(path) })
+  })
+  ipcMain.handle('task-artifact:preview', async (_, payload: unknown) => {
+    const request = parseIpcPayload('task-artifact:preview', z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict(), payload)
+    try { return { ok: true, ...await taskArtifactPreview.open(request) } }
+    catch (error) { return { ok: false, message: error instanceof Error ? error.message : '网页成果暂时无法预览。' } }
   })
   ipcMain.handle('mcp-server:save', async (_, payload: unknown) => {
     const request = parseIpcPayload('mcp-server:save', mcpServerSavePayloadSchema, payload)
