@@ -43,7 +43,7 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
     chrome.stderr.on('data', bytes => { chromeLog = (chromeLog + String(bytes)).slice(-6000) })
     const server = createServer((request, response) => {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      response.end(request.url === '/two' ? '<!doctype html><html><body><h1>PAGE TWO RAILWISE</h1><p>Second controlled source.</p></body></html>' : '<!doctype html><html><body><h1>PAGE ONE RAILWISE</h1><a href="/two">Next page</a></body></html>')
+      response.end(request.url === '/two' ? '<!doctype html><html><head><title>RailWise controlled source two</title></head><body><h1>PAGE TWO RAILWISE</h1><p>Second controlled source.</p></body></html>' : '<!doctype html><html><head><title>RailWise controlled source one</title></head><body><h1>PAGE ONE RAILWISE</h1><a href="/two">Next page</a></body></html>')
     })
     await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
     const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
@@ -108,6 +108,10 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
       const session = await call('browser_session_start', {})
       const first = await call('browser_navigate', { sessionId: session.sessionId, url: origin + '/one' })
       expect(first.evidence.contentRead).toBe(true)
+      const realTabs = await runBrowserCommand(config, ['tab', 'list', '--session', session.sessionId, '--scope', 'agent'])
+      expect(realTabs.ok).toBe(true)
+      const realTab = (realTabs.output as { tabs: Array<Record<string, unknown>> }).tabs[0]
+      expect(realTab.title).toBe('RailWise controlled source one')
       const html = await call('browser_get_html', { sessionId: session.sessionId })
       expect(html.html).toContain('href="/two"')
       const second = await call('browser_navigate', { sessionId: session.sessionId, url: origin + '/two', contextId: first.observation.context_id })
@@ -137,7 +141,7 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
       await call('browser_session_stop', { sessionId: session.sessionId })
       await writeFile(join(root, 'evidence.json'), JSON.stringify({ passed: true, testedAt: new Date().toISOString(), cliVersion: '0.4.0', extensionVersion: manifest.version,
         credentialStore: 'isolated-test-mock-keychain', protocol: status.protocolVersion, browserVersion: (await executeFile(chromePath, ['--version'])).stdout.trim(), pagesRead: 2, htmlRead: true,
-        publicPage, pageEvidenceHashes: [first.resultHash, second.resultHash], screenshotHash: shot.sha256, approvals: 0,
+        tabListShape: { keys: Object.keys(realTab), title: realTab.title }, publicPage, pageEvidenceHashes: [first.resultHash, second.resultHash], screenshotHash: shot.sha256, approvals: 0,
         sessionStopped: repository.operations('synthetic-browser', 'browser_session').every(item => (item.result as { stopped?: boolean }).stopped) }, null, 2))
     } catch (error) {
       await writeFile(join(root, 'failure.json'), JSON.stringify({ error: String(error), lastStatus, daemonLog, chromeLog, workerEvents }, null, 2))

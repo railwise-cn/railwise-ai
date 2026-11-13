@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "version": "0.5.6",
+    "sourceHead": "ce5b00cc41c3a53144144c85ecc772efe5872718",
+    "asarSha256": "1cf3cb06df161768333aaf0d8b0bd59ce9989b8ae61a7f21947c9441fcebe115",
+    "releaseEvidence": "docs/qa/release-gates/v0.5.6.json",
+    "generatedBy": "Packaged 0.5.6 createKunServeRuntime, TaskRunRepository and FileThreadStore",
+    "synthetic": true,
+    "credentialsUsed": false,
+    "modelCalls": 0,
+    "externalCalls": 0
+  },
+  "userVersion": 2,
+  "tables": [
+    {
+      "name": "execution_attempts",
+      "sql": "CREATE TABLE execution_attempts(id TEXT PRIMARY KEY,task_id TEXT NOT NULL,turn_id TEXT NOT NULL,data_json TEXT NOT NULL)",
+      "rows": []
+    },
+    {
+      "name": "execution_sessions",
+      "sql": "CREATE TABLE execution_sessions(id TEXT PRIMARY KEY,task_id TEXT NOT NULL UNIQUE,thread_id TEXT NOT NULL,data_json TEXT NOT NULL)",
+      "rows": [
+        {
+          "id": "exec_session_task_v056_paused",
+          "task_id": "task_v056_paused",
+          "thread_id": "thr_30smevvi",
+          "data_json": "{\"id\":\"exec_session_task_v056_paused\",\"taskId\":\"task_v056_paused\",\"threadId\":\"thr_30smevvi\",\"originThreadId\":\"thr_30smevvi\",\"visibility\":\"legacy\",\"createdAt\":\"2026-11-12T01:00:00.000Z\",\"updatedAt\":\"2026-11-12T01:00:00.000Z\",\"revision\":0}"
+        }
+      ]
+    },
+    {
+      "name": "human_requests",
+      "sql": "CREATE TABLE human_requests(id TEXT PRIMARY KEY,data_json TEXT NOT NULL)",
+      "rows": []
+    },
+    {
+      "name": "inbox_items",
+      "sql": "CREATE TABLE inbox_items(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,status TEXT NOT NULL,data_json TEXT NOT NULL)",
+      "rows": []
+    },
+    {
+      "name": "input_deliveries",
+      "sql": "CREATE TABLE input_deliveries(id TEXT PRIMARY KEY,input_id TEXT NOT NULL,session_id TEXT NOT NULL,sequence INTEGER NOT NULL,status TEXT NOT NULL,data_json TEXT NOT NULL,UNIQUE(input_id,session_id),UNIQUE(session_id,sequence))",
+      "rows": [
+        {
+          "id": "delivery_11f6cbf3-86b2-45a7-9f7a-9aa7abe811d9",
+          "input_id": "input_95d83f2c-8e6f-471a-978d-4003dc09ab23",
+          "session_id": "exec_session_task_v056_paused",
+          "sequence": 1,
+          "status": "queued",
+          "data_json": "{\"id\":\"delivery_11f6cbf3-86b2-45a7-9f7a-9aa7abe811d9\",\"inputId\":\"input_95d83f2c-8e6f-471a-978d-4003dc09ab23\",\"taskId\":\"task_v056_paused\",\"sessionId\":\"exec_session_task_v056_paused\",\"sequence\":1,\"status\":\"queued\",\"messageItemId\":\"item_task_input_input_95d83f2c-8e6f-471a-978d-4003dc09ab23\"}"
+        }
+      ]
+    },
+    {
+      "name": "operation_receipts",
+      "sql": "CREATE TABLE operation_receipts(owner_id TEXT NOT NULL,idempotency_key TEXT NOT NULL,data_json TEXT NOT NULL,PRIMARY KEY(owner_id,idempotency_key))",
+      "rows": [
+        {
+          "owner_id": "task_v056_paused",
+          "idempotency_key": "v056-unknown",
+          "data_json": "{\"id\":\"operation_29008af5-2d71-43e9-b4ec-eb1b2b75ea59\",\"ownerId\":\"task_v056_paused\",\"idempotencyKey\":\"v056-unknown\",\"fingerprint\":\"9c9961470ae043c84429863a39763a77450e82db1b8c1c23f08c0b4706cd1aac\",\"kind\":\"tool\",\"status\":\"outcome_unknown\",\"request\":{\"tool\":\"synthetic_remote_write\",\"target\":\"synthetic-only\"},\"createdAt\":\"2026-11-12T01:00:00.000Z\",\"updatedAt\":\"2026-11-12T01:00:00.000Z\",\"error\":\"synthetic interruption\"}"
+        }
+      ]
+    },
+    {
+      "name": "runtime_outbox",
+      "sql": "CREATE TABLE runtime_outbox(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,kind TEXT NOT NULL,delivered_at TEXT,data_json TEXT NOT NULL)",
+      "rows": []
+    },
+    {
+      "name": "runtime_spans",
+      "sql": "CREATE TABLE runtime_spans (\n        id TEXT PRIMARY KEY,\n        task_id TEXT,\n        turn_id TEXT,\n        kind TEXT NOT NULL,\n        status TEXT NOT NULL,\n        started_at TEXT NOT NULL,\n        finished_at TEXT,\n        data_json TEXT NOT NULL\n      )",
+      "rows": []
+    },
+    {
+      "name": "shell_sessions",
+      "sql": "CREATE TABLE shell_sessions (\n        id TEXT PRIMARY KEY,\n        task_id TEXT NOT NULL,\n        status TEXT NOT NULL,\n        updated_at TEXT NOT NULL,\n        revision INTEGER NOT NULL,\n        data_json TEXT NOT NULL\n      )",
+      "rows": []
+    },
+    {
+      "name": "task_assignments",
+      "sql": "CREATE TABLE task_assignments (\n        id TEXT PRIMARY KEY, parent_task_id TEXT NOT NULL, child_task_id TEXT NOT NULL,\n        status TEXT NOT NULL, data_json TEXT NOT NULL\n      )",
+      "rows": []
+    },
+    {
+      "name": "task_budget_usage",
+      "sql": "CREATE TABLE task_budget_usage(id TEXT PRIMARY KEY,root_id TEXT NOT NULL,kind TEXT NOT NULL,amount REAL NOT NULL,data_json TEXT NOT NULL)",
+      "rows": []
+    },
+    {
+      "name": "task_change_feed",
+      "sql": "CREATE TABLE task_change_feed(seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT, kind TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)",
+      "rows": [
+        {
+          "seq": 1,
+          "task_id": "task_v056_paused",
+          "kind": "task_changed",
+          "payload_json": "{\"id\":\"task_v056_paused\",\"threadId\":\"thr_30smevvi\",\"childTaskIds\":[],\"workspaceRoot\":\"__RAILWISE_V056_ROOT__/工作区\",\"goal\":\"保存报告与资料来源，等待用户继续。\",\"status\":\"paused\",\"acceptance\":{\"kind\":\"files\",\"requiredNodeKinds\":[\"deliver\"],\"requiredFormats\":[\"html\"],\"requireFinalResponse\":true,\"requireActionableArtifactCard\":true},\"agentId\":\"general\",\"budget\":{\"maxAttempts\":8,\"maxDurationMs\":60000},\"attempts\":0,\"replans\":0,\"noProgressCount\":0,\"nodes\":[{\"id\":\"node_v056_deliver\",\"taskId\":\"task_v056_paused\",\"kind\":\"deliver\",\"title\":\"交付报告\",\"status\":\"pending\",\"dependsOn\":[],\"attempt\":0,\"maxAttempts\":8,\"idempotencyKey\":\"task_v056_paused:deliver\",\"evidence\":[],\"revision\":0}],\"artifacts\":[],\"waitingReason\":\"用户明确暂停\",\"createdAt\":\"2026-11-12T01:00:00.000Z\",\"updatedAt\":\"2026-11-12T01:00:00.000Z\",\"revision\":0}",
+          "created_at": "2026-11-13T05:02:46.825Z"
+        },
+        {
+          "seq": 2,
+          "task_id": "task_v056_paused",
+          "kind": "task_changed",
+          "payload_json": "{\"id\":\"task_v056_paused\",\"threadId\":\"thr_30smevvi\",\"childTaskIds\":[],\"workspaceRoot\":\"__RAILWISE_V056_ROOT__/工作区\",\"goal\":\"保存报告与资料来源，等待用户继续。\",\"status\":\"paused\",\"acceptance\":{\"kind\":\"files\",\"requiredNodeKinds\":[\"deliver\"],\"requiredFormats\":[\"html\"],\"requireFinalResponse\":true,\"requireActionableArtifactCard\":true},\"agentId\":\"general\",\"budget\":{\"maxAttempts\":8,\"maxDurationMs\":60000},\"attempts\":0,\"replans\":0,\"noProgressCount\":0,\"nodes\":[{\"id\":\"node_v056_deliver\",\"taskId\":\"task_v056_paused\",\"kind\":\"deliver\",\"title\":\"交付报告\",\"status\":\"pending\",\"dependsOn\":[],\"attempt\":0,\"maxAttempts\":8,\"idempotencyKey\":\"task_v056_paused:deliver\",\"evidence\":[],\"revision\":0}],\"artifacts\":[],\"waitingReason\":\"用户明确暂停\",\"createdAt\":\"2026-11-12T01:00:00.000Z\",\"updatedAt\":\"2026-11-12T01:00:00.000Z\",\"revision\":1}",
+          "created_at": "2026-11-13T05:02:46.826Z"
+        }
+      ]
+    },
+    {
+      "name": "task_checkpoints",
+      "sql": "CREATE TABLE task_checkpoints (\n        id TEXT PRIMARY KEY,\n        task_id TEXT NOT NULL REFERENCES task_runs(id) ON DELETE CASCADE,\n        created_at TEXT NOT NULL,\n        revision INTEGER NOT NULL,\n        data_json TEXT NOT NULL\n      )",
+      "rows": [
+        {
+          "id": "checkpoint_v056",
+          "task_id": "task_v056_paused",
+          "created_at": "2026-11-12T01:00:00.000Z",
+          "revision": 1,
+          "data_json": "{\"id\":\"checkpoint_v056\",\"taskId\":\"task_v056_paused\",\"completedNodeIds\":[],\"pendingNodeIds\":[\"node_v056_deliver\"],\"artifactIds\":[],\"eventSequence\":2,\"resumeSummary\":\"旧版本明确暂停，补充尚未消费。\",\"createdAt\":\"2026-11-12T01:00:00.000Z\",\"revision\":1}"
+        }
+      ]
+    },
+    {
+      "name": "task_command_receipts",
+      "sql": "CREATE TABLE task_command_receipts(owner_id TEXT NOT NULL,command_key TEXT NOT NULL,fingerprint TEXT NOT NULL,result_json TEXT,PRIMARY KEY(owner_id,command_key))",
+      "rows": []
+    },
+    {
+      "name": "task_context_bundles",
+      "sql": "CREATE TABLE task_context_bundles (\n        id TEXT PRIMARY KEY,\n        task_id TEXT NOT NULL,\n        revision INTEGER NOT NULL,\n        updated_at TEXT NOT NULL,\n        data_json TEXT NOT NULL\n      )",
+      "rows": []
+    },
+    {
+      "name": "task_events",
+      "sql": "CREATE TABLE task_events (\n        task_id TEXT NOT NULL REFERENCES task_runs(id) ON DELETE CASCADE,\n        sequence INTEGER NOT NULL,\n        event_key TEXT NOT NULL,\n        kind TEXT NOT NULL,\n        payload_json TEXT NOT NULL,\n        created_at TEXT NOT NULL,\n        PRIMARY KEY(task_id, sequence),\n        UNIQUE(task_id, event_key)\n      )",
+      "rows": [
+        {
+          "task_id": "task_v056_paused",
+          "sequence": 1,
+          "event_key": "task-created:task_v056_paused",
+          "kind": "task_created",
+          "payload_json": "{\"status\":\"paused\"}",
+          "created_at": "2026-11-12T01:00:00.000Z"
+        },
+        {
+          "task_id": "task_v056_paused",
+          "sequence": 2,
+          "event_key": "input:input_95d83f2c-8e6f-471a-978d-4003dc09ab23",
+          "kind": "task_input_received",
+          "payload_json": "{\"inputId\":\"input_95d83f2c-8e6f-471a-978d-4003dc09ab23\",\"kind\":\"supplement\"}",
+          "created_at": "2026-11-12T01:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "name": "task_handoff_packets",
+      "sql": "CREATE TABLE task_handoff_packets (\n        id TEXT PRIMARY KEY,\n        from_task_id TEXT NOT NULL,\n        to_task_id TEXT,\n        revision INTEGER NOT NULL,\n        updated_at TEXT NOT NULL,\n        data_json TEXT NOT NULL\n      )",
+      "rows": []
+    },
+    {
+      "name": "task_inputs",
+      "sql": "CREATE TABLE task_inputs(id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES task_runs(id), idempotency_key TEXT NOT NULL, consumed_at TEXT, data_json TEXT NOT NULL, UNIQUE(task_id,idempotency_key))",
+      "rows": [
+        {
+          "id": "input_95d83f2c-8e6f-471a-978d-4003dc09ab23",
+          "task_id": "task_v056_paused",
+          "idempotency_key": "v056-supplement",
+          "consumed_at": null,
+          "data_json": "{\"id\":\"input_95d83f2c-8e6f-471a-978d-4003dc09ab23\",\"taskId\":\"task_v056_paused\",\"kind\":\"supplement\",\"text\":\"补充 0.5.6 原始资料，等待明确继续。\",\"idempotencyKey\":\"v056-supplement\",\"createdAt\":\"2026-11-12T01:00:00.000Z\"}"
+        }
+      ]
+    },
+    {
+      "name": "task_leases",
+      "sql": "CREATE TABLE task_leases (\n        task_id TEXT PRIMARY KEY REFERENCES task_runs(id) ON DELETE CASCADE,\n        owner_id TEXT NOT NULL,\n        acquired_at TEXT NOT NULL,\n        expires_at TEXT NOT NULL,\n        revision INTEGER NOT NULL\n      )",
+      "rows": []
+    },
+    {
+      "name": "task_nodes",
+      "sql": "CREATE TABLE task_nodes (\n        id TEXT PRIMARY KEY,\n        task_id TEXT NOT NULL REFERENCES task_runs(id) ON DELETE CASCADE,\n        kind TEXT NOT NULL,\n        status TEXT NOT NULL,\n        revision INTEGER NOT NULL,\n        data_json TEXT NOT NULL\n      )",
+      "rows": [
+        {
+          "id": "node_v056_deliver",
+          "task_id": "task_v056_paused",
+          "kind": "deliver",
+          "status": "pending",
+          "revision": 0,
+          "data_json": "{\"id\":\"node_v056_deliver\",\"taskId\":\"task_v056_paused\",\"kind\":\"deliver\",\"title\":\"交付报告\",\"status\":\"pending\",\"dependsOn\":[],\"attempt\":0,\"maxAttempts\":8,\"idempotencyKey\":\"task_v056_paused:deliver\",\"evidence\":[],\"revision\":0}"
+        }
+      ]
+    },
+    {
+      "name": "task_query_snapshots",
+      "sql": "CREATE TABLE task_query_snapshots(id TEXT PRIMARY KEY, query_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, data_json TEXT NOT NULL)",
+      "rows": []
+    },
+    {
+      "name": "task_runs",
+      "sql": "CREATE TABLE task_runs (\n        id TEXT PRIMARY KEY,\n        thread_id TEXT NOT NULL,\n        status TEXT NOT NULL,\n        updated_at TEXT NOT NULL,\n        revision INTEGER NOT NULL,\n        data_json TEXT NOT NULL\n      )",
+      "rows": [
+        {
+          "id": "task_v056_paused",
+          "thread_id": "thr_30smevvi",
+          "status": "paused",
+          "updated_at": "2026-11-12T01:00:00.000Z",
+          "revision": 1,
+          "data_json": "{\"id\":\"task_v056_paused\",\"threadId\":\"thr_30smevvi\",\"childTaskIds\":[],\"workspaceRoot\":\"__RAILWISE_V056_ROOT__/工作区\",\"goal\":\"保存报告与资料来源，等待用户继续。\",\"status\":\"paused\",\"acceptance\":{\"kind\":\"files\",\"requiredNodeKinds\":[\"deliver\"],\"requiredFormats\":[\"html\"],\"requireFinalResponse\":true,\"requireActionableArtifactCard\":true},\"agentId\":\"general\",\"budget\":{\"maxAttempts\":8,\"maxDurationMs\":60000},\"attempts\":0,\"replans\":0,\"noProgressCount\":0,\"nodes\":[{\"id\":\"node_v056_deliver\",\"taskId\":\"task_v056_paused\",\"kind\":\"deliver\",\"title\":\"交付报告\",\"status\":\"pending\",\"dependsOn\":[],\"attempt\":0,\"maxAttempts\":8,\"idempotencyKey\":\"task_v056_paused:deliver\",\"evidence\":[],\"revision\":0}],\"artifacts\":[],\"waitingReason\":\"用户明确暂停\",\"createdAt\":\"2026-11-12T01:00:00.000Z\",\"updatedAt\":\"2026-11-12T01:00:00.000Z\",\"revision\":1}"
+        }
+      ]
+    },
+    {
+      "name": "task_source_deliveries",
+      "sql": "CREATE TABLE task_source_deliveries (\n        event_id TEXT NOT NULL, worker_id TEXT NOT NULL, task_id TEXT NOT NULL,\n        input_id TEXT, status TEXT NOT NULL, data_json TEXT NOT NULL,\n        PRIMARY KEY(event_id, worker_id)\n      )",
+      "rows": []
+    },
+    {
+      "name": "task_source_events",
+      "sql": "CREATE TABLE task_source_events (\n        id TEXT PRIMARY KEY,\n        source TEXT NOT NULL,\n        idempotency_key TEXT NOT NULL,\n        request_hash TEXT NOT NULL,\n        status TEXT NOT NULL,\n        received_at TEXT NOT NULL,\n        data_json TEXT NOT NULL,\n        UNIQUE(source, idempotency_key)\n      )",
+      "rows": []
+    },
+    {
+      "name": "task_status_spans",
+      "sql": "CREATE TABLE task_status_spans(id INTEGER PRIMARY KEY AUTOINCREMENT,task_id TEXT NOT NULL,status TEXT NOT NULL,started_at TEXT NOT NULL,finished_at TEXT)",
+      "rows": [
+        {
+          "id": 1,
+          "task_id": "task_v056_paused",
+          "status": "paused",
+          "started_at": "2026-11-12T01:00:00.000Z",
+          "finished_at": null
+        }
+      ]
+    },
+    {
+      "name": "task_subscriptions",
+      "sql": "CREATE TABLE task_subscriptions (\n        id TEXT PRIMARY KEY,\n        worker_id TEXT NOT NULL,\n        source TEXT NOT NULL,\n        enabled INTEGER NOT NULL,\n        revision INTEGER NOT NULL,\n        updated_at TEXT NOT NULL,\n        data_json TEXT NOT NULL\n      )",
+      "rows": []
+    },
+    {
+      "name": "task_work_spans",
+      "sql": "CREATE TABLE task_work_spans(id TEXT PRIMARY KEY,root_id TEXT NOT NULL,started_ms INTEGER NOT NULL,finished_ms INTEGER,kind TEXT NOT NULL,execution_id TEXT)",
+      "rows": []
+    }
+  ],
+  "indexes": [
+    "CREATE INDEX execution_attempt_task ON execution_attempts(task_id)",
+    "CREATE INDEX execution_session_thread ON execution_sessions(thread_id)",
+    "CREATE INDEX runtime_spans_task_started_idx\n        ON runtime_spans(task_id, started_at DESC)",
+    "CREATE INDEX shell_sessions_task_idx ON shell_sessions(task_id)",
+    "CREATE INDEX task_checkpoints_task_created_idx\n        ON task_checkpoints(task_id, created_at DESC)",
+    "CREATE INDEX task_context_bundles_task ON task_context_bundles(task_id, updated_at)",
+    "CREATE INDEX task_handoff_packets_from ON task_handoff_packets(from_task_id, updated_at)",
+    "CREATE INDEX task_handoff_packets_to ON task_handoff_packets(to_task_id, updated_at)",
+    "CREATE INDEX task_nodes_task_idx ON task_nodes(task_id)",
+    "CREATE INDEX task_runs_status_updated_idx\n        ON task_runs(status, updated_at DESC)",
+    "CREATE INDEX task_runs_thread_updated_idx\n        ON task_runs(thread_id, updated_at DESC)",
+    "CREATE INDEX task_source_events_status ON task_source_events(status, received_at)",
+    "CREATE INDEX task_status_span_task ON task_status_spans(task_id)",
+    "CREATE INDEX task_subscriptions_source ON task_subscriptions(source, enabled)"
+  ],
+  "files": {
+    "threads/index.json": "{\"order\":[\"thr_30smevvi\"],\"updatedAt\":\"2026-11-13T05:02:46.808Z\"}",
+    "threads/thr_30smevvi/events.jsonl": "{\"seq\":1,\"timestamp\":\"2026-11-13T05:02:46.818Z\",\"threadId\":\"thr_30smevvi\",\"kind\":\"thread_created\",\"title\":\"0.5.6 合成历史\"}\n",
+    "threads/thr_30smevvi/thread.json": "{\"id\":\"thr_30smevvi\",\"title\":\"0.5.6 合成历史\",\"workspace\":\"__RAILWISE_V056_ROOT__/工作区\",\"model\":\"synthetic-no-model\",\"mode\":\"agent\",\"status\":\"idle\",\"approvalPolicy\":\"auto\",\"sandboxMode\":\"danger-full-access\",\"agentId\":\"general\",\"agentRevision\":0,\"relation\":\"primary\",\"createdAt\":\"2026-11-13T05:02:46.794Z\",\"updatedAt\":\"2026-11-13T05:02:46.794Z\",\"turns\":[]}"
+  },
+  "expected": {
+    "threadId": "thr_30smevvi",
+    "task": {
+      "id": "task_v056_paused",
+      "threadId": "thr_30smevvi",
+      "childTaskIds": [],
+      "workspaceRoot": "__RAILWISE_V056_ROOT__/工作区",
+      "goal": "保存报告与资料来源，等待用户继续。",
+      "status": "paused",
+      "acceptance": {
+        "kind": "files",
+        "requiredNodeKinds": [
+          "deliver"
+        ],
+        "requiredFormats": [
+          "html"
+        ],
+        "requireFinalResponse": true,
+        "requireActionableArtifactCard": true
+      },
+      "agentId": "general",
+      "budget": {
+        "maxAttempts": 8,
+        "maxDurationMs": 60000
+      },
+      "attempts": 0,
+      "replans": 0,
+      "noProgressCount": 0,
+      "nodes": [
+        {
+          "id": "node_v056_deliver",
+          "taskId": "task_v056_paused",
+          "kind": "deliver",
+          "title": "交付报告",
+          "status": "pending",
+          "dependsOn": [],
+          "attempt": 0,
+          "maxAttempts": 8,
+          "idempotencyKey": "task_v056_paused:deliver",
+          "evidence": [],
+          "revision": 0
+        }
+      ],
+      "artifacts": [],
+      "waitingReason": "用户明确暂停",
+      "createdAt": "2026-11-12T01:00:00.000Z",
+      "updatedAt": "2026-11-12T01:00:00.000Z",
+      "revision": 1
+    },
+    "inputId": "input_95d83f2c-8e6f-471a-978d-4003dc09ab23",
+    "checkpoint": {
+      "id": "checkpoint_v056",
+      "taskId": "task_v056_paused",
+      "completedNodeIds": [],
+      "pendingNodeIds": [
+        "node_v056_deliver"
+      ],
+      "artifactIds": [],
+      "eventSequence": 2,
+      "resumeSummary": "旧版本明确暂停，补充尚未消费。",
+      "createdAt": "2026-11-12T01:00:00.000Z",
+      "revision": 1
+    },
+    "session": {
+      "id": "exec_session_task_v056_paused",
+      "taskId": "task_v056_paused",
+      "threadId": "thr_30smevvi",
+      "originThreadId": "thr_30smevvi",
+      "visibility": "legacy",
+      "createdAt": "2026-11-12T01:00:00.000Z",
+      "updatedAt": "2026-11-12T01:00:00.000Z",
+      "revision": 0
+    },
+    "operations": [
+      {
+        "id": "operation_29008af5-2d71-43e9-b4ec-eb1b2b75ea59",
+        "ownerId": "task_v056_paused",
+        "idempotencyKey": "v056-unknown",
+        "fingerprint": "9c9961470ae043c84429863a39763a77450e82db1b8c1c23f08c0b4706cd1aac",
+        "kind": "tool",
+        "status": "outcome_unknown",
+        "request": {
+          "tool": "synthetic_remote_write",
+          "target": "synthetic-only"
+        },
+        "createdAt": "2026-11-12T01:00:00.000Z",
+        "updatedAt": "2026-11-12T01:00:00.000Z",
+        "error": "synthetic interruption"
+      }
+    ]
+  }
+}

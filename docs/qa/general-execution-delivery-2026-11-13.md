@@ -1,6 +1,6 @@
 # 通用执行链与网页成果交付整改
 
-本轮基于 0.5.6 的 Windows 实际使用反馈。验收原请求包含 BrowserSkill、招标信息采集、HTML 汇报和每日两次执行，须通过普通聊天入口完成。
+本轮基于 0.5.6 的 Windows 实际使用反馈，准备 0.5.7 候选包。验收原请求包含 BrowserSkill、招标信息采集、HTML 汇报和每日两次执行，须通过普通聊天入口完成。0.5.7 的精确包验收和正式发布仍待完成。
 
 ## 实现与证据
 
@@ -10,15 +10,52 @@
 | 审批控制输入 | 持久审批、输入来源、检查点及旧历史投影 | SQLite 来源关联与原始记录保留回归通过 |
 | 任务级目录权限 | 不可变 Grant、范围确认、工具路径检查 | 默认只读工作区的有限授权及到期/撤销回归通过 |
 | 应用内 HTML 成果 | 专用任务目录、publish_artifact、文件回执与哈希 | 真实 Runtime、SQLite 和文件回放通过 |
-| 内置预览 | 成果证明、受限 loopback 服务、持久任务事件、侧栏浏览器 | HTTP 隔离与页面归属回归通过，精确包 UI 待验证 |
+| 内置预览 | 成果证明、受限 loopback 服务、持久任务事件、侧栏浏览器 | HTTP 隔离、会话返回恢复、手动关闭保留、伴随资源更新回归通过，精确包 UI 待验证 |
 | 每日任务 | 规范化时间、Flow outbox、TaskCoordinator、计划读回 | 真实 Runtime 回放通过，精确包到期执行待验证 |
-| 网络能力 | 实际可用工具目录、来源级重试、正文编码 | 聚焦回归通过，全量回归进行中 |
-| BrowserSkill | 固定 CLI、扩展诊断、类型化 Provider、Skill 热同步 | 接入及验证进行中，真实浏览器操作待验证 |
+| 网络能力 | 实际可用工具目录、来源级重试、正文编码 | 聚焦及本机全量回归通过，真实采集待验证 |
+| BrowserSkill | 固定 CLI、扩展诊断、类型化 Provider、Skill 热同步 | 官方 CLI／扩展 0.4.0 与 CfT 151 的 Provider 正向实测通过，初始化 prepare／start 接线已修复，精确包待验证 |
 | 默认呈现 | 工作进度、授权与成果，执行详情手动展开 | 聚焦 DOM 回归通过，精确包 UI 待验证 |
+| 权限撤销与恢复 | DELETE 权限路由、Main IPC、持久撤销回执、暂停和 Turn 中断 | 真实 Runtime／SQLite 的 10 项合成场景通过，覆盖幂等、并发、崩溃、继承授权与过期重试 |
+| 中途输入与归属选择 | 原请求及附件持久入队、检查点确认、聊天意图选择卡 | 旧等待任务恢复、暂停期间附图、原请求绑定和重复选择回归通过 |
 
 模型协议回放使用本机合成服务，底层经过生产装配、真实工具、SQLite 和文件服务。这些结果仅证明对应工程链路。真实模型、浏览器扩展和精确安装包的验收分别记录。
 
+## 本机完整验证
+
+截至 2026-11-13，最近一轮完整检查结果如下。
+
+| 检查 | 结果 |
+| --- | --- |
+| Desktop 全量测试 | 4489 项通过，10 项跳过 |
+| KUN 全量测试 | 3e5c2714 源码 3918 项通过、23 项跳过，298 个文件通过、3 个文件跳过 |
+| Web、Node 与 KUN 类型检查 | 通过 |
+| Lint | 0 个错误 |
+| 生产构建 | 3e5c2714 源码本机通过 |
+
+本机验证使用固定 Node 22.22.0 与 npm 10.9.4。跳过项目保留在测试报告中，真实浏览器和安装包验证继续单独执行。
+
+随机临时目录 `ABCdef/workspace` 被误识别为时区的问题已修复，时区有效性与路径匹配边界回归通过，并完成上表中的 KUN 全量重跑。对应本机日志为 `/tmp/railwise-kun-post-live-fixes.log` 与 `/tmp/railwise-build-3e5c2714.log`。
+
+预览补充回归覆盖切换会话后重新校验并呈现原 HTML、手动关闭同版本后保持关闭，以及 CSS／JS 等已验证资源变化后重新生成预览快照。旧快照继续拒绝变化后的资源。相关预览与 Desktop 兼容测试共 13 项通过，Web／Node 类型检查与定向 Lint 通过。
+
+## 远端 CI 与精确包进度
+
+首轮 bf8 源码的 Quality 运行中，Windows 安全检查与 Electron smoke 已通过，Desktop 测试出现 3 项失败。已定位并修复以下问题。后续 ff6b 源码的三个 Quality job 均已通过。[Quality 运行记录](https://github.com/railwise-cn/railwise-ai/actions/runs/43365405176)
+
+- Main IPC 的权限端点白名单遗漏 `DELETE`，导致桌面撤销入口被拒绝。已补充该方法，并以实际 IPC 转发回归验证精确撤销请求，额外字段、查询参数和无请求体仍会被拒绝。
+- 两项权限面板 DOM 测试仍断言旧文案。已更新为当前简洁说明，同时验证确认权限期间仅读取原会话，执行由“继续原任务”触发。
+
+修复后的相关 3 个测试文件共 129 项通过，全量 Desktop 结果见上表。后续 Quality 已通过 Desktop 质量检查、Electron production smoke 和 Windows path／spawn／persistence 三个 job。[Quality 通过记录](https://github.com/railwise-cn/railwise-ai/actions/runs/43367773054)
+
+已取得官方 CLI／扩展 0.4.0 与 Chrome for Testing 151 的生产 Provider 正向实测，覆盖 prepare、start、claim、两页读取、HTML 与 PNG 摘要核验以及 stop，证据标识为 `connected-provider-15`。该真测同时确认初始化须先执行 `session request <requestId> --prepare` 再 start，相关产品接线已修复并纳入 3e5c2714。
+
+此前已确认 macOS 隔离 Chrome for Testing 访问 Keychain 受阻。当前隔离环境完成了上述正向读取，精确安装包中的用户流程仍待验证。后续原始来源实测发现 403 页面曾被标记为成功读取，已补充正文阻断识别。候选构建 `43367794641`、`43368850405` 与 `43369704622` 已取消，等待源码收敛后重新构建。精确 Windows／macOS 包的采集、HTML 自动预览和同包计划到期执行仍保留为待验收。[原始来源修复前候选记录](https://github.com/railwise-cn/railwise-ai/actions/runs/43368850405)
+
+依赖镜像的全部 36 个文件已验证，其中包含 BrowserSkill 的 5 项依赖。对应清单 SHA-256 为 `f4b13d7e032151a912c8a5acbc81d451d1d858f3ee063aeb427f59d8d39e40da`，本机证据为 `/private/tmp/railwise-browser-acceptance-20261113/dependency-mirror-43367814889/dependency-mirror-evidence.json`。[依赖镜像验证记录](https://github.com/railwise-cn/railwise-ai/actions/runs/43367814889)
+
 ## 兼容和默认状态迁移
+
+新增三项合成兼容回归通过。Runtime fixture 由已发布 0.5.6 精确包的生产装配与仓储写出，已核对 source `ce5b00cc41c3a53144144c85ecc772efe5872718` 与发行记录中的 ASAR 摘要。当前 Runtime 在真实 SQLite 上连续启动两次，保留暂停任务、原验收合同、未消费输入、检查点与结果未知回执，状态查询保持零 Turn、零外部调用。Desktop 用 0.5.6 的持久格式分别读取 keychain／DPAPI 合成凭据引用，并通过实际 Settings、MCP、Skill 与安装清单服务验证项目、空活动工作区、写作草稿、自定义 Skill 和已安装包保留。此组回归使用隔离合成目录及凭据适配器，个人 Windows 数据和系统安全存储仍需对应精确包实测。
 
 - 现有 BrowserSkill 安装记录及用户文件继续保留。旧安装表示资料已安装，执行就绪还需检查 CLI、扩展、连接和站点授权。升级后从原条目补齐依赖。
 - Skill 更新以带版本的目录清单同步到 Runtime，当前执行使用已捕获的版本。用户自定义文件与旧版本保留，移除遵守原包管理流程。

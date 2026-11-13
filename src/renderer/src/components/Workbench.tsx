@@ -627,6 +627,7 @@ export function Workbench(): ReactElement {
   const {
     beginLeftResize,
     beginRightResize,
+    closeDevPreview,
     filePreviewTarget,
     leftSidebarCollapsed,
     leftSidebarWidth,
@@ -642,6 +643,7 @@ export function Workbench(): ReactElement {
     toggleRightPanelMode,
   } = useWorkbenchLayout({
     activeThreadId,
+    latestAutoOpenDevPreviewKey: taskArtifactPreview.key,
     latestAutoOpenDevPreviewUrl,
     latestDevPreviewUrl,
     route,
@@ -1970,6 +1972,10 @@ export function Workbench(): ReactElement {
       : 'chat'
 
   const closeRightPanel = (): void => {
+    if (rightPanelMode === 'browser') {
+      closeDevPreview()
+      return
+    }
     if (route === 'write' && rightPanelMode === 'sdd-ai') {
       setRightPanelMode(null)
       return

@@ -58,6 +58,23 @@ describe('verified loopback HTML artifact preview', () => {
     expect((await fetch(preview.url)).status).toBe(409)
   })
 
+  it('serves updated companion bytes only through a newly verified snapshot', async () => {
+    const f = await fixture()
+    const first = await f.service.open({ taskId: 'task', artifactId: 'html' })
+    const css = f.proofs.get('css')!
+    const nextContent = 'body{color:#456}'
+    await writeFile(css.absolutePath!, nextContent)
+    css.sha256 = createHash('sha256').update(nextContent).digest('hex')
+    expect((await fetch(new URL('assets/report.css', first.url))).status).toBe(409)
+    const renewed = await f.service.open({ taskId: 'task', artifactId: 'html' })
+    expect(renewed.url).not.toBe(first.url)
+    expect(await (await fetch(renewed.url)).text()).toBe(f.content)
+    const response = await fetch(new URL('assets/report.css', renewed.url))
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe(nextContent)
+    expect((await fetch(new URL('assets/report.css', first.url))).status).toBe(409)
+  })
+
   it('refuses symlink replacement and a different task identity', async () => {
     const f = await fixture()
     const preview = await f.service.open({ taskId: 'task', artifactId: 'html' })

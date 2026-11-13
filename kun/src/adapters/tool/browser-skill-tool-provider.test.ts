@@ -31,6 +31,7 @@ function fixture() {
   let starts = 0
   let sessionId = 'session-one'
   let url = 'about:blank'
+  let title = ''
   const runner = vi.fn<BrowserCommandRunner>(async (_config, args) => {
     if (args[0] === 'status') return { ok: true, output: { daemon_version: '0.4.0', protocol_version: '1.7', pid: 10,
       browsers: [{ instance_id: 'browser-one', browser_name: 'Chrome', label: 'Test', extension_version: '0.4.0', extension_protocol_version: '1.7' }],
@@ -38,8 +39,8 @@ function fixture() {
     if (args[0] === 'session' && args[1] === 'start') { started = true; starts += 1; sessionId = starts === 1 ? 'session-one' : 'session-two'; return { ok: true, output: { session_id: sessionId, browser_instance_id: 'browser-one' } } }
     if (args[0] === 'session' && args[1] === 'request') return { ok: true, output: { state: 'ready', session: { session_id: sessionId, browser_instance_id: 'browser-one' } } }
     if (args[0] === 'session' && args[1] === 'stop') return { ok: true, output: { stopped: [sessionId], failed: [] } }
-    if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: 7, active: true, url, scope: 'agent' }] } }
-    if (args[0] === 'navigate') { url = args[1]; return { ok: true, output: { final_url: url } } }
+    if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: 7, active: true, url, title, scope: 'agent' }] } }
+    if (args[0] === 'navigate') { url = args[1]; title = 'Normal source'; return { ok: true, output: { final_url: url } } }
     if (args[0] === 'get-html') return { ok: true, output: { tab_id: 7, html: elementHtml, byte_size: elementHtml.length, truncated: false } }
     if (args[0] === 'cooperate') return { ok: true, output: { ready: true, context_id: 'context-one', observation: { text: 'Synthetic page content @e1' } } }
     return { ok: true, output: { tab_id: 7 } }
@@ -52,7 +53,7 @@ function fixture() {
       browserScope: { browserInstanceId: 'browser-one', origins: ['https://example.com'], interaction: 'interact', revision: 1 },
       workspaceRevision: 0, agentRevision: 0, revision: 0, idempotencyKey: 'grant', issuedAt: new Date().toISOString() }) }
   const execute = (name: string, args = {}, ctx = context) => provider.tools.find(tool => tool.name === name)!.execute(args, ctx)
-  return { repository, config, runner, provider, context, execute, setElement: (html: string) => { elementHtml = html }, setUrl: (next: string) => { url = next } }
+  return { repository, config, runner, provider, context, execute, setTitle: (next: string) => { title = next }, setElement: (html: string) => { elementHtml = html }, setUrl: (next: string) => { url = next } }
 }
 
 describe('typed BrowserSkill production provider', () => {
@@ -238,6 +239,21 @@ describe('typed BrowserSkill production provider', () => {
       ? Promise.resolve({ ok: true, output: { context_id: 'denied-context', observation: { text: '@vom 1\nL1 page\n RootWebArea "403 Forbidden"\n StaticText "Forbidden"' } } })
       : original(config, args, signal))
     expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/' })).toMatchObject({ isError: true, output: { code: 'web_access_blocked', evidence: { contentRead: false, verified: false } } })
+  })
+
+  it('checks the official tab title before a target subtree read and can navigate away using a fresh blocked-page context', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/denied' })
+    f.setTitle('403 Forbidden')
+    f.setElement('<div>Restricted subtree without a document title</div>')
+    expect(await f.execute('browser_get_html', { sessionId: 'session-one', target: '@e1' })).toMatchObject({ isError: true, output: {
+      code: 'web_access_blocked', evidence: { verified: false, contentRead: false } } })
+    expect(f.runner.mock.calls.some(([, args]) => args[0] === 'get-html')).toBe(false)
+    const blocked = await f.execute('browser_observe', { sessionId: 'session-one' })
+    expect(blocked).toMatchObject({ isError: true, output: { contextId: 'context-one', code: 'web_access_blocked' } })
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/readable', contextId: 'context-one' }))
+      .toMatchObject({ output: { sourceUrl: 'https://example.com/readable', evidence: { verified: true, contentRead: true } } })
   })
 
 })

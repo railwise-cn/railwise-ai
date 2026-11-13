@@ -42,6 +42,40 @@ describe('task-owned HTML auto preview', () => {
     tasks = [task('one', 'chat', 'changed')]; await hook.render()
     expect(preview).toHaveBeenCalledTimes(2)
   })
+  it('revalidates the original conversation when returning to its existing HTML', async () => {
+    tasks = [task('one')]
+    const preview = vi.fn(async () => ({ ok: true, url: `http://127.0.0.1:1/session-${preview.mock.calls.length}`, title: '报告' }))
+    Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact: preview } })
+    const hook = await mountPreview('chat')
+    const firstUrl = hook.current().url
+    const firstKey = hook.current().key
+    await hook.render('other')
+    expect(hook.current().url).toBeNull()
+    await hook.render('chat')
+    expect(preview).toHaveBeenCalledTimes(2)
+    expect(hook.current().url).not.toBe(firstUrl)
+    expect(hook.current().key).toBe(firstKey)
+  })
+  it('renews the resource snapshot when only a verified companion changes and ignores reordered replay', async () => {
+    const report = task('one')
+    report.artifacts.push({ ...report.artifacts[0]!, id: 'css', relativePath: 'assets/report.css', sha256: 'css-v1' })
+    tasks = [report]
+    const preview = vi.fn(async () => ({ ok: true, url: 'http://127.0.0.1:1/report', title: '报告' }))
+    Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact: preview } })
+    const hook = await mountPreview('chat')
+    const firstKey = hook.current().key
+    tasks = [{ ...report, artifacts: [...report.artifacts].reverse() }]
+    await hook.render()
+    expect(preview).toHaveBeenCalledTimes(1)
+    tasks = [{ ...report, artifacts: report.artifacts.map(file => file.id === 'css' ? { ...file, sha256: 'css-v2' } : file) }]
+    await hook.render()
+    expect(preview).toHaveBeenCalledTimes(2)
+    expect(hook.current().key).not.toBe(firstKey)
+    expect(preview).toHaveBeenLastCalledWith({ taskId: 'one', artifactId: 'html' })
+    tasks = [{ ...report, artifacts: report.artifacts.filter(file => file.id !== 'css') }]
+    await hook.render()
+    expect(preview).toHaveBeenCalledTimes(3)
+  })
   it('discards a late preview response after switching conversations', async () => {
     tasks = [task('one')]
     let finish!: (value: unknown) => void
