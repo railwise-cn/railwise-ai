@@ -13,6 +13,7 @@ import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { makeAssistantTextItem, makeToolResultItem } from '../domain/item.js'
 import type { ToolEffectResolver } from '../ports/tool-effect.js'
 import { externalOperationForTool } from './external-effect-evidence.js'
+import { browserApprovalSummary } from '../security/browser-approval-summary.js'
 
 const cleanup: string[] = []
 const PERSISTENCE_TEST_TIMEOUT_MS = 15_000
@@ -171,6 +172,40 @@ describe('TaskController reliability boundaries', () => {
         expect(controller.claimUndispatchedApproval(repeated.token, repeated.key, { ...approval, id: 'another-approval', callId: 'another-call' })).toBe(false)
         expect(repository.humanRequest(approval.id)?.payload.continuedFromApprovalId).toBe(oldApproval.id)
       }
+    } finally { repository.close() }
+  })
+
+  it.each(['same', 'changed-target', 'legacy-summary'])('checks the exact reviewed Browser DOM summary before transferring an undispatched approval (%s)', async variation => {
+    const { repository, controller, task, thread } = await fixture()
+    try {
+      controller.beginAttempt(thread.id, 'turn_reliability')
+      const grant = ExecutionGrantSchema.parse({ id: 'browser-grant', taskId: task.id, threadId: thread.id, turnId: 'turn_reliability',
+        workspaceRoot: thread.workspace, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', sandboxMode: 'workspace-write', approvalPolicy: 'on-request',
+        browserScope: { browserInstanceId: 'synthetic-browser', origins: ['https://example.test'], interaction: 'interact', revision: 1 },
+        workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'browser-grant', issuedAt: '2026-07-18T00:00:00.000Z', expiresAt: '2026-07-18T00:15:00.000Z' })
+      const toolName = 'browser_click'
+      const current = controller.beginToolOperation('turn_reliability', { callId: 'current-browser-call', toolName, providerId: 'browser-skill',
+        arguments: { sessionId: 'synthetic-session', contextId: 'synthetic-observation', target: '@e1' } }, grant)!
+      const request = repository.operation(task.id, current.key)!.request!
+      const previousRequest = { ...request, turnId: 'previous-turn', callId: 'previous-browser-call',
+        executionGrant: { ...grant, id: 'previous-grant', turnId: 'previous-turn', idempotencyKey: 'previous-grant' } }
+      repository.beginOperation({ ownerId: task.id, idempotencyKey: 'previous-browser-operation', kind: 'tool', request: previousRequest, nowIso: '2026-07-18T00:00:00.000Z' })
+      repository.finishOperation(task.id, 'previous-browser-operation', { status: 'failed', result: { approved: false,
+        item: makeToolResultItem({ id: 'previous-browser-result', threadId: thread.id, turnId: 'previous-turn', callId: 'previous-browser-call',
+          toolName, isError: true, output: { code: 'operation_not_dispatched' } }) } }, '2026-07-18T00:00:00.000Z')
+      const requestHash = request.approvalRequestHash as string
+      const summary = browserApprovalSummary({ action: 'click', origin: 'https://example.test', targetHtml: '<button data-action="submit">提交申请</button>', requestHash })
+      const priorSummary = variation === 'legacy-summary' ? 'Run browser_click'
+        : variation === 'changed-target' ? browserApprovalSummary({ action: 'click', origin: 'https://example.test', targetHtml: '<button data-action="delete">提交申请</button>', requestHash }) : summary
+      const previousApproval = createApprovalRequest({ id: 'appr_previous-browser-call', threadId: thread.id, turnId: 'previous-turn',
+        toolName, callId: 'previous-browser-call', requestHash, summary: priorSummary })
+      repository.saveHumanRequest({ id: previousApproval.id, kind: 'approval', threadId: thread.id, turnId: 'previous-turn', message: priorSummary,
+        payload: { approval: previousApproval }, status: 'answered', resolution: { decision: 'allow' }, createdAt: '2026-07-18T00:00:00.000Z', updatedAt: '2026-07-18T00:00:00.000Z' })
+      const approval = createApprovalRequest({ id: 'current-browser-approval', threadId: thread.id, turnId: 'turn_reliability',
+        toolName, callId: 'current-browser-call', requestHash, summary })
+      expect(controller.claimUndispatchedApproval(current.token, current.key, approval)).toBe(variation === 'same')
+      expect(repository.operations(task.id, 'approval_transfer')).toHaveLength(variation === 'same' ? 1 : 0)
+      expect(repository.humanRequest(approval.id)?.status).toBe(variation === 'same' ? 'answered' : undefined)
     } finally { repository.close() }
   })
 

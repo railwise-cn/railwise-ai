@@ -2,6 +2,7 @@ import { isBrowserTask, browserTaskOrigins } from '../contracts/browser-skill.js
 import { extractScheduleRequirement } from '../contracts/schedule.js'
 import { authorizedArtifactWrites } from './task-artifact-proof.js'
 import { workspacePermissionCapability } from './workspace-write-preflight.js'
+import type { CapabilityPreflight } from '../contracts/harness.js'
 import type { ToolEffectResolver } from '../ports/tool-effect.js'
 import { externalTaskIntent } from './external-task-capability.js'
 import { verifiedEffectReceipts, externalOperationForTool, externalTarget, requestedEffectOperations } from './external-effect-evidence.js'
@@ -627,6 +628,7 @@ export class TaskController {
   async assessNonRetryableBlock(threadId: string, turnId: string): Promise<TaskCandidateDecision | null> {
     const task = this.repository.findActiveByThread(threadId)
     if (!task || task.activeTurnId !== turnId) return null
+    if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
     const thread = await this.threadStore.get(threadId)
     const turn = thread?.turns.find(candidate => candidate.id === turnId)
     const items = (await this.sessionStore.loadItems(threadId)).filter(item => item.turnId === turnId)
@@ -639,16 +641,32 @@ export class TaskController {
 
   private waitForToolPermission(task: TaskRun, items: TurnItem[], turnId: string): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null {
     const denied = [...items].reverse().find(item => item.kind === 'tool_result' && item.isError && item.output && typeof item.output === 'object' &&
-      ['sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked'].includes(String((item.output as Record<string, unknown>).code)))
+      ['sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
+        'browser_interaction_scope_required', 'browser_binding_changed'].includes(String((item.output as Record<string, unknown>).code)))
     if (!denied || denied.kind !== 'tool_result') return null
     const code = String((denied.output as Record<string, unknown>).code)
-    const capability = workspacePermissionCapability(code, code === 'network_scope_blocked' ? '本次操作的网络目标超出当前任务授权，请确认所需的网络范围后继续原任务。' : '本次文件操作缺少对应的任务权限，请确认目标路径的读写范围后继续原任务。')
+    const browserBlock = code === 'browser_interaction_scope_required' || code === 'browser_binding_changed'
+    let capability: CapabilityPreflight
+    if (browserBlock) {
+      const resolution = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认当前任务的浏览器范围' }
+      capability = { provider: 'browser-skill', status: 'needs_authorization', errorCode: code,
+        message: code === 'browser_binding_changed'
+          ? '浏览器实例或连接配置已变化。请审阅当前任务的浏览器和站点范围，确认后继续原任务。'
+          : '当前任务需要网页交互权限。请确认浏览器、允许访问的站点和交互范围，然后继续原任务。',
+        credentialState: 'unknown', networkState: 'unknown', workspaceState: 'unknown', sandboxState: 'allowed',
+        approvalState: 'required', action: resolution, resolution, checkedAt: this.nowIso() }
+    } else {
+      capability = workspacePermissionCapability(code, code === 'network_scope_blocked' ? '本次操作的网络目标超出当前任务授权，请确认所需的网络范围后继续原任务。' : '本次文件操作缺少对应的任务权限，请确认目标路径的读写范围后继续原任务。')
+    }
     const attentionId = `capability_${task.id}`
     const fingerprint = `permission:${turnId}:${code}`
     const now = this.nowIso()
     return this.repository.transact(() => {
-      const result = this.waitForUser(task, capability.message, '', fingerprint, turnId)
       const prior = this.repository.attention(attentionId)
+      if (task.status === 'waiting_user' && prior?.status === 'pending' && prior.payload?.fingerprint === fingerprint) {
+        return { kind: 'waiting_user', task, reason: capability.message }
+      }
+      const result = this.waitForUser(task, capability.message, '', fingerprint, turnId)
       if (prior?.status === 'pending' && prior.payload?.fingerprint === fingerprint) return result
       this.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: task.originThreadId ?? task.threadId,
         workspaceRoot: task.workspaceRoot, kind: 'blocked', title: '确认任务执行权限', message: capability.message, status: 'pending', revision: (prior?.revision ?? -1) + 1,
@@ -937,6 +955,7 @@ export class TaskController {
           return request.status === 'answered' && (request.resolution as { decision?: string })?.decision === 'allow' &&
             request.threadId === approval.threadId &&
             request.turnId === previous.request?.turnId && original?.toolName === approval.toolName &&
+            (!approval.toolName.startsWith('browser_') || original.summary === approval.summary) &&
             (original.callId === previous.request?.callId || request.id === `appr_${previous.request?.callId}`) &&
             (!original.requestHash || original.requestHash === originalRequestHash)
         })
