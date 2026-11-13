@@ -590,7 +590,7 @@ export function inspectWindowsBrowserRecoveryState({ task, thread, originThreadI
   return { taskId, threadId: task.threadId, originThreadId, status, turns: 0, modelRequests: 0, ...(binding ? { binding } : {}) }
 }
 
-export function windowsBrowserBindingUiExpression() {
+export function windowsBrowserBindingUiExpression({ pointerAudit = false } = {}) {
   return `(() => {
     const detail=document.querySelector('article[aria-label="任务详情"]');
     if(!detail || !detail.getClientRects().length)return null;
@@ -601,11 +601,84 @@ export function windowsBrowserBindingUiExpression() {
     if(!root?.textContent.includes('请核对本任务将使用的浏览器和原有站点范围。确认后可继续原任务。'))return null;
     const values=Array.from(root.querySelectorAll('dl dd')).map(node=>node.textContent);
     if(values.length!==3)return null;
-    button.scrollIntoView({block:'center'});
+    button.scrollIntoView({block:'center',inline:'center',behavior:'instant'});
     const box=button.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
-    if(!button.contains(document.elementFromPoint(point.x,point.y)))return null;
-    return {point,values};
+    const hit=document.elementFromPoint(point.x,point.y);
+    if(!button.contains(hit) || point.x<0 || point.y<0 || point.x>=innerWidth || point.y>=innerHeight)return null;
+    const target=node=>({tag:node?.tagName ?? null,confirmationButton:button.contains(node)});
+    const scroll=[];for(let node=button.parentElement;node;node=node.parentElement) {
+      if(node.scrollHeight>node.clientHeight || node.scrollWidth>node.clientWidth)scroll.push({tag:node.tagName,top:node.scrollTop,left:node.scrollLeft,width:node.clientWidth,height:node.clientHeight,scrollWidth:node.scrollWidth,scrollHeight:node.scrollHeight});
+    }
+    const measurement={point,values,sampledAt:Date.now(),rect:{x:box.x,y:box.y,width:box.width,height:box.height},
+      viewport:{width:innerWidth,height:innerHeight,devicePixelRatio,visualScale:globalThis.visualViewport?.scale ?? 1},
+      zoom:getComputedStyle(document.documentElement).zoom,scroll,hit:target(hit)};
+    if(${JSON.stringify(pointerAudit)}) {
+      globalThis.__railwiseWindowsBindingPointerAudit?.stop();
+      const events=[];const listener=event=>{if(events.length<8)events.push({type:event.type,trusted:Boolean(event.isTrusted),x:event.clientX,y:event.clientY,button:event.button,target:target(event.target),at:Date.now()});};
+      document.addEventListener('pointerdown',listener,true);
+      globalThis.__railwiseWindowsBindingPointerAudit={events,stop:()=>document.removeEventListener('pointerdown',listener,true)};
+    }
+    return measurement;
   })()`
+}
+
+/** No Runtime read or screenshot may intervene between this fresh hit test and the actual mouse events. */
+export async function clickWindowsBrowserBinding(cdp, audit) {
+  audit.measurement = await cdp.wait(windowsBrowserBindingUiExpression({ pointerAudit: true }), 'the current uncovered browser binding confirmation button')
+  try {
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...audit.measurement.point })
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...audit.measurement.point })
+  } finally {
+    audit.pointerEvents = await cdp.evaluate(`(() => {const audit=globalThis.__railwiseWindowsBindingPointerAudit;if(!audit)return [];audit.stop();delete globalThis.__railwiseWindowsBindingPointerAudit;return audit.events;})()`)
+  }
+  assert.ok(audit.pointerEvents.some(event => event.type === 'pointerdown' && event.trusted && event.target.confirmationButton), 'The real mouse pointerdown must reach the current browser binding confirmation button')
+}
+
+/** Serialized into the owned Main inspector; never inspect or retain headers, credentials, bodies or query strings. */
+export function windowsBindingPostAudit(taskId, stop = false) {
+  const key = '__railwiseWindowsBindingPostAudit'
+  if (taskId) {
+    if (!/^task_[a-zA-Z0-9_-]+$/.test(taskId)) throw new Error('Invalid owned task audit target')
+    globalThis[key]?.stop()
+    const channels = process.getBuiltinModule('node:diagnostics_channel')
+    const path = `/v1/tasks/${encodeURIComponent(taskId)}/browser-binding`
+    const state = { probe: { requests: 0, responseStatus: null }, posts: [], stopped: false }
+    const requests = new WeakMap()
+    const kind = request => {
+      if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(String(request?.origin))) return
+      if (request.method === 'GET' && request.path === '/v1/runtime/info') return 'probe'
+      if (request.method === 'POST' && request.path === path) return 'post'
+    }
+    const created = ({ request }) => {
+      const type = kind(request)
+      if (type === 'probe') state.probe.requests += 1
+      if (type !== 'post' || state.posts.length >= 8) return
+      const entry = { method: 'POST', path, requestedAt: Date.now(), status: null }
+      state.posts.push(entry)
+      requests.set(request, entry)
+    }
+    const headers = ({ request, response }) => {
+      if (kind(request) === 'probe') state.probe.responseStatus = response.statusCode
+      const entry = requests.get(request)
+      if (entry) { entry.status = response.statusCode; entry.respondedAt = Date.now() }
+    }
+    const failed = ({ request, error }) => {
+      const entry = requests.get(request)
+      if (entry) entry.errorCode = /^[A-Z0-9_]{1,80}$/.test(error?.code ?? '') ? error.code : 'transport_error'
+    }
+    const subscriptions = [['undici:request:create', created], ['undici:request:headers', headers], ['undici:request:error', failed]]
+    for (const [name, listener] of subscriptions) channels.channel(name).subscribe(listener)
+    state.stop = () => { for (const [name, listener] of subscriptions) channels.channel(name).unsubscribe(listener); state.stopped = true }
+    globalThis[key] = state
+  }
+  const state = globalThis[key]
+  if (!state) return { status: 'unavailable', reason: 'owned-main-audit-not-installed', posts: [] }
+  if (stop) state.stop()
+  const result = { status: state.probe.requests > 0 && state.probe.responseStatus === 200 ? 'available' : 'unavailable',
+    transport: 'undici-diagnostics-channel', probe: { ...state.probe }, posts: state.posts.map(entry => ({ ...entry })), stopped: state.stopped }
+  if (result.status === 'unavailable') result.reason = 'same-runtime-host-read-not-observed'
+  if (stop) delete globalThis[key]
+  return result
 }
 
 export function windowsFixtureApprovalUiExpression(values, summary, { openDetails = false, businessOnly = false } = {}) {
@@ -1247,6 +1320,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const environment = windowsUiEnvironment(process.env, root)
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
   const taskModel = taskSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke }) : undefined
+  const mainInspectorPort = browserSmoke ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
   await writeFile(settingsPath, JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: 'zh', theme: 'dark', workspaceRoot: workspace, uiFontScale: 'small',
@@ -1259,13 +1333,16 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   // Electron's supported --user-data-dir overrides chrome::DIR_USER_DATA
   // before application startup. The installed EXE/ASAR and public identity
   // are used unchanged; candidate mode and updater overrides are absent.
-  const child = spawn(executable, [`--user-data-dir=${profile}`, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN'],
+  const child = spawn(executable, [`--user-data-dir=${profile}`, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN',
+    ...(mainInspectorPort ? [`--inspect=127.0.0.1:${mainInspectorPort}`] : [])],
     { cwd: root, env: environment, stdio: ['ignore', 'pipe', 'pipe'] })
   let output = ''
   let launchError
   child.once('error', error => { launchError = error })
   for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => { output = (output + bytes).slice(-50_000) })
   let cdp
+  let mainCdp
+  let stopBindingPostAudit
   let realBrowser
   try {
     const deadline = Date.now() + 90_000
@@ -1284,6 +1361,19 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       if (!cdp) await sleep(200)
     }
     if (!cdp) throw new Error('The installed application did not expose its packaged renderer')
+    if (mainInspectorPort) {
+      try {
+        const targets = await fetch(`http://127.0.0.1:${mainInspectorPort}/json/list`, { signal: AbortSignal.timeout(3000) }).then(response => response.json())
+        const target = targets.find(item => item.type === 'node' && item.webSocketDebuggerUrl?.startsWith(`ws://127.0.0.1:${mainInspectorPort}/`))
+        assert.ok(target, 'The loopback inspector must belong to the owned Main process')
+        mainCdp = await connectCdp(target.webSocketDebuggerUrl)
+        assert.equal(await mainCdp.evaluate('process.pid'), child.pid)
+      } catch {
+        mainCdp?.close()
+        mainCdp = undefined
+        report.bindingTransportAudit = { status: 'unavailable', reason: 'owned-main-inspector-unavailable' }
+      }
+    }
     await cdp.wait(`Boolean(window.workwise?.getAppVersion && document.querySelector('button') && document.body.innerText.includes('技能与连接器'))`, 'Chinese navigation', 60_000)
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), version)
     const actualSettings = await cdp.evaluate(`window.workwise.getSettings().then(settings => ({locale:settings.locale,theme:settings.theme,workspaceRoot:settings.workspaceRoot}))`)
@@ -1512,11 +1602,26 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         assert.equal(previewSnapshot.interaction, 'interact')
         assert.deepEqual(previewSnapshot.origins, [new URL(taskModel.fixtureUrl).origin])
         assert.deepEqual(panel.values, [previewSnapshot.browserLabel, new URL(taskModel.fixtureUrl).origin, '允许网页交互。可能修改网站数据的操作仍按任务范围审阅。'])
+        const confirmationAudit = { transport: report.bindingTransportAudit ?? { status: 'unavailable', reason: 'owned-main-audit-not-installed', posts: [] } }
+        browserRecovery.confirmationAudit = confirmationAudit
+        if (mainCdp) {
+          try {
+            await mainCdp.evaluate(`(${windowsBindingPostAudit.toString()})(${JSON.stringify(taskId)})`)
+            stopBindingPostAudit = async () => {
+              try { confirmationAudit.transport = await mainCdp.evaluate(`(${windowsBindingPostAudit.toString()})(null,true)`) }
+              catch { confirmationAudit.transport = { status: 'unavailable', reason: 'owned-main-audit-read-unavailable', posts: [] } }
+              stopBindingPostAudit = undefined
+            }
+            // Verify this host's actual fetch transport before interpreting any missing POST trace.
+            await runtimeRequest('/v1/runtime/info')
+          } catch { confirmationAudit.transport = { status: 'unavailable', reason: 'owned-main-audit-install-unavailable', posts: [] } }
+        }
         const bindingScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
         await writeFile(join(evidenceDir, 'windows-task-browser-binding-before-confirm-zh-dark.png'), Buffer.from(bindingScreenshot.data, 'base64'))
-        await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...panel.point })
-        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...panel.point })
-        await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes('浏览器范围已确认。点击继续原任务。'))`, 'the actual UI confirmation without starting the task')
+        try {
+          await clickWindowsBrowserBinding(cdp, confirmationAudit)
+          await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes('浏览器范围已确认。点击继续原任务。'))`, 'the actual UI confirmation without starting the task')
+        } finally { await stopBindingPostAudit?.() }
         const binding = { browserInstanceId: realBrowser.evidence.browserInstanceId, origins: [new URL(taskModel.fixtureUrl).origin], interaction: 'interact', revision: realBrowser.browserRevision }
         const confirmed = await readRecovery('paused')
         const confirmedTask = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`)
@@ -1793,6 +1898,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       try { report.failureLogs = await readWindowsFailureLogs(profile, output) } catch { report.failureLogs = { readUnavailable: true } }
     }
   } finally {
+    await stopBindingPostAudit?.()
+    mainCdp?.close()
     realBrowser?.cdp.close()
     await realBrowser?.stop()
     if (cdp) {

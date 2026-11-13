@@ -3,12 +3,14 @@ import { readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
+import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
 import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
+import { clickWindowsBrowserBinding, windowsBindingPostAudit } from './run-windows-ui-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
 function permissionRuntimeEvidence() {
@@ -634,13 +636,77 @@ test('browser binding UI selection requires the actual task card, complete previ
     button.getBoundingClientRect = () => ({ x: 10, y: 20, width: 20, height: 10 })
     window.document.elementFromPoint = () => button
     const result = JSON.parse(JSON.stringify(window.eval(windowsBrowserBindingUiExpression())))
-    assert.deepEqual(result, { point: { x: 20, y: 25 }, values: ['browser-fixed', 'http://127.0.0.1:1234', zh.browserSkillAllowInteraction] })
+    assert.deepEqual(result.point, { x: 20, y: 25 })
+    assert.deepEqual(result.values, ['browser-fixed', 'http://127.0.0.1:1234', zh.browserSkillAllowInteraction])
+    assert.deepEqual(result.hit, { tag: 'BUTTON', confirmationButton: true })
+    assert.equal(result.viewport.width, window.innerWidth)
+    assert.ok(Number.isFinite(result.sampledAt))
+    window.eval(windowsBrowserBindingUiExpression({ pointerAudit: true }))
+    button.dispatchEvent(new window.PointerEvent('pointerdown', { bubbles: true, clientX: 20, clientY: 25, button: 0 }))
+    assert.deepEqual(JSON.parse(JSON.stringify(window.__railwiseWindowsBindingPointerAudit.events)).map(({ type, trusted, x, y, target }) => ({ type, trusted, x, y, target })),
+      [{ type: 'pointerdown', trusted: false, x: 20, y: 25, target: { tag: 'BUTTON', confirmationButton: true } }])
+    window.__railwiseWindowsBindingPointerAudit.stop()
+    window.document.elementFromPoint = () => window.document.body
+    assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
+    window.document.elementFromPoint = () => button
     button.disabled = true
     assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
     button.disabled = false
     detail.querySelector('dd').remove()
     assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
   } finally { await window.happyDOM.close() }
+})
+
+test('browser binding samples the current hit point immediately before real mouse and retains pointer diagnostics', async () => {
+  const calls = [], audit = {}
+  const cdp = {
+    wait: async expression => { calls.push('fresh-hit-test'); assert.match(expression, /elementFromPoint/); return { point: { x: 120, y: 220 } } },
+    send: async (method, parameters) => { calls.push(parameters.type); assert.equal(method, 'Input.dispatchMouseEvent'); assert.equal(parameters.x, 120); assert.equal(parameters.y, 220) },
+    evaluate: async expression => { calls.push('read-and-stop-pointer-audit'); assert.match(expression, /audit\.stop\(\)/); return [{ type: 'pointerdown', trusted: true, target: { confirmationButton: true } }] }
+  }
+  await clickWindowsBrowserBinding(cdp, audit)
+  assert.deepEqual(calls, ['fresh-hit-test', 'mousePressed', 'mouseReleased', 'read-and-stop-pointer-audit'])
+  assert.equal(audit.measurement.point.x, 120)
+  assert.equal(audit.pointerEvents[0].target.confirmationButton, true)
+  cdp.evaluate = async () => [{ type: 'pointerdown', trusted: true, target: { confirmationButton: false } }]
+  await assert.rejects(() => clickWindowsBrowserBinding(cdp, {}), /pointerdown must reach/)
+  cdp.evaluate = async () => [{ type: 'pointerdown', trusted: false, target: { confirmationButton: true } }]
+  await assert.rejects(() => clickWindowsBrowserBinding(cdp, {}), /pointerdown must reach/)
+  const source = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+  const preview = source.indexOf('const previewSnapshot = await runtimeRequest(')
+  const screenshot = source.indexOf("await writeFile(join(evidenceDir, 'windows-task-browser-binding-before-confirm-zh-dark.png')", preview)
+  const click = source.indexOf('await clickWindowsBrowserBinding(cdp, confirmationAudit)', screenshot)
+  assert.ok(preview > 0 && screenshot > preview && click > screenshot)
+  assert.doesNotMatch(source.slice(screenshot, click), /runtimeRequest\(|cdp\.send\(/)
+  assert.doesNotMatch(clickWindowsBrowserBinding.toString(), /\.click\(|runtimeRequest|captureScreenshot/)
+})
+
+test('binding POST audit observes actual Node fetch path/status, proves transport with a host read and excludes secrets and queries', async () => {
+  const server = createServer((_request, response) => { response.writeHead(200, { 'content-type': 'application/json', 'set-cookie': 'private-cookie' }); response.end('{"private":"private-response-body"}') })
+  await new Promise(done => server.listen(0, '127.0.0.1', done))
+  const base = `http://127.0.0.1:${server.address().port}`, path = '/v1/tasks/task_scope_audit/browser-binding'
+  try {
+    assert.equal(windowsBindingPostAudit('task_scope_audit').status, 'unavailable', 'No trace cannot be interpreted before verifying the actual transport')
+    await (await fetch(`${base}/v1/runtime/info`)).text()
+    await (await fetch(base + path, { method: 'POST', headers: { Authorization: 'Bearer private-token' }, body: 'private-request-body' })).text()
+    await (await fetch(base + path + '?private-query', { method: 'POST', body: 'private-other-body' })).text()
+    const audit = windowsBindingPostAudit(null, true)
+    assert.equal(audit.status, 'available')
+    assert.equal(audit.stopped, true)
+    assert.equal(audit.probe.responseStatus, 200)
+    assert.equal(audit.posts.length, 1)
+    assert.equal(audit.posts[0].method, 'POST')
+    assert.equal(audit.posts[0].path, path)
+    assert.equal(audit.posts[0].status, 200)
+    assert.deepEqual(Object.keys(audit.posts[0]).sort(), ['method', 'path', 'requestedAt', 'respondedAt', 'status'])
+    assert.doesNotMatch(JSON.stringify(audit), /private|Authorization|Bearer|cookie|body|headers|query/)
+    await (await fetch(base + path, { method: 'POST' })).text()
+    assert.equal(windowsBindingPostAudit().status, 'unavailable', 'Stopped subscriptions do not survive the owned audit')
+  } finally {
+    windowsBindingPostAudit(null, true)
+    server.closeAllConnections()
+    await new Promise(done => server.close(done))
+  }
 })
 
 test('manual-preview layout keeps task details readable and stacks narrow containers using the actual rem threshold', () => {
