@@ -80,6 +80,37 @@ export async function verifyInstalledAgentPackSkill(skill, { applicationRoot, is
     entrySha256: skill.entrySha256, metadataVerified: true, installManifestVerified: true, ownedPathVerified: true }
 }
 
+function verifiedBundledSkillCopy(skill) {
+  const source = skill.bundledCopySource
+  return skill.id === 'tender-master' && skill.source?.type === 'bundled' && skill.source.id === 'tender-master' &&
+    skill.source.autoUpdate === false && source?.id === 'tender-master' && source.metadataVerified === true &&
+    source.ownedPathVerified === true && source.entryRegisteredInAsar === true &&
+    /^[a-f0-9]{64}$/.test(source.entrySha256 ?? '') && source.entrySha256 === skill.entrySha256 &&
+    source.entryRelativePath === 'resources/app.asar.unpacked/src/asset/skills/tender-master/SKILL.md'
+}
+
+export async function verifyInstalledBundledSkillCopy(skill, { applicationRoot, isolatedRoot }) {
+  assert.equal(skill.id, 'tender-master')
+  assert.deepEqual(skill.source, { type: 'bundled', id: 'tender-master', autoUpdate: false })
+  const expectedRoot = join(isolatedRoot, 'home', '.workwise', 'skills', 'tender-master')
+  assert.equal(resolve(skill.root), resolve(expectedRoot))
+  assert.equal(resolve(skill.entryPath), resolve(join(expectedRoot, 'SKILL.md')))
+  assert.ok((await lstat(expectedRoot)).isDirectory() && !(await lstat(expectedRoot)).isSymbolicLink())
+  assert.ok((await lstat(skill.entryPath)).isFile() && !(await lstat(skill.entryPath)).isSymbolicLink())
+  const metadata = JSON.parse(await readFile(join(expectedRoot, '.workwise-skill-source.json'), 'utf8'))
+  assert.equal(metadata.type, 'bundled')
+  assert.equal(metadata.id, 'tender-master')
+  assert.equal(metadata.autoUpdate, false)
+  const bytes = await readFile(skill.entryPath)
+  assert.ok(bytes.equals(asar.extractFile(join(applicationRoot, 'resources', 'app.asar'), join('src', 'asset', 'skills', skill.id, 'SKILL.md'))),
+    'The installed specialist Skill must equal its exact packaged ASAR entry bytes')
+  skill.entrySha256 = createHash('sha256').update(bytes).digest('hex')
+  skill.entryRelativePath = relative(isolatedRoot, skill.entryPath).replaceAll('\\', '/')
+  skill.entryRegisteredInAsar = true
+  skill.bundledCopySource = { id: skill.id, entryRelativePath: 'resources/app.asar.unpacked/src/asset/skills/tender-master/SKILL.md',
+    entrySha256: skill.entrySha256, entryRegisteredInAsar: true, metadataVerified: true, ownedPathVerified: true }
+}
+
 export function validateDefaultSkillSources(skills) {
   return defaultSkillIds.map(id => {
     const skill = skills.find(skill => skill.id === id)
@@ -146,7 +177,10 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.deepEqual(validateDefaultSkillSources(report.resources.defaultSkills).map(skill => skill.id), defaultSkillIds)
   for (const skill of report.resources.defaultSkills) {
     const agentPack = verifiedAgentPackSource(skill)
-    assert.equal(skill.entryRelativePath, agentPack ? 'home/.codex/skills/di-bao-monitoring/SKILL.md' : `resources/app.asar.unpacked/src/asset/skills/${skill.id}/SKILL.md`)
+    const copiedBundle = verifiedBundledSkillCopy(skill)
+    const expectedEntry = agentPack ? 'home/.codex/skills/di-bao-monitoring/SKILL.md'
+      : copiedBundle ? 'home/.workwise/skills/tender-master/SKILL.md' : `resources/app.asar.unpacked/src/asset/skills/${skill.id}/SKILL.md`
+    assert.equal(skill.entryRelativePath, expectedEntry)
     assert.match(skill.entrySha256, /^[a-f0-9]{64}$/)
     assert.equal(skill.entryRegisteredInAsar, !agentPack)
   }
@@ -604,10 +638,13 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       if (skill.id === monitoringAgentPack.component && !skill.source) {
         await verifyInstalledAgentPackSkill(skill, { applicationRoot: dirname(executable), isolatedRoot: root })
       }
+      if (skill.id === 'tender-master' && resolve(skill.root) === resolve(join(root, 'home', '.workwise', 'skills', 'tender-master'))) {
+        await verifyInstalledBundledSkillCopy(skill, { applicationRoot: dirname(executable), isolatedRoot: root })
+      }
     }
     const defaultSkills = validateDefaultSkillSources(skills)
     for (const skill of defaultSkills) {
-      if (!verifiedAgentPackSource(skill)) {
+      if (!verifiedAgentPackSource(skill) && !verifiedBundledSkillCopy(skill)) {
         const entry = join('src', 'asset', 'skills', skill.id, 'SKILL.md')
         const expectedRoot = join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', skill.id)
         assert.equal(resolve(skill.root).toLowerCase(), expectedRoot.toLowerCase())
