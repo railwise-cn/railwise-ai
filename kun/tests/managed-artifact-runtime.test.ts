@@ -72,7 +72,7 @@ describe('managed artifact production assembly with real SQLite and file tools',
     const origin = await runtime.threadService.create({ workspace, mode: 'agent', model: 'synthetic-protocol' })
     const result = await runtime.taskCoordinator!.command({ threadId: origin.id, idempotencyKey: 'html-delivery', request: { prompt: '请生成并交付一份 HTML 网页报告。' } })
     expect(result.task).toBeDefined()
-    await expect.poll(() => runtime.taskRepository!.get(result.task!.id)?.status, { timeout: 10_000 }).not.toBe('running')
+    await expect.poll(() => runtime.taskRepository!.get(result.task!.id)?.status, { timeout: 10_000 }).toBe('completed')
     const task = runtime.taskRepository!.get(result.task!.id)!
     expect(task.status, JSON.stringify({ waitingReason: task.waitingReason, calls: step, toolNames: catalogs[0], operations: runtime.taskRepository!.operations(task.id, 'tool').map(receipt => ({ status: receipt.status, error: receipt.error })) })).toBe('completed')
     expect(task.artifacts).toMatchObject([{ format: 'html', validation: 'valid' }])
