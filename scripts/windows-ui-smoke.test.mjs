@@ -206,7 +206,8 @@ test('browser evidence requires the actual extension, HTML tool output and close
   // Only exercises the evidence validator, never substitutes for a real extension session.
   const evidence = { status: 'passed', fixturePageRead: true, htmlFromBrowserTool: true, sessionStopped: true, cliVersion: '0.4.0',
     skillInstallation: { packageId: 'browser-skill', sourceCommit: '9cfba53582cb04d48da36aabd0a5017987d4daea',
-      runtimeHotLoaded: true, runtimeUnchanged: true, sameConversation: true, activeInTask: true, entrySha256: 'b'.repeat(64) },
+      runtimeHotLoaded: true, runtimeUnchanged: true, sameConversation: true, activeInTask: true, entrySha256: 'b'.repeat(64),
+      guiScheduleMcp: { id: 'gui_schedule', enabled: true, available: true, status: 'connected', toolCount: 8 } },
     extension: { version: '0.4.0', sha256: browserSmokeDependency.extensionSha256 }, browser: { version: browserSmokeDependency.chromeVersion },
     browserInstanceId: 'synthetic-validation-id', sessionId: 'synthetic-validation-session', htmlSha256: 'a'.repeat(64) }
   assert.doesNotThrow(() => validateWindowsBrowserEvidence(evidence))
@@ -214,8 +215,22 @@ test('browser evidence requires the actual extension, HTML tool output and close
   for (const field of ['runtimeHotLoaded', 'runtimeUnchanged', 'sameConversation', 'activeInTask']) {
     assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, skillInstallation: { ...evidence.skillInstallation, [field]: false } }))
   }
+  for (const change of [{ status: 'error' }, { toolCount: 7 }, { enabled: false }, { available: false }]) {
+    assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, skillInstallation: { ...evidence.skillInstallation,
+      guiScheduleMcp: { ...evidence.skillInstallation.guiScheduleMcp, ...change } } }))
+  }
   assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, status: 'not_exercised' }))
   assert.throws(() => validateWindowsUiReport(report(), identity, { requireBrowserExecution: true }))
+})
+
+test('the installed schedule bridge evidence count matches the fixed node-entry tool contract', () => {
+  const server = readFileSync(new URL('../src/main/claw-schedule-mcp-server.ts', import.meta.url), 'utf8')
+  const names = [...server.matchAll(/register(?:List|Create|Update|Delete)Tool\('([^']+)'\)/g)].map(match => match[1]).sort()
+  assert.deepEqual(names, ['claw_schedule_create', 'claw_schedule_delete', 'claw_schedule_list', 'claw_schedule_update',
+    'gui_schedule_create', 'gui_schedule_delete', 'gui_schedule_list', 'gui_schedule_update'])
+  const ui = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+  assert.match(ui, /const guiScheduleMcp = loaded\.mcpServers\.find/)
+  assert.match(ui, /validateGuiScheduleMcpEvidence\(guiScheduleMcp\)/)
 })
 
 test('installed acceptance uses the real marketplace and checks the existing Runtime without manually refreshing it', () => {

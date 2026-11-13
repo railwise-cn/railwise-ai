@@ -150,6 +150,7 @@ export function validateWindowsBrowserEvidence(evidence) {
   assert.equal(evidence.skillInstallation.runtimeUnchanged, true)
   assert.equal(evidence.skillInstallation.sameConversation, true)
   assert.equal(evidence.skillInstallation.activeInTask, true)
+  validateGuiScheduleMcpEvidence(evidence.skillInstallation.guiScheduleMcp)
   assert.match(evidence.skillInstallation.entrySha256, /^[a-f0-9]{64}$/)
   assert.equal(evidence.extension.version, browserSmokeDependency.extensionVersion)
   assert.equal(evidence.extension.sha256, browserSmokeDependency.extensionSha256)
@@ -157,6 +158,15 @@ export function validateWindowsBrowserEvidence(evidence) {
   assert.ok(evidence.browserInstanceId)
   assert.ok(evidence.sessionId)
   assert.match(evidence.htmlSha256, /^[a-f0-9]{64}$/)
+}
+
+function validateGuiScheduleMcpEvidence(server) {
+  assert.ok(server, 'The installed Runtime must report its built-in gui_schedule MCP')
+  assert.equal(server.id, 'gui_schedule')
+  assert.equal(server.enabled, true)
+  assert.equal(server.available, true)
+  assert.equal(server.status, 'connected')
+  assert.equal(server.toolCount, 8, 'The fixed schedule bridge must discover all eight registered tools')
 }
 
 export async function startWindowsTaskModelFixture({ browser = false } = {}) {
@@ -386,6 +396,8 @@ async function installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeReq
   assert.equal(gui.ok, true)
   assert.ok(gui.skills.some(skill => resolve(skill.entryPath) === resolve(skillEntry)), 'The GUI must discover the exact installed Skill file')
   const loaded = await runtimeRequest('/v1/runtime/tools')
+  const guiScheduleMcp = loaded.mcpServers.find(server => server.id === 'gui_schedule')
+  validateGuiScheduleMcpEvidence(guiScheduleMcp)
   const skill = loaded.skills.skills.find(skill => resolve(skill.root) === resolve(installed.artifact.location))
   assert.ok(skill, 'The existing Runtime must hot-load the real immutable installed Skill root')
   assert.ok(!beforeTools.skills.roots.includes(skill.root), 'The accepted Skill root must be newly installed')
@@ -395,7 +407,7 @@ async function installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeReq
   await cdp.evaluate(`window.workwise.cancelPluginImport(${JSON.stringify(prepared.id)})`)
   return { packageId: installed.packageId, sourceCommit: source.resolvedRef, sourceSubpath: source.subpath, scope: installed.scope,
     reviewSha256: installed.reviewSha256, contentSha256: installed.artifact.sha256, entrySha256: createHash('sha256').update(bytes).digest('hex'),
-    installedRecordReadBack: true, runtimeSkillId: skill.id, runtimeRoot: skill.root, runtimeHotLoaded: true, runtimeUnchanged: true, runtimePid: after.pid, runtimeStartedAt: after.startedAt,
+    installedRecordReadBack: true, runtimeSkillId: skill.id, runtimeRoot: skill.root, runtimeHotLoaded: true, runtimeUnchanged: true, runtimePid: after.pid, runtimeStartedAt: after.startedAt, guiScheduleMcp,
     originThreadId, installationAuthorization: 'explicit-acceptance-in-owned-synthetic-profile' }
 }
 
