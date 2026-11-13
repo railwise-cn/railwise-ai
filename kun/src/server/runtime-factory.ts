@@ -1048,20 +1048,32 @@ export async function createKunServeRuntime(
       return skillRuntime.diagnostics()
     },
     shutdown: async () => {
-      await browserRuntime.close()
+      // SIGTERM also reaches this path directly, without update preparation.
+      // Fence producers before awaiting anything that can admit a late Turn.
+      turnService.setAdmissionSuspended(true)
+      taskController.setAdmissionSuspended(true)
+      flowService.setUpdateSuspended(true)
       deliveryCoordinator.shutdown()
+      taskController.stopWatchdog()
+      flowService.executor.checkpointActiveRuns()
+      await turnService.awaitPendingStarts()
       dingtalkRuntime.close()
       stopContextObserver()
-      taskContextRepository.close()
-      taskController.stopWatchdog()
       if (attachmentCleanupTimer) clearInterval(attachmentCleanupTimer)
       turnService.abortAll('application_exit')
       delegationRuntime?.abortAll('application_exit')
       approvalGate.expireAll('application_exit')
       userInputGate.reset()
+      await browserRuntime.close()
       await stopAllBashSessions('application_exit')
+      await flowService.awaitSourceDispatch()
+      await deliveryCoordinator.awaitIdle()
+      await flowService.executor.awaitIdle()
       await loop.awaitIdle()
       await delegationRuntime?.awaitIdle()
+      await flowService.awaitSourceDispatch()
+      await taskCoordinator.flushCommandMessages()
+      taskContextRepository.close()
       try {
         await mcpRuntime.close()
       } finally {

@@ -143,13 +143,18 @@ function flowAgentPrompt(config: Record<string, unknown>, input: unknown): strin
 /** Polls only persisted state. Waiting tasks cause zero model requests. */
 export class TaskDeliveryCoordinator {
   private timer?: ReturnType<typeof setInterval>
-  private busy = false
+  private pendingTick?: Promise<void>
   constructor(private readonly runtime: ServerRuntime) {}
   start(): void { if (this.timer) return; this.timer = setInterval(() => void this.tick(), 1000); this.timer.unref?.(); void this.tick() }
   shutdown(): void { if (this.timer) clearInterval(this.timer); this.timer = undefined }
-  async tick(): Promise<void> {
-    if (this.busy || !this.runtime.flowService || !this.runtime.taskRepository) return
-    this.busy = true
+  async awaitIdle(): Promise<void> { await this.pendingTick }
+  tick(): Promise<void> {
+    if (this.pendingTick) return this.pendingTick
+    this.pendingTick = this.consumePending().finally(() => { this.pendingTick = undefined })
+    return this.pendingTick
+  }
+  private async consumePending(): Promise<void> {
+    if (!this.runtime.flowService || !this.runtime.taskRepository) return
     const service = this.runtime.flowService
     try {
       await service.flushSourceEvents()
@@ -208,7 +213,7 @@ export class TaskDeliveryCoordinator {
     } catch (error) {
       // Keep the outbox for the next tick; no accepted work or callback is discarded.
       process.stderr.write(`[delivery] ${error instanceof Error ? error.message : String(error)}\n`)
-    } finally { this.busy = false }
+    }
   }
 
   /** Task creation and its retry intent commit together. Cross-database delivery is idempotent. */

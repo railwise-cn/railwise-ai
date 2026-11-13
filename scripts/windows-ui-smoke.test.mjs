@@ -199,12 +199,31 @@ test('task execution is opt-in and cannot be omitted when explicitly requested',
 test('browser evidence requires the actual extension, HTML tool output and closed session', () => {
   // Only exercises the evidence validator, never substitutes for a real extension session.
   const evidence = { status: 'passed', fixturePageRead: true, htmlFromBrowserTool: true, sessionStopped: true, cliVersion: '0.4.0',
+    skillInstallation: { packageId: 'browser-skill', sourceCommit: '9cfba53582cb04d48da36aabd0a5017987d4daea',
+      runtimeHotLoaded: true, runtimeUnchanged: true, sameConversation: true, activeInTask: true, entrySha256: 'b'.repeat(64) },
     extension: { version: '0.4.0', sha256: browserSmokeDependency.extensionSha256 }, browser: { version: browserSmokeDependency.chromeVersion },
     browserInstanceId: 'synthetic-validation-id', sessionId: 'synthetic-validation-session', htmlSha256: 'a'.repeat(64) }
   assert.doesNotThrow(() => validateWindowsBrowserEvidence(evidence))
   for (const field of ['fixturePageRead', 'htmlFromBrowserTool', 'sessionStopped']) assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, [field]: false }))
+  for (const field of ['runtimeHotLoaded', 'runtimeUnchanged', 'sameConversation', 'activeInTask']) {
+    assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, skillInstallation: { ...evidence.skillInstallation, [field]: false } }))
+  }
   assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, status: 'not_exercised' }))
   assert.throws(() => validateWindowsUiReport(report(), identity, { requireBrowserExecution: true }))
+})
+
+test('installed acceptance uses the real marketplace and checks the existing Runtime without manually refreshing it', () => {
+  const ui = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+  assert.match(ui, /window\.workwise\.prepareCatalogPlugin/)
+  assert.match(ui, /window\.workwise\.installPreparedPlugin/)
+  assert.match(ui, /readFile\(skillEntry\)/)
+  assert.match(ui, /runtimeRequest\('\/v1\/runtime\/tools'\)/)
+  assert.doesNotMatch(ui, /runtime\/skills\/refresh|window\.workwise\.refreshSkills/)
+  assert.ok(ui.indexOf('const originThreadId = newThreads[0].id') < ui.indexOf('skillInstallation = await installMarketplaceBrowserSkill'))
+  assert.match(ui, /assert\.equal\(task\.originThreadId, originThreadId/)
+  assert.doesNotMatch(ui, /(?:tasks|list)\.tasks\.(?:find|filter)/)
+  const runtimeRoute = readFileSync(new URL('../kun/src/server/routes/tasks.ts', import.meta.url), 'utf8')
+  assert.match(runtimeRoute, /return jsonResponse\(runtime\.taskRepository\.list\(/)
 })
 
 test('browser protocol model asks for real navigation and refuses to invent missing page HTML', async () => {
@@ -223,5 +242,15 @@ test('browser protocol model asks for real navigation and refuses to invent miss
     assert.equal(response.status, 200)
     const body = await response.text()
     assert.ok(body.includes('publish_artifact') && body.includes(fixture.marker))
+    // A later scheduled task uses a fresh conversation. Completed calls from
+    // the previous request never become mutable state in this protocol model.
+    const nextTask = await (await request([])).text()
+    assert.ok(nextTask.includes('browser_session_start'))
+    const freshHistory = [
+      { role: 'assistant', tool_calls: [{ id: 'fresh-start', function: { name: 'browser_session_start', arguments: '{}' } }] },
+      { role: 'tool', tool_call_id: 'fresh-start', content: JSON.stringify({ sessionId: 'fresh-task-session' }) }
+    ]
+    const navigation = await (await request(freshHistory)).text()
+    assert.ok(navigation.includes('browser_navigate') && navigation.includes('fresh-task-session'))
   } finally { await fixture.close() }
 })

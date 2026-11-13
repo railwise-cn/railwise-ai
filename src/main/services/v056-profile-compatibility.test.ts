@@ -3,6 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
+import type { InstalledPackageV1, PackageSourceV1 } from '../../shared/marketplace'
 import { JsonSettingsStore } from '../settings-store'
 import { McpConfigService } from './mcp-config-service'
 import { inspectPackageDirectory, PackageInstallationService } from './package-installation-service'
@@ -60,11 +61,11 @@ it.each(['keychain', 'dpapi'] as const)('preserves 0.5.6 workspace, custom Skill
   const packagePath = join(pluginRoot, 'packages', createHash('sha256').update(packageId).digest('hex'), 'versions', inspection.sha256)
   await mkdir(dirname(packagePath), { recursive: true })
   await cp(source, packagePath, { recursive: true })
-  const packageSource = { id: 'v056-source', kind: 'local', location: source }
-  const packageRecord = { schemaVersion: 1, packageId, version: '1.0.0', scope: 'user', source: packageSource, sources: [packageSource],
-    components: [{ id: 'package-v056', type: 'skill', skillNames: ['package-v056'] }], permissions: [], license: 'MIT',
+  const packageSource: PackageSourceV1 = { id: 'v056-source', catalogSourceId: 'local-import', kind: 'local', location: source }
+  const packageRecord: Omit<InstalledPackageV1, 'rollback'> = { schemaVersion: 1, packageId, version: '1.0.0', scope: 'user', source: packageSource, sources: [packageSource],
+    components: [{ componentId: 'package-v056', sourceId: packageSource.id }], permissions: [], license: 'MIT',
     reviewSha256: 'a'.repeat(64), timestamps: { installedAt: '2026-11-12T01:00:00.000Z' },
-    updatePolicy: { strategy: 'manual', channel: 'stable', allowMajor: false }, health: { status: 'installed' },
+    updatePolicy: { strategy: 'manual', channel: 'stable', allowMajor: false }, health: { status: 'healthy' },
     artifact: { sha256: inspection.sha256, location: packagePath, fileCount: inspection.fileCount, totalBytes: inspection.totalBytes } }
   const installedPath = join(pluginRoot, 'installed.json')
   const installedContents = JSON.stringify({ schema: 'workwise.installed-packages', version: 1, revision: 3,

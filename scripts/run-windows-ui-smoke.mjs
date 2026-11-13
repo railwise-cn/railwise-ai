@@ -144,6 +144,13 @@ export function validateWindowsBrowserEvidence(evidence) {
   assert.equal(evidence.htmlFromBrowserTool, true)
   assert.equal(evidence.sessionStopped, true)
   assert.equal(evidence.cliVersion, '0.4.0')
+  assert.equal(evidence.skillInstallation.packageId, 'browser-skill')
+  assert.equal(evidence.skillInstallation.sourceCommit, '9cfba53582cb04d48da36aabd0a5017987d4daea')
+  assert.equal(evidence.skillInstallation.runtimeHotLoaded, true)
+  assert.equal(evidence.skillInstallation.runtimeUnchanged, true)
+  assert.equal(evidence.skillInstallation.sameConversation, true)
+  assert.equal(evidence.skillInstallation.activeInTask, true)
+  assert.match(evidence.skillInstallation.entrySha256, /^[a-f0-9]{64}$/)
   assert.equal(evidence.extension.version, browserSmokeDependency.extensionVersion)
   assert.equal(evidence.extension.sha256, browserSmokeDependency.extensionSha256)
   assert.equal(evidence.browser.version, browserSmokeDependency.chromeVersion)
@@ -347,6 +354,51 @@ async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
   }
 }
 
+async function installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeRequest, originThreadId }) {
+  const before = await runtimeRequest('/v1/runtime/info')
+  assert.ok(Number.isInteger(before.pid) && before.pid > 0)
+  assert.ok(Number.isFinite(Date.parse(before.startedAt)))
+  const beforeTools = await runtimeRequest('/v1/runtime/tools')
+  assert.ok(!beforeTools.skills.skills.some(skill => skill.name === 'browser-skill'), 'The isolated Runtime must start without the marketplace BrowserSkill')
+  const catalog = await cdp.evaluate('window.workwise.listCatalogPackages()')
+  const entry = catalog.packages.find(item => item.package.id === 'browser-skill')
+  assert.ok(entry, 'The fixed BrowserSkill must be available in the installed local marketplace')
+  const source = entry.package.sources.find(item => item.kind === 'github' && item.owner === 'Tencent' && item.repository === 'BrowserSkill')
+  assert.equal(source?.resolvedRef, '9cfba53582cb04d48da36aabd0a5017987d4daea')
+  assert.equal(source.subpath, 'crates/bsk-cli/skill')
+  const prepared = await cdp.evaluate(`window.workwise.prepareCatalogPlugin(${JSON.stringify({ sourceId: entry.sourceId, packageId: 'browser-skill' })})`, 180_000)
+  assert.equal(prepared.package.id, 'browser-skill')
+  assert.equal(prepared.compatibility.workwiseCompatible, true)
+  const installed = await cdp.evaluate(`window.workwise.installPreparedPlugin(${JSON.stringify({ preparedId: prepared.id, reviewSha256: prepared.reviewSha256,
+    expectedCurrentVersion: null, scope: 'user', permissions: [], idempotencyKey: 'windows-synthetic-browser-skill-install' })})`, 180_000)
+  assert.equal(installed.packageId, 'browser-skill')
+  assert.equal(installed.reviewSha256, prepared.reviewSha256)
+  assert.equal(installed.artifact.sha256, prepared.contentSha256)
+  const installedReadback = await cdp.evaluate('window.workwise.listInstalledPlugins()')
+  const saved = installedReadback.find(item => item.packageId === 'browser-skill')
+  assert.equal(saved?.artifact.sha256, installed.artifact.sha256)
+  assert.equal(saved?.reviewSha256, prepared.reviewSha256)
+  assert.ok(contained(root, installed.artifact.location), 'The actual Skill installation must remain in the isolated profile')
+  const skillEntry = join(installed.artifact.location, 'SKILL.md')
+  const bytes = await readFile(skillEntry)
+  assert.ok(bytes.toString('utf8').includes('browser-skill'))
+  const gui = await cdp.evaluate(`window.workwise.listSkills(${JSON.stringify(workspace)})`)
+  assert.equal(gui.ok, true)
+  assert.ok(gui.skills.some(skill => resolve(skill.entryPath) === resolve(skillEntry)), 'The GUI must discover the exact installed Skill file')
+  const loaded = await runtimeRequest('/v1/runtime/tools')
+  const skill = loaded.skills.skills.find(skill => resolve(skill.root) === resolve(installed.artifact.location))
+  assert.ok(skill, 'The existing Runtime must hot-load the real immutable installed Skill root')
+  assert.ok(!beforeTools.skills.roots.includes(skill.root), 'The accepted Skill root must be newly installed')
+  const after = await runtimeRequest('/v1/runtime/info')
+  assert.equal(after.pid, before.pid)
+  assert.equal(after.startedAt, before.startedAt)
+  await cdp.evaluate(`window.workwise.cancelPluginImport(${JSON.stringify(prepared.id)})`)
+  return { packageId: installed.packageId, sourceCommit: source.resolvedRef, sourceSubpath: source.subpath, scope: installed.scope,
+    reviewSha256: installed.reviewSha256, contentSha256: installed.artifact.sha256, entrySha256: createHash('sha256').update(bytes).digest('hex'),
+    installedRecordReadBack: true, runtimeSkillId: skill.id, runtimeRoot: skill.root, runtimeHotLoaded: true, runtimeUnchanged: true, runtimePid: after.pid, runtimeStartedAt: after.startedAt,
+    originThreadId, installationAuthorization: 'explicit-acceptance-in-owned-synthetic-profile' }
+}
+
 export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true' }) {
   taskSmoke ||= browserSmoke
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
@@ -547,23 +599,36 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.checks.push('offline-help-images')
     if (taskSmoke) {
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
-      if (browserSmoke) realBrowser = await startRealBrowserSmoke({ cdp, root, environment, fixtureUrl: taskModel.fixtureUrl })
       const runtimeRequest = (path, method = 'GET', body) => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},${JSON.stringify(method)},${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'}).then(result=>{if(!result.ok)throw new Error(result.body);return JSON.parse(result.body)})`)
-      const prompt = `${browserSmoke ? `请用 BrowserSkill 浏览器读取 ${taskModel.fixtureUrl}，将网页实际内容生成HTML报告并交付。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
+      const previousThreads = new Set((await runtimeRequest('/v1/threads')).threads.map(thread => thread.id))
+      const prompt = `${browserSmoke ? `请用已安装的 BrowserSkill（$browser-skill）浏览器读取 ${taskModel.fixtureUrl}，将网页实际内容生成HTML报告并交付。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
       await cdp.hover('button[aria-label="新建会话"]')
       await cdp.wait(`(()=>{const node=document.querySelector('button[aria-label="新建会话"]');if(!node)return false;const r=node.getBoundingClientRect();return node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))})()`, 'the visible new-conversation action')
       await cdp.click('button[aria-label="新建会话"]')
       await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]:not(:disabled)'))`, 'the active conversation composer')
+      const newThreads = (await runtimeRequest('/v1/threads')).threads.filter(thread => !previousThreads.has(thread.id))
+      assert.equal(newThreads.length, 1, 'The normal UI must create one existing conversation before Skill installation')
+      const originThreadId = newThreads[0].id
+      let skillInstallation
+      if (browserSmoke) {
+        skillInstallation = await installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeRequest, originThreadId })
+        realBrowser = await startRealBrowserSmoke({ cdp, root, environment, fixtureUrl: taskModel.fixtureUrl })
+        const runtimeAfter = await runtimeRequest('/v1/runtime/info')
+        assert.equal(runtimeAfter.pid, skillInstallation.runtimePid)
+        assert.equal(runtimeAfter.startedAt, skillInstallation.runtimeStartedAt)
+      }
       await cdp.fill('textarea[placeholder="向智能体提问…"]', prompt)
       await cdp.click('button[aria-label="发送"]')
       let task
       const admissionDeadline = Date.now() + 30_000
       while (!task && Date.now() < admissionDeadline) {
         const tasks = await runtimeRequest('/v1/tasks?limit=100')
-        task = tasks.tasks.find(item => item.goal === prompt && !item.scheduledBy)
+        assert.ok(Array.isArray(tasks), 'The ordinary task-list API returns an array')
+        task = tasks.find(item => item.goal === prompt && !item.scheduledBy)
         if (!task) await sleep(200)
       }
       assert.ok(task?.id, 'The actual composer must create the ordinary task and origin conversation')
+      assert.equal(task.originThreadId, originThreadId, 'Installing the Skill must preserve the already open conversation')
       const taskDeadline = Date.now() + 90_000
       while (Date.now() < taskDeadline && !['completed', 'failed', 'stalled', 'waiting_user'].includes(task.status)) {
         await sleep(250)
@@ -593,7 +658,13 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         const stopped = output('browser_session_stop')
         assert.equal(html?.sourceUrl, taskModel.fixtureUrl)
         assert.ok(html?.html?.includes(taskModel.marker), 'The actual browser HTML tool must return the controlled page marker')
-        report.taskExecution.browserSkill = { ...realBrowser.evidence, status: 'passed', fixturePageRead: true, htmlFromBrowserTool: true,
+        const runtimeAfterTask = await runtimeRequest('/v1/runtime/info')
+        assert.equal(runtimeAfterTask.pid, skillInstallation.runtimePid)
+        assert.equal(runtimeAfterTask.startedAt, skillInstallation.runtimeStartedAt)
+        const taskTools = await runtimeRequest('/v1/runtime/tools')
+        assert.ok(taskTools.skills.lastInjection?.activeSkillIds.includes(skillInstallation.runtimeSkillId), 'The real task must activate the newly installed Skill in the existing Runtime')
+        report.taskExecution.browserSkill = { ...realBrowser.evidence, skillInstallation: { ...skillInstallation, sameConversation: true, activeInTask: true },
+          status: 'passed', fixturePageRead: true, htmlFromBrowserTool: true,
           sessionId: session?.sessionId, sessionStopped: stopped?.stopped === true && stopped?.sessionId === session?.sessionId,
           sourceUrl: html.sourceUrl, htmlSha256: createHash('sha256').update(html.html).digest('hex') }
         validateWindowsBrowserEvidence(report.taskExecution.browserSkill)
@@ -641,7 +712,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const occurrenceDeadline = Date.now() + 150_000
       while (Date.now() < occurrenceDeadline) {
         const list = await runtimeRequest('/v1/tasks?limit=100')
-        const matching = list.tasks.filter(item => item.scheduledBy?.scheduleId === schedule.id && item.scheduledBy?.dueAt === dueAt)
+        assert.ok(Array.isArray(list), 'The actual task-list API returns an array')
+        const matching = list.filter(item => item.scheduledBy?.scheduleId === schedule.id && item.scheduledBy?.dueAt === dueAt)
         assert.ok(matching.length <= 1, 'A due occurrence must create at most one task')
         occurrence = matching[0]
         if (occurrence && ['completed', 'failed', 'stalled', 'waiting_user'].includes(occurrence.status)) break
