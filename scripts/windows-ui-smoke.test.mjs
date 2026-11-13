@@ -627,33 +627,39 @@ test('browser binding UI selection requires the actual task card, complete previ
   try {
     const zh = JSON.parse(readFileSync(new URL('../src/renderer/src/locales/zh/common.json', import.meta.url), 'utf8'))
     const panel = `<section aria-label="${zh.capabilityRequiredTitle}"><div><p>${zh.browserTaskBindingReview}</p><dl><dd>browser-fixed</dd><dd>http://127.0.0.1:1234</dd><dd>${zh.browserSkillAllowInteraction}</dd></dl><button>${zh.browserTaskBindingConfirm}</button></div></section>`
+    window.requestAnimationFrame = callback => { queueMicrotask(() => callback(0)); return 1 }
     window.document.body.innerHTML = panel
-    assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
+    assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null)
     window.document.body.innerHTML = `<article aria-label="任务详情">${panel}</article>`
     const detail = window.document.querySelector('article'), button = detail.querySelector('button')
     detail.getClientRects = button.getClientRects = () => [{}]
     button.scrollIntoView = () => undefined
     button.getBoundingClientRect = () => ({ x: 10, y: 20, width: 20, height: 10 })
     window.document.elementFromPoint = () => button
-    const result = JSON.parse(JSON.stringify(window.eval(windowsBrowserBindingUiExpression())))
+    const result = JSON.parse(JSON.stringify(await window.eval(windowsBrowserBindingUiExpression())))
     assert.deepEqual(result.point, { x: 20, y: 25 })
     assert.deepEqual(result.values, ['browser-fixed', 'http://127.0.0.1:1234', zh.browserSkillAllowInteraction])
     assert.deepEqual(result.hit, { tag: 'BUTTON', confirmationButton: true })
     assert.equal(result.viewport.width, window.innerWidth)
     assert.ok(Number.isFinite(result.sampledAt))
-    window.eval(windowsBrowserBindingUiExpression({ pointerAudit: true }))
+    assert.equal(result.stableFrames, 2)
+    assert.equal(result.observedFrames, 3)
+    await window.eval(windowsBrowserBindingUiExpression({ pointerAudit: true }))
     button.dispatchEvent(new window.PointerEvent('pointerdown', { bubbles: true, clientX: 20, clientY: 25, button: 0 }))
     assert.deepEqual(JSON.parse(JSON.stringify(window.__railwiseWindowsBindingPointerAudit.events)).map(({ type, trusted, x, y, target }) => ({ type, trusted, x, y, target })),
       [{ type: 'pointerdown', trusted: false, x: 20, y: 25, target: { tag: 'BUTTON', confirmationButton: true } }])
+    const pointer = window.__railwiseWindowsBindingPointerAudit.events[0]
+    assert.equal(pointer.buttonAtPointer.rect.y, 20)
+    assert.equal(pointer.hitAtPointer.confirmationButton, true)
     window.__railwiseWindowsBindingPointerAudit.stop()
     window.document.elementFromPoint = () => window.document.body
-    assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
+    assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null)
     window.document.elementFromPoint = () => button
     button.disabled = true
-    assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
+    assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null)
     button.disabled = false
     detail.querySelector('dd').remove()
-    assert.equal(window.eval(windowsBrowserBindingUiExpression()), null)
+    assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null)
   } finally { await window.happyDOM.close() }
 })
 
@@ -661,11 +667,11 @@ test('browser binding samples the current hit point immediately before real mous
   const calls = [], audit = {}
   const cdp = {
     wait: async expression => { calls.push('fresh-hit-test'); assert.match(expression, /elementFromPoint/); return { point: { x: 120, y: 220 } } },
-    send: async (method, parameters) => { calls.push(parameters.type); assert.equal(method, 'Input.dispatchMouseEvent'); assert.equal(parameters.x, 120); assert.equal(parameters.y, 220) },
+    send: async (method, parameters) => { if (method === 'Page.bringToFront') { calls.push('bring-to-front'); return } calls.push(parameters.type); assert.equal(method, 'Input.dispatchMouseEvent'); assert.equal(parameters.x, 120); assert.equal(parameters.y, 220) },
     evaluate: async expression => { calls.push('read-and-stop-pointer-audit'); assert.match(expression, /audit\.stop\(\)/); return [{ type: 'pointerdown', trusted: true, target: { confirmationButton: true } }] }
   }
   await clickWindowsBrowserBinding(cdp, audit)
-  assert.deepEqual(calls, ['fresh-hit-test', 'mousePressed', 'mouseReleased', 'read-and-stop-pointer-audit'])
+  assert.deepEqual(calls, ['bring-to-front', 'fresh-hit-test', 'mousePressed', 'mouseReleased', 'read-and-stop-pointer-audit'])
   assert.equal(audit.measurement.point.x, 120)
   assert.equal(audit.pointerEvents[0].target.confirmationButton, true)
   cdp.evaluate = async () => [{ type: 'pointerdown', trusted: true, target: { confirmationButton: false } }]
@@ -679,6 +685,54 @@ test('browser binding samples the current hit point immediately before real mous
   assert.ok(preview > 0 && screenshot > preview && click > screenshot)
   assert.doesNotMatch(source.slice(screenshot, click), /runtimeRequest\(|cdp\.send\(/)
   assert.doesNotMatch(clickWindowsBrowserBinding.toString(), /\.click\(|runtimeRequest|captureScreenshot/)
+})
+
+test('browser binding waits for stable painted frames after scroll, re-queries replacement targets and records pointer-time movement', async () => {
+  const { Window } = await import('happy-dom')
+  const window = new Window()
+  try {
+    const zh = JSON.parse(readFileSync(new URL('../src/renderer/src/locales/zh/common.json', import.meta.url), 'utf8'))
+    window.document.body.innerHTML = `<article aria-label="任务详情"><section aria-label="${zh.capabilityRequiredTitle}"><div><p>${zh.browserTaskBindingReview}</p><dl><dd>chrome</dd><dd>http://127.0.0.1:1234</dd><dd>${zh.browserSkillAllowInteraction}</dd></dl><button>${zh.browserTaskBindingConfirm}</button></div></section></article>`
+    const detail = window.document.querySelector('article'), root = detail.querySelector('section > div')
+    let button = detail.querySelector('button'), frame = 0, top = 0, pointerY, queries = 0
+    const queryAll = detail.querySelectorAll.bind(detail)
+    detail.querySelectorAll = (...args) => { queries += 1; return queryAll(...args) }
+    detail.getClientRects = () => [{}]
+    Object.defineProperties(root, { scrollHeight: { get: () => 1000 }, clientHeight: { get: () => 500 }, scrollTop: { get: () => top } })
+    const prepare = target => {
+      target.getClientRects = () => [{}]
+      target.scrollIntoView = options => { assert.equal(options.behavior, 'instant') }
+      target.getBoundingClientRect = () => ({ x: 10, y: pointerY ?? (frame >= 2 ? 40 : 20), width: 20, height: 10 })
+    }
+    prepare(button)
+    window.document.elementFromPoint = () => frame === 4 ? window.document.body : button
+    window.requestAnimationFrame = callback => {
+      queueMicrotask(() => {
+        frame += 1
+        if (frame === 2) { const replacement = button.cloneNode(true); button.replaceWith(replacement); button = replacement; prepare(button) }
+        if (frame === 3) top = 100
+        callback(frame)
+      })
+      return frame + 1
+    }
+    const result = await window.eval(windowsBrowserBindingUiExpression({ pointerAudit: true }))
+    assert.equal(result.observedFrames, 7, 'Changed geometry, scroll and a covered frame each prevent premature input')
+    assert.equal(result.stableFrames, 2)
+    assert.equal(result.rect.y, 40)
+    assert.equal(result.scroll[0].top, 100)
+    assert.ok(queries >= frame + 1, 'Every rendered frame re-queries the actual button')
+    pointerY = 90
+    top = 125
+    window.document.elementFromPoint = () => window.document.body
+    button.dispatchEvent(new window.PointerEvent('pointerdown', { bubbles: true, clientX: 20, clientY: 45, button: 0 }))
+    const pointer = window.__railwiseWindowsBindingPointerAudit.events[0]
+    assert.equal(pointer.buttonAtPointer.rect.y, 90)
+    assert.equal(pointer.buttonAtPointer.scroll[0].top, 125)
+    assert.equal(pointer.hitAtPointer.tag, 'BODY')
+    assert.equal(pointer.hitAtPointer.confirmationButton, false)
+    window.__railwiseWindowsBindingPointerAudit.stop()
+    assert.doesNotMatch(windowsBrowserBindingUiExpression(), /setTimeout|sleep\(/)
+  } finally { await window.happyDOM.close() }
 })
 
 test('binding POST audit observes actual Node fetch path/status, proves transport with a host read and excludes secrets and queries', async () => {

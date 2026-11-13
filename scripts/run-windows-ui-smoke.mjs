@@ -591,30 +591,45 @@ export function inspectWindowsBrowserRecoveryState({ task, thread, originThreadI
 }
 
 export function windowsBrowserBindingUiExpression({ pointerAudit = false } = {}) {
-  return `(() => {
-    const detail=document.querySelector('article[aria-label="任务详情"]');
-    if(!detail || !detail.getClientRects().length)return null;
-    const candidates=Array.from(detail.querySelectorAll('section[aria-label="等待连接或授权，尚未执行"] button'))
-      .filter(button=>button.textContent.trim()==='确认本任务的浏览器范围' && !button.disabled && button.getClientRects().length);
-    if(candidates.length!==1)return null;
-    const button=candidates[0],root=button.parentElement;
-    if(!root?.textContent.includes('请核对本任务将使用的浏览器和原有站点范围。确认后可继续原任务。'))return null;
-    const values=Array.from(root.querySelectorAll('dl dd')).map(node=>node.textContent);
-    if(values.length!==3)return null;
-    button.scrollIntoView({block:'center',inline:'center',behavior:'instant'});
-    const box=button.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
-    const hit=document.elementFromPoint(point.x,point.y);
-    if(!button.contains(hit) || point.x<0 || point.y<0 || point.x>=innerWidth || point.y>=innerHeight)return null;
-    const target=node=>({tag:node?.tagName ?? null,confirmationButton:button.contains(node)});
-    const scroll=[];for(let node=button.parentElement;node;node=node.parentElement) {
-      if(node.scrollHeight>node.clientHeight || node.scrollWidth>node.clientWidth)scroll.push({tag:node.tagName,top:node.scrollTop,left:node.scrollLeft,width:node.clientWidth,height:node.clientHeight,scrollWidth:node.scrollWidth,scrollHeight:node.scrollHeight});
+  return `(async () => {
+    const target=(node,button)=>({tag:node?.tagName ?? null,confirmationButton:Boolean(button?.contains(node))});
+    const sample=()=>{
+      const detail=document.querySelector('article[aria-label="任务详情"]');
+      if(!detail || !detail.getClientRects().length)return null;
+      const candidates=Array.from(detail.querySelectorAll('section[aria-label="等待连接或授权，尚未执行"] button'))
+        .filter(button=>button.textContent.trim()==='确认本任务的浏览器范围' && button.getClientRects().length);
+      if(candidates.length!==1)return null;
+      const button=candidates[0],root=button.parentElement;
+      if(!root?.textContent.includes('请核对本任务将使用的浏览器和原有站点范围。确认后可继续原任务。'))return null;
+      const values=Array.from(root.querySelectorAll('dl dd')).map(node=>node.textContent);
+      if(values.length!==3)return null;
+      const box=button.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
+      const hit=document.elementFromPoint(point.x,point.y),scroll=[];
+      for(let node=button.parentElement;node;node=node.parentElement) {
+        if(node.scrollHeight>node.clientHeight || node.scrollWidth>node.clientWidth)scroll.push({tag:node.tagName,top:node.scrollTop,left:node.scrollLeft,width:node.clientWidth,height:node.clientHeight,scrollWidth:node.scrollWidth,scrollHeight:node.scrollHeight});
+      }
+      return {button,measurement:{point,values,sampledAt:Date.now(),rect:{x:box.x,y:box.y,width:box.width,height:box.height},
+        viewport:{width:innerWidth,height:innerHeight,devicePixelRatio,visualScale:globalThis.visualViewport?.scale ?? 1},
+        zoom:getComputedStyle(document.documentElement).zoom,scroll,hit:target(hit,button),disabled:button.disabled}};
+    };
+    const initial=sample();if(!initial || initial.button.disabled)return null;
+    initial.button.scrollIntoView({block:'center',inline:'center',behavior:'instant'});
+    let previous,stable=0,current,observedFrames=0;
+    for(;observedFrames<60;) {
+      await new Promise(resolve=>requestAnimationFrame(resolve));observedFrames+=1;
+      current=sample();
+      const measurement=current?.measurement,point=measurement?.point;
+      if(!measurement || measurement.disabled || !measurement.hit.confirmationButton || point.x<0 || point.y<0 || point.x>=innerWidth || point.y>=innerHeight) {previous=undefined;stable=0;continue;}
+      const signature=JSON.stringify({rect:measurement.rect,scroll:measurement.scroll,viewport:measurement.viewport,zoom:measurement.zoom,values:measurement.values});
+      stable=signature===previous ? stable+1 : 0;previous=signature;
+      if(stable>=2)break;
     }
-    const measurement={point,values,sampledAt:Date.now(),rect:{x:box.x,y:box.y,width:box.width,height:box.height},
-      viewport:{width:innerWidth,height:innerHeight,devicePixelRatio,visualScale:globalThis.visualViewport?.scale ?? 1},
-      zoom:getComputedStyle(document.documentElement).zoom,scroll,hit:target(hit)};
+    if(stable<2)return null;
+    const {button,measurement}=current;
+    measurement.stableFrames=stable;measurement.observedFrames=observedFrames;
     if(${JSON.stringify(pointerAudit)}) {
       globalThis.__railwiseWindowsBindingPointerAudit?.stop();
-      const events=[];const listener=event=>{if(events.length<8)events.push({type:event.type,trusted:Boolean(event.isTrusted),x:event.clientX,y:event.clientY,button:event.button,target:target(event.target),at:Date.now()});};
+      const events=[];const listener=event=>{if(events.length<8){const current=sample();const currentButton=current?.button ?? button;events.push({type:event.type,trusted:Boolean(event.isTrusted),x:event.clientX,y:event.clientY,button:event.button,target:target(event.target,currentButton),hitAtPointer:target(document.elementFromPoint(event.clientX,event.clientY),currentButton),buttonAtPointer:current?.measurement ?? null,matchesMeasuredButton:button.contains(event.target),at:Date.now()});}};
       document.addEventListener('pointerdown',listener,true);
       globalThis.__railwiseWindowsBindingPointerAudit={events,stop:()=>document.removeEventListener('pointerdown',listener,true)};
     }
@@ -624,6 +639,7 @@ export function windowsBrowserBindingUiExpression({ pointerAudit = false } = {})
 
 /** No Runtime read or screenshot may intervene between this fresh hit test and the actual mouse events. */
 export async function clickWindowsBrowserBinding(cdp, audit) {
+  await cdp.send('Page.bringToFront')
   audit.measurement = await cdp.wait(windowsBrowserBindingUiExpression({ pointerAudit: true }), 'the current uncovered browser binding confirmation button')
   try {
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...audit.measurement.point })
@@ -1592,6 +1608,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         const resolution = attention.payload.capability.resolution ?? attention.payload.capability.action
         assert.equal(resolution?.route, 'task/browser-binding')
         await cdp.click('article[aria-label="任务详情"] section[aria-label="等待连接或授权，尚未执行"] button', '确认当前任务的浏览器范围')
+        await cdp.send('Page.bringToFront')
         const panel = await cdp.wait(windowsBrowserBindingUiExpression(), 'the real browser binding panel loaded through main-process IPC')
         // Corroborate the displayed preview through the same main-process read boundary.
         // Confirmation is performed only by the visible panel button below.
