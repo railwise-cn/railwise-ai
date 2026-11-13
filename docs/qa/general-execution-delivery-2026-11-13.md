@@ -278,3 +278,9 @@ Main 的退出协调也新增修复：Runtime 停止后，根据持久未知回�
 最终有效本机检查：Desktop 4,610 项通过、10 项跳过（460 文件通过、6 文件跳过）；KUN 4,104 项通过、23 项跳过（308 文件通过、3 文件跳过）；Web／Node／KUN 类型及相关 lint 通过，生产构建通过。UI 71 项、Windows 驱动 122 项通过／1 项平台跳过及真实 Runtime 周期两例属于聚焦回归，与全量样本重叠，不相加。Windows 驱动继续使用真实界面确认与独立继续，核对 source／due 的实际 Grant、新短授权、完整页面摘要、原目标依赖和回读；最终实包仍待执行该驱动。
 
 保留测试过程中两类失败：首次构建误调用包管理器的依赖自动同步，改动本隔离树依赖并干扰测试，已将中断依赖与自动 lock 另存，恢复既有依赖及原 lock；69 个声明包元数据与原依赖匹配，Node22 SQLite 校验通过，原工作目录及用户数据未修改。此污染轮不计作源码通过或失败。恢复后的 Desktop 曾有一项原 5 秒用例超时，定向 1.30 秒通过，随后保持原超时、限制四 worker 的完整重跑通过，旧日志保留；KUN 旧 review fixture 尚未经过新增初次确认，17 项失败后仅补真实范围确认与独立继续准备，17 项原断言与最终全量通过，未绕过生产门禁或改超时。最终有效日志为 `/tmp/railwise-public-query-production-build-attempt2.log`、`/tmp/railwise-public-query-kun-full-attempt3.log` 和私有 `railwise-policy-source-validation-final.json` 所列日志。没有新精确包安装或公开发布的通过主张。
+
+### 21a6487f 私有构建与 QA lint 修正
+
+源码 `21a6487f03d7394ad592a4b3f74860d451fc244f` 的唯一私有 Release `43518948758` 已启动，公开发布与官网部署均关闭，真实升级基线为 0.5.6。两条 Quality `43518795389`／`43518802949` 在 lint 阶段发现 Windows 测试脚本一行中的两个多余转义，保留原始失败日志；Electron production 与 Windows 专项 job 通过，不能将整条 Quality 标为通过。修正只移除 `scripts/windows-ui-smoke.test.mjs:722` 两个无效反斜杠，另更新本验收文档，属于既有发行门禁明确允许的包外 QA 差异，App、依赖、构建输入和许可清单不变。
+
+修后固定 Node22 的 Windows 脚本聚焦 122 项通过、1 项平台跳过，完整 root lint 零错误（仅两条既有 TaskPermissionPanel 警告）。继续等待新 QA 源码的实际完整 CI；同一 21a6487f 精确包保持唯一，不因这项包外修正重复打包或重复真实升级，不放宽现有来源门禁。证据在私有 `railwise-windows-057-build-43518948758/qa-lint-fix-validation.json`，新包安装与真实业务仍未验收。

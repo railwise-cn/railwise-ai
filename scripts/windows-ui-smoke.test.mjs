@@ -719,7 +719,7 @@ test('browser policy is selected through a current real mouse target and native 
       waits += 1
       if (waits === 1) return { point: { x: 40, y: 50 }, policy: { value: 'strict', disabled: false, options } }
       if (waits === 2) { assert.match(expression, /document\.activeElement/); return true }
-      assert.match(expression, /select\.value===\"public_query_target\"/)
+      assert.match(expression, /select\.value==="public_query_target"/)
       return { value: 'public_query_target', label: '公开资料查询' }
     }
   }
