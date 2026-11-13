@@ -215,4 +215,29 @@ describe('typed BrowserSkill production provider', () => {
     expect(gate.get((authorization.result as { approvalId: string }).approvalId)?.status).toBe('allowed')
   })
 
+  it.each(['403 Forbidden', '401 Unauthorized', 'Login', 'Just a moment...', '人机验证'])('withholds source evidence for a real %s document title', async title => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/' })
+    f.setElement(`<html><head><title>${title}</title></head><body>Restricted</body></html>`)
+    expect(await f.execute('browser_get_html', { sessionId: 'session-one' })).toMatchObject({ isError: true, output: {
+      code: 'web_access_blocked', sourceUrl: 'https://example.com/', evidence: { verified: false, contentRead: false } } })
+  })
+  it('does not mistake an article discussing HTTP errors for an access-denied page', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/' })
+    f.setElement('<html><title>HTTP 403 troubleshooting guide</title><body>This article explains 403 Forbidden and login failures.</body></html>')
+    expect(await f.execute('browser_get_html', { sessionId: 'session-one' })).toMatchObject({ output: { evidence: { contentRead: true, verified: true } } })
+  })
+  it('uses the same access-denied evidence rule for the actual observed document title', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    const original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation((config, args, signal) => args[0] === 'cooperate'
+      ? Promise.resolve({ ok: true, output: { context_id: 'denied-context', observation: { text: '@vom 1\nL1 page\n RootWebArea "403 Forbidden"\n StaticText "Forbidden"' } } })
+      : original(config, args, signal))
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/' })).toMatchObject({ isError: true, output: { code: 'web_access_blocked', evidence: { contentRead: false, verified: false } } })
+  })
+
 })

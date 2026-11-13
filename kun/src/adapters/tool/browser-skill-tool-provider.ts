@@ -116,6 +116,8 @@ export function buildBrowserSkillToolProvider(options: {
     const observation = await command(config, ['cooperate', 'sync', '--session', sessionId, '--tab-id', String(before.id), '--max-tokens', '12000'], context)
     const after = await activeTab(config, sessionId, scope, context, true)
     if (before.id !== after.id || before.url !== after.url) throw failure('browser_page_changed')
+    const observedText = String(object(observation.observation).text ?? '')
+    assertReadablePage(/RootWebArea\s+"([^"\n]*)"/.exec(observedText)?.[1], after.url, sha256(JSON.stringify(observation)))
     if (typeof observation.context_id === 'string') observations.set(`${context.executionGrant!.taskId}:${sessionId}`, { contextId: observation.context_id, sourceUrl: after.url, tabId: after.id })
     return { sourceUrl: after.url, tabId: after.id, observation, resultHash: sha256(JSON.stringify(observation)) }
   }
@@ -127,6 +129,7 @@ export function buildBrowserSkillToolProvider(options: {
     const result = await command(config, argv, context)
     const after = await activeTab(config, sessionId, scope, context)
     if (tab.id !== after.id || tab.url !== after.url || result.tab_id !== tab.id || typeof result.html !== 'string') throw failure('browser_page_changed')
+    assertReadablePage(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(result.html)?.[1], tab.url, sha256(result.html))
     return { sourceUrl: tab.url, tabId: tab.id, html: result.html, truncated: result.truncated === true, byteSize: result.byte_size }
   }
 
@@ -286,7 +289,9 @@ Repeat this exact element and value within this task until ${expiresAt}. Page ac
           actionAcknowledged: true, businessOutcomeVerified: false } } }
     } catch (error) {
       return { isError: true, output: { status: dispatched ? 'outcome_unknown' : 'failed', provider: 'browser-skill', action,
-        code: error instanceof Error ? error.message : 'browser_failed' } }
+        code: error instanceof Error ? error.message : 'browser_failed',
+        ...(error && typeof error === 'object' && 'evidence' in error ? { evidence: error.evidence, sourceUrl: (error as { sourceUrl?: string }).sourceUrl,
+          message: '目标网页要求登录、安全验证或拒绝访问。请处理该站点的阻断后继续。' } : {}) } }
     }
   }
 
@@ -315,4 +320,16 @@ function hasReadableBrowserContent(value: unknown): boolean {
     if (['text', 'snapshot', 'content', 'html', 'markdown', 'baseline', 'changes'].includes(key) && typeof item === 'string') return item.trim().length > 0
     return item && typeof item === 'object' && hasReadableBrowserContent(item)
   })
+}
+
+/** Match the actual document title, never a phrase in an article's body. */
+function assertReadablePage(rawTitle: string | undefined, sourceUrl: string, resultHash: string): void {
+  const title = (rawTitle ?? '').replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;/g, ' ').trim()
+  const denied = /^(?:401(?:\s+Unauthorized)?|403(?:\s+Forbidden)?|Access\s+Denied|Forbidden)(?:\s*[-|]\s*(?:nginx|cloudflare))?$/i.test(title)
+  const challenge = /^(?:Just a moment(?:\.{3}|…)?|Attention Required!\s*\|\s*Cloudflare|CAPTCHA(?: Verification)?|安全验证|人机验证|访问验证|访问被拒绝)$/i.test(title)
+  const login = /^(?:用户登录|登录|Login|Sign in|Log in)(?:\s*[-|·]\s*.{1,100})?$/i.test(title)
+  if (!denied && !challenge && !login) return
+  throw Object.assign(failure('web_access_blocked'), { sourceUrl, evidence: { kind: 'browser_observation', sourceUrl, resultHash,
+    verifiedAt: new Date().toISOString(), verified: false, contentRead: false,
+    accessStatus: denied ? 'access_denied' : challenge ? 'verification_required' : 'login_required' } })
 }
