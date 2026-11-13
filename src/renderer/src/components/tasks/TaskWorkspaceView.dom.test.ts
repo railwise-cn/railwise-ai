@@ -349,6 +349,9 @@ describe('TaskWorkspaceView', () => {
     expect(window.workwise.resumeTask).toHaveBeenCalledOnce()
     expect(tasks[0]).toEqual(original)
     expect(container.textContent).toContain(capability.message)
+    const workspaceValue = container.querySelector(`[aria-label="${i18n.t('common:capabilityRequiredTitle')}"] dl`)?.textContent
+    expect(workspaceValue).toContain(original.workspaceRoot)
+    expect(workspaceValue).not.toContain('No workspace selected')
     expect(container.querySelector('nav[aria-label="Task filters"] button[aria-pressed="true"]')?.textContent).toContain('Needs you')
     await click('确认当前任务的浏览器范围')
     expect(window.workwise.getBrowserTaskBinding).toHaveBeenCalledWith(original.id)

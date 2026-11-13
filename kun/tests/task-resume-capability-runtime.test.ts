@@ -29,7 +29,7 @@ afterEach(async () => {
   vi.unstubAllEnvs()
 })
 
-async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser') {
+async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser', initiallyDisabled = false) {
   vi.stubEnv('RAILWISE_TASK_SCHEDULING_DISABLED', '1')
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-resume-capability-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
@@ -50,7 +50,7 @@ async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser') {
     endpointFormat: 'chat_completions' as const, model: 'synthetic-resume', approvalPolicy: 'auto' as const,
     sandboxMode: 'workspace-write' as const, tokenEconomyMode: false, insecure: false,
     storage: { backend: 'file' as const }, capabilities: KunCapabilitiesConfig.parse({ browserSkill: {
-      enabled: true, state: 'ready', browserInstanceId: 'browser-new', revision: 3,
+      enabled: !initiallyDisabled, state: 'ready', browserInstanceId: 'browser-new', revision: 3,
       executablePath: join(root, 'synthetic-browser-cli'), executableHash: 'a'.repeat(64),
       origins: ['https://example.com', 'https://new.example'], interaction: 'interact'
     } })
@@ -63,12 +63,16 @@ async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser') {
     ...(body ? { body: JSON.stringify(body) } : {})
   }))
   const origin = await runtime.threadService.create({ title: '原始用户任务', workspace, mode: 'agent', model: 'synthetic-resume' })
-  const worker = await runtime.threadService.create({ title: '内部执行', workspace, mode: 'agent', model: 'synthetic-resume' })
   const prompt = kind === 'browser' ? '使用 BrowserSkill 读取 https://example.com 的信息。'
     : kind === 'workspace' ? '保存到 report.html' : '帮我处理钉钉待办'
-  const waiting = runtime.taskController!.createWaitingTask({ id: `task_resume_${kind}`, thread: worker,
+  const initial = initiallyDisabled ? await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new',
+    idempotencyKey: 'browser-initially-disabled', request: { prompt } }) : undefined
+  if (initial) expect(initial).toMatchObject({ kind: 'capability_required', capability: { errorCode: 'browser_disabled' }, task: { status: 'waiting_user' } })
+  const worker = initial?.task ? (await runtime.threadService.get(initial.task.threadId))!
+    : await runtime.threadService.create({ title: '内部执行', workspace, mode: 'agent', model: 'synthetic-resume' })
+  const waiting = initial?.task ?? runtime.taskController!.createWaitingTask({ id: `task_resume_${kind}`, thread: worker,
     request: { prompt, taskIntent: 'new', taskVisibility: 'task', taskOriginThreadId: origin.id }, reason: 'Synthetic initial blocker' })
-  if (kind === 'browser') runtime.taskRepository!.update(waiting.id, waiting.revision, task => ({ ...task, authority: {
+  if (kind === 'browser' && !initiallyDisabled) runtime.taskRepository!.update(waiting.id, waiting.revision, task => ({ ...task, authority: {
     source: 'user', workspaceRoot: workspace, grantedAt: runtime.nowIso(), externalTargets: [], browserScope: {
       browserInstanceId: 'browser-old', revision: 1, origins: ['https://example.com'], interaction: 'observe'
     }
@@ -84,8 +88,55 @@ async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser') {
     runtime = await createKunServeRuntime(options)
     router = buildRouter(runtime)
   }
-  return { get runtime() { return runtime }, api, current, origin, worker, workspace, prompt, turnCount, cards, outboxCount, restart, requests: () => modelRequests }
+  const enableBrowser = async () => { options.capabilities.browserSkill.enabled = true; await restart() }
+  return { get runtime() { return runtime }, api, current, origin, worker, workspace, prompt, turnCount, cards, outboxCount, restart, enableBrowser, requests: () => modelRequests }
 }
+
+it('keeps a task created without Browser capability unbound until preview, confirmation and a separate resume', async () => {
+  const f = await fixture('browser', true)
+  expect(f.current().authority?.browserScope).toBeUndefined()
+  expect(await f.turnCount()).toBe(0)
+  expect(f.requests()).toBe(0)
+  await f.enableBrowser()
+  const original = f.current()
+  const response = await f.api(`/v1/tasks/${original.id}/resume`, 'POST', {
+    expectedRevision: original.revision, idempotencyKey: 'connected-before-first-turn'
+  })
+  expect(response.status, await response.clone().text()).toBe(202)
+  const blocked = await response.json() as TaskControlResult
+  expect(blocked).toMatchObject({ task: { id: original.id, status: 'paused' }, capability: {
+    status: 'needs_authorization', errorCode: 'browser_task_scope_required', workspaceRoot: f.workspace,
+    resolution: { kind: 'grant', route: 'task/browser-binding' }
+  } })
+  expect(f.current().authority?.browserScope).toBeUndefined()
+  expect(await f.turnCount()).toBe(0)
+  expect(f.requests()).toBe(0)
+  const preview = await f.api(`/v1/tasks/${original.id}/browser-binding`)
+  expect(preview.status).toBe(200)
+  const snapshot = await preview.json() as BrowserTaskBindingSnapshot
+  const confirm = await f.api(`/v1/tasks/${original.id}/browser-binding`, 'POST', {
+    expectedTaskRevision: snapshot.taskRevision, expectedBrowserRevision: snapshot.browserRevision,
+    browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction: snapshot.interaction,
+    confirmed: true, idempotencyKey: 'first-browser-binding'
+  })
+  expect(confirm.status, await confirm.clone().text()).toBe(200)
+  expect(await confirm.json()).toMatchObject({ resumed: false })
+  expect(f.current().status).toBe('paused')
+  expect(await f.turnCount()).toBe(0)
+  expect(f.requests()).toBe(0)
+  const resumed = await f.api(`/v1/tasks/${original.id}/resume`, 'POST', {
+    expectedRevision: f.current().revision, idempotencyKey: 'start-first-turn-after-review'
+  })
+  expect(resumed.status, await resumed.clone().text()).toBe(202)
+  const started = await resumed.json() as TaskControlResult
+  expect(started.task.id).toBe(original.id)
+  expect(started.turn?.turnId).toBeTruthy()
+  await expect.poll(f.requests, { timeout: 10_000 }).toBe(1)
+  expect(await f.turnCount()).toBe(1)
+  const turn = (await f.runtime.threadService.get(f.worker.id))!.turns.find(item => item.id === started.turn!.turnId)!
+  expect(turn.executionGrant?.browserScope).toMatchObject({ browserInstanceId: snapshot.browserInstanceId,
+    origins: snapshot.origins, revision: snapshot.browserRevision, interaction: snapshot.interaction })
+})
 
 it('persists a blocked browser resume across restart, confirms its scope while paused, and starts a Turn only on a separate resume', async () => {
   const f = await fixture()

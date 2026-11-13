@@ -28,7 +28,8 @@ describe('Browser task authority rebinding', () => {
   it('accepts the real General wildcard and blocks a changed browser pending explicit task confirmation', async () => {
     const f = fixture()
     const thread = { id: 'thread', mode: 'agent', agentProfile: { toolAllowlist: ['*'] } } as ThreadRecord
-    expect(await f.runtime.preflight('继续', thread)).toMatchObject({ errorCode: 'browser_binding_changed', status: 'needs_authorization' })
+    expect(await f.runtime.preflight('继续', thread)).toMatchObject({ errorCode: 'browser_binding_changed', status: 'needs_authorization',
+      workspaceRoot: f.repository.get('task')!.workspaceRoot })
     const snapshot = f.runtime.bindingSnapshot('task')
     expect(snapshot.origins).toEqual(['https://example.com'])
     const input = { confirmed: true as const, expectedTaskRevision: snapshot.taskRevision, expectedBrowserRevision: snapshot.browserRevision, browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, idempotencyKey: 'explicit-browser-review' }
@@ -38,9 +39,36 @@ describe('Browser task authority rebinding', () => {
     expect(f.repository.get('task')?.authority?.browserScope).toEqual({ browserInstanceId: 'browser-new', revision: 3, origins: ['https://example.com'], interaction: 'observe' })
     expect((await f.runtime.preflight('浏览器 https://example.com', thread))?.status).toBe('available')
   })
+  it('uses the initiating workspace before a browser task has been created', async () => {
+    const f = fixture()
+    const thread = { id: 'new-thread', workspace: '/workspace/selected-project', mode: 'agent', agentProfile: { toolAllowlist: ['*'] } } as ThreadRecord
+    expect(await f.runtime.preflight('使用browser-skill读取 https://example.com', thread)).toMatchObject({ status: 'available', workspaceRoot: thread.workspace })
+  })
+  it('requires explicit binding for an existing unbound waiting task after the browser is configured', async () => {
+    const f = fixture()
+    f.repository.update('task', 0, task => ({ ...task, authority: undefined }))
+    const thread = { id: 'thread', workspace: '/different-chat-workspace', mode: 'agent', agentProfile: { toolAllowlist: ['*'] } } as ThreadRecord
+    expect(await f.runtime.preflight('使用browser-skill读取 https://example.com', thread)).toMatchObject({
+      status: 'needs_authorization', errorCode: 'browser_task_scope_required', workspaceRoot: f.repository.get('task')!.workspaceRoot,
+      resolution: { kind: 'grant', route: 'task/browser-binding' }
+    })
+    expect(f.repository.get('task')!.authority?.browserScope).toBeUndefined()
+    const snapshot = f.runtime.bindingSnapshot('task')
+    expect(snapshot).toMatchObject({ origins: ['https://example.com'], previousBrowserInstanceId: undefined })
+    expect(f.runtime.confirmBinding('task', { ...snapshot, confirmed: true, expectedTaskRevision: snapshot.taskRevision,
+      expectedBrowserRevision: snapshot.browserRevision, idempotencyKey: 'first-reviewed-binding' }).resumed).toBe(false)
+    expect(f.repository.get('task')!.status).toBe('waiting_user')
+    expect((await f.runtime.preflight('继续', thread))?.status).toBe('available')
+  })
   it('never widens inherited origins from changed global config, prompt or network defaults', () => {
     const f = fixture()
     expect(f.runtime.scope('浏览器 https://new.example', f.old, ['*', 'https://other.example']).browserScope).toEqual(f.old)
+  })
+  it('offers configured sites for explicit first binding when an unbound task did not name a URL', () => {
+    const f = fixture()
+    f.repository.update('task', 0, task => ({ ...task, goal: '用browser-skill查询公开采购公告', authority: undefined }))
+    expect(f.runtime.bindingSnapshot('task').origins).toEqual(f.config.origins)
+    expect(f.repository.get('task')!.authority?.browserScope).toBeUndefined()
   })
   it('rejects stale reviewed revisions and active tasks without changing authority', () => {
     const f = fixture()
@@ -81,6 +109,18 @@ describe('Browser task authority rebinding', () => {
     const f = fixture()
     f.repository.acquireLease('task', 'other-runtime', new Date().toISOString(), new Date(Date.now() + 60000).toISOString())
     expect(() => f.runtime.bindingSnapshot('task')).toThrow('browser_task_not_waiting')
+  })
+  it('limits first binding of a child without a URL to the parent and current configuration intersection', () => {
+    const f = fixture()
+    const original = f.repository.get('task')!
+    f.repository.create({ ...original, id: 'parent', threadId: 'parent-thread', authority: { ...original.authority!, browserScope: {
+      ...f.old, browserInstanceId: 'browser-new', revision: 3
+    } } })
+    f.repository.update('task', 0, task => ({ ...task, parentTaskId: 'parent', goal: '用browser-skill查询公开采购公告', authority: undefined }))
+    expect(f.runtime.bindingSnapshot('task')).toMatchObject({ origins: ['https://example.com'], interaction: 'observe' })
+    expect(f.repository.get('task')!.authority?.browserScope).toBeUndefined()
+    f.repository.update('parent', 0, task => ({ ...task, authority: { ...task.authority!, revokedAt: new Date().toISOString() } }))
+    expect(() => f.runtime.bindingSnapshot('task')).toThrow('browser_parent_scope_blocked')
   })
 
 })

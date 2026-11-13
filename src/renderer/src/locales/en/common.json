@@ -4421,7 +4421,7 @@
   "capabilityProvider": "Provider",
   "capabilityCurrentStatus": "Current status",
   "capabilityWorkspace": "Current workspace",
-  "capabilityWorkspaceUnknown": "No workspace selected",
+  "capabilityWorkspaceUnknown": "Workspace information has not loaded",
   "capabilityRequestedScope": "Required scope",
   "capabilityScopeNotGranted": "Not granted; recheck after connecting",
   "capabilityLark": "Feishu / Lark",
@@ -4679,5 +4679,10 @@
   "browserApprovalTechnicalDetails": "Execution details",
   "browserTaskBindingConfirm": "Confirm browser scope for this task",
   "browserTaskBindingConfirmed": "Browser scope confirmed. Continue the original task.",
+  "browserTaskBindingLoading": "Loading browser scope…",
+  "browserTaskBindingLoadFailed": "This task’s browser scope could not be loaded. Reload it to review the scope.",
+  "browserTaskBindingConfirmFailed": "Browser scope confirmation did not complete. Reload and review the scope before confirming again.",
+  "browserTaskBindingChanged": "The task or browser configuration has changed. Reload and review the browser, sites and interaction scope before confirming.",
+  "browserTaskBindingReload": "Reload browser scope",
   "browserTaskReadOnly": "Read and navigate within allowed sites"
 }

@@ -39,8 +39,8 @@ function button(label: string): HTMLButtonElement {
   if (!result) throw new Error(`Missing button: ${label}`)
   return result
 }
-async function render(value = card): Promise<void> {
-  await act(async () => { root.render(createElement(CapabilityRequiredCard, { key: JSON.stringify(value.capability), card: value })) })
+async function render(value = card, workspaceRoot?: string): Promise<void> {
+  await act(async () => { root.render(createElement(CapabilityRequiredCard, { key: JSON.stringify(value.capability), card: value, workspaceRoot })) })
 }
 async function click(label: string): Promise<void> {
   await act(async () => { button(label).click(); await Promise.resolve(); await Promise.resolve() })
@@ -58,6 +58,18 @@ describe('capability waiting card', () => {
     root = createRoot(container)
   })
   afterEach(async () => { await act(async () => root.unmount()); container.remove() })
+
+  it('shows the owner task workspace for historical cards without workspace metadata', async () => {
+    const historical = { ...card, capability: { provider: 'workspace' as const, status: 'needs_authorization' as const,
+      message: '需要确认权限', action: { kind: 'grant' as const, route: 'task/permissions', label: '确认权限' } } }
+    await render(historical, '/workspace/original-task')
+    expect(container.textContent).toContain('/workspace/original-task')
+    expect(container.textContent).not.toContain('尚未选择工作区')
+    await render(historical)
+    expect(container.textContent).toContain('工作区信息尚未加载')
+    expect(container.textContent).not.toContain('尚未选择工作区')
+    expect(api.getTaskRun).not.toHaveBeenCalled()
+  })
 
   it('continues the original source task to obtain a real periodic action review without opening a nonexistent plan', async () => {
     api.coordinateTaskCommand.mockResolvedValue({ kind: 'task_started', task: { id: card.taskId }, turn: { threadId: 'worker', turnId: 'new-turn' } })

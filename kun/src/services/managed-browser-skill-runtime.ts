@@ -40,6 +40,7 @@ export class ManagedBrowserSkillRuntime {
     if (!isBrowserTask(text) && !currentTask?.authority?.browserScope) return null
     const config = this.config
     const base = { provider: 'browser-skill' as const, checkedAt: new Date().toISOString(), credentialState: 'unknown' as const,
+      workspaceRoot: currentTask?.workspaceRoot ?? thread?.workspace,
       networkState: 'unknown' as const, workspaceState: 'allowed' as const, sandboxState: 'allowed' as const, approvalState: 'required' as const }
     const action = { kind: config.state === 'not_installed' ? 'install' as const : 'connect' as const, route: 'marketplace', label: '配置浏览器连接' }
     if (thread?.mode === 'plan') return { ...base, status: 'blocked', errorCode: 'task_mode_blocked', message: '当前任务处于计划模式，请切换到执行模式。',
@@ -65,6 +66,11 @@ export class ManagedBrowserSkillRuntime {
         message: '当前浏览器连接未通过实时核验。请重新检查扩展和浏览器连接，然后继续原任务。' }
     }
     const bound = currentTask?.authority?.browserScope
+    if (currentTask && !bound && ['paused', 'waiting_user', 'stalled'].includes(currentTask.status)) {
+      const confirmation = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认当前任务的浏览器范围' }
+      return { ...base, status: 'needs_authorization', action: confirmation, resolution: confirmation, errorCode: 'browser_task_scope_required',
+        message: '浏览器已连接。请审阅当前等待任务使用的浏览器、站点和交互范围，确认后再继续原任务。' }
+    }
     if (bound && (bound.browserInstanceId !== config.browserInstanceId || bound.revision !== config.revision)) {
       const confirmation = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认当前任务的浏览器范围' }
       return { ...base, status: 'needs_authorization', action: confirmation, resolution: confirmation, errorCode: 'browser_binding_changed',
@@ -100,11 +106,15 @@ export class ManagedBrowserSkillRuntime {
     const config = this.config
     if (!config.enabled || config.state !== 'ready' || !config.browserInstanceId) throw new Error('browser_connection_unavailable')
     const previous = task.authority?.browserScope
-    const taskOrigins = previous?.origins ?? browserTaskOrigins(task.goal)
-    const origins = taskOrigins.filter(origin => !config.origins.length || config.origins.includes(origin))
-    if (!origins.length) throw new Error('browser_original_origins_not_allowed')
     const parent = task.parentTaskId ? this.options.repository.get(task.parentTaskId) : undefined
     const parentScope = parent?.authority?.browserScope
+    const requestedOrigins = browserTaskOrigins(task.goal)
+    // A previously unbound task reviews the explicitly configured sites here.
+    // Existing task authority always retains its original origin boundary.
+    const fallbackOrigins = task.parentTaskId ? parentScope?.origins ?? [] : config.origins
+    const taskOrigins = previous?.origins ?? (requestedOrigins.length ? requestedOrigins : fallbackOrigins)
+    const origins = taskOrigins.filter(origin => !config.origins.length || config.origins.includes(origin))
+    if (!origins.length) throw new Error('browser_original_origins_not_allowed')
     if (task.parentTaskId && (!parentScope || parent?.authority?.revokedAt ||
       parentScope.browserInstanceId !== config.browserInstanceId || parentScope.revision !== config.revision ||
       origins.some(origin => !parentScope.origins.includes(origin)))) throw new Error('browser_parent_scope_blocked')

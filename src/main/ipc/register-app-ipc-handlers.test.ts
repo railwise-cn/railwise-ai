@@ -301,6 +301,32 @@ describe('registerAppIpcHandlers', () => {
     }
   })
 
+  it('forwards exact browser scope preview and confirmation through the real IPC handler', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const response = { ok: true, status: 200, body: '{"resumed":false}' }
+    const runtimeRequest = vi.fn(async () => response)
+    registerAppIpcHandlers(registerOptions({ runtimeRequest: runtimeRequest as never }))
+    const path = '/v1/tasks/task-1/browser-binding'
+    const confirmation = { expectedTaskRevision: 2, expectedBrowserRevision: 4, browserInstanceId: 'chrome-test',
+      origins: ['https://example.com'], interaction: 'interact', confirmed: true, idempotencyKey: 'binding-1' }
+    const body = JSON.stringify(confirmation)
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'GET' })).resolves.toEqual(response)
+    expect(runtimeRequest).toHaveBeenLastCalledWith(path, 'GET', undefined)
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'POST', body })).resolves.toEqual(response)
+    expect(runtimeRequest).toHaveBeenLastCalledWith(path, 'POST', body)
+    for (const request of [
+      { path, method: 'DELETE', body },
+      { path, method: 'GET', body },
+      { path, method: 'POST', body: JSON.stringify({ ...confirmation, taskId: 'task-2' }) },
+      { path, method: 'POST', body: JSON.stringify({ ...confirmation, allowedTools: ['bash'] }) },
+      { path: `${path}?taskId=task-2`, method: 'GET' },
+      { path: '/v1/tasks/task-1/../task-2/browser-binding', method: 'GET' }
+    ]) await expect(handlers.get('runtime:request')?.({}, request)).rejects.toThrow(/Invalid payload for runtime:request/)
+    expect(runtimeRequest).toHaveBeenCalledTimes(2)
+    runtimeRequest.mockResolvedValueOnce({ ok: false, status: 409, body: '{"code":"browser_binding_changed"}' })
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'POST', body })).resolves.toMatchObject({ ok: false, status: 409 })
+  })
+
   it('forwards valid Survey draft requests through the desktop runtime handler', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const response = { ok: true, status: 200, body: '{"drafts":[]}' }

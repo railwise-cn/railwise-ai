@@ -4421,7 +4421,7 @@
   "capabilityProvider": "外部平台",
   "capabilityCurrentStatus": "当前状态",
   "capabilityWorkspace": "当前工作区",
-  "capabilityWorkspaceUnknown": "尚未选择工作区",
+  "capabilityWorkspaceUnknown": "工作区信息尚未加载",
   "capabilityRequestedScope": "所需范围",
   "capabilityScopeNotGranted": "尚未授予；连接后重新检查",
   "capabilityLark": "飞书 / Lark",
@@ -4679,5 +4679,10 @@
   "browserApprovalTechnicalDetails": "执行详情",
   "browserTaskBindingConfirm": "确认本任务的浏览器范围",
   "browserTaskBindingConfirmed": "浏览器范围已确认。点击继续原任务。",
+  "browserTaskBindingLoading": "正在读取浏览器范围…",
+  "browserTaskBindingLoadFailed": "暂时无法读取本任务的浏览器范围。请重新加载后核对。",
+  "browserTaskBindingConfirmFailed": "浏览器范围确认未完成。请重新加载并核对后再次确认。",
+  "browserTaskBindingChanged": "任务或浏览器配置已变化。请重新加载并核对浏览器、站点和操作范围后确认。",
+  "browserTaskBindingReload": "重新加载浏览器范围",
   "browserTaskReadOnly": "读取与站点内导航"
 }

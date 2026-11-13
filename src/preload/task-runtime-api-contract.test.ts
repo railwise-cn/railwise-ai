@@ -71,6 +71,17 @@ describe('production preload task API and main IPC contract', () => {
     expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task_1/receipts/receipt_1/verify', method: 'POST', body: JSON.stringify(mutation) })
   })
 
+  it('passes both browser binding methods used by the review panel through the real main validator', async () => {
+    const request = { expectedTaskRevision: 6, expectedBrowserRevision: 8, browserInstanceId: 'chrome-current',
+      origins: ['https://example.com'], interaction: 'interact' as const, confirmed: true as const, idempotencyKey: 'binding-reviewed' }
+    await api.getBrowserTaskBinding('task-original')
+    await api.confirmBrowserTaskBinding('task-original', request)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-original/browser-binding', method: 'GET' })
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-original/browser-binding', method: 'POST', body: JSON.stringify(request) })
+    await expect(api.getBrowserTaskBinding('task-original/../task-other')).rejects.toThrow()
+    await expect(api.confirmBrowserTaskBinding('task-original', { ...request, taskId: 'task-other' } as typeof request)).rejects.toThrow()
+  })
+
   it('passes real chat/model and candidate review commands, and the aggregate task stream, through their typed boundaries', async () => {
     await api.coordinateTaskCommand({ threadId: 'origin_1', intent: 'auto', idempotencyKey: 'chat-1', request: {
       prompt: '根据资料形成报告', displayText: '形成报告', mode: 'agent', model: 'deepseek-flash', providerId: 'deepseek', reasoningEffort: 'high', attachmentIds: ['attachment_1'], workspaceReferences: [{ path: 'source.md', kind: 'file' }]

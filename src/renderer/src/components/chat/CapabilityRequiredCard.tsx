@@ -10,7 +10,7 @@ import { requestFlowDetail } from '../../store/flow-navigation'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
 
 /** A capability failure is a durable waiting task, never a completed answer. */
-export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityCard }): ReactElement {
+export function CapabilityRequiredCard({ card, workspaceRoot }: { card: ExternalTaskCapabilityCard; workspaceRoot?: string }): ReactElement {
   const { t } = useTranslation('common')
   const openFlow = useChatStore((state) => state.openFlow)
   const openPlugins = useChatStore((state) => state.openPlugins)
@@ -110,7 +110,7 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
         <dt className="text-ds-muted">{t('capabilityProvider')}</dt><dd>{t(isLark ? 'capabilityLark' : isDingTalk ? 'capabilityDingTalk' : isBrowser ? 'connectorHubBrowserSkill' : capability.provider === 'schedule' ? 'capabilitySchedule' : 'capabilityWorkspaceFiles')}</dd>
         <dt className="text-ds-muted">{t('capabilityCurrentStatus')}</dt><dd>{t(`capabilityStatus_${capability.status}`)}</dd>
-        <dt className="text-ds-muted">{t('capabilityWorkspace')}</dt><dd className="break-all">{execution?.workspaceRoot || capability.workspaceRoot || t('capabilityWorkspaceUnknown')}</dd>
+        <dt className="text-ds-muted">{t('capabilityWorkspace')}</dt><dd className="break-all">{execution?.workspaceRoot || capability.workspaceRoot || workspaceRoot || t('capabilityWorkspaceUnknown')}</dd>
         <dt className="text-ds-muted">{t('capabilityRequestedScope')}</dt><dd>{capability.requiredScopes?.join(', ') || t('capabilityScopeNotGranted')}</dd>
         {execution ? <>
           <dt className="text-ds-muted">{t('capabilityWorkspaceTrust')}</dt><dd>{t(`settings:agentCenterTrust_${execution.workspaceTrust}`)}</dd>

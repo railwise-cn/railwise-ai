@@ -2465,6 +2465,37 @@ pre {
   }
 }
 
+/* The preview rail changes available workspace width without changing the viewport. */
+.ds-task-workspace {
+  container-name: task-workspace;
+  container-type: inline-size;
+}
+
+.ds-task-workspace-templates {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ds-task-workspace-columns {
+  grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.4fr);
+  align-items: start;
+}
+
+@container task-workspace (max-width: 44rem) {
+  .ds-task-workspace-templates,
+  .ds-task-workspace-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ds-task-workspace-list {
+    max-height: 16rem;
+    overflow-y: auto;
+  }
+
+  .ds-task-workspace-empty {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ds-shiny-text,
   .ds-work-logo,
