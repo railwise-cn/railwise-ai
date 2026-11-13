@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { build } from 'esbuild'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
@@ -274,4 +278,52 @@ test('browser protocol model asks for real navigation and refuses to invent miss
     const navigation = await (await request(freshHistory)).text()
     assert.ok(navigation.includes('browser_navigate') && navigation.includes('fresh-task-session'))
   } finally { await fixture.close() }
+})
+
+test('the fixture reads session and HTML results using the production model client framing', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-model-framing-'))
+  const fixture = await startWindowsTaskModelFixture({ browser: true })
+  try {
+    const output = join(root, 'model-client.mjs')
+    await build({ entryPoints: [fileURLToPath(new URL('../kun/src/adapters/model/deepseek-compat-model-client.ts', import.meta.url))],
+      outfile: output, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' })
+    const { DeepseekCompatModelClient } = await import(pathToFileURL(output).href)
+    const client = new DeepseekCompatModelClient({ baseUrl: fixture.baseUrl, apiKey: 'synthetic', model: 'synthetic' })
+    const framed = (name, value) => client.toolResultToMessage({ kind: 'tool_result', callId: name, output: value },
+      { kind: 'tool_call', callId: name, toolName: name, arguments: {}, argumentSummary: 'Original arguments omitted' })
+    const names = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop', 'publish_artifact']
+    const calls = names.slice(0, 4).map(name => ({ role: 'assistant', tool_calls: [{ id: name, function: { name, arguments: '{}' } }] }))
+    const tools = names.map(name => ({ type: 'function', function: { name } }))
+    const request = messages => fetch(`${fixture.baseUrl}/chat/completions`, { method: 'POST', body: JSON.stringify({ tools, messages }) })
+    const session = framed('browser_session_start', { sessionId: 'actual-framed-session' })
+    assert.throws(() => JSON.parse(session.content), 'The old plain-JSON fixture parser cannot read the production framing')
+    const navigation = await request([calls[0], session])
+    assert.equal(navigation.status, 200)
+    assert.ok((await navigation.text()).includes('actual-framed-session'))
+    const html = await (await fetch(fixture.fixtureUrl)).text()
+    for (const untrusted of [false, true]) {
+      const result = await request([...calls, framed('browser_get_html', { html, untrusted })])
+      assert.equal(result.status, 200)
+      assert.ok((await result.text()).includes(fixture.marker))
+    }
+    const invalid = await request([...calls, { role: 'tool', tool_call_id: 'browser_get_html',
+      content: `<html>Recorded result:\n${JSON.stringify({ html })}</html>` }])
+    assert.equal(invalid.status, 400)
+    assert.match(fixture.observed.requests.at(-1).error, /requires actual browser HTML/)
+  } finally {
+    await fixture.close()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('failed task evidence retains status and codes without exporting prompts, arguments or tool content', () => {
+  const summary = summarizeWindowsTaskFailure({ id: 'task', threadId: 'thread', status: 'stalled', goal: 'private prompt', artifacts: [] },
+    { turns: [{ id: 'turn', status: 'failed', error: 'HTTP 400 Authorization=private-key', items: [
+      { kind: 'user_message', text: 'private prompt' },
+      { kind: 'tool_result', toolName: 'browser_navigate', callId: 'call', isError: true,
+        arguments: { secret: 'private-key' }, output: { status: 'failed', code: 'browser_scope_required', html: 'private page' } }
+    ] }] }, [{ id: 'receipt', toolName: 'browser_navigate', status: 'failed', request: { secret: 'private-key' } }])
+  assert.equal(summary.turns[0].toolResults[0].code, 'browser_scope_required')
+  assert.equal(summary.receipts[0].status, 'failed')
+  assert.doesNotMatch(JSON.stringify(summary), /private prompt|private-key|private page/)
 })
