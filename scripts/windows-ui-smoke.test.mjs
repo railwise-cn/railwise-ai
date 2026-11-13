@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
@@ -133,6 +133,59 @@ test('default Skills retain the exact packaged PPT upstream overlay provenance',
   const changed = structuredClone(skills)
   changed[1].source.id = 'other'
   assert.throws(() => validateDefaultSkillSources(changed), /Unverified default Skill source/)
+})
+
+test('only the exact installed di-bao agent-pack component with matching packaged bytes is accepted', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-agent-pack-proof-'))
+  const applicationRoot = join(root, 'application')
+  const isolatedRoot = join(root, 'profile')
+  const id = 'metro-monitoring-agent-pack'
+  const codexRoot = join(isolatedRoot, 'home', '.codex')
+  const skillRoot = join(codexRoot, 'skills', 'di-bao-monitoring')
+  const packRoot = join(applicationRoot, 'resources', 'src', 'asset', 'agent-packs', id)
+  const sourceRoot = join(packRoot, 'assets', 'skill', 'di-bao-monitoring')
+  const manifestRoot = join(codexRoot, '.workwise-agent-packs')
+  const pack = { name: id, version: '1.2.34', agentAssets: [{ kind: 'skill', name: 'di-bao-monitoring', dir: 'assets/skill/di-bao-monitoring' }] }
+  const metadata = { type: 'bundled-agent-pack', id, kind: 'skill', name: 'di-bao-monitoring', version: pack.version, installedAt: '2026-11-13T00:00:00Z' }
+  const manifest = { type: metadata.type, id, version: pack.version, installedAt: metadata.installedAt, target: 'codex', rootPath: codexRoot,
+    assets: [{ kind: 'skill', name: 'di-bao-monitoring', targetKind: 'directory', destination: skillRoot }] }
+  const skill = () => ({ id: 'di-bao-monitoring', name: 'Di Bao Monitoring', root: skillRoot, entryPath: join(skillRoot, 'SKILL.md') })
+  const reset = async () => {
+    await Promise.all([skillRoot, sourceRoot, manifestRoot].map(path => mkdir(path, { recursive: true })))
+    await Promise.all([
+      writeFile(join(packRoot, 'package.json'), JSON.stringify(pack)),
+      writeFile(join(skillRoot, '.workwise-agent-pack-source.json'), JSON.stringify(metadata)),
+      writeFile(join(manifestRoot, `${id}.json`), JSON.stringify(manifest)),
+      writeFile(join(sourceRoot, 'SKILL.md'), 'synthetic fixed packaged entry\n'),
+      writeFile(join(skillRoot, 'SKILL.md'), 'synthetic fixed packaged entry\n')
+    ])
+  }
+  try {
+    await reset()
+    const valid = skill()
+    await verifyInstalledAgentPackSkill(valid, { applicationRoot, isolatedRoot })
+    const evidence = report()
+    evidence.resources.defaultSkills[2] = valid
+    assert.equal(validateWindowsUiReport(evidence, identity), true)
+    assert.equal(valid.agentPackSource.type, 'bundled-agent-pack')
+    assert.equal(valid.entryRegisteredInAsar, false)
+    for (const mutate of [
+      async () => writeFile(join(skillRoot, 'SKILL.md'), 'same name, changed entry'),
+      async () => writeFile(join(skillRoot, '.workwise-agent-pack-source.json'), JSON.stringify({ ...metadata, id: 'untrusted-pack' })),
+      async () => writeFile(join(manifestRoot, `${id}.json`), JSON.stringify({ ...manifest, assets: [] })),
+      async () => writeFile(join(packRoot, 'package.json'), JSON.stringify({ ...pack, agentAssets: [{ ...pack.agentAssets[0], dir: 'other/component' }] }))
+    ]) {
+      await reset()
+      await mutate()
+      await assert.rejects(verifyInstalledAgentPackSkill(skill(), { applicationRoot, isolatedRoot }))
+    }
+    await reset()
+    await assert.rejects(verifyInstalledAgentPackSkill({ ...skill(), root: join(root, 'unrelated') }, { applicationRoot, isolatedRoot }))
+    await assert.rejects(verifyInstalledAgentPackSkill({ ...skill(), id: 'tender-master' }, { applicationRoot, isolatedRoot }))
+    const changedProof = structuredClone(valid)
+    changedProof.agentPackSource.entrySha256 = '0'.repeat(64)
+    assert.throws(() => validateDefaultSkillSources([report().resources.defaultSkills[0], report().resources.defaultSkills[1], changedProof]))
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
 
 test('Chinese UI uses the same installed EXE before owned uninstall, with unchanged ordinary app configuration', () => {

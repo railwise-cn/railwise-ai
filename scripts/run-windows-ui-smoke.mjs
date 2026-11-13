@@ -26,6 +26,59 @@ const cadEntries = [
 ]
 const cadCommit = 'ed182ec5966caaaf1d82d6ad4015435a27a8a909'
 const asar = createRequire(import.meta.url)('@electron/asar')
+const monitoringAgentPack = { id: 'metro-monitoring-agent-pack', version: '1.2.34', component: 'di-bao-monitoring', directory: 'assets/skill/di-bao-monitoring' }
+
+function verifiedAgentPackSource(skill) {
+  const source = skill.agentPackSource
+  return skill.id === monitoringAgentPack.component && !skill.source && source?.type === 'bundled-agent-pack' &&
+    source.id === monitoringAgentPack.id && source.version === monitoringAgentPack.version &&
+    source.component === monitoringAgentPack.component && source.directory === monitoringAgentPack.directory &&
+    source.metadataVerified === true && source.installManifestVerified === true && source.ownedPathVerified === true &&
+    /^[a-f0-9]{64}$/.test(source.entrySha256 ?? '') && source.entrySha256 === skill.entrySha256 &&
+    source.entryRelativePath === `resources/src/asset/agent-packs/${monitoringAgentPack.id}/${monitoringAgentPack.directory}/SKILL.md`
+}
+
+export async function verifyInstalledAgentPackSkill(skill, { applicationRoot, isolatedRoot }) {
+  assert.equal(skill.id, monitoringAgentPack.component)
+  const codexRoot = join(isolatedRoot, 'home', '.codex')
+  const expectedRoot = join(codexRoot, 'skills', monitoringAgentPack.component)
+  assert.equal(resolve(skill.root), resolve(expectedRoot), 'The copied Skill must use the exact owned agent-pack destination')
+  assert.equal(resolve(skill.entryPath), resolve(join(expectedRoot, 'SKILL.md')))
+  assert.ok((await lstat(expectedRoot)).isDirectory() && !(await lstat(expectedRoot)).isSymbolicLink())
+  assert.ok((await lstat(skill.entryPath)).isFile() && !(await lstat(skill.entryPath)).isSymbolicLink())
+  const packRoot = join(applicationRoot, 'resources', 'src', 'asset', 'agent-packs', monitoringAgentPack.id)
+  const pack = JSON.parse(await readFile(join(packRoot, 'package.json'), 'utf8'))
+  assert.equal(pack.name, monitoringAgentPack.id)
+  assert.equal(pack.version, monitoringAgentPack.version)
+  const components = pack.agentAssets.filter(item => item.kind === 'skill' && item.name === skill.id)
+  assert.equal(components.length, 1)
+  assert.equal(components[0].dir, monitoringAgentPack.directory)
+  assert.equal(components[0].target ?? components[0].name, monitoringAgentPack.component)
+  const metadata = JSON.parse(await readFile(join(expectedRoot, '.workwise-agent-pack-source.json'), 'utf8'))
+  assert.equal(metadata.type, 'bundled-agent-pack')
+  assert.equal(metadata.id, pack.name)
+  assert.equal(metadata.version, pack.version)
+  assert.equal(metadata.kind, 'skill')
+  assert.equal(metadata.name, skill.id)
+  const manifest = JSON.parse(await readFile(join(codexRoot, '.workwise-agent-packs', `${pack.name}.json`), 'utf8'))
+  assert.equal(manifest.type, 'bundled-agent-pack')
+  assert.equal(manifest.id, pack.name)
+  assert.equal(manifest.version, pack.version)
+  assert.equal(manifest.target, 'codex')
+  assert.equal(resolve(manifest.rootPath), resolve(codexRoot))
+  assert.equal(manifest.installedAt, metadata.installedAt)
+  assert.ok(Number.isFinite(Date.parse(metadata.installedAt)))
+  assert.equal(manifest.assets.filter(item => item.kind === 'skill' && item.name === skill.id && item.targetKind === 'directory' && resolve(item.destination) === resolve(expectedRoot)).length, 1)
+  const packagedEntry = join(packRoot, monitoringAgentPack.directory, 'SKILL.md')
+  const [entryBytes, packagedBytes] = await Promise.all([readFile(skill.entryPath), readFile(packagedEntry)])
+  assert.ok(entryBytes.equals(packagedBytes), 'The installed agent-pack entry must equal its exact packaged source bytes')
+  skill.entrySha256 = createHash('sha256').update(entryBytes).digest('hex')
+  skill.entryRelativePath = relative(isolatedRoot, skill.entryPath).replaceAll('\\', '/')
+  skill.entryRegisteredInAsar = false
+  skill.agentPackSource = { type: 'bundled-agent-pack', id: pack.name, version: pack.version, component: skill.id,
+    directory: monitoringAgentPack.directory, entryRelativePath: relative(applicationRoot, packagedEntry).replaceAll('\\', '/'),
+    entrySha256: skill.entrySha256, metadataVerified: true, installManifestVerified: true, ownedPathVerified: true }
+}
 
 export function validateDefaultSkillSources(skills) {
   return defaultSkillIds.map(id => {
@@ -36,7 +89,7 @@ export function validateDefaultSkillSources(skills) {
       source.owner === 'hugohe3' && source.repo === 'ppt-master' && source.path === 'skills/ppt-master' && source.ref === 'v6.8.0' &&
       source.installedSha === '5e8856be0da8e6bc85c4aa28acc614478f7b7137' &&
       source.overlaySkillId === 'ppt-master' && source.autoUpdate === false
-    assert.ok(id === 'ppt-master' ? auditedPptOverlay : source?.type === 'bundled' && source.id === id, `Unverified default Skill source: ${id}`)
+    assert.ok(id === 'ppt-master' ? auditedPptOverlay : source?.type === 'bundled' && source.id === id || verifiedAgentPackSource(skill), `Unverified default Skill source: ${id}`)
     return skill
   })
 }
@@ -92,9 +145,10 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   for (const check of requiredChecks) assert.ok(report.checks.includes(check), `Missing actual UI observation: ${check}`)
   assert.deepEqual(validateDefaultSkillSources(report.resources.defaultSkills).map(skill => skill.id), defaultSkillIds)
   for (const skill of report.resources.defaultSkills) {
-    assert.equal(skill.entryRelativePath, `resources/app.asar.unpacked/src/asset/skills/${skill.id}/SKILL.md`)
+    const agentPack = verifiedAgentPackSource(skill)
+    assert.equal(skill.entryRelativePath, agentPack ? 'home/.codex/skills/di-bao-monitoring/SKILL.md' : `resources/app.asar.unpacked/src/asset/skills/${skill.id}/SKILL.md`)
     assert.match(skill.entrySha256, /^[a-f0-9]{64}$/)
-    assert.equal(skill.entryRegisteredInAsar, true)
+    assert.equal(skill.entryRegisteredInAsar, !agentPack)
   }
   assert.deepEqual(report.resources.engineeringSkills.map(skill => skill.name), engineeringSkillNames)
   assert.ok(report.resources.engineeringSkills.every(skill => skill.installEnabled))
@@ -538,17 +592,24 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       source:skill.source&&{type:skill.source.type,id:skill.source.id,owner:skill.source.owner,repo:skill.source.repo,path:skill.source.path,ref:skill.source.ref,
         installedSha:skill.source.installedSha,overlaySkillId:skill.source.overlaySkillId,autoUpdate:skill.source.autoUpdate}})):[])`)
     report.resources.defaultSkills = skills.filter(skill => defaultSkillIds.includes(skill.id))
+    for (const skill of report.resources.defaultSkills) {
+      if (skill.id === monitoringAgentPack.component && !skill.source) {
+        await verifyInstalledAgentPackSkill(skill, { applicationRoot: dirname(executable), isolatedRoot: root })
+      }
+    }
     const defaultSkills = validateDefaultSkillSources(skills)
     for (const skill of defaultSkills) {
-      const entry = join('src', 'asset', 'skills', skill.id, 'SKILL.md')
-      const expectedRoot = join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', skill.id)
-      assert.equal(resolve(skill.root).toLowerCase(), expectedRoot.toLowerCase())
-      assert.equal(resolve(skill.entryPath).toLowerCase(), join(expectedRoot, 'SKILL.md').toLowerCase())
-      const entryBytes = await readFile(skill.entryPath)
-      assert.ok(entryBytes.equals(asar.extractFile(join(dirname(executable), 'resources', 'app.asar'), entry)))
-      skill.entryRelativePath = relative(dirname(executable), skill.entryPath).replaceAll('\\', '/')
-      skill.entrySha256 = createHash('sha256').update(entryBytes).digest('hex')
-      skill.entryRegisteredInAsar = true
+      if (!verifiedAgentPackSource(skill)) {
+        const entry = join('src', 'asset', 'skills', skill.id, 'SKILL.md')
+        const expectedRoot = join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', skill.id)
+        assert.equal(resolve(skill.root).toLowerCase(), expectedRoot.toLowerCase())
+        assert.equal(resolve(skill.entryPath).toLowerCase(), join(expectedRoot, 'SKILL.md').toLowerCase())
+        const entryBytes = await readFile(skill.entryPath)
+        assert.ok(entryBytes.equals(asar.extractFile(join(dirname(executable), 'resources', 'app.asar'), entry)))
+        skill.entryRelativePath = relative(dirname(executable), skill.entryPath).replaceAll('\\', '/')
+        skill.entrySha256 = createHash('sha256').update(entryBytes).digest('hex')
+        skill.entryRegisteredInAsar = true
+      }
       await cdp.fill('input[placeholder*="已索引"]', skill.name || skill.id)
       await cdp.wait(`document.body.innerText.includes(${JSON.stringify(skill.root)}) && Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===${JSON.stringify(skill.name || skill.id)})`, `${skill.id} in its actual local package directory`)
     }
