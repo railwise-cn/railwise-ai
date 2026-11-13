@@ -160,6 +160,8 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   assert.match(ui, /nav\[aria-label="工作区工具"\]/)
   assert.match(ui, /view\.executeJavaScript\('.*document\.body\.innerText/)
   assert.match(ui, /windows-task-html-preview-zh-dark\.png/)
+  assert.match(ui, /report\.runtimeFailure = await cdp\.evaluate/)
+  assert.match(ui, /mcpServers:tools\.body\.mcpServers/)
   assert.doesNotMatch(ui, /window\.workwise\s*=|innerHTML\s*=|mock\w*\(/)
 })
 
