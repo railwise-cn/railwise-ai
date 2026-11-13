@@ -877,7 +877,8 @@ export async function createKunServeRuntime(
   })
   const connectorPreflight = contextualExternalTaskPreflight({
     providerPreflight: async (text: string, thread) => {
-      const browser = await browserRuntime.preflight(text, thread)
+      const scheduled = thread ? await taskScheduleService?.executionScopeForThread(thread.id) : undefined
+      const browser = await browserRuntime.preflight(text, thread, scheduled?.browserScope)
       if (browser) return browser
       if (externalTaskIntent(text)?.provider === 'dingtalk') {
         return useDws() || !dingtalkRuntime.state().enabled ? dwsRuntime.preflight(text) : dingtalkRuntime.preflight(text)

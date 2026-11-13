@@ -110,6 +110,76 @@ it('keeps a new periodic source scope requirement on the original task without i
   expect(f.network).not.toHaveBeenCalled()
 })
 
+it('persists a single public-query action review on the original task without inventing an authorization or resuming pause', async () => {
+  const f = await fixture()
+  await f.toolFailure('browser_public_query_action_required')
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'waiting_user' })
+  const attention = f.runtime.taskRepository!.attention(`capability_${f.task.id}`)!
+  expect(attention).toMatchObject({ payload: { capability: { provider: 'browser-skill', status: 'needs_authorization', errorCode: 'browser_public_query_action_required',
+    resolution: { kind: 'retry', route: 'task/browser-action-review', label: '继续原任务并审阅公开查询动作' } } } })
+  expect(f.runtime.taskRepository!.operations(f.task.id, 'browser_action_authorization')).toHaveLength(0)
+  expect(f.runtime.taskRepository!.operations(f.task.id, 'browser_action_dispatch')).toHaveLength(0)
+  const waiting = f.runtime.taskRepository!.get(f.task.id)!
+  const paused = f.runtime.taskController!.pauseTask(waiting.id, waiting.revision, '用户明确暂停')
+  await f.runtime.taskCoordinator!.flushCommandMessages()
+  expect(f.runtime.taskRepository!.get(f.task.id)).toEqual(paused)
+  expect(f.runtime.approvalGate.pending()).toHaveLength(0)
+  expect(f.network).not.toHaveBeenCalled()
+})
+
+async function singleActionLedger(scenario: 'matching' | 'different-target' | 'old-policy' | 'revoked' | 'expired' | 'unknown') {
+  const f = await fixture()
+  const repository = f.runtime.taskRepository!
+  const initial = repository.get(f.task.id)!
+  const browserScope = { browserInstanceId: 'reviewed-browser', revision: 1, interaction: 'interact' as const,
+    origins: ['https://example.test'], verificationPolicy: 'public_query_target' as const }
+  const task = repository.update(initial.id, initial.revision, current => ({ ...current,
+    authority: { source: 'user', workspaceRoot: f.workspace, externalTargets: [], grantedAt: f.runtime.nowIso(), browserScope } }))
+  const target = { action: 'fill' as const, pageUrl: 'https://example.test/search', elementHash: 'a'.repeat(64), valueHash: 'b'.repeat(64),
+    browserInstanceId: browserScope.browserInstanceId, browserRevision: browserScope.revision, verificationPolicy: browserScope.verificationPolicy }
+  repository.beginOperation({ ownerId: task.id, idempotencyKey: `tool:${f.turn.turnId}:single-missing`, kind: 'tool',
+    request: { toolName: 'browser_fill', turnId: f.turn.turnId, argumentsHash: 'c'.repeat(64) }, nowIso: f.runtime.nowIso() })
+  repository.finishOperation(task.id, `tool:${f.turn.turnId}:single-missing`, { status: 'failed' })
+  repository.beginOperation({ ownerId: task.id, idempotencyKey: 'single-scope-request', kind: 'browser_action_scope_request',
+    request: { ...target, toolName: 'browser_fill', turnId: f.turn.turnId, argumentsHash: 'c'.repeat(64) }, nowIso: f.runtime.nowIso() })
+  repository.finishOperation(task.id, 'single-scope-request', { status: 'succeeded' })
+  await f.runtime.sessionStore.appendItem(f.worker.id, makeToolResultItem({ id: 'single-missing', threadId: f.worker.id, turnId: f.turn.turnId,
+    callId: 'single-missing', toolName: 'browser_fill', isError: true, output: { code: 'browser_public_query_action_required' } }))
+  const actual = { ...target, ...(scenario === 'different-target' ? { elementHash: 'd'.repeat(64) } : {}) }
+  const { verificationPolicy: _policy, ...legacy } = actual
+  const authorization = repository.beginOperation({ ownerId: task.id, idempotencyKey: 'single-authorization', kind: 'browser_action_authorization',
+    request: scenario === 'old-policy' ? legacy : actual, nowIso: f.runtime.nowIso() }).receipt
+  repository.finishOperation(task.id, 'single-authorization', { status: 'succeeded', result: { approvalId: 'explicit-single-query-review', access: 'public_query',
+    expiresAt: new Date(Date.now() + (scenario === 'expired' ? -60_000 : 15 * 60_000)).toISOString(), revoked: scenario === 'revoked' } })
+  const dispatch = repository.beginOperation({ ownerId: task.id, idempotencyKey: 'single-dispatch', kind: 'browser_action_dispatch',
+    request: { ...actual, authorizationReceiptId: authorization.id, turnId: f.turn.turnId, toolName: 'browser_fill', argumentsHash: 'f'.repeat(64), dependsOn: ['@e1'] }, nowIso: f.runtime.nowIso() }).receipt
+  repository.finishOperation(task.id, 'single-dispatch', { status: scenario === 'unknown' ? 'outcome_unknown' : 'succeeded',
+    result: { actionAcknowledged: true, readbackPending: false, resultHash: 'e'.repeat(64) } })
+  repository.beginOperation({ ownerId: task.id, idempotencyKey: `tool:${f.turn.turnId}:single-later`, kind: 'tool',
+    request: { toolName: 'browser_fill', turnId: f.turn.turnId, callId: 'single-later', argumentsHash: 'f'.repeat(64) }, nowIso: f.runtime.nowIso() })
+  repository.finishOperation(task.id, `tool:${f.turn.turnId}:single-later`, { status: scenario === 'unknown' ? 'outcome_unknown' : 'succeeded' })
+  await f.runtime.sessionStore.appendItem(f.worker.id, makeToolResultItem({ id: 'single-later', threadId: f.worker.id, turnId: f.turn.turnId,
+    callId: 'single-later', toolName: 'browser_fill', isError: scenario === 'unknown', output: { dispatchReceiptId: dispatch.id, resultHash: 'e'.repeat(64) } }))
+  return f
+}
+
+it('clears the earlier single public-query scope blocker only after matching task authorization, dispatch and readback in the same Turn', async () => {
+  const f = await singleActionLedger('matching')
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toBeNull()
+  expect(f.runtime.taskRepository!.attention(`capability_${f.task.id}`)).toBeNull()
+  expect(f.runtime.taskRepository!.operations(f.task.id, 'browser_schedule_action_authorization')).toHaveLength(0)
+  expect(f.runtime.taskRepository!.get(f.task.id)?.status).toBe('running')
+  expect(f.network).not.toHaveBeenCalled()
+})
+
+it.each(['different-target', 'old-policy', 'revoked', 'expired', 'unknown'] as const)('does not clear the single public-query blocker for %s authorization or dispatch evidence', async scenario => {
+  const f = await singleActionLedger(scenario)
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'waiting_user' })
+  expect(f.runtime.taskRepository!.attention(`capability_${f.task.id}`)).toMatchObject({ status: 'pending', payload: { capability: { errorCode: 'browser_public_query_action_required' } } })
+  expect(f.runtime.taskRepository!.get(f.task.id)?.status).not.toBe('completed')
+  expect(f.network).not.toHaveBeenCalled()
+})
+
 it.each(['browser_schedule_authority_changed', 'browser_schedule_action_scope_changed', 'browser_schedule_action_scope_required', 'browser_schedule_outcome_unknown'])('persists one actionable %s plan blocker without waking a paused task', async code => {
   const f = await fixture()
   const current = f.runtime.taskRepository!.get(f.task.id)!

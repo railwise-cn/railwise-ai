@@ -16,6 +16,19 @@ const scheduleSummary = ['确认周期浏览器权限', '计划目的 "每日公
   '操作说明 "元素或输入变化时重新审阅"', `授权版本 "${'a'.repeat(64)}"`].join('\n')
 
 describe('browser approval business view', () => {
+  it.each(['公开查询目标及明确依赖', '完整页面与目标'])('shows the explicit %s policy as business scope while keeping hashes folded', async policy => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const element = document.createElement('div'), root = createRoot(element)
+    try {
+      const summary = `${actionSummary}\n校验范围 ${JSON.stringify(policy)}`
+      await act(async () => root.render(createElement(BrowserApprovalDetails, { summary })))
+      expect(element.querySelector('dl')?.textContent).toContain('校验范围')
+      expect(element.querySelector('dl')?.textContent).toContain(policy)
+      expect(element.textContent).not.toContain('a'.repeat(64))
+      expect(element.querySelector('pre')).toBeNull()
+    } finally { await act(async () => root.unmount()) }
+  })
   it.each(['details', 'chat', 'schedule'] as const)('shows reviewable fields and reveals technical evidence only after an explicit open in %s', async surface => {
     const summary = surface === 'schedule' ? scheduleSummary : actionSummary
     await i18n.changeLanguage('zh')

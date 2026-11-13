@@ -5,9 +5,12 @@ import { describe, expect, it, vi } from 'vitest'
 import i18n from '../../i18n'
 import { BrowserTaskBindingPanel } from './BrowserTaskBindingPanel'
 import type { BrowserTaskBindingSnapshot } from '../../../../../kun/src/contracts/browser-skill'
+import { takeRequestedTask } from '../../store/task-live-store'
+import { useChatStore } from '../../store/chat-store'
 
 const binding: BrowserTaskBindingSnapshot = { taskId: 'task', taskRevision: 5, browserRevision: 3, browserInstanceId: 'browser',
-  browserLabel: '测试 Chrome', origins: ['https://example.com'], interaction: 'observe', previousInteraction: 'observe' }
+  browserLabel: '测试 Chrome', origins: ['https://example.com'], interaction: 'observe', previousInteraction: 'observe', purpose: '核对公开资料',
+  verificationPolicy: 'strict', recommendedVerificationPolicy: 'strict', allowedVerificationPolicies: ['strict'] }
 function button(element: HTMLElement, key: string): HTMLButtonElement {
   return [...element.querySelectorAll('button')].find(item => item.textContent === i18n.t(`common:${key}`))!
 }
@@ -19,6 +22,113 @@ function deferred<T>() {
 }
 
 describe('browser task reauthorization', () => {
+  it.each(['zh', 'en'])('reviews the server-recommended public-query mode without authorizing or resuming until confirmation in %s', async language => {
+    await i18n.changeLanguage(language)
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const snapshot = { ...binding, purpose: '搜索公开招标公告，不提交业务表单', interaction: 'interact' as const,
+      verificationPolicy: 'strict' as const, recommendedVerificationPolicy: 'public_query_target' as const,
+      allowedVerificationPolicies: ['strict', 'public_query_target'] as const }
+    const api = { getBrowserTaskBinding: vi.fn(async () => snapshot),
+      confirmBrowserTaskBinding: vi.fn(async (_id: string, input: { verificationPolicy?: 'strict' | 'public_query_target' }) => ({ binding: { ...snapshot, verificationPolicy: input.verificationPolicy }, resumed: false })),
+      coordinateTaskCommand: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
+    try {
+      await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: binding.taskId, onConfirmed: confirmed })))
+      const select = element.querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('common:browserTaskVerificationPolicy')}"]`)!
+      expect(select.value).toBe('public_query_target')
+      expect([...select.options].map(option => option.value)).toEqual(['strict', 'public_query_target'])
+      expect(element.textContent).toContain(snapshot.purpose)
+      expect(element.textContent).toContain(i18n.t('common:browserTaskPolicyPublicQueryDescription'))
+      expect(element.textContent).not.toContain('public_query_target')
+      expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+      await act(async () => { select.value = 'strict'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+      expect(element.textContent).toContain(i18n.t('common:browserTaskPolicyStrictDescription'))
+      await act(async () => { select.value = 'public_query_target'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+      expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+      await act(async () => button(element, 'browserTaskBindingConfirm').click())
+      expect(api.confirmBrowserTaskBinding).toHaveBeenCalledExactlyOnceWith(binding.taskId, expect.objectContaining({ verificationPolicy: 'public_query_target', confirmed: true, expectedTaskRevision: binding.taskRevision }))
+      expect(confirmed).toHaveBeenCalledOnce()
+      expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    } finally { await act(async () => root.unmount()) }
+  })
+
+  it('keeps a legacy snapshot strict and changes nothing when the user leaves without confirming', async () => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const legacy = { taskId: binding.taskId, taskRevision: binding.taskRevision, browserRevision: binding.browserRevision,
+      browserInstanceId: binding.browserInstanceId, browserLabel: binding.browserLabel, origins: binding.origins, interaction: binding.interaction }
+    const api = { getBrowserTaskBinding: vi.fn(async () => legacy), confirmBrowserTaskBinding: vi.fn(), coordinateTaskCommand: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
+    await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: binding.taskId, onConfirmed: confirmed })))
+    const select = element.querySelector<HTMLSelectElement>('select')!
+    expect(select.value).toBe('strict'); expect(select.disabled).toBe(true)
+    expect(select.options[1].disabled).toBe(true)
+    await act(async () => root.unmount())
+    expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(confirmed).not.toHaveBeenCalled()
+  })
+
+  it('keeps an unresolved action on its current mode and opens the original task for review without cancelling or resuming', async () => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const snapshot = { ...binding, verificationPolicy: 'strict' as const, recommendedVerificationPolicy: 'public_query_target' as const,
+      allowedVerificationPolicies: ['strict'] as const, policyChangeBlocked: 'browser_unresolved_operation' as const }
+    const api = { getBrowserTaskBinding: vi.fn(async () => snapshot), confirmBrowserTaskBinding: vi.fn(), coordinateTaskCommand: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const route = vi.spyOn(useChatStore.getState(), 'setRoute').mockImplementation(() => undefined)
+    const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
+    try {
+      await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: binding.taskId, onConfirmed: confirmed })))
+      expect(element.querySelector<HTMLSelectElement>('select')!.value).toBe('strict')
+      expect(element.querySelector<HTMLSelectElement>('select')!.disabled).toBe(true)
+      expect(element.textContent).toContain(i18n.t('common:browserTaskUnresolvedOperation'))
+      await act(async () => button(element, 'browserTaskOpenOriginalReview').click())
+      expect(takeRequestedTask()).toBe(binding.taskId)
+      expect(route).toHaveBeenCalledWith('tasks')
+      expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+      expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    } finally { await act(async () => root.unmount()); route.mockRestore(); takeRequestedTask() }
+  })
+
+  it.each(['browser_verification_policy_blocked', 'browser_unresolved_operation'])('shows actionable %s without claiming success', async code => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const api = { getBrowserTaskBinding: vi.fn(async () => binding), confirmBrowserTaskBinding: vi.fn().mockRejectedValue(new Error(`[${code}] rejected`)), coordinateTaskCommand: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
+    try {
+      await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: binding.taskId, onConfirmed: confirmed })))
+      await act(async () => button(element, 'browserTaskBindingConfirm').click())
+      expect(element.querySelector('[role="alert"]')?.textContent).toBe(i18n.t(`common:${code === 'browser_unresolved_operation' ? 'browserTaskUnresolvedOperation' : 'browserTaskVerificationPolicyBlocked'}`))
+      expect(button(element, 'browserTaskBindingConfirm').disabled).toBe(true)
+      expect(button(element, 'browserTaskBindingReload')).toBeTruthy()
+      if (code === 'browser_unresolved_operation') expect(button(element, 'browserTaskOpenOriginalReview')).toBeTruthy()
+      expect(confirmed).not.toHaveBeenCalled()
+      expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    } finally { await act(async () => root.unmount()) }
+  })
+
+  it.each(['missing-policy', 'wrong-policy', 'resumed', 'different-sites'] as const)('rejects a %s confirmation acknowledgement', async condition => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const snapshot = { ...binding, verificationPolicy: 'strict' as const, recommendedVerificationPolicy: 'public_query_target' as const,
+      allowedVerificationPolicies: ['strict', 'public_query_target'] as const }
+    const result = { ...snapshot, verificationPolicy: condition === 'missing-policy' ? undefined : condition === 'wrong-policy' ? 'strict' : 'public_query_target',
+      origins: condition === 'different-sites' ? ['https://another.example.com'] : snapshot.origins }
+    const api = { getBrowserTaskBinding: vi.fn(async () => snapshot), confirmBrowserTaskBinding: vi.fn(async () => ({ binding: result, resumed: condition === 'resumed' })), coordinateTaskCommand: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
+    try {
+      await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: binding.taskId, onConfirmed: confirmed })))
+      await act(async () => button(element, 'browserTaskBindingConfirm').click())
+      expect(element.querySelector('[role="alert"]')?.textContent).toBe(i18n.t('common:browserTaskBindingChanged'))
+      expect(confirmed).not.toHaveBeenCalled()
+      expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    } finally { await act(async () => root.unmount()) }
+  })
   it.each(['observe', 'interact'] as const)('shows the reviewed browser and original origins, confirms the exact revision and leaves resume explicit for %s', async interaction => {
     await i18n.changeLanguage('zh')
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -35,7 +145,7 @@ describe('browser task reauthorization', () => {
       if (interaction === 'interact') expect(element.textContent).toContain('从仅阅读扩大为允许网页交互')
       expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
       await act(async () => element.querySelector('button')!.click())
-      expect(api.confirmBrowserTaskBinding).toHaveBeenCalledWith('task', { confirmed: true, expectedTaskRevision: 5, expectedBrowserRevision: 3, browserInstanceId: 'browser', origins: ['https://example.com'], interaction, idempotencyKey: expect.any(String) })
+      expect(api.confirmBrowserTaskBinding).toHaveBeenCalledWith('task', { confirmed: true, expectedTaskRevision: 5, expectedBrowserRevision: 3, browserInstanceId: 'browser', origins: ['https://example.com'], interaction, verificationPolicy: 'strict', idempotencyKey: expect.any(String) })
       expect(confirmed).toHaveBeenCalledOnce()
       expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     } finally { await act(async () => root.unmount()) }
@@ -65,7 +175,7 @@ describe('browser task reauthorization', () => {
       expect(button(element, 'browserTaskBindingConfirm').disabled).toBe(false)
       await act(async () => button(element, 'browserTaskBindingConfirm').click())
       expect(api.confirmBrowserTaskBinding).toHaveBeenCalledWith('task', { confirmed: true, expectedTaskRevision: 5,
-        expectedBrowserRevision: 3, browserInstanceId: 'browser', origins: ['https://example.com'], interaction: 'observe', idempotencyKey: expect.any(String) })
+        expectedBrowserRevision: 3, browserInstanceId: 'browser', origins: ['https://example.com'], interaction: 'observe', verificationPolicy: 'strict', idempotencyKey: expect.any(String) })
       expect(confirmed).toHaveBeenCalledOnce()
       expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     } finally { await act(async () => root.unmount()) }

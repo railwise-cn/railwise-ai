@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import type { BrowserCapabilityConfig } from '../contracts/browser-skill.js'
+import { browserVerificationPolicy, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 import type { ExecutionGrant, ExecutionScope } from '../contracts/permissions.js'
 import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
 import type { FlowDefinitionV1 } from '../contracts/flow.js'
@@ -253,7 +253,11 @@ export class TaskScheduleService {
         if (task.scheduledBy) return
         this.deps.repository.update(task.id, task.revision, value => {
           const { schedule: _schedule, ...acceptance } = value.acceptance
-          return { ...value, scheduledBy: { scheduleId: input.scheduleId, dueAt: input.dueAt }, acceptance }
+          return { ...value, scheduledBy: { scheduleId: input.scheduleId, dueAt: input.dueAt },
+            ...(authority.scope.browserScope ? { authority: { ...value.authority!, browserScope: authority.scope.browserScope } } : {}),
+            acceptance: { ...acceptance,
+              ...(authority.scope.browserScope && acceptance.requiresWebEvidence && !acceptance.requiredSourceOrigins?.length
+                ? { requiredSourceOrigins: authority.scope.browserScope.origins } : {}) } }
         }, { key: `scheduled:${input.dueAt}`, kind: 'scheduled_task_created', payload: input, createdAt: this.deps.nowIso() })
       } })
     } catch (error) {
@@ -272,7 +276,7 @@ export class TaskScheduleService {
     if (receipts.some(receipt => receipt.kind === 'browser_schedule_action_outcome' && receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
     const matches = (target: Record<string, unknown>) => actions.some(action => action.action === target.action && action.pageUrl === target.pageUrl &&
       action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === target.browserInstanceId &&
-      action.browserRevision === target.browserRevision)
+      action.browserRevision === target.browserRevision && browserVerificationPolicy(action.verificationPolicy) === browserVerificationPolicy(target.verificationPolicy))
     for (const dispatch of dispatches) {
       if (record(dispatch.result).readbackPending === true) throw Object.assign(new Error('浏览器已确认动作，但页面结果尚未读取，不能保存计划。请只读观察原页面。'), { code: 'browser_readback_blocked' })
       if (this.deps.repository.verifiedOperationResolution(dispatch)?.evidence.kind === 'human_confirmation') {

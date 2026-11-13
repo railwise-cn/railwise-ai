@@ -1,4 +1,4 @@
-import { isBrowserTask, browserTaskOrigins } from '../contracts/browser-skill.js'
+import { isBrowserTask, browserTaskOrigins, browserVerificationPolicy } from '../contracts/browser-skill.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { extractScheduleRequirement } from '../contracts/schedule.js'
 import { authorizedArtifactWrites } from './task-artifact-proof.js'
@@ -647,6 +647,7 @@ export class TaskController {
     const denied = [...items].reverse().find(item => item.kind === 'tool_result' && item.isError && item.output && typeof item.output === 'object' &&
       ['sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
         'browser_interaction_scope_required', 'browser_binding_changed', 'browser_schedule_authority_changed',
+        'browser_verification_policy_required', 'browser_verification_policy_blocked', 'browser_public_query_action_required', 'browser_public_query_target_blocked',
         'browser_schedule_action_scope_changed', 'browser_schedule_action_scope_required', 'browser_schedule_outcome_unknown',
         'browser_control_required', 'browser_sync_blocked', 'browser_sync_target_changed', 'browser_readback_blocked'].includes(String((item.output as Record<string, unknown>).code)) &&
       !((item.output as Record<string, unknown>).code === 'browser_readback_blocked' && !this.repository.operations(task.id, 'browser_action_dispatch').some(receipt => (receipt.result as { readbackPending?: boolean } | undefined)?.readbackPending === true)) &&
@@ -654,10 +655,16 @@ export class TaskController {
     if (!denied || denied.kind !== 'tool_result') return null
     const code = String((denied.output as Record<string, unknown>).code)
     const legacyBrowserEvidenceMissing = code === 'browser_schedule_action_scope_required' && String((denied.output as { error?: string }).error ?? '').startsWith('旧操作缺少可核对的执行前页面或逐次目标审批凭据')
-    const browserBlock = code === 'browser_interaction_scope_required' || code === 'browser_binding_changed'
+    const browserBlock = ['browser_interaction_scope_required', 'browser_binding_changed', 'browser_verification_policy_required', 'browser_verification_policy_blocked'].includes(code)
     let capability: CapabilityPreflight
     if (['browser_control_required', 'browser_sync_blocked', 'browser_sync_target_changed', 'browser_readback_blocked'].includes(code)) {
       capability = browserRecoveryCapability(code, this.nowIso())
+    } else if (['browser_public_query_action_required', 'browser_public_query_target_blocked'].includes(code)) {
+      const resolution = { kind: 'retry' as const, route: 'task/browser-action-review', label: '继续原任务并审阅公开查询动作' }
+      capability = { provider: 'browser-skill', status: 'needs_authorization', errorCode: code,
+        message: code === 'browser_public_query_target_blocked' ? '所选目标包含账号操作或业务写入内容。请继续原任务并重新选择公开搜索或翻页目标。业务操作需要单独审阅完整页面范围。' : '公开查询目标模式尚缺当前动作的明确授权。继续原任务后，智能体会重新观察页面，展示具体目标、输入和校验范围供你审阅。',
+        credentialState: 'unknown', networkState: 'unknown', workspaceState: 'unknown', sandboxState: 'allowed',
+        approvalState: 'required', action: resolution, resolution, checkedAt: this.nowIso() }
     } else if (code.startsWith('browser_schedule_')) {
       const resolution = task.scheduledBy
         ? { kind: 'grant' as const, route: `flow/${task.scheduledBy.scheduleId}`, label: '查看并核对定时计划' }
@@ -672,7 +679,8 @@ export class TaskController {
     } else if (browserBlock) {
       const resolution = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认当前任务的浏览器范围' }
       capability = { provider: 'browser-skill', status: 'needs_authorization', errorCode: code,
-        message: code === 'browser_binding_changed'
+        message: code.startsWith('browser_verification_policy_') ? '当前任务的浏览器校验范围需要确认。请审阅公开查询或完整页面校验模式，确认后以新授权继续任务。'
+          : code === 'browser_binding_changed'
           ? '浏览器实例或连接配置已变化。请审阅当前任务的浏览器和站点范围，确认后继续原任务。'
           : '当前任务需要网页交互权限。请确认浏览器、允许访问的站点和交互范围，然后继续原任务。',
         credentialState: 'unknown', networkState: 'unknown', workspaceState: 'unknown', sandboxState: 'allowed',
@@ -706,23 +714,29 @@ export class TaskController {
   }
 
   private resolvedBrowserScopeRequest(task: TaskRun, denied: TurnItem, items: TurnItem[], turnId: string): boolean {
-    if (denied.kind !== 'tool_result' || (denied.output as { code?: string })?.code !== 'browser_schedule_action_scope_required') return false
+    if (denied.kind !== 'tool_result' || !['browser_schedule_action_scope_required', 'browser_public_query_action_required'].includes(String((denied.output as { code?: string })?.code))) return false
     const operation = this.repository.operation(task.id, `tool:${turnId}:${denied.callId}`)
     const request = this.repository.operations(task.id, 'browser_action_scope_request').find(receipt => receipt.status === 'succeeded' &&
       receipt.request?.turnId === turnId && receipt.request?.toolName === denied.toolName &&
       receipt.request?.argumentsHash === operation?.request?.argumentsHash)?.request
     if (!request || this.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !this.repository.verifiedOperationResolution(receipt))) return false
     const sameTarget = (candidate: Record<string, unknown>) => ['action', 'pageUrl', 'elementHash', 'valueHash', 'browserInstanceId', 'browserRevision']
-      .every(key => candidate[key] === request[key])
+      .every(key => candidate[key] === request[key]) && browserVerificationPolicy(candidate.verificationPolicy) === browserVerificationPolicy(request.verificationPolicy)
     const approved = listApprovedBrowserScheduleActions(this.repository, task).find(action => sameTarget(action))
-    if (!approved) return false
+    const approvedTask = this.repository.operations(task.id, 'browser_action_authorization').find(receipt => {
+      const result = receipt.result as { access?: string; revoked?: boolean; expiresAt?: string } | undefined
+      return receipt.status === 'succeeded' && result?.access === 'public_query' && result.revoked !== true &&
+        Date.parse(result.expiresAt ?? '') > Date.parse(this.nowIso()) && sameTarget(receipt.request ?? {})
+    })
+    if (!approved && !approvedTask) return false
     const dispatches = this.repository.operations(task.id, 'browser_action_dispatch')
     return items.slice(items.indexOf(denied) + 1).some(item => {
       if (item.kind !== 'tool_result' || item.isError || !['browser_click', 'browser_fill'].includes(item.toolName)) return false
       const output = item.output as { dispatchReceiptId?: string; resultHash?: string } | undefined
       const dispatch = dispatches.find(receipt => receipt.id === output?.dispatchReceiptId)
       const actual = this.repository.operation(task.id, `tool:${turnId}:${item.callId}`)
-      return dispatch?.status === 'succeeded' && dispatch.request?.turnId === turnId && dispatch.request?.scheduleActionId === approved.id &&
+      return dispatch?.status === 'succeeded' && dispatch.request?.turnId === turnId &&
+        (approved ? dispatch.request?.scheduleActionId === approved.id : dispatch.request?.authorizationReceiptId === approvedTask?.id) &&
         sameTarget(dispatch.request) && actual?.status === 'succeeded' && actual.request?.toolName === item.toolName &&
         actual.request.argumentsHash === dispatch.request.argumentsHash && typeof output?.resultHash === 'string' &&
         (dispatch.result as { resultHash?: string } | undefined)?.resultHash === output.resultHash

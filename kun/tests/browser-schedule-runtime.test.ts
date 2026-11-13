@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,9 +9,12 @@ import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
 import { buildRouter } from '../src/server/routes/index.js'
 import { dispatchRequest } from '../src/server/http-server.js'
 import type { TaskRun } from '../src/contracts/tasks.js'
+import type { BrowserTaskBindingSnapshot } from '../src/contracts/browser-skill.js'
+import type { BrowserScheduleAction } from '../src/contracts/browser-schedule-actions.js'
+import { listApprovedBrowserScheduleActions } from '../src/services/browser-schedule-action-authority.js'
 
 const browser = vi.hoisted(() => ({ next: 0, latest: '', sessions: new Map<string, { url: string; context: string; tab: number }>(),
-  writes: [] as Array<{ sessionId: string; action: string }>, elementChanged: false }))
+  writes: [] as Array<{ sessionId: string; action: string; targetRef: string; dependsOn: string[] }>, elementChanged: false }))
 vi.mock('../src/services/browser-skill-cli.js', async original => ({
   ...await original<typeof import('../src/services/browser-skill-cli.js')>(),
   runBrowserCommand: vi.fn(async (_config: unknown, args: readonly string[]) => {
@@ -41,7 +45,8 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
       return { ok: true, output: { tab_id: session.tab, html, byte_size: Buffer.byteLength(html), truncated: false } }
     }
     if (args[0] === 'fill' || args[0] === 'click') {
-      browser.writes.push({ sessionId: id!, action: args[0] })
+      browser.writes.push({ sessionId: id!, action: args[0], targetRef: args.find(value => /^@?e\d+$/.test(value))!,
+        dependsOn: args.flatMap((value, index) => value === '--depends-on' ? [args[index + 1]!] : []) })
       return { ok: true, output: { tab_id: session.tab } }
     }
     throw new Error(`Unexpected synthetic browser command ${args[0]}`)
@@ -56,15 +61,18 @@ afterEach(async () => {
   browser.next = 0; browser.latest = ''; browser.sessions.clear(); browser.writes = []; browser.elementChanged = false
 })
 
-it('runs two independent scheduled browser tasks after expiry and restart without repeating approved action prompts', async () => {
+it.each([undefined, 'public_query_target'] as const)('runs independent scheduled tasks after expiry and restart with policy %s and no repeated approvals', async verificationPolicy => {
+  const effectivePolicy = verificationPolicy ?? 'strict'
   vi.stubEnv('RAILWISE_TASK_SCHEDULING_DISABLED', '0')
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-browser-schedule-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
   const workspace = join(root, 'workspace')
   await mkdir(workspace)
   let beforeNextFill: (() => void) | undefined
+  let modelRequests = 0
   // This deterministic model and CLI replay verify production wiring, not a live website or model.
   const model = createServer(async (request, response) => {
+    modelRequests += 1
     const chunks: Buffer[] = []
     for await (const chunk of request) chunks.push(Buffer.from(chunk))
     const body = JSON.parse(Buffer.concat(chunks).toString()) as { tools?: Array<{ function: { name: string } }>; messages?: Array<{ tool_calls?: Array<{ id: string }> }> }
@@ -126,7 +134,28 @@ it('runs two independent scheduled browser tasks after expiry and restart withou
   const origin = await runtime.threadService.create({ workspace, mode: 'agent', model: 'synthetic-model', approvalPolicy: 'on-request' })
   const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'public-browser-schedule',
     request: { prompt: '使用BrowserSkill查询 https://public.example.test/search 的公开工程监测公告并生成HTML报告，每天09:00和17:00执行。' } })
-  expect(started.kind).toBe('task_started')
+  expect(started).toMatchObject({ kind: 'capability_required', capability: { errorCode: 'browser_verification_policy_required' }, task: { status: 'waiting_user' } })
+  const sourceId = started.task!.id
+  expect((await runtime.threadService.get(started.task!.threadId))!.turns).toHaveLength(0)
+  expect(modelRequests).toBe(0)
+  const confirmPolicy = async (taskId: string, policy?: 'public_query_target') => {
+    const path = `http://localhost/v1/tasks/${taskId}/browser-binding`
+    const preview = await dispatchRequest(router, new Request(path, { headers: { authorization: 'Bearer synthetic' } }))
+    expect(preview.status).toBe(200)
+    const snapshot = await preview.json() as BrowserTaskBindingSnapshot
+    expect(snapshot.verificationPolicy).toBe('strict')
+    const response = await dispatchRequest(router, new Request(path, { method: 'POST', headers: { authorization: 'Bearer synthetic', 'content-type': 'application/json' },
+      body: JSON.stringify({ confirmed: true, expectedTaskRevision: snapshot.taskRevision, expectedBrowserRevision: snapshot.browserRevision,
+        browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction: 'interact', ...(policy ? { verificationPolicy: policy } : {}), idempotencyKey: `policy:${taskId}:${policy ?? 'legacy'}` }) }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ resumed: false, binding: { verificationPolicy: policy ?? 'strict' } })
+  }
+  await confirmPolicy(sourceId, verificationPolicy)
+  expect(runtime.taskRepository!.get(sourceId)!.status).toBe('waiting_user')
+  expect((await runtime.threadService.get(started.task!.threadId))!.turns).toHaveLength(0)
+  expect(modelRequests).toBe(0)
+  expect(Object.hasOwn(runtime.taskRepository!.get(sourceId)!.authority!.browserScope!, 'verificationPolicy')).toBe(Boolean(verificationPolicy))
+  await runtime.taskCoordinator!.command({ threadId: origin.id, taskId: sourceId, intent: 'resume', idempotencyKey: 'separate-source-resume', request: { prompt: '继续原任务' } })
   const waitCompleted = async (id: string) => {
     await expect.poll(() => {
       const task = runtime.taskRepository!.get(id)!
@@ -136,10 +165,78 @@ it('runs two independent scheduled browser tasks after expiry and restart withou
   await waitCompleted(started.task!.id)
   expect(approvals).toEqual(['browser_authorize_action', 'browser_authorize_action', 'schedule_task'])
   const source = runtime.taskRepository!.get(started.task!.id)!
+  const assertExecutionPolicy = async (task: TaskRun) => {
+    const thread = (await runtime.threadService.get(task.threadId))!
+    const turns = thread.turns.filter(turn => turn.executionGrant?.taskId === task.id)
+    expect(turns).toHaveLength(1)
+    const grant = turns[0]!.executionGrant!
+    expect(task.authority!.browserScope!.verificationPolicy ?? 'strict').toBe(effectivePolicy)
+    expect(grant.browserScope).toEqual(task.authority!.browserScope)
+    expect(Object.hasOwn(grant.browserScope!, 'verificationPolicy')).toBe(Boolean(verificationPolicy))
+    if (task.scheduledBy) expect(runtime.taskRepository!.attention(`capability_${task.id}`)).toBeNull()
+    else expect(runtime.taskRepository!.attention(`capability_${task.id}`)).toMatchObject({ status: 'answered' })
+    const dispatches = runtime.taskRepository!.operations(task.id, 'browser_action_dispatch')
+    const derived = runtime.taskRepository!.operations(task.id, 'browser_derived_action_authorization')
+    expect(dispatches).toHaveLength(2)
+    expect(derived).toHaveLength(2)
+    for (const dispatch of dispatches) {
+      const request = dispatch.request!
+      expect(dispatch.status).toBe('succeeded')
+      expect(request.verificationPolicy).toBe(effectivePolicy)
+      expect(request.dependsOn).toEqual(verificationPolicy ? [request.targetRef] : [])
+      expect(dispatch.result).toMatchObject({ actionAcknowledged: true, readbackPending: false })
+      const call = turns[0]!.items.find(item => item.kind === 'tool_call' && item.callId === `synthetic-${String(request.action)}`)
+      expect(call?.kind).toBe('tool_call')
+      if (call?.kind !== 'tool_call') throw new Error('Missing actual synthetic model action')
+      expect(call.toolName).toBe(request.toolName)
+      expect(request.targetRef).toBe(request.action === 'fill' ? '@e1' : '@e2')
+      const authorization = derived.find(item => item.request?.action === request.action)
+      expect(authorization?.status).toBe('succeeded')
+      expect(authorization?.request).toMatchObject({ grantId: grant.id, turnId: turns[0]!.id, sessionId: request.sessionId, elementHash: request.elementHash })
+      expect(authorization!.request!.verificationPolicy ?? 'strict').toBe(effectivePolicy)
+      expect(authorization?.result).toMatchObject({ verificationPolicy: effectivePolicy })
+      expect(browser.writes.filter(write => write.sessionId === request.sessionId && write.action === request.action)).toEqual([
+        { sessionId: request.sessionId, action: request.action, targetRef: request.targetRef, dependsOn: verificationPolicy ? [request.targetRef] : [] }
+      ])
+    }
+    return grant
+  }
+  const sourceGrant = await assertExecutionPolicy(source)
   expect(runtime.taskRepository!.operations(source.id, 'browser_action_scope_request')).toHaveLength(1)
-  expect(runtime.taskRepository!.attention(`capability_${source.id}`)).toBeNull()
+  expect(runtime.taskRepository!.attention(`capability_${source.id}`)).toMatchObject({ status: 'answered' })
   const flow = runtime.flowService!.get(`schedule_${source.id}`)!
-  expect((flow.variables.taskSchedule as { scope: { browserScheduleActions: unknown[] } }).scope.browserScheduleActions).toHaveLength(2)
+  const publishedScope = (flow.variables.taskSchedule as { scope: { browserScope: typeof sourceGrant.browserScope; browserScheduleActions: BrowserScheduleAction[] } }).scope
+  expect(publishedScope.browserScope).toEqual(source.authority!.browserScope)
+  expect(publishedScope.browserScheduleActions).toHaveLength(2)
+  for (const action of publishedScope.browserScheduleActions) {
+    expect(action.verificationPolicy).toBe(effectivePolicy)
+    expect(action.summary).toContain(`校验范围 "${verificationPolicy ? '公开查询目标及明确依赖' : '完整页面与目标'}"`)
+    expect(Object.hasOwn(action, 'dependsOn') || Object.hasOwn(action, 'targetRef')).toBe(false)
+  }
+  if (verificationPolicy === 'public_query_target') {
+    // Restore an old policy-less authorization into a separate waiting task.
+    // Explicitly changing that task's policy must retain, but never reuse, the old record.
+    const legacyStarted = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'legacy-policy-record', request: { prompt: source.goal } })
+    expect(legacyStarted.kind).toBe('capability_required')
+    const legacyId = legacyStarted.task!.id
+    await confirmPolicy(legacyId)
+    const { id: _id, approvalId, summary, verificationPolicy: _policy, ...oldFields } = publishedScope.browserScheduleActions[0]!
+    const legacyFields = { ...oldFields, sourceTaskId: legacyId, scheduleId: `schedule_${legacyId}` }
+    const legacyAction = { id: createHash('sha256').update(JSON.stringify(legacyFields)).digest('hex'), ...legacyFields, approvalId,
+      summary: summary.split('\n').filter(line => !line.startsWith('校验范围 ')).join('\n') }
+    const key = `browser-schedule-action:${legacyAction.id}`
+    runtime.taskRepository!.beginOperation({ ownerId: legacyId, idempotencyKey: key, kind: 'browser_schedule_action_authorization', request: legacyFields, nowIso: new Date().toISOString() })
+    runtime.taskRepository!.finishOperation(legacyId, key, { status: 'succeeded', result: legacyAction })
+    expect(listApprovedBrowserScheduleActions(runtime.taskRepository!, runtime.taskRepository!.get(legacyId)!)).toHaveLength(1)
+    const oldBytes = JSON.stringify(runtime.taskRepository!.operation(legacyId, key))
+    const writesBefore = browser.writes.length, requestsBefore = modelRequests
+    await confirmPolicy(legacyId, 'public_query_target')
+    expect(listApprovedBrowserScheduleActions(runtime.taskRepository!, runtime.taskRepository!.get(legacyId)!)).toEqual([])
+    expect(JSON.stringify(runtime.taskRepository!.operation(legacyId, key))).toBe(oldBytes)
+    expect((await runtime.threadService.get(legacyStarted.task!.threadId))!.turns).toHaveLength(0)
+    expect(browser.writes).toHaveLength(writesBefore)
+    expect(modelRequests).toBe(requestsBefore)
+  }
   const dueAt = runtime.flowService!.repository.getTriggerState(flow.id, 'schedule')!.nextRunAt!
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(dueAt))
@@ -148,6 +245,8 @@ it('runs two independent scheduled browser tasks after expiry and restart withou
   await expect.poll(() => occurrence()?.id, { timeout: 5_000 }).toBeTruthy()
   await waitCompleted(occurrence()!.id)
   const first = occurrence()!
+  const checkedFirstGrant = await assertExecutionPolicy(first)
+  expect(checkedFirstGrant.id).not.toBe(sourceGrant.id)
   const firstGrant = (await runtime.threadService.get(first.threadId))!.turns.find(turn => turn.id === first.activeTurnId)!.executionGrant!
   expect(firstGrant.browserScheduleBinding).toMatchObject({ scheduleId: flow.id, versionId: flow.publishedVersionId, sourceTaskId: source.id })
   expect(runtime.taskRepository!.operations(first.id, 'browser_derived_action_authorization')).toHaveLength(2)
@@ -163,6 +262,9 @@ it('runs two independent scheduled browser tasks after expiry and restart withou
   const secondTask = () => runtime.taskRepository!.list().find(task => task.scheduledBy?.scheduleId === flow.id && task.id !== first.id)
   await expect.poll(() => secondTask()?.id, { timeout: 5_000 }).toBeTruthy()
   await waitCompleted(secondTask()!.id)
+  const secondGrant = await assertExecutionPolicy(secondTask()!)
+  expect(secondGrant.id).not.toBe(checkedFirstGrant.id)
+  expect(secondGrant.id).not.toBe(sourceGrant.id)
   expect(secondTask()!.threadId).not.toBe(first.threadId)
   expect(new Set(browser.writes.map(write => write.sessionId)).size).toBe(3)
   expect(browser.writes).toHaveLength(6)
@@ -178,7 +280,7 @@ it('runs two independent scheduled browser tasks after expiry and restart withou
   const changedTask = () => runtime.taskRepository!.list().find(task => task.scheduledBy?.dueAt === changedDue)
   await expect.poll(() => changedTask()?.status, { timeout: 10_000 }).toBe('waiting_user')
   expect(runtime.taskRepository!.attention(`capability_${changedTask()!.id}`)).toMatchObject({ status: 'pending', payload: {
-    capability: { provider: 'schedule', errorCode: 'browser_schedule_action_scope_changed' }
+    capability: { provider: 'browser-skill', errorCode: 'browser_public_query_target_blocked' }
   } })
   expect(browser.writes.filter(write => write.action === 'click')).toHaveLength(3)
   expect(browser.writes).toHaveLength(7)
@@ -204,4 +306,24 @@ it('runs two independent scheduled browser tasks after expiry and restart withou
   await runtime.flowService!.tickSchedules(new Date(Date.parse(disabledDue) + 24 * 60 * 60_000))
   expect(runtime.taskRepository!.list()).toHaveLength(before)
   expect(browser.writes).toHaveLength(7)
-}, 40_000)
+  const stopped = runtime.flowService!.get(flow.id)!
+  runtime.flowService!.update({ ...stopped, variables: { ...stopped.variables, enabled: true } }, stopped.revision)
+  beforeNextFill = () => {
+    // Persistent unknown-outcome boundary injected before any new input.
+    runtime.taskRepository!.beginOperation({ ownerId: source.id, idempotencyKey: 'unresolved-source-action', kind: 'browser_schedule_action_outcome',
+      request: { scheduleId: flow.id, taskId: source.id, action: 'fill' }, nowIso: new Date().toISOString() })
+    runtime.taskRepository!.finishOperation(source.id, 'unresolved-source-action', { status: 'outcome_unknown' })
+  }
+  const unknownDue = runtime.flowService!.repository.getTriggerState(flow.id, 'schedule')!.nextRunAt!
+  vi.setSystemTime(new Date(unknownDue))
+  await runtime.flowService!.tickSchedules(new Date())
+  const unknownTask = () => runtime.taskRepository!.list().find(task => task.scheduledBy?.dueAt === unknownDue)
+  await expect.poll(() => unknownTask()?.status, { timeout: 10_000 }).toBe('waiting_user')
+  expect(runtime.taskRepository!.attention(`capability_${unknownTask()!.id}`)).toMatchObject({ status: 'pending', payload: {
+    capability: { provider: 'schedule', errorCode: 'browser_schedule_outcome_unknown' }
+  } })
+  expect(runtime.taskRepository!.operation(source.id, 'unresolved-source-action')?.status).toBe('outcome_unknown')
+  expect(browser.writes).toHaveLength(7)
+  expect(approvals).toHaveLength(3)
+  expect(unexpected).toEqual([])
+}, 60_000)

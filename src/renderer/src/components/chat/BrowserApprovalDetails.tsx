@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 const labels: Record<string, string> = {
   站点: 'browserApprovalSite', 动作: 'browserApprovalAction', 目标: 'browserApprovalTarget', 输入内容: 'browserApprovalInput',
-  授权期限: 'browserApprovalLifetime', 操作说明: 'browserApprovalNotice', 计划目的: 'browserApprovalPurpose',
+  授权期限: 'browserApprovalLifetime', 操作说明: 'browserApprovalNotice', 校验范围: 'browserApprovalVerificationScope', 计划目的: 'browserApprovalPurpose',
   执行时刻: 'browserApprovalTimes', 时区: 'browserApprovalTimezone', 浏览器: 'browserSkillBrowser', 账号状态: 'browserApprovalAccount',
   读取路径: 'browserApprovalReadPaths', 写入路径: 'browserApprovalWritePaths', 网页动作: 'browserApprovalActions'
 }
@@ -14,7 +14,7 @@ export function browserApprovalFields(summary: string): Array<{ name: string; va
   if (!plan && lines[0] !== '确认浏览器操作') return undefined
   const required = plan ? ['计划目的', '执行时刻', '时区', '读取路径', '写入路径', '站点', '网页动作', '浏览器', '账号状态', '授权期限', '操作说明']
     : ['站点', '动作', '目标', '输入内容', '授权期限', '操作说明']
-  const fields = [...required, ...(!plan ? ['计划目的', '执行时刻', '时区', '浏览器', '账号状态'].filter(field => lines.some(line => line.startsWith(`${field} `))) : [])]
+  const fields = [...required, ...['校验范围', ...(!plan ? ['计划目的', '执行时刻', '时区', '浏览器', '账号状态'] : [])].filter(field => lines.some(line => line.startsWith(`${field} `)))]
   try {
     return fields.map(name => {
       const prefix = `${name} `

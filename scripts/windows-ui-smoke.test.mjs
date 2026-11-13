@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
+import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -10,7 +11,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
-import { clickWindowsBrowserBinding, windowsBindingPostAudit } from './run-windows-ui-smoke.mjs'
+import { clickWindowsBrowserBinding, selectWindowsBrowserPolicy, windowsBindingPostAudit, inspectWindowsBrowserPolicy, windowsTaskPrompt } from './run-windows-ui-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
 function permissionRuntimeEvidence() {
@@ -514,7 +515,7 @@ test('fixture approval review rejects altered actual targets, inputs, origins, t
     const origin = new URL(fixture.fixtureUrl).origin
     const prompt = '合成组件测试：本地公开查询，每天09:00和17:00前提前30分钟执行。'
     const workspace = join(root, windowsSmokeWorkspaceName)
-    const makeSummary = (action, change = {}) => browserApprovalSummary({ action, origin, pageUrl: fixture.fixtureUrl, targetHtml: action === 'fill' ? fixture.inputHtml : fixture.buttonHtml,
+    const makeSummary = (action, change = {}) => browserApprovalSummary({ action, origin, pageUrl: fixture.fixtureUrl, verificationPolicy: 'public_query_target', targetHtml: action === 'fill' ? fixture.inputHtml : fixture.buttonHtml,
       value: action === 'fill' ? fixture.query : undefined, requestHash: 'a'.repeat(64), schedule: { purpose: prompt,
         requirement: { kind: 'daily', times: ['09:00', '17:00'], leadMinutes: 30, timezone: 'Asia/Shanghai' }, browserLabel: '合成组件浏览器', version: 'b'.repeat(64) }, ...change })
     const thread = { turns: [{ items: ['fill', 'click'].map(action => ({ kind: 'tool_result', callId: `smoke-read-${action}-target`, isError: false,
@@ -524,10 +525,11 @@ test('fixture approval review rejects altered actual targets, inputs, origins, t
     assert.equal(reviewWindowsFixtureApproval(approval, options).scope, 'schedule')
     assert.throws(() => reviewWindowsFixtureApproval({ ...approval, requestHash: 'd'.repeat(64) }, options))
     for (const change of [{ origin: 'https://unreviewed.example.test' }, { value: fixture.query + '扩大' }, { targetHtml: '<input type="password" aria-label="合成公告关键词">' }, { schedule: undefined },
-      { pageUrl: undefined }, { pageUrl: fixture.fixtureUrl + '/other' }, { pageUrl: fixture.fixtureUrl + '?different=1' }, { pageUrl: fixture.fixtureUrl + '#other' }]) {
+      { pageUrl: undefined }, { pageUrl: fixture.fixtureUrl + '/other' }, { pageUrl: fixture.fixtureUrl + '?different=1' }, { pageUrl: fixture.fixtureUrl + '#other' },
+      { verificationPolicy: undefined }, { verificationPolicy: 'strict' }]) {
       assert.throws(() => reviewWindowsFixtureApproval({ ...approval, summary: makeSummary('fill', change) }, options))
     }
-    for (const [field, value] of [['执行时刻', '01:20、08:30、16:30'], ['账号状态', '已登录'], ['计划目的', prompt + '扩大范围'], ['页面摘要', ''], ['页面摘要', 'malformed'], ['页面摘要', '0'.repeat(64)]]) {
+    for (const [field, value] of [['执行时刻', '01:20、08:30、16:30'], ['账号状态', '已登录'], ['计划目的', prompt + '扩大范围'], ['页面摘要', ''], ['页面摘要', 'malformed'], ['页面摘要', '0'.repeat(64)], ['校验范围', ''], ['校验范围', '未知策略']]) {
       const summary = approval.summary.replace(new RegExp(`^${field} .+$`, 'm'), `${field} ${JSON.stringify(value)}`)
       assert.throws(() => reviewWindowsFixtureApproval({ ...approval, summary }, options))
     }
@@ -537,7 +539,7 @@ test('fixture approval review rejects altered actual targets, inputs, origins, t
     const click = { ...approval, summary: makeSummary('click') }
     assert.equal(reviewWindowsFixtureApproval(click, { ...options, index: 1 }).action, 'click')
     const planSummary = browserScheduleApprovalSummary({ purpose: prompt, times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', readPaths: [workspace], writePaths: [],
-      origins: [origin], browserLabel: options.browserLabel, actions: [{ summary: approval.summary }, { summary: click.summary }], scopeHash: 'c'.repeat(64) })
+      origins: [origin], browserLabel: options.browserLabel, actions: [{ summary: approval.summary, verificationPolicy: 'public_query_target' }, { summary: click.summary, verificationPolicy: 'public_query_target' }], scopeHash: 'c'.repeat(64) })
     const plan = { ...approval, toolName: 'schedule_task', requestHash: 'c'.repeat(64), summary: planSummary }
     assert.equal(reviewWindowsFixtureApproval(plan, { ...options, index: 2 }).toolName, 'schedule_task')
     assert.throws(() => reviewWindowsFixtureApproval(plan, { ...options, index: 3 }))
@@ -545,6 +547,20 @@ test('fixture approval review rejects altered actual targets, inputs, origins, t
     const writes = planSummary.replace(/^写入路径 .+$/m, `写入路径 ${JSON.stringify(workspace)}`)
     assert.throws(() => reviewWindowsFixtureApproval({ ...plan, summary: writes }, { ...options, index: 2 }))
   } finally { await fixture.close(); await rm(root, { recursive: true, force: true }) }
+})
+
+test('the exact installed browser fixture request qualifies for explicit public-query review without permitting account or business writes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-query-policy-contract-'))
+  try {
+    const output = join(root, 'browser-contract.mjs')
+    await build({ entryPoints: [fileURLToPath(new URL('../kun/src/contracts/browser-skill.ts', import.meta.url))], outfile: output, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' })
+    const { isPublicBrowserQuery } = await import(pathToFileURL(output).href)
+    const prompt = windowsTaskPrompt({ fixtureUrl: 'http://127.0.0.1:1234/fixture', query: '轨道交通监测合成验收' }, true)
+    assert.equal(isPublicBrowserQuery(prompt), true)
+    for (const unsafe of ['登录账号后查询并提交表单', '填写密码后查询', '审批公开采购付款', '查询后发送消息']) {
+      assert.equal(isPublicBrowserQuery(`使用browser-skill ${unsafe}`), false)
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
 
 test('UI approval targeting requires the mounted task workspace, actual Chinese allow label and original technical summary', async () => {
@@ -599,11 +615,13 @@ test('browser recovery keeps the exact original task at zero Turns and model req
   for (const change of [{ modelRequests: 1 }, { task: { ...task, activeTurnId: 'unexpected' } }, { thread: { ...thread, turns: [{ id: 'old-turn' }] } },
     { taskId: 'different' }, { originThreadId: 'different' }, { prompt: 'changed goal' }]) assert.throws(() => inspectWindowsBrowserRecoveryState({ ...options, ...change }))
   const paused = inspectWindowsBrowserRecoveryState({ ...options, task: { ...task, status: 'paused' }, status: 'paused' })
-  const binding = { browserInstanceId: 'browser-fixed', revision: 2, origins: ['http://127.0.0.1:1234'], interaction: 'interact' }
+  const binding = { browserInstanceId: 'browser-fixed', revision: 2, origins: ['http://127.0.0.1:1234'], interaction: 'interact', verificationPolicy: 'public_query_target' }
   const confirmed = inspectWindowsBrowserRecoveryState({ ...options, task: { ...task, status: 'paused', authority: { browserScope: binding } }, status: 'paused', binding })
   const evidence = { taskId: task.id, threadId: task.threadId, originThreadId: task.originThreadId, fixtureOrigin: binding.origins[0],
     initial, pausedBeforeConfiguration: paused, blockedResume: paused, confirmed, initialCapability: 'browser_disabled', blockedCapability: 'browser_task_scope_required', blockedRoute: 'task/browser-binding',
-    uiPreviewVerified: true, uiConfirmVerified: true, resumed: { taskId: task.id, threadId: task.threadId, turns: 1, firstTurnId: 'first-turn' } }
+    uiPreviewVerified: true, uiConfirmVerified: true, policyReview: { snapshotPolicy: 'strict', beforePublicSelection: paused,
+      strictSelection: { input: 'real-cdp-mouse-and-keyboard', selected: { value: 'strict' } }, publicQuerySelection: { input: 'real-cdp-mouse-and-keyboard', selected: { value: 'public_query_target' } } },
+    resumed: { taskId: task.id, threadId: task.threadId, turns: 1, firstTurnId: 'first-turn', executionGrant: { id: 'first-grant', verificationPolicy: 'public_query_target' } } }
   assert.equal(validateWindowsBrowserRecoveryEvidence(evidence, binding.browserInstanceId), true)
   for (const key of ['initial', 'pausedBeforeConfiguration', 'blockedResume', 'confirmed']) {
     const changed = structuredClone(evidence); changed[key].turns = 1
@@ -612,6 +630,10 @@ test('browser recovery keeps the exact original task at zero Turns and model req
   for (const change of [{ uiPreviewVerified: false }, { uiConfirmVerified: false }, { blockedRoute: 'marketplace' }, { resumed: { ...evidence.resumed, turns: 2 } }]) {
     assert.throws(() => validateWindowsBrowserRecoveryEvidence({ ...evidence, ...change }, binding.browserInstanceId))
   }
+  const implicit = structuredClone(evidence); delete implicit.policyReview
+  assert.throws(() => validateWindowsBrowserRecoveryEvidence(implicit, binding.browserInstanceId))
+  const strictBinding = structuredClone(evidence); delete strictBinding.confirmed.binding.verificationPolicy
+  assert.throws(() => validateWindowsBrowserRecoveryEvidence(strictBinding, binding.browserInstanceId))
   const script = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
   const start = script.indexOf('const initial = await readRecovery(')
   const end = script.indexOf('const uiApprovals = []', start)
@@ -627,7 +649,7 @@ test('browser binding UI selection requires the actual task card, complete previ
   const window = new Window()
   try {
     const zh = JSON.parse(readFileSync(new URL('../src/renderer/src/locales/zh/common.json', import.meta.url), 'utf8'))
-    const panel = `<section aria-label="${zh.capabilityRequiredTitle}"><div><p>${zh.browserTaskBindingReview}</p><dl><dd>browser-fixed</dd><dd>http://127.0.0.1:1234</dd><dd>${zh.browserSkillAllowInteraction}</dd></dl><button>${zh.browserTaskBindingConfirm}</button></div></section>`
+    const panel = `<section aria-label="${zh.capabilityRequiredTitle}"><div><p>${zh.browserTaskBindingReview}</p><dl><dt>${zh.browserSkillInstance}</dt><dd>browser-fixed</dd><dt>${zh.browserSkillOrigins}</dt><dd>http://127.0.0.1:1234</dd><dt>${zh.capabilityRequestedScope}</dt><dd>${zh.browserSkillAllowInteraction}</dd></dl><button>${zh.browserTaskBindingConfirm}</button></div></section>`
     window.requestAnimationFrame = callback => { queueMicrotask(() => callback(0)); return 1 }
     window.document.body.innerHTML = panel
     assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null)
@@ -688,12 +710,61 @@ test('browser binding samples the current hit point immediately before real mous
   assert.doesNotMatch(clickWindowsBrowserBinding.toString(), /\.click\(|runtimeRequest|captureScreenshot/)
 })
 
+test('browser policy is selected through a current real mouse target and native keyboard without a direct authority write', async () => {
+  const calls = [], options = [{ value: 'strict', label: '严格网页操作', disabled: false }, { value: 'public_query_target', label: '公开资料查询', disabled: false }]
+  let waits = 0
+  const cdp = {
+    send: async (method, parameters) => { calls.push([method, parameters?.type, parameters?.key]); if (method === 'Input.dispatchMouseEvent') assert.deepEqual([parameters.x, parameters.y], [40, 50]) },
+    wait: async expression => {
+      waits += 1
+      if (waits === 1) return { point: { x: 40, y: 50 }, policy: { value: 'strict', disabled: false, options } }
+      if (waits === 2) { assert.match(expression, /document\.activeElement/); return true }
+      assert.match(expression, /select\.value===\"public_query_target\"/)
+      return { value: 'public_query_target', label: '公开资料查询' }
+    }
+  }
+  const audit = {}
+  await selectWindowsBrowserPolicy(cdp, 'public_query_target', audit)
+  assert.equal(audit.selected.value, 'public_query_target')
+  assert.equal(audit.input, 'real-cdp-mouse-and-keyboard')
+  assert.deepEqual(calls.map(([method, type, key]) => method === 'Input.dispatchKeyEvent' ? [type, key] : method === 'Input.dispatchMouseEvent' ? type : method),
+    ['Page.bringToFront', 'mousePressed', 'mouseReleased', ['rawKeyDown', 'Home'], ['keyUp', 'Home'], ['rawKeyDown', 'ArrowDown'], ['keyUp', 'ArrowDown'], ['rawKeyDown', 'Enter'], ['keyUp', 'Enter']])
+  const body = selectWindowsBrowserPolicy.toString()
+  assert.doesNotMatch(body, /\.click\(|\.value\s*=(?!=)|confirmBrowserTaskBinding|runtimeRequest/)
+  options[1].disabled = true
+  waits = 0
+  await assert.rejects(() => selectWindowsBrowserPolicy(cdp, 'public_query_target', {}))
+})
+
+test('browser binding preview reads its named browser fields beside purpose and the explicit verification selector', async () => {
+  const { Window } = await import('happy-dom')
+  const window = new Window()
+  try {
+    const zh = JSON.parse(readFileSync(new URL('../src/renderer/src/locales/zh/common.json', import.meta.url), 'utf8'))
+    window.document.body.innerHTML = `<article aria-label="任务详情"><section aria-label="${zh.capabilityRequiredTitle}"><div><p>${zh.browserTaskBindingReview}</p><dl><dt>${zh.browserSkillInstance}</dt><dd>chrome</dd><dt>${zh.browserSkillOrigins}</dt><dd>http://127.0.0.1:1234</dd><dt>任务目的</dt><dd>合成原任务</dd><dt>${zh.capabilityRequestedScope}</dt><dd>${zh.browserSkillAllowInteraction}</dd><dt>网页操作方式</dt><dd><select aria-label="网页操作方式"><option value="strict">严格网页操作</option><option value="public_query_target">公开资料查询</option></select><p>核对完整页面与目标。</p></dd></dl><button>${zh.browserTaskBindingConfirm}</button></div></section></article>`
+    const detail = window.document.querySelector('article'), button = detail.querySelector('button'), select = detail.querySelector('select')
+    detail.getClientRects = button.getClientRects = select.getClientRects = () => [{}]
+    button.getBoundingClientRect = select.getBoundingClientRect = () => ({ x: 10, y: 20, width: 20, height: 10 })
+    button.scrollIntoView = select.scrollIntoView = () => undefined
+    window.document.elementFromPoint = () => select
+    window.requestAnimationFrame = callback => { queueMicrotask(() => callback(0)); return 1 }
+    const sampled = await window.eval(windowsBrowserBindingUiExpression({ control: 'policy' }))
+    assert.deepEqual(JSON.parse(JSON.stringify(sampled.values)), ['chrome', 'http://127.0.0.1:1234', zh.browserSkillAllowInteraction])
+    assert.equal(sampled.purpose, '合成原任务')
+    assert.equal(sampled.policy.value, 'strict')
+    assert.deepEqual(Array.from(sampled.policy.options, option => option.value), ['strict', 'public_query_target'])
+    assert.equal(sampled.hit.tag, 'SELECT')
+    select.disabled = true
+    assert.equal(await window.eval(windowsBrowserBindingUiExpression({ control: 'policy' })), null)
+  } finally { await window.happyDOM.close() }
+})
+
 test('browser binding waits for stable painted frames after scroll, re-queries replacement targets and records pointer-time movement', async () => {
   const { Window } = await import('happy-dom')
   const window = new Window()
   try {
     const zh = JSON.parse(readFileSync(new URL('../src/renderer/src/locales/zh/common.json', import.meta.url), 'utf8'))
-    window.document.body.innerHTML = `<article aria-label="任务详情"><section aria-label="${zh.capabilityRequiredTitle}"><div><p>${zh.browserTaskBindingReview}</p><dl><dd>chrome</dd><dd>http://127.0.0.1:1234</dd><dd>${zh.browserSkillAllowInteraction}</dd></dl><button>${zh.browserTaskBindingConfirm}</button></div></section></article>`
+    window.document.body.innerHTML = `<article aria-label="任务详情"><section aria-label="${zh.capabilityRequiredTitle}"><div><p>${zh.browserTaskBindingReview}</p><dl><dt>${zh.browserSkillInstance}</dt><dd>chrome</dd><dt>${zh.browserSkillOrigins}</dt><dd>http://127.0.0.1:1234</dd><dt>${zh.capabilityRequestedScope}</dt><dd>${zh.browserSkillAllowInteraction}</dd></dl><button>${zh.browserTaskBindingConfirm}</button></div></section></article>`
     const detail = window.document.querySelector('article'), root = detail.querySelector('section > div')
     let button = detail.querySelector('button'), frame = 0, top = 0, pointerY, queries = 0
     const queryAll = detail.querySelectorAll.bind(detail)
@@ -853,11 +924,53 @@ test('the production gate, repository projection and inbox route expose pending 
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test('policy evidence binds actual task, Turn Grant, fresh target, derived authorization and exact dispatch dependencies', () => {
+  const fixture = { fixtureUrl: 'http://127.0.0.1:1234/fixture', inputHtml: '<input aria-label="合成查询">', buttonHtml: '<button>查询</button>', query: '合成查询',
+    observed: { requests: [{ browserAction: { action: 'fill', sessionId: 'actual-session', targetRef: '@e1' } }, { browserAction: { action: 'click', sessionId: 'actual-session', targetRef: 'e2' } }] } }
+  const digest = value => createHash('sha256').update(value).digest('hex')
+  const input = verificationPolicy => {
+    const optional = verificationPolicy === undefined ? {} : { verificationPolicy }
+    const scope = { browserInstanceId: 'test-browser', revision: 2, origins: ['http://127.0.0.1:1234'], interaction: 'interact', ...optional }
+    const task = { id: 'task-fixture', authority: { browserScope: scope } }
+    const turn = { id: 'turn-fixture', executionGrant: { id: 'grant-fixture', taskId: task.id, browserScope: structuredClone(scope) },
+      items: ['fill', 'click'].map(action => ({ kind: 'tool_call', callId: `smoke-${action}`, toolName: `browser_${action}`, arguments: {} })) }
+    const receipts = turn.items.flatMap((call, i) => {
+      const action = i ? 'click' : 'fill', binding = { action, turnId: turn.id, sessionId: 'actual-session', elementHash: digest(i ? fixture.buttonHtml : fixture.inputHtml), ...(i ? {} : { valueHash: digest(fixture.query) }), ...optional }
+      return [{ id: `dispatch-${action}`, ownerId: task.id, kind: 'browser_action_dispatch', status: 'succeeded',
+        request: { ...binding, toolName: `browser_${action}`, targetRef: i ? 'e2' : '@e1', pageUrl: fixture.fixtureUrl, dependsOn: verificationPolicy === 'public_query_target' ? [i ? 'e2' : '@e1'] : [] },
+        result: { actionAcknowledged: true, readbackPending: false } },
+      { id: `derived-${action}`, ownerId: task.id, kind: 'browser_derived_action_authorization', status: 'succeeded', request: { ...binding, grantId: turn.executionGrant.id }, result: { ...optional } }]
+    })
+    return { task, thread: { turns: [turn] }, receipts }
+  }
+  const check = value => inspectWindowsBrowserPolicy(value.task, value.thread, value.receipts, fixture)
+  const valid = input('public_query_target')
+  const result = check(valid)
+  assert.deepEqual(result.dispatches.map(item => item.dependsOn), [['@e1'], ['e2']])
+  assert.equal(result.grants[0].id, 'grant-fixture')
+  for (const mutate of [value => { delete value.task.authority.browserScope.verificationPolicy },
+    value => { value.thread.turns[0].executionGrant.browserScope.verificationPolicy = 'strict' },
+    value => { value.receipts[0].request.dependsOn = [] }, value => { value.receipts[0].request.dependsOn = ['e1'] },
+    value => { value.receipts[0].request.dependsOn.push('other') }, value => { delete value.receipts[0].request.verificationPolicy },
+    value => { value.receipts[0].request.targetRef = 'e99' }, value => { value.receipts[0].request.pageUrl += '?other=1' },
+    value => { value.receipts[1].request.grantId = 'old-grant' }, value => { value.receipts[1].result.verificationPolicy = 'strict' },
+    value => { value.receipts[0].result.readbackPending = true }, value => { value.receipts[0].status = 'outcome_unknown' }]) {
+    const invalid = structuredClone(valid); mutate(invalid); assert.throws(() => check(invalid))
+  }
+  const legacy = input(undefined), before = structuredClone(legacy)
+  assert.equal(inspectWindowsBrowserPolicy(legacy.task, legacy.thread, legacy.receipts, fixture, 'strict').verificationPolicy, 'strict')
+  assert.deepEqual(legacy, before, 'Missing legacy policy is interpreted as strict without changing persisted hashes')
+  legacy.receipts[0].request.dependsOn = ['@e1']
+  assert.throws(() => inspectWindowsBrowserPolicy(legacy.task, legacy.thread, legacy.receipts, fixture, 'strict'), 'An old strict Grant never gains target dependencies implicitly')
+})
+
 test('scheduled query validation requires source UI reviews and independent derived authority without extra due approvals', () => {
   // Synthetic validator input; never emitted as actual business evidence.
   const query = { domReadbackVerified: true, htmlReadbackVerified: true, actions: 2, unknownOutcomes: 0, accountState: 'unknown', access: 'public_query' }
-  const evidence = { browserSkill: { publicQuery: { ...query, uiApprovals: ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'].map(toolName => ({ toolName, status: 'allowed', uiFieldsVerified: true, businessCardDisplayedVerified: true, originalSummaryVerified: true, cardDisplayedVerified: true, buttonOperableVerified: true })), persistentActionAuthorizations: 2 } },
-    dueOccurrence: { publicQuery: { ...query, addedApprovals: 0, derivedActionAuthorizations: 2, publishedPlanVersionVerified: true, enabledPlanVerified: true, shortAuthorizationVerified: true } } }
+  const policyProjection = id => ({ verificationPolicy: 'public_query_target', grants: [{ id, verificationPolicy: 'public_query_target' }],
+    dispatches: ['@e1', 'e2'].map(targetRef => ({ verificationPolicy: 'public_query_target', derivedVerificationPolicy: 'public_query_target', grantId: id, targetRef, dependsOn: [targetRef] })) })
+  const evidence = { browserSkill: { publicQuery: { ...query, policyExecution: policyProjection('source-grant'), uiApprovals: ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'].map(toolName => ({ toolName, status: 'allowed', verificationPolicy: 'public_query_target', uiFieldsVerified: true, businessCardDisplayedVerified: true, originalSummaryVerified: true, cardDisplayedVerified: true, buttonOperableVerified: true })), persistentActionAuthorizations: 2 } },
+    dueOccurrence: { publicQuery: { ...query, policyExecution: policyProjection('due-grant'), addedApprovals: 0, derivedActionAuthorizations: 2, publishedPlanVersionVerified: true, enabledPlanVerified: true, shortAuthorizationVerified: true } } }
   assert.doesNotThrow(() => validateWindowsScheduledQueryEvidence(evidence))
   for (const [field, value] of [['addedApprovals', 1], ['derivedActionAuthorizations', 0], ['publishedPlanVersionVerified', false], ['enabledPlanVerified', false], ['shortAuthorizationVerified', false], ['unknownOutcomes', 1], ['domReadbackVerified', false], ['htmlReadbackVerified', false]]) {
     const changed = structuredClone(evidence)
@@ -867,6 +980,12 @@ test('scheduled query validation requires source UI reviews and independent deri
   const noReview = structuredClone(evidence)
   noReview.browserSkill.publicQuery.uiApprovals.pop()
   assert.throws(() => validateWindowsScheduledQueryEvidence(noReview))
+  for (const mutate of [value => { value.dueOccurrence.publicQuery.policyExecution.dispatches[0].dependsOn = [] },
+    value => { value.dueOccurrence.publicQuery.policyExecution.grants[0].verificationPolicy = 'strict' },
+    value => { value.dueOccurrence.publicQuery.policyExecution = policyProjection('source-grant') },
+    value => { delete value.browserSkill.publicQuery.uiApprovals[0].verificationPolicy }]) {
+    const invalid = structuredClone(evidence); mutate(invalid); assert.throws(() => validateWindowsScheduledQueryEvidence(invalid))
+  }
   for (const field of ['businessCardDisplayedVerified', 'originalSummaryVerified', 'cardDisplayedVerified', 'buttonOperableVerified']) {
     const missing = structuredClone(evidence)
     missing.browserSkill.publicQuery.uiApprovals[0][field] = false

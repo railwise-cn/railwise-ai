@@ -211,6 +211,29 @@ describe('capability waiting card', () => {
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
   })
 
+  it('continues the exact source task for public-query action review only after the explicit retry click', async () => {
+    tasks[0].status = 'paused'
+    const waiting = { provider: 'browser-skill', status: 'needs_authorization', errorCode: 'browser_public_query_action_required',
+      message: '公开查询动作仍需审阅实际目标和输入', resolution: { kind: 'retry', route: 'task/browser-action-review', label: '继续原任务并审阅公开查询动作' } } as const
+    api.coordinateTaskCommand.mockResolvedValue({ kind: 'capability_required', task: { id: card.taskId, status: 'paused' },
+      capability: waiting, attentionId: card.attentionId, message: waiting.message })
+    await render({ ...card, capability: waiting })
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+    expect(tasks[0].status).toBe('paused')
+    await click('继续原任务并审阅公开查询动作')
+    expect(api.coordinateTaskCommand).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ threadId: card.threadId, taskId: card.taskId,
+      resolveAttentionId: card.attentionId, intent: 'resume' }))
+    expect(container.textContent).toContain(waiting.message)
+    expect(tasks[0].status).toBe('paused')
+    expect(api.openExternal).not.toHaveBeenCalled()
+    expect(state.openPlugins).not.toHaveBeenCalled()
+    expect(state.openFlow).not.toHaveBeenCalled()
+    expect(state.openSettings).not.toHaveBeenCalled()
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+  })
+
   it('opens the dedicated DingTalk connection hub without executing the task', async () => {
     await render({ ...card, capability: { provider: 'dingtalk', status: 'unsupported', message: '尚无钉钉连接器' } })
     expect(container.textContent).toContain('尚无钉钉连接器')

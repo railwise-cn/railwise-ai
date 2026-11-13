@@ -7,6 +7,7 @@ import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
 import { buildRouter } from '../src/server/routes/index.js'
 import { dispatchRequest } from '../src/server/http-server.js'
+import type { BrowserTaskBindingSnapshot } from '../src/contracts/browser-skill.js'
 import type { BrowserVerificationResult } from '../src/services/browser-operation-verification.js'
 import type { ToolHostContext } from '../src/ports/tool-host.js'
 import type { ExecutionGrant } from '../src/contracts/permissions.js'
@@ -96,6 +97,19 @@ async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown') {
   const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'review-source',
     request: { prompt: `使用BrowserSkill读取 https://public.example.test/query ，在公开查询框填写轨道监测，生成HTML报告${mode === 'unknown' ? '，每天09:00执行。' : '。'}` } })
   const id = started.task!.id
+  expect(started).toMatchObject({ kind: 'capability_required', capability: { errorCode: 'browser_verification_policy_required' } })
+  expect(modelCalls).toBe(0)
+  expect((await runtime.threadService.get(started.task!.threadId))!.turns).toHaveLength(0)
+  const binding = await (await api(`/v1/tasks/${id}/browser-binding`, 'GET')).json() as BrowserTaskBindingSnapshot
+  const bound = await api(`/v1/tasks/${id}/browser-binding`, 'POST', { expectedTaskRevision: binding.taskRevision,
+    expectedBrowserRevision: binding.browserRevision, browserInstanceId: binding.browserInstanceId,
+    origins: binding.origins, interaction: 'interact', verificationPolicy: 'strict', confirmed: true, idempotencyKey: 'review-fixture-strict-binding' })
+  expect(bound.status, await bound.clone().text()).toBe(200)
+  expect(await bound.json()).toMatchObject({ resumed: false, binding: { verificationPolicy: 'strict' } })
+  expect(modelCalls).toBe(0)
+  expect(runtime.taskRepository!.get(id)!.status).toBe('waiting_user')
+  const resumed = await api(`/v1/tasks/${id}/resume`, 'POST', { expectedRevision: runtime.taskRepository!.get(id)!.revision, idempotencyKey: 'review-fixture-explicit-resume' })
+  expect(resumed.status, await resumed.clone().text()).toBe(202)
   await expect.poll(() => runtime.taskRepository!.get(id)?.status, { timeout: 10000 }).toBe(mode === 'ack_pending' ? 'waiting_user' : 'stalled')
   const task = () => runtime.taskRepository!.get(id)!
   const unknown = runtime.taskRepository!.operations(id, 'tool').find(item => item.request?.toolName === 'browser_fill' && item.status === (mode === 'ack_pending' ? 'failed' : 'outcome_unknown'))!

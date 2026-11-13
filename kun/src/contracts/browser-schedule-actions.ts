@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { BrowserOrigin } from './browser-skill.js'
+import { BrowserOrigin, BrowserVerificationPolicy } from './browser-skill.js'
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/)
 export const BrowserScheduleActionSchema = z.object({
@@ -17,6 +17,7 @@ export const BrowserScheduleActionSchema = z.object({
   valueHash: hash.optional(),
   accountState: z.literal('unknown'),
   access: z.literal('public_query'),
+  verificationPolicy: BrowserVerificationPolicy.optional(),
   approvalId: z.string().min(1),
   summary: z.string().min(1).max(400000)
 }).strict()

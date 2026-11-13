@@ -7,14 +7,25 @@ import { BrowserInstance, type BrowserCapabilityConfig } from '../contracts/brow
 
 const executeFile = promisify(execFile)
 export type BrowserCommandResult = { ok: boolean; output: unknown; code?: string; outcomeUnknown?: boolean;
-  vendorReason?: string; effectState?: 'none' | 'unknown' | 'committed' }
+  vendorReason?: string; effectState?: 'none' | 'unknown' | 'committed';
+  vendorFailureKind?: 'observed_content_changed' | 'context_superseded' | 'context_stale' | 'operation_settling' }
+const vendorFailureMessages: Readonly<Record<string, NonNullable<BrowserCommandResult['vendorFailureKind']>>> = {
+  "The action's observed content changed; synchronize and replan": 'observed_content_changed',
+  'Page changed; synchronize before choosing an action': 'observed_content_changed',
+  'This context belongs to a different or superseded observation': 'context_superseded',
+  'This action requires the context returned by the latest cooperate sync': 'context_stale',
+  'Another operation is settling on this tab': 'operation_settling'
+}
 /** Fixed vendor diagnostic scalars only; messages/recovery text can contain page data. */
-export function browserCommandDiagnostics(result: BrowserCommandResult): Pick<BrowserCommandResult, 'vendorReason' | 'effectState'> {
+export function browserCommandDiagnostics(result: BrowserCommandResult): Pick<BrowserCommandResult, 'vendorReason' | 'effectState' | 'vendorFailureKind'> {
   const data = object(object(result.output).data)
   const reason = result.vendorReason ?? data.reason
   const effect = result.effectState ?? data.effect_state
+  const message = object(result.output).message
+  const kind = result.vendorFailureKind ?? (typeof message === 'string' && Object.hasOwn(vendorFailureMessages, message) ? vendorFailureMessages[message] : undefined)
   return { ...(typeof reason === 'string' && /^[a-z][a-z0-9_]{0,99}$/.test(reason) ? { vendorReason: reason } : {}),
-    ...(['none', 'unknown', 'committed'].includes(String(effect)) ? { effectState: effect as 'none' | 'unknown' | 'committed' } : {}) }
+    ...(['none', 'unknown', 'committed'].includes(String(effect)) ? { effectState: effect as 'none' | 'unknown' | 'committed' } : {}),
+    ...(kind && Object.values(vendorFailureMessages).includes(kind) ? { vendorFailureKind: kind } : {}) }
 }
 export type BrowserCommandRunner = (config: Pick<BrowserCapabilityConfig, 'executablePath' | 'executableHash' | 'homeDirectory'>, args: readonly string[], signal?: AbortSignal) => Promise<BrowserCommandResult>
 

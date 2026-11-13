@@ -68,6 +68,10 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       void run(recheck)
       return
     }
+    if (isBrowser && route === 'task/browser-action-review') {
+      void run(recheck)
+      return
+    }
     if (capability.provider === 'schedule' && route.startsWith('flow/')) {
       requestFlowDetail({ flowId: route.slice('flow/'.length) })
       openFlow()

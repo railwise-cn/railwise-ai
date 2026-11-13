@@ -29,7 +29,7 @@ afterEach(async () => {
   vi.unstubAllEnvs()
 })
 
-async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser', initiallyDisabled = false) {
+async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser', initiallyDisabled = false, requestedPrompt?: string) {
   vi.stubEnv('RAILWISE_TASK_SCHEDULING_DISABLED', '1')
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-resume-capability-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
@@ -63,16 +63,16 @@ async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser', i
     ...(body ? { body: JSON.stringify(body) } : {})
   }))
   const origin = await runtime.threadService.create({ title: '原始用户任务', workspace, mode: 'agent', model: 'synthetic-resume' })
-  const prompt = kind === 'browser' ? '使用 BrowserSkill 读取 https://example.com 的信息。'
-    : kind === 'workspace' ? '保存到 report.html' : '帮我处理钉钉待办'
-  const initial = initiallyDisabled ? await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new',
+  const prompt = requestedPrompt ?? (kind === 'browser' ? '使用 BrowserSkill 读取 https://example.com 的信息。'
+    : kind === 'workspace' ? '保存到 report.html' : '帮我处理钉钉待办')
+  const initial = initiallyDisabled || requestedPrompt ? await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new',
     idempotencyKey: 'browser-initially-disabled', request: { prompt } }) : undefined
-  if (initial) expect(initial).toMatchObject({ kind: 'capability_required', capability: { errorCode: 'browser_disabled' }, task: { status: 'waiting_user' } })
+  if (initial) expect(initial).toMatchObject({ kind: 'capability_required', capability: { errorCode: initiallyDisabled ? 'browser_disabled' : 'browser_verification_policy_required' }, task: { status: 'waiting_user' } })
   const worker = initial?.task ? (await runtime.threadService.get(initial.task.threadId))!
     : await runtime.threadService.create({ title: '内部执行', workspace, mode: 'agent', model: 'synthetic-resume' })
   const waiting = initial?.task ?? runtime.taskController!.createWaitingTask({ id: `task_resume_${kind}`, thread: worker,
     request: { prompt, taskIntent: 'new', taskVisibility: 'task', taskOriginThreadId: origin.id }, reason: 'Synthetic initial blocker' })
-  if (kind === 'browser' && !initiallyDisabled) runtime.taskRepository!.update(waiting.id, waiting.revision, task => ({ ...task, authority: {
+  if (kind === 'browser' && !initial) runtime.taskRepository!.update(waiting.id, waiting.revision, task => ({ ...task, authority: {
     source: 'user', workspaceRoot: workspace, grantedAt: runtime.nowIso(), externalTargets: [], browserScope: {
       browserInstanceId: 'browser-old', revision: 1, origins: ['https://example.com'], interaction: 'observe'
     }
@@ -91,6 +91,40 @@ async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser', i
   const enableBrowser = async () => { options.capabilities.browserSkill.enabled = true; await restart() }
   return { get runtime() { return runtime }, api, current, origin, worker, workspace, prompt, turnCount, cards, outboxCount, restart, enableBrowser, requests: () => modelRequests }
 }
+
+it('preserves the literal procurement, HTML and twice-daily request with zero Turns until explicit public-query binding', async () => {
+  const prompt = '使用broswer-skill，帮我去政采云、阳光采购平台等平台去获取一些招标信息，我们主要是做工程测量、工程监测类的业务，所以需要找的是这一类招标信息，并以html形式将获取到的信息给我汇报，每天执行两次，早上九点前一次，下午五点前一次。'
+  const f = await fixture('browser', false, prompt)
+  expect(f.current()).toMatchObject({ goal: prompt, attempts: 0, status: 'paused', acceptance: {
+    kind: 'files', requiredFormats: ['html', 'htm'], requiresWebEvidence: true,
+    schedule: { kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai', leadMinutes: 30 }
+  } })
+  expect(await f.turnCount()).toBe(0)
+  expect(f.requests()).toBe(0)
+  await f.restart()
+  const snapshot = await (await f.api(`/v1/tasks/${f.current().id}/browser-binding`)).json() as BrowserTaskBindingSnapshot
+  expect(snapshot).toMatchObject({ recommendedVerificationPolicy: 'public_query_target', verificationPolicy: 'strict',
+    origins: ['https://example.com', 'https://new.example'], purpose: prompt })
+  const confirm = await f.api(`/v1/tasks/${f.current().id}/browser-binding`, 'POST', {
+    expectedTaskRevision: snapshot.taskRevision, expectedBrowserRevision: snapshot.browserRevision, browserInstanceId: snapshot.browserInstanceId,
+    origins: snapshot.origins, interaction: 'interact', verificationPolicy: 'public_query_target', confirmed: true, idempotencyKey: 'review-original-public-query'
+  })
+  expect(confirm.status, await confirm.clone().text()).toBe(200)
+  expect(await confirm.json()).toMatchObject({ resumed: false, binding: { verificationPolicy: 'public_query_target' } })
+  expect(f.current().status).toBe('paused')
+  expect(await f.turnCount()).toBe(0)
+  expect(f.requests()).toBe(0)
+  expect(f.current().acceptance.requiredSourceOrigins).toEqual(snapshot.origins)
+  const resumed = await f.api(`/v1/tasks/${f.current().id}/resume`, 'POST', { expectedRevision: f.current().revision, idempotencyKey: 'start-reviewed-public-query' })
+  expect(resumed.status, await resumed.clone().text()).toBe(202)
+  const started = await resumed.json() as TaskControlResult
+  await expect.poll(f.requests, { timeout: 10000 }).toBe(1)
+  const turn = (await f.runtime.threadService.get(f.worker.id))!.turns.find(turn => turn.id === started.turn!.turnId)!
+  expect(turn.executionGrant?.browserScope).toEqual(f.current().authority?.browserScope)
+  expect(turn.executionGrant?.browserScope?.verificationPolicy).toBe('public_query_target')
+  expect(f.current().acceptance.requiredFormats).toEqual(['html', 'htm'])
+  expect(f.current().acceptance.schedule?.times).toEqual(['09:00', '17:00'])
+})
 
 it('keeps a task created without Browser capability unbound until preview, confirmation and a separate resume', async () => {
   const f = await fixture('browser', true)

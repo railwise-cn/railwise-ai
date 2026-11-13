@@ -124,10 +124,12 @@ export type TaskPermissionScopeV1 = {
   readPaths?: string[]; writePaths?: string[]; networkOrigins?: string[]; providerIds?: string[]; externalTargets?: string[]
 }
 export type TaskExecutionPermissionV1 = {
+  id?: string
   turnId: string; workspaceRoot: string; workspaceTrust: WorkspaceTrustLevel; agentTrust: WorkspaceTrustLevel
   sandboxMode: string; approvalPolicy: string; allowedToolNames?: string[]; allowedProviderIds?: string[]
   pathAllowlist: string[]; readPathAllowlist?: string[]; writePathAllowlist?: string[]; networkAllowlist: string[]
   connectorScopes: string[]; externalTargets: string[]; issuedAt: string; expiresAt?: string
+  browserScope?: import('../../kun/src/contracts/browser-skill').BrowserExecutionScope
 }
 export type TaskPermissionSnapshotV1 = {
   taskId: string; taskRevision: number; taskTitle: string; scopeHash: string

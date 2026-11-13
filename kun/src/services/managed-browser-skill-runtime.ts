@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { BrowserCapabilityConfig, browserTaskOrigins, isBrowserTask, type BrowserExecutionScope, type BrowserTaskBindingConfirmation, type BrowserTaskBindingSnapshot } from '../contracts/browser-skill.js'
+import { BrowserCapabilityConfig, browserTaskOrigins, browserVerificationPolicy, isBrowserTask, isPublicBrowserQuery, type BrowserExecutionScope, type BrowserTaskBindingConfirmation, type BrowserTaskBindingSnapshot, type BrowserVerificationPolicy } from '../contracts/browser-skill.js'
 import type { CapabilityPreflight } from '../contracts/harness.js'
 import type { ExecutionScope } from '../contracts/permissions.js'
 import type { ThreadRecord } from '../contracts/threads.js'
@@ -8,7 +8,7 @@ import { buildBrowserSkillToolProvider } from '../adapters/tool/browser-skill-to
 import type { CapabilityToolProvider } from '../adapters/tool/capability-registry.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
 import type { BrowserScheduleResolution } from '../contracts/browser-schedule-actions.js'
-import type { TaskRunRepository } from './task-run-repository.js'
+import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
 import { object, runBrowserCommand, parseBrowserStatus, compatibleBrowserProtocol, type BrowserCommandRunner } from './browser-skill-cli.js'
 
 export class ManagedBrowserSkillRuntime {
@@ -49,9 +49,9 @@ export class ManagedBrowserSkillRuntime {
     return this.currentProvider
   }
 
-  async preflight(text: string, thread?: ThreadRecord): Promise<CapabilityPreflight | null> {
+  async preflight(text: string, thread?: ThreadRecord, scheduledBrowserScope?: BrowserExecutionScope): Promise<CapabilityPreflight | null> {
     const currentTask = thread ? this.options.repository.findActiveByThread(thread.id) : null
-    if (!isBrowserTask(text) && !currentTask?.authority?.browserScope) return null
+    if (!isBrowserTask(text) && !currentTask?.authority?.browserScope && !scheduledBrowserScope) return null
     const config = this.config
     const base = { provider: 'browser-skill' as const, checkedAt: new Date().toISOString(), credentialState: 'unknown' as const,
       workspaceRoot: currentTask?.workspaceRoot ?? thread?.workspace,
@@ -79,7 +79,12 @@ export class ManagedBrowserSkillRuntime {
       return { ...base, status: 'blocked', action, resolution: action, errorCode: 'browser_connection_unavailable',
         message: '当前浏览器连接未通过实时核验。请重新检查扩展和浏览器连接，然后继续原任务。' }
     }
-    const bound = currentTask?.authority?.browserScope
+    const bound = currentTask?.authority?.browserScope ?? scheduledBrowserScope
+    if (!currentTask && !scheduledBrowserScope && isPublicBrowserQuery(text)) {
+      const confirmation = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认公开查询的浏览器范围' }
+      return { ...base, status: 'needs_authorization', action: confirmation, resolution: confirmation, errorCode: 'browser_verification_policy_required',
+        message: '请先审阅公开查询的浏览器、站点及校验范围。确认后再继续任务。' }
+    }
     if (currentTask && !bound && ['paused', 'waiting_user', 'stalled'].includes(currentTask.status)) {
       const confirmation = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认当前任务的浏览器范围' }
       return { ...base, status: 'needs_authorization', action: confirmation, resolution: confirmation, errorCode: 'browser_task_scope_required',
@@ -106,6 +111,7 @@ export class ManagedBrowserSkillRuntime {
     const scope = config.browserInstanceId && origins.length ? {
       browserInstanceId: inherited?.browserInstanceId ?? config.browserInstanceId,
       origins, interaction: inherited?.interaction ?? config.interaction,
+      ...(inherited?.verificationPolicy ? { verificationPolicy: inherited.verificationPolicy } : {}),
       revision: inherited?.revision ?? config.revision
     } : undefined
     return { networkAllowlist: origins, connectorScopes: [], externalTargets: [], ...(scope ? {
@@ -135,10 +141,19 @@ export class ManagedBrowserSkillRuntime {
       parentScope.browserInstanceId !== config.browserInstanceId || parentScope.revision !== config.revision ||
       origins.some(origin => !parentScope.origins.includes(origin)))) throw new Error('browser_parent_scope_blocked')
     const interaction = config.interaction === 'interact' && (!task.parentTaskId || parentScope?.interaction === 'interact') ? 'interact' : 'observe'
+    const verificationPolicy = browserVerificationPolicy(previous?.verificationPolicy)
+    const unresolved = this.hasUnresolvedBrowserOperation(taskId)
+    const allowedVerificationPolicies: BrowserVerificationPolicy[] = unresolved ? [verificationPolicy] : ['strict']
+    if (!unresolved && isPublicBrowserQuery(task.goal) && (!task.parentTaskId || browserVerificationPolicy(parentScope?.verificationPolicy) === 'public_query_target')) {
+      allowedVerificationPolicies.push('public_query_target')
+    }
+    const recommendedVerificationPolicy = allowedVerificationPolicies.includes('public_query_target') && isPublicBrowserQuery(task.goal)
+      ? 'public_query_target' : allowedVerificationPolicies.includes(verificationPolicy) ? verificationPolicy : 'strict'
     const browser = config.browsers.find(item => item.id === config.browserInstanceId)
     return { taskId, taskRevision: task.revision, browserRevision: config.revision, browserInstanceId: config.browserInstanceId,
       browserLabel: browser?.label || browser?.name || config.browserInstanceId, previousBrowserInstanceId: previous?.browserInstanceId,
-      origins, interaction, previousInteraction: previous?.interaction }
+      origins, interaction, previousInteraction: previous?.interaction, purpose: task.goal, verificationPolicy, recommendedVerificationPolicy,
+      allowedVerificationPolicies, ...(unresolved ? { policyChangeBlocked: 'browser_unresolved_operation' as const } : {}) }
   }
 
   confirmBinding(taskId: string, input: BrowserTaskBindingConfirmation): { binding: BrowserTaskBindingSnapshot; resumed: false } {
@@ -156,14 +171,34 @@ export class ManagedBrowserSkillRuntime {
       // Old clients may rebind the browser, but cannot implicitly widen interaction.
       const interaction = input.interaction ?? snapshot.previousInteraction ?? 'observe'
       if (interaction === 'interact' && snapshot.interaction !== 'interact') throw new Error('browser_interaction_scope_required')
-      const confirmed = { ...snapshot, interaction }
+      const verificationPolicy = input.verificationPolicy ?? snapshot.verificationPolicy
+      if (!snapshot.allowedVerificationPolicies.includes(verificationPolicy)) throw new Error(snapshot.policyChangeBlocked ?? 'browser_verification_policy_blocked')
+      const task = this.options.repository.get(taskId)!
+      const priorScope = task.authority?.browserScope
+      const browserScope: BrowserExecutionScope = { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction, revision: snapshot.browserRevision,
+        ...(priorScope?.verificationPolicy || !snapshot.policyChangeBlocked && input.verificationPolicy ? { verificationPolicy } : {}) }
+      if (snapshot.policyChangeBlocked && operationFingerprint(browserScope) !== operationFingerprint(priorScope ?? {})) throw new Error('browser_unresolved_operation')
+      const confirmed = { ...snapshot, interaction, verificationPolicy }
       this.options.repository.beginOperation({ ownerId: taskId, idempotencyKey: key, kind: 'browser_binding', request: input, nowIso: new Date().toISOString() })
       this.options.repository.update(taskId, snapshot.taskRevision, task => ({ ...task, authority: {
         ...(task.authority ?? { source: 'user', workspaceRoot: task.workspaceRoot, externalTargets: [], grantedAt: new Date().toISOString() }),
-        browserScope: { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction, revision: snapshot.browserRevision }
-      } }), { key, kind: 'browser_binding_confirmed', payload: { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, browserRevision: snapshot.browserRevision, interaction } })
+        browserScope
+      }, acceptance: { ...task.acceptance,
+        ...(task.acceptance.requiresWebEvidence && !task.acceptance.requiredSourceOrigins?.length ? { requiredSourceOrigins: snapshot.origins } : {})
+      } }), { key, kind: 'browser_binding_confirmed', payload: { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, browserRevision: snapshot.browserRevision, interaction, verificationPolicy } })
       this.options.repository.finishOperation(taskId, key, { status: 'succeeded', result: confirmed })
       return { binding: confirmed, resumed: false as const }
+    })
+  }
+
+  private hasUnresolvedBrowserOperation(taskId: string): boolean {
+    return this.options.repository.operations(taskId).some(receipt => {
+      const relevant = ['browser_session', 'browser_action_dispatch', 'browser_schedule_action_outcome'].includes(receipt.kind) ||
+        receipt.kind === 'tool' && ['browser_fill', 'browser_click', 'browser_press'].includes(String(receipt.request?.toolName))
+      if (!relevant) return false
+      if (receipt.kind === 'browser_action_dispatch' && object(receipt.result).readbackPending === true) return true
+      if (receipt.kind === 'tool' && receipt.status === 'prepared' && receipt.request?.dispatchTracking === 'host-v1') return false
+      return ['prepared', 'running', 'outcome_unknown'].includes(receipt.status) && !this.options.repository.verifiedOperationResolution(receipt)
     })
   }
 

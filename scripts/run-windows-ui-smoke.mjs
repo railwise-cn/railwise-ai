@@ -262,11 +262,24 @@ export function validateWindowsBrowserRecoveryEvidence(evidence, browserInstance
   assert.equal(evidence.uiConfirmVerified, true)
   assert.equal(evidence.confirmed.binding.browserInstanceId, browserInstanceId)
   assert.equal(evidence.confirmed.binding.interaction, 'interact')
+  assert.equal(evidence.confirmed.binding.verificationPolicy, 'public_query_target')
+  assert.equal(evidence.policyReview?.snapshotPolicy, 'strict')
+  for (const [name, value] of [['strictSelection', 'strict'], ['publicQuerySelection', 'public_query_target']]) {
+    assert.equal(evidence.policyReview[name]?.selected?.value, value)
+    assert.equal(evidence.policyReview[name]?.input, 'real-cdp-mouse-and-keyboard')
+  }
+  const beforePublic = evidence.policyReview.beforePublicSelection
+  assert.equal(beforePublic.taskId, evidence.taskId)
+  assert.equal(beforePublic.status, 'paused')
+  assert.equal(beforePublic.turns, 0)
+  assert.equal(beforePublic.modelRequests, 0)
   assert.deepEqual(evidence.confirmed.binding.origins, [evidence.fixtureOrigin])
   assert.equal(evidence.resumed.taskId, evidence.taskId)
   assert.equal(evidence.resumed.threadId, evidence.threadId)
   assert.equal(evidence.resumed.turns, 1)
   assert.ok(evidence.resumed.firstTurnId)
+  assert.ok(evidence.resumed.executionGrant?.id)
+  assert.equal(evidence.resumed.executionGrant.verificationPolicy, 'public_query_target')
   return true
 }
 
@@ -428,6 +441,7 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
         if (id.startsWith('authorize-')) Object.assign(args, { action: id.endsWith('fill') ? 'fill' : 'click', scope: 'schedule', scheduleAccess: 'public_query' })
       }
       if (id === 'read-results' || id === 'stop') args = { sessionId: session?.sessionId }
+      if (id === 'fill' || id === 'click') observation.browserAction = { action: id, sessionId: args.sessionId, targetRef: args.target }
       if (next === 'publish_artifact') {
         const content = browser ? toolOutput('read-results')?.html : '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Windows 合成验收报告</title></head><body><h1>每日网页报告</h1><p>这是隔离验收生成的合成内容。</p></body></html>'
         if (browser) validateWindowsFixtureQueryHtml(content, { marker, query })
@@ -471,6 +485,10 @@ export function validateWindowsFixtureQueryHtml(html, { marker, query }) {
     'The actual DOM must contain the clicked search result and exact synthetic input')
 }
 
+export function windowsTaskPrompt(fixture, browser = false) {
+  return `${browser ? `使用broswer-skill，读取 ${fixture.fixtureUrl} 的本地合成公开页面。在“合成公告关键词”搜索框填写“${fixture.query}”，点击“查询合成公告”，核对查询后的页面实际内容，生成HTML报告并交付。明确申请这两个精确公开查询动作的周期计划范围授权；无需账号，仅限该合成站点，不提交到外部服务。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
+}
+
 const fixtureSummaryFields = summary => {
   const lines = summary.split('\n')
   const fields = Object.fromEntries(lines.slice(1).map(line => {
@@ -499,7 +517,7 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
   let uiNames
   let action
   if (index < 2) {
-    assert.deepEqual(Object.keys(fields), ['站点', '动作', '目标', '输入内容', '输入摘要', '目标摘要', '请求摘要', '授权期限', '操作说明', '页面摘要', '计划目的', '执行时刻', '时区', '浏览器', '账号状态', '授权版本'])
+    assert.deepEqual(Object.keys(fields), ['站点', '动作', '目标', '输入内容', '输入摘要', '目标摘要', '请求摘要', '授权期限', '操作说明', '校验范围', '页面摘要', '计划目的', '执行时刻', '时区', '浏览器', '账号状态', '授权版本'])
     assert.equal(header, '确认浏览器操作')
     assert.equal(approval.toolName, 'browser_authorize_action')
     action = index === 0 ? 'fill' : 'click'
@@ -514,13 +532,14 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
     assert.equal(fields.输入内容, action === 'fill' ? fixture.query : '')
     assert.equal(fields.输入摘要, createHash('sha256').update(fields.输入内容).digest('hex'))
     assert.equal(fields.目标摘要, createHash('sha256').update(targetHtml).digest('hex'))
+    assert.equal(fields.校验范围, '公开查询目标及明确依赖')
     assert.match(fields.页面摘要, /^[a-f0-9]{64}$/)
     assert.equal(fields.页面摘要, createHash('sha256').update(targetRead.output.sourceUrl).digest('hex'), 'The reviewed action must bind the exact page URL read by the actual Browser tool')
     assert.match(fields.请求摘要, /^[a-f0-9]{64}$/)
     assert.equal(fields.请求摘要, approval.requestHash, 'The exact pending request must own this reviewed summary')
     assert.equal(fields.授权期限, '持续到计划停用或授权撤销')
     assert.match(fields.操作说明, /^持续授权仅覆盖这里列出的站点、真实元素和精确输入。/)
-    uiNames = ['站点', '动作', '目标', '输入内容', '授权期限', '操作说明', '计划目的', '执行时刻', '时区', '浏览器', '账号状态']
+    uiNames = ['站点', '动作', '目标', '输入内容', '授权期限', '操作说明', '校验范围', '计划目的', '执行时刻', '时区', '浏览器', '账号状态']
   } else {
     assert.deepEqual(Object.keys(fields), ['计划目的', '执行时刻', '时区', '读取路径', '写入路径', '站点', '网页动作', '浏览器', '账号状态', '授权期限', '操作说明', '授权版本'])
     assert.equal(index, 2, 'Unexpected additional approval must stop acceptance')
@@ -529,7 +548,7 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
     assert.equal(fields.读取路径, workspace)
     assert.equal(fields.写入路径, '', 'The fixture may deliver managed artifacts, but cannot gain workspace writes')
     assert.equal(fields.站点, origin)
-    const actions = ['fill', 'click'].map((action, i) => `${i + 1}. 站点 ${origin}\n动作 ${action === 'fill' ? '填写网页输入框' : '点击网页元素'}\n目标 ${action === 'fill' ? 'input · 合成公告关键词' : 'button · 查询合成公告'}\n输入内容 ${action === 'fill' ? fixture.query : ''}`)
+    const actions = ['fill', 'click'].map((action, i) => `${i + 1}. 站点 ${origin}\n动作 ${action === 'fill' ? '填写网页输入框' : '点击网页元素'}\n目标 ${action === 'fill' ? 'input · 合成公告关键词' : 'button · 查询合成公告'}\n输入内容 ${action === 'fill' ? fixture.query : ''}\n校验范围 公开查询目标及明确依赖`)
     // Production sorts stable action IDs; either order must still be the exact two reviewed actions.
     const blocks = fields.网页动作.split('\n\n').map(block => block.replace(/^\d+\. /, ''))
     assert.deepEqual(blocks.sort(), actions.map(block => block.replace(/^\d+\. /, '')).sort())
@@ -538,7 +557,7 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
     assert.match(fields.操作说明, /^每次执行核对原计划版本、浏览器与有限动作范围。/)
     uiNames = ['计划目的', '执行时刻', '时区', '读取路径', '写入路径', '站点', '网页动作', '浏览器', '账号状态', '授权期限', '操作说明']
   }
-  return { approvalId: approval.approvalId, toolName: approval.toolName, action, scope: 'schedule',
+  return { approvalId: approval.approvalId, toolName: approval.toolName, action, scope: 'schedule', verificationPolicy: 'public_query_target',
     requestHash: approval.requestHash,
     summarySha256: createHash('sha256').update(approval.summary).digest('hex'), targetSha256: fields.目标摘要, pageSha256: fields.页面摘要,
     uiValues: uiNames.map(name => fields[name] || '无输入') }
@@ -592,7 +611,8 @@ export function inspectWindowsBrowserRecoveryState({ task, thread, originThreadI
   return { taskId, threadId: task.threadId, originThreadId, status, turns: 0, modelRequests: 0, ...(binding ? { binding } : {}) }
 }
 
-export function windowsBrowserBindingUiExpression({ pointerAudit = false } = {}) {
+export function windowsBrowserBindingUiExpression({ pointerAudit = false, control = 'confirm' } = {}) {
+  assert.ok(['confirm', 'policy'].includes(control))
   return `(async () => {
     const target=(node,button)=>({tag:node?.tagName ?? null,confirmationButton:Boolean(button?.contains(node))});
     const sample=()=>{
@@ -601,16 +621,22 @@ export function windowsBrowserBindingUiExpression({ pointerAudit = false } = {})
       const candidates=Array.from(detail.querySelectorAll('section[aria-label="等待连接或授权，尚未执行"] button'))
         .filter(button=>button.textContent.trim()==='确认本任务的浏览器范围' && button.getClientRects().length);
       if(candidates.length!==1)return null;
-      const button=candidates[0],root=button.parentElement;
+      const confirmButton=candidates[0],root=confirmButton.parentElement;
       if(!root?.textContent.includes('请核对本任务将使用的浏览器和原有站点范围。确认后可继续原任务。'))return null;
-      const values=Array.from(root.querySelectorAll('dl dd')).map(node=>node.textContent);
-      if(values.length!==3)return null;
+      const fields=Array.from(root.querySelectorAll('dl > dt'));
+      const field=name=>{const matches=fields.filter(node=>node.textContent.trim()===name);const value=matches.length===1 ? matches[0].nextElementSibling : undefined;return value?.tagName==='DD' ? value : undefined;};
+      const values=['所选浏览器','任务默认允许访问的站点','所需范围'].map(name=>field(name)?.textContent);
+      if(values.some(value=>typeof value!=='string'))return null;
+      const select=root.querySelector('select[aria-label="网页操作方式"]');
+      const policy=select ? {value:select.value,disabled:select.disabled,options:Array.from(select.options).map(option=>({value:option.value,label:option.textContent,disabled:option.disabled})),description:select.parentElement.querySelector('p')?.textContent} : undefined;
+      const button=${JSON.stringify(control)}==='policy' ? select : confirmButton;
+      if(!button || !button.getClientRects().length)return null;
       const box=button.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
       const hit=document.elementFromPoint(point.x,point.y),scroll=[];
       for(let node=button.parentElement;node;node=node.parentElement) {
         if(node.scrollHeight>node.clientHeight || node.scrollWidth>node.clientWidth)scroll.push({tag:node.tagName,top:node.scrollTop,left:node.scrollLeft,width:node.clientWidth,height:node.clientHeight,scrollWidth:node.scrollWidth,scrollHeight:node.scrollHeight});
       }
-      return {button,measurement:{point,values,sampledAt:Date.now(),rect:{x:box.x,y:box.y,width:box.width,height:box.height},
+      return {button,measurement:{point,values,purpose:field('任务目的')?.textContent,policy,sampledAt:Date.now(),rect:{x:box.x,y:box.y,width:box.width,height:box.height},
         viewport:{width:innerWidth,height:innerHeight,devicePixelRatio,visualScale:globalThis.visualViewport?.scale ?? 1},
         zoom:getComputedStyle(document.documentElement).zoom,scroll,hit:target(hit,button),disabled:button.disabled}};
     };
@@ -622,7 +648,7 @@ export function windowsBrowserBindingUiExpression({ pointerAudit = false } = {})
       current=sample();
       const measurement=current?.measurement,point=measurement?.point;
       if(!measurement || measurement.disabled || !measurement.hit.confirmationButton || point.x<0 || point.y<0 || point.x>=innerWidth || point.y>=innerHeight) {previous=undefined;stable=0;continue;}
-      const signature=JSON.stringify({rect:measurement.rect,scroll:measurement.scroll,viewport:measurement.viewport,zoom:measurement.zoom,values:measurement.values});
+      const signature=JSON.stringify({rect:measurement.rect,scroll:measurement.scroll,viewport:measurement.viewport,zoom:measurement.zoom,values:measurement.values,purpose:measurement.purpose,policy:measurement.policy});
       stable=signature===previous ? stable+1 : 0;previous=signature;
       if(stable>=2)break;
     }
@@ -650,6 +676,24 @@ export async function clickWindowsBrowserBinding(cdp, audit) {
     audit.pointerEvents = await cdp.evaluate(`(() => {const audit=globalThis.__railwiseWindowsBindingPointerAudit;if(!audit)return [];audit.stop();delete globalThis.__railwiseWindowsBindingPointerAudit;return audit.events;})()`)
   }
   assert.ok(audit.pointerEvents.some(event => event.type === 'pointerdown' && event.trusted && event.target.confirmationButton), 'The real mouse pointerdown must reach the current browser binding confirmation button')
+}
+
+export async function selectWindowsBrowserPolicy(cdp, policy, audit) {
+  assert.ok(['strict', 'public_query_target'].includes(policy))
+  await cdp.send('Page.bringToFront')
+  audit.measurement = await cdp.wait(windowsBrowserBindingUiExpression({ control: 'policy' }), 'the current uncovered web operation mode selector')
+  assert.deepEqual(audit.measurement.policy.options.map(option => [option.value, option.label]), [['strict', '严格网页操作'], ['public_query_target', '公开资料查询']])
+  assert.equal(audit.measurement.policy.disabled, false)
+  assert.equal(audit.measurement.policy.options.find(option => option.value === policy).disabled, false)
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...audit.measurement.point })
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...audit.measurement.point })
+  await cdp.wait(`document.activeElement?.matches('select[aria-label="网页操作方式"]')`, 'the real mode selector keyboard focus')
+  for (const [key, windowsVirtualKeyCode] of [['Home', 36], ...(policy === 'public_query_target' ? [['ArrowDown', 40]] : []), ['Enter', 13]]) {
+    await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code: key, windowsVirtualKeyCode })
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode })
+  }
+  audit.selected = await cdp.wait(`(() => {const select=document.querySelector('article[aria-label="任务详情"] select[aria-label="网页操作方式"]');return select && select.value===${JSON.stringify(policy)} && {value:select.value,label:select.selectedOptions[0]?.textContent,description:select.parentElement.querySelector('p')?.textContent};})()`, 'the explicitly selected browser verification mode')
+  audit.input = 'real-cdp-mouse-and-keyboard'
 }
 
 /** Serialized into the owned Main inspector; never inspect or retain headers, credentials, bodies or query strings. */
@@ -730,10 +774,22 @@ export function validateWindowsScheduledQueryEvidence(evidence) {
     assert.equal(item.unknownOutcomes, 0)
     assert.equal(item.accountState, 'unknown')
     assert.equal(item.access, 'public_query')
+    assert.equal(item.policyExecution?.verificationPolicy, 'public_query_target')
+    assert.ok(item.policyExecution.grants.length >= 1)
+    assert.ok(item.policyExecution.grants.every(grant => grant.verificationPolicy === 'public_query_target'))
+    assert.equal(item.policyExecution.dispatches.length, 2)
+    for (const dispatch of item.policyExecution.dispatches) {
+      assert.equal(dispatch.verificationPolicy, 'public_query_target')
+      assert.equal(dispatch.derivedVerificationPolicy, 'public_query_target')
+      assert.match(dispatch.targetRef, /^@?e\d+$/)
+      assert.deepEqual(dispatch.dependsOn, [dispatch.targetRef])
+      assert.ok(item.policyExecution.grants.some(grant => grant.id === dispatch.grantId))
+    }
   }
   assert.equal(source.uiApprovals.length, 3)
   assert.deepEqual(source.uiApprovals.map(item => item.toolName), ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'])
-  assert.ok(source.uiApprovals.every(item => item.uiFieldsVerified && item.businessCardDisplayedVerified && item.originalSummaryVerified && item.cardDisplayedVerified && item.buttonOperableVerified && item.status === 'allowed'))
+  assert.ok(source.uiApprovals.every(item => item.uiFieldsVerified && item.businessCardDisplayedVerified && item.originalSummaryVerified && item.cardDisplayedVerified && item.buttonOperableVerified && item.status === 'allowed' && item.verificationPolicy === 'public_query_target'))
+  assert.ok(due.policyExecution.grants.every(grant => !source.policyExecution.grants.some(previous => previous.id === grant.id)))
   assert.equal(source.persistentActionAuthorizations, 2)
   assert.equal(due.addedApprovals, 0)
   assert.equal(due.derivedActionAuthorizations, 2)
@@ -771,6 +827,56 @@ export function inspectWindowsQueryThread(thread, fixture, { initial }) {
   return { actions: 2, domReadbackVerified: true, htmlReadbackVerified: true, accountState: 'unknown', access: 'public_query' }
 }
 
+/** Read only the owned test task's actual Grants and dispatches; export no complete Grant or tool arguments. */
+export function inspectWindowsBrowserPolicy(task, thread, receipts, fixture, expectedPolicy = 'public_query_target') {
+  const policy = value => { const result = value === undefined ? 'strict' : value; assert.ok(['strict', 'public_query_target'].includes(result)); return result }
+  assert.equal(policy(task.authority?.browserScope?.verificationPolicy), expectedPolicy)
+  const dispatches = receipts.filter(receipt => receipt.ownerId === task.id && receipt.kind === 'browser_action_dispatch')
+  assert.equal(dispatches.length, 2, 'The controlled normal chain must dispatch exactly its two reviewed actions')
+  const grants = new Map(), checked = []
+  for (const action of ['fill', 'click']) {
+    const turn = thread.turns.find(turn => turn.items.some(item => item.kind === 'tool_call' && item.callId === `smoke-${action}`))
+    const call = turn?.items.find(item => item.kind === 'tool_call' && item.callId === `smoke-${action}`)
+    assert.equal(call?.toolName, `browser_${action}`)
+    const grant = turn.executionGrant
+    assert.ok(grant?.id)
+    assert.equal(grant.taskId, task.id)
+    assert.equal(policy(grant.browserScope?.verificationPolicy), expectedPolicy)
+    assert.deepEqual(grant.browserScope, task.authority.browserScope)
+    grants.set(grant.id, { id: grant.id, turnId: turn.id, taskId: grant.taskId, verificationPolicy: policy(grant.browserScope.verificationPolicy) })
+    const matching = dispatches.filter(receipt => receipt.request?.action === action)
+    assert.equal(matching.length, 1)
+    const receipt = matching[0], request = receipt.request
+    const actualRequests = fixture.observed.requests.map(item => item.browserAction).filter(item => item?.action === action && item.sessionId === request.sessionId)
+    assert.equal(actualRequests.length, 1, 'The target must come from the real observed ref actually sent by the model protocol fixture')
+    const actualRequest = actualRequests[0]
+    assert.match(actualRequest.targetRef, /^@?e\d+$/)
+    assert.equal(receipt.status, 'succeeded')
+    assert.equal(request.turnId, turn.id)
+    assert.equal(request.toolName, `browser_${action}`)
+    assert.equal(request.targetRef, actualRequest.targetRef)
+    assert.equal(request.sessionId, actualRequest.sessionId)
+    assert.equal(request.pageUrl, fixture.fixtureUrl)
+    assert.equal(request.elementHash, createHash('sha256').update(action === 'fill' ? fixture.inputHtml : fixture.buttonHtml).digest('hex'))
+    assert.equal(request.valueHash, action === 'fill' ? createHash('sha256').update(fixture.query).digest('hex') : undefined)
+    assert.equal(policy(request.verificationPolicy), expectedPolicy)
+    assert.deepEqual(request.dependsOn ?? (expectedPolicy === 'strict' ? [] : undefined), expectedPolicy === 'public_query_target' ? [actualRequest.targetRef] : [])
+    assert.equal(receipt.result.actionAcknowledged, true)
+    assert.equal(receipt.result.readbackPending, false)
+    const derived = receipts.filter(item => item.ownerId === task.id && item.kind === 'browser_derived_action_authorization' && item.request?.turnId === turn.id &&
+      item.request.action === action && item.request.sessionId === request.sessionId && item.request.elementHash === request.elementHash && item.request.valueHash === request.valueHash)
+    assert.equal(derived.length, 1)
+    assert.equal(derived[0].status, 'succeeded')
+    assert.equal(derived[0].request.grantId, grant.id)
+    assert.equal(policy(derived[0].request.verificationPolicy), expectedPolicy)
+    assert.equal(policy(derived[0].result.verificationPolicy), expectedPolicy)
+    checked.push({ receiptId: receipt.id, action, turnId: turn.id, grantId: grant.id, verificationPolicy: policy(request.verificationPolicy), targetRef: request.targetRef,
+      dependsOn: request.dependsOn ?? [], derivedAuthorizationId: derived[0].id, derivedVerificationPolicy: policy(derived[0].result.verificationPolicy),
+      actionAcknowledged: true, readbackPending: false })
+  }
+  return { verificationPolicy: expectedPolicy, grants: [...grants.values()], dispatches: checked }
+}
+
 async function readWindowsQueryAuthorizations(root, sourceId, occurrenceId) {
   // Only the fresh acceptance profile is readable; never open a user's database or export raw receipts.
   const path = join(root, 'runtime', 'tasks.sqlite3')
@@ -778,7 +884,7 @@ async function readWindowsQueryAuthorizations(root, sourceId, occurrenceId) {
   const { DatabaseSync } = await import('node:sqlite')
   const database = new DatabaseSync(path, { readOnly: true })
   try {
-    return database.prepare(`SELECT data_json FROM operation_receipts WHERE owner_id IN (?, ?) AND json_extract(data_json, '$.kind') IN ('browser_schedule_action_authorization','browser_derived_action_authorization','browser_schedule_action_outcome')`)
+    return database.prepare(`SELECT data_json FROM operation_receipts WHERE owner_id IN (?, ?) AND json_extract(data_json, '$.kind') IN ('browser_schedule_action_authorization','browser_derived_action_authorization','browser_schedule_action_outcome','browser_action_dispatch')`)
       .all(sourceId, occurrenceId).map(row => JSON.parse(row.data_json))
   } finally { database.close() }
 }
@@ -1557,7 +1663,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       await cdp.wait(`!document.querySelector('.ds-settings-sidebar')`, 'the main workspace after leaving help')
       const runtimeRequest = (path, method = 'GET', body) => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},${JSON.stringify(method)},${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'}).then(result=>{if(!result.ok)throw new Error(result.body);return JSON.parse(result.body)})`)
       const previousThreads = new Set((await runtimeRequest('/v1/threads')).threads.map(thread => thread.id))
-      const prompt = `${browserSmoke ? `使用broswer-skill，读取 ${taskModel.fixtureUrl} 的本地合成公开页面。在“合成公告关键词”搜索框填写“${taskModel.query}”，点击“查询合成公告”，核对查询后的页面实际内容，生成HTML报告并交付。明确申请这两个精确公开查询动作的周期计划范围授权；无需账号，仅限该合成站点，不提交到外部服务。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
+      const prompt = windowsTaskPrompt(taskModel, browserSmoke)
       await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
       await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]:not(:disabled)'))`, 'the active conversation composer')
       const newThreads = (await runtimeRequest('/v1/threads')).threads.filter(thread => !previousThreads.has(thread.id))
@@ -1621,6 +1727,20 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         assert.equal(previewSnapshot.interaction, 'interact')
         assert.deepEqual(previewSnapshot.origins, [new URL(taskModel.fixtureUrl).origin])
         assert.deepEqual(panel.values, [previewSnapshot.browserLabel, new URL(taskModel.fixtureUrl).origin, '允许网页交互。可能修改网站数据的操作仍按任务范围审阅。'])
+        assert.equal(previewSnapshot.purpose, prompt)
+        assert.equal(panel.purpose, prompt)
+        assert.equal(previewSnapshot.verificationPolicy, 'strict', 'A task without an explicit policy must retain the strict default')
+        assert.deepEqual([...previewSnapshot.allowedVerificationPolicies].sort(), ['public_query_target', 'strict'])
+        assert.equal(previewSnapshot.policyChangeBlocked, undefined)
+        const policyReview = { snapshotPolicy: previewSnapshot.verificationPolicy, initialUiPolicy: panel.policy?.value, strictSelection: {}, publicQuerySelection: {} }
+        browserRecovery.policyReview = policyReview
+        await selectWindowsBrowserPolicy(cdp, 'strict', policyReview.strictSelection)
+        assert.equal(policyReview.strictSelection.selected.description, '核对完整页面与目标。账号操作、业务提交及其他写操作使用此方式。')
+        policyReview.beforePublicSelection = await readRecovery('paused')
+        const beforePolicyConfirmation = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`)
+        assert.equal(beforePolicyConfirmation.authority?.browserScope?.verificationPolicy ?? 'strict', 'strict', 'UI selection alone must not silently widen task authority')
+        await selectWindowsBrowserPolicy(cdp, 'public_query_target', policyReview.publicQuerySelection)
+        assert.equal(policyReview.publicQuerySelection.selected.description, '仅用于无需账号的搜索、阅读和翻页，核对原目标及同一表单的明确依赖。不能用于账号操作或业务提交。')
         const confirmationAudit = { transport: report.bindingTransportAudit ?? { status: 'unavailable', reason: 'owned-main-audit-not-installed', posts: [] } }
         browserRecovery.confirmationAudit = confirmationAudit
         if (mainCdp) {
@@ -1641,7 +1761,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           await clickWindowsBrowserBinding(cdp, confirmationAudit)
           await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes('浏览器范围已确认。点击继续原任务。'))`, 'the actual UI confirmation without starting the task')
         } finally { await stopBindingPostAudit?.() }
-        const binding = { browserInstanceId: realBrowser.evidence.browserInstanceId, origins: [new URL(taskModel.fixtureUrl).origin], interaction: 'interact', revision: realBrowser.browserRevision }
+        const binding = { browserInstanceId: realBrowser.evidence.browserInstanceId, origins: [new URL(taskModel.fixtureUrl).origin], interaction: 'interact', verificationPolicy: 'public_query_target', revision: realBrowser.browserRevision }
         const confirmed = await readRecovery('paused')
         const confirmedTask = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`)
         assert.deepEqual(confirmedTask.authority.browserScope, binding)
@@ -1649,13 +1769,17 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         const confirmedScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
         await writeFile(join(evidenceDir, 'windows-task-browser-binding-confirmed-paused-zh-dark.png'), Buffer.from(confirmedScreenshot.data, 'base64'))
         await cdp.click('article[aria-label="任务详情"] button', '继续任务')
-        await cdp.wait(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/threads/${encodeURIComponent(task.threadId)}`)},'GET').then(result=>JSON.parse(result.body).turns.length===1)`, 'one first Turn from a separate explicit resume')
+        await cdp.wait(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/threads/${encodeURIComponent(task.threadId)}`)},'GET').then(result=>{const turns=JSON.parse(result.body).turns;return turns.length===1 && Boolean(turns[0].executionGrant);})`, 'one first Turn with its actual Grant from a separate explicit resume')
         const resumedThread = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
         assert.equal(resumedThread.turns.length, 1)
+        const firstGrant = resumedThread.turns[0].executionGrant
+        assert.ok(firstGrant?.id)
+        assert.deepEqual(firstGrant.browserScope, binding)
         task = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`)
         assert.equal(task.id, taskId)
         Object.assign(browserRecovery, { confirmed, initialCapability: 'browser_disabled', blockedCapability: 'browser_task_scope_required', blockedRoute: resolution.route,
-          uiPreviewVerified: true, uiConfirmVerified: true, resumed: { taskId, threadId: task.threadId, turns: 1, firstTurnId: resumedThread.turns[0].id } })
+          uiPreviewVerified: true, uiConfirmVerified: true, resumed: { taskId, threadId: task.threadId, turns: 1, firstTurnId: resumedThread.turns[0].id,
+            executionGrant: { id: firstGrant.id, verificationPolicy: firstGrant.browserScope.verificationPolicy } } })
         validateWindowsBrowserRecoveryEvidence(browserRecovery, realBrowser.evidence.browserInstanceId)
         report.taskSetup = { originThreadId, skillInstallation, browser: realBrowser.evidence, browserRecovery }
         await cdp.click('article[aria-label="任务详情"] button', '打开原会话')
@@ -1743,6 +1867,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         assert.equal(reviewedRequests.length, 3)
         for (const approval of reviewedRequests) assert.equal(windowsFixtureApprovalResolution(resolutions, approval, task.id)?.status, 'allowed')
         const actions = flow.flow.variables.taskSchedule.scope.browserScheduleActions
+        assert.equal(flow.flow.variables.taskSchedule.scope.browserScope.verificationPolicy, 'public_query_target')
         assert.equal(actions.length, 2)
         assert.deepEqual(actions.map(item => item.action).sort(), ['click', 'fill'])
         for (const action of actions) {
@@ -1750,12 +1875,20 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           assert.equal(action.origin, new URL(taskModel.fixtureUrl).origin)
           assert.equal(action.accountState, 'unknown')
           assert.equal(action.access, 'public_query')
+          assert.equal(action.verificationPolicy, 'public_query_target')
           assert.equal(action.browserInstanceId, realBrowser.evidence.browserInstanceId)
-          assert.ok(uiApprovals.some(item => item.approvalId === action.approvalId && item.targetSha256 === action.elementHash))
+          const approved = uiApprovals.find(item => item.approvalId === action.approvalId && item.targetSha256 === action.elementHash && item.verificationPolicy === action.verificationPolicy)
+          assert.ok(approved)
+          assert.equal(createHash('sha256').update(action.summary).digest('hex'), approved.summarySha256)
+          const actionSummary = fixtureSummaryFields(action.summary).fields
+          assert.equal(actionSummary.校验范围, '公开查询目标及明确依赖')
+          assert.equal(actionSummary.页面摘要, approved.pageSha256)
+          assert.equal(Object.hasOwn(action, 'targetRef') || Object.hasOwn(action, 'dependsOn'), false, 'A persistent descriptor cannot capture another session\'s live element reference')
           if (action.action === 'fill') assert.equal(action.valueHash, createHash('sha256').update(taskModel.query).digest('hex'))
         }
         report.taskExecution.browserSkill.publicQuery = { ...inspectWindowsQueryThread(execution, taskModel, { initial: true }),
-          uiApprovals, persistentActionAuthorizations: actions.length, unknownOutcomes: 0 }
+          uiApprovals, persistentActionAuthorizations: actions.length, unknownOutcomes: 0,
+          policyExecution: inspectWindowsBrowserPolicy(task, execution, await readWindowsQueryAuthorizations(root, task.id, task.id), taskModel) }
         validateWindowsBrowserEvidence(report.taskExecution.browserSkill)
         report.checks.push('real-browser-skill-html-and-schedule')
       }
@@ -1856,14 +1989,19 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           assert.equal(receipt.request.binding.scheduleId, schedule.id)
           assert.equal(receipt.request.sessionId, freshSession.sessionId)
           assert.equal(receipt.result.accountState, 'unknown')
-          assert.ok(persistent.some(source => source.result.id === receipt.request.actionId && source.result.approvalId === receipt.result.sourceApprovalId))
+          assert.equal(receipt.request.verificationPolicy, 'public_query_target')
+          assert.equal(receipt.result.verificationPolicy, 'public_query_target')
+          assert.ok(persistent.some(source => source.result.id === receipt.request.actionId && source.result.approvalId === receipt.result.sourceApprovalId && source.result.verificationPolicy === receipt.request.verificationPolicy))
           assert.ok(Date.parse(receipt.result.expiresAt) > Date.parse(receipt.createdAt) && Date.parse(receipt.result.expiresAt) <= Date.parse(receipt.createdAt) + 15 * 60_000)
         }
         report.taskExecution.dueOccurrence.publicQuery = { ...inspectWindowsQueryThread(occurrenceThread, taskModel, { initial: false }),
           addedApprovals: 0, derivedActionAuthorizations: derived.length, unknownOutcomes: 0,
+          policyExecution: inspectWindowsBrowserPolicy(occurrence, occurrenceThread, receipts, taskModel),
           publishedPlanVersionVerified: true, enabledPlanVerified: true, shortAuthorizationVerified: true,
           publishedVersionId: dueReadback.flow.publishedVersionId,
           authorizationExpirations: derived.map(item => item.result.expiresAt) }
+        assert.ok(report.taskExecution.dueOccurrence.publicQuery.policyExecution.grants.every(grant =>
+          !report.taskExecution.browserSkill.publicQuery.policyExecution.grants.some(source => source.id === grant.id)), 'The due task must use fresh ExecutionGrants, preserving the explicitly selected policy')
         validateWindowsScheduledQueryEvidence(report.taskExecution)
       }
       const afterOccurrence = (await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`)).flow

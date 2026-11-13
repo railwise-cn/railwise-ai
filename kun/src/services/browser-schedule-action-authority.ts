@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { BrowserScheduleActionSchema, BrowserScheduleBindingSchema, type BrowserScheduleAction, type BrowserScheduleResolution } from '../contracts/browser-schedule-actions.js'
-import type { BrowserExecutionScope } from '../contracts/browser-skill.js'
+import { browserVerificationPolicy, type BrowserExecutionScope, type BrowserVerificationPolicy } from '../contracts/browser-skill.js'
 import type { TaskRun } from '../contracts/tasks.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
 import type { TaskRunRepository } from './task-run-repository.js'
@@ -13,7 +13,7 @@ function fail(code: string): never {
 }
 type Candidate = Omit<BrowserScheduleAction, 'approvalId' | 'summary'>
 export type BrowserActionTarget = {
-  action: 'click' | 'fill'; pageUrl: string; elementHash: string; valueHash?: string
+  action: 'click' | 'fill'; pageUrl: string; elementHash: string; valueHash?: string; verificationPolicy?: BrowserVerificationPolicy
 }
 export type BrowserActionBinding = BrowserActionTarget & { sessionId: string; taskId: string }
 
@@ -26,7 +26,8 @@ export function listApprovedBrowserScheduleActions(repository: TaskRunRepository
     const action = parsed.data
     if (action.sourceTaskId !== task.id || action.scheduleId !== `schedule_${task.id}` || action.purposeHash !== hash(task.goal) ||
       action.requirementHash !== hash(task.acceptance.schedule) || browser && (browser.interaction !== 'interact' ||
-      action.browserInstanceId !== browser.browserInstanceId || action.browserRevision !== browser.revision || !browser.origins.includes(action.origin))) return []
+      action.browserInstanceId !== browser.browserInstanceId || action.browserRevision !== browser.revision || !browser.origins.includes(action.origin) ||
+      browserVerificationPolicy(action.verificationPolicy) !== browserVerificationPolicy(browser.verificationPolicy))) return []
     return [action]
   }).sort((a, b) => a.id.localeCompare(b.id))
 }
@@ -44,7 +45,7 @@ export class BrowserScheduleActionAuthority {
       [...url.searchParams.keys()].some(key => /token|secret|password|authorization|session|oauth/i.test(key))) fail('browser_schedule_public_query_required')
     const fields = { sourceTaskId: taskId, scheduleId: `schedule_${taskId}`, purposeHash: hash(task.goal), requirementHash: hash(task.acceptance.schedule),
       browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision, origin: url.origin,
-      ...target, accountState: 'unknown' as const, access: 'public_query' as const }
+      ...target, verificationPolicy: browserVerificationPolicy(scope.verificationPolicy), accountState: 'unknown' as const, access: 'public_query' as const }
     return { id: hash(fields), ...fields }
   }
 
@@ -68,7 +69,9 @@ export class BrowserScheduleActionAuthority {
     const actions = listApprovedBrowserScheduleActions(this.options.repository, task)
     const approved = actions.find(action => action.action === target.action && action.pageUrl === target.pageUrl &&
       action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === scope?.browserInstanceId &&
-      action.browserRevision === scope.revision && scope.origins.includes(action.origin))
+      action.browserRevision === scope.revision && scope.origins.includes(action.origin) &&
+      browserVerificationPolicy(action.verificationPolicy) === browserVerificationPolicy(scope.verificationPolicy) &&
+      browserVerificationPolicy(target.verificationPolicy) === browserVerificationPolicy(scope.verificationPolicy))
     if (!approved) fail('browser_schedule_action_scope_required')
     if (this.options.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !this.options.repository.verifiedOperationResolution(receipt))) fail('browser_schedule_outcome_unknown')
     if (!this.options.resolveSchedule) fail('browser_schedule_authority_changed')
@@ -80,7 +83,7 @@ export class BrowserScheduleActionAuthority {
     const key = `browser-source-action:${hash(request)}`
     this.options.repository.transact(() => {
       this.options.repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'browser_derived_action_authorization', request, nowIso: new Date().toISOString() })
-      this.options.repository.finishOperation(task.id, key, { status: 'succeeded', result: { expiresAt: new Date(expiry).toISOString(), sourceApprovalId: approved.approvalId, accountState: 'unknown' } })
+      this.options.repository.finishOperation(task.id, key, { status: 'succeeded', result: { expiresAt: new Date(expiry).toISOString(), sourceApprovalId: approved.approvalId, accountState: 'unknown', verificationPolicy: browserVerificationPolicy(approved.verificationPolicy) } })
     })
     return true
   }
@@ -99,7 +102,9 @@ export class BrowserScheduleActionAuthority {
     const scope = context.executionGrant!.browserScope!
     const matched = resolved.actions.find(action => action.action === target.action && action.pageUrl === target.pageUrl &&
       action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === scope.browserInstanceId &&
-      action.browserRevision === scope.revision && scope.origins.includes(action.origin) && action.accountState === 'unknown' && action.access === 'public_query')
+      action.browserRevision === scope.revision && scope.origins.includes(action.origin) && action.accountState === 'unknown' && action.access === 'public_query' &&
+      browserVerificationPolicy(action.verificationPolicy) === browserVerificationPolicy(scope.verificationPolicy) &&
+      browserVerificationPolicy(target.verificationPolicy) === browserVerificationPolicy(scope.verificationPolicy))
     if (!matched) fail('browser_schedule_action_scope_changed')
     const expiry = Math.min(Date.now() + 15 * 60_000, Date.parse(context.executionGrant!.expiresAt ?? new Date(Date.now() + 15 * 60_000).toISOString()))
     if (expiry <= Date.now()) fail('execution_grant_expired')
@@ -111,7 +116,7 @@ export class BrowserScheduleActionAuthority {
     if (prior?.status !== 'succeeded' || !Number.isFinite(previousExpiry) || previousExpiry <= Date.now()) {
       this.options.repository.transact(() => {
         this.options.repository.beginOperation({ ownerId: target.taskId, idempotencyKey: key, kind: 'browser_derived_action_authorization', request, nowIso: new Date().toISOString() })
-        this.options.repository.finishOperation(target.taskId, key, { status: 'succeeded', result: { expiresAt: new Date(expiry).toISOString(), sourceApprovalId: matched.approvalId, accountState: 'unknown' } })
+        this.options.repository.finishOperation(target.taskId, key, { status: 'succeeded', result: { expiresAt: new Date(expiry).toISOString(), sourceApprovalId: matched.approvalId, accountState: 'unknown', verificationPolicy: browserVerificationPolicy(matched.verificationPolicy) } })
       })
     }
     return true

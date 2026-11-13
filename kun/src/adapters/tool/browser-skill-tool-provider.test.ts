@@ -61,7 +61,128 @@ function fixture() {
   return { repository, config, runner, provider, context, execute, setSchedule: (value: BrowserScheduleResolution | undefined) => { scheduleResolution = value }, failSchedule: (code: string) => { scheduleFailure = code }, setTitle: (next: string) => { title = next }, setElement: (html: string) => { elementHtml = html }, setUrl: (next: string) => { url = next } }
 }
 
+function publicQueryFixture() {
+  const f = fixture()
+  const scope = { ...f.context.executionGrant!.browserScope!, verificationPolicy: 'public_query_target' as const }
+  f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant!, id: 'reviewed-public-grant', browserScope: scope })
+  f.repository.update('task', 0, task => ({ ...task, goal: '用browser-skill搜索公开招标信息，无需账号', authority: {
+    source: 'user', workspaceRoot: task.workspaceRoot, externalTargets: [], grantedAt: new Date().toISOString(), browserScope: scope
+  } }))
+  return f
+}
+
 describe('typed BrowserSkill production provider', () => {
+  it('requires a reviewed public-query action before adding the exact observed dependency, including direct approved calls', async () => {
+    const f = publicQueryFixture()
+    const approval = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow')
+    f.context.awaitApproval = approval
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input aria-label="公开查询">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程测量' }
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    expect(await host.execute({ toolName: 'browser_fill', callId: 'missing-public-review', arguments: args }, f.context))
+      .toMatchObject({ item: { isError: true, output: { code: 'browser_public_query_action_required' } } })
+    expect(await f.execute('browser_fill', args, { ...f.context, explicitApproval: { callId: 'legacy-direct-call', toolName: 'browser_fill', requestHash: 'a'.repeat(64) } }))
+      .toMatchObject({ isError: true, output: { code: 'browser_public_query_action_required' } })
+    expect(approval).not.toHaveBeenCalled()
+    expect(f.runner.mock.calls.some(([, args]) => args[0] === 'fill')).toBe(false)
+    expect(await f.execute('browser_authorize_action', { ...args, action: 'fill' })).toMatchObject({ isError: true, output: { code: 'browser_public_query_action_required' } })
+    await f.execute('browser_authorize_action', { ...args, action: 'fill', access: 'public_query' })
+    expect(approval).toHaveBeenCalledTimes(1)
+    expect(approval.mock.calls[0]![0].summary).toContain('校验范围 "公开查询目标及明确依赖"')
+    const before = JSON.stringify(f.context.executionGrant)
+    expect(await host.execute({ toolName: 'browser_fill', callId: 'reviewed-public-fill', arguments: args }, f.context))
+      .toMatchObject({ item: { isError: false, output: { status: 'succeeded' } } })
+    expect(JSON.stringify(f.context.executionGrant)).toBe(before)
+    const command = f.runner.mock.calls.map(([, argv]) => argv).find(argv => argv[0] === 'fill')!
+    expect(command.slice(-2)).toEqual(['--depends-on', '@e1'])
+    expect(f.repository.operations('task', 'browser_action_dispatch')[0]!.request).toMatchObject({
+      verificationPolicy: 'public_query_target', targetRef: '@e1', dependsOn: ['@e1'],
+      authorizationReceiptId: f.repository.operations('task', 'browser_action_authorization')[0]!.id
+    })
+  })
+
+  it('keeps historical strict grants and approvals strict without dependency arguments', async () => {
+    const f = fixture()
+    expect(Object.hasOwn(f.context.executionGrant!.browserScope!, 'verificationPolicy')).toBe(false)
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: 'e1' }
+    expect(await f.execute('browser_click', args, { ...f.context, explicitApproval: { callId: 'legacy-direct-call', toolName: 'browser_fill', requestHash: 'a'.repeat(64) } })).toMatchObject({ output: { status: 'succeeded' } })
+    expect(f.runner.mock.calls.find(([, args]) => args[0] === 'click')![1]).not.toContain('--depends-on')
+    expect(f.repository.operations('task', 'browser_action_dispatch')[0]!.request).toMatchObject({ verificationPolicy: 'strict', dependsOn: [] })
+  })
+
+  it.each(['expired', 'revoked', 'target-changed', 'policy-missing'] as const)('never dispatches a public-query action with %s approval', async change => {
+    const f = publicQueryFixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input aria-label="公开查询">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: 'e1', value: '工程测量' }
+    await f.execute('browser_authorize_action', { ...args, action: 'fill', access: 'public_query' })
+    const receipt = f.repository.operations('task', 'browser_action_authorization')[0]!
+    if (change === 'target-changed') f.setElement('<input aria-label="另一个目标">')
+    else if (change === 'policy-missing') {
+      const { verificationPolicy: _policy, ...legacy } = receipt.request!
+      f.repository.connection().prepare('UPDATE operation_receipts SET data_json=? WHERE owner_id=? AND idempotency_key=?')
+        .run(JSON.stringify({ ...receipt, request: legacy }), 'task', receipt.idempotencyKey)
+    } else f.repository.finishOperation('task', receipt.idempotencyKey, { status: 'succeeded', result: {
+      ...(receipt.result as Record<string, unknown>), ...(change === 'expired' ? { expiresAt: '2000-01-01T00:00:00Z' } : { revoked: true })
+    } })
+    expect(await f.execute('browser_fill', args, { ...f.context, explicitApproval: { callId: 'legacy-direct-call', toolName: 'browser_fill', requestHash: 'a'.repeat(64) } })).toMatchObject({ isError: true, output: { code: 'browser_public_query_action_required' } })
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'fill')).toBe(false)
+  })
+
+  it('rejects press and account fields in public mode before asking for approval or sending input', async () => {
+    const f = publicQueryFixture()
+    const approval = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow')
+    f.context.awaitApproval = approval
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    expect((await host.listTools(f.context)).some(tool => tool.name === 'browser_press')).toBe(false)
+    expect(await f.execute('browser_press', { sessionId: 'session-one', contextId: 'context-one', key: 'Enter' }, { ...f.context, explicitApproval: { callId: 'legacy-direct-call', toolName: 'browser_fill', requestHash: 'a'.repeat(64) } }))
+      .toMatchObject({ isError: true, output: { code: 'browser_public_query_action_required' } })
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input type="password" aria-label="账号密码">')
+    expect(await f.execute('browser_authorize_action', { sessionId: 'session-one', contextId: 'context-one', target: 'e1', action: 'fill', value: 'synthetic', access: 'public_query' }))
+      .toMatchObject({ isError: true, output: { code: 'browser_public_query_target_blocked' } })
+    expect(approval).not.toHaveBeenCalled()
+    expect(f.runner.mock.calls.some(([, argv]) => ['press', 'fill'].includes(argv[0]))).toBe(false)
+  })
+
+  it.each(['<button>提交审批</button>', '<button>删除账户</button>', '<button title="转交待办">确定</button>',
+    '<input placeholder="付款金额">', '<button>&#25552;&#20132;</button>'])('blocks a business target before authorization and dispatch: %s', async html => {
+    const f = publicQueryFixture()
+    const approval = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow')
+    f.context.awaitApproval = approval
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1' }
+    f.setElement('<button>搜索</button>')
+    await f.execute('browser_authorize_action', { ...args, action: 'click', access: 'public_query' })
+    approval.mockClear()
+    f.setElement(html)
+    expect(await f.execute('browser_authorize_action', { ...args, action: 'click', access: 'public_query' }))
+      .toMatchObject({ isError: true, output: { code: 'browser_public_query_target_blocked' } })
+    expect(await f.execute('browser_click', args, { ...f.context, explicitApproval: { callId: 'old', toolName: 'browser_click', requestHash: 'a'.repeat(64) } }))
+      .toMatchObject({ isError: true, output: { code: 'browser_public_query_target_blocked' } })
+    expect(approval).not.toHaveBeenCalled()
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'click')).toBe(false)
+  })
+
+  it.each(['<button type="submit">搜索</button>', '<a aria-label="下一页">2</a>', '<button>Search</button>'])('permits a reviewed public search or pagination target: %s', async html => {
+    const f = publicQueryFixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement(html)
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1' }
+    expect(await f.execute('browser_authorize_action', { ...args, action: 'click', access: 'public_query' }))
+      .toMatchObject({ output: { status: 'succeeded' } })
+    expect(await f.execute('browser_click', args)).toMatchObject({ output: { status: 'succeeded' } })
+    expect(f.runner.mock.calls.find(([, argv]) => argv[0] === 'click')![1].slice(-2)).toEqual(['--depends-on', '@e1'])
+  })
+
   it('refreshes once only after an explicit vendor none rejection, reuses the reviewed target/input and then fills with the fresh context', async () => {
     const f = fixture()
     await f.execute('browser_session_start')
@@ -433,7 +554,7 @@ describe('typed BrowserSkill production provider', () => {
   it('advertises a scope request while hiding interactive tools, and blocks legacy dispatch before approval', async () => {
     const f = fixture()
     f.context.executionGrant!.browserScope!.interaction = 'observe'
-    const approval = vi.fn(async () => 'allow' as const)
+    const approval = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow')
     f.context.awaitApproval = approval
     const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
     const names = (await host.listTools(f.context)).map(item => item.name)
@@ -532,7 +653,7 @@ describe('typed BrowserSkill production provider', () => {
 
   it('requires an actual recurring source task and explicit public-query scope before durable authorization', async () => {
     const f = fixture()
-    const approval = vi.fn(async () => 'allow' as const)
+    const approval = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow')
     f.context.awaitApproval = approval
     await f.execute('browser_session_start')
     await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/' })
@@ -633,7 +754,7 @@ describe('typed BrowserSkill production provider', () => {
 
   it('blocks omitted periodic scope and old temporary approvals before any ordinary approval or page write', async () => {
     const f = fixture()
-    const approval = vi.fn(async () => 'allow' as const)
+    const approval = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow')
     f.context.awaitApproval = approval
     await f.execute('browser_session_start')
     await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
@@ -660,7 +781,7 @@ describe('typed BrowserSkill production provider', () => {
   it('blocks an old recurring occurrence without continuous action binding instead of asking for one-time approval', async () => {
     const f = fixture()
     f.repository.update('task', 0, task => ({ ...task, scheduledBy: { scheduleId: 'existing-plan', dueAt: new Date().toISOString() } }))
-    const approval = vi.fn(async () => 'allow' as const)
+    const approval = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow')
     const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
     expect(await host.execute({ callId: 'legacy-occurrence', toolName: 'browser_fill', arguments: {
       sessionId: 'new-session', contextId: 'fresh-context', target: '@e1', value: 'query'

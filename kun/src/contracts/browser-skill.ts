@@ -7,10 +7,18 @@ export const BrowserOrigin = z.string().refine(value => {
   } catch { return false }
 }, 'Expected an exact HTTP(S) origin')
 
+export const BrowserVerificationPolicy = z.enum(['strict', 'public_query_target'])
+export type BrowserVerificationPolicy = z.infer<typeof BrowserVerificationPolicy>
+/** Interpret historical grants without rewriting their persisted hashes. */
+export function browserVerificationPolicy(value?: unknown): BrowserVerificationPolicy {
+  return value === 'public_query_target' ? value : 'strict'
+}
+
 export const BrowserExecutionScope = z.object({
   browserInstanceId: z.string().min(1).max(512),
   origins: z.array(BrowserOrigin).max(64),
   interaction: z.enum(['observe', 'interact']),
+  verificationPolicy: BrowserVerificationPolicy.optional(),
   revision: z.number().int().nonnegative()
 }).strict()
 export type BrowserExecutionScope = z.infer<typeof BrowserExecutionScope>
@@ -58,12 +66,21 @@ export function browserTaskOrigins(text: string): string[] {
   return [...origins]
 }
 
+/** Recommend a mode from the user's request. Only a binding confirmation grants it. */
+export function isPublicBrowserQuery(text: string): boolean {
+  if (!isBrowserTask(text)) return false
+  const request = text.replace(/(?:不需要|无需|不要|禁止|不必|不)(?:任何)?(?:登录|登陆|提交|发送|支付|购买|转账|审批|发布|删除|账号|账户|密码|验证码)/g, '')
+  if (/登录|登陆|账号|账户|密码|验证码|网银|付款|支付|转账|购买|审批|转交|变更|修改|保存|上传|报名|网站授权|网页授权|发布|删除|投递|提交|发送|发邮件|个人资料|私有|内部业务|private\s+account|sign\s*in|log\s*in|purchase|payment|approve|delete|submit\s+form/i.test(request)) return false
+  return /公开|检索|搜索|查询|采集|收集|获取.*信息|招标|采购公告|政采云|阳光采购|\b(?:public|search|collect|procurement)\b/i.test(request)
+}
+
 export const BrowserTaskBindingConfirmation = z.object({
   expectedTaskRevision: z.number().int().nonnegative(),
   expectedBrowserRevision: z.number().int().nonnegative(),
   browserInstanceId: z.string().min(1),
   origins: z.array(BrowserOrigin).min(1).max(64),
   interaction: z.enum(['observe', 'interact']).optional(),
+  verificationPolicy: BrowserVerificationPolicy.optional(),
   confirmed: z.literal(true),
   idempotencyKey: z.string().min(1).max(200)
 }).strict()
@@ -71,6 +88,8 @@ export type BrowserTaskBindingConfirmation = z.infer<typeof BrowserTaskBindingCo
 export type BrowserTaskBindingSnapshot = {
   taskId: string; taskRevision: number; browserRevision: number; browserInstanceId: string;
   browserLabel: string; previousBrowserInstanceId?: string; origins: string[]; interaction: 'observe' | 'interact'; previousInteraction?: 'observe' | 'interact'
+  purpose: string; verificationPolicy: BrowserVerificationPolicy; recommendedVerificationPolicy: BrowserVerificationPolicy;
+  allowedVerificationPolicies: BrowserVerificationPolicy[]; policyChangeBlocked?: 'browser_unresolved_operation'
 }
 
 export const BrowserOperationConfirmation = z.object({
