@@ -39,7 +39,7 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
       const values = Object.fromEntries(fields.map(field => [field.key, ref
         ? field.read === 'exists' ? true : field.read === 'value' ? page.value : field.read === 'text' ? '搜索' : field.attribute === 'type' ? page.action === 'fill' ? 'search' : 'submit' : field.attribute === 'aria-label' && page.action === 'fill' ? '关键词' : null
         : ['present', 'target', 'searchInput'].includes(field.key) ? true : field.key === 'sensitive' ? false : field.key === 'method' ? 'get' : field.key === 'action' ? '/query' : field.key === 'class' ? 'search-form' : ['trigger', 'triggerLabel'].includes(field.key) ? '搜索' : null]))
-      return { ok: true, output: { tab_id: 1, page_url: page.url, frame_url: page.url, scope: 'current_dom', truncated: false, items: [{ ref: '@e1', values, redacted: [] }] } }
+      return { ok: true, output: { tab_id: 1, page_url: page.url, frame_url: page.url, frame_id: 'MAIN-FRAME', scope: 'current_dom', truncated: false, items: [{ ref: '@e1', values, redacted: [] }] } }
     }
     if (args[0] === 'fill' || args[0] === 'click') {
       page.writes++; expect(args).toContain('--expect')

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { expect, it } from 'vitest'
-import { browserCommandDiagnostics, runBrowserCommand, supportsBrowserTargetPolicy } from './browser-skill-cli.js'
+import { browserCommandDiagnostics, runBrowserCommand, supportsBrowserTargetPolicy, supportsBrowserNativeRead } from './browser-skill-cli.js'
 
 it('retains only typed vendor reason/effect scalars from the real CLI error JSON envelope', async () => {
   const executableHash = createHash('sha256').update(await readFile(process.execPath)).digest('hex')
@@ -34,6 +34,12 @@ it('requires the official target-policy CLI and both protocol peers before adver
   for (const args of [['0.4.0', '1.9', '1.9'], ['0.5.0', '1.7', '1.9'], ['0.5.0', '1.9', '1.7'], ['0.5.0', '2.0', '1.9'], [undefined, '1.9', '1.9']]) {
     expect(supportsBrowserTargetPolicy(...args)).toBe(false)
   }
+})
+
+it('requires both live protocol 1.9 peers for native read while preserving bare target policy 1.8', () => {
+  expect(supportsBrowserNativeRead('0.5.0', '1.9', '1.10')).toBe(true)
+  for (const args of [['0.4.0', '1.9', '1.9'], ['0.5.0', '1.8', '1.9'], ['0.5.0', '1.9', '1.8'], ['0.5.0', '2.0', '1.9'], ['0.5.0', undefined, '1.9']]) expect(supportsBrowserNativeRead(...args)).toBe(false)
+  expect(supportsBrowserTargetPolicy('0.5.0', '1.8', '1.8')).toBe(true)
 })
 
 it('preserves official dispatch proof scalars without downgrading the vendor unknown effect', async () => {

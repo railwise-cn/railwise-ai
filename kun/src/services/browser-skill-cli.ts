@@ -96,6 +96,12 @@ export function supportsBrowserTargetPolicy(version?: string, daemonProtocol?: s
   return supportsBrowserPolicyCLI(version) && protocol(daemonProtocol) && protocol(extensionProtocol)
 }
 
+/** Declarative native DOM read is the official 0.5 / protocol 1.9 contract. */
+export function supportsBrowserNativeRead(version?: string, daemonProtocol?: string, extensionProtocol?: string): boolean {
+  return supportsBrowserTargetPolicy(version, daemonProtocol, extensionProtocol) &&
+    [daemonProtocol, extensionProtocol].every(value => Number(value!.split('.')[1]) >= 9)
+}
+
 export function supportsBrowserPolicyCLI(version?: string): boolean {
   const cli = /^(\d+)\.(\d+)\.(\d+)$/.exec(version ?? '')
   return Boolean(cli && (Number(cli[1]) > 0 || Number(cli[2]) >= 5))

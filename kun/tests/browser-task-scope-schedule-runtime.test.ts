@@ -46,15 +46,15 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
         const selector = args[args.indexOf('--selector') + 1]!, fields = JSON.parse(args[args.indexOf('--fields-json') + 1]!)
         const values = fields.length === 1 ? { present: true } : { present: true, target: true, sensitive: false, method: null, action: null,
           class: 'search_form', id: null, role: null, 'aria-label': null, searchInput: true, label: '公告关键词 查询公告' }
-        return { ok: true, output: { tab_id: session.tab, page_url: session.url, frame_url: session.url, scope: 'current_dom', truncated: false,
-          items: selector.startsWith('form:') ? [] : [{ ref: '@e900', values, redacted: [] }] } }
+        return { ok: true, output: { tab_id: session.tab, page_url: session.url, frame_url: session.url, frame_id: 'MAIN-FRAME', scope: 'current_dom', truncated: false,
+          items: selector.startsWith('form:') ? [] : [{ ref: fields.length === 1 ? '@e999' : '@e900', values, redacted: [] }] } }
       }
       expect(browser.modern).toBe(true)
       const target = args[args.indexOf('--ref') + 1], input = target === '@e1'
       const fields = JSON.parse(args[args.indexOf('--fields-json') + 1]!) as Array<{ key: string; read: string; attribute?: string }>
       const attributes: Record<string, string | null> = input ? { name: 'keyword', 'aria-label': '公告关键词' } : { id: 'search' }
       const values = Object.fromEntries(fields.map(field => [field.key, field.read === 'exists' ? true : field.read === 'value' ? session.value : field.read === 'text' ? '查询公告' : attributes[field.attribute ?? ''] ?? null]))
-      return { ok: true, output: { tab_id: session.tab, page_url: session.url, frame_url: session.url, scope: 'current_dom', truncated: false,
+      return { ok: true, output: { tab_id: session.tab, page_url: session.url, frame_url: session.url, frame_id: 'MAIN-FRAME', scope: 'current_dom', truncated: false,
         items: [{ ref: '@e999', values, redacted: [] }] } }
     }
     if (args[0] === 'get-html') {

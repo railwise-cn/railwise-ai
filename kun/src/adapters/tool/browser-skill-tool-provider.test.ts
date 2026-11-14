@@ -1079,17 +1079,49 @@ function taskQueryFixture(mode = 'safe') {
   const human = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow'); f.context.awaitApproval = human
   const original = f.runner.getMockImplementation()!
   f.runner.mockImplementation(async (config, argv, signal) => {
+    if (argv[0] === 'read' && argv.includes('--ref') && JSON.parse(argv[argv.indexOf('--fields-json') + 1]!).length === 1) return { ok: true, output: {
+      tab_id: 7, page_url: 'https://example.com/search', frame_url: mode === 'iframe' ? 'https://example.com/embedded-account' : 'https://example.com/search', frame_id: mode === 'same-url-iframe' ? 'CHILD-FRAME' : 'MAIN-FRAME', scope: 'current_dom', truncated: false,
+      items: [{ ref: mode === 'invalid-canonical' ? 'not-a-dom-ref' : '@e999', values: { present: true }, redacted: [] }] } }
     if (argv[0] !== 'read' || !argv.includes('--selector')) return original(config, argv, signal)
     expect(argv[argv.indexOf('--max-nodes') + 1]).toBe('2')
     const selector = argv[argv.indexOf('--selector') + 1]!, targetOnly = JSON.parse(argv[argv.indexOf('--fields-json') + 1]!).length === 1, form = selector.startsWith('form:')
     if (mode === 'unavailable' && form) return { ok: false, code: 'read_failed', output: {} }
     const values: Record<string, unknown> = targetOnly ? { present: true } : { present: true, target: true, sensitive: mode === 'sensitive', method: form && mode === 'post' ? 'post' : form && mode === 'get' ? 'get' : null, action: form && mode === 'cross' ? 'https://other.example/submit' : null, class: 'search_form', id: null, role: null, 'aria-label': null, searchInput: true, label: '公开公告关键词 搜索 查询公告' }
-    const items = form && !['post', 'sensitive', 'cross', 'get'].includes(mode) ? [] : [{ ref: '@e900', values, redacted: [] }]
+    const items = form && !['post', 'sensitive', 'cross', 'get'].includes(mode) ? [] : [{ ref: targetOnly ? mode === 'substitute' ? '@e777' : '@e999' : '@e900', values, redacted: [] }]
     if (mode === 'duplicate' && targetOnly) items.push({ ref: '@e901', values: { ...values, method: 'post', sensitive: true }, redacted: [] })
-    return { ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search', scope: 'current_dom', truncated: mode === 'truncated', items } }
+    return { ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search', frame_id: 'MAIN-FRAME', scope: 'current_dom', truncated: mode === 'truncated', items } }
   })
   return { ...f, human, authorization, host: new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) }) }
 }
+
+it('requires CLI0.5 for a confirmed task scope even when its verification policy is strict', async () => {
+  const f = taskQueryFixture(), scope = { ...f.context.executionGrant!.browserScope!, verificationPolicy: 'strict' as const }, task = f.repository.get('task')!
+  f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant, browserScope: scope })
+  f.repository.update(task.id, task.revision, value => ({ ...value, authority: { ...value.authority!, browserScope: scope } }))
+  f.config.version = '0.4.0'
+  expect(await f.execute('browser_session_start')).toMatchObject({ isError: true, output: { code: 'browser_target_policy_upgrade_required' } })
+  expect(f.runner.mock.calls.some(([, argv]) => ['session', 'read', 'fill'].includes(argv[0]!))).toBe(false)
+  expect(f.human).not.toHaveBeenCalled()
+})
+
+it.each(['daemon', 'extension'].flatMap(peer => ['strict_task_scope', 'legacy_target'].map(kind => ({ peer, kind }))))('allows bare observation but blocks native-read mutation with protocol1.8: $peer/$kind', async ({ peer, kind }) => {
+  const f = kind === 'strict_task_scope' ? taskQueryFixture() : publicQueryFixture()
+  if (kind === 'strict_task_scope') {
+    const scope = { ...f.context.executionGrant!.browserScope!, verificationPolicy: 'strict' as const }, task = f.repository.get('task')!
+    f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant, browserScope: scope })
+    f.repository.update(task.id, task.revision, value => ({ ...value, authority: { ...value.authority!, browserScope: scope } }))
+  }
+  const original = f.runner.getMockImplementation()!
+  f.runner.mockImplementation(async (config, argv, signal) => {
+    const result = await original(config, argv, signal)
+    return argv[0] === 'status' ? { ...result, output: { ...result.output as object, protocol_version: peer === 'daemon' ? '1.8' : '1.9', browsers: [{ instance_id: 'browser-one', browser_name: 'Chrome', extension_protocol_version: peer === 'extension' ? '1.8' : '1.9' }] } } : result
+  })
+  expect(await f.execute('browser_session_start')).toMatchObject({ output: { sessionId: 'session-one' } })
+  expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })).toMatchObject({ output: { status: 'succeeded' } })
+  for (const [name, extra] of [['browser_fill', {}], ['browser_authorize_action', { action: 'fill', access: 'public_query' }]] as const) expect(await f.execute(name, { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测', ...extra })).toMatchObject({ isError: true, output: { code: 'browser_target_policy_upgrade_required' } })
+  expect(f.runner.mock.calls.some(([, argv]) => ['read', 'fill'].includes(argv[0]!))).toBe(false)
+  expect(f.repository.operations('task', 'browser_scope_action_authorization')).toHaveLength(0)
+})
 
 it.each(['safe', 'get'])('derives new query values from a real persisted task binding without invented human approval (%s)', async mode => {
   const f = taskQueryFixture(mode); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' }); f.setElement('<input type="search" placeholder="输入关键字，搜索公告或新闻">')
@@ -1097,13 +1129,17 @@ it.each(['safe', 'get'])('derives new query values from a real persisted task bi
   expect(await f.host.execute({ toolName: 'browser_authorize_action', callId: 'declare', arguments: { ...args, action: 'fill', access: 'public_query' } }, f.context)).toMatchObject({ item: { output: { status: 'succeeded', authorizationSource: 'task_scope', origin: 'https://example.com', scopeAuthorizationReceiptId: f.authorization.receiptId } } })
   for (const value of ['工程监测', '工程测量']) expect(await f.host.execute({ toolName: 'browser_fill', callId: value, arguments: { ...args, value } }, f.context)).toMatchObject({ item: { isError: false, output: { status: 'succeeded' } } })
   expect(f.human).not.toHaveBeenCalled(); expect(f.repository.humanRequests('approval', false)).toHaveLength(0)
+  const proofReads = f.runner.mock.calls.map(([, argv]) => argv).filter(argv => argv[0] === 'read' && JSON.parse(argv[argv.indexOf('--fields-json') + 1]!).length === 1)
+  // The observation alias @e1 differs from canonical @e999; canonical identity is paired, not guessed.
+  expect(proofReads[0]![proofReads[0]!.indexOf('--ref') + 1]).toBe('@e1')
+  expect(proofReads[1]).toContain('--selector')
   const scopes = f.repository.operations('task', 'browser_scope_action_authorization'), derived = f.repository.operations('task', 'browser_derived_action_authorization')
   expect(scopes).toHaveLength(2); expect(derived).toHaveLength(2)
   for (const row of scopes) { expect(row.fingerprint).toBe(operationFingerprint(row.request)); expect(row.result).toMatchObject({ authorizationSource: 'task_scope', accountState: 'unknown', access: 'public_query', sourceTaskId: 'task' }); expect(row.result).not.toHaveProperty('approvalId'); expect(derived.find(item => item.request?.scopeActionReceiptId === row.id)?.result).toMatchObject({ scopeAuthorizationReceiptId: f.authorization.receiptId, scopeActionReceiptId: row.id, access: 'public_query' }) }
   expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(2)
 })
 
-it.each(['post', 'sensitive', 'cross', 'duplicate', 'truncated', 'unavailable'])('requires actual unique/form/container proof despite a clear search label: %s', async mode => {
+it.each(['post', 'sensitive', 'cross', 'duplicate', 'truncated', 'unavailable', 'substitute', 'iframe', 'same-url-iframe', 'invalid-canonical'])('requires actual unique/form/container proof despite a clear search label: %s', async mode => {
   const f = taskQueryFixture(mode); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' }); f.setElement('<input type="search" class="search" placeholder="公开查询">')
   expect(await f.host.execute({ toolName: 'browser_fill', callId: 'denied', arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测' } }, f.context)).toMatchObject({ item: { isError: true } })
   expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(0); expect(f.repository.operations('task', 'browser_scope_action_authorization')).toHaveLength(0); expect(f.human).not.toHaveBeenCalled()
