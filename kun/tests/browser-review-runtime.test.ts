@@ -14,7 +14,7 @@ import type { ExecutionGrant } from '../src/contracts/permissions.js'
 import { operationFingerprint } from '../src/services/task-run-repository.js'
 
 const page = vi.hoisted(() => ({ session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0,
-  htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false,
+  htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false, hiddenHtmlVersion: 0, observationRefVersion: 1, controlValue: '轨道监测',
   largePage: false, emptyObservation: false, emptyPage: false, targetTruncated: false, lastFill: {} as Record<string, unknown>,
   modelCallsAtUnknown: 0, navigations: 0, clickUnknown: false, notSent: false, beforeUnknown: undefined as (() => void) | undefined }))
 vi.mock('../src/services/browser-skill-cli.js', async original => ({
@@ -35,7 +35,8 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
       if (page.clickUnknown) { expect(args).toContain('--settle'); expect(args[args.indexOf('--policy') + 1]).toBe('target') }
       else { expect(args).not.toContain('--policy'); expect(args).not.toContain('--settle') }
       return { ok: true, output: { context_id: `review-context-${++page.context}`, ...(page.clickUnknown ? { control_policy: 'target' } : {}),
-        observation: { text: page.emptyObservation ? ' ' : page.clickUnknown ? '@e1 button 查询公开公告。仅供合成公开查询。' : '@e1 公开关键词输入框。仅供合成公开查询，已填写轨道监测。' } } }
+        observation: { text: page.emptyObservation ? ' ' : page.htmlChanged ? '@e1 查询结果已更新。'
+          : page.clickUnknown ? `@e${page.observationRefVersion} button 查询公开公告。仅供合成公开查询。` : `@e${page.observationRefVersion} searchbox "公开关键词输入框" value="${page.controlValue}"，已填写${page.controlValue}。` } } }
     }
     if (args[0] === 'read') {
       expect(page.clickUnknown).toBe(true)
@@ -48,7 +49,7 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
     if (args[0] === 'get-html') { page.reads++; return { ok: true, output: { tab_id: 1, truncated: args.includes('--ref') ? page.targetTruncated : page.largePage,
       html: args.includes('--ref') ? page.targetChanged ? '<input name="password">' : page.clickUnknown ? '<button aria-label="查询公开公告">查询公开公告</button>' : '<input aria-label="公开关键词">'
         : page.emptyPage ? '' : page.largePage ? '<html><head><title>合成公开查询</title><script>' + 'x'.repeat(524000)
-          : `<html><title>合成公开查询</title><body>${page.htmlChanged ? '页面已改变' : '公开查询结果'}<input aria-label="公开关键词"></body></html>`,
+          : `<html><title>合成公开查询</title><body data-render="${page.hiddenHtmlVersion}"><!-- build ${page.hiddenHtmlVersion} --><script>window.renderNonce=${page.hiddenHtmlVersion}</script>${page.htmlChanged ? '页面已改变' : '公开查询结果'}<input aria-label="公开关键词"></body></html>`,
       byte_size: page.largePage && !args.includes('--ref') ? 3_283_929 : undefined } } }
     if (args[0] === 'fill') { page.beforeUnknown?.(); page.writes++; return page.acknowledge ? { ok: true, output: { filled: true } } : { ok: false, code: 'simulated_lost_ack', outcomeUnknown: true } }
     if (args[0] === 'click') { expect(args).not.toContain('--depends-on'); expect(JSON.parse(args[args.indexOf('--expect') + 1]!)).toEqual([
@@ -62,7 +63,7 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
   })
 }))
 const cleanup: Array<() => Promise<unknown>> = []
-afterEach(async () => { while (cleanup.length) await cleanup.pop()!(); vi.useRealTimers(); vi.unstubAllEnvs(); Object.assign(page, { session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0, htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false,
+afterEach(async () => { while (cleanup.length) await cleanup.pop()!(); vi.useRealTimers(); vi.unstubAllEnvs(); Object.assign(page, { session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0, htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false, hiddenHtmlVersion: 0, observationRefVersion: 1, controlValue: '轨道监测',
   largePage: false, emptyObservation: false, emptyPage: false, targetTruncated: false, lastFill: {}, modelCallsAtUnknown: 0, navigations: 0, clickUnknown: false, notSent: false, beforeUnknown: undefined }) })
 
 type EscapeTool = 'browser_navigate' | 'browser_session_stop' | 'browser_observe' | 'echo' | 'schedule_task'
@@ -390,6 +391,18 @@ it.each(['paused', 'stalled'] as const)('records an incomplete public query revi
   expect(page.writes).toBe(1)
 }, 30000)
 
+it.each(['completed', 'not_completed'])('compares the displayed semantic review, allowing hidden HTML and generated refs to change for %s', async decision => {
+  const f = await fixture()
+  await f.api(`/v1/tasks/${f.task().id}/pause`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'semantic-pause' })
+  const before = f.modelCalls(), review = await f.verify('semantic-review')
+  page.hiddenHtmlVersion++
+  page.observationRefVersion = 202
+  const response = await f.confirm(review, 'semantic-confirm', f.task().revision, decision)
+  expect(response.status, await response.clone().text()).toBe(200)
+  expect(await response.json()).toMatchObject({ status: 'verified', outcome: decision === 'not_completed' ? 'not_completed' : 'succeeded' })
+  expect(f.task().status).toBe('paused'); expect(page.writes).toBe(1); expect(f.modelCalls()).toBe(before)
+}, 20000)
+
 it('reviews a large page using a fresh visible observation and exact target without claiming a full-page scan or resolving automatically', async () => {
   const f = await fixture()
   await f.api(`/v1/tasks/${f.task().id}/pause`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'large-page-paused' })
@@ -397,8 +410,8 @@ it('reviews a large page using a fresh visible observation and exact target with
   const before = f.modelCalls()
   const review = await f.verify('large-page-review')
   expect(review.status).toBe('outcome_unknown')
-  expect(review.browserReview?.observationText).toContain('未读取整页')
-  expect(review.browserReview?.observationText).toContain('不证明原操作已成功')
+  expect(review.browserReview?.observationText).toContain('仅包含实际读取部分')
+  expect(review.browserReview?.observationText).toContain('检查不会重复执行操作')
   expect(review.browserReview?.observationText).toContain('已填写轨道监测')
   expect(review.browserReview?.observationText).not.toContain('x'.repeat(100))
   const saved = f.runtime.taskRepository!.operations(f.task().id, 'browser_action_review').find(item => item.status === 'succeeded')!
@@ -431,7 +444,7 @@ it.each(['missing-observation', 'empty', 'target-truncated', 'target-changed', '
   expect(f.task().status).toBe('stalled'); expect(page.writes).toBe(1); expect(f.modelCalls()).toBe(before)
 }, 20000)
 
-it.each((['expired', 'target', 'page', 'revoked', 'cancelled', 'browser'] as const).flatMap(condition => ['confirmed_complete', 'not_completed'].map(decision => ({ condition, decision }))))('keeps $condition $decision review unknown without replay or resumption', async ({ condition, decision }) => {
+it.each((['expired', 'target', 'page', 'input', 'revoked', 'cancelled', 'browser'] as const).flatMap(condition => ['confirmed_complete', 'not_completed'].map(decision => ({ condition, decision }))))('keeps $condition $decision review unknown without replay or resumption', async ({ condition, decision }) => {
   const f = await fixture()
   const review = await f.verify()
   expect(review.browserReview).toBeTruthy()
@@ -439,6 +452,7 @@ it.each((['expired', 'target', 'page', 'revoked', 'cancelled', 'browser'] as con
   if (condition === 'expired') { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() + 121000) }
   if (condition === 'target') page.targetChanged = true
   if (condition === 'page') page.htmlChanged = true
+  if (condition === 'input') page.controlValue = '另一项查询'
   if (condition === 'revoked') f.runtime.taskRepository!.update(f.task().id, f.task().revision, task => ({ ...task, authority: { ...task.authority!, revokedAt: new Date().toISOString() } }))
   if (condition === 'cancelled') await f.api(`/v1/tasks/${f.task().id}/cancel`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'cancel' })
   if (condition === 'browser') f.options.capabilities.browserSkill.browserInstanceId = 'other-browser'

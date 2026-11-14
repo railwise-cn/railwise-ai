@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import sax from 'sax'
 import { BrowserOperationConfirmation, type BrowserOperationReview, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 import { BrowserScheduleActionSchema, type BrowserScheduleAction } from '../contracts/browser-schedule-actions.js'
 import { ExecutionGrantSchema, type ExecutionGrant } from '../contracts/permissions.js'
@@ -243,18 +244,82 @@ export class BrowserOperationVerificationService {
     if (target.truncated || typeof target.html !== 'string' || sha(target.html) !== action.elementHash) fail('browser_review_target_changed')
     const page = await read('browser_get_html', { sessionId, maxBytes: 524288 })
     const observedText = object(object(observation.observation).observation).text
-    const hasObservation = typeof observedText === 'string' && Boolean(observedText.trim())
-    // A large page can still supply a fresh visible observation and the exact
-    // authorized target. Never derive review text from an incomplete HTML prefix.
-    if (typeof page.html !== 'string' || page.truncated && !hasObservation) fail('browser_review_read_failed')
-    const sourceText = hasObservation ? observedText as string
-      : page.html.replace(/<(?:script|style)\b[^>]*>[\s\S]*?<\/(?:script|style)>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-    if (!sourceText.trim()) fail('browser_review_read_failed')
-    const coverage = { source: hasObservation ? 'visible_observation' : 'html', htmlTruncated: page.truncated === true,
-      textTruncated: sourceText.length > 12000 }
-    const text = `只读核验范围：当前页面摘要与原目标。${coverage.htmlTruncated ? '页面 HTML 超出读取上限，未读取整页。' : ''}${coverage.textTruncated ? '摘要仅展示前 12000 个字符。' : ''}这不是完整页面扫描，也不证明原操作已成功；请核对下面的实际内容后再决定是否确认。\n\n${sourceText.slice(0, 12000)}`
-    return { text, coverage, hash: operationFingerprint({ pageUrl: action.pageUrl, html: page.html, text, coverage, elementHash: action.elementHash }) }
+    if (typeof page.html !== 'string') fail('browser_review_read_failed')
+    const { text, coverage } = browserReviewSemanticContent(page.html, page.truncated === true, observedText)
+    // Hash precisely the content shown for review, plus its immutable location
+    // and original authorization. Unshown HTML bytes/tail and generated refs
+    // are not evidence the user was asked to confirm.
+    return { text, coverage, hash: operationFingerprint({ pageUrl: action.pageUrl, sessionId, tabId: binding.dispatch.request!.tabId,
+      targetRef, text, coverage, elementHash: action.elementHash, originalInputHash: action.valueHash }) }
   }
+}
+
+/** Pure projection shared by the displayed review and its comparison; never evaluates page code. */
+export function browserReviewSemanticContent(html: string, htmlTruncated: boolean, observedText: unknown) {
+  const observation = typeof observedText === 'string' ? observedText : ''
+  const normalizeRef = (line: string) => line.replace(/^(\s*)@e\d+\s+/, '$1').replace(/^(\s*)L\d+\s+/, '$1layer ')
+  const quoteState = (line: string, quoted: boolean) => {
+    for (let at = 0; at < line.length; at++) {
+      if (line[at] === '\\') at++
+      else if (line[at] === '"') quoted = !quoted
+    }
+    return quoted
+  }
+  const lines: string[] = []
+  let quoted = false
+  for (const line of observation.split(/\r?\n/)) {
+    const continuation = quoted
+    quoted = quoteState(line, quoted)
+    if (!continuation && /^\s*@(?:vom|view|layers)\b/.test(line)) continue
+    lines.push(continuation ? line : normalizeRef(line))
+  }
+  const normalizedObservation = lines.join('\n').trim()
+  if (!normalizedObservation) fail('browser_review_read_failed')
+  const controlLines: string[] = []
+  let controlIndent = -1, controlQuoted = false
+  for (const line of lines) {
+    const indent = line.length - line.trimStart().length
+    if (!controlQuoted) {
+      if (!line.trim()) continue
+      if (/^\s*(?:searchbox|textbox|combobox|checkbox|radio|switch|spinbutton|slider|listbox|option|input|textarea|select)\b/.test(line)) controlIndent = indent
+      else if (indent <= controlIndent) controlIndent = -1
+    }
+    if (controlIndent >= 0) {
+      controlLines.push(line)
+      controlQuoted = quoteState(line, controlQuoted)
+    }
+  }
+  // Keep values and states exact (including spaces inside quoted values).
+  // Do not truncate important controls behind the page-summary budget.
+  const controls = controlLines.join('\n')
+  if (controls.length > 12000) fail('browser_review_read_failed')
+  let sourceText: string
+  if (htmlTruncated) {
+    if (!normalizedObservation) fail('browser_review_read_failed')
+    sourceText = normalizedObservation
+  } else {
+    const chunks: string[] = [], ignored: string[] = []
+    const parser = sax.parser(false, { lowercase: true })
+    parser.onopentag = node => {
+      const name = node.name.toLowerCase()
+      if (['script', 'style'].includes(name) || ignored.length) ignored.push(name)
+      else chunks.push(' ')
+    }
+    parser.onclosetag = name => {
+      if (ignored.length) { if (ignored.at(-1) === name.toLowerCase()) ignored.pop() }
+      else chunks.push(' ')
+    }
+    parser.ontext = text => { if (!ignored.length) chunks.push(text) }
+    parser.oncdata = text => { if (!ignored.length) chunks.push(text) }
+    parser.onerror = () => fail('browser_review_read_failed')
+    try { parser.write(html).close() } catch { fail('browser_review_read_failed') }
+    sourceText = chunks.join('').replace(/\s+/g, ' ').trim()
+  }
+  if (!sourceText) fail('browser_review_read_failed')
+  const coverage = { source: htmlTruncated ? 'visible_observation' : 'html_semantic_text', htmlTruncated,
+    textTruncated: sourceText.length > 12000, controlsSource: 'visible_observation' }
+  const text = `只读核验范围：${htmlTruncated ? '当前可见内容摘要，仅包含实际读取部分。' : '当前页面正文摘要；摘要含已载入的文字，部分可能不在当前视口。'}同时核对原目标和输入状态。${coverage.textTruncated ? '正文仅展示前 12000 个字符；未展示的尾部不参与本次核验。' : ''}请对照原网页选择结果；检查不会重复执行操作。\n\n${sourceText.slice(0, 12000)}\n\n当前读取的输入与选项状态（完整展示）：\n${controls || '本次未读取到可展示的输入或选项状态。'}`
+  return { text, coverage }
 }
 
 function sha(value: string): string { return createHash('sha256').update(value).digest('hex') }
