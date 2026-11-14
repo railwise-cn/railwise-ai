@@ -50,3 +50,27 @@ it('does not allow a sensitive container, malformed page or oversized target', (
   expect(classifyPublicQueryAction({ action: 'fill', html: '<input type="search">', value: 'x', pageUrl: 'https://public.example/?token=private', context })).toBeUndefined()
   expect(classify('<button>' + 'x'.repeat(8192) + '</button>')).toBeUndefined()
 })
+
+it.each(['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部'])('recognizes %s only as the proved native date component after common guards', label => {
+  expect(classify(`<div class="level-content-timeItem active">${label}</div>`, 'click', { filter: true, dateFacet: true })).toBe('filter_control')
+  expect(classify(`<div class="level-content-timeItem active">${label}</div>`, 'click', { filter: true, dateFacet: true, sensitive: true })).toBeUndefined()
+})
+
+it.each([
+  '<div class="level-content-timeItem">任意时间</div>', '<div class="level-content-timeItem">提交审批</div>',
+  '<div class="other">今日</div>', '<span class="level-content-timeItem">今日</span>',
+  '<div class="level-content-timeItem" disabled>今日</div>', '<div class="level-content-timeItem" aria-disabled="true">今日</div>',
+  '<div class="level-content-timeItem" form="account">今日</div>', '<div class="level-content-timeItem" formmethod="post">今日</div>',
+  '<div class="level-content-timeItem" formaction="https://outside.example/search">今日</div>',
+  '<div class="level-content-timeItem" href="/account/delete">今日</div>'
+])('does not let the host date marker bypass component or universal safety guards: %s', html => {
+  expect(classify(html, 'click', { filter: true, dateFacet: true })).toBeUndefined()
+})
+
+it('does not infer the host-only complete date proof from text, class or page claims', () => {
+  const html = '<div class="level-content-timeItem">今日</div>'
+  expect(classify(html, 'click', { filter: true })).toBeUndefined()
+  expect(classify(html, 'click', { dateFacet: true, filter: false })).toBeUndefined()
+  expect(classify(html, 'click', { dateFacet: true, filter: true, targetPresent: false })).toBeUndefined()
+  expect(classify('<div class="level-content-timeItem" data-date-facet="true">今日</div>', 'click', { filter: true })).toBeUndefined()
+})

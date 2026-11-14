@@ -339,13 +339,14 @@ export function buildBrowserSkillToolProvider(options: {
         original.frame_url !== page.sourceUrl || typeof original.frame_id !== 'string' || !original.frame_id || !Array.isArray(original.items) || original.items.length !== 1) return undefined
       const actual = object(original.items[0])
       if (!Array.isArray(actual.redacted) || actual.redacted.length || object(actual.values).present !== true || typeof actual.ref !== 'string' || !/^@?e\d+$/.test(actual.ref)) return undefined
-      if (element.tag === 'div' && element.label === '近3日' && attributes.class?.trim() === 'level-content-timeItem') {
+      const dateLabels = ['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部']
+      if (element.tag === 'div' && dateLabels.includes(element.label) && attributes.class?.split(/\s+/).includes('level-content-timeItem')) {
         // This date facet has several identically styled siblings. Native read's
         // scalar descendant fields reject that multiplicity; prove the bounded
         // complete group and exact original canonical node instead of guessing
         // a unique selector from its label or inventing a new element reference.
-        const labels = ['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部']
-        const members = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--selector', locator,
+        const labels = dateLabels, dateLocator = 'div.level-content-timeItem'
+        const members = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--selector', dateLocator,
           '--fields-json', JSON.stringify([{ key: 'present', read: 'exists' }, { key: 'label', read: 'text' }]), '--max-nodes', '8', '--max-bytes', '8192'], context)
         if (members.scope !== 'current_dom' || members.truncated !== false || members.tab_id !== page.tabId || members.page_url !== page.sourceUrl ||
           members.frame_url !== page.sourceUrl || members.frame_id !== original.frame_id || !Array.isArray(members.items) || members.items.length !== labels.length) return undefined
@@ -356,14 +357,14 @@ export function buildBrowserSkillToolProvider(options: {
             values.present !== true || typeof values.label !== 'string' || values.label.replace(/\s+/g, '') !== labels[index]) return undefined
           refs.add(item.ref.replace(/^@/, ''))
         }
-        if (String(object(members.items[1]).ref).replace(/^@/, '') !== actual.ref.replace(/^@/, '')) return undefined
+        if (String(object(members.items[labels.indexOf(element.label)]).ref).replace(/^@/, '') !== actual.ref.replace(/^@/, '')) return undefined
         // Exactly one direct parent for all matched members and no enclosing
         // form are required. A POST/account/form control is never this rule.
-        if (await probe(`form:has(${locator})`, false, true)) return undefined
-        const parent = await probe(`*:has(> ${locator})`, false, true)
+        if (await probe(`form:has(${dateLocator})`, false, true)) return undefined
+        const parent = await probe(`*:has(> ${dateLocator})`, false, true)
         if (!parent || parent.frameId !== original.frame_id || parent.sensitive !== false || parent.method || parent.action ||
           String(parent.class ?? '').trim() !== 'level-content' || typeof parent.label !== 'string' || parent.label.replace(/\s+/g, '') !== labels.join('')) return undefined
-        return { search: false, pagination: false, filter: true, sort: false, sensitive: false, targetPresent: true }
+        return { search: false, pagination: false, filter: true, dateFacet: true, sort: false, sensitive: false, targetPresent: true }
       }
       const selected = await probe(locator, true)
       if (!selected || selected.canonicalRef !== actual.ref.replace(/^@/, '') || selected.frameId !== original.frame_id) return undefined

@@ -1,7 +1,9 @@
 import { browserPublicQueryTargetBlocked } from './browser-approval-summary.js'
 import type { PublicQueryActionRule } from '../services/browser-public-query-authority.js'
 
-export type PublicQueryDomContext = { search: boolean; pagination: boolean; filter: boolean; sort: boolean; sensitive: boolean; targetPresent: boolean }
+export type PublicQueryDomContext = { search: boolean; pagination: boolean; filter: boolean; sort: boolean; sensitive: boolean; targetPresent: boolean;
+  /** Host-only proof of the complete native date group, canonical target, frame and safe parent. */
+  dateFacet?: boolean }
 const decode = (s: string) => s.replace(/&#(x[0-9a-f]+|\d+);/gi, (_m, n: string) => { const cp = Number.parseInt(n[0].toLowerCase() === 'x' ? n.slice(1) : n, n[0].toLowerCase() === 'x' ? 16 : 10); return cp <= 0x10ffff ? String.fromCodePoint(cp) : '' }).replace(/&(?:nbsp|amp|quot|apos|lt|gt);/gi, x => ({ '&nbsp;': ' ', '&amp;': '&', '&quot;': '"', '&apos;': "'", '&lt;': '<', '&gt;': '>' })[x.toLowerCase()] ?? '')
 export function publicQueryElement(html: string) {
   const open = /^\s*<([a-z][\w:-]*)\b([^>]*)>/i.exec(html)
@@ -32,7 +34,9 @@ export function classifyPublicQueryAction(input: { action: 'click' | 'fill'; htm
   if (a.formaction) { try { const url = new URL(a.formaction, input.pageUrl); if (!['http:', 'https:'].includes(url.protocol) || url.origin !== new URL(input.pageUrl).origin || url.username || url.password || /(?:delete|remove|submit|account|login|payment|upload|approve)/i.test(url.pathname)) return undefined } catch { return undefined } }
   const context = input.context?.targetPresent ? input.context : undefined
   const cue = [a.id, a.name, a.placeholder, a['aria-label'], a.title].filter(Boolean).join(' ')
-  const clickable = ['a', 'button', 'option'].includes(tag) || ['div', 'span'].includes(tag) && Boolean(context && (context.search && search.test(label) || context.pagination && pageLabel.test(label) || context.filter && filter.test(cue + label) || context.sort && sort.test(cue + label))) || ['button', 'link', 'option', 'tab', 'checkbox', 'radio'].includes(a.role ?? '') || tag === 'input' && ['submit', 'button', 'radio', 'checkbox'].includes(type)
+  const dateFacet = context?.dateFacet === true && context.filter && tag === 'div' && a.class?.split(/\s+/).includes('level-content-timeItem') &&
+    ['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部'].includes(label)
+  const clickable = dateFacet || ['a', 'button', 'option'].includes(tag) || ['div', 'span'].includes(tag) && Boolean(context && (context.search && search.test(label) || context.pagination && pageLabel.test(label) || context.filter && filter.test(cue + label) || context.sort && sort.test(cue + label))) || ['button', 'link', 'option', 'tab', 'checkbox', 'radio'].includes(a.role ?? '') || tag === 'input' && ['submit', 'button', 'radio', 'checkbox'].includes(type)
   if (input.action === 'fill') {
     if (!['input', 'textarea', 'select'].includes(tag) || ['password', 'file', 'hidden'].includes(type) || typeof input.value !== 'string' || input.value.length > 2048 || [...input.value].some(character => character.charCodeAt(0) < 32 && ![9, 10, 13].includes(character.charCodeAt(0)))) return undefined
     if (tag === 'select') {
@@ -44,6 +48,7 @@ export function classifyPublicQueryAction(input: { action: 'click' | 'fill'; htm
     return context?.filter && filter.test(cue) ? 'filter_control' : context?.sort && sort.test(cue) ? 'sort_control' : undefined
   }
   if (!clickable) return undefined
+  if (dateFacet) return 'filter_control'
   if (search.test(label) && (context?.search || input.priorSearchInput || /(?:search|query|检索|搜索)/i.test([a.class, a.id, a.role].join(' ')))) return 'search_trigger'
   if (!label && /(?:search|query)[_-]?(?:btn|button|icon)/i.test([a.class, a.id].join(' ')) && (context?.search || input.priorSearchInput)) return 'search_trigger'
   if (pageLabel.test(label)) {

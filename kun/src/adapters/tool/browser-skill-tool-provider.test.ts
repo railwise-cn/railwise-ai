@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Window } from 'happy-dom'
 import { BrowserCapabilityConfig } from '../../contracts/browser-skill.js'
 import { TaskRunSchema } from '../../contracts/tasks.js'
 import { ExecutionGrantSchema } from '../../contracts/permissions.js'
@@ -1176,7 +1177,7 @@ function taskQueryFixture(mode = 'safe') {
   return { ...f, human, authorization, host: new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) }) }
 }
 
-it.each(['safe', 'post', 'sensitive', 'cross', 'duplicate_group', 'truncated', 'wrong_ref', 'wrong_frame', 'outside_group', 'business_label'] as const)('proves the actual seven-option date query group before task-scope click: %s', async mode => {
+it.each(['safe', 'post', 'sensitive', 'cross', 'duplicate_group', 'truncated', 'wrong_ref', 'wrong_frame', 'outside_group', 'business_label', 'redacted', 'duplicate_ref', 'wrong_page', 'parent_frame', 'wrong_parent_class'] as const)('proves the actual seven-option date query group before task-scope click: %s', async mode => {
   const f = taskQueryFixture(); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
   f.setElement('<div class="level-content-timeItem ">\n          近3日\n        </div>')
   const original = f.runner.getMockImplementation()!
@@ -1188,14 +1189,14 @@ it.each(['safe', 'post', 'sensitive', 'cross', 'duplicate_group', 'truncated', '
     // Native read's scalar descendant selector cannot stand for several siblings.
     if (fields.some(field => field.key === 'target')) return { ok: false, code: 'invalid_params', output: { code: 'invalid_params', data: { reason: 'read_field_ambiguous' } } }
     const values = { present: true, sensitive: mode === 'sensitive', method: mode === 'post' ? 'post' : null,
-      action: mode === 'cross' ? 'https://outside.example/delete' : null, class: 'level-content', id: null, role: null, 'aria-label': null,
+      action: mode === 'cross' ? 'https://outside.example/delete' : null, class: mode === 'wrong_parent_class' ? 'account-date-options' : 'level-content', id: null, role: null, 'aria-label': null,
       label: labels.join('\n') }
     const items = form ? mode === 'post' ? [{ ref: '@e500', values, redacted: [] }] : [] : parent
       ? [{ ref: '@e379', values, redacted: [] }, ...(mode === 'duplicate_group' ? [{ ref: '@e380', values, redacted: [] }] : [])]
-      : labels.map((label, index) => ({ ref: index === 1 && mode !== 'wrong_ref' ? '@e999' : `@e${200 + index}`,
-        values: { present: true, label: mode === 'outside_group' && index === 2 ? '近7日' : mode === 'business_label' && index === 2 ? '提交审批' : label }, redacted: [] }))
-    return { ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search',
-      frame_id: mode === 'wrong_frame' ? 'OTHER-FRAME' : 'MAIN-FRAME', scope: 'current_dom', truncated: mode === 'truncated', items } }
+      : labels.map((label, index) => ({ ref: index === 1 && mode !== 'wrong_ref' || mode === 'duplicate_ref' && index === 2 ? '@e999' : `@e${200 + index}`,
+        values: { present: true, label: mode === 'outside_group' && index === 2 ? '近7日' : mode === 'business_label' && index === 2 ? '提交审批' : label }, redacted: mode === 'redacted' ? ['label'] : [] }))
+    return { ok: true, output: { tab_id: 7, page_url: mode === 'wrong_page' ? 'https://example.com/other' : 'https://example.com/search', frame_url: 'https://example.com/search',
+      frame_id: mode === 'wrong_frame' || mode === 'parent_frame' && parent ? 'OTHER-FRAME' : 'MAIN-FRAME', scope: 'current_dom', truncated: mode === 'truncated', items } }
   })
   const result = await f.host.execute({ toolName: 'browser_click', callId: 'date-filter', arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e345' } }, f.context)
   expect(result.item).toMatchObject({ isError: mode !== 'safe' })
@@ -1207,6 +1208,51 @@ it.each(['safe', 'post', 'sensitive', 'cross', 'duplicate_group', 'truncated', '
     expect(authorizations[0].request).toMatchObject({ rule: 'filter_control' })
     expect(authorizations[0].result).toMatchObject({ authorizationSource: 'task_scope' })
   }
+})
+
+it('does not accept a model-supplied date facet proof in tool arguments', async () => {
+  const f = taskQueryFixture()
+  await expect(f.execute('browser_click', { sessionId: 'session-one', contextId: 'context-one', target: '@e345', dateFacet: true })).rejects.toThrow('dateFacet')
+  expect(f.runner).not.toHaveBeenCalled()
+  expect(f.human).not.toHaveBeenCalled()
+})
+
+it.each(['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部'].flatMap(label => [false, true].map(selected => ({ label, selected }))))('matches date component CSS tokens and the actual canonical member: $label selected=$selected', async ({ label, selected }) => {
+  const f = taskQueryFixture(); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+  const window = new Window({ url: 'https://example.com/search' })
+  const labels = ['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部'], targetIndex = labels.indexOf(label)
+  const activeIndex = selected ? targetIndex : (targetIndex + 1) % labels.length
+  window.document.body.innerHTML = `<div class="level-content">${labels.map((text, index) => `<div class="level-content-timeItem ${index === activeIndex ? 'active' : ''}">${text}</div>`).join('')}</div>`
+  const members = [...window.document.querySelectorAll('div.level-content-timeItem')], target = members[targetIndex]
+  f.setElement(target.outerHTML)
+  // Real CSS semantics expose the old fixture's blind spot: selected siblings
+  // do not have the exact same class attribute bytes as unselected siblings.
+  expect(window.document.querySelectorAll(`div[class="${target.getAttribute('class')}"]`)).toHaveLength(selected ? 1 : 6)
+  expect(members).toHaveLength(7)
+  const original = f.runner.getMockImplementation()!
+  f.runner.mockImplementation(async (config, argv, signal) => {
+    if (argv[0] !== 'read' || !argv.includes('--selector')) return original(config, argv, signal)
+    const selector = argv[argv.indexOf('--selector') + 1], fields = JSON.parse(argv[argv.indexOf('--fields-json') + 1]) as Array<{ key: string; read: string; selector?: string; attribute?: string }>
+    const nodes = [...window.document.querySelectorAll(selector)], maxNodes = Number(argv[argv.indexOf('--max-nodes') + 1])
+    const items = []
+    for (const node of nodes.slice(0, maxNodes)) {
+      const values: Record<string, unknown> = {}
+      for (const field of fields) {
+        const matches = field.selector ? [...node.querySelectorAll(field.selector)] : [node]
+        if (matches.length > 1) return { ok: false, code: 'invalid_params', output: { code: 'invalid_params', data: { reason: 'read_field_ambiguous' } } }
+        values[field.key] = field.read === 'exists' ? matches.length === 1 : field.read === 'attribute' ? matches[0]?.getAttribute(field.attribute!) ?? null : matches[0]?.textContent ?? null
+      }
+      items.push({ ref: node === target ? '@e999' : `@e${members.includes(node) ? 200 + members.indexOf(node) : 379}`, values, redacted: [] })
+    }
+    return { ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search', frame_id: 'MAIN-FRAME', scope: 'current_dom', truncated: nodes.length > maxNodes, items } }
+  })
+  try {
+    const result = await f.host.execute({ toolName: 'browser_click', callId: 'date-css', arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e345' } }, f.context)
+    expect(result.item).toMatchObject({ isError: false })
+    expect(f.human).not.toHaveBeenCalled()
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'click')).toHaveLength(1)
+    expect(f.repository.operations('task', 'browser_scope_action_authorization')[0]?.request).toMatchObject({ rule: 'filter_control' })
+  } finally { await window.happyDOM.close() }
 })
 
 it('requires CLI0.5 for a confirmed task scope even when its verification policy is strict', async () => {
