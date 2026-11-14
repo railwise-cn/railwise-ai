@@ -73,6 +73,88 @@ function publicQueryFixture() {
 }
 
 describe('typed BrowserSkill production provider', () => {
+  it.each(['partial', 'empty', 'title_only'] as const)('keeps lifecycle timeout failed and reads the original tab once as %s without navigating again', async state => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    await f.execute('browser_session_start')
+    const url = 'https://example.com/search'
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] === 'navigate') {
+        f.setUrl(url)
+        return { ok: false, code: 'browser_navigation_timeout', exitCode: 4, outcomeUnknown: false,
+          output: { tab_id: 7, url, final_url: url, reached: 'timeout' }, navigation: { tab_id: 7, url, final_url: url, reached: 'timeout' } }
+      }
+      const result = await original(config, argv, signal)
+      if (argv[0] === 'cooperate') return { ...result, output: { ...result.output as object, state: { mode: 'ready' }, settle: { outcome: 'synchronized' },
+        observation: { text: state === 'partial' ? 'A real tender result is visible' : state === 'title_only' ? '@vom 1\n@view 1920x835\n@layers 1 focus=L1\nL1 page\n  RootWebArea "浙江政府采购网"' : '' } } }
+      return result
+    })
+    const result = await f.execute('browser_navigate', { sessionId: 'session-one', url })
+    expect(result).toMatchObject({ isError: true, output: { status: 'failed', code: 'browser_navigation_timeout', stage: 'readback', exitCode: 4,
+      navigation: { reached: 'timeout', final_url: url }, sourceUrl: url, tabId: 7,
+      readback: { status: state === 'partial' ? 'partial' : 'empty', contentRead: state === 'partial', loadConfirmed: false, loadingState: 'unconfirmed', navigationReplayed: false } } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(1)
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate')).toHaveLength(1)
+    expect(f.runner.mock.calls.some(([, argv]) => ['click', 'fill', 'get-html'].includes(argv[0]))).toBe(false)
+    expect(f.repository.operations('task', 'browser_action_dispatch')).toHaveLength(0)
+  })
+
+  it.each(['revoked', 'stale_config', 'aborted', 'out_of_scope', 'different_tab', 'unknown', 'pending_readback'] as const)('does not sync/read after lifecycle timeout when %s', async boundary => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    const abort = new AbortController()
+    f.context.abortSignal = abort.signal
+    let revoked = false
+    f.context.validateExecutionGrant = async () => { if (revoked) throw Object.assign(new Error('execution_grant_revoked'), { code: 'execution_grant_revoked' }) }
+    await f.execute('browser_session_start')
+    const url = 'https://example.com/search'
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] === 'navigate') {
+        f.setUrl(url)
+        if (boundary === 'revoked') revoked = true
+        if (boundary === 'stale_config') f.config.revision += 1
+        if (boundary === 'aborted') abort.abort()
+        if (['unknown', 'pending_readback'].includes(boundary)) {
+          f.repository.beginOperation({ ownerId: 'task', idempotencyKey: boundary, kind: 'browser_action_dispatch', request: { sessionId: 'session-one' }, nowIso: new Date().toISOString() })
+          f.repository.finishOperation('task', boundary, { status: boundary === 'unknown' ? 'outcome_unknown' : 'succeeded', result: { readbackPending: true } })
+        }
+        return { ok: false, code: 'browser_navigation_timeout', exitCode: 4, outcomeUnknown: false, output: {},
+          navigation: { tab_id: boundary === 'different_tab' ? 8 : 7, url, final_url: boundary === 'out_of_scope' ? 'https://not-authorized.example/' : url, reached: 'timeout' } }
+      }
+      return original(config, argv, signal)
+    })
+    const result = await f.execute('browser_navigate', { sessionId: 'session-one', url })
+    expect(result.isError).toBe(true)
+    expect(result.output).toMatchObject({ status: 'failed', stage: 'action', navigation: { reached: 'timeout' }, exitCode: 4 })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(1)
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate')).toHaveLength(0)
+  })
+
+  it.each(['command_failure', 'readback_failure', 'readback_redirect', 'readback_tab_drift'] as const)('preserves %s stage and does not retry navigation or observation', async boundary => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    await f.execute('browser_session_start')
+    const url = 'https://example.com/search'
+    let navigated = false
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] === 'navigate') {
+        navigated = true; f.setUrl(url)
+        if (boundary === 'command_failure') return { ok: false, output: {}, code: 'browser_command_failed', exitCode: 2 }
+        if (boundary === 'readback_failure') return { ok: true, output: { final_url: url } }
+        return { ok: false, code: 'browser_navigation_timeout', exitCode: 4, outcomeUnknown: false, output: {}, navigation: { tab_id: 7, url, final_url: url, reached: 'timeout' } }
+      }
+      if (navigated && argv[0] === 'cooperate') {
+        if (boundary === 'readback_failure') return { ok: false, output: {}, code: 'browser_command_failed' }
+        f.setUrl('https://outside.example/')
+      }
+      if (navigated && argv[0] === 'tab' && boundary === 'readback_tab_drift') return { ok: true, output: { tabs: [{ tab_id: 8, url, title: 'Different tab' }] } }
+      return original(config, argv, signal)
+    })
+    const result = await f.execute('browser_navigate', { sessionId: 'session-one', url })
+    expect(result).toMatchObject({ isError: true, output: { status: 'failed', stage: boundary === 'command_failure' ? 'action' : 'readback' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(1)
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate').length).toBeLessThanOrEqual(1)
+    expect((result.output as Record<string, unknown>).evidence).toBeUndefined()
+    expect((result.output as Record<string, unknown>).readback).toBeUndefined()
+  })
+
   it('passes the exact official context/observation pair when navigating to a second authorized source under 0.5', async () => {
     const f = fixture()
     const origins = ['https://example.com', 'https://second.example']
@@ -1093,6 +1175,39 @@ function taskQueryFixture(mode = 'safe') {
   })
   return { ...f, human, authorization, host: new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) }) }
 }
+
+it.each(['safe', 'post', 'sensitive', 'cross', 'duplicate_group', 'truncated', 'wrong_ref', 'wrong_frame', 'outside_group', 'business_label'] as const)('proves the actual seven-option date query group before task-scope click: %s', async mode => {
+  const f = taskQueryFixture(); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+  f.setElement('<div class="level-content-timeItem ">\n          近3日\n        </div>')
+  const original = f.runner.getMockImplementation()!
+  const labels = ['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部']
+  f.runner.mockImplementation(async (config, argv, signal) => {
+    if (argv[0] !== 'read' || !argv.includes('--selector')) return original(config, argv, signal)
+    const selector = argv[argv.indexOf('--selector') + 1], fields = JSON.parse(argv[argv.indexOf('--fields-json') + 1]) as Array<{ key: string }>
+    const form = selector.startsWith('form:'), parent = selector.startsWith('*:')
+    // Native read's scalar descendant selector cannot stand for several siblings.
+    if (fields.some(field => field.key === 'target')) return { ok: false, code: 'invalid_params', output: { code: 'invalid_params', data: { reason: 'read_field_ambiguous' } } }
+    const values = { present: true, sensitive: mode === 'sensitive', method: mode === 'post' ? 'post' : null,
+      action: mode === 'cross' ? 'https://outside.example/delete' : null, class: 'level-content', id: null, role: null, 'aria-label': null,
+      label: labels.join('\n') }
+    const items = form ? mode === 'post' ? [{ ref: '@e500', values, redacted: [] }] : [] : parent
+      ? [{ ref: '@e379', values, redacted: [] }, ...(mode === 'duplicate_group' ? [{ ref: '@e380', values, redacted: [] }] : [])]
+      : labels.map((label, index) => ({ ref: index === 1 && mode !== 'wrong_ref' ? '@e999' : `@e${200 + index}`,
+        values: { present: true, label: mode === 'outside_group' && index === 2 ? '近7日' : mode === 'business_label' && index === 2 ? '提交审批' : label }, redacted: [] }))
+    return { ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search',
+      frame_id: mode === 'wrong_frame' ? 'OTHER-FRAME' : 'MAIN-FRAME', scope: 'current_dom', truncated: mode === 'truncated', items } }
+  })
+  const result = await f.host.execute({ toolName: 'browser_click', callId: 'date-filter', arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e345' } }, f.context)
+  expect(result.item).toMatchObject({ isError: mode !== 'safe' })
+  expect(f.human).not.toHaveBeenCalled()
+  expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'click')).toHaveLength(mode === 'safe' ? 1 : 0)
+  const authorizations = f.repository.operations('task', 'browser_scope_action_authorization')
+  expect(authorizations).toHaveLength(mode === 'safe' ? 1 : 0)
+  if (mode === 'safe') {
+    expect(authorizations[0].request).toMatchObject({ rule: 'filter_control' })
+    expect(authorizations[0].result).toMatchObject({ authorizationSource: 'task_scope' })
+  }
+})
 
 it('requires CLI0.5 for a confirmed task scope even when its verification policy is strict', async () => {
   const f = taskQueryFixture(), scope = { ...f.context.executionGrant!.browserScope!, verificationPolicy: 'strict' as const }, task = f.repository.get('task')!

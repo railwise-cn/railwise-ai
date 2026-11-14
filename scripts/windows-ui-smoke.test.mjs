@@ -428,7 +428,7 @@ for (const [name, change] of [
 test('the local model protocol fixture requests real tools and never impersonates a browser result', async () => {
   const fixture = await startWindowsTaskModelFixture()
   try {
-    const tools = ['publish_artifact', 'schedule_task', 'list_schedules'].map(name => ({ type: 'function', function: { name } }))
+    const tools = ['publish_artifact', 'read_artifact', 'schedule_task', 'list_schedules'].map(name => ({ type: 'function', function: { name } }))
     const first = await fetch(`${fixture.baseUrl}/chat/completions`, { method: 'POST', body: JSON.stringify({ tools, messages: [] }) })
     const payload = await first.text()
     assert.ok(payload.includes('publish_artifact'))
@@ -492,7 +492,7 @@ test('installed acceptance uses the real marketplace and checks the existing Run
 })
 
 // These protocol-component tests supply synthetic results only; they are not Windows business acceptance evidence.
-const browserToolNames = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_authorize_action', 'browser_fill', 'browser_click', 'browser_session_stop', 'publish_artifact', 'schedule_task', 'list_schedules']
+const browserToolNames = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_authorize_action', 'browser_fill', 'browser_click', 'browser_session_stop', 'publish_artifact', 'read_artifact', 'schedule_task', 'list_schedules']
 const fixtureMessages = (id, name, output) => [
   { role: 'assistant', tool_calls: [{ id: `smoke-${id}`, function: { name, arguments: '{}' } }] },
   ...(output === undefined ? [] : [{ role: 'tool', tool_call_id: `smoke-${id}`, content: JSON.stringify(output) }])
@@ -504,6 +504,27 @@ const fixtureCall = async response => {
   const data = (await response.text()).split('\n').find(line => line.startsWith('data: {'))
   return JSON.parse(data.slice(6)).choices[0].delta.tool_calls?.[0]
 }
+
+test('the model fixture reads exact published artifact bytes before scheduling or final delivery', async () => {
+  const fixture = await startWindowsTaskModelFixture()
+  try {
+    const names = ['publish_artifact', 'read_artifact', 'schedule_task', 'list_schedules']
+    const content = '<h1>读取实际成果，不能只凭写入说明完成</h1>'
+    const sha256 = createHash('sha256').update(content).digest('hex')
+    const published = { name: '每日网页报告.html', read_artifact: { path: '每日网页报告.html' }, bytes_written: Buffer.byteLength(content), sha256 }
+    const messages = fixtureMessages('artifact', 'publish_artifact', published)
+    const read = await fixtureCall(await fixtureRequest(fixture, names, messages))
+    assert.equal(read.function.name, 'read_artifact')
+    assert.deepEqual(JSON.parse(read.function.arguments), published.read_artifact)
+    const readback = { name: published.name, content, byte_size: published.bytes_written, sha256, truncated: false }
+    const verified = [...messages, ...fixtureMessages('read-artifact', 'read_artifact', readback)]
+    assert.equal((await fixtureCall(await fixtureRequest(fixture, names, verified))).function.name, 'schedule_task')
+    assert.deepEqual(fixture.observed.requests.at(-1).artifactReadback, { name: published.name, bytes: published.bytes_written, sha256, toolName: 'read_artifact', complete: true })
+    for (const changed of [{ content: 'different' }, { truncated: true }, { sha256: '0'.repeat(64) }, { byte_size: 0 }]) {
+      assert.equal((await fixtureRequest(fixture, names, [...messages, ...fixtureMessages('read-artifact', 'read_artifact', { ...readback, ...changed })])).status, 400)
+    }
+  } finally { await fixture.close() }
+})
 
 test('browser protocol obtains fresh real refs, asks exact persistent actions, and omits approvals for a new scheduled conversation', async () => {
   const fixture = await startWindowsTaskModelFixture({ browser: true })

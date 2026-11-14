@@ -6,7 +6,9 @@ import { promisify } from 'node:util'
 import { BrowserInstance, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 
 const executeFile = promisify(execFile)
+export type BrowserNavigationResult = { tab_id: number; url: string; reached: 'load' | 'domcontentloaded' | 'networkidle' | 'commit' | 'timeout'; final_url?: string; error_text?: string }
 export type BrowserCommandResult = { ok: boolean; output: unknown; code?: string; outcomeUnknown?: boolean;
+  exitCode?: number; navigation?: BrowserNavigationResult;
   vendorReason?: string; effectState?: 'none' | 'unknown' | 'committed';
   vendorCode?: string; vendorPhase?: string; vendorPressSent?: boolean; vendorDispatched?: boolean; vendorOperationId?: string;
   vendorFailureKind?: 'observed_content_changed' | 'context_superseded' | 'context_stale' | 'operation_settling' }
@@ -41,6 +43,18 @@ export function browserCommandDiagnostics(result: BrowserCommandResult): Pick<Br
 }
 export type BrowserCommandRunner = (config: Pick<BrowserCapabilityConfig, 'executablePath' | 'executableHash' | 'homeDirectory'>, args: readonly string[], signal?: AbortSignal) => Promise<BrowserCommandResult>
 
+/** A navigation lifecycle result is printed before exit 4; it is not an RPC error envelope. */
+function navigationResult(args: readonly string[], output: unknown): BrowserNavigationResult | undefined {
+  const value = object(output)
+  if (args[0] !== 'navigate' || value.url !== args[1] || !Number.isSafeInteger(value.tab_id) || Number(value.tab_id) < 1 ||
+    !['load', 'domcontentloaded', 'networkidle', 'commit', 'timeout'].includes(String(value.reached))) return undefined
+  const boundedText = (item: unknown) => typeof item === 'string' && item.length <= 4096 && ![...item].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
+  if (!boundedText(value.url) || value.final_url != null && !boundedText(value.final_url) || value.error_text != null && !boundedText(value.error_text)) return undefined
+  return { tab_id: Number(value.tab_id), url: String(value.url), reached: value.reached as BrowserNavigationResult['reached'],
+    ...(typeof value.final_url === 'string' ? { final_url: value.final_url } : {}),
+    ...(typeof value.error_text === 'string' ? { error_text: value.error_text } : {}) }
+}
+
 export function browserEnvironment(homeDirectory?: string): NodeJS.ProcessEnv {
   return { ...process.env, ...(homeDirectory ? { BSK_HOME: homeDirectory } : {}), BSK_AUTO_START: '0', BSK_CANCEL_ON_STDIN_CLOSE: '1' }
 }
@@ -55,13 +69,19 @@ export const runBrowserCommand: BrowserCommandRunner = async (config, args, sign
       shell: false, windowsHide: true, env: browserEnvironment(config.homeDirectory), signal,
       timeout: 35_000, maxBuffer: 4 * 1024 * 1024
     })
-    return { ok: true, output: JSON.parse(String(result.stdout)) }
+    const output: unknown = JSON.parse(String(result.stdout))
+    const navigation = navigationResult(args, output)
+    return { ok: true, output, exitCode: 0, ...(navigation ? { navigation } : {}) }
   } catch (error) {
     const failure = error as { stdout?: string; code?: string | number; killed?: boolean; name?: string }
     let output: unknown
     try { output = JSON.parse(String(failure.stdout ?? '')) } catch { output = undefined }
     const code = object(output).code
-    const result = { ok: false, output, code: typeof code === 'string' ? code : failure.killed || failure.name === 'AbortError' ? 'browser_request_timeout' : 'browser_command_failed',
+    const exitCode = typeof failure.code === 'number' && Number.isSafeInteger(failure.code) && failure.code >= 0 && failure.code <= 255 ? failure.code : undefined
+    const navigation = navigationResult(args, output)
+    const lifecycleTimeout = exitCode === 4 && navigation?.reached === 'timeout' && !failure.killed && failure.name !== 'AbortError'
+    const result = { ok: false, output, ...(exitCode !== undefined ? { exitCode } : {}), ...(navigation ? { navigation } : {}),
+      code: typeof code === 'string' ? code : failure.killed || failure.name === 'AbortError' ? 'browser_request_timeout' : lifecycleTimeout ? 'browser_navigation_timeout' : 'browser_command_failed',
       outcomeUnknown: Boolean(failure.killed || failure.name === 'AbortError' || failure.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') }
     return { ...result, ...browserCommandDiagnostics(result) }
   }

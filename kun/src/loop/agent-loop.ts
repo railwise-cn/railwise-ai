@@ -1162,7 +1162,11 @@ export class AgentLoop {
       ...formatWorkspaceInstructions(workspaceInstructions),
       ...skillResolution.instructions,
       ...(this.opts.tasks?.activeTask(threadId)?.scheduledBy ? ['This is one occurrence of a persisted schedule. Perform the original business task and deliver this occurrence’s artifacts. The schedule is already stored.'] : []),
-      ...(executionGrant?.managedArtifactRoot ? ['For requested HTML or file deliverables, use publish_artifact with a relative filename and complete content to save a verified task artifact. The app previews HTML automatically. This output namespace is available independently of workspace write permission. Deliver artifact references in the final response.'] : []),
+      ...(executionGrant?.managedArtifactRoot && effectiveToolSpecs.some(tool => tool.name === 'publish_artifact') ? [
+        'For requested HTML or file deliverables, use publish_artifact with a relative filename and complete content to save a verified task artifact. The app previews HTML automatically. This output namespace is available independently of workspace write permission. '
+        + (effectiveToolSpecs.some(tool => tool.name === 'read_artifact') ? 'Inspect saved content with read_artifact using that same relative filename, rather than generic file read or requesting workspace permission for this task-owned output. ' : '')
+        + 'Refine an existing report at the same relative filename instead of publishing duplicate drafts. Saving a draft does not complete source verification or schedule creation. Deliver artifact references in the final response.'
+      ] : []),
       ...(userInputDisabled ? [userInputUnavailableInstruction()] : []),
       ...(completionRecoveryInstruction ? [completionRecoveryInstruction] : []),
       ...optionalInstruction(webSearchCapabilityInstruction(workflowPrompt, toolSpecs)),

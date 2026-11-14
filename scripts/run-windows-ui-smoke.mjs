@@ -450,12 +450,23 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
         ...(initial ? [['authorize-fill', 'browser_authorize_action']] : []), ['fill', 'browser_fill'],
         ['read-click-target', 'browser_get_html'], ...(initial ? [['authorize-click', 'browser_authorize_action']] : []),
         ['click', 'browser_click'], ['read-results', 'browser_get_html'], ['stop', 'browser_session_stop']
-      ] : []), ['artifact', 'publish_artifact'], ...(initial ? [['schedule', 'schedule_task'], ['read-schedule', 'list_schedules']] : [])]
+      ] : []), ['artifact', 'publish_artifact'], ['read-artifact', 'read_artifact'], ...(initial ? [['schedule', 'schedule_task'], ['read-schedule', 'list_schedules']] : [])]
       const step = steps.find(([id]) => !called.has(`smoke-${id}`))
       const [id, next] = step ?? []
       if (next) assert.ok(names.includes(next), `The actual tool catalog must advertise ${next}`)
       observation.next = id ?? 'final-response'
       const session = toolOutput('start')
+      if (called.has('smoke-read-artifact')) {
+        const published = toolOutput('artifact'), read = toolOutput('read-artifact')
+        assert.ok(published?.read_artifact?.path && typeof read?.content === 'string', 'The task must read its own published artifact through the actual managed reader')
+        assert.equal(read.name, published.read_artifact.path)
+        assert.equal(read.truncated, false)
+        assert.equal(read.byte_size, published.bytes_written)
+        assert.equal(Buffer.byteLength(read.content), published.bytes_written)
+        assert.equal(read.sha256, published.sha256)
+        assert.equal(createHash('sha256').update(read.content).digest('hex'), published.sha256)
+        observation.artifactReadback = { name: read.name, bytes: read.byte_size, sha256: read.sha256, toolName: 'read_artifact', complete: true }
+      }
       let args = {}
       if (id === 'navigate') args = { sessionId: session?.sessionId, url: fixtureUrl }
       if (['read-fill-target', 'authorize-fill', 'fill', 'read-click-target', 'authorize-click', 'click'].includes(id)) {
@@ -477,6 +488,11 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
         const content = browser ? toolOutput('read-results')?.html : '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Windows 合成验收报告</title></head><body><h1>每日网页报告</h1><p>这是隔离验收生成的合成内容。</p></body></html>'
         if (browser) validateWindowsFixtureQueryHtml(content, { marker, query })
         args = { path: '每日网页报告.html', content }
+      }
+      if (next === 'read_artifact') {
+        const published = toolOutput('artifact')
+        assert.equal(published?.read_artifact?.path, '每日网页报告.html', 'Publication must return the relative managed-reader request')
+        args = published.read_artifact
       }
       const delta = next ? { tool_calls: [{ index: 0, id: `smoke-${id}`, type: 'function', function: { name: next, arguments: JSON.stringify(args) } }] }
         : { content: 'HTML 报告已保存并核验，每日计划已创建并读回，可在任务成果中查看。' }

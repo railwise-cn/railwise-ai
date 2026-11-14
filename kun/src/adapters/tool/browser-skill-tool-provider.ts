@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { BrowserExecutionScope, browserVerificationPolicy, isPublicBrowserQuery, type BrowserCapabilityConfig } from '../../contracts/browser-skill.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import { operationFingerprint, type TaskRunRepository } from '../../services/task-run-repository.js'
-import { browserCommandDiagnostics, compatibleBrowserProtocol, supportsBrowserTargetPolicy, supportsBrowserNativeRead, supportsBrowserPolicyCLI, object, parseBrowserStatus, runBrowserCommand, type BrowserCommandRunner } from '../../services/browser-skill-cli.js'
+import { browserCommandDiagnostics, compatibleBrowserProtocol, supportsBrowserTargetPolicy, supportsBrowserNativeRead, supportsBrowserPolicyCLI, object, parseBrowserStatus, runBrowserCommand, type BrowserCommandRunner, type BrowserNavigationResult } from '../../services/browser-skill-cli.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { defineLocalTool } from './local-tool-definition.js'
 import { assertGrantAllowsNetwork } from './sandbox-policy.js'
@@ -143,7 +143,8 @@ export function buildBrowserSkillToolProvider(options: {
     if (!result.ok) {
       const diagnostic = browserCommandDiagnostics(result)
       throw Object.assign(failure(diagnostic.vendorReason === 'control_authority_required' ? 'browser_control_required' : result.code ?? 'browser_command_failed'),
-        diagnostic, { outcomeUnknown: result.outcomeUnknown === true })
+        diagnostic, { outcomeUnknown: result.outcomeUnknown === true, ...(result.exitCode !== undefined ? { exitCode: result.exitCode } : {}),
+          ...(result.navigation ? { navigation: result.navigation } : {}) })
     }
     return object(result.output)
   }
@@ -176,8 +177,9 @@ export function buildBrowserSkillToolProvider(options: {
     return { id: Number(tab.tab_id), url: tab.url, title: typeof tab.title === 'string' ? tab.title : undefined }
   }
 
-  const observe = async (config: BrowserCapabilityConfig, sessionId: string, scope: BrowserExecutionScope, context: ToolHostContext) => {
+  const observe = async (config: BrowserCapabilityConfig, sessionId: string, scope: BrowserExecutionScope, context: ToolHostContext, expected?: { tabId: number; sourceUrl?: string }) => {
     const before = await activeTab(config, sessionId, scope, context, true)
+    if (expected && (before.id !== expected.tabId || expected.sourceUrl !== undefined && before.url !== expected.sourceUrl)) throw failure('browser_page_changed')
     const key = `${context.executionGrant!.taskId}:${sessionId}`
     // Only the latest complete sync can supply a navigation baseline. A failed
     // or malformed newer observation must not leave an older pair reusable.
@@ -318,14 +320,14 @@ export function buildBrowserSkillToolProvider(options: {
       ...['method', 'action', 'class', 'id', 'role', 'aria-label'].map(attribute => ({ key: attribute, read: 'attribute', attribute })),
       { key: 'searchInput', read: 'exists', selector: 'input[type="search"],input[name="q"],input[name="keyword"],input[id="title"]' },
       { key: 'label', read: 'text' }]
-    const probe = async (selector: string, targetOnly = false): Promise<(Json & { canonicalRef: string; frameId: string }) | undefined> => {
+    const probe = async (selector: string, targetOnly = false, provenDateGroup = false): Promise<(Json & { canonicalRef: string; frameId: string }) | undefined> => {
       const raw = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--selector', selector,
-        '--fields-json', JSON.stringify(targetOnly ? [{ key: 'present', read: 'exists' }] : fields), '--max-nodes', '2', '--max-bytes', '8192'], context)
+        '--fields-json', JSON.stringify(targetOnly ? [{ key: 'present', read: 'exists' }] : provenDateGroup ? fields.filter(field => !['target', 'searchInput'].includes(field.key)) : fields), '--max-nodes', '2', '--max-bytes', '8192'], context)
       if (raw.scope !== 'current_dom' || raw.truncated !== false || raw.tab_id !== page.tabId || raw.page_url !== page.sourceUrl || raw.frame_url !== page.sourceUrl || typeof raw.frame_id !== 'string' || !raw.frame_id || !Array.isArray(raw.items) || raw.items.length > 1) throw failure('browser_public_query_dom_unverified')
       if (!raw.items.length) return undefined
       const item = object(raw.items[0])
       if (!Array.isArray(item.redacted) || item.redacted.length || object(item.values).present !== true ||
-        !targetOnly && (['method', 'action', 'class', 'id', 'role', 'aria-label', 'label'].some(key => !Object.hasOwn(object(item.values), key) || object(item.values)[key] !== null && typeof object(item.values)[key] !== 'string') || typeof object(item.values).searchInput !== 'boolean')) throw failure('browser_public_query_dom_unverified')
+        !targetOnly && (['method', 'action', 'class', 'id', 'role', 'aria-label', 'label'].some(key => !Object.hasOwn(object(item.values), key) || object(item.values)[key] !== null && typeof object(item.values)[key] !== 'string') || !provenDateGroup && typeof object(item.values).searchInput !== 'boolean')) throw failure('browser_public_query_dom_unverified')
       if (typeof item.ref !== 'string' || !/^@?e\d+$/.test(item.ref)) throw failure('browser_public_query_dom_unverified')
       return { ...object(item.values), canonicalRef: item.ref.replace(/^@/, ''), frameId: raw.frame_id }
     }
@@ -337,6 +339,32 @@ export function buildBrowserSkillToolProvider(options: {
         original.frame_url !== page.sourceUrl || typeof original.frame_id !== 'string' || !original.frame_id || !Array.isArray(original.items) || original.items.length !== 1) return undefined
       const actual = object(original.items[0])
       if (!Array.isArray(actual.redacted) || actual.redacted.length || object(actual.values).present !== true || typeof actual.ref !== 'string' || !/^@?e\d+$/.test(actual.ref)) return undefined
+      if (element.tag === 'div' && element.label === '近3日' && attributes.class?.trim() === 'level-content-timeItem') {
+        // This date facet has several identically styled siblings. Native read's
+        // scalar descendant fields reject that multiplicity; prove the bounded
+        // complete group and exact original canonical node instead of guessing
+        // a unique selector from its label or inventing a new element reference.
+        const labels = ['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部']
+        const members = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--selector', locator,
+          '--fields-json', JSON.stringify([{ key: 'present', read: 'exists' }, { key: 'label', read: 'text' }]), '--max-nodes', '8', '--max-bytes', '8192'], context)
+        if (members.scope !== 'current_dom' || members.truncated !== false || members.tab_id !== page.tabId || members.page_url !== page.sourceUrl ||
+          members.frame_url !== page.sourceUrl || members.frame_id !== original.frame_id || !Array.isArray(members.items) || members.items.length !== labels.length) return undefined
+        const refs = new Set<string>()
+        for (const [index, entry] of members.items.entries()) {
+          const item = object(entry), values = object(item.values)
+          if (typeof item.ref !== 'string' || !/^@?e\d+$/.test(item.ref) || refs.has(item.ref.replace(/^@/, '')) || !Array.isArray(item.redacted) || item.redacted.length ||
+            values.present !== true || typeof values.label !== 'string' || values.label.replace(/\s+/g, '') !== labels[index]) return undefined
+          refs.add(item.ref.replace(/^@/, ''))
+        }
+        if (String(object(members.items[1]).ref).replace(/^@/, '') !== actual.ref.replace(/^@/, '')) return undefined
+        // Exactly one direct parent for all matched members and no enclosing
+        // form are required. A POST/account/form control is never this rule.
+        if (await probe(`form:has(${locator})`, false, true)) return undefined
+        const parent = await probe(`*:has(> ${locator})`, false, true)
+        if (!parent || parent.frameId !== original.frame_id || parent.sensitive !== false || parent.method || parent.action ||
+          String(parent.class ?? '').trim() !== 'level-content' || typeof parent.label !== 'string' || parent.label.replace(/\s+/g, '') !== labels.join('')) return undefined
+        return { search: false, pagination: false, filter: true, sort: false, sensitive: false, targetPresent: true }
+      }
       const selected = await probe(locator, true)
       if (!selected || selected.canonicalRef !== actual.ref.replace(/^@/, '') || selected.frameId !== original.frame_id) return undefined
       const form = await probe(`form:has(${locator})`)
@@ -491,6 +519,7 @@ export function buildBrowserSkillToolProvider(options: {
     let stage: 'preflight' | 'action' | 'readback' = 'preflight'
     let acknowledgementHash: string | undefined
     let dispatchKey: string | undefined
+    let navigationDiagnostic: { exitCode?: number; navigation?: BrowserNavigationResult } | undefined
     try {
       if (action === 'press' && browserVerificationPolicy(context.executionGrant?.browserScope?.verificationPolicy) === 'public_query_target') throw failure('browser_public_query_action_required')
       if (isRecurring(context) && action === 'press') throw failure('browser_schedule_action_scope_required')
@@ -640,7 +669,42 @@ export function buildBrowserSkillToolProvider(options: {
           if (args.contextId) argv.push('--context', String(args.contextId))
         }
         observations.delete(key)
-        await command(config, argv, context)
+        stage = 'action'
+        try { await command(config, argv, context) }
+        catch (error) {
+          const failed = error as { code?: string; exitCode?: number; navigation?: BrowserNavigationResult; outcomeUnknown?: boolean }
+          navigationDiagnostic = { ...(failed.exitCode !== undefined ? { exitCode: failed.exitCode } : {}), ...(failed.navigation ? { navigation: failed.navigation } : {}) }
+          if (failed.code !== 'browser_navigation_timeout' || failed.exitCode !== 4 || failed.navigation?.reached !== 'timeout' || failed.outcomeUnknown) throw error
+          const navigation = failed.navigation
+          // A timeout says nothing about page readiness or whether navigation occurred.
+          // Inspect only this owned tab once; never navigate again, settle an action,
+          // or treat vendor error_text (untrusted diagnostic data) as an instruction.
+          if (navigation.tab_id !== tab.id || navigation.url !== String(args.url)) throw failure('browser_page_changed')
+          if (navigation.final_url) originAllowed(navigation.final_url, scope, context)
+          context.abortSignal.throwIfAborted()
+          await context.validateExecutionGrant?.()
+          context.assertExecution?.()
+          const blocked = contextBlock(context, false)
+          if (blocked) throw failure(blocked.code)
+          if (options.repository.operations(taskId, 'browser_action_dispatch').some(receipt =>
+            !options.repository.verifiedOperationResolution(receipt) && (['prepared', 'running', 'outcome_unknown'].includes(receipt.status) ||
+              receipt.status === 'succeeded' && object(receipt.result).readbackPending === true))) throw failure('browser_readback_blocked')
+          stage = 'readback'
+          try {
+            const read = await observe(config, sessionId, scope, context, { tabId: tab.id, ...(navigation.final_url ? { sourceUrl: navigation.final_url } : {}) })
+            const contentRead = hasNavigationPageContent(read.observation)
+            return { isError: true, output: { status: 'failed', provider: 'browser-skill', action, code: 'browser_navigation_timeout', stage,
+              ...navigationDiagnostic, sessionId, ...read,
+              readback: { status: contentRead ? 'partial' : 'empty', contentRead, loadConfirmed: false, loadingState: 'unconfirmed', navigationReplayed: false },
+              message: contentRead ? '导航等待页面加载超时。已只读核对原标签，以下为实际读取的部分内容，不能据此认定页面加载完成。可继续只读检查；没有重复导航。'
+                : '导航等待页面加载超时。已只读核对原标签，但尚未读到页面正文；网址已到达也不代表内容就绪。没有重复导航。' } }
+          } catch (readError) {
+            // Preserve the original lifecycle failure separately from the readback
+            // failure; neither is converted to a successful browser observation.
+            throw Object.assign(readError instanceof Error ? readError : failure('browser_readback_blocked'), { navigationTimeout: true })
+          }
+        }
+        stage = 'readback'
       }
       if (mutation) {
         if (await pendingActionReadback(action as 'click' | 'fill', args, context)) throw failure('browser_readback_blocked')
@@ -783,6 +847,7 @@ export function buildBrowserSkillToolProvider(options: {
       if (dispatchKey && context.executionGrant?.taskId && !actionAcknowledged) options.repository.finishOperation(context.executionGrant.taskId, dispatchKey, { status: unknown ? 'outcome_unknown' : 'failed', result: { stage, ...diagnostic, ...(dispatched ? {} : { notDispatched: true }), ...(actionNotDispatched ? { actionDispatch: 'not_sent' } : {}) }, error: 'Browser action result requires verification.' })
       if (unknown && (action === 'click' || action === 'fill')) scheduleAuthority.recordUnknown(context, action)
       return { isError: true, output: { status: unknown ? 'outcome_unknown' : 'failed', provider: 'browser-skill', action, stage, ...diagnostic,
+        ...(navigationDiagnostic ?? {}), ...(object(error).navigationTimeout === true ? { navigationTimeout: true } : {}),
         ...(actionNotDispatched ? { actionDispatch: 'not_sent', notDispatched: true } : {}),
         ...(actionAcknowledged ? { actionAcknowledged: true, readbackPending: true, acknowledgementHash,
           message: '网页动作已被浏览器确认，后续读取失败。请只读重新观察原页面，不要重复动作。' } : {}),
@@ -818,6 +883,16 @@ function hasReadableBrowserContent(value: unknown): boolean {
   return Object.entries(value).some(([key, item]) => {
     if (['text', 'snapshot', 'content', 'html', 'markdown', 'baseline', 'changes'].includes(key) && typeof item === 'string') return item.trim().length > 0
     return item && typeof item === 'object' && hasReadableBrowserContent(item)
+  })
+}
+
+/** VOM headers and a document title alone are not page-body evidence. */
+function hasNavigationPageContent(value: unknown): boolean {
+  const text = object(object(value).observation).text
+  if (typeof text !== 'string') return false
+  return text.split('\n').some(line => {
+    const trimmed = line.trim()
+    return trimmed.length > 0 && !/^@(?:vom|view|layers)\b/.test(trimmed) && !/^L\d+\s+page\s*$/.test(trimmed) && !/^RootWebArea(?:\s|$)/.test(trimmed)
   })
 }
 
