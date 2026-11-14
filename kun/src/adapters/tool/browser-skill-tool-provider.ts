@@ -140,7 +140,7 @@ export function buildBrowserSkillToolProvider(options: {
     if (!result.ok) {
       const diagnostic = browserCommandDiagnostics(result)
       throw Object.assign(failure(diagnostic.vendorReason === 'control_authority_required' ? 'browser_control_required' : result.code ?? 'browser_command_failed'),
-        diagnostic, { vendorCode: result.code, outcomeUnknown: result.outcomeUnknown === true })
+        diagnostic, { outcomeUnknown: result.outcomeUnknown === true })
     }
     return object(result.output)
   }
@@ -348,7 +348,8 @@ export function buildBrowserSkillToolProvider(options: {
   const confirmedAction = async (action: 'click' | 'fill', args: Json, context: ToolHostContext) => {
     const taskId = context.executionGrant?.taskId
     const confirmed = taskId ? options.repository.operations(taskId, 'browser_action_dispatch').filter(dispatch =>
-      dispatch.request?.action === action && options.repository.verifiedOperationResolution(dispatch)?.evidence.kind === 'human_confirmation') : []
+      dispatch.request?.action === action && options.repository.verifiedOperationResolution(dispatch)?.evidence.kind === 'human_confirmation' &&
+      options.repository.verifiedOperationResolution(dispatch)?.outcome !== 'not_completed') : []
     if (!confirmed.length) return undefined
     const reviewed = await actionBinding(action, args, context)
     for (const dispatch of confirmed) {
@@ -401,6 +402,8 @@ export function buildBrowserSkillToolProvider(options: {
     const mutation = ['click', 'fill', 'press'].includes(action)
     let dispatched = false
     let actionAcknowledged = false
+    let actionNotDispatched = false
+    let finitePublicQueryAuthorized = false
     let stage: 'preflight' | 'action' | 'readback' = 'preflight'
     let acknowledgementHash: string | undefined
     let dispatchKey: string | undefined
@@ -578,6 +581,8 @@ export function buildBrowserSkillToolProvider(options: {
           receipt.request?.action === action && receipt.request?.elementHash === target.binding.elementHash && receipt.request?.valueHash === target.binding.valueHash &&
           browserVerificationPolicy(receipt.request.verificationPolicy) === verificationPolicy && Date.parse(String(object(receipt.result).expiresAt)) > Date.now()) : undefined
         const authorization = target ? savedActionApproval(target.binding) : undefined
+        // A derived receipt is produced only from an exact public_query descriptor.
+        finitePublicQueryAuthorized = Boolean(target && scoped && (derived || object(authorization?.result).access === 'public_query'))
         if (verificationPolicy === 'public_query_target' && !derived && (!authorization || object(authorization.result).access !== 'public_query')) throw failure('browser_public_query_action_required')
         const expectations = verificationPolicy === 'public_query_target' && target
           ? await publicQueryExpectations(action as 'click' | 'fill', args, context, target, config, scope) : undefined
@@ -600,20 +605,29 @@ export function buildBrowserSkillToolProvider(options: {
             const acknowledged = await command(config, [...argv], context)
             actionAcknowledged = true
             acknowledgementHash = sha256(JSON.stringify(acknowledged))
-            options.repository.finishOperation(taskId, dispatchKey, { status: 'succeeded', result: { actionAcknowledged: true, acknowledgementHash, readbackPending: true,
+            options.repository.finishOperation(taskId, dispatchKey, { status: 'succeeded', result: { ...browserCommandDiagnostics({ ok: true, output: acknowledged }), actionAcknowledged: true, acknowledgementHash, readbackPending: true,
               ...(expectations && action === 'fill' ? { publicQueryInput: { target: String(args.target), value: String(args.value), elementHash: target!.binding.elementHash, frameUrl: expectations.frameUrl } } : {}) } })
             break
           } catch (error) {
-            const diagnostic = error as { vendorReason?: string; effectState?: string; outcomeUnknown?: boolean }
+            const diagnostic = browserCommandDiagnostics({ ok: false, output: {}, ...object(error) })
+            const uncertainTransport = object(error).outcomeUnknown === true
+            if (finitePublicQueryAuthorized && !uncertainTransport && diagnostic.vendorCode && diagnostic.effectState !== 'committed' &&
+              diagnostic.vendorPressSent !== true && (diagnostic.vendorPhase === undefined || ['precondition', 'preparation'].includes(diagnostic.vendorPhase)) &&
+              (diagnostic.vendorDispatched === false || action === 'click' && diagnostic.vendorPressSent === false)) {
+              // This proves only that this authorized input was not sent. Preparation may still have effects.
+              actionNotDispatched = true
+              dispatched = false
+              throw Object.assign(failure('browser_action_not_dispatched'), diagnostic)
+            }
             // Only the pinned vendor's explicit pre-effect contract can prove no input was sent.
-            if (diagnostic.effectState !== 'none' || diagnostic.outcomeUnknown) throw error
+            if (diagnostic.effectState !== 'none' || uncertainTransport) throw error
             dispatched = false
             const canRefresh = attempt === 0 && diagnostic.vendorReason === 'cooperation_sync_required' && action !== 'press' && target
             options.repository.finishOperation(taskId, dispatchKey, { status: 'failed', result: { notDispatched: true,
-              ...browserCommandDiagnostics({ ok: false, output: {}, vendorReason: diagnostic.vendorReason, effectState: diagnostic.effectState as 'none' }), refreshExhausted: true, refreshAttempted: Boolean(canRefresh) } })
+              ...diagnostic, refreshExhausted: true, refreshAttempted: Boolean(canRefresh) } })
             dispatchKey = undefined
             if (!canRefresh) throw Object.assign(failure(diagnostic.vendorReason === 'control_authority_required' ? 'browser_control_required' : 'browser_sync_blocked'),
-              { vendorReason: diagnostic.vendorReason, effectState: diagnostic.effectState })
+              diagnostic)
             stage = 'preflight'
             try {
               await command(config, ['cooperate', 'wait', '--session', sessionId, '--tab-id', String(tab.id), '--timeout', '5s'], context)
@@ -675,9 +689,10 @@ export function buildBrowserSkillToolProvider(options: {
     } catch (error) {
       const diagnostic = browserCommandDiagnostics({ ok: false, output: {}, ...object(error) })
       const unknown = dispatched && !actionAcknowledged
-      if (dispatchKey && context.executionGrant?.taskId && !actionAcknowledged) options.repository.finishOperation(context.executionGrant.taskId, dispatchKey, { status: unknown ? 'outcome_unknown' : 'failed', result: { stage, ...diagnostic, ...(dispatched ? {} : { notDispatched: true }) }, error: 'Browser action result requires verification.' })
+      if (dispatchKey && context.executionGrant?.taskId && !actionAcknowledged) options.repository.finishOperation(context.executionGrant.taskId, dispatchKey, { status: unknown ? 'outcome_unknown' : 'failed', result: { stage, ...diagnostic, ...(dispatched ? {} : { notDispatched: true }), ...(actionNotDispatched ? { actionDispatch: 'not_sent' } : {}) }, error: 'Browser action result requires verification.' })
       if (unknown && (action === 'click' || action === 'fill')) scheduleAuthority.recordUnknown(context, action)
       return { isError: true, output: { status: unknown ? 'outcome_unknown' : 'failed', provider: 'browser-skill', action, stage, ...diagnostic,
+        ...(actionNotDispatched ? { actionDispatch: 'not_sent', notDispatched: true } : {}),
         ...(actionAcknowledged ? { actionAcknowledged: true, readbackPending: true, acknowledgementHash,
           message: '网页动作已被浏览器确认，后续读取失败。请只读重新观察原页面，不要重复动作。' } : {}),
         code: actionAcknowledged ? 'browser_readback_blocked' : typeof (error as { code?: unknown })?.code === 'string' ? (error as { code: string }).code : error instanceof Error ? error.message : 'browser_failed',

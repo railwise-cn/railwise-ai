@@ -8,6 +8,7 @@ import { BrowserInstance, type BrowserCapabilityConfig } from '../contracts/brow
 const executeFile = promisify(execFile)
 export type BrowserCommandResult = { ok: boolean; output: unknown; code?: string; outcomeUnknown?: boolean;
   vendorReason?: string; effectState?: 'none' | 'unknown' | 'committed';
+  vendorCode?: string; vendorPhase?: string; vendorPressSent?: boolean; vendorDispatched?: boolean; vendorOperationId?: string;
   vendorFailureKind?: 'observed_content_changed' | 'context_superseded' | 'context_stale' | 'operation_settling' }
 const vendorFailureMessages: Readonly<Record<string, NonNullable<BrowserCommandResult['vendorFailureKind']>>> = {
   "The action's observed content changed; synchronize and replan": 'observed_content_changed',
@@ -17,15 +18,26 @@ const vendorFailureMessages: Readonly<Record<string, NonNullable<BrowserCommandR
   'Another operation is settling on this tab': 'operation_settling'
 }
 /** Fixed vendor diagnostic scalars only; messages/recovery text can contain page data. */
-export function browserCommandDiagnostics(result: BrowserCommandResult): Pick<BrowserCommandResult, 'vendorReason' | 'effectState' | 'vendorFailureKind'> {
+export function browserCommandDiagnostics(result: BrowserCommandResult): Pick<BrowserCommandResult, 'vendorReason' | 'effectState' | 'vendorFailureKind' | 'vendorCode' | 'vendorPhase' | 'vendorPressSent' | 'vendorDispatched' | 'vendorOperationId'> {
   const data = object(object(result.output).data)
   const reason = result.vendorReason ?? data.reason
   const effect = result.effectState ?? data.effect_state
-  const message = object(result.output).message
+  const envelope = object(result.output)
+  const message = envelope.message
+  const code = result.vendorCode ?? envelope.code
+  const phase = result.vendorPhase ?? data.phase
+  const pressSent = result.vendorPressSent ?? data.press_sent
+  const dispatched = result.vendorDispatched ?? data.dispatched
+  const operationId = result.vendorOperationId ?? data.operation_id
   const kind = result.vendorFailureKind ?? (typeof message === 'string' && Object.hasOwn(vendorFailureMessages, message) ? vendorFailureMessages[message] : undefined)
   return { ...(typeof reason === 'string' && /^[a-z][a-z0-9_]{0,99}$/.test(reason) ? { vendorReason: reason } : {}),
     ...(['none', 'unknown', 'committed'].includes(String(effect)) ? { effectState: effect as 'none' | 'unknown' | 'committed' } : {}),
-    ...(kind && Object.values(vendorFailureMessages).includes(kind) ? { vendorFailureKind: kind } : {}) }
+    ...(kind && Object.values(vendorFailureMessages).includes(kind) ? { vendorFailureKind: kind } : {}),
+    ...(typeof code === 'string' && /^[a-z][a-z0-9_]{0,99}$/.test(code) ? { vendorCode: code } : {}),
+    ...(typeof phase === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(phase) ? { vendorPhase: phase } : {}),
+    ...(typeof pressSent === 'boolean' ? { vendorPressSent: pressSent } : {}),
+    ...(typeof dispatched === 'boolean' ? { vendorDispatched: dispatched } : {}),
+    ...(typeof operationId === 'string' && /^[A-Za-z0-9_.:-]{1,160}$/.test(operationId) ? { vendorOperationId: operationId } : {}) }
 }
 export type BrowserCommandRunner = (config: Pick<BrowserCapabilityConfig, 'executablePath' | 'executableHash' | 'homeDirectory'>, args: readonly string[], signal?: AbortSignal) => Promise<BrowserCommandResult>
 

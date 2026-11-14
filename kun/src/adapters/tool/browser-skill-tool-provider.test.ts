@@ -1013,3 +1013,56 @@ describe('typed BrowserSkill production provider', () => {
   })
 
 })
+
+
+describe('trusted finite public-query input dispatch refusal', () => {
+  it.each([
+    { action: 'click', data: { press_sent: false }, known: true },
+    { action: 'click', data: { dispatched: false }, known: true },
+    { action: 'fill', data: { dispatched: false }, known: true },
+    { action: 'fill', data: { press_sent: false }, known: false },
+    { action: 'click', data: {}, known: false },
+    { action: 'click', data: { press_sent: true }, known: false },
+    { action: 'click', data: { press_sent: 'false' }, known: false },
+    { action: 'click', data: { dispatched: 'false' }, known: false },
+    { action: 'click', data: { dispatched: false, press_sent: true }, known: false },
+    { action: 'click', data: { press_sent: false, phase: 'after_press' }, known: false },
+    { action: 'click', data: { press_sent: false }, known: false, timeout: true },
+    { action: 'click', data: { press_sent: false }, known: false, business: true },
+  ])('classifies $action $data without retry (known=$known timeout=$timeout business=$business)', async ({ action, data, known, timeout, business }) => {
+    const f = business ? fixture() : publicQueryFixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement(action === 'click' ? business ? '<button>保存设置</button>' : '<button>搜索</button>' : '<input placeholder="公开查询">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', ...(action === 'fill' ? { value: '工程监测' } : {}) }
+    const authorization = await f.execute('browser_authorize_action', { ...args, action, ...(!business ? { access: 'public_query' } : {}) })
+    expect(authorization).toMatchObject({ output: { status: 'succeeded' } })
+    const original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation((config, argv, signal) => argv[0] === action ? Promise.resolve({ ok: false, code: 'permission_denied', outcomeUnknown: Boolean(timeout),
+      output: { code: 'permission_denied', data: { reason: 'target_covered', effect_state: 'unknown', operation_id: 'op-official-123', ...data } } }) : original(config, argv, signal))
+    const result = await f.execute(`browser_${action}`, args)
+    expect(result).toMatchObject({ isError: true, output: { status: known ? 'failed' : 'outcome_unknown', vendorCode: 'permission_denied',
+      vendorReason: 'target_covered', effectState: 'unknown', vendorOperationId: 'op-official-123', ...(known ? { code: 'browser_action_not_dispatched', actionDispatch: 'not_sent' } : {}) } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === action)).toHaveLength(1)
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'cooperate' && argv[1] === 'wait')).toBe(false)
+    const dispatch = f.repository.operations('task', 'browser_action_dispatch').at(-1)!
+    expect(dispatch).toMatchObject({ status: known ? 'failed' : 'outcome_unknown', result: { effectState: 'unknown', vendorOperationId: 'op-official-123',
+      ...(known ? { actionDispatch: 'not_sent', notDispatched: true } : {}) } })
+    if (known) {
+      expect(await f.execute('browser_observe', { sessionId: 'session-one' })).toMatchObject({ output: { status: 'succeeded' } })
+      expect(f.repository.operations('task', 'browser_schedule_action_outcome')).toHaveLength(0)
+    }
+  })
+
+  it('retains safe official success metadata alongside the durable ACK and readback', async () => {
+    const f = publicQueryFixture(), original = f.runner.getMockImplementation()!
+    await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<button>搜索</button>')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1' }
+    await f.execute('browser_authorize_action', { ...args, action: 'click', access: 'public_query' })
+    f.runner.mockImplementation((config, argv, signal) => argv[0] === 'click' ? Promise.resolve({ ok: true, output: { data: { operation_id: 'op-ack-123', dispatched: true } } }) : original(config, argv, signal))
+    expect(await f.execute('browser_click', args)).toMatchObject({ output: { status: 'succeeded' } })
+    expect(f.repository.operations('task', 'browser_action_dispatch').at(-1)).toMatchObject({ status: 'succeeded', result: {
+      actionAcknowledged: true, readbackPending: false, vendorOperationId: 'op-ack-123', vendorDispatched: true } })
+  })
+})

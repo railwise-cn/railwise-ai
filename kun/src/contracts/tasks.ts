@@ -160,6 +160,9 @@ export const AttentionItemSchema = z.object({
 })
 export type AttentionItem = z.infer<typeof AttentionItemSchema>
 
+export const OperationResolutionOutcomeSchema = z.enum(['succeeded', 'not_completed'])
+export type OperationResolutionOutcome = z.infer<typeof OperationResolutionOutcomeSchema>
+
 export const OperationReceiptSchema = z.object({
   dispatchApproval: z.object({ toolName: z.string(), requestHash: z.string(), approvedAt: z.string() }).optional(),
   id: z.string(), ownerId: z.string(), idempotencyKey: z.string(), fingerprint: z.string(), kind: z.string(),
@@ -168,7 +171,7 @@ export const OperationReceiptSchema = z.object({
   createdAt: z.string(), updatedAt: z.string(), error: z.string().optional()
   ,taskId: z.string().optional(), turnId: z.string().optional(), provider: z.string().optional(), toolName: z.string().optional(),
   remoteOperationId: z.string().optional(), target: z.string().optional(), evidence: ResultEvidenceSchema.optional(),
-  resolution: z.object({ status: z.literal('verified'), receiptId: z.string().min(1), evidence: ResultEvidenceSchema, resolvedAt: z.string() }).optional()
+  resolution: z.object({ status: z.literal('verified'), outcome: OperationResolutionOutcomeSchema.optional(), receiptId: z.string().min(1), evidence: ResultEvidenceSchema, resolvedAt: z.string() }).optional()
 })
 export type OperationReceipt = z.infer<typeof OperationReceiptSchema>
 

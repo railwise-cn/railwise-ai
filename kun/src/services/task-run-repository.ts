@@ -1,3 +1,6 @@
+import { BrowserScheduleActionSchema } from '../contracts/browser-schedule-actions.js'
+import { browserVerificationPolicy } from '../contracts/browser-skill.js'
+import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { ExecutionStore } from './execution-store.js'
 import { inspectProcess } from './process-identity.js'
 import { existsSync, mkdirSync } from 'node:fs'
@@ -662,16 +665,70 @@ export class TaskRunRepository {
   verifiedOperationResolution(receipt: OperationReceipt): OperationReceipt['resolution'] | undefined {
     const resolution = receipt.resolution
     if (!resolution) return undefined
-    const proof = this.operations(receipt.ownerId, 'effect_verification').find(item => item.id === resolution.receiptId)
+    const outcome = resolution.outcome ?? 'succeeded'
+    const proof = this.operations(receipt.ownerId, outcome === 'not_completed' ? 'effect_verification_incomplete' : 'effect_verification').find(item => item.id === resolution.receiptId)
     if (proof?.status !== 'succeeded' || proof.request?.originalReceiptId !== receipt.id || proof.request?.originalFingerprint !== receipt.fingerprint) return undefined
-    const result = proof.result as { evidence?: unknown } | undefined
-    return operationFingerprint(result?.evidence) === operationFingerprint(resolution.evidence) ? resolution : undefined
+    const result = proof.result as { evidence?: unknown; outcome?: unknown } | undefined
+    if ((result?.outcome ?? 'succeeded') !== outcome || operationFingerprint(result?.evidence) !== operationFingerprint(resolution.evidence)) return undefined
+    if (outcome === 'not_completed' ? !this.negativeBrowserReviewProof(receipt, proof, resolution.evidence) : resolution.evidence.status === 'public_query_reviewed_incomplete') return undefined
+    return { ...resolution, outcome }
+  }
+  /** A negative outcome is scoped to one durable, finite public-query review, never arbitrary tool text. */
+  private negativeBrowserReviewProof(receipt: OperationReceipt, proof: OperationReceipt, evidence: NonNullable<OperationReceipt['resolution']>['evidence'], validateCurrent = false): boolean {
+    const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+    const owner = proof.request?.confirmationOwnerId, key = proof.request?.confirmationKey
+    if (typeof owner !== 'string' || typeof key !== 'string' || evidence.kind !== 'human_confirmation' || evidence.provider !== 'browser-skill' ||
+      evidence.status !== 'public_query_reviewed_incomplete' || evidence.verified !== true) return false
+    const confirmation = this.operation(owner, key)
+    if (!confirmation || confirmation.kind !== 'browser_confirmation' || !['prepared', 'succeeded'].includes(confirmation.status) ||
+      confirmation.request?.decision !== 'not_completed' || typeof confirmation.request.reviewId !== 'string') return false
+    const original = this.operations(owner, 'tool').find(item => item.id === confirmation.request?.originalReceiptId)
+    const action = original?.request?.toolName === 'browser_click' ? 'click' : original?.request?.toolName === 'browser_fill' ? 'fill' : undefined
+    if (!original || original.status !== 'outcome_unknown' || original.request?.providerId !== 'browser-skill' || !action || evidence.operation !== action) return false
+    const review = this.operations(owner, 'browser_action_review').find(item => object(object(item.result).review).id === confirmation.request?.reviewId)
+    if (!review || review.status !== 'succeeded' || review.request?.originalReceiptId !== original.id || review.request.originalFingerprint !== original.fingerprint ||
+      review.request.expectedRevision !== confirmation.request.expectedRevision) return false
+    const dispatch = this.operations(owner, 'browser_action_dispatch').find(item => item.id === object(review.result).dispatchId)
+    if (!dispatch || !dispatch.request || dispatch.status !== 'outcome_unknown' || dispatch.request?.turnId !== original.request.turnId ||
+      dispatch.request?.argumentsHash !== original.request.argumentsHash || dispatch.request.action !== action || evidence.target !== dispatch.request.pageUrl) return false
+    const dispatchRequest = dispatch.request
+    const grant = object(original.request.executionGrant), scope = object(grant.browserScope), task = this.get(owner)
+    if (!task || grant.taskId !== owner || grant.threadId !== task.threadId || grant.turnId !== original.request.turnId || scope.interaction !== 'interact') return false
+    if (validateCurrent && (task.authority?.revokedAt || operationFingerprint(task.authority?.browserScope) !== operationFingerprint(scope))) return false
+    const sourceId = object(grant.browserScheduleBinding).sourceTaskId ?? owner
+    if (typeof sourceId !== 'string') return false
+    const source = this.get(sourceId)
+    if (validateCurrent && (!source || !listApprovedBrowserScheduleActions(this, source).some(item => item.id === dispatchRequest.scheduleActionId))) return false
+    const authorization = this.operations(sourceId, 'browser_schedule_action_authorization').find(item =>
+      item.status === 'succeeded' && object(item.result).id === dispatchRequest.scheduleActionId)
+    const parsed = BrowserScheduleActionSchema.safeParse(authorization?.result)
+    if (!parsed.success) return false
+    const approved = parsed.data, human = typeof approved.approvalId === 'string' ? this.humanRequest(approved.approvalId) : null
+    if (!authorization || validateCurrent && authorization.request?.revoked === true || approved.sourceTaskId !== sourceId || approved.scheduleId !== `schedule_${sourceId}` ||
+      approved.access !== 'public_query' || approved.action !== action || browserVerificationPolicy(approved.verificationPolicy) !== browserVerificationPolicy(scope.verificationPolicy) ||
+      approved.pageUrl !== dispatch.request.pageUrl || approved.elementHash !== dispatch.request.elementHash || approved.valueHash !== dispatch.request.valueHash ||
+      approved.browserInstanceId !== scope.browserInstanceId || approved.browserRevision !== scope.revision ||
+      !human || human.threadId !== this.get(sourceId)?.threadId || human.status !== 'answered' || object(human.resolution).decision !== 'allow' ||
+      object(human.payload.approval).toolName !== 'browser_authorize_action' || object(human.payload.approval).summary !== approved.summary ||
+      object(human.payload.approval).requestHash !== createHash('sha256').update(JSON.stringify(authorization.request)).digest('hex')) return false
+    if (receipt.kind === 'tool') return receipt.id === original.id
+    if (receipt.kind === 'browser_action_dispatch') return receipt.id === dispatch.id
+    return receipt.kind === 'browser_schedule_action_outcome' && receipt.ownerId === sourceId && receipt.request?.taskId === owner &&
+      receipt.request.turnId === original.request.turnId && receipt.request.action === action && receipt.request.scheduleId === approved.scheduleId
   }
   resolveOperation(ownerId: string, key: string, resolution: NonNullable<OperationReceipt['resolution']>): void {
     const receipt = this.operation(ownerId, key)
     if (!receipt || receipt.status !== 'outcome_unknown') throw Object.assign(new Error('Unknown operation not found.'), { code: 'invalid_state' })
+    if (receipt.resolution) {
+      if (operationFingerprint({ ...receipt.resolution, outcome: receipt.resolution.outcome ?? 'succeeded' }) !== operationFingerprint({ ...resolution, outcome: resolution.outcome ?? 'succeeded' })) throw Object.assign(new Error('Operation resolution is immutable.'), { code: 'idempotency_conflict' })
+      return
+    }
     const next = OperationReceiptSchema.parse({ ...receipt, resolution })
     if (!this.verifiedOperationResolution(next)) throw Object.assign(new Error('Verified readback proof is missing.'), { code: 'invalid_state' })
+    if (resolution.outcome === 'not_completed') {
+      const proof = this.operations(ownerId, 'effect_verification_incomplete').find(item => item.id === resolution.receiptId)
+      if (!proof || !this.negativeBrowserReviewProof(next, proof, resolution.evidence, true)) throw Object.assign(new Error('Current public-query review authority is missing.'), { code: 'invalid_state' })
+    }
     this.db.prepare('UPDATE operation_receipts SET data_json = ? WHERE owner_id = ? AND idempotency_key = ?').run(JSON.stringify(next), ownerId, key)
   }
   operations(ownerId: string, kind?: string): OperationReceipt[] {

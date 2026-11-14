@@ -1,3 +1,4 @@
+import type { OperationResolutionOutcome } from '../contracts/tasks.js'
 import { isBrowserTask, browserTaskOrigins, browserVerificationPolicy } from '../contracts/browser-skill.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { extractScheduleRequirement } from '../contracts/schedule.js'
@@ -978,7 +979,7 @@ export class TaskController {
           receipt.request?.argumentsHash === argumentsHash && this.repository.verifiedOperationResolution(receipt)?.evidence.kind === 'human_confirmation')
         const proof = resolved && this.repository.verifiedOperationResolution(resolved)
         if (resolved && proof) return { key: resolved.idempotencyKey, token, prior: { approved: true,
-          item: makeToolResultForVerifiedResolution(this.repository.get(token.taskId)!, turnId, call, proof.evidence) } }
+          item: makeToolResultForVerifiedResolution(this.repository.get(token.taskId)!, turnId, call, proof.evidence, proof.outcome) } }
       }
       const unresolved = this.repository.operations(token.taskId, 'tool').find(receipt =>
         receipt.idempotencyKey !== key && receipt.status === 'outcome_unknown' &&
@@ -1001,7 +1002,7 @@ export class TaskController {
             throw Object.assign(new Error('This reviewed target already has a different operation request. Inspect its receipt before changing the action.'), { code: 'idempotency_conflict' })
           }
           const resolution = this.repository.verifiedOperationResolution(prior)
-          if (resolution) return { key: prior.idempotencyKey, token, prior: { approved: true, item: makeToolResultForVerifiedResolution(task, turnId, call, resolution.evidence) } }
+          if (resolution) return { key: prior.idempotencyKey, token, prior: { approved: true, item: makeToolResultForVerifiedResolution(task, turnId, call, resolution.evidence, resolution.outcome) } }
           if (prior.status === 'succeeded' && prior.result) {
             const replay = prior.result as ToolHostResult
             return { key: prior.idempotencyKey, token, prior: { ...replay, item: { ...replay.item, id: `item_${call.callId}`, callId: call.callId, turnId, threadId: task.threadId } as ToolHostResult['item'] } }
@@ -1168,20 +1169,22 @@ export class TaskController {
   }
 
   /** Attach trusted readback evidence without overwriting the original unknown dispatch or resuming execution. */
-  recordOperationVerification(taskId: string, expectedRevision: number, receiptId: string, verificationKey: string, evidence: import('../contracts/harness.js').ResultEvidence): void {
+  recordOperationVerification(taskId: string, expectedRevision: number, receiptId: string, verificationKey: string, evidence: import('../contracts/harness.js').ResultEvidence, outcome: OperationResolutionOutcome = 'succeeded'): void {
     this.repository.transact(() => {
       const task = this.repository.get(taskId)
       const receipt = this.repository.operations(taskId, 'tool').find(item => item.id === receiptId)
       const proof = this.repository.operation(taskId, verificationKey)
-      if (!task || !receipt || !proof || proof.kind !== 'effect_verification' || proof.request?.originalReceiptId !== receipt.id || proof.request?.originalFingerprint !== receipt.fingerprint) throw Object.assign(new Error('Readback proof does not belong to this operation.'), { code: 'invalid_state' })
+      if (!task || !receipt || !proof || proof.kind !== (outcome === 'not_completed' ? 'effect_verification_incomplete' : 'effect_verification') || proof.request?.originalReceiptId !== receipt.id || proof.request?.originalFingerprint !== receipt.fingerprint) throw Object.assign(new Error('Readback proof does not belong to this operation.'), { code: 'invalid_state' })
       if (task.revision !== expectedRevision) throw Object.assign(new Error('Task changed while verification was running.'), { code: 'stale_request' })
       if (TERMINAL.has(task.status) || task.authority?.revokedAt) throw Object.assign(new Error('Task authorization was revoked.'), { code: 'execution_grant_revoked' })
+      const proofOutcome = (proof.result as { outcome?: unknown } | undefined)?.outcome ?? 'succeeded'
+      if (proofOutcome !== outcome || outcome === 'not_completed' && (!['paused', 'stalled', 'waiting_user'].includes(task.status) || evidence.kind !== 'human_confirmation' || evidence.provider !== 'browser-skill' || evidence.status !== 'public_query_reviewed_incomplete')) throw Object.assign(new Error('Verification outcome does not match its trusted proof.'), { code: 'invalid_state' })
       const now = this.nowIso()
-      this.repository.finishOperation(taskId, verificationKey, { status: 'succeeded', result: { taskId, receiptId, status: 'verified', evidence } }, now)
-      this.repository.resolveOperation(taskId, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, resolvedAt: now })
+      this.repository.finishOperation(taskId, verificationKey, { status: 'succeeded', result: { taskId, receiptId, status: 'verified', evidence, outcome } }, now)
+      this.repository.resolveOperation(taskId, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, outcome, resolvedAt: now })
       this.repository.update(taskId, task.revision, current => ({ ...current, updatedAt: now,
-        resultEvidence: [...(current.resultEvidence ?? []).filter(item => !(item.provider === evidence.provider && item.operation === evidence.operation && item.target === evidence.target)), evidence] }),
-      { key: `operation-verified:${proof.id}`, kind: 'operation_verified', payload: { provider: evidence.provider, operation: evidence.operation, target: evidence.target, receiptId }, createdAt: now })
+        ...(outcome === 'succeeded' ? { resultEvidence: [...(current.resultEvidence ?? []).filter(item => !(item.provider === evidence.provider && item.operation === evidence.operation && item.target === evidence.target)), evidence] } : {}) }),
+      { key: `operation-verified:${proof.id}`, kind: 'operation_verified', payload: { provider: evidence.provider, operation: evidence.operation, target: evidence.target, receiptId, outcome }, createdAt: now })
     })
   }
 
@@ -1782,7 +1785,9 @@ function externalVerificationLocator(args: Record<string, unknown>): Record<stri
   return Object.keys(locator).length ? locator : undefined
 }
 
-function makeToolResultForVerifiedResolution(task: TaskRun, turnId: string, call: ToolCallLike, evidence: NonNullable<OperationReceipt['resolution']>['evidence']): ToolHostResult['item'] {
+function makeToolResultForVerifiedResolution(task: TaskRun, turnId: string, call: ToolCallLike, evidence: NonNullable<OperationReceipt['resolution']>['evidence'], outcome: OperationResolutionOutcome = 'succeeded'): ToolHostResult['item'] {
+  if (outcome === 'not_completed') return makeToolResultItem({ id: `item_${call.callId}`, threadId: task.threadId, turnId, callId: call.callId, toolName: call.toolName, isError: true,
+    output: { ok: false, status: 'failed', code: 'browser_action_not_completed', outcome, evidence, recovered: true } })
   return makeToolResultItem({ id: `item_${call.callId}`, threadId: task.threadId, turnId, callId: call.callId, toolName: call.toolName, output: { ok: true, status: 'succeeded', evidence, recovered: true } })
 }
 
