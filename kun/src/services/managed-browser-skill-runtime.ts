@@ -10,7 +10,7 @@ import type { CapabilityToolProvider } from '../adapters/tool/capability-registr
 import type { ToolHostContext } from '../ports/tool-host.js'
 import type { BrowserScheduleResolution } from '../contracts/browser-schedule-actions.js'
 import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
-import { object, runBrowserCommand, parseBrowserStatus, compatibleBrowserProtocol, supportsBrowserTargetPolicy, type BrowserCommandRunner } from './browser-skill-cli.js'
+import { object, runBrowserCommand, parseBrowserStatus, compatibleBrowserProtocol, supportsBrowserTargetPolicy, supportsBrowserNativeRead, type BrowserCommandRunner } from './browser-skill-cli.js'
 
 export class ManagedBrowserSkillRuntime {
   private config: BrowserCapabilityConfig
@@ -71,6 +71,7 @@ export class ManagedBrowserSkillRuntime {
         message: !config.enabled ? '请启用 BrowserSkill 并选择已连接的浏览器。' : 'BrowserSkill 尚未就绪。请检查 CLI、浏览器扩展与所选浏览器实例，然后继续原任务。' }
     }
     let targetPolicySupported = false
+    let nativeReadSupported = false
     try {
       const response = await (this.options.run ?? runBrowserCommand)(config, ['status'])
       if (!response.ok) throw new Error('browser_connection_unavailable')
@@ -78,15 +79,17 @@ export class ManagedBrowserSkillRuntime {
       const browser = live.browsers.find(item => item.id === config.browserInstanceId && item.connected)
       if (!browser || !compatibleBrowserProtocol(live.protocolVersion) || !compatibleBrowserProtocol(browser.protocolVersion)) throw new Error('browser_connection_unavailable')
       targetPolicySupported = supportsBrowserTargetPolicy(config.version, live.protocolVersion, browser.protocolVersion)
+      nativeReadSupported = supportsBrowserNativeRead(config.version, live.protocolVersion, browser.protocolVersion)
     } catch {
       return { ...base, status: 'blocked', action, resolution: action, errorCode: 'browser_connection_unavailable',
         message: '当前浏览器连接未通过实时核验。请重新检查扩展和浏览器连接，然后继续原任务。' }
     }
     const bound = currentTask?.authority?.browserScope ?? scheduledBrowserScope
-    if (browserVerificationPolicy(bound?.verificationPolicy) === 'public_query_target' && !targetPolicySupported) {
+    const requiresNativeRead = bound?.publicQueryAuthorization || bound?.interaction === 'interact' && browserVerificationPolicy(bound.verificationPolicy) === 'public_query_target' || !bound && isPublicBrowserQuery(text)
+    if (browserVerificationPolicy(bound?.verificationPolicy) === 'public_query_target' && !targetPolicySupported || requiresNativeRead && !nativeReadSupported) {
       const upgrade = { kind: 'install' as const, route: 'marketplace', label: '升级 CLI 并更新或重新连接扩展' }
       return { ...base, status: 'blocked', action: upgrade, resolution: upgrade, errorCode: 'browser_target_policy_upgrade_required',
-        message: '当前公开资料查询范围需要 BrowserSkill CLI 0.5.0 及服务和所选扩展协议 1.8 或以上。请升级 CLI、更新或重新连接官方扩展，再继续原任务；原授权和待核验操作保持保留。' }
+        message: '当前公开资料查询范围需要 BrowserSkill CLI 0.5.0 及服务和所选扩展协议 1.9 或以上，以核对实际页面目标。请升级 CLI、更新或重新连接官方扩展，再继续原任务；原授权和待核验操作保持保留。' }
     }
     if (!currentTask && !scheduledBrowserScope && isPublicBrowserQuery(text)) {
       const confirmation = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认公开查询的浏览器范围' }
@@ -152,8 +155,10 @@ export class ManagedBrowserSkillRuntime {
     const interaction = config.interaction === 'interact' && (!task.parentTaskId || parentScope?.interaction === 'interact') ? 'interact' : 'observe'
     const verificationPolicy = browserVerificationPolicy(previous?.verificationPolicy)
     const browser = config.browsers.find(item => item.id === config.browserInstanceId)
-    const targetPolicySupported = Boolean(browser?.connected && supportsBrowserTargetPolicy(config.version, config.daemonProtocolVersion, browser.protocolVersion))
-    if (verificationPolicy === 'public_query_target' && !targetPolicySupported) throw new Error('browser_target_policy_upgrade_required')
+    const nativeReadSupported = Boolean(browser?.connected && supportsBrowserNativeRead(config.version, config.daemonProtocolVersion, browser.protocolVersion))
+    const targetPolicySupported = Boolean(browser?.connected && supportsBrowserTargetPolicy(config.version, config.daemonProtocolVersion, browser.protocolVersion) &&
+      (interaction === 'observe' || nativeReadSupported))
+    if ((verificationPolicy === 'public_query_target' || previous?.publicQueryAuthorization) && !targetPolicySupported) throw new Error('browser_target_policy_upgrade_required')
     const unresolved = this.hasUnresolvedBrowserOperation(taskId)
     const allowedVerificationPolicies: BrowserVerificationPolicy[] = unresolved ? [verificationPolicy] : ['strict']
     if (!unresolved && targetPolicySupported && isPublicBrowserQuery(task.goal) && (!task.parentTaskId || browserVerificationPolicy(parentScope?.verificationPolicy) === 'public_query_target')) {
@@ -162,7 +167,7 @@ export class ManagedBrowserSkillRuntime {
     const allowedPublicQueryAuthorizations: BrowserPublicQueryDuration[] = []
     // A binding confirmation grants scope only for this root purpose. Children
     // and scheduled occurrences remain within their already inherited authority.
-    if (!unresolved && !task.parentTaskId && !task.scheduledBy && interaction === 'interact' && isPublicBrowserQuery(task.goal)) {
+    if (!unresolved && nativeReadSupported && !task.parentTaskId && !task.scheduledBy && interaction === 'interact' && isPublicBrowserQuery(task.goal)) {
       allowedPublicQueryAuthorizations.push('task')
       if (task.acceptance.schedule) allowedPublicQueryAuthorizations.push('schedule')
     }

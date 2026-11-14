@@ -26,11 +26,15 @@ function fixture(versions: { cli?: string; daemon?: string; extension?: string; 
 describe('Browser task authority rebinding', () => {
   const literalRequest = '使用broswer-skill，帮我去政采云、阳光采购平台等平台去获取一些招标信息，我们主要是做工程测量、工程监测类的业务，所以需要找的是这一类招标信息，并以html形式将获取到的信息给我汇报，每天执行两次，早上九点前一次，下午五点前一次。'
 
-  it.each([{ cli: '0.4.0' }, { daemon: '1.7' }, { extension: '1.7' }, { cli: '' }, { daemon: '' }, { extension: '' }])('keeps strict bindings available but never offers target policy for incompatible dependencies %j', versions => {
+  it.each([{ cli: '0.4.0' }, { daemon: '1.7' }, { extension: '1.7' }, { daemon: '1.8' }, { extension: '1.8' }, { cli: '' }, { daemon: '' }, { extension: '' }])('keeps strict bindings available but never offers target interaction for incompatible dependencies %j', versions => {
     const f = fixture(versions)
     f.repository.update('task', 0, task => ({ ...task, goal: literalRequest, authority: undefined }))
     const snapshot = f.runtime.bindingSnapshot('task')
     expect(snapshot).toMatchObject({ verificationPolicy: 'strict', recommendedVerificationPolicy: 'strict', allowedVerificationPolicies: ['strict'] })
+    expect(snapshot.allowedPublicQueryAuthorizations).toEqual([])
+    expect(() => f.runtime.confirmBinding('task', { confirmed: true, expectedTaskRevision: snapshot.taskRevision,
+      expectedBrowserRevision: snapshot.browserRevision, browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins,
+      interaction: 'interact', verificationPolicy: 'strict', publicQueryAuthorization: 'task', idempotencyKey: 'unsupported-native-dom-scope' })).toThrow('browser_public_query_authorization_blocked')
     expect(() => f.runtime.confirmBinding('task', { confirmed: true, expectedTaskRevision: snapshot.taskRevision,
       expectedBrowserRevision: snapshot.browserRevision, browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins,
       verificationPolicy: 'public_query_target', idempotencyKey: 'unsupported-target' })).toThrow('browser_verification_policy_blocked')
@@ -40,19 +44,31 @@ describe('Browser task authority rebinding', () => {
       verificationPolicy: 'strict', idempotencyKey: 'explicit-strict' })).toMatchObject({ resumed: false, binding: { verificationPolicy: 'strict' } })
   })
 
-  it('allows an explicit target-policy review at the exact 0.5.0 / protocol 1.8 boundary', () => {
-    const f = fixture({ cli: '0.5.0', daemon: '1.8', extension: '1.8' })
+  it('allows explicit target interaction and task consent at the native-read 0.5.0 / protocol 1.9 boundary', () => {
+    const f = fixture({ cli: '0.5.0', daemon: '1.9', extension: '1.9' })
     f.repository.update('task', 0, task => ({ ...task, goal: literalRequest, authority: undefined }))
     expect(f.runtime.bindingSnapshot('task')).toMatchObject({ verificationPolicy: 'strict', recommendedVerificationPolicy: 'public_query_target',
-      allowedVerificationPolicies: ['strict', 'public_query_target'] })
+      allowedVerificationPolicies: ['strict', 'public_query_target'], allowedPublicQueryAuthorizations: ['task'] })
     expect(f.repository.get('task')!.authority).toBeUndefined()
     expect(f.repository.get('task')!.attempts).toBe(0)
   })
 
-  it.each([{ cli: '0.4.0' }, { liveDaemon: '1.7' }, { liveExtension: '1.7' }])('blocks an existing target scope before a Turn using live dependency state %j', async versions => {
+  it.each([{ cli: '0.4.0' }, { daemon: '1.7' }, { extension: '1.7' }, { daemon: '1.8' }, { extension: '1.8' }])('routes a new public-query request to a real capability upgrade instead of offering unusable consent %j', async versions => {
+    const f = fixture(versions)
+    const before = JSON.stringify(f.repository.get('task'))
+    expect(await f.runtime.preflight(literalRequest)).toMatchObject({ status: 'blocked', errorCode: 'browser_target_policy_upgrade_required',
+      resolution: { kind: 'install', route: 'marketplace' } })
+    expect(JSON.stringify(f.repository.get('task'))).toBe(before)
+    expect(f.repository.operations('task', 'browser_binding')).toHaveLength(0)
+  })
+
+  it.each([{ cli: '0.4.0' }, { liveDaemon: '1.7' }, { liveExtension: '1.7' }, { liveDaemon: '1.8' }, { liveExtension: '1.8' }].flatMap(versions => [
+    { ...versions, taskScope: false }, { ...versions, taskScope: true }
+  ]))('blocks an existing native-DOM scope before a Turn using live dependency state %j', async versions => {
     const f = fixture(versions)
     f.repository.update('task', 0, task => ({ ...task, goal: literalRequest, status: 'paused', authority: { ...task.authority!, browserScope: {
-      ...f.old, browserInstanceId: f.config.browserInstanceId!, revision: f.config.revision, interaction: 'interact', verificationPolicy: 'public_query_target'
+      ...f.old, browserInstanceId: f.config.browserInstanceId!, revision: f.config.revision, interaction: 'interact', verificationPolicy: versions.taskScope ? 'strict' : 'public_query_target',
+      ...(versions.taskScope ? { publicQueryAuthorization: { receiptId: 'historical-scope-reference', duration: 'task' as const, purposeHash: operationFingerprint({ purpose: literalRequest }) } } : {})
     } } }))
     f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'preserve-unknown', kind: 'browser_action_dispatch', request: { sessionId: 'original-session' }, nowIso: new Date().toISOString() })
     f.repository.finishOperation('task', 'preserve-unknown', { status: 'outcome_unknown' })
@@ -81,6 +97,16 @@ describe('Browser task authority rebinding', () => {
       browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, idempotencyKey: 'retain-legacy-strict' })
     expect(await f.runtime.preflight('继续', { id: 'thread', mode: 'agent' } as ThreadRecord)).toMatchObject({ status: 'available' })
     expect(f.repository.get('task')?.authority?.browserScope).not.toHaveProperty('verificationPolicy')
+  })
+
+  it('keeps an existing observe-only target binding readable at protocol 1.8 without granting native-query interaction', async () => {
+    const f = fixture({ cli: '0.5.0', daemon: '1.8', extension: '1.8' })
+    f.repository.update('task', 0, task => ({ ...task, status: 'paused', authority: { ...task.authority!, browserScope: {
+      ...f.old, browserInstanceId: f.config.browserInstanceId!, revision: f.config.revision, verificationPolicy: 'public_query_target'
+    } } }))
+    const before = JSON.stringify(f.repository.get('task'))
+    expect(await f.runtime.preflight('继续读取', { id: 'thread', mode: 'agent' } as ThreadRecord)).toMatchObject({ status: 'available' })
+    expect(JSON.stringify(f.repository.get('task'))).toBe(before)
   })
 
   it('requires explicit policy review for the literal URL-free public procurement request', async () => {
