@@ -4,7 +4,7 @@
 
 ## 当前验收状态（2026-11-14）
 
-最新候选源码为 `3a83346f40314afc1aeee90f8f15d86919dbf286`，其唯一私有构建 `43551973679`、两条同头 Quality、Windows 完整受控回放及同包真实原生升级均已通过，详细身份与原始 archive 摘要见本文件末尾的 3a83346f 记录。**当前整版仍未标记 accepted**：最终精确 Mac 包的原始完整业务、照片与 README 仍待本轮验收完成。Windows 的确定性模型协议和受控页面、升级中的资料保留夹具均不替代真实模型与双公开来源业务；未进行正式发布或官网修改。
+最新候选源码为 `3a83346f40314afc1aeee90f8f15d86919dbf286`，其唯一私有构建 `43551973679`、两条同头 Quality、Windows 完整受控回放及同包真实原生升级均已通过，详细身份与原始 archive 摘要见本文件末尾的 3a83346f 记录。**当前整版未通过**：精确 Mac 包的原始完整业务在第二来源点击被遮挡后进入结果待核实，无 HTML 或已发布计划，照片与 README 尚未完成。Windows 的确定性模型协议和受控页面、升级中的资料保留夹具均不替代真实模型与双公开来源业务；未进行正式发布或官网修改。
 
 ### 2f38642a 历史诊断（非当前候选验收）
 
@@ -370,3 +370,17 @@ HTML 成果字节与真实浏览器工具输出一致，自动打开及手动预
 资料种子明确使用 source-bound compatibility service；升级后及再次启动后的读回则均使用目标包内的真实服务和依赖，source／service tree／ASAR 身份精确一致。paused 与 waiting_user 两类任务、两个待处理输入、一个问题、一份草稿、两个可读线程及两条消息保持，candidate receipt 为 succeeded。停用 MCP、插件 manifest 引用、Skill 文本及惰性凭据引用保持原字节，独立 sentinel 与自有资源清理通过；该证据不认证真实凭据、插件激活或完整目录迁移。私有摘要为 `exact-updater-43551973679-summary.json`，原始记录为同运行的 `frozen-updater.json`、`native-updater.json`。正式 feed、公开 Release、官网与生产资料均未修改。
 
 截至本条追加，真实 Mac 原始完整请求、真实模型／双公开来源业务、照片与 README 仍待后续结果；本次没有修改 README、生产代码、官网或正式发行 manifest，也没有将这两个子项通过写成整版 accepted。
+
+### 3a83346f Mac 真实业务阻断与原现场保全
+
+该精确包已通过 Finder 实际打开，中文 About 与 Help 均显示 0.5.7。隔离副本使用 SQLite backup 完整保留 20 个数据库和 26 个 JSONL；首次连接发现复制的 BrowserSkill connection 仍引用旧私有路径，在零模型状态修正新副本的可执行文件及 BSK_HOME 路径后，由新 Main 正常创建 owner，未改旧数据或手写 ready。
+
+普通聊天提交原截图无 URL 原文，建立独立任务；确认浏览器范围后仍为 waiting_user、零 attempt／Turn／模型，单独继续后开始真实 DeepSeek。40 次请求均为 HTTP 200，actualModel 为 deepseek-flash；原始 usage 累计 prompt 2,127,868、completion 14,811、total 2,142,679 tokens，不推算缺失费用。首站完成公开搜索与筛选，第二来源实际导航携带同次 context／observation 并成功打开。自然人工等待与工作段的只读账本仅有毫秒级边界重叠，不再将整段人工等待计入执行预算。
+
+第二来源的搜索按钮被固定浮动工具栏遮挡，browser_click 返回 target_covered／effectState unknown，任务因此 stalled。验收浏览器准备脚本复用的是 756×413 的 headless 浏览器，这不能冒称用户的可见 Chrome 或营销截图。官方只读原 viewport 截图确认搜索框为空、没有搜索结果；第二站仅取得填写授权，没有实际 fill 派发。授权、导航成功均不代表检索已完成，本轮 HTML 与 Flow 为零。
+
+只读审计固定官方源码及完整 WAL 支持本次 click 未发送鼠标按下，scroll／hover 仍可能发生。原结构化 press_sent／dispatched 字段在接入层缩减错误时未保存；仅凭原因或阶段不能将未知动作改为成功或页面无副作用。现有恢复 UI 只有完成确认，不能用于这个未完成场景。本轮没有勾选完成、伪造成功、重放或新建任务绕开旧 unknown。诊断保真与明确未完成恢复入口需要新的源码及精确包。
+
+原 App 经 CUA 正常退出，Main／Runtime 已停止，临时真实模型 relay 停止并恢复原配置。仅对已核对 PID、完整参数与出生指纹的自有 Node 测试 helper 暂停其自动 cleanup timer，原 Chrome、Main 自有 daemon、session 和 unknown 保留。等待修复时只用官方同 session／tab 的只读 viewport screenshot 保活，不导航、点击或改 TTL。用户另行安装的正常 Chrome 0.5.0 已通过只读 status 识别为 connected／protocol 1.9，当前任务选择与 Grant 未被覆盖；后续真实业务应在正常可见 Chrome 验收。
+
+私有证据标识为 native-real-task-3a83346f-stage-summary.json、new-real-task-blocker-3a83346f-evidence.json、target-covered-source-audit-3a83346f.json、preserve-original-browser-helper-sigstop-3a83346f.json 及 personal-chrome-registration-readonly-3a83346f.json。3a 的 Windows 和升级通过保留各自范围，当前版本不发布。
