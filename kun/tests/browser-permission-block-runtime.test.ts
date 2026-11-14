@@ -7,6 +7,9 @@ import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
 import { CapabilityPreflightSchema } from '../src/contracts/harness.js'
 import { makeAssistantTextItem, makeToolResultItem } from '../src/domain/item.js'
+import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
+import { operationFingerprint } from '../src/services/task-run-repository.js'
+import { saveTaskPublicQueryAction } from '../src/services/browser-public-query-authority.js'
 
 const cleanup: Array<() => Promise<unknown>> = []
 afterEach(async () => {
@@ -188,6 +191,86 @@ it('prioritizes verification of a persisted unknown operation over offering anot
   expect(f.runtime.taskRepository!.attention(`capability_${f.task.id}`)).toBeNull()
   expect(f.runtime.taskRepository!.get(f.task.id)?.status).toBe('stalled')
   expect(JSON.stringify(f.runtime.taskRepository!.operations(f.task.id))).toBe(before)
+  expect(f.network).not.toHaveBeenCalled()
+})
+
+type ScopedCompletionScenario = 'matching' | 'authorization-only' | 'different-target' | 'different-input' | 'different-browser' | 'old-policy' | 'old-grant' | 'readback-pending' | 'unknown' | 'missing-tool-output' | 'unverified-evidence' | 'revoked'
+async function scopedCompletionLedger(scenario: ScopedCompletionScenario, code = 'browser_public_query_action_required') {
+  const f = await fixture(), repository = f.runtime.taskRepository!, now = f.runtime.nowIso()
+  const initial = repository.get(f.task.id)!, duration = code === 'browser_schedule_action_scope_required' ? 'schedule' as const : 'task' as const
+  const schedule = { kind: 'daily' as const, times: ['09:00'], timezone: 'Asia/Shanghai' }
+  const scope = { browserInstanceId: 'reviewed-browser', revision: 1, interaction: 'interact' as const,
+    origins: ['https://example.test'], verificationPolicy: 'public_query_target' as const }
+  const binding = repository.beginOperation({ ownerId: initial.id, idempotencyKey: 'task-scope-binding', kind: 'browser_binding',
+    request: { confirmed: true, publicQueryAuthorization: duration, expectedTaskRevision: initial.revision, expectedBrowserRevision: scope.revision,
+      browserInstanceId: scope.browserInstanceId, origins: scope.origins, interaction: scope.interaction, verificationPolicy: scope.verificationPolicy }, nowIso: now }).receipt
+  const browserScope = { ...scope, publicQueryAuthorization: { receiptId: binding.id, duration, purposeHash: operationFingerprint({ purpose: initial.goal }),
+    ...(duration === 'schedule' ? { requirementHash: operationFingerprint({ requirement: schedule }) } : {}) } }
+  repository.finishOperation(initial.id, binding.idempotencyKey, { status: 'succeeded', result: { taskId: initial.id, purpose: initial.goal,
+    browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision, origins: scope.origins, interaction: scope.interaction,
+    verificationPolicy: scope.verificationPolicy, publicQueryAuthorization: browserScope.publicQueryAuthorization } })
+  const task = repository.update(initial.id, initial.revision, current => ({ ...current,
+    acceptance: { ...current.acceptance, ...(duration === 'schedule' ? { schedule } : {}) },
+    authority: { source: 'user', workspaceRoot: f.workspace, externalTargets: [], grantedAt: now, browserScope } }))
+  const currentGrant = ExecutionGrantSchema.parse({ id: 'current-turn-grant', taskId: task.id, threadId: f.worker.id, turnId: f.turn.turnId,
+    workspaceRoot: f.workspace, workspaceTrust: 'read-only', agentTrust: 'read-only', approvalPolicy: 'on-request', sandboxMode: 'read-only',
+    workspaceRevision: 0, agentRevision: 0, revision: task.revision, idempotencyKey: 'current-turn-grant', issuedAt: now, browserScope })
+  await f.runtime.turnService.updateTurnMetadata(f.worker.id, f.turn.turnId, { executionGrant: currentGrant })
+  const target = { action: 'fill' as const, pageUrl: 'https://example.test/search', elementHash: 'a'.repeat(64), valueHash: 'b'.repeat(64),
+    browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision, verificationPolicy: scope.verificationPolicy }
+  const deniedKey = `tool:${f.turn.turnId}:scoped-missing`
+  repository.beginOperation({ ownerId: task.id, idempotencyKey: deniedKey, kind: 'tool', request: {
+    toolName: 'browser_fill', turnId: f.turn.turnId, argumentsHash: 'c'.repeat(64), executionGrant: currentGrant }, nowIso: now })
+  repository.finishOperation(task.id, deniedKey, { status: 'failed' })
+  repository.beginOperation({ ownerId: task.id, idempotencyKey: 'scoped-request', kind: 'browser_action_scope_request', request: {
+    ...target, ...(scenario === 'old-policy' ? { verificationPolicy: 'strict' } : {}), toolName: 'browser_fill', turnId: f.turn.turnId, argumentsHash: 'c'.repeat(64) }, nowIso: now })
+  repository.finishOperation(task.id, 'scoped-request', { status: 'succeeded' })
+  await f.runtime.sessionStore.appendItem(f.worker.id, makeToolResultItem({ id: 'scoped-missing', threadId: f.worker.id, turnId: f.turn.turnId,
+    callId: 'scoped-missing', toolName: 'browser_fill', isError: true, output: { code } }))
+  const grant = scenario === 'old-grant' ? { ...currentGrant, id: 'different-grant', idempotencyKey: 'different-grant' } : currentGrant
+  const actual = { ...target, ...(scenario === 'different-target' ? { elementHash: 'd'.repeat(64) } : {}),
+    ...(scenario === 'different-input' ? { valueHash: 'd'.repeat(64) } : {}), ...(scenario === 'different-browser' ? { browserInstanceId: 'different-browser' } : {}) }
+  const approved = saveTaskPublicQueryAction(repository, grant, { ...actual, taskId: task.id, sessionId: 'synthetic-session', origin: scope.origins[0]! }, 'fresh-context', 'search_input', '已审任务范围中的公开查询')!
+  expect(approved).toBeTruthy()
+  expect(repository.operations(task.id, 'browser_action_authorization')).toHaveLength(0)
+  expect(repository.operations(task.id, 'browser_schedule_action_authorization')).toHaveLength(0)
+  if (scenario === 'authorization-only') return f
+  const dispatch = repository.beginOperation({ ownerId: task.id, idempotencyKey: 'scoped-dispatch', kind: 'browser_action_dispatch', request: {
+    ...approved.receipt.request, scopeActionReceiptId: approved.receipt.id, authorizationSource: 'task_scope', toolName: 'browser_fill', argumentsHash: 'f'.repeat(64) }, nowIso: now }).receipt
+  repository.finishOperation(task.id, dispatch.idempotencyKey, { status: scenario === 'unknown' ? 'outcome_unknown' : 'succeeded', result: {
+    actionAcknowledged: true, readbackPending: scenario === 'readback-pending', sourceUrl: target.pageUrl, resultHash: 'e'.repeat(64) } })
+  const resultItem = makeToolResultItem({ id: 'scoped-later', threadId: f.worker.id, turnId: f.turn.turnId,
+    callId: 'scoped-later', toolName: 'browser_fill', isError: scenario === 'unknown', output: { status: 'succeeded', provider: 'browser-skill',
+      dispatchReceiptId: dispatch.id, sourceUrl: target.pageUrl, resultHash: 'e'.repeat(64), evidence: { kind: 'browser_observation',
+        sourceUrl: target.pageUrl, resultHash: 'e'.repeat(64), verified: scenario !== 'unverified-evidence', contentRead: true, actionAcknowledged: true } } })
+  const actualKey = `tool:${f.turn.turnId}:scoped-later`
+  repository.beginOperation({ ownerId: task.id, idempotencyKey: actualKey, kind: 'tool', request: { toolName: 'browser_fill',
+    providerId: 'browser-skill', turnId: f.turn.turnId, callId: 'scoped-later', argumentsHash: 'f'.repeat(64), executionGrant: grant }, nowIso: now })
+  repository.finishOperation(task.id, actualKey, { status: scenario === 'unknown' ? 'outcome_unknown' : 'succeeded',
+    ...(scenario === 'missing-tool-output' ? {} : { result: { approved: true, item: resultItem } }) })
+  await f.runtime.sessionStore.appendItem(f.worker.id, resultItem)
+  if (scenario === 'revoked') repository.update(task.id, task.revision, current => ({ ...current, authority: { ...current.authority!, revokedAt: now } }))
+  return f
+}
+
+it.each(['browser_public_query_action_required', 'browser_schedule_action_scope_required'])('clears %s only after a matching scope-backed action has actually succeeded and read back in this Turn', async code => {
+  const f = await scopedCompletionLedger('matching', code)
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toBeNull()
+  expect(f.runtime.taskRepository!.attention(`capability_${f.task.id}`)).toBeNull()
+  expect(f.runtime.taskRepository!.get(f.task.id)?.status).toBe('running')
+  expect(f.network).not.toHaveBeenCalled()
+})
+
+it.each(['authorization-only', 'different-target', 'different-input', 'different-browser', 'old-policy', 'old-grant', 'readback-pending', 'missing-tool-output', 'unverified-evidence', 'revoked'] as const)('retains scope-required after %s scope-backed evidence', async scenario => {
+  const f = await scopedCompletionLedger(scenario)
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'waiting_user' })
+  expect(f.runtime.taskRepository!.get(f.task.id)?.status).not.toBe('completed')
+  expect(f.network).not.toHaveBeenCalled()
+})
+
+it('never resolves scope-required using a scope-backed unknown action', async () => {
+  const f = await scopedCompletionLedger('unknown')
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'stalled' })
   expect(f.network).not.toHaveBeenCalled()
 })
 
