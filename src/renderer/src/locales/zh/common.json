@@ -4732,5 +4732,7 @@
   "taskBrowserReviewReason_browser_review_task_not_waiting": "任务状态已变化或原执行尚未退出。请刷新任务后再核验。",
   "taskBrowserReviewReason_stale_request": "任务已更新，请重新检查原网页后确认。",
   "taskBrowserReviewReason_browser_review_plan_changed": "原周期计划已停用或范围发生变化，不能沿用旧范围核验。",
-  "taskApprovalReviewHint": "请在任务工作台核对本次操作的目标与范围。"
+  "taskApprovalReviewHint": "请在任务工作台核对本次操作的目标与范围。",
+  "browserTaskTargetUpgradeRequired": "公开资料查询需要 BrowserSkill CLI 0.5.0 及服务和所选扩展协议 1.8 或以上。请先更新并重新连接浏览器，再重新加载本任务范围。原授权和待核验操作会保留，任务不会自动继续。",
+  "browserTaskOpenConnector": "打开浏览器连接器"
 }

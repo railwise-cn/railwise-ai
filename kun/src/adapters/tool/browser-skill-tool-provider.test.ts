@@ -27,7 +27,7 @@ function fixture() {
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite'))
   cleanups.push(() => { repository.close(); rmSync(root, { recursive: true, force: true }) })
   const config = BrowserCapabilityConfig.parse({ enabled: true, state: 'ready', executablePath: '/fixed/bsk', executableHash: 'a'.repeat(64),
-    browserInstanceId: 'browser-one', revision: 1, origins: ['https://example.com'], interaction: 'interact' })
+    version: '0.5.0', daemonProtocolVersion: '1.9', browsers: [{ id: 'browser-one', name: 'Chrome', label: 'Test', extensionVersion: '0.5.0', protocolVersion: '1.9', connected: true, versionSkew: false }], browserInstanceId: 'browser-one', revision: 1, origins: ['https://example.com'], interaction: 'interact' })
   repository.create(TaskRunSchema.parse({ id: 'task', threadId: 'thread', activeTurnId: 'turn', childTaskIds: [], workspaceRoot: root, goal: 'Read paginated products', status: 'running', agentId: 'default', acceptance: { kind: 'answer', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: false }, budget: { maxAttempts: 3, maxDurationMs: 600000 }, attempts: 0, replans: 0, noProgressCount: 0, nodes: [], artifacts: [], revision: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }))
   let elementHtml = '<button id="next">Next page</button>'
   let started = false
@@ -36,8 +36,8 @@ function fixture() {
   let url = 'about:blank'
   let title = ''
   const runner = vi.fn<BrowserCommandRunner>(async (_config, args) => {
-    if (args[0] === 'status') return { ok: true, output: { daemon_version: '0.4.0', protocol_version: '1.7', pid: 10,
-      browsers: [{ instance_id: 'browser-one', browser_name: 'Chrome', label: 'Test', extension_version: '0.4.0', extension_protocol_version: '1.7' }],
+    if (args[0] === 'status') return { ok: true, output: { daemon_version: '0.5.0', protocol_version: '1.9', pid: 10,
+      browsers: [{ instance_id: 'browser-one', browser_name: 'Chrome', label: 'Test', extension_version: '0.5.0', extension_protocol_version: '1.9' }],
       sessions: started ? [{ session_id: sessionId, browser_instance_id: 'browser-one' }] : [] } }
     if (args[0] === 'session' && args[1] === 'start') { started = true; url = 'about:blank'; title = ''; starts += 1; sessionId = starts === 1 ? 'session-one' : 'session-two'; return { ok: true, output: { session_id: sessionId, browser_instance_id: 'browser-one' } } }
     if (args[0] === 'session' && args[1] === 'request') return { ok: true, output: { state: 'ready', session: { session_id: sessionId, browser_instance_id: 'browser-one' } } }
@@ -45,7 +45,8 @@ function fixture() {
     if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: 7, active: true, url, title, scope: 'agent' }] } }
     if (args[0] === 'navigate') { url = args[1]; title = 'Normal source'; return { ok: true, output: { final_url: url } } }
     if (args[0] === 'get-html') return { ok: true, output: { tab_id: 7, html: elementHtml, byte_size: elementHtml.length, truncated: false } }
-    if (args[0] === 'cooperate') return { ok: true, output: { ready: true, context_id: 'context-one', observation: { text: 'Synthetic page content @e1' } } }
+    if (args[0] === 'read') return { ok: true, output: { tab_id: 7, page_url: url, frame_url: url, scope: 'current_dom', truncated: false, items: [{ ref: '@e999', values: { exists: true, text: elementHtml.replace(/<[^>]*>/g, ''), value: '', placeholder: '公开查询' }, redacted: [] }] } }
+    if (args[0] === 'cooperate') return { ok: true, output: { control_policy: args[args.indexOf('--policy') + 1], ready: true, context_id: 'context-one', observation: { text: 'Synthetic page content @e1' } } }
     return { ok: true, output: { tab_id: 7 } }
   })
   let scheduleResolution: BrowserScheduleResolution | undefined
@@ -72,7 +73,7 @@ function publicQueryFixture() {
 }
 
 describe('typed BrowserSkill production provider', () => {
-  it('requires a reviewed public-query action before adding the exact observed dependency, including direct approved calls', async () => {
+  it('requires reviewed public-query authorization before fixed native DOM expectations, including direct approved calls', async () => {
     const f = publicQueryFixture()
     const approval = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow')
     f.context.awaitApproval = approval
@@ -96,11 +97,129 @@ describe('typed BrowserSkill production provider', () => {
       .toMatchObject({ item: { isError: false, output: { status: 'succeeded' } } })
     expect(JSON.stringify(f.context.executionGrant)).toBe(before)
     const command = f.runner.mock.calls.map(([, argv]) => argv).find(argv => argv[0] === 'fill')!
-    expect(command.slice(-2)).toEqual(['--depends-on', '@e1'])
+    expect(command).not.toContain('--depends-on')
+    expect(JSON.parse(String(command[command.indexOf('--expect') + 1]))).toEqual(expect.arrayContaining([{ target: '@e1', field: 'value', equals: '' }, { target: '@e1', field: 'exists', equals: true }]))
     expect(f.repository.operations('task', 'browser_action_dispatch')[0]!.request).toMatchObject({
-      verificationPolicy: 'public_query_target', targetRef: '@e1', dependsOn: ['@e1'],
+      verificationPolicy: 'public_query_target', targetRef: '@e1', dependsOn: [], expectationVersion: 'native-dom-v1', expectationHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       authorizationReceiptId: f.repository.operations('task', 'browser_action_authorization')[0]!.id
     })
+  })
+
+  it('blocks legacy public policy before creating a session and keeps strict0.4 compatible', async () => {
+    const f = publicQueryFixture()
+    f.config.version = '0.4.0'
+    expect(await f.execute('browser_session_start')).toMatchObject({ isError: true, output: { code: 'browser_target_policy_upgrade_required' } })
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'session')).toBe(false)
+  })
+
+  it('explicitly selects strict on modern CLI even when historical cached peer metadata is absent', async () => {
+    const f = fixture()
+    delete f.config.daemonProtocolVersion
+    f.config.browsers = []
+    await f.execute('browser_session_start')
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })).toMatchObject({ output: { status: 'succeeded' } })
+    const sync = f.runner.mock.calls.find(([, argv]) => argv[0] === 'cooperate')![1]
+    expect(sync[sync.indexOf('--policy') + 1]).toBe('strict')
+  })
+
+  it('uses immutable strict/target session policies and a new session after a separately confirmed policy change', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    const scope = { ...f.context.executionGrant!.browserScope!, verificationPolicy: 'public_query_target' as const }
+    f.context.executionGrant!.browserScope = scope
+    f.repository.update('task', 0, task => ({ ...task, goal: 'browser-skill搜索公开公告', authority: { source: 'user', workspaceRoot: task.workspaceRoot, externalTargets: [], grantedAt: new Date().toISOString(), browserScope: scope } }))
+    expect(await f.execute('browser_observe', { sessionId: 'session-one' })).toMatchObject({ isError: true, output: { code: 'browser_session_policy_changed' } })
+    expect(await f.execute('browser_session_start')).toMatchObject({ output: { sessionId: 'session-two' } })
+    await f.execute('browser_navigate', { sessionId: 'session-two', url: 'https://example.com/search' })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate').map(([, argv]) => argv[argv.indexOf('--policy') + 1])).toEqual(['strict', 'target'])
+  })
+
+  it('binds a later search click to the approved fill value using real native reads and settles navigation ACK without replay', async () => {
+    const f = publicQueryFixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    let value = ''
+    const original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] === 'read') {
+        const input = argv[argv.indexOf('--ref') + 1] === '@e1'
+        return { ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search', scope: 'current_dom', truncated: false,
+          items: [{ ref: '@e900', values: { exists: true, text: input ? '' : '\n  搜标题\n', value: input ? value : null }, redacted: [] }] } }
+      }
+      if (argv[0] === 'fill') value = String(argv[argv.indexOf('--value') + 1])
+      if (argv[0] === 'click') f.setUrl('https://example.com/search?k=measurement')
+      if (argv[0] === 'get-html' && argv[argv.indexOf('--ref') + 1] === '@e1') return { ok: true, output: { tab_id: 7, html: '<input placeholder="公开查询">', truncated: false } }
+      return original(config, argv, signal)
+    })
+    f.setElement('<input placeholder="公开查询">')
+    const fill = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程测量' }
+    await f.execute('browser_authorize_action', { ...fill, action: 'fill', access: 'public_query' })
+    expect(await f.execute('browser_fill', fill)).toMatchObject({ output: { status: 'succeeded' } })
+    f.setElement('<button>搜标题</button>')
+    const click = { sessionId: 'session-one', contextId: 'context-one', target: '@e2' }
+    await f.execute('browser_authorize_action', { ...click, action: 'click', access: 'public_query' })
+    value = '未经授权的查询'
+    expect(await f.execute('browser_click', click)).toMatchObject({ isError: true, output: { code: 'browser_query_input_changed' } })
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'click')).toBe(false)
+    value = '工程测量'
+    expect(await f.execute('browser_click', click)).toMatchObject({ output: { status: 'succeeded', sourceUrl: 'https://example.com/search?k=measurement' } })
+    const dispatched = f.runner.mock.calls.filter(([, argv]) => argv[0] === 'click')
+    expect(dispatched).toHaveLength(1)
+    const argv = dispatched[0]![1]
+    expect(JSON.parse(String(argv[argv.indexOf('--expect') + 1]))).toEqual(expect.arrayContaining([
+      { target: '@e2', field: 'text', equals: '\n  搜标题\n' }, { target: '@e1', field: 'value', equals: '工程测量' }
+    ]))
+    expect(f.repository.operations('task', 'browser_action_dispatch').every(receipt => (receipt.result as { readbackPending?: boolean }).readbackPending === false)).toBe(true)
+  })
+
+  it('checks both filled inputs when distinct observed targets have identical HTML', async () => {
+    const f = publicQueryFixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    const html = '<input class="query">', elementHash = createHash('sha256').update(html).digest('hex')
+    const values = new Map([['@e1', '工程测量'], ['@e2', '工程监测']])
+    for (const [target, value] of values) {
+      f.repository.beginOperation({ ownerId: 'task', idempotencyKey: `filled:${target}`, kind: 'browser_action_dispatch', nowIso: new Date().toISOString(),
+        request: { action: 'fill', sessionId: 'session-one', pageUrl: 'https://example.com/search', tabId: 7, verificationPolicy: 'public_query_target' } })
+      f.repository.finishOperation('task', `filled:${target}`, { status: 'succeeded', result: { actionAcknowledged: true, readbackPending: false,
+        publicQueryInput: { target, value, elementHash, frameUrl: 'https://example.com/search' } } })
+    }
+    const original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation((config, argv, signal) => {
+      const target = argv[argv.indexOf('--ref') + 1]
+      if (argv[0] === 'get-html' && values.has(String(target))) return Promise.resolve({ ok: true, output: { tab_id: 7, html, truncated: false } })
+      if (argv[0] === 'read') return Promise.resolve({ ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search', scope: 'current_dom', truncated: false,
+        items: [{ ref: '@e900', values: { exists: true, text: '搜索', value: values.get(String(target)) ?? '' }, redacted: [] }] } })
+      return original(config, argv, signal)
+    })
+    f.setElement('<button>搜索</button>')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e3' }
+    await f.execute('browser_authorize_action', { ...args, action: 'click', access: 'public_query' })
+    expect(await f.execute('browser_click', args)).toMatchObject({ output: { status: 'succeeded' } })
+    const argv = f.runner.mock.calls.find(([, argv]) => argv[0] === 'click')![1]
+    expect(JSON.parse(String(argv[argv.indexOf('--expect') + 1]))).toEqual(expect.arrayContaining([
+      { target: '@e1', field: 'value', equals: '工程测量' }, { target: '@e2', field: 'value', equals: '工程监测' }
+    ]))
+    values.set('@e1', 'changed')
+    expect(await f.execute('browser_click', args)).toMatchObject({ isError: true, output: { code: 'browser_query_input_changed' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'click')).toHaveLength(1)
+  })
+
+  it.each(['truncated', 'redacted', 'wrong-page', 'empty'] as const)('does not dispatch public input from %s native facts', async invalid => {
+    const f = publicQueryFixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    f.setElement('<input placeholder="公开查询">')
+    const fill = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程测量' }
+    await f.execute('browser_authorize_action', { ...fill, action: 'fill', access: 'public_query' })
+    const original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation((config, argv, signal) => argv[0] === 'read' ? Promise.resolve({ ok: true, output: {
+      tab_id: 7, page_url: invalid === 'wrong-page' ? 'https://example.com/elsewhere' : 'https://example.com/search', frame_url: 'https://example.com/search', scope: 'current_dom', truncated: invalid === 'truncated',
+      items: invalid === 'empty' ? [] : [{ ref: '@e900', values: { exists: true, value: '' }, redacted: invalid === 'redacted' ? ['value'] : [] }]
+    } }) : original(config, argv, signal))
+    expect(await f.execute('browser_fill', fill)).toMatchObject({ isError: true, output: { code: 'browser_element_unverified' } })
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'fill')).toBe(false)
   })
 
   it('keeps historical strict grants and approvals strict without dependency arguments', async () => {
@@ -180,7 +299,7 @@ describe('typed BrowserSkill production provider', () => {
     expect(await f.execute('browser_authorize_action', { ...args, action: 'click', access: 'public_query' }))
       .toMatchObject({ output: { status: 'succeeded' } })
     expect(await f.execute('browser_click', args)).toMatchObject({ output: { status: 'succeeded' } })
-    expect(f.runner.mock.calls.find(([, argv]) => argv[0] === 'click')![1].slice(-2)).toEqual(['--depends-on', '@e1'])
+    expect(f.runner.mock.calls.find(([, argv]) => argv[0] === 'click')![1]).toContain('--expect')
   })
 
   it('refreshes once only after an explicit vendor none rejection, reuses the reviewed target/input and then fills with the fresh context', async () => {
@@ -196,7 +315,7 @@ describe('typed BrowserSkill production provider', () => {
     f.runner.mockImplementation(async (config, argv, signal) => {
       if (argv[0] === 'fill' && ++sent === 1) return { ok: false, output: { code: 'permission_denied', data: { reason: 'cooperation_sync_required', effect_state: 'none' } }, code: 'permission_denied' }
       if (argv[0] === 'cooperate' && argv[1] === 'wait') { fresh = true; return { ok: true, output: { ready: true } } }
-      if (argv[0] === 'cooperate' && fresh) return { ok: true, output: { context_id: 'context-two', observation: { text: 'Fresh public search @e1' } } }
+      if (argv[0] === 'cooperate' && fresh) return { ok: true, output: { control_policy: 'strict', context_id: 'context-two', observation: { text: 'Fresh public search @e1' } } }
       return original(config, argv, signal)
     })
     expect(await f.execute('browser_fill', args)).toMatchObject({ output: { status: 'succeeded', action: 'fill' } })
@@ -297,7 +416,7 @@ describe('typed BrowserSkill production provider', () => {
     const original = f.runner.getMockImplementation()!
     let html = ''
     f.runner.mockImplementation((config, argv, signal) => argv[0] === 'cooperate'
-      ? Promise.resolve({ ok: true, output: { context_id: 'unchanged-context', unchanged: true } })
+      ? Promise.resolve({ ok: true, output: { control_policy: 'strict', context_id: 'unchanged-context', unchanged: true } })
       : argv[0] === 'get-html' ? Promise.resolve({ ok: true, output: { tab_id: 7, html, truncated: false } }) : original(config, argv, signal))
     expect(await f.execute('browser_observe', { sessionId: 'session-one' })).toMatchObject({ isError: true, output: { code: 'browser_readback_blocked' } })
     await f.execute('browser_get_html', { sessionId: 'session-one' })
@@ -310,20 +429,22 @@ describe('typed BrowserSkill production provider', () => {
     expect(f.runner.mock.calls.some(([, argv]) => ['click', 'fill', 'press'].includes(argv[0]))).toBe(false)
   })
 
-  it('does not settle a pending action by reading or navigating to a different same-origin page', async () => {
+  it('blocks further navigation while ACK readback is pending, but reads a legitimate click navigation in the owned tab', async () => {
     const f = fixture()
     await f.execute('browser_session_start')
     await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/original' })
     f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'original-ack', kind: 'browser_action_dispatch',
       request: { action: 'click', sessionId: 'session-one', pageUrl: 'https://example.com/original', tabId: 7 }, nowIso: new Date().toISOString() })
-    f.repository.finishOperation('task', 'original-ack', { status: 'succeeded', result: { actionAcknowledged: true, readbackPending: true } })
-    await f.execute('browser_navigate', { sessionId: 'session-one', contextId: 'context-one', url: 'https://example.com/different' })
-    await f.execute('browser_get_html', { sessionId: 'session-one' })
-    await f.execute('browser_observe', { sessionId: 'session-one' })
-    expect(f.repository.operation('task', 'original-ack')).toMatchObject({ status: 'succeeded', result: { readbackPending: true } })
-    f.setUrl('https://example.com/original')
-    await f.execute('browser_get_html', { sessionId: 'session-one' })
-    expect(f.repository.operation('task', 'original-ack')).toMatchObject({ status: 'succeeded', result: { readbackPending: false } })
+    f.repository.finishOperation('task', 'original-ack', { status: 'succeeded', result: { actionAcknowledged: true, acknowledgementHash: 'a'.repeat(64), readbackPending: true } })
+    const navigationCount = f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate').length
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', contextId: 'context-one', url: 'https://example.com/different' }))
+      .toMatchObject({ isError: true, output: { code: 'browser_readback_blocked' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(navigationCount)
+    f.setUrl('https://example.com/search?k=measurement') // the acknowledged click navigated this same owned tab
+    expect(await f.execute('browser_observe', { sessionId: 'session-one' }))
+      .toMatchObject({ output: { status: 'succeeded', evidence: { businessOutcomeVerified: false, contentRead: true } } })
+    expect(f.repository.operation('task', 'original-ack')).toMatchObject({ status: 'succeeded', result: {
+      actionAcknowledged: true, acknowledgementHash: 'a'.repeat(64), sourceUrl: 'https://example.com/search?k=measurement', readbackPending: false } })
     expect(f.runner.mock.calls.some(([, argv]) => ['click', 'fill', 'press'].includes(argv[0]))).toBe(false)
   })
 
@@ -531,7 +652,7 @@ describe('typed BrowserSkill production provider', () => {
     await f.execute('browser_session_start')
     const original = f.runner.getMockImplementation()!
     f.runner.mockImplementation((config, args, signal) => args[0] === 'cooperate'
-      ? Promise.resolve({ ok: true, output: { context_id: 'denied-context', observation: { text: '@vom 1\nL1 page\n RootWebArea "403 Forbidden"\n StaticText "Forbidden"' } } })
+      ? Promise.resolve({ ok: true, output: { control_policy: 'strict', context_id: 'denied-context', observation: { text: '@vom 1\nL1 page\n RootWebArea "403 Forbidden"\n StaticText "Forbidden"' } } })
       : original(config, args, signal))
     expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/' })).toMatchObject({ isError: true, output: { code: 'web_access_blocked', evidence: { contentRead: false, verified: false } } })
   })

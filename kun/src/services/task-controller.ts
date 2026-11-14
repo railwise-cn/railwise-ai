@@ -633,6 +633,8 @@ export class TaskController {
     const task = this.repository.findActiveByThread(threadId)
     if (!task || task.activeTurnId !== turnId) return null
     if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
+    const unknown = this.suspendUnknownToolOutcome(threadId, turnId)
+    if (unknown) return unknown
     const thread = await this.threadStore.get(threadId)
     const turn = thread?.turns.find(candidate => candidate.id === turnId)
     const items = (await this.sessionStore.loadItems(threadId)).filter(item => item.turnId === turnId)
@@ -641,6 +643,30 @@ export class TaskController {
     const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
     if (blocked?.retryable !== false) return null
     return this.waitForUser(task, blocked.reason, latestAssistantText(turn, items), blocked.fingerprint, turnId)
+  }
+
+  private unknownToolOutcomes(taskId: string): OperationReceipt[] {
+    return this.repository.unsettledOperations(taskId).filter(operation => operation.kind === 'tool' && operation.status === 'outcome_unknown')
+  }
+
+  /** Only trusted, persisted receipts fence the current task; tool prose cannot do so. */
+  hasUnknownToolOutcome(threadId: string, turnId: string): boolean {
+    const task = this.repository.findActiveByThread(threadId)
+    return Boolean(task?.activeTurnId === turnId && this.unknownToolOutcomes(task.id).length)
+  }
+
+  suspendUnknownToolOutcome(threadId: string, turnId: string): TaskCandidateDecision | null {
+    const task = this.repository.findActiveByThread(threadId)
+    if (!task || task.activeTurnId !== turnId) return null
+    const operations = this.unknownToolOutcomes(task.id)
+    if (!operations.length) return null
+    if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
+    const ids = operations.map(operation => operation.id)
+    const prior = this.repository.attention(`unknown_${task.id}`)
+    if (task.status === 'stalled' && prior?.status === 'pending' && JSON.stringify(prior.payload?.operationIds) === JSON.stringify(ids)) {
+      return { kind: 'stalled', task, reason: task.stalledReason ?? prior.message }
+    }
+    return this.stallUnknown(task, ids)
   }
 
   private waitForToolPermission(task: TaskRun, items: TurnItem[], turnId: string): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null {
@@ -942,6 +968,9 @@ export class TaskController {
     if (!token) return undefined
     return this.repository.transact(() => {
       this.assertToken(token)
+      if (this.unknownToolOutcomes(token.taskId).length) {
+        throw Object.assign(new Error('A previous tool has an unknown outcome. Verify its original receipt before executing another tool.'), { code: 'outcome_unknown' })
+      }
       const key = `tool:${turnId}:${call.callId}`
       const argumentsHash = operationFingerprint(call.arguments)
       if (['browser_click', 'browser_fill'].includes(call.toolName)) {
@@ -1055,6 +1084,9 @@ export class TaskController {
   recordToolDispatch(token: ExecutionToken, key: string): void {
     this.repository.transact(() => {
       this.assertToken(token)
+      if (this.unknownToolOutcomes(token.taskId).length) {
+        throw Object.assign(new Error('An earlier operation requires verification; this tool was not dispatched.'), { code: 'operation_not_dispatched' })
+      }
       const receipt = this.repository.operation(token.taskId, key)
       if (!receipt || receipt.status !== 'prepared') throw Object.assign(new Error('This tool operation has already entered dispatch.'), { code: 'outcome_unknown' })
       this.repository.finishOperation(token.taskId, key, { status: 'running' }, this.nowIso())

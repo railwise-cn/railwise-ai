@@ -172,11 +172,22 @@ it('clears the earlier single public-query scope blocker only after matching tas
   expect(f.network).not.toHaveBeenCalled()
 })
 
-it.each(['different-target', 'old-policy', 'revoked', 'expired', 'unknown'] as const)('does not clear the single public-query blocker for %s authorization or dispatch evidence', async scenario => {
+it.each(['different-target', 'old-policy', 'revoked', 'expired'] as const)('does not clear the single public-query blocker for %s authorization or dispatch evidence', async scenario => {
   const f = await singleActionLedger(scenario)
   expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'waiting_user' })
   expect(f.runtime.taskRepository!.attention(`capability_${f.task.id}`)).toMatchObject({ status: 'pending', payload: { capability: { errorCode: 'browser_public_query_action_required' } } })
   expect(f.runtime.taskRepository!.get(f.task.id)?.status).not.toBe('completed')
+  expect(f.network).not.toHaveBeenCalled()
+})
+
+it('prioritizes verification of a persisted unknown operation over offering another public-query authorization', async () => {
+  const f = await singleActionLedger('unknown')
+  const before = JSON.stringify(f.runtime.taskRepository!.operations(f.task.id))
+  expect(await f.runtime.taskController!.assessNonRetryableBlock(f.worker.id, f.turn.turnId)).toMatchObject({ kind: 'stalled' })
+  expect(f.runtime.taskRepository!.attention(`unknown_${f.task.id}`)).toMatchObject({ status: 'pending', title: '核实上次操作结果' })
+  expect(f.runtime.taskRepository!.attention(`capability_${f.task.id}`)).toBeNull()
+  expect(f.runtime.taskRepository!.get(f.task.id)?.status).toBe('stalled')
+  expect(JSON.stringify(f.runtime.taskRepository!.operations(f.task.id))).toBe(before)
   expect(f.network).not.toHaveBeenCalled()
 })
 

@@ -13,21 +13,21 @@ import type { BrowserTaskBindingSnapshot } from '../src/contracts/browser-skill.
 import type { BrowserScheduleAction } from '../src/contracts/browser-schedule-actions.js'
 import { listApprovedBrowserScheduleActions } from '../src/services/browser-schedule-action-authority.js'
 
-const browser = vi.hoisted(() => ({ next: 0, latest: '', sessions: new Map<string, { url: string; context: string; tab: number }>(),
-  writes: [] as Array<{ sessionId: string; action: string; targetRef: string; dependsOn: string[] }>, elementChanged: false }))
+const browser = vi.hoisted(() => ({ next: 0, latest: '', modern: false, sessions: new Map<string, { url: string; context: string; tab: number; value: string }>(),
+  writes: [] as Array<{ sessionId: string; action: string; targetRef: string; dependsOn: string[]; expect?: unknown[] }>, elementChanged: false }))
 vi.mock('../src/services/browser-skill-cli.js', async original => ({
   ...await original<typeof import('../src/services/browser-skill-cli.js')>(),
   runBrowserCommand: vi.fn(async (_config: unknown, args: readonly string[]) => {
     const id = args[args.indexOf('--session') + 1]
     const session = browser.sessions.get(id ?? '')
-    if (args[0] === 'status') return { ok: true, output: { protocol_version: '1.7', pid: 7,
-      browsers: [{ instance_id: 'synthetic-browser', browser_name: 'Chrome', label: '合成公开页面', extension_version: '0.4.0', extension_protocol_version: '1.7' }],
+    if (args[0] === 'status') return { ok: true, output: { protocol_version: browser.modern ? '1.9' : '1.7', pid: 7,
+      browsers: [{ instance_id: 'synthetic-browser', browser_name: 'Chrome', label: '合成公开页面', extension_version: browser.modern ? '0.5.0' : '0.4.0', extension_protocol_version: browser.modern ? '1.9' : '1.7' }],
       sessions: [...browser.sessions.keys()].map(session_id => ({ session_id, browser_instance_id: 'synthetic-browser' })) } }
     if (args[0] === 'session' && args[1] === 'request') return { ok: true, output: { state: 'prepared' } }
     if (args[0] === 'session' && args[1] === 'start') {
       const sessionId = `synthetic-session-${++browser.next}`
       browser.latest = sessionId
-      browser.sessions.set(sessionId, { url: 'about:blank', context: 'context-0', tab: browser.next })
+      browser.sessions.set(sessionId, { url: 'about:blank', context: 'context-0', tab: browser.next, value: '' })
       return { ok: true, output: { session_id: sessionId, browser_instance_id: 'synthetic-browser' } }
     }
     if (args[0] === 'session' && args[1] === 'stop') { browser.sessions.delete(args[2]!); return { ok: true, output: { stopped: [args[2]], failed: [] } } }
@@ -35,9 +35,20 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
     if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: session.tab, active: true, url: session.url, title: '合成公告查询', scope: 'agent' }] } }
     if (args[0] === 'navigate') { session.url = args.find(value => value.startsWith('https://'))!; return { ok: true, output: { final_url: session.url } } }
     if (args[0] === 'cooperate') {
+      if (browser.modern) { expect(args).toContain('--settle'); expect(args[args.indexOf('--policy') + 1]).toBe('target') }
+      else { expect(args).not.toContain('--policy'); expect(args).not.toContain('--settle') }
       session.context = `context-${Number(session.context.split('-')[1]) + 1}`
-      return { ok: true, output: { ready: true, context_id: session.context,
+      return { ok: true, output: { ready: true, context_id: session.context, ...(browser.modern ? { control_policy: 'target' } : {}),
         observation: { text: '公开工程公告查询页面。@e1 关键词输入框，@e2 查询按钮。合成招标公告可读取并核对来源。' } } }
+    }
+    if (args[0] === 'read') {
+      expect(browser.modern).toBe(true)
+      const target = args[args.indexOf('--ref') + 1], input = target === '@e1'
+      const fields = JSON.parse(args[args.indexOf('--fields-json') + 1]!) as Array<{ key: string; read: string; attribute?: string }>
+      const attributes: Record<string, string | null> = input ? { name: 'keyword', 'aria-label': '公告关键词' } : { id: 'search' }
+      const values = Object.fromEntries(fields.map(field => [field.key, field.read === 'exists' ? true : field.read === 'value' ? session.value : field.read === 'text' ? '查询公告' : attributes[field.attribute ?? ''] ?? null]))
+      return { ok: true, output: { tab_id: session.tab, page_url: session.url, frame_url: session.url, scope: 'current_dom', truncated: false,
+        items: [{ ref: '@e999', values, redacted: [] }] } }
     }
     if (args[0] === 'get-html') {
       const html = args.includes('@e1') ? '<input name="keyword" aria-label="公告关键词">'
@@ -46,7 +57,9 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
     }
     if (args[0] === 'fill' || args[0] === 'click') {
       browser.writes.push({ sessionId: id!, action: args[0], targetRef: args.find(value => /^@?e\d+$/.test(value))!,
-        dependsOn: args.flatMap((value, index) => value === '--depends-on' ? [args[index + 1]!] : []) })
+        dependsOn: args.flatMap((value, index) => value === '--depends-on' ? [args[index + 1]!] : []),
+        ...(args.includes('--expect') ? { expect: JSON.parse(args[args.indexOf('--expect') + 1]!) } : {}) })
+      if (args[0] === 'fill') session.value = args[args.indexOf('--value') + 1]!
       return { ok: true, output: { tab_id: session.tab } }
     }
     throw new Error(`Unexpected synthetic browser command ${args[0]}`)
@@ -58,11 +71,12 @@ afterEach(async () => {
   while (cleanup.length) await cleanup.pop()!()
   vi.useRealTimers()
   vi.unstubAllEnvs()
-  browser.next = 0; browser.latest = ''; browser.sessions.clear(); browser.writes = []; browser.elementChanged = false
+  browser.next = 0; browser.latest = ''; browser.sessions.clear(); browser.writes = []; browser.elementChanged = false; browser.modern = false
 })
 
 it.each([undefined, 'public_query_target'] as const)('runs independent scheduled tasks after expiry and restart with policy %s and no repeated approvals', async verificationPolicy => {
   const effectivePolicy = verificationPolicy ?? 'strict'
+  browser.modern = verificationPolicy === 'public_query_target'
   vi.stubEnv('RAILWISE_TASK_SCHEDULING_DISABLED', '0')
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-browser-schedule-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
@@ -110,7 +124,10 @@ it.each([undefined, 'public_query_target'] as const)('runs independent scheduled
     baseUrl: `http://127.0.0.1:${(model.address() as { port: number }).port}/v1`, endpointFormat: 'chat_completions' as const, model: 'synthetic-model',
     approvalPolicy: 'on-request' as const, sandboxMode: 'read-only' as const, tokenEconomyMode: false, insecure: false,
     storage: { backend: 'file' as const }, capabilities: KunCapabilitiesConfig.parse({ browserSkill: { enabled: true, state: 'ready',
-      executablePath: join(root, 'synthetic-cli'), executableHash: 'a'.repeat(64), version: '0.4.0',
+      executablePath: join(root, 'synthetic-cli'), executableHash: 'a'.repeat(64), version: browser.modern ? '0.5.0' : '0.4.0',
+      daemonProtocolVersion: browser.modern ? '1.9' : '1.7',
+      browsers: [{ id: 'synthetic-browser', name: 'Chrome', label: '合成公开页面', connected: true, versionSkew: false,
+        extensionVersion: browser.modern ? '0.5.0' : '0.4.0', protocolVersion: browser.modern ? '1.9' : '1.7' }],
       browserInstanceId: 'synthetic-browser', origins: ['https://public.example.test'], interaction: 'interact', revision: 1 } }) }
   let runtime = await createKunServeRuntime(options)
   cleanup.push(async () => runtime.shutdown?.())
@@ -177,13 +194,15 @@ it.each([undefined, 'public_query_target'] as const)('runs independent scheduled
     else expect(runtime.taskRepository!.attention(`capability_${task.id}`)).toMatchObject({ status: 'answered' })
     const dispatches = runtime.taskRepository!.operations(task.id, 'browser_action_dispatch')
     const derived = runtime.taskRepository!.operations(task.id, 'browser_derived_action_authorization')
-    expect(dispatches).toHaveLength(2)
+    const errors = turns.flatMap(turn => turn.items).flatMap(item => item.kind === 'tool_result' && item.isError
+      ? [{ toolName: item.toolName, code: (item.output as { code?: string } | undefined)?.code }] : [])
+    expect(dispatches, JSON.stringify(errors)).toHaveLength(2)
     expect(derived).toHaveLength(2)
     for (const dispatch of dispatches) {
       const request = dispatch.request!
       expect(dispatch.status).toBe('succeeded')
       expect(request.verificationPolicy).toBe(effectivePolicy)
-      expect(request.dependsOn).toEqual(verificationPolicy ? [request.targetRef] : [])
+      expect(request.dependsOn).toEqual([])
       expect(dispatch.result).toMatchObject({ actionAcknowledged: true, readbackPending: false })
       const call = turns[0]!.items.find(item => item.kind === 'tool_call' && item.callId === `synthetic-${String(request.action)}`)
       expect(call?.kind).toBe('tool_call')
@@ -195,8 +214,22 @@ it.each([undefined, 'public_query_target'] as const)('runs independent scheduled
       expect(authorization?.request).toMatchObject({ grantId: grant.id, turnId: turns[0]!.id, sessionId: request.sessionId, elementHash: request.elementHash })
       expect(authorization!.request!.verificationPolicy ?? 'strict').toBe(effectivePolicy)
       expect(authorization?.result).toMatchObject({ verificationPolicy: effectivePolicy })
+      const inputFacts = (value: string) => [{ target: '@e1', field: 'exists', equals: true }, { target: '@e1', field: 'value', equals: value },
+        { target: '@e1', field: 'attribute', attribute: 'name', equals: 'keyword' }, { target: '@e1', field: 'attribute', attribute: 'aria-label', equals: '公告关键词' }]
+      const facts = request.action === 'fill' ? inputFacts('') : [{ target: '@e2', field: 'exists', equals: true },
+        { target: '@e2', field: 'text', equals: '查询公告' }, { target: '@e2', field: 'attribute', attribute: 'id', equals: 'search' }, ...inputFacts('工程监测')]
+      if (verificationPolicy) {
+        expect(request.expectationVersion).toBe('native-dom-v1')
+        expect(request.expectationHash).toBe(createHash('sha256').update(JSON.stringify(facts)).digest('hex'))
+        if (request.action === 'fill') expect((dispatch.result as { publicQueryInput?: unknown }).publicQueryInput).toEqual({
+          target: '@e1', value: '工程监测', elementHash: request.elementHash, frameUrl: 'https://public.example.test/search'
+        })
+      } else {
+        expect(request.expectationVersion).toBeUndefined(); expect(request.expectationHash).toBeUndefined()
+        expect((dispatch.result as { publicQueryInput?: unknown }).publicQueryInput).toBeUndefined()
+      }
       expect(browser.writes.filter(write => write.sessionId === request.sessionId && write.action === request.action)).toEqual([
-        { sessionId: request.sessionId, action: request.action, targetRef: request.targetRef, dependsOn: verificationPolicy ? [request.targetRef] : [] }
+        { sessionId: request.sessionId, action: request.action, targetRef: request.targetRef, dependsOn: [], ...(verificationPolicy ? { expect: facts } : {}) }
       ])
     }
     return grant

@@ -350,9 +350,10 @@ export function validateWindowsBrowserEvidence(evidence) {
   assert.equal(evidence.fixturePageRead, true)
   assert.equal(evidence.htmlFromBrowserTool, true)
   assert.equal(evidence.sessionStopped, true)
-  assert.equal(evidence.cliVersion, '0.4.0')
+  assert.equal(evidence.cliVersion, '0.5.0')
+  assert.equal(evidence.protocolVersion, '1.9')
   assert.equal(evidence.skillInstallation.packageId, 'browser-skill')
-  assert.equal(evidence.skillInstallation.sourceCommit, '9cfba53582cb04d48da36aabd0a5017987d4daea')
+  assert.equal(evidence.skillInstallation.sourceCommit, '361da1d75798b99b358dfb434b8ce1921fb90d9e')
   assert.equal(evidence.skillInstallation.runtimeHotLoaded, true)
   assert.equal(evidence.skillInstallation.runtimeUnchanged, true)
   assert.equal(evidence.skillInstallation.sameConversation, true)
@@ -782,7 +783,11 @@ export function validateWindowsScheduledQueryEvidence(evidence) {
       assert.equal(dispatch.verificationPolicy, 'public_query_target')
       assert.equal(dispatch.derivedVerificationPolicy, 'public_query_target')
       assert.match(dispatch.targetRef, /^@?e\d+$/)
-      assert.deepEqual(dispatch.dependsOn, [dispatch.targetRef])
+      assert.deepEqual(dispatch.dependsOn, [])
+      assert.equal(dispatch.expectationVersion, 'native-dom-v1')
+      assert.match(dispatch.expectationHash, /^[a-f0-9]{64}$/)
+      assert.equal(dispatch.nativeExpectationVerified, true)
+      assert.equal(dispatch.inputBindingVerified, true)
       assert.ok(item.policyExecution.grants.some(grant => grant.id === dispatch.grantId))
     }
   }
@@ -827,6 +832,24 @@ export function inspectWindowsQueryThread(thread, fixture, { initial }) {
   return { actions: 2, domReadbackVerified: true, htmlReadbackVerified: true, accountState: 'unknown', access: 'public_query' }
 }
 
+/** Expected native facts for the fixed, controlled page only; no model-supplied field definitions. */
+export function windowsFixtureNativeExpectations(fixture, { action, targetRef, inputTargetRef }) {
+  const facts = (target, html, field, value) => {
+    assert.match(target, /^@?e\d+$/)
+    const result = [{ target, field: 'exists', equals: true }, { target, field, equals: value }]
+    for (const attribute of ['id', 'name', 'placeholder', 'aria-label', 'type', 'href']) {
+      const found = new RegExp(`(?:^|\\s)${attribute}="([^"]*)"`).exec(html)?.[1]
+      if (found) result.push({ target, field: 'attribute', attribute, equals: found })
+    }
+    return result
+  }
+  if (action === 'fill') return facts(targetRef, fixture.inputHtml, 'value', '')
+  assert.equal(action, 'click')
+  const text = /^<button\b[^>]*>([^<]*)<\/button>$/.exec(fixture.buttonHtml)?.[1]
+  assert.ok(text, 'The controlled button must have exact plain text')
+  return [...facts(targetRef, fixture.buttonHtml, 'text', text), ...facts(inputTargetRef, fixture.inputHtml, 'value', fixture.query)]
+}
+
 /** Read only the owned test task's actual Grants and dispatches; export no complete Grant or tool arguments. */
 export function inspectWindowsBrowserPolicy(task, thread, receipts, fixture, expectedPolicy = 'public_query_target') {
   const policy = value => { const result = value === undefined ? 'strict' : value; assert.ok(['strict', 'public_query_target'].includes(result)); return result }
@@ -860,7 +883,19 @@ export function inspectWindowsBrowserPolicy(task, thread, receipts, fixture, exp
     assert.equal(request.elementHash, createHash('sha256').update(action === 'fill' ? fixture.inputHtml : fixture.buttonHtml).digest('hex'))
     assert.equal(request.valueHash, action === 'fill' ? createHash('sha256').update(fixture.query).digest('hex') : undefined)
     assert.equal(policy(request.verificationPolicy), expectedPolicy)
-    assert.deepEqual(request.dependsOn ?? (expectedPolicy === 'strict' ? [] : undefined), expectedPolicy === 'public_query_target' ? [actualRequest.targetRef] : [])
+    assert.deepEqual(request.dependsOn ?? (expectedPolicy === 'strict' ? [] : undefined), [])
+    if (expectedPolicy === 'public_query_target') {
+      const filled = fixture.observed.requests.map(item => item.browserAction).find(item => item?.action === 'fill' && item.sessionId === request.sessionId)
+      assert.ok(filled?.targetRef)
+      const expectations = windowsFixtureNativeExpectations(fixture, { action, targetRef: actualRequest.targetRef, inputTargetRef: filled.targetRef })
+      assert.equal(request.expectationVersion, 'native-dom-v1')
+      assert.equal(request.expectationHash, createHash('sha256').update(JSON.stringify(expectations)).digest('hex'))
+      if (action === 'fill') assert.deepEqual(receipt.result.publicQueryInput, { target: actualRequest.targetRef,
+        value: fixture.query, elementHash: request.elementHash, frameUrl: fixture.fixtureUrl })
+    } else {
+      assert.equal(request.expectationVersion, undefined); assert.equal(request.expectationHash, undefined)
+      assert.equal(receipt.result.publicQueryInput, undefined)
+    }
     assert.equal(receipt.result.actionAcknowledged, true)
     assert.equal(receipt.result.readbackPending, false)
     const derived = receipts.filter(item => item.ownerId === task.id && item.kind === 'browser_derived_action_authorization' && item.request?.turnId === turn.id &&
@@ -871,7 +906,9 @@ export function inspectWindowsBrowserPolicy(task, thread, receipts, fixture, exp
     assert.equal(policy(derived[0].request.verificationPolicy), expectedPolicy)
     assert.equal(policy(derived[0].result.verificationPolicy), expectedPolicy)
     checked.push({ receiptId: receipt.id, action, turnId: turn.id, grantId: grant.id, verificationPolicy: policy(request.verificationPolicy), targetRef: request.targetRef,
-      dependsOn: request.dependsOn ?? [], derivedAuthorizationId: derived[0].id, derivedVerificationPolicy: policy(derived[0].result.verificationPolicy),
+      dependsOn: request.dependsOn ?? [], ...(expectedPolicy === 'public_query_target' ? { expectationVersion: request.expectationVersion,
+        expectationHash: request.expectationHash, nativeExpectationVerified: true, inputBindingVerified: true } : {}),
+      derivedAuthorizationId: derived[0].id, derivedVerificationPolicy: policy(derived[0].result.verificationPolicy),
       actionAcknowledged: true, readbackPending: false })
   }
   return { verificationPolicy: expectedPolicy, grants: [...grants.values()], dispatches: checked }
@@ -1226,7 +1263,7 @@ async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
     assert.match(extension.id, /^[a-p]{32}$/)
     const installed = await cdp.evaluate('window.workwise.installBrowserSkill()', 180_000)
     assert.equal(installed.ok, true, installed.message)
-    assert.equal(installed.status.version, '0.4.0')
+    assert.equal(installed.status.version, '0.5.0')
     const connection = await observeWindowsBrowserConnect({
       connect: () => cdp.evaluate('window.workwise.connectBrowserSkill()'),
       diagnose: () => cdp.evaluate('window.workwise.diagnoseBrowserSkill()', 6000),
@@ -1243,6 +1280,7 @@ async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
     const connected = diagnosis?.status.browsers.filter(item => item.connected) ?? []
     assert.equal(connected.length, 1, `Expected one real isolated extension connection (${diagnosis?.status.state})`)
     assert.equal(connected[0].extensionVersion, browserSmokeDependency.extensionVersion)
+    assert.equal(connected[0].protocolVersion, '1.9')
     const configured = await cdp.evaluate(`window.workwise.configureBrowserSkill(${JSON.stringify({ enabled: true, expectedRevision: diagnosis.status.revision,
       browserInstanceId: connected[0].id, origins: [new URL(fixtureUrl).origin], interaction: 'interact' })})`)
     assert.equal(configured.ok, true, configured.message)
@@ -1272,7 +1310,7 @@ async function installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeReq
   const entry = catalog.packages.find(item => item.package.id === 'browser-skill')
   assert.ok(entry, 'The fixed BrowserSkill must be available in the installed local marketplace')
   const source = entry.package.sources.find(item => item.kind === 'github' && item.owner === 'Tencent' && item.repository === 'BrowserSkill')
-  assert.equal(source?.resolvedRef, '9cfba53582cb04d48da36aabd0a5017987d4daea')
+  assert.equal(source?.resolvedRef, '361da1d75798b99b358dfb434b8ce1921fb90d9e')
   assert.equal(source.subpath, 'crates/bsk-cli/skill')
   const prepared = await cdp.evaluate(`window.workwise.prepareCatalogPlugin(${JSON.stringify({ sourceId: entry.sourceId, packageId: 'browser-skill' })})`, 180_000)
   assert.equal(prepared.package.id, 'browser-skill')

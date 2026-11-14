@@ -310,11 +310,35 @@ describe('TaskController reliability boundaries', () => {
     expect(repository.operation(task.id, waiting.key)?.status).toBe('prepared')
     controller.finishToolOperation(waiting.token, waiting.key)
     expect(repository.operation(task.id, waiting.key)).toMatchObject({ status: 'failed', result: { approved: false, item: { output: { code: 'operation_not_dispatched' } } } })
+    expect(controller.hasUnknownToolOutcome(task.threadId, 'turn_reliability')).toBe(false)
+    const denied = controller.beginToolOperation('turn_reliability', { callId: 'denied-approval', toolName: 'pending_write', arguments: {} })!
+    controller.finishToolOperation(denied.token, denied.key, { approved: false, item: makeToolResultItem({
+      id: 'denied', threadId: task.threadId, turnId: 'turn_reliability', callId: 'denied-approval', toolName: 'pending_write',
+      isError: true, output: { code: 'approval_denied', message: 'outcome_unknown is only quoted text here' }
+    }) })
+    expect(controller.hasUnknownToolOutcome(task.threadId, 'turn_reliability')).toBe(false)
     const started = controller.beginToolOperation('turn_reliability', { callId: 'actual-dispatch', toolName: 'pending_write', arguments: { target: 'test' } })!
     controller.recordToolDispatch(started.token, started.key)
     expect(repository.operation(task.id, started.key)?.status).toBe('running')
     controller.finishToolOperation(started.token, started.key)
     expect(repository.operation(task.id, started.key)?.status).toBe('outcome_unknown')
+    expect(controller.hasUnknownToolOutcome(task.threadId, 'turn_reliability')).toBe(true)
+    repository.close()
+  })
+
+  it('fences a prepared concurrent call at its real dispatch boundary without inventing another unknown receipt', async () => {
+    const { repository, controller, task } = await fixture()
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const first = controller.beginToolOperation('turn_reliability', { callId: 'first', toolName: 'first_write', arguments: {} })!
+    const queued = controller.beginToolOperation('turn_reliability', { callId: 'queued', toolName: 'queued_tool', arguments: {} })!
+    controller.recordToolDispatch(first.token, first.key)
+    controller.finishToolOperation(first.token, first.key)
+    const original = JSON.stringify(repository.operation(task.id, first.key))
+    expect(() => controller.recordToolDispatch(queued.token, queued.key)).toThrow(/not dispatched/)
+    controller.finishToolOperation(queued.token, queued.key)
+    expect(repository.operation(task.id, queued.key)).toMatchObject({ status: 'failed', result: { approved: false, item: { output: { code: 'operation_not_dispatched' } } } })
+    expect(JSON.stringify(repository.operation(task.id, first.key))).toBe(original)
+    expect(repository.operations(task.id, 'tool').filter(receipt => receipt.status === 'outcome_unknown')).toHaveLength(1)
     repository.close()
   })
 

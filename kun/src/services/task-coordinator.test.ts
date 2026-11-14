@@ -1,9 +1,11 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
+import { FileThreadStore } from '../adapters/file/file-thread-store.js'
+import { FileSessionStore } from '../adapters/file/file-session-store.js'
 import { InMemoryEventBus } from '../adapters/in-memory-event-bus.js'
 import { RuntimeEventRecorder } from './runtime-event-recorder.js'
 import { ThreadService } from './thread-service.js'
@@ -21,11 +23,13 @@ import { defaultExternalTaskCapability } from './external-task-capability.js'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async()=>{ for(const close of cleanup.splice(0)) await close() })
-async function fixture() {
+async function fixture(persistent = false) {
   const root=await mkdtemp(join(tmpdir(),'railwise-coordinator-'))
   const repository=new TaskRunRepository(join(root,'tasks.sqlite3'))
   cleanup.push(async()=>{repository.close();await rm(root,{recursive:true,force:true})})
-  const threadStore=new InMemoryThreadStore(), sessionStore=new InMemorySessionStore(), bus=new InMemoryEventBus(),ids=new SequentialIdGenerator()
+  const threadStore=persistent ? new FileThreadStore({dataDir:root}) : new InMemoryThreadStore()
+  const sessionStore=persistent ? new FileSessionStore({dataDir:root}) : new InMemorySessionStore()
+  const bus=new InMemoryEventBus(),ids=new SequentialIdGenerator()
   const nowIso=()=>new Date().toISOString()
   const events=new RuntimeEventRecorder({eventBus:bus,sessionStore,allocateSeq:id=>bus.allocateSeq(id),nowIso})
   const threads=new ThreadService({threadStore,sessionStore,events,ids,nowIso})
@@ -38,6 +42,47 @@ async function fixture() {
 }
 
 describe('task commands before Turn allocation',()=>{
+  it.each(['explicit', 'rule'] as const)('projects a %s resume as a short control without repeating the persisted original request', async origin => {
+    const f = await fixture(true)
+    let ready = false
+    const grantTaskReference = vi.fn(async () => undefined)
+    const coordinator = new TaskCoordinator({ ...f, nowIso: () => new Date().toISOString(),
+      attachments: { grantTaskReference } as unknown as AttachmentStore,
+      preflightExternalTask: () => defaultExternalTaskCapability('lark', ready ? { lark: {
+        enabled: true, authState: 'installed', executablePath: '/managed/lark-cli', scopes: ['task:task:read', 'task:task:write']
+      } } : {}) })
+    const prompt = '帮我处理飞书待办，按附件要求汇总。'
+    const waiting = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'original-goal',
+      request: { prompt, attachmentIds: ['original-image'] } })
+    if (waiting.kind !== 'capability_required' || !waiting.task) throw new Error('expected preflight waiting task')
+    expect(f.runTurn).not.toHaveBeenCalled()
+    ready = true
+    const command = { threadId: f.origin.id, taskId: waiting.task.id, idempotencyKey: 'resume-control',
+      ...(origin === 'explicit' ? { intent: 'resume' as const, resolveAttentionId: waiting.attentionId } : {}),
+      request: origin === 'explicit' ? { prompt, displayText: prompt, attachmentIds: ['original-image'] } : { prompt: '继续' } }
+    const resumed = await coordinator.command(command)
+    expect(resumed).toMatchObject({ kind: 'task_started', task: { id: waiting.task.id, goal: prompt } })
+    expect(f.repository.list()).toHaveLength(1)
+    expect(f.runTurn).toHaveBeenCalledTimes(1)
+    expect((await f.threads.get(f.origin.id))?.turns).toHaveLength(0)
+    expect((await f.threads.get(waiting.task.threadId))?.turns).toHaveLength(1)
+    expect(f.repository.operation(waiting.task.id, 'command:resume-control')).toMatchObject({ kind: 'resume', status: 'succeeded' })
+    expect(f.repository.inputs(waiting.task.id)).toMatchObject([{ kind: 'supplement', sourceId: 'capability-original', text: prompt, attachmentIds: ['original-image'] }])
+    expect(f.repository.attention(waiting.attentionId!)?.payload?.request).toMatchObject({ prompt, attachmentIds: ['original-image'] })
+    const readHistory = async () => (await readFile(join(f.root, 'threads', f.origin.id, 'messages.jsonl'), 'utf8'))
+      .trim().split('\n').map(line => JSON.parse(line) as { kind: string; text: string; conversationReceiptId?: string })
+    const history = await readHistory()
+    expect(history.filter(item => item.kind === 'user_message').map(item => item.text)).toEqual([prompt, '继续任务'])
+    expect(history.at(-1)).toMatchObject({ kind: 'assistant_text', text: '正在继续任务。', conversationReceiptId: expect.any(String) })
+    await coordinator.command(command)
+    expect(await readHistory()).toEqual(history)
+    expect(f.runTurn).toHaveBeenCalledTimes(1)
+    const supplement = '只保留本周待办，负责人和期限按附件原文保留。'
+    await coordinator.command({ threadId: f.origin.id, taskId: waiting.task.id, intent: 'supplement', idempotencyKey: 'actual-supplement', request: { prompt: supplement } })
+    expect((await readHistory()).filter(item => item.kind === 'user_message').map(item => item.text)).toEqual([prompt, '继续任务', supplement])
+    expect(f.repository.inputs(waiting.task.id).at(-1)).toMatchObject({ kind: 'supplement', text: supplement })
+  })
+
   it('routes pause, continue and cancel deterministically without a classification request',async()=>{
     expect(classifyTaskInput('先暂停',true)).toBe('pause')
     expect(classifyTaskInput('继续',true)).toBe('resume')

@@ -18,9 +18,10 @@ function bindingError(error: unknown, fallback: 'browserTaskBindingLoadFailed' |
   const changed = ['conflict', 'stale_request', 'browser_binding_changed'].includes(code ?? '') ||
     /\b(?:conflict|stale_request|browser_binding_changed)\b/.test(detail)
   const blocked = ['browser_verification_policy_blocked', 'browser_unresolved_operation'].find(value => code === value || new RegExp(`\\b${value}\\b`).test(detail))
-  return { messageKey: blocked === 'browser_unresolved_operation' ? 'browserTaskUnresolvedOperation'
+  const upgrade = code === 'browser_target_policy_upgrade_required' || /\bbrowser_target_policy_upgrade_required\b/.test(detail)
+  return { messageKey: upgrade ? 'browserTaskTargetUpgradeRequired' : blocked === 'browser_unresolved_operation' ? 'browserTaskUnresolvedOperation'
     : blocked ? 'browserTaskVerificationPolicyBlocked' : changed ? 'browserTaskBindingChanged' : fallback,
-  detail: redactSecretText(detail), unresolved: blocked === 'browser_unresolved_operation' }
+  detail: redactSecretText(detail), unresolved: blocked === 'browser_unresolved_operation', upgrade }
 }
 
 export function BrowserTaskBindingPanel({ taskId, onConfirmed }: { taskId: string; onConfirmed: (message: string) => void }) {
@@ -112,6 +113,7 @@ export function BrowserTaskBindingPanel({ taskId, onConfirmed }: { taskId: strin
     {currentSnapshot?.previousInteraction === 'observe' && currentSnapshot.interaction === 'interact' ? <p className="mt-2">{t('browserTaskInteractionExpansion')}</p> : null}
     {error ? <>
       <p role="alert" className="mt-2">{t(error.messageKey)}</p>
+      {error.upgrade ? <button type="button" className="mt-2 mr-2 rounded border border-ds-border px-3 py-1.5" onClick={() => useChatStore.getState().openPlugins(undefined, 'browser-skill')}>{t('browserTaskOpenConnector')}</button> : null}
       <button type="button" className="mt-2 rounded border border-ds-border px-3 py-1.5 disabled:opacity-50" disabled={pending} onClick={() => void load()}>{t('browserTaskBindingReload')}</button>
     </> : null}
     {policyBlocked ? <>

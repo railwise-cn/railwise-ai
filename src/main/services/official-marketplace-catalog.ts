@@ -1177,14 +1177,14 @@ const officialPackages: MarketplacePackageV1[] = [
     publisher: publisher('tencent', 'Tencent', 'https://github.com/Tencent/BrowserSkill'),
     owner: 'Tencent',
     repository: 'BrowserSkill',
-    commit: '9cfba53582cb04d48da36aabd0a5017987d4daea',
+    commit: '361da1d75798b99b358dfb434b8ce1921fb90d9e',
     subpath: 'crates/bsk-cli/skill',
     skillNames: ['browser-skill'],
     license: 'MIT',
     categories: ['browser-automation'],
-    usage: { howToUse: '安装技能资料后，在“连接器 → BrowserSkill 浏览器”安装 CLI、连接官方扩展并选择浏览器与站点范围。连接检查通过后，在任务中说明网页地址和目标，再读取页面、点击控件或整理结果。', requirements: ['受管理的 BrowserSkill CLI 0.4.0', '用户在 Chrome 或 Edge 中安装官方扩展并启用本机连接', '明确选择浏览器实例与任务站点范围'], examples: ['使用 BrowserSkill 打开 https://example.com，读取页面并保留资料来源。'] },
+    usage: { howToUse: '安装技能资料后，在“连接器 → BrowserSkill 浏览器”安装 CLI、连接官方扩展并选择浏览器与站点范围。连接检查通过后，在任务中说明网页地址和目标，再读取页面、点击控件或整理结果。', requirements: ['受管理的 BrowserSkill CLI 0.5.0', '用户在 Chrome 或 Edge 中安装官方扩展并启用本机连接；公开查询目标校验要求服务及所选扩展协议至少 1.8', '明确选择浏览器实例与任务站点范围'], examples: ['使用 BrowserSkill 打开 https://example.com，读取页面并保留资料来源。'] },
     dependencies: [
-      { id: 'bsk-cli', kind: 'system', requirement: 'BrowserSkill CLI 0.4.0（连接器中安装）', optional: false, managedBy: 'workwise' },
+      { id: 'bsk-cli', kind: 'system', requirement: 'BrowserSkill CLI 0.5.0（连接器中安装）', optional: false, managedBy: 'workwise' },
       { id: 'browser-extension', kind: 'system', requirement: 'Chrome or Edge extension', optional: false, managedBy: 'user' }
     ]
   }),

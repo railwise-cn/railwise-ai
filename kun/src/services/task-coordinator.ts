@@ -72,7 +72,7 @@ export class TaskCoordinator {
     if (receipt.result) {
       const result = receipt.result as TaskCommandResult
       if (result.task) await options.prepareTask?.(this.deps.repository.get(result.task.id) ?? result.task)
-      await this.recordResult(command, result)
+      await this.recordResult(command, result, intent)
       return result
     }
     if (resolving?.status !== undefined && resolving.status !== 'pending') throw Object.assign(new Error('这条待处理选择已经完成，请刷新当前任务。'), { code: 'stale_request' })
@@ -88,7 +88,7 @@ export class TaskCoordinator {
         payload:{ kind:'external_provider_choice', providers:['dingtalk','lark'], request:command.request, originalText:userText } })
       const result:TaskCommandResult = { kind:'attention_required', ...(task ? {task} : {}), attentionId:id, message }
       this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
-      await this.recordResult(command,result)
+      await this.recordResult(command,result,intent)
       return result
     }
     if (intent === 'ambiguous' && task && this.deps.classifyIntent) {
@@ -135,7 +135,7 @@ export class TaskCoordinator {
             payload: { kind: 'capability_required', capability, request: command.request } })
           result = { kind: 'capability_required', task: saved.task, attentionId, capability, message: capability.message }
           this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
-          await this.recordResult(command, result)
+          await this.recordResult(command, result, intent)
           return result
         }
         if (capability && (unresolvedEffect || priorBinding) && ['waiting_user', 'paused', 'stalled'].includes(task.status)) {
@@ -161,7 +161,7 @@ export class TaskCoordinator {
             result = { kind: 'capability_required', task: saved.task, attentionId, capability, message: capability.message }
           } else result = { kind: 'input_queued', task: saved.task, input: saved.input }
           this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
-          await this.recordResult(command, result)
+          await this.recordResult(command, result, intent)
           return result
         }
         const providerChanged = capability && task.acceptance.effect?.provider !== capability.provider
@@ -211,7 +211,7 @@ export class TaskCoordinator {
         result = { kind: 'capability_required', task: this.deps.repository.get(waiting.id) ?? waiting, attentionId, capability, message: capability.message }
         if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:now})
         this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
-        await this.recordResult(command, result)
+        await this.recordResult(command, result, intent)
         return result
       }
       const turnKey=`command:${command.idempotencyKey}`
@@ -227,7 +227,7 @@ export class TaskCoordinator {
       if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:this.deps.nowIso()})
       this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
       if(!oldTurn)void this.deps.runTurn(turn.threadId,turn.turnId)
-      await this.recordResult(command,result)
+      await this.recordResult(command,result,intent)
       return result
     }
     if (resolving && result.kind !== 'attention_required' && result.kind !== 'capability_required') {
@@ -235,7 +235,7 @@ export class TaskCoordinator {
       if(latest.status==='pending')this.deps.repository.putAttention({...latest,status:'answered',revision:latest.revision+1,updatedAt:this.deps.nowIso()})
     }
     this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
-    await this.recordResult(command,result)
+    await this.recordResult(command,result,intent)
     return result
   }
 
@@ -247,7 +247,7 @@ export class TaskCoordinator {
     }
   }
 
-  private async recordResult(command:ReturnType<typeof TaskCommandSchema.parse>,result:TaskCommandResult):Promise<void> {
+  private async recordResult(command:ReturnType<typeof TaskCommandSchema.parse>,result:TaskCommandResult,intent:ReturnType<typeof classifyTaskInput>):Promise<void> {
     if (result.kind === 'chat_started') return
     if (result.kind === 'capability_required' && result.task) {
       const pending = this.deps.repository.attention(result.attentionId ?? `capability_${result.task.id}`)
@@ -267,8 +267,11 @@ export class TaskCoordinator {
     }
     const commandId=createHash('sha256').update(`${command.threadId}:${command.idempotencyKey}`).digest('hex').slice(0,32)
     result.receipt={userMessageItemId:`item_command_${commandId}_user`,resultMessageItemId:`item_command_${commandId}_receipt`}
-    const assistantText=result.kind==='snapshot' ? result.task ? `${result.task.goal}\n${result.task.waitingReason ?? result.task.stalledReason ?? ({queued:'已接收任务',running:'正在执行',retrying:'正在继续',paused:'已暂停',waiting_user:'等待你补充',waiting_approval:'等待必要授权',completed:'已完成',stalled:'需要处理阻塞',failed:'执行失败',cancelled:'已取消'} as const)[result.task.status]}` : '当前没有进行中的任务。' : result.kind==='input_queued' ? result.task.status==='paused'?'补充已保存，将在你继续任务后送达。':'补充已保存，将送达当前任务。' : result.kind==='task_updated'?result.action==='pause'?'任务已暂停，补充会继续保存。':'任务已取消，已有成果和记录已保留。': result.kind==='attention_required'?result.message:result.kind==='capability_required'?result.capability.message:`已接收任务：${result.task?.goal ?? command.request.displayText ?? command.request.prompt}`
-    this.deps.repository.enqueueOutbox({id:`command-message:${commandId}`,ownerId:command.threadId,kind:'task_command_message',payload:{threadId:command.threadId,commandId,userText:command.request.displayText ?? command.request.prompt,assistantText,...(result.intentCard ? { intentCard: result.intentCard } : {}),...(result.kind==='capability_required'&&result.task?{capabilityCard:{threadId:command.threadId,taskId:result.task.id,attentionId:result.attentionId,prompt:command.request.prompt,capability:result.capability}}:{}),createdAt:this.deps.nowIso()},createdAt:this.deps.nowIso()})
+    // A resume command retains its original request for execution and audit,
+    // but its conversation receipt describes the control instead of resending the goal.
+    const userText = intent === 'resume' ? '继续任务' : command.request.displayText ?? command.request.prompt
+    const assistantText=intent==='resume'&&result.kind==='task_started'?'正在继续任务。':result.kind==='snapshot' ? result.task ? `${result.task.goal}\n${result.task.waitingReason ?? result.task.stalledReason ?? ({queued:'已接收任务',running:'正在执行',retrying:'正在继续',paused:'已暂停',waiting_user:'等待你补充',waiting_approval:'等待必要授权',completed:'已完成',stalled:'需要处理阻塞',failed:'执行失败',cancelled:'已取消'} as const)[result.task.status]}` : '当前没有进行中的任务。' : result.kind==='input_queued' ? result.task.status==='paused'?'补充已保存，将在你继续任务后送达。':'补充已保存，将送达当前任务。' : result.kind==='task_updated'?result.action==='pause'?'任务已暂停，补充会继续保存。':'任务已取消，已有成果和记录已保留。': result.kind==='attention_required'?result.message:result.kind==='capability_required'?result.capability.message:`已接收任务：${result.task?.goal ?? command.request.displayText ?? command.request.prompt}`
+    this.deps.repository.enqueueOutbox({id:`command-message:${commandId}`,ownerId:command.threadId,kind:'task_command_message',payload:{threadId:command.threadId,commandId,userText,assistantText,...(result.intentCard ? { intentCard: result.intentCard } : {}),...(result.kind==='capability_required'&&result.task?{capabilityCard:{threadId:command.threadId,taskId:result.task.id,attentionId:result.attentionId,prompt:command.request.prompt,capability:result.capability}}:{}),createdAt:this.deps.nowIso()},createdAt:this.deps.nowIso()})
     await this.flushCommandMessages()
   }
 

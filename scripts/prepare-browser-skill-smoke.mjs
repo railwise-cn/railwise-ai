@@ -12,9 +12,9 @@ import JSZip from 'jszip'
 const execute = promisify(execFile)
 export const browserSmokeDependency = Object.freeze({
   chromeVersion: '151.0.7922.34',
-  extensionVersion: '0.4.0',
-  extensionUrl: 'https://github.com/Tencent/BrowserSkill/releases/download/ext-v0.4.0/browser-skill-extension-v0.4.0-chrome.zip',
-  extensionSha256: 'ebb28abf4d18e8983e416647145d2acdbd3aa0a3b70320bf39401e27b5d4f16e'
+  extensionVersion: '0.5.0',
+  extensionUrl: 'https://github.com/Tencent/BrowserSkill/releases/download/ext-v0.5.0/browser-skill-extension-v0.5.0-chrome.zip',
+  extensionSha256: '4de785b340e401de855448410be3b7bad5e685a9e5128c0bd4ec4edeba5c9fc9'
 })
 
 export function chromeSmokeAsset(platform, arch) {

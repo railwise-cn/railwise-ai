@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { expect, it } from 'vitest'
-import { browserCommandDiagnostics, runBrowserCommand } from './browser-skill-cli.js'
+import { browserCommandDiagnostics, runBrowserCommand, supportsBrowserTargetPolicy } from './browser-skill-cli.js'
 
 it('retains only typed vendor reason/effect scalars from the real CLI error JSON envelope', async () => {
   const executableHash = createHash('sha256').update(await readFile(process.execPath)).digest('hex')
@@ -26,4 +26,12 @@ it('classifies the fixed content-change refusal without persisting raw page mess
   expect(JSON.stringify(diagnostic)).not.toContain('Untrusted page detail')
   expect(browserCommandDiagnostics({ ok: false, output: { message: output.message + '\nprivate page value' } })).toEqual({})
   expect(browserCommandDiagnostics({ ok: false, output: { message: 'constructor' } })).toEqual({})
+})
+
+
+it('requires the official target-policy CLI and both protocol peers before advertising public target control', () => {
+  expect(supportsBrowserTargetPolicy('0.5.0', '1.9', '1.8')).toBe(true)
+  for (const args of [['0.4.0', '1.9', '1.9'], ['0.5.0', '1.7', '1.9'], ['0.5.0', '1.9', '1.7'], ['0.5.0', '2.0', '1.9'], [undefined, '1.9', '1.9']]) {
+    expect(supportsBrowserTargetPolicy(...args)).toBe(false)
+  }
 })

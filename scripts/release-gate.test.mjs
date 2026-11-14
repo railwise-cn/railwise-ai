@@ -348,6 +348,16 @@ test('private exact updater smoke consumes this run’s package once without a r
   assert.match(signing.run, /EXACT_PACKAGE_UPDATER_SMOKE.*true/)
 })
 
+test('cancelled releases cannot start installers, native upgrades or public promotion', () => {
+  for (const name of ['exact-package-windows-install-smoke', 'exact-package-updater-smoke', 'publish']) {
+    assert.match(jobs[name].if, /!cancelled\(\)/, `${name} must honor cancellation`)
+    assert.doesNotMatch(jobs[name].if, /always\(\)/, `${name} must not bypass cancellation`)
+  }
+  for (const name of ['exact-package-windows-install-smoke', 'exact-package-updater-smoke']) {
+    assert.equal(jobs[name].steps.find(step => /actions\/upload-artifact@/.test(step.uses ?? '')).if, 'always()', 'Retain evidence even after cancellation')
+  }
+})
+
 test('private Windows installation smoke inspects this run’s exact EXE without rebuilding or publication', () => {
   const smoke = jobs['exact-package-windows-install-smoke']
   assert.deepEqual(smoke.needs, ['prepare', 'build-windows'])

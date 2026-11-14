@@ -16,9 +16,10 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
   ...await original<typeof import('../src/services/browser-skill-cli.js')>(),
   runBrowserCommand: vi.fn(async (_config: unknown, args: string[]) => {
     if (JSON.stringify(args) !== JSON.stringify(['status'])) throw new Error('Unexpected synthetic browser action')
-    return { ok: true, output: { protocol_version: '1.7', pid: 7, browsers: [{
+    const modern = (_config as { version?: string }).version === '0.5.0'
+    return { ok: true, output: { protocol_version: modern ? '1.9' : '1.7', pid: 7, browsers: [{
       instance_id: 'browser-new', browser_name: 'Chrome', label: 'Synthetic browser',
-      extension_version: '0.4.0', extension_protocol_version: '1.7'
+      extension_version: modern ? '0.5.0' : '0.4.0', extension_protocol_version: modern ? '1.9' : '1.7'
     }] } }
   })
 }))
@@ -52,6 +53,8 @@ async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser', i
     storage: { backend: 'file' as const }, capabilities: KunCapabilitiesConfig.parse({ browserSkill: {
       enabled: !initiallyDisabled, state: 'ready', browserInstanceId: 'browser-new', revision: 3,
       executablePath: join(root, 'synthetic-browser-cli'), executableHash: 'a'.repeat(64),
+      ...(requestedPrompt ? { version: '0.5.0', daemonProtocolVersion: '1.9', browsers: [{ id: 'browser-new', name: 'Chrome',
+        label: 'Synthetic browser', extensionVersion: '0.5.0', protocolVersion: '1.9', connected: true, versionSkew: false }] } : {}),
       origins: ['https://example.com', 'https://new.example'], interaction: 'interact'
     } })
   }

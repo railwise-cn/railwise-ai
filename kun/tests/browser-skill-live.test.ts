@@ -36,11 +36,14 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
     expect(await lstat(join(root, 'chrome-profile')).catch(() => undefined), 'Acceptance requires a fresh isolated browser profile').toBeUndefined()
     await mkdir(join(root, 'extension'), { recursive: true })
     const archive = await readFile(extensionZip)
-    expect(hash(archive)).toBe('ebb28abf4d18e8983e416647145d2acdbd3aa0a3b70320bf39401e27b5d4f16e')
+    expect(hash(archive)).toBe('4de785b340e401de855448410be3b7bad5e685a9e5128c0bd4ec4edeba5c9fc9')
     await executeFile('tar', ['-xf', extensionZip, '-C', join(root, 'extension')])
     const manifest = JSON.parse(await readFile(join(root, 'extension', 'manifest.json'), 'utf8'))
-    expect(manifest.version).toBe('0.4.0')
-    const config = BrowserCapabilityConfig.parse({ enabled: true, state: 'ready', executablePath: executable,
+    expect(manifest.version).toBe('0.5.0')
+    const versionOutput = String((await executeFile(executable, ['--version'])).stdout)
+    const cliVersion = /\b(\d+\.\d+\.\d+)\b/.exec(versionOutput)?.[1]
+    expect(cliVersion).toBe('0.5.0')
+    const config = BrowserCapabilityConfig.parse({ enabled: true, state: 'ready', version: cliVersion, executablePath: executable,
       executableHash: hash(await readFile(executable)), homeDirectory: join(root, 'bsk-home'), revision: 1, interaction: 'observe' })
     const daemon = spawn(executable, ['daemon', 'start', '--foreground'], { env: browserEnvironment(config.homeDirectory), shell: false, stdio: 'pipe' })
     let daemonLog = ''
@@ -227,7 +230,7 @@ describe.runIf(process.env.RAILWISE_BROWSER_CONNECTED_ACCEPTANCE === '1')('actua
         }
       }
       await call('browser_session_stop', { sessionId: session.sessionId })
-      await writeFile(join(root, 'evidence.json'), JSON.stringify({ passed: true, testedAt: new Date().toISOString(), cliVersion: '0.4.0', extensionVersion: manifest.version,
+      await writeFile(join(root, 'evidence.json'), JSON.stringify({ passed: true, testedAt: new Date().toISOString(), cliVersion, extensionVersion: manifest.version,
         credentialStore: 'isolated-test-mock-keychain', protocol: status.protocolVersion, browserVersion: (await executeFile(chromePath, ['--version'])).stdout.trim(), pagesRead: 2, htmlRead: true,
         tabListShape: { keys: Object.keys(realTab), title: realTab.title }, publicPage, pageEvidenceHashes: [first.resultHash, second.resultHash], screenshotHash: shot.sha256, approvals: interactionAcceptance ? 1 : 0, interactionEvidence, scheduledInteractionEvidence,
         sessionStopped: repository.operations('synthetic-browser', 'browser_session').every(item => (item.result as { stopped?: boolean }).stopped) }, null, 2))

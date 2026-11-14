@@ -74,3 +74,17 @@ export function compatibleBrowserProtocol(version: string): boolean {
   const match = /^(\d+)\.(\d+)(?:\.\d+)?$/.exec(version)
   return Boolean(match && Number(match[1]) === 1 && Number(match[2]) >= 6)
 }
+
+/** Target facts/read/explicit policy are an official 0.5 / protocol 1.8 contract. */
+export function supportsBrowserTargetPolicy(version?: string, daemonProtocol?: string, extensionProtocol?: string): boolean {
+  const protocol = (value?: string) => {
+    const match = /^(\d+)\.(\d+)(?:\.\d+)?$/.exec(value ?? '')
+    return Boolean(match && Number(match[1]) === 1 && Number(match[2]) >= 8)
+  }
+  return supportsBrowserPolicyCLI(version) && protocol(daemonProtocol) && protocol(extensionProtocol)
+}
+
+export function supportsBrowserPolicyCLI(version?: string): boolean {
+  const cli = /^(\d+)\.(\d+)\.(\d+)$/.exec(version ?? '')
+  return Boolean(cli && (Number(cli[1]) > 0 || Number(cli[2]) >= 5))
+}

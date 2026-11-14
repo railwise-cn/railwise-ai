@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { BrowserExecutionScope, browserVerificationPolicy, isPublicBrowserQuery, type BrowserCapabilityConfig } from '../../contracts/browser-skill.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import { operationFingerprint, type TaskRunRepository } from '../../services/task-run-repository.js'
-import { browserCommandDiagnostics, compatibleBrowserProtocol, object, parseBrowserStatus, runBrowserCommand, type BrowserCommandRunner } from '../../services/browser-skill-cli.js'
+import { browserCommandDiagnostics, compatibleBrowserProtocol, supportsBrowserTargetPolicy, supportsBrowserPolicyCLI, object, parseBrowserStatus, runBrowserCommand, type BrowserCommandRunner } from '../../services/browser-skill-cli.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { defineLocalTool } from './local-tool-definition.js'
 import { assertGrantAllowsNetwork } from './sandbox-policy.js'
@@ -38,7 +38,8 @@ const sha256 = (value: string | Buffer): string => createHash('sha256').update(v
 const failure = (code: string): Error => Object.assign(new Error(code === 'browser_schedule_action_scope_required'
   ? '周期任务需要持续动作授权。重新观察页面，使用 browser_authorize_action 的 scope=schedule、scheduleAccess=public_query 审阅明确的 click/fill 动作；周期按键和单次授权均不可替代。'
   : code === 'browser_public_query_action_required' ? '公开查询目标模式需要先审阅具体动作。重新观察页面，使用 browser_authorize_action 并明确 access=public_query，确认真实目标和完整输入后继续。'
-  : code === 'browser_public_query_target_blocked' ? '该页面目标包含账号操作或业务写入内容，不能使用公开查询目标模式。请重新选择公开搜索或翻页目标；业务操作需要单独审阅完整页面范围。' : code), { code })
+  : code === 'browser_public_query_target_blocked' ? '该页面目标包含账号操作或业务写入内容，不能使用公开查询目标模式。请重新选择公开搜索或翻页目标；业务操作需要单独审阅完整页面范围。'
+  : code === 'browser_target_policy_upgrade_required' ? '公开查询需要升级 BrowserSkill CLI 和浏览器扩展后重新检查连接。原任务与待核验结果已保留。' : code), { code })
 
 /** Fixed argv operations; page data cannot choose executables, scripts or another browser profile. */
 export function buildBrowserSkillToolProvider(options: {
@@ -124,6 +125,8 @@ export function buildBrowserSkillToolProvider(options: {
     const parsed = parseBrowserStatus(status.output)
     const browser = parsed.browsers.find(item => item.id === scope.data.browserInstanceId && item.connected)
     if (!browser || !compatibleBrowserProtocol(parsed.protocolVersion) || !compatibleBrowserProtocol(browser.protocolVersion)) throw failure('browser_connection_unavailable')
+    if (browserVerificationPolicy(scope.data.verificationPolicy) === 'public_query_target' &&
+      !supportsBrowserTargetPolicy(config.version, parsed.protocolVersion, browser.protocolVersion)) throw failure('browser_target_policy_upgrade_required')
     return { taskId, config, scope: scope.data, status: object(status.output) }
   }
 
@@ -153,6 +156,8 @@ export function buildBrowserSkillToolProvider(options: {
     const record = options.repository.operations(taskId, 'browser_session').find(item => object(item.result).sessionId === id)
     const session = object(record?.result)
     if (!record || record.status !== 'succeeded' || session.browserInstanceId !== browserId || session.stopped) throw failure('browser_session_not_owned')
+    const policy = browserVerificationPolicy(options.repository.get(taskId)?.authority?.browserScope?.verificationPolicy)
+    if (browserVerificationPolicy(record.request?.verificationPolicy) !== policy) throw failure('browser_session_policy_changed')
     return session as Session
   }
 
@@ -169,7 +174,13 @@ export function buildBrowserSkillToolProvider(options: {
 
   const observe = async (config: BrowserCapabilityConfig, sessionId: string, scope: BrowserExecutionScope, context: ToolHostContext) => {
     const before = await activeTab(config, sessionId, scope, context, true)
-    const observation = await command(config, ['cooperate', 'sync', '--session', sessionId, '--tab-id', String(before.id), '--max-tokens', '12000'], context)
+    // The 0.5 CLI defaults to target. Missing cached peer metadata must never
+    // silently weaken a strict session; live peer gating happens above.
+    const modern = supportsBrowserPolicyCLI(config.version)
+    const policy = browserVerificationPolicy(scope.verificationPolicy) === 'public_query_target' ? 'target' : 'strict'
+    const observation = await command(config, ['cooperate', 'sync', '--session', sessionId, '--tab-id', String(before.id), '--max-tokens', '12000',
+      ...(modern ? ['--policy', policy, '--settle'] : [])], context)
+    if (modern && observation.control_policy !== policy) throw failure('browser_session_policy_changed')
     const after = await activeTab(config, sessionId, scope, context, true)
     if (before.id !== after.id || before.url !== after.url) throw failure('browser_page_changed')
     const observedText = String(object(observation.observation).text ?? '')
@@ -212,6 +223,60 @@ export function buildBrowserSkillToolProvider(options: {
       ...(scope.verificationPolicy ? { verificationPolicy: scope.verificationPolicy } : {}),
       valueHash: action === 'fill' ? sha256(String(args.value)) : undefined }
     return { binding, key: `browser-action:${sha256(JSON.stringify(binding))}`, page }
+  }
+
+  // Fixed native DOM reads only. Neither the model nor the page supplies scripts,
+  // selectors, field definitions or the expectations used for dispatch.
+  const readTargetFacts = async (config: BrowserCapabilityConfig, sessionId: string, target: string,
+    page: { tabId: number; sourceUrl: string }, scope: BrowserExecutionScope, context: ToolHostContext, field: 'text' | 'value') => {
+    if (!/^@?e\d+$/.test(target)) throw failure('browser_element_unverified')
+    const attributes = ['id', 'name', 'placeholder', 'aria-label', 'type', 'href']
+    const fields = [{ key: 'exists', read: 'exists' }, { key: field, read: field },
+      ...attributes.map(attribute => ({ key: attribute, read: 'attribute', attribute }))]
+    const result = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--ref', target,
+      '--fields-json', JSON.stringify(fields), '--max-nodes', '1', '--max-bytes', '8192'], context)
+    const item = Array.isArray(result.items) && result.items.length === 1 ? object(result.items[0]) : {}
+    const values = object(item.values)
+    if (result.scope !== 'current_dom' || result.truncated !== false || result.tab_id !== page.tabId || result.page_url !== page.sourceUrl ||
+      !Array.isArray(item.redacted) || item.redacted.length || values.exists !== true || typeof values[field] !== 'string') throw failure('browser_element_unverified')
+    originAllowed(String(result.frame_url), scope, context)
+    const facts: Json[] = [{ target, field: 'exists', equals: true }, { target, field, equals: values[field] }]
+    for (const attribute of attributes) if (typeof values[attribute] === 'string' && values[attribute] !== '') {
+      facts.push({ target, field: 'attribute', attribute, equals: values[attribute] })
+    }
+    return { facts, value: values[field] as string, frameUrl: String(result.frame_url) }
+  }
+
+  const publicQueryExpectations = async (action: 'click' | 'fill', args: Json, context: ToolHostContext,
+    target: Awaited<ReturnType<typeof actionBinding>>, config: BrowserCapabilityConfig, scope: BrowserExecutionScope) => {
+    const sessionId = String(args.sessionId)
+    const read = await readTargetFacts(config, sessionId, String(args.target), target.page, scope, context, action === 'fill' ? 'value' : 'text')
+    const facts = [...read.facts]
+    if (action === 'click') {
+      const seen = new Set<string>()
+      // Persisted successful fills bind a later search click to the exact input
+      // already approved in this task; a new value is never inferred from HTML.
+      const receipts = options.repository.operations(target.binding.taskId, 'browser_action_dispatch').slice().reverse()
+      for (const receipt of receipts) {
+        if (receipt.status !== 'succeeded' || receipt.request?.sessionId !== sessionId || receipt.request.pageUrl !== target.page.sourceUrl ||
+          receipt.request.tabId !== target.page.tabId || receipt.request.verificationPolicy !== 'public_query_target' ||
+          object(receipt.result).readbackPending !== false) continue
+        const input = object(object(receipt.result).publicQueryInput)
+        if (typeof input.target !== 'string' || typeof input.value !== 'string' || typeof input.elementHash !== 'string') continue
+        const dependencyKey = `${input.target}:${input.elementHash}`
+        if (seen.has(dependencyKey)) continue
+        if (seen.size >= 16) throw failure('browser_query_dependencies_exceeded')
+        seen.add(dependencyKey)
+        const html = await readHtml(config, sessionId, scope, context, input.target, 8192)
+        if (html.truncated || sha256(html.html) !== input.elementHash) throw failure('browser_query_input_changed')
+        const dependency = await readTargetFacts(config, sessionId, input.target, target.page, scope, context, 'value')
+        if (dependency.value !== input.value || dependency.frameUrl !== input.frameUrl) throw failure('browser_query_input_changed')
+        facts.push(...dependency.facts)
+      }
+    }
+    const verified = await readHtml(config, sessionId, scope, context, String(args.target), 8192)
+    if (verified.truncated || sha256(verified.html) !== target.binding.elementHash) throw failure('browser_element_changed_after_approval')
+    return { facts, frameUrl: read.frameUrl }
   }
 
   const recordScopeRequest = (action: 'click' | 'fill', args: Json, context: ToolHostContext, reviewed: Awaited<ReturnType<typeof actionBinding>>, toolName: string) => {
@@ -290,8 +355,10 @@ export function buildBrowserSkillToolProvider(options: {
 
   const settleReadback = (taskId: string, sessionId: string, sourceUrl: string, tabId: number, resultHash: string): void => {
     for (const receipt of options.repository.operations(taskId, 'browser_action_dispatch')) {
-      if (receipt.status === 'succeeded' && receipt.request?.sessionId === sessionId && receipt.request.pageUrl === sourceUrl && receipt.request.tabId === tabId && object(receipt.result).actionAcknowledged === true && object(receipt.result).readbackPending === true) {
-        options.repository.finishOperation(taskId, receipt.idempotencyKey, { status: 'succeeded', result: { ...object(receipt.result), readbackPending: false, resultHash } })
+      if (receipt.status === 'succeeded' && receipt.request?.sessionId === sessionId && receipt.request.tabId === tabId && object(receipt.result).actionAcknowledged === true && object(receipt.result).readbackPending === true) {
+        // A click may navigate. The caller has already checked the owned tab and
+        // final origin; settling its ACK is distinct from resolving an unknown.
+        options.repository.finishOperation(taskId, receipt.idempotencyKey, { status: 'succeeded', result: { ...object(receipt.result), readbackPending: false, sourceUrl, resultHash } })
       }
     }
   }
@@ -336,14 +403,21 @@ export function buildBrowserSkillToolProvider(options: {
         throw failure('browser_schedule_action_scope_required')
       }
       const { taskId, config, scope, status } = await assertContext(context, mutation || action === 'authorize_action')
+      if (!['observe', 'get_html', 'screenshot', 'request_interaction'].includes(action) &&
+        options.repository.operations(taskId, 'browser_action_dispatch').some(receipt =>
+          ['running', 'prepared', 'outcome_unknown'].includes(receipt.status) && !options.repository.verifiedOperationResolution(receipt))) {
+        throw failure('browser_schedule_outcome_unknown')
+      }
       if (action === 'request_interaction') return { isError: true, output: { status: 'blocked', provider: 'browser-skill', code: 'browser_interaction_scope_required', message: '请审阅当前任务的浏览器交互范围后继续。' } }
       if (action === 'start') {
         const prefix = `browser-session:${scope.browserInstanceId}:${scope.revision}`
-        const reusable = options.repository.operations(taskId, 'browser_session').find(receipt => (receipt.idempotencyKey === prefix || receipt.idempotencyKey.startsWith(prefix + ':')) && !object(receipt.result).stopped)
-        const key = reusable?.idempotencyKey ?? `${prefix}:${context.turnId}`
+        const verificationPolicy = browserVerificationPolicy(scope.verificationPolicy)
+        const reusable = options.repository.operations(taskId, 'browser_session').find(receipt => (receipt.idempotencyKey === prefix || receipt.idempotencyKey.startsWith(prefix + ':')) &&
+          browserVerificationPolicy(receipt.request?.verificationPolicy) === verificationPolicy && !object(receipt.result).stopped)
+        const key = reusable?.idempotencyKey ?? `${prefix}:${verificationPolicy}:${context.turnId}`
         const previous = options.repository.operation(taskId, key)
         const requestId = typeof previous?.request?.requestId === 'string' ? previous.request.requestId : `${Date.now() + 9 * 60_000}:${randomUUID()}`
-        const request = { browserInstanceId: scope.browserInstanceId, revision: scope.revision, threadId: context.threadId, requestId }
+        const request = previous?.request ?? { browserInstanceId: scope.browserInstanceId, revision: scope.revision, threadId: context.threadId, requestId, verificationPolicy }
         const prepared = options.repository.beginOperation({ ownerId: taskId, idempotencyKey: key, kind: 'browser_session', request, nowIso: new Date().toISOString() })
         if (!prepared.created) {
           let previousSession = object(prepared.receipt.result)
@@ -383,6 +457,7 @@ export function buildBrowserSkillToolProvider(options: {
       }
       const sessionId = String(args.sessionId)
       ownedSession(taskId, sessionId, scope.browserInstanceId)
+      if ((action === 'navigate' || action === 'stop') && await pendingActionReadback('click', args, context)) throw failure('browser_readback_blocked')
       if (action === 'authorize_action') {
         if (context.approvalPolicy === 'never' || context.executionGrant?.approvalPolicy === 'never') throw failure('approval_policy_blocked')
         const authorizedAction = args.action as 'click' | 'fill'
@@ -472,8 +547,6 @@ export function buildBrowserSkillToolProvider(options: {
         const argv = [action, '--session', sessionId, '--tab-id', String(tab.id), '--context', String(args.contextId)]
         if (action === 'fill') argv.push('--value', String(args.value), String(args.target))
         else argv.push(String(action === 'press' ? args.key : args.target))
-        const dependsOn = verificationPolicy === 'public_query_target' ? [String(args.target)] : []
-        if (dependsOn.length) argv.push('--depends-on', dependsOn[0]!)
         const target = action !== 'press' ? await actionBinding(action as 'click' | 'fill', args, context) : undefined
         const derived = target ? options.repository.operations(taskId, 'browser_derived_action_authorization').find(receipt =>
           receipt.status === 'succeeded' && receipt.request?.turnId === context.turnId && receipt.request?.sessionId === sessionId &&
@@ -481,6 +554,9 @@ export function buildBrowserSkillToolProvider(options: {
           browserVerificationPolicy(receipt.request.verificationPolicy) === verificationPolicy && Date.parse(String(object(receipt.result).expiresAt)) > Date.now()) : undefined
         const authorization = target ? savedActionApproval(target.binding) : undefined
         if (verificationPolicy === 'public_query_target' && !derived && (!authorization || object(authorization.result).access !== 'public_query')) throw failure('browser_public_query_action_required')
+        const expectations = verificationPolicy === 'public_query_target' && target
+          ? await publicQueryExpectations(action as 'click' | 'fill', args, context, target, config, scope) : undefined
+        if (expectations) argv.push('--expect', JSON.stringify(expectations.facts))
         const previousBlock = options.repository.operations(taskId, 'browser_action_dispatch').find(receipt => receipt.status === 'failed' &&
           receipt.request?.turnId === context.turnId && receipt.request.action === action && receipt.request.elementHash === target?.binding.elementHash &&
           receipt.request.valueHash === target?.binding.valueHash && object(receipt.result).refreshExhausted === true)
@@ -490,7 +566,8 @@ export function buildBrowserSkillToolProvider(options: {
           options.repository.beginOperation({ ownerId: taskId, idempotencyKey: dispatchKey, kind: 'browser_action_dispatch', nowIso: new Date().toISOString(),
             request: { turnId: context.turnId, toolName: `browser_${action}`, argumentsHash: operationFingerprint(raw), action, pageUrl: tab.url, sessionId, tabId: tab.id, targetRef: args.target, browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision,
               contextHash: sha256(String(argv[argv.indexOf('--context') + 1])), attempt, elementHash: target?.binding.elementHash, valueHash: target?.binding.valueHash,
-              verificationPolicy, dependsOn, authorizationReceiptId: authorization?.id, scheduleActionId: derived?.request?.actionId } })
+              verificationPolicy, dependsOn: [], ...(expectations ? { expectationHash: sha256(JSON.stringify(expectations.facts)), expectationVersion: 'native-dom-v1' } : {}),
+              authorizationReceiptId: authorization?.id, scheduleActionId: derived?.request?.actionId } })
           observations.delete(`${taskId}:${sessionId}`)
           dispatched = true
           stage = 'action'
@@ -498,7 +575,8 @@ export function buildBrowserSkillToolProvider(options: {
             const acknowledged = await command(config, [...argv], context)
             actionAcknowledged = true
             acknowledgementHash = sha256(JSON.stringify(acknowledged))
-            options.repository.finishOperation(taskId, dispatchKey, { status: 'succeeded', result: { actionAcknowledged: true, acknowledgementHash, readbackPending: true } })
+            options.repository.finishOperation(taskId, dispatchKey, { status: 'succeeded', result: { actionAcknowledged: true, acknowledgementHash, readbackPending: true,
+              ...(expectations && action === 'fill' ? { publicQueryInput: { target: String(args.target), value: String(args.value), elementHash: target!.binding.elementHash, frameUrl: expectations.frameUrl } } : {}) } })
             break
           } catch (error) {
             const diagnostic = error as { vendorReason?: string; effectState?: string; outcomeUnknown?: boolean }
@@ -522,6 +600,10 @@ export function buildBrowserSkillToolProvider(options: {
               if (refreshed.binding.elementHash !== target.binding.elementHash || refreshed.binding.valueHash !== target.binding.valueHash || refreshed.page.sourceUrl !== target.page.sourceUrl) throw failure('browser_sync_target_changed')
               const authorized = await hasScopedApproval(action as 'click' | 'fill', refreshedArgs, context)
               if (!authorized && !context.explicitApproval) throw failure('browser_operation_approval_required')
+              if (expectations) {
+                const freshExpectations = await publicQueryExpectations(action as 'click' | 'fill', refreshedArgs, context, refreshed, config, scope)
+                if (JSON.stringify(freshExpectations.facts) !== JSON.stringify(expectations.facts)) throw failure('browser_sync_target_changed')
+              }
               argv[argv.indexOf('--context') + 1] = refreshedId
             } catch (refreshError) {
               const code = (refreshError as { code?: string }).code
@@ -558,7 +640,9 @@ export function buildBrowserSkillToolProvider(options: {
       }
       if (hasReadableBrowserContent(result.observation)) settleReadback(taskId, sessionId, result.sourceUrl, result.tabId, result.resultHash)
       if (dispatchKey && object(options.repository.operation(taskId, dispatchKey)?.result).readbackPending === true) throw failure('browser_readback_blocked')
-      if (dispatchKey) options.repository.finishOperation(taskId, dispatchKey, { status: 'succeeded', result: { actionAcknowledged: true, acknowledgementHash, readbackPending: false, resultHash: result.resultHash } })
+      if (dispatchKey) options.repository.finishOperation(taskId, dispatchKey, { status: 'succeeded', result: {
+        ...object(options.repository.operation(taskId, dispatchKey)?.result), actionAcknowledged: true, acknowledgementHash,
+        readbackPending: false, sourceUrl: result.sourceUrl, resultHash: result.resultHash } })
       return { output: { status: 'succeeded', provider: 'browser-skill', sessionId, action, ...result, ...(dispatchKey ? { dispatchReceiptId: options.repository.operation(taskId, dispatchKey)!.id } : {}),
         evidence: { kind: 'browser_observation', sourceUrl: result.sourceUrl, resultHash: result.resultHash, verifiedAt: new Date().toISOString(),
           verified: result.sourceUrl !== 'about:blank', contentRead: result.sourceUrl !== 'about:blank' && hasReadableBrowserContent(result.observation),

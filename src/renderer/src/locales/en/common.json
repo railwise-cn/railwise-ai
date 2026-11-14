@@ -4732,5 +4732,7 @@
   "taskBrowserReviewReason_browser_review_task_not_waiting": "The task changed or the original execution has not exited. Refresh the task before checking.",
   "taskBrowserReviewReason_stale_request": "The task changed. Check the original page again before confirming.",
   "taskBrowserReviewReason_browser_review_plan_changed": "The original schedule was disabled or changed. Its previous scope cannot be reused for this review.",
-  "taskApprovalReviewHint": "Review the operation target and scope in the task workspace."
+  "taskApprovalReviewHint": "Review the operation target and scope in the task workspace.",
+  "browserTaskTargetUpgradeRequired": "Public queries need BrowserSkill CLI 0.5.0 and daemon and selected-extension protocol 1.8 or later. Update and reconnect the browser, then reload this task’s scope. Existing authority and unresolved operations are preserved; the task does not resume automatically.",
+  "browserTaskOpenConnector": "Open browser connector"
 }

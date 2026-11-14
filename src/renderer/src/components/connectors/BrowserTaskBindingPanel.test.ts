@@ -22,6 +22,32 @@ function deferred<T>() {
 }
 
 describe('browser task reauthorization', () => {
+  it.each(['load', 'confirm'])('offers the exact dependency-upgrade route after a %s failure without authorizing or resuming', async phase => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const failure = Object.assign(new Error('browser_target_policy_upgrade_required'), { code: 'browser_target_policy_upgrade_required' })
+    const api = { getBrowserTaskBinding: vi.fn(async () => { if (phase === 'load') throw failure; return binding }),
+      confirmBrowserTaskBinding: vi.fn(async () => { throw failure }), coordinateTaskCommand: vi.fn(), installBrowserSkill: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const openPlugins = vi.fn(), previousOpenPlugins = useChatStore.getState().openPlugins
+    useChatStore.setState({ openPlugins })
+    const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
+    try {
+      await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: binding.taskId, onConfirmed: confirmed })))
+      if (phase === 'confirm') await act(async () => button(element, 'browserTaskBindingConfirm').click())
+      expect(element.querySelector('[role="alert"]')?.textContent).toBe(i18n.t('common:browserTaskTargetUpgradeRequired'))
+      expect(element.querySelector('[role="alert"]')?.textContent).toContain('任务不会自动继续')
+      expect(button(element, 'browserTaskBindingConfirm').disabled).toBe(true)
+      expect(openPlugins).not.toHaveBeenCalled()
+      await act(async () => button(element, 'browserTaskOpenConnector').click())
+      expect(openPlugins).toHaveBeenCalledExactlyOnceWith(undefined, 'browser-skill')
+      expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+      expect(api.installBrowserSkill).not.toHaveBeenCalled()
+      expect(confirmed).not.toHaveBeenCalled()
+      expect(api.confirmBrowserTaskBinding).toHaveBeenCalledTimes(phase === 'confirm' ? 1 : 0)
+    } finally { await act(async () => root.unmount()); useChatStore.setState({ openPlugins: previousOpenPlugins }) }
+  })
+
   it.each(['zh', 'en'])('reviews the server-recommended public-query mode without authorizing or resuming until confirmation in %s', async language => {
     await i18n.changeLanguage(language)
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })

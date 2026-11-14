@@ -14,7 +14,7 @@ import { processIdentityAsync, type ProcessIdentityProbeOptions } from '../../..
 import type { ProcessIdentity } from '../../../kun/src/contracts/execution.js'
 
 const executeFile = promisify(execFile)
-export const BROWSER_SKILL_VERSION = '0.4.0'
+export const BROWSER_SKILL_VERSION = '0.5.0'
 export const BROWSER_EXTENSION_URLS = {
   chrome: 'https://chromewebstore.google.com/detail/hhcmgoofomhgciiibhipgmgkgnoenaoi',
   edge: 'https://microsoftedge.microsoft.com/addons/detail/browserskill/emacgiaaaiojkkpkddmmdfhmokgmnikg'

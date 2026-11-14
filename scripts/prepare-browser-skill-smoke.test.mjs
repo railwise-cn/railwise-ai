@@ -8,8 +8,8 @@ import { browserSmokeArguments, browserSmokeDependency, chromeSmokeAsset } from 
 import { validateWindowsSmokeSource } from './prepare-windows-install-smoke.mjs'
 
 test('browser acceptance pins the official extension bytes and Chrome for Testing distribution', () => {
-  assert.equal(browserSmokeDependency.extensionUrl, 'https://github.com/Tencent/BrowserSkill/releases/download/ext-v0.4.0/browser-skill-extension-v0.4.0-chrome.zip')
-  assert.equal(browserSmokeDependency.extensionSha256, 'ebb28abf4d18e8983e416647145d2acdbd3aa0a3b70320bf39401e27b5d4f16e')
+  assert.equal(browserSmokeDependency.extensionUrl, 'https://github.com/Tencent/BrowserSkill/releases/download/ext-v0.5.0/browser-skill-extension-v0.5.0-chrome.zip')
+  assert.equal(browserSmokeDependency.extensionSha256, '4de785b340e401de855448410be3b7bad5e685a9e5128c0bd4ec4edeba5c9fc9')
   assert.equal(chromeSmokeAsset('win32', 'x64').url, 'https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.34/win64/chrome-win64.zip')
   assert.equal(chromeSmokeAsset('darwin', 'arm64').executable, 'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing')
   assert.throws(() => chromeSmokeAsset('linux', 'x64'))

@@ -29,8 +29,8 @@ async function fixture() {
   const asset = { id: 'browser-synthetic', name: 'bsk.zip', size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') } as ManagedDependency
   const absent = { ok: false, output: { message: 'automatic daemon startup is disabled (BSK_AUTO_START=0); restore the daemon' } }
   let online = false
-  const run = vi.fn(async (): Promise<BrowserCommandResult> => online ? { ok: true, output: { daemon_version: '0.4.0', protocol_version: '1.7', pid: 7,
-    browsers: [{ instance_id: 'chrome-synthetic', browser_name: 'Chrome', label: 'Test profile', extension_version: '0.4.0', extension_protocol_version: '1.7' }] } } : absent)
+  const run = vi.fn(async (): Promise<BrowserCommandResult> => online ? { ok: true, output: { daemon_version: '0.5.0', protocol_version: '1.9', pid: 7,
+    browsers: [{ instance_id: 'chrome-synthetic', browser_name: 'Chrome', label: 'Test profile', extension_version: '0.5.0', extension_protocol_version: '1.9' }] } } : absent)
   const child = Object.assign(new EventEmitter(), { pid: 7, stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null as number | null, signalCode: null as NodeJS.Signals | null, kill: vi.fn(), unref: vi.fn() })
   const start = vi.fn((_path: string, _args: string[], _env: NodeJS.ProcessEnv) => { online = true; return child as unknown as ChildProcess })
   const identity = vi.fn((pid: number, _options?: ProcessIdentityProbeOptions): ProcessIdentity | null | Promise<ProcessIdentity | null> => ({ pid, fingerprint: 'synthetic-owned-birth' }))
@@ -38,7 +38,7 @@ async function fixture() {
   const download = vi.fn(async (item: ManagedDependency) => item.id === asset.id ? bytes : Buffer.from('MIT synthetic'))
   const wait = vi.fn(async (): Promise<void> => undefined)
   const deps = { root, homeDirectory: join(root, 'browser-state'), target: { platform: 'win32', arch: 'x64' },
-    asset, run, start, identity, signal, download, version: async () => 'bsk 0.4.0', wait }
+    asset, run, start, identity, signal, download, version: async () => 'bsk 0.5.0', wait }
   const service = new ManagedBrowserSkillService(deps)
   services.push(service)
   return { root, service, run, start, child, identity, signal, download, wait, deps, setOnline: () => { online = true } }
@@ -48,12 +48,31 @@ describe('managed BrowserSkill lifecycle', () => {
   it('installs pinned bytes without starting a daemon or replacing user browser state', async () => {
     const f = await fixture()
     const result = await f.service.install()
-    expect(result).toMatchObject({ ok: true, status: { state: 'daemon_stopped', enabled: false, version: '0.4.0' } })
+    expect(result).toMatchObject({ ok: true, status: { state: 'daemon_stopped', enabled: false, version: '0.5.0' } })
     expect(await readFile(result.status.executablePath!, 'utf8')).toBe('fixed-synthetic-binary')
     expect(f.start).not.toHaveBeenCalled()
     expect(f.download).toHaveBeenCalledTimes(2)
     await f.service.install()
     expect(f.download).toHaveBeenCalledTimes(2)
+  })
+  it('updates only the explicitly installed CLI while preserving the legacy binary, browser scope and external daemon', async () => {
+    const f = await fixture()
+    const legacyPath = join(f.root, 'legacy-bsk.exe')
+    const legacyBytes = Buffer.from('preserved-0.4.0-binary')
+    await writeFile(legacyPath, legacyBytes)
+    await writeFile(join(f.root, 'connection.json'), JSON.stringify({ enabled: true, revision: 9, state: 'ready', version: '0.4.0',
+      executablePath: legacyPath, executableHash: createHash('sha256').update(legacyBytes).digest('hex'), homeDirectory: f.deps.homeDirectory,
+      browserInstanceId: 'chrome-synthetic', origins: ['https://example.com'], interaction: 'observe' }))
+    f.run.mockResolvedValue({ ok: true, output: { daemon_version: '0.4.0', protocol_version: '1.7', pid: 88,
+      browsers: [{ instance_id: 'chrome-synthetic', browser_name: 'Chrome', extension_version: '0.4.0', extension_protocol_version: '1.7' }] } })
+    const installed = await f.service.install()
+    expect(installed).toMatchObject({ ok: true, status: { version: '0.5.0', revision: 10, enabled: true,
+      homeDirectory: f.deps.homeDirectory, browserInstanceId: 'chrome-synthetic', origins: ['https://example.com'], interaction: 'observe', daemonProtocolVersion: '1.7' } })
+    expect(installed.status.executablePath).not.toBe(legacyPath)
+    expect(await readFile(legacyPath)).toEqual(legacyBytes)
+    expect(f.start).not.toHaveBeenCalled()
+    expect(f.child.kill).not.toHaveBeenCalled()
+    expect(f.signal).not.toHaveBeenCalled()
   })
   it('starts one owned foreground daemon with a thirty-minute session idle window and requires explicit browser selection', async () => {
     const f = await fixture()
@@ -296,7 +315,7 @@ describe('managed BrowserSkill lifecycle', () => {
     await f.service.install()
     f.run.mockResolvedValue({ ok: true, output: { daemon_version: '0.3.3', protocol_version: '1.3', pid: 7, browsers: [] } })
     expect((await f.service.diagnose()).status.state).toBe('protocol_mismatch')
-    f.run.mockResolvedValue({ ok: true, output: { daemon_version: '0.4.0', protocol_version: '1.7', pid: 7, browsers: [] } })
+    f.run.mockResolvedValue({ ok: true, output: { daemon_version: '0.5.0', protocol_version: '1.9', pid: 7, browsers: [] } })
     expect((await f.service.diagnose()).status.state).toBe('needs_extension')
   })
   it('rejects a changed archive and never starts the downloaded content', async () => {

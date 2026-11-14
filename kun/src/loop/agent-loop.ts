@@ -544,21 +544,27 @@ export class AgentLoop {
           outcome = await this.loop(threadId, turnId, signal)
         } catch (error) {
           if (signal.aborted || !this.opts.tasks) throw error
-          const message = error instanceof Error ? error.message : String(error)
-          await this.opts.events.record({
-            kind: 'error',
-            threadId,
-            turnId,
-            message: '本次模型或工具尝试异常，任务将从检查点自动继续。',
-            code: 'turn_attempt_exception',
-            severity: 'warning'
-          })
-          outcome = {
-            kind: 'retryable',
-            code: 'turn_attempt_exception',
-            message: message.trim() || '本次模型或工具尝试异常。'
+          if (this.opts.tasks.hasUnknownToolOutcome?.(threadId, turnId)) {
+            outcome = { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
+          } else {
+            const message = error instanceof Error ? error.message : String(error)
+            await this.opts.events.record({
+              kind: 'error',
+              threadId,
+              turnId,
+              message: '本次模型或工具尝试异常，任务将从检查点自动继续。',
+              code: 'turn_attempt_exception',
+              severity: 'warning'
+            })
+            outcome = {
+              kind: 'retryable',
+              code: 'turn_attempt_exception',
+              message: message.trim() || '本次模型或工具尝试异常。'
+            }
           }
         }
+        if (outcome.kind === 'waiting_user' && signal.aborted) outcome = { kind: 'cancelled', reason: 'operation_cancelled' }
+        if (outcome.kind === 'waiting_user') return await this.finishUnknownToolOutcome(threadId, turnId, outcome.message)
         if (outcome.kind === 'candidate' && this.opts.tasks) {
           const decision = await this.opts.tasks.assessCandidate(threadId, turnId)
           if (decision.kind === 'continue') {
@@ -592,6 +598,7 @@ export class AgentLoop {
           }
         } else if (outcome.kind === 'retryable' && this.opts.tasks) {
           const blocked = await this.opts.tasks.assessNonRetryableBlock?.(threadId, turnId)
+          if (blocked?.kind === 'stalled') return await this.finishUnknownToolOutcome(threadId, turnId, 'outcome_unknown: 操作结果尚未核验，执行已停止。')
           if (blocked?.kind === 'waiting_user') {
             await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
             return 'completed'
@@ -764,7 +771,7 @@ export class AgentLoop {
   }
 
   private async drainSteering(threadId: string, turnId: string, signal: AbortSignal): Promise<void> {
-    if (signal.aborted) return
+    if (signal.aborted || this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) return
     const deliveries = this.opts.tasks?.pendingDeliveries(threadId, turnId) ?? []
     const durableIds = new Set(deliveries.map(entry => entry.input.id))
     const hints = this.opts.steering.drainEntries(turnId).filter(entry => !entry.inputId || !durableIds.has(entry.inputId))
@@ -801,6 +808,9 @@ export class AgentLoop {
   ): Promise<TaskAttemptOutcome> {
     for (let step = 0; ; step += 1) {
       if (signal.aborted) return { kind: 'cancelled', reason: 'operation_cancelled' }
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) {
+        return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
+      }
       if (step >= MAX_TURN_MODEL_STEPS) {
         const message =
           `Turn stopped after ${MAX_TURN_MODEL_STEPS} model steps without reaching a final response.`
@@ -831,6 +841,7 @@ export class AgentLoop {
       }
       await this.drainSteering(threadId, turnId, signal)
       const stepResult = await this.modelStep(threadId, turnId, signal, step)
+      if (stepResult === 'outcome_unknown') return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
       if (stepResult === 'stop') return { kind: 'candidate' }
       if (stepResult === 'blocked') {
         return {
@@ -869,7 +880,7 @@ export class AgentLoop {
     turnId: string,
     signal: AbortSignal,
     stepIndex = 0
-  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted'> {
+  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown'> {
     if (shouldVerifyImmutablePrefix()) {
       verifyImmutablePrefix(this.opts.prefix)
     }
@@ -1245,6 +1256,7 @@ export class AgentLoop {
       finishWork = this.opts.tasks?.beginWork(turnId, modelRequestId, 'model')
       const remainingMs = this.opts.tasks?.workBudget(turnId)?.remainingMs
       if (remainingMs !== undefined) { workTimer = setTimeout(() => this.opts.turns.abortTurn(turnId, 'execution_budget_exhausted'), Math.max(1, remainingMs)); workTimer.unref?.() }
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) return 'outcome_unknown'
       for await (const chunk of this.opts.model.stream(request)) {
         if (modelToken) this.opts.tasks?.assertToken(modelToken)
         if (signal.aborted) {
@@ -1535,6 +1547,7 @@ export class AgentLoop {
             signal
           })
           if (dispatched === 'aborted') return 'aborted'
+          if (dispatched === 'outcome_unknown') return 'outcome_unknown'
           if (dispatched === 'all_suppressed') return 'stop'
           return 'continue'
         }
@@ -1679,6 +1692,7 @@ export class AgentLoop {
       signal
     })
     if (dispatched === 'aborted') return 'aborted'
+    if (dispatched === 'outcome_unknown') return 'outcome_unknown'
     if (dispatched === 'all_suppressed') {
       // A blocked Web call is persisted as a failed tool result, then the next
       // model step gets no Web tools and one final recovery instruction. This
@@ -1730,13 +1744,14 @@ export class AgentLoop {
     approvalPolicy: ToolHostContext['approvalPolicy']
     sandboxMode: NonNullable<ToolHostContext['sandboxMode']>
     signal: AbortSignal
-  }): Promise<'continue' | 'aborted' | 'all_suppressed'> {
+  }): Promise<'continue' | 'aborted' | 'all_suppressed' | 'outcome_unknown'> {
     const context = this.createToolContext(input)
     let index = 0
     let executedAny = false
 
     while (index < input.calls.length) {
       if (input.signal.aborted) return 'aborted'
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) return 'outcome_unknown'
 
       const call = input.calls[index]
       if (!call) break
@@ -1774,6 +1789,8 @@ export class AgentLoop {
         })
         executedAny = true
         await this.persistToolCallResult(input.threadId, input.turnId, call, result)
+        if (input.signal.aborted) return 'aborted'
+        if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) return 'outcome_unknown'
         index += 1
         continue
       }
@@ -1816,6 +1833,8 @@ export class AgentLoop {
         if (result.status === 'rejected') throw result.reason
         await this.persistToolCallResult(input.threadId, input.turnId, batchCall, result.value)
       }
+      if (input.signal.aborted) return 'aborted'
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) return 'outcome_unknown'
 
       if (suppressedAfterBatch) {
         await this.persistSuppressedToolCall({
@@ -1828,6 +1847,15 @@ export class AgentLoop {
     }
 
     return executedAny ? 'continue' : 'all_suppressed'
+  }
+
+  private async finishUnknownToolOutcome(threadId: string, turnId: string, message: string): Promise<'failed'> {
+    this.opts.tasks?.suspendUnknownToolOutcome?.(threadId, turnId)
+    await this.opts.events.record({ kind: 'error', threadId, turnId, code: 'outcome_unknown', severity: 'warning', message })
+    // This Turn is blocked, while its Task and browser surface remain available
+    // for read-only verification and a separately authorized continuation.
+    await this.opts.turns.finishTurn({ threadId, turnId, status: 'failed', reason: 'blocked', error: message })
+    return 'failed'
   }
 
   private isParallelSafeToolCall(
@@ -2409,10 +2437,12 @@ export class AgentLoop {
       const scope = this.opts.tasks?.workBudget(input.turnId)
       summaryPermit = await this.opts.capacityManager?.acquire({ id:summaryRequestId,rootTaskId:scope?.rootTaskId,serialRoot:scope?.serialRoot,resources:{model:1,worker:1} },controller.signal)
       finishSummaryWork = this.opts.tasks?.beginWork(input.turnId,summaryRequestId,'compaction')
+      const summaryProviderId = (await this.opts.threadStore.get(input.threadId))?.turns.find(turn => turn.id === input.turnId)?.providerId
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) throw Object.assign(new Error('The original operation requires verification before another model request.'), { code: 'outcome_unknown' })
       for await (const chunk of this.opts.model.stream({
         threadId: input.threadId,
         turnId: input.turnId,
-        providerId: (await this.opts.threadStore.get(input.threadId))?.turns.find(turn => turn.id === input.turnId)?.providerId,
+        providerId: summaryProviderId,
         model: input.model,
         systemPrompt: this.opts.prefix.systemPrompt,
         contextInstructions: [

@@ -223,7 +223,7 @@ describe('capability waiting card', () => {
     expect(tasks[0].status).toBe('paused')
     await click('继续原任务并审阅公开查询动作')
     expect(api.coordinateTaskCommand).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ threadId: card.threadId, taskId: card.taskId,
-      resolveAttentionId: card.attentionId, intent: 'resume' }))
+      resolveAttentionId: card.attentionId, intent: 'resume', request: { prompt: card.prompt } }))
     expect(container.textContent).toContain(waiting.message)
     expect(tasks[0].status).toBe('paused')
     expect(api.openExternal).not.toHaveBeenCalled()
