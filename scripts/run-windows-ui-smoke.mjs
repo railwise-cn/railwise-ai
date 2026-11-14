@@ -410,13 +410,14 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
   const observed = { catalogs: [], requests: [] }
   const marker = `RAILWISE_BROWSER_${randomUUID()}`
   const query = '轨道交通监测合成验收'
-  const inputHtml = '<input type="search" id="query" aria-label="合成公告关键词">'
-  const buttonHtml = '<button type="button" id="search">查询合成公告</button>'
+  const inputHtml = '<input type="text" placeholder="请输入内容" class="po-input__inner" data-testid="query">'
+  const buttonHtml = '<div class="input-button" role="button" tabindex="0" data-testid="search-title">搜标题</div>'
+  const fullButtonHtml = '<div class="input-button" role="button" tabindex="0" data-testid="search-full">搜全文</div>'
   let fixtureUrl
   const server = createHttpServer(async (request, response) => {
     if (browser && request.method === 'GET' && request.url === '/fixture') {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      response.end(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>受控网页验收</title></head><body><h1>真实浏览器合成页面</h1><p>${marker}</p><p>仅供本地合成公开查询，无需账号；不会提交到外部服务。</p>${inputHtml}${buttonHtml}<output id="query-result" aria-live="polite"></output><script>document.getElementById('search').addEventListener('click',()=>{const value=document.getElementById('query').value;const result=document.getElementById('query-result');result.dataset.query=value;result.textContent='本地查询结果：'+value+'；已完成合成公开检索'});</script></body></html>`)
+      response.end(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>受控网页验收</title></head><body><h1>真实浏览器合成页面</h1><p>${marker}</p><p>仅供本地合成公开查询，无需账号；不会提交到外部服务。</p><div class="searchInput-content-input"><div class="input-input"><div class="po-input po-input--medium po-input--prefix po-input--suffix">${inputHtml}<span class="po-input__prefix"><i class="po-input__icon"></i></span></div></div>${buttonHtml}${fullButtonHtml}</div><output id="query-result" aria-live="polite"></output><script>for(const control of document.querySelectorAll('[data-testid="search-title"],[data-testid="search-full"]'))control.addEventListener('click',()=>{const value=document.querySelector('[data-testid="query"]').value;const result=document.getElementById('query-result');result.dataset.query=value;result.textContent='本地查询结果：'+value+'；已完成合成公开检索'});</script></body></html>`)
       return
     }
     if (request.method === 'GET') {
@@ -471,10 +472,12 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
       if (id === 'navigate') args = { sessionId: session?.sessionId, url: fixtureUrl }
       if (['read-fill-target', 'authorize-fill', 'fill', 'read-click-target', 'authorize-click', 'click'].includes(id)) {
         const page = toolOutput(['read-fill-target', 'authorize-fill', 'fill'].includes(id) ? 'navigate' : 'fill')
-        const label = ['read-fill-target', 'authorize-fill', 'fill'].includes(id) ? '合成公告关键词' : '查询合成公告'
+        const filling = ['read-fill-target', 'authorize-fill', 'fill'].includes(id)
+        const label = filling ? '请输入内容' : '搜标题'
         const text = String(page?.observation?.observation?.text ?? '')
-        const line = text.split('\n').find(line => line.includes(label) && /@?e\d+/.test(line))
-        const target = /@?e\d+/.exec(line ?? '')?.[0]
+        const lines = text.split('\n').filter(line => line.includes(label) && /@?e\d+/.test(line) && (filling ? /\b(?:textbox|searchbox|input)\b/.test(line) : /\bbutton\b/.test(line)))
+        assert.equal(lines.length, 1, 'The protocol fixture requires one fresh actual observed element with the exact search meaning')
+        const target = /@?e\d+/.exec(lines[0] ?? '')?.[0]
         assert.ok(target && page?.observation?.context_id, 'The protocol fixture requires fresh actual observed element references')
         args = { sessionId: session?.sessionId, target }
         if (!id.startsWith('read-')) args.contextId = page.observation.context_id
@@ -508,7 +511,7 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
   })
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
   fixtureUrl = `http://127.0.0.1:${server.address().port}/fixture`
-  return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, fixtureUrl, marker, query, inputHtml, buttonHtml, observed,
+  return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, fixtureUrl, marker, query, inputHtml, buttonHtml, fullButtonHtml, observed,
     close: () => new Promise(done => { server.close(done); server.closeAllConnections() }) }
 }
 
@@ -533,7 +536,7 @@ export function validateWindowsFixtureQueryHtml(html, { marker, query }) {
 }
 
 export function windowsTaskPrompt(fixture, browser = false) {
-  return `${browser ? `使用broswer-skill，读取 ${fixture.fixtureUrl} 的本地合成公开页面。在“合成公告关键词”搜索框填写“${fixture.query}”，点击“查询合成公告”，核对查询后的页面实际内容，生成HTML报告并交付。明确申请这两个精确公开查询动作的周期计划范围授权；无需账号，仅限该合成站点，不提交到外部服务。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
+  return `${browser ? `使用broswer-skill，读取 ${fixture.fixtureUrl} 的本地合成公开页面。在“请输入内容”搜索框填写“${fixture.query}”，点击“搜标题”，核对查询后的页面实际内容，生成HTML报告并交付。明确申请这两个精确公开查询动作的周期计划范围授权；无需账号，仅限该合成站点，不提交到外部服务。` : '请生成并交付一份HTML网页报告。'}每天09:00和17:00前提前30分钟执行。`
 }
 
 const fixtureSummaryFields = summary => {
@@ -575,7 +578,7 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
     assert.equal(targetRead.output.html, targetHtml, 'The actual Browser tool must read the exact owned fixture target before approval')
     assert.equal(fields.站点, origin)
     assert.equal(fields.动作, action === 'fill' ? '填写网页输入框' : '点击网页元素')
-    assert.equal(fields.目标, action === 'fill' ? 'input · 合成公告关键词' : 'button · 查询合成公告')
+    assert.equal(fields.目标, action === 'fill' ? 'input · 请输入内容' : 'div · 搜标题')
     assert.equal(fields.输入内容, action === 'fill' ? fixture.query : '')
     assert.equal(fields.输入摘要, createHash('sha256').update(fields.输入内容).digest('hex'))
     assert.equal(fields.目标摘要, createHash('sha256').update(targetHtml).digest('hex'))
@@ -595,7 +598,7 @@ export function reviewWindowsFixtureApproval(approval, { fixture, prompt, worksp
     assert.equal(fields.读取路径, workspace)
     assert.equal(fields.写入路径, '', 'The fixture may deliver managed artifacts, but cannot gain workspace writes')
     assert.equal(fields.站点, origin)
-    const actions = ['fill', 'click'].map((action, i) => `${i + 1}. 站点 ${origin}\n动作 ${action === 'fill' ? '填写网页输入框' : '点击网页元素'}\n目标 ${action === 'fill' ? 'input · 合成公告关键词' : 'button · 查询合成公告'}\n输入内容 ${action === 'fill' ? fixture.query : ''}\n校验范围 公开查询目标及明确依赖`)
+    const actions = ['fill', 'click'].map((action, i) => `${i + 1}. 站点 ${origin}\n动作 ${action === 'fill' ? '填写网页输入框' : '点击网页元素'}\n目标 ${action === 'fill' ? 'input · 请输入内容' : 'div · 搜标题'}\n输入内容 ${action === 'fill' ? fixture.query : ''}\n校验范围 公开查询目标及明确依赖`)
     // Production sorts stable action IDs; either order must still be the exact two reviewed actions.
     const blocks = fields.网页动作.split('\n\n').map(block => block.replace(/^\d+\. /, ''))
     assert.deepEqual(blocks.sort(), actions.map(block => block.replace(/^\d+\. /, '')).sort())
@@ -951,7 +954,7 @@ export function windowsFixtureNativeExpectations(fixture, { action, targetRef, i
   }
   if (action === 'fill') return facts(targetRef, fixture.inputHtml, 'value', '')
   assert.equal(action, 'click')
-  const text = /^<button\b[^>]*>([^<]*)<\/button>$/.exec(fixture.buttonHtml)?.[1]
+  const text = /^<(button|div)\b[^>]*>([^<]*)<\/\1>$/.exec(fixture.buttonHtml)?.[2]
   assert.ok(text, 'The controlled button must have exact plain text')
   return [...facts(targetRef, fixture.buttonHtml, 'text', text), ...facts(inputTargetRef, fixture.inputHtml, 'value', fixture.query)]
 }

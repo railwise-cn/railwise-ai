@@ -13,7 +13,7 @@ import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import { createApprovalRequest } from '../../domain/approval.js'
 import { waitForApprovalDecision } from '../../ports/approval-gate.js'
 import { taskPublicQueryGrant, saveTaskPublicQueryAction } from '../../services/browser-public-query-authority.js'
-import { classifyPublicQueryAction, publicQueryElement, type PublicQueryDomContext } from '../../security/browser-public-query-rules.js'
+import { classifyPublicQueryAction, publicQueryElement, publicSearchLabel, type PublicQueryDomContext } from '../../security/browser-public-query-rules.js'
 import { BrowserScheduleActionAuthority } from '../../services/browser-schedule-action-authority.js'
 import type { BrowserScheduleResolution } from '../../contracts/browser-schedule-actions.js'
 import { browserApprovalSummary, browserPublicQueryTargetBlocked } from '../../security/browser-approval-summary.js'
@@ -396,14 +396,15 @@ export function buildBrowserSkillToolProvider(options: {
     return { facts, frameUrl: read.frameUrl }
   }
 
-  const recordScopeRequest = (action: 'click' | 'fill', args: Json, context: ToolHostContext, reviewed: Awaited<ReturnType<typeof actionBinding>>, toolName: string) => {
+  type DomProofDiagnostic = { stage: 'canonical_target' | 'candidates' | 'form' | 'container' | 'date_members'; code: string }
+  const recordScopeRequest = (action: 'click' | 'fill', args: Json, context: ToolHostContext, reviewed: Awaited<ReturnType<typeof actionBinding>>, toolName: string, domProof?: DomProofDiagnostic) => {
     const request = { turnId: context.turnId, toolName, argumentsHash: operationFingerprint(args), action,
       pageUrl: reviewed.page.sourceUrl, elementHash: reviewed.binding.elementHash, valueHash: reviewed.binding.valueHash,
       browserInstanceId: reviewed.binding.browserInstanceId, browserRevision: reviewed.binding.browserRevision,
       verificationPolicy: browserVerificationPolicy(reviewed.binding.verificationPolicy) }
     const key = `browser-scope-request:${operationFingerprint(request)}`
-    options.repository.beginOperation({ ownerId: reviewed.binding.taskId, idempotencyKey: key, kind: 'browser_action_scope_request', request, nowIso: new Date().toISOString() })
-    options.repository.finishOperation(reviewed.binding.taskId, key, { status: 'succeeded', result: { actionDispatched: false } })
+    const { receipt } = options.repository.beginOperation({ ownerId: reviewed.binding.taskId, idempotencyKey: key, kind: 'browser_action_scope_request', request, nowIso: new Date().toISOString() })
+    options.repository.finishOperation(reviewed.binding.taskId, key, { status: 'succeeded', result: { ...object(receipt.result), actionDispatched: false, ...(domProof ? { domProof } : {}) } })
   }
 
   const savedActionApproval = (binding: Awaited<ReturnType<typeof actionBinding>>['binding']) => options.repository.operations(binding.taskId, 'browser_action_authorization')
@@ -411,27 +412,34 @@ export function buildBrowserSkillToolProvider(options: {
       typeof object(receipt.result).expiresAt === 'string' && Date.parse(String(object(receipt.result).expiresAt)) > Date.now() &&
       JSON.stringify(receipt.request) === JSON.stringify(binding))
 
-  const scopeDomContext = async (html: string, page: { sourceUrl: string; tabId: number }, sessionId: string, targetRef: string, scope: BrowserExecutionScope, config: BrowserCapabilityConfig, context: ToolHostContext): Promise<PublicQueryDomContext | undefined> => {
+  const scopeDomContext = async (html: string, page: { sourceUrl: string; tabId: number }, sessionId: string, targetRef: string, scope: BrowserExecutionScope, config: BrowserCapabilityConfig, context: ToolHostContext, onFailure?: (diagnostic: DomProofDiagnostic) => void): Promise<PublicQueryDomContext | undefined> => {
     const element = publicQueryElement(html)
     if (!element) return undefined
     const quote = (value: string) => '"' + [...value].map(char => /[a-z0-9 _-]/i.test(char) ? char : '\\' + char.codePointAt(0)!.toString(16) + ' ').join('') + '"'
     const attributes = element.attributes
     const locator = element.tag + ['id', 'name', 'class', 'placeholder', 'aria-label', 'type'].filter(name => attributes[name]).map(name => `[${name}=${quote(attributes[name])}]`).join('')
-    const fields = [{ key: 'present', read: 'exists' }, { key: 'target', read: 'exists', selector: locator },
+    const fields = [{ key: 'present', read: 'exists' },
       { key: 'sensitive', read: 'exists', selector: 'input[type="password"],input[type="file"],input[type="email"],input[autocomplete="username"],input[autocomplete="cc-number"],input[name*="password" i],input[name*="account" i],input[name*="user" i],input[name*="token" i],input[name*="secret" i]' },
       ...['method', 'action', 'class', 'id', 'role', 'aria-label'].map(attribute => ({ key: attribute, read: 'attribute', attribute })),
       { key: 'searchInput', read: 'exists', selector: 'input[type="search"],input[name="q"],input[name="keyword"],input[id="title"]' },
       { key: 'label', read: 'text' }]
-    const probe = async (selector: string, targetOnly = false, provenDateGroup = false): Promise<(Json & { canonicalRef: string; frameId: string }) | undefined> => {
+    let proofStage: DomProofDiagnostic['stage'] = 'canonical_target'
+    let targetFrameId: string | undefined
+    const probe = async (selector: string, targetOnly = false, provenDateGroup = false): Promise<(Json & { canonicalRefs: string[]; frameId: string }) | undefined> => {
+      proofStage = targetOnly ? 'candidates' : selector.startsWith('form:') ? 'form' : 'container'
       const raw = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--selector', selector,
-        '--fields-json', JSON.stringify(targetOnly ? [{ key: 'present', read: 'exists' }] : provenDateGroup ? fields.filter(field => !['target', 'searchInput'].includes(field.key)) : fields), '--max-nodes', '2', '--max-bytes', '8192'], context)
-      if (raw.scope !== 'current_dom' || raw.truncated !== false || raw.tab_id !== page.tabId || raw.page_url !== page.sourceUrl || raw.frame_url !== page.sourceUrl || typeof raw.frame_id !== 'string' || !raw.frame_id || !Array.isArray(raw.items) || raw.items.length > 1) throw failure('browser_public_query_dom_unverified')
+        '--fields-json', JSON.stringify(targetOnly ? [{ key: 'present', read: 'exists' }] : provenDateGroup ? fields.filter(field => field.key !== 'searchInput') : fields), '--max-nodes', targetOnly ? '8' : '2', '--max-bytes', '8192'], context)
+      if (raw.scope !== 'current_dom' || raw.truncated !== false || raw.tab_id !== page.tabId || raw.page_url !== page.sourceUrl || raw.frame_url !== page.sourceUrl || typeof raw.frame_id !== 'string' || !raw.frame_id || raw.frame_id !== targetFrameId || !Array.isArray(raw.items) || raw.items.length > (targetOnly ? 8 : 1)) throw failure('browser_public_query_dom_unverified')
       if (!raw.items.length) return undefined
-      const item = object(raw.items[0])
-      if (!Array.isArray(item.redacted) || item.redacted.length || object(item.values).present !== true ||
-        !targetOnly && (['method', 'action', 'class', 'id', 'role', 'aria-label', 'label'].some(key => !Object.hasOwn(object(item.values), key) || object(item.values)[key] !== null && typeof object(item.values)[key] !== 'string') || !provenDateGroup && typeof object(item.values).searchInput !== 'boolean')) throw failure('browser_public_query_dom_unverified')
-      if (typeof item.ref !== 'string' || !/^@?e\d+$/.test(item.ref)) throw failure('browser_public_query_dom_unverified')
-      return { ...object(item.values), canonicalRef: item.ref.replace(/^@/, ''), frameId: raw.frame_id }
+      const refs = new Set<string>()
+      for (const entry of raw.items) {
+        const item = object(entry)
+        if (!Array.isArray(item.redacted) || item.redacted.length || object(item.values).present !== true ||
+          !targetOnly && (['method', 'action', 'class', 'id', 'role', 'aria-label', 'label'].some(key => !Object.hasOwn(object(item.values), key) || object(item.values)[key] !== null && typeof object(item.values)[key] !== 'string') || !provenDateGroup && typeof object(item.values).searchInput !== 'boolean')) throw failure('browser_public_query_dom_unverified')
+        if (typeof item.ref !== 'string' || !/^@?e\d+$/.test(item.ref) || refs.has(item.ref.replace(/^@/, ''))) throw failure('browser_public_query_dom_unverified')
+        refs.add(item.ref.replace(/^@/, ''))
+      }
+      return { ...object(object(raw.items[0]).values), canonicalRefs: [...refs], frameId: raw.frame_id }
     }
     try {
       // Native read canonicalizes a strict VOM alias without replacing its observation.
@@ -439,6 +447,7 @@ export function buildBrowserSkillToolProvider(options: {
         '--fields-json', JSON.stringify([{ key: 'present', read: 'exists' }]), '--max-nodes', '2', '--max-bytes', '8192'], context)
       if (original.scope !== 'current_dom' || original.truncated !== false || original.tab_id !== page.tabId || original.page_url !== page.sourceUrl ||
         original.frame_url !== page.sourceUrl || typeof original.frame_id !== 'string' || !original.frame_id || !Array.isArray(original.items) || original.items.length !== 1) return undefined
+      targetFrameId = original.frame_id
       const actual = object(original.items[0])
       if (!Array.isArray(actual.redacted) || actual.redacted.length || object(actual.values).present !== true || typeof actual.ref !== 'string' || !/^@?e\d+$/.test(actual.ref)) return undefined
       const dateLabels = ['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部']
@@ -448,6 +457,7 @@ export function buildBrowserSkillToolProvider(options: {
         // complete group and exact original canonical node instead of guessing
         // a unique selector from its label or inventing a new element reference.
         const labels = dateLabels, dateLocator = 'div.level-content-timeItem'
+        proofStage = 'date_members'
         const members = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--selector', dateLocator,
           '--fields-json', JSON.stringify([{ key: 'present', read: 'exists' }, { key: 'label', read: 'text' }]), '--max-nodes', '8', '--max-bytes', '8192'], context)
         if (members.scope !== 'current_dom' || members.truncated !== false || members.tab_id !== page.tabId || members.page_url !== page.sourceUrl ||
@@ -469,10 +479,13 @@ export function buildBrowserSkillToolProvider(options: {
         return { search: false, pagination: false, filter: true, dateFacet: true, sort: false, sensitive: false, targetPresent: true }
       }
       const selected = await probe(locator, true)
-      if (!selected || selected.canonicalRef !== actual.ref.replace(/^@/, '') || selected.frameId !== original.frame_id) return undefined
+      if (!selected || !selected.canonicalRefs.includes(actual.ref.replace(/^@/, '')) || selected.frameId !== original.frame_id) return undefined
+      // Several query controls can share the same CSS attributes. The complete
+      // bounded set must contain the exact original node; the unique direct
+      // parent below proves membership without an ambiguous descendant field.
       const form = await probe(`form:has(${locator})`)
       const safe = (value: Json) => {
-        if (value.target !== true || value.sensitive !== false) return false
+        if (value.sensitive !== false) return false
         if (value.method && String(value.method).toLowerCase() !== 'get') return false
         if (value.action) {
           const action = new URL(String(value.action), page.sourceUrl)
@@ -480,15 +493,70 @@ export function buildBrowserSkillToolProvider(options: {
         }
         return true
       }
-      if (form && !safe(form)) return undefined
-      const container = await probe(`*:has(> ${locator})`)
-      if (!container || !safe(container)) return undefined
-      const cue = ['class', 'id', 'role', 'aria-label'].map(key => String(container[key] ?? '')).join(' ')
-      const labels = String((form ?? container).label ?? '').replace(/\s+/g, '')
-      const search = (form ?? container).searchInput === true && (/(?:搜(?:索|标题|全文)|查询|检索|search)/i.test(labels) || /search_form|search-form|searchbox/i.test(cue)) || labels.includes('搜标题') && labels.includes('搜全文')
-      return { search, pagination: /pagination|分页|翻页/i.test(cue), filter: /filter|筛选|分类/i.test(cue) || /近3[日天]/.test(labels) && /近7[日天]/.test(labels), sort: /sort|orderby|排序/i.test(cue) || labels.includes('按时间降序') && labels.includes('按时间升序'), sensitive: false, targetPresent: true }
+      if (form && (form.frameId !== original.frame_id || !safe(form))) return undefined
+      const containerLocator = (value: Json, verifiedForm = false) => {
+        const names = ['id', 'class', 'role', 'aria-label'].filter(name => typeof value[name] === 'string' && value[name] !== '')
+        return names.length || verifiedForm ? (verifiedForm ? 'form' : '*:not(html):not(body):not(form)') + names.map(name => `[${name}=${quote(String(value[name]))}]`).join('') : undefined
+      }
+      const queryGroup = async (container: Json & { canonicalRefs: string[] }, branchRef: string) => {
+        const selector = containerLocator(container, form?.canonicalRefs.includes(container.canonicalRefs[0]))
+        if (!selector) return false
+        const identity = await probe(selector, true)
+        if (!identity || identity.canonicalRefs.length !== 1 || identity.canonicalRefs[0] !== container.canonicalRefs[0]) return false
+        proofStage = 'container'
+        const raw = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--selector', `${selector} > *`,
+          '--fields-json', JSON.stringify([{ key: 'present', read: 'exists' }, { key: 'label', read: 'text' }]), '--max-nodes', '8', '--max-bytes', '8192'], context)
+        if (raw.scope !== 'current_dom' || raw.truncated !== false || raw.tab_id !== page.tabId || raw.page_url !== page.sourceUrl ||
+          raw.frame_url !== page.sourceUrl || raw.frame_id !== targetFrameId || !Array.isArray(raw.items) || !raw.items.length || raw.items.length > 8) return false
+        const refs = new Set<string>()
+        let branch = false, controls = 0
+        for (const entry of raw.items) {
+          const item = object(entry), values = object(item.values)
+          if (typeof item.ref !== 'string' || !/^@?e\d+$/.test(item.ref) || refs.has(item.ref.replace(/^@/, '')) ||
+            !Array.isArray(item.redacted) || item.redacted.length || values.present !== true || typeof values.label !== 'string') return false
+          const ref = item.ref.replace(/^@/, ''), label = values.label.trim()
+          refs.add(ref)
+          if (ref === branchRef) { if (label) return false; branch = true }
+          else if (label) { if (!publicSearchLabel(label)) return false; controls++ }
+        }
+        // The exact input branch and individual search controls must be direct
+        // siblings. A neighbouring nested query group cannot authorize another
+        // input merely because their shared outer container mentions search.
+        return branch && controls > 0 && controls <= 4
+      }
+      let container = await probe(`*:has(> ${locator})`)
+      let branchRef = actual.ref.replace(/^@/, '')
+      const nestedInput = element.tag === 'input' && ['text', 'search'].includes((attributes.type ?? 'text').toLowerCase())
+      const needsQueryGroup = nestedInput && classifyPublicQueryAction({ action: 'fill', html, value: '', pageUrl: page.sourceUrl }) !== 'search_input'
+      const seen = new Set<string>()
+      for (let depth = 1; container && depth <= 4; depth++) {
+        if (container.frameId !== original.frame_id || !safe(container) || seen.has(container.canonicalRefs[0])) return undefined
+        seen.add(container.canonicalRefs[0])
+        const cue = ['class', 'id', 'role', 'aria-label'].map(key => String(container![key] ?? '')).join(' ')
+        const labels = String((form ?? container).label ?? '').replace(/\s+/g, '')
+        const search = needsQueryGroup
+          ? (/(?:search|query|搜索|查询|检索)/i.test(cue) || Boolean(form?.canonicalRefs.includes(container.canonicalRefs[0]) && form.searchInput === true && publicSearchLabel(labels))) && await queryGroup(container, branchRef)
+          : (form ?? container).searchInput === true && (/(?:搜(?:索|标题|全文)|查询|检索|search)/i.test(labels) || /search_form|search-form|searchbox/i.test(cue)) || labels.includes('搜标题') && labels.includes('搜全文')
+        const result = { search, pagination: /pagination|分页|翻页/i.test(cue), filter: /filter|筛选|分类/i.test(cue) || /近3[日天]/.test(labels) && /近7[日天]/.test(labels), sort: /sort|orderby|排序/i.test(cue) || labels.includes('按时间降序') && labels.includes('按时间升序'), sensitive: false, targetPresent: true }
+        if (search || !nestedInput || depth === 4 || form?.canonicalRefs.includes(container.canonicalRefs[0])) return result
+        // Decorative input wrappers are followed one verified parent at a time.
+        // Attribute candidates must include this exact canonical branch; their
+        // next parent must be unique, safe and in the original frame. Never
+        // cross the verified form endpoint or widen to html/body, and stop after
+        // four parent levels.
+        const wrapper = containerLocator(container)
+        if (!wrapper) return result
+        const candidates = await probe(wrapper, true)
+        if (!candidates?.canonicalRefs.includes(container.canonicalRefs[0])) return undefined
+        branchRef = container.canonicalRefs[0]
+        container = await probe(`*:not(html):not(body):has(> ${wrapper})`)
+      }
+      return undefined
     } catch (error) {
       if (context.abortSignal.aborted || String(object(error).code).startsWith('execution_grant_') || object(error).code === 'browser_binding_changed') throw error
+      const reason = object(error).vendorReason ?? object(error).code
+      const allowed = ['read_field_ambiguous', 'read_target_stale', 'read_limit', 'read_selector_invalid', 'read_params_invalid', 'browser_public_query_dom_unverified', 'permission_denied', 'cdp_failed', 'browser_request_timeout']
+      onFailure?.({ stage: proofStage, code: typeof reason === 'string' && allowed.includes(reason) ? reason : 'read_failed' })
       return undefined
     }
   }
@@ -508,8 +576,12 @@ export function buildBrowserSkillToolProvider(options: {
       object(object(receipt.result).publicQueryInput).target && receipt.request?.scopeAuthorizationReceiptId === authority.binding.id)
     const classify = (dom?: PublicQueryDomContext) => classifyPublicQueryAction({ action, html: reviewed.page.html, value: args.value as string | undefined,
       pageUrl: reviewed.page.sourceUrl, context: dom, priorSearchInput: Boolean(priorSearchInput) })
-    const dom = await scopeDomContext(reviewed.page.html, reviewed.page, String(args.sessionId), String(args.target), scope, config, context)
-    if (!dom) return undefined
+    let domProof: DomProofDiagnostic | undefined
+    const dom = await scopeDomContext(reviewed.page.html, reviewed.page, String(args.sessionId), String(args.target), scope, config, context, diagnostic => { domProof = diagnostic })
+    if (!dom) {
+      recordScopeRequest(action, args, context, reviewed, args.action ? 'browser_authorize_action' : `browser_${action}`, domProof)
+      return undefined
+    }
     const rule = classify(dom)
     if (!rule) return undefined
     return saveTaskPublicQueryAction(options.repository, grant!, { ...reviewed.binding, pageUrl: reviewed.page.sourceUrl }, String(args.contextId), rule,

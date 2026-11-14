@@ -526,6 +526,32 @@ test('the model fixture reads exact published artifact bytes before scheduling o
   } finally { await fixture.close() }
 })
 
+test('the Windows controlled page requires real shared-class candidate and nested generic-input proof', async () => {
+  const { Window } = await import('happy-dom')
+  const window = new Window(), fixture = await startWindowsTaskModelFixture({ browser: true })
+  try {
+    const page = await (await fetch(fixture.fixtureUrl)).text()
+    window.document.body.innerHTML = page
+    const input = window.document.querySelector('.input-input > .po-input > input')
+    const buttons = [...window.document.querySelectorAll('div.input-button')]
+    assert.equal(input.getAttribute('type'), 'text')
+    assert.equal(input.getAttribute('placeholder'), '请输入内容')
+    assert.equal(input.hasAttribute('id') || input.hasAttribute('name') || input.hasAttribute('aria-label'), false)
+    assert.deepEqual(buttons.map(node => node.textContent), ['搜标题', '搜全文'])
+    assert.equal(buttons[0].parentElement, buttons[1].parentElement)
+    assert.equal(buttons[0].parentElement.className, 'searchInput-content-input')
+    assert.equal(window.document.querySelectorAll('div[class="input-button"]').length, 2, 'A production class locator must not become artificially unique')
+    assert.equal(buttons[0].parentElement.querySelectorAll('div[class="input-button"]').length, 2, 'A scalar descendant target field would be ambiguous')
+    assert.equal(buttons[0].parentElement.querySelectorAll('input[type="search"],input[name="q"],input[name="keyword"],input[id="title"]').length, 0, 'The fixture must not manufacture a searchInput=true field')
+    assert.ok(buttons.every(node => !node.hasAttribute('id') && !node.hasAttribute('aria-label')))
+    assert.ok(page.includes(fixture.inputHtml) && page.includes(fixture.buttonHtml) && page.includes(fixture.fullButtonHtml))
+    const native = windowsFixtureNativeExpectations(fixture, { action: 'click', targetRef: '@e55', inputTargetRef: '@e54' })
+    assert.deepEqual(native.slice(0, 2), [{ target: '@e55', field: 'exists', equals: true }, { target: '@e55', field: 'text', equals: '搜标题' }])
+    assert.ok(native.some(value => value.target === '@e54' && value.field === 'value' && value.equals === fixture.query))
+    assert.ok(!native.some(value => value.attribute === 'id' || value.attribute === 'data-testid'))
+  } finally { await fixture.close(); await window.happyDOM.close() }
+})
+
 test('browser protocol obtains fresh real refs, asks exact persistent actions, and omits approvals for a new scheduled conversation', async () => {
   const fixture = await startWindowsTaskModelFixture({ browser: true })
   try {
@@ -549,7 +575,7 @@ test('browser protocol obtains fresh real refs, asks exact persistent actions, a
         }
         let output = { status: 'succeeded' }
         if (call.id === 'smoke-start') output.sessionId = initial ? 'synthetic-source-session' : 'synthetic-due-session'
-        if (call.id === 'smoke-navigate') output = { observation: { context_id: 'synthetic-navigation-context', observation: { text: '@e1 input 合成公告关键词\n@e2 button 查询合成公告' } } }
+        if (call.id === 'smoke-navigate') output = { observation: { context_id: 'synthetic-navigation-context', observation: { text: '@e1 input 请输入内容\n@e2 button 搜标题' } } }
         if (call.id === 'smoke-read-fill-target') assert.equal(args.target, '@e1')
         if (call.id === 'smoke-read-click-target') assert.equal(args.target, '@e12')
         if (call.function.name === 'browser_authorize_action') {
@@ -560,7 +586,7 @@ test('browser protocol obtains fresh real refs, asks exact persistent actions, a
         if (call.id === 'smoke-fill') {
           assert.equal(args.value, fixture.query)
           assert.equal(args.contextId, 'synthetic-navigation-context')
-          output = { observation: { context_id: 'synthetic-post-fill-context', observation: { text: '@e11 input 合成公告关键词\n@e12 button 查询合成公告' } } }
+          output = { observation: { context_id: 'synthetic-post-fill-context', observation: { text: '@e11 input 请输入内容\n@e90 generic 搜标题 搜全文\n@e12 button 搜标题\n@e13 button 搜全文' } } }
         }
         if (call.id === 'smoke-click') {
           assert.equal(args.contextId, 'synthetic-post-fill-context')
@@ -576,6 +602,10 @@ test('browser protocol obtains fresh real refs, asks exact persistent actions, a
     missing.push(...fixtureMessages('navigate', 'browser_navigate', {}))
     assert.equal((await fixtureRequest(fixture, browserToolNames, missing)).status, 400)
     assert.match(fixture.observed.requests.at(-1).error, /fresh actual observed element/)
+    const ambiguous = ['start', 'navigate', 'read-fill-target', 'authorize-fill'].flatMap(id => fixtureMessages(id, 'synthetic-component-call'))
+    ambiguous.push(...fixtureMessages('fill', 'browser_fill', { observation: { context_id: 'ambiguous-click-context', observation: { text: '@e55 button 搜标题\n@e56 button 搜标题' } } }))
+    assert.equal((await fixtureRequest(fixture, browserToolNames, ambiguous)).status, 400)
+    assert.match(fixture.observed.requests.at(-1).error, /one fresh actual observed element/)
     const finished = ['start', 'navigate', 'read-fill-target', 'authorize-fill', 'fill', 'read-click-target', 'authorize-click', 'click', 'read-results', 'stop']
       .flatMap(id => fixtureMessages(id, 'synthetic-component-call'))
     assert.equal((await fixtureRequest(fixture, browserToolNames, finished)).status, 400)

@@ -1338,16 +1338,103 @@ function taskQueryFixture(mode = 'safe') {
       tab_id: 7, page_url: 'https://example.com/search', frame_url: mode === 'iframe' ? 'https://example.com/embedded-account' : 'https://example.com/search', frame_id: mode === 'same-url-iframe' ? 'CHILD-FRAME' : 'MAIN-FRAME', scope: 'current_dom', truncated: false,
       items: [{ ref: mode === 'invalid-canonical' ? 'not-a-dom-ref' : '@e999', values: { present: true }, redacted: [] }] } }
     if (argv[0] !== 'read' || !argv.includes('--selector')) return original(config, argv, signal)
-    expect(argv[argv.indexOf('--max-nodes') + 1]).toBe('2')
     const selector = argv[argv.indexOf('--selector') + 1]!, targetOnly = JSON.parse(argv[argv.indexOf('--fields-json') + 1]!).length === 1, form = selector.startsWith('form:')
+    expect(argv[argv.indexOf('--max-nodes') + 1]).toBe(targetOnly ? '8' : '2')
     if (mode === 'unavailable' && form) return { ok: false, code: 'read_failed', output: {} }
     const values: Record<string, unknown> = targetOnly ? { present: true } : { present: true, target: true, sensitive: mode === 'sensitive', method: form && mode === 'post' ? 'post' : form && mode === 'get' ? 'get' : null, action: form && mode === 'cross' ? 'https://other.example/submit' : null, class: 'search_form', id: null, role: null, 'aria-label': null, searchInput: true, label: '公开公告关键词 搜索 查询公告' }
     const items = form && !['post', 'sensitive', 'cross', 'get'].includes(mode) ? [] : [{ ref: targetOnly ? mode === 'substitute' ? '@e777' : '@e999' : '@e900', values, redacted: [] }]
-    if (mode === 'duplicate' && targetOnly) items.push({ ref: '@e901', values: { ...values, method: 'post', sensitive: true }, redacted: [] })
+    if (mode === 'duplicate' && !targetOnly && !form) items.push({ ref: '@e901', values: { ...values, method: 'post', sensitive: true }, redacted: [] })
     return { ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search', frame_id: 'MAIN-FRAME', scope: 'current_dom', truncated: mode === 'truncated', items } }
   })
   return { ...f, human, authorization, host: new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) }) }
 }
+
+describe('canonical query group proof using official native-read CSS semantics', () => {
+  it.each([
+    ...['搜标题', '搜全文'].map(label => ({ label, mode: 'safe' })),
+    ...['get', 'nested_input', 'input_get', 'input_direct_get', 'input_wrapped_get', 'input_post', 'input_sensitive', 'input_cross', 'input_no_cue', 'input_body', 'input_deep', 'input_duplicate_ancestor', 'input_child_frame', 'input_child_truncated', 'unrelated_input', 'outside_parent', 'nested_parent', 'post', 'cross', 'sensitive', 'duplicate_ref', 'missing_ref', 'wrong_frame', 'parent_frame', 'absent_form_frame', 'wrong_page', 'truncated', 'over_bound', 'redacted', 'business', 'ambiguous_field'].map(mode => ({ label: '搜标题', mode }))
+  ])('uses complete canonical query group proof: $label / $mode', async ({ label, mode }) => {
+    const allowed = ['safe', 'get', 'nested_input', 'input_get', 'input_direct_get', 'input_wrapped_get'].includes(mode)
+    const nestedInput = mode.startsWith('input_') || ['nested_input', 'unrelated_input'].includes(mode)
+    const f = taskQueryFixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+    const window = new Window({ url: 'https://example.com/search' })
+    // Minimal structure from the verified public query component; page-owned
+    // scope IDs, styling and original page content are deliberately not copied.
+    window.document.body.innerHTML = `<div class="searchInput-content-input"><div class="input-input"><div class="po-input"><input type="text" placeholder="请输入内容"></div></div><div class="input-button">搜标题</div><div class="input-button">搜全文</div></div>`
+    const parent = window.document.querySelector('.searchInput-content-input')!
+    if (mode === 'unrelated_input') {
+      const outer = window.document.createElement('div'); outer.className = 'query-panel'
+      parent.replaceWith(outer); outer.innerHTML = '<input id="ordinary" type="text" placeholder="请输入内容">'; outer.append(parent)
+    }
+    const target = nestedInput ? window.document.querySelector('input')! : [...window.document.querySelectorAll('div.input-button')].find(node => node.textContent === label)!
+    if (['get', 'post', 'cross', 'input_get', 'input_post', 'input_cross'].includes(mode)) {
+      const form = window.document.createElement('form'); form.method = mode.endsWith('post') ? 'post' : 'get'
+      if (mode.endsWith('cross')) form.action = 'https://outside.example/search'
+      parent.replaceWith(form); form.append(parent)
+    }
+    if (['sensitive', 'input_sensitive'].includes(mode)) parent.insertAdjacentHTML('beforeend', '<input type="password">')
+    if (mode === 'outside_parent') window.document.body.insertAdjacentHTML('beforeend', '<div><div class="input-button">搜索</div></div>')
+    if (mode === 'nested_parent') { const wrapper = window.document.createElement('div'); target.replaceWith(wrapper); wrapper.append(target) }
+    if (mode === 'over_bound') parent.insertAdjacentHTML('beforeend', '<div class="input-button">搜索</div>'.repeat(7))
+    if (mode === 'business') target.textContent = '提交审批'
+    if (mode === 'ambiguous_field') parent.insertAdjacentHTML('beforeend', '<input type="search"><input type="search">')
+    if (['input_direct_get', 'input_wrapped_get'].includes(mode)) {
+      const form = window.document.createElement('form'); form.method = 'get'; form.className = 'search-form'
+      target.id = 'title'; target.removeAttribute('placeholder'); parent.replaceWith(form); form.append(target)
+      if (mode === 'input_wrapped_get') { const wrapper = window.document.createElement('div'); wrapper.className = 'decoration'; target.replaceWith(wrapper); wrapper.append(target) }
+      form.insertAdjacentHTML('beforeend', '<button>搜索</button>')
+    }
+    if (mode === 'input_no_cue') parent.className = 'ordinary-controls'
+    if (mode === 'input_body') { window.document.body.className = 'query-panel'; parent.replaceWith(...parent.childNodes) }
+    if (mode === 'input_deep') {
+      const one = window.document.createElement('div'), two = window.document.createElement('div')
+      one.className = 'decoration-one'; two.className = 'decoration-two'; target.replaceWith(one); one.append(two); two.append(target)
+    }
+    if (mode === 'input_duplicate_ancestor') window.document.body.insertAdjacentHTML('beforeend', '<div class="outside"><div class="po-input"></div></div>')
+    const nodes = [...window.document.querySelectorAll('*')]
+    f.setElement(target.outerHTML)
+    if (allowed && !nestedInput) {
+      expect(window.document.querySelectorAll('div[class="input-button"]')).toHaveLength(2)
+      expect(target.parentElement!.querySelectorAll('div[class="input-button"]')).toHaveLength(2)
+    }
+    const original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] !== 'read' || !argv.includes('--selector')) return original(config, argv, signal)
+      const selector = argv[argv.indexOf('--selector') + 1], fields = JSON.parse(argv[argv.indexOf('--fields-json') + 1]) as Array<{ key: string; read: string; selector?: string; attribute?: string }>
+      const matches = [...window.document.querySelectorAll(selector)], max = Number(argv[argv.indexOf('--max-nodes') + 1])
+      const items = []
+      for (const node of matches.slice(0, max)) {
+        const values: Record<string, unknown> = {}
+        for (const field of fields) {
+          const selected = !field.selector || field.selector === ':scope' ? [node] : [...node.querySelectorAll(field.selector)]
+          if (selected.length > 1) return { ok: false, code: 'invalid_params', outcomeUnknown: false, exitCode: 1,
+            output: { code: 'invalid_params', data: { reason: 'read_field_ambiguous', phase: 'read', effect_state: 'none' } } }
+          values[field.key] = field.read === 'exists' ? selected.length === 1 : field.read === 'attribute' ? selected[0]?.getAttribute(field.attribute!) ?? null : selected[0]?.textContent ?? null
+        }
+        items.push({ ref: mode === 'duplicate_ref' || node === target && mode !== 'missing_ref' ? '@e999' : `@e${100 + nodes.indexOf(node)}`, values, redacted: mode === 'redacted' ? ['present'] : [] })
+      }
+      return { ok: true, output: { tab_id: 7, page_url: mode === 'wrong_page' ? 'https://example.com/other' : 'https://example.com/search', frame_url: 'https://example.com/search', frame_id: mode === 'wrong_frame' || mode === 'parent_frame' && selector.startsWith('*:') || mode === 'absent_form_frame' && selector.startsWith('form:') || mode === 'input_child_frame' && selector.endsWith(' > *') ? 'OTHER-FRAME' : 'MAIN-FRAME', scope: 'current_dom', truncated: mode === 'truncated' || mode === 'input_child_truncated' && selector.endsWith(' > *') || matches.length > max, items } }
+    })
+    try {
+      const result = await f.host.execute({ toolName: nestedInput ? 'browser_fill' : 'browser_click', callId: 'same-class-search', arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e7', ...(nestedInput ? { value: '工程测量' } : {}) } }, f.context)
+      expect(result.item).toMatchObject({ isError: !allowed })
+      expect(f.human).not.toHaveBeenCalled()
+      expect(f.repository.operations('task', 'browser_scope_action_authorization')).toHaveLength(allowed ? 1 : 0)
+      expect(f.runner.mock.calls.filter(([, argv]) => ['click', 'fill'].includes(argv[0]))).toHaveLength(allowed ? 1 : 0)
+      if (allowed) {
+        expect(f.repository.operations('task', 'browser_scope_action_authorization')[0].request).toMatchObject({ rule: nestedInput ? 'search_input' : 'search_trigger' })
+        expect(f.repository.operations('task', 'browser_action_dispatch')).toMatchObject([{ status: 'succeeded', result: { actionAcknowledged: true, readbackPending: false } }])
+      } else expect(f.repository.operations('task', 'browser_action_dispatch')).toHaveLength(0)
+      if (mode === 'ambiguous_field') {
+        const receipt = f.repository.operations('task', 'browser_action_scope_request')[0]
+        expect(receipt.result).toEqual({ actionDispatched: false, domProof: { stage: 'container', code: 'read_field_ambiguous' } })
+        expect(JSON.stringify(receipt.result)).not.toContain('input-button')
+      }
+    } finally { await window.happyDOM.close() }
+  })
+})
 
 it.each(['safe', 'post', 'sensitive', 'cross', 'duplicate_group', 'truncated', 'wrong_ref', 'wrong_frame', 'outside_group', 'business_label', 'redacted', 'duplicate_ref', 'wrong_page', 'parent_frame', 'wrong_parent_class'] as const)('proves the actual seven-option date query group before task-scope click: %s', async mode => {
   const f = taskQueryFixture(); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
