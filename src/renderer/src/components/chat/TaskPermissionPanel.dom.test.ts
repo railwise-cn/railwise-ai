@@ -19,8 +19,8 @@ let container: HTMLDivElement
 const onConfirmed=vi.fn()
 const api={
   getTaskPermissions:vi.fn(async()=>snapshot),getTaskRun:vi.fn(async()=>({id:'task-1',threadId:'hidden-1',status:'waiting_user'}) as TaskRunV1|null),
-  listAgentProfiles:vi.fn(async()=>({profiles:[]})),runtimeRequest:vi.fn(async()=>({ok:true,body:JSON.stringify({agentRevision:7})})),
-  confirmTaskPermissions:vi.fn(async()=>({permission:{...snapshot,canConfirm:false},resumed:false})),setThreadAgent:vi.fn()
+  listAgentProfiles:vi.fn(async()=>({profiles:[]})),runtimeRequest:vi.fn(async(_path?:string,_method?:string,_body?:string)=>({ok:true,body:JSON.stringify({agentRevision:7})})),
+  confirmTaskPermissions:vi.fn(async():Promise<{task?:TaskRunV1;permission:TaskPermissionSnapshotV1;resumed:boolean}>=>({permission:{...snapshot,canConfirm:false},resumed:false})),setThreadAgent:vi.fn(),resumeTask:vi.fn(),retryTask:vi.fn()
 }
 
 function button(label:string):HTMLButtonElement {
@@ -33,6 +33,8 @@ async function click(label:string):Promise<void>{await act(async()=>{button(labe
 beforeEach(async()=>{
   vi.clearAllMocks()
   api.getTaskPermissions.mockResolvedValue(snapshot)
+  api.runtimeRequest.mockResolvedValue({ok:true,body:JSON.stringify({agentRevision:7})})
+  api.confirmTaskPermissions.mockResolvedValue({permission:{...snapshot,canConfirm:false},resumed:false})
   api.getTaskRun.mockResolvedValue({id:'task-1',threadId:'hidden-1',status:'waiting_user'} as TaskRunV1)
   await i18n.changeLanguage('zh')
   Object.defineProperty(window,'workwise',{configurable:true,value:api})
@@ -42,6 +44,73 @@ beforeEach(async()=>{
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();Reflect.deleteProperty(window,'workwise');await i18n.changeLanguage('en')})
 
 describe('task permission authority overview',()=>{
+  it('recovers the same failed task through explicit base restoration without resuming or replacing it', async () => {
+    const expired = { ...snapshot, workspaceTrust: 'read-only', sandboxMode: 'read-only', canWritePaths: false, canConfirm: true,
+      recoveryEligible: true, canRestoreBase: true, grant: { id: 'expired-diagnostic', status: 'active', confirmedAt: '2026-11-14T12:11:56.795Z', expiresAt: new Date(Date.now() - 60_000).toISOString(), scope: { readPaths: ['/project/synthetic', '/old/diagnostic'], writePaths: [] } } } as TaskPermissionSnapshotV1
+    const original: TaskRunV1 = {id:'task-1',threadId:'hidden-1',status:'failed',revision:4,attempts:8,budget:{maxAttempts:8,maxDurationMs:1800000},
+      timing:{executionMs:1013026,queuedMs:0,humanWaitMs:0,pausedMs:0,sampledAt:'2026-11-14T14:00:00.000Z',coverage:'complete'},
+      childTaskIds:[],workspaceRoot:'/project/synthetic',goal:'Original public query',acceptance:{kind:'answer',requiredNodeKinds:[],requireFinalResponse:true,requireActionableArtifactCard:false},
+      agentId:'default',replans:0,noProgressCount:0,nodes:[],artifacts:[],createdAt:'2026-11-14T12:00:00.000Z',updatedAt:'2026-11-14T14:00:00.000Z'}
+    api.getTaskPermissions.mockResolvedValue(expired); api.getTaskRun.mockResolvedValue(original)
+    api.runtimeRequest.mockImplementation(async (_path, method, body) => {
+      if (method !== 'DELETE') return {ok:true,body:JSON.stringify({agentRevision:7})}
+      expect(JSON.parse(body!)).toEqual({expectedRevision:4,permissionId:'expired-diagnostic',idempotencyKey:expect.any(String),restoreBase:true})
+      const paused = {...original,status:'paused',revision:5} as TaskRunV1
+      const permission = {...snapshot,taskRevision:5,workspaceTrust:'read-only',recoveryEligible:false,canRestoreBase:false} as TaskPermissionSnapshotV1
+      api.getTaskRun.mockResolvedValue(paused); api.getTaskPermissions.mockResolvedValue(permission)
+      return {ok:true,body:JSON.stringify({task:paused,permission,resumed:false})}
+    })
+    await click('查看当前任务权限')
+    expect(container.textContent).toContain(i18n.t('common:taskPermissionExpired'))
+    await click(i18n.t('common:taskPermissionRestoreBase'))
+    expect(onConfirmed).toHaveBeenCalledWith(i18n.t('common:taskPermissionBaseRestored'))
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled(); expect(api.resumeTask).not.toHaveBeenCalled(); expect(api.retryTask).not.toHaveBeenCalled()
+    expect(original.attempts).toBe(8); expect(original.timing?.executionMs).toBe(1013026)
+  })
+
+  it('requires explicit reconfirmation for an eligible failed expired grant and rejects automatic-resume replies', async () => {
+    const expired = {...snapshot,canConfirm:true,recoveryEligible:true,canRestoreBase:true,grant:{id:'expired',status:'expired',confirmedAt:'2026-11-14T12:11:56.795Z',expiresAt:'2026-11-14T12:26:56.795Z'}} as TaskPermissionSnapshotV1
+    api.getTaskPermissions.mockResolvedValue(expired); api.getTaskRun.mockResolvedValue({id:'task-1',threadId:'hidden-1',status:'failed'} as TaskRunV1)
+    api.confirmTaskPermissions.mockResolvedValue({task:{id:'task-1',threadId:'hidden-1',status:'paused'} as TaskRunV1,permission:{...snapshot,recoveryEligible:true} as TaskPermissionSnapshotV1,resumed:true})
+    await click('查看当前任务权限')
+    const allow = button(i18n.t('common:taskPermissionRenew'))
+    expect(allow.disabled).toBe(true)
+    await act(async()=>container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click(i18n.t('common:taskPermissionRenew'))
+    expect(api.confirmTaskPermissions).toHaveBeenCalledOnce()
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(i18n.t('common:taskPermissionRecoveryReadFailed'))
+    expect(onConfirmed).not.toHaveBeenCalled(); expect(api.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('reconfirms the reviewed temporary scope of an eligible failed task without starting work', async () => {
+    const expired = {...snapshot,recoveryEligible:true,canRestoreBase:true,grant:{id:'expired',status:'expired',confirmedAt:'2026-11-14T12:11:56.795Z',expiresAt:'2026-11-14T12:26:56.795Z',scope:{readPaths:['/project/synthetic','/old/diagnostic'],writePaths:[]}}} as TaskPermissionSnapshotV1
+    const original = {id:'task-1',threadId:'hidden-1',status:'failed',revision:4,attempts:8} as TaskRunV1
+    api.getTaskPermissions.mockResolvedValue(expired); api.getTaskRun.mockResolvedValue(original)
+    api.confirmTaskPermissions.mockResolvedValue({task:{...original,status:'paused',revision:5},permission:{...expired,taskRevision:5,recoveryEligible:false,canRestoreBase:false,grant:{...expired.grant!,status:'active',expiresAt:new Date(Date.now()+900_000).toISOString()}},resumed:false})
+    await click('查看当前任务权限')
+    expect(container.textContent).toContain('/old/diagnostic')
+    expect(button(i18n.t('common:taskPermissionRenew')).disabled).toBe(true)
+    await act(async()=>container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click(i18n.t('common:taskPermissionRenew'))
+    expect(api.confirmTaskPermissions).toHaveBeenCalledExactlyOnceWith('task-1',{
+      expectedRevision:4,scopeHash:'reviewed-scope',confirmed:true,approvalPolicy:'on-request',ttlSeconds:900,idempotencyKey:expect.any(String),duration:'task'
+    })
+    expect(onConfirmed).toHaveBeenCalledWith(i18n.t('common:taskPermissionSaved'))
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(api.resumeTask).not.toHaveBeenCalled(); expect(api.retryTask).not.toHaveBeenCalled()
+    expect(original.status).toBe('failed'); expect(original.attempts).toBe(8)
+  })
+
+  it.each(['completed','cancelled','failed'] as const)('keeps %s read-only when the task is not eligible for recovery', async status => {
+    api.getTaskRun.mockResolvedValue({id:'task-1',threadId:'hidden-1',status} as TaskRunV1)
+    api.getTaskPermissions.mockResolvedValue({...snapshot,canConfirm:true,canRestoreBase:true,recoveryEligible:status !== 'failed',grant:{id:'expired',status:'expired',confirmedAt:'2026-11-14T12:11:56.795Z',expiresAt:'2026-11-14T12:26:56.795Z'}} as TaskPermissionSnapshotV1)
+    await click('查看当前任务权限')
+    expect(container.querySelector('input, select, textarea')).toBeNull()
+    expect([...container.querySelectorAll('button')].map(item=>item.textContent)).toEqual(['查看当前任务权限'])
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(api.runtimeRequest).toHaveBeenCalledExactlyOnceWith('/v1/threads/hidden-1','GET')
+  })
+
   it.each(['completed', 'cancelled', 'failed'] as const)('keeps the permission summary and execution history without new authorization controls for %s tasks', async status => {
     api.getTaskRun.mockResolvedValue({ id: 'task-1', threadId: 'hidden-1', status } as TaskRunV1)
     api.getTaskPermissions.mockResolvedValue({ ...snapshot, canConfirm: false,

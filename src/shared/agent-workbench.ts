@@ -141,6 +141,8 @@ export type TaskPermissionSnapshotV1 = {
   connectorScopeSources?: Array<{ provider: string; scopes: string[]; source: 'task_requirements' | 'tool_catalog' | 'last_execution_grant'; issuedAt?: string; expiresAt?: string }>
   canWritePaths?: boolean
   canConfirm: boolean; reason?: string
+  /** Server-verified in-place permission recovery; never inferred from an error string. */
+  canRestoreBase?: boolean; recoveryEligible?: boolean
   executionGrants?: TaskExecutionPermissionV1[]
   grant?: { id: string; status: 'active' | 'expired' | 'invalid' | 'prepared' | 'consumed'; confirmedAt: string; expiresAt: string; scope?: TaskPermissionScopeV1; duration?: 'task'|'next_operation' }
 }

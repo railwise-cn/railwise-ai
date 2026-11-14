@@ -55,6 +55,8 @@ import { validateArtifactFile } from './artifact-validator.js'
 import type { RuntimeSpanService } from './runtime-span-service.js'
 import { verifyTaskDelivery } from '../delivery/verification.js'
 
+import { taskPermissionFailure } from './task-permission-recovery.js'
+
 const DEFAULT_MAX_ATTEMPTS = 8
 const DEFAULT_MAX_DURATION_MS = 30 * 60 * 1000
 const TERMINAL = new Set<TaskRunStatus>(['completed', 'failed', 'cancelled'])
@@ -671,9 +673,20 @@ export class TaskController {
     return this.stallUnknown(task, ids)
   }
 
+  blockTaskPermission(threadId: string, turnId: string, error: unknown): TaskCandidateDecision | null {
+    const failure = taskPermissionFailure(error)
+    const task = this.repository.findActiveByThread(threadId)
+    if (!failure || !task || task.activeTurnId !== turnId) return null
+    if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? failure.message }
+    const unknown = this.suspendUnknownToolOutcome(threadId, turnId)
+    if (unknown) return unknown
+    return this.waitForCapability(task, turnId, workspacePermissionCapability(failure.code, failure.message), failure.code)
+  }
+
   private waitForToolPermission(task: TaskRun, items: TurnItem[], turnId: string, currentGrant?: ExecutionGrant): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null {
     const denied = [...items].reverse().find(item => item.kind === 'tool_result' && item.isError && item.output && typeof item.output === 'object' &&
-      ['sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
+      ['task_permission_expired', 'task_permission_revoked', 'task_permission_consumed', 'execution_grant_expired', 'execution_grant_revoked', 'execution_grant_scope',
+        'sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
         'browser_interaction_scope_required', 'browser_binding_changed', 'browser_schedule_authority_changed',
         'browser_verification_policy_required', 'browser_verification_policy_blocked', 'browser_public_query_action_required', 'browser_public_query_target_blocked',
         'browser_schedule_action_scope_changed', 'browser_schedule_action_scope_required', 'browser_schedule_outcome_unknown',

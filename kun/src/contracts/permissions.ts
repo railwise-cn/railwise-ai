@@ -99,5 +99,5 @@ export type ExecutionScope = Pick<ExecutionGrant, 'networkAllowlist' | 'connecto
   Pick<Partial<ExecutionGrant>, 'allowedProviderIds' | 'pathAllowlist' | 'readPathAllowlist' | 'writePathAllowlist' | 'expiresAt' | 'taskPermissionId' | 'permissionDuration'> &
   { permissionScope?: TaskPermissionScope; workspaceWriteException?: boolean; browserScheduleActions?: BrowserScheduleAction[] }
 
-export const TaskPermissionRevocationSchema = z.object({expectedRevision:z.number().int().nonnegative(),permissionId:z.string().min(1),idempotencyKey:z.string().trim().min(1).max(256)}).strict()
+export const TaskPermissionRevocationSchema = z.object({expectedRevision:z.number().int().nonnegative(),permissionId:z.string().min(1),idempotencyKey:z.string().trim().min(1).max(256),restoreBase:z.boolean().optional()}).strict()
 export type TaskPermissionRevocation = z.infer<typeof TaskPermissionRevocationSchema>

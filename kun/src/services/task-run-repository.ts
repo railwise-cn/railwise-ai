@@ -1,3 +1,4 @@
+import { recoverablePermissionFailure } from './task-permission-recovery.js'
 import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { BrowserScheduleActionSchema } from '../contracts/browser-schedule-actions.js'
 import { browserVerificationPolicy } from '../contracts/browser-skill.js'
@@ -231,6 +232,29 @@ export class TaskRunRepository {
     return rows.map(row => this.parseRun(row))
   }
 
+  /** The sole terminal-state exception repairs an evidenced pre-execution permission failure.
+   * It is configuration-only: no new task, attempt, budget or executable Turn is created.
+   */
+  private isPermissionRepair(current: TaskRun, candidate: TaskRun, event?: { key: string; kind: string; payload?: Record<string, unknown>; createdAt?: string }): boolean {
+    if (!event?.createdAt || candidate.status !== 'paused' || !['task_permission_confirmed', 'task_permission_base_restored'].includes(event.kind) ||
+      !recoverablePermissionFailure(this, current, event.createdAt)) return false
+    const stable = (task: TaskRun) => ({ id: task.id, threadId: task.threadId, originThreadId: task.originThreadId, activeTurnId: task.activeTurnId,
+      rootTaskId: task.rootTaskId, parentTaskId: task.parentTaskId, retryOfTaskId: task.retryOfTaskId, goal: task.goal, workspaceRoot: task.workspaceRoot,
+      attempts: task.attempts, budget: task.budget, nodes: task.nodes, acceptance: task.acceptance, artifacts: task.artifacts, executionMs: task.executionMs,
+      authority: task.authority ? { ...task.authority, taskApprovalGrant: undefined, approvalPolicy: undefined } : undefined })
+    if (operationFingerprint(stable(current)) !== operationFingerprint(stable(candidate))) return false
+    const grant = current.authority?.taskApprovalGrant
+    if (!grant || event.payload?.permissionId !== grant.id) return false
+    if (event.kind === 'task_permission_confirmed') {
+      const receipt = this.operation(current.id, `task-permission:${grant.idempotencyKey}`)
+      return receipt?.kind === 'task_permission' && receipt.status === 'prepared' && receipt.request?.confirmed === true &&
+        grant.status === 'prepared' && operationFingerprint(candidate.authority?.taskApprovalGrant) === operationFingerprint({ ...grant, status: 'active' })
+    }
+    return !candidate.authority?.taskApprovalGrant && Boolean(grant.revokedAt) && this.operations(current.id, 'task_permission_revoke').some(receipt =>
+      receipt.status === 'prepared' && receipt.request?.restoreBase === true && receipt.request.permissionId === grant.id &&
+      event.key === `permission-base-restored:${grant.id}:${receipt.request.idempotencyKey}`)
+  }
+
   update(
     taskId: string,
     expectedRevision: number,
@@ -248,7 +272,7 @@ export class TaskRunRepository {
         throw new TaskRevisionConflictError(expectedRevision, current.revision)
       }
       const candidate = mutator(current)
-      if (TERMINAL_TASK_STATUSES.has(current.status) && candidate.status !== current.status) {
+      if (TERMINAL_TASK_STATUSES.has(current.status) && candidate.status !== current.status && !this.isPermissionRepair(current, candidate, event)) {
         throw Object.assign(new Error(`terminal task cannot transition from ${current.status}`), {
           code: 'invalid_state'
         })

@@ -11,6 +11,7 @@ import { workspacePermissionCapability } from './workspace-write-preflight.js'
 import { externalOperationForTool } from './external-effect-evidence.js'
 import { toolCanProveExternalEffect } from '../loop/turn-completion-guard.js'
 import { createHash } from 'node:crypto'
+import { taskPermissionFailure } from './task-permission-recovery.js'
 
 export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel'
 export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string }
@@ -19,7 +20,7 @@ export type TaskControlResult = { task:TaskRun; turn?:StartTurnResponse; capabil
 /** One deterministic mutation path for chat commands and the task HTTP API. */
 export class TaskControlService {
   private readonly pending = new Map<string,Promise<unknown>>()
-  constructor(private readonly deps:{repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;validateTaskPermission?(threadId:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;nowIso():string}) {}
+  constructor(private readonly deps:{repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;nowIso():string}) {}
 
   async mutate(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const previous=this.pending.get(taskId) ?? Promise.resolve()
@@ -61,6 +62,14 @@ export class TaskControlService {
       if(action==='retry')this.assertRetrySafe(current)
     }
     if(action==='resume'||action==='retry') {
+      if (action === 'resume') {
+        try { await this.deps.validateTaskPermission?.(current.threadId, current.id) }
+        catch (error) {
+          const failure = taskPermissionFailure(error)
+          if (!failure) throw error
+          return this.persistResumeCapability(taskId, current, data, workspacePermissionCapability(failure.code, failure.message))
+        }
+      }
       if (action === 'resume' && !current.retryOfTaskId && !current.activeTurnId && !repository.inputs(current.id).some(input => input.sourceId === 'capability-original')) {
         const original = StartTurnRequest.safeParse(repository.attention(`capability_${current.id}`)?.payload?.request)
         if (original.success) current = tasks.appendInput(current.id, current.revision, `capability-original:${current.id}`, original.data.prompt, 'supplement', 'capability-original',

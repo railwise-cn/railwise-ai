@@ -72,6 +72,8 @@ describe('app-ipc-schemas', () => {
   it('accepts only an exact bounded permission revocation over the existing task endpoint', () => {
     const payload={path:'/v1/tasks/task-1/permissions',method:'DELETE',body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'revoke'})}
     expect(runtimeRequestPayloadSchema.safeParse(payload).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'restore',restoreBase:true})}).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'restore',restoreBase:'true'})}).success).toBe(false)
     expect(runtimeRequestPayloadSchema.safeParse({...payload,body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'revoke',allowedTools:['bash']})}).success).toBe(false)
     expect(runtimeRequestPayloadSchema.safeParse({...payload,path:`${payload.path}?force=true`}).success).toBe(false)
     expect(runtimeRequestPayloadSchema.safeParse({...payload,body:undefined}).success).toBe(false)

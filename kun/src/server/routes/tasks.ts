@@ -86,7 +86,8 @@ export async function revokeTaskPermissions(runtime:ServerRuntime,taskId:string,
   const parsed=TaskPermissionRevocationSchema.safeParse(body.value)
   if(!parsed.success)return ERRORS.validation('invalid task permission revocation',parsed.error.issues)
   try {
-    await runtime.taskPermissionService.revoke(taskId,parsed.data)
+    const restored = await runtime.taskPermissionService.revoke(taskId,parsed.data)
+    if (parsed.data.restoreBase) return jsonResponse(restored)
     const pauseKey=`permission-revoke:${parsed.data.idempotencyKey}`
     let paused=false
     for(let attempt=0;attempt<3;attempt++) {

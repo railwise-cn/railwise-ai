@@ -537,6 +537,16 @@ export class AgentLoop {
       await this.recordPipelineStage(threadId, turnId, 'pre_start')
       await this.recordPipelineStage(threadId, turnId, 'post_start')
       for (;;) {
+        // Permission can expire after admission or between attempts. Check before creating an execution attempt.
+        try {
+          const existingGrant = (await this.opts.threadStore.get(threadId))?.turns.find(turn => turn.id === turnId)?.executionGrant
+          await this.opts.validateTaskPermission?.(threadId, existingGrant?.taskPermissionId)
+        } catch (error) {
+          const blocked = this.opts.tasks?.blockTaskPermission?.(threadId, turnId, error)
+          if (!blocked) throw error
+          await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
+          return 'completed'
+        }
         this.opts.tasks?.beginAttempt(threadId, turnId)
         await this.drainSteering(threadId, turnId, signal)
         let outcome: TaskAttemptOutcome
@@ -544,6 +554,11 @@ export class AgentLoop {
           outcome = await this.loop(threadId, turnId, signal)
         } catch (error) {
           if (signal.aborted || !this.opts.tasks) throw error
+          const permissionBlock = this.opts.tasks.blockTaskPermission?.(threadId, turnId, error)
+          if (permissionBlock) {
+            await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
+            return 'completed'
+          }
           if (this.opts.tasks.hasUnknownToolOutcome?.(threadId, turnId)) {
             outcome = { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
           } else {

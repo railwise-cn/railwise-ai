@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TaskAttentionV1, TaskOperationReceiptV1, TaskRunV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskOperationReceiptV1, TaskPermissionSnapshotV1, TaskRunV1 } from '@shared/agent-workbench'
 import i18n from '../../i18n'
 import { TaskWorkspaceView, filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from './TaskWorkspaceView'
 import { resetTaskStateForTests, refreshTaskState } from '../../store/task-live-store'
@@ -126,6 +126,42 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('restores an eligible failed task in place and starts it only after a separate Continue', async () => {
+    const original: TaskRunV1 = {...task('original-expired','failed','Original public query'),attempts:8,
+      timing:{executionMs:1013026,queuedMs:0,humanWaitMs:0,pausedMs:0,sampledAt:now,coverage:'complete'}}
+    tasks = [original]; inbox = []
+    let permission: TaskPermissionSnapshotV1 = {
+      taskId:original.id,taskRevision:1,taskTitle:original.goal,scopeHash:'expired-scope',workspaceRoot:'/workspace',workspaceTrust:'read-only',workspaceRevision:2,agentRevision:3,
+      approvalPolicy:'on-request',targetApprovalPolicy:'on-request',maxTtlSeconds:900,canConfirm:true,recoveryEligible:true,canRestoreBase:true,
+      grant:{id:'temporary-diagnostic',status:'expired',confirmedAt:now,expiresAt:now,scope:{readPaths:['/workspace','/old/diagnostic'],writePaths:[]}}
+    }
+    Object.assign(window.workwise,{
+      getTaskPermissions:vi.fn(async()=>permission),getTaskRun:vi.fn(async()=>tasks[0]),listAgentProfiles:vi.fn(async()=>({profiles:[]})),confirmTaskPermissions:vi.fn(),
+      runtimeRequest:vi.fn(async(path:string,method:string,body?:string)=>{
+        if(method==='GET')return {ok:true,status:200,body:JSON.stringify({agentRevision:3})}
+        expect(path).toBe('/v1/tasks/original-expired/permissions'); expect(method).toBe('DELETE')
+        expect(JSON.parse(body!)).toEqual({expectedRevision:1,permissionId:'temporary-diagnostic',idempotencyKey:expect.any(String),restoreBase:true})
+        tasks = [{...tasks[0],status:'paused',revision:2}]
+        permission = {...permission,taskRevision:2,recoveryEligible:false,canRestoreBase:false,grant:undefined}
+        return {ok:true,status:200,body:JSON.stringify({task:tasks[0],permission,resumed:false})}
+      })
+    })
+    await act(async()=>refreshTaskState())
+    await click('All tasks'); await click('Original public query')
+    const summary = [...container.querySelectorAll('details > summary')].find(item=>item.textContent===i18n.t('common:taskPermissionReview'))!
+    await act(async()=>{(summary as HTMLElement).click()})
+    expect((summary.parentElement as HTMLDetailsElement).open).toBe(true)
+    await settle()
+    await click(i18n.t('common:taskPermissionRestoreBase'))
+    expect([...container.querySelectorAll('[role="status"]')].some(item=>item.textContent===i18n.t('common:taskPermissionBaseRestored'))).toBe(true)
+    expect(tasks[0]).toMatchObject({id:original.id,status:'paused',attempts:8,timing:original.timing,budget:original.budget})
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled(); expect(window.workwise.retryTask).not.toHaveBeenCalled()
+    expect(window.workwise.confirmTaskPermissions).not.toHaveBeenCalled(); expect(window.workwise.startTaskTemplate).not.toHaveBeenCalled()
+    await click(i18n.t('common:taskRunResume'))
+    expect(window.workwise.resumeTask).toHaveBeenCalledExactlyOnceWith(original.id,{expectedRevision:2,idempotencyKey:expect.any(String)})
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+
   it('keeps detailed task permissions closed until the user opens them', async () => {
     await click('Monthly report')
     const summary = [...container.querySelectorAll('details > summary')].find(item => item.textContent === i18n.t('common:taskPermissionReview'))
