@@ -2214,7 +2214,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         report.taskExecution.browserSkill.publicQuery = { ...inspectWindowsQueryThread(execution, taskModel, { initial: true }),
           uiApprovals, persistentActionAuthorizations: actions.length, scopeActionAuthorizations: scopedActions.length, unknownOutcomes: 0,
           taskScopeAuthorization: { ...task.authority.browserScope.publicQueryAuthorization, authorizationSource: 'task_scope',
-            uiConsentVerified: browserRecovery.publicQueryAuthorizationReview.selected.checked === true },
+            uiConsentVerified: report.taskSetup.browserRecovery.publicQueryAuthorizationReview.selected.checked === true },
           policyExecution: inspectWindowsBrowserPolicy(task, execution, queryReceipts, taskModel) }
         validateWindowsBrowserEvidence(report.taskExecution.browserSkill)
         report.checks.push('real-browser-skill-html-and-schedule')
