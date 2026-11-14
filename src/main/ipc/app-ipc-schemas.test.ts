@@ -52,6 +52,7 @@ describe('app-ipc-schemas', () => {
     expect(runtimeRequestPayloadSchema.safeParse({ path }).success).toBe(true)
     expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'GET' }).success).toBe(true)
     expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify(confirmation) }).success).toBe(true)
+    for (const duration of ['task', 'schedule']) expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify({ ...confirmation, publicQueryAuthorization: duration }) }).success).toBe(true)
     for (const request of [
       { path, method: 'GET', body: '{}' },
       { path, method: 'POST' },
@@ -62,7 +63,7 @@ describe('app-ipc-schemas', () => {
         '/v1/tasks/task-1%252Ftask-2/browser-binding', '/v1/tasks/%ZZ/browser-binding',
         '//elsewhere/v1/tasks/task-1/browser-binding'].map(path => ({ path, method: 'GET' })),
       ...[{ taskId: 'task-2' }, { allowedTools: ['bash'] }, { force: true }, { confirmed: false },
-        { expectedTaskRevision: -1 }, { origins: ['*'] }, { origins: ['https://example.com/private'] }]
+        { expectedTaskRevision: -1 }, { publicQueryAuthorization: '*' }, { publicQueryAuthorization: { receiptId: 'forged', duration: 'schedule' } }, { origins: ['*'] }, { origins: ['https://example.com/private'] }]
         .map(extra => ({ path, method: 'POST', body: JSON.stringify({ ...confirmation, ...extra }) })),
       { path, taskId: 'task-2', method: 'POST', body: JSON.stringify(confirmation) }
     ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(false)

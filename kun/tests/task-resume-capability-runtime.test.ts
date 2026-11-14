@@ -95,7 +95,7 @@ async function fixture(kind: 'browser' | 'workspace' | 'dingtalk' = 'browser', i
   return { get runtime() { return runtime }, api, current, origin, worker, workspace, prompt, turnCount, cards, outboxCount, restart, enableBrowser, requests: () => modelRequests }
 }
 
-it('preserves the literal procurement, HTML and twice-daily request with zero Turns until explicit public-query binding', async () => {
+it.each([undefined, 'task', 'schedule'] as const)('preserves the literal procurement request with zero Turns until explicit binding and %s public query permission', async publicQueryAuthorization => {
   const prompt = '使用broswer-skill，帮我去政采云、阳光采购平台等平台去获取一些招标信息，我们主要是做工程测量、工程监测类的业务，所以需要找的是这一类招标信息，并以html形式将获取到的信息给我汇报，每天执行两次，早上九点前一次，下午五点前一次。'
   const f = await fixture('browser', false, prompt)
   expect(f.current()).toMatchObject({ goal: prompt, attempts: 0, status: 'paused', acceptance: {
@@ -110,7 +110,8 @@ it('preserves the literal procurement, HTML and twice-daily request with zero Tu
     origins: ['https://example.com', 'https://new.example'], purpose: prompt })
   const confirm = await f.api(`/v1/tasks/${f.current().id}/browser-binding`, 'POST', {
     expectedTaskRevision: snapshot.taskRevision, expectedBrowserRevision: snapshot.browserRevision, browserInstanceId: snapshot.browserInstanceId,
-    origins: snapshot.origins, interaction: 'interact', verificationPolicy: 'public_query_target', confirmed: true, idempotencyKey: 'review-original-public-query'
+    origins: snapshot.origins, interaction: 'interact', verificationPolicy: 'public_query_target', confirmed: true, idempotencyKey: 'review-original-public-query',
+    ...(publicQueryAuthorization ? { publicQueryAuthorization } : {})
   })
   expect(confirm.status, await confirm.clone().text()).toBe(200)
   expect(await confirm.json()).toMatchObject({ resumed: false, binding: { verificationPolicy: 'public_query_target' } })
@@ -118,6 +119,17 @@ it('preserves the literal procurement, HTML and twice-daily request with zero Tu
   expect(await f.turnCount()).toBe(0)
   expect(f.requests()).toBe(0)
   expect(f.current().acceptance.requiredSourceOrigins).toEqual(snapshot.origins)
+  const authorization = f.current().authority!.browserScope!.publicQueryAuthorization
+  const receipt = f.runtime.taskRepository!.operation(f.current().id, 'browser-binding:review-original-public-query')!
+  if (publicQueryAuthorization) {
+    expect(authorization).toMatchObject({ receiptId: receipt.id, duration: publicQueryAuthorization })
+    expect(receipt).toMatchObject({ status: 'succeeded', kind: 'browser_binding', request: { publicQueryAuthorization }, result: { publicQueryAuthorization: authorization } })
+  } else expect(f.current().authority!.browserScope).not.toHaveProperty('publicQueryAuthorization')
+  await f.restart()
+  expect(f.current().authority!.browserScope!.publicQueryAuthorization).toEqual(authorization)
+  expect(f.current().status).toBe('paused')
+  expect(await f.turnCount()).toBe(0)
+  expect(f.requests()).toBe(0)
   const resumed = await f.api(`/v1/tasks/${f.current().id}/resume`, 'POST', { expectedRevision: f.current().revision, idempotencyKey: 'start-reviewed-public-query' })
   expect(resumed.status, await resumed.clone().text()).toBe(202)
   const started = await resumed.json() as TaskControlResult
@@ -125,6 +137,7 @@ it('preserves the literal procurement, HTML and twice-daily request with zero Tu
   const turn = (await f.runtime.threadService.get(f.worker.id))!.turns.find(turn => turn.id === started.turn!.turnId)!
   expect(turn.executionGrant?.browserScope).toEqual(f.current().authority?.browserScope)
   expect(turn.executionGrant?.browserScope?.verificationPolicy).toBe('public_query_target')
+  expect(turn.executionGrant?.browserScope?.publicQueryAuthorization).toEqual(authorization)
   expect(f.current().acceptance.requiredFormats).toEqual(['html', 'htm'])
   expect(f.current().acceptance.schedule?.times).toEqual(['09:00', '17:00'])
 })

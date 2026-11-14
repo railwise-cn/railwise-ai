@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { BrowserCapabilityConfig, BrowserExecutionScope, isPublicBrowserQuery } from '../contracts/browser-skill.js'
 import { TaskRunSchema } from '../contracts/tasks.js'
 import type { ThreadRecord } from '../contracts/threads.js'
-import { TaskRunRepository } from './task-run-repository.js'
+import { TaskRunRepository, operationFingerprint } from './task-run-repository.js'
 import { ManagedBrowserSkillRuntime } from './managed-browser-skill-runtime.js'
 const cleanups: (() => void)[] = []
 afterEach(() => cleanups.splice(0).forEach(fn => fn()))
@@ -180,7 +180,7 @@ describe('Browser task authority rebinding', () => {
     expect(f.repository.get('task')!.authority?.browserScope).toBeUndefined()
     const snapshot = f.runtime.bindingSnapshot('task')
     expect(snapshot).toMatchObject({ origins: ['https://example.com'], previousBrowserInstanceId: undefined })
-    expect(f.runtime.confirmBinding('task', { ...snapshot, confirmed: true, expectedTaskRevision: snapshot.taskRevision,
+    expect(f.runtime.confirmBinding('task', { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, confirmed: true, expectedTaskRevision: snapshot.taskRevision,
       expectedBrowserRevision: snapshot.browserRevision, idempotencyKey: 'first-reviewed-binding' }).resumed).toBe(false)
     expect(f.repository.get('task')!.status).toBe('waiting_user')
     expect((await f.runtime.preflight('继续', thread))?.status).toBe('available')
@@ -246,6 +246,103 @@ describe('Browser task authority rebinding', () => {
     expect(f.repository.get('task')!.authority?.browserScope).toBeUndefined()
     f.repository.update('parent', 0, task => ({ ...task, authority: { ...task.authority!, revokedAt: new Date().toISOString() } }))
     expect(() => f.runtime.bindingSnapshot('task')).toThrow('browser_parent_scope_blocked')
+  })
+
+  function publicTask(f: ReturnType<typeof fixture>, scheduled = false) {
+    return f.repository.update('task', 0, task => ({ ...task, goal: literalRequest, status: 'paused', authority: undefined,
+      acceptance: { ...task.acceptance, ...(scheduled ? { schedule: { kind: 'daily' as const, times: ['09:00', '17:00'], timezone: 'Asia/Shanghai', leadMinutes: 30 } } : {}) } }))
+  }
+  function confirmInput(f: ReturnType<typeof fixture>, key = 'public-scope') {
+    const snapshot = f.runtime.bindingSnapshot('task')
+    return { confirmed: true as const, expectedTaskRevision: snapshot.taskRevision, expectedBrowserRevision: snapshot.browserRevision,
+      browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction: 'interact' as const,
+      verificationPolicy: 'public_query_target' as const, idempotencyKey: key }
+  }
+
+  it('does not turn a verification policy or an omitted consent field into public query permission', () => {
+    const f = fixture(); publicTask(f)
+    const result = f.runtime.confirmBinding('task', confirmInput(f))
+    expect(result.binding.publicQueryAuthorization).toBeUndefined()
+    const scope = f.repository.get('task')!.authority!.browserScope!
+    expect(scope).not.toHaveProperty('publicQueryAuthorization')
+    expect(BrowserExecutionScope.parse(f.old)).toEqual(f.old)
+    expect(f.runtime.scope(literalRequest, scope).browserScope).toEqual(scope)
+  })
+
+  it('persists checkbox-backed task authority in the actual binding receipt without resuming or mutating the inherited scope', () => {
+    const f = fixture(); publicTask(f)
+    const input = { ...confirmInput(f), publicQueryAuthorization: 'task' as const }
+    const result = f.runtime.confirmBinding('task', input)
+    const receipt = f.repository.operation('task', 'browser-binding:public-scope')!
+    const task = f.repository.get('task')!, authorization = task.authority!.browserScope!.publicQueryAuthorization!
+    expect(authorization).toEqual({ receiptId: receipt.id, purposeHash: operationFingerprint({ purpose: task.goal }), duration: 'task' })
+    expect(receipt).toMatchObject({ kind: 'browser_binding', status: 'succeeded', request: input, result: { taskId: task.id, purpose: task.goal, publicQueryAuthorization: authorization } })
+    expect(result).toMatchObject({ resumed: false, binding: { publicQueryAuthorization: authorization } })
+    expect(task).toMatchObject({ status: 'paused', attempts: 0 })
+    expect(f.runtime.confirmBinding('task', input)).toEqual(result)
+    expect(f.repository.operations('task', 'browser_binding')).toHaveLength(1)
+    expect(() => f.runtime.confirmBinding('task', { ...input, publicQueryAuthorization: 'schedule' })).toThrow('key is bound')
+    const inherited = f.runtime.scope(literalRequest, task.authority!.browserScope).browserScope!
+    expect(inherited).toEqual(task.authority!.browserScope)
+    inherited.publicQueryAuthorization!.purposeHash = 'f'.repeat(64)
+    expect(task.authority!.browserScope!.publicQueryAuthorization!.purposeHash).toBe(authorization.purposeHash)
+  })
+
+  it('offers and binds persistent schedule consent only with exact daily purpose, requirement and displayed start times', () => {
+    const f = fixture(); publicTask(f, true)
+    expect(f.runtime.bindingSnapshot('task')).toMatchObject({ allowedPublicQueryAuthorizations: ['task', 'schedule'], scheduleReview: {
+      times: ['09:00', '17:00'], startTimes: ['08:30', '16:30'], timezone: 'Asia/Shanghai', leadMinutes: 30
+    } })
+    const result = f.runtime.confirmBinding('task', { ...confirmInput(f), publicQueryAuthorization: 'schedule' })
+    expect(result.binding.publicQueryAuthorization).toMatchObject({ duration: 'schedule',
+      purposeHash: operationFingerprint({ purpose: literalRequest }),
+      requirementHash: operationFingerprint({ requirement: f.repository.get('task')!.acceptance.schedule }) })
+    expect(f.repository.get('task')).toMatchObject({ status: 'paused', attempts: 0 })
+  })
+
+  it.each(['missing-schedule', 'business', 'read-only', 'child', 'scheduled-occurrence'] as const)('rejects a new public scope beyond the actual %s ceiling with no receipt or revision change', condition => {
+    const f = fixture(); publicTask(f)
+    if (condition === 'business') f.repository.update('task', 1, task => ({ ...task, goal: '浏览器登录账号并发送消息' }))
+    if (condition === 'child') {
+      const task = f.repository.get('task')!
+      f.repository.create({ ...task, id: 'parent', threadId: 'parent-thread', authority: { source: 'user', workspaceRoot: task.workspaceRoot, externalTargets: [], grantedAt: task.createdAt,
+        browserScope: { browserInstanceId: 'browser-new', revision: 3, origins: ['https://example.com'], interaction: 'interact', verificationPolicy: 'public_query_target' } } })
+      f.repository.update('task', 1, task => ({ ...task, parentTaskId: 'parent' }))
+    }
+    if (condition === 'scheduled-occurrence') f.repository.update('task', 1, task => ({ ...task, scheduledBy: { scheduleId: 'existing', dueAt: new Date().toISOString() } }))
+    const input = confirmInput(f), before = JSON.stringify(f.repository.get('task'))
+    expect(() => f.runtime.confirmBinding('task', { ...input, verificationPolicy: condition === 'business' ? 'strict' : input.verificationPolicy,
+      interaction: condition === 'read-only' ? 'observe' : 'interact', publicQueryAuthorization: condition === 'missing-schedule' ? 'schedule' : 'task' })).toThrow('browser_public_query_authorization_blocked')
+    expect(JSON.stringify(f.repository.get('task'))).toBe(before)
+    expect(f.repository.operations('task', 'browser_binding')).toHaveLength(0)
+  })
+
+  it.each(['prepared', 'running', 'outcome_unknown', 'readbackPending'] as const)('cannot grant broader task scope while %s evidence is unresolved', status => {
+    const f = fixture(); publicTask(f)
+    f.runtime.confirmBinding('task', confirmInput(f, 'old-policy'))
+    f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'pending-action', kind: 'browser_action_dispatch', request: { sessionId: 'session' }, nowIso: new Date().toISOString() })
+    if (status !== 'prepared') f.repository.finishOperation('task', 'pending-action', { status: status === 'readbackPending' ? 'succeeded' : status,
+      ...(status === 'readbackPending' ? { result: { actionAcknowledged: true, readbackPending: true } } : {}) })
+    expect(f.runtime.bindingSnapshot('task').allowedPublicQueryAuthorizations).toEqual([])
+    const input = confirmInput(f), before = JSON.stringify(f.repository.get('task'))
+    expect(() => f.runtime.confirmBinding('task', { ...input, publicQueryAuthorization: 'task' })).toThrow('browser_unresolved_operation')
+    expect(JSON.stringify(f.repository.get('task'))).toBe(before)
+    expect(f.repository.operations('task', 'browser_binding')).toHaveLength(1)
+  })
+
+  it('only retains the same parent public authority reference and never offers a child an expanded grant', () => {
+    const f = fixture(); publicTask(f)
+    f.runtime.confirmBinding('task', { ...confirmInput(f), publicQueryAuthorization: 'task' })
+    const parent = f.repository.get('task')!
+    f.repository.create({ ...parent, id: 'child', threadId: 'child-thread', parentTaskId: parent.id, revision: 0, authority: { ...parent.authority!, source: 'inherited',
+      browserScope: { ...parent.authority!.browserScope!, origins: ['https://example.com'] } } })
+    const snapshot = f.runtime.bindingSnapshot('child')
+    expect(snapshot.allowedPublicQueryAuthorizations).toEqual([])
+    const input = { confirmed: true as const, expectedTaskRevision: snapshot.taskRevision, expectedBrowserRevision: snapshot.browserRevision,
+      browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction: 'interact' as const, verificationPolicy: 'public_query_target' as const, idempotencyKey: 'child-confirm' }
+    expect(f.runtime.confirmBinding('child', input).binding.publicQueryAuthorization).toEqual(parent.authority!.browserScope!.publicQueryAuthorization)
+    f.repository.update('child', 1, child => ({ ...child, goal: '浏览器搜索其他公开资料' }))
+    expect(() => f.runtime.confirmBinding('child', { ...input, expectedTaskRevision: 2, idempotencyKey: 'changed-purpose' })).toThrow('browser_parent_scope_blocked')
   })
 
 })

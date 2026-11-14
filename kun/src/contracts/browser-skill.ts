@@ -14,11 +14,24 @@ export function browserVerificationPolicy(value?: unknown): BrowserVerificationP
   return value === 'public_query_target' ? value : 'strict'
 }
 
+export const BrowserPublicQueryDuration = z.enum(['task', 'schedule'])
+export type BrowserPublicQueryDuration = z.infer<typeof BrowserPublicQueryDuration>
+export const BrowserPublicQueryAuthorization = z.object({
+  receiptId: z.string().min(1).max(256),
+  purposeHash: z.string().regex(/^[a-f0-9]{64}$/),
+  duration: BrowserPublicQueryDuration,
+  requirementHash: z.string().regex(/^[a-f0-9]{64}$/).optional()
+}).strict().superRefine((value, context) => {
+  if ((value.duration === 'schedule') !== Boolean(value.requirementHash)) context.addIssue({ code: 'custom', message: 'Only a schedule authorization must bind its exact requirement', path: ['requirementHash'] })
+})
+export type BrowserPublicQueryAuthorization = z.infer<typeof BrowserPublicQueryAuthorization>
+
 export const BrowserExecutionScope = z.object({
   browserInstanceId: z.string().min(1).max(512),
   origins: z.array(BrowserOrigin).max(64),
   interaction: z.enum(['observe', 'interact']),
   verificationPolicy: BrowserVerificationPolicy.optional(),
+  publicQueryAuthorization: BrowserPublicQueryAuthorization.optional(),
   revision: z.number().int().nonnegative()
 }).strict()
 export type BrowserExecutionScope = z.infer<typeof BrowserExecutionScope>
@@ -81,6 +94,7 @@ export const BrowserTaskBindingConfirmation = z.object({
   origins: z.array(BrowserOrigin).min(1).max(64),
   interaction: z.enum(['observe', 'interact']).optional(),
   verificationPolicy: BrowserVerificationPolicy.optional(),
+  publicQueryAuthorization: BrowserPublicQueryDuration.optional(),
   confirmed: z.literal(true),
   idempotencyKey: z.string().min(1).max(200)
 }).strict()
@@ -90,6 +104,9 @@ export type BrowserTaskBindingSnapshot = {
   browserLabel: string; previousBrowserInstanceId?: string; origins: string[]; interaction: 'observe' | 'interact'; previousInteraction?: 'observe' | 'interact'
   purpose: string; verificationPolicy: BrowserVerificationPolicy; recommendedVerificationPolicy: BrowserVerificationPolicy;
   allowedVerificationPolicies: BrowserVerificationPolicy[]; policyChangeBlocked?: 'browser_unresolved_operation'
+  publicQueryAuthorization?: BrowserPublicQueryAuthorization
+  allowedPublicQueryAuthorizations?: BrowserPublicQueryDuration[]
+  scheduleReview?: { kind: 'daily'; times: string[]; timezone: string; leadMinutes?: number; startTimes: string[] }
 }
 
 export const BrowserOperationConfirmation = z.object({

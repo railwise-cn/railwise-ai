@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
-import { BrowserCapabilityConfig, browserTaskOrigins, browserVerificationPolicy, isBrowserTask, isPublicBrowserQuery, type BrowserExecutionScope, type BrowserTaskBindingConfirmation, type BrowserTaskBindingSnapshot, type BrowserVerificationPolicy } from '../contracts/browser-skill.js'
+import { BrowserCapabilityConfig, browserTaskOrigins, browserVerificationPolicy, isBrowserTask, isPublicBrowserQuery, type BrowserExecutionScope, type BrowserTaskBindingConfirmation, type BrowserTaskBindingSnapshot, type BrowserVerificationPolicy, type BrowserPublicQueryAuthorization, type BrowserPublicQueryDuration } from '../contracts/browser-skill.js'
 import type { CapabilityPreflight } from '../contracts/harness.js'
 import type { ExecutionScope } from '../contracts/permissions.js'
+import { scheduleForRequirement } from '../contracts/schedule.js'
 import type { ThreadRecord } from '../contracts/threads.js'
 import { readOptionalKunConfigFile } from '../config/kun-config.js'
 import { buildBrowserSkillToolProvider } from '../adapters/tool/browser-skill-tool-provider.js'
@@ -119,6 +120,7 @@ export class ManagedBrowserSkillRuntime {
       browserInstanceId: inherited?.browserInstanceId ?? config.browserInstanceId,
       origins, interaction: inherited?.interaction ?? config.interaction,
       ...(inherited?.verificationPolicy ? { verificationPolicy: inherited.verificationPolicy } : {}),
+      ...(inherited?.publicQueryAuthorization ? { publicQueryAuthorization: structuredClone(inherited.publicQueryAuthorization) } : {}),
       revision: inherited?.revision ?? config.revision
     } : undefined
     return { networkAllowlist: origins, connectorScopes: [], externalTargets: [], ...(scope ? {
@@ -157,12 +159,25 @@ export class ManagedBrowserSkillRuntime {
     if (!unresolved && targetPolicySupported && isPublicBrowserQuery(task.goal) && (!task.parentTaskId || browserVerificationPolicy(parentScope?.verificationPolicy) === 'public_query_target')) {
       allowedVerificationPolicies.push('public_query_target')
     }
+    const allowedPublicQueryAuthorizations: BrowserPublicQueryDuration[] = []
+    // A binding confirmation grants scope only for this root purpose. Children
+    // and scheduled occurrences remain within their already inherited authority.
+    if (!unresolved && !task.parentTaskId && !task.scheduledBy && interaction === 'interact' && isPublicBrowserQuery(task.goal)) {
+      allowedPublicQueryAuthorizations.push('task')
+      if (task.acceptance.schedule) allowedPublicQueryAuthorizations.push('schedule')
+    }
+    const schedule = task.acceptance.schedule && !task.scheduledBy ? scheduleForRequirement(task.acceptance.schedule) : undefined
+    const scheduleReview = schedule?.kind === 'daily' && task.acceptance.schedule ? {
+      ...task.acceptance.schedule, startTimes: schedule.times
+    } : undefined
     const recommendedVerificationPolicy = allowedVerificationPolicies.includes('public_query_target') && isPublicBrowserQuery(task.goal)
       ? 'public_query_target' : allowedVerificationPolicies.includes(verificationPolicy) ? verificationPolicy : 'strict'
     return { taskId, taskRevision: task.revision, browserRevision: config.revision, browserInstanceId: config.browserInstanceId,
       browserLabel: browser?.label || browser?.name || config.browserInstanceId, previousBrowserInstanceId: previous?.browserInstanceId,
       origins, interaction, previousInteraction: previous?.interaction, purpose: task.goal, verificationPolicy, recommendedVerificationPolicy,
-      allowedVerificationPolicies, ...(unresolved ? { policyChangeBlocked: 'browser_unresolved_operation' as const } : {}) }
+      allowedVerificationPolicies, allowedPublicQueryAuthorizations,
+      ...(previous?.publicQueryAuthorization ? { publicQueryAuthorization: previous.publicQueryAuthorization } : {}),
+      ...(scheduleReview ? { scheduleReview } : {}), ...(unresolved ? { policyChangeBlocked: 'browser_unresolved_operation' as const } : {}) }
   }
 
   confirmBinding(taskId: string, input: BrowserTaskBindingConfirmation): { binding: BrowserTaskBindingSnapshot; resumed: false } {
@@ -184,17 +199,41 @@ export class ManagedBrowserSkillRuntime {
       if (!snapshot.allowedVerificationPolicies.includes(verificationPolicy)) throw new Error(snapshot.policyChangeBlocked ?? 'browser_verification_policy_blocked')
       const task = this.options.repository.get(taskId)!
       const priorScope = task.authority?.browserScope
+      if (input.publicQueryAuthorization && (interaction !== 'interact' || !snapshot.allowedPublicQueryAuthorizations?.includes(input.publicQueryAuthorization))) {
+        throw new Error(snapshot.policyChangeBlocked ?? 'browser_public_query_authorization_blocked')
+      }
+      // Nothing is granted by a policy selection alone. The explicit duration
+      // is the checkbox-backed request, and the resulting receipt is its proof.
+      const { receipt } = this.options.repository.beginOperation({ ownerId: taskId, idempotencyKey: key, kind: 'browser_binding', request: input, nowIso: new Date().toISOString() })
+      let publicQueryAuthorization: BrowserPublicQueryAuthorization | undefined
+      if (input.publicQueryAuthorization) publicQueryAuthorization = {
+        receiptId: receipt.id, purposeHash: operationFingerprint({ purpose: task.goal }), duration: input.publicQueryAuthorization,
+        ...(input.publicQueryAuthorization === 'schedule' ? { requirementHash: operationFingerprint({ requirement: task.acceptance.schedule }) } : {})
+      }
+      else if (priorScope?.publicQueryAuthorization && (snapshot.policyChangeBlocked || task.parentTaskId || task.scheduledBy)) {
+        // Preserve only an existing reference. Missing consent never mints new
+        // authority; descendants cannot extend its purpose, duration or sites.
+        publicQueryAuthorization = priorScope.publicQueryAuthorization
+        if (task.parentTaskId) {
+          const parent = this.options.repository.get(task.parentTaskId)
+          const inherited = parent?.authority?.browserScope?.publicQueryAuthorization
+          if (!inherited || operationFingerprint(inherited) !== operationFingerprint(publicQueryAuthorization) ||
+            inherited.purposeHash !== operationFingerprint({ purpose: task.goal }) ||
+            inherited.duration === 'schedule' && inherited.requirementHash !== operationFingerprint({ requirement: task.acceptance.schedule })) throw new Error('browser_parent_scope_blocked')
+        }
+      }
       const browserScope: BrowserExecutionScope = { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction, revision: snapshot.browserRevision,
-        ...(priorScope?.verificationPolicy || !snapshot.policyChangeBlocked && input.verificationPolicy ? { verificationPolicy } : {}) }
+        ...(priorScope?.verificationPolicy || !snapshot.policyChangeBlocked && input.verificationPolicy ? { verificationPolicy } : {}),
+        ...(publicQueryAuthorization ? { publicQueryAuthorization } : {}) }
       if (snapshot.policyChangeBlocked && operationFingerprint(browserScope) !== operationFingerprint(priorScope ?? {})) throw new Error('browser_unresolved_operation')
-      const confirmed = { ...snapshot, interaction, verificationPolicy }
-      this.options.repository.beginOperation({ ownerId: taskId, idempotencyKey: key, kind: 'browser_binding', request: input, nowIso: new Date().toISOString() })
+      const { publicQueryAuthorization: _previousPublicQueryAuthorization, ...reviewed } = snapshot
+      const confirmed = { ...reviewed, interaction, verificationPolicy, ...(publicQueryAuthorization ? { publicQueryAuthorization } : {}) }
       this.options.repository.update(taskId, snapshot.taskRevision, task => ({ ...task, authority: {
         ...(task.authority ?? { source: 'user', workspaceRoot: task.workspaceRoot, externalTargets: [], grantedAt: new Date().toISOString() }),
         browserScope
       }, acceptance: { ...task.acceptance,
         ...(task.acceptance.requiresWebEvidence && !task.acceptance.requiredSourceOrigins?.length ? { requiredSourceOrigins: snapshot.origins } : {})
-      } }), { key, kind: 'browser_binding_confirmed', payload: { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, browserRevision: snapshot.browserRevision, interaction, verificationPolicy } })
+      } }), { key, kind: 'browser_binding_confirmed', payload: { browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, browserRevision: snapshot.browserRevision, interaction, verificationPolicy, ...(publicQueryAuthorization ? { publicQueryAuthorization } : {}) } })
       this.options.repository.finishOperation(taskId, key, { status: 'succeeded', result: confirmed })
       return { binding: confirmed, resumed: false as const }
     })

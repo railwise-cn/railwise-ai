@@ -78,6 +78,10 @@ describe('production preload task API and main IPC contract', () => {
     await api.confirmBrowserTaskBinding('task-original', request)
     expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-original/browser-binding', method: 'GET' })
     expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-original/browser-binding', method: 'POST', body: JSON.stringify(request) })
+    for (const duration of ['task', 'schedule'] as const) {
+      await api.confirmBrowserTaskBinding('task-original', { ...request, publicQueryAuthorization: duration })
+      expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-original/browser-binding', method: 'POST', body: JSON.stringify({ ...request, publicQueryAuthorization: duration }) })
+    }
     await expect(api.getBrowserTaskBinding('task-original/../task-other')).rejects.toThrow()
     await expect(api.confirmBrowserTaskBinding('task-original', { ...request, taskId: 'task-other' } as typeof request)).rejects.toThrow()
   })

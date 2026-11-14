@@ -295,3 +295,96 @@ describe('browser task reauthorization', () => {
     } finally { await act(async () => root.unmount()) }
   })
 })
+
+describe('explicit task public query authorization', () => {
+  const publicBinding = { ...binding, interaction: 'interact' as const, purpose: '查询两站点的工程测量公开公告',
+    allowedPublicQueryAuthorizations: ['task', 'schedule'] as const,
+    scheduleReview: { kind: 'daily' as const, times: ['09:00', '17:00'], startTimes: ['08:30', '16:30'], timezone: 'Asia/Shanghai', leadMinutes: 30 } }
+  const auth = (duration: 'task' | 'schedule') => ({ receiptId: 'server-binding-receipt', purposeHash: 'a'.repeat(64), duration,
+    ...(duration === 'schedule' ? { requirementHash: 'b'.repeat(64) } : {}) })
+
+  it.each(['zh', 'en'])('requires an explicit unchecked consent and displays exact recurring timing and boundaries in %s', async language => {
+    await i18n.changeLanguage(language)
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const api = { getBrowserTaskBinding: vi.fn(async () => publicBinding),
+      confirmBrowserTaskBinding: vi.fn(async (_id: string, input: { publicQueryAuthorization?: 'task' | 'schedule' }) => ({ binding: { ...publicBinding,
+        ...(input.publicQueryAuthorization ? { publicQueryAuthorization: auth(input.publicQueryAuthorization) } : {}) }, resumed: false })), coordinateTaskCommand: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
+    try {
+      await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: 'task', onConfirmed: confirmed })))
+      const select = element.querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('common:browserTaskPublicQueryDuration')}"]`)!
+      const checkbox = element.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('common:browserTaskPublicQueryConsent')}"]`)!
+      expect(checkbox.checked).toBe(false)
+      expect(select.value).toBe('task')
+      expect(element.textContent).toContain(publicBinding.purpose)
+      expect(element.textContent).toContain(binding.origins[0])
+      expect(element.textContent).toContain(i18n.t('common:browserTaskPublicQueryExclusions'))
+      expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+      await act(async () => checkbox.click())
+      await act(async () => { select.value = 'schedule'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+      expect(checkbox.checked).toBe(false)
+      for (const detail of ['08:30', '16:30', '09:00', '17:00', 'Asia/Shanghai', i18n.t('common:browserTaskPublicQueryScheduleTerm')]) expect(element.textContent).toContain(detail)
+      await act(async () => checkbox.click())
+      expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+      await act(async () => button(element, 'browserTaskBindingConfirm').click())
+      expect(api.confirmBrowserTaskBinding).toHaveBeenCalledExactlyOnceWith('task', expect.objectContaining({ publicQueryAuthorization: 'schedule', confirmed: true,
+        expectedTaskRevision: 5, expectedBrowserRevision: 3, origins: binding.origins, interaction: 'interact' }))
+      expect(confirmed).toHaveBeenCalledOnce()
+      expect(button(element, 'browserTaskBindingConfirm').disabled).toBe(true)
+      expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+      expect(element.textContent).not.toContain('server-binding-receipt')
+      expect(element.textContent).not.toContain('a'.repeat(64))
+    } finally { await act(async () => root.unmount()) }
+  })
+
+  it('omits new authority when consent is not checked even if recurring scope was selected', async () => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const api = { getBrowserTaskBinding: vi.fn(async () => publicBinding), confirmBrowserTaskBinding: vi.fn(async (_taskId: string, _request: unknown) => ({ binding: publicBinding, resumed: false })), coordinateTaskCommand: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
+    try {
+      await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: 'task', onConfirmed: confirmed })))
+      const select = element.querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('common:browserTaskPublicQueryDuration')}"]`)!
+      await act(async () => { select.value = 'schedule'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+      await act(async () => button(element, 'browserTaskBindingConfirm').click())
+      expect(api.confirmBrowserTaskBinding.mock.calls[0]?.[1]).not.toHaveProperty('publicQueryAuthorization')
+      expect(confirmed).toHaveBeenCalledOnce(); expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    } finally { await act(async () => root.unmount()) }
+  })
+
+  it.each(['missing', 'wrong-duration', 'missing-requirement', 'bad-purpose'] as const)('rejects a %s permission acknowledgement rather than claiming it saved', async condition => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const authorization = condition === 'missing' ? undefined : { ...auth(condition === 'wrong-duration' ? 'task' : 'schedule'),
+      ...(condition === 'missing-requirement' ? { requirementHash: undefined } : {}), ...(condition === 'bad-purpose' ? { purposeHash: 'not-a-hash' } : {}) }
+    const api = { getBrowserTaskBinding: vi.fn(async () => publicBinding), confirmBrowserTaskBinding: vi.fn(async () => ({ binding: { ...publicBinding, publicQueryAuthorization: authorization }, resumed: false })), coordinateTaskCommand: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
+    try {
+      await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: 'task', onConfirmed: confirmed })))
+      const select = element.querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('common:browserTaskPublicQueryDuration')}"]`)!
+      await act(async () => { select.value = 'schedule'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+      await act(async () => element.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+      await act(async () => button(element, 'browserTaskBindingConfirm').click())
+      expect(element.querySelector('[role="alert"]')?.textContent).toBe(i18n.t('common:browserTaskBindingChanged'))
+      expect(confirmed).not.toHaveBeenCalled(); expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    } finally { await act(async () => root.unmount()) }
+  })
+
+  it('does not offer persistent consent without the actual schedule times and timezone', async () => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const api = { getBrowserTaskBinding: vi.fn(async () => ({ ...publicBinding, scheduleReview: undefined })), confirmBrowserTaskBinding: vi.fn() }
+    Object.assign(window, { workwise: api })
+    const element = document.createElement('div'), root = createRoot(element)
+    try {
+      await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: 'task', onConfirmed: vi.fn() })))
+      const select = element.querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('common:browserTaskPublicQueryDuration')}"]`)!
+      expect([...select.options].map(option => option.value)).toEqual(['task'])
+      expect(element.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false)
+      expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+    } finally { await act(async () => root.unmount()) }
+  })
+})
