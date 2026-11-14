@@ -11,7 +11,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
-import { clickWindowsBrowserBinding, selectWindowsBrowserPolicy, windowsBindingPostAudit, inspectWindowsBrowserPolicy, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
+import { clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState } from './run-windows-ui-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
@@ -820,6 +820,35 @@ test('browser policy is selected through a current real mouse target and native 
   await assert.rejects(() => selectWindowsBrowserPolicy(cdp, 'public_query_target', {}))
 })
 
+test('autonomous query consent requires unchecked explicit scope, actual displayed times and real input without a direct authority write', async () => {
+  const text = '08:30、16:30；09:00、17:00；Asia/Shanghai；持续至停用或撤销'
+  const run = async (change = {}) => {
+    let waits = 0
+    const calls = [], audit = {}
+    const cdp = {
+      wait: async expression => {
+        waits++
+        if (waits === 1) return { duration: 'task', checked: false, options: ['task', 'schedule'], text, ...change }
+        if (waits === 2 || waits === 4) { assert.match(expression, /elementFromPoint/); return { x: 40, y: 50 } }
+        if (waits === 3) return { duration: 'schedule', checked: false, text: change.text ?? text }
+        return { duration: 'schedule', checked: true, text }
+      },
+      send: async (method, parameters) => calls.push([method, parameters?.type, parameters?.key])
+    }
+    await selectWindowsPublicQueryAuthorization(cdp, 'schedule', audit)
+    return { audit, calls }
+  }
+  const { audit, calls } = await run()
+  assert.equal(audit.input, 'real-cdp-mouse-and-keyboard')
+  assert.equal(audit.selected.checked, true)
+  assert.equal(calls.filter(([method, type]) => method === 'Input.dispatchMouseEvent' && type === 'mousePressed').length, 2)
+  assert.ok(calls.some(([method, type, key]) => method === 'Input.dispatchKeyEvent' && type === 'rawKeyDown' && key === 'ArrowDown'))
+  assert.doesNotMatch(selectWindowsPublicQueryAuthorization.toString(), /\.click\(|\.checked\s*=|\.value\s*=(?!=)|runtimeRequest|confirmBrowserTaskBinding/)
+  await assert.rejects(() => run({ checked: true }), /must never be prechecked/)
+  await assert.rejects(() => run({ options: ['task'] }))
+  await assert.rejects(() => run({ text: '08:30、16:30；09:00、17:00；停用' }), /display Asia\/Shanghai/)
+})
+
 test('browser binding preview reads its named browser fields beside purpose and the explicit verification selector', async () => {
   const { Window } = await import('happy-dom')
   const window = new Window()
@@ -1071,6 +1100,56 @@ test('controlled native expectations include the precise DOM attributes and the 
   assert.deepEqual(click[5], { target: '@e1', field: 'value', equals: '轨道监测' })
 })
 
+test('task-query evidence requires a real scope receipt and exact current action without invented human approvals', () => {
+  const fingerprint = value => {
+    const canonical = item => Array.isArray(item) ? item.map(canonical) : item && typeof item === 'object'
+      ? Object.fromEntries(Object.entries(item).filter(([, item]) => item !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)])) : item
+    return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex')
+  }
+  const task = { id: 'task_source', goal: '公开检索', acceptance: { schedule: { kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai', leadMinutes: 30 } } }
+  const authorization = { receiptId: 'binding-row', duration: 'schedule', purposeHash: fingerprint({ purpose: task.goal }), requirementHash: fingerprint({ requirement: task.acceptance.schedule }) }
+  const scope = { browserInstanceId: 'actual-browser', origins: ['https://example.test'], interaction: 'interact', verificationPolicy: 'public_query_target', revision: 2, publicQueryAuthorization: authorization }
+  const grant = { id: 'current-grant', browserScope: scope }
+  const binding = { id: 'binding-row', ownerId: task.id, kind: 'browser_binding', status: 'succeeded',
+    request: { confirmed: true, publicQueryAuthorization: 'schedule' },
+    result: { purpose: task.goal, browserRevision: 2, ...scope } }
+  const target = { action: 'fill', pageUrl: 'https://example.test/search', elementHash: 'a'.repeat(64), valueHash: 'b'.repeat(64),
+    browserInstanceId: scope.browserInstanceId, browserRevision: 2, verificationPolicy: 'public_query_target', sessionId: 'fresh-session', turnId: 'current-turn' }
+  const scoped = { id: 'scope-action-row', ownerId: task.id, kind: 'browser_scope_action_authorization', status: 'succeeded', createdAt: '2026-11-14T09:00:00.000Z',
+    request: { ...target, taskId: task.id, sourceTaskId: task.id, grantId: grant.id, purposeHash: authorization.purposeHash, requirementHash: authorization.requirementHash,
+      scopeAuthorizationReceiptId: binding.id, contextHash: 'c'.repeat(64), rule: 'search_input', origin: 'https://example.test' },
+    result: { id: 'action-hash', authorizationSource: 'task_scope', scopeAuthorizationReceiptId: binding.id, sourceTaskId: task.id,
+      accountState: 'unknown', access: 'public_query', verificationPolicy: 'public_query_target', expiresAt: '2026-11-14T09:15:00.000Z' } }
+  const derived = { id: 'derived-row', ownerId: task.id, status: 'succeeded', kind: 'browser_derived_action_authorization', createdAt: scoped.createdAt,
+    request: { ...scoped.request, actionId: scoped.result.id, scopeActionReceiptId: scoped.id },
+    result: { ...scoped.result, scopeActionReceiptId: scoped.id } }
+  const dispatch = { request: { ...target, authorizationSource: 'task_scope', scopeAuthorizationReceiptId: binding.id, scopeActionReceiptId: scoped.id } }
+  const base = { task, grant, dispatch, derived, receipts: [binding, scoped], actualRequest: { contextHash: 'c'.repeat(64) } }
+  const finalize = value => { for (const receipt of [...value.receipts, value.derived]) receipt.fingerprint = fingerprint(receipt.request); return value }
+  const valid = finalize(structuredClone(base))
+  assert.equal(inspectWindowsTaskScopeAction(valid).taskConsentVerified, true)
+  const due = structuredClone(valid)
+  due.task.id = 'task_due'; due.task.scheduledBy = { scheduleId: 'schedule_task_source', dueAt: '2026-11-14T09:00:00.000Z' }
+  due.grant.id = 'fresh-due-grant'
+  due.grant.browserScheduleBinding = { sourceTaskId: 'task_source', scheduleId: 'schedule_task_source', versionId: 'real-published-version', scopeHash: 'd'.repeat(64) }
+  due.derived.ownerId = due.receipts[1].ownerId = due.task.id
+  for (const item of [due.receipts[1], due.derived]) Object.assign(item.request, { taskId: due.task.id, grantId: due.grant.id, binding: due.grant.browserScheduleBinding })
+  finalize(due)
+  assert.equal(inspectWindowsTaskScopeAction(due).scopeActionVerified, true)
+  due.derived.request.binding = { ...due.derived.request.binding, versionId: 'superseded-version' }
+  finalize(due)
+  assert.throws(() => inspectWindowsTaskScopeAction(due))
+  for (const mutate of [value => { value.receipts.splice(0, 1) }, value => { value.receipts[0].request.confirmed = false },
+    value => { value.receipts[0].request.publicQueryAuthorization = 'task' }, value => { value.receipts[0].result.purpose = 'another task' },
+    value => { value.receipts[1].request.grantId = 'old-grant' }, value => { value.receipts[1].request.elementHash = 'd'.repeat(64) },
+    value => { value.receipts[1].request.contextHash = 'd'.repeat(64) }, value => { value.receipts[1].request.rule = 'model-says-safe' },
+    value => { value.derived.result.sourceApprovalId = 'fake-human-approval' }, value => { value.derived.result.expiresAt = '2026-11-14T09:15:01.000Z' },
+    value => { value.dispatch.request.scopeAuthorizationReceiptId = 'another-binding' }]) {
+    const invalid = structuredClone(base); mutate(invalid); finalize(invalid)
+    assert.throws(() => inspectWindowsTaskScopeAction(invalid))
+  }
+})
+
 test('scheduled query validation requires source UI reviews and independent derived authority without extra due approvals', () => {
   // Synthetic validator input; never emitted as actual business evidence.
   const query = { domReadbackVerified: true, htmlReadbackVerified: true, actions: 2, unknownOutcomes: 0, accountState: 'unknown', access: 'public_query' }
@@ -1080,6 +1159,25 @@ test('scheduled query validation requires source UI reviews and independent deri
   const evidence = { browserSkill: { publicQuery: { ...query, policyExecution: policyProjection('source-grant'), uiApprovals: ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'].map(toolName => ({ toolName, status: 'allowed', verificationPolicy: 'public_query_target', uiFieldsVerified: true, businessCardDisplayedVerified: true, originalSummaryVerified: true, cardDisplayedVerified: true, buttonOperableVerified: true })), persistentActionAuthorizations: 2 } },
     dueOccurrence: { publicQuery: { ...query, policyExecution: policyProjection('due-grant'), addedApprovals: 0, derivedActionAuthorizations: 2, publishedPlanVersionVerified: true, enabledPlanVerified: true, shortAuthorizationVerified: true } } }
   assert.doesNotThrow(() => validateWindowsScheduledQueryEvidence(evidence))
+  const modern = structuredClone(evidence)
+  const consent = { receiptId: 'real-binding-row', duration: 'schedule', purposeHash: 'b'.repeat(64), requirementHash: 'c'.repeat(64) }
+  Object.assign(modern.browserSkill.publicQuery, { uiApprovals: [], persistentActionAuthorizations: 0, scopeActionAuthorizations: 2,
+    taskScopeAuthorization: { ...consent, authorizationSource: 'task_scope', uiConsentVerified: true } })
+  modern.dueOccurrence.publicQuery.scopeActionAuthorizations = 2
+  for (const item of [modern.browserSkill.publicQuery, modern.dueOccurrence.publicQuery]) {
+    for (const grant of item.policyExecution.grants) grant.publicQueryAuthorization = consent
+    for (const dispatch of item.policyExecution.dispatches) Object.assign(dispatch, { authorizationSource: 'task_scope', scopeAuthorizationReceiptId: consent.receiptId,
+      scopeActionReceiptId: `actual-scoped-${dispatch.targetRef}`, taskConsentVerified: true, scopeActionVerified: true })
+  }
+  assert.doesNotThrow(() => validateWindowsScheduledQueryEvidence(modern))
+  for (const mutate of [value => { value.browserSkill.publicQuery.uiApprovals.push({ toolName: 'browser_authorize_action' }) },
+    value => { value.browserSkill.publicQuery.taskScopeAuthorization.uiConsentVerified = false },
+    value => { value.dueOccurrence.publicQuery.scopeActionAuthorizations = 1 },
+    value => { value.dueOccurrence.publicQuery.policyExecution.dispatches[0].scopeAuthorizationReceiptId = 'another-task' },
+    value => { delete value.dueOccurrence.publicQuery.policyExecution.grants[0].publicQueryAuthorization },
+    value => { value.dueOccurrence.publicQuery.policyExecution.dispatches[0].scopeActionVerified = false }]) {
+    const invalid = structuredClone(modern); mutate(invalid); assert.throws(() => validateWindowsScheduledQueryEvidence(invalid))
+  }
   for (const [field, value] of [['addedApprovals', 1], ['derivedActionAuthorizations', 0], ['publishedPlanVersionVerified', false], ['enabledPlanVerified', false], ['shortAuthorizationVerified', false], ['unknownOutcomes', 1], ['domReadbackVerified', false], ['htmlReadbackVerified', false]]) {
     const changed = structuredClone(evidence)
     changed.dueOccurrence.publicQuery[field] = value
