@@ -1122,3 +1122,35 @@ it('preserves central never blocking for declared and direct actions through the
   for (const toolName of ['browser_fill', 'browser_authorize_action']) expect((await f.host.execute({ toolName, callId: toolName, arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测', ...(toolName === 'browser_authorize_action' ? { action: 'fill', access: 'public_query' } : {}) } }, context)).item).toMatchObject({ kind: 'tool_result', isError: true })
   expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(0); expect(f.repository.operations('task', 'browser_scope_action_authorization')).toHaveLength(0)
 })
+
+it('keeps exact scope/derived receipt bytes immutable and cannot renew an expired context', async () => {
+  const f = taskQueryFixture(), started = Date.now()
+  f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant, expiresAt: new Date(started + 30 * 60_000).toISOString() })
+  await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' }); f.setElement('<input type="search">')
+  const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测', action: 'fill', access: 'public_query' }
+  vi.useFakeTimers({ toFake: ['Date'] })
+  try {
+    vi.setSystemTime(new Date(started))
+    const first = await f.execute('browser_authorize_action', args)
+    expect(first).toMatchObject({ output: { status: 'succeeded', authorizationSource: 'task_scope' } })
+    const before = JSON.stringify(f.repository.operations('task').filter(row => ['browser_scope_action_authorization', 'browser_derived_action_authorization'].includes(row.kind)))
+    vi.setSystemTime(new Date(started + 2 * 60_000))
+    expect(await f.execute('browser_authorize_action', args)).toEqual(first)
+    expect(JSON.stringify(f.repository.operations('task').filter(row => ['browser_scope_action_authorization', 'browser_derived_action_authorization'].includes(row.kind)))).toBe(before)
+    vi.setSystemTime(new Date(started + 15 * 60_000 + 1))
+    expect(await f.execute('browser_authorize_action', args)).toMatchObject({ isError: true, output: { code: 'browser_public_query_authorization_expired' } })
+    expect(await f.execute('browser_authorize_action', { ...args, value: '另一公开关键词' })).toMatchObject({ isError: true, output: { code: 'browser_public_query_authorization_expired' } })
+    expect(await f.host.execute({ toolName: 'browser_fill', callId: 'old-expired', arguments: { sessionId: args.sessionId, contextId: args.contextId, target: args.target, value: args.value } }, f.context)).toMatchObject({ item: { isError: true, output: { code: 'browser_public_query_authorization_expired' } } })
+    expect(JSON.stringify(f.repository.operations('task').filter(row => ['browser_scope_action_authorization', 'browser_derived_action_authorization'].includes(row.kind)))).toBe(before)
+    expect(f.runner.mock.calls.some(([, argv]) => argv[0] === 'fill')).toBe(false)
+    const original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation(async (config, argv, signal) => { const response = await original(config, argv, signal); return argv[0] === 'cooperate' ? { ...response, output: { ...response.output as object, context_id: 'fresh-context' } } : response })
+    await f.execute('browser_observe', { sessionId: args.sessionId })
+    expect(await f.execute('browser_authorize_action', { ...args, contextId: 'fresh-context' })).toMatchObject({ output: { status: 'succeeded' } })
+    const rows = f.repository.operations('task', 'browser_scope_action_authorization')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]!.request?.contextHash).not.toBe(rows[1]!.request?.contextHash)
+    expect(Date.parse((rows[1]!.result as { expiresAt: string }).expiresAt)).toBe(started + 30 * 60_000)
+    expect(f.human).not.toHaveBeenCalled()
+  } finally { vi.useRealTimers() }
+})

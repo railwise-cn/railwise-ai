@@ -78,6 +78,29 @@ export function saveTaskPublicQueryAction(repository: TaskRunRepository, grant: 
   const result = { id, authorizationSource: 'task_scope', scopeAuthorizationReceiptId: authority.binding.id, sourceTaskId: authority.source.id,
     expiresAt, accountState: 'unknown', access: 'public_query', verificationPolicy: request.verificationPolicy, summary: typeof summary === 'function' ? summary(createHash('sha256').update(JSON.stringify(request)).digest('hex')) : summary }
   return repository.transact(() => {
+    const previous = repository.operation(binding.taskId, key)
+    if (previous) {
+      const saved = previous.result as typeof result | undefined
+      const derivedRequest = { ...request, actionId: id, scopeActionReceiptId: previous.id }
+      const derived = repository.operation(binding.taskId, `browser-derived-scope-action:${operationFingerprint(derivedRequest)}`)
+      if (previous.status !== 'succeeded' || previous.fingerprint !== operationFingerprint(request) || !saved || saved.id !== id ||
+        saved.authorizationSource !== 'task_scope' || saved.scopeAuthorizationReceiptId !== authority.binding.id ||
+        saved.sourceTaskId !== authority.source.id || saved.verificationPolicy !== request.verificationPolicy ||
+        derived?.status !== 'succeeded' || derived.fingerprint !== operationFingerprint(derivedRequest) ||
+        operationFingerprint(derived.result) !== operationFingerprint({ ...saved, scopeActionReceiptId: previous.id })) {
+        throw Object.assign(new Error('The exact scoped action proof is incomplete; observe again instead of reusing it.'), { code: 'browser_public_query_authority_invalid' })
+      }
+      const expiry = Date.parse(saved.expiresAt)
+      if (!Number.isFinite(expiry) || expiry <= now || expiry > Date.parse(previous.createdAt) + 15 * 60_000) {
+        throw Object.assign(new Error('The exact action context expired. Read the page again and use its fresh context; the old proof cannot be renewed.'), { code: 'browser_public_query_authorization_expired' })
+      }
+      return { receipt: previous, result: saved, authority }
+    }
+    if (repository.operations(binding.taskId, 'browser_scope_action_authorization').some(item => item.request?.grantId === grant.id &&
+      item.request?.sessionId === binding.sessionId && item.request?.contextHash === request.contextHash &&
+      Date.parse(String(object(item.result).expiresAt)) <= now)) {
+      throw Object.assign(new Error('This observed context has expired action proofs. Observe again before deriving a new input or target.'), { code: 'browser_public_query_authorization_expired' })
+    }
     const receipt = repository.beginOperation({ ownerId: binding.taskId, idempotencyKey: key, kind: 'browser_scope_action_authorization', request, nowIso }).receipt
     repository.finishOperation(binding.taskId, key, { status: 'succeeded', result }, nowIso)
     const derivedRequest = { ...request, actionId: id, scopeActionReceiptId: receipt.id }
