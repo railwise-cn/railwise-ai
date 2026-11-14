@@ -35,6 +35,7 @@ describe('app-ipc-schemas', () => {
     const path = '/v1/tasks/task-1/receipts/receipt-1/browser-confirm'
     const body = { expectedRevision: 4, idempotencyKey: 'verify-once', reviewId: 'review-1', decision: 'confirmed_complete' }
     expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify(body) }).success).toBe(true)
+    for (const decision of ['completed', 'not_completed']) expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify({ ...body, decision }) }).success).toBe(true)
     for (const request of [
       { path, method: 'GET' }, { path, method: 'POST' }, { path, method: 'POST', body: '{' },
       ...['GET', 'PUT', 'PATCH', 'DELETE'].map(method => ({ path, method, body: JSON.stringify(body) })),

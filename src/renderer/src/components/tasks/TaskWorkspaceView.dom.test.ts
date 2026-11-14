@@ -318,7 +318,7 @@ describe('TaskWorkspaceView', () => {
     expect(onOpenThread).not.toHaveBeenCalled()
   })
 
-  it('uses the browser review command and preserves a paused task after explicit human confirmation', async () => {
+  it.each(['completed', 'not_completed'] as const)('uses the browser review command and preserves a paused task after explicit %s confirmation', async decision => {
     const pending = { ...task('browser-review', 'paused', 'Review original query'), revision: 7 }
     tasks = [pending]; inbox = []
     const receipt: TaskOperationReceiptV1 = { id: 'browser-receipt', taskId: pending.id, purpose: 'browser_action',
@@ -331,7 +331,7 @@ describe('TaskWorkspaceView', () => {
     runtimeRequest.mockImplementation(async path => {
       if (path.endsWith('/browser-confirm')) {
         tasks = [{ ...pending, revision: 8 }]
-        return { ok: true, status: 200, body: JSON.stringify({ taskId: pending.id, receiptId: receipt.id, status: 'verified', evidence: { kind: 'human_confirmation', provider: 'browser-skill', operation: 'click', target: 'https://example.com/notices', status: 'public_query_confirmed_by_user', verified: true, verifiedAt: new Date().toISOString(), resultHash: 'b'.repeat(64) } }) }
+        return { ok: true, status: 200, body: JSON.stringify({ taskId: pending.id, receiptId: receipt.id, status: 'verified', outcome: decision === 'not_completed' ? 'not_completed' : 'succeeded', evidence: { kind: 'human_confirmation', provider: 'browser-skill', operation: 'click', target: 'https://example.com/notices', status: decision === 'not_completed' ? 'public_query_reviewed_incomplete' : 'public_query_confirmed_by_user', verified: true, verifiedAt: new Date().toISOString(), resultHash: 'b'.repeat(64) } }) }
       }
       return { ok: true, status: 200, body: '{}' }
     })
@@ -341,13 +341,14 @@ describe('TaskWorkspaceView', () => {
     const checkbox = container.querySelector<HTMLInputElement>('[aria-label="Review this browser operation"] input[type="checkbox"]')!
     expect(checkbox).toBeTruthy()
     expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    await act(async () => container.querySelector<HTMLInputElement>(`input[value="${decision}"]`)!.click())
     await act(async () => checkbox.click())
     const refreshes = vi.mocked(window.workwise.listTaskPage).mock.calls.length
     await click('Save my confirmation')
     const request = runtimeRequest.mock.calls.find(([path]) => path.endsWith('/browser-confirm'))!
     expect(request[0]).toBe('/v1/tasks/browser-review/receipts/browser-receipt/browser-confirm')
     expect(request[1]).toBe('POST')
-    expect(JSON.parse(request[2]!)).toEqual({ expectedRevision: 7, idempotencyKey: expect.any(String), reviewId: 'review-1', decision: 'confirmed_complete' })
+    expect(JSON.parse(request[2]!)).toEqual({ expectedRevision: 7, idempotencyKey: expect.any(String), reviewId: 'review-1', decision })
     expect(tasks[0].status).toBe('paused')
     expect(tasks[0].revision).toBe(8)
     expect(vi.mocked(window.workwise.listTaskPage).mock.calls.length).toBeGreaterThan(refreshes)

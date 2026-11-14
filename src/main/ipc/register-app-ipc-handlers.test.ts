@@ -327,13 +327,13 @@ describe('registerAppIpcHandlers', () => {
     await expect(handlers.get('runtime:request')?.({}, { path, method: 'POST', body })).resolves.toMatchObject({ ok: false, status: 409 })
   })
 
-  it('forwards a browser outcome confirmation only for its exact receipt and explicit reviewed decision', async () => {
+  it.each(['confirmed_complete', 'completed', 'not_completed'])('forwards a browser outcome confirmation only for its exact receipt and explicit %s decision', async decision => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const response = { ok: true, status: 200, body: '{"status":"verified"}' }
     const runtimeRequest = vi.fn(async () => response)
     registerAppIpcHandlers(registerOptions({ runtimeRequest: runtimeRequest as never }))
     const path = '/v1/tasks/task-1/receipts/receipt-1/browser-confirm'
-    const confirmation = { expectedRevision: 4, idempotencyKey: 'confirm-once', reviewId: 'review-1', decision: 'confirmed_complete' }
+    const confirmation = { expectedRevision: 4, idempotencyKey: 'confirm-once', reviewId: 'review-1', decision }
     const body = JSON.stringify(confirmation)
     await expect(handlers.get('runtime:request')?.({}, { path, method: 'POST', body })).resolves.toEqual(response)
     expect(runtimeRequest).toHaveBeenCalledExactlyOnceWith(path, 'POST', body)

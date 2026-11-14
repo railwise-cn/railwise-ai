@@ -474,10 +474,10 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
             const result = await window.workwise.verifyTaskOperationReceipt(owner.id, receipt.id, { expectedRevision: owner.revision, idempotencyKey: operationKey() })
             if (!result.browserReview) await refresh()
             return result
-          }} onConfirmBrowser={async (receipt, reviewId) => {
+          }} onConfirmBrowser={async (receipt, reviewId, decision) => {
             const owner = selectedGroup?.all.find(task => task.id === receipt.taskId)
             if (!owner) throw new Error(t('taskBrowserReviewUnavailable'))
-            const response = await window.workwise.runtimeRequest(`/v1/tasks/${encodeURIComponent(owner.id)}/receipts/${encodeURIComponent(receipt.id)}/browser-confirm`, 'POST', JSON.stringify({ expectedRevision: owner.revision, idempotencyKey: operationKey(), reviewId, decision: 'confirmed_complete' }))
+            const response = await window.workwise.runtimeRequest(`/v1/tasks/${encodeURIComponent(owner.id)}/receipts/${encodeURIComponent(receipt.id)}/browser-confirm`, 'POST', JSON.stringify({ expectedRevision: owner.revision, idempotencyKey: operationKey(), reviewId, decision }))
             if (!response.ok) {
               let code = 'browser_review_unavailable'
               try { const body = JSON.parse(response.body); if (/^[a-z][a-z0-9_]{0,99}$/.test(body.message)) code = body.message } catch { /* Keep the safe scoped failure code. */ }

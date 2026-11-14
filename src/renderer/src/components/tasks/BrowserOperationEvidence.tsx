@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useId, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { BrowserOperationReviewV1, TaskOperationReceiptV1, TaskOperationVerificationV1 } from '@shared/agent-workbench'
 
@@ -6,22 +6,29 @@ export function BrowserOperationEvidence({ receipt, ended, onVerify, onConfirm, 
   receipt: TaskOperationReceiptV1
   ended: boolean
   onVerify?: (receipt: TaskOperationReceiptV1) => Promise<TaskOperationVerificationV1>
-  onConfirm?: (receipt: TaskOperationReceiptV1, reviewId: string) => Promise<TaskOperationVerificationV1>
+  onConfirm?: (receipt: TaskOperationReceiptV1, reviewId: string, decision: 'completed' | 'not_completed') => Promise<TaskOperationVerificationV1>
   onConfigure?: () => void
 }): ReactElement {
   const { t } = useTranslation('common')
   const [review, setReview] = useState<BrowserOperationReviewV1 | null>(null)
   const [confirmed, setConfirmed] = useState(false)
+  const [decision, setDecision] = useState<'completed' | 'not_completed' | null>(null)
+  const decisionName = useId()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [errorCode, setErrorCode] = useState('')
   const [now, setNow] = useState(Date.now)
-  const [verified, setVerified] = useState(false)
-  const resolved = receipt.resolution?.evidence.kind === 'human_confirmation' || verified
+  const [verifiedOutcome, setVerifiedOutcome] = useState<'succeeded' | 'not_completed' | null>(null)
+  const resolved = receipt.resolution?.evidence.kind === 'human_confirmation' || verifiedOutcome !== null
+  const outcome = verifiedOutcome ?? receipt.resolution?.outcome ?? 'succeeded'
+  const outcomeMessage = (value: 'succeeded' | 'not_completed'): string => t(value === 'not_completed' ? 'taskBrowserHumanIncomplete' : 'taskBrowserHumanConfirmed')
   const expired = Boolean(review && (!Number.isFinite(Date.parse(review.expiresAt)) || Date.parse(review.expiresAt) <= Math.max(now, Date.now())))
   const isHumanConfirmation = (result: TaskOperationVerificationV1): boolean => result.taskId === receipt.taskId && result.receiptId === receipt.id
     && result.status === 'verified' && result.evidence?.kind === 'human_confirmation' && result.evidence.provider === 'browser-skill'
     && result.evidence.operation === receipt.browser?.action && result.evidence.verified === true
+    && result.evidence.target === receipt.browser?.pageUrl
+    && (result.outcome === 'not_completed' ? result.evidence.status === 'public_query_reviewed_incomplete'
+      : (result.outcome === undefined || result.outcome === 'succeeded') && result.evidence.status === 'public_query_confirmed_by_user')
   const reason = (value?: string): string => t(`taskBrowserReviewReason_${value ?? ''}`, { defaultValue: t('taskBrowserReviewUnavailable') })
 
   useEffect(() => {
@@ -37,6 +44,7 @@ export function BrowserOperationEvidence({ receipt, ended, onVerify, onConfirm, 
     setBusy(true)
     setReview(null)
     setConfirmed(false)
+    setDecision(null)
     setErrorCode('')
     setMessage('')
     try {
@@ -46,8 +54,8 @@ export function BrowserOperationEvidence({ receipt, ended, onVerify, onConfirm, 
         setReview(result.browserReview)
         setMessage(t('taskBrowserReviewReadOnly'))
       } else {
-        if (isHumanConfirmation(result)) setVerified(true)
-        setMessage(isHumanConfirmation(result) ? t('taskBrowserHumanConfirmed') : reason(result.errorCode))
+        if (isHumanConfirmation(result)) setVerifiedOutcome(result.outcome ?? 'succeeded')
+        setMessage(isHumanConfirmation(result) ? outcomeMessage(result.outcome ?? 'succeeded') : reason(result.errorCode))
         setErrorCode(result.errorCode ?? '')
       }
     } catch (error) {
@@ -57,16 +65,16 @@ export function BrowserOperationEvidence({ receipt, ended, onVerify, onConfirm, 
   }
 
   const confirm = async (): Promise<void> => {
-    if (!onConfirm || !review || !confirmed || busy || ended || expired || Date.parse(review.expiresAt) <= Date.now()) return
+    if (!onConfirm || !review || !decision || !confirmed || busy || ended || expired || Date.parse(review.expiresAt) <= Date.now()) return
     setBusy(true)
     setMessage('')
     try {
-      const result = await onConfirm(receipt, review.id)
-      if (isHumanConfirmation(result)) {
-        setVerified(true)
+      const result = await onConfirm(receipt, review.id, decision)
+      if (isHumanConfirmation(result) && (result.outcome ?? 'succeeded') === (decision === 'not_completed' ? 'not_completed' : 'succeeded')) {
+        setVerifiedOutcome(result.outcome ?? 'succeeded')
         setReview(null)
         setConfirmed(false)
-        setMessage(t('taskBrowserHumanConfirmed'))
+        setMessage(outcomeMessage(result.outcome ?? 'succeeded'))
       } else {
         setReview(null)
         setConfirmed(false)
@@ -84,7 +92,7 @@ export function BrowserOperationEvidence({ receipt, ended, onVerify, onConfirm, 
   return <li className="rounded-lg border border-ds-border bg-ds-card p-3 text-xs">
     <p className="font-medium">{t(receipt.browser?.action === 'fill' ? 'taskBrowserActionFill' : 'taskBrowserActionClick')}</p>
     {receipt.browser?.pageUrl ? <p className="mt-1 break-all text-ds-muted">{receipt.browser.pageUrl}</p> : null}
-    <p className="mt-2 text-ds-muted">{t(resolved ? 'taskBrowserHumanConfirmed' : receipt.status === 'outcome_unknown' ? 'taskBrowserOutcomeUnknown' : `taskReceiptStatus_${receipt.status}`)}</p>
+    <p className="mt-2 text-ds-muted">{resolved ? outcomeMessage(outcome) : t(receipt.status === 'outcome_unknown' ? 'taskBrowserOutcomeUnknown' : `taskReceiptStatus_${receipt.status}`)}</p>
     {receipt.status === 'outcome_unknown' && !resolved && !ended && receipt.browser?.canReview ? <p className="mt-2 text-ds-muted">{t('taskBrowserReviewSessionLimit')}</p> : null}
     {receipt.status === 'outcome_unknown' && !resolved && !ended ? <div className="mt-3 flex flex-wrap gap-2">
       {onVerify && receipt.browser?.canReview ? <button type="button" disabled={busy} onClick={() => void inspect()} className="rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t(busy ? 'taskEffectVerifying' : 'taskBrowserReview')}</button> : null}
@@ -100,8 +108,12 @@ export function BrowserOperationEvidence({ receipt, ended, onVerify, onConfirm, 
       <pre className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap break-words font-sans leading-relaxed">{review.observationText}</pre>
       <p className="mt-2 text-ds-muted">{t('taskBrowserReviewReadOnly')}</p>
       {expired ? <p role="status" className="mt-2 text-amber-700 dark:text-amber-300">{t('taskBrowserReviewExpired')}</p> : <>
-        <label className="mt-3 flex items-start gap-2"><input type="checkbox" checked={confirmed} disabled={busy || ended} onChange={event => setConfirmed(event.target.checked)} /><span>{t('taskBrowserConfirmStatement')}</span></label>
-        {onConfirm ? <button type="button" disabled={!confirmed || busy || ended} onClick={() => void confirm()} className="mt-3 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('taskBrowserConfirmComplete')}</button> : null}
+        <fieldset className="mt-3 space-y-2" disabled={busy || ended}><legend className="mb-2 font-medium">{t('taskBrowserReviewDecision')}</legend>
+          {(['completed', 'not_completed'] as const).map(value => <label key={value} className="flex items-start gap-2"><input type="radio" name={decisionName} value={value} checked={decision === value} onChange={() => { setDecision(value); setConfirmed(false) }} /><span>{t(value === 'completed' ? 'taskBrowserDecisionCompleted' : 'taskBrowserDecisionIncomplete')}</span></label>)}
+        </fieldset>
+        {decision === 'not_completed' ? <p className="mt-2 text-ds-muted">{t('taskBrowserIncompleteNotice')}</p> : null}
+        <label className="mt-3 flex items-start gap-2"><input type="checkbox" checked={confirmed} disabled={!decision || busy || ended} onChange={event => setConfirmed(event.target.checked)} /><span>{t(decision === 'not_completed' ? 'taskBrowserIncompleteStatement' : 'taskBrowserConfirmStatement')}</span></label>
+        {onConfirm ? <button type="button" disabled={!decision || !confirmed || busy || ended} onClick={() => void confirm()} className="mt-3 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('taskBrowserConfirmComplete')}</button> : null}
       </>}
     </section> : null}
     {message && !resolved ? <p role="status" className="mt-2 whitespace-pre-wrap text-ds-muted">{message}</p> : null}

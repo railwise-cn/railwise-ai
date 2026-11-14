@@ -94,7 +94,8 @@ export type BrowserTaskBindingSnapshot = {
 
 export const BrowserOperationConfirmation = z.object({
   expectedRevision: z.number().int().nonnegative(), idempotencyKey: z.string().trim().min(1).max(256),
-  reviewId: z.string().min(1).max(200), decision: z.literal('confirmed_complete')
+  // Keep the original Desktop request readable during migration.
+  reviewId: z.string().min(1).max(200), decision: z.enum(['confirmed_complete', 'completed', 'not_completed'])
 }).strict()
 export type BrowserOperationConfirmation = z.infer<typeof BrowserOperationConfirmation>
 export type BrowserOperationReview = { id: string; expiresAt: string; action: 'click' | 'fill'; pageUrl: string;

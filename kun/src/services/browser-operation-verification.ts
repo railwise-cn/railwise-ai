@@ -3,7 +3,7 @@ import { BrowserOperationConfirmation, type BrowserOperationReview, type Browser
 import { BrowserScheduleActionSchema, type BrowserScheduleAction } from '../contracts/browser-schedule-actions.js'
 import { ExecutionGrantSchema, type ExecutionGrant } from '../contracts/permissions.js'
 import { ResultEvidenceSchema, type ResultEvidence } from '../contracts/harness.js'
-import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
+import type { OperationReceipt, OperationResolutionOutcome, TaskRun } from '../contracts/tasks.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import type { ToolHost, ToolHostContext } from '../ports/tool-host.js'
 import type { FlowRuntimeService } from '../flow/service.js'
@@ -16,7 +16,7 @@ import { assertGrantAllowsNetwork } from '../adapters/tool/sandbox-policy.js'
 
 type Input = { expectedRevision: number; idempotencyKey: string }
 export type BrowserVerificationResult = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown';
-  evidence?: ResultEvidence; errorCode?: string; browserReview?: BrowserOperationReview }
+  evidence?: ResultEvidence; outcome?: OperationResolutionOutcome; errorCode?: string; browserReview?: BrowserOperationReview }
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 function fail(code: string): never { throw Object.assign(new Error(code), { code }) }
 const code = (error: unknown) => /^[a-z][a-z0-9_]{0,99}$/.test(String(object(error).code)) ? String(object(error).code) : 'browser_review_unavailable'
@@ -40,7 +40,7 @@ export class BrowserOperationVerificationService {
     try {
       const binding = await this.binding(taskId, receiptId, input.expectedRevision)
       const resolved = this.deps.repository.verifiedOperationResolution(binding.receipt)
-      if (resolved) return { ...result, status: 'verified', evidence: resolved.evidence }
+      if (resolved) return { ...result, status: 'verified', evidence: resolved.evidence, outcome: resolved.outcome ?? 'succeeded' }
       const previous = this.deps.repository.operation(taskId, key)
       if (previous) {
         if (previous.request?.expectedRevision !== input.expectedRevision) fail('idempotency_conflict')
@@ -69,6 +69,7 @@ export class BrowserOperationVerificationService {
 
   async confirm(taskId: string, receiptId: string, raw: BrowserOperationConfirmation): Promise<BrowserVerificationResult> {
     const input = BrowserOperationConfirmation.parse(raw)
+    const outcome: OperationResolutionOutcome = input.decision === 'not_completed' ? 'not_completed' : 'succeeded'
     const key = `browser-confirm:${receiptId}:${input.idempotencyKey}`
     const request = { originalReceiptId: receiptId, ...input }
     const prior = this.deps.repository.operation(taskId, key)
@@ -94,45 +95,48 @@ export class BrowserOperationVerificationService {
       const now = this.deps.nowIso()
       if (Date.parse(review.expiresAt) <= Date.parse(now)) fail('browser_review_expired')
       const evidence = ResultEvidenceSchema.parse({ kind: 'human_confirmation', provider: 'browser-skill', operation: binding.action.action,
-        target: binding.action.pageUrl, status: 'public_query_confirmed_by_user', verified: true, verifiedAt: now,
+        target: binding.action.pageUrl, status: outcome === 'not_completed' ? 'public_query_reviewed_incomplete' : 'public_query_confirmed_by_user', verified: true, verifiedAt: now,
         resultHash: operationFingerprint({ reviewId: review.id, snapshotHash: snapshot.hash, receiptId, decision: input.decision }) })
       this.deps.repository.beginOperation({ ownerId: taskId, idempotencyKey: key, kind: 'browser_confirmation', request, nowIso: now })
-      const proofKey = this.proof(binding.receipt, evidence, key)
-      this.deps.controller.recordOperationVerification(taskId, input.expectedRevision, receiptId, proofKey, evidence)
-      this.resolve(binding.dispatch, evidence, key)
+      const proofKey = this.proof(binding.receipt, evidence, key, taskId, outcome)
+      this.deps.controller.recordOperationVerification(taskId, input.expectedRevision, receiptId, proofKey, evidence, outcome)
+      this.resolve(binding.dispatch, evidence, key, taskId, outcome)
       // A turn/action outcome may cover more than one dispatch; keep it blocked until each exact dispatch is reviewed.
       const remaining = this.deps.repository.operations(taskId, 'browser_action_dispatch').some(item => item.status === 'outcome_unknown' &&
         item.request?.turnId === binding.receipt.request?.turnId && item.request?.action === binding.action.action && !this.deps.repository.verifiedOperationResolution(item))
       if (!remaining) for (const lock of this.deps.repository.operations(binding.action.sourceTaskId, 'browser_schedule_action_outcome')) {
         if (lock.status === 'outcome_unknown' && lock.request?.taskId === taskId && lock.request?.turnId === binding.receipt.request?.turnId &&
-          lock.request?.action === binding.action.action && lock.request?.scheduleId === binding.action.scheduleId) this.resolve(lock, evidence, key)
+          lock.request?.action === binding.action.action && lock.request?.scheduleId === binding.action.scheduleId) this.resolve(lock, evidence, key, taskId, outcome)
       }
       this.deps.repository.finishOperation(taskId, saved.idempotencyKey, { status: 'succeeded', result: { ...state, consumedAt: now } }, now)
       const updated = this.deps.repository.get(taskId)!
       const clear = !this.deps.repository.unsettledOperations(taskId).some(item => item.kind === 'tool')
       this.deps.repository.update(taskId, updated.revision, value => ({ ...value, updatedAt: now,
-        ...(clear ? { waitingReason: '本次公开查询动作已由你核对。任务尚未继续，请单独点击继续。', stalledReason: undefined,
-          status: value.status === 'paused' ? 'paused' : 'waiting_user' } : {}) }),
-      { key: `browser-confirmed:${review.id}`, kind: 'browser_action_human_confirmed', payload: { receiptId, reviewId: review.id }, createdAt: now })
+        ...(clear ? { waitingReason: outcome === 'not_completed' ? '你已核对本次公开查询动作未完成。原记录保留；请单独点击继续，由任务重新规划。' : '本次公开查询动作已由你核对。任务尚未继续，请单独点击继续。',
+          stalledReason: outcome === 'not_completed' && value.status === 'stalled' ? '公开查询已核对未完成，等待你单独继续并重新规划。' : undefined,
+          status: outcome === 'not_completed' ? value.status : value.status === 'paused' ? 'paused' : 'waiting_user' } : {}) }),
+      { key: `browser-confirmed:${review.id}`, kind: 'browser_action_human_confirmed', payload: { receiptId, reviewId: review.id, outcome }, createdAt: now })
       const attention = this.deps.repository.attention(`unknown_${taskId}`)
       if (clear && attention) this.deps.repository.putAttention({ ...attention, status: 'answered', revision: attention.revision + 1, updatedAt: now })
-      const result: BrowserVerificationResult = { taskId, receiptId, status: 'verified', evidence }
+      const result: BrowserVerificationResult = { taskId, receiptId, status: 'verified', evidence, outcome }
       this.deps.repository.finishOperation(taskId, key, { status: 'succeeded', result }, now)
       return result
     })
   }
 
-  private proof(receipt: OperationReceipt, evidence: ResultEvidence, confirmationKey: string): string {
+  private proof(receipt: OperationReceipt, evidence: ResultEvidence, confirmationKey: string, confirmationOwnerId: string, outcome: OperationResolutionOutcome): string {
     const key = `${confirmationKey}:proof:${receipt.id}`
-    this.deps.repository.beginOperation({ ownerId: receipt.ownerId, idempotencyKey: key, kind: 'effect_verification',
-      request: { originalReceiptId: receipt.id, originalFingerprint: receipt.fingerprint }, nowIso: this.deps.nowIso() })
-    this.deps.repository.finishOperation(receipt.ownerId, key, { status: 'succeeded', result: { evidence } }, this.deps.nowIso())
+    // Legacy readers recognize only effect_verification as successful proof.
+    // A negative review must remain unknown to those readers rather than look completed.
+    this.deps.repository.beginOperation({ ownerId: receipt.ownerId, idempotencyKey: key, kind: outcome === 'not_completed' ? 'effect_verification_incomplete' : 'effect_verification',
+      request: { originalReceiptId: receipt.id, originalFingerprint: receipt.fingerprint, confirmationKey, confirmationOwnerId }, nowIso: this.deps.nowIso() })
+    this.deps.repository.finishOperation(receipt.ownerId, key, { status: 'succeeded', result: { evidence, outcome } }, this.deps.nowIso())
     return key
   }
-  private resolve(receipt: OperationReceipt, evidence: ResultEvidence, key: string): void {
+  private resolve(receipt: OperationReceipt, evidence: ResultEvidence, key: string, confirmationOwnerId: string, outcome: OperationResolutionOutcome): void {
     if (this.deps.repository.verifiedOperationResolution(receipt)) return
-    const proof = this.deps.repository.operation(receipt.ownerId, this.proof(receipt, evidence, key))!
-    this.deps.repository.resolveOperation(receipt.ownerId, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, resolvedAt: this.deps.nowIso() })
+    const proof = this.deps.repository.operation(receipt.ownerId, this.proof(receipt, evidence, key, confirmationOwnerId, outcome))!
+    this.deps.repository.resolveOperation(receipt.ownerId, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, outcome, resolvedAt: this.deps.nowIso() })
   }
 
   private async binding(taskId: string, receiptId: string, revision: number) {

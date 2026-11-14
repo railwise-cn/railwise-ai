@@ -13,7 +13,7 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
   relatedTasks: TaskRunV1[]
   receipts: TaskOperationReceiptV1[]
   onVerify?: (receipt: TaskOperationReceiptV1) => Promise<TaskOperationVerificationV1>
-  onConfirmBrowser?: (receipt: TaskOperationReceiptV1, reviewId: string) => Promise<TaskOperationVerificationV1>
+  onConfirmBrowser?: (receipt: TaskOperationReceiptV1, reviewId: string, decision: 'completed' | 'not_completed') => Promise<TaskOperationVerificationV1>
   onConfigureProvider?: (provider: string) => void
   onConfigureReplyDelivery?: () => void
 }): ReactElement | null {

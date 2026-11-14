@@ -16,7 +16,7 @@ import { operationFingerprint } from '../src/services/task-run-repository.js'
 const page = vi.hoisted(() => ({ session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0,
   htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false,
   largePage: false, emptyObservation: false, emptyPage: false, targetTruncated: false, lastFill: {} as Record<string, unknown>,
-  modelCallsAtUnknown: 0, navigations: 0, clickUnknown: false, beforeUnknown: undefined as (() => void) | undefined }))
+  modelCallsAtUnknown: 0, navigations: 0, clickUnknown: false, notSent: false, beforeUnknown: undefined as (() => void) | undefined }))
 vi.mock('../src/services/browser-skill-cli.js', async original => ({
   ...await original<typeof import('../src/services/browser-skill-cli.js')>(),
   runBrowserCommand: vi.fn(async (_config: unknown, args: readonly string[]) => {
@@ -54,19 +54,22 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
     if (args[0] === 'click') { expect(args).not.toContain('--depends-on'); expect(JSON.parse(args[args.indexOf('--expect') + 1]!)).toEqual([
       { target: '@e1', field: 'exists', equals: true }, { target: '@e1', field: 'text', equals: '查询公开公告' },
       { target: '@e1', field: 'attribute', attribute: 'aria-label', equals: '查询公开公告' }
-    ]); page.beforeUnknown?.(); page.writes++; return { ok: false, code: 'permission_denied', outcomeUnknown: true,
+    ]); page.beforeUnknown?.(); page.writes++; if (page.notSent) return { ok: false, code: 'permission_denied', outcomeUnknown: false,
+      output: { code: 'permission_denied', data: { reason: 'target_covered', effect_state: 'unknown', press_sent: false, phase: 'preparation', operation_id: 'op-fixture' } } }
+      return { ok: false, code: 'permission_denied', outcomeUnknown: true,
       vendorReason: 'cooperation_sync_required', effectState: 'unknown', vendorFailureKind: 'observed_content_changed' } }
     throw new Error('Unexpected synthetic browser command')
   })
 }))
 const cleanup: Array<() => Promise<unknown>> = []
 afterEach(async () => { while (cleanup.length) await cleanup.pop()!(); vi.useRealTimers(); vi.unstubAllEnvs(); Object.assign(page, { session: false, url: 'about:blank', writes: 0, reads: 0, stopped: 0, context: 0, htmlChanged: false, targetChanged: false, acknowledge: false, readbackBroken: false,
-  largePage: false, emptyObservation: false, emptyPage: false, targetTruncated: false, lastFill: {}, modelCallsAtUnknown: 0, navigations: 0, clickUnknown: false, beforeUnknown: undefined }) })
+  largePage: false, emptyObservation: false, emptyPage: false, targetTruncated: false, lastFill: {}, modelCallsAtUnknown: 0, navigations: 0, clickUnknown: false, notSent: false, beforeUnknown: undefined }) })
 
-type EscapeTool = 'browser_navigate' | 'browser_session_stop' | 'echo' | 'schedule_task'
-async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown', escape?: { tool: EscapeTool; when: 'same_batch' | 'next_model'; action: 'click' | 'fill' }) {
+type EscapeTool = 'browser_navigate' | 'browser_session_stop' | 'browser_observe' | 'echo' | 'schedule_task'
+async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown', escape?: { tool: EscapeTool; when: 'same_batch' | 'next_model'; action: 'click' | 'fill'; notSent?: boolean }) {
   page.acknowledge = mode === 'ack_pending'; page.readbackBroken = mode === 'ack_pending'
   page.clickUnknown = escape?.action === 'click'
+  page.notSent = escape?.notSent === true
   vi.stubEnv('RAILWISE_TASK_SCHEDULING_DISABLED', '1')
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-browser-review-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
@@ -99,7 +102,7 @@ async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown', escape?: { t
     if (next?.[0] === 'artifact') args = { path: 'report.html', content: '<!doctype html><html lang="zh-CN"><head><title>回读报告</title></head><body><h1>原查询页面已回读</h1><a href="https://public.example.test/query">来源</a></body></html>' }
     if (next?.[0] === 'fill') page.lastFill = args
     const escapeArgs = escape?.tool === 'browser_navigate' ? { sessionId: 'review-session', url: 'https://public.example.test/left-original' }
-      : escape?.tool === 'browser_session_stop' ? { sessionId: 'review-session' }
+      : escape?.tool === 'browser_session_stop' || escape?.tool === 'browser_observe' ? { sessionId: 'review-session' }
         : escape?.tool === 'schedule_task' ? {}
           : { text: 'must-not-run' }
     if (next?.[0] === 'after-unknown') args = escapeArgs
@@ -135,7 +138,7 @@ async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown', escape?: { t
   const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'review-source',
     request: { prompt: `使用BrowserSkill读取 https://public.example.test/query ，${page.clickUnknown ? '点击查询公开公告按钮' : '在公开查询框填写轨道监测'}，生成HTML报告${mode === 'unknown' ? '，每天09:00执行。' : '。'}` } })
   const id = started.task!.id
-  if (escape) page.beforeUnknown = () => {
+  if (escape && !page.notSent) page.beforeUnknown = () => {
     const task = runtime.taskRepository!.get(id)!
     runtime.taskController!.appendInput(id, task.revision, 'pending-after-unknown', '保留此补充，核验前不要投递模型。')
   }
@@ -153,10 +156,11 @@ async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown', escape?: { t
   expect(runtime.taskRepository!.get(id)!.status).toBe('waiting_user')
   const resumed = await api(`/v1/tasks/${id}/resume`, 'POST', { expectedRevision: runtime.taskRepository!.get(id)!.revision, idempotencyKey: 'review-fixture-explicit-resume' })
   expect(resumed.status, await resumed.clone().text()).toBe(202)
-  await expect.poll(() => runtime.taskRepository!.get(id)?.status, { timeout: 10000 }).toBe(mode === 'ack_pending' ? 'waiting_user' : 'stalled')
+  if (page.notSent) await expect.poll(() => runtime.taskRepository!.operations(id, 'tool').find(item => item.request?.callId === 'review-after-unknown')?.status, { timeout: 10000 }).toBe('succeeded')
+  else await expect.poll(() => runtime.taskRepository!.get(id)?.status, { timeout: 10000 }).toBe(mode === 'ack_pending' ? 'waiting_user' : 'stalled')
   const task = () => runtime.taskRepository!.get(id)!
   const unknownTool = page.clickUnknown ? 'browser_click' : 'browser_fill'
-  const unknown = runtime.taskRepository!.operations(id, 'tool').find(item => item.request?.toolName === unknownTool && item.status === (mode === 'ack_pending' ? 'failed' : 'outcome_unknown'))!
+  const unknown = runtime.taskRepository!.operations(id, 'tool').find(item => item.request?.toolName === unknownTool && item.status === (mode === 'ack_pending' || page.notSent ? 'failed' : 'outcome_unknown'))!
   expect(unknown.request?.toolName).toBe(unknownTool)
   expect(page.writes).toBe(1)
   const verify = async (key = 'review-once') => {
@@ -166,8 +170,8 @@ async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown', escape?: { t
     expect(result.errorCode, JSON.stringify(result)).toBeUndefined()
     return result
   }
-  const confirm = (review: BrowserVerificationResult, key = 'confirm-once', revision = task().revision) => api(`/v1/tasks/${id}/receipts/${unknown.id}/browser-confirm`, 'POST',
-    { expectedRevision: revision, idempotencyKey: key, reviewId: review.browserReview?.id, decision: 'confirmed_complete' })
+  const confirm = (review: BrowserVerificationResult, key = 'confirm-once', revision = task().revision, decision = 'confirmed_complete') => api(`/v1/tasks/${id}/receipts/${unknown.id}/browser-confirm`, 'POST',
+    { expectedRevision: revision, idempotencyKey: key, reviewId: review.browserReview?.id, decision })
   const restart = async () => { restarting = true; await closeRuntime(); runtime = await createKunServeRuntime(options); closed = false; router = buildRouter(runtime); restarting = false }
   const expireOriginalGrant = async () => {
     // Persistence-boundary fixture: the historical short Turn grant expired;
@@ -188,6 +192,21 @@ async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown', escape?: { t
   }
   return { get runtime() { return runtime }, task, unknown, api, verify, confirm, restart, closeRuntime, expireOriginalGrant, independent, modelCalls: () => modelCalls, options, holdModel: () => { hold = true }, holdBeforeReadback: () => { holdReadback = true }, repairReadback: () => { page.readbackBroken = false } }
 }
+
+it.each(['same_batch', 'next_model'] as const)('allows %s readonly replanning after the exact CLI proves a public click was not sent, without retry or success evidence', async when => {
+  const f = await fixture('unknown', { tool: 'browser_observe', when, action: 'click', notSent: true })
+  const repository = f.runtime.taskRepository!, id = f.task().id
+  await expect.poll(f.modelCalls).toBeGreaterThan(page.modelCallsAtUnknown)
+  expect(f.unknown).toMatchObject({ status: 'failed', result: { item: { isError: true, output: {
+    status: 'failed', code: 'browser_action_not_dispatched', effectState: 'unknown', vendorPressSent: false, actionDispatch: 'not_sent' } } } })
+  expect(repository.operations(id, 'tool').find(item => item.request?.callId === 'review-after-unknown')).toMatchObject({ status: 'succeeded' })
+  expect(repository.operations(id, 'browser_action_dispatch')).toMatchObject([{ status: 'failed', result: { notDispatched: true, vendorPressSent: false } }])
+  expect(repository.unsettledOperations(id).filter(item => item.kind === 'tool')).toHaveLength(0)
+  expect(repository.operations(id, 'browser_schedule_action_outcome').some(item => item.status === 'outcome_unknown')).toBe(false)
+  expect(f.task().resultEvidence ?? []).not.toContainEqual(expect.objectContaining({ provider: 'browser-skill', operation: 'click', verified: true }))
+  expect(page.writes).toBe(1) // One CLI click request, explicitly rejected before native input; no retry.
+  expect(page.session).toBe(true); expect(page.navigations).toBe(1)
+}, 20000)
 
 it.each([
   ...(['click', 'fill'] as const).flatMap(action => (['same_batch', 'next_model'] as const).flatMap(when => (['browser_navigate', 'browser_session_stop', 'echo'] as const).map(tool => ({ when, tool, action })))),
@@ -329,6 +348,48 @@ it('retains an unknown browser surface across pause/restart, reads without mutat
   expect(page.writes).toBe(1)
 }, 30000)
 
+it.each(['paused', 'stalled'] as const)('records an incomplete public query review while preserving %s and the original unknown, across restart and separate continue', async status => {
+  const f = await fixture(), id = f.task().id
+  if (status === 'paused') await f.api(`/v1/tasks/${id}/pause`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'negative-pause' })
+  const repository = f.runtime.taskRepository!
+  repository.beginOperation({ ownerId: id, idempotencyKey: 'unrelated-negative-lock', kind: 'browser_schedule_action_outcome',
+    request: { scheduleId: `schedule_${id}`, taskId: 'another-task', turnId: f.unknown.request!.turnId, action: 'fill' }, nowIso: f.runtime.nowIso() })
+  const other = repository.finishOperation(id, 'unrelated-negative-lock', { status: 'outcome_unknown' }, f.runtime.nowIso())
+  const original = repository.operation(id, f.unknown.idempotencyKey)!
+  const before = f.modelCalls(), review = await f.verify('negative-review'), revision = f.task().revision
+  const response = await f.confirm(review, 'negative-confirm', revision, 'not_completed')
+  expect(response.status, await response.clone().text()).toBe(200)
+  const result = await response.json()
+  expect(result).toMatchObject({ status: 'verified', outcome: 'not_completed', evidence: {
+    kind: 'human_confirmation', status: 'public_query_reviewed_incomplete', verified: true } })
+  expect(f.task().status).toBe(status); expect(f.modelCalls()).toBe(before); expect(page.writes).toBe(1)
+  const after = repository.operation(id, f.unknown.idempotencyKey)!
+  expect({ ...after, resolution: undefined, updatedAt: original.updatedAt }).toEqual({ ...original, resolution: undefined })
+  expect(after.status).toBe('outcome_unknown')
+  expect(repository.verifiedOperationResolution(after)).toMatchObject({ outcome: 'not_completed' })
+  const dispatch = repository.operations(id, 'browser_action_dispatch').find(item => item.status === 'outcome_unknown')!
+  expect(repository.verifiedOperationResolution(dispatch)).toMatchObject({ outcome: 'not_completed' })
+  expect(repository.operations(id, 'effect_verification')).toHaveLength(0)
+  expect(repository.operations(id, 'effect_verification_incomplete')).toHaveLength(3)
+  const locks = repository.operations(id, 'browser_schedule_action_outcome')
+  expect(locks.filter(item => item.id !== other.id).every(item => repository.verifiedOperationResolution(item)?.outcome === 'not_completed')).toBe(true)
+  expect(repository.verifiedOperationResolution(repository.operation(id, other.idempotencyKey)!)).toBeUndefined()
+  const duplicate = await f.confirm(review, 'negative-confirm', revision, 'not_completed')
+  expect(duplicate.status).toBe(200); expect(await duplicate.json()).toEqual(result)
+  expect((await f.confirm(review, 'negative-confirm', revision, 'completed')).status).toBe(409)
+  expect(f.task().artifacts).toHaveLength(0)
+  expect(f.task().resultEvidence ?? []).not.toContainEqual(expect.objectContaining({ status: 'public_query_reviewed_incomplete' }))
+  await f.restart()
+  expect(f.task().status).toBe(status)
+  const projected = await (await f.api(`/v1/tasks/${id}/receipts`, 'GET')).json() as Array<{ id: string; resolution?: { outcome?: string }; browser?: { canReview: boolean } }>
+  expect(projected.find(item => item.id === f.unknown.id)).toMatchObject({ resolution: { outcome: 'not_completed' }, browser: { canReview: false } })
+  f.holdModel()
+  const resumed = await f.api(`/v1/tasks/${id}/resume`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'negative-separate-continue' })
+  expect(resumed.status, await resumed.clone().text()).toBe(202)
+  await expect.poll(f.modelCalls).toBeGreaterThan(before)
+  expect(page.writes).toBe(1)
+}, 30000)
+
 it('reviews a large page using a fresh visible observation and exact target without claiming a full-page scan or resolving automatically', async () => {
   const f = await fixture()
   await f.api(`/v1/tasks/${f.task().id}/pause`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'large-page-paused' })
@@ -370,7 +431,7 @@ it.each(['missing-observation', 'empty', 'target-truncated', 'target-changed', '
   expect(f.task().status).toBe('stalled'); expect(page.writes).toBe(1); expect(f.modelCalls()).toBe(before)
 }, 20000)
 
-it.each(['expired', 'target', 'page', 'revoked', 'cancelled', 'browser'] as const)('keeps %s review unknown without replay or resumption', async condition => {
+it.each((['expired', 'target', 'page', 'revoked', 'cancelled', 'browser'] as const).flatMap(condition => ['confirmed_complete', 'not_completed'].map(decision => ({ condition, decision }))))('keeps $condition $decision review unknown without replay or resumption', async ({ condition, decision }) => {
   const f = await fixture()
   const review = await f.verify()
   expect(review.browserReview).toBeTruthy()
@@ -382,7 +443,7 @@ it.each(['expired', 'target', 'page', 'revoked', 'cancelled', 'browser'] as cons
   if (condition === 'cancelled') await f.api(`/v1/tasks/${f.task().id}/cancel`, 'POST', { expectedRevision: f.task().revision, idempotencyKey: 'cancel' })
   if (condition === 'browser') f.options.capabilities.browserSkill.browserInstanceId = 'other-browser'
   if (condition === 'browser') await f.restart()
-  const response = await f.confirm(review)
+  const response = await f.confirm(review, 'confirm-once', f.task().revision, decision)
   expect(response.status).not.toBe(200)
   const receipt = f.runtime.taskRepository!.operations(f.task().id, 'tool').find(item => item.id === f.unknown.id)!
   expect(receipt.resolution).toBeUndefined()
