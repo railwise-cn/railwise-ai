@@ -143,7 +143,10 @@ async function fixture(mode: 'unknown' | 'ack_pending' = 'unknown', escape?: { t
     const task = runtime.taskRepository!.get(id)!
     runtime.taskController!.appendInput(id, task.revision, 'pending-after-unknown', '保留此补充，核验前不要投递模型。')
   }
-  expect(started).toMatchObject({ kind: 'capability_required', capability: { errorCode: 'browser_verification_policy_required' } })
+  // New public-query tasks truthfully offer upgrade on the legacy CLI. The
+  // explicit strict binding below still exercises that unchanged legacy stack.
+  expect(started).toMatchObject({ kind: 'capability_required', capability: {
+    errorCode: page.clickUnknown ? 'browser_verification_policy_required' : 'browser_target_policy_upgrade_required' } })
   expect(modelCalls).toBe(0)
   expect((await runtime.threadService.get(started.task!.threadId))!.turns).toHaveLength(0)
   const binding = await (await api(`/v1/tasks/${id}/browser-binding`, 'GET')).json() as BrowserTaskBindingSnapshot

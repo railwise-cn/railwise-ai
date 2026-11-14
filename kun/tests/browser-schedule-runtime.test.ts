@@ -151,7 +151,10 @@ it.each([undefined, 'public_query_target'] as const)('runs independent scheduled
   const origin = await runtime.threadService.create({ workspace, mode: 'agent', model: 'synthetic-model', approvalPolicy: 'on-request' })
   const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'public-browser-schedule',
     request: { prompt: '使用BrowserSkill查询 https://public.example.test/search 的公开工程监测公告并生成HTML报告，每天09:00和17:00执行。' } })
-  expect(started).toMatchObject({ kind: 'capability_required', capability: { errorCode: 'browser_verification_policy_required' }, task: { status: 'waiting_user' } })
+  // Preserve the old CLI/protocol fixture: only its initial upgrade guidance
+  // differs; explicit legacy strict scope and every subsequent assertion remain.
+  expect(started).toMatchObject({ kind: 'capability_required', capability: {
+    errorCode: browser.modern ? 'browser_verification_policy_required' : 'browser_target_policy_upgrade_required' }, task: { status: 'waiting_user' } })
   const sourceId = started.task!.id
   expect((await runtime.threadService.get(started.task!.threadId))!.turns).toHaveLength(0)
   expect(modelRequests).toBe(0)
