@@ -384,3 +384,15 @@ HTML 成果字节与真实浏览器工具输出一致，自动打开及手动预
 原 App 经 CUA 正常退出，Main／Runtime 已停止，临时真实模型 relay 停止并恢复原配置。仅对已核对 PID、完整参数与出生指纹的自有 Node 测试 helper 暂停其自动 cleanup timer，原 Chrome、Main 自有 daemon、session 和 unknown 保留。等待修复时只用官方同 session／tab 的只读 viewport screenshot 保活，不导航、点击或改 TTL。用户另行安装的正常 Chrome 0.5.0 已通过只读 status 识别为 connected／protocol 1.9，当前任务选择与 Grant 未被覆盖；后续真实业务应在正常可见 Chrome 验收。
 
 私有证据标识为 native-real-task-3a83346f-stage-summary.json、new-real-task-blocker-3a83346f-evidence.json、target-covered-source-audit-3a83346f.json、preserve-original-browser-helper-sigstop-3a83346f.json 及 personal-chrome-registration-readonly-3a83346f.json。3a 的 Windows 和升级通过保留各自范围，当前版本不发布。
+
+### 71cefc48 原任务恢复确认阻断
+
+源码 `71cefc4880ee47d79a4ba8424079d3de613db2dd` 的唯一私有构建为 `43568688318`。本机 Desktop 4628／10 跳过、KUN 4209／24 跳过、三类类型检查、零错误 lint 与生产构建通过，两条同源码 Quality 均成功。Windows 完整回放 `43570636407` 的官方原始证据、每日计划／真实到期新任务及六项权限通过；同 Release 的真实 0.5.6 → 0.5.7 原生升级也通过。以上仍按受控页面、协议模型及资料连续性夹具的实际范围解释，不代替真实采购网站业务。
+
+精确 Mac 包已安装并实际通过 Finder 打开，ASAR 为 `3569d0ec0af701c7c4142c6c51a4bc48f45f7ccb2b046c2cde98626d3a378d04`。启动前一致性备份 20 个数据库及 32 个 JSONL，直接使用原 mac3a 私有 profile，恢复同一个原任务；没有复制任务或新建任务绕开失败。原 unknown 与其它旧任务保持，模型请求为零。
+
+新界面的未完成选择及对应声明可以正常操作，但两次保存均被 browser_review_page_changed 拒绝。首次核验完成至保存不足 120 秒，错误不是过期。只读记录表明原查询控件和输入未变，无关新闻轮播与生成引用变化使可见摘要的三行及截断位置变化；完整 HTML 中未展示的变化也参与了旧比较。两次都未保存 resolution 或 proof，未点击继续、未切换授权、未产生 HTML 或计划。原应用正常退出后仍保留原浏览器现场并只读保活。
+
+新增窄修复将比较范围与实际展示的页面正文摘要、完整输入／选项状态和原目标一致，保留会话、页签、来源、权限、版本、时限及幂等约束。完整 HTML 的正文提取不依赖脚本、样式、注释、属性或生成引用；截断 HTML 继续使用保守的已观察内容。不能忽略真实结果段或重要输入变化，也不推断动作完成。原页两次官方只读 HTML 为 225695／225731 字节，均未截断；跨轮播读取后，稳定正文与原输入状态的展示投影均为 8739 字节，摘要逐字一致。原始网页和诊断材料仅留在私有证据，未提交原文。
+
+对应证据标识为 original-task-reopened-71cefc48-before-review.json、negative-review-save-blocker-71cefc48-private.json、negative-review-text-coverage-diff-71cefc48.json、browser-review-visible-pair/evidence.json，以及本次 Windows／updater 摘要。当前真实任务仍 stalled、无 HTML／Flow，整版不记为通过或发布；修复必须进入新的精确包继续原任务。
