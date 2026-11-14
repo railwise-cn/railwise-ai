@@ -721,6 +721,20 @@ describe('typed BrowserSkill production provider', () => {
     expect(await f.execute('browser_session_start')).toMatchObject({ output: { reused: true } })
     expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'session' && args[1] === 'start')).toHaveLength(1)
   })
+  it('uses a fresh owned tab after request reconciliation even when the preflight status was empty', async () => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    let interrupted = true
+    f.runner.mockImplementation(async (config, args, signal) => {
+      const result = await original(config, args, signal)
+      if (args[0] === 'status') return { ...result, output: { ...result.output as object, sessions: [] } }
+      if (args[0] === 'session' && args[1] === 'start' && interrupted) { interrupted = false; return { ok: false, output: {}, outcomeUnknown: true } }
+      return result
+    })
+    expect(await f.execute('browser_session_start')).toMatchObject({ isError: true })
+    expect(await f.execute('browser_session_start')).toMatchObject({ output: { reused: true, sessionId: 'session-one' } })
+    expect(f.repository.operations('task', 'browser_session_retirement')).toHaveLength(0)
+    expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'session' && args[1] === 'start')).toHaveLength(1)
+  })
   it('reads HTML and uses the current observed context for automatic link pagination', async () => {
     const f = fixture()
     await f.execute('browser_session_start')
@@ -779,14 +793,172 @@ describe('typed BrowserSkill production provider', () => {
     expect(approvals).toHaveBeenCalledOnce()
   })
 
-  it('creates a new owned session after a verified stop only in a later task turn', async () => {
+  it.each([{ priorObservation: false, sameTurn: false }, { priorObservation: true, sameTurn: false }, { priorObservation: false, sameTurn: true }])('retires a proven idle-expired successful session without replaying actions %j', async ({ priorObservation, sameTurn }) => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    const originalReceipt = structuredClone(f.repository.operations('task', 'browser_session')[0])
+    const original = f.runner.getMockImplementation()!
+    let expired = true
+    f.runner.mockImplementation(async (config, args, signal) => {
+      if (args[0] === 'tab' && args[1] === 'list' && args.includes('session-one') && expired) return {
+        ok: false, code: 'not_found', exitCode: 1, outcomeUnknown: false,
+        output: { code: 'not_found', message: 'session not registered or already stopped', data: { reason: 'session_idle_timeout', ended_unix_ms: Date.now() } }
+      }
+      if (args[0] === 'session' && args[1] === 'start') expired = false
+      const result = await original(config, args, signal)
+      return args[0] === 'status' && expired ? { ...result, output: { ...result.output as object, sessions: [] } } : result
+    })
+    if (priorObservation) expect(await f.execute('browser_observe', { sessionId: 'session-one' })).toMatchObject({ isError: true, output: { code: 'not_found', vendorReason: 'session_idle_timeout' } })
+    const resumed = sameTurn ? f.context : { ...f.context, turnId: 'resumed-turn', executionGrant: { ...f.context.executionGrant!, id: 'resumed-grant', turnId: 'resumed-turn' } }
+    f.repository.update('task', f.repository.get('task')!.revision, task => ({ ...task, activeTurnId: resumed.turnId }))
+    const results = await Promise.all([f.execute('browser_session_start', {}, resumed), f.execute('browser_session_start', {}, resumed)])
+    for (const result of results) expect(result).toMatchObject({ output: { status: 'succeeded', sessionId: 'session-two' } })
+    expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'session' && args[1] === 'start')).toHaveLength(2)
+    expect(f.runner.mock.calls.some(([, args]) => ['click', 'fill', 'press'].includes(args[0]))).toBe(false)
+    expect(f.repository.operations('task', 'browser_session')[0]).toEqual(originalReceipt)
+    expect(f.repository.operations('task', 'browser_session_retirement')).toHaveLength(1)
+    expect(await f.execute('browser_observe', { sessionId: 'session-one' }, resumed)).toMatchObject({ isError: true, output: { code: 'browser_session_not_owned' } })
+  })
+
+  it.each(['missing_reason', 'wrong_reason', 'transport_unknown', 'timeout', 'missing_timestamp', 'before_creation', 'future_timestamp', 'wrong_exit', 'revoked', 'changed_config', 'pending_readback', 'pending_create', 'generic_unknown'] as const)(
+    'never replaces a missing successful session without safe terminal evidence (%s)', async boundary => {
+      const f = fixture(), original = f.runner.getMockImplementation()!
+      await f.execute('browser_session_start')
+      const before = structuredClone(f.repository.operations('task', 'browser_session')[0])
+      let denied = false
+      const resumed = { ...f.context, turnId: 'resume', executionGrant: { ...f.context.executionGrant!, id: 'resume-grant', turnId: 'resume' },
+        validateExecutionGrant: async () => { if (denied) throw Object.assign(new Error('execution_grant_revoked'), { code: 'execution_grant_revoked' }) } }
+      if (['pending_readback', 'pending_create', 'generic_unknown'].includes(boundary)) {
+        const kind = boundary === 'pending_readback' ? 'browser_action_dispatch' : boundary === 'pending_create' ? 'browser_session' : 'tool'
+        f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'pending', kind,
+          request: { sessionId: 'session-one', providerId: 'browser-skill', toolName: 'browser_click', dispatchTracking: 'host-v1' }, nowIso: new Date().toISOString() })
+        f.repository.finishOperation('task', 'pending', { status: boundary === 'pending_readback' ? 'succeeded' : boundary === 'pending_create' ? 'prepared' : 'outcome_unknown',
+          result: boundary === 'pending_readback' ? { actionAcknowledged: true, readbackPending: true } : undefined })
+      }
+      f.runner.mockImplementation(async (config, args, signal) => {
+        if (args[0] === 'status') { const value = await original(config, args, signal); return { ...value, output: { ...value.output as object, sessions: [] } } }
+        if (args[0] === 'tab') {
+          if (boundary === 'revoked') denied = true
+          if (boundary === 'changed_config') f.config.revision += 1
+          return { ok: false, code: boundary === 'timeout' ? 'browser_command_timeout' : 'not_found',
+            exitCode: boundary === 'wrong_exit' ? 2 : 1, outcomeUnknown: boundary === 'transport_unknown',
+            output: { code: 'not_found', data: { reason: boundary === 'missing_reason' ? undefined : boundary === 'wrong_reason' ? 'browser_disconnected' : 'session_idle_timeout',
+              ended_unix_ms: boundary === 'missing_timestamp' ? undefined : boundary === 'before_creation' ? 1 : boundary === 'future_timestamp' ? Date.now() + 100000 : Date.now() } } }
+        }
+        return original(config, args, signal)
+      })
+      expect(await f.execute('browser_session_start', {}, resumed)).toMatchObject({ isError: true })
+      expect(f.repository.operations('task', 'browser_session')[0]).toEqual(before)
+      expect(f.repository.operations('task', 'browser_session_retirement')).toHaveLength(0)
+      expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'session' && args[1] === 'start')).toHaveLength(1)
+      expect(f.runner.mock.calls.some(([, args]) => ['click', 'fill', 'press'].includes(args[0]))).toBe(false)
+    })
+
+  it.each(['valid', 'wrong_arguments', 'wrong_browser', 'wrong_provider', 'missing_reason', 'configuration_changed'] as const)(
+    'uses only an exactly bound trusted old observation after daemon tombstones are lost (%s)', async boundary => {
+      const f = fixture(), original = f.runner.getMockImplementation()!
+      const provider = buildBrowserSkillToolProvider({ config: () => f.config, repository: f.repository, dataDir: f.context.workspace!, run: f.runner,
+        configurationFingerprint: 'same-configuration' })
+      f.context.executionGrant!.connectorIdentityFingerprints = { 'browser-skill': 'same-configuration' }
+      const execute = (ctx: ToolHostContext) => provider.tools.find(tool => tool.name === 'browser_session_start')!.execute({}, ctx)
+      await execute(f.context)
+      const before = structuredClone(f.repository.operations('task', 'browser_session')[0])
+      const observedGrant = structuredClone(f.context.executionGrant!)
+      if (boundary === 'wrong_browser') observedGrant.browserScope!.browserInstanceId = 'other-browser'
+      if (boundary === 'configuration_changed') observedGrant.connectorIdentityFingerprints!['browser-skill'] = 'older-configuration'
+      f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'old-observe', kind: 'tool', nowIso: new Date().toISOString(), request: {
+        providerId: boundary === 'wrong_provider' ? 'builtin' : 'browser-skill', toolName: 'browser_observe', callId: 'observed-idle', executionGrant: observedGrant,
+        argumentsHash: operationFingerprint({ sessionId: boundary === 'wrong_arguments' ? 'other-session' : 'session-one' }) } })
+      f.repository.finishOperation('task', 'old-observe', { status: 'failed', result: { item: { toolName: 'browser_observe', callId: 'observed-idle', isError: true,
+        output: { status: 'failed', code: 'not_found', vendorCode: 'not_found', vendorReason: boundary === 'missing_reason' ? undefined : 'session_idle_timeout' } } } })
+      f.runner.mockImplementation(async (config, args, signal) => {
+        if (args[0] === 'status') { const value = await original(config, args, signal); return { ...value, output: { ...value.output as object, sessions: [] } } }
+        if (args[0] === 'tab' && args.includes('session-one')) return { ok: false, code: 'not_found', exitCode: 1, outcomeUnknown: false, output: { code: 'not_found' } }
+        return original(config, args, signal)
+      })
+      const resumed = { ...f.context, turnId: 'resume', executionGrant: { ...f.context.executionGrant!, id: 'new-grant', turnId: 'resume' } }
+      const result = await execute(resumed)
+      expect(result).toMatchObject(boundary === 'valid' ? { output: { status: 'succeeded', sessionId: 'session-two' } } : { isError: true })
+      expect(f.repository.operations('task', 'browser_session')[0]).toEqual(before)
+      expect(f.repository.operations('task', 'browser_session_retirement')).toHaveLength(boundary === 'valid' ? 1 : 0)
+      expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'session' && args[1] === 'start')).toHaveLength(boundary === 'valid' ? 2 : 1)
+    })
+
+  it('reuses the freshly verified owned tab when a stale status snapshot omitted a live session', async () => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    await f.execute('browser_session_start')
+    f.runner.mockImplementation(async (config, args, signal) => {
+      const result = await original(config, args, signal)
+      return args[0] === 'status' ? { ...result, output: { ...result.output as object, sessions: [] } } : result
+    })
+    expect(await f.execute('browser_session_start')).toMatchObject({ output: { status: 'succeeded', sessionId: 'session-one', reused: true } })
+    expect(f.repository.operations('task', 'browser_session_retirement')).toHaveLength(0)
+    expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'session' && args[1] === 'start')).toHaveLength(1)
+  })
+
+  it('selects the new creation if the vendor reuses a retired short session id', async () => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    await f.execute('browser_session_start')
+    const before = structuredClone(f.repository.operations('task', 'browser_session')[0])
+    let expired = true
+    f.runner.mockImplementation(async (config, args, signal) => {
+      if (args[0] === 'tab' && expired) return { ok: false, code: 'not_found', exitCode: 1, outcomeUnknown: false,
+        output: { code: 'not_found', data: { reason: 'session_idle_timeout', ended_unix_ms: Date.now() } } }
+      if (args[0] === 'session' && args[1] === 'start') { expired = false; await original(config, args, signal); return { ok: true, output: { session_id: 'session-one', browser_instance_id: 'browser-one' } } }
+      const response = await original(config, args, signal)
+      return args[0] === 'status' ? { ...response, output: { ...response.output as object, sessions: expired ? [] : [{ session_id: 'session-one', browser_instance_id: 'browser-one' }] } } : response
+    })
+    const resumed = { ...f.context, turnId: 'resume', executionGrant: { ...f.context.executionGrant!, id: 'new-grant', turnId: 'resume' } }
+    expect(await f.execute('browser_session_start', {}, resumed)).toMatchObject({ output: { status: 'succeeded', sessionId: 'session-one' } })
+    expect(await f.execute('browser_observe', { sessionId: 'session-one' }, resumed)).toMatchObject({ output: { status: 'succeeded' } })
+    expect(f.repository.operations('task', 'browser_session')[0]).toEqual(before)
+    expect(f.repository.operations('task', 'browser_session')).toHaveLength(2)
+  })
+
+  it('releases the owned runtime association after a verified explicit stop', async () => {
+    const f = fixture(), retired = vi.fn()
+    const provider = buildBrowserSkillToolProvider({ config: () => f.config, repository: f.repository, dataDir: f.context.workspace!, run: f.runner, onSessionRetired: retired })
+    const execute = (name: string, args = {}) => provider.tools.find(tool => tool.name === name)!.execute(args, f.context)
+    await execute('browser_session_start')
+    expect(await execute('browser_session_stop', { sessionId: 'session-one' })).toMatchObject({ output: { stopped: true } })
+    expect(retired).toHaveBeenCalledExactlyOnceWith('task', 'session-one')
+  })
+
+  it.each([true, false])('creates one successor after a verified stop with concurrent starts (same Turn=%s)', async sameTurn => {
     const f = fixture()
     await f.execute('browser_session_start')
     await f.execute('browser_session_stop', { sessionId: 'session-one' })
-    expect(await f.execute('browser_session_start')).toMatchObject({ isError: true, output: { code: 'browser_session_ended' } })
-    const resumed = { ...f.context, turnId: 'resumed-turn', executionGrant: { ...f.context.executionGrant!, turnId: 'resumed-turn' } }
-    expect(await f.execute('browser_session_start', {}, resumed)).toMatchObject({ output: { status: 'succeeded' } })
+    const stopped = structuredClone(f.repository.operations('task', 'browser_session')[0])
+    const resumed = sameTurn ? f.context : { ...f.context, turnId: 'resumed-turn', executionGrant: { ...f.context.executionGrant!, turnId: 'resumed-turn' } }
+    const results = await Promise.all([f.execute('browser_session_start', {}, resumed), f.execute('browser_session_start', {}, resumed)])
+    for (const result of results) expect(result).toMatchObject({ output: { status: 'succeeded', sessionId: 'session-two' } })
+    expect(f.repository.operations('task', 'browser_session')[0]).toEqual(stopped)
     expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'session' && args[1] === 'start')).toHaveLength(2)
+    expect(f.repository.operations('task', 'browser_session_retirement')).toHaveLength(0)
+  })
+
+  it('atomically saves a local retirement audit before releasing the owned session', async () => {
+    const f = fixture(), original = f.runner.getMockImplementation()!, released = vi.fn()
+    const provider = buildBrowserSkillToolProvider({ config: () => f.config, repository: f.repository, dataDir: f.context.workspace!, run: f.runner, onSessionRetired: released })
+    const start = () => provider.tools.find(tool => tool.name === 'browser_session_start')!.execute({}, f.context)
+    await start()
+    const saved = structuredClone(f.repository.operations('task', 'browser_session')[0])
+    f.runner.mockImplementation(async (config, args, signal) => {
+      if (args[0] === 'status') { const response = await original(config, args, signal); return { ...response, output: { ...response.output as object, sessions: [] } } }
+      if (args[0] === 'tab') return { ok: false, code: 'not_found', exitCode: 1, outcomeUnknown: false,
+        output: { code: 'not_found', data: { reason: 'session_idle_timeout', ended_unix_ms: Date.now() } } }
+      return original(config, args, signal)
+    })
+    const finish = f.repository.finishOperation.bind(f.repository)
+    const stopBeforeCommit = vi.spyOn(f.repository, 'finishOperation').mockImplementation((...args: Parameters<typeof finish>) => {
+      if (args[1].startsWith('browser-session-retired:')) throw new Error('Synthetic failure between audit writes')
+      return finish(...args)
+    })
+    expect(await start()).toMatchObject({ isError: true })
+    expect(f.repository.operations('task', 'browser_session_retirement')).toHaveLength(0)
+    expect(f.repository.operations('task', 'browser_session')[0]).toEqual(saved)
+    expect(released).not.toHaveBeenCalled()
+    stopBeforeCommit.mockRestore()
   })
 
   it('keeps internal browser scope approval separate from the actual TaskController outer operation hash', async () => {

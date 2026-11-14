@@ -101,6 +101,40 @@ describe('BrowserSkill diagnostic refresh lifecycle', () => {
     expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'session' && args[1] === 'start')).toHaveLength(1)
   })
 
+  it('retires only the ended task session and fences its obsolete abort listener from the replacement', async () => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    const oldAbort = new AbortController(), nextAbort = new AbortController(), otherAbort = new AbortController()
+    f.context.abortSignal = oldAbort.signal
+    await f.prepare()
+    let replacement = false
+    f.runner.mockImplementation(async (config, args, signal) => {
+      if (args[0] === 'status') { const response = await original(config, args, signal); return { ...response, output: { ...response.output as object, sessions: [] } } }
+      if (args[0] === 'tab' && args.includes('session-one')) return { ok: false, code: 'not_found', exitCode: 1, outcomeUnknown: false,
+        output: { code: 'not_found', data: { reason: 'session_idle_timeout', ended_unix_ms: Date.now() } } }
+      if (args[0] === 'session' && args[1] === 'start') { const id = replacement ? 'other-session' : 'replacement'; replacement = true; return { ok: true, output: { session_id: id, browser_instance_id: 'browser-one' } } }
+      return original(config, args, signal)
+    })
+    const provider = f.runtime.provider()
+    const resumed: ToolHostContext = { ...f.context, abortSignal: nextAbort.signal, turnId: 'next-turn',
+      executionGrant: { ...f.context.executionGrant!, id: 'next-grant', turnId: 'next-turn' } }
+    expect(await provider.tools.find(tool => tool.name === 'browser_session_start')!.execute({}, resumed)).toMatchObject({ output: { sessionId: 'replacement' } })
+    const originalTask = f.repository.get('task')!
+    f.repository.create({ ...originalTask, id: 'other-task', threadId: 'other-thread', activeTurnId: 'other-turn' })
+    const other: ToolHostContext = { ...f.context, abortSignal: otherAbort.signal, threadId: 'other-thread', turnId: 'other-turn',
+      executionGrant: { ...f.context.executionGrant!, id: 'other-grant', taskId: 'other-task', threadId: 'other-thread', turnId: 'other-turn' } }
+    expect(await provider.tools.find(tool => tool.name === 'browser_session_start')!.execute({}, other)).toMatchObject({ output: { sessionId: 'other-session' } })
+    expect(await provider.tools.find(tool => tool.name === 'browser_observe')!.execute({ sessionId: 'session-one' }, resumed))
+      .toMatchObject({ isError: true, output: { code: 'browser_session_not_owned' } })
+    const stop = vi.spyOn(f.runtime, 'stopThread').mockResolvedValue()
+    oldAbort.abort()
+    expect(stop).not.toHaveBeenCalled()
+    nextAbort.abort()
+    expect(stop.mock.calls).toEqual([['thread']])
+    otherAbort.abort()
+    expect(stop.mock.calls).toEqual([['thread'], ['other-thread']])
+    expect(f.repository.operations('other-task', 'browser_session_retirement')).toHaveLength(0)
+  })
+
   it('retains the per-task in-flight queue through same-config diagnostic refresh', async () => {
     const f = fixture()
     await f.execute('browser_session_start')

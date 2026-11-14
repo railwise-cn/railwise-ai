@@ -43,8 +43,14 @@ export class ManagedBrowserSkillRuntime {
       configurationFingerprint: this.configurationFingerprint, isCurrentConfiguration: () => generation === this.providerGeneration,
       repository: this.options.repository, dataDir: this.options.dataDir, run: this.options.run, resolveSchedule: this.options.resolveSchedule,
       onSession: (taskId, sessionId, threadId, signal) => {
-        this.sessions.set(sessionId, { taskId, threadId, config: this.state() })
-        signal.addEventListener('abort', () => { void this.stopThread(threadId) }, { once: true })
+        const owned = { taskId, threadId, config: this.state() }
+        this.sessions.set(sessionId, owned)
+        signal.addEventListener('abort', () => {
+          if (this.sessions.get(sessionId) === owned) void this.stopThread(threadId)
+        }, { once: true })
+      },
+      onSessionRetired: (taskId, sessionId) => {
+        if (this.sessions.get(sessionId)?.taskId === taskId) this.sessions.delete(sessionId)
       } })
     this.currentProvider = { ...provider, enabled: this.config.enabled, available: this.config.state === 'ready' }
     return this.currentProvider
@@ -285,10 +291,10 @@ export class ManagedBrowserSkillRuntime {
         (!receipt.request?.sessionId || receipt.request.sessionId === sessionId))
       if (task?.status !== 'cancelled' && pending) return
       try {
+        const receipt = this.options.repository.operations(owned.taskId, 'browser_session').filter(item => item.status === 'succeeded' && object(item.result).sessionId === sessionId && !object(item.result).stopped).at(-1)
         const response = await runBrowserCommand(owned.config, ['session', 'stop', sessionId])
         const result = object(response.output)
-        if (!response.ok || !Array.isArray(result.stopped) || !result.stopped.includes(sessionId)) return
-        const receipt = this.options.repository.operations(owned.taskId, 'browser_session').find(item => object(item.result).sessionId === sessionId)
+        if (this.sessions.get(sessionId) !== owned || !response.ok || !Array.isArray(result.stopped) || !result.stopped.includes(sessionId)) return
         if (receipt) this.options.repository.finishOperation(owned.taskId, receipt.idempotencyKey, { status: 'succeeded', result: { ...object(receipt.result), stopped: true } })
         this.sessions.delete(sessionId)
       } catch { /* Preserve the owned journal for explicit recovery when a stop is unverified. */ }

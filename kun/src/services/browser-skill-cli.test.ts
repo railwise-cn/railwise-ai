@@ -86,3 +86,14 @@ it('preserves official dispatch proof scalars without downgrading the vendor unk
   expect(browserCommandDiagnostics({ ok: false, output: { data: { press_sent: 'false', dispatched: 0, phase: 'page secret', operation_id: 'secret value' } } })).toEqual({})
   expect(browserCommandDiagnostics({ ok: false, output: { data: { press_sent: true, dispatched: true } } })).toEqual({ vendorPressSent: true, vendorDispatched: true })
 })
+
+
+it('produces explicit known transport and the official idle tombstone from exit 1', async () => {
+  const executableHash = createHash('sha256').update(await readFile(process.execPath)).digest('hex')
+  const output = { code: 'not_found', message: 'session not registered or already stopped',
+    data: { reason: 'session_idle_timeout', ended_unix_ms: Date.now() } }
+  const result = await runBrowserCommand({ executablePath: process.execPath, executableHash },
+    ['-e', `process.stdout.write(${JSON.stringify(JSON.stringify(output))});process.exit(1)`, '--'])
+  expect(result).toMatchObject({ ok: false, code: 'not_found', exitCode: 1, outcomeUnknown: false, vendorCode: 'not_found', vendorReason: 'session_idle_timeout' })
+  expect(result.output).toEqual(output)
+})
