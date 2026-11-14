@@ -1,10 +1,22 @@
 # 通用执行链与网页成果交付整改
 
-本轮基于 0.5.6 的 Windows 实际使用反馈，准备 0.5.7 候选包。验收原请求包含 BrowserSkill、招标信息采集、HTML 汇报和每日两次执行，须通过普通聊天入口完成。0.5.7 的精确包验收和正式发布仍待完成。
+本轮基于 0.5.6 的 Windows 实际使用反馈，准备 0.5.7 候选包。验收原请求包含 BrowserSkill、招标信息采集、HTML 汇报和每日两次执行，须通过普通聊天入口完成。当前真实 Mac 任务仍有阻断，0.5.7 尚未完成整版验收或正式发布。
+
+## 当前验收状态（2026-11-14）
+
+源码 `2f38642a2de1f026b9b57540112184180eed2aba` 的精确 macOS arm64 包已安装并实际打开，界面版本为 0.5.7，bundle 为 `com.wangjiawei508.workgpt`，ASAR SHA256 为 `6dbfab6928cf57c8f060b9c001bd86954cfa215c450cb0fd2e40accfc7c599bf`。Developer ID 签名与公证票据核验通过。本机 Gatekeeper 因既有系统 override 保留为未独立评估。私有证据标识为 `release-local-package-2f38642a-evidence.json` 与 `mac-2f38642a-version-ui-evidence.json`。[2f 私有构建](https://github.com/railwise-cn/railwise-ai/actions/runs/43540694345)
+
+同包 Windows 完整受控回放已通过，覆盖原任务能力等待、真实界面确认及独立继续、公开查询动作、HTML 自动及手动预览、每日计划与到期新任务。该回放使用本机确定性模型协议和真实浏览器工具。安装程序及 EXE 签名状态仍为 `NotSigned`。同一私有构建的真实升级完成正式 0.5.6 → 精确 0.5.7 的下载、安装、重启和资料回读，升级后的 ASAR 与上述 Mac 包一致。私有摘要为 `windows-43543309160-summary.json` 与 `exact-updater-43540694345-summary.json`。[Windows 完整回放](https://github.com/railwise-cn/railwise-ai/actions/runs/43543309160) [真实升级记录](https://github.com/railwise-cn/railwise-ai/actions/runs/43540694345/job/132293918866)
+
+Mac 随后通过普通聊天提交原截图无 URL 原文，使用真实 DeepSeek 和两个公开来源。29 次模型请求均返回 HTTP 200，实际模型为 `deepseek-flash`。5 次浏览器动作均完成 ACK 和页面回读，另有 3 次导航进入已知失败分支。本轮 HTML 成果为 0，已发布计划为 0，原任务已暂停，完整业务验收未通过。原操作回执、旧未知记录及资料保留，私有实证摘要为 `mac-2f38642a-observer/real-business-diagnostic-summary.json`。
+
+本轮还确证内部审批等待被重复计入执行预算。只读账本中，已闭合工作时段合计 252,977 毫秒，其中 210,646 毫秒与两次人工审批等待重叠。界面执行用时和实际执行预算共同读取该工作账本。预算修复已纳入后续源码 `241b5d25`，内部审批及提问等待暂停当前工具的工作段，回答后恢复新的工作段，其他模型、工具及子任务继续使用原共享预算。80 项聚焦回归、KUN 类型与相关 lint 通过。真实 Runtime／SQLite 回归在原 2f 源码复现等待 20 秒误计执行 20 秒，修后等待只增长人工等待时间，恢复后的工具和模型执行继续计费。FakeClock 回归同时验证等待超过原剩余预算不会触发执行预算中止，恢复后按实际执行时间耗尽预算。原历史账本未改写。源码与回归见 [工具等待预算测试](../../kun/src/adapters/tool/tool-human-wait-budget.test.ts) 和 [Runtime 审批预算测试](../../kun/tests/internal-approval-budget-runtime.test.ts)。私有证据标识为 `approval-work-budget-fix-evidence.json` 与 `internal-approval-budget-runtime-evidence.json`。
+
+导航失败的合同修复仍在进行。预算及导航修复需要进入新的精确包，再完成实际入口与原始任务验收。2f 的安装、Windows 和升级成功保留各自已验证范围。整版整改仍待验收，0.5.7 未公开发布。以下各阶段记录保留原来源、失败和通过事实。
 
 ## 实现与证据
 
-下表按最新源码列出验证状态。旧 0.5.7 诊断包的 Windows 实证和 Mac 阻断单独记在后文，不能替代修复后最终包的操作验收。
+下表保留初期实现阶段的生产接线与验证记录，最近一次精确包的结果见上方当前状态。各诊断包的 Windows 实证和 Mac 阻断继续记在后文。
 
 | 项目 | 生产接线 | 验证进度 |
 | --- | --- | --- |
