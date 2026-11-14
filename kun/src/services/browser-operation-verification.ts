@@ -11,10 +11,12 @@ import type { FlowRuntimeService } from '../flow/service.js'
 import { canonicalTrustRoot, type WorkspaceTrustReader } from './workspace-trust-reader.js'
 import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
 import type { TaskController } from './task-controller.js'
+import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { sanitizeBrowserApprovalSummary } from '../security/browser-approval-summary.js'
 import { assertGrantAllowsNetwork } from '../adapters/tool/sandbox-policy.js'
 
+type ReviewedBrowserAction = Pick<BrowserScheduleAction, 'id' | 'sourceTaskId' | 'scheduleId' | 'browserInstanceId' | 'browserRevision' | 'origin' | 'pageUrl' | 'elementHash' | 'valueHash' | 'action' | 'summary' | 'verificationPolicy'>
 type Input = { expectedRevision: number; idempotencyKey: string }
 export type BrowserVerificationResult = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown';
   evidence?: ResultEvidence; outcome?: OperationResolutionOutcome; errorCode?: string; browserReview?: BrowserOperationReview }
@@ -162,16 +164,29 @@ export class BrowserOperationVerificationService {
     const sourceId = original.browserScheduleBinding?.sourceTaskId ?? taskId
     const source = repository.get(sourceId)
     if (!source || source.authority?.revokedAt) fail('browser_review_authority_revoked')
-    const approved = listApprovedBrowserScheduleActions(repository, source).find(item => item.action === action && item.pageUrl === request.pageUrl &&
-      item.elementHash === request.elementHash && item.valueHash === request.valueHash && item.browserInstanceId === request.browserInstanceId &&
-      item.browserRevision === request.browserRevision && item.id === request.scheduleActionId)
-    if (!approved) fail('browser_review_public_query_scope_missing')
-    const parsed = BrowserScheduleActionSchema.parse(approved)
-    const approval = repository.humanRequest(parsed.approvalId)
-    const approvedRequest = object(approval?.payload.approval)
-    const authorityReceipt = repository.operations(sourceId, 'browser_schedule_action_authorization').find(item => item.status === 'succeeded' && object(item.result).id === parsed.id)
-    if (approval?.status !== 'answered' || object(approval.resolution).decision !== 'allow' || approval.threadId !== source.threadId ||
-      !authorityReceipt || approvedRequest.toolName !== 'browser_authorize_action' || approvedRequest.requestHash !== sha(JSON.stringify(authorityReceipt.request)) || approvedRequest.summary !== parsed.summary) fail('browser_review_approval_missing')
+    const scopedAction = verifiedTaskPublicQueryAction(repository, receipt, dispatch)
+    if (!scopedAction && (request.authorizationSource === 'task_scope' || request.scopeActionReceiptId !== undefined || request.scopeAuthorizationReceiptId !== undefined)) fail('browser_review_public_query_scope_missing')
+    let parsed: ReviewedBrowserAction
+    if (scopedAction) {
+      const candidate = scopedAction.request
+      if (typeof scopedAction.result.id !== 'string' || typeof scopedAction.result.summary !== 'string' || candidate.action !== action || typeof candidate.pageUrl !== 'string' || typeof candidate.elementHash !== 'string') fail('browser_review_public_query_scope_missing')
+      parsed = { id: scopedAction.result.id, sourceTaskId: scopedAction.authority.source.id, scheduleId: `schedule_${scopedAction.authority.source.id}`,
+        browserInstanceId: original.browserScope!.browserInstanceId, browserRevision: original.browserScope!.revision, origin: new URL(candidate.pageUrl).origin,
+        pageUrl: candidate.pageUrl, elementHash: candidate.elementHash, valueHash: typeof candidate.valueHash === 'string' ? candidate.valueHash : undefined,
+        action, summary: scopedAction.result.summary, verificationPolicy: original.browserScope!.verificationPolicy }
+    } else {
+      const approved = listApprovedBrowserScheduleActions(repository, source).find(item => item.action === action && item.pageUrl === request.pageUrl &&
+        item.elementHash === request.elementHash && item.valueHash === request.valueHash && item.browserInstanceId === request.browserInstanceId &&
+        item.browserRevision === request.browserRevision && item.id === request.scheduleActionId)
+      if (!approved) fail('browser_review_public_query_scope_missing')
+      const humanAction = BrowserScheduleActionSchema.parse(approved)
+      parsed = humanAction
+      const approval = repository.humanRequest(humanAction.approvalId)
+      const approvedRequest = object(approval?.payload.approval)
+      const authorityReceipt = repository.operations(sourceId, 'browser_schedule_action_authorization').find(item => item.status === 'succeeded' && object(item.result).id === parsed.id)
+      if (approval?.status !== 'answered' || object(approval.resolution).decision !== 'allow' || approval.threadId !== source.threadId ||
+        !authorityReceipt || approvedRequest.toolName !== 'browser_authorize_action' || approvedRequest.requestHash !== sha(JSON.stringify(authorityReceipt.request)) || approvedRequest.summary !== parsed.summary) fail('browser_review_approval_missing')
+    }
     const fields = summaryFields(parsed.summary)
     const value = fields['输入内容']
     if (action === 'fill' && (typeof value !== 'string' || sha(value) !== parsed.valueHash)) fail('browser_review_input_unavailable')
@@ -184,9 +199,10 @@ export class BrowserOperationVerificationService {
       if (!flow || flow.variables.enabled === false || flow.variables.archived === true || flow.publishedVersionId !== binding.versionId ||
         !published || operationFingerprint(published.definition.variables.taskSchedule) !== operationFingerprint(authority) ||
         authority.sourceAuthorityHash !== sha(JSON.stringify(source.authority ?? null)) ||
-        object(authority.authorization).scopeHash !== binding.scopeHash || sha(JSON.stringify(scope.browserScheduleActions)) !== binding.actionsHash ||
-        operationFingerprint(scope.browserScheduleActions) !== operationFingerprint(listApprovedBrowserScheduleActions(repository, source)) ||
-        !Array.isArray(scope.browserScheduleActions) || !scope.browserScheduleActions.some(item => operationFingerprint(item) === operationFingerprint(parsed))) fail('browser_review_plan_changed')
+        object(authority.authorization).scopeHash !== binding.scopeHash || sha(JSON.stringify(scope.browserScheduleActions ?? [])) !== binding.actionsHash ||
+        (scopedAction ? operationFingerprint(object(scope.browserScope).publicQueryAuthorization) !== operationFingerprint(original.browserScope!.publicQueryAuthorization) || scopedAction.authority.authorization.duration !== 'schedule' :
+          operationFingerprint(scope.browserScheduleActions) !== operationFingerprint(listApprovedBrowserScheduleActions(repository, source)) ||
+          !Array.isArray(scope.browserScheduleActions) || !scope.browserScheduleActions.some(item => operationFingerprint(item) === operationFingerprint(parsed)))) fail('browser_review_plan_changed')
     }
     await this.validate(task, original, parsed)
     const session = repository.operations(taskId, 'browser_session').find(item => object(item.result).sessionId === request.sessionId)
@@ -196,7 +212,7 @@ export class BrowserOperationVerificationService {
       hash: operationFingerprint({ receipt: receipt.fingerprint, dispatch: dispatch.fingerprint, original, action: parsed }) }
   }
 
-  private async validate(task: TaskRun, original: ExecutionGrant, action: BrowserScheduleAction): Promise<void> {
+  private async validate(task: TaskRun, original: ExecutionGrant, action: ReviewedBrowserAction): Promise<void> {
     const browser = this.deps.browserState()
     if (!browser.enabled || browser.state !== 'ready' || browser.browserInstanceId !== action.browserInstanceId || browser.revision !== action.browserRevision ||
       original.connectorIdentityFingerprints?.['browser-skill'] !== this.deps.browserIdentity() || browser.origins.length > 0 && !browser.origins.includes(action.origin) ||

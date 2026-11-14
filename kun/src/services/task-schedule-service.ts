@@ -14,6 +14,7 @@ import type { TaskRunRepository } from './task-run-repository.js'
 import type { TaskController } from './task-controller.js'
 import type { TaskCoordinator } from './task-coordinator.js'
 import type { WorkspaceTrustReader } from './workspace-trust-reader.js'
+import { taskPublicQueryAuthority, taskPublicQueryGrant, verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import type { BrowserScheduleAction, BrowserScheduleBinding } from '../contracts/browser-schedule-actions.js'
 import { browserScheduleApprovalSummary, sanitizeBrowserApprovalSummary } from '../security/browser-approval-summary.js'
@@ -32,7 +33,7 @@ type ScheduledTaskAuthority = {
   origin: ThreadAuthority
   sourceAuthorityHash: string
   scope: ExecutionScope
-  authorization: { kind: 'requested_schedule' | 'confirmed_scope'; expiresAt: null; until: 'disabled'; scopeHash: string; approvalId?: string; receiptKey?: string }
+  authorization: { kind: 'requested_schedule' | 'confirmed_scope' | 'confirmed_task_scope'; sourceScopeReceiptId?: string; expiresAt: null; until: 'disabled'; scopeHash: string; approvalId?: string; receiptKey?: string }
 }
 export type ScheduledTaskDispatch = { scheduleId: string; versionId: string; dueAt: string }
 const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -74,19 +75,22 @@ export class TaskScheduleService {
     const permission = task.authority?.taskApprovalGrant
     if (task.authority?.revokedAt || permission?.revokedAt || permission && (permission.status !== 'active' || Date.parse(permission.expiresAt) <= Date.parse(this.deps.nowIso()))) fail('任务的临时权限已变化，请重新确认后建立计划。')
     const browserActions = listApprovedBrowserScheduleActions(this.deps.repository, task)
+    const taskQuery = taskPublicQueryGrant(this.deps.repository, grant, task, Date.parse(this.deps.nowIso()))
+    const scopedSchedule = taskQuery?.authorization.duration === 'schedule' ? taskQuery : undefined
     this.validateBrowserDispatches(task, browserActions)
     const scope: ExecutionScope = { allowedToolNames: grant.allowedToolNames, allowedProviderIds: grant.allowedProviderIds,
       pathAllowlist: grant.pathAllowlist, readPathAllowlist: grant.readPathAllowlist, writePathAllowlist: grant.writePathAllowlist,
       networkAllowlist: grant.networkAllowlist, connectorScopes: grant.connectorScopes, externalTargets: grant.externalTargets,
       connectorIdentityFingerprints: grant.connectorIdentityFingerprints, connectorBackends: grant.connectorBackends, browserScope: grant.browserScope,
       ...(permission?.scope ? { permissionScope: permission.scope } : {}), ...(grant.workspaceWriteException ? { workspaceWriteException: true } : {}),
-      ...(browserActions.length ? { browserScheduleActions: browserActions } : {}) }
+      ...(browserActions.length || scopedSchedule ? { browserScheduleActions: browserActions } : {}) }
     const scopeHash = fingerprint({ taskId: task.id, requirement: task.acceptance.schedule, scope, execution: threadAuthority(execution), origin: threadAuthority(origin) })
     let authority: ScheduledTaskAuthority = {
       taskId: task.id, threadId: context.threadId, originThreadId: task.originThreadId ?? context.threadId,
       model: task.model ?? context.model?.id ?? 'auto', providerId: task.providerId, prompt: task.goal, requirement: task.acceptance.schedule, grant,
       execution: threadAuthority(execution), origin: threadAuthority(origin), sourceAuthorityHash: fingerprint(task.authority ?? null), scope,
-      authorization: { kind: 'requested_schedule', expiresAt: null, until: 'disabled', scopeHash }
+      authorization: { kind: scopedSchedule ? 'confirmed_task_scope' : 'requested_schedule', expiresAt: null, until: 'disabled', scopeHash,
+        ...(scopedSchedule ? { sourceScopeReceiptId: scopedSchedule.binding.id } : {}) }
     }
     const id = `schedule_${task.id}`
     const existing = this.deps.flows.get(id)
@@ -116,7 +120,7 @@ export class TaskScheduleService {
       await this.validateAuthority(saved)
       authority = saved
     }
-    if (!savedApproval && (permission?.scope || grant.workspaceWriteException || extendsBrowserActions || browserActions.length)) {
+    if (!savedApproval && (permission?.scope || grant.workspaceWriteException || !scopedSchedule && (extendsBrowserActions || browserActions.length))) {
       const schedule = scheduleForRequirement(authority.requirement)
       const browser = this.deps.browserState?.()
       const label = browser?.browsers.find(item => item.id === grant.browserScope?.browserInstanceId)
@@ -200,9 +204,9 @@ export class TaskScheduleService {
     if (!thread || thread.status === 'deleted' || fingerprint(threadAuthority(thread)) !== fingerprint(authority.execution) || prepared.request?.authorityHash !== fingerprint(authority)) fail('周期执行的 Agent 或权限已变化。')
     const actions = authority.scope.browserScheduleActions
     return { ...authority.scope, scheduleScopeHash: authority.authorization.scopeHash,
-      ...(actions?.length ? { browserScheduleBinding: {
+      ...(actions?.length || authority.scope.browserScope?.publicQueryAuthorization?.duration === 'schedule' ? { browserScheduleBinding: {
         scheduleId: flow.id, versionId: flow.publishedVersionId!, scopeHash: authority.authorization.scopeHash,
-        sourceTaskId: authority.taskId, actionsHash: fingerprint(actions)
+        sourceTaskId: authority.taskId, actionsHash: fingerprint(actions ?? [])
       } } : {}) }
   }
 
@@ -214,7 +218,9 @@ export class TaskScheduleService {
     if (!task || task.threadId !== context.threadId || task.activeTurnId !== context.turnId ||
       !['running', 'waiting_approval'].includes(task.status)) fail('计划浏览器动作不属于当前有效执行。')
     if (sourceActionId && !grant.browserScheduleBinding) {
-      if (task.scheduledBy || !listApprovedBrowserScheduleActions(this.deps.repository, task).some(action => action.id === sourceActionId)) fail('当前任务的持续动作授权已变化。')
+      const scoped = grant.browserScope && taskPublicQueryAuthority(this.deps.repository, task, grant.browserScope)
+      const scopeSource = scoped?.authorization.duration === 'schedule' && scoped.binding.id === sourceActionId
+      if (task.scheduledBy || !scopeSource && !listApprovedBrowserScheduleActions(this.deps.repository, task).some(action => action.id === sourceActionId)) fail('当前任务的持续动作授权已变化。')
       const flow = this.deps.flows.get(`schedule_${task.id}`)
       if (!flow) return undefined
       if (flow.variables.archived === true || flow.variables.enabled === false || !flow.publishedVersionId) fail('计划已停用，当前任务的计划动作授权不再可用。')
@@ -274,7 +280,13 @@ export class TaskScheduleService {
     const receipts = this.deps.repository.operations(task.id)
     const dispatches = receipts.filter(receipt => receipt.kind === 'browser_action_dispatch')
     if (receipts.some(receipt => receipt.kind === 'browser_schedule_action_outcome' && receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
-    const matches = (target: Record<string, unknown>) => actions.some(action => action.action === target.action && action.pageUrl === target.pageUrl &&
+    const scopedMatches = (target: Record<string, unknown>) => {
+      const dispatch = dispatches.find(item => fingerprint(item.request) === fingerprint(target))
+      const original = dispatch && receipts.find(item => item.kind === 'tool' && item.request?.turnId === dispatch.request?.turnId && item.request?.toolName === dispatch.request?.toolName && item.request?.argumentsHash === dispatch.request?.argumentsHash)
+      const scoped = original && dispatch && verifiedTaskPublicQueryAction(this.deps.repository, original, dispatch)
+      return Boolean(scoped && scoped.authority.authorization.duration === 'schedule')
+    }
+    const matches = (target: Record<string, unknown>) => scopedMatches(target) || actions.some(action => action.action === target.action && action.pageUrl === target.pageUrl &&
       action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === target.browserInstanceId &&
       action.browserRevision === target.browserRevision && browserVerificationPolicy(action.verificationPolicy) === browserVerificationPolicy(target.verificationPolicy))
     for (const dispatch of dispatches) {
@@ -372,7 +384,15 @@ export class TaskScheduleService {
       (execution.agentRevision ?? 0) !== grant.agentRevision || (execution.agentProfile?.trustLevel ?? 'full-access') !== grant.agentTrust ||
       execution.approvalPolicy !== grant.approvalPolicy) fail('原计划的工作区、Agent 或授权范围已变化，请核对后再执行。')
     if ((source.authority?.taskApprovalGrant?.scope || grant.workspaceWriteException) && authority.authorization.kind !== 'confirmed_scope') fail('持续路径权限尚未确认。')
+    const publicScope = grant.browserScope?.publicQueryAuthorization
+    if (publicScope) {
+      const scoped = grant.browserScope && taskPublicQueryAuthority(this.deps.repository, source, grant.browserScope)
+      if (!scoped || scoped.authorization.duration !== 'schedule' || authority.authorization.sourceScopeReceiptId !== scoped.binding.id && authority.authorization.kind !== 'confirmed_scope' ||
+        fingerprint(authority.scope.browserScope) !== fingerprint(grant.browserScope)) fail('持续公开查询范围已变化或尚未明确确认。')
+    }
     this.validateBrowserDispatches(source, browserActions)
+    if ((authority.scope.browserScheduleActions?.length || publicScope) && this.deps.repository.operations(source.id, 'browser_schedule_action_outcome').some(receipt =>
+      receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
     if (authority.scope.browserScheduleActions?.length) {
       const approved = listApprovedBrowserScheduleActions(this.deps.repository, source)
       if (authority.scope.browserScheduleActions.some(action => !approved.some(candidate => fingerprint(candidate) === fingerprint(action)))) fail('计划浏览器动作已撤销或范围已变化，请重新审阅。')

@@ -124,7 +124,7 @@ export class BrowserScheduleActionAuthority {
 
   recordUnknown(context: ToolHostContext, action: 'click' | 'fill'): void {
     const source = context.executionGrant?.taskId ? this.options.repository.get(context.executionGrant.taskId) : null
-    const approvedSource = source && !source.scheduledBy && listApprovedBrowserScheduleActions(this.options.repository, source).some(item => item.action === action)
+    const approvedSource = source && !source.scheduledBy && (source.authority?.browserScope?.publicQueryAuthorization?.duration === 'schedule' || listApprovedBrowserScheduleActions(this.options.repository, source).some(item => item.action === action))
     const binding = context.executionGrant?.browserScheduleBinding ?? (approvedSource ? { sourceTaskId: source.id, scheduleId: `schedule_${source.id}` } : undefined)
     if (!binding) return
     const key = `browser-schedule-outcome:${binding.scheduleId}:${context.executionGrant!.taskId}:${context.turnId}:${action}`

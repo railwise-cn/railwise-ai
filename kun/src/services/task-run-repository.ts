@@ -1,3 +1,4 @@
+import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { BrowserScheduleActionSchema } from '../contracts/browser-schedule-actions.js'
 import { browserVerificationPolicy } from '../contracts/browser-skill.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
@@ -692,6 +693,14 @@ export class TaskRunRepository {
     if (!dispatch || !dispatch.request || dispatch.status !== 'outcome_unknown' || dispatch.request?.turnId !== original.request.turnId ||
       dispatch.request?.argumentsHash !== original.request.argumentsHash || dispatch.request.action !== action || evidence.target !== dispatch.request.pageUrl) return false
     const dispatchRequest = dispatch.request
+    const scopedAction = verifiedTaskPublicQueryAction(this, original, dispatch, !validateCurrent)
+    if (!scopedAction && (dispatchRequest.authorizationSource === 'task_scope' || dispatchRequest.scopeActionReceiptId !== undefined || dispatchRequest.scopeAuthorizationReceiptId !== undefined)) return false
+    if (scopedAction) {
+      if (receipt.kind === 'tool') return receipt.id === original.id
+      if (receipt.kind === 'browser_action_dispatch') return receipt.id === dispatch.id
+      return receipt.kind === 'browser_schedule_action_outcome' && receipt.ownerId === scopedAction.authority.source.id && receipt.request?.taskId === owner &&
+        receipt.request.turnId === original.request.turnId && receipt.request.action === action && receipt.request.scheduleId === `schedule_${scopedAction.authority.source.id}`
+    }
     const grant = object(original.request.executionGrant), scope = object(grant.browserScope), task = this.get(owner)
     if (!task || grant.taskId !== owner || grant.threadId !== task.threadId || grant.turnId !== original.request.turnId || scope.interaction !== 'interact') return false
     if (validateCurrent && (task.authority?.revokedAt || operationFingerprint(task.authority?.browserScope) !== operationFingerprint(scope))) return false

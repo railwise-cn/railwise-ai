@@ -9,7 +9,7 @@ import { BrowserCapabilityConfig } from '../../contracts/browser-skill.js'
 import { TaskRunSchema } from '../../contracts/tasks.js'
 import { ExecutionGrantSchema } from '../../contracts/permissions.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
-import { TaskRunRepository } from '../../services/task-run-repository.js'
+import { operationFingerprint, TaskRunRepository } from '../../services/task-run-repository.js'
 import type { BrowserCommandRunner } from '../../services/browser-skill-cli.js'
 import { TaskController } from '../../services/task-controller.js'
 import { InMemoryThreadStore } from '../in-memory-thread-store.js'
@@ -1065,4 +1065,60 @@ describe('trusted finite public-query input dispatch refusal', () => {
     expect(f.repository.operations('task', 'browser_action_dispatch').at(-1)).toMatchObject({ status: 'succeeded', result: {
       actionAcknowledged: true, readbackPending: false, vendorOperationId: 'op-ack-123', vendorDispatched: true } })
   })
+})
+
+function taskQueryFixture(mode = 'safe') {
+  const f = publicQueryFixture(), task = f.repository.get('task')!, scope = f.context.executionGrant!.browserScope!
+  const request = { confirmed: true, publicQueryAuthorization: 'task', expectedTaskRevision: task.revision, expectedBrowserRevision: scope.revision, browserInstanceId: scope.browserInstanceId, origins: scope.origins, interaction: 'interact', verificationPolicy: scope.verificationPolicy }
+  const row = f.repository.beginOperation({ ownerId: task.id, idempotencyKey: 'browser-binding:explicit', kind: 'browser_binding', request, nowIso: new Date().toISOString() }).receipt
+  const authorization = { receiptId: row.id, purposeHash: operationFingerprint({ purpose: task.goal }), duration: 'task' as const }
+  const nextScope = { ...scope, publicQueryAuthorization: authorization }
+  f.repository.finishOperation(task.id, row.idempotencyKey, { status: 'succeeded', result: { taskId: task.id, purpose: task.goal, browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision, origins: scope.origins, interaction: 'interact', verificationPolicy: scope.verificationPolicy, publicQueryAuthorization: authorization } })
+  f.repository.update(task.id, task.revision, current => ({ ...current, authority: { ...current.authority!, browserScope: nextScope } }))
+  f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant, browserScope: nextScope })
+  const human = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow'); f.context.awaitApproval = human
+  const original = f.runner.getMockImplementation()!
+  f.runner.mockImplementation(async (config, argv, signal) => {
+    if (argv[0] !== 'read' || !argv.includes('--selector')) return original(config, argv, signal)
+    expect(argv[argv.indexOf('--max-nodes') + 1]).toBe('2')
+    const selector = argv[argv.indexOf('--selector') + 1]!, targetOnly = JSON.parse(argv[argv.indexOf('--fields-json') + 1]!).length === 1, form = selector.startsWith('form:')
+    if (mode === 'unavailable' && form) return { ok: false, code: 'read_failed', output: {} }
+    const values: Record<string, unknown> = targetOnly ? { present: true } : { present: true, target: true, sensitive: mode === 'sensitive', method: form && mode === 'post' ? 'post' : form && mode === 'get' ? 'get' : null, action: form && mode === 'cross' ? 'https://other.example/submit' : null, class: 'search_form', id: null, role: null, 'aria-label': null, searchInput: true, label: '公开公告关键词 搜索 查询公告' }
+    const items = form && !['post', 'sensitive', 'cross', 'get'].includes(mode) ? [] : [{ ref: '@e900', values, redacted: [] }]
+    if (mode === 'duplicate' && targetOnly) items.push({ ref: '@e901', values: { ...values, method: 'post', sensitive: true }, redacted: [] })
+    return { ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search', scope: 'current_dom', truncated: mode === 'truncated', items } }
+  })
+  return { ...f, human, authorization, host: new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) }) }
+}
+
+it.each(['safe', 'get'])('derives new query values from a real persisted task binding without invented human approval (%s)', async mode => {
+  const f = taskQueryFixture(mode); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' }); f.setElement('<input type="search" placeholder="输入关键字，搜索公告或新闻">')
+  const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测' }
+  expect(await f.host.execute({ toolName: 'browser_authorize_action', callId: 'declare', arguments: { ...args, action: 'fill', access: 'public_query' } }, f.context)).toMatchObject({ item: { output: { status: 'succeeded', authorizationSource: 'task_scope', origin: 'https://example.com', scopeAuthorizationReceiptId: f.authorization.receiptId } } })
+  for (const value of ['工程监测', '工程测量']) expect(await f.host.execute({ toolName: 'browser_fill', callId: value, arguments: { ...args, value } }, f.context)).toMatchObject({ item: { isError: false, output: { status: 'succeeded' } } })
+  expect(f.human).not.toHaveBeenCalled(); expect(f.repository.humanRequests('approval', false)).toHaveLength(0)
+  const scopes = f.repository.operations('task', 'browser_scope_action_authorization'), derived = f.repository.operations('task', 'browser_derived_action_authorization')
+  expect(scopes).toHaveLength(2); expect(derived).toHaveLength(2)
+  for (const row of scopes) { expect(row.fingerprint).toBe(operationFingerprint(row.request)); expect(row.result).toMatchObject({ authorizationSource: 'task_scope', accountState: 'unknown', access: 'public_query', sourceTaskId: 'task' }); expect(row.result).not.toHaveProperty('approvalId'); expect(derived.find(item => item.request?.scopeActionReceiptId === row.id)?.result).toMatchObject({ scopeAuthorizationReceiptId: f.authorization.receiptId, scopeActionReceiptId: row.id, access: 'public_query' }) }
+  expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(2)
+})
+
+it.each(['post', 'sensitive', 'cross', 'duplicate', 'truncated', 'unavailable'])('requires actual unique/form/container proof despite a clear search label: %s', async mode => {
+  const f = taskQueryFixture(mode); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' }); f.setElement('<input type="search" class="search" placeholder="公开查询">')
+  expect(await f.host.execute({ toolName: 'browser_fill', callId: 'denied', arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测' } }, f.context)).toMatchObject({ item: { isError: true } })
+  expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(0); expect(f.repository.operations('task', 'browser_scope_action_authorization')).toHaveLength(0); expect(f.human).not.toHaveBeenCalled()
+})
+
+it.each(['<input type="search" form="account-form">', '<input type="search" formmethod="post">', '<button id="search" formaction="https://other.example/send">搜索</button>'])('rejects alternate form owners and method/action overrides: %s', async html => {
+  const f = taskQueryFixture('get'); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' }); f.setElement(html)
+  const action = html.startsWith('<input') ? 'fill' : 'click'
+  expect((await f.host.execute({ toolName: `browser_${action}`, callId: 'override', arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e1', ...(action === 'fill' ? { value: '工程监测' } : {}) } }, f.context)).item).toMatchObject({ kind: 'tool_result', isError: true })
+  expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === action)).toHaveLength(0); expect(f.repository.operations('task', 'browser_scope_action_authorization')).toHaveLength(0)
+})
+
+it('preserves central never blocking for declared and direct actions through the actual Host', async () => {
+  const f = taskQueryFixture(); await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' }); f.setElement('<input type="search">')
+  const context = { ...f.context, approvalPolicy: 'never' as const, executionGrant: ExecutionGrantSchema.parse({ ...f.context.executionGrant, approvalPolicy: 'never' }) }
+  for (const toolName of ['browser_fill', 'browser_authorize_action']) expect((await f.host.execute({ toolName, callId: toolName, arguments: { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '工程监测', ...(toolName === 'browser_authorize_action' ? { action: 'fill', access: 'public_query' } : {}) } }, context)).item).toMatchObject({ kind: 'tool_result', isError: true })
+  expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(0); expect(f.repository.operations('task', 'browser_scope_action_authorization')).toHaveLength(0)
 })

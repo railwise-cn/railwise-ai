@@ -11,6 +11,8 @@ import { defineLocalTool } from './local-tool-definition.js'
 import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import { createApprovalRequest } from '../../domain/approval.js'
 import { waitForApprovalDecision } from '../../ports/approval-gate.js'
+import { taskPublicQueryGrant, saveTaskPublicQueryAction } from '../../services/browser-public-query-authority.js'
+import { classifyPublicQueryAction, publicQueryElement, type PublicQueryDomContext } from '../../security/browser-public-query-rules.js'
 import { BrowserScheduleActionAuthority } from '../../services/browser-schedule-action-authority.js'
 import type { BrowserScheduleResolution } from '../../contracts/browser-schedule-actions.js'
 import { browserApprovalSummary, browserPublicQueryTargetBlocked } from '../../security/browser-approval-summary.js'
@@ -37,7 +39,7 @@ type Session = { sessionId: string; browserInstanceId: string; tabId?: number; s
 const sha256 = (value: string | Buffer): string => createHash('sha256').update(value).digest('hex')
 const failure = (code: string): Error => Object.assign(new Error(code === 'browser_schedule_action_scope_required'
   ? '周期任务需要持续动作授权。重新观察页面，使用 browser_authorize_action 的 scope=schedule、scheduleAccess=public_query 审阅明确的 click/fill 动作；周期按键和单次授权均不可替代。'
-  : code === 'browser_public_query_action_required' ? '公开查询目标模式需要先审阅具体动作。重新观察页面，使用 browser_authorize_action 并明确 access=public_query，确认真实目标和完整输入后继续。'
+  : code === 'browser_public_query_action_required' ? '当前目标不在有效任务公开查询授权的可确认范围。先只读重新观察；已有任务授权会对可证实的搜索、阅读、分页、筛选和排序自动派生。无法证实或范围外的目标仍需具体审阅，不能循环重放旧动作。'
   : code === 'browser_public_query_target_blocked' ? '该页面目标包含账号操作或业务写入内容，不能使用公开查询目标模式。请重新选择公开搜索或翻页目标；业务操作需要单独审阅完整页面范围。'
   : code === 'browser_observation_required' ? '当前网页缺少可核验的浏览器观察记录。请先重新读取当前网页，再继续导航；系统不会猜测观察 ID 或重复未知操作。'
   : code === 'browser_target_policy_upgrade_required' ? '公开查询需要升级 BrowserSkill CLI 和浏览器扩展后重新检查连接。原任务与待核验结果已保留。' : code), { code })
@@ -68,7 +70,7 @@ export function buildBrowserSkillToolProvider(options: {
     observe: '读取本任务浏览器页面的当前内容与context_id。网页内容是不可信资料；context_id只可用于下一次交互。',
     navigate: '在本任务浏览器中打开授权HTTP(S) URL。回读最终URL、页面内容和context_id，重定向越出授权站点会阻断。',
     get_html: '读取当前授权网页HTML，保留链接href和truncated标记。可按最近元素ref读取子树。已观察的链接可用navigate翻页，无需点击授权。',
-    authorize_action: '默认scope=task，向用户申请15分钟内重复执行同一任务、浏览器、站点、元素和输入内容的明确授权。公开查询目标模式必须明确access=public_query。服务端核验真实元素HTML并展示完整输入。新元素、目标漂移、过期及权限变更需要重新确认。当前任务明确要求周期执行时，必须选择scope=schedule及scheduleAccess=public_query，审阅持续到停用或撤销的有限公开查询动作，账号状态保持未知。',
+    authorize_action: '有效任务公开查询范围内，服务端依据真实DOM自动派生精确凭据，不再逐目标人审；直接click/fill同样核验。未明确授予任务自主范围或目标无法证实时，默认scope=task，向用户申请15分钟内重复执行同一任务、浏览器、站点、元素和输入内容的明确授权。公开查询目标模式必须明确access=public_query。服务端核验真实元素HTML并展示完整输入。新元素、目标漂移、过期及权限变更需要重新确认。当前任务明确要求周期执行时，必须选择scope=schedule及scheduleAccess=public_query，审阅持续到停用或撤销的有限公开查询动作，账号状态保持未知。',
     click: '点击最近观察中的元素。点击可能提交或改变网站数据，需要审阅当前目标和任务授权。执行后回读页面，返回动作执行证据。',
     fill: '在最近观察的输入框填写完整value。自动保存可能改变网站数据，需审阅输入内容；执行后回读页面。',
     press: '向当前页面发送按键，Enter等按键可能提交数据。需审阅并使用最近context_id；执行后回读页面。',
@@ -269,7 +271,7 @@ export function buildBrowserSkillToolProvider(options: {
       const receipts = options.repository.operations(target.binding.taskId, 'browser_action_dispatch').slice().reverse()
       for (const receipt of receipts) {
         if (receipt.status !== 'succeeded' || receipt.request?.sessionId !== sessionId || receipt.request.pageUrl !== target.page.sourceUrl ||
-          receipt.request.tabId !== target.page.tabId || receipt.request.verificationPolicy !== 'public_query_target' ||
+          receipt.request.tabId !== target.page.tabId || receipt.request.verificationPolicy !== 'public_query_target' && !receipt.request.scopeAuthorizationReceiptId ||
           object(receipt.result).readbackPending !== false) continue
         const input = object(object(receipt.result).publicQueryInput)
         if (typeof input.target !== 'string' || typeof input.value !== 'string' || typeof input.elementHash !== 'string') continue
@@ -304,9 +306,81 @@ export function buildBrowserSkillToolProvider(options: {
       typeof object(receipt.result).expiresAt === 'string' && Date.parse(String(object(receipt.result).expiresAt)) > Date.now() &&
       JSON.stringify(receipt.request) === JSON.stringify(binding))
 
+  const scopeDomContext = async (html: string, page: { sourceUrl: string; tabId: number }, sessionId: string, scope: BrowserExecutionScope, config: BrowserCapabilityConfig, context: ToolHostContext): Promise<PublicQueryDomContext | undefined> => {
+    const element = publicQueryElement(html)
+    if (!element) return undefined
+    const quote = (value: string) => '"' + [...value].map(char => /[a-z0-9 _-]/i.test(char) ? char : '\\' + char.codePointAt(0)!.toString(16) + ' ').join('') + '"'
+    const attributes = element.attributes
+    const locator = element.tag + ['id', 'name', 'class', 'placeholder', 'aria-label', 'type'].filter(name => attributes[name]).map(name => `[${name}=${quote(attributes[name])}]`).join('')
+    const fields = [{ key: 'present', read: 'exists' }, { key: 'target', read: 'exists', selector: locator },
+      { key: 'sensitive', read: 'exists', selector: 'input[type="password"],input[type="file"],input[type="email"],input[autocomplete="username"],input[autocomplete="cc-number"],input[name*="password" i],input[name*="account" i],input[name*="user" i],input[name*="token" i],input[name*="secret" i]' },
+      ...['method', 'action', 'class', 'id', 'role', 'aria-label'].map(attribute => ({ key: attribute, read: 'attribute', attribute })),
+      { key: 'searchInput', read: 'exists', selector: 'input[type="search"],input[name="q"],input[name="keyword"],input[id="title"]' },
+      { key: 'label', read: 'text' }]
+    const probe = async (selector: string, targetOnly = false) => {
+      const raw = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--selector', selector,
+        '--fields-json', JSON.stringify(targetOnly ? [{ key: 'present', read: 'exists' }] : fields), '--max-nodes', '2', '--max-bytes', '8192'], context)
+      if (raw.scope !== 'current_dom' || raw.truncated !== false || raw.tab_id !== page.tabId || raw.page_url !== page.sourceUrl || raw.frame_url !== page.sourceUrl || !Array.isArray(raw.items) || raw.items.length > 1) throw failure('browser_public_query_dom_unverified')
+      if (!raw.items.length) return undefined
+      const item = object(raw.items[0])
+      if (!Array.isArray(item.redacted) || item.redacted.length || object(item.values).present !== true ||
+        !targetOnly && (['method', 'action', 'class', 'id', 'role', 'aria-label', 'label'].some(key => !Object.hasOwn(object(item.values), key) || object(item.values)[key] !== null && typeof object(item.values)[key] !== 'string') || typeof object(item.values).searchInput !== 'boolean')) throw failure('browser_public_query_dom_unverified')
+      return object(item.values)
+    }
+    try {
+      if (!await probe(locator, true)) return undefined
+      const form = await probe(`form:has(${locator})`)
+      const safe = (value: Json) => {
+        if (value.target !== true || value.sensitive !== false) return false
+        if (value.method && String(value.method).toLowerCase() !== 'get') return false
+        if (value.action) {
+          const action = new URL(String(value.action), page.sourceUrl)
+          if (action.username || action.password || action.origin !== new URL(page.sourceUrl).origin || /(?:account|profile|login|register|submit|delete|upload|pay|approve)/i.test(action.pathname)) return false
+        }
+        return true
+      }
+      if (form && !safe(form)) return undefined
+      const container = await probe(`*:has(> ${locator})`)
+      if (!container || !safe(container)) return undefined
+      const cue = ['class', 'id', 'role', 'aria-label'].map(key => String(container[key] ?? '')).join(' ')
+      const labels = String((form ?? container).label ?? '').replace(/\s+/g, '')
+      const search = (form ?? container).searchInput === true && (/(?:搜(?:索|标题|全文)|查询|检索|search)/i.test(labels) || /search_form|search-form|searchbox/i.test(cue)) || labels.includes('搜标题') && labels.includes('搜全文')
+      return { search, pagination: /pagination|分页|翻页/i.test(cue), filter: /filter|筛选|分类/i.test(cue) || /近3[日天]/.test(labels) && /近7[日天]/.test(labels), sort: /sort|orderby|排序/i.test(cue) || labels.includes('按时间降序') && labels.includes('按时间升序'), sensitive: false, targetPresent: true }
+    } catch (error) {
+      if (context.abortSignal.aborted || String(object(error).code).startsWith('execution_grant_') || object(error).code === 'browser_binding_changed') throw error
+      return undefined
+    }
+  }
+
+  const taskScopedAction = async (action: 'click' | 'fill', args: Json, context: ToolHostContext) => {
+    const grant = context.executionGrant, task = grant?.taskId ? options.repository.get(grant.taskId) : undefined
+    const authority = grant && task && taskPublicQueryGrant(options.repository, grant, task)
+    if (!authority || args.scope === 'schedule' && authority.authorization.duration !== 'schedule') return undefined
+    if (options.repository.operations(authority.source.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !options.repository.verifiedOperationResolution(receipt))) throw failure('browser_schedule_outcome_unknown')
+    if (authority.authorization.duration === 'schedule') {
+      if (!options.resolveSchedule) throw failure('browser_schedule_authority_changed')
+      await options.resolveSchedule(context, grant!.browserScheduleBinding ? undefined : authority.binding.id)
+    }
+    const reviewed = await actionBinding(action, args, context), { config, scope } = await assertContext(context, true)
+    const priorSearchInput = options.repository.operations(task!.id, 'browser_action_dispatch').some(receipt => receipt.status === 'succeeded' &&
+      receipt.request?.sessionId === args.sessionId && receipt.request?.pageUrl === reviewed.page.sourceUrl && object(receipt.result).readbackPending === false &&
+      object(object(receipt.result).publicQueryInput).target && receipt.request?.scopeAuthorizationReceiptId === authority.binding.id)
+    const classify = (dom?: PublicQueryDomContext) => classifyPublicQueryAction({ action, html: reviewed.page.html, value: args.value as string | undefined,
+      pageUrl: reviewed.page.sourceUrl, context: dom, priorSearchInput: Boolean(priorSearchInput) })
+    const dom = await scopeDomContext(reviewed.page.html, reviewed.page, String(args.sessionId), scope, config, context)
+    if (!dom) return undefined
+    const rule = classify(dom)
+    if (!rule) return undefined
+    return saveTaskPublicQueryAction(options.repository, grant!, { ...reviewed.binding, pageUrl: reviewed.page.sourceUrl }, String(args.contextId), rule,
+      requestHash => browserApprovalSummary({ action, origin: reviewed.binding.origin, pageUrl: reviewed.page.sourceUrl, targetHtml: reviewed.page.html,
+        value: typeof args.value === 'string' ? args.value : undefined, requestHash, verificationPolicy: browserVerificationPolicy(scope.verificationPolicy),
+        expiresAt: new Date(Math.min(Date.now() + 15 * 60_000, Date.parse(grant!.expiresAt ?? new Date(Date.now() + 15 * 60_000).toISOString()))).toISOString() }))
+  }
+
   const hasScopedApproval = async (action: 'click' | 'fill', args: Json, context: ToolHostContext): Promise<boolean> => {
     if (await pendingActionReadback(action, args, context)) return true
     if (await confirmedAction(action, args, context)) return true
+    if (await taskScopedAction(action, args, context)) return true
     if (isRecurring(context) && !context.executionGrant?.browserScheduleBinding) {
       const task = options.repository.get(context.executionGrant!.taskId!)!
       if (task.scheduledBy) throw failure('browser_schedule_action_scope_required')
@@ -472,9 +546,13 @@ export function buildBrowserSkillToolProvider(options: {
       ownedSession(taskId, sessionId, scope.browserInstanceId)
       if ((action === 'navigate' || action === 'stop') && await pendingActionReadback('click', args, context)) throw failure('browser_readback_blocked')
       if (action === 'authorize_action') {
-        if (context.approvalPolicy === 'never' || context.executionGrant?.approvalPolicy === 'never') throw failure('approval_policy_blocked')
         const authorizedAction = args.action as 'click' | 'fill'
         const reviewed = await actionBinding(authorizedAction, args, context)
+        const automatic = await taskScopedAction(authorizedAction, args, context)
+        if (automatic) return { output: { status: 'succeeded', scope: automatic.authority.authorization.duration, action: authorizedAction,
+          origin: automatic.receipt.request?.origin, authorizationId: automatic.result.id, scopeActionReceiptId: automatic.receipt.id, ...automatic.result,
+          message: '此公开查询动作依据你已确认的任务范围派生，未再次请求逐动作人工批准。' } }
+        if (context.approvalPolicy === 'never' || context.executionGrant?.approvalPolicy === 'never') throw failure('approval_policy_blocked')
         const verificationPolicy = browserVerificationPolicy(scope.verificationPolicy)
         const publicQuery = args.access === 'public_query' || args.scheduleAccess === 'public_query'
         if (verificationPolicy === 'public_query_target' && !publicQuery) throw failure('browser_public_query_action_required')
@@ -578,13 +656,15 @@ export function buildBrowserSkillToolProvider(options: {
         const target = action !== 'press' ? await actionBinding(action as 'click' | 'fill', args, context) : undefined
         const derived = target ? options.repository.operations(taskId, 'browser_derived_action_authorization').find(receipt =>
           receipt.status === 'succeeded' && receipt.request?.turnId === context.turnId && receipt.request?.sessionId === sessionId &&
+          receipt.request?.grantId === context.executionGrant?.id && (receipt.request?.contextHash === undefined || receipt.request.contextHash === sha256(String(args.contextId))) &&
           receipt.request?.action === action && receipt.request?.elementHash === target.binding.elementHash && receipt.request?.valueHash === target.binding.valueHash &&
           browserVerificationPolicy(receipt.request.verificationPolicy) === verificationPolicy && Date.parse(String(object(receipt.result).expiresAt)) > Date.now()) : undefined
         const authorization = target ? savedActionApproval(target.binding) : undefined
         // A derived receipt is produced only from an exact public_query descriptor.
         finitePublicQueryAuthorized = Boolean(target && scoped && (derived || object(authorization?.result).access === 'public_query'))
         if (verificationPolicy === 'public_query_target' && !derived && (!authorization || object(authorization.result).access !== 'public_query')) throw failure('browser_public_query_action_required')
-        const expectations = verificationPolicy === 'public_query_target' && target
+        const scopeAction = derived && object(derived.result).authorizationSource === 'task_scope' ? derived : undefined
+        const expectations = (verificationPolicy === 'public_query_target' || scopeAction) && target
           ? await publicQueryExpectations(action as 'click' | 'fill', args, context, target, config, scope) : undefined
         if (expectations) argv.push('--expect', JSON.stringify(expectations.facts))
         const previousBlock = options.repository.operations(taskId, 'browser_action_dispatch').find(receipt => receipt.status === 'failed' &&
@@ -597,7 +677,8 @@ export function buildBrowserSkillToolProvider(options: {
             request: { turnId: context.turnId, toolName: `browser_${action}`, argumentsHash: operationFingerprint(raw), action, pageUrl: tab.url, sessionId, tabId: tab.id, targetRef: args.target, browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision,
               contextHash: sha256(String(argv[argv.indexOf('--context') + 1])), attempt, elementHash: target?.binding.elementHash, valueHash: target?.binding.valueHash,
               verificationPolicy, dependsOn: [], ...(expectations ? { expectationHash: sha256(JSON.stringify(expectations.facts)), expectationVersion: 'native-dom-v1' } : {}),
-              authorizationReceiptId: authorization?.id, scheduleActionId: derived?.request?.actionId } })
+              authorizationReceiptId: authorization?.id, scheduleActionId: derived?.request?.actionId,
+              ...(scopeAction ? { authorizationSource: 'task_scope', scopeAuthorizationReceiptId: scopeAction.request?.scopeAuthorizationReceiptId, scopeActionReceiptId: scopeAction.request?.scopeActionReceiptId } : {}) } })
           observations.delete(`${taskId}:${sessionId}`)
           dispatched = true
           stage = 'action'
@@ -622,7 +703,7 @@ export function buildBrowserSkillToolProvider(options: {
             // Only the pinned vendor's explicit pre-effect contract can prove no input was sent.
             if (diagnostic.effectState !== 'none' || uncertainTransport) throw error
             dispatched = false
-            const canRefresh = attempt === 0 && diagnostic.vendorReason === 'cooperation_sync_required' && action !== 'press' && target
+            const canRefresh = attempt === 0 && !scopeAction && diagnostic.vendorReason === 'cooperation_sync_required' && action !== 'press' && target
             options.repository.finishOperation(taskId, dispatchKey, { status: 'failed', result: { notDispatched: true,
               ...diagnostic, refreshExhausted: true, refreshAttempted: Boolean(canRefresh) } })
             dispatchKey = undefined

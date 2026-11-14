@@ -19,7 +19,8 @@ export function browserPublicQueryTargetBlocked(html: string): boolean {
     const point = code[0].toLowerCase() === 'x' ? Number.parseInt(code.slice(1), 16) : Number.parseInt(code, 10)
     return point <= 0x10ffff ? String.fromCodePoint(point) : ''
   })
-  return /审批|转交|付款|支付|转账|发送|报名|提交|删除|授权|登录|登陆|注册|下单|购买|保存|上传|账号|账户|密码|验证码|密钥|口令|password|secret|token|api[-_]?key|one-time-code|cc-number|\b(?:approve|reject|transfer|pay|payment|send|submit|delete|remove|authorize|login|register|purchase|save|upload)\b|sign\s*in|log\s*in/i.test(label)
+  const intent = label.replace(/发布日期|发布时间|发文时间/g, '')
+  return /审批|转交|付款|支付|转账|发送|报名|提交|删除|授权|登录|登陆|注册|下单|购买|保存|上传|账号|账户|密码|验证码|密钥|口令|password|secret|token|api[-_]?key|one-time-code|cc-number|\b(?:approve|reject|transfer|pay|payment|send|submit|delete|remove|authorize|login|register|purchase|save|upload)\b|sign\s*in|log\s*in/i.test(intent)
 }
 
 /** Page HTML supplies a label only. Attribute values and field contents are never copied wholesale. */
