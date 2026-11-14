@@ -4,6 +4,10 @@
 
 ## 当前验收状态（2026-11-14）
 
+最新候选源码为 `3a83346f40314afc1aeee90f8f15d86919dbf286`，其唯一私有构建 `43551973679`、两条同头 Quality、Windows 完整受控回放及同包真实原生升级均已通过，详细身份与原始 archive 摘要见本文件末尾的 3a83346f 记录。**当前整版仍未标记 accepted**：最终精确 Mac 包的原始完整业务、照片与 README 仍待本轮验收完成。Windows 的确定性模型协议和受控页面、升级中的资料保留夹具均不替代真实模型与双公开来源业务；未进行正式发布或官网修改。
+
+### 2f38642a 历史诊断（非当前候选验收）
+
 源码 `2f38642a2de1f026b9b57540112184180eed2aba` 的精确 macOS arm64 包已安装并实际打开，界面版本为 0.5.7，bundle 为 `com.wangjiawei508.workgpt`，ASAR SHA256 为 `6dbfab6928cf57c8f060b9c001bd86954cfa215c450cb0fd2e40accfc7c599bf`。Developer ID 签名与公证票据核验通过。本机 Gatekeeper 因既有系统 override 保留为未独立评估。私有证据标识为 `release-local-package-2f38642a-evidence.json` 与 `mac-2f38642a-version-ui-evidence.json`。[2f 私有构建](https://github.com/railwise-cn/railwise-ai/actions/runs/43540694345)
 
 同包 Windows 完整受控回放已通过，覆盖原任务能力等待、真实界面确认及独立继续、公开查询动作、HTML 自动及手动预览、每日计划与到期新任务。该回放使用本机确定性模型协议和真实浏览器工具。安装程序及 EXE 签名状态仍为 `NotSigned`。同一私有构建的真实升级完成正式 0.5.6 → 精确 0.5.7 的下载、安装、重启和资料回读，升级后的 ASAR 与上述 Mac 包一致。私有摘要为 `windows-43543309160-summary.json` 与 `exact-updater-43540694345-summary.json`。[Windows 完整回放](https://github.com/railwise-cn/railwise-ai/actions/runs/43543309160) [真实升级记录](https://github.com/railwise-cn/railwise-ai/actions/runs/43540694345/job/132293918866)
@@ -330,3 +334,39 @@ macOS 的 `21a6487f` 包已实际由 Finder 启动，已确认实际进程路径
 本轮新合同的最终桌面全量为 4623 通过、10 跳过（460 文件通过、6 跳过），Node22／Python3.12；71 项 Provider／CLI／进程指纹聚焦通过，Node／Web 类型和生产构建通过，Lint 零错误、两项既有警告。发行门禁／依赖分发／浏览器准备脚本合计 550 通过、1 平台跳过，Windows 驱动静态 75 通过。首次桌面测试 PATH 误选系统 Python3.9 导致既有 PPT 脚本失败，保留日志并改用既有 Python3.12 环境，未修改 PPT 实现；第二次与新增翻译编写重叠出现两项 key 断言失败，完整资源落盘后的最终重跑通过，未降低原断言。新 Runtime 的完整全量及精确包结果继续单独记录。
 
 Runtime 最终全量已通过：310 文件通过、4 跳过，4155 用例通过、24 跳过、0 失败，KUN 类型通过；原始 `kun-full-modern-final.log`／`kun-types-modern-final.log` 和稳定源码快照在私有恢复证据目录。首轮两处旧 fixture 未配置新协议、旧错误文本断言分别保留失败日志，随后只修测试准备与类型化错误精确断言，未放松生产门禁；完整重跑通过。以上均为新候选构建前的源码验证，未将新包的真实 UI、完整业务或升级记为通过。
+
+### 3a83346f Windows 完整受控链与同包真实升级通过
+
+本条只记录已完成的 Windows 与原生升级子项，不将当前整版标为 accepted。应用与验收驱动均为源码 `3a83346f40314afc1aeee90f8f15d86919dbf286`，来源门禁读回 `changedFiles=[]`；使用唯一[私有构建 43551973679](https://github.com/railwise-cn/railwise-ai/actions/runs/43551973679) 的原包，没有第二次 Release 或独立 updater 派发。两条同头 [push Quality 43551567059](https://github.com/railwise-cn/railwise-ai/actions/runs/43551567059)／[PR Quality 43551572001](https://github.com/railwise-cn/railwise-ai/actions/runs/43551572001) 各三个 job 全部成功。依赖清单 SHA256 `ee6abd6457a37b3c7ee7f21b3f5ce7389ac9f99af5d737b52638f83ad26fac34` 未变化，复用此前 36 项已验证的不可变镜像，没有重新 staging。私有证据标识为 `quality-3a83346f-evidence.json`、`dependency-mirror-reuse-3a83346f.json`。
+
+#### Windows 精确包与原始证据
+
+基础安装 job `132321053735` 成功后，官方重复运行查询为零，仅派发一次[完整回放 43553981054](https://github.com/railwise-cn/railwise-ai/actions/runs/43553981054)（job `132322544530`，任务与浏览器参数均为 true）；结束后的同头查询仍恰为这一条。基础与完整报告均通过原有严格校验，版本 `0.5.7`、产品 `RailWise AI`、包名 `workwise`、bundle `com.wangjiawei508.workgpt` 与安装身份一致。安装程序和已安装 EXE 的 Authenticode 状态均为 **`NotSigned`**，记录为未配置 Windows 签名，不记为签名通过。
+
+| 对象 | 官方 artifact／字节数 | SHA256 |
+| --- | --- | --- |
+| 唯一 `release-win` 原始 ZIP | `14096893347`／317,245,820 | `7d78a3faac5e3d755db94265c54890f2cac2ac7f761bad4cac2c0aeba4537440` |
+| 基础安装原始证据 ZIP | `14096469455`／563,616 | `c4b8fd4d758130a49d180fee1f37ba57c3e37dfd543acfeb1a6c01035f9d0fd1` |
+| 完整回放原始证据 ZIP | `14097697114`／1,929,683 | `a822ee8e265cfbdd1fcb4a7ac4e8c794d4532540d5fe135c61333906ac751c87` |
+| 唯一实际安装 EXE | 317,356,807 | `b51053046ab346ad52cb48844022ab0689637e92ca2a7280c912ff31078da8c2` |
+| 已安装 `app.asar` | 基础与完整回放一致 | `95d77f4b0a650324ab9435377aea3b64452a75de6947193aaa63045d03ff1b31` |
+
+以上三个原始 ZIP 均已下载到本机，与官方摘要及 ZIP CRC 核对。安装器的 SHA256 与两份实际安装报告一致，内部 `latest.yml` 的版本、唯一文件名、字节数与 SHA512 也与该 EXE 一致。完整证据首次本机 HTTP 读取超时，保留原始 partial 后仅以官方 HTTP Range 补齐；补齐后的完整 archive 摘要与 CRC 通过。这是只读传输恢复，没有重跑 Windows 任务，也未将下载超时当作产品失败。
+
+完整受控链实际通过：缺能力时原任务等待，范围确认采用稳定三帧、真实 trusted pointerdown 与事件时几何命中校验，Main 的真实 browser-binding POST 为 200；绑定落盘后仍暂停、零 Turn／零模型，独立继续才产生绑定 `public_query_target` 的新 Grant。固定官方 CLI／扩展为 0.5.0、协议 1.9，配套 Skill 为官方源码 `361da1d75798b99b358dfb434b8ce1921fb90d9e`。三张界面授权的业务字段及页面摘要精确核对；来源及到期任务的填写／点击均核对实际 Grant、持久授权、`native-dom-v1` 原生 DOM 预期及原输入绑定，`dependsOn=[]`，ACK 成功、回读完成、未知结果为零，没有恢复旧的 `--depends-on` 合同。
+
+HTML 成果字节与真实浏览器工具输出一致，自动打开及手动预览均通过。中文、深色、1024×728 的范围卡、确认后暂停卡、动作授权及两种预览共五张现有截图完成**界面截图视觉核看（AI）**，无新增视觉缺陷；不是人类或工程专业审定。单次 BrowserSkill 连接为 2,011 毫秒，没有连接重试，Main 所有权标记与固定可执行文件核对通过。
+
+真实工具读回的是**一个启用的每日 Flow，包含 08:30 与 16:30 两个时刻、时区 Asia/Shanghai**，不是两个重复计划。另以真实时钟将该计划临时设为近时到期，2026-11-14 03:59:46.377 UTC 到期，04:00:08.740 UTC 建立独立任务 `task_237f96ea-bb42-4d18-be0c-148337de4d04`，以新会话 `jaqe`、新 Grant 和两条短授权完成独立查询及 HTML，零新增审批、零未知结果，之后恢复原每日计划。六项已安装 Runtime 权限用例、正常退出、ASAR 不变、卸载清理及两份旧资料标记保留均通过。完整摘要为私有 `windows-43553981054-summary.json`、`railwise-windows-057-43553981054/verified-acceptance-summary.json` 和 `local-strict-validators.json`。这只证明本地受控合成页面与确定性模型协议的 Windows 链路，不证明真实模型或真实采购网站业务已经完成。
+
+#### 同一 Release 的真实 0.5.6 → 0.5.7 原生升级
+
+自动随同本次构建运行的[唯一 exact updater job 132327869959](https://github.com/railwise-cn/railwise-ai/actions/runs/43551973679/job/132327869959) 通过，平台为 macOS arm64。官方原始证据 artifact `14098227309` 的 ZIP 为 35,986 字节，SHA256 `ed76162a9a9c463a98206288671a1bd81a3facefc883dce039231dac75bf3ff1`；本机下载、摘要、CRC、原生六阶段报告及服务／任务连续性严格校验均通过，未复用旧 2f 的通过结果。
+
+实际流程从固定官方 0.5.6 开始，04:23:43.073 UTC 启动基线，04:24:20.019 UTC 完成下载，04:24:54.470 UTC 重启到本次 0.5.7，并通过严格 nonce 与旧资料探针。临时私有 HTTPS feed 实际提供完整目标 ZIP 一次，共 404,113,707 字节，目标 ZIP SHA256 `598c0700fcd6fe2f7db03c77e4531376cca32436cffccb630af4a1556f96984a`。安装前 target 与升级后 installed 的 ASAR 均为 `d78286d04ba2450d0bc0060554e36be4c1ccd935d10f8a059d79cc4075de686a`，与本机安装的 3a83346f arm64 包一致；本机 DMG SHA256 `509f097f8fbbc99978a4afda2e62d6377cb2729b74b440e74674df2c2ea81543` 也与该原始升级报告的同包文件身份一致。
+
+干净 GitHub-hosted CI 对 baseline、target、installed 三个边界均记录 Developer ID 签名、公证票据 verified，Gatekeeper accepted、`gatekeeperAssessments=enabled`，签名 designated requirement 相同，未改变系统信任。**本机 Mac 的既有 Gatekeeper override 仍单独记为未独立评估**，不因 CI 通过而改写本机结论。本机下载的是同 artifact 中选定的 DMG，其 CRC／更新 SHA512 已核验；未完整下载并核验 1,610,092,857 字节的外层 `release-mac` ZIP。外层 artifact `14097996965` 的官方摘要 `30e7eec5a31a4723368569816cbf2b29fe78bba533ef96255002004249529c90` 只作为官方 metadata 记录，不冒称本机 whole-ZIP hash 已通过。
+
+资料种子明确使用 source-bound compatibility service；升级后及再次启动后的读回则均使用目标包内的真实服务和依赖，source／service tree／ASAR 身份精确一致。paused 与 waiting_user 两类任务、两个待处理输入、一个问题、一份草稿、两个可读线程及两条消息保持，candidate receipt 为 succeeded。停用 MCP、插件 manifest 引用、Skill 文本及惰性凭据引用保持原字节，独立 sentinel 与自有资源清理通过；该证据不认证真实凭据、插件激活或完整目录迁移。私有摘要为 `exact-updater-43551973679-summary.json`，原始记录为同运行的 `frozen-updater.json`、`native-updater.json`。正式 feed、公开 Release、官网与生产资料均未修改。
+
+截至本条追加，真实 Mac 原始完整请求、真实模型／双公开来源业务、照片与 README 仍待后续结果；本次没有修改 README、生产代码、官网或正式发行 manifest，也没有将这两个子项通过写成整版 accepted。
