@@ -15,6 +15,7 @@ import {
   X
 } from 'lucide-react'
 import type { ChatBlock } from '../agent/types'
+import { taskArtifactPreviewScope } from '@shared/task-artifact-preview'
 import {
   DEFAULT_DEV_PREVIEW_URL,
   normalizeDevPreviewUrlInput
@@ -147,6 +148,7 @@ export function DevBrowserPanel({
   })
   const preferredUrlRef = useRef<string | null>(normalizedPreferredUrl)
   const [activeUrl, setActiveUrl] = useState<string | null>(initialUrl)
+  const artifactPreviewScope = taskArtifactPreviewScope(activeUrl ?? '')
   const [draftUrl, setDraftUrl] = useState(() => (initialUrl ? formatAddressInput(initialUrl) : ''))
   const [autoFollow, setAutoFollow] = useState(readStoredAutoFollow)
   const [loading, setLoading] = useState(false)
@@ -166,7 +168,7 @@ export function DevBrowserPanel({
   }, [autoFollow])
 
   useEffect(() => {
-    if (activeUrl) persistUrl(activeUrl)
+    if (activeUrl && !taskArtifactPreviewScope(activeUrl)) persistUrl(activeUrl)
   }, [activeUrl])
 
   useEffect(() => {
@@ -181,13 +183,13 @@ export function DevBrowserPanel({
   }, [normalizedPreferredUrl])
 
   useEffect(() => {
-    if (!autoFollow || !latestDetectedUrl || latestDetectedUrl === activeUrl) return
+    if (taskArtifactPreviewScope(normalizedPreferredUrl ?? '') || !autoFollow || !latestDetectedUrl || latestDetectedUrl === activeUrl) return
     setActiveUrl(latestDetectedUrl)
     setDraftUrl(formatAddressInput(latestDetectedUrl))
     setPageTitle('')
     setLoading(true)
     setLoadError(null)
-  }, [activeUrl, autoFollow, latestDetectedUrl])
+  }, [activeUrl, autoFollow, latestDetectedUrl, normalizedPreferredUrl])
 
   useEffect(() => {
     const webview = webviewRef.current
@@ -472,16 +474,17 @@ export function DevBrowserPanel({
 
           <div className="flex h-8 min-w-[7rem] flex-1 items-center gap-2 rounded-full border border-ds-border-muted bg-ds-surface-subtle px-3 text-ds-muted transition focus-within:border-ds-border-strong focus-within:bg-white dark:bg-white/[0.07] dark:focus-within:bg-white/10">
             <Globe2 className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-            <input
+            {artifactPreviewScope ? <span className="min-w-0 truncate text-[13px] font-medium text-ds-ink">{t('taskArtifactManagedStorage')} · {formatDevPreviewUrlLabel(activeUrl!)}</span> : <input
               value={draftUrl}
               onChange={(event) => setDraftUrl(event.target.value)}
               className="h-full w-full min-w-0 bg-transparent text-[13px] font-medium text-ds-ink outline-none"
               placeholder={t('browserAddressPlaceholder')}
               spellCheck={false}
-            />
+            />}
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
+            {!artifactPreviewScope ? <>
             <button
               type="submit"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
@@ -511,6 +514,7 @@ export function DevBrowserPanel({
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />
             </button>
+            </> : null}
             <button
               type="button"
               onClick={openExternal}
@@ -579,10 +583,10 @@ export function DevBrowserPanel({
           </div>
         ) : useElectronWebview ? (
           <webview
-            key={`webview:${previewInstanceNonce}`}
+            key={`webview:${previewInstanceNonce}:${artifactPreviewScope ?? 'dev'}`}
             ref={webviewRef}
             src={activeUrl}
-            partition="persist:workwise-dev-browser"
+            partition={artifactPreviewScope ? `railwise-artifact-${artifactPreviewScope.split('/').at(-2)}` : 'persist:workwise-dev-browser'}
             webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
             className="flex h-full w-full bg-white"
           />

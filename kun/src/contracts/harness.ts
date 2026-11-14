@@ -16,7 +16,7 @@ const ResolutionSchema = z.object({
   kind: z.enum(['install', 'connect', 'grant', 'switch_workspace', 'retry']), route: z.string(), label: z.string()
 })
 export const CapabilityPreflightSchema = z.object({
-  provider: ExternalTaskProviderSchema,
+  provider: z.enum(['dingtalk', 'lark', 'browser-skill', 'workspace', 'schedule']),
   status: z.enum(['available', 'not_installed', 'needs_authorization', 'unsupported', 'blocked']),
   message: z.string(), errorCode: z.string().optional(), toolId: z.string().optional(), executablePath: z.string().optional(),
   requiredScopes: z.array(z.string().min(1)).optional(),

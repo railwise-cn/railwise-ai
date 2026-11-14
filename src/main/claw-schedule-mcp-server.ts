@@ -1,3 +1,4 @@
+import { TimezoneSchema } from '../../kun/src/contracts/schedule'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -108,6 +109,8 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
         prompt: z.string().min(1).describe('The prompt/instruction the agent should run at schedule time'),
         schedule_kind: z.enum(['at', 'daily', 'interval']).describe('Schedule type'),
         at_time: z.string().optional().describe('ISO 8601 timestamp with timezone offset, required when schedule_kind is `at`'),
+        times: z.array(z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)).min(1).max(24).optional().describe('Daily execution times, e.g. 08:30 and 16:30'),
+        timezone: TimezoneSchema.optional().describe('IANA timezone, e.g. Asia/Shanghai'),
         time_of_day: z.string().optional().describe('24h time like 09:00, required when schedule_kind is `daily`'),
         every_minutes: z.number().int().min(1).max(10080).optional().describe('Interval in minutes, required when schedule_kind is `interval`'),
         workspace_root: z.string().optional().describe('Optional workspace directory override'),
@@ -131,6 +134,8 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
               kind: args.schedule_kind,
               atTime: args.at_time,
               timeOfDay: args.time_of_day,
+              times: args.times,
+              timezone: args.timezone,
               everyMinutes: args.every_minutes
             }
           }
@@ -165,6 +170,8 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
         schedule_kind: z.enum(['manual', 'at', 'daily', 'interval']).optional(),
         at_time: z.string().optional(),
         time_of_day: z.string().optional(),
+        times: z.array(z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)).min(1).max(24).optional(),
+        timezone: TimezoneSchema.optional(),
         every_minutes: z.number().int().min(1).max(10080).optional()
       }
     }, async (args) => {
@@ -181,12 +188,15 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
           args.schedule_kind !== undefined ||
           args.at_time !== undefined ||
           args.time_of_day !== undefined ||
+          args.times !== undefined || args.timezone !== undefined ||
           args.every_minutes !== undefined
         ) {
           patch.schedule = {
             ...(args.schedule_kind !== undefined ? { kind: args.schedule_kind } : {}),
             ...(args.at_time !== undefined ? { atTime: args.at_time } : {}),
-            ...(args.time_of_day !== undefined ? { timeOfDay: args.time_of_day } : {}),
+            ...(args.time_of_day !== undefined ? { timeOfDay: args.time_of_day, times: [args.time_of_day] } : {}),
+            ...(args.times !== undefined ? { times: args.times } : {}),
+            ...(args.timezone !== undefined ? { timezone: args.timezone } : {}),
             ...(args.every_minutes !== undefined ? { everyMinutes: args.every_minutes } : {})
           }
         }

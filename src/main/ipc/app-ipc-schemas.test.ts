@@ -31,6 +31,54 @@ import {
 } from '../../shared/design-document'
 
 describe('app-ipc-schemas', () => {
+  it('allows only a scoped explicit browser result confirmation and rejects replay or scope overrides', () => {
+    const path = '/v1/tasks/task-1/receipts/receipt-1/browser-confirm'
+    const body = { expectedRevision: 4, idempotencyKey: 'verify-once', reviewId: 'review-1', decision: 'confirmed_complete' }
+    expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify(body) }).success).toBe(true)
+    for (const decision of ['completed', 'not_completed']) expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify({ ...body, decision }) }).success).toBe(true)
+    for (const request of [
+      { path, method: 'GET' }, { path, method: 'POST' }, { path, method: 'POST', body: '{' },
+      ...['GET', 'PUT', 'PATCH', 'DELETE'].map(method => ({ path, method, body: JSON.stringify(body) })),
+      ...[`${path}?force=true`, `${path}#force`, path.replace('task-1', 'task-1%2Fother'), path.replace('receipt-1', '%252Fother'),
+        path.replace('receipt-1', '..'), `//elsewhere${path}`].map(path => ({ path, method: 'POST', body: JSON.stringify(body) })),
+      ...[{ expectedRevision: -1 }, { decision: 'retry' }, { reviewId: '' }, { force: true }, { taskId: 'other' }, { allowedTools: ['bash'] }]
+        .map(extra => ({ path, method: 'POST', body: JSON.stringify({ ...body, ...extra }) }))
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(false)
+  })
+  it('allows only exact task browser previews and strictly scoped confirmations', () => {
+    const path = '/v1/tasks/task-1/browser-binding'
+    const confirmation = { expectedTaskRevision: 2, expectedBrowserRevision: 4, browserInstanceId: 'chrome-test',
+      origins: ['https://example.com'], interaction: 'interact', confirmed: true, idempotencyKey: 'binding-1' }
+    expect(runtimeRequestPayloadSchema.safeParse({ path }).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'GET' }).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify(confirmation) }).success).toBe(true)
+    for (const duration of ['task', 'schedule']) expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify({ ...confirmation, publicQueryAuthorization: duration }) }).success).toBe(true)
+    for (const request of [
+      { path, method: 'GET', body: '{}' },
+      { path, method: 'POST' },
+      { path, method: 'POST', body: '{' },
+      ...['PUT', 'PATCH', 'DELETE'].map(method => ({ path, method, body: JSON.stringify(confirmation) })),
+      ...[`${path}?taskId=task-2`, `${path}#force`, '/v1/tasks/task-1/../task-2/browser-binding',
+        '/v1/tasks/task-1%2F..%2Ftask-2/browser-binding', '/v1/tasks/task-1%5Ctask-2/browser-binding',
+        '/v1/tasks/task-1%252Ftask-2/browser-binding', '/v1/tasks/%ZZ/browser-binding',
+        '//elsewhere/v1/tasks/task-1/browser-binding'].map(path => ({ path, method: 'GET' })),
+      ...[{ taskId: 'task-2' }, { allowedTools: ['bash'] }, { force: true }, { confirmed: false },
+        { expectedTaskRevision: -1 }, { publicQueryAuthorization: '*' }, { publicQueryAuthorization: { receiptId: 'forged', duration: 'schedule' } }, { origins: ['*'] }, { origins: ['https://example.com/private'] }]
+        .map(extra => ({ path, method: 'POST', body: JSON.stringify({ ...confirmation, ...extra }) })),
+      { path, taskId: 'task-2', method: 'POST', body: JSON.stringify(confirmation) }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(false)
+  })
+
+  it('accepts only an exact bounded permission revocation over the existing task endpoint', () => {
+    const payload={path:'/v1/tasks/task-1/permissions',method:'DELETE',body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'revoke'})}
+    expect(runtimeRequestPayloadSchema.safeParse(payload).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'restore',restoreBase:true})}).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'restore',restoreBase:'true'})}).success).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,body:JSON.stringify({expectedRevision:3,permissionId:'reviewed-permission',idempotencyKey:'revoke',allowedTools:['bash']})}).success).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,path:`${payload.path}?force=true`}).success).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,body:undefined}).success).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({...payload,path:'/v1/tasks/task-1'}).success).toBe(false)
+  })
   it('validates explicit legacy workspace snapshot requests and SHA-256 baselines', () => {
     expect(workspaceMigrationImportPayloadSchema.safeParse({ sourceId: '.workgpt:default', expectedFingerprint: 'a'.repeat(64), confirmed: true, idempotencyKey: 'migration-1' }).success).toBe(true)
     expect(workspaceMigrationImportPayloadSchema.safeParse({ sourceId: '.workgpt:default', expectedFingerprint: 'not-a-hash', confirmed: true, idempotencyKey: 'migration-1' }).success).toBe(false)

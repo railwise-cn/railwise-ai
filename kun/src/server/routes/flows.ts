@@ -13,7 +13,7 @@ const RetryInput = z.object({ nodeId: z.string().min(1) }).strict()
 const WebhookProvisionInput = z.object({ nodeId: z.string().min(1) }).strict()
 const LegacyScheduleTask = z.object({
   id: z.string().min(1), title: z.string(), enabled: z.boolean(), prompt: z.string(), workspaceRoot: z.string(), model: z.string(), reasoningEffort: z.string(), mode: z.string(),
-  schedule: z.object({ kind: z.string(), everyMinutes: z.number(), timeOfDay: z.string(), atTime: z.string() }).strict(),
+  schedule: z.object({ kind: z.string(), everyMinutes: z.number(), timeOfDay: z.string(), atTime: z.string(), times: z.array(z.string()).optional(), timezone: z.string().optional() }).strict(),
   createdAt: z.string(), updatedAt: z.string(), lastRunAt: z.string(), nextRunAt: z.string(), lastStatus: z.string(), lastMessage: z.string(), lastThreadId: z.string()
 }).strict()
 const LegacyScheduleMigration = z.object({ tasks: z.array(LegacyScheduleTask).max(512) }).strict()

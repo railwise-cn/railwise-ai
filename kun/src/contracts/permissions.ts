@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { ApprovalPolicySchema, SandboxModeSchema } from './policy.js'
+import { BrowserExecutionScope } from './browser-skill.js'
+import { BrowserScheduleBindingSchema, type BrowserScheduleAction } from './browser-schedule-actions.js'
 
 export const WorkspaceTrustLevelSchema = z.enum(['read-only', 'workspace-write', 'trusted', 'full-access'])
 export type WorkspaceTrustLevel = z.infer<typeof WorkspaceTrustLevelSchema>
@@ -31,6 +33,12 @@ export const ExecutionGrantSchema = z.object({
   pathAllowlist: z.array(z.string()).default([]),
   readPathAllowlist: z.array(z.string()).optional(),
   writePathAllowlist: z.array(z.string()).optional(),
+  /** Runtime-owned output namespace. Only publish_artifact may write here. */
+  managedArtifactRoot: z.string().min(1).optional(),
+  scheduleScopeHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  browserScope: BrowserExecutionScope.optional(),
+  browserScheduleBinding: BrowserScheduleBindingSchema.optional(),
+  workspaceWriteException: z.boolean().optional(),
   networkAllowlist: z.array(z.string()).default([]),
   connectorScopes: z.array(z.string()).default([]),
   connectorIdentityFingerprints: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).optional(),
@@ -68,9 +76,11 @@ export const TaskApprovalGrantSchema = z.object({
   status: z.enum(['prepared','active']), confirmed: z.literal(true),
   confirmedAt: z.iso.datetime(), expiresAt: z.iso.datetime(), idempotencyKey: z.string().min(1)
   ,scope: TaskPermissionScopeSchema.optional(),
+  workspaceWriteException: z.boolean().optional(),
   duration: z.enum(['task', 'next_operation']).optional(),
   consumedOperationId: z.string().min(1).optional(),
-  consumedAt: z.iso.datetime().optional()
+  consumedAt: z.iso.datetime().optional(),
+  revokedAt: z.iso.datetime().optional()
 })
 export type TaskApprovalGrant = z.infer<typeof TaskApprovalGrantSchema>
 
@@ -84,7 +94,10 @@ export const TaskPermissionConfirmationSchema = z.object({
 export type TaskPermissionConfirmation = z.infer<typeof TaskPermissionConfirmationSchema>
 
 export type ExecutionScope = Pick<ExecutionGrant, 'networkAllowlist' | 'connectorScopes' | 'externalTargets'> &
-  Pick<Partial<ExecutionGrant>, 'connectorIdentityFingerprints' | 'connectorBackends'> &
+  Pick<Partial<ExecutionGrant>, 'connectorIdentityFingerprints' | 'connectorBackends' | 'browserScope' | 'browserScheduleBinding' | 'scheduleScopeHash'> &
   Pick<Partial<ExecutionGrant>, 'allowedToolNames'> &
   Pick<Partial<ExecutionGrant>, 'allowedProviderIds' | 'pathAllowlist' | 'readPathAllowlist' | 'writePathAllowlist' | 'expiresAt' | 'taskPermissionId' | 'permissionDuration'> &
-  { permissionScope?: TaskPermissionScope }
+  { permissionScope?: TaskPermissionScope; workspaceWriteException?: boolean; browserScheduleActions?: BrowserScheduleAction[] }
+
+export const TaskPermissionRevocationSchema = z.object({expectedRevision:z.number().int().nonnegative(),permissionId:z.string().min(1),idempotencyKey:z.string().trim().min(1).max(256),restoreBase:z.boolean().optional()}).strict()
+export type TaskPermissionRevocation = z.infer<typeof TaskPermissionRevocationSchema>

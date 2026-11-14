@@ -51,6 +51,12 @@ export type LocalTool = {
   policy: 'auto' | 'on-request' | 'suggest' | 'never' | 'untrusted'
   /** External writes must obtain a real user confirmation, even under legacy auto policy. */
   requireExplicitApproval?: boolean
+  /** Trusted Provider verifies a persisted, task-scoped authorization against the current target. */
+  hasScopedApproval?: (args: Record<string, unknown>, context: ToolHostContext) => Promise<boolean>
+  /** A trusted Provider checks hard scope limits before approval or dispatch. */
+  contextBlock?: (context: ToolHostContext) => { code: string; message: string } | undefined
+  /** A trusted Provider reads and describes the actual target before user review. */
+  approvalSummary?: (args: Record<string, unknown>, context: ToolHostContext) => Promise<string>
   /**
    * Optional gating predicate. When present, the tool is only listed
    * and only executed when `shouldAdvertise` returns true for the
@@ -135,7 +141,7 @@ export class LocalToolHost implements ToolHost {
       originalProviderId = resolved.provider.id
     } catch (error) {
       const code = (error as { code?: unknown })?.code
-      if (typeof code !== 'string' || !/^(sandbox_|execution_grant_|workspace_trust_)/.test(code)) throw error
+      if (typeof code !== 'string' || !/^(sandbox_|execution_grant_|workspace_trust_|browser_)/.test(code)) throw error
       return { item: this.errorToolResult(context, call, { toolKind: call.toolKind ?? 'tool_call' }, error instanceof Error ? error.message : String(error), code), approved: false }
     }
     if (tool.policy === 'never') {
@@ -201,7 +207,17 @@ export class LocalToolHost implements ToolHost {
         approved: false
       }
     }
-    const needsApproval = this.requiresApproval(tool, activeCall, context)
+    let needsApproval: boolean
+    let reviewedSummary: string | undefined
+    try {
+      needsApproval = await this.requiresApproval(tool, activeCall, context)
+      if (needsApproval) reviewedSummary = await tool.approvalSummary?.(activeCall.arguments, context)
+    } catch (error) {
+      if (context.abortSignal.aborted) throw error
+      const code = (error as { code?: unknown })?.code
+      return { item: this.errorToolResult(context, activeCall, tool, error instanceof Error ? error.message : String(error),
+        typeof code === 'string' ? code : 'tool_preflight_failed'), approved: false }
+    }
     const approvedRequestHash = createHash('sha256').update(JSON.stringify(activeCall.arguments)).digest('hex')
     const approvalId = `appr_${createHash('sha256').update(JSON.stringify([context.threadId, context.turnId, activeCall.callId, activeCall.toolName, approvedRequestHash])).digest('hex')}`
     if (needsApproval) {
@@ -212,7 +228,7 @@ export class LocalToolHost implements ToolHost {
         toolName: activeCall.toolName,
         requestHash: approvedRequestHash,
         callId: activeCall.callId,
-        summary: this.buildApprovalSummary(activeCall, context.workspace)
+        summary: reviewedSummary ?? this.buildApprovalSummary(activeCall, context.workspace)
       })
       const decision = context.claimUndispatchedApproval?.(approval)
         ? 'allow'
@@ -250,31 +266,60 @@ export class LocalToolHost implements ToolHost {
         throw Object.assign(new Error('The approved tool was replaced. Check capabilities and request approval again.'), { code: 'tool_catalog_changed' })
       }
       context.assertExecution?.()
+      if (needsApproval && reviewedSummary && await tool.approvalSummary?.(activeCall.arguments, context) !== reviewedSummary) {
+        throw Object.assign(new Error('浏览器目标在审阅后发生变化，请重新确认实际操作。'), { code: 'approval_target_changed' })
+      }
       if (needsApproval) context.recordExplicitApproval?.({ toolName: activeCall.toolName, requestHash: approvedRequestHash })
       await context.claimTaskPermission?.()
       context.assertExecution?.()
       if (context.abortSignal.aborted) throw new Error('Tool call aborted before dispatch')
-      const finishWork = context.beginExecutionWork?.()
+      let finishWork = context.beginExecutionWork?.()
+      let humanWaits = 0
+      let toolFinished = false
+      const withoutExecutionWork = async <T>(wait: () => Promise<T>): Promise<T> => {
+        humanWaits++
+        finishWork?.()
+        finishWork = undefined
+        try {
+          return await wait()
+        } finally {
+          humanWaits--
+          if (humanWaits === 0 && !toolFinished && !context.abortSignal.aborted) {
+            context.assertExecution?.()
+            finishWork = context.beginExecutionWork?.()
+          }
+        }
+      }
       try {
         context.recordToolDispatch?.()
         result = await tool.execute(activeCall.arguments, {
-        ...context,
-        explicitApproval: needsApproval ? { approvalId, callId: activeCall.callId, toolName: activeCall.toolName, requestHash: approvedRequestHash } : undefined
-      }, async (update) => {
-        if (!onUpdate) return
-        const partialItem = makeToolResultItem({
-          id: `item_${activeCall.callId}`,
-          turnId: context.turnId,
-          threadId: context.threadId,
-          callId: activeCall.callId,
-          toolName: activeCall.toolName,
-          toolKind: activeCall.toolKind ?? tool.toolKind,
-          output: update.output,
-          isError: update.isError,
-          status: 'running'
+          ...context,
+          // Providers may request approval from inside execute. Only this tool's
+          // work pauses; concurrent model, tool and child-task work stays charged.
+          awaitApproval: approval => withoutExecutionWork(() => context.awaitApproval(approval)),
+          ...(context.awaitUserInput ? {
+            awaitUserInput: request => withoutExecutionWork(() => context.awaitUserInput!(request))
+          } : {}),
+          explicitApproval: needsApproval ? { approvalId, callId: activeCall.callId, toolName: activeCall.toolName, requestHash: approvedRequestHash } : undefined
+        }, async (update) => {
+          if (!onUpdate) return
+          const partialItem = makeToolResultItem({
+            id: `item_${activeCall.callId}`,
+            turnId: context.turnId,
+            threadId: context.threadId,
+            callId: activeCall.callId,
+            toolName: activeCall.toolName,
+            toolKind: activeCall.toolKind ?? tool.toolKind,
+            output: update.output,
+            isError: update.isError,
+            status: 'running'
+          })
+          await onUpdate(partialItem)
         })
-        await onUpdate(partialItem)
-      }) } finally { finishWork?.() }
+      } finally {
+        toolFinished = true
+        finishWork?.()
+      }
     } catch (error) {
       // A tool blowing up (an MCP server returning a protocol error, a
       // provider bug) is feedback for the model, not a reason to kill the
@@ -349,11 +394,23 @@ export class LocalToolHost implements ToolHost {
     }
   }
 
-  private requiresApproval(tool: LocalTool, call: ToolCallLike, context: ToolHostContext): boolean {
+  private async requiresApproval(tool: LocalTool, call: ToolCallLike, context: ToolHostContext): Promise<boolean> {
     if (this.isInteractiveGuiGateTool(call.toolName)) return false
     const approvalPolicy = effectiveApprovalPolicy(context)
     if (tool.policy === 'never' || approvalPolicy === 'never') return false
-    if (tool.requireExplicitApproval || (context.executionGrant && tool.toolKind === 'command_execution')) return true
+    if (tool.requireExplicitApproval) {
+      const provider = this.registry.resolveTool(call.toolName, context, call.providerId).provider
+      if (provider.id === 'browser-skill' && ['browser_click', 'browser_fill'].includes(tool.name) &&
+        await tool.hasScopedApproval?.(call.arguments, context)) return false
+      return true
+    }
+    if (context.executionGrant && tool.toolKind === 'command_execution') return true
+    // The user already reviewed this task's exact file scope. The file tools
+    // still canonicalize the target and validate the immutable Grant at write.
+    const grant = context.executionGrant
+    if (['write', 'edit'].includes(tool.name) && tool.toolKind === 'file_change' &&
+      (grant?.taskPermissionId || grant?.scheduleScopeHash) && grant.writePathAllowlist?.length &&
+      this.registry.resolveTool(call.toolName, context, call.providerId).provider.kind === 'built-in') return false
     switch (approvalPolicy) {
       case 'auto':
         return false

@@ -99,7 +99,7 @@ export type SettingsRouteSection =
   | 'help'
 export type AppRoute = 'chat' | 'write' | 'design' | 'flow' | 'tasks' | 'settings' | 'plugins' | 'claw' | 'schedule' | 'engineering'
 export type PluginHostRoute = 'chat' | 'claw'
-export type ConnectorProviderRoute = 'lark' | 'dingtalk'
+export type ConnectorProviderRoute = 'lark' | 'dingtalk' | 'browser-skill'
 
 /**
  * A side conversation ("by-the-way") running alongside the active

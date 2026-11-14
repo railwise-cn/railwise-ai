@@ -15,11 +15,12 @@ import { appendFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
-import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, githubApi, validateReviewedBuild, verifyReviewedBuildSource } from './verify-reviewed-release-artifacts.mjs'
+import { parse as parseYaml } from 'yaml'
+import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW, githubApi, validateReviewedBuild, verifyReviewedBuildSource } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, validateUpdaterEvidenceRun, verifyRemoteUpdaterEvidence } from './verify-frozen-updater-evidence.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 import { FROZEN_BASE_VERSION, resolveUpdaterBaseline } from './frozen-release-version.mjs'
-import { validateExactUpdaterEvidenceRun, verifyRemoteExactUpdaterEvidence } from './verify-exact-updater-evidence.mjs'
+import { EXACT_UPDATER_BASE_VERSION, validateExactUpdaterEvidenceRun, verifyRemoteExactUpdaterEvidence } from './verify-exact-updater-evidence.mjs'
 
 const ROOT = process.cwd()
 
@@ -58,6 +59,8 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/verify-exact-updater-evidence.mjs',
   'scripts/verify-exact-updater-evidence.test.mjs',
   'scripts/run-task-delivery-live.mjs',
+  'scripts/run-windows-ui-smoke.mjs',
+  'scripts/windows-ui-smoke.test.mjs',
   'scripts/macos-updater-trust.test.mjs',
   // Excluded by kun/tsconfig.build.json and the runtime packaging filter.
   'kun/src/services/task-controller.test.ts',
@@ -69,6 +72,48 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/workwise-product-public-verification.test.mjs',
   'openspec/changes/durable-task-document-workbench/tasks.md',
 ])
+
+/** The whole workflow must stay equivalent apart from this publication-only opt-out. */
+export function isProductPagePublicationOnlyChange(beforeSource, afterSource) {
+  try {
+    const before = parseYaml(beforeSource)
+    const after = parseYaml(afterSource)
+    if (!before || !after || typeof before !== 'object' || typeof after !== 'object') return false
+    if (isDeepStrictEqual(before, after)) return true
+    const expected = structuredClone(before)
+    const inputs = expected.on?.workflow_dispatch?.inputs
+    const steps = expected.jobs?.publish?.steps
+    if (!inputs || typeof inputs !== 'object' || !Array.isArray(steps) || Object.hasOwn(inputs, 'publish_product_page')) return false
+    inputs.publish_product_page = {
+      description: 'Publish the product page and its download data after release promotion.',
+      required: false, type: 'boolean', default: true
+    }
+    const enabled = '${{ inputs.publish_product_page == true }}'
+    const rollback = "${{ always() && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}"
+    const conditions = [
+      ['Generate product download data from the publication manifest', undefined, enabled],
+      ['Deploy the generated product download page', undefined, enabled],
+      ['Verify the generated public product download page', undefined, enabled],
+      ['Restore only the previous product page if its public verification fails', rollback,
+        "${{ always() && inputs.publish_product_page == true && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}"]
+    ]
+    for (const [name, previous, next] of conditions) {
+      const matching = steps.filter(step => step?.name === name)
+      if (matching.length !== 1 || matching[0].if !== previous) return false
+      matching[0].if = next
+    }
+    return isDeepStrictEqual(expected, after)
+  } catch { return false }
+}
+
+function isPublicationOnlyWorkflowCommit(commit) {
+  const parents = git(['rev-list', '--parents', '-n', '1', commit]).trim().split(/\s+/).slice(1)
+  if (!parents.length) return false
+  try {
+    const after = git(['show', `${commit}:${RELEASE_WORKFLOW}`])
+    return parents.every(parent => isProductPagePublicationOnlyChange(git(['show', `${parent}:${RELEASE_WORKFLOW}`]), after))
+  } catch { return false }
+}
 
 function requireReviewedSource(reviewedSourceHead, releaseHead, schemaVersion) {
   if (typeof reviewedSourceHead !== 'string' || !/^[0-9a-f]{40}$/.test(reviewedSourceHead)) {
@@ -92,7 +137,8 @@ function requireReviewedSource(reviewedSourceHead, releaseHead, schemaVersion) {
   for (const commit of commits) {
     const changes = git(['diff-tree', '--root', '-r', '-m', '--no-commit-id', '--name-only', '-z', '--no-renames', commit])
       .split('\0').filter(Boolean)
-    const unreviewed = changes.find(path => !path.startsWith('docs/qa/') && !(schemaVersion === 2 && PACKAGE_EXTERNAL_EVIDENCE_FILES.has(path)))
+    const unreviewed = changes.find(path => !path.startsWith('docs/qa/') && !(schemaVersion === 2 &&
+      (PACKAGE_EXTERNAL_EVIDENCE_FILES.has(path) || path === RELEASE_WORKFLOW && isPublicationOnlyWorkflowCommit(commit))))
     if (unreviewed) {
       fail(`changes after the reviewed package must be limited to docs/qa evidence: ${unreviewed} at ${commit}`)
     }
@@ -196,7 +242,7 @@ function readCommittedJson(relativePath, releaseHead, label) {
 
 function requireUpdaterEvidence(evidence, reviewedBuild, packageIdentity, version, releaseHead) {
   const exactBuild = evidence.mode === 'exact-build'
-  const baseVersion = exactBuild ? '0.5.4' : FROZEN_BASE_VERSION
+  const baseVersion = exactBuild ? evidence.baseVersion ?? EXACT_UPDATER_BASE_VERSION : FROZEN_BASE_VERSION
   const baseline = resolveUpdaterBaseline(baseVersion)
   // A prose summary or a green declaration cannot substitute for the native
   // runner's two reports, bound to the exact frozen public package bytes.
@@ -276,7 +322,7 @@ function requireUpdaterEvidence(evidence, reviewedBuild, packageIdentity, versio
   if (native.failure) fail('native updater evidence retains a failure')
   equal(reportSha256(nativeBytes), machine.nativeReportSha256, 'retained native report digest')
   const run = exactBuild
-    ? validateExactUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild, version)
+    ? validateExactUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild, version, baseVersion)
     : validateUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild.sourceHead, version)
   return { run, machineBytes, nativeBytes, mode: exactBuild ? 'exact-build' : 'frozen-public-release' }
 }

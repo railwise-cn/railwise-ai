@@ -7,12 +7,32 @@ on:
         description: 'Same-repository release run containing the exact release-win artifact to inspect'
         type: string
         required: true
+      run_task_execution:
+        description: 'Run real installed task tools, HTML file verification and daily schedule readback with a local model protocol fixture'
+        type: boolean
+        required: false
+        default: false
+      run_browser_execution:
+        description: 'Load the fixed official BrowserSkill extension in isolated Chrome for Testing and read a controlled page through real task tools'
+        type: boolean
+        required: false
+        default: false
   workflow_dispatch:
     inputs:
       package_run_id:
         description: 'Same-repository release run containing the exact release-win artifact to inspect'
         type: string
         required: true
+      run_task_execution:
+        description: 'Run real installed task tools, HTML file verification and daily schedule readback with a local model protocol fixture'
+        type: boolean
+        required: false
+        default: false
+      run_browser_execution:
+        description: 'Load the fixed official BrowserSkill extension in isolated Chrome for Testing and read a controlled page through real task tools'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -22,7 +42,7 @@ jobs:
   windows-install:
     name: Install and inspect the existing Windows package
     runs-on: windows-2022
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.run_browser_execution && 25 || 15 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -36,7 +56,7 @@ jobs:
       - name: Install verification tools
         run: npm ci --ignore-scripts
       - name: Verify Windows acceptance contracts and PowerShell syntax
-        run: node --test scripts/windows-install-smoke.test.mjs scripts/windows-ui-smoke.test.mjs scripts/prepare-windows-install-smoke.test.mjs
+        run: node --test scripts/windows-install-smoke.test.mjs scripts/windows-ui-smoke.test.mjs scripts/prepare-windows-install-smoke.test.mjs scripts/prepare-browser-skill-smoke.test.mjs
       - name: Verify the original build and unchanged application source
         id: source
         env:
@@ -56,6 +76,8 @@ jobs:
         env:
           PACKAGE_SOURCE_HEAD: ${{ steps.source.outputs.package_source_head }}
           WORKWISE_WINDOWS_SMOKE_SOURCE_FILE: ${{ runner.temp }}/windows-package-source.json
+          RAILWISE_WINDOWS_TASK_SMOKE: ${{ inputs.run_task_execution }}
+          RAILWISE_WINDOWS_BROWSER_SMOKE: ${{ inputs.run_browser_execution }}
         run: |
           $packages = Join-Path $env:RUNNER_TEMP 'exact-windows-packages'
           $installers = @(Get-ChildItem -LiteralPath $packages -Filter '*.exe' -File)

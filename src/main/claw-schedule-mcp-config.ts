@@ -2,6 +2,8 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, posix } from 'node:path'
 import type { AppSettingsV1 } from '../shared/app-settings'
+import type { McpServerConfigV2 } from '../shared/agent-workbench'
+import type { McpRuntimeSnapshotV1 } from './services/mcp-config-service'
 import {
   LEGACY_SCHEDULE_MCP_MARKER_END,
   LEGACY_SCHEDULE_MCP_MARKER_START
@@ -106,6 +108,29 @@ export function buildClawScheduleMcpServerConfig(
     enabled_tools: [],
     disabled_tools: []
   }
+}
+
+/** Restore only the launch flag owned by the application, never arbitrary legacy environment values. */
+export function restoreManagedScheduleMcpEnvironment(
+  snapshot: McpRuntimeSnapshotV1,
+  sources: readonly McpServerConfigV2[],
+  settings: AppSettingsV1,
+  launch: ClawScheduleMcpLaunchConfig
+): McpRuntimeSnapshotV1 {
+  const server = snapshot.servers[GUI_SCHEDULE_MCP_SERVER_NAME]
+  const command = resolveClawScheduleMcpCommand(launch)
+  const args = buildClawScheduleMcpArgs(settings, launch)
+  const matchesLaunch = (value: { command?: unknown; args?: unknown }): boolean =>
+    value.command === command && Array.isArray(value.args) &&
+    value.args.length === args.length && value.args.every((arg, index) => arg === args[index])
+  const managedSource = sources.some(source => source.id === GUI_SCHEDULE_MCP_SERVER_NAME &&
+    source.source === 'migration' && source.scope === 'global' && source.transport === 'stdio' && source.enabled &&
+    !source.credentialRef && !source.credentialEnvironmentVariables?.length && matchesLaunch(source))
+  if (!managedSource || !server || server.enabled !== true || server.transport !== 'stdio' ||
+      server.trustScope !== 'user' || !matchesLaunch(server)) return snapshot
+  return { ...snapshot, servers: { ...snapshot.servers,
+    [GUI_SCHEDULE_MCP_SERVER_NAME]: { ...server, env: { ...(isRecord(server.env) ? server.env : {}), ...ELECTRON_RUN_AS_NODE_ENV } }
+  } }
 }
 
 export function buildSyncedClawScheduleMcpJson(

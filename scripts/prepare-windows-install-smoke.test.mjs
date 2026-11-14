@@ -26,11 +26,28 @@ test('existing Windows acceptance binds separate driver and package heads to the
 })
 
 for (const file of ['src/renderer/src/components/HelpReader.tsx', 'kun/package.json', 'package-lock.json',
+  'kun/src/adapters/tool/browser-skill-tool-provider.ts', 'docs/USER_GUIDE.md',
   'electron-builder.config.cjs', 'build/icon.ico', 'scripts/prepare-runtime.cjs']) {
   test(`existing artifact cannot stand in for changed application source ${file}`, () => {
     assert.throws(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }), /application or build source changed/)
   })
 }
+
+test('only the exact undistributed execution QA and opt-in live test are allowed', () => {
+  for (const file of ['docs/qa/general-execution-delivery-2026-11-13.md', 'kun/tests/browser-skill-live.test.ts']) {
+    assert.doesNotThrow(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }))
+  }
+  for (const file of ['docs/qa/another-execution-change.md', 'kun/tests/browser-skill-live.ts', 'kun/src/services/browser-skill-cli.ts']) {
+    assert.throws(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }), /application or build source changed/)
+  }
+})
+
+test('publication approval verification does not require rebuilding an unchanged application', () => {
+  assert.doesNotThrow(() => validateWindowsSmokeSource({ ...source(), changedFiles: ['scripts/verify-release-approval.mjs'] }))
+  for (const file of ['scripts/verify-release-approval.cjs', 'scripts/prepare-runtime.cjs', 'electron-builder.cjs', 'src/main/index.ts']) {
+    assert.throws(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }), /application or build source changed/)
+  }
+})
 
 for (const [field, value] of [['windowsBuildConclusion', 'failure'], ['artifactExpired', true],
   ['artifactName', 'release-mac'], ['artifactDigest', ''], ['workflow', '.github/workflows/other.yml']]) {
@@ -59,7 +76,7 @@ test('Windows provenance keeps the actual workflow SHA and requires source evide
 
 test('Windows acceptance workflow downloads the original artifact and performs no packaging or publication', () => {
   const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
-  assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), ['package_run_id'])
+  assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), ['package_run_id', 'run_task_execution', 'run_browser_execution'])
   assert.deepEqual(workflow.on.workflow_call.inputs, workflow.on.workflow_dispatch.inputs)
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   const steps = workflow.jobs['windows-install'].steps
@@ -84,4 +101,16 @@ test('existing Windows package routing excludes every other release action and h
     assert.ok(job.if.endsWith(" && inputs.existing_windows_package_run_id == '' }}"), `${name} must skip during existing-package inspection`)
   }
   assert.match(workflow.concurrency.group, /inputs.existing_windows_package_run_id != '' && format\('windows-package-\{0\}', github.run_id\)/)
+})
+
+test('existing-package task execution is explicitly opted in without changing release publishing', () => {
+  const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
+  for (const trigger of ['workflow_call', 'workflow_dispatch']) {
+    assert.deepEqual(workflow.on[trigger].inputs.run_task_execution, {
+      description: 'Run real installed task tools, HTML file verification and daily schedule readback with a local model protocol fixture',
+      type: 'boolean', required: false, default: false
+    })
+  }
+  const install = workflow.jobs['windows-install'].steps.find(step => step.name === 'Install, inspect the Chinese UI and uninstall the temporary instance')
+  assert.equal(install.env.RAILWISE_WINDOWS_TASK_SMOKE, '${{ inputs.run_task_execution }}')
 })

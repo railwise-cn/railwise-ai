@@ -1,7 +1,18 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { FlowNodeInspector, FlowWorkspaceView, RunDetailsPanel, createStarterFlowInput, flowPortCompatibility, flowRegistryAvailabilityLabel, flowStatusClass } from './FlowWorkspaceView'
+import { FlowNodeInspector, FlowWorkspaceView, RunDetailsPanel, ScheduleAuthoritySummary, createStarterFlowInput, flowPortCompatibility, flowRegistryAvailabilityLabel, flowStatusClass } from './FlowWorkspaceView'
+
+it('shows the stored recurring scope and lifetime with technical read scopes collapsed', () => {
+  const html = renderToStaticMarkup(createElement(ScheduleAuthoritySummary, { value: {
+    authorization: { until: 'disabled', expiresAt: null }, scope: { readPathAllowlist: ['F:\\Projects'], writePathAllowlist: ['F:\\Reports'], networkAllowlist: ['https://example.test'] }
+  } }))
+  expect(html).toContain('持续至暂停计划或撤销原任务权限')
+  expect(html).toContain('F:\\Reports')
+  expect(html).toContain('<details>')
+  expect(html).not.toContain('<details open')
+  expect(renderToStaticMarkup(createElement(ScheduleAuthoritySummary, { value: { grant: {} } }))).toContain('重新核对持续执行权限')
+})
 
 describe('FlowNodeInspector', () => {
   it('renders binding, model/provider, node config, and complete execution policy controls', () => {

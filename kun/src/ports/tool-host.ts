@@ -104,6 +104,8 @@ export type ToolHostContext = {
   sandboxMode?: SandboxMode
   /** Immutable effective workspace/agent grant for this execution attempt. */
   executionGrant?: ExecutionGrant
+  /** Server-reserved session identity for one explicitly authorized host command. */
+  hostShellSessionId?: string
   /** Supplied by LocalToolHost only after this exact call received an allow decision. */
   explicitApproval?: { approvalId?: string; callId: string; toolName: string; requestHash: string }
   /** Claim an exact, durably approved operation that was proven undispatched before restart. */
@@ -121,6 +123,7 @@ export type ToolHostContext = {
   validateExecutionGrant?: () => Promise<void>
   /** Atomically reserve a one-operation permission after all approval checks. */
   claimTaskPermission?: () => Promise<void>
+  /** Starts a fresh work segment; internal human waits finish it before a later restart. */
   beginExecutionWork?: () => (() => void) | undefined
   /** Resolves a pending approval with the user's decision. */
   awaitApproval: (approval: ApprovalRequest) => Promise<'allow' | 'deny'>

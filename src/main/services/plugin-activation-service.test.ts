@@ -96,6 +96,24 @@ async function fixture(): Promise<{ item: MarketplacePackageV1; installed: Insta
 }
 
 describe('activatePluginPackage', () => {
+  it('reports removed MCP components when an update now contains only Skills', async () => {
+    const { item, installed } = await fixture()
+    installed.rollback = { ...installed, available: true }
+    const priorComponent = item.components[0]!
+    item.components = [{ ...priorComponent, type: 'skill', runtime: { kind: 'system', provider: 'fixture', capability: 'skill' }, skillNames: ['replacement-skill'] }]
+    const previous = { id: 'example-mcp', source: 'managed-tool', enabled: true, revision: 3 }
+    const untouched = { id: 'user-server', source: 'user', enabled: true, revision: 2 }
+    const save = vi.fn(async ({ config }) => ({ ...config, revision: 4 }))
+    const result = await activatePluginPackage({ item, installed, workspaceRoot: '/tmp/workspace',
+      mcpConfigService: { list: async () => [previous, untouched], save } as never, idempotencyKey: 'replace-with-skill' })
+    expect(result).toEqual({ mcpChanged: true })
+    expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      config: { ...previous, enabled: false }, expectedRevision: 3
+    }))
+    expect(previous.enabled).toBe(true)
+    expect(untouched.enabled).toBe(true)
+  })
+
   it('activates verified npm entrypoints in MCP V2 without shell command strings', async () => {
     const { item, installed } = await fixture()
     const save = vi.fn(async ({ config }) => ({ ...config, revision: 1 }))

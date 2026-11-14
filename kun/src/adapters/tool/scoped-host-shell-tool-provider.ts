@@ -21,7 +21,7 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 const fail = (code: string, message: string): never => { throw Object.assign(new Error(message), { code }) }
 const connectorProxy = /(?:\bdws\b|\bdingtalk\b|\blark(?:-cli)?\b|\bfeishu\b|\blarksuite\b|钉钉|飞书)/i
 type ShellResult = Awaited<ReturnType<LocalTool['execute']>>
-type SavedResult = { authorization: HostShellAuthorization; shell?: ShellResult }
+type SavedResult = { authorization: HostShellAuthorization; sessionId?: string; shell?: ShellResult }
 
 /** The proposal is not Bash and grants no ambient Shell access. Only this exact approved command is dispatched. */
 export function buildScopedHostShellToolProviders(options: {
@@ -48,7 +48,7 @@ export function buildScopedHostShellToolProviders(options: {
   }
   const resultFor = (result: SavedResult | undefined) => result?.shell
     ? { output: { authorizationId: result.authorization.id, commandHash: result.authorization.commandHash, expiresAt: result.authorization.expiresAt, ...objectOutput(result.shell.output) }, ...(result.shell.isError ? { isError: true } : {}) }
-    : { output: { status: 'outcome_unknown', code: 'outcome_unknown', authorizationId: result?.authorization.id, message: 'The approved command may have started. Verify its process and output; it will not be replayed.' }, isError: true }
+    : { output: { status: 'outcome_unknown', code: 'outcome_unknown', authorizationId: result?.authorization.id, session_id: result?.sessionId, message: 'The approved command may have started. Verify its process and output; it will not be replayed.' }, isError: true }
   return [{ id: 'scoped-host-shell', kind: 'built-in', enabled: true, available: true, tools: [
     defineLocalTool({
       name: 'request_host_shell',
@@ -79,10 +79,11 @@ export function buildScopedHostShellToolProviders(options: {
           executionId: checked.token.executionId, ownerId: checked.token.ownerId, leaseRevision: checked.token.leaseRevision, executionGrantId: checked.grant.id,
           workspaceRoot: checked.workspace, workspaceRevision: checked.grant.workspaceRevision, agentRevision: checked.grant.agentRevision,
           commandHash: operationRequest.commandHash, requestHash, approvalId, idempotencyKey: request.idempotency_key, issuedAt, expiresAt })
+        const sessionId = `bash_${randomUUID()}`
         const prepared = repository.transact(() => {
           tasks.assertToken(checked.token)
           const created = repository.beginOperation({ ownerId: checked.task.id, idempotencyKey: key, kind: 'host_shell', request: operationRequest, nowIso: nowIso() })
-          if (created.created) repository.finishOperation(checked.task.id, key, { status: 'running', result: { authorization } }, nowIso())
+          if (created.created) repository.finishOperation(checked.task.id, key, { status: 'running', result: { authorization, sessionId } }, nowIso())
           return created.created
         })
         if (!prepared) return resultFor(repository.operation(checked.task.id, key)?.result as SavedResult | undefined)
@@ -95,18 +96,20 @@ export function buildScopedHostShellToolProviders(options: {
           const remaining = Math.floor((Date.parse(expiresAt) - Date.parse(nowIso())) / 1000)
           if (remaining < 1) return fail('host_shell_authorization_expired', 'The command authorization expired before dispatch.')
           dispatched = true
-          const shell = await options.bashTool.execute({ action: 'run', command: request.command, timeout: Math.min(request.timeout_seconds, remaining), yield_seconds: 1 }, context, onUpdate)
-          const saved = { authorization, shell: { ...shell, output: sanitizeToolResultOutput('request_host_shell', shell.output) } }
+          const shell = await options.bashTool.execute({ action: 'run', command: request.command, timeout: Math.min(request.timeout_seconds, remaining), yield_seconds: 1 }, { ...context, hostShellSessionId: sessionId }, onUpdate)
           const payload = objectOutput(shell.output)
-          repository.finishOperation(checked.task.id, key, { status: payload.status === 'running' ? 'running' : shell.isError ? 'failed' : 'succeeded', result: saved }, nowIso())
+          const unknown = payload.code === 'outcome_unknown' || !payload.status && typeof payload.exit_code !== 'number'
+          const saved = { authorization, sessionId, shell: { ...shell, ...(unknown ? { isError: true } : {}),
+            output: sanitizeToolResultOutput('request_host_shell', unknown ? { ...payload, session_id: sessionId, status: 'outcome_unknown', code: 'outcome_unknown' } : shell.output) } }
+          repository.finishOperation(checked.task.id, key, { status: unknown ? 'outcome_unknown' : payload.status === 'running' ? 'running' : shell.isError ? 'failed' : 'succeeded', result: saved }, nowIso())
           return resultFor(saved)
         } catch (error) {
           if (!dispatched) {
             repository.finishOperation(checked.task.id, key, { status: 'failed', result: { authorization, shell: { output: { status: 'failed', code: 'host_shell_not_dispatched', message: 'The approved command was not dispatched; create a new request if needed.' }, isError: true } }, error: 'Authorization invalidated before dispatch.' }, nowIso())
             return resultFor(repository.operation(checked.task.id, key)!.result as SavedResult)
           }
-          repository.finishOperation(checked.task.id, key, { status: 'outcome_unknown', result: { authorization }, error: 'Approved host command outcome requires verification.' }, nowIso())
-          return { ...resultFor({ authorization }), output: { ...objectOutput(resultFor({ authorization }).output), code: 'outcome_unknown', cause: error instanceof Error ? error.name : 'error' } }
+          repository.finishOperation(checked.task.id, key, { status: 'outcome_unknown', result: { authorization, sessionId }, error: 'Approved host command outcome requires verification.' }, nowIso())
+          return { ...resultFor({ authorization, sessionId }), output: { ...objectOutput(resultFor({ authorization, sessionId }).output), code: 'outcome_unknown', cause: error instanceof Error ? error.name : 'error' } }
         }
       }
     }),
@@ -124,7 +127,7 @@ export function buildScopedHostShellToolProviders(options: {
         if (authorization.taskId !== checked.task.id || authorization.threadId !== context.threadId || authorization.workspaceRoot !== checked.workspace || authorization.workspaceRevision !== checked.grant.workspaceRevision || authorization.agentRevision !== checked.grant.agentRevision) return fail('host_shell_scope_blocked', 'This command authorization belongs to a different task or revoked workspace/Agent scope.')
         if (request.action === 'stop' && (authorization.turnId !== context.turnId || authorization.executionId !== checked.token.executionId || authorization.ownerId !== checked.token.ownerId || authorization.leaseRevision !== checked.token.leaseRevision || authorization.executionGrantId !== checked.grant.id)) return fail('host_shell_scope_blocked', 'Stopping requires the original command execution and its immutable lease; read-only poll can verify an earlier attempt.')
         if (receipt.status === 'succeeded' || receipt.status === 'failed') return resultFor(saved)
-        const sessionId = objectOutput(saved.shell?.output).session_id
+        const sessionId = saved.sessionId ?? objectOutput(saved.shell?.output).session_id
         if (typeof sessionId !== 'string') return resultFor(saved)
         const session = repository.getShellSession(sessionId)
         if (!session || session.taskId !== checked.task.id || session.executionId !== authorization.executionId || session.ownerId !== authorization.ownerId) return fail('host_shell_scope_blocked', 'Shell process ownership could not be verified; no signal was sent.')
@@ -132,7 +135,7 @@ export function buildScopedHostShellToolProviders(options: {
         const payload = objectOutput(shell.output)
         const recoveredUnknown = payload.recovered === true && (!['completed', 'failed', 'terminated'].includes(session.status) || session.exitCode === undefined)
         const recoveredFailure = payload.recovered === true && !recoveredUnknown && (session.status !== 'completed' || session.exitCode !== 0)
-        const next = { authorization, shell: { ...shell, ...(recoveredUnknown || recoveredFailure ? { isError: true } : {}), output: sanitizeToolResultOutput('host_shell_session', { ...payload,
+        const next = { authorization, sessionId, shell: { ...shell, ...(recoveredUnknown || recoveredFailure ? { isError: true } : {}), output: sanitizeToolResultOutput('host_shell_session', { ...payload,
           ...(payload.recovered === true && !recoveredUnknown ? { status: session.status, exit_code: session.exitCode } : {}),
           ...(recoveredUnknown ? { status: 'outcome_unknown', code: 'outcome_unknown' } : {}) }) } }
         repository.finishOperation(checked.task.id, receipt.idempotencyKey, { status: recoveredUnknown || payload.code === 'outcome_unknown' ? 'outcome_unknown' : payload.status === 'running' ? 'running' : next.shell.isError ? 'failed' : 'succeeded', result: next }, nowIso())

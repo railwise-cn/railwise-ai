@@ -68,3 +68,12 @@ describe('conversation visibility', () => {
     ], true)).toEqual({ phase: 'validating', operationCount: 3, active: true })
   })
 })
+
+  it('uses semantic task status while keeping commands available only in developer details', () => {
+    const input: ChatBlock[] = [{ kind: 'tool', id: 'shell', status: 'error', summary: 'request_host_shell curl.exe https://example.test', detail: 'curl.exe --verbose', meta: { toolName: 'request_host_shell', command: 'curl.exe --verbose', outcomeUnknown: true } }]
+    const standard = visibleProcessBlocksForMode(input, 'standard')[0]!
+    expect(standard).toMatchObject({ detail: undefined })
+    expect('summary' in standard && standard.summary).not.toContain('request_host_shell')
+    expect('summary' in standard && standard.summary).not.toContain('curl.exe')
+    expect(visibleProcessBlocksForMode(input, 'developer')[0]).toMatchObject({ detail: 'curl.exe --verbose' })
+  })

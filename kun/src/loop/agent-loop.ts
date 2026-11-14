@@ -537,6 +537,17 @@ export class AgentLoop {
       await this.recordPipelineStage(threadId, turnId, 'pre_start')
       await this.recordPipelineStage(threadId, turnId, 'post_start')
       for (;;) {
+        // Permission can expire after admission or between attempts. Check before creating an execution attempt.
+        try {
+          const existingGrant = (await this.opts.threadStore.get(threadId))?.turns.find(turn => turn.id === turnId)?.executionGrant
+          await this.opts.validateTaskPermission?.(threadId, existingGrant?.taskPermissionId)
+        } catch (error) {
+          const blocked = this.opts.tasks?.blockTaskPermission?.(threadId, turnId, error)
+          if (!blocked) throw error
+          if (blocked.kind === 'stalled') return await this.finishUnknownToolOutcome(threadId, turnId, 'outcome_unknown: 操作结果尚未核验，执行已停止。')
+          await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
+          return 'completed'
+        }
         this.opts.tasks?.beginAttempt(threadId, turnId)
         await this.drainSteering(threadId, turnId, signal)
         let outcome: TaskAttemptOutcome
@@ -544,21 +555,33 @@ export class AgentLoop {
           outcome = await this.loop(threadId, turnId, signal)
         } catch (error) {
           if (signal.aborted || !this.opts.tasks) throw error
-          const message = error instanceof Error ? error.message : String(error)
-          await this.opts.events.record({
-            kind: 'error',
-            threadId,
-            turnId,
-            message: '本次模型或工具尝试异常，任务将从检查点自动继续。',
-            code: 'turn_attempt_exception',
-            severity: 'warning'
-          })
-          outcome = {
-            kind: 'retryable',
-            code: 'turn_attempt_exception',
-            message: message.trim() || '本次模型或工具尝试异常。'
+          const permissionBlock = this.opts.tasks.blockTaskPermission?.(threadId, turnId, error)
+          if (permissionBlock) {
+            if (permissionBlock.kind === 'stalled') return await this.finishUnknownToolOutcome(threadId, turnId, 'outcome_unknown: 操作结果尚未核验，执行已停止。')
+            await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
+            return 'completed'
+          }
+          if (this.opts.tasks.hasUnknownToolOutcome?.(threadId, turnId)) {
+            outcome = { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
+          } else {
+            const message = error instanceof Error ? error.message : String(error)
+            await this.opts.events.record({
+              kind: 'error',
+              threadId,
+              turnId,
+              message: '本次模型或工具尝试异常，任务将从检查点自动继续。',
+              code: 'turn_attempt_exception',
+              severity: 'warning'
+            })
+            outcome = {
+              kind: 'retryable',
+              code: 'turn_attempt_exception',
+              message: message.trim() || '本次模型或工具尝试异常。'
+            }
           }
         }
+        if (outcome.kind === 'waiting_user' && signal.aborted) outcome = { kind: 'cancelled', reason: 'operation_cancelled' }
+        if (outcome.kind === 'waiting_user') return await this.finishUnknownToolOutcome(threadId, turnId, outcome.message)
         if (outcome.kind === 'candidate' && this.opts.tasks) {
           const decision = await this.opts.tasks.assessCandidate(threadId, turnId)
           if (decision.kind === 'continue') {
@@ -592,6 +615,7 @@ export class AgentLoop {
           }
         } else if (outcome.kind === 'retryable' && this.opts.tasks) {
           const blocked = await this.opts.tasks.assessNonRetryableBlock?.(threadId, turnId)
+          if (blocked?.kind === 'stalled') return await this.finishUnknownToolOutcome(threadId, turnId, 'outcome_unknown: 操作结果尚未核验，执行已停止。')
           if (blocked?.kind === 'waiting_user') {
             await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
             return 'completed'
@@ -764,19 +788,22 @@ export class AgentLoop {
   }
 
   private async drainSteering(threadId: string, turnId: string, signal: AbortSignal): Promise<void> {
-    if (signal.aborted) return
+    if (signal.aborted || this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) return
     const deliveries = this.opts.tasks?.pendingDeliveries(threadId, turnId) ?? []
     const durableIds = new Set(deliveries.map(entry => entry.input.id))
     const hints = this.opts.steering.drainEntries(turnId).filter(entry => !entry.inputId || !durableIds.has(entry.inputId))
-    const entries = [...deliveries.map(entry => ({ text: entry.input.text, inputId: entry.input.id, itemId: entry.delivery.messageItemId,attachmentIds:entry.input.attachmentIds,workspaceReferences:entry.input.workspaceReferences })),
-      ...hints.filter(entry => !entry.inputId).map(entry => ({ ...entry, itemId: this.opts.ids.next('item_steered'),attachmentIds:undefined,workspaceReferences:undefined }))]
+    const entries = [...deliveries.map(entry => ({ text: entry.input.text, inputId: entry.input.id, itemId: entry.delivery.messageItemId, approval: this.opts.tasks?.approvalForInput(entry.input), sourceId: entry.input.sourceId, attachmentIds:entry.input.attachmentIds,workspaceReferences:entry.input.workspaceReferences })),
+      ...hints.filter(entry => !entry.inputId).map(entry => ({ ...entry, itemId: this.opts.ids.next('item_steered'), approval: undefined, sourceId: undefined, attachmentIds:undefined,workspaceReferences:undefined }))]
     if (!entries.length) return
     // Stable IDs bridge the JSONL/SQLite boundary. appendItem flushes before resolving.
     const persisted = await this.opts.sessionStore.loadItems(threadId)
     const present = new Set(persisted.map(item => item.id))
     for (const entry of entries) {
       if (present.has(entry.itemId)) continue
-      const item: TurnItem = { id: entry.itemId, turnId, threadId, role: 'user', status: 'completed', createdAt: this.opts.nowIso(), finishedAt: this.opts.nowIso(), kind: 'user_message', text: entry.text,attachmentIds:entry.attachmentIds,workspaceReferences:entry.workspaceReferences }
+      const base = { id: entry.itemId, turnId, threadId, createdAt: this.opts.nowIso(), finishedAt: this.opts.nowIso(), taskInputId: entry.inputId, sourceRequestId: entry.sourceId }
+      const item: TurnItem = entry.approval
+        ? { ...base, role: 'system', kind: 'approval', approvalId: entry.approval.id, toolName: entry.approval.toolName, status: entry.approval.status, summary: entry.approval.status === 'allowed' ? '已允许本次操作' : entry.approval.status === 'expired' ? '本次授权已过期' : '已拒绝本次操作' }
+        : { ...base, role: 'user', status: 'completed', kind: 'user_message', text: entry.text,attachmentIds:entry.attachmentIds,workspaceReferences:entry.workspaceReferences }
       await this.opts.turns.applyItem(threadId, item)
       present.add(item.id)
     }
@@ -798,6 +825,9 @@ export class AgentLoop {
   ): Promise<TaskAttemptOutcome> {
     for (let step = 0; ; step += 1) {
       if (signal.aborted) return { kind: 'cancelled', reason: 'operation_cancelled' }
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) {
+        return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
+      }
       if (step >= MAX_TURN_MODEL_STEPS) {
         const message =
           `Turn stopped after ${MAX_TURN_MODEL_STEPS} model steps without reaching a final response.`
@@ -828,6 +858,7 @@ export class AgentLoop {
       }
       await this.drainSteering(threadId, turnId, signal)
       const stepResult = await this.modelStep(threadId, turnId, signal, step)
+      if (stepResult === 'outcome_unknown') return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
       if (stepResult === 'stop') return { kind: 'candidate' }
       if (stepResult === 'blocked') {
         return {
@@ -866,7 +897,7 @@ export class AgentLoop {
     turnId: string,
     signal: AbortSignal,
     stepIndex = 0
-  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted'> {
+  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown'> {
     if (shouldVerifyImmutablePrefix()) {
       verifyImmutablePrefix(this.opts.prefix)
     }
@@ -1147,11 +1178,17 @@ export class AgentLoop {
       ...(workspaceReferences.length ? [workspaceReferenceInstruction(workspaceReferences)] : []),
       ...formatWorkspaceInstructions(workspaceInstructions),
       ...skillResolution.instructions,
+      ...(this.opts.tasks?.activeTask(threadId)?.scheduledBy ? ['This is one occurrence of a persisted schedule. Perform the original business task and deliver this occurrence’s artifacts. The schedule is already stored.'] : []),
+      ...(executionGrant?.managedArtifactRoot && effectiveToolSpecs.some(tool => tool.name === 'publish_artifact') ? [
+        'For requested HTML or file deliverables, use publish_artifact with a relative filename and complete content to save a verified task artifact. The app previews HTML automatically. This output namespace is available independently of workspace write permission. '
+        + (effectiveToolSpecs.some(tool => tool.name === 'read_artifact') ? 'Inspect saved content with read_artifact using that same relative filename, rather than generic file read or requesting workspace permission for this task-owned output. ' : '')
+        + 'Refine an existing report at the same relative filename instead of publishing duplicate drafts. Saving a draft does not complete source verification or schedule creation. Deliver artifact references in the final response.'
+      ] : []),
       ...(userInputDisabled ? [userInputUnavailableInstruction()] : []),
       ...(completionRecoveryInstruction ? [completionRecoveryInstruction] : []),
       ...optionalInstruction(webSearchCapabilityInstruction(workflowPrompt, toolSpecs)),
       ...optionalInstruction(webFailureGuard?.recoveryInstruction()),
-      ...(effectiveToolSpecs.some((tool) => tool.name === 'bash') ? [shellRuntimeInstruction()] : []),
+      ...(effectiveToolSpecs.some((tool) => tool.name === 'bash' || tool.name === 'request_host_shell') ? [shellRuntimeInstruction()] : []),
       ...(toolCatalogDriftMessage ? [toolCatalogDriftMessage] : [])
     ]
     await this.recordPipelineStage(threadId, turnId, 'input_remembered', {
@@ -1240,6 +1277,7 @@ export class AgentLoop {
       finishWork = this.opts.tasks?.beginWork(turnId, modelRequestId, 'model')
       const remainingMs = this.opts.tasks?.workBudget(turnId)?.remainingMs
       if (remainingMs !== undefined) { workTimer = setTimeout(() => this.opts.turns.abortTurn(turnId, 'execution_budget_exhausted'), Math.max(1, remainingMs)); workTimer.unref?.() }
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) return 'outcome_unknown'
       for await (const chunk of this.opts.model.stream(request)) {
         if (modelToken) this.opts.tasks?.assertToken(modelToken)
         if (signal.aborted) {
@@ -1530,6 +1568,7 @@ export class AgentLoop {
             signal
           })
           if (dispatched === 'aborted') return 'aborted'
+          if (dispatched === 'outcome_unknown') return 'outcome_unknown'
           if (dispatched === 'all_suppressed') return 'stop'
           return 'continue'
         }
@@ -1674,6 +1713,7 @@ export class AgentLoop {
       signal
     })
     if (dispatched === 'aborted') return 'aborted'
+    if (dispatched === 'outcome_unknown') return 'outcome_unknown'
     if (dispatched === 'all_suppressed') {
       // A blocked Web call is persisted as a failed tool result, then the next
       // model step gets no Web tools and one final recovery instruction. This
@@ -1725,13 +1765,14 @@ export class AgentLoop {
     approvalPolicy: ToolHostContext['approvalPolicy']
     sandboxMode: NonNullable<ToolHostContext['sandboxMode']>
     signal: AbortSignal
-  }): Promise<'continue' | 'aborted' | 'all_suppressed'> {
+  }): Promise<'continue' | 'aborted' | 'all_suppressed' | 'outcome_unknown'> {
     const context = this.createToolContext(input)
     let index = 0
     let executedAny = false
 
     while (index < input.calls.length) {
       if (input.signal.aborted) return 'aborted'
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) return 'outcome_unknown'
 
       const call = input.calls[index]
       if (!call) break
@@ -1769,6 +1810,8 @@ export class AgentLoop {
         })
         executedAny = true
         await this.persistToolCallResult(input.threadId, input.turnId, call, result)
+        if (input.signal.aborted) return 'aborted'
+        if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) return 'outcome_unknown'
         index += 1
         continue
       }
@@ -1811,6 +1854,8 @@ export class AgentLoop {
         if (result.status === 'rejected') throw result.reason
         await this.persistToolCallResult(input.threadId, input.turnId, batchCall, result.value)
       }
+      if (input.signal.aborted) return 'aborted'
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) return 'outcome_unknown'
 
       if (suppressedAfterBatch) {
         await this.persistSuppressedToolCall({
@@ -1823,6 +1868,15 @@ export class AgentLoop {
     }
 
     return executedAny ? 'continue' : 'all_suppressed'
+  }
+
+  private async finishUnknownToolOutcome(threadId: string, turnId: string, message: string): Promise<'failed'> {
+    this.opts.tasks?.suspendUnknownToolOutcome?.(threadId, turnId)
+    await this.opts.events.record({ kind: 'error', threadId, turnId, code: 'outcome_unknown', severity: 'warning', message })
+    // This Turn is blocked, while its Task and browser surface remain available
+    // for read-only verification and a separately authorized continuation.
+    await this.opts.turns.finishTurn({ threadId, turnId, status: 'failed', reason: 'blocked', error: message })
+    return 'failed'
   }
 
   private isParallelSafeToolCall(
@@ -1841,7 +1895,9 @@ export class AgentLoop {
     const scope = await this.opts.executionScope?.(thread.id, turnId)
     const agentTrust = thread.agentProfile?.trustLevel ?? 'full-access'
     const trustOrder = ['read-only', 'workspace-write', 'trusted', 'full-access'] as const
-    const trust = trustOrder[Math.min(trustOrder.indexOf(workspace.level), trustOrder.indexOf(agentTrust))]!
+    const workspaceWriteException = Boolean(scope?.workspaceWriteException && scope.permissionScope?.writePaths?.length && agentTrust !== 'read-only' && context.sandboxMode !== 'read-only' && context.sandboxMode !== 'external-sandbox')
+    const workspaceCeiling = workspaceWriteException ? 'workspace-write' : workspace.level
+    const trust = trustOrder[Math.min(trustOrder.indexOf(workspaceCeiling), trustOrder.indexOf(agentTrust))]!
     const sandboxMode = effectiveAgentSandboxMode(context.sandboxMode ?? DEFAULT_SANDBOX_MODE, trust)
     const task = this.opts.tasks?.activeTask(thread.id)
     const permission = scope?.permissionScope
@@ -1849,19 +1905,13 @@ export class AgentLoop {
     const readPaths = intersectGrantedPaths(permission?.readPaths ?? scope?.readPathAllowlist ?? scope?.pathAllowlist ?? defaultPaths, scope?.readPathAllowlist ?? scope?.pathAllowlist)
     const writePaths = sandboxMode === 'read-only' ? [] : intersectGrantedPaths(permission?.writePaths ?? scope?.writePathAllowlist ?? scope?.pathAllowlist ?? defaultPaths, scope?.writePathAllowlist ?? scope?.pathAllowlist)
     const providerIds = intersectGrantValues(scope?.allowedProviderIds, permission?.providerIds)
-    const catalog = await this.opts.toolHost.listTools({
-      ...context,
-      workspace: workspace.canonicalRoot,
-      sandboxMode,
-      ...(providerIds !== undefined ? { allowedProviderIds: providerIds } : {})
-    })
     const grant = ExecutionGrantSchema.parse({
       id: `grant:${turnId}:${workspace.revision}:${thread.agentRevision ?? 0}`,
-      ...(task ? { taskId: task.id } : {}),
+      ...(task ? { taskId: task.id, managedArtifactRoot: this.opts.tasks?.managedArtifactRoot(task.id) } : {}),
       threadId: thread.id, turnId, workspaceRoot: workspace.canonicalRoot,
-      workspaceTrust: workspace.level, agentTrust, approvalPolicy: context.approvalPolicy,
+      workspaceTrust: workspace.level, ...(workspaceWriteException ? {workspaceWriteException:true} : {}), agentTrust, approvalPolicy: context.approvalPolicy,
       sandboxMode,
-      allowedToolNames: catalog.map(tool => tool.name).filter(name => !scope?.allowedToolNames || scope.allowedToolNames.includes(name)),
+      ...(scope?.allowedToolNames ? {allowedToolNames: scope.allowedToolNames} : {}),
       ...(context.allowedMcpProviderIds ? { allowedMcpProviderIds: [...context.allowedMcpProviderIds] } : {}),
       ...(providerIds !== undefined ? { allowedProviderIds: providerIds } : {}),
       pathAllowlist: [...new Set([...readPaths, ...writePaths])],
@@ -1870,6 +1920,9 @@ export class AgentLoop {
       connectorScopes: scope?.connectorScopes ?? [], externalTargets: intersectGrantValues(scope?.externalTargets ?? [], permission?.externalTargets),
       ...(scope?.connectorIdentityFingerprints ? {connectorIdentityFingerprints:scope.connectorIdentityFingerprints} : {}),
       ...(scope?.connectorBackends ? { connectorBackends: scope.connectorBackends } : {}),
+      ...(scope?.browserScope ? {browserScope: scope.browserScope} : {}),
+      ...(scope?.browserScheduleBinding ? {browserScheduleBinding: scope.browserScheduleBinding} : {}),
+      ...(scope?.scheduleScopeHash ? {scheduleScopeHash: scope.scheduleScopeHash} : {}),
       workspaceRevision: workspace.revision, agentRevision: thread.agentRevision ?? 0,
       revision: workspace.revision, idempotencyKey: `grant:${turnId}`, issuedAt: this.opts.nowIso(),
       ...(scope?.taskPermissionId ? { taskPermissionId: scope.taskPermissionId } : {}),
@@ -1989,6 +2042,7 @@ export class AgentLoop {
           operation = this.opts.tasks?.beginToolOperation(input.turnId, input.call, input.context.executionGrant)
           if (operation?.prior) return operation.prior
           const dispatchOperation = operation
+          let workSegment = 0
           const result = await this.opts.toolHost.execute(input.call, { ...input.context, ...(dispatchOperation ? {
             assertExecution: () => this.opts.tasks?.assertToken(dispatchOperation.token),
             assertExternalTarget: (provider: string, operation: string, target: string) => this.opts.tasks!.assertExternalTarget(input.turnId, provider, operation, target),
@@ -1996,7 +2050,10 @@ export class AgentLoop {
             recordExplicitApproval: approval => this.opts.tasks!.recordToolApproval(dispatchOperation.token, dispatchOperation.key, approval),
             recordToolDispatch: () => this.opts.tasks!.recordToolDispatch(dispatchOperation.token, dispatchOperation.key),
             ...(input.context.executionGrant?.taskPermissionId ? { claimTaskPermission: () => this.opts.claimTaskPermission!(input.threadId, input.context.executionGrant!.taskPermissionId!, dispatchOperation.key) } : {}),
-            ...(!/^(?:bash|user_input|request_user_input|delegate.*|.*subagent.*|spawn_agent)$/.test(input.call.toolName) ? {beginExecutionWork:()=>this.opts.tasks?.beginWork(input.turnId,`tool-work:${dispatchOperation.token.executionId}:${input.call.callId}`,'tool')} : {})
+            ...(!/^(?:bash|user_input|request_user_input|delegate.*|.*subagent.*|spawn_agent)$/.test(input.call.toolName) ? {
+              beginExecutionWork: () => this.opts.tasks?.beginWork(input.turnId,
+                `tool-work:${dispatchOperation.token.executionId}:${input.call.callId}:${workSegment++}`, 'tool')
+            } : {})
           } : {}) }, async (item) => {
             if (operation) this.opts.tasks?.assertToken(operation.token)
             const existing = await this.opts.turns.updateItem(input.threadId, item.id, {
@@ -2105,7 +2162,8 @@ export class AgentLoop {
   ): void {
     this.webToolFailureGuards.get(turnId)?.observe(
       call,
-      result.item.kind === 'tool_result' && result.item.isError === true
+      result.item.kind === 'tool_result' && result.item.isError === true,
+      result.item.kind === 'tool_result' ? result.item.output : undefined
     )
   }
 
@@ -2404,10 +2462,12 @@ export class AgentLoop {
       const scope = this.opts.tasks?.workBudget(input.turnId)
       summaryPermit = await this.opts.capacityManager?.acquire({ id:summaryRequestId,rootTaskId:scope?.rootTaskId,serialRoot:scope?.serialRoot,resources:{model:1,worker:1} },controller.signal)
       finishSummaryWork = this.opts.tasks?.beginWork(input.turnId,summaryRequestId,'compaction')
+      const summaryProviderId = (await this.opts.threadStore.get(input.threadId))?.turns.find(turn => turn.id === input.turnId)?.providerId
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) throw Object.assign(new Error('The original operation requires verification before another model request.'), { code: 'outcome_unknown' })
       for await (const chunk of this.opts.model.stream({
         threadId: input.threadId,
         turnId: input.turnId,
-        providerId: (await this.opts.threadStore.get(input.threadId))?.turns.find(turn => turn.id === input.turnId)?.providerId,
+        providerId: summaryProviderId,
         model: input.model,
         systemPrompt: this.opts.prefix.systemPrompt,
         contextInstructions: [

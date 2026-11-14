@@ -256,7 +256,7 @@ describe('Web tool provider', () => {
     }
   })
 
-  it('returns unavailable-provider errors for search without a search provider', async () => {
+  it('hides unavailable search and rejects an unadvertised direct call', async () => {
     const config = KunCapabilitiesConfig.parse({
       web: {
         enabled: true,
@@ -268,21 +268,8 @@ describe('Web tool provider', () => {
       registry: new CapabilityRegistry(buildWebToolProviders(config.web).providers)
     })
 
-    const result = await host.execute({
-      callId: 'call_1',
-      toolName: 'web_search',
-      arguments: { query: 'kun web' }
-    }, buildContext())
-
-    expect(result.item).toMatchObject({ kind: 'tool_result', isError: true })
-    if (result.item.kind === 'tool_result') {
-      expect(result.item.output).toMatchObject({
-        error: {
-          code: 'provider_unavailable',
-          message: 'web search provider is unavailable'
-        }
-      })
-    }
+    expect((await host.listTools(buildContext())).map(tool => tool.name)).not.toContain('web_search')
+    await expect(host.execute({callId:'unavailable-search',toolName:'web_search',arguments:{query:'kun web'}},buildContext())).rejects.toThrow('unknown tool')
   })
 
   it('searches through a configured provider with citations and telemetry', async () => {

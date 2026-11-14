@@ -1725,7 +1725,7 @@ function packageStatusLabel(
   const checkedAt = check ? new Date(check.checkedAt).toLocaleString() : ''
   switch (marketplacePackageStatus(item, installed, server, diagnostic).state) {
     case 'available': return text('settings:pluginAvailableToInstall', 'Available to install')
-    case 'installed': return text('pluginFilterInstalled', 'Installed')
+    case 'installed': return item.id === 'browser-skill' ? text('browserSkillFilesInstalled', 'Skill installed · configure browser connection') : text('pluginFilterInstalled', 'Installed')
     case 'configuration': return text('pluginUnifiedNeedsConfig', 'Needs configuration')
     case 'configured_unverified': return text('settings:pluginConfiguredUnverified', 'Configured · verification pending')
     case 'connection_checked': return `${text('settings:pluginConnectionChecked', 'Connection check passed ({{count}} tools)', { count: check?.toolCount ?? 0 })} · ${checkedAt}`

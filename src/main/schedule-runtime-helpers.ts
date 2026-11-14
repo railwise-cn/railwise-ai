@@ -1,3 +1,4 @@
+import { nextScheduleOccurrence } from '../../kun/src/contracts/schedule'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type {
   AppSettingsV1,
@@ -150,24 +151,10 @@ export function summarizeTaskResult(text: string): string {
 }
 
 export function computeScheduleNextRunAt(task: ScheduledTaskV1, from: Date): string {
-  if (!task.enabled || task.schedule.kind === 'manual') return ''
-  if (task.schedule.kind === 'at') {
-    return task.schedule.atTime.trim()
-  }
-  if (task.schedule.kind === 'interval') {
-    return new Date(from.getTime() + task.schedule.everyMinutes * 60_000).toISOString()
-  }
-
-  const [hourRaw, minuteRaw] = task.schedule.timeOfDay.split(':')
-  const hour = Number(hourRaw)
-  const minute = Number(minuteRaw)
-  const next = new Date(from)
-  next.setSeconds(0, 0)
-  next.setHours(Number.isFinite(hour) ? hour : 9, Number.isFinite(minute) ? minute : 0, 0, 0)
-  if (next.getTime() <= from.getTime()) {
-    next.setDate(next.getDate() + 1)
-  }
-  return next.toISOString()
+  if (!task.enabled) return ''
+  // Legacy one-shot tasks catch up once when their saved deadline has passed.
+  if (task.schedule.kind === 'at') return task.schedule.atTime.trim()
+  return nextScheduleOccurrence(task.schedule, from) ?? ''
 }
 
 export function asString(value: unknown): string {

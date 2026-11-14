@@ -273,6 +273,23 @@ test('new smoke selects the exact official 0.5.4 installers while retaining hist
   }
 })
 
+test('0.5.6 baseline pins select official RailWise installers and reject arbitrary remote inputs', () => {
+  const baseline = resolveUpdaterBaseline('0.5.6')
+  assert.deepEqual(baseline.pins, {
+    arm64: { name: 'RailWise-AI-0.5.6-mac-Apple-Silicon.dmg', size: 395569874, sha256: '27ddbc81b909208125e222cba4fddc1b9a7e01ab53a64af595fbe0ac97329d21' },
+    x64: { name: 'RailWise-AI-0.5.6-mac-Intel.dmg', size: 406107895, sha256: '31daae24204bd0976f875407556c5925118f13b2382f39242f200cfaf5b1a08d' }
+  })
+  assert.equal(validateFrozenTargetVersion('0.5.7', baseline.version), '0.5.7')
+  for (const target of ['0.5.6', '0.5.5']) assert.throws(() => validateFrozenTargetVersion(target, baseline.version))
+  for (const version of ['https://example.invalid/baseline.dmg', '../0.5.6', '0.5.6?source=other', '0.5.9']) {
+    assert.throws(() => resolveUpdaterBaseline(version))
+  }
+  for (const name of ['https://example.invalid/RailWise-AI-0.5.6-mac-Apple-Silicon.dmg', '../RailWise-AI-0.5.6-mac-Apple-Silicon.dmg', 'RailWise-AI-0.5.7-mac-Apple-Silicon.dmg']) {
+    const manifest = { versions: { '0.5.6': { 'darwin-arm64': { ...baseline.pins.arm64, name }, 'darwin-x64': baseline.pins.x64 } } }
+    assert.throws(() => resolveUpdaterBaseline('0.5.6', manifest), /installer pin/)
+  }
+})
+
 test('private exact-package smoke accepts its release branch without authorizing reviewed-main provenance', () => {
   const env = { ...hostedEnvironment(), GITHUB_REF: 'refs/heads/codex/example', GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/release.yml@refs/heads/codex/example` }
   assert.equal(requireExactPackageRunner(env, 'darwin', '/runner/home').mode, 'private-exact-package-smoke')

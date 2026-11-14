@@ -4,7 +4,7 @@
 
 > Engineering survey processing and coding collaboration.
 
-RailWise AI 0.5.6 is a local-first desktop platform for persistent tasks, engineering documents and external-platform work. Code and Survey are the primary workspaces. RailWise Survey connects original observations, calculation records and reviewable deliverables, with Write, Design, Flow, skills and connectors providing supporting tools.
+RailWise AI 0.5.7 provides a local-first desktop platform for persistent tasks, engineering documents and external-platform work. Code and Survey are the primary workspaces. RailWise Survey connects original observations, calculation records and reviewable deliverables, with Write, Design, Flow, skills and connectors providing supporting tools.
 
 Installers use the `RailWise-AI` name while retaining the existing installation identity and `.workwise` data and configuration readers. Engineering deliverables retain source, calculation and review records for professional assessment. [Release identity and migration notes](./docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md)
 
@@ -14,24 +14,27 @@ Installers use the `RailWise-AI` name while retaining the existing installation 
 - Public releases: [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases)
 - Latest stable version: [Download](https://github.com/railwise-cn/railwise-ai/releases/latest), or check for updates in the installed application.
 
-## Current release
+## Version 0.5.7
 
-Version **[0.5.6](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.6)** improves persistent tasks, connector authorization, document delivery and in-app upgrades. [Release notes](./release/release-v0.5.6.md)
+[Release notes](./release/release-v0.5.7.md) describe the changes. See the [acceptance record](./docs/qa/general-execution-delivery-2026-11-13.md) for the exact validation scope and limits.
 
-| Platform | Installer | Download |
+| Platform | Installer filename | Download |
 | --- | --- | --- |
-| macOS Apple Silicon | `RailWise-AI-0.5.6-mac-Apple-Silicon.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
-| macOS Intel | `RailWise-AI-0.5.6-mac-Intel.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
-| Windows x64 | `RailWise-AI-0.5.6-win-x64.exe` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
+| macOS Apple Silicon | `RailWise-AI-0.5.7-mac-Apple-Silicon.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
+| macOS Intel | `RailWise-AI-0.5.7-mac-Intel.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
+| Windows x64 | `RailWise-AI-0.5.7-win-x64.exe` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
 
-GitHub Releases remains the public release log and manual installer source. Signed updater metadata and platform update artifacts are published through the official `railwise.cn` Stable channel. There is currently no Linux client, portable edition, or activation-code flow.
+Published installers remain available from GitHub Releases and the official update channel. [Published versions](https://github.com/railwise-cn/railwise-ai/releases)
 
-## What changed in 0.5.6
+## Changes in 0.5.7
 
-- The **task center** brings together goals, progress, pending actions and results. Follow-up requirements reach the original task, inputs remain queued while paused, and task details expose execution scope, operation receipts and verification results.
-- **Skills, Plugins, Connectors** appear in that order, with Skills open by default. Browse engineering tools by source and installation state, connect Feishu and DingTalk separately, and confirm external write targets before execution.
-- Four new **engineering skills** cover source inventories, monitoring quality checks and charts, document differences, and meeting notes with action items. The market also provides setup and installation entries for Amap, Zotero and AutoCAD redraw skills.
-- An **available update** appears in the lower-left corner. One click starts download, safe saving, installation and restart. The bundled Chinese manual has 13 chapters with search and chapter navigation.
+- **BrowserSkill** checks the managed CLI, official extension, selected Chrome/Edge instance and permitted sites. Skill installation and activation synchronize with the running application. Missing dependencies or permissions leave an actionable item on the original task.
+- **HTML deliverables** register actual generated files as task results. The first verified HTML result in the active conversation opens automatically in the right-hand preview. Reopen it from the task center or result card to inspect its content, sources and saved location.
+- **File permissions** allow new reports to use application-managed task storage in a read-only workspace. Requests to write to a specified directory require review of the target path and permission scope.
+- **Daily schedules** support multiple times and an explicit timezone. For delivery deadlines, review the earlier start time. Recurring browser interactions use reviewed, finite scopes and recheck the site, element, input and browser binding on subsequent runs.
+- **Conversation display** focuses on concise progress, pending actions and results. Tool parameters and long output are available in expandable work details.
+
+The Chinese manual includes setup and operating instructions for browser tasks, file delivery and daily schedules. [User guide](./docs/USER_GUIDE.zh-CN.md)
 
 ## 0.5.6 Chinese interface
 
@@ -230,9 +233,9 @@ Preview and directional items are not described as stable released features.
 
 ### In-app updates
 
-RailWise AI 0.5.6 checks the official `railwise.cn` Stable channel at startup and every 24 hours. When an update is available, a compact **Upgrade** control appears at the lower left of the standard and writing sidebars and displays download progress.
+Published releases check the official `railwise.cn` Stable channel at startup and every 24 hours. When an update is available, a compact **Upgrade** control appears at the lower left of the standard and writing sidebars and displays download progress.
 
-One click starts download and verification, saves edited content, and waits for a safe execution boundary before installing and restarting. Save or shutdown failures show a reason and a retry action. Tasks, drafts, history and configuration references are preserved across upgrades, including paused and waiting tasks. The release completed a native upgrade test from formal 0.5.4 to the exact 0.5.6 package.
+One click starts download and verification, saves edited content, and waits for a safe execution boundary before installing and restarting. Save or shutdown failures show a reason and a retry action. Tasks, drafts, history and configuration references are preserved across upgrades, including paused and waiting tasks. The 0.5.6 release record includes its historical native upgrade test from formal 0.5.4 to the exact 0.5.6 package.
 
 Manual checking, channel selection and diagnostics remain available in Help or Settings. The Help center bundles the complete 13-chapter Chinese manual for offline reading, full-text search, chapter navigation and internal links. [Complete user guide](./docs/USER_GUIDE.zh-CN.md)
 

@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
-import { TaskApprovalGrantSchema, TaskPermissionConfirmationSchema, type TaskPermissionConfirmation, type TaskApprovalGrant, type TaskPermissionScope, type ExecutionGrant, type WorkspaceTrustLevel } from '../contracts/permissions.js'
+import { TaskPermissionRevocationSchema, type TaskPermissionRevocation, TaskApprovalGrantSchema, TaskPermissionConfirmationSchema, type TaskPermissionConfirmation, type TaskApprovalGrant, type TaskPermissionScope, type ExecutionGrant, type WorkspaceTrustLevel } from '../contracts/permissions.js'
 import type { ThreadRecord } from '../contracts/threads.js'
 import type { TaskRun } from '../contracts/tasks.js'
 import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
 import { canonicalTrustRoot, type WorkspaceTrustReader } from './workspace-trust-reader.js'
 import type { ToolEffectDefinition } from '../ports/tool-effect.js'
+import { recoverablePermissionFailure } from './task-permission-recovery.js'
 
 export type TaskPermissionSnapshot = {
   taskId: string; taskRevision: number; taskTitle: string; scopeHash: string
@@ -14,18 +15,18 @@ export type TaskPermissionSnapshot = {
   sandboxMode: ThreadRecord['sandboxMode']; agentTrust: WorkspaceTrustLevel; agentName?: string
   toolAllowlist?: string[]; mcpAllowlist?: string[]; externalTargets: string[]
   connectorScopeSources: Array<{ provider: string; scopes: string[]; source: 'task_requirements' | 'tool_catalog' | 'last_execution_grant'; issuedAt?: string; expiresAt?: string }>
-  canConfirm: boolean; reason?: string
+  canWritePaths: boolean; canConfirm: boolean; canRestoreBase?: boolean; recoveryEligible?: boolean; reason?: string
   executionGrants: ExecutionGrant[]
   grant?: { id: string; status: 'active'|'expired'|'invalid'|'prepared'|'consumed'; confirmedAt: string; expiresAt: string; scope?: TaskPermissionScope; duration?: 'task'|'next_operation' }
 }
 export type TaskPermissionResult = { task: TaskRun; permission: TaskPermissionSnapshot; resumed: false }
-export type TaskExecutionRestriction = { taskPermissionId?: string; expiresAt?: string; permissionScope?: TaskPermissionScope; permissionDuration?: 'task'|'next_operation' }
+export type TaskExecutionRestriction = { taskPermissionId?: string; expiresAt?: string; permissionScope?: TaskPermissionScope; permissionDuration?: 'task'|'next_operation'; workspaceWriteException?: boolean }
 const fail = (code:string,message:string):never => {throw Object.assign(new Error(message),{code})}
 
 /** Only the dedicated task thread changes policy. Workspace, Agent and origin authority are untouched. */
 export class TaskPermissionService {
   private readonly pending = new Map<string,Promise<unknown>>()
-  constructor(private readonly deps:{repository:TaskRunRepository;threads:{get(threadId:string):Promise<ThreadRecord|null>;update(threadId:string,patch:{approvalPolicy:'on-request'}):Promise<ThreadRecord>};workspaceTrust:WorkspaceTrustReader;nowIso():string;toolEffects?:()=>readonly ToolEffectDefinition[]}) {}
+  constructor(private readonly deps:{repository:TaskRunRepository;threads:{get(threadId:string):Promise<ThreadRecord|null>;update(threadId:string,patch:{approvalPolicy:ThreadRecord['approvalPolicy']}):Promise<ThreadRecord>};workspaceTrust:WorkspaceTrustReader;nowIso():string;toolEffects?:()=>readonly ToolEffectDefinition[]}) {}
 
   async snapshot(taskId:string):Promise<TaskPermissionSnapshot> {
     const scope=await this.scope(taskId)
@@ -40,9 +41,106 @@ export class TaskPermissionService {
     try{return await next}finally{if(this.pending.get(taskId)===next)this.pending.delete(taskId)}
   }
 
+  async revoke(taskId:string,raw:TaskPermissionRevocation):Promise<TaskPermissionResult> {
+    const request=TaskPermissionRevocationSchema.parse(raw)
+    const previous=this.pending.get(taskId) ?? Promise.resolve()
+    const next=previous.catch(()=>undefined).then(()=>this.revokeOnce(taskId,request))
+    this.pending.set(taskId,next)
+    try{return await next}finally{if(this.pending.get(taskId)===next)this.pending.delete(taskId)}
+  }
+
+  private async revokeOnce(taskId:string,request:TaskPermissionRevocation):Promise<TaskPermissionResult> {
+    if (request.restoreBase) return this.restoreBaseOnce(taskId, request)
+    const key=`task-permission-revoke:${request.idempotencyKey}`
+    const existingResult=():TaskPermissionResult|undefined=>{
+      const prior=this.deps.repository.operation(taskId,key)
+      if(!prior)return undefined
+      this.deps.repository.beginOperation({ownerId:taskId,idempotencyKey:key,kind:'task_permission_revoke',request,nowIso:this.deps.nowIso()})
+      if(prior.status==='succeeded')return prior.result as TaskPermissionResult
+      return fail('outcome_unknown','读取原撤销记录后重试。')
+    }
+    const prior=existingResult()
+    if(prior)return prior
+    const scope=await this.scope(taskId)
+    const concurrent=existingResult()
+    if(concurrent)return concurrent
+    if(scope.task.revision!==request.expectedRevision)fail('stale_request','任务已变化，请刷新权限面板。')
+    if(['completed','cancelled','failed'].includes(scope.task.status))fail('task_permission_blocked','任务已经结束。')
+    const owner=this.permissionOwner(scope.task)?.owner
+    const grant=owner?.authority?.taskApprovalGrant
+    if(!owner||!grant||grant.id!==request.permissionId)fail('stale_request','当前临时权限已变化，请重新核对。')
+    const now=this.deps.nowIso()
+    return this.deps.repository.transact(()=>{
+      const committed=existingResult()
+      if(committed)return committed
+      const current=this.deps.repository.get(taskId)!
+      if(current.revision!==request.expectedRevision)fail('stale_request','任务已变化，请刷新权限面板。')
+      const latest=this.deps.repository.get(owner!.id)!
+      if(latest.authority?.taskApprovalGrant?.id!==request.permissionId)fail('stale_request','临时权限已被替换。')
+      this.deps.repository.beginOperation({ownerId:taskId,idempotencyKey:key,kind:'task_permission_revoke',request,nowIso:now})
+      const revokedGrant={...latest.authority!.taskApprovalGrant!,revokedAt:now}
+      this.deps.repository.update(latest.id,latest.revision,value=>({...value,authority:{...value.authority!,taskApprovalGrant:revokedGrant},updatedAt:now}),
+        {key:`permission-revoked:${grant!.id}`,kind:'task_permission_revoked',payload:{permissionId:grant!.id},createdAt:now})
+      const task=this.deps.repository.get(taskId)!
+      const result:TaskPermissionResult={task,permission:this.describe({...scope,task},{scope,grant:revokedGrant,revoked:true}),resumed:false}
+      this.deps.repository.finishOperation(taskId,key,{status:'succeeded',result},now)
+      return result
+    })
+  }
+
+  private async restoreBaseOnce(taskId: string, request: TaskPermissionRevocation): Promise<TaskPermissionResult> {
+    const { repository, threads, nowIso } = this.deps
+    const key = `task-permission-revoke:${request.idempotencyKey}`
+    const prior = repository.operation(taskId, key)
+    if (prior) {
+      repository.beginOperation({ ownerId: taskId, idempotencyKey: key, kind: 'task_permission_revoke', request, nowIso: nowIso() })
+      if (prior.status === 'succeeded') return prior.result as TaskPermissionResult
+      return fail('outcome_unknown', '上次恢复权限尚未完成，请核对当前权限后使用新的确认请求。')
+    }
+    const scope = await this.scope(taskId)
+    const permission = await this.permissionScope(scope.task)
+    const description = this.describe(scope, permission)
+    if (scope.task.revision !== request.expectedRevision || permission?.grant.id !== request.permissionId) fail('stale_request', '任务或临时权限已变化，请刷新权限面板。')
+    if (!description.canRestoreBase) fail('task_permission_blocked', description.reason ?? '请先暂停任务并核实未完成的操作。')
+    const grant = permission!.grant
+    const now = nowIso()
+    const prepared = repository.transact(() => {
+      const current = repository.get(taskId)!
+      if (current.revision !== request.expectedRevision) fail('stale_request', '任务已变化，请重新核对。')
+      this.assertIdle(current)
+      repository.beginOperation({ ownerId: taskId, idempotencyKey: key, kind: 'task_permission_revoke', request, nowIso: now })
+      return repository.update(taskId, current.revision, task => ({ ...task, authority: { ...task.authority!, taskApprovalGrant: { ...grant, revokedAt: now } }, updatedAt: now }),
+        { key: `permission-base-prepared:${grant.id}:${request.idempotencyKey}`, kind: 'task_permission_revoked', payload: { permissionId: grant.id, restoreBase: true }, createdAt: now })
+    })
+    try {
+      await threads.update(scope.thread.id, { approvalPolicy: grant.previousPolicy })
+      const fresh = await this.scope(taskId)
+      if (fresh.task.revision !== prepared.revision || fresh.binding !== scope.binding || fresh.thread.approvalPolicy !== grant.previousPolicy) fail('stale_request', '任务范围在恢复期间变化，请重新核对。')
+      const task = repository.transact(() => {
+        const current = repository.get(taskId)!
+        if (current.revision !== prepared.revision || current.authority?.taskApprovalGrant?.id !== grant.id) fail('stale_request', '临时权限已变化，请重新核对。')
+        this.assertIdle(current)
+        return repository.update(taskId, current.revision, value => {
+          const authority = { ...value.authority! }
+          delete authority.taskApprovalGrant
+          return { ...value, authority: { ...authority, approvalPolicy: grant.previousPolicy }, status: 'paused', finishedAt: undefined,
+            executionStartedAt: undefined, waitingReason: '临时权限已撤销，已恢复原有权限。请单独继续原任务。', updatedAt: nowIso() }
+        }, { key: `permission-base-restored:${grant.id}:${request.idempotencyKey}`, kind: 'task_permission_base_restored', payload: { permissionId: grant.id, previousPolicy: grant.previousPolicy }, createdAt: nowIso() })
+      })
+      const result: TaskPermissionResult = { task, permission: await this.snapshot(taskId), resumed: false }
+      repository.finishOperation(taskId, key, { status: 'succeeded', result }, nowIso())
+      return result
+    } catch (error) {
+      repository.finishOperation(taskId, key, { status: 'outcome_unknown', error: '原临时权限已禁用，基础权限恢复尚未完成，请重新核对。' }, nowIso())
+      throw error
+    }
+  }
+
   /** Called before admission, Grant creation and each dispatch. An expired/prepared grant fails closed. */
-  async executionRestriction(threadId:string,expectedPermissionId?:string):Promise<TaskExecutionRestriction> {
-    const task=this.deps.repository.findActiveByThread(threadId)
+  async executionRestriction(threadId:string,expectedPermissionId?:string,sourceTaskId?:string):Promise<TaskExecutionRestriction> {
+    const active=this.deps.repository.findActiveByThread(threadId)
+    const task=sourceTaskId ? this.deps.repository.get(sourceTaskId) : active
+    if(sourceTaskId && (!task || task.threadId!==threadId || active && active.id!==task.id || !active && !['failed','cancelled'].includes(task.status)))fail('task_permission_revoked','The retry preflight source does not match this execution context.')
     if(!task){if(expectedPermissionId)fail('task_permission_revoked','The task permission no longer has an active task.');return {}}
     if(task.authority?.revokedAt)fail('task_permission_revoked','Task authority was revoked.')
     const permission=await this.permissionScope(task)
@@ -52,7 +150,7 @@ export class TaskPermissionService {
     if(state==='consumed' && expectedPermissionId !== grant.id)fail('task_permission_consumed','本次操作授权已使用，请重新核对任务权限。')
     if(state!=='active' && state!=='consumed')fail(state==='expired'?'task_permission_expired':'task_permission_revoked',state==='expired'?'当前任务的临时审批权限已到期，请重新确认后重查原任务。':'当前任务权限范围已变化或尚未完成确认，请重新核对权限卡片。')
     if(expectedPermissionId&&expectedPermissionId!==grant.id)fail('task_permission_revoked','A different task permission replaced this execution grant.')
-    return {taskPermissionId:grant.id,expiresAt:grant.expiresAt,permissionScope:grant.scope,permissionDuration:grant.duration}
+    return {taskPermissionId:grant.id,expiresAt:grant.expiresAt,permissionScope:grant.scope,permissionDuration:grant.duration,...(grant.workspaceWriteException ? {workspaceWriteException:true} : {})}
   }
 
   /** Consume only immediately before actual dispatch, after approval and lease validation. */
@@ -89,12 +187,13 @@ export class TaskPermissionService {
     if(scope.task.revision!==request.expectedRevision||description.scopeHash!==request.scopeHash)fail('stale_request','Task, workspace or Agent permissions changed. Reload the permission card before confirming.')
     if(!description.canConfirm)fail('task_permission_blocked',description.reason??'This task cannot receive a scoped approval permission.')
     const permissionScope = request.scope ? await normalizePermissionScope(request.scope) : undefined
-    if (permissionScope?.writePaths?.length && description.sandboxMode === 'read-only') fail('sandbox_read_only', '当前工作区或 Agent 为只读，请先选择允许写入的工作区和 Agent。')
+    if (permissionScope?.writePaths?.length && !description.canWritePaths) fail('sandbox_read_only', '当前 Agent 或显式沙箱限制写入，请在此任务中选择允许写入的 Agent 或工作区。')
+    const workspaceWriteException = Boolean(permissionScope?.writePaths?.length && scope.workspace.level === 'read-only')
     if (permissionScope?.externalTargets?.some(target => !description.externalTargets.includes(target))) fail('external_target_blocked', '请先在任务中确认需要处理的外部目标，再为这些目标授权。')
     const confirmedAt=nowIso(),permission=TaskApprovalGrantSchema.parse({id:`task_permission_${randomUUID()}`,taskId,threadId:scope.thread.id,
       previousPolicy:scope.thread.approvalPolicy,approvalPolicy:'on-request',workspaceRoot:scope.workspace.canonicalRoot,workspaceRevision:scope.workspace.revision,workspaceTrust:scope.workspace.level,
       agentRevision:scope.thread.agentRevision??0,scopeFingerprint:scope.binding,status:'prepared',confirmed:true,confirmedAt,
-      scope: permissionScope, duration: request.duration,
+      scope: permissionScope, duration: request.duration, ...(workspaceWriteException ? {workspaceWriteException:true} : {}),
       expiresAt:new Date(Date.parse(confirmedAt)+request.ttlSeconds*1000).toISOString(),idempotencyKey:request.idempotencyKey})
     const prepared=repository.transact(()=>{
       const latest=repository.get(taskId)!
@@ -115,7 +214,7 @@ export class TaskPermissionService {
         const latest=repository.get(taskId)!
         if(latest.revision!==prepared.revision||latest.authority?.taskApprovalGrant?.id!==permission.id)fail('stale_request','Task permission was concurrently replaced.')
         this.assertIdle(latest)
-        return repository.update(taskId,latest.revision,current=>({...current,authority:{...current.authority!,approvalPolicy:'on-request',taskApprovalGrant:{...permission,status:'active'}},updatedAt:nowIso()}),
+        return repository.update(taskId,latest.revision,current=>({...current,authority:{...current.authority!,approvalPolicy:'on-request',taskApprovalGrant:{...permission,status:'active'}},...(current.status==='failed'?{status:'paused' as const,finishedAt:undefined,executionStartedAt:undefined,waitingReason:'权限已重新确认，请单独继续原任务。'}:{}),updatedAt:nowIso()}),
           {key:`task-permission-confirmed:${permission.id}`,kind:'task_permission_confirmed',payload:{permissionId:permission.id,previousPolicy:permission.previousPolicy,approvalPolicy:'on-request',expiresAt:permission.expiresAt,confirmed:true},createdAt:nowIso()})
       })
       const result:TaskPermissionResult={task,permission:await this.snapshot(taskId),resumed:false}
@@ -141,7 +240,7 @@ export class TaskPermissionService {
     while (true) {
       if(visited.has(current.id))return fail('task_permission_revoked','Task permission retry lineage contains a cycle.')
       visited.add(current.id)
-      revoked ||= Boolean(current.authority?.revokedAt)
+      revoked ||= Boolean(current.authority?.revokedAt || current.authority?.taskApprovalGrant?.revokedAt)
       if(current.authority?.taskApprovalGrant)return {owner:current,revoked}
       if(!current.retryOfTaskId)return undefined
       const parent=this.deps.repository.get(current.retryOfTaskId)
@@ -207,25 +306,27 @@ export class TaskPermissionService {
     const priorProvider=priorTurn?.externalTaskProvider??(priorProviders.length===1?(priorProviders[0]==='lark-cli'?'lark':'dingtalk'):undefined)
     if(priorGrant&&priorProvider&&priorGrant.connectorScopes.length)connectorScopeSources.push({provider:priorProvider,scopes:[...priorGrant.connectorScopes],source:'last_execution_grant',issuedAt:priorGrant.issuedAt,...(priorGrant.expiresAt?{expiresAt:priorGrant.expiresAt}:{})})
     const state=permission?(permission.revoked?'invalid':this.grantState(permission.scope,permission.grant)):undefined
+    const recoveryEligible = recoverablePermissionFailure(this.deps.repository, task, this.deps.nowIso())
     let reason:string|undefined
     if(!task.originThreadId||task.originThreadId===task.threadId||thread.relation!=='side'||thread.parentThreadId!==task.originThreadId)reason='只能为当前任务的独立执行上下文确认权限，不能修改普通聊天或发起会话。'
     else if(task.parentTaskId || task.authority?.source === 'inherited')reason='子任务继承父任务的范围，请在父任务中核对并确认权限。'
     else if(!task.authority||task.authority.revokedAt)reason='任务授权已撤销。'
-    else if(!['waiting_user','waiting_approval','stalled','paused'].includes(task.status))reason='请先让任务停止执行并进入等待或暂停状态。'
-    else if(state==='active')reason='当前任务已有尚未到期的有限期审批权限。'
+    else if(!['waiting_user','waiting_approval','stalled','paused'].includes(task.status) && !recoveryEligible)reason='请先让任务停止执行并进入等待或暂停状态。'
     else if(!workspace.canonicalRoot)reason='请先为当前任务选择工作区。'
     else {try{this.assertIdle(task)}catch(error){reason=error instanceof Error?error.message:String(error)}}
-    return {taskId:task.id,taskRevision:task.revision,taskTitle:task.goal.slice(0,200),workspaceRoot:workspace.canonicalRoot,workspaceTrust:workspace.level,workspaceRevision:workspace.revision,
+    return {canWritePaths: agentTrust !== 'read-only' && thread.sandboxMode !== 'read-only' && thread.sandboxMode !== 'external-sandbox', taskId:task.id,taskRevision:task.revision,taskTitle:task.goal.slice(0,200),workspaceRoot:workspace.canonicalRoot,workspaceTrust:workspace.level,workspaceRevision:workspace.revision,
       agentRevision:thread.agentRevision??0,approvalPolicy:thread.approvalPolicy,targetApprovalPolicy:'on-request',maxTtlSeconds:900,
       sandboxMode,agentTrust,...(thread.agentProfile?.name?{agentName:thread.agentProfile.name}:{}),
       toolAllowlist:intersectAllowlist(thread.agentProfile?.toolAllowlist,task.authority?.toolAllowlist),
       mcpAllowlist:intersectAllowlist(thread.agentProfile?.mcpAllowlist,task.authority?.mcpAllowlist),externalTargets,connectorScopeSources,
+      recoveryEligible, canRestoreBase: !reason && Boolean(grant && grant.taskId === task.id),
       scopeHash:operationFingerprint({taskRevision:task.revision,binding:scope.binding,approvalPolicy:thread.approvalPolicy,permissionId:grant?.id??null}),canConfirm:!reason,...(reason?{reason}:{}),
       executionGrants: thread.turns.flatMap(turn => turn.executionGrant?.taskId === task.id ? [turn.executionGrant] : []),
       ...(grant&&state?{grant:{id:grant.id,status:state,confirmedAt:grant.confirmedAt,expiresAt:grant.expiresAt,scope:grant.scope,duration:grant.duration}}:{})}
   }
 
   private grantState(scope:Awaited<ReturnType<TaskPermissionService['scope']>>,grant:TaskApprovalGrant):'active'|'expired'|'invalid'|'prepared'|'consumed' {
+    if(grant.revokedAt)return 'invalid'
     if(grant.status==='prepared')return 'prepared'
     if(grant.taskId!==scope.task.id||grant.threadId!==scope.thread.id||scope.thread.approvalPolicy!=='on-request'||grant.scopeFingerprint!==scope.binding||scope.task.authority?.revokedAt)return 'invalid'
     if (Date.parse(grant.expiresAt)<=Date.parse(this.deps.nowIso())) return 'expired'

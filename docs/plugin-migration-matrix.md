@@ -16,6 +16,7 @@ Skills remain readable; an item is not removed or replaced silently.
 | Brave Search | External / unavailable | No independently supported WorkWise install is claimed | No files are removed | Use an external service or leave disabled |
 | Slack | External / unavailable | No independently supported WorkWise install is claimed | No files are removed | Configure an external integration if required |
 | Lark CLI | WorkWise-managed | Managed toolchain already owns installation and credentials | Existing managed tool data is preserved | Use the managed tool status panel |
+| BrowserSkill CLI 0.4.0 and installed browser-skill Skill | Preserved; explicit dependency installation now pins official CLI 0.5.0 and Skill source 361da1d75798b99b358dfb434b8ce1921fb90d9e (MIT) | Native target expectations require CLI 0.5.0 and daemon/selected-extension protocol 1.8 or later; legacy 0.4.0/protocol 1.7 remains strict-only | Old binaries, Skill versions, connection settings, MCP records, credential references, active execution snapshots, and unknown-operation receipts remain intact; no external daemon is killed or active Worker silently upgraded | Update through the BrowserSkill connector when needed, update/reconnect the official extension, explicitly confirm the task scope, and continue separately. Verify or cancel unresolved operations before changing their scope; see [BrowserSkill migration](browser-skill-runtime.md#旧技能与配置迁移) |
 | OfficeCLI | WorkWise-managed | Managed document toolchain | Existing managed tool data is preserved | Use the managed tool status panel |
 | Ego Browser | External managed integration | It is an external application, not a bundled installer | Existing external app is untouched | Keep the external app installed separately |
 | MarkItDown | WorkWise-managed / bundled | Document engine is already managed by WorkWise | Existing conversion configuration is preserved | None |
@@ -91,3 +92,5 @@ Zotero 的许可例外绑定包名 `zotero-mcp-server`、版本 `0.17.0`、唯�
 固定上游图片重绘脚本在 OpenCV 5.0.0.93 下因直线数组维度变化失败。已用独立 Python 3.12 环境、`opencv-python-headless==4.14.0.94` 运行合成图，生成可编辑 DXF、PNG/PDF 和视觉对比记录，DXF 审计零错误。目录依赖与使用说明固定到该已验证版本，用户在独立环境选择安装。Skill 上游 commit、原始文件、已有安装记录及权限保留。
 
 该开源描线脚本写入毫米单位，使用前需给出毫米/像素比例。本次合成图的比例为已知 0.25 mm/px，产物包含 9 个 LINE 与 1 个 CIRCLE。双边缘描线作为粗略基线记录，尺寸精度待具体图纸核验。严格尺寸模式缺少标定时的阻断也已验证。此验收补充市场使用说明，许可 AutoCAD 的 DWG 运行环境继续作为功能依赖展示。
+
+BrowserSkill macOS 历史所有权 `darwin:` 指纹保留。新的 `darwin-utc:` 使用固定语言和时区；旧记录无法可靠比较时维持身份未知，避免因中英文启动环境差异误杀或错误接管。用户资料、扩展配置与未知动作记录保持原样，可在原进程退出后重新检查连接。

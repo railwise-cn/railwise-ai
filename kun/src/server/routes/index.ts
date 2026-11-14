@@ -78,7 +78,7 @@ import { flowRoutes } from './flows.js'
 import { isAuthorized, bearerToken } from '../auth.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
-import { appendTaskInput, cancelTask, getTask, getTaskArtifactProof, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
+import { taskBrowserBinding, appendTaskInput, cancelTask, getTask, getTaskArtifactProof, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, revokeTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, confirmBrowserOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
 import { externalProviderAmbiguity } from '../../services/external-task-capability.js'
 import { classifyTaskInput } from '../../services/task-coordinator.js'
 import { listShellSessions, terminateShellSession } from './shell-sessions.js'
@@ -210,6 +210,18 @@ export function buildRouter(runtime: ServerRuntime): Router {
     if(request.body||Number(request.headers.get('content-length')||0)!==0)return ERRORS.validation('DingTalk CLI refresh does not accept a request body')
     try{return jsonResponse(await runtime.refreshDws())}catch{return jsonResponse({code:'connector_refresh_failed',message:'无法读取钉钉连接状态，请重新诊断后继续。'},409)}
   })
+  for (const [path, refresh] of [
+    ['/v1/connectors/browser-skill/refresh', runtime.refreshBrowserSkill],
+    ['/v1/runtime/skills/refresh', runtime.refreshSkills]
+  ] as const) {
+    router.add('POST', path, async request => {
+      if (!authorize(request, runtime)) return ERRORS.unauthorized()
+      if (!refresh) return ERRORS.unavailable('Runtime refresh is unavailable')
+      if (request.body || Number(request.headers.get('content-length') || 0) !== 0) return ERRORS.validation('Refresh does not accept a request body')
+      try { return jsonResponse({ ok: true, state: await refresh() }) }
+      catch { return jsonResponse({ code: 'runtime_refresh_failed', message: '配置已保存，Runtime 刷新失败。请重试检查。' }, 409) }
+    })
+  }
   router.add('POST', '/v1/connectors/lark/refresh', async (request) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     if (!runtime.refreshLark) return ERRORS.unavailable('managed Lark connector refresh is unavailable')
@@ -391,9 +403,12 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('GET', '/v1/tasks/:id/events', async (request, ctx) => authorize(request, runtime) ? getTaskEvents(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/receipts', async (request, ctx) => authorize(request, runtime) ? getTaskOperationReceipts(runtime, ctx.params.id) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/artifacts/:artifact/proof', async (request, ctx) => authorize(request, runtime) ? getTaskArtifactProof(runtime, ctx.params.id, ctx.params.artifact) : ERRORS.unauthorized())
+  for (const method of ['GET', 'POST']) router.add(method, '/v1/tasks/:id/browser-binding', async (request, ctx) => authorize(request, runtime) ? taskBrowserBinding(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? getTaskPermissions(runtime, ctx.params.id) : ERRORS.unauthorized())
   router.add('POST', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? confirmTaskPermissions(runtime, ctx.params.id, request) : ERRORS.unauthorized())
+  router.add('DELETE', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? revokeTaskPermissions(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/tasks/:id/receipts/:receipt/verify', async (request, ctx) => authorize(request, runtime) ? verifyTaskOperationReceipt(runtime, ctx.params.id, ctx.params.receipt, request) : ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/receipts/:receipt/browser-confirm', async (request, ctx) => authorize(request, runtime) ? confirmBrowserOperationReceipt(runtime, ctx.params.id, ctx.params.receipt, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/stream', (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     if (!runtime.taskRepository?.get(ctx.params.id)) return ERRORS.notFound('task not found')
@@ -442,7 +457,7 @@ export function buildRouter(runtime: ServerRuntime): Router {
   })
   router.add('GET', '/v1/threads/:id', async (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
-    return getThread(runtime.threadService, ctx.params.id, runtime.sessionStore)
+    return getThread(runtime.threadService, ctx.params.id, runtime.sessionStore, runtime.taskController)
   })
   router.add('PATCH', '/v1/threads/:id', async (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()

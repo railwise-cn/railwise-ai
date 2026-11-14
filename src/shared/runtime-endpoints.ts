@@ -131,7 +131,9 @@ export const RUNTIME_TASK_INPUTS_TEMPLATE = '/v1/tasks/{id}/inputs'
 export const RUNTIME_TASK_EVENTS_TEMPLATE = '/v1/tasks/{id}/events'
 export const RUNTIME_TASK_RECEIPTS_TEMPLATE = '/v1/tasks/{id}/receipts'
 export const RUNTIME_TASK_PERMISSIONS_TEMPLATE = '/v1/tasks/{id}/permissions'
+export const RUNTIME_TASK_BROWSER_BINDING_TEMPLATE = '/v1/tasks/{id}/browser-binding'
 export const RUNTIME_TASK_RECEIPT_VERIFY_TEMPLATE = '/v1/tasks/{id}/receipts/{turn}/verify'
+export const RUNTIME_TASK_BROWSER_CONFIRM_TEMPLATE = '/v1/tasks/{id}/receipts/{turn}/browser-confirm'
 export const RUNTIME_TASK_SUMMARY_TEMPLATE = '/v1/tasks/summary'
 export const RUNTIME_INBOX_TEMPLATE = '/v1/inbox'
 export const RUNTIME_TASK_TEMPLATES_TEMPLATE = '/v1/task-templates'
@@ -166,6 +168,9 @@ export function runtimeTaskReceiptsPath(taskId: string): string {
 }
 export function runtimeTaskPermissionsPath(taskId: string): string {
   return `${runtimeTaskPath(taskId)}/permissions`
+}
+export function runtimeTaskBrowserBindingPath(taskId: string): string {
+  return `${runtimeTaskPath(taskId)}/browser-binding`
 }
 export function runtimeTaskReceiptVerifyPath(taskId: string, receiptId: string): string {
   return `${runtimeTaskReceiptsPath(taskId)}/${encodeURIComponent(receiptId)}/verify`

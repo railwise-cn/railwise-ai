@@ -3,7 +3,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { FlowWorkspaceView, createStarterFlowInput } from './FlowWorkspaceView'
+import { FlowWorkspaceView, createStarterFlowInput, ScheduleConfigFields } from './FlowWorkspaceView'
 
 let container: HTMLDivElement
 let root: Root
@@ -141,4 +141,22 @@ describe('FlowWorkspaceView mounted canvas', () => {
     expect(container.textContent).toContain('定时触发')
     expect(container.textContent).toContain('Agent 处理')
   })
+})
+
+it('edits daily times and timezone through the fields consumed by the scheduler', async () => {
+  let config: Record<string, unknown> = { kind: 'interval', everyMinutes: 15, timezone: 'Asia/Shanghai' }
+  const render = async () => {
+    await act(async () => root.render(createElement(ScheduleConfigFields, { config, onChange: value => { config = value } })))
+  }
+  await render()
+  const select = container.querySelector('[aria-label="计划类型"]') as HTMLSelectElement
+  await act(async () => { select.value = 'daily'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+  await render()
+  const input = container.querySelector('[aria-label="每日执行时刻"]') as HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '08:30, 16:30')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  expect(config).toMatchObject({ kind: 'daily', times: ['08:30', '16:30'], timezone: 'Asia/Shanghai' })
+  expect(config.schedule).toBeUndefined()
 })

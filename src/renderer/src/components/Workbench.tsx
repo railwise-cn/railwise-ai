@@ -1,4 +1,5 @@
 import { requestTaskDetail } from '../store/task-live-store'
+import { useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -555,8 +556,16 @@ export function Workbench(): ReactElement {
     () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
     [activeSkillWorkspace, timelineBlocks]
   )
-  const latestDevPreviewUrl = detectedDevPreviewUrls[0] ?? null
-  const latestAutoOpenDevPreviewUrl = autoOpenDevPreviewUrls[0] ?? null
+  const conversationArtifactPreview = useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready')
+  // Task/Flow artifacts can have no user chat. Keep manual previews separate
+  // from the active conversation so opening another task cannot replace it.
+  const workspaceArtifactPreview = useTaskArtifactPreview(null, runtimeConnection === 'ready' && route === 'tasks')
+  const lastWorkspaceArtifactRequest = useRef<{ taskId: string; artifactId: string } | null>(null)
+  const taskArtifactPreview = route === 'tasks' ? workspaceArtifactPreview : conversationArtifactPreview
+  const artifactPreviewRouteRef = useRef(route)
+  artifactPreviewRouteRef.current = route
+  const latestDevPreviewUrl = taskArtifactPreview.url ?? (route === 'tasks' ? null : detectedDevPreviewUrls[0]) ?? null
+  const latestAutoOpenDevPreviewUrl = taskArtifactPreview.url ?? (route === 'tasks' ? null : autoOpenDevPreviewUrls[0]) ?? null
   const currentSideConversations = useMemo(
     () =>
       Object.values(sideConversations)
@@ -625,6 +634,7 @@ export function Workbench(): ReactElement {
   const {
     beginLeftResize,
     beginRightResize,
+    closeDevPreview,
     filePreviewTarget,
     leftSidebarCollapsed,
     leftSidebarWidth,
@@ -639,7 +649,8 @@ export function Workbench(): ReactElement {
     toggleLeftSidebar,
     toggleRightPanelMode,
   } = useWorkbenchLayout({
-    activeThreadId,
+    activeThreadId: route === 'tasks' ? 'task-workspace-preview' : activeThreadId,
+    latestAutoOpenDevPreviewKey: taskArtifactPreview.key,
     latestAutoOpenDevPreviewUrl,
     latestDevPreviewUrl,
     route,
@@ -1968,6 +1979,10 @@ export function Workbench(): ReactElement {
       : 'chat'
 
   const closeRightPanel = (): void => {
+    if (rightPanelMode === 'browser') {
+      closeDevPreview()
+      return
+    }
     if (route === 'write' && rightPanelMode === 'sdd-ai') {
       setRightPanelMode(null)
       return
@@ -1978,6 +1993,16 @@ export function Workbench(): ReactElement {
     }
     setRightPanelMode(null)
     setFilePreviewTarget(null)
+  }
+
+  const openWorkspaceArtifact = async (request: { taskId: string; artifactId: string }): Promise<void> => {
+    lastWorkspaceArtifactRequest.current = request
+    try {
+      await workspaceArtifactPreview.open(request)
+      if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
+    } catch {
+      // The preview hook retains the error for the task workspace retry card.
+    }
   }
 
   const startNewWriteAssistantConversation = (): void => {
@@ -2129,7 +2154,7 @@ export function Workbench(): ReactElement {
     },
     browser: (module) => {
       const Panel = (module as typeof import('./DevBrowserPanel')).DevBrowserPanel
-      return <Panel blocks={devPreviewBlocks} preferredUrl={latestDevPreviewUrl} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
+      return <Panel blocks={route === 'tasks' ? [] : devPreviewBlocks} preferredUrl={latestDevPreviewUrl} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
     },
     plan: (module) => {
       const Panel = (module as typeof import('./plan/PlanPanel')).PlanPanel
@@ -2175,14 +2200,27 @@ export function Workbench(): ReactElement {
   const workbenchViewRenderers: Record<string, (module: unknown) => ReactElement | null> = {
     tasks: (module) => {
       const View = (module as typeof import('./tasks/TaskWorkspaceView')).TaskWorkspaceView
-      return <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path) => {
-        if (/\.(?:md|mdx|markdown)$/i.test(path)) {
+      return <div className="flex min-h-0 min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {workspaceArtifactPreview.error ? <div role="alert" className="ds-no-drag m-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <p>{workspaceArtifactPreview.error}</p>
+          <button type="button" className="mt-2 text-accent" onClick={() => {
+            if (lastWorkspaceArtifactRequest.current) void openWorkspaceArtifact(lastWorkspaceArtifactRequest.current)
+          }}>重新打开网页成果</button>
+        </div> : null}
+        <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {
+        if (/\.html?$/i.test(path) && artifactId) {
+          await openWorkspaceArtifact({ taskId: task.id, artifactId })
+        } else if (/\.(?:md|mdx|markdown)$/i.test(path)) {
           await useWriteWorkspaceStore.getState().openFile(task.workspaceRoot, path)
           setRoute('write')
         } else {
           window.dispatchEvent(new CustomEvent('kun:workspace-file-preview', { detail: { workspaceRoot: task.workspaceRoot, path } }))
         }
       }} onOpenFlow={(flowId, flowRunId) => { requestFlowDetail({flowId,flowRunId}); openFlow() }} onConfigureReplyDelivery={() => openSettings('claw')} onConfigureProvider={provider => { setConnectPhoneSidebarOpen(false); openPlugins(sidebarView === 'claw' ? 'claw' : 'chat', provider === 'lark' || provider === 'feishu' ? 'lark' : provider === 'dingtalk' ? 'dingtalk' : undefined) }} />
+        </div>
+        {renderRightPanel()}
+      </div>
     },
     plugins: (module) => {
       const View = (module as typeof import('./PluginMarketplaceView')).PluginMarketplaceView
@@ -2415,7 +2453,12 @@ export function Workbench(): ReactElement {
               onBuildPlan={() => void buildGuiPlan()}
               onOpenPlan={openGuiPlanPanel}
               devPreviewCard={
-                showDevPreviewCard ? (
+                taskArtifactPreview.error ? (
+                  <div role="status" className="rounded-xl border border-ds-border bg-ds-card px-4 py-3 text-sm text-ds-ink">
+                    <p>{taskArtifactPreview.error}</p>
+                    <button type="button" className="mt-2 text-accent" onClick={() => void taskArtifactPreview.retry().catch(() => undefined)}>重新打开网页成果</button>
+                  </div>
+                ) : showDevPreviewCard ? (
                   <DevPreviewLaunchCard
                     url={latestDevPreviewUrl}
                     opened={rightPanelMode === 'browser'}

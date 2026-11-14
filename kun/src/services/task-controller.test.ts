@@ -13,6 +13,7 @@ import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { makeAssistantTextItem, makeToolResultItem } from '../domain/item.js'
 import type { ToolEffectResolver } from '../ports/tool-effect.js'
 import { externalOperationForTool } from './external-effect-evidence.js'
+import { browserApprovalSummary } from '../security/browser-approval-summary.js'
 
 const cleanup: string[] = []
 const PERSISTENCE_TEST_TIMEOUT_MS = 15_000
@@ -174,6 +175,40 @@ describe('TaskController reliability boundaries', () => {
     } finally { repository.close() }
   })
 
+  it.each(['same', 'changed-target', 'legacy-summary'])('checks the exact reviewed Browser DOM summary before transferring an undispatched approval (%s)', async variation => {
+    const { repository, controller, task, thread } = await fixture()
+    try {
+      controller.beginAttempt(thread.id, 'turn_reliability')
+      const grant = ExecutionGrantSchema.parse({ id: 'browser-grant', taskId: task.id, threadId: thread.id, turnId: 'turn_reliability',
+        workspaceRoot: thread.workspace, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', sandboxMode: 'workspace-write', approvalPolicy: 'on-request',
+        browserScope: { browserInstanceId: 'synthetic-browser', origins: ['https://example.test'], interaction: 'interact', revision: 1 },
+        workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'browser-grant', issuedAt: '2026-07-18T00:00:00.000Z', expiresAt: '2026-07-18T00:15:00.000Z' })
+      const toolName = 'browser_click'
+      const current = controller.beginToolOperation('turn_reliability', { callId: 'current-browser-call', toolName, providerId: 'browser-skill',
+        arguments: { sessionId: 'synthetic-session', contextId: 'synthetic-observation', target: '@e1' } }, grant)!
+      const request = repository.operation(task.id, current.key)!.request!
+      const previousRequest = { ...request, turnId: 'previous-turn', callId: 'previous-browser-call',
+        executionGrant: { ...grant, id: 'previous-grant', turnId: 'previous-turn', idempotencyKey: 'previous-grant' } }
+      repository.beginOperation({ ownerId: task.id, idempotencyKey: 'previous-browser-operation', kind: 'tool', request: previousRequest, nowIso: '2026-07-18T00:00:00.000Z' })
+      repository.finishOperation(task.id, 'previous-browser-operation', { status: 'failed', result: { approved: false,
+        item: makeToolResultItem({ id: 'previous-browser-result', threadId: thread.id, turnId: 'previous-turn', callId: 'previous-browser-call',
+          toolName, isError: true, output: { code: 'operation_not_dispatched' } }) } }, '2026-07-18T00:00:00.000Z')
+      const requestHash = request.approvalRequestHash as string
+      const summary = browserApprovalSummary({ action: 'click', origin: 'https://example.test', targetHtml: '<button data-action="submit">提交申请</button>', requestHash })
+      const priorSummary = variation === 'legacy-summary' ? 'Run browser_click'
+        : variation === 'changed-target' ? browserApprovalSummary({ action: 'click', origin: 'https://example.test', targetHtml: '<button data-action="delete">提交申请</button>', requestHash }) : summary
+      const previousApproval = createApprovalRequest({ id: 'appr_previous-browser-call', threadId: thread.id, turnId: 'previous-turn',
+        toolName, callId: 'previous-browser-call', requestHash, summary: priorSummary })
+      repository.saveHumanRequest({ id: previousApproval.id, kind: 'approval', threadId: thread.id, turnId: 'previous-turn', message: priorSummary,
+        payload: { approval: previousApproval }, status: 'answered', resolution: { decision: 'allow' }, createdAt: '2026-07-18T00:00:00.000Z', updatedAt: '2026-07-18T00:00:00.000Z' })
+      const approval = createApprovalRequest({ id: 'current-browser-approval', threadId: thread.id, turnId: 'turn_reliability',
+        toolName, callId: 'current-browser-call', requestHash, summary })
+      expect(controller.claimUndispatchedApproval(current.token, current.key, approval)).toBe(variation === 'same')
+      expect(repository.operations(task.id, 'approval_transfer')).toHaveLength(variation === 'same' ? 1 : 0)
+      expect(repository.humanRequest(approval.id)?.status).toBe(variation === 'same' ? 'answered' : undefined)
+    } finally { repository.close() }
+  })
+
   it.each(['confirmed', 'dispatched', 'supplement', 'unsettled_unknown', 'unrecognized', 'legacy_denial'])('preserves historical write obligations when a query task has %s authority or work', async reason => {
     const { repository, controller, task, thread } = await fixture('查询钉钉未完成的待办')
     try {
@@ -275,11 +310,35 @@ describe('TaskController reliability boundaries', () => {
     expect(repository.operation(task.id, waiting.key)?.status).toBe('prepared')
     controller.finishToolOperation(waiting.token, waiting.key)
     expect(repository.operation(task.id, waiting.key)).toMatchObject({ status: 'failed', result: { approved: false, item: { output: { code: 'operation_not_dispatched' } } } })
+    expect(controller.hasUnknownToolOutcome(task.threadId, 'turn_reliability')).toBe(false)
+    const denied = controller.beginToolOperation('turn_reliability', { callId: 'denied-approval', toolName: 'pending_write', arguments: {} })!
+    controller.finishToolOperation(denied.token, denied.key, { approved: false, item: makeToolResultItem({
+      id: 'denied', threadId: task.threadId, turnId: 'turn_reliability', callId: 'denied-approval', toolName: 'pending_write',
+      isError: true, output: { code: 'approval_denied', message: 'outcome_unknown is only quoted text here' }
+    }) })
+    expect(controller.hasUnknownToolOutcome(task.threadId, 'turn_reliability')).toBe(false)
     const started = controller.beginToolOperation('turn_reliability', { callId: 'actual-dispatch', toolName: 'pending_write', arguments: { target: 'test' } })!
     controller.recordToolDispatch(started.token, started.key)
     expect(repository.operation(task.id, started.key)?.status).toBe('running')
     controller.finishToolOperation(started.token, started.key)
     expect(repository.operation(task.id, started.key)?.status).toBe('outcome_unknown')
+    expect(controller.hasUnknownToolOutcome(task.threadId, 'turn_reliability')).toBe(true)
+    repository.close()
+  })
+
+  it('fences a prepared concurrent call at its real dispatch boundary without inventing another unknown receipt', async () => {
+    const { repository, controller, task } = await fixture()
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const first = controller.beginToolOperation('turn_reliability', { callId: 'first', toolName: 'first_write', arguments: {} })!
+    const queued = controller.beginToolOperation('turn_reliability', { callId: 'queued', toolName: 'queued_tool', arguments: {} })!
+    controller.recordToolDispatch(first.token, first.key)
+    controller.finishToolOperation(first.token, first.key)
+    const original = JSON.stringify(repository.operation(task.id, first.key))
+    expect(() => controller.recordToolDispatch(queued.token, queued.key)).toThrow(/not dispatched/)
+    controller.finishToolOperation(queued.token, queued.key)
+    expect(repository.operation(task.id, queued.key)).toMatchObject({ status: 'failed', result: { approved: false, item: { output: { code: 'operation_not_dispatched' } } } })
+    expect(JSON.stringify(repository.operation(task.id, first.key))).toBe(original)
+    expect(repository.operations(task.id, 'tool').filter(receipt => receipt.status === 'outcome_unknown')).toHaveLength(1)
     repository.close()
   })
 
@@ -768,6 +827,60 @@ describe('TaskController reliability boundaries', () => {
       controller.stopWatchdog()
       repository.close()
     }
+  })
+
+  it.each(['browser_control_required', 'browser_sync_blocked', 'browser_sync_target_changed'])('stops a browser recovery loop and keeps one actionable card for %s', async code => {
+    const f = await fixture('使用浏览器查询公告。')
+    try {
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      await f.sessionStore.appendItem(f.thread.id, makeToolResultItem({ id: `blocked-${code}`, threadId: f.thread.id,
+        turnId: 'turn_reliability', callId: 'blocked', toolName: 'browser_fill', isError: true, output: { status: 'failed', code } }))
+      expect(await f.controller.assessNonRetryableBlock(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'waiting_user' })
+      expect(await f.controller.assessNonRetryableBlock(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'waiting_user' })
+      expect(f.repository.attention(`capability_${f.task.id}`)?.payload).toMatchObject({ kind: 'capability_required',
+        capability: { provider: 'browser-skill', errorCode: code, resolution: { route: 'marketplace' } } })
+      expect(f.repository.events(f.task.id).filter(event => event.kind === 'task_waiting_user')).toHaveLength(1)
+      expect(f.repository.get(f.task.id)?.status).toBe('waiting_user')
+    } finally { f.repository.close() }
+  })
+
+  it('keeps an unscheduled browser report waiting after action ACK until a new readback completes', async () => {
+    const f = await fixture('使用浏览器核对公告正文并生成和交付 report.html 网页文件。')
+    try {
+      const current = f.repository.get(f.task.id)!
+      f.repository.update(current.id, current.revision, task => ({ ...task, acceptance: { kind: 'files',
+        requiredNodeKinds: ['execute', 'verify', 'deliver'], requireFinalResponse: true, requireActionableArtifactCard: true,
+        requiredFormats: ['html'], minimumArtifacts: 1, requiresWebEvidence: true, requiredSourceOrigins: ['https://example.test'] } }))
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      await writeFile(join(f.root, 'report.html'), '<!doctype html><html lang="zh-CN"><head><title>公告核对报告</title></head><body><h1>公告核对报告</h1><p>原文来源已核对。</p></body></html>')
+      await f.sessionStore.appendItem(f.thread.id, makeToolResultItem({ id: 'write-report', threadId: f.thread.id,
+        turnId: 'turn_reliability', callId: 'write-report', toolName: 'write', output: { path: join(f.root, 'report.html') } }))
+      const readCall = { callId: 'previous-read', toolName: 'browser_get_html', arguments: { sessionId: 'original-session' } }
+      const read = f.controller.beginToolOperation('turn_reliability', readCall)!
+      const readResult = { approved: true, item: makeToolResultItem({ id: 'previous-read-result', threadId: f.thread.id,
+        turnId: 'turn_reliability', callId: readCall.callId, toolName: readCall.toolName, output: { status: 'succeeded',
+          sourceUrl: 'https://example.test/search', resultHash: 'previous-page-hash', evidence: { verified: true, contentRead: true } } }) }
+      f.controller.finishToolOperation(read.token, read.key, readResult)
+      await f.sessionStore.appendItem(f.thread.id, readResult.item)
+      f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: 'acked-action', kind: 'browser_action_dispatch',
+        request: { turnId: 'turn_reliability', toolName: 'browser_fill', sessionId: 'original-session' }, nowIso: '2026-07-18T00:00:00.000Z' })
+      f.repository.finishOperation(f.task.id, 'acked-action', { status: 'succeeded', result: {
+        actionAcknowledged: true, acknowledgementHash: 'ack-hash', readbackPending: true } })
+      await f.sessionStore.appendItem(f.thread.id, makeAssistantTextItem({ id: 'report-final', threadId: f.thread.id,
+        turnId: 'turn_reliability', text: '公告正文已核对，HTML 报告已生成并交付。', status: 'completed' }))
+      const waiting = await f.controller.assessCandidate(f.thread.id, 'turn_reliability')
+      expect(waiting).toMatchObject({ kind: 'waiting_user', task: { status: 'waiting_user', artifacts: [{ relativePath: 'report.html', validation: 'valid' }] } })
+      expect(f.repository.attention(`capability_${f.task.id}`)?.payload).toMatchObject({ kind: 'capability_required',
+        capability: { errorCode: 'browser_readback_blocked', resolution: { route: 'marketplace' } } })
+      expect(f.repository.events(f.task.id).some(event => event.kind === 'task_completed')).toBe(false)
+      expect(f.repository.operations(f.task.id, 'browser_action_dispatch')).toMatchObject([{ status: 'succeeded', result: { readbackPending: true } }])
+      // Provider coverage proves only a successful full read of this original session clears the flag.
+      f.repository.finishOperation(f.task.id, 'acked-action', { status: 'succeeded', result: {
+        actionAcknowledged: true, acknowledgementHash: 'ack-hash', readbackPending: false, readbackHash: 'new-page-hash' } })
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      expect(await f.controller.assessCandidate(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'completed' })
+      expect(f.repository.operations(f.task.id, 'browser_action_dispatch')).toHaveLength(1)
+    } finally { f.repository.close() }
   })
 
   it('records task, turn, and artifact validation spans without storing the absolute artifact path', async () => {

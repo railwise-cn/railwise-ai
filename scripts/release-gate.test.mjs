@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { parse } from 'yaml'
-import { classifyReleaseChanges, verifyReleaseApproval, verifyRequiredCI } from './verify-release-approval.mjs'
+import { parse, stringify as stringifyYaml } from 'yaml'
+import { classifyReleaseChanges, isProductPagePublicationOnlyChange, verifyReleaseApproval, verifyRequiredCI } from './verify-release-approval.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, UPDATER_WORKFLOW, UPDATER_WORKFLOW_REF } from './verify-frozen-updater-evidence.mjs'
 import { FROZEN_BASE_VERSION, FROZEN_BASELINE_PINS, resolveUpdaterBaseline } from './frozen-release-version.mjs'
@@ -197,6 +197,66 @@ test('stable publication requires an explicit opt-in and a review evidence path'
   assert.ok(publishJob.needs.some((name) => /release[-_]approval[-_]gate|verify[-_]release[-_]approval/.test(String(name))), 'approval gate must be an upstream publish dependency')
 })
 
+const productPageSteps = [
+  'Generate product download data from the publication manifest',
+  'Deploy the generated product download page',
+  'Verify the generated public product download page',
+  'Restore only the previous product page if its public verification fails'
+]
+const originalProductRollback = "${{ always() && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}"
+
+function legacyPublicationWorkflow() {
+  const previous = structuredClone(workflow)
+  delete previous.on.workflow_dispatch.inputs.publish_product_page
+  for (const name of productPageSteps.slice(0, 3)) delete previous.jobs.publish.steps.find(step => step.name === name).if
+  previous.jobs.publish.steps.find(step => step.name === productPageSteps[3]).if = originalProductRollback
+  return previous
+}
+
+test('product page opt-out gates every page operation and retains the existing rollback conditions', () => {
+  assert.deepEqual(input('publish_product_page'), {
+    description: 'Publish the product page and its download data after release promotion.',
+    required: false, type: 'boolean', default: true
+  })
+  const pageSteps = jobs.publish.steps.filter(step => productPageSteps.includes(step.name))
+  assert.equal(pageSteps.length, 4)
+  for (const step of pageSteps.slice(0, 3)) assert.equal(step.if, '${{ inputs.publish_product_page == true }}')
+  assert.equal(pageSteps[3].if, "${{ always() && inputs.publish_product_page == true && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}")
+  for (const step of jobs.publish.steps.filter(step => !productPageSteps.includes(step.name))) {
+    assert.doesNotMatch(String(step.if ?? ''), /publish_product_page/)
+  }
+  assert.equal(isProductPagePublicationOnlyChange(stringifyYaml(legacyPublicationWorkflow()), workflowSource), true)
+  assert.equal(isProductPagePublicationOnlyChange(workflowSource, '# Formatting-only comment\n' + workflowSource), true)
+})
+
+test('publication-only workflow equivalence rejects all unrelated execution changes', async t => {
+  const before = stringifyYaml(legacyPublicationWorkflow())
+  const mutations = {
+    'default-disabled': value => { value.on.workflow_dispatch.inputs.publish_product_page.default = false },
+    'missing-page-generation-gate': value => { delete value.jobs.publish.steps.find(step => step.name === productPageSteps[0]).if },
+    'broad-page-gate': value => { value.jobs.publish.steps.find(step => step.name === productPageSteps[1]).if = '${{ always() }}' },
+    'removed-rollback-failure-condition': value => { value.jobs.publish.steps.find(step => step.name === productPageSteps[3]).if = '${{ inputs.publish_product_page == true }}' },
+    'changed-product-page-command': value => { value.jobs.publish.steps.find(step => step.name === productPageSteps[1]).run += '\necho changed deployment' },
+    'changed-build-command': value => { value.jobs['build-macos'].steps.push({ name: 'Change package', run: 'echo changed package bytes' }) },
+    'changed-signing-environment': value => { value.jobs['build-macos'].env.CSC_IDENTITY_AUTO_DISCOVERY = 'false' },
+    'changed-artifact-source': value => { value.jobs.publish.steps.find(step => step.name === 'Download immutable reviewed release artifacts').with['run-id'] = '1' },
+    'removed-byte-verification': value => { value.jobs.publish.steps.find(step => step.name === 'Verify every reviewed installer and updater byte before publication').run = 'true' },
+    'changed-r2-upload': value => { value.jobs.publish.steps.find(step => String(step.run).includes('publish-r2.mjs upload')).run += '\necho changed upload' },
+    'changed-feed-promotion': value => { value.jobs.publish.steps.find(step => step.id === 'stable_promotion').run += '\necho changed feed' },
+    'disabled-recovery': value => { value.jobs.publish.steps.find(step => String(step.run).includes('release-promotion-recovery.mjs restore')).if = '${{ false }}' },
+    'additional-unreviewed-download': value => { value.jobs.publish.steps.push({ name: 'Replace installer', run: 'curl -fsS https://example.invalid/unreviewed -o public-release-assets/installer.exe' }) },
+    'broader-token-permissions': value => { value.permissions.contents = 'write' },
+    'unrelated-workflow-input': value => { value.on.workflow_dispatch.inputs.skip_verification = { type: 'boolean', default: true } }
+  }
+  for (const [name, mutate] of Object.entries(mutations)) await t.test(name, () => {
+    const changed = structuredClone(workflow)
+    mutate(changed)
+    assert.equal(isProductPagePublicationOnlyChange(before, stringifyYaml(changed)), false)
+  })
+  assert.equal(isProductPagePublicationOnlyChange(before, workflowSource + '\njobs: {}\n'), false)
+  assert.equal(isProductPagePublicationOnlyChange(before, 'invalid: [yaml'), false)
+})
+
 test('release workflow verifies the recorded approval evidence before side effects', () => {
   assert.ok(existsSync(new URL('./verify-release-approval.mjs', import.meta.url)), 'approval evidence verifier is required')
   assert.match(workflowSource, /scripts\/verify-release-approval\.mjs/, 'publish workflow must invoke the approval evidence verifier')
@@ -267,6 +327,9 @@ test('release Electron mirror is scoped to the checksummed runtime preparation s
 
 test('private exact updater smoke consumes this run’s package once without a rebuild or publication', () => {
   assert.equal(input('exact_package_updater_smoke').default, false)
+  assert.doesNotMatch(input('exact_package_updater_smoke').description, /0\.5\.4/)
+  assert.equal(input('exact_updater_base_version').type, 'string')
+  assert.equal(input('exact_updater_base_version').default, '0.5.6')
   const smoke = jobs['exact-package-updater-smoke']
   assert.deepEqual(smoke.needs, ['prepare', 'build-macos'])
   assert.match(smoke.if, /inputs\.exact_package_updater_smoke == true/)
@@ -276,12 +339,23 @@ test('private exact updater smoke consumes this run’s package once without a r
   assert.equal(download.with.name, 'release-mac')
   assert.equal(download.with['run-id'], undefined, 'artifact must belong to this run')
   const launch = smoke.steps.find(step => /--target-dist=/.test(step.run ?? ''))
-  assert.match(launch.run, /--base-version=0\.5\.4/)
+  assert.equal(launch.env.BASE_VERSION, '${{ inputs.exact_updater_base_version }}')
+  assert.match(launch.run, /--base-version="\$\{BASE_VERSION\}"/)
   assert.match(launch.run, /--target-version="\$\{TARGET_VERSION\}"/)
   assert.doesNotMatch(JSON.stringify(smoke), /npm run dist|electron-builder|publish-r2|gh release|deploy-website-release|REVIEWED_BUILD_JSON/)
   const signing = jobs['build-macos'].steps.find(step => step.name === 'Resolve signing mode')
   assert.equal(signing.env.EXACT_PACKAGE_UPDATER_SMOKE, '${{ inputs.exact_package_updater_smoke }}')
   assert.match(signing.run, /EXACT_PACKAGE_UPDATER_SMOKE.*true/)
+})
+
+test('cancelled releases cannot start installers, native upgrades or public promotion', () => {
+  for (const name of ['exact-package-windows-install-smoke', 'exact-package-updater-smoke', 'publish']) {
+    assert.match(jobs[name].if, /!cancelled\(\)/, `${name} must honor cancellation`)
+    assert.doesNotMatch(jobs[name].if, /always\(\)/, `${name} must not bypass cancellation`)
+  }
+  for (const name of ['exact-package-windows-install-smoke', 'exact-package-updater-smoke']) {
+    assert.equal(jobs[name].steps.find(step => /actions\/upload-artifact@/.test(step.uses ?? '')).if, 'always()', 'Retain evidence even after cancellation')
+  }
 })
 
 test('private Windows installation smoke inspects this run’s exact EXE without rebuilding or publication', () => {
@@ -694,15 +768,14 @@ test('evidence paths reject line breaks before writing workflow outputs', t => {
   f.verify(f.tagRelease(), /must not contain line breaks/)
 })
 
-function currentPolicyFixture(t, { changedFiles = {}, sourceVersion = '0.5.5', exact = false } = {}) {
-  const version = '0.5.5'
-  const f = releaseFixture(t, sourceVersion, version, { previousTag: 'v0.5.4', changedFiles,
+function currentPolicyFixture(t, { changedFiles = {}, version = '0.5.5', sourceVersion = version, previousTag = 'v0.5.4', exact = false } = {}) {
+  const f = releaseFixture(t, sourceVersion, version, { previousTag, changedFiles,
     sourceFiles: {
       '.github/workflows/release.yml': 'jobs:\n  build:\n    env:\n      WORKWISE_APP_VERSION: ${{ needs.prepare.outputs.version }}\n',
       'electron-builder.cjs': 'const releaseAppVersion = process.env.WORKWISE_APP_VERSION; module.exports = { extraMetadata: { version: releaseAppVersion } }\n',
     } })
   f.manifest.schemaVersion = 2
-  f.manifest.release.previousTag = 'v0.5.4'
+  f.manifest.release.previousTag = previousTag
   delete f.manifest.package.screenshots
   f.manifest.acceptance = { installedPackage: { status: 'passed', path: `${f.base}/installed-package.md`, sourceHead: f.reviewedSourceHead } }
   f.manifest.checks = {
@@ -801,7 +874,7 @@ test('effective version evidence cannot disguise a source-version or installed p
 
 test('package-external policy, test harness and evidence edits can follow the exact package without a second build', t => {
   const f = currentPolicyFixture(t, { exact: true })
-  for (const path of ['scripts/verify-release-approval.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/run-task-delivery-live.mjs', 'scripts/macos-updater-trust.test.mjs', 'kun/src/services/task-controller.test.ts', 'docs/runtime-architecture.md', 'website/products/workwise/index.php', 'scripts/workwise-product-public-verification.test.mjs', 'openspec/changes/durable-task-document-workbench/tasks.md']) f.put(path, 'package-external correction\n')
+  for (const path of ['scripts/verify-release-approval.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/run-task-delivery-live.mjs', 'scripts/run-windows-ui-smoke.mjs', 'scripts/windows-ui-smoke.test.mjs', 'scripts/macos-updater-trust.test.mjs', 'kun/src/services/task-controller.test.ts', 'docs/runtime-architecture.md', 'website/products/workwise/index.php', 'scripts/workwise-product-public-verification.test.mjs', 'openspec/changes/durable-task-document-workbench/tasks.md']) f.put(path, 'package-external correction\n')
   const policyHead = f.commit('record nonshipped policy and evidence harness changes')
   f.manifest.checks.requiredCI.workflowRun.sourceHead = policyHead
   f.manifest.checks.focusedTests.sourceHead = policyHead
@@ -810,12 +883,34 @@ test('package-external policy, test harness and evidence edits can follow the ex
 })
 
 test('exact build still rejects every later application or packaging edit', async t => {
-  for (const path of ['src/runtime.js', 'kun/src/services/task-controller.ts', 'kun/src/other.test.ts', 'package.json', 'electron-builder.cjs', 'scripts/before-pack.cjs', '.github/workflows/release.yml']) await t.test(path, t => {
+  for (const path of ['src/runtime.js', 'kun/src/services/task-controller.ts', 'kun/src/other.test.ts', 'package.json', 'electron-builder.cjs', 'scripts/before-pack.cjs', 'scripts/prepare-windows-install-smoke.mjs', '.github/workflows/release.yml']) await t.test(path, t => {
     const f = currentPolicyFixture(t, { exact: true })
     f.put(path, path === 'package.json' ? JSON.stringify({ version: '0.5.5', changed: true }) : 'changed application/build inputs\n')
     f.commit('change package inputs after build'); f.recordEvidence()
     f.verify(f.tagRelease(), /changes after the reviewed package/)
   })
+})
+
+test('exact package evidence accepts the product-page switch and the two Windows QA scripts', t => {
+  const f = currentPolicyFixture(t, { exact: true, changedFiles: { [RELEASE_WORKFLOW]: stringifyYaml(legacyPublicationWorkflow()) } })
+  f.put(RELEASE_WORKFLOW, workflowSource)
+  f.put('scripts/run-windows-ui-smoke.mjs', 'exact-package QA driver\n')
+  f.put('scripts/windows-ui-smoke.test.mjs', 'QA driver regression\n')
+  f.commit('add scoped product publication opt-out and QA driver evidence')
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('reverting a post-build workflow packaging change still requires a newly accepted package', t => {
+  const f = currentPolicyFixture(t, { exact: true, changedFiles: { [RELEASE_WORKFLOW]: stringifyYaml(legacyPublicationWorkflow()) } })
+  const changed = legacyPublicationWorkflow()
+  changed.jobs['build-macos'].steps.push({ name: 'Change package', run: 'echo changed package bytes' })
+  f.put(RELEASE_WORKFLOW, stringifyYaml(changed))
+  f.commit('change packaging after the accepted build')
+  f.put(RELEASE_WORKFLOW, workflowSource)
+  f.commit('restore packaging while adding publication opt-out')
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /changes after the reviewed package/)
 })
 
 test('curated 0.5.6 publication notes can follow an accepted package', t => {
@@ -826,16 +921,15 @@ test('curated 0.5.6 publication notes can follow an accepted package', t => {
   assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
 })
 
-test('current rename release accepts original same-run native smoke without inventing a frozen receipt', t => {
-  const f = currentPolicyFixture(t, { exact: true })
+function addExactUpdaterEvidence(f, baseVersion) {
   f.manifest.release.updaterPathChanged = true
   const build = f.manifest.package.reviewedBuild
-  f.machineReport.baseVersion = '0.5.4'
-  f.machineReport.baselineIdentity.version = '0.5.4'
-  f.machineReport.baselineAsset = { tag: 'v0.5.4', ...resolveUpdaterBaseline('0.5.4').pins.arm64 }
-  f.machineReport.dataSeed.serviceIdentity.packageVersion = '0.5.4'
-  f.nativeReport.baseVersion = '0.5.4'
-  f.nativeReport.stages.at(-1).detail = '0.5.4'
+  f.machineReport.baseVersion = baseVersion
+  f.machineReport.baselineIdentity.version = baseVersion
+  f.machineReport.baselineAsset = { tag: `v${baseVersion}`, ...resolveUpdaterBaseline(baseVersion).pins.arm64 }
+  f.machineReport.dataSeed.serviceIdentity.packageVersion = baseVersion
+  f.nativeReport.baseVersion = baseVersion
+  f.nativeReport.stages.at(-1).detail = baseVersion
   delete f.machineReport.reviewedBuild
   f.machineReport.privatePackage = { sourceHead: build.sourceHead, artifactRunId: build.runId, artifactName: 'release-mac', files: structuredClone(build.files.filter(file => file.artifact === 'release-mac')) }
   f.machineReport.provenance = { repository: build.repository, workflowPath: build.workflowPath, workflowRef: build.workflowRef,
@@ -844,8 +938,38 @@ test('current rename release accepts original same-run native smoke without inve
     workflowRun: { repository: build.repository, workflowPath: build.workflowPath, headRef: build.headRef, workflowRef: build.workflowRef,
       workflowSha: build.workflowSha, sourceHead: build.sourceHead, runId: build.runId, runAttempt: build.runAttempt,
       artifact: { id: 88, name: `exact-package-updater-${build.runId}`, digest: `sha256:${'d'.repeat(64)}` } } }
+}
+
+test('current rename release accepts original same-run native smoke without inventing a frozen receipt', t => {
+  const f = currentPolicyFixture(t, { exact: true })
+  addExactUpdaterEvidence(f, '0.5.4')
   f.recordEvidence()
   assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('0.5.7 exact smoke binds the independently declared 0.5.6 baseline through machine and native reports', async t => {
+  const changes = {
+    passed: () => {},
+    missingDeclaration: f => { delete f.manifest.acceptance.updaterRoundTrip.baseVersion },
+    mismatchedDeclaration: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = '0.5.4' },
+    unpinnedBaseline: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = '0.5.9' },
+    remoteBaseline: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = 'https://example.invalid/baseline.dmg' },
+    machineBaseline: f => { f.machineReport.baseVersion = '0.5.4' },
+    nativeBaseline: f => { f.nativeReport.baseVersion = '0.5.4' },
+    nonceBaseline: f => { f.nativeReport.stages.at(-1).detail = '0.5.4' },
+    otherInstaller: f => { f.machineReport.baselineAsset.name = 'https://example.invalid/installer.dmg' },
+    installerHash: f => { f.machineReport.baselineAsset.sha256 = '0'.repeat(64) }
+  }
+  for (const [name, change] of Object.entries(changes)) await t.test(name, t => {
+    const f = currentPolicyFixture(t, { exact: true, version: '0.5.7', previousTag: 'v0.5.6' })
+    addExactUpdaterEvidence(f, '0.5.6')
+    f.manifest.acceptance.updaterRoundTrip.baseVersion = '0.5.6'
+    change(f)
+    f.recordEvidence()
+    const releaseHead = f.tagRelease()
+    if (name === 'passed') assert.match(f.verify(releaseHead), /verified v0\.5\.7/)
+    else assert.throws(() => f.verify(releaseHead))
+  })
 })
 
 test('required CI verifies actual API source, repository, run attempt and successful quality job', async t => {

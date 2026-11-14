@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   buildSyncedClawScheduleMcpJson,
   clawScheduleMcpSettingsChanged,
@@ -10,6 +10,7 @@ import {
   resolveClawScheduleMcpNodeEntryPath,
   resolveRuntimeConfigPath,
   resolveRuntimeMcpJsonPath,
+  restoreManagedScheduleMcpEnvironment,
   syncClawScheduleMcpConfig,
   type ClawScheduleMcpLaunchConfig
 } from './claw-schedule-mcp-config'
@@ -22,6 +23,9 @@ import {
   defaultWriteSettings,
   type AppSettingsV1
 } from '../shared/app-settings'
+import { McpConfigService } from './services/mcp-config-service'
+
+vi.mock('electron', () => ({ safeStorage: { isEncryptionAvailable: () => false } }))
 
 function createSettings(patch: Partial<AppSettingsV1['schedule']['internal']> = {}): AppSettingsV1 {
   const claw = defaultClawSettings()
@@ -122,6 +126,50 @@ describe('claw schedule MCP config', () => {
       }
     })
     expect(synced.timeouts).toEqual({ connect_timeout: 1 })
+  })
+
+  it('restores the managed Electron launch flag after legacy-to-V2 migration without inheriting legacy environment secrets', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-schedule-mcp-refresh-'))
+    const settings = createSettings({ port: 9787, secret: 'synthetic-local-secret' })
+    const legacyPath = join(root, 'mcp.json')
+    const manifestPath = join(root, 'mcp-v2.json')
+    const legacy = buildSyncedClawScheduleMcpJson({ servers: {
+      ordinary: { command: 'node', args: ['ordinary.js'], env: { ELECTRON_RUN_AS_NODE: '1', API_TOKEN: 'must-not-migrate' } }
+    } }, settings, launch)
+    const servers = legacy.servers as Record<string, Record<string, unknown>>
+    servers.gui_schedule!.env = { ELECTRON_RUN_AS_NODE: '1', API_TOKEN: 'must-not-migrate' }
+    await writeFile(legacyPath, JSON.stringify(legacy))
+    const service = new McpConfigService({ manifestPath, legacyPath, credentialRoot: join(root, 'credentials'),
+      encryption: { available: () => false, encrypt: () => { throw new Error('No credentials expected') }, decrypt: () => { throw new Error('No credentials expected') }, storage: 'session' } })
+    try {
+      const sources = await service.list()
+      const snapshot = await service.runtimeSnapshot()
+      expect(snapshot.servers.gui_schedule!.env).toEqual({})
+      const refreshed = restoreManagedScheduleMcpEnvironment(snapshot, sources, settings, launch)
+      expect(refreshed.servers.gui_schedule).toEqual({ ...snapshot.servers.gui_schedule, env: { ELECTRON_RUN_AS_NODE: '1' } })
+      expect(refreshed.servers.ordinary!.env).toEqual({})
+      expect(refreshed.environment).toEqual({})
+      expect(snapshot.servers.gui_schedule!.env).toEqual({})
+      expect(await readFile(manifestPath, 'utf8')).not.toContain('must-not-migrate')
+      expect(JSON.stringify(refreshed)).not.toContain('must-not-migrate')
+      expect(await readFile(legacyPath, 'utf8')).toBe(JSON.stringify(legacy))
+      expect(restoreManagedScheduleMcpEnvironment(refreshed, sources, settings, launch)).toEqual(refreshed)
+
+      for (const replacement of [
+        { source: 'user' as const },
+        { scope: 'workspace' as const, workspaceRoot: '/synthetic' },
+        { command: 'untrusted-launcher' },
+        { args: [...sources.find(source => source.id === 'gui_schedule')!.args!, '--eval', 'untrusted'] },
+        { credentialRef: { id: 'unrelated-reference', storage: 'session' as const } }
+      ]) {
+        const untrusted = sources.map(source => source.id === 'gui_schedule' ? { ...source, ...replacement } : source)
+        expect(restoreManagedScheduleMcpEnvironment(snapshot, untrusted, settings, launch)).toBe(snapshot)
+      }
+      for (const replacement of [{ command: 'untrusted-launcher' }, { args: ['other-entry.js'] }, { trustScope: 'workspace' }, { enabled: false }]) {
+        const changed = { ...snapshot, servers: { ...snapshot.servers, gui_schedule: { ...snapshot.servers.gui_schedule, ...replacement } } }
+        expect(restoreManagedScheduleMcpEnvironment(changed, sources, settings, launch)).toBe(changed)
+      }
+    } finally { await rm(root, { recursive: true, force: true }) }
   })
 
   it('uses the macOS Electron helper for real app bundle paths', () => {

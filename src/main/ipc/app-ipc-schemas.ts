@@ -11,7 +11,8 @@ import { SurveyQualityPlanCreateV1, SurveyQualityEvidenceCreateV1, SurveyQuality
 import { QUALITY_WORKFLOW_LIMITS, SurveyQualityWorkflowCreateV1, SurveyQualityWorkflowAppendV1, parseQualityWorkflowJson } from '../../shared/survey-quality-workflow'
 import { SurveyDraftCreateV1, SurveyDraftSealV1 } from '../../shared/survey-collaboration'
 import { TaskCommandSchema } from '../../../kun/src/contracts/execution'
-import { TaskPermissionConfirmationSchema } from '../../../kun/src/contracts/permissions'
+import { TaskPermissionRevocationSchema, TaskPermissionConfirmationSchema } from '../../../kun/src/contracts/permissions'
+import { BrowserOperationConfirmation, BrowserTaskBindingConfirmation } from '../../../kun/src/contracts/browser-skill'
 import {
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE,
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE,
@@ -39,7 +40,9 @@ import {
   RUNTIME_TASK_EVENTS_TEMPLATE,
   RUNTIME_TASK_RECEIPTS_TEMPLATE,
   RUNTIME_TASK_PERMISSIONS_TEMPLATE,
+  RUNTIME_TASK_BROWSER_BINDING_TEMPLATE,
   RUNTIME_TASK_RECEIPT_VERIFY_TEMPLATE,
+  RUNTIME_TASK_BROWSER_CONFIRM_TEMPLATE,
   RUNTIME_TASK_SUMMARY_TEMPLATE,
   RUNTIME_INBOX_TEMPLATE,
   RUNTIME_TASK_TEMPLATES_TEMPLATE,
@@ -309,8 +312,10 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_TASK_INPUTS_TEMPLATE, ['GET', 'POST'], []),
   compileEndpoint(RUNTIME_TASK_EVENTS_TEMPLATE, ['GET'], ['afterSequence']),
   compileEndpoint(RUNTIME_TASK_RECEIPTS_TEMPLATE, ['GET']),
-  compileEndpoint(RUNTIME_TASK_PERMISSIONS_TEMPLATE, ['GET', 'POST']),
+  compileEndpoint(RUNTIME_TASK_PERMISSIONS_TEMPLATE, ['GET', 'POST', 'DELETE']),
+  compileEndpoint(RUNTIME_TASK_BROWSER_BINDING_TEMPLATE, ['GET', 'POST'], []),
   compileEndpoint(RUNTIME_TASK_RECEIPT_VERIFY_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_TASK_BROWSER_CONFIRM_TEMPLATE, ['POST'], []),
   compileEndpoint(RUNTIME_TASK_SUMMARY_TEMPLATE, ['GET'], ['workspaceRoot', 'search', 'threadId']),
   compileEndpoint(RUNTIME_INBOX_TEMPLATE, ['GET'], ['workspaceRoot']),
   compileEndpoint(RUNTIME_TASK_TEMPLATES_TEMPLATE, ['GET'], []),
@@ -452,11 +457,41 @@ export const runtimeRequestPayloadSchema = z
           && (limit === null || (/^[1-9]\d*$/.test(limit) && Number(limit) <= 200))))
       if (!valid) context.addIssue({ code: 'custom', message: 'invalid task list request' })
     }
+    const browserBinding = /^\/v1\/tasks\/([^/]+)\/browser-binding$/.exec(url.pathname)
+    if (browserBinding) {
+      const method = payload.method ?? 'GET'
+      let safeTaskPath = false
+      try {
+        const taskId = decodeURIComponent(browserBinding[1])
+        safeTaskPath = payload.path === url.pathname && url.origin === 'http://localhost'
+          && !!taskId.trim() && !/[/\\?#%\s]/u.test(taskId) && !taskId.includes('\0') && !['.', '..'].includes(taskId)
+      } catch { /* Malformed encoded identifiers cannot reach Runtime. */ }
+      let valid = safeTaskPath && method === 'GET' && payload.body === undefined
+      if (safeTaskPath && method === 'POST' && payload.body !== undefined) {
+        try { valid = BrowserTaskBindingConfirmation.safeParse(JSON.parse(payload.body)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid scoped browser binding request' })
+    }
+    const browserConfirmation = /^\/v1\/tasks\/([^/]+)\/receipts\/([^/]+)\/browser-confirm$/.exec(url.pathname)
+    if (browserConfirmation) {
+      let valid = payload.path === url.pathname && url.origin === 'http://localhost'
+        && payload.method === 'POST' && payload.body !== undefined && Buffer.byteLength(payload.body, 'utf8') <= 4096
+      try {
+        valid = valid && browserConfirmation.slice(1).every(raw => {
+          const id = decodeURIComponent(raw)
+          return !!id.trim() && !/[/\\?#%\s]/u.test(id) && !id.includes('\0') && !['.', '..'].includes(id)
+        }) && BrowserOperationConfirmation.safeParse(JSON.parse(payload.body!)).success
+      } catch { valid = false }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid browser operation confirmation request' })
+    }
     if (/^\/v1\/tasks\/[^/]+\/permissions$/.test(url.pathname)) {
       const method = payload.method ?? 'GET'
       let valid = method === 'GET' && payload.body === undefined && !url.search && !url.hash
       if (method === 'POST' && payload.body !== undefined && !url.search && !url.hash && Buffer.byteLength(payload.body, 'utf8') <= 4096) {
         try { valid = TaskPermissionConfirmationSchema.safeParse(JSON.parse(payload.body)).success } catch { valid = false }
+      }
+      if (method === 'DELETE' && payload.body !== undefined && !url.search && !url.hash && Buffer.byteLength(payload.body,'utf8') <= 4096) {
+        try { valid = TaskPermissionRevocationSchema.safeParse(JSON.parse(payload.body)).success } catch { valid = false }
       }
       if (!valid) context.addIssue({ code: 'custom', message: 'invalid scoped task permission request' })
     }

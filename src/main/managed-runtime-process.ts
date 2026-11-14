@@ -42,6 +42,8 @@ import { diagnoseManagedDingTalk } from './services/managed-dws-service'
 import type { ManagedDwsStatus } from '../shared/managed-dws'
 import { DwsCapabilityConfig } from '../../kun/src/contracts/dws.js'
 import { DingTalkCapabilityConfig } from '../../kun/src/contracts/dingtalk.js'
+import { BrowserCapabilityConfig } from '../../kun/src/contracts/browser-skill.js'
+import { getManagedBrowserSkillService } from './services/managed-browser-skill-service'
 import { resolveLarkCliEnvironment } from '../../kun/src/services/lark-cli-environment.js'
 import { resolveDwsEnvironment } from '../../kun/src/services/dws-cli-environment.js'
 import {
@@ -56,6 +58,7 @@ import { isRuntimeHealthResponseBody } from './runtime-health'
 import { appendManagedLogLine } from './logger'
 import {
   guiSkillRootsForRuntime,
+  isManagedPluginSkillRoot,
   installBundledSkill,
   normalizeSkillRootPath,
   resolveBundledSkillDirectory
@@ -382,6 +385,7 @@ export function isManagedRuntimeChildRunning(): boolean {
 }
 
 export type StartManagedRuntimeChildOptions = {
+  allowStart?: () => boolean
   autoInstallBundledAgentPack?: boolean
   autoInstallBundledSpecialistSkills?: boolean
   candidateRoot?: string
@@ -414,6 +418,10 @@ export async function startManagedRuntimeChild(
   settings: AppSettingsV1,
   options: StartManagedRuntimeChildOptions = {}
 ): Promise<void> {
+  const assertStartAllowed = (): void => {
+    if (options.allowStart?.() === false) throw new Error('runtime_shutdown_in_progress')
+  }
+  assertStartAllowed()
   const candidateRoot = options.candidateRoot?.trim()
   const runtime = {
     ...resolveManagedRuntimeForStart(settings, Boolean(candidateRoot), options.runtimeToken),
@@ -486,6 +494,12 @@ export async function startManagedRuntimeChild(
     skillRoots: options.skillRoots,
     larkCli,
     dws:dwsDiagnosis.status??{state:'error'},
+    browserSkill: await getManagedBrowserSkillService().configuration().then(async config => {
+      if (!config.enabled) return config
+      const result = await getManagedBrowserSkillService().connect()
+      const { ownedDaemon: _owned, skillInstalled: _skill, ...status } = result.status
+      return BrowserCapabilityConfig.parse(status)
+    }),
     scheduleMcp: {
       settings,
       launch: {
@@ -529,6 +543,7 @@ export async function startManagedRuntimeChild(
   documentExportBridge = startedExportBridge
   try {
     child = await safeSpawn(resolution.command, args, {
+    beforeSpawn: assertStartAllowed,
     env: {
       ...runtimeEnvironment,
       [MCP_PATH_ENV_KEY]: resolveMcpToolPath(process.env, homeDir),
@@ -743,6 +758,26 @@ export async function syncManagedDwsCapability(dataDir: string, status: ManagedD
   return enabled
 }
 
+export async function syncManagedBrowserSkillCapability(dataDir: string, status: BrowserCapabilityConfig): Promise<void> {
+  await updateManagedConnectorConfig(dataDir, existing => ({ ...existing,
+    capabilities: { ...objectValue(existing.capabilities), browserSkill: BrowserCapabilityConfig.parse(status) } }))
+}
+
+export async function syncManagedSkillCapability(dataDir: string, settings: AppSettingsV1): Promise<void> {
+  const managedRoots = (await guiSkillRootsForRuntime(settings)).map(root => root.path)
+  await updateManagedConnectorConfig(dataDir, existing => {
+    const capabilities = objectValue(existing.capabilities)
+    const current = objectValue(capabilities.skills)
+    const previousManaged = new Set(stringArrayValue(current.managedRoots))
+    const customRoots = stringArrayValue(current.roots).filter(root => !previousManaged.has(root) && !isManagedPluginSkillRoot(root))
+    const roots = uniqueStrings([...customRoots, ...managedRoots])
+    const skills = SkillsCapabilityConfig.parse({ ...current, roots, managedRoots,
+      revision: Number(current.revision ?? 0) + 1,
+      enabled: current.enabled === false ? false : roots.length > 0 })
+    return { ...existing, capabilities: { ...capabilities, skills } }
+  })
+}
+
 /** Explicit UI action only; never diagnose an account or resume a task here. */
 export async function setManagedDwsEnabled(dataDir: string, enabled: boolean): Promise<ManagedDwsStatus> {
   let updated = DwsCapabilityConfig.parse({ enabled })
@@ -770,6 +805,7 @@ export async function syncManagedRuntimeConfig(
     mcpV2Servers?: Record<string, Record<string, unknown>>
     skillRoots?: string[]
     dws?:ManagedDwsStatus
+    browserSkill?: BrowserCapabilityConfig
     larkCli?: {
       state: 'not_installed' | 'needs_login' | 'installed' | 'error'
       executablePath?: string
@@ -858,6 +894,7 @@ export async function syncManagedRuntimeConfig(
       skills: skillCapability,
       imageGen: imageGenConfigForRuntime(runtime.imageGeneration, imageGen),
       dws: dwsCapabilityFromStatus(options?.dws ?? { state: 'not_installed' }, managedDwsEnabled(capabilities)),
+      browserSkill: options?.browserSkill ?? BrowserCapabilityConfig.parse(capabilities.browserSkill ?? {}),
       lark: {
         ...lark,
         enabled: lark.enabled === false ? false : true,
@@ -948,13 +985,14 @@ async function skillCapabilityConfigForRuntime(
   const roots = explicitRoots
     ? uniqueStrings(explicitRoots.map(normalizeSkillRootPath))
     : uniqueStrings([
-        ...stringArrayValue(existing.roots).map(normalizeSkillRootPath),
+        ...stringArrayValue(existing.roots).filter(root => !stringArrayValue(existing.managedRoots).includes(root) && !isManagedPluginSkillRoot(root)).map(normalizeSkillRootPath),
         ...(await guiSkillRootsForRuntime(settings)).map((root) => root.path)
       ])
   return {
     ...existing,
     enabled: existing.enabled === false ? false : roots.length > 0 || existing.enabled === true,
     roots,
+    managedRoots: explicitRoots ? [] : (await guiSkillRootsForRuntime(settings)).map(root => root.path),
     legacySkillMd: existing.legacySkillMd === false ? false : true
   }
 }
@@ -1356,6 +1394,7 @@ function sanitizeRuntimeCapabilitiesConfig(value: unknown): Record<string, unkno
   if ('imageGen' in raw) next.imageGen = parseRuntimeConfigSection(ImageGenCapabilityConfig, raw.imageGen)
   if ('lark' in raw) next.lark = parseRuntimeConfigSection(LarkCapabilityConfig, raw.lark)
   if ('dws' in raw) next.dws=parseRuntimeConfigSection(DwsCapabilityConfig,raw.dws)
+  if ('browserSkill' in raw) next.browserSkill = parseRuntimeConfigSection(BrowserCapabilityConfig, raw.browserSkill)
   if ('dingtalk' in raw) next.dingtalk=parseRuntimeConfigSection(DingTalkCapabilityConfig,raw.dingtalk)
   return next
 }
@@ -1448,7 +1487,8 @@ function waitForChildExit(process: ChildProcess, timeoutMs: number): Promise<boo
       resolve(exited)
     }
     const onExit = (): void => settle(true)
-    const onError = (): void => settle(true)
+    // A failed kill or IPC operation is not a process-exit acknowledgement.
+    const onError = (): void => settle(false)
     process.once('exit', onExit)
     process.once('error', onError)
   })

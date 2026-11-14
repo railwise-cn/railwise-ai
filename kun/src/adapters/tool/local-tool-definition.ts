@@ -22,6 +22,9 @@ export function defineLocalTool(
     ...(tool.validateArguments ? { validateArguments: tool.validateArguments } : {}),
     ...(tool.effect ? { effect: tool.effect } : {}),
     ...(tool.requireExplicitApproval ? { requireExplicitApproval: true } : {}),
+    ...(tool.hasScopedApproval ? { hasScopedApproval: tool.hasScopedApproval } : {}),
+    ...(tool.contextBlock ? { contextBlock: tool.contextBlock } : {}),
+    ...(tool.approvalSummary ? { approvalSummary: tool.approvalSummary } : {}),
     ...(tool.shouldAdvertise ? { shouldAdvertise: tool.shouldAdvertise } : {})
   }
 }

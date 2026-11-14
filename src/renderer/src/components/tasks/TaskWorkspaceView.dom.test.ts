@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TaskAttentionV1, TaskOperationReceiptV1, TaskRunV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskOperationReceiptV1, TaskPermissionSnapshotV1, TaskRunV1 } from '@shared/agent-workbench'
 import i18n from '../../i18n'
 import { TaskWorkspaceView, filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from './TaskWorkspaceView'
 import { resetTaskStateForTests, refreshTaskState } from '../../store/task-live-store'
@@ -126,6 +126,49 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('restores an eligible failed task in place and starts it only after a separate Continue', async () => {
+    const original: TaskRunV1 = {...task('original-expired','failed','Original public query'),attempts:8,
+      timing:{executionMs:1013026,queuedMs:0,humanWaitMs:0,pausedMs:0,sampledAt:now,coverage:'complete'}}
+    tasks = [original]; inbox = []
+    let permission: TaskPermissionSnapshotV1 = {
+      taskId:original.id,taskRevision:1,taskTitle:original.goal,scopeHash:'expired-scope',workspaceRoot:'/workspace',workspaceTrust:'read-only',workspaceRevision:2,agentRevision:3,
+      approvalPolicy:'on-request',targetApprovalPolicy:'on-request',maxTtlSeconds:900,canConfirm:true,recoveryEligible:true,canRestoreBase:true,
+      grant:{id:'temporary-diagnostic',status:'expired',confirmedAt:now,expiresAt:now,scope:{readPaths:['/workspace','/old/diagnostic'],writePaths:[]}}
+    }
+    Object.assign(window.workwise,{
+      getTaskPermissions:vi.fn(async()=>permission),getTaskRun:vi.fn(async()=>tasks[0]),listAgentProfiles:vi.fn(async()=>({profiles:[]})),confirmTaskPermissions:vi.fn(),
+      runtimeRequest:vi.fn(async(path:string,method:string,body?:string)=>{
+        if(method==='GET')return {ok:true,status:200,body:JSON.stringify({agentRevision:3})}
+        expect(path).toBe('/v1/tasks/original-expired/permissions'); expect(method).toBe('DELETE')
+        expect(JSON.parse(body!)).toEqual({expectedRevision:1,permissionId:'temporary-diagnostic',idempotencyKey:expect.any(String),restoreBase:true})
+        tasks = [{...tasks[0],status:'paused',revision:2}]
+        permission = {...permission,taskRevision:2,recoveryEligible:false,canRestoreBase:false,grant:undefined}
+        return {ok:true,status:200,body:JSON.stringify({task:tasks[0],permission,resumed:false})}
+      })
+    })
+    await act(async()=>refreshTaskState())
+    await click('All tasks'); await click('Original public query')
+    const summary = [...container.querySelectorAll('details > summary')].find(item=>item.textContent===i18n.t('common:taskPermissionReview'))!
+    await act(async()=>{(summary as HTMLElement).click()})
+    expect((summary.parentElement as HTMLDetailsElement).open).toBe(true)
+    await settle()
+    await click(i18n.t('common:taskPermissionRestoreBase'))
+    expect([...container.querySelectorAll('[role="status"]')].some(item=>item.textContent===i18n.t('common:taskPermissionBaseRestored'))).toBe(true)
+    expect(tasks[0]).toMatchObject({id:original.id,status:'paused',attempts:8,timing:original.timing,budget:original.budget})
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled(); expect(window.workwise.retryTask).not.toHaveBeenCalled()
+    expect(window.workwise.confirmTaskPermissions).not.toHaveBeenCalled(); expect(window.workwise.startTaskTemplate).not.toHaveBeenCalled()
+    await click(i18n.t('common:taskRunResume'))
+    expect(window.workwise.resumeTask).toHaveBeenCalledExactlyOnceWith(original.id,{expectedRevision:2,idempotencyKey:expect.any(String)})
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+
+  it('keeps detailed task permissions closed until the user opens them', async () => {
+    await click('Monthly report')
+    const summary = [...container.querySelectorAll('details > summary')].find(item => item.textContent === i18n.t('common:taskPermissionReview'))
+    expect(summary).toBeTruthy()
+    expect((summary!.parentElement as HTMLDetailsElement).open).toBe(false)
+  })
+
   it('opens an authorized external artifact by task identity and displays its file name', async () => {
     const openTaskArtifact = vi.fn(async () => ({ ok: true as const }))
     Object.assign(window.workwise, { openTaskArtifact })
@@ -309,6 +352,162 @@ describe('TaskWorkspaceView', () => {
     expect(window.workwise.pauseTask).toHaveBeenCalledWith('t1', expect.objectContaining({ expectedRevision: 1 }))
     expect(container.querySelector('[aria-label="Task details"]')?.textContent).toContain('Resume')
     expect(onOpenThread).not.toHaveBeenCalled()
+  })
+
+  it.each(['completed', 'not_completed'] as const)('uses the browser review command and preserves a paused task after explicit %s confirmation', async decision => {
+    const pending = { ...task('browser-review', 'paused', 'Review original query'), revision: 7 }
+    tasks = [pending]; inbox = []
+    const receipt: TaskOperationReceiptV1 = { id: 'browser-receipt', taskId: pending.id, purpose: 'browser_action',
+      provider: 'browser-skill', operation: 'click', toolName: 'browser_click', requestHash: 'a'.repeat(64), status: 'outcome_unknown',
+      browser: { action: 'click', pageUrl: 'https://example.com/notices', canReview: true }, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([receipt])
+    vi.mocked(window.workwise.verifyTaskOperationReceipt).mockResolvedValue({ taskId: pending.id, receiptId: receipt.id, status: 'outcome_unknown',
+      browserReview: { id: 'review-1', action: 'click', pageUrl: 'https://example.com/notices', observationText: 'Public query completed', expiresAt: new Date(Date.now() + 120_000).toISOString() } })
+    const runtimeRequest = vi.mocked(window.workwise.runtimeRequest)
+    runtimeRequest.mockImplementation(async path => {
+      if (path.endsWith('/browser-confirm')) {
+        tasks = [{ ...pending, revision: 8 }]
+        return { ok: true, status: 200, body: JSON.stringify({ taskId: pending.id, receiptId: receipt.id, status: 'verified', outcome: decision === 'not_completed' ? 'not_completed' : 'succeeded', evidence: { kind: 'human_confirmation', provider: 'browser-skill', operation: 'click', target: 'https://example.com/notices', status: decision === 'not_completed' ? 'public_query_reviewed_incomplete' : 'public_query_confirmed_by_user', verified: true, verifiedAt: new Date().toISOString(), resultHash: 'b'.repeat(64) } }) }
+      }
+      return { ok: true, status: 200, body: '{}' }
+    })
+    await act(async () => { await refreshTaskState() })
+    await click('In progress')
+    await click('Check the original page')
+    const checkbox = container.querySelector<HTMLInputElement>('[aria-label="Review this browser operation"] input[type="checkbox"]')!
+    expect(checkbox).toBeTruthy()
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    await act(async () => container.querySelector<HTMLInputElement>(`input[value="${decision}"]`)!.click())
+    await act(async () => checkbox.click())
+    const refreshes = vi.mocked(window.workwise.listTaskPage).mock.calls.length
+    await click('Save my confirmation')
+    const request = runtimeRequest.mock.calls.find(([path]) => path.endsWith('/browser-confirm'))!
+    expect(request[0]).toBe('/v1/tasks/browser-review/receipts/browser-receipt/browser-confirm')
+    expect(request[1]).toBe('POST')
+    expect(JSON.parse(request[2]!)).toEqual({ expectedRevision: 7, idempotencyKey: expect.any(String), reviewId: 'review-1', decision })
+    expect(tasks[0].status).toBe('paused')
+    expect(tasks[0].revision).toBe(8)
+    expect(vi.mocked(window.workwise.listTaskPage).mock.calls.length).toBeGreaterThan(refreshes)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.appendTaskInput).not.toHaveBeenCalled()
+  })
+
+  it('keeps a failed browser review reason visible through its refresh and later updates of the same root', async () => {
+    const pending = { ...task('browser-failure', 'paused', '核对原网页'), revision: 7 }
+    tasks = [pending]; inbox = []
+    const receipt: TaskOperationReceiptV1 = { id: 'failed-browser-receipt', taskId: pending.id, purpose: 'browser_action',
+      provider: 'browser-skill', operation: 'fill', toolName: 'browser_fill', requestHash: 'a'.repeat(64), status: 'outcome_unknown',
+      browser: { action: 'fill', pageUrl: 'https://example.com/notices', canReview: true }, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([receipt])
+    vi.mocked(window.workwise.verifyTaskOperationReceipt).mockResolvedValue({ taskId: pending.id, receiptId: receipt.id,
+      status: 'outcome_unknown', errorCode: 'browser_review_read_failed' })
+    await act(async () => { await i18n.changeLanguage('zh'); await refreshTaskState() })
+    await click('进行中')
+    const originalCard = container.querySelector('[aria-label="网页操作核验"] li')!
+    expect(originalCard).toBeTruthy()
+    const refreshes = vi.mocked(window.workwise.listTaskPage).mock.calls.length
+    await click('检查原网页结果')
+    const message = i18n.t('common:taskBrowserReviewUnavailable')
+    expect(container.textContent).toContain(message)
+    expect(container.querySelector('[aria-label="网页操作核验"] li')).toBe(originalCard)
+    expect(vi.mocked(window.workwise.listTaskPage).mock.calls.length).toBeGreaterThan(refreshes)
+    const event = vi.mocked(window.workwise.onSseEvent).mock.calls.at(-1)![0]
+    const streamId = vi.mocked(window.workwise.startTaskSse).mock.calls.at(-1)![1]!
+    tasks = [{ ...pending, revision: 8 }]
+    await act(async () => event({ streamId, events: [{ seq: 1, taskId: pending.id, kind: 'task_changed', payload: tasks[0], createdAt: now }] }))
+    await settle()
+    expect(container.textContent).toContain(message)
+    expect(container.querySelector('[aria-label="网页操作核验"] li')).toBe(originalCard)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.appendTaskInput).not.toHaveBeenCalled()
+    expect(tasks[0].status).toBe('paused')
+  })
+
+  it('clears the previous root review immediately when switching tasks and ignores its late detail response', async () => {
+    const first = task('browser-first', 'paused', '第一个公开查询')
+    const second = task('browser-second', 'paused', '另一个独立任务')
+    tasks = [first, second]; inbox = []
+    const receipt: TaskOperationReceiptV1 = { id: 'first-browser-receipt', taskId: first.id, purpose: 'browser_action',
+      provider: 'browser-skill', operation: 'click', toolName: 'browser_click', requestHash: 'a'.repeat(64), status: 'outcome_unknown',
+      browser: { action: 'click', pageUrl: 'https://example.com/first', canReview: true }, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockImplementation(async id => id === first.id ? [receipt] : [])
+    vi.mocked(window.workwise.verifyTaskOperationReceipt).mockResolvedValue({ taskId: first.id, receiptId: receipt.id, status: 'outcome_unknown',
+      browserReview: { id: 'first-private-review', action: 'click', pageUrl: 'https://example.com/first', observationText: '只属于第一个任务的观察内容', expiresAt: new Date(Date.now() + 120_000).toISOString() } })
+    await act(async () => { await i18n.changeLanguage('zh'); await refreshTaskState() })
+    await click('进行中')
+    await click('第一个公开查询')
+    await click('检查原网页结果')
+    expect(container.textContent).toContain('只属于第一个任务的观察内容')
+    let finishOldRead: ((value: TaskOperationReceiptV1[]) => void) | undefined
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockImplementation(id => id === first.id
+      ? new Promise(resolve => { finishOldRead = resolve }) : new Promise(() => undefined))
+    tasks = [{ ...first, revision: 2 }, second]
+    await act(async () => refreshTaskState())
+    expect(finishOldRead).toBeTypeOf('function')
+    expect(container.textContent).toContain('只属于第一个任务的观察内容')
+    await click('另一个独立任务')
+    expect(container.querySelector('[aria-label="任务详情"] h2')?.textContent).toBe('另一个独立任务')
+    expect(container.textContent).not.toContain('只属于第一个任务的观察内容')
+    expect(container.textContent).not.toContain('https://example.com/first')
+    expect(container.querySelector('[aria-label="网页操作核验"]')).toBeNull()
+    await act(async () => finishOldRead!([receipt]))
+    await settle()
+    expect(container.textContent).not.toContain('只属于第一个任务的观察内容')
+    expect(container.querySelector('[aria-label="网页操作核验"]')).toBeNull()
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('uses the browser business review without exposing technical fingerprints in task attention', async () => {
+    const summary = ['确认浏览器操作', '站点 "https://example.com"', '动作 "填写网页输入框"', '目标 "采购关键词"',
+      '输入内容 "轨道交通监测"', `输入摘要 "${'a'.repeat(64)}"`, `目标摘要 "${'b'.repeat(64)}"`, `请求摘要 "${'c'.repeat(64)}"`,
+      '授权期限 "仅本次操作"', '操作说明 "执行后读取页面核验。"'].join('\n')
+    inbox = [{ ...approval, message: summary }]
+    tasks = tasks.map(item => item.id === approval.taskId ? { ...item, waitingReason: summary } : item)
+    await act(async () => refreshTaskState())
+    await click('Needs you')
+    expect(container.textContent).toContain('采购关键词')
+    expect(container.textContent).toContain('轨道交通监测')
+    expect(container.textContent).not.toContain('a'.repeat(64))
+    expect(container.textContent).not.toContain('输入摘要')
+  })
+
+  it('projects a blocked resume into its durable actionable card while preserving pause', async () => {
+    const capability = { provider: 'browser-skill', status: 'needs_authorization', errorCode: 'browser_binding_changed',
+      message: '请确认当前任务的浏览器范围。', action: { kind: 'grant', route: 'task/browser-binding', label: '确认当前任务的浏览器范围' } }
+    tasks = [{ ...tasks[0], status: 'paused' }]
+    inbox = []
+    const original = tasks[0]
+    const binding = { taskId: original.id, taskRevision: original.revision, browserRevision: 3, browserInstanceId: 'new-browser',
+      browserLabel: 'Chrome 验收', origins: ['https://example.com'], interaction: 'interact', previousInteraction: 'observe' }
+    Object.assign(window.workwise, {
+      diagnoseBrowserSkill: vi.fn(async () => ({ status: { enabled: true, state: 'ready', origins: binding.origins, interaction: 'interact', revision: 3, browsers: [] } })),
+      getBrowserTaskBinding: vi.fn(async () => binding),
+      confirmBrowserTaskBinding: vi.fn(async () => ({ binding, resumed: false })),
+      resumeTask: vi.fn(async () => {
+        inbox = [{ ...approval, id: `capability_${original.id}`, ownerId: original.id, taskId: original.id, threadId: original.threadId,
+          kind: 'blocked', title: '继续原任务前需要处理', message: capability.message, requestId: undefined,
+          payload: { kind: 'capability_required', capability, request: { prompt: original.goal } } }]
+        return { task: original, capability, attentionId: inbox[0].id }
+      })
+    })
+    await act(async () => refreshTaskState())
+    await settle()
+    await click('Resume')
+    expect(window.workwise.resumeTask).toHaveBeenCalledOnce()
+    expect(tasks[0]).toEqual(original)
+    expect(container.textContent).toContain(capability.message)
+    const workspaceValue = container.querySelector(`[aria-label="${i18n.t('common:capabilityRequiredTitle')}"] dl`)?.textContent
+    expect(workspaceValue).toContain(original.workspaceRoot)
+    expect(workspaceValue).not.toContain('No workspace selected')
+    expect(container.querySelector('nav[aria-label="Task filters"] button[aria-pressed="true"]')?.textContent).toContain('Needs you')
+    await click('确认当前任务的浏览器范围')
+    expect(window.workwise.getBrowserTaskBinding).toHaveBeenCalledWith(original.id)
+    expect(container.textContent).toContain('Chrome 验收')
+    await click('Confirm browser scope for this task')
+    expect(window.workwise.confirmBrowserTaskBinding).toHaveBeenCalledWith(original.id, expect.objectContaining({ interaction: 'interact', expectedTaskRevision: original.revision }))
+    expect(window.workwise.resumeTask).toHaveBeenCalledOnce()
+    await act(async () => refreshTaskState())
+    expect(container.textContent).toContain('继续原任务前需要处理')
   })
 
   it('shows pending decisions and resolves them through the original approval API', async () => {

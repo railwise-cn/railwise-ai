@@ -44,6 +44,7 @@ export type RevisionMutation = {
 }
 
 export type TaskArtifactV1 = {
+  storage?: 'task'
   id: string
   relativePath: string
   absolutePath?: string
@@ -95,8 +96,10 @@ export type TaskResultEvidenceV1 = {
 
 /** Read-only projection: raw requests, results, credentials and execution IDs stay in Runtime. */
 export type TaskOperationReceiptV1 = {
-  purpose?: 'assistant_reply'
+  purpose?: 'assistant_reply' | 'host_shell' | 'browser_action'
   phase?: 'upload' | 'send'
+  shell?: { canPoll?: boolean; exitCode?: number; outputSha256?: string; message?: string }
+  browser?: { action: 'click' | 'fill'; pageUrl?: string; canReview: boolean }
   id: string
   taskId: string
   provider: string
@@ -107,22 +110,26 @@ export type TaskOperationReceiptV1 = {
   status: 'prepared' | 'running' | 'succeeded' | 'failed' | 'outcome_unknown'
   remoteOperationId?: string
   evidence?: TaskResultEvidenceV1
-  resolution?: { status: 'verified'; receiptId: string; evidence: TaskResultEvidenceV1; resolvedAt: string }
+  resolution?: { status: 'verified'; receiptId: string; evidence: TaskResultEvidenceV1; resolvedAt: string; outcome?: 'succeeded' | 'not_completed' }
   errorCode?: string
   createdAt: string
   updatedAt: string
 }
 
-export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown'; evidence?: TaskResultEvidenceV1; errorCode?: string }
+export type BrowserOperationReviewV1 = { id: string; expiresAt: string; action: 'click' | 'fill'; pageUrl: string; observationText: string; targetLabel?: string; value?: string }
+export type BrowserOperationConfirmationV1 = { expectedRevision: number; idempotencyKey: string; reviewId: string; decision: 'confirmed_complete' | 'completed' | 'not_completed' }
+export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown' | 'running' | 'failed'; evidence?: TaskResultEvidenceV1; outcome?: 'succeeded' | 'not_completed'; errorCode?: string; browserReview?: BrowserOperationReviewV1; shell?: { status: 'verified' | 'running' | 'failed' | 'outcome_unknown'; message: string; exitCode?: number; outputSha256?: string } }
 
 export type TaskPermissionScopeV1 = {
   readPaths?: string[]; writePaths?: string[]; networkOrigins?: string[]; providerIds?: string[]; externalTargets?: string[]
 }
 export type TaskExecutionPermissionV1 = {
+  id?: string
   turnId: string; workspaceRoot: string; workspaceTrust: WorkspaceTrustLevel; agentTrust: WorkspaceTrustLevel
   sandboxMode: string; approvalPolicy: string; allowedToolNames?: string[]; allowedProviderIds?: string[]
   pathAllowlist: string[]; readPathAllowlist?: string[]; writePathAllowlist?: string[]; networkAllowlist: string[]
   connectorScopes: string[]; externalTargets: string[]; issuedAt: string; expiresAt?: string
+  browserScope?: import('../../kun/src/contracts/browser-skill').BrowserExecutionScope
 }
 export type TaskPermissionSnapshotV1 = {
   taskId: string; taskRevision: number; taskTitle: string; scopeHash: string
@@ -132,7 +139,10 @@ export type TaskPermissionSnapshotV1 = {
   sandboxMode?: string; agentTrust?: WorkspaceTrustLevel; agentName?: string
   toolAllowlist?: string[]; mcpAllowlist?: string[]; externalTargets?: string[]
   connectorScopeSources?: Array<{ provider: string; scopes: string[]; source: 'task_requirements' | 'tool_catalog' | 'last_execution_grant'; issuedAt?: string; expiresAt?: string }>
+  canWritePaths?: boolean
   canConfirm: boolean; reason?: string
+  /** Server-verified in-place permission recovery; never inferred from an error string. */
+  canRestoreBase?: boolean; recoveryEligible?: boolean
   executionGrants?: TaskExecutionPermissionV1[]
   grant?: { id: string; status: 'active' | 'expired' | 'invalid' | 'prepared' | 'consumed'; confirmedAt: string; expiresAt: string; scope?: TaskPermissionScopeV1; duration?: 'task'|'next_operation' }
 }
@@ -231,7 +241,7 @@ export type TaskRunListQuery = {
 export type TaskInputV1 = {
   id: string
   taskId: string
-  kind: 'supplement' | 'user_answer' | 'tool_result' | 'handoff'
+  kind: 'supplement' | 'user_answer' | 'approval_resolution' | 'tool_result' | 'handoff'
   text: string
   createdAt: string
   deliveredAt?: string

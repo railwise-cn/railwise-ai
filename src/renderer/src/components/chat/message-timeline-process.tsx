@@ -120,7 +120,7 @@ export function ProcessSectionRow({
   const active = isProcessSectionActive(section, processing)
   const hasError = section.blocks.some(
     (block) =>
-      (block.kind === 'tool' && block.status === 'error') ||
+      (block.kind === 'tool' && block.status === 'error' && !block.meta?.outcomeUnknown) ||
       (block.kind === 'approval' && block.status === 'error') ||
       (block.kind === 'user_input' && block.status === 'error') ||
       (block.kind === 'system' && block.severity === 'error')
@@ -247,7 +247,7 @@ function processBlockIsActive(block: ChatBlock, processing: boolean): boolean {
 
 function processBlockHasError(block: ChatBlock): boolean {
   return (
-    (block.kind === 'tool' && block.status === 'error') ||
+    (block.kind === 'tool' && block.status === 'error' && !block.meta?.outcomeUnknown) ||
     (block.kind === 'compaction' && block.status === 'error') ||
     (block.kind === 'approval' && block.status === 'error') ||
     (block.kind === 'user_input' && block.status === 'error') ||
@@ -352,7 +352,7 @@ function ProcessEntryRow({
   const isError = processBlockHasError(block)
   const open =
     canExpand &&
-    (isError || isAssistantProcessText || isAutoOpenPending || isStreamingAssistant || userOpen)
+    (isAssistantProcessText || isAutoOpenPending || isStreamingAssistant || userOpen)
 
   const { verb, rest } = splitVerb(summary)
   const rowActive = isRunningTool || isAutoOpenPending || isStreamingAssistant
@@ -773,6 +773,7 @@ export function summarizeToolBlock(
   block: ToolBlock,
   t: (key: string, opts?: Record<string, unknown>) => string
 ): string {
+  if (typeof block.meta?.presentationSummary === 'string') return block.meta.presentationSummary
   const rawSummary = block.summary?.trim() ?? ''
   const metaToolName = readMetaString(block.meta, 'toolName')
   const toolName = extractToolName(rawSummary) || metaToolName || ''
@@ -833,7 +834,7 @@ function getProcessDetail(block: ChatBlock, summaryText?: string): ProcessDetail
     if (summaryText && normalizeProcessText(detailText) === normalizeProcessText(summaryText)) {
       return { kind: 'none' }
     }
-    const isError = block.status === 'error'
+    const isError = block.status === 'error' && !block.meta?.outcomeUnknown
     const patchText =
       block.toolKind === 'file_change' && !isError
         ? extractUnifiedDiffText(detailText)
@@ -935,6 +936,7 @@ function describeProcessBlock(
     return t('processTextLabel')
   }
   if (block.kind === 'tool') {
+    if (typeof block.meta?.presentationSummary === 'string') return block.meta.presentationSummary
     return summarizeToolBlock(block, t)
   }
   if (block.kind === 'compaction') {
@@ -949,7 +951,7 @@ function describeProcessBlock(
     return block.auto === true ? t('compactionAutoCompleted') : t('compactionManualCompleted')
   }
   if (block.kind === 'approval') {
-    return block.summary || t('approvalTitle')
+    return t('approvalTitle')
   }
   if (block.kind === 'user_input') {
     return t('userInputTitle')

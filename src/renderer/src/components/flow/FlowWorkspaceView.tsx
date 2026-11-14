@@ -1,3 +1,4 @@
+import { normalizeScheduleSpec } from '@shared/app-settings-schedule'
 import brand from '@shared/product-brand.json'
 import '@xyflow/react/dist/style.css'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
@@ -33,7 +34,7 @@ const FLOW_NODE_TYPES = { workwise: FlowNodeCard }
 const FLOW_NODE_WIDTH = 180
 const FLOW_NODE_HEIGHT = 80
 const NODE_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; kind?: 'number' | 'boolean' | 'json'; required?: boolean; placeholder?: string }>> = {
-  schedule_trigger: [{ key: 'schedule', label: '计划表达式', required: true, placeholder: 'interval:15m / daily:09:00' }, { key: 'timezone', label: '时区', placeholder: 'Asia/Shanghai' }],
+  schedule_trigger: [],
   webhook_trigger: [{ key: 'credentialRef', label: 'Webhook 密钥引用', required: true }],
   agent: [{ key: 'prompt', label: '系统提示词', required: true }], subagent: [{ key: 'prompt', label: '委派提示词', required: true }],
   knowledge_retrieval: [{ key: 'attachmentId', label: '附件 ID' }, { key: 'query', label: '检索词' }, { key: 'limit', label: '结果上限', kind: 'number' }],
@@ -185,6 +186,18 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
   const addNode = (entry: RegistryEntry) => { if (!draft || !entry.available) return; const id = `${entry.type}_${crypto.randomUUID().slice(0, 8)}`; const next = { id, type: entry.type, label: entry.label, position: { x: 180 + draft.nodes.length * 24, y: 100 + draft.nodes.length * 20 }, bindings: {}, config: entry.type === 'loop' ? { maxIterations: 10 } : {}, policy: { ...DEFAULT_POLICY }, disabled: false }; setDraft({ ...draft, nodes: [...draft.nodes, next] }); setSelectedNodeId(id) }
   const createFlow = async () => { setBusy('create'); try { const id = `flow_${crypto.randomUUID()}`; const value = await runtimeJson<{ flow: FlowDefinition }>('/v1/flows', 'POST', createStarterFlowInput(id, { triggerType: filter === 'scheduled' ? 'scheduled' : 'manual' })); activeIdRef.current = id; setFlows((current) => [value.flow, ...current]); setActiveId(id); setDraft(value.flow); setSelectedNodeId(value.flow.nodes.find((node) => node.type === 'agent')?.id ?? null); setIssues([]); setError(null) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
   const save = async () => { if (!draft) return; setBusy('save'); try { const value = await runtimeJson<{ flow: FlowDefinition }>(`/v1/flows/${draft.id}`, 'PUT', { definition: draft, expectedRevision: draft.revision }); setDraft(value.flow); setFlows((current) => current.map((flow) => flow.id === value.flow.id ? value.flow : flow)); setError(null) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
+  const setScheduleEnabled = async (enabled: boolean) => {
+    if (!draft?.variables.taskSchedule) return
+    setBusy('schedule')
+    try {
+      const value = await runtimeJson<{ flow: FlowDefinition }>(`/v1/flows/${draft.id}`, 'PUT', { definition: { ...draft, variables: { ...draft.variables, enabled } }, expectedRevision: draft.revision })
+      const published = await runtimeJson<{ published: boolean }>(`/v1/flows/publish`, 'POST', { id: draft.id })
+      if (!published.published) throw new Error('计划状态未能保存，请刷新核对。')
+      setDraft(value.flow)
+      setFlows(current => current.map(flow => flow.id === value.flow.id ? value.flow : flow))
+      setError(null)
+    } catch (reason) { setError(message(reason)) } finally { setBusy(null) }
+  }
   const validate = async () => { if (!draft) return false; const result = await runtimeJson<{ valid: boolean; issues: ValidationIssue[] }>('/v1/flows/validate', 'POST', { definition: draft }); setIssues(result.issues); return result.valid }
   const publish = async () => { if (!draft) return; setBusy('publish'); try { await save(); const result = await runtimeJson<{ published: boolean; validation: { issues: ValidationIssue[] } }>('/v1/flows/publish', 'POST', { id: draft.id }); setIssues(result.validation.issues); if (!result.published) throw new Error('发布校验未通过') } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
   const run = async () => { if (!draft) return; setBusy('run'); try { const input = JSON.parse(mockInput); const result = await runtimeJson<{ run: FlowRun }>('/v1/flows/run', 'POST', { flowId: draft.id, input, invocationStack: [] }); setRuns((current) => [result.run, ...current.filter((item) => item.id !== result.run.id)]) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
@@ -209,7 +222,7 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
       <Workflow className="h-5 w-5 text-blue-600" /><h1 className="text-[16px] font-semibold">{brand.platform} Flow</h1><span className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-400/10 dark:text-blue-300">Preview</span>
       {filter === 'scheduled' ? <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">定时流程</span> : null}<select className="ds-no-drag ml-3 rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-[13px] dark:border-ds-border dark:bg-ds-main" value={activeId ?? ''} onChange={(event) => { const flow = visibleFlows.find((item) => item.id === event.target.value) ?? null; activeIdRef.current = flow?.id ?? null; setActiveId(flow?.id ?? null); setDraft(flow) }}><option value="">选择流程</option>{visibleFlows.map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select>
       <button className="ds-no-drag rounded-lg border border-[#e2e8f0] px-3 py-1.5 text-[13px] hover:bg-slate-50 dark:border-ds-border" onClick={() => void createFlow()}>新建</button>
-      <div className="ml-auto flex gap-2">{busy ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" /> : null}<Action icon={<Save />} label="保存" onClick={() => void save()} /><Action icon={<CheckCircle2 />} label="校验" onClick={() => void validate()} /><Action icon={<Download />} label="脱敏导出" onClick={() => void exportRedacted()} /><Action icon={<Send />} label="发布" primary onClick={() => void publish()} /><Action icon={<Play />} label="运行" primary onClick={() => void run()} />{runs.some((item) => ['queued', 'running', 'waiting_approval', 'paused', 'interrupted'].includes(item.status)) ? <Action icon={<Square />} label="取消" onClick={() => void cancelRun()} /> : null}</div>
+      <div className="ml-auto flex gap-2">{draft?.variables.taskSchedule ? <button disabled={busy !== null} className="ds-no-drag rounded-lg border border-ds-border px-3 py-1.5 text-[13px]" onClick={() => void setScheduleEnabled(draft.variables.enabled === false)}>{draft.variables.enabled === false ? '启用计划' : '暂停计划'}</button> : null}{busy ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" /> : null}<Action icon={<Save />} label="保存" onClick={() => void save()} /><Action icon={<CheckCircle2 />} label="校验" onClick={() => void validate()} /><Action icon={<Download />} label="脱敏导出" onClick={() => void exportRedacted()} /><Action icon={<Send />} label="发布" primary onClick={() => void publish()} /><Action icon={<Play />} label="运行" primary onClick={() => void run()} />{runs.some((item) => ['queued', 'running', 'waiting_approval', 'paused', 'interrupted'].includes(item.status)) ? <Action icon={<Square />} label="取消" onClick={() => void cancelRun()} /> : null}</div>
     </header>
     {error ? <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-[12px] text-red-700"><AlertTriangle className="h-4 w-4" />{error}</div> : null}
     <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(320px,1fr)_auto] lg:grid-cols-[220px_minmax(360px,1fr)_320px] lg:grid-rows-1">
@@ -231,8 +244,43 @@ export function FlowNodeInspector({ node, entry, allNodes, registry, variables, 
   return <div><div className="mb-3 text-[13px] font-semibold">节点配置</div><Field label="名称"><input value={node.label} onChange={(event) => onChange({ ...node, label: event.target.value })} /></Field>
     {entry?.inputs.length ? <section className="mt-4"><div className="text-[11px] font-semibold text-[#475569]">输入绑定</div>{entry.inputs.map((port) => { const binding = bindings[port.id] ?? { kind: 'literal', value: '' }; return <div key={port.id} className="mt-2 rounded-lg border border-[#e2e8f0] p-2"><div className="flex items-center justify-between text-[11px]"><span>{port.label}{port.required ? ' *' : ''}</span><span className="text-[9px] text-[#94a3b8]">{port.type}</span></div><select className="mt-1 w-full rounded border border-[#e2e8f0] px-2 py-1 text-[11px]" value={binding.kind} onChange={(event) => changeBinding(port.id, event.target.value === 'variable' ? { kind: 'variable', variable: Object.keys(variables)[0] ?? '' } : event.target.value === 'port' ? { kind: 'port', nodeId: '', portId: '' } : { kind: 'literal', value: '' })}><option value="literal">常量</option><option value="variable">Flow 变量</option><option value="port">节点输出</option></select>{binding.kind === 'literal' ? <textarea className="mt-1 w-full rounded border border-[#e2e8f0] p-1.5 font-mono text-[10px]" value={formatConfigValue(binding.value)} onChange={(event) => changeBinding(port.id, { kind: 'literal', value: parseConfigValue(event.target.value) })} /> : binding.kind === 'variable' ? <select className="mt-1 w-full rounded border border-[#e2e8f0] px-2 py-1 text-[11px]" value={binding.variable} onChange={(event) => changeBinding(port.id, { kind: 'variable', variable: event.target.value })}><option value="">选择变量</option>{Object.keys(variables).map((key) => <option key={key}>{key}</option>)}</select> : <select className="mt-1 w-full rounded border border-[#e2e8f0] px-2 py-1 text-[11px]" value={`${binding.nodeId}:${binding.portId}`} onChange={(event) => { const [nodeId, portId] = event.target.value.split(':'); changeBinding(port.id, { kind: 'port', nodeId: nodeId ?? '', portId: portId ?? '' }) }}><option value=":">选择节点输出</option>{portOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>}</div> })}</section> : null}
     {MODEL_NODE_TYPES.has(node.type) ? <div className="grid grid-cols-2 gap-2"><Field label="提供商"><input value={String(node.config.provider ?? '')} onChange={(event) => changeConfig('provider', event.target.value)} placeholder="默认" /></Field><Field label="模型"><input value={String(node.config.model ?? '')} onChange={(event) => changeConfig('model', event.target.value)} placeholder="默认模型" /></Field></div> : null}
+    {node.type === 'schedule_trigger' ? <><ScheduleConfigFields config={node.config} onChange={config => onChange({ ...node, config })} /><ScheduleAuthoritySummary value={variables.taskSchedule} /></> : null}
     {(NODE_CONFIG_FIELDS[node.type] ?? []).map((field) => <Field key={field.key} label={`${field.label}${field.required ? ' *' : ''}`}>{field.kind === 'boolean' ? <input type="checkbox" checked={node.config[field.key] === true} onChange={(event) => changeConfig(field.key, event.target.checked)} /> : field.kind === 'json' ? <textarea rows={3} className="font-mono" value={formatConfigValue(node.config[field.key])} onChange={(event) => changeConfig(field.key, parseConfigValue(event.target.value))} placeholder={field.placeholder} /> : <input type={field.kind === 'number' ? 'number' : 'text'} value={String(node.config[field.key] ?? '')} onChange={(event) => changeConfig(field.key, field.kind === 'number' ? Number(event.target.value) : event.target.value)} placeholder={field.placeholder} />}</Field>)}
     <div className="mt-4 text-[11px] font-semibold text-[#475569]">执行策略</div><div className="grid grid-cols-2 gap-2"><Field label="超时(ms)"><input type="number" min={100} max={3600000} value={policy.timeoutMs} onChange={(event) => changePolicy({ timeoutMs: Number(event.target.value) })} /></Field><Field label="重试次数"><input type="number" min={0} max={10} value={policy.retryAttempts} onChange={(event) => changePolicy({ retryAttempts: Number(event.target.value) })} /></Field><Field label="退避(ms)"><input type="number" min={0} max={300000} value={policy.retryBackoffMs} onChange={(event) => changePolicy({ retryBackoffMs: Number(event.target.value) })} /></Field><Field label="并发限制"><input type="number" min={1} max={64} value={policy.concurrencyLimit} onChange={(event) => changePolicy({ concurrencyLimit: Number(event.target.value) })} /></Field></div><Field label="错误处理"><select className="w-full rounded-lg border border-[#e2e8f0] px-2 py-1.5" value={policy.errorBehavior} onChange={(event) => changePolicy({ errorBehavior: event.target.value as NodePolicy['errorBehavior'] })}><option value="fail">失败并停止</option><option value="error_edge">错误分支</option><option value="continue">记录后继续</option></select></Field><label className="mt-2 flex items-center gap-2 text-[11px]"><input type="checkbox" checked={policy.resumable} onChange={(event) => changePolicy({ resumable: event.target.checked })} />可恢复</label><label className="mt-2 flex items-center gap-2 text-[11px]"><input type="checkbox" checked={policy.breakpoint} onChange={(event) => changePolicy({ breakpoint: event.target.checked })} />断点</label><Field label="Mock JSON"><textarea rows={5} value={mockInput} onChange={(event) => onMockInput(event.target.value)} className="font-mono" /></Field><button onClick={onTest} disabled={busy} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-700 disabled:opacity-50"><TestTube2 className="h-4 w-4" />单节点测试</button></div>
+}
+export function ScheduleAuthoritySummary({ value }: { value: unknown }): ReactElement | null {
+  if (!value || typeof value !== 'object') return null
+  const saved = value as { authorization?: { until?: string }; scope?: { readPathAllowlist?: string[]; writePathAllowlist?: string[]; networkAllowlist?: string[]; browserScope?: { origins?: string[] } } }
+  if (saved.authorization?.until !== 'disabled' || !saved.scope) return <p className="mt-3 text-xs text-ds-muted">此计划需要重新核对持续执行权限。</p>
+  const scope = saved.scope
+  return <section className="mt-3 space-y-2 rounded-lg border border-ds-border p-3 text-xs" aria-label="计划持续权限">
+    <p>持续至暂停计划或撤销原任务权限。</p>
+    <p>写入范围 {scope.writePathAllowlist?.length ? scope.writePathAllowlist.join('、') : '应用管理的任务成果目录'}</p>
+    <details><summary className="cursor-pointer">查看读取与网络范围</summary>
+      <p className="mt-2 break-all">读取范围 {scope.readPathAllowlist?.join('、') || '未设置额外文件范围'}</p>
+      <p className="mt-2 break-all">网络范围 {(scope.browserScope?.origins ?? scope.networkAllowlist)?.join('、') || '未设置网络访问'}</p>
+    </details>
+  </section>
+}
+
+export function ScheduleConfigFields({ config, onChange }: { config: Record<string, unknown>; onChange: (config: Record<string, unknown>) => void }): ReactElement {
+  let normalized = config
+  try { normalized = normalizeScheduleSpec(config) } catch { /* Keep incomplete edits visible for correction. */ }
+  const kind = String(normalized.kind ?? 'manual')
+  const update = (patch: Record<string, unknown>) => {
+    const { schedule: _legacyExpression, ...current } = config
+    onChange({ ...current, ...normalized, ...patch })
+  }
+  const times = Array.isArray(normalized.times) ? normalized.times.join(', ') : String(config.timeOfDay ?? '09:00')
+  return <div className="space-y-2">
+    <Field label="计划类型"><select aria-label="计划类型" value={kind} onChange={event => update({ kind: event.target.value })}>
+      <option value="manual">手动</option><option value="daily">每天</option><option value="interval">固定间隔</option><option value="at">指定时间</option>
+    </select></Field>
+    {kind === 'daily' ? <><Field label="每日执行时刻"><input aria-label="每日执行时刻" value={times} placeholder="08:30, 16:30" onChange={event => update({ times: event.target.value.split(/[,，]/).map(value => value.trim()) })} /></Field>
+      <Field label="时区"><input aria-label="时区" value={String(config.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone)} placeholder="Asia/Shanghai" onChange={event => update({ timezone: event.target.value })} /></Field></> : null}
+    {kind === 'interval' ? <Field label="间隔分钟"><input aria-label="间隔分钟" type="number" min={1} max={10080} value={Number(config.everyMinutes ?? 15)} onChange={event => update({ everyMinutes: Number(event.target.value) })} /></Field> : null}
+    {kind === 'at' ? <Field label="执行时间"><input aria-label="执行时间" value={String(config.atTime ?? '')} placeholder="2026-11-14T09:00:00+08:00" onChange={event => update({ atTime: event.target.value })} /></Field> : null}
+  </div>
 }
 function formatConfigValue(value: unknown): string { if (value === undefined) return ''; return typeof value === 'string' ? value : JSON.stringify(value, null, 2) }
 function parseConfigValue(value: string): unknown { const trimmed = value.trim(); if (!trimmed) return ''; try { return JSON.parse(trimmed) } catch { return value } }

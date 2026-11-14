@@ -147,6 +147,7 @@ function fitWorkbenchWidths(
 
 export function useWorkbenchLayout({
   activeThreadId,
+  latestAutoOpenDevPreviewKey,
   latestAutoOpenDevPreviewUrl,
   latestDevPreviewUrl,
   route,
@@ -154,6 +155,7 @@ export function useWorkbenchLayout({
   writeAssistantOpen
 }: {
   activeThreadId: string | null
+  latestAutoOpenDevPreviewKey?: string | null
   latestAutoOpenDevPreviewUrl: string | null
   latestDevPreviewUrl: string | null
   route: AppRoute
@@ -173,7 +175,9 @@ export function useWorkbenchLayout({
   )
   const shellRef = useRef<HTMLDivElement | null>(null)
   const previewThreadId = useRef<string | null>(activeThreadId)
-  const autoOpenedPreviewUrlRef = useRef<string | null>(null)
+  const autoOpenedPreviewKeyRef = useRef<string | null>(null)
+  const dismissedPreviews = useRef(new Map<string | null, string>())
+  const currentPreviewKey = latestAutoOpenDevPreviewKey ?? latestAutoOpenDevPreviewUrl
   const rightPanelVisible = route === 'write'
     ? writeAssistantOpen || rightPanelMode === 'sdd-ai'
     : rightPanelMode !== null
@@ -222,7 +226,7 @@ export function useWorkbenchLayout({
   useEffect(() => {
     if (previewThreadId.current === activeThreadId) return
     previewThreadId.current = activeThreadId
-    autoOpenedPreviewUrlRef.current = null
+    autoOpenedPreviewKeyRef.current = null
     if (rightPanelMode === 'browser') setRightPanelMode(null)
     if (rightPanelMode === 'file') {
       setRightPanelMode(null)
@@ -231,11 +235,12 @@ export function useWorkbenchLayout({
   }, [activeThreadId, rightPanelMode])
 
   useEffect(() => {
-    if (!latestAutoOpenDevPreviewUrl || route !== 'chat') return
-    if (autoOpenedPreviewUrlRef.current === latestAutoOpenDevPreviewUrl) return
-    autoOpenedPreviewUrlRef.current = latestAutoOpenDevPreviewUrl
+    if (!latestAutoOpenDevPreviewUrl || !currentPreviewKey || route !== 'chat') return
+    if (dismissedPreviews.current.get(activeThreadId) === currentPreviewKey) return
+    if (autoOpenedPreviewKeyRef.current === currentPreviewKey) return
+    autoOpenedPreviewKeyRef.current = currentPreviewKey
     setRightPanelMode('browser')
-  }, [latestAutoOpenDevPreviewUrl, route])
+  }, [activeThreadId, currentPreviewKey, latestAutoOpenDevPreviewUrl, route])
 
   useEffect(() => {
     if (route !== 'write') return
@@ -263,6 +268,8 @@ export function useWorkbenchLayout({
   }, [leftSidebarCollapsed, leftSidebarWidth, rightPanelVisible, rightSidebarWidth])
 
   const toggleRightPanelMode = (nextMode: Exclude<RightPanelMode, null>): void => {
+    if (rightPanelMode === 'browser' && currentPreviewKey) dismissedPreviews.current.set(activeThreadId, currentPreviewKey)
+    if (nextMode === 'browser' && rightPanelMode !== 'browser') dismissedPreviews.current.delete(activeThreadId)
     setRightPanelMode((current) => (current === nextMode ? null : nextMode))
   }
 
@@ -271,10 +278,14 @@ export function useWorkbenchLayout({
   }
 
   const openDevPreview = (): void => {
-    if (latestDevPreviewUrl) {
-      autoOpenedPreviewUrlRef.current = latestDevPreviewUrl
-    }
+    dismissedPreviews.current.delete(activeThreadId)
+    autoOpenedPreviewKeyRef.current = currentPreviewKey ?? latestDevPreviewUrl
     setRightPanelMode('browser')
+  }
+
+  const closeDevPreview = (): void => {
+    if (currentPreviewKey) dismissedPreviews.current.set(activeThreadId, currentPreviewKey)
+    setRightPanelMode(null)
   }
 
   const beginLeftResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
@@ -356,6 +367,7 @@ export function useWorkbenchLayout({
   return {
     beginLeftResize,
     beginRightResize,
+    closeDevPreview,
     filePreviewTarget,
     leftSidebarCollapsed,
     leftSidebarWidth,

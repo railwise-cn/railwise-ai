@@ -46,6 +46,7 @@ export async function withToolBoundary(
   } catch (error) {
     return {
       output: {
+        ...(typeof (error as { code?: unknown })?.code === 'string' ? { code: (error as { code: string }).code } : {}),
         error: error instanceof Error ? error.message : String(error)
       },
       isError: true

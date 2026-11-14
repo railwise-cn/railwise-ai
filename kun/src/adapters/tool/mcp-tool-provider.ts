@@ -344,7 +344,15 @@ function matchesMcpAuthority(state: McpConnectionState, context: ToolHostContext
 }
 
 function assertMcpAuthority(state: McpConnectionState, context: ToolHostContext): void {
+  const bridgeBlock = taskScheduleBridgeBlock(state.serverId, context)
+  if (bridgeBlock) throw Object.assign(new Error(bridgeBlock.message), { code: bridgeBlock.code })
   if (!matchesMcpAuthority(state, context)) throw Object.assign(new Error('MCP configuration or account changed. Resume the task with a newly authorized execution.'), { code: 'connector_configuration_changed' })
+}
+
+/** Task schedules must use their task-owned authority and readback, including on replay. */
+function taskScheduleBridgeBlock(serverId: string, context: ToolHostContext): { code: string; message: string } | undefined {
+  if (!context.executionGrant?.taskId || !['gui_schedule', 'claw_schedule'].includes(serverId)) return undefined
+  return { code: 'execution_grant_scope', message: '当前任务不能使用兼容定时桥。请使用 schedule_task 建立本任务计划，再用 list_schedules 读回验收。' }
 }
 
 async function createSdkMcpClient(serverId: string, server: McpServerConfig, environment?: Readonly<Record<string, string>>): Promise<McpClientLike> {
@@ -431,6 +439,7 @@ function createMcpLocalTool(
     description: descriptor.description ?? `MCP tool ${descriptor.name} from ${state.serverId}`,
     inputSchema: descriptor.inputSchema ?? { type: 'object' },
     policy: policyFromAnnotations(descriptor.annotations),
+    contextBlock: context => taskScheduleBridgeBlock(state.serverId, context),
     shouldAdvertise: (context: ToolHostContext) => matchesMcpAuthority(state, context) && isMcpServerTrusted(state.server, context.workspace) && allowsMcpNetwork(state.server, context),
     execute: async (args, context) => {
       assertMcpAuthority(state, context)
@@ -475,6 +484,7 @@ function createMcpSearchCatalogRecord(
     toolId: `${state.serverId}/${descriptor.name}`,
     serverId: state.serverId,
     server: state.server,
+    contextBlock: context => taskScheduleBridgeBlock(state.serverId, context),
     isAvailable: context => matchesMcpAuthority(state, context),
     client: {
       callTool: (input, options) => {

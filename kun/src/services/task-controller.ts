@@ -1,4 +1,11 @@
+import type { OperationResolutionOutcome } from '../contracts/tasks.js'
+import { isBrowserTask, browserTaskOrigins, browserVerificationPolicy } from '../contracts/browser-skill.js'
+import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
+import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
+import { extractScheduleRequirement } from '../contracts/schedule.js'
 import { authorizedArtifactWrites } from './task-artifact-proof.js'
+import { workspacePermissionCapability } from './workspace-write-preflight.js'
+import type { CapabilityPreflight } from '../contracts/harness.js'
 import type { ToolEffectResolver } from '../ports/tool-effect.js'
 import { externalTaskIntent } from './external-task-capability.js'
 import { verifiedEffectReceipts, externalOperationForTool, externalTarget, requestedEffectOperations } from './external-effect-evidence.js'
@@ -11,6 +18,7 @@ import { makeToolResultItem } from '../domain/item.js'
 import type { ApprovalRequest } from '../domain/approval.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import { extname, isAbsolute, relative, resolve } from 'node:path'
 import type { TurnItem } from '../contracts/items.js'
 import type { ThreadRecord } from '../contracts/threads.js'
@@ -47,6 +55,8 @@ import { validateArtifactFile } from './artifact-validator.js'
 import type { RuntimeSpanService } from './runtime-span-service.js'
 import { verifyTaskDelivery } from '../delivery/verification.js'
 
+import { taskPermissionFailure } from './task-permission-recovery.js'
+
 const DEFAULT_MAX_ATTEMPTS = 8
 const DEFAULT_MAX_DURATION_MS = 30 * 60 * 1000
 const TERMINAL = new Set<TaskRunStatus>(['completed', 'failed', 'cancelled'])
@@ -61,6 +71,7 @@ export type TaskCandidateDecision =
   | { kind: 'failed'; task: TaskRun; reason: string }
 
 export type TaskControllerDeps = {
+  dataDir?: string
   repository: TaskRunRepository
   threadStore: ThreadStore
   sessionStore: SessionStore
@@ -68,6 +79,7 @@ export type TaskControllerDeps = {
   ownerId?: string
   resolveToolEffect?: ToolEffectResolver
   spans?: RuntimeSpanService
+  reconcileHostShell?: (taskId: string) => Promise<void>
   completionGuard?: (input: { thread?: ThreadRecord; turn?: Turn; task: TaskRun }) => { reason: string; fingerprint: string; retryable?: boolean } | null
 }
 
@@ -88,12 +100,14 @@ export class TaskController {
   setAdmissionSuspended(suspended: boolean): void { this.admissionSuspended = suspended }
 
   private readonly repository: TaskRunRepository
+  private readonly artifactDataDir?: string
   private readonly threadStore: ThreadStore
   private readonly sessionStore: SessionStore
   private readonly nowIso: () => string
   private readonly ownerId: string
   private readonly resolveToolEffect: ToolEffectResolver
   private readonly spans?: RuntimeSpanService
+  private readonly reconcileHostShell?: TaskControllerDeps['reconcileHostShell']
   private readonly completionGuard?: TaskControllerDeps['completionGuard']
   private readonly leases = new Map<string, { leaseRevision: number; turnId?: string }>()
   private readonly attemptTokens = new Map<string, ExecutionToken>()
@@ -109,6 +123,7 @@ export class TaskController {
 
   constructor(deps: TaskControllerDeps) {
     this.repository = deps.repository
+    this.artifactDataDir = deps.dataDir ? realpathSync(deps.dataDir) : undefined
     let sharedBudget=sharedWorkBudgets.get(deps.repository)
     if(!sharedBudget){sharedBudget={aborts:new Map(),active:new Map(),timers:new Map()};sharedWorkBudgets.set(deps.repository,sharedBudget)}
     this.executionAborts=sharedBudget.aborts;this.activeWork=sharedBudget.active;this.rootBudgetTimers=sharedBudget.timers
@@ -118,7 +133,13 @@ export class TaskController {
     this.ownerId = deps.ownerId ?? `runtime-${process.pid}-${randomUUID()}`
     this.spans = deps.spans
     this.completionGuard = deps.completionGuard
+    this.reconcileHostShell = deps.reconcileHostShell
     this.resolveToolEffect = deps.resolveToolEffect ?? externalOperationForTool
+  }
+
+  managedArtifactRoot(taskId: string): string | undefined {
+    if (!this.artifactDataDir || !this.repository.get(taskId)) return undefined
+    return resolve(this.artifactDataDir, 'task-artifacts', createHash('sha256').update(taskId).digest('hex'))
   }
 
   ensureTask(input: {
@@ -167,10 +188,13 @@ export class TaskController {
     if (existing) return existing
     return this.repository.transact(() => {
       const task = this.createTask(input)
-      return this.repository.update(task.id, task.revision, current => ({
+      const waiting = this.repository.update(task.id, task.revision, current => ({
         ...current, status: 'waiting_user', waitingReason: input.reason,
         nodes: current.nodes.map(node => ({ ...node, status: 'blocked' as const }))
       }), { key: 'capability-blocked', kind: 'capability_required', payload: { reason: input.reason } })
+      return this.repository.appendInput({ taskId: waiting.id, expectedRevision: waiting.revision, idempotencyKey: `capability-original:${waiting.id}`,
+        text: input.request.prompt, kind: 'supplement', sourceId: 'capability-original', attachmentIds: input.request.attachmentIds,
+        workspaceReferences: input.request.workspaceReferences, nowIso: this.nowIso() }).task
     })
   }
 
@@ -443,6 +467,8 @@ export class TaskController {
       throw Object.assign(new Error(`active task not found for thread ${threadId}`), { code: 'not_found' })
     }
     if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
+    await this.reconcileHostShell?.(task.id)
+    task = this.repository.get(task.id)!
     const hostShell = this.hostShellState(task)
     const unsettled = [...this.repository.unsettledOperations(task.id).filter(operation => operation.kind === 'tool'), ...hostShell.unknown]
     const [thread, items] = await Promise.all([
@@ -460,6 +486,11 @@ export class TaskController {
       task = this.updateExecution(task.id, task.revision, current => ({ ...current, artifacts, updatedAt: this.nowIso() }))
     }
     if (unsettled.length) return this.stallUnknown(task, unsettled.map(operation => operation.id))
+    if (this.repository.operations(task.id, 'browser_action_dispatch').some(receipt => receipt.status === 'succeeded' && (receipt.result as { readbackPending?: boolean } | undefined)?.readbackPending === true)) {
+      return this.waitForCapability(task, turnId, browserRecoveryCapability('browser_readback_blocked', this.nowIso()), 'browser_readback_blocked')
+    }
+    const permissionBlock = this.waitForToolPermission(task, items.filter(item => item.turnId === turnId), turnId, thread?.turns.find(candidate => candidate.id === turnId)?.executionGrant)
+    if (permissionBlock) return permissionBlock
     if (hostShell.pending.length) return this.retry(task,'已授权命令仍有待核验回执，请使用 host_shell_session 只读轮询原命令，不能重新执行或仅用文字交付。',`host-shell-pending:${hostShell.pending.map(operation => operation.id).join(',')}`,turnId)
     if (this.repository.listShellSessions(task.id).some(session => ['running','starting','outcome_unknown'].includes(session.status))) return this.retry(task,'命令进程尚未确认完成，请轮询已有命令并核实其结果后交付。',`shell-pending:${task.attempts}`,turnId)
     const turn = thread?.turns.find((candidate) => candidate.id === turnId)
@@ -497,6 +528,23 @@ export class TaskController {
         'web_access_exhausted: 在线搜索连续失败，无法核实当前资讯。'
       )
     }
+    if (task.acceptance.requiresWebEvidence) {
+      const origins = new Set<string>()
+      const reads = this.repository.operations(task.id, 'tool').filter(receipt => receipt.status === 'succeeded')
+      for (const item of items) {
+        if (!taskTurns.has(item.turnId) || item.kind !== 'tool_result' || item.isError || !item.output || typeof item.output !== 'object') continue
+        if (!reads.some(receipt => receipt.request?.callId === item.callId && receipt.request?.turnId === item.turnId && receipt.request?.toolName === item.toolName)) continue
+        const output = item.output as Record<string, unknown>
+        const evidence = output.evidence && typeof output.evidence === 'object' ? output.evidence as Record<string,unknown> : {}
+        const source = item.toolName === 'web_fetch' && typeof output.text === 'string' && output.text.trim()
+          ? output.finalUrl ?? output.url
+          : /^browser_(?:navigate|observe|get_html|read|extract)$/.test(item.toolName) && output.status === 'succeeded' && evidence.verified === true && evidence.contentRead === true && typeof output.resultHash === 'string'
+            ? output.sourceUrl : undefined
+        if (typeof source === 'string') { try { const url = new URL(source); if (['http:', 'https:'].includes(url.protocol)) origins.add(url.origin) } catch { /* Invalid source metadata is not evidence. */ } }
+      }
+      const missing = task.acceptance.requiredSourceOrigins?.filter(origin => !origins.has(origin)) ?? []
+      if (!origins.size || missing.length) return this.retry(task, `网页采集尚缺实际正文来源证据${missing.length ? `（${missing.join('、')}）` : ''}，请使用已授权浏览器或网页读取工具核验后交付。`, `web-evidence:${[...origins].sort().join(',')}:${missing.join(',')}`, turnId)
+    }
     if (task.templateId) {
       const delivery = verifyTaskDelivery(this.repository,task)
       if (!delivery.complete) return this.waitForUser(task,delivery.reasons.join('；'),finalResponse,`delivery:${task.revision}`,turnId)
@@ -532,7 +580,7 @@ export class TaskController {
     }
 
     if (task.acceptance.kind === 'files') {
-      const validArtifacts = artifacts.filter((artifact) => artifact.validation === 'valid')
+      const validArtifacts = artifacts.filter((artifact) => artifact.validation === 'valid' && (!task.acceptance.requiredFormats?.length || task.acceptance.requiredFormats.includes(artifact.format ?? '')))
       const minimum = task.acceptance.minimumArtifacts ?? 1
       if (validArtifacts.length < minimum) {
         const required = task.acceptance.requiredFormats?.map((value) => `.${value}`).join(' / ')
@@ -588,12 +636,168 @@ export class TaskController {
   async assessNonRetryableBlock(threadId: string, turnId: string): Promise<TaskCandidateDecision | null> {
     const task = this.repository.findActiveByThread(threadId)
     if (!task || task.activeTurnId !== turnId) return null
+    if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
+    const unknown = this.suspendUnknownToolOutcome(threadId, turnId)
+    if (unknown) return unknown
     const thread = await this.threadStore.get(threadId)
     const turn = thread?.turns.find(candidate => candidate.id === turnId)
+    const items = (await this.sessionStore.loadItems(threadId)).filter(item => item.turnId === turnId)
+    const permissionBlock = this.waitForToolPermission(task, items, turnId, turn?.executionGrant)
+    if (permissionBlock) return permissionBlock
     const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
     if (blocked?.retryable !== false) return null
-    const items = (await this.sessionStore.loadItems(threadId)).filter(item => item.turnId === turnId)
     return this.waitForUser(task, blocked.reason, latestAssistantText(turn, items), blocked.fingerprint, turnId)
+  }
+
+  private unknownToolOutcomes(taskId: string): OperationReceipt[] {
+    return this.repository.unsettledOperations(taskId).filter(operation => operation.kind === 'tool' && operation.status === 'outcome_unknown')
+  }
+
+  /** Only trusted, persisted receipts fence the current task; tool prose cannot do so. */
+  hasUnknownToolOutcome(threadId: string, turnId: string): boolean {
+    const task = this.repository.findActiveByThread(threadId)
+    return Boolean(task?.activeTurnId === turnId && this.unknownToolOutcomes(task.id).length)
+  }
+
+  suspendUnknownToolOutcome(threadId: string, turnId: string): TaskCandidateDecision | null {
+    const task = this.repository.findActiveByThread(threadId)
+    if (!task || task.activeTurnId !== turnId) return null
+    const operations = this.unknownToolOutcomes(task.id)
+    if (!operations.length) return null
+    if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
+    const ids = operations.map(operation => operation.id)
+    const prior = this.repository.attention(`unknown_${task.id}`)
+    if (task.status === 'stalled' && prior?.status === 'pending' && JSON.stringify(prior.payload?.operationIds) === JSON.stringify(ids)) {
+      return { kind: 'stalled', task, reason: task.stalledReason ?? prior.message }
+    }
+    return this.stallUnknown(task, ids)
+  }
+
+  blockTaskPermission(threadId: string, turnId: string, error: unknown): TaskCandidateDecision | null {
+    const failure = taskPermissionFailure(error)
+    const task = this.repository.findActiveByThread(threadId)
+    if (!failure || !task || task.activeTurnId !== turnId) return null
+    if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? failure.message }
+    const unknown = this.suspendUnknownToolOutcome(threadId, turnId)
+    if (unknown) return unknown
+    return this.waitForCapability(task, turnId, workspacePermissionCapability(failure.code, failure.message), failure.code)
+  }
+
+  private waitForToolPermission(task: TaskRun, items: TurnItem[], turnId: string, currentGrant?: ExecutionGrant): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null {
+    const denied = [...items].reverse().find(item => item.kind === 'tool_result' && item.isError && item.output && typeof item.output === 'object' &&
+      ['task_permission_expired', 'task_permission_revoked', 'task_permission_consumed', 'execution_grant_expired', 'execution_grant_revoked', 'execution_grant_scope',
+        'sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
+        'browser_interaction_scope_required', 'browser_binding_changed', 'browser_schedule_authority_changed',
+        'browser_verification_policy_required', 'browser_verification_policy_blocked', 'browser_public_query_action_required', 'browser_public_query_target_blocked',
+        'browser_schedule_action_scope_changed', 'browser_schedule_action_scope_required', 'browser_schedule_outcome_unknown',
+        'browser_control_required', 'browser_sync_blocked', 'browser_sync_target_changed', 'browser_readback_blocked'].includes(String((item.output as Record<string, unknown>).code)) &&
+      !((item.output as Record<string, unknown>).code === 'browser_readback_blocked' && !this.repository.operations(task.id, 'browser_action_dispatch').some(receipt => (receipt.result as { readbackPending?: boolean } | undefined)?.readbackPending === true)) &&
+      !this.resolvedBrowserScopeRequest(task, item, items, turnId, currentGrant))
+    if (!denied || denied.kind !== 'tool_result') return null
+    const code = String((denied.output as Record<string, unknown>).code)
+    const legacyBrowserEvidenceMissing = code === 'browser_schedule_action_scope_required' && String((denied.output as { error?: string }).error ?? '').startsWith('旧操作缺少可核对的执行前页面或逐次目标审批凭据')
+    const browserBlock = ['browser_interaction_scope_required', 'browser_binding_changed', 'browser_verification_policy_required', 'browser_verification_policy_blocked'].includes(code)
+    let capability: CapabilityPreflight
+    if (['browser_control_required', 'browser_sync_blocked', 'browser_sync_target_changed', 'browser_readback_blocked'].includes(code)) {
+      capability = browserRecoveryCapability(code, this.nowIso())
+    } else if (['browser_public_query_action_required', 'browser_public_query_target_blocked'].includes(code)) {
+      const resolution = { kind: 'retry' as const, route: 'task/browser-action-review', label: '继续原任务并审阅公开查询动作' }
+      capability = { provider: 'browser-skill', status: 'needs_authorization', errorCode: code,
+        message: code === 'browser_public_query_target_blocked' ? '所选目标包含账号操作或业务写入内容。请继续原任务并重新选择公开搜索或翻页目标。业务操作需要单独审阅完整页面范围。' : '公开查询目标模式尚缺当前动作的明确授权。继续原任务后，智能体会重新观察页面，展示具体目标、输入和校验范围供你审阅。',
+        credentialState: 'unknown', networkState: 'unknown', workspaceState: 'unknown', sandboxState: 'allowed',
+        approvalState: 'required', action: resolution, resolution, checkedAt: this.nowIso() }
+    } else if (code.startsWith('browser_schedule_')) {
+      const resolution = task.scheduledBy
+        ? { kind: 'grant' as const, route: `flow/${task.scheduledBy.scheduleId}`, label: '查看并核对定时计划' }
+        : { kind: 'retry' as const, route: 'task/schedule-review', label: '继续原任务并审阅周期动作' }
+      capability = { provider: 'schedule', status: 'blocked', errorCode: code,
+        message: legacyBrowserEvidenceMissing ? '旧浏览器操作缺少执行前页面或逐次审批的目标凭据，当前记录无法核验。原记录已保留。请核对原始凭据；无法补齐时，从原会话新建独立来源任务，重新执行公开查询并审阅周期范围。'
+          : code === 'browser_schedule_action_scope_required' ? '这项周期任务尚缺已核对的持续网页动作范围。继续原任务后，智能体会重新观察页面，并展示具体站点、目标、输入和计划范围供你审阅。'
+          : code === 'browser_schedule_outcome_unknown' ? '上次计划的网页动作结果待核实。请查看原操作记录并核验结果后继续。'
+          : '计划的浏览器、页面目标、输入内容或授权范围已变化，请审阅定时计划后继续。',
+        credentialState: 'unknown', networkState: 'unknown', workspaceState: 'unknown', sandboxState: 'allowed',
+        approvalState: 'required', action: resolution, resolution, checkedAt: this.nowIso() }
+    } else if (browserBlock) {
+      const resolution = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认当前任务的浏览器范围' }
+      capability = { provider: 'browser-skill', status: 'needs_authorization', errorCode: code,
+        message: code.startsWith('browser_verification_policy_') ? '当前任务的浏览器校验范围需要确认。请审阅公开查询或完整页面校验模式，确认后以新授权继续任务。'
+          : code === 'browser_binding_changed'
+          ? '浏览器实例或连接配置已变化。请审阅当前任务的浏览器和站点范围，确认后继续原任务。'
+          : '当前任务需要网页交互权限。请确认浏览器、允许访问的站点和交互范围，然后继续原任务。',
+        credentialState: 'unknown', networkState: 'unknown', workspaceState: 'unknown', sandboxState: 'allowed',
+        approvalState: 'required', action: resolution, resolution, checkedAt: this.nowIso() }
+    } else {
+      capability = workspacePermissionCapability(code, code === 'network_scope_blocked' ? '本次操作的网络目标超出当前任务授权，请确认所需的网络范围后继续原任务。' : '本次文件操作缺少对应的任务权限，请确认目标路径的读写范围后继续原任务。')
+    }
+    return this.waitForCapability(task, turnId, capability, code)
+  }
+
+  private waitForCapability(task: TaskRun, turnId: string, capability: CapabilityPreflight, code: string): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> {
+    const attentionId = `capability_${task.id}`
+    const fingerprint = `permission:${turnId}:${code}`
+    const now = this.nowIso()
+    return this.repository.transact(() => {
+      const prior = this.repository.attention(attentionId)
+      if (task.status === 'waiting_user' && prior?.status === 'pending' && prior.payload?.fingerprint === fingerprint) {
+        return { kind: 'waiting_user', task, reason: capability.message }
+      }
+      const result = this.waitForUser(task, capability.message, '', fingerprint, turnId)
+      if (prior?.status === 'pending' && prior.payload?.fingerprint === fingerprint) return result
+      this.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: task.originThreadId ?? task.threadId,
+        workspaceRoot: task.workspaceRoot, kind: 'blocked', title: '确认任务执行权限', message: capability.message, status: 'pending', revision: (prior?.revision ?? -1) + 1,
+        createdAt: prior?.status === 'pending' ? prior.createdAt : now, updatedAt: now, payload: { kind: 'capability_required', capability, fingerprint, request: { prompt: task.goal } } })
+      const commandId = createHash('sha256').update(`${task.id}:${fingerprint}`).digest('hex').slice(0, 32)
+      this.repository.enqueueOutbox({ id: `command-message:${commandId}`, ownerId: task.originThreadId ?? task.threadId, kind: 'task_command_message', createdAt: now,
+        payload: { threadId: task.originThreadId ?? task.threadId, commandId, assistantText: capability.message, createdAt: now,
+          capabilityCard: { threadId: task.originThreadId ?? task.threadId, taskId: task.id, attentionId, prompt: task.goal, capability } } })
+      return result
+    })
+  }
+
+  private resolvedBrowserScopeRequest(task: TaskRun, denied: TurnItem, items: TurnItem[], turnId: string, currentGrant?: ExecutionGrant): boolean {
+    if (denied.kind !== 'tool_result' || !['browser_schedule_action_scope_required', 'browser_public_query_action_required'].includes(String((denied.output as { code?: string })?.code))) return false
+    const operation = this.repository.operation(task.id, `tool:${turnId}:${denied.callId}`)
+    const request = this.repository.operations(task.id, 'browser_action_scope_request').find(receipt => receipt.status === 'succeeded' &&
+      receipt.request?.turnId === turnId && receipt.request?.toolName === denied.toolName &&
+      receipt.request?.argumentsHash === operation?.request?.argumentsHash)?.request
+    if (!request || this.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !this.repository.verifiedOperationResolution(receipt))) return false
+    const sameTarget = (candidate: Record<string, unknown>) => ['action', 'pageUrl', 'elementHash', 'valueHash', 'browserInstanceId', 'browserRevision']
+      .every(key => candidate[key] === request[key]) && browserVerificationPolicy(candidate.verificationPolicy) === browserVerificationPolicy(request.verificationPolicy)
+    const approved = listApprovedBrowserScheduleActions(this.repository, task).find(action => sameTarget(action))
+    const approvedTask = this.repository.operations(task.id, 'browser_action_authorization').find(receipt => {
+      const result = receipt.result as { access?: string; revoked?: boolean; expiresAt?: string } | undefined
+      return receipt.status === 'succeeded' && result?.access === 'public_query' && result.revoked !== true &&
+        Date.parse(result.expiresAt ?? '') > Date.parse(this.nowIso()) && sameTarget(receipt.request ?? {})
+    })
+    const dispatches = this.repository.operations(task.id, 'browser_action_dispatch')
+    return items.slice(items.indexOf(denied) + 1).some(item => {
+      if (item.kind !== 'tool_result' || item.isError || !['browser_click', 'browser_fill'].includes(item.toolName)) return false
+      const output = item.output as { dispatchReceiptId?: string; resultHash?: string } | undefined
+      const dispatch = dispatches.find(receipt => receipt.id === output?.dispatchReceiptId)
+      const actual = this.repository.operation(task.id, `tool:${turnId}:${item.callId}`)
+      if (dispatch?.status !== 'succeeded' || dispatch.request?.turnId !== turnId || !sameTarget(dispatch.request) ||
+        actual?.status !== 'succeeded' || actual.request?.toolName !== item.toolName || actual.request.argumentsHash !== dispatch.request.argumentsHash ||
+        typeof output?.resultHash !== 'string' || (dispatch.result as { resultHash?: string } | undefined)?.resultHash !== output.resultHash) return false
+      if (dispatch.request.authorizationSource === 'task_scope' || dispatch.request.scopeActionReceiptId !== undefined || dispatch.request.scopeAuthorizationReceiptId !== undefined) {
+        // Task binding authority is not a per-action human approval. Require its
+        // exact derived action plus this Turn's stored tool result and readback.
+        const grant = ExecutionGrantSchema.safeParse(actual.request.executionGrant)
+        const source = verifiedTaskPublicQueryAction(this.repository, actual, dispatch)
+        const storedItem = (actual.result as ToolHostResult | undefined)?.item
+        const result = item.output as { status?: string; provider?: string; sourceUrl?: string; evidence?: { verified?: boolean; contentRead?: boolean; sourceUrl?: string; resultHash?: string } }
+        const settled = dispatch.result as { actionAcknowledged?: boolean; readbackPending?: boolean; sourceUrl?: string } | undefined
+        if (!source || !currentGrant || !grant.success || operationFingerprint(grant.data) !== operationFingerprint(currentGrant) ||
+          actual.request.providerId !== 'browser-skill' || !storedItem || storedItem.kind !== 'tool_result' || storedItem.isError ||
+          storedItem.callId !== item.callId || storedItem.turnId !== turnId || storedItem.toolName !== item.toolName ||
+          settled?.actionAcknowledged !== true || settled.readbackPending !== false || result.status !== 'succeeded' || result.provider !== 'browser-skill' ||
+          !result.sourceUrl || settled.sourceUrl !== result.sourceUrl || result.evidence?.verified !== true || result.evidence.contentRead !== true ||
+          result.evidence.sourceUrl !== result.sourceUrl || result.evidence.resultHash !== output.resultHash) return false
+        const saved = storedItem.output as Record<string, unknown> | undefined
+        return Boolean(saved && saved.dispatchReceiptId === output.dispatchReceiptId && saved.resultHash === output.resultHash && saved.sourceUrl === result.sourceUrl &&
+          operationFingerprint(saved.evidence) === operationFingerprint(result.evidence))
+      }
+      return Boolean(approved ? dispatch.request.scheduleActionId === approved.id : approvedTask && dispatch.request.authorizationReceiptId === approvedTask.id)
+    })
   }
 
   recordAttemptFailure(threadId: string, turnId: string, code: string, message: string): TaskCandidateDecision | null {
@@ -714,6 +918,42 @@ export class TaskController {
     return this.repository.execution.pending(token.sessionId).flatMap(delivery => inputs.has(delivery.inputId) ? [{ delivery, input: inputs.get(delivery.inputId)! }] : [])
   }
 
+  /** Resolve control provenance against SQLite, including inputs written by older clients. */
+  approvalForInput(input: TaskInput): ApprovalRequest | undefined {
+    if (!input.sourceId || !['approval_resolution', 'user_answer'].includes(input.kind)) return undefined
+    const request = this.repository.humanRequest(input.sourceId)
+    const task = this.repository.get(input.taskId)
+    if (!request || request.kind !== 'approval' || request.status === 'pending' || request.threadId !== task?.threadId) return undefined
+    const approval = request.payload.approval as ApprovalRequest | undefined
+    if (!approval || approval.id !== request.id) return undefined
+    const resolution = request.resolution as { decision?: string }
+    return { ...approval, status: request.status === 'expired' ? 'expired' : resolution?.decision === 'allow' ? 'allowed' : 'denied', decidedAt: request.updatedAt }
+  }
+
+  /** Only DB-linked historical controls are projected; the original transcript stays intact. */
+  projectApprovalHistory(threadId: string, items: TurnItem[]): TurnItem[] {
+    const deliveries = new Map(this.repository.execution.deliveriesForThread(threadId).map(delivery => [delivery.messageItemId, delivery]))
+    return items.map(item => {
+      if (item.kind === 'approval' && !item.taskInputId) {
+        const request = this.repository.humanRequest(item.approvalId)
+        if (request?.kind === 'approval' && request.threadId === threadId && request.status !== 'pending') {
+          const resolution = request.resolution as {decision?: string}
+          return {...item, status: request.status === 'expired' ? 'expired' : resolution?.decision === 'allow' ? 'allowed' : 'denied'}
+        }
+      }
+      if (item.kind !== 'user_message') return item
+      const delivery = deliveries.get(item.id)
+      if (!delivery) return item
+      const input = this.repository.inputs(delivery.taskId).find(input => input.id === delivery.inputId)
+      const approval = input ? this.approvalForInput(input) : undefined
+      if (!approval) return item
+      const {text: _text, displayText: _displayText, ...base} = item
+      return {...base, kind:'approval', role:'system', approvalId:approval.id, toolName:approval.toolName,
+        status:approval.status, summary:approval.status === 'allowed' ? '已允许本次操作' : '本次操作未获授权',
+        taskInputId:input!.id, sourceRequestId:approval.id}
+    })
+  }
+
   markInputsDelivered(turnId:string,deliveries:InputDelivery[],sessionItemId:string,sessionHash:string):void {
     const token=this.attemptTokens.get(turnId)
     if(!token||!deliveries.length)return
@@ -759,8 +999,18 @@ export class TaskController {
     if (!token) return undefined
     return this.repository.transact(() => {
       this.assertToken(token)
+      if (this.unknownToolOutcomes(token.taskId).length) {
+        throw Object.assign(new Error('A previous tool has an unknown outcome. Verify its original receipt before executing another tool.'), { code: 'outcome_unknown' })
+      }
       const key = `tool:${turnId}:${call.callId}`
       const argumentsHash = operationFingerprint(call.arguments)
+      if (['browser_click', 'browser_fill'].includes(call.toolName)) {
+        const resolved = this.repository.operations(token.taskId, 'tool').find(receipt => receipt.request?.toolName === call.toolName &&
+          receipt.request?.argumentsHash === argumentsHash && this.repository.verifiedOperationResolution(receipt)?.evidence.kind === 'human_confirmation')
+        const proof = resolved && this.repository.verifiedOperationResolution(resolved)
+        if (resolved && proof) return { key: resolved.idempotencyKey, token, prior: { approved: true,
+          item: makeToolResultForVerifiedResolution(this.repository.get(token.taskId)!, turnId, call, proof.evidence, proof.outcome) } }
+      }
       const unresolved = this.repository.operations(token.taskId, 'tool').find(receipt =>
         receipt.idempotencyKey !== key && receipt.status === 'outcome_unknown' &&
         receipt.request?.toolName === call.toolName && receipt.request?.argumentsHash === argumentsHash &&
@@ -782,7 +1032,7 @@ export class TaskController {
             throw Object.assign(new Error('This reviewed target already has a different operation request. Inspect its receipt before changing the action.'), { code: 'idempotency_conflict' })
           }
           const resolution = this.repository.verifiedOperationResolution(prior)
-          if (resolution) return { key: prior.idempotencyKey, token, prior: { approved: true, item: makeToolResultForVerifiedResolution(task, turnId, call, resolution.evidence) } }
+          if (resolution) return { key: prior.idempotencyKey, token, prior: { approved: true, item: makeToolResultForVerifiedResolution(task, turnId, call, resolution.evidence, resolution.outcome) } }
           if (prior.status === 'succeeded' && prior.result) {
             const replay = prior.result as ToolHostResult
             return { key: prior.idempotencyKey, token, prior: { ...replay, item: { ...replay.item, id: `item_${call.callId}`, callId: call.callId, turnId, threadId: task.threadId } as ToolHostResult['item'] } }
@@ -836,6 +1086,7 @@ export class TaskController {
           return request.status === 'answered' && (request.resolution as { decision?: string })?.decision === 'allow' &&
             request.threadId === approval.threadId &&
             request.turnId === previous.request?.turnId && original?.toolName === approval.toolName &&
+            (!approval.toolName.startsWith('browser_') || original.summary === approval.summary) &&
             (original.callId === previous.request?.callId || request.id === `appr_${previous.request?.callId}`) &&
             (!original.requestHash || original.requestHash === originalRequestHash)
         })
@@ -864,6 +1115,9 @@ export class TaskController {
   recordToolDispatch(token: ExecutionToken, key: string): void {
     this.repository.transact(() => {
       this.assertToken(token)
+      if (this.unknownToolOutcomes(token.taskId).length) {
+        throw Object.assign(new Error('An earlier operation requires verification; this tool was not dispatched.'), { code: 'operation_not_dispatched' })
+      }
       const receipt = this.repository.operation(token.taskId, key)
       if (!receipt || receipt.status !== 'prepared') throw Object.assign(new Error('This tool operation has already entered dispatch.'), { code: 'outcome_unknown' })
       this.repository.finishOperation(token.taskId, key, { status: 'running' }, this.nowIso())
@@ -928,6 +1182,7 @@ export class TaskController {
     // An already-dispatched result is immutable evidence even after lease loss.
     const prior = this.repository.operation(token.taskId, key)
     if (!prior || prior.status === 'succeeded') return
+    if (!result && prior.status === 'failed' && prior.result) return
     if (!result && prior.status === 'prepared' && prior.request?.dispatchTracking === 'host-v1') {
       const task = this.repository.get(token.taskId)!
       result = { approved: false, item: makeToolResultItem({ id: `item_${prior.request.callId}`, threadId: task.threadId,
@@ -944,20 +1199,22 @@ export class TaskController {
   }
 
   /** Attach trusted readback evidence without overwriting the original unknown dispatch or resuming execution. */
-  recordOperationVerification(taskId: string, expectedRevision: number, receiptId: string, verificationKey: string, evidence: import('../contracts/harness.js').ResultEvidence): void {
+  recordOperationVerification(taskId: string, expectedRevision: number, receiptId: string, verificationKey: string, evidence: import('../contracts/harness.js').ResultEvidence, outcome: OperationResolutionOutcome = 'succeeded'): void {
     this.repository.transact(() => {
       const task = this.repository.get(taskId)
       const receipt = this.repository.operations(taskId, 'tool').find(item => item.id === receiptId)
       const proof = this.repository.operation(taskId, verificationKey)
-      if (!task || !receipt || !proof || proof.kind !== 'effect_verification' || proof.request?.originalReceiptId !== receipt.id || proof.request?.originalFingerprint !== receipt.fingerprint) throw Object.assign(new Error('Readback proof does not belong to this operation.'), { code: 'invalid_state' })
+      if (!task || !receipt || !proof || proof.kind !== (outcome === 'not_completed' ? 'effect_verification_incomplete' : 'effect_verification') || proof.request?.originalReceiptId !== receipt.id || proof.request?.originalFingerprint !== receipt.fingerprint) throw Object.assign(new Error('Readback proof does not belong to this operation.'), { code: 'invalid_state' })
       if (task.revision !== expectedRevision) throw Object.assign(new Error('Task changed while verification was running.'), { code: 'stale_request' })
       if (TERMINAL.has(task.status) || task.authority?.revokedAt) throw Object.assign(new Error('Task authorization was revoked.'), { code: 'execution_grant_revoked' })
+      const proofOutcome = (proof.result as { outcome?: unknown } | undefined)?.outcome ?? 'succeeded'
+      if (proofOutcome !== outcome || outcome === 'not_completed' && (!['paused', 'stalled', 'waiting_user'].includes(task.status) || evidence.kind !== 'human_confirmation' || evidence.provider !== 'browser-skill' || evidence.status !== 'public_query_reviewed_incomplete')) throw Object.assign(new Error('Verification outcome does not match its trusted proof.'), { code: 'invalid_state' })
       const now = this.nowIso()
-      this.repository.finishOperation(taskId, verificationKey, { status: 'succeeded', result: { taskId, receiptId, status: 'verified', evidence } }, now)
-      this.repository.resolveOperation(taskId, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, resolvedAt: now })
+      this.repository.finishOperation(taskId, verificationKey, { status: 'succeeded', result: { taskId, receiptId, status: 'verified', evidence, outcome } }, now)
+      this.repository.resolveOperation(taskId, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, outcome, resolvedAt: now })
       this.repository.update(taskId, task.revision, current => ({ ...current, updatedAt: now,
-        resultEvidence: [...(current.resultEvidence ?? []).filter(item => !(item.provider === evidence.provider && item.operation === evidence.operation && item.target === evidence.target)), evidence] }),
-      { key: `operation-verified:${proof.id}`, kind: 'operation_verified', payload: { provider: evidence.provider, operation: evidence.operation, target: evidence.target, receiptId }, createdAt: now })
+        ...(outcome === 'succeeded' ? { resultEvidence: [...(current.resultEvidence ?? []).filter(item => !(item.provider === evidence.provider && item.operation === evidence.operation && item.target === evidence.target)), evidence] } : {}) }),
+      { key: `operation-verified:${proof.id}`, kind: 'operation_verified', payload: { provider: evidence.provider, operation: evidence.operation, target: evidence.target, receiptId, outcome }, createdAt: now })
     })
   }
 
@@ -1452,7 +1709,8 @@ export class TaskController {
       const externalWrite = !inside ? authorizedWrites.get(canonical) : undefined
       const allowed = inside || Boolean(externalWrite)
       const info = canonical && allowed ? await stat(canonical).catch(() => null) : null
-      const validFormat = !required || required.includes(extension)
+      const managedOutput = externalWrite?.authorizedRoot === this.managedArtifactRoot(task.id)
+      const validFormat = !required || required.includes(extension) || Boolean(externalWrite && managedOutput)
       const validationSpanId = artifactValidationSpanId(task.id, rawPath)
       this.spans?.start({
         id: validationSpanId,
@@ -1497,6 +1755,7 @@ export class TaskController {
         }
       })
       artifacts.push({
+        ...(managedOutput && externalWrite ? { storage: 'task' as const } : previous?.storage ? { storage: previous.storage } : {}),
         id: previous?.id ?? `artifact_${createHash('sha256').update(`${task.id}:${inside ? relativePath : absolutePath}`).digest('hex').slice(0, 16)}`,
         relativePath: inside ? relativePath : externalWrite ? relative(externalWrite.authorizedRoot, canonical) || canonical.split(/[\\/]/).at(-1)! : previous?.relativePath ?? rawPath,
         ...(!inside && (externalWrite || previous?.absolutePath) ? {
@@ -1556,20 +1815,25 @@ function externalVerificationLocator(args: Record<string, unknown>): Record<stri
   return Object.keys(locator).length ? locator : undefined
 }
 
-function makeToolResultForVerifiedResolution(task: TaskRun, turnId: string, call: ToolCallLike, evidence: NonNullable<OperationReceipt['resolution']>['evidence']): ToolHostResult['item'] {
+function makeToolResultForVerifiedResolution(task: TaskRun, turnId: string, call: ToolCallLike, evidence: NonNullable<OperationReceipt['resolution']>['evidence'], outcome: OperationResolutionOutcome = 'succeeded'): ToolHostResult['item'] {
+  if (outcome === 'not_completed') return makeToolResultItem({ id: `item_${call.callId}`, threadId: task.threadId, turnId, callId: call.callId, toolName: call.toolName, isError: true,
+    output: { ok: false, status: 'failed', code: 'browser_action_not_completed', outcome, evidence, recovered: true } })
   return makeToolResultItem({ id: `item_${call.callId}`, threadId: task.threadId, turnId, callId: call.callId, toolName: call.toolName, output: { ok: true, status: 'succeeded', evidence, recovered: true } })
 }
 
 function acceptanceForPrompt(prompt: string): TaskAcceptance {
   const files = promptRequiresFileDeliverable(prompt)
+  const web = isBrowserTask(prompt) || /(?:采集|抓取|检索|获取).{0,60}(?:网页|网站|平台).{0,60}(?:信息|公告|正文)|(?:网页|网站|平台).{0,60}(?:采集|抓取|检索|获取)/i.test(prompt)
   const effect = promptRequiresExternalEffect(prompt)
   const intent = effect ? externalTaskIntent(prompt) : null
   const requiredFormats = requiredFileExtensionsForPrompt(prompt)
   return {
+    schedule: extractScheduleRequirement(prompt),
     kind: files ? 'files' : effect ? 'effect' : 'answer',
     requiredNodeKinds: files || effect ? ['execute', 'verify', 'deliver'] : ['deliver'],
     ...(requiredFormats ? { requiredFormats: [...requiredFormats] } : {}),
     ...(files ? { minimumArtifacts: 1 } : {}),
+    ...(web ? {requiresWebEvidence:true,requiredSourceOrigins:browserTaskOrigins(prompt)} : {}),
     requireFinalResponse: true,
     requireActionableArtifactCard: files,
     ...(effect ? { requiresExternalEffects: true } : {}),
@@ -1644,4 +1908,14 @@ function activeExecutionMs(task: TaskRun, now: string): number {
 function approvalAuthorityFingerprint(grant: ExecutionGrant): string {
   const { id: _id, turnId: _turnId, idempotencyKey: _idempotencyKey, issuedAt: _issuedAt, expiresAt: _expiresAt, ...authority } = grant
   return operationFingerprint(authority)
+}
+
+function browserRecoveryCapability(code: string, checkedAt: string): CapabilityPreflight {
+  const resolution = { kind: 'connect' as const, route: 'marketplace', label: '查看浏览器连接与控制状态' }
+  return { provider: 'browser-skill', status: 'blocked', errorCode: code,
+    message: code === 'browser_control_required' ? '浏览器当前由你控制或已暂停自动操作。请在原浏览器的 BrowserSkill 控制条交还控制，检查连接后再单独继续原任务；系统不会抢占控制或重复动作。'
+      : code === 'browser_readback_blocked' ? '浏览器已确认网页动作，但后续页面读取失败。请检查原浏览器与连接后继续，系统将只读核对原页面，不能重复动作或交付为已完成。'
+        : '原网页观察已失效，系统已进行一次有限刷新并停止继续尝试。请检查原浏览器页面和连接，再单独继续任务；目标或输入变化需重新审阅。',
+    credentialState: 'unknown', networkState: 'unknown', workspaceState: 'allowed', sandboxState: 'allowed', approvalState: 'required',
+    action: resolution, resolution, checkedAt }
 }
