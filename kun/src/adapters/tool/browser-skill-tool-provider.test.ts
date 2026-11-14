@@ -46,7 +46,7 @@ function fixture() {
     if (args[0] === 'navigate') { url = args[1]; title = 'Normal source'; return { ok: true, output: { final_url: url } } }
     if (args[0] === 'get-html') return { ok: true, output: { tab_id: 7, html: elementHtml, byte_size: elementHtml.length, truncated: false } }
     if (args[0] === 'read') return { ok: true, output: { tab_id: 7, page_url: url, frame_url: url, scope: 'current_dom', truncated: false, items: [{ ref: '@e999', values: { exists: true, text: elementHtml.replace(/<[^>]*>/g, ''), value: '', placeholder: '公开查询' }, redacted: [] }] } }
-    if (args[0] === 'cooperate') return { ok: true, output: { control_policy: args[args.indexOf('--policy') + 1], ready: true, context_id: 'context-one', observation: { text: 'Synthetic page content @e1' } } }
+    if (args[0] === 'cooperate') return { ok: true, output: { control_policy: args[args.indexOf('--policy') + 1], ready: true, context_id: 'context-one', observation_id: 'observation-one', observation: { text: 'Synthetic page content @e1' } } }
     return { ok: true, output: { tab_id: 7 } }
   })
   let scheduleResolution: BrowserScheduleResolution | undefined
@@ -73,6 +73,107 @@ function publicQueryFixture() {
 }
 
 describe('typed BrowserSkill production provider', () => {
+  it('passes the exact official context/observation pair when navigating to a second authorized source under 0.5', async () => {
+    const f = fixture()
+    const origins = ['https://example.com', 'https://second.example']
+    f.config.origins = origins
+    f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant, networkAllowlist: origins,
+      browserScope: { ...f.context.executionGrant!.browserScope, origins } })
+    const original = f.runner.getMockImplementation()!
+    let sequence = 0
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] === 'navigate' && argv[1] === 'https://second.example/two' && !argv.includes('--observation')) {
+        return { ok: false, code: 'permission_denied', output: { code: 'permission_denied', data: { reason: 'observation_required', effect_state: 'none' } } }
+      }
+      const result = await original(config, argv, signal)
+      return argv[0] === 'cooperate' ? { ...result, output: { ...result.output as object,
+        context_id: `official-context-${++sequence}`, observation_id: `official-observation-${sequence}` } } : result
+    })
+    await f.execute('browser_session_start')
+    const first = (await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/one' })).output as {
+      observation: { context_id: string; observation_id: string }
+    }
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://second.example/two', contextId: first.observation.context_id }))
+      .toMatchObject({ output: { status: 'succeeded', sourceUrl: 'https://second.example/two' } })
+    const second = f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')[1][1]
+    expect(second[second.indexOf('--context') + 1]).toBe(first.observation.context_id)
+    expect(second[second.indexOf('--observation') + 1]).toBe(first.observation.observation_id)
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(2)
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate').every(([, argv]) => argv[argv.indexOf('--policy') + 1] === 'strict')).toBe(true)
+  })
+
+  it('rejects fabricated caller context/observation and a pair from a different page before navigation', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/one' })
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two', contextId: 'invented-context' }))
+      .toMatchObject({ isError: true, output: { code: 'browser_context_stale' } })
+    await expect(f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two', contextId: 'context-one', observationId: 'invented-observation' }))
+      .rejects.toThrow('observationId')
+    f.setUrl('https://example.com/a-different-page')
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two', contextId: 'context-one' }))
+      .toMatchObject({ isError: true, output: { code: 'browser_context_stale' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(1)
+  })
+
+  it('does not invent a missing official observation ID for modern navigation', async () => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      const result = await original(config, argv, signal)
+      return argv[0] === 'cooperate' ? { ...result, output: { ...result.output as object, observation_id: undefined } } : result
+    })
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/one' })
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two', contextId: 'context-one' }))
+      .toMatchObject({ isError: true, output: { code: 'browser_observation_required' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(1)
+  })
+
+  it.each(['missing_context', 'different_tab'] as const)('does not reuse an older pair after a newer sync returns %s', async mismatch => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/one' })
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      const result = await original(config, argv, signal)
+      return argv[0] === 'cooperate' ? { ...result, output: { ...result.output as object,
+        ...(mismatch === 'missing_context' ? { context_id: undefined } : { tab_id: 8 }) } } : result
+    })
+    await f.execute('browser_observe', { sessionId: 'session-one' })
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two', contextId: 'context-one' }))
+      .toMatchObject({ isError: true, output: { code: 'browser_context_stale' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(1)
+  })
+
+  it.each(['outcome_unknown', 'readback_pending'] as const)('blocks automatic metadata sync/navigation while %s is unresolved', async state => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/one' })
+    f.repository.beginOperation({ ownerId: 'task', idempotencyKey: state, kind: 'browser_action_dispatch',
+      request: { action: 'click', sessionId: 'session-one', pageUrl: 'https://example.com/one', tabId: 7 }, nowIso: new Date().toISOString() })
+    f.repository.finishOperation('task', state, { status: state === 'outcome_unknown' ? 'outcome_unknown' : 'succeeded',
+      ...(state === 'readback_pending' ? { result: { actionAcknowledged: true, readbackPending: true } } : {}) })
+    const calls = f.runner.mock.calls.filter(([, argv]) => ['navigate', 'cooperate'].includes(argv[0])).length
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two' }))
+      .toMatchObject({ isError: true, output: { code: state === 'outcome_unknown' ? 'browser_schedule_outcome_unknown' : 'browser_readback_blocked' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => ['navigate', 'cooperate'].includes(argv[0]))).toHaveLength(calls)
+    expect(f.repository.operation('task', state)?.status).toBe(state === 'outcome_unknown' ? 'outcome_unknown' : 'succeeded')
+  })
+
+  it('preserves the legacy 0.4 strict navigation argument contract', async () => {
+    const f = fixture()
+    f.config.version = '0.4.0'
+    await f.execute('browser_session_start')
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/one' })
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two' }))
+      .toMatchObject({ isError: true, output: { code: 'browser_context_required' } })
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two', contextId: 'context-one' }))
+      .toMatchObject({ output: { status: 'succeeded' } })
+    const argv = f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')[1][1]
+    expect(argv).toContain('--context')
+    expect(argv).not.toContain('--observation')
+    expect(f.runner.mock.calls.filter(([, args]) => args[0] === 'cooperate').every(([, args]) => !args.includes('--policy'))).toBe(true)
+  })
+
   it('requires reviewed public-query authorization before fixed native DOM expectations, including direct approved calls', async () => {
     const f = publicQueryFixture()
     const approval = vi.fn<ToolHostContext['awaitApproval']>(async () => 'allow')
@@ -542,9 +643,9 @@ describe('typed BrowserSkill production provider', () => {
     await f.execute('browser_session_start')
     await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/one' })
     expect(await f.execute('browser_get_html', { sessionId: 'session-one' })).toMatchObject({ output: { truncated: false, evidence: { contentRead: true } } })
-    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two' })).toMatchObject({ isError: true, output: { code: 'browser_context_required' } })
-    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two', contextId: 'context-one' })).toMatchObject({ output: { sourceUrl: 'https://example.com/two' } })
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two' })).toMatchObject({ output: { sourceUrl: 'https://example.com/two' } })
     expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')[1][1]).toContain('--context')
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')[1][1]).toContain('--observation')
   })
   it('reuses only a reviewed task element and value within the finite authorization', async () => {
     const f = fixture()

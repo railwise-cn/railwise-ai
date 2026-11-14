@@ -39,6 +39,7 @@ const failure = (code: string): Error => Object.assign(new Error(code === 'brows
   ? '周期任务需要持续动作授权。重新观察页面，使用 browser_authorize_action 的 scope=schedule、scheduleAccess=public_query 审阅明确的 click/fill 动作；周期按键和单次授权均不可替代。'
   : code === 'browser_public_query_action_required' ? '公开查询目标模式需要先审阅具体动作。重新观察页面，使用 browser_authorize_action 并明确 access=public_query，确认真实目标和完整输入后继续。'
   : code === 'browser_public_query_target_blocked' ? '该页面目标包含账号操作或业务写入内容，不能使用公开查询目标模式。请重新选择公开搜索或翻页目标；业务操作需要单独审阅完整页面范围。'
+  : code === 'browser_observation_required' ? '当前网页缺少可核验的浏览器观察记录。请先重新读取当前网页，再继续导航；系统不会猜测观察 ID 或重复未知操作。'
   : code === 'browser_target_policy_upgrade_required' ? '公开查询需要升级 BrowserSkill CLI 和浏览器扩展后重新检查连接。原任务与待核验结果已保留。' : code), { code })
 
 /** Fixed argv operations; page data cannot choose executables, scripts or another browser profile. */
@@ -55,7 +56,7 @@ export function buildBrowserSkillToolProvider(options: {
   const run = options.run ?? runBrowserCommand
   const scheduleAuthority = new BrowserScheduleActionAuthority(options)
   const queues = new Map<string, Promise<unknown>>()
-  const observations = new Map<string, { contextId: string; sourceUrl: string; tabId: number }>()
+  const observations = new Map<string, { contextId: string; observationId?: string; sourceUrl: string; tabId: number }>()
   const configurationChanged = (context: ToolHostContext): boolean => options.isCurrentConfiguration?.() === false ||
     (options.configurationFingerprint !== undefined && context.executionGrant?.connectorIdentityFingerprints?.['browser-skill'] !== options.configurationFingerprint)
   const assertCurrentConfiguration = (context: ToolHostContext): void => {
@@ -174,6 +175,10 @@ export function buildBrowserSkillToolProvider(options: {
 
   const observe = async (config: BrowserCapabilityConfig, sessionId: string, scope: BrowserExecutionScope, context: ToolHostContext) => {
     const before = await activeTab(config, sessionId, scope, context, true)
+    const key = `${context.executionGrant!.taskId}:${sessionId}`
+    // Only the latest complete sync can supply a navigation baseline. A failed
+    // or malformed newer observation must not leave an older pair reusable.
+    observations.delete(key)
     // The 0.5 CLI defaults to target. Missing cached peer metadata must never
     // silently weaken a strict session; live peer gating happens above.
     const modern = supportsBrowserPolicyCLI(config.version)
@@ -186,9 +191,14 @@ export function buildBrowserSkillToolProvider(options: {
     const observedText = String(object(observation.observation).text ?? '')
     const resultHash = sha256(JSON.stringify(observation))
     const contextId = typeof observation.context_id === 'string' ? observation.context_id : undefined
+    const officialId = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 512 && value.trim() === value && ![...value].some(char => char.charCodeAt(0) < 32)
+    if (observation.tab_id !== undefined && observation.tab_id !== after.id) throw failure('browser_page_changed')
+    if (officialId(observation.context_id)) observations.set(key, { contextId: observation.context_id,
+      ...(officialId(observation.observation_id) ? { observationId: observation.observation_id } : {}), sourceUrl: after.url, tabId: after.id })
+    // A trusted baseline also permits navigating away from an access-denied
+    // page. It does not turn that page into verified source content.
     assertReadablePage(after.title, after.url, resultHash, contextId)
     assertReadablePage(/RootWebArea\s+"([^"\n]*)"/.exec(observedText)?.[1], after.url, resultHash, contextId)
-    if (typeof observation.context_id === 'string') observations.set(`${context.executionGrant!.taskId}:${sessionId}`, { contextId: observation.context_id, sourceUrl: after.url, tabId: after.id })
     return { sourceUrl: after.url, tabId: after.id, observation, resultHash: sha256(JSON.stringify(observation)) }
   }
 
@@ -520,10 +530,25 @@ export function buildBrowserSkillToolProvider(options: {
       if (action === 'navigate') {
         originAllowed(String(args.url), scope, context)
         const tab = await activeTab(config, sessionId, scope, context, true)
-        if (tab.url !== 'about:blank' && !args.contextId) throw failure('browser_context_required')
         const argv = ['navigate', String(args.url), '--session', sessionId, '--tab-id', String(tab.id)]
-        if (args.contextId) argv.push('--context', String(args.contextId))
-        observations.delete(`${taskId}:${sessionId}`)
+        const key = `${taskId}:${sessionId}`
+        if (supportsBrowserPolicyCLI(config.version) && (tab.url !== 'about:blank' || args.contextId)) {
+          let observed = observations.get(key)
+          if (args.contextId && observed?.contextId !== args.contextId) throw failure('browser_context_stale')
+          // Missing caller metadata is repaired by an actual read-only sync,
+          // never by inventing or accepting a caller-supplied observation ID.
+          if (!args.contextId) {
+            await observe(config, sessionId, scope, context)
+            observed = observations.get(key)
+          }
+          if (!observed?.observationId) throw failure('browser_observation_required')
+          if (observed.tabId !== tab.id || observed.sourceUrl !== tab.url) throw failure('browser_context_stale')
+          argv.push('--context', observed.contextId, '--observation', observed.observationId)
+        } else {
+          if (tab.url !== 'about:blank' && !args.contextId) throw failure('browser_context_required')
+          if (args.contextId) argv.push('--context', String(args.contextId))
+        }
+        observations.delete(key)
         await command(config, argv, context)
       }
       if (mutation) {
