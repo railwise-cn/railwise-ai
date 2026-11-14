@@ -2021,6 +2021,7 @@ export class AgentLoop {
           operation = this.opts.tasks?.beginToolOperation(input.turnId, input.call, input.context.executionGrant)
           if (operation?.prior) return operation.prior
           const dispatchOperation = operation
+          let workSegment = 0
           const result = await this.opts.toolHost.execute(input.call, { ...input.context, ...(dispatchOperation ? {
             assertExecution: () => this.opts.tasks?.assertToken(dispatchOperation.token),
             assertExternalTarget: (provider: string, operation: string, target: string) => this.opts.tasks!.assertExternalTarget(input.turnId, provider, operation, target),
@@ -2028,7 +2029,10 @@ export class AgentLoop {
             recordExplicitApproval: approval => this.opts.tasks!.recordToolApproval(dispatchOperation.token, dispatchOperation.key, approval),
             recordToolDispatch: () => this.opts.tasks!.recordToolDispatch(dispatchOperation.token, dispatchOperation.key),
             ...(input.context.executionGrant?.taskPermissionId ? { claimTaskPermission: () => this.opts.claimTaskPermission!(input.threadId, input.context.executionGrant!.taskPermissionId!, dispatchOperation.key) } : {}),
-            ...(!/^(?:bash|user_input|request_user_input|delegate.*|.*subagent.*|spawn_agent)$/.test(input.call.toolName) ? {beginExecutionWork:()=>this.opts.tasks?.beginWork(input.turnId,`tool-work:${dispatchOperation.token.executionId}:${input.call.callId}`,'tool')} : {})
+            ...(!/^(?:bash|user_input|request_user_input|delegate.*|.*subagent.*|spawn_agent)$/.test(input.call.toolName) ? {
+              beginExecutionWork: () => this.opts.tasks?.beginWork(input.turnId,
+                `tool-work:${dispatchOperation.token.executionId}:${input.call.callId}:${workSegment++}`, 'tool')
+            } : {})
           } : {}) }, async (item) => {
             if (operation) this.opts.tasks?.assertToken(operation.token)
             const existing = await this.opts.turns.updateItem(input.threadId, item.id, {

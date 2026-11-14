@@ -273,27 +273,53 @@ export class LocalToolHost implements ToolHost {
       await context.claimTaskPermission?.()
       context.assertExecution?.()
       if (context.abortSignal.aborted) throw new Error('Tool call aborted before dispatch')
-      const finishWork = context.beginExecutionWork?.()
+      let finishWork = context.beginExecutionWork?.()
+      let humanWaits = 0
+      let toolFinished = false
+      const withoutExecutionWork = async <T>(wait: () => Promise<T>): Promise<T> => {
+        humanWaits++
+        finishWork?.()
+        finishWork = undefined
+        try {
+          return await wait()
+        } finally {
+          humanWaits--
+          if (humanWaits === 0 && !toolFinished && !context.abortSignal.aborted) {
+            context.assertExecution?.()
+            finishWork = context.beginExecutionWork?.()
+          }
+        }
+      }
       try {
         context.recordToolDispatch?.()
         result = await tool.execute(activeCall.arguments, {
-        ...context,
-        explicitApproval: needsApproval ? { approvalId, callId: activeCall.callId, toolName: activeCall.toolName, requestHash: approvedRequestHash } : undefined
-      }, async (update) => {
-        if (!onUpdate) return
-        const partialItem = makeToolResultItem({
-          id: `item_${activeCall.callId}`,
-          turnId: context.turnId,
-          threadId: context.threadId,
-          callId: activeCall.callId,
-          toolName: activeCall.toolName,
-          toolKind: activeCall.toolKind ?? tool.toolKind,
-          output: update.output,
-          isError: update.isError,
-          status: 'running'
+          ...context,
+          // Providers may request approval from inside execute. Only this tool's
+          // work pauses; concurrent model, tool and child-task work stays charged.
+          awaitApproval: approval => withoutExecutionWork(() => context.awaitApproval(approval)),
+          ...(context.awaitUserInput ? {
+            awaitUserInput: request => withoutExecutionWork(() => context.awaitUserInput!(request))
+          } : {}),
+          explicitApproval: needsApproval ? { approvalId, callId: activeCall.callId, toolName: activeCall.toolName, requestHash: approvedRequestHash } : undefined
+        }, async (update) => {
+          if (!onUpdate) return
+          const partialItem = makeToolResultItem({
+            id: `item_${activeCall.callId}`,
+            turnId: context.turnId,
+            threadId: context.threadId,
+            callId: activeCall.callId,
+            toolName: activeCall.toolName,
+            toolKind: activeCall.toolKind ?? tool.toolKind,
+            output: update.output,
+            isError: update.isError,
+            status: 'running'
+          })
+          await onUpdate(partialItem)
         })
-        await onUpdate(partialItem)
-      }) } finally { finishWork?.() }
+      } finally {
+        toolFinished = true
+        finishWork?.()
+      }
     } catch (error) {
       // A tool blowing up (an MCP server returning a protocol error, a
       // provider bug) is feedback for the model, not a reason to kill the
