@@ -544,6 +544,7 @@ export class AgentLoop {
         } catch (error) {
           const blocked = this.opts.tasks?.blockTaskPermission?.(threadId, turnId, error)
           if (!blocked) throw error
+          if (blocked.kind === 'stalled') return await this.finishUnknownToolOutcome(threadId, turnId, 'outcome_unknown: 操作结果尚未核验，执行已停止。')
           await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
           return 'completed'
         }
@@ -556,6 +557,7 @@ export class AgentLoop {
           if (signal.aborted || !this.opts.tasks) throw error
           const permissionBlock = this.opts.tasks.blockTaskPermission?.(threadId, turnId, error)
           if (permissionBlock) {
+            if (permissionBlock.kind === 'stalled') return await this.finishUnknownToolOutcome(threadId, turnId, 'outcome_unknown: 操作结果尚未核验，执行已停止。')
             await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
             return 'completed'
           }

@@ -143,6 +143,35 @@ it.each(['before-attempt', 'after-attempt'] as const)('handles an expiry race %s
   expect(f.runtime.taskRepository!.events(f.current().id).filter(event => ['attempt_retrying', 'task_replanned'].includes(event.kind))).toHaveLength(0)
 })
 
+it.each(['before-attempt', 'after-attempt'] as const)('keeps an unknown operation and a failed Turn when permission expires %s concurrently', async boundary => {
+  const f = await fixture()
+  const service = f.runtime.taskPermissionService!, repo = f.runtime.taskRepository!
+  const original = service.executionRestriction.bind(service)
+  let checked = 0
+  vi.spyOn(service, 'executionRestriction').mockImplementation(async (...args) => {
+    checked++
+    if (checked === (boundary === 'before-attempt' ? 2 : 3)) {
+      // Another durable operation result arrives at the permission-check boundary.
+      // This fixture records uncertainty, never claims or executes a browser action.
+      const task = f.current()
+      repo.beginOperation({ ownerId: task.id, idempotencyKey: 'concurrent-unknown', kind: 'tool',
+        request: { toolName: 'browser_click', turnId: task.activeTurnId }, nowIso: f.runtime.nowIso() })
+      repo.finishOperation(task.id, 'concurrent-unknown', { status: 'outcome_unknown', error: 'Synthetic interrupted result' }, f.runtime.nowIso())
+      throw Object.assign(new Error('Synthetic permission expired with unresolved effect'), { code: 'task_permission_expired' })
+    }
+    return original(...args)
+  })
+  await f.resume()
+  await expect.poll(() => f.current().status).toBe('stalled')
+  await expect.poll(async () => (await f.turns()).at(-1)?.status).toBe('failed')
+  expect((await f.turns()).at(-1)?.error).toContain('outcome_unknown')
+  expect(f.current().attempts).toBe(boundary === 'before-attempt' ? 0 : 1)
+  expect(f.requests()).toBe(0)
+  expect(repo.operation(f.current().id, 'concurrent-unknown')).toMatchObject({ status: 'outcome_unknown', error: 'Synthetic interrupted result' })
+  expect(repo.operation(f.current().id, 'concurrent-unknown')?.resolution).toBeUndefined()
+  expect(repo.events(f.current().id).filter(event => ['attempt_retrying', 'task_replanned'].includes(event.kind))).toHaveLength(0)
+})
+
 it.each(['restore', 'replace'] as const)('recovers the original failed attempt-eight task through explicit %s, keeping history and budget until separate Continue', async action => {
   const f = await fixture()
   const priorScope = { browserInstanceId: 'synthetic-browser', revision: 1, interaction: 'observe' as const, origins: ['https://example.com'] }
