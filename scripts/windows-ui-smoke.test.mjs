@@ -11,7 +11,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
-import { clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
+import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState } from './run-windows-ui-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
@@ -767,6 +767,47 @@ test('browser binding UI selection requires the actual task card, complete previ
     button.disabled = false
     detail.querySelector('dd').remove()
     assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null)
+  } finally { await window.happyDOM.close() }
+})
+
+test('after an autonomous task leaves Needs you, navigation re-selects the same task through real UI controls', async () => {
+  const { Window } = await import('happy-dom'), window = new Window()
+  const task = { id: 'task-original', goal: '原任务公开查询与每日两次计划' }, clicks = []
+  try {
+    // DOM contract only: the actual package run must later exercise CDP mouse input.
+    window.document.body.innerHTML = `<section aria-label="任务"><nav aria-label="任务筛选"><button>进行中 <span>0</span></button><button aria-pressed="true">需要你 <span>0</span></button><button>已完成 <span>1</span></button><button aria-pressed="false">全部任务 <span>1</span></button></nav><div aria-label="任务列表"></div><div id="details"></div></section>`
+    const all = window.document.querySelector('nav button:last-child'), list = window.document.querySelector('[aria-label="任务列表"]')
+    all.addEventListener('click', () => {
+      all.setAttribute('aria-pressed', 'true')
+      list.innerHTML = '<button aria-pressed="false"><span></span></button><button><span>其他任务</span></button>'
+      const original = list.querySelector('button'); original.querySelector('span').textContent = task.goal
+      original.addEventListener('click', () => {
+        original.setAttribute('aria-pressed', 'true')
+        const detail = window.document.createElement('article'); detail.setAttribute('aria-label', '任务详情')
+        const heading = window.document.createElement('h2'); heading.textContent = task.goal; detail.append(heading)
+        const open = window.document.createElement('button'); open.textContent = '打开原会话'; detail.append(open)
+        open.addEventListener('click', () => { window.document.body.dataset.openedTask = task.id })
+        window.document.querySelector('#details').replaceChildren(detail)
+      })
+    })
+    const cdp = {
+      wait: async expression => { assert.ok(window.eval(expression), 'Only genuine mounted UI state may satisfy navigation') },
+      click: async (selector, label) => {
+        const node = Array.from(window.document.querySelectorAll(selector)).find(node => !label || node.textContent.trim() === label || node.querySelector('span')?.textContent.trim() === label)
+        assert.ok(node); clicks.push(label ?? node.firstChild.textContent.trim()); node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+      }
+    }
+    assert.equal(window.document.querySelector('article'), null)
+    const result = await openWindowsTaskConversation(cdp, task)
+    assert.deepEqual(clicks, ['全部任务', task.goal, '打开原会话'])
+    assert.equal(window.document.body.dataset.openedTask, task.id)
+    assert.deepEqual(result, { taskId: task.id, goal: task.goal, filter: 'all', exactTaskSelected: true, input: 'real-cdp-mouse' })
+    await assert.rejects(openWindowsTaskConversation(cdp, { ...task, goal: '不存在的任务' }), /mounted UI state/)
+    all.addEventListener('click', () => list.append(list.firstElementChild.cloneNode(true)))
+    await assert.rejects(openWindowsTaskConversation(cdp, task), /mounted UI state/, 'Ambiguous same-goal tasks must not open a different conversation')
+    const source = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+    assert.match(source, /originalConversationNavigation = await openWindowsTaskConversation\(cdp, task\)/)
+    assert.doesNotMatch(openWindowsTaskConversation.toString(), /runtimeRequest|dispatchEvent|setSelected|setFilter|\.click\(\)/)
   } finally { await window.happyDOM.close() }
 })
 

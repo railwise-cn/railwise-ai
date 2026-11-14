@@ -321,6 +321,21 @@ export function validateWindowsTaskEvidence(evidence) {
   assert.ok(Date.parse(evidence.dueOccurrence.createdAt) >= Date.parse(evidence.dueOccurrence.dueAt))
 }
 
+/** Re-select the persisted task after resume removes it from the attention filter. */
+export async function openWindowsTaskConversation(cdp, task) {
+  assert.ok(task?.id && typeof task.goal === 'string' && task.goal.trim(), 'The original persisted task identity is required')
+  const workspace = 'section[aria-label="任务"]'
+  const all = `${workspace} nav[aria-label="任务筛选"] button:last-child`
+  const list = `${workspace} [aria-label="任务列表"] button`
+  await cdp.wait(`(() => {const node=document.querySelector(${JSON.stringify(all)});return node?.firstChild?.textContent.trim()==='全部任务';})()`, 'the actual All tasks filter')
+  await cdp.click(all)
+  await cdp.wait(`(() => {const all=document.querySelector(${JSON.stringify(all)});const matches=Array.from(document.querySelectorAll(${JSON.stringify(list)})).filter(node=>node.querySelector('span')?.textContent.trim()===${JSON.stringify(task.goal)});return all?.getAttribute('aria-pressed')==='true' && matches.length===1;})()`, 'the same task goal uniquely visible in All tasks')
+  await cdp.click(list, task.goal)
+  await cdp.wait(`(() => {const detail=document.querySelector('article[aria-label="任务详情"]');const selected=Array.from(document.querySelectorAll(${JSON.stringify(list)})).filter(node=>node.getAttribute('aria-pressed')==='true' && node.querySelector('span')?.textContent.trim()===${JSON.stringify(task.goal)});return selected.length===1 && detail?.querySelector('h2')?.textContent.trim()===${JSON.stringify(task.goal)};})()`, 'the exact original task details after UI selection')
+  await cdp.click('article[aria-label="任务详情"] button', '打开原会话')
+  return { taskId: task.id, goal: task.goal, filter: 'all', exactTaskSelected: true, input: 'real-cdp-mouse' }
+}
+
 export function windowsTaskPreviewLayoutExpression() {
   return `(() => {
     const workspace=document.querySelector('section[aria-label="任务"]'),details=workspace?.querySelector('article[aria-label="任务详情"]'),list=workspace?.querySelector('[aria-label="任务列表"]'),columns=workspace?.querySelector('.ds-task-workspace-columns');
@@ -2118,7 +2133,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
               publicQueryAuthorization: firstGrant.browserScope.publicQueryAuthorization } } })
         validateWindowsBrowserRecoveryEvidence(browserRecovery, realBrowser.evidence.browserInstanceId)
         report.taskSetup = { originThreadId, skillInstallation, browser: realBrowser.evidence, browserRecovery }
-        await cdp.click('article[aria-label="任务详情"] button', '打开原会话')
+        browserRecovery.originalConversationNavigation = await openWindowsTaskConversation(cdp, task)
       }
       const uiApprovals = []
       const reviewedRequests = []
