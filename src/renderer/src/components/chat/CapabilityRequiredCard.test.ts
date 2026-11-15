@@ -7,10 +7,10 @@ import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
 import i18n from '../../i18n'
 import { takeRequestedFlow } from '../../store/flow-navigation'
 import { CapabilityRequiredCard } from './CapabilityRequiredCard'
-import { refreshTaskState, resetTaskStateForTests } from '../../store/task-live-store'
+import { refreshTaskState, resetTaskStateForTests, takeRequestedTask } from '../../store/task-live-store'
 
 const state = vi.hoisted(() => ({
-  openFlow: vi.fn(), openPlugins: vi.fn(), openSettings: vi.fn(), chooseWorkspace: vi.fn(),
+  openFlow: vi.fn(), openPlugins: vi.fn(), openSettings: vi.fn(), chooseWorkspace: vi.fn(), setRoute: vi.fn(),
   refreshThreads: vi.fn(async () => undefined), selectThread: vi.fn(async () => undefined),
   activeThreadId: 'thread-original'
 }))
@@ -94,6 +94,97 @@ describe('capability waiting card', () => {
     root = createRoot(container)
   })
   afterEach(async () => { await act(async () => root.unmount()); resetTaskStateForTests(); container.remove() })
+
+  it('keeps a legacy card outside the loaded task snapshot neutral instead of claiming current missing capability', async () => {
+    tasks = []
+    const legacy: ExternalTaskCapabilityCard = { ...browserCard, taskId: 'old-task-outside-snapshot', attentionId: undefined,
+      capability: { provider: 'browser-skill', status: 'not_installed', message: '原始检查提示缺少浏览器' } }
+    await render(legacy, undefined, [])
+    expect(container.textContent).not.toContain('当前状态')
+    expect(container.textContent).not.toContain('当前工作区')
+    expect(container.textContent).toContain('当时状态')
+    expect(container.querySelector('details')?.open).toBe(false)
+    expect(container.querySelector('section')?.className).not.toContain('border-amber')
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    await click('打开任务工作台')
+    expect(takeRequestedTask()).toBe(legacy.taskId)
+    expect(state.setRoute).toHaveBeenCalledWith('tasks')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    await click('查看配置')
+    expect(state.openPlugins).toHaveBeenCalledWith(undefined, 'browser-skill')
+  })
+
+  it.each(['completed', 'cancelled'] as const)('closes a %s task card even when an old attention snapshot is still pending', async status => {
+    tasks[0].status = status
+    await render(browserCard)
+    expect(container.textContent).toContain('能力处理记录')
+    expect(container.textContent).not.toContain('当前状态')
+    expect(container.querySelector('details')?.open).toBe(false)
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    expect(container.querySelector('select')).toBeNull()
+    expect(container.textContent).not.toContain('重新检查并继续原任务')
+    expect(container.textContent).not.toContain('取消此任务')
+  })
+
+  it('does not bind a timestamp-less old card to a newer different-provider request using the same attention ID', async () => {
+    await render(card, undefined, [attentionFor(browserCard)])
+    expect(container.textContent).toContain('能力处理记录')
+    expect(container.textContent).not.toContain('当前状态')
+    expect(api.diagnoseManagedTool).not.toHaveBeenCalled()
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain('重新检查并继续原任务')
+  })
+
+  it.each([
+    { requiredScopes: ['task:write'] },
+    { resolution: { kind: 'grant' as const, route: 'task/permissions', label: '新的范围' } },
+    { errorCode: 'new_permission_scope' }
+  ])('does not reuse a timestamp-less card for a changed legacy scope or resolution: %j', async patch => {
+    const legacy = { ...browserCard, capability: { ...browserCard.capability, checkedAt: undefined } }
+    const latest = { ...legacy, capability: { ...legacy.capability, ...patch } }
+    await render(legacy, undefined, [attentionFor(latest)])
+    expect(container.textContent).toContain('能力处理记录')
+    expect(container.querySelector('select')).toBeNull()
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+  })
+
+  it('reacts to terminal task events without waiting for stale attention to be removed', async () => {
+    await render(browserCard)
+    expect(api.diagnoseBrowserSkill).toHaveBeenCalledOnce()
+    const streamId = api.startTaskSse.mock.calls.at(-1)![1]
+    await act(async () => taskEvent({ streamId, events: [{ seq: ++watermark, kind: 'task_changed',
+      payload: { ...tasks[0], status: 'completed', revision: 2 } }] }))
+    expect(container.textContent).toContain('能力处理记录')
+    expect(container.querySelector('select')).toBeNull()
+    expect(container.querySelector('details')?.open).toBe(false)
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.diagnoseBrowserSkill).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a failed task with an exact pending capability request actionable', async () => {
+    tasks[0].status = 'failed'
+    await render(browserCard)
+    expect(container.textContent).toContain('当前状态')
+    expect(api.diagnoseBrowserSkill).toHaveBeenCalledOnce()
+    expect(button('重新检查并继续原任务')).toBeTruthy()
+  })
+
+  it('does not present a cached capability snapshot as current while task-state verification is pending or failed', async () => {
+    let reject!: (error: Error) => void
+    api.listTaskPage.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+    inbox = [attentionFor(browserCard)]
+    await act(async () => root.render(createElement(CapabilityRequiredCard, { card: browserCard })))
+    expect(container.textContent).not.toContain('当前状态')
+    expect(container.querySelector('details')?.open).toBe(false)
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+    await act(async () => reject(new Error('synthetic unavailable task state')))
+    expect(container.textContent).not.toContain('当前状态')
+    expect(container.textContent).not.toContain('能力处理记录')
+    await click('重新核对任务状态')
+    expect(container.textContent).toContain('当前状态')
+    expect(api.diagnoseBrowserSkill).toHaveBeenCalledOnce()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
 
   it('keeps a resolved browser card historical after remount and opens configuration only on request', async () => {
     tasks[0].status = 'running'

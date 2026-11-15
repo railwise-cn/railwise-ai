@@ -17,7 +17,7 @@ export class TaskArtifactPreviewService {
 
   constructor(private readonly runtimeRequest: TaskArtifactReader) {}
 
-  async open(request: { taskId: string; artifactId: string }): Promise<{ url: string; title: string }> {
+  async open(request: { taskId: string; artifactId: string }): Promise<{ url: string; title: string; sha256: string }> {
     const primary = await readVerifiedTaskArtifact(request, this.runtimeRequest, 32 * 1024 * 1024)
     if (!/\.html?$/i.test(primary.proof.absolutePath)) throw new Error('当前成果不是 HTML 网页。')
     const response = await this.runtimeRequest(`/v1/tasks/${encodeURIComponent(request.taskId)}`, 'GET')
@@ -40,7 +40,7 @@ export class TaskArtifactPreviewService {
     const token = randomBytes(24).toString('hex')
     this.sessions.set(token, { taskId: request.taskId, expiresAt: Date.now() + 60 * 60 * 1000, files })
     const port = await this.start()
-    return { url: `http://127.0.0.1:${port}/task-preview/${token}/${entry.split('/').map(encodeURIComponent).join('/')}`, title: entry.split('/').at(-1)! }
+    return { url: `http://127.0.0.1:${port}/task-preview/${token}/${entry.split('/').map(encodeURIComponent).join('/')}`, title: entry.split('/').at(-1)!, sha256: primary.proof.sha256 }
   }
 
   private start(): Promise<number> {

@@ -7,7 +7,9 @@ import { FlowRepository } from '../flow/repository.js'
 import { FlowRuntimeService } from '../flow/service.js'
 import { buildCoreFlowAdapters } from '../flow/core-adapters.js'
 import { buildFlowNodeRegistry } from '../flow/node-registry.js'
-import { TaskRunRepository } from './task-run-repository.js'
+import { TaskRunRepository, operationFingerprint } from './task-run-repository.js'
+import { ManagedBrowserSkillRuntime } from './managed-browser-skill-runtime.js'
+import { saveTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { TaskRunSchema } from '../contracts/tasks.js'
 import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { ThreadSchema } from '../contracts/threads.js'
@@ -96,10 +98,303 @@ function fixture() {
     } })
     return repository.finishOperation(task.id, key, { status })
   }
-  return { service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths, approveBrowserAction, browserTool, browserDispatch }
+  return { service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths, approveBrowserAction, browserTool, browserDispatch, browser, root }
+}
+
+/** Safe-equivalent of the real c9/rev3 -> f84/rev4 durable binding history. */
+function reboundBrowserFixture(options: { resolveOld?: boolean } = {}) {
+  const f = fixture(), grant = f.context.executionGrant!
+  f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision, task => ({ ...task, status: 'paused',
+    goal: '使用浏览器查询公开招标公告并生成HTML，每天9点和17点前执行。' }))
+  Object.assign(f.browser, { version: '0.5.0', daemonProtocolVersion: '1.9', browsers: [
+    { id: 'browser-one', name: 'Chrome', label: '测试 Chrome', extensionVersion: '0.5.0', protocolVersion: '1.9', connected: true, versionSkew: false }
+  ] })
+  const bind = (duration?: 'schedule') => {
+    const runtime = new ManagedBrowserSkillRuntime({ config: f.browser, configPath: join(f.root, 'config.json'), dataDir: f.root,
+      repository: f.repository, apply: () => undefined })
+    const snapshot = runtime.bindingSnapshot(f.task.id)
+    runtime.confirmBinding(f.task.id, { confirmed: true, expectedTaskRevision: snapshot.taskRevision, expectedBrowserRevision: snapshot.browserRevision,
+      browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins, interaction: 'interact', verificationPolicy: 'public_query_target',
+      ...(duration ? { publicQueryAuthorization: duration } : {}), idempotencyKey: `bind-${snapshot.browserRevision}` })
+    grant.browserScope = structuredClone(f.repository.get(f.task.id)!.authority!.browserScope!)
+    f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision, task => ({ ...task, status: 'running', activeTurnId: grant.turnId }))
+  }
+  bind()
+  const authority = new BrowserScheduleActionAuthority({ repository: f.repository })
+  const candidate = authority.prepare(f.task.id, grant.browserScope!, { action: 'fill', pageUrl: 'https://example.test/search',
+    elementHash: digest(browserTargetHtml.fill), valueHash: digest('工程监测') })
+  const approved = authority.save(candidate, 'old-approval', browserApprovalSummary({ action: 'fill', origin: 'https://example.test',
+    targetHtml: browserTargetHtml.fill, value: '工程监测', requestHash: candidate.id, verificationPolicy: 'public_query_target' }))
+  const scheduleAuthorization = f.repository.operations(f.task.id, 'browser_schedule_action_authorization')[0]!
+  f.repository.saveHumanRequest({ id: approved.approvalId, kind: 'approval', threadId: f.task.threadId, turnId: 'turn',
+    message: approved.summary, payload: { approval: { toolName: 'browser_authorize_action', requestHash: digest(JSON.stringify(scheduleAuthorization.request)),
+      summary: approved.summary } }, status: 'answered', resolution: { decision: 'allow' }, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+  const actionRequest = { taskId: f.task.id, sessionId: 'session-one', browserInstanceId: 'browser-one', browserRevision: 1,
+    grantRevision: grant.revision, workspaceRevision: grant.workspaceRevision, agentRevision: grant.agentRevision, goalHash: digest(f.repository.get(f.task.id)!.goal),
+    origin: 'https://example.test', pageUrl: approved.pageUrl, elementHash: approved.elementHash, valueHash: approved.valueHash,
+    action: 'fill', verificationPolicy: 'public_query_target' }
+  const authorization = f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: 'old-exact-action', kind: 'browser_action_authorization',
+    request: actionRequest, nowIso: new Date().toISOString() }).receipt
+  f.repository.finishOperation(f.task.id, authorization.idempotencyKey, { status: 'succeeded', result: {
+    approvalId: approved.approvalId, expiresAt: '2026-11-13T00:15:00Z', revoked: false, scheduleActionId: approved.id, access: 'public_query', verificationPolicy: 'public_query_target'
+  } })
+  const args = digest('same-old-action'), dispatch = f.browserDispatch('fill', 'succeeded', { argumentsHash: args, sessionId: 'session-one',
+    authorizationReceiptId: authorization.id, scheduleActionId: approved.id, verificationPolicy: 'public_query_target' })
+  f.repository.finishOperation(f.task.id, dispatch.idempotencyKey, { status: 'succeeded', result: {
+    actionAcknowledged: true, acknowledgementHash: digest('ack'), readbackPending: false, resultHash: digest('old-page')
+  } })
+  const original = f.browserTool('browser_fill', { request: { providerId: 'browser-skill', argumentsHash: args },
+    output: { dispatchReceiptId: dispatch.id, resultHash: digest('old-page') } })
+  if (options.resolveOld) {
+    vi.setSystemTime(new Date('2026-11-13T00:00:30Z'))
+    const evidence = { kind: 'human_confirmation' as const, provider: 'browser-skill', operation: 'fill', target: approved.pageUrl,
+      status: 'public_query_confirmed_by_user', verified: true, verifiedAt: new Date().toISOString(), resultHash: digest('reviewed-page') }
+    for (const receipt of [original, dispatch]) {
+      f.repository.finishOperation(f.task.id, receipt.idempotencyKey, { status: 'outcome_unknown', result: receipt.result })
+      const key = `verified-old-${receipt.id}`
+      const proof = f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: key, kind: 'effect_verification',
+        request: { originalReceiptId: receipt.id, originalFingerprint: receipt.fingerprint }, nowIso: new Date().toISOString() }).receipt
+      f.repository.finishOperation(f.task.id, key, { status: 'succeeded', result: { evidence } })
+      f.repository.resolveOperation(f.task.id, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, resolvedAt: new Date().toISOString() })
+    }
+  }
+  const oldRows = f.repository.operations(f.task.id).map(row => JSON.stringify(row))
+  vi.setSystemTime(new Date('2026-11-13T00:01:00Z'))
+  f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision, task => ({ ...task, status: 'paused' }))
+  Object.assign(f.browser, { browserInstanceId: 'browser-two', revision: 2, browsers: [
+    { id: 'browser-two', name: 'Chrome', label: '测试 Chrome', extensionVersion: '0.5.0', protocolVersion: '1.9', connected: true, versionSkew: false }
+  ] })
+  Object.assign(grant, { id: 'grant-new', turnId: 'turn-new', idempotencyKey: 'grant-new', issuedAt: new Date().toISOString() })
+  f.context.turnId = 'turn-new'
+  bind('schedule')
+  const currentTask = f.repository.get(f.task.id)!, scope = grant.browserScope!
+  const currentBinding = f.repository.operations(f.task.id, 'browser_binding').at(-1)!
+  const scopeAction = saveTaskPublicQueryAction(f.repository, grant, { taskId: f.task.id, sessionId: 'session-two', browserInstanceId: scope.browserInstanceId,
+    browserRevision: scope.revision, pageUrl: 'https://example.test/search', origin: 'https://example.test', action: 'click', elementHash: digest(browserTargetHtml.click),
+    verificationPolicy: 'public_query_target' }, 'current-context', 'search_trigger', '已授权公开查询')!
+  const currentDispatch = f.browserDispatch('click', 'succeeded', { turnId: 'turn-new', argumentsHash: digest('new-click'), sessionId: 'session-two',
+    browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision, verificationPolicy: 'public_query_target',
+    authorizationSource: 'task_scope', scopeActionReceiptId: scopeAction.receipt.id, scopeAuthorizationReceiptId: currentBinding.id,
+    contextHash: digest('current-context') })
+  f.repository.finishOperation(f.task.id, currentDispatch.idempotencyKey, { status: 'succeeded', result: {
+    actionAcknowledged: true, acknowledgementHash: digest('new-ack'), readbackPending: false, resultHash: digest('new-page')
+  } })
+  f.browserTool('browser_click', { request: { providerId: 'browser-skill', turnId: 'turn-new', argumentsHash: digest('new-click') },
+    output: { dispatchReceiptId: currentDispatch.id, resultHash: digest('new-page') } })
+  return { ...f, oldRows, dispatch, original, authorization, approved, scheduleAuthorization, currentTask, currentBinding, currentDispatch, bind }
+}
+
+function rewriteReceipt(f: ReturnType<typeof reboundBrowserFixture>, id: string, edit: (value: OperationReceipt) => void) {
+  const value = f.repository.operations(f.task.id).find(row => row.id === id)!
+  edit(value)
+  value.fingerprint = operationFingerprint(value.request)
+  f.repository.connection().prepare('UPDATE operation_receipts SET data_json = ? WHERE owner_id = ? AND idempotency_key = ?')
+    .run(JSON.stringify(value), value.ownerId, value.idempotencyKey)
+}
+
+function twiceReboundBrowserFixture() {
+  const f = reboundBrowserFixture(), before = f.repository.operations(f.task.id).map(row => JSON.stringify(row))
+  vi.setSystemTime(new Date('2026-11-13T00:02:00Z'))
+  f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision, task => ({ ...task, status: 'paused' }))
+  Object.assign(f.browser, { browserInstanceId: 'browser-three', revision: 3, browsers: [
+    { id: 'browser-three', name: 'Chrome', label: '测试 Chrome', extensionVersion: '0.5.0', protocolVersion: '1.9', connected: true, versionSkew: false }
+  ] })
+  Object.assign(f.context.executionGrant!, { id: 'grant-third', turnId: 'turn-third', idempotencyKey: 'grant-third', issuedAt: new Date().toISOString() })
+  f.context.turnId = 'turn-third'
+  f.bind('schedule')
+  return { ...f, before }
 }
 
 describe('task-owned recurring execution', () => {
+  it('retires proven ancestors across two explicit browser rebindings without copying either generation into the new plan', async () => {
+    const f = twiceReboundBrowserFixture()
+    const saved = await f.service.create(f.context)
+    expect(saved.scope.browserScope).toMatchObject({ browserInstanceId: 'browser-three', revision: 3 })
+    expect(saved.scope.browserScheduleActions).toEqual([])
+    expect(f.repository.operations(f.task.id).slice(0, f.before.length).map(row => JSON.stringify(row))).toEqual(f.before)
+    const audit = (f.repository.operations(f.task.id, 'schedule_authority')[0]!.result as { retiredBrowserActions: Array<{ dispatchReceiptId: string }> }).retiredBrowserActions
+    expect(audit.map(row => row.dispatchReceiptId).sort()).toEqual([f.dispatch.id, f.currentDispatch.id].sort())
+    const first = f.repository.operations(f.task.id, 'browser_binding')[0]!, last = f.repository.operations(f.task.id, 'browser_binding').at(-1)!
+    expect(audit.find(row => row.dispatchReceiptId === f.dispatch.id)).toMatchObject({ bindingLineageReceiptIds: [first.id, f.currentBinding.id, last.id] })
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+  })
+
+  it.each(['missing_middle', 'broken_previous', 'changed_purpose', 'changed_requirement', 'missing_identity', 'late_old_success',
+    'unknown_ancestor', 'unfinished_middle'] as const)('keeps an unprovable multi-generation lineage blocked: %s', async variant => {
+    const f = twiceReboundBrowserFixture()
+    if (variant === 'missing_middle') f.repository.connection().prepare('DELETE FROM operation_receipts WHERE owner_id = ? AND idempotency_key = ?')
+      .run(f.task.id, f.currentBinding.idempotencyKey)
+    if (variant === 'broken_previous') rewriteReceipt(f, f.currentBinding.id, row => { (row.result as Record<string, unknown>).previousBrowserInstanceId = 'unrelated' })
+    if (variant === 'changed_purpose') rewriteReceipt(f, f.currentBinding.id, row => { (row.result as Record<string, unknown>).purpose = '另一个目的' })
+    if (variant === 'changed_requirement') rewriteReceipt(f, f.currentBinding.id, row => {
+      ((row.result as Record<string, unknown>).publicQueryAuthorization as Record<string, unknown>).requirementHash = digest('another-schedule')
+    })
+    if (variant === 'missing_identity') rewriteReceipt(f, f.dispatch.id, row => { delete row.request!.browserRevision })
+    if (variant === 'late_old_success') rewriteReceipt(f, f.dispatch.id, row => { row.createdAt = new Date().toISOString(); row.updatedAt = new Date().toISOString() })
+    if (variant === 'unknown_ancestor') rewriteReceipt(f, f.dispatch.id, row => { row.status = 'outcome_unknown' })
+    if (variant === 'unfinished_middle') rewriteReceipt(f, f.currentDispatch.id, row => { row.status = 'running' })
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: variant === 'unknown_ancestor' || variant === 'unfinished_middle'
+      ? 'browser_schedule_outcome_unknown' : 'browser_schedule_action_scope_required' })
+    expect(f.flows.list()).toHaveLength(0)
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+  })
+
+  it('does not infer expanded site authority from a broader browser configuration during rebinding', () => {
+    const f = reboundBrowserFixture()
+    f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision, task => ({ ...task, status: 'paused' }))
+    f.browser.origins.push('https://additional.test')
+    const runtime = new ManagedBrowserSkillRuntime({ config: f.browser, configPath: join(f.root, 'config.json'), dataDir: f.root,
+      repository: f.repository, apply: () => undefined })
+    const snapshot = runtime.bindingSnapshot(f.task.id), before = JSON.stringify(f.repository.get(f.task.id))
+    expect(snapshot.origins).toEqual(['https://example.test'])
+    expect(() => runtime.confirmBinding(f.task.id, { confirmed: true, expectedTaskRevision: snapshot.taskRevision,
+      expectedBrowserRevision: snapshot.browserRevision, browserInstanceId: snapshot.browserInstanceId,
+      origins: [...snapshot.origins, 'https://additional.test'], interaction: 'interact', verificationPolicy: 'public_query_target',
+      publicQueryAuthorization: 'schedule', idempotencyKey: 'cannot-infer-expanded-sites' })).toThrow('browser_binding_changed')
+    expect(JSON.stringify(f.repository.get(f.task.id))).toBe(before)
+  })
+
+  it.each(['previous_created', 'dispatch_created', 'tool_created', 'tool_updated', 'authorization_created', 'continuous_created',
+    'human_created', 'human_updated', 'dispatch_resolution', 'tool_resolution'] as const)('rejects a retired proof with an unparseable %s timestamp', async field => {
+    const f = reboundBrowserFixture({ resolveOld: field.endsWith('_resolution') })
+    if (field === 'previous_created') rewriteReceipt(f, f.repository.operations(f.task.id, 'browser_binding')[0]!.id, row => { row.createdAt = 'invalid-time' })
+    if (field === 'dispatch_created') rewriteReceipt(f, f.dispatch.id, row => { row.createdAt = 'invalid-time' })
+    if (field === 'tool_created') rewriteReceipt(f, f.original.id, row => { row.createdAt = 'invalid-time' })
+    if (field === 'tool_updated') rewriteReceipt(f, f.original.id, row => { row.updatedAt = 'invalid-time' })
+    if (field === 'authorization_created') rewriteReceipt(f, f.authorization.id, row => { row.createdAt = 'invalid-time' })
+    if (field === 'continuous_created') rewriteReceipt(f, f.scheduleAuthorization.id, row => { row.createdAt = 'invalid-time' })
+    if (field === 'human_created' || field === 'human_updated') {
+      const human = f.repository.humanRequest(f.approved.approvalId)!
+      human[field === 'human_created' ? 'createdAt' : 'updatedAt'] = 'invalid-time'
+      f.repository.connection().prepare('UPDATE human_requests SET data_json = ? WHERE id = ?').run(JSON.stringify(human), human.id)
+    }
+    if (field === 'dispatch_resolution' || field === 'tool_resolution') rewriteReceipt(f, field === 'dispatch_resolution' ? f.dispatch.id : f.original.id,
+      row => { row.resolution!.resolvedAt = 'invalid-time' })
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+    expect(f.flows.list()).toHaveLength(0)
+  })
+
+  it.each(['verified', 'missing_proof', 'succeeded_ack_pending'] as const)('respects the exact unknown readback resolution contract: %s', async state => {
+    const f = fixture()
+    f.approveBrowserAction('fill')
+    const argumentsHash = digest('readback-unknown')
+    const dispatch = f.browserDispatch('fill', state === 'succeeded_ack_pending' ? 'succeeded' : 'outcome_unknown', { argumentsHash })
+    f.repository.finishOperation(f.task.id, dispatch.idempotencyKey, { status: dispatch.status, result: { actionAcknowledged: true, readbackPending: true } })
+    const tool = f.browserTool('browser_fill', { status: 'outcome_unknown', request: { argumentsHash } })
+    const evidence = { kind: 'human_confirmation' as const, provider: 'browser-skill', operation: 'fill', target: String(dispatch.request!.pageUrl),
+      status: 'public_query_confirmed_by_user', verified: true, verifiedAt: new Date().toISOString(), resultHash: digest('verified-readback') }
+    for (const receipt of [tool, ...(state === 'succeeded_ack_pending' ? [] : [dispatch])]) {
+      const key = `readback-proof-${receipt.id}`
+      const proof = f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: key, kind: 'effect_verification',
+        request: { originalReceiptId: receipt.id, originalFingerprint: receipt.fingerprint }, nowIso: new Date().toISOString() }).receipt
+      f.repository.finishOperation(f.task.id, key, { status: 'succeeded', result: { evidence } })
+      f.repository.resolveOperation(f.task.id, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, resolvedAt: new Date().toISOString() })
+    }
+    if (state === 'missing_proof') f.repository.connection().prepare('DELETE FROM operation_receipts WHERE owner_id = ? AND idempotency_key = ?')
+      .run(f.task.id, `readback-proof-${dispatch.id}`)
+    if (state === 'verified') await expect(f.service.create(f.context)).resolves.toMatchObject({ enabled: true })
+    else {
+      await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_readback_blocked' })
+      expect(f.flows.list()).toHaveLength(0)
+    }
+  })
+
+  it('creates a forward plan from the new durable scope without reauthorizing or copying acknowledged retired-browser actions', async () => {
+    const f = reboundBrowserFixture()
+    const saved = await f.service.create(f.context)
+    expect(saved.scope.browserScope).toMatchObject({ browserInstanceId: 'browser-two', revision: 2 })
+    expect(saved.scope.browserScheduleActions).toEqual([])
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+    expect(f.repository.operations(f.task.id).slice(0, f.oldRows.length).map(row => JSON.stringify(row))).toEqual(f.oldRows)
+    expect(f.flows.list()).toHaveLength(1)
+  })
+
+  it('records stronger exact proof for a stale legacy derived pointer without rewriting history or writing during read-only validation', async () => {
+    const f = reboundBrowserFixture(), staleId = digest('another-page-derived-action')
+    rewriteReceipt(f, f.dispatch.id, receipt => { receipt.request!.scheduleActionId = staleId })
+    const old = f.repository.operations(f.task.id).map(row => JSON.stringify(row))
+    const saved = await f.service.create(f.context)
+    const approval = f.repository.operations(f.task.id, 'schedule_authority')[0]!
+    expect(approval.result).toMatchObject({ retiredBrowserActions: [{ dispatchReceiptId: f.dispatch.id, toolReceiptId: f.original.id,
+      evidenceKind: 'historical_exact_approval', authorizationReceiptId: f.authorization.id, approvedScheduleActionId: f.approved.id,
+      recordedScheduleActionId: staleId, legacyActionLinkMismatch: true, currentBindingReceiptId: f.currentBinding.id }] })
+    expect(f.repository.operations(f.task.id).slice(0, old.length).map(row => JSON.stringify(row))).toEqual(old)
+    const persisted = f.repository.operations(f.task.id).map(row => JSON.stringify(row))
+    await f.service.resolveBrowserActions(f.context, f.currentBinding.id)
+    f.service.assessCompletion(f.repository.get(f.task.id)!)
+    expect((await f.service.create(f.context)).id).toBe(saved.id)
+    expect(f.repository.operations(f.task.id).map(row => JSON.stringify(row))).toEqual(persisted)
+  })
+
+  it('accepts completed history after its old exact approval and Grant expire without using them for the new plan', async () => {
+    const f = reboundBrowserFixture()
+    rewriteReceipt(f, f.original.id, tool => { (tool.request!.executionGrant as Record<string, unknown>).expiresAt = '2026-11-13T00:00:30Z' })
+    rewriteReceipt(f, f.authorization.id, receipt => { (receipt.result as Record<string, unknown>).expiresAt = '2026-11-13T00:00:30Z' })
+    const saved = await f.service.create(f.context)
+    expect(saved.scope.browserScope?.browserInstanceId).toBe('browser-two')
+    expect(f.flows.get(saved.id)!.variables.taskSchedule).toMatchObject({ grant: { id: 'grant-new', turnId: 'turn-new' } })
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+  })
+
+  it.each(['missing_predecessor', 'unrelated_predecessor', 'old_purpose', 'current_requirement', 'missing_grant', 'wrong_turn',
+    'missing_human', 'denied_human', 'human_hash', 'authorization_target', 'missing_ack', 'missing_readback', 'late_dispatch', 'expired_at_dispatch'] as const)('does not discard unprovable retired history: %s', async variant => {
+      const f = reboundBrowserFixture(), oldBinding = f.repository.operations(f.task.id, 'browser_binding')[0]!
+      if (variant === 'missing_predecessor' || variant === 'unrelated_predecessor') rewriteReceipt(f, f.currentBinding.id, receipt => {
+        (receipt.result as Record<string, unknown>).previousBrowserInstanceId = variant === 'missing_predecessor' ? undefined : 'unrelated-browser'
+      })
+      if (variant === 'old_purpose') rewriteReceipt(f, oldBinding.id, receipt => { (receipt.result as Record<string, unknown>).purpose = '查询其他任务' })
+      if (variant === 'current_requirement') f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision,
+        task => ({ ...task, acceptance: { ...task.acceptance, schedule: { ...task.acceptance.schedule!, times: ['10:00'] } } }))
+      if (variant === 'missing_grant') rewriteReceipt(f, f.original.id, receipt => { delete receipt.request!.executionGrant })
+      if (variant === 'wrong_turn') rewriteReceipt(f, f.original.id, receipt => { (receipt.request!.executionGrant as Record<string, unknown>).turnId = 'another-turn' })
+      if (variant === 'missing_human') f.repository.connection().prepare('DELETE FROM human_requests WHERE id = ?').run(f.approved.approvalId)
+      if (variant === 'denied_human' || variant === 'human_hash') {
+        const human = f.repository.humanRequest(f.approved.approvalId)!
+        if (variant === 'denied_human') human.resolution = { decision: 'deny' }
+        else (human.payload.approval as Record<string, unknown>).requestHash = digest('wrong')
+        f.repository.connection().prepare('UPDATE human_requests SET data_json = ? WHERE id = ?').run(JSON.stringify(human), human.id)
+      }
+      if (variant === 'authorization_target') rewriteReceipt(f, f.authorization.id, receipt => { receipt.request!.elementHash = digest('other-element') })
+      if (variant === 'missing_ack') rewriteReceipt(f, f.dispatch.id, receipt => { delete (receipt.result as Record<string, unknown>).acknowledgementHash })
+      if (variant === 'missing_readback') rewriteReceipt(f, f.dispatch.id, receipt => { delete (receipt.result as Record<string, unknown>).readbackPending })
+      if (variant === 'late_dispatch') rewriteReceipt(f, f.dispatch.id, receipt => { receipt.updatedAt = f.currentBinding.createdAt })
+      if (variant === 'expired_at_dispatch') rewriteReceipt(f, f.original.id, receipt => {
+        (receipt.request!.executionGrant as Record<string, unknown>).expiresAt = '2026-11-12T23:59:00Z'
+      })
+      await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+      expect(f.flows.list()).toHaveLength(0)
+      expect(f.context.awaitApproval).not.toHaveBeenCalled()
+    })
+
+  it.each(['outcome_unknown', 'running', 'readback_pending', 'unknown_tool', 'unknown_schedule', 'unknown_session'] as const)('checks all generations before allowing the new plan: %s', async variant => {
+      const f = reboundBrowserFixture()
+      if (variant === 'readback_pending') rewriteReceipt(f, f.dispatch.id, receipt => { (receipt.result as Record<string, unknown>).readbackPending = true })
+      else if (variant === 'outcome_unknown' || variant === 'running') rewriteReceipt(f, f.dispatch.id, receipt => { receipt.status = variant })
+      else {
+        const kind = variant === 'unknown_tool' ? 'tool' : variant === 'unknown_schedule' ? 'browser_schedule_action_outcome' : 'browser_session'
+        f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: 'unfinished-history', kind,
+          request: { turnId: 'old-turn', toolName: 'browser_click', browserInstanceId: 'browser-one', browserRevision: 1 }, nowIso: new Date().toISOString() })
+        f.repository.finishOperation(f.task.id, 'unfinished-history', { status: 'outcome_unknown' })
+      }
+      await expect(f.service.create(f.context)).rejects.toMatchObject({ code: variant === 'readback_pending' ? 'browser_readback_blocked' : 'browser_schedule_outcome_unknown' })
+      expect(f.flows.list()).toHaveLength(0)
+    })
+
+  it('still requires current actions to have current scope evidence', async () => {
+    const f = reboundBrowserFixture()
+    f.browserDispatch('click', 'succeeded', { turnId: 'turn-new', browserInstanceId: 'browser-two', browserRevision: 2,
+      pageUrl: 'https://example.test/unreviewed', verificationPolicy: 'public_query_target' })
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+    expect(f.flows.list()).toHaveLength(0)
+  })
+
+  it('does not apply legacy link-mismatch compatibility to the current browser scope', async () => {
+    const f = reboundBrowserFixture()
+    rewriteReceipt(f, f.currentDispatch.id, receipt => { receipt.request!.scheduleActionId = digest('another-current-action') })
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+    expect(f.flows.list()).toHaveLength(0)
+  })
+
   it.each([false, true])('keeps original action scope checks for human-confirmed unknown dispatches (drift=%s)', async drift => {
     const f = fixture()
     f.approveBrowserAction('fill')

@@ -43,6 +43,8 @@ export const TaskArtifactSchema = z.object({
   sha256: z.string().optional(),
   validation: z.enum(['pending', 'valid', 'invalid']),
   validationMessage: z.string().optional(),
+  sourceEvidenceStatus: z.enum(['draft', 'verified']).optional(),
+  sourceEvidenceReceiptId: z.string().min(1).optional(),
   createdAt: z.string().min(1)
 })
 export type TaskArtifact = z.infer<typeof TaskArtifactSchema>

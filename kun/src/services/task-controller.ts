@@ -54,6 +54,8 @@ import { sanitizeTurnItemForPersistence } from '../security/tool-persistence-sec
 import { validateArtifactFile } from './artifact-validator.js'
 import type { RuntimeSpanService } from './runtime-span-service.js'
 import { verifyTaskDelivery } from '../delivery/verification.js'
+import type { WebArtifactEvidenceInput } from '../contracts/web-artifact-evidence.js'
+import { assessWebArtifactEvidence, verifiedWebArtifactEvidence, webArtifactRequirementHash, webEvidenceRepair } from './web-artifact-evidence.js'
 
 import { taskPermissionFailure } from './task-permission-recovery.js'
 
@@ -461,6 +463,27 @@ export class TaskController {
     return started
   }
 
+  /** Binds source provenance to existing exact artifact bytes; it never fetches or edits sources. */
+  async verifyWebArtifact(taskId: string, turnId: string, artifactPath: string, artifactHash: string, html: string, input: WebArtifactEvidenceInput) {
+    const token = this.attemptTokens.get(turnId)
+    if (!token || token.taskId !== taskId) throw Object.assign(new Error('Active task execution is required.'), { code: 'execution_grant_scope' })
+    this.assertToken(token)
+    const task = this.repository.get(taskId)!
+    const [thread, items] = await Promise.all([this.threadStore.get(task.threadId), this.sessionStore.loadItems(task.threadId)])
+    const writes = await authorizedArtifactWrites(task, this.repository.operations(task.id, 'tool'), thread?.turns ?? [])
+    this.assertToken(token)
+    const write = writes.get(artifactPath)
+    if (!write || write.sha256 !== artifactHash || createHash('sha256').update(html).digest('hex') !== artifactHash) throw Object.assign(new Error('The exact artifact has no matching successful writer receipt.'), { code: 'artifact_write_proof_required' })
+    const assessment = assessWebArtifactEvidence(this.repository, task, items, thread?.turns ?? [], html, input, this.nowIso())
+    const request = { artifactPath, artifactHash, writerReceiptId: write.operationId, requirementHash: webArtifactRequirementHash(task), input,
+      sourceReceiptIds: assessment.sourceReceipts.map(source => source.receiptId).sort() }
+    const key = `web-artifact-evidence:${operationFingerprint(request)}`
+    const receipt = this.repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'web_artifact_evidence', request, nowIso: this.nowIso() }).receipt
+    const result = { ...assessment, artifactHash, evidenceReceiptId: receipt.id, ...(assessment.complete ? {} : { code: 'web_artifact_evidence_incomplete', repair: webEvidenceRepair(task) }) }
+    this.repository.finishOperation(task.id, key, { status: assessment.complete ? 'succeeded' : 'failed', result }, this.nowIso())
+    return result
+  }
+
   async assessCandidate(threadId: string, turnId: string): Promise<TaskCandidateDecision> {
     let task = this.repository.findActiveByThread(threadId)
     if (!task) {
@@ -479,9 +502,20 @@ export class TaskController {
     if (capturedToken) this.assertToken(capturedToken)
     const taskTurns = new Set(this.repository.execution.attempts(task.id).map(attempt => attempt.turnId))
     taskTurns.add(turnId)
-    const artifacts = task.acceptance.kind === 'files'
+    let artifacts = task.acceptance.kind === 'files'
       ? await this.collectArtifacts(task, items.filter(item => taskTurns.has(item.turnId)), turnId)
       : task.artifacts
+    if (task.acceptance.requiresWebEvidence && task.acceptance.kind === 'files') {
+      const writes = await authorizedArtifactWrites(task, this.repository.operations(task.id, 'tool'), thread?.turns ?? [])
+      const artifactTask = task
+      artifacts = artifacts.map(artifact => {
+        if (!['html', 'htm'].includes(artifact.format ?? '')) return artifact
+        const writer = writes.get(artifact.absolutePath ?? resolve(artifactTask.workspaceRoot, artifact.relativePath))
+        const proof = writer && artifact.validation === 'valid' && writer.sha256 === artifact.sha256 ? verifiedWebArtifactEvidence(this.repository, artifactTask, artifact, writer.operationId) : undefined
+        const { sourceEvidenceReceiptId: _prior, ...saved } = artifact
+        return { ...saved, sourceEvidenceStatus: proof ? 'verified' as const : 'draft' as const, ...(proof ? { sourceEvidenceReceiptId: proof.id } : {}) }
+      })
+    }
     if (JSON.stringify(artifacts) !== JSON.stringify(task.artifacts)) {
       task = this.updateExecution(task.id, task.revision, current => ({ ...current, artifacts, updatedAt: this.nowIso() }))
     }
@@ -545,6 +579,11 @@ export class TaskController {
       const missing = task.acceptance.requiredSourceOrigins?.filter(origin => !origins.has(origin)) ?? []
       if (!origins.size || missing.length) return this.retry(task, `网页采集尚缺实际正文来源证据${missing.length ? `（${missing.join('、')}）` : ''}，请使用已授权浏览器或网页读取工具核验后交付。`, `web-evidence:${[...origins].sort().join(',')}:${missing.join(',')}`, turnId)
     }
+    if (task.acceptance.requiresWebEvidence && task.acceptance.kind === 'files' && (task.acceptance.requiredFormats?.some(format => ['html', 'htm'].includes(format)) || artifacts.some(artifact => ['html', 'htm'].includes(artifact.format ?? '')))) {
+      const html = artifacts.filter(artifact => artifact.validation === 'valid' && ['html', 'htm'].includes(artifact.format ?? ''))
+      const verified = html.some(artifact => artifact.sourceEvidenceStatus === 'verified')
+      if (!verified) return this.retry(task, webEvidenceRepair(task), `web-artifact-evidence:${webArtifactRequirementHash(task)}:${html.map(artifact => artifact.sha256).join(',')}`, turnId)
+    }
     if (task.templateId) {
       const delivery = verifyTaskDelivery(this.repository,task)
       if (!delivery.complete) return this.waitForUser(task,delivery.reasons.join('；'),finalResponse,`delivery:${task.revision}`,turnId)
@@ -580,7 +619,7 @@ export class TaskController {
     }
 
     if (task.acceptance.kind === 'files') {
-      const validArtifacts = artifacts.filter((artifact) => artifact.validation === 'valid' && (!task.acceptance.requiredFormats?.length || task.acceptance.requiredFormats.includes(artifact.format ?? '')))
+      const validArtifacts = artifacts.filter((artifact) => artifact.validation === 'valid' && (!task.acceptance.requiresWebEvidence || !['html', 'htm'].includes(artifact.format ?? '') || artifact.sourceEvidenceStatus === 'verified') && (!task.acceptance.requiredFormats?.length || task.acceptance.requiredFormats.includes(artifact.format ?? '')))
       const minimum = task.acceptance.minimumArtifacts ?? 1
       if (validArtifacts.length < minimum) {
         const required = task.acceptance.requiredFormats?.map((value) => `.${value}`).join(' / ')
@@ -602,14 +641,14 @@ export class TaskController {
       waitingReason: undefined,
       stalledReason: undefined,
       finalResponse,
-      ...(task.acceptance.effect || task.acceptance.kind === 'effect' ?{resultEvidence:this.verifiedTaskEffects(task)}:{}),
+      ...((task.acceptance.effect || task.acceptance.kind === 'effect' || artifacts.some(artifact => artifact.sourceEvidenceStatus === 'verified')) ? { resultEvidence: [...this.verifiedTaskEffects(task), ...artifacts.filter(artifact => artifact.sourceEvidenceStatus === 'verified').map(artifact => ({ kind: 'file' as const, provider: 'managed-artifacts', operation: 'verify_web_artifact', target: artifact.absolutePath ?? artifact.relativePath, status: 'source_verified', verified: true, verifiedAt: now, resultHash: artifact.sha256!, targetVersion: artifact.sha256, sourceVersion: artifact.sourceEvidenceReceiptId }))] } : {}),
       artifacts,
       noProgressCount: 0,
       nodes: current.nodes.map((node) => ({
         ...node,
         status: 'completed',
         finishedAt: now,
-        evidence: [...new Set([...node.evidence, ...(artifacts.map((artifact) => artifact.relativePath))])],
+        evidence: [...new Set([...node.evidence, ...(artifacts.filter(artifact => !task.acceptance.requiresWebEvidence || !['html', 'htm'].includes(artifact.format ?? '') || artifact.sourceEvidenceStatus === 'verified').map((artifact) => artifact.relativePath))])],
         revision: node.revision + 1
       })),
       updatedAt: now,

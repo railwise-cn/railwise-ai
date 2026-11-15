@@ -825,7 +825,7 @@ export function buildBrowserSkillToolProvider(options: {
         const result = await readHtml(config, sessionId, scope, context, args.target as string | undefined, Number(args.maxBytes))
         const resultHash = sha256(result.html)
         if (!args.target && !result.truncated && result.html.trim()) settleReadback(taskId, sessionId, result.sourceUrl, result.tabId, resultHash)
-        return { output: { status: 'succeeded', provider: 'browser-skill', sessionId, ...result, resultHash,
+        return { output: { status: 'succeeded', provider: 'browser-skill', sessionId, ...result, resultHash, readScope: args.target ? 'element' : 'document',
           evidence: { kind: 'browser_observation', sourceUrl: result.sourceUrl, resultHash, verifiedAt: new Date().toISOString(), verified: true, contentRead: Boolean(result.html.trim()) } } }
       }
       if (action === 'stop') {
@@ -920,6 +920,8 @@ export function buildBrowserSkillToolProvider(options: {
         const target = action !== 'press' ? await actionBinding(action as 'click' | 'fill', args, context) : undefined
         const derived = target ? options.repository.operations(taskId, 'browser_derived_action_authorization').find(receipt =>
           receipt.status === 'succeeded' && receipt.request?.turnId === context.turnId && receipt.request?.sessionId === sessionId &&
+          receipt.request?.taskId === taskId && receipt.request?.pageUrl === target.page.sourceUrl && receipt.request?.origin === target.binding.origin &&
+          receipt.request?.browserInstanceId === scope.browserInstanceId && receipt.request?.browserRevision === scope.revision &&
           receipt.request?.grantId === context.executionGrant?.id && (receipt.request?.contextHash === undefined || receipt.request.contextHash === sha256(String(args.contextId))) &&
           receipt.request?.action === action && receipt.request?.elementHash === target.binding.elementHash && receipt.request?.valueHash === target.binding.valueHash &&
           browserVerificationPolicy(receipt.request.verificationPolicy) === verificationPolicy && Date.parse(String(object(receipt.result).expiresAt)) > Date.now()) : undefined
@@ -932,6 +934,8 @@ export function buildBrowserSkillToolProvider(options: {
           ? await publicQueryExpectations(action as 'click' | 'fill', args, context, target, config, scope) : undefined
         if (expectations) argv.push('--expect', JSON.stringify(expectations.facts))
         const previousBlock = options.repository.operations(taskId, 'browser_action_dispatch').find(receipt => receipt.status === 'failed' &&
+          receipt.request?.sessionId === sessionId && receipt.request?.pageUrl === tab.url &&
+          receipt.request?.browserInstanceId === scope.browserInstanceId && receipt.request?.browserRevision === scope.revision &&
           receipt.request?.turnId === context.turnId && receipt.request.action === action && receipt.request.elementHash === target?.binding.elementHash &&
           receipt.request.valueHash === target?.binding.valueHash && object(receipt.result).refreshExhausted === true)
         if (previousBlock) throw failure('browser_sync_blocked')

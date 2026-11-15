@@ -126,6 +126,28 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('labels sourced HTML drafts and verified outputs separately while keeping ordinary file validation and draft preview', async () => {
+    await i18n.changeLanguage('zh')
+    tasks[0].acceptance.requiresWebEvidence = true
+    tasks[0].artifacts = [
+      { id: 'draft', relativePath: '待核验报告.html', validation: 'valid', sourceEvidenceStatus: 'draft', sha256: 'a'.repeat(64), createdAt: now },
+      { id: 'verified', relativePath: '已核验报告.html', validation: 'valid', sourceEvidenceStatus: 'verified', sourceEvidenceReceiptId: 'proof-report', sha256: 'b'.repeat(64), createdAt: now },
+      { id: 'legacy', relativePath: '旧报告.htm', validation: 'valid', sha256: 'c'.repeat(64), createdAt: now },
+      { id: 'file', relativePath: '统计数据.csv', validation: 'valid', sha256: 'd'.repeat(64), createdAt: now }
+    ]
+    await act(async () => refreshTaskState())
+    await click('Monthly report')
+    const row = (name: string) => [...container.querySelectorAll('li')].find(item => item.textContent?.includes(name))!
+    expect(row('待核验报告.html').textContent).toContain('草稿·来源待核验')
+    expect(row('待核验报告.html').textContent).not.toContain('验证通过')
+    expect(row('旧报告.htm').textContent).toContain('草稿·来源待核验')
+    expect(row('已核验报告.html').textContent).toContain('文件及来源已核验')
+    expect(row('统计数据.csv').textContent).toContain('验证通过')
+    expect(row('统计数据.csv').textContent).not.toContain('来源待核验')
+    await click('待核验报告.html')
+    expect(onOpenArtifact).toHaveBeenCalledWith(tasks[0], '待核验报告.html', 'draft')
+  })
+
   it('restores an eligible failed task in place and starts it only after a separate Continue', async () => {
     const original: TaskRunV1 = {...task('original-expired','failed','Original public query'),attempts:8,
       timing:{executionMs:1013026,queuedMs:0,humanWaitMs:0,pausedMs:0,sampledAt:now,coverage:'complete'}}

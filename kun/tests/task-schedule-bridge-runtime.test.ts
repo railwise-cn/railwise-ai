@@ -44,15 +44,26 @@ it('keeps browser HTML task schedules native while rejecting every legacy bridge
     for await (const chunk of request) chunks.push(Buffer.from(chunk))
     const body = JSON.parse(Buffer.concat(chunks).toString()) as {
       tools?: Array<{ function: { name: string } }>
-      messages?: Array<{ tool_calls?: Array<{ function: { name: string } }> }>
+      messages?: Array<{ role?: string; tool_call_id?: string; content?: string; tool_calls?: Array<{ function: { name: string } }> }>
     }
     const names = body.tools?.map(tool => tool.function.name) ?? []
     catalogs.push(names)
     if (catalogs.length === 1) await firstRequest
     const called = new Set(body.messages?.flatMap(message => message.tool_calls?.map(call => call.function.name) ?? []))
-    const next = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop', 'publish_artifact', 'schedule_task', 'list_schedules'].find(name => names.includes(name) && !called.has(name))
-    const args = next === 'publish_artifact' ? { path: 'boundary.html', content: '<!doctype html><html><body>合成调度边界成果</body></html>' }
+    const toolOutput = (name: string): Record<string, unknown> => {
+      const value = body.messages?.find(message => message.role === 'tool' && message.tool_call_id === `call-${name}`)?.content
+      if (!value) return {}
+      const marker = '\n\nRecorded result:\n', offset = value.lastIndexOf(marker)
+      const encoded = offset >= 0 ? value.slice(offset + marker.length)
+        : value.startsWith('UNTRUSTED external web content follows.') ? value.slice(value.indexOf('\n') + 1) : value
+      return JSON.parse(encoded) as Record<string, unknown>
+    }
+    const next = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop', 'publish_artifact', 'read_artifact', 'verify_web_artifact', 'schedule_task', 'list_schedules'].find(name => names.includes(name) && !called.has(name))
+    const source = toolOutput('browser_get_html')
+    const args = next === 'publish_artifact' ? { path: 'boundary.html', content: String(source.html).replace('</body>', '<a href="https://example.test/">合成来源原文</a></body>') }
       : next === 'browser_navigate' ? { sessionId: 'synthetic-session', url: 'https://example.test/' }
+        : next === 'read_artifact' ? { path: 'boundary.html' }
+        : next === 'verify_web_artifact' ? { path: 'boundary.html', coverage: [{ url: source.sourceUrl, resultHash: source.resultHash }], items: [] }
         : next === 'browser_get_html' || next === 'browser_session_stop' ? { sessionId: 'synthetic-session' } : {}
     const delta = next ? { tool_calls: [{ index: 0, id: `call-${next}`, type: 'function', function: { name: next, arguments: JSON.stringify(args) } }] }
       : { content: '合成HTML已交付，每日计划已建立并读回。' }
@@ -74,7 +85,7 @@ it('keeps browser HTML task schedules native while rejecting every legacy bridge
       request: { prompt: '使用 BrowserSkill 读取 https://example.test ，生成并交付HTML报告，每天09:00和17:00执行。' } })
     expect(started.kind).toBe('task_started')
     await expect.poll(() => catalogs.length, { timeout: 10000 }).toBeGreaterThan(0)
-    expect(catalogs[0]).toEqual(expect.arrayContaining(['browser_session_start', 'schedule_task', 'list_schedules', 'publish_artifact']))
+    expect(catalogs[0]).toEqual(expect.arrayContaining(['browser_session_start', 'schedule_task', 'list_schedules', 'publish_artifact', 'read_artifact', 'verify_web_artifact']))
     expect(catalogs.every(names => names.every(name => !name.startsWith('mcp_gui_schedule_')))).toBe(true)
     const task = runtime.taskRepository!.get(started.task!.id)!
     const worker = (await runtime.threadService.get(task.threadId))!
@@ -92,10 +103,16 @@ it('keeps browser HTML task schedules native while rejecting every legacy bridge
     expect(legacyDispatch).not.toHaveBeenCalled()
     releaseFirstRequest()
     await expect.poll(() => {
+      const proof = runtime!.taskRepository!.operations(task.id, 'web_artifact_evidence').at(-1)?.result as { complete: boolean; reasons: string[] } | undefined
+      return proof && { complete: proof.complete, reasons: proof.reasons }
+    }, { timeout: 10000 }).toEqual({ complete: true, reasons: [] })
+    await expect.poll(() => {
       const current = runtime!.taskRepository!.get(task.id)!
       return { status: current.status, reason: current.stalledReason ?? current.waitingReason ?? null }
     }, { timeout: 15000 }).toEqual({ status: 'completed', reason: null })
     expect(runtime.taskRepository!.operations(task.id, 'schedule_readback')).toHaveLength(1)
+    expect(runtime.taskRepository!.operations(task.id, 'web_artifact_evidence')).toMatchObject([{ status: 'succeeded', result: { complete: true } }])
+    expect(runtime.taskRepository!.get(task.id)!.artifacts).toMatchObject([{ sourceEvidenceStatus: 'verified', sourceEvidenceReceiptId: expect.any(String) }])
     expect(runtime.flowService!.get(`schedule_${task.id}`)?.variables.taskSchedule).toBeDefined()
     expect(runtime.flowService!.get(`schedule_${task.id}`)?.nodes[0]?.config).toEqual({ kind: 'daily', times: ['09:00', '17:00'], timezone: 'Asia/Shanghai' })
     expect(legacyDispatch).not.toHaveBeenCalled()

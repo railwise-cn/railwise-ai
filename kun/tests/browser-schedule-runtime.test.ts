@@ -13,6 +13,12 @@ import type { BrowserTaskBindingSnapshot } from '../src/contracts/browser-skill.
 import type { BrowserScheduleAction } from '../src/contracts/browser-schedule-actions.js'
 import { listApprovedBrowserScheduleActions } from '../src/services/browser-schedule-action-authority.js'
 
+const sourceFixture = vi.hoisted(() => ({
+  url: 'https://public.example.test/notices/monitoring-1', title: '工程监测合成公告',
+  quote: '工程监测合成公告仅用于验证公开页面读取与来源核验流程。',
+  discovery: '<html><body><a href="https://public.example.test/notices/monitoring-1">工程监测合成公告</a></body></html>',
+  document: '<html><body><h1>工程监测合成公告</h1><p>工程监测合成公告仅用于验证公开页面读取与来源核验流程。</p></body></html>'
+}))
 const browser = vi.hoisted(() => ({ next: 0, latest: '', modern: false, sessions: new Map<string, { url: string; context: string; tab: number; value: string }>(),
   writes: [] as Array<{ sessionId: string; action: string; targetRef: string; dependsOn: string[]; expect?: unknown[] }>, elementChanged: false }))
 vi.mock('../src/services/browser-skill-cli.js', async original => ({
@@ -38,7 +44,7 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
       if (browser.modern) { expect(args).toContain('--settle'); expect(args[args.indexOf('--policy') + 1]).toBe('target') }
       else { expect(args).not.toContain('--policy'); expect(args).not.toContain('--settle') }
       session.context = `context-${Number(session.context.split('-')[1]) + 1}`
-      return { ok: true, output: { ready: true, context_id: session.context, ...(browser.modern ? { control_policy: 'target' } : {}),
+      return { ok: true, output: { ready: true, context_id: session.context, observation_id: `${session.context}-observation`, tab_id: session.tab, ...(browser.modern ? { control_policy: 'target' } : {}),
         observation: { text: '公开工程公告查询页面。@e1 关键词输入框，@e2 查询按钮。合成招标公告可读取并核对来源。' } } }
     }
     if (args[0] === 'read') {
@@ -51,6 +57,10 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
         items: [{ ref: '@e999', values, redacted: [] }] } }
     }
     if (args[0] === 'get-html') {
+      if (!args.includes('--ref')) {
+        const html = session.url === sourceFixture.url ? sourceFixture.document : sourceFixture.discovery
+        return { ok: true, output: { tab_id: session.tab, html, byte_size: Buffer.byteLength(html), truncated: false } }
+      }
       const html = args.includes('@e1') ? '<input name="keyword" aria-label="公告关键词">'
         : browser.elementChanged ? '<button id="delete">删除记录</button>' : '<button id="search">查询公告</button>'
       return { ok: true, output: { tab_id: session.tab, html, byte_size: Buffer.byteLength(html), truncated: false } }
@@ -89,14 +99,15 @@ it.each([undefined, 'public_query_target'] as const)('runs independent scheduled
     modelRequests += 1
     const chunks: Buffer[] = []
     for await (const chunk of request) chunks.push(Buffer.from(chunk))
-    const body = JSON.parse(Buffer.concat(chunks).toString()) as { tools?: Array<{ function: { name: string } }>; messages?: Array<{ tool_calls?: Array<{ id: string }> }> }
+    const body = JSON.parse(Buffer.concat(chunks).toString()) as { tools?: Array<{ function: { name: string } }>; messages?: Array<{ tool_call_id?: string; content?: string; tool_calls?: Array<{ id: string }> }> }
     const initial = body.tools?.some(tool => tool.function.name === 'schedule_task')
     const called = new Set(body.messages?.flatMap(message => message.tool_calls?.map(call => call.id) ?? []))
     const steps = [
       ['start', 'browser_session_start'], ['navigate', 'browser_navigate'],
       ...(initial ? [['missing-fill-scope', 'browser_fill'], ['authorize-fill', 'browser_authorize_action']] : []), ['fill', 'browser_fill'],
       ...(initial ? [['authorize-click', 'browser_authorize_action']] : []), ['click', 'browser_click'],
-      ['artifact', 'publish_artifact'], ...(initial ? [['schedule', 'schedule_task'], ['verify-schedule', 'list_schedules']] : [])
+      ['discovery', 'browser_get_html'], ['detail-navigate', 'browser_navigate'], ['detail', 'browser_get_html'],
+      ['artifact', 'publish_artifact'], ['read-artifact', 'read_artifact'], ['verify-artifact', 'verify_web_artifact'], ...(initial ? [['schedule', 'schedule_task'], ['verify-schedule', 'list_schedules']] : [])
     ]
     const next = steps.find(([id]) => !called.has(`synthetic-${id}`))
     if (next?.[0] === 'fill' && beforeNextFill) {
@@ -108,11 +119,27 @@ it.each([undefined, 'public_query_target'] as const)('runs independent scheduled
     const contextId = browser.sessions.get(sessionId)?.context
     let args: Record<string, unknown> = {}
     if (next?.[0] === 'navigate') args = { sessionId, url: 'https://public.example.test/search' }
+    if (next?.[0] === 'detail-navigate') args = { sessionId, contextId, url: sourceFixture.url }
+    if (next?.[0] === 'discovery' || next?.[0] === 'detail') args = { sessionId }
     if (next?.[0] === 'fill' || next?.[0] === 'missing-fill-scope' || next?.[0] === 'authorize-fill') args = { sessionId, contextId, target: '@e1', value: '工程监测',
       ...(next[0] === 'authorize-fill' ? { action: 'fill', scope: 'schedule', scheduleAccess: 'public_query' } : {}) }
     if (next?.[0] === 'click' || next?.[0] === 'authorize-click') args = { sessionId, contextId, target: '@e2',
       ...(next[0] === 'authorize-click' ? { action: 'click', scope: 'schedule', scheduleAccess: 'public_query' } : {}) }
-    if (next?.[0] === 'artifact') args = { path: 'report.html', content: '<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>合成查询报告</title></head><body><h1>工程公告合成报告</h1><p>本报告只用于自动化回归。</p><a href="https://public.example.test/search">合成来源</a></body></html>' }
+    if (next?.[0] === 'artifact') args = { path: 'report.html', content: `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>合成查询报告</title></head><body><h1>工程公告合成报告</h1><p>本报告只用于自动化回归。</p><main data-evidence-report><article id="notice-one" data-evidence-item="notice-one" data-evidence-classification="source"><h2 data-evidence-field="title">${sourceFixture.title}</h2><a data-evidence-source href="${sourceFixture.url}">原文</a></article></main></body></html>` }
+    if (next?.[0] === 'read-artifact') args = { path: 'report.html' }
+    if (next?.[0] === 'verify-artifact') {
+      const reference = (id: string) => {
+        const content = body.messages?.find(message => message.tool_call_id === `synthetic-${id}`)?.content
+        if (typeof content !== 'string') throw new Error(`Missing actual source tool result ${id}`)
+        const result = JSON.parse(content.slice(content.indexOf('{'))) as { status: string; sourceUrl: string; resultHash: string; readScope: string; truncated: boolean }
+        expect(result).toMatchObject({ status: 'succeeded', readScope: 'document', truncated: false })
+        expect(result.resultHash).toMatch(/^[a-f0-9]{64}$/)
+        return { url: result.sourceUrl, resultHash: result.resultHash }
+      }
+      const primary = reference('detail'), discovery = reference('discovery')
+      args = { path: 'report.html', coverage: [primary], items: [{ sectionId: 'notice-one', title: sourceFixture.title,
+        source: primary, discovery, classification: 'source', fields: [{ field: 'title', value: sourceFixture.title, quote: sourceFixture.quote }] }] }
+    }
     const delta = next ? { tool_calls: [{ index: 0, id: `synthetic-${next[0]}`, type: 'function', function: { name: next[1], arguments: JSON.stringify(args) } }] }
       : { content: '已读取合成公开页面并保存HTML成果。计划按已确认范围保存和核验。' }
     response.writeHead(200, { 'content-type': 'text/event-stream' })
@@ -186,6 +213,11 @@ it.each([undefined, 'public_query_target'] as const)('runs independent scheduled
   expect(approvals).toEqual(['browser_authorize_action', 'browser_authorize_action', 'schedule_task'])
   const source = runtime.taskRepository!.get(started.task!.id)!
   const assertExecutionPolicy = async (task: TaskRun) => {
+    const artifact = task.artifacts.find(artifact => artifact.relativePath === 'report.html')!
+    expect(artifact).toMatchObject({ validation: 'valid', sourceEvidenceStatus: 'verified', sourceEvidenceReceiptId: expect.any(String) })
+    const proof = runtime.taskRepository!.operations(task.id, 'web_artifact_evidence').find(receipt => receipt.id === artifact.sourceEvidenceReceiptId)!
+    expect(proof).toMatchObject({ status: 'succeeded', request: { artifactHash: artifact.sha256 },
+      result: { complete: true, sourceReceipts: expect.arrayContaining([expect.objectContaining({ url: sourceFixture.url }), expect.objectContaining({ url: 'https://public.example.test/search' })]) } })
     const thread = (await runtime.threadService.get(task.threadId))!
     const turns = thread.turns.filter(turn => turn.executionGrant?.taskId === task.id)
     expect(turns).toHaveLength(1)

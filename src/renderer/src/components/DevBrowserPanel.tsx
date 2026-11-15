@@ -120,11 +120,13 @@ export function canUseElectronWebviewEnvironment(input: {
 export function DevBrowserPanel({
   blocks,
   preferredUrl,
+  sourceEvidenceStatus,
   className,
   onCollapse
 }: {
   blocks: ChatBlock[]
   preferredUrl?: string | null
+  sourceEvidenceStatus?: 'draft' | 'verified' | null
   className?: string
   onCollapse: () => void
 }): ReactElement {
@@ -474,7 +476,7 @@ export function DevBrowserPanel({
 
           <div className="flex h-8 min-w-[7rem] flex-1 items-center gap-2 rounded-full border border-ds-border-muted bg-ds-surface-subtle px-3 text-ds-muted transition focus-within:border-ds-border-strong focus-within:bg-white dark:bg-white/[0.07] dark:focus-within:bg-white/10">
             <Globe2 className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-            {artifactPreviewScope ? <span className="min-w-0 truncate text-[13px] font-medium text-ds-ink">{t('taskArtifactManagedStorage')} · {formatDevPreviewUrlLabel(activeUrl!)}</span> : <input
+            {artifactPreviewScope ? <><span className="min-w-0 truncate text-[13px] font-medium text-ds-ink">{t('taskArtifactManagedStorage')} · {formatDevPreviewUrlLabel(activeUrl!)}</span>{activeUrl === normalizedPreferredUrl && sourceEvidenceStatus ? <span role="status" className="shrink-0 text-[11px] text-ds-muted">{t(sourceEvidenceStatus === 'draft' ? 'taskArtifactSourceEvidenceDraft' : 'taskArtifactSourceEvidenceVerified')}</span> : null}</> : <input
               value={draftUrl}
               onChange={(event) => setDraftUrl(event.target.value)}
               className="h-full w-full min-w-0 bg-transparent text-[13px] font-medium text-ds-ink outline-none"

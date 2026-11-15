@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import type { TaskRunV1, TaskAttentionV1, TaskChangeEvent } from '@shared/agent-workbench'
+import { taskArtifactSourceEvidenceState } from '@shared/task-artifact-source-evidence'
 
 type State = {
   tasks: TaskRunV1[]
@@ -72,7 +73,7 @@ function apply(value: unknown): void {
     const task = event.payload as unknown as TaskRunV1
     if (typeof task.id !== 'string') return
     for (const artifact of task.artifacts ?? []) {
-      if (artifact.validation !== 'valid') continue
+      if (artifact.validation !== 'valid' || taskArtifactSourceEvidenceState(task, artifact) === 'draft') continue
       void window.workwise.notifyTask({
         key: `artifact:${task.id}:${artifact.id}:${artifact.sha256 ?? artifact.createdAt}`,
         taskId: task.rootTaskId ?? task.id, kind: 'artifact', title: 'RailWise AI', body: artifact.relativePath

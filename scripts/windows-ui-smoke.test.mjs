@@ -12,9 +12,15 @@ import { build } from 'esbuild'
 import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
-import { observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState } from './run-windows-ui-smoke.mjs'
+import { observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact } from './run-windows-ui-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
+// Validator input only; these synthetic projections are never acceptance receipts.
+const syntheticWebArtifactVerification = (fixtureUrl = 'http://127.0.0.1:1234/fixture', artifactHash = 'a'.repeat(64)) => ({
+  complete: true, reasons: [], artifactHash, evidenceReceiptId: 'synthetic-verification', persistedReceiptVerified: true,
+  sourceReceipts: [fixtureUrl, new URL('/fixture/detail', fixtureUrl).href].map((url, index) => ({ receiptId: 'synthetic-read-' + index,
+    turnId: 'synthetic-turn', url, resultHash: 'b'.repeat(64), full: true, readAt: '2026-11-15T00:00:00Z' }))
+})
 
 test('successful connect is single-shot and reads markers without warming PowerShell', async () => {
   const calls = []; let clock = 10
@@ -453,7 +459,8 @@ test('browser evidence requires the actual extension, HTML tool output and close
       runtimeHotLoaded: true, runtimeUnchanged: true, sameConversation: true, activeInTask: true, entrySha256: 'b'.repeat(64),
       guiScheduleMcp: { id: 'gui_schedule', enabled: true, available: true, status: 'connected', toolCount: 8 } },
     extension: { version: '0.5.0', sha256: browserSmokeDependency.extensionSha256 }, browser: { version: browserSmokeDependency.chromeVersion },
-    browserInstanceId: 'synthetic-validation-id', sessionId: 'synthetic-validation-session', htmlSha256: 'a'.repeat(64) }
+    browserInstanceId: 'synthetic-validation-id', sessionId: 'synthetic-validation-session', htmlSha256: 'a'.repeat(64),
+    sourceUrl: 'http://127.0.0.1:1234/fixture', artifactSha256: 'a'.repeat(64), webArtifactEvidence: syntheticWebArtifactVerification() }
   assert.doesNotThrow(() => validateWindowsBrowserEvidence(evidence))
   for (const field of ['fixturePageRead', 'htmlFromBrowserTool', 'sessionStopped']) assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, [field]: false }))
   for (const field of ['runtimeHotLoaded', 'runtimeUnchanged', 'sameConversation', 'activeInTask']) {
@@ -464,6 +471,10 @@ test('browser evidence requires the actual extension, HTML tool output and close
       guiScheduleMcp: { ...evidence.skillInstallation.guiScheduleMcp, ...change } } }))
   }
   assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, status: 'not_exercised' }))
+  for (const change of [{ complete: false }, { reasons: ['missing source'] }, { artifactHash: '0'.repeat(64) },
+    { evidenceReceiptId: undefined }, { sourceReceipts: [] }, { persistedReceiptVerified: false }]) {
+    assert.throws(() => validateWindowsBrowserEvidence({ ...evidence, webArtifactEvidence: { ...evidence.webArtifactEvidence, ...change } }))
+  }
   assert.throws(() => validateWindowsUiReport(report(), identity, { requireBrowserExecution: true }))
 })
 
@@ -492,18 +503,90 @@ test('installed acceptance uses the real marketplace and checks the existing Run
 })
 
 // These protocol-component tests supply synthetic results only; they are not Windows business acceptance evidence.
-const browserToolNames = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_authorize_action', 'browser_fill', 'browser_click', 'browser_session_stop', 'publish_artifact', 'read_artifact', 'schedule_task', 'list_schedules']
+const browserToolNames = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_authorize_action', 'browser_fill', 'browser_click', 'browser_session_stop', 'publish_artifact', 'read_artifact', 'verify_web_artifact', 'schedule_task', 'list_schedules']
 const fixtureMessages = (id, name, output) => [
   { role: 'assistant', tool_calls: [{ id: `smoke-${id}`, function: { name, arguments: '{}' } }] },
   ...(output === undefined ? [] : [{ role: 'tool', tool_call_id: `smoke-${id}`, content: JSON.stringify(output) }])
 ]
 const fixtureResultHtml = (page, query) => page.replace('<output id="query-result" aria-live="polite"></output>', `<output id="query-result" aria-live="polite" data-query="${query}">本地查询结果：${query}；已完成合成公开检索</output>`)
+const fixtureRead = (sourceUrl, html) => ({ sourceUrl, html, truncated: false, resultHash: createHash('sha256').update(html).digest('hex') })
 const fixtureRequest = (fixture, names, messages) => fetch(`${fixture.baseUrl}/chat/completions`, { method: 'POST', body: JSON.stringify({ tools: names.map(name => ({ type: 'function', function: { name } })), messages }) })
 const fixtureCall = async response => {
   assert.equal(response.status, 200)
   const data = (await response.text()).split('\n').find(line => line.startsWith('data: {'))
   return JSON.parse(data.slice(6)).choices[0].delta.tool_calls?.[0]
 }
+
+test('the controlled browser fixture discovers a distinct primary document with verifiable report fields', async () => {
+  const fixture = await startWindowsTaskModelFixture({ browser: true })
+  try {
+    const list = await (await fetch(fixture.fixtureUrl)).text()
+    assert.ok(list.includes('href="/fixture/detail"'), 'The actual result page must discover a primary document link')
+    const response = await fetch(new URL('/fixture/detail', fixture.fixtureUrl))
+    assert.match(response.headers.get('content-type'), /text\/html/)
+    const detail = await response.text()
+    for (const field of ['title', 'publication_date', 'budget', 'deadline', 'status', 'qualification']) {
+      assert.ok(detail.includes(`data-field="${field}"`), `Missing actual primary document field ${field}`)
+    }
+    assert.ok(detail.includes(fixture.marker))
+    const secondDetail = await (await fetch(new URL('/fixture/detail', fixture.fixtureUrl))).text()
+    assert.notEqual(secondDetail, detail, 'The source itself must provide an independent document version for a due read')
+  } finally { await fixture.close() }
+})
+
+test('report fixture extracts exact source quotes and never manufactures missing primary evidence', async () => {
+  const fixture = await startWindowsTaskModelFixture({ browser: true })
+  try {
+    const list = fixtureRead(fixture.fixtureUrl, fixtureResultHtml(await (await fetch(fixture.fixtureUrl)).text(), fixture.query))
+    const detail = fixtureRead(fixture.detailUrl, await (await fetch(fixture.detailUrl)).text())
+    const report = buildWindowsFixtureWebReport({ list, detail, ...fixture })
+    assert.equal(report.verification.items.length, 1)
+    const item = report.verification.items[0]
+    assert.equal(item.source.url, fixture.detailUrl)
+    assert.equal(item.discovery.url, fixture.fixtureUrl)
+    assert.notEqual(item.source.url, item.discovery.url)
+    assert.equal(item.fields.length, 6)
+    for (const field of item.fields) {
+      assert.ok(detail.html.includes(field.quote) && field.quote.includes(field.value))
+      assert.ok(report.content.includes(`data-evidence-field="${field.field}"`))
+    }
+    assert.ok(report.content.includes('data-evidence-report') && report.content.includes('data-evidence-item="notice-1"'))
+    assert.ok(report.content.includes(`data-evidence-source href="${fixture.detailUrl}"`))
+    for (const change of [{ sourceUrl: fixture.fixtureUrl }, { truncated: true }, { resultHash: '0'.repeat(64) },
+      fixtureRead(fixture.detailUrl, detail.html.replace(/<p data-field="budget">[^<]+<\/p>/, ''))]) {
+      assert.throws(() => buildWindowsFixtureWebReport({ list, detail: { ...detail, ...change }, ...fixture }))
+    }
+  } finally { await fixture.close() }
+})
+
+test('Windows web evidence inspection binds the actual file, task receipt and exact full source reads', async () => {
+  const fixture = await startWindowsTaskModelFixture({ browser: true })
+  try {
+    // Projection validator inputs only; real package acceptance must read its own SQLite and tool history.
+    const list = fixtureRead(fixture.fixtureUrl, fixtureResultHtml(await (await fetch(fixture.fixtureUrl)).text(), fixture.query))
+    const detail = fixtureRead(fixture.detailUrl, await (await fetch(fixture.detailUrl)).text())
+    const report = buildWindowsFixtureWebReport({ list, detail, ...fixture })
+    const artifact = { absolutePath: 'D:\\isolated\\每日网页报告.html', sha256: createHash('sha256').update(report.content).digest('hex') }
+    const task = { id: 'synthetic-owned-task' }, proof = syntheticWebArtifactVerification(fixture.fixtureUrl, artifact.sha256)
+    proof.sourceReceipts[0].resultHash = list.resultHash; proof.sourceReceipts[1].resultHash = detail.resultHash
+    const thread = { turns: [{ id: 'synthetic-turn', items: [['read-results', list], ['read-detail', detail], ['verify-web-artifact', proof]].map(([id, output]) => ({
+      kind: 'tool_result', turnId: 'synthetic-turn', callId: 'smoke-' + id, toolName: id === 'verify-web-artifact' ? 'verify_web_artifact' : 'browser_get_html', isError: false, output
+    })) }] }
+    const receipts = [{ id: proof.evidenceReceiptId, ownerId: task.id, kind: 'web_artifact_evidence', status: 'succeeded',
+      request: { artifactPath: artifact.absolutePath, artifactHash: artifact.sha256, writerReceiptId: 'synthetic-writer' }, result: proof }]
+    const saved = inspectWindowsPersistedWebArtifact(task, thread, receipts, artifact, fixture)
+    assert.equal(saved.persistedReceiptVerified, true)
+    assert.doesNotThrow(() => inspectWindowsWebArtifactVerification(saved, { sha256: artifact.sha256, fixtureUrl: fixture.fixtureUrl }))
+    for (const mutate of [value => { value.receipts[0].ownerId = 'another-task' }, value => { value.receipts[0].status = 'failed' },
+      value => { value.receipts[0].request.artifactHash = '0'.repeat(64) }, value => { value.receipts[0].request.artifactPath = 'D:\\other.html' },
+      value => { delete value.receipts[0].request.writerReceiptId }, value => { value.receipts[0].result.sourceReceipts = [] },
+      value => { value.thread.turns[0].items[1].output.truncated = true }, value => { value.thread.turns[0].items[1].output.sourceUrl = fixture.fixtureUrl },
+      value => { value.thread.turns[0].items[1].output.html = '<html>Other source</html>' }, value => { value.thread.turns[0].items[1].turnId = 'other-turn' }]) {
+      const changed = structuredClone({ thread, receipts }); mutate(changed)
+      assert.throws(() => inspectWindowsPersistedWebArtifact(task, changed.thread, changed.receipts, artifact, fixture))
+    }
+  } finally { await fixture.close() }
+})
 
 test('the model fixture reads exact published artifact bytes before scheduling or final delivery', async () => {
   const fixture = await startWindowsTaskModelFixture()
@@ -556,6 +639,7 @@ test('browser protocol obtains fresh real refs, asks exact persistent actions, a
   const fixture = await startWindowsTaskModelFixture({ browser: true })
   try {
     const page = await (await fetch(fixture.fixtureUrl)).text()
+    const detail = await (await fetch(fixture.detailUrl)).text()
     assert.ok(page.includes(fixture.inputHtml) && page.includes(fixture.buttonHtml))
     assert.ok(!page.includes('fetch(') && !page.includes('<form'))
     assert.throws(() => validateWindowsFixtureQueryHtml(page, fixture), /actual DOM/)
@@ -564,14 +648,17 @@ test('browser protocol obtains fresh real refs, asks exact persistent actions, a
       const messages = []
       const authorizations = []
       const ids = []
-      for (let count = 0; count < 15; count++) {
+      let published
+      for (let count = 0; count < 24; count++) {
         const call = await fixtureCall(await fixtureRequest(fixture, names, messages))
-        assert.ok(call)
+        if (!call) break
         ids.push(call.id)
         const args = JSON.parse(call.function.arguments)
         if (call.function.name === 'publish_artifact') {
           assert.ok(args.content.includes(`data-query="${fixture.query}"`))
-          break
+          assert.ok(args.content.includes('data-evidence-report') && args.content.includes('data-evidence-field="budget"'))
+          published = { name: args.path, read_artifact: { path: args.path }, bytes_written: Buffer.byteLength(args.content),
+            sha256: createHash('sha256').update(args.content).digest('hex'), content: args.content }
         }
         let output = { status: 'succeeded' }
         if (call.id === 'smoke-start') output.sessionId = initial ? 'synthetic-source-session' : 'synthetic-due-session'
@@ -592,11 +679,26 @@ test('browser protocol obtains fresh real refs, asks exact persistent actions, a
           assert.equal(args.contextId, 'synthetic-post-fill-context')
           assert.equal(args.target, '@e12')
         }
-        if (call.id === 'smoke-read-results') output = { html: fixtureResultHtml(page, fixture.query) }
+        if (call.id === 'smoke-read-results') output = fixtureRead(fixture.fixtureUrl, fixtureResultHtml(page, fixture.query))
+        if (call.id === 'smoke-navigate-detail') assert.equal(args.url, fixture.detailUrl)
+        if (call.id === 'smoke-read-detail') { assert.equal(args.target, undefined); output = fixtureRead(fixture.detailUrl, detail) }
+        if (call.id === 'smoke-artifact') output = published
+        if (call.id === 'smoke-read-artifact') output = { name: published.name, content: published.content, sha256: published.sha256, byte_size: published.bytes_written, truncated: false }
+        if (call.id === 'smoke-verify-web-artifact') {
+          const expected = buildWindowsFixtureWebReport({ list: fixtureRead(fixture.fixtureUrl, fixtureResultHtml(page, fixture.query)),
+            detail: fixtureRead(fixture.detailUrl, detail), ...fixture }).verification
+          assert.deepEqual(args, expected)
+          // Local protocol test input, never persisted or reported as Runtime acceptance.
+          output = syntheticWebArtifactVerification(fixture.fixtureUrl, published.sha256)
+          inspectWindowsWebArtifactVerification(output, { sha256: published.sha256, fixtureUrl: fixture.fixtureUrl })
+        }
         messages.push(...fixtureMessages(call.id.slice(6), call.function.name, output))
       }
       assert.equal(authorizations.length, initial ? 2 : 0)
       assert.ok(ids.includes('smoke-artifact'))
+      assert.ok(ids.includes('smoke-read-detail') && ids.includes('smoke-verify-web-artifact'))
+      assert.ok(ids.indexOf('smoke-read-detail') < ids.indexOf('smoke-artifact'))
+      if (initial) assert.ok(ids.indexOf('smoke-verify-web-artifact') < ids.indexOf('smoke-schedule'))
     }
     const missing = fixtureMessages('start', 'browser_session_start', { sessionId: 'synthetic' })
     missing.push(...fixtureMessages('navigate', 'browser_navigate', {}))
@@ -629,10 +731,13 @@ test('the query fixture reads session and DOM HTML using the production model cl
     const navigation = await fixtureCall(await fixtureRequest(fixture, browserToolNames, [...first, session]))
     assert.equal(JSON.parse(navigation.function.arguments).sessionId, 'synthetic-framed-session')
     const html = fixtureResultHtml(await (await fetch(fixture.fixtureUrl)).text(), fixture.query)
-    const calls = ['start', 'navigate', 'read-fill-target', 'authorize-fill', 'fill', 'read-click-target', 'authorize-click', 'click', 'read-results', 'stop']
+    const detail = await (await fetch(fixture.detailUrl)).text()
+    const calls = ['start', 'navigate', 'read-fill-target', 'authorize-fill', 'fill', 'read-click-target', 'authorize-click', 'click', 'read-results', 'navigate-detail', 'read-detail', 'stop']
       .flatMap(id => fixtureMessages(id, 'synthetic-component-call'))
     for (const untrusted of [false, true]) {
-      const result = await fixtureCall(await fixtureRequest(fixture, browserToolNames, [...calls, framed('read-results', 'browser_get_html', { html, untrusted })]))
+      const result = await fixtureCall(await fixtureRequest(fixture, browserToolNames, [...calls,
+        framed('read-results', 'browser_get_html', { ...fixtureRead(fixture.fixtureUrl, html), untrusted }),
+        framed('read-detail', 'browser_get_html', { ...fixtureRead(fixture.detailUrl, detail), untrusted })]))
       assert.ok(result.function.arguments.includes(fixture.query))
     }
     const invalid = await fixtureRequest(fixture, browserToolNames, [...calls, { role: 'tool', tool_call_id: 'smoke-read-results', content: `<html>Recorded result:\n${JSON.stringify({ html })}</html>` }])
@@ -1244,12 +1349,15 @@ test('task-query evidence requires a real scope receipt and exact current action
 
 test('scheduled query validation requires source UI reviews and independent derived authority without extra due approvals', () => {
   // Synthetic validator input; never emitted as actual business evidence.
-  const query = { domReadbackVerified: true, htmlReadbackVerified: true, actions: 2, unknownOutcomes: 0, accountState: 'unknown', access: 'public_query' }
+  const query = { domReadbackVerified: true, htmlReadbackVerified: true, primaryDocumentReadbackVerified: true,
+    verifiedFields: ['title', 'publication_date', 'budget', 'deadline', 'status', 'qualification'],
+    actions: 2, unknownOutcomes: 0, accountState: 'unknown', access: 'public_query' }
   const policyProjection = id => ({ verificationPolicy: 'public_query_target', grants: [{ id, verificationPolicy: 'public_query_target' }],
     dispatches: ['@e1', 'e2'].map(targetRef => ({ verificationPolicy: 'public_query_target', derivedVerificationPolicy: 'public_query_target', grantId: id, targetRef,
       dependsOn: [], expectationVersion: 'native-dom-v1', expectationHash: 'a'.repeat(64), nativeExpectationVerified: true, inputBindingVerified: true })) })
-  const evidence = { browserSkill: { publicQuery: { ...query, policyExecution: policyProjection('source-grant'), uiApprovals: ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'].map(toolName => ({ toolName, status: 'allowed', verificationPolicy: 'public_query_target', uiFieldsVerified: true, businessCardDisplayedVerified: true, originalSummaryVerified: true, cardDisplayedVerified: true, buttonOperableVerified: true })), persistentActionAuthorizations: 2 } },
-    dueOccurrence: { publicQuery: { ...query, policyExecution: policyProjection('due-grant'), addedApprovals: 0, derivedActionAuthorizations: 2, publishedPlanVersionVerified: true, enabledPlanVerified: true, shortAuthorizationVerified: true } } }
+  const evidence = { browserSkill: { sourceUrl: 'http://127.0.0.1:1234/fixture', publicQuery: { ...query, policyExecution: policyProjection('source-grant'), uiApprovals: ['browser_authorize_action', 'browser_authorize_action', 'schedule_task'].map(toolName => ({ toolName, status: 'allowed', verificationPolicy: 'public_query_target', uiFieldsVerified: true, businessCardDisplayedVerified: true, originalSummaryVerified: true, cardDisplayedVerified: true, buttonOperableVerified: true })), persistentActionAuthorizations: 2 } },
+    dueOccurrence: { artifactSha256: 'a'.repeat(64), webArtifactEvidence: syntheticWebArtifactVerification(),
+      publicQuery: { ...query, policyExecution: policyProjection('due-grant'), addedApprovals: 0, derivedActionAuthorizations: 2, publishedPlanVersionVerified: true, enabledPlanVerified: true, shortAuthorizationVerified: true } } }
   assert.doesNotThrow(() => validateWindowsScheduledQueryEvidence(evidence))
   const modern = structuredClone(evidence)
   const consent = { receiptId: 'real-binding-row', duration: 'schedule', purposeHash: 'b'.repeat(64), requirementHash: 'c'.repeat(64) }
@@ -1270,7 +1378,7 @@ test('scheduled query validation requires source UI reviews and independent deri
     value => { value.dueOccurrence.publicQuery.policyExecution.dispatches[0].scopeActionVerified = false }]) {
     const invalid = structuredClone(modern); mutate(invalid); assert.throws(() => validateWindowsScheduledQueryEvidence(invalid))
   }
-  for (const [field, value] of [['addedApprovals', 1], ['derivedActionAuthorizations', 0], ['publishedPlanVersionVerified', false], ['enabledPlanVerified', false], ['shortAuthorizationVerified', false], ['unknownOutcomes', 1], ['domReadbackVerified', false], ['htmlReadbackVerified', false]]) {
+  for (const [field, value] of [['addedApprovals', 1], ['derivedActionAuthorizations', 0], ['publishedPlanVersionVerified', false], ['enabledPlanVerified', false], ['shortAuthorizationVerified', false], ['unknownOutcomes', 1], ['domReadbackVerified', false], ['htmlReadbackVerified', false], ['primaryDocumentReadbackVerified', false], ['verifiedFields', ['title']]]) {
     const changed = structuredClone(evidence)
     changed.dueOccurrence.publicQuery[field] = value
     assert.throws(() => validateWindowsScheduledQueryEvidence(changed))

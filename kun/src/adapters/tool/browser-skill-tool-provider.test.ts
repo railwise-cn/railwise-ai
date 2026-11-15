@@ -74,6 +74,50 @@ function publicQueryFixture() {
 }
 
 describe('typed BrowserSkill production provider', () => {
+  it('selects the exact page authorization when identical controls have legacy derived receipts without context hashes', async () => {
+    const f = fixture()
+    f.repository.update('task', 0, task => ({ ...task, acceptance: { ...task.acceptance, schedule: { kind: 'daily', times: ['09:00'], timezone: 'Asia/Shanghai' } },
+      authority: { source: 'user', workspaceRoot: task.workspaceRoot, grantedAt: new Date().toISOString(), externalTargets: [], browserScope: f.context.executionGrant!.browserScope } }))
+    await f.execute('browser_session_start')
+    f.setElement('<input type="search" aria-label="采购关键词">')
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '轨道监测' }
+    for (const path of ['first', 'second']) {
+      await f.execute('browser_navigate', { sessionId: 'session-one', url: `https://example.com/${path}` })
+      expect(await f.execute('browser_authorize_action', { ...args, action: 'fill', scope: 'schedule', scheduleAccess: 'public_query' }))
+        .toMatchObject({ output: { status: 'succeeded' } })
+      expect(await f.execute('browser_fill', args)).toMatchObject({ output: { status: 'succeeded' } })
+    }
+    const derived = f.repository.operations('task', 'browser_derived_action_authorization')
+    expect(derived).toHaveLength(2)
+    expect(derived.every(row => row.request?.contextHash === undefined)).toBe(true)
+    const dispatches = f.repository.operations('task', 'browser_action_dispatch')
+    expect(dispatches).toHaveLength(2)
+    for (const dispatch of dispatches) {
+      const exact = f.repository.operations('task', 'browser_action_authorization').find(row => row.id === dispatch.request?.authorizationReceiptId)!
+      expect(dispatch.request?.scheduleActionId).toBe((exact.result as Record<string, unknown>).scheduleActionId)
+      const chosen = derived.find(row => row.request?.actionId === dispatch.request?.scheduleActionId)!
+      expect(chosen.request?.pageUrl).toBe(dispatch.request?.pageUrl)
+    }
+    expect(dispatches[0]!.request?.scheduleActionId).not.toBe(dispatches[1]!.request?.scheduleActionId)
+  })
+
+  it('limits an exhausted refresh to its exact session and page while keeping the original page blocked', async () => {
+    const f = fixture(), html = '<input type="search" aria-label="采购关键词">'
+    await f.execute('browser_session_start')
+    f.setElement(html)
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e1', value: '轨道监测' }
+    const approvedContext = { ...f.context, explicitApproval: { callId: 'exact-page-check', toolName: 'browser_fill', requestHash: operationFingerprint(args) } }
+    f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'old-page-exhausted', kind: 'browser_action_dispatch', nowIso: new Date().toISOString(),
+      request: { turnId: 'turn', sessionId: 'session-one', pageUrl: 'https://example.com/first', browserInstanceId: 'browser-one', browserRevision: 1,
+        action: 'fill', elementHash: createHash('sha256').update(html).digest('hex'), valueHash: createHash('sha256').update(args.value).digest('hex') } })
+    f.repository.finishOperation('task', 'old-page-exhausted', { status: 'failed', result: { refreshExhausted: true } })
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/second' })
+    expect(await f.execute('browser_fill', args, approvedContext)).toMatchObject({ output: { status: 'succeeded' } })
+    await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/first' })
+    expect(await f.execute('browser_fill', args, approvedContext)).toMatchObject({ isError: true, output: { code: 'browser_sync_blocked' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'fill')).toHaveLength(1)
+  })
+
   it.each(['partial', 'empty', 'title_only'] as const)('keeps lifecycle timeout failed and reads the original tab once as %s without navigating again', async state => {
     const f = fixture(), original = f.runner.getMockImplementation()!
     await f.execute('browser_session_start')

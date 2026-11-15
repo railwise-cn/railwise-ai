@@ -56,6 +56,8 @@ export type TaskArtifactV1 = {
   sha256?: string
   validation: 'pending' | 'valid' | 'invalid'
   validationMessage?: string
+  sourceEvidenceStatus?: 'draft' | 'verified'
+  sourceEvidenceReceiptId?: string
   createdAt: string
 }
 
@@ -67,6 +69,7 @@ export type TaskAcceptanceV1 = {
   requireFinalResponse: boolean
   requireActionableArtifactCard: boolean
   requiresExternalEffects?: boolean
+  requiresWebEvidence?: boolean
   effect?: Omit<TaskRequiredEffectV1, 'target'> & { target?: string; requiredEffects?: TaskRequiredEffectV1[] }
 }
 

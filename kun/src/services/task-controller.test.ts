@@ -878,7 +878,9 @@ describe('TaskController reliability boundaries', () => {
       f.repository.finishOperation(f.task.id, 'acked-action', { status: 'succeeded', result: {
         actionAcknowledged: true, acknowledgementHash: 'ack-hash', readbackPending: false, readbackHash: 'new-page-hash' } })
       f.controller.beginAttempt(f.thread.id, 'turn_reliability')
-      expect(await f.controller.assessCandidate(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'completed' })
+      // ACK/readback completion alone cannot certify this unlinked draft report.
+      expect(await f.controller.assessCandidate(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'continue', task: { status: 'retrying' }, reason: expect.stringContaining('verify_web_artifact') })
+      expect(f.repository.events(f.task.id).some(event => event.kind === 'task_completed')).toBe(false)
       expect(f.repository.operations(f.task.id, 'browser_action_dispatch')).toHaveLength(1)
     } finally { f.repository.close() }
   })

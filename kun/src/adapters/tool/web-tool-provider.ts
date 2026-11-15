@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import type { KunCapabilitiesConfig, WebCapabilityConfig } from '../../contracts/capabilities.js'
 import type { WebFetchResult, WebProvider, WebSearchResult } from '../../ports/web-provider.js'
@@ -292,6 +293,7 @@ function fetchOutput(result: WebFetchResult, toolTelemetry: Record<string, unkno
     retrievedAt: result.retrievedAt,
     contentType: result.contentType,
     text: result.text,
+    resultHash: createHash('sha256').update(result.text).digest('hex'),
     byteCount: result.byteCount,
     truncated: result.truncated,
     sources: [source],

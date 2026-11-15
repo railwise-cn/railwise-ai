@@ -2154,7 +2154,7 @@ export function Workbench(): ReactElement {
     },
     browser: (module) => {
       const Panel = (module as typeof import('./DevBrowserPanel')).DevBrowserPanel
-      return <Panel blocks={route === 'tasks' ? [] : devPreviewBlocks} preferredUrl={latestDevPreviewUrl} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
+      return <Panel blocks={route === 'tasks' ? [] : devPreviewBlocks} preferredUrl={latestDevPreviewUrl} sourceEvidenceStatus={taskArtifactPreview.sourceEvidenceStatus} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
     },
     plan: (module) => {
       const Panel = (module as typeof import('./plan/PlanPanel')).PlanPanel

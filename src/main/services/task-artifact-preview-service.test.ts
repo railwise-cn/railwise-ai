@@ -31,6 +31,20 @@ async function fixture() {
 }
 
 describe('verified loopback HTML artifact preview', () => {
+  it('returns the actual selected primary file hash after a stable artifact ID advances to new bytes', async () => {
+    const f = await fixture(), firstHash = f.proofs.get('html')!.sha256
+    const first = await f.service.open({ taskId: 'task', artifactId: 'html' })
+    expect(first.sha256).toBe(firstHash)
+    const next = '<!doctype html><html lang="zh-CN"><body>新草稿</body></html>'
+    await writeFile(f.proofs.get('html')!.absolutePath!, next)
+    const nextHash = createHash('sha256').update(next).digest('hex')
+    f.proofs.get('html')!.sha256 = nextHash
+    const selected = await f.service.open({ taskId: 'task', artifactId: 'html' })
+    expect(selected.sha256).toBe(nextHash)
+    expect(selected.sha256).not.toBe(firstHash)
+    expect(await (await fetch(selected.url)).text()).toBe(next)
+    expect((await fetch(first.url)).status).toBe(409)
+  })
   it('serves the real Chinese HTML and its registered companion with isolated response policy', async () => {
     const f = await fixture()
     const preview = await f.service.open({ taskId: 'task', artifactId: 'html' })

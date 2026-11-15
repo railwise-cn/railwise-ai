@@ -3,6 +3,7 @@ import { constants, type Stats } from 'node:fs'
 import { lstat, mkdir, open, realpath } from 'node:fs/promises'
 import { dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { z } from 'zod'
+import { WebArtifactEvidenceInputSchema } from '../../contracts/web-artifact-evidence.js'
 import { prepareHtmlArtifact } from '../../services/html-artifact.js'
 import type { TaskController } from '../../services/task-controller.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
@@ -31,7 +32,7 @@ function inputPath(path: string): string[] {
 }
 
 /** The model never chooses the physical output root or obtains general dataDir access. */
-export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'managedArtifactRoot' | 'getTask'>): CapabilityToolProvider[] {
+export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'managedArtifactRoot' | 'getTask'> & Partial<Pick<TaskController, 'verifyWebArtifact'>>): CapabilityToolProvider[] {
   function rootFor(context: ToolHostContext): string {
     const grant = context.executionGrant
     const expected = grant?.taskId ? tasks.managedArtifactRoot(grant.taskId) : undefined
@@ -69,9 +70,44 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
     return snapshot
   }
 
+  async function readOwnArtifact(args: Record<string, unknown>, context: ToolHostContext, whole = false) {
+      const input = ReadInput.parse(args), parts = inputPath(input.path), root = await validateRead(context), target = join(root, ...parts)
+      return serializeFileOperation(target, async () => {
+        const before = await readSnapshot(root, parts)
+        await validateRead(context)
+        const handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+        try {
+          const info = await handle.stat()
+          if (!info.isFile() || info.nlink !== 1 || identity(info, true) !== before.at(-1)) throw readError('artifact_read_changed', '成果文件在读取前发生变化。')
+          if (info.size > maxReadBytes) throw readError('artifact_read_too_large', '成果文件超过受管理发布内容的最大读取字节数。')
+          const bytes = Buffer.alloc(info.size)
+          let offset = 0
+          while (offset < bytes.length) {
+            context.abortSignal.throwIfAborted()
+            const result = await handle.read(bytes, offset, Math.min(256 * 1024, bytes.length - offset), offset)
+            if (!result.bytesRead) break
+            offset += result.bytesRead
+          }
+          await validateRead(context)
+          const after = await readSnapshot(root, parts), final = await handle.stat()
+          if (offset !== bytes.length || JSON.stringify(before) !== JSON.stringify(after) || identity(final, true) !== identity(info, true)) throw readError('artifact_read_changed', '成果文件或目录在读取期间发生变化，请重新核对。')
+          try { new TextDecoder('utf-8', { fatal: true }).decode(bytes) } catch { throw readError('artifact_read_encoding', '成果文件不是有效的 UTF-8 文本。') }
+          const start = input.offset_bytes
+          if (start > bytes.length || start < bytes.length && (bytes[start]! & 0xc0) === 0x80) throw readError('artifact_read_range', '读取偏移必须是文件内的 UTF-8 字符边界。')
+          let end = whole ? bytes.length : Math.min(bytes.length, start + input.limit_bytes)
+          while (end > start && end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end--
+          const selected = bytes.subarray(start, end)
+          await validateRead(context)
+          return { output: { name: input.path, storage: 'task', content: selected.toString('utf8'), encoding: 'utf-8', byte_size: bytes.length,
+            sha256: createHash('sha256').update(bytes).digest('hex'), offset_bytes: start, bytes_returned: selected.length,
+            truncated: end < bytes.length, next_offset_bytes: end < bytes.length ? end : null } }
+        } finally { await handle.close() }
+      })
+  }
+
   return [{ id: 'managed-artifacts', kind: 'built-in', enabled: true, available: true, tools: [defineLocalTool({
     name: 'publish_artifact',
-    description: 'Save a real deliverable in this task’s application-managed output directory, including HTML webpages and their local CSS/JS/SVG assets. Available with a read-only user workspace. Pass a relative filename and complete content. When read_artifact is available, use it to inspect the exact saved bytes with the same relative filename; generic read remains workspace-scoped and cannot read this application-managed directory. HTML deliverables appear in the built-in preview after verification. This does not save to a user-selected workspace path. For reports include a title, collection time, source coverage, verified facts, original source links and unresolved fields. Use UTF-8, responsive layout and local resources. HTML without author styles receives an offline Chinese report stylesheet. Cite only observed sources and label partial coverage.',
+    description: 'Save a real deliverable in this task’s application-managed output directory, including HTML webpages and their local CSS/JS/SVG assets. Available with a read-only user workspace. Pass a relative filename and complete content. When read_artifact is available, use it to inspect the exact saved bytes with the same relative filename; generic read remains workspace-scoped and cannot read this application-managed directory. HTML deliverables appear in the built-in preview after verification. This does not save to a user-selected workspace path. For reports include a title, collection time, source coverage, verified facts, original source links and unresolved fields. Use UTF-8, responsive layout and local resources. HTML without author styles receives an offline Chinese report stylesheet. Cite only observed sources and label partial coverage. Web-research reports remain drafts until verify_web_artifact verifies source receipts against this exact file. First read real result hrefs and primary pages; preserve the same filename when repairing evidence.',
     inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'Relative filename, e.g. report.html or assets/chart.svg.' }, content: { type: 'string' } }, required: ['path', 'content'], additionalProperties: false },
     toolKind: 'file_change', policy: 'auto',
     shouldAdvertise: context => Boolean(context.executionGrant?.managedArtifactRoot),
@@ -111,39 +147,21 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
     inputSchema: z.toJSONSchema(ReadInput) as Record<string, unknown>, policy: 'auto',
     shouldAdvertise: context => Boolean(context.executionGrant?.managedArtifactRoot),
     validateArguments: (args, context) => { const input = ReadInput.parse(args); inputPath(input.path); rootFor(context) },
+    execute: (args, context) => readOwnArtifact(args, context)
+  }), ...(tasks.verifyWebArtifact ? [defineLocalTool({
+    name: 'verify_web_artifact', policy: 'auto',
+    description: 'Verify an already-saved HTML research report against this task’s actual successful source-read receipts. No network or external action. First browser_get_html the real result link (discovery HTML with href), navigate to that observed URL, then browser_get_html its complete primary document (truncated=false). coverage lists exact URL/resultHash pairs for each required source. items bind a tr/article/section id in the HTML to title, source, discovery, classification (opportunity/intent/historical; source for non-procurement documents), and material field values with verbatim source quotes. The formal data region must be main[data-evidence-report]. Each item section requires id=sectionId, data-evidence-item=sectionId and data-evidence-classification. Mark each value with data-evidence-field=title/publication_date/budget/deadline/status/qualification; unverified values also need data-evidence-unverified and visible 待核验. Put the primary URL inside a[data-evidence-source] in that section. All report data rows/items/fields must be declared; one verified item cannot certify unrelated draft rows. Successful verification covers this structured data region, not arbitrary narrative. Mark unread fields unverified; do not count them as verified opportunities. Legitimate no-result pages may use noMatches with query (a term from the task purpose) and the exact returned zero-result quote. Each required origin needs its own relevant primary item or actual query-zero evidence. A user-provided exact document URL may be its own discovery reference. Existing valid prior-Turn receipts can be reused. If incomplete, continue collecting and repair the same saved artifact; do not ask the user to search/copy pages. Only actual permission/login/network blockers require user attention. Ordinary files without web-research requirements need no extra step.',
+    inputSchema: z.toJSONSchema(WebArtifactEvidenceInputSchema) as Record<string, unknown>,
+    shouldAdvertise: context => Boolean(context.executionGrant?.managedArtifactRoot),
+    validateArguments: (args, context) => { const input = WebArtifactEvidenceInputSchema.parse(args); inputPath(input.path); if (!/\.html?$/i.test(input.path)) throw new Error('来源核验目前用于 HTML 成果。'); rootFor(context) },
     execute: async (args, context) => {
-      const input = ReadInput.parse(args), parts = inputPath(input.path), root = await validateRead(context), target = join(root, ...parts)
-      return serializeFileOperation(target, async () => {
-        const before = await readSnapshot(root, parts)
-        await validateRead(context)
-        const handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
-        try {
-          const info = await handle.stat()
-          if (!info.isFile() || info.nlink !== 1 || identity(info, true) !== before.at(-1)) throw readError('artifact_read_changed', '成果文件在读取前发生变化。')
-          if (info.size > maxReadBytes) throw readError('artifact_read_too_large', '成果文件超过受管理发布内容的最大读取字节数。')
-          const bytes = Buffer.alloc(info.size)
-          let offset = 0
-          while (offset < bytes.length) {
-            context.abortSignal.throwIfAborted()
-            const result = await handle.read(bytes, offset, Math.min(256 * 1024, bytes.length - offset), offset)
-            if (!result.bytesRead) break
-            offset += result.bytesRead
-          }
-          await validateRead(context)
-          const after = await readSnapshot(root, parts), final = await handle.stat()
-          if (offset !== bytes.length || JSON.stringify(before) !== JSON.stringify(after) || identity(final, true) !== identity(info, true)) throw readError('artifact_read_changed', '成果文件或目录在读取期间发生变化，请重新核对。')
-          try { new TextDecoder('utf-8', { fatal: true }).decode(bytes) } catch { throw readError('artifact_read_encoding', '成果文件不是有效的 UTF-8 文本。') }
-          const start = input.offset_bytes
-          if (start > bytes.length || start < bytes.length && (bytes[start]! & 0xc0) === 0x80) throw readError('artifact_read_range', '读取偏移必须是文件内的 UTF-8 字符边界。')
-          let end = Math.min(bytes.length, start + input.limit_bytes)
-          while (end > start && end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end--
-          const selected = bytes.subarray(start, end)
-          await validateRead(context)
-          return { output: { name: input.path, storage: 'task', content: selected.toString('utf8'), encoding: 'utf-8', byte_size: bytes.length,
-            sha256: createHash('sha256').update(bytes).digest('hex'), offset_bytes: start, bytes_returned: selected.length,
-            truncated: end < bytes.length, next_offset_bytes: end < bytes.length ? end : null } }
-        } finally { await handle.close() }
-      })
+      const input = WebArtifactEvidenceInputSchema.parse(args)
+      inputPath(input.path)
+      const read = await readOwnArtifact({ path: input.path }, context, true)
+      await validateRead(context)
+      const result = await tasks.verifyWebArtifact!(context.executionGrant!.taskId!, context.turnId, join(rootFor(context), ...inputPath(input.path)), read.output.sha256, read.output.content, input)
+      await validateRead(context)
+      return { output: result, ...(result.complete ? {} : { isError: true }) }
     }
-  })] }]
+  })] : [])] }]
 }

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { browserVerificationPolicy, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
+import { BrowserExecutionScope, browserVerificationPolicy, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 import type { ExecutionGrant, ExecutionScope } from '../contracts/permissions.js'
 import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
 import type { FlowDefinitionV1 } from '../contracts/flow.js'
@@ -10,16 +10,21 @@ import type { ThreadRecord } from '../contracts/threads.js'
 import { createApprovalRequest } from '../domain/approval.js'
 import { waitForApprovalDecision } from '../ports/approval-gate.js'
 import type { FlowRuntimeService } from '../flow/service.js'
-import type { TaskRunRepository } from './task-run-repository.js'
+import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
 import type { TaskController } from './task-controller.js'
 import type { TaskCoordinator } from './task-coordinator.js'
 import type { WorkspaceTrustReader } from './workspace-trust-reader.js'
 import { taskPublicQueryAuthority, taskPublicQueryGrant, verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
-import type { BrowserScheduleAction, BrowserScheduleBinding } from '../contracts/browser-schedule-actions.js'
+import { BrowserScheduleActionSchema, type BrowserScheduleAction, type BrowserScheduleBinding } from '../contracts/browser-schedule-actions.js'
 import { browserScheduleApprovalSummary, sanitizeBrowserApprovalSummary } from '../security/browser-approval-summary.js'
 
 type ThreadAuthority = Pick<ThreadRecord, 'workspace' | 'agentId' | 'agentRevision' | 'agentProfile' | 'approvalPolicy' | 'sandboxMode' | 'mode'>
+type RetiredBrowserActionEvidence = {
+  dispatchReceiptId: string; toolReceiptId: string; retiredBindingReceiptId: string; currentBindingReceiptId: string; bindingLineageReceiptIds: string[]
+  evidenceKind: 'historical_task_scope' | 'historical_exact_approval'; settlementReceiptId?: string
+  authorizationReceiptId?: string; approvedScheduleActionId?: string; recordedScheduleActionId?: string; legacyActionLinkMismatch: boolean
+}
 type ScheduledTaskAuthority = {
   taskId: string
   threadId: string
@@ -44,6 +49,7 @@ function threadAuthority(thread: ThreadRecord): ThreadAuthority {
 function fail(message: string): never { throw Object.assign(new Error(message), { code: 'schedule_authority_changed' }) }
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const browserOutput = (receipt: OperationReceipt) => record(record(record(receipt.result).item).output)
+const validTimes = (...values: unknown[]): boolean => values.every(value => typeof value === 'string' && Number.isFinite(Date.parse(value)))
 function browserScopeRequired(detail: string): never {
   throw Object.assign(new Error(`${detail} 请重新观察目标，使用 browser_authorize_action 的 scope=schedule、scheduleAccess=public_query 审阅真实元素与精确输入，再保存计划。`), { code: 'browser_schedule_action_scope_required' })
 }
@@ -138,11 +144,12 @@ export class TaskScheduleService {
       await context.validateExecutionGrant?.()
       authority.authorization = { ...authority.authorization, kind: 'confirmed_scope', approvalId: approval.id }
     }
-    await this.validateAuthority(authority)
+    const browserHistory = await this.validateAuthority(authority)
     if (existing && this.deps.flows.get(id)?.revision !== existing.revision) fail('计划在确认期间已变化，请核对最新版本后重试。')
     if (!savedApproval) this.deps.repository.transact(() => {
       this.deps.repository.beginOperation({ ownerId: task.id, idempotencyKey: authorizationKey, kind: 'schedule_authority', request: { scopeHash }, nowIso: this.deps.nowIso() })
-      this.deps.repository.finishOperation(task.id, authorizationKey, { status: 'succeeded', result: { authorityHash: fingerprint(authority), authority } }, this.deps.nowIso())
+      this.deps.repository.finishOperation(task.id, authorizationKey, { status: 'succeeded', result: { authorityHash: fingerprint(authority), authority,
+        ...(browserHistory.length ? { retiredBrowserActions: browserHistory } : {}) } }, this.deps.nowIso())
     })
     const policy = { timeoutMs: 120000, retryAttempts: 0, retryBackoffMs: 1000, errorBehavior: 'fail' as const, concurrencyLimit: 1, resumable: true, breakpoint: false }
     this.deps.flows.repository.transaction(() => {
@@ -279,18 +286,42 @@ export class TaskScheduleService {
   private validateBrowserDispatches(task: TaskRun, actions: BrowserScheduleAction[]) {
     const receipts = this.deps.repository.operations(task.id)
     const dispatches = receipts.filter(receipt => receipt.kind === 'browser_action_dispatch')
+    // Rebinding never settles an operation. Check every generation before
+    // selecting the action evidence needed by the current forward plan.
+    for (const receipt of receipts) {
+      if (receipt.kind === 'browser_action_dispatch' && record(receipt.result).readbackPending === true &&
+        !(receipt.status === 'outcome_unknown' && this.deps.repository.verifiedOperationResolution(receipt))) {
+        throw Object.assign(new Error('浏览器已确认动作，但页面结果尚未读取，不能保存计划。请只读观察原页面。'), { code: 'browser_readback_blocked' })
+      }
+      const actionTool = receipt.kind === 'tool' && ['browser_click', 'browser_fill', 'browser_press'].includes(String(receipt.request?.toolName))
+      const tracked = ['browser_session', 'browser_action_dispatch', 'browser_schedule_action_outcome'].includes(receipt.kind) || actionTool
+      if (tracked && ['prepared', 'running', 'outcome_unknown'].includes(receipt.status) &&
+        !(actionTool && receipt.status === 'prepared' && receipt.request?.dispatchTracking === 'host-v1') &&
+        !this.deps.repository.verifiedOperationResolution(receipt)) browserOutcomeUnknown()
+    }
+    const retired = this.retiredBrowserDispatches(task, receipts)
     if (receipts.some(receipt => receipt.kind === 'browser_schedule_action_outcome' && receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
     const scopedMatches = (target: Record<string, unknown>) => {
       const dispatch = dispatches.find(item => fingerprint(item.request) === fingerprint(target))
       const original = dispatch && receipts.find(item => item.kind === 'tool' && item.request?.turnId === dispatch.request?.turnId && item.request?.toolName === dispatch.request?.toolName && item.request?.argumentsHash === dispatch.request?.argumentsHash)
       const scoped = original && dispatch && verifiedTaskPublicQueryAction(this.deps.repository, original, dispatch)
-      return Boolean(scoped && scoped.authority.authorization.duration === 'schedule')
+      return Boolean(scoped && scoped.authority.authorization.duration === 'schedule' &&
+        (target.scheduleActionId === undefined || target.scheduleActionId === scoped.result.id))
     }
-    const matches = (target: Record<string, unknown>) => scopedMatches(target) || actions.some(action => action.action === target.action && action.pageUrl === target.pageUrl &&
-      action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === target.browserInstanceId &&
-      action.browserRevision === target.browserRevision && browserVerificationPolicy(action.verificationPolicy) === browserVerificationPolicy(target.verificationPolicy))
+    const matches = (target: Record<string, unknown>) => {
+      const exact = receipts.find(item => item.id === target.authorizationReceiptId && item.kind === 'browser_action_authorization')
+      const approvedId = record(exact?.result).scheduleActionId
+      if (target.scheduleActionId !== undefined && approvedId !== undefined && target.scheduleActionId !== approvedId) return false
+      return scopedMatches(target) || actions.some(action => action.action === target.action && action.pageUrl === target.pageUrl &&
+        action.elementHash === target.elementHash && action.valueHash === target.valueHash && action.browserInstanceId === target.browserInstanceId &&
+        action.browserRevision === target.browserRevision && browserVerificationPolicy(action.verificationPolicy) === browserVerificationPolicy(target.verificationPolicy))
+    }
     for (const dispatch of dispatches) {
-      if (record(dispatch.result).readbackPending === true) throw Object.assign(new Error('浏览器已确认动作，但页面结果尚未读取，不能保存计划。请只读观察原页面。'), { code: 'browser_readback_blocked' })
+      if (retired.has(dispatch.id)) continue
+      if (record(dispatch.result).readbackPending === true &&
+        !(dispatch.status === 'outcome_unknown' && this.deps.repository.verifiedOperationResolution(dispatch))) {
+        throw Object.assign(new Error('浏览器已确认动作，但页面结果尚未读取，不能保存计划。请只读观察原页面。'), { code: 'browser_readback_blocked' })
+      }
       if (this.deps.repository.verifiedOperationResolution(dispatch)?.evidence.kind === 'human_confirmation') {
         if (!matches(dispatch.request ?? {})) browserScopeRequired('已核对的浏览器动作已离开持续授权范围。')
         continue
@@ -301,6 +332,7 @@ export class TaskScheduleService {
     }
     for (const [index, receipt] of receipts.entries()) {
       if (receipt.kind !== 'tool' || !['browser_click', 'browser_fill', 'browser_press'].includes(String(receipt.request?.toolName))) continue
+      if (dispatches.some(dispatch => retired.has(dispatch.id) && this.browserDispatchToolMatches(dispatch, receipt))) continue
       if (this.deps.repository.verifiedOperationResolution(receipt)?.evidence.kind === 'human_confirmation') {
         const dispatch = dispatches.find(candidate => candidate.request?.turnId === receipt.request?.turnId && candidate.request?.toolName === receipt.request?.toolName &&
           candidate.request?.argumentsHash === receipt.request?.argumentsHash && this.deps.repository.verifiedOperationResolution(candidate)?.evidence.kind === 'human_confirmation')
@@ -335,6 +367,153 @@ export class TaskScheduleService {
       if (!target) browserScopeRequired('旧操作缺少可核对的执行前页面或逐次目标审批凭据。旧记录已保留，请先核验原始凭据，无法补齐时需在新来源任务中建立计划。')
       if (!matches(target)) browserScopeRequired('旧操作的真实页面、元素、输入或浏览器与持续授权不匹配。')
     }
+    return [...retired.values()]
+  }
+
+  private browserDispatchToolMatches(dispatch: OperationReceipt, tool: OperationReceipt): boolean {
+    if (tool.kind !== 'tool' || tool.request?.providerId !== 'browser-skill' || tool.request?.turnId !== dispatch.request?.turnId ||
+      tool.request?.toolName !== dispatch.request?.toolName || tool.request?.argumentsHash !== dispatch.request?.argumentsHash) return false
+    if (browserOutput(tool).dispatchReceiptId === dispatch.id) return true
+    const toolResolution = this.deps.repository.verifiedOperationResolution(tool)
+    const dispatchResolution = this.deps.repository.verifiedOperationResolution(dispatch)
+    return Boolean(toolResolution && dispatchResolution && toolResolution.outcome === dispatchResolution.outcome &&
+      operationFingerprint(toolResolution.evidence) === operationFingerprint(dispatchResolution.evidence))
+  }
+
+  /** Completed history is not a request to repeat old actions in a new plan. */
+  private retiredBrowserDispatches(task: TaskRun, receipts: OperationReceipt[]): Map<string, RetiredBrowserActionEvidence> {
+    const retired = new Map<string, RetiredBrowserActionEvidence>(), scope = task.authority?.browserScope
+    const current = scope && taskPublicQueryAuthority(this.deps.repository, task, scope)
+    if (!current || current.source.id !== task.id || current.authorization.duration !== 'schedule') return retired
+    const binding = current.binding
+    const bindings = receipts.filter(item => item.kind === 'browser_binding' && item.status === 'succeeded')
+    const currentIndex = bindings.findIndex(item => item.id === binding.id)
+    const ancestors: Array<{ previous: OperationReceipt; replacement: OperationReceipt; lineage: string[] }> = []
+    // Only adjacent, explicit and fully authenticated replacements form a path.
+    // A missing/changed link never permits searching arbitrary older bindings.
+    for (let index = currentIndex; index > 0 && ancestors.length < 32; index--) {
+      const replacement = bindings[index]!, previous = bindings[index - 1]!
+      if (!this.verifiedBrowserBindingTransition(task, previous, replacement)) break
+      ancestors.push({ previous, replacement, lineage: bindings.slice(index - 1, currentIndex + 1).map(item => item.id) })
+    }
+    for (const dispatch of receipts.filter(item => item.kind === 'browser_action_dispatch')) {
+      const target = record(dispatch.request), settled = this.deps.repository.verifiedOperationResolution(dispatch)
+      const ancestor = ancestors.find(item => target.browserInstanceId === record(item.previous.result).browserInstanceId &&
+        target.browserRevision === record(item.previous.result).browserRevision && validTimes(dispatch.createdAt) &&
+        Date.parse(dispatch.createdAt) >= Date.parse(item.previous.createdAt) && Date.parse(dispatch.createdAt) < Date.parse(item.replacement.createdAt))
+      if (!ancestor) continue
+      const { previous, replacement } = ancestor, prior = record(previous.result)
+      if (target.browserInstanceId !== prior.browserInstanceId || target.browserRevision !== prior.browserRevision ||
+        !validTimes(dispatch.createdAt, dispatch.updatedAt) || Date.parse(dispatch.createdAt) > Date.parse(dispatch.updatedAt) ||
+        Date.parse(dispatch.createdAt) < Date.parse(previous.createdAt) ||
+        Date.parse(dispatch.updatedAt) >= Date.parse(replacement.createdAt) ||
+        settled && (!validTimes(settled.resolvedAt, settled.evidence.verifiedAt) || Date.parse(settled.resolvedAt) < Date.parse(dispatch.updatedAt) ||
+          Date.parse(settled.evidence.verifiedAt) > Date.parse(settled.resolvedAt) || Date.parse(settled.resolvedAt) >= Date.parse(replacement.createdAt)) ||
+        browserVerificationPolicy(target.verificationPolicy) !== browserVerificationPolicy(prior.verificationPolicy)) continue
+      const tool = receipts.find(item => this.browserDispatchToolMatches(dispatch, item) &&
+        (item.status === 'succeeded' || this.deps.repository.verifiedOperationResolution(item)))
+      if (!tool) continue
+      const toolResolution = this.deps.repository.verifiedOperationResolution(tool)
+      if (!validTimes(tool.createdAt, tool.updatedAt) || Date.parse(tool.createdAt) > Date.parse(tool.updatedAt) ||
+        Date.parse(tool.createdAt) > Date.parse(dispatch.createdAt) || Date.parse(tool.updatedAt) < Date.parse(dispatch.createdAt) ||
+        Date.parse(tool.updatedAt) >= Date.parse(replacement.createdAt) ||
+        toolResolution && (!validTimes(toolResolution.resolvedAt, toolResolution.evidence.verifiedAt) ||
+          Date.parse(toolResolution.resolvedAt) < Date.parse(tool.updatedAt) || Date.parse(toolResolution.evidence.verifiedAt) > Date.parse(toolResolution.resolvedAt) ||
+          Date.parse(toolResolution.resolvedAt) >= Date.parse(replacement.createdAt))) continue
+      const grant = record(tool.request?.executionGrant), oldScope = record(grant.browserScope), output = browserOutput(tool)
+      if (grant.taskId !== task.id || grant.threadId !== task.threadId || grant.turnId !== target.turnId ||
+        typeof grant.id !== 'string' || !grant.id ||
+        operationFingerprint(oldScope.publicQueryAuthorization) !== operationFingerprint(prior.publicQueryAuthorization) ||
+        oldScope.interaction !== 'interact' || oldScope.browserInstanceId !== prior.browserInstanceId || oldScope.revision !== prior.browserRevision ||
+        browserVerificationPolicy(oldScope.verificationPolicy) !== browserVerificationPolicy(prior.verificationPolicy) ||
+        !Array.isArray(oldScope.origins) || typeof target.pageUrl !== 'string' || !URL.canParse(target.pageUrl) ||
+        !oldScope.origins.includes(new URL(target.pageUrl).origin) ||
+        typeof grant.issuedAt !== 'string' || !Number.isFinite(Date.parse(grant.issuedAt)) || Date.parse(grant.issuedAt) < Date.parse(previous.createdAt) || Date.parse(grant.issuedAt) > Date.parse(dispatch.createdAt) ||
+        typeof grant.expiresAt === 'string' && (!Number.isFinite(Date.parse(grant.expiresAt)) || Date.parse(grant.expiresAt) <= Date.parse(dispatch.createdAt))) continue
+      if (!settled && (dispatch.status !== 'succeeded' || record(dispatch.result).actionAcknowledged !== true ||
+        typeof record(dispatch.result).acknowledgementHash !== 'string' || record(dispatch.result).readbackPending !== false ||
+        typeof record(dispatch.result).resultHash !== 'string' || tool.status !== 'succeeded' || output.provider !== 'browser-skill' ||
+        output.status !== 'succeeded' || output.resultHash !== record(dispatch.result).resultHash)) continue
+      const historical = verifiedTaskPublicQueryAction(this.deps.repository, tool, dispatch, true)
+      const scoped = historical?.authority.source.id === task.id && historical.authority.authorization.purposeHash === current.authorization.purposeHash &&
+        (historical.authority.authorization.duration !== 'schedule' || historical.authority.authorization.requirementHash === current.authorization.requirementHash)
+      const exact = this.historicalBrowserScheduleAction(task, dispatch, tool, receipts)
+      if (scoped || exact) retired.set(dispatch.id, { dispatchReceiptId: dispatch.id, toolReceiptId: tool.id,
+        retiredBindingReceiptId: previous.id, currentBindingReceiptId: binding.id, bindingLineageReceiptIds: ancestor.lineage, evidenceKind: scoped ? 'historical_task_scope' : 'historical_exact_approval',
+        ...(settled ? { settlementReceiptId: settled.receiptId } : {}),
+        ...(exact ? { authorizationReceiptId: String(target.authorizationReceiptId), approvedScheduleActionId: exact.id } : {}),
+        ...(typeof target.scheduleActionId === 'string' ? { recordedScheduleActionId: target.scheduleActionId } : {}),
+        legacyActionLinkMismatch: Boolean(exact && target.scheduleActionId !== exact.id) })
+    }
+    return retired
+  }
+
+  private verifiedBrowserBindingTransition(task: TaskRun, previous: OperationReceipt, replacement: OperationReceipt): boolean {
+    const from = record(previous.result), to = record(replacement.result), before = record(previous.request), after = record(replacement.request)
+    if (to.previousBrowserInstanceId !== from.browserInstanceId || typeof after.expectedTaskRevision !== 'number' ||
+      typeof before.expectedTaskRevision !== 'number' || after.expectedTaskRevision <= before.expectedTaskRevision ||
+      !validTimes(previous.createdAt, previous.updatedAt, replacement.createdAt, replacement.updatedAt) ||
+      Date.parse(previous.createdAt) > Date.parse(previous.updatedAt) || Date.parse(replacement.createdAt) > Date.parse(replacement.updatedAt) ||
+      Date.parse(previous.updatedAt) >= Date.parse(replacement.createdAt) || !Array.isArray(before.origins) || !Array.isArray(after.origins) ||
+      after.origins.some(origin => !(before.origins as unknown[]).includes(origin))) return false
+    for (const receipt of [previous, replacement]) {
+      const request = record(receipt.request), result = record(receipt.result)
+      if (receipt.fingerprint !== operationFingerprint(request) || request.confirmed !== true || request.interaction !== 'interact' ||
+        result.interaction !== 'interact' || result.taskId !== task.id || result.purpose !== task.goal ||
+        result.taskRevision !== request.expectedTaskRevision || result.browserInstanceId !== request.browserInstanceId ||
+        result.browserRevision !== request.expectedBrowserRevision || operationFingerprint(result.origins) !== operationFingerprint(request.origins) ||
+        browserVerificationPolicy(result.verificationPolicy) !== browserVerificationPolicy(request.verificationPolicy)) return false
+      if (result.scheduleReview !== undefined) {
+        const { startTimes: _startTimes, ...requirement } = record(result.scheduleReview)
+        if (operationFingerprint(requirement) !== operationFingerprint(task.acceptance.schedule)) return false
+      }
+      if (result.publicQueryAuthorization !== undefined) {
+        const parsed = BrowserExecutionScope.safeParse({ browserInstanceId: result.browserInstanceId, revision: result.browserRevision,
+          origins: result.origins, interaction: result.interaction, verificationPolicy: result.verificationPolicy,
+          publicQueryAuthorization: result.publicQueryAuthorization })
+        const authority = parsed.success && taskPublicQueryAuthority(this.deps.repository, task, parsed.data, { historical: true })
+        if (!authority || authority.binding.id !== receipt.id || authority.source.id !== task.id ||
+          authority.authorization.purposeHash !== operationFingerprint({ purpose: task.goal }) ||
+          authority.authorization.duration === 'schedule' && authority.authorization.requirementHash !== operationFingerprint({ requirement: task.acceptance.schedule })) return false
+      }
+    }
+    return true
+  }
+
+  /** Authenticate the old exact approval; it grants nothing to the new scope. */
+  private historicalBrowserScheduleAction(task: TaskRun, dispatch: OperationReceipt, tool: OperationReceipt, receipts: OperationReceipt[]): BrowserScheduleAction | undefined {
+    const target = record(dispatch.request), grant = record(tool.request?.executionGrant)
+    const single = receipts.find(item => item.id === target.authorizationReceiptId && item.kind === 'browser_action_authorization')
+    const initial = record(single?.request), saved = record(single?.result)
+    // Some old producer versions attached a derived ID from another page with
+    // identical HTML. Only the exact action authorization can prove this target.
+    const continuous = receipts.find(item => item.kind === 'browser_schedule_action_authorization' && record(item.result).id === saved.scheduleActionId)
+    const parsed = BrowserScheduleActionSchema.safeParse(continuous?.result)
+    if (!single || single.status !== 'succeeded' || single.fingerprint !== operationFingerprint(initial) || saved.revoked === true ||
+      !continuous || continuous.status !== 'succeeded' || continuous.request?.revoked === true || !parsed.success ||
+      continuous.fingerprint !== operationFingerprint(continuous.request)) return undefined
+    const approved = parsed.data, human = this.deps.repository.humanRequest(approved.approvalId), approval = record(human?.payload.approval)
+    const { approvalId: _approvalId, summary: _summary, ...descriptor } = approved
+    if (approved.sourceTaskId !== task.id || approved.scheduleId !== `schedule_${task.id}` || approved.access !== 'public_query' ||
+      operationFingerprint(descriptor) !== operationFingerprint(continuous.request) ||
+      approved.purposeHash !== createHash('sha256').update(task.goal).digest('hex') || approved.requirementHash !== fingerprint(task.acceptance.schedule) ||
+      approved.id !== saved.scheduleActionId || saved.approvalId !== approved.approvalId || saved.access !== 'public_query' ||
+      initial.taskId !== task.id || initial.sessionId !== target.sessionId || initial.goalHash !== approved.purposeHash ||
+      initial.grantRevision !== grant.revision || initial.workspaceRevision !== grant.workspaceRevision || initial.agentRevision !== grant.agentRevision ||
+      typeof saved.expiresAt !== 'string' || !Number.isFinite(Date.parse(saved.expiresAt)) || Date.parse(saved.expiresAt) <= Date.parse(dispatch.createdAt) ||
+      !validTimes(single.createdAt, single.updatedAt, continuous.createdAt, continuous.updatedAt) ||
+      Date.parse(single.createdAt) > Date.parse(single.updatedAt) || Date.parse(continuous.createdAt) > Date.parse(continuous.updatedAt) ||
+      Date.parse(single.updatedAt) > Date.parse(dispatch.createdAt) || Date.parse(continuous.updatedAt) > Date.parse(dispatch.createdAt) ||
+      Date.parse(single.createdAt) > Date.parse(dispatch.createdAt) || Date.parse(continuous.createdAt) > Date.parse(dispatch.createdAt) ||
+      ['action', 'pageUrl', 'elementHash', 'valueHash', 'browserInstanceId', 'browserRevision'].some(key => initial[key] !== target[key] || record(approved)[key] !== target[key]) ||
+      browserVerificationPolicy(initial.verificationPolicy) !== browserVerificationPolicy(target.verificationPolicy) ||
+      browserVerificationPolicy(approved.verificationPolicy) !== browserVerificationPolicy(target.verificationPolicy) ||
+      !human || human.status !== 'answered' || record(human.resolution).decision !== 'allow' || human.threadId !== task.threadId ||
+      !validTimes(human.createdAt, human.updatedAt) || Date.parse(human.createdAt) > Date.parse(human.updatedAt) ||
+      Date.parse(human.updatedAt) > Date.parse(single.createdAt) ||
+      human.turnId !== target.turnId || approval.toolName !== 'browser_authorize_action' || approval.summary !== approved.summary ||
+      approval.requestHash !== fingerprint(continuous.request)) return undefined
+    return approved
   }
 
   /** Legacy approvals contain an origin and target digests, never a pre-action page URL. */
@@ -390,7 +569,7 @@ export class TaskScheduleService {
       if (!scoped || scoped.authorization.duration !== 'schedule' || authority.authorization.sourceScopeReceiptId !== scoped.binding.id && authority.authorization.kind !== 'confirmed_scope' ||
         fingerprint(authority.scope.browserScope) !== fingerprint(grant.browserScope)) fail('持续公开查询范围已变化或尚未明确确认。')
     }
-    this.validateBrowserDispatches(source, browserActions)
+    const browserHistory = this.validateBrowserDispatches(source, browserActions)
     if ((authority.scope.browserScheduleActions?.length || publicScope) && this.deps.repository.operations(source.id, 'browser_schedule_action_outcome').some(receipt =>
       receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
     if (authority.scope.browserScheduleActions?.length) {
@@ -407,6 +586,7 @@ export class TaskScheduleService {
     }
     const identities = this.deps.connectorIdentities()
     if (Object.entries(grant.connectorIdentityFingerprints ?? {}).some(([id, identity]) => identities[id] !== identity)) fail('计划绑定的连接器身份已变化，请核对原计划。')
+    return browserHistory
   }
 
   private authority(flow: FlowDefinitionV1): ScheduledTaskAuthority {

@@ -30,6 +30,29 @@ it('shares one stream and ignores repeated event sequence numbers', async () => 
   releases.shift()!()
   expect(window.workwise.stopSse).toHaveBeenCalledWith(streamId)
 })
+it('keeps drafts and old unverified web HTML silent, then notifies a verified version without changing ordinary file notifications', async () => {
+  releases.push(retainTaskState()); await refreshTaskState(); await Promise.resolve()
+  const streamId = vi.mocked(window.workwise.startTaskSse).mock.calls[0][1]!
+  const base = { id: 'root', acceptance: { requiresWebEvidence: true }, artifacts: [
+    { id: 'draft', relativePath: 'draft.html', validation: 'valid', sha256: 'same-hash', sourceEvidenceStatus: 'draft' },
+    { id: 'legacy', relativePath: 'legacy.htm', validation: 'valid', sha256: 'legacy-hash' },
+    { id: 'invalid-proof', relativePath: 'missing-proof.html', validation: 'valid', sha256: 'missing-proof', sourceEvidenceStatus: 'verified' },
+    { id: 'file', relativePath: 'data.csv', validation: 'valid', sha256: 'csv-hash' }
+  ] }
+  event({ streamId, events: [{ seq: 5, kind: 'task_changed', payload: base }] })
+  expect(vi.mocked(window.workwise.notifyTask).mock.calls.map(([value]) => value.body)).toEqual(['data.csv'])
+  vi.mocked(window.workwise.notifyTask).mockClear()
+  const verified = { ...base, artifacts: [{ ...base.artifacts[0], sourceEvidenceStatus: 'verified', sourceEvidenceReceiptId: 'proof-exact-hash' }] }
+  event({ streamId, events: [{ seq: 6, kind: 'task_changed', payload: verified }, { seq: 6, kind: 'task_changed', payload: verified }] })
+  expect(window.workwise.notifyTask).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ key: 'artifact:root:draft:same-hash', kind: 'artifact', body: 'draft.html' }))
+})
+it('preserves notifications for an ordinary HTML file that has no web-source requirement', async () => {
+  releases.push(retainTaskState()); await refreshTaskState(); await Promise.resolve()
+  const streamId = vi.mocked(window.workwise.startTaskSse).mock.calls[0][1]!
+  event({ streamId, events: [{ seq: 5, kind: 'task_changed', payload: { id: 'local-page', acceptance: { requiresWebEvidence: false },
+    artifacts: [{ id: 'html', relativePath: 'calculator.html', sha256: 'local-hash', validation: 'valid' }] } }] })
+  expect(window.workwise.notifyTask).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'artifact', body: 'calculator.html' }))
+})
 it('applies resolved attention and leaves OS deduplication to the persistent ledger', async () => {
   releases.push(retainTaskState()); await refreshTaskState(); await Promise.resolve()
   const streamId = vi.mocked(window.workwise.startTaskSse).mock.calls[0][1]!

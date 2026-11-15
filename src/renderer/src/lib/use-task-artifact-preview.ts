@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { TaskRunV1 } from '@shared/agent-workbench'
+import { taskArtifactSourceEvidenceState } from '@shared/task-artifact-source-evidence'
 import { useTaskState } from '../store/task-live-store'
 
 function previewVersion(task: TaskRunV1, artifactId: string): string {
@@ -23,8 +24,11 @@ export function latestHtmlArtifact(tasks: TaskRunV1[], threadId: string | null):
 
 export function useTaskArtifactPreview(threadId: string | null, enabled: boolean) {
   const state = useTaskState(enabled)
+  const tasksRef = useRef(state.tasks)
+  tasksRef.current = state.tasks
   const candidate = useMemo(() => latestHtmlArtifact(state.tasks, threadId), [state.tasks, threadId])
-  const [preview, setPreview] = useState<{ threadId: string | null; url: string; key: string } | null>(null)
+  const [preview, setPreview] = useState<{ threadId: string | null; url: string; key: string; taskId: string; artifactId: string;
+    sha256?: string; sourceEvidenceStatus: 'draft' | 'verified' | null } | null>(null)
   const [error, setError] = useState('')
   const opened = useRef<string | null>(null)
   const generation = useRef(0)
@@ -32,13 +36,19 @@ export function useTaskArtifactPreview(threadId: string | null, enabled: boolean
   const open = useCallback(async (request: { taskId: string; artifactId: string }): Promise<void> => {
     const current = ++generation.current
     const task = state.tasks.find(task => task.id === request.taskId)
+    const artifact = task?.artifacts.find(artifact => artifact.id === request.artifactId)
     const key = task ? previewVersion(task, request.artifactId) : JSON.stringify([request.taskId, request.artifactId])
     try {
       const result = await window.workwise.previewTaskArtifact({ taskId: request.taskId, artifactId: request.artifactId })
       if (current !== generation.current) return
       if (!result.ok) throw new Error(result.message)
       setError('')
-      setPreview({ threadId, url: result.url, key })
+      const sha256 = typeof result.sha256 === 'string' && result.sha256 ? result.sha256 : undefined
+      const actualTask = tasksRef.current.find(task => task.id === request.taskId)
+      const actualArtifact = sha256 && actualTask?.artifacts.find(artifact => artifact.id === request.artifactId && artifact.sha256 === sha256)
+      const hasWebSourceRequirement = task && artifact && taskArtifactSourceEvidenceState(task, artifact) !== null
+      setPreview({ threadId, url: result.url, key, ...request, sha256,
+        sourceEvidenceStatus: actualTask && actualArtifact ? taskArtifactSourceEvidenceState(actualTask, actualArtifact) : hasWebSourceRequirement ? 'draft' : null })
     } catch (cause) {
       if (current !== generation.current) return
       const message = cause instanceof Error ? cause.message : String(cause)
@@ -53,6 +63,10 @@ export function useTaskArtifactPreview(threadId: string | null, enabled: boolean
   }, [candidate, enabled, threadId, open])
   useEffect(() => () => { generation.current++ }, [])
   const retry = useCallback(() => candidate ? open(candidate) : Promise.resolve(), [candidate, open])
-  return { url: preview?.threadId === threadId ? preview.url : null,
-    key: preview?.threadId === threadId ? preview.key : null, error, open, retry }
+  const shown = preview?.threadId === threadId ? preview : null
+  const shownTask = shown && state.tasks.find(task => task.id === shown.taskId)
+  const currentArtifact = shown?.sha256 && shownTask?.artifacts.find(artifact => artifact.id === shown.artifactId && artifact.sha256 === shown.sha256)
+  return { url: shown?.url ?? null, key: shown?.key ?? null,
+    sourceEvidenceStatus: shownTask && currentArtifact ? taskArtifactSourceEvidenceState(shownTask, currentArtifact) : shown?.sourceEvidenceStatus ?? null,
+    error, open, retry }
 }
