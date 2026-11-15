@@ -1523,7 +1523,7 @@ test('failure diagnostics retain exact native scalar proof from both Host output
   assert.equal(separate.operations[0].result.nativeDiagnostics.vendorPhase, 'preparation')
   assert.equal(separate.operations[0].result.outputNativeDiagnostics.vendorPhase, 'precondition')
   assert.doesNotMatch(JSON.stringify(report), /private|html|arguments|stderr|token|surprise/)
-  const malicious = summarizeWindowsTaskFailure({}, { turns: [{ items: [{ kind: 'tool_result', output: { vendorReason: 'https:\/\/private.test/path', stage: 'curl command', vendorDispatched: 'false', notDispatched: { secret: 'private-key' }, effectState: 'unverified_page_text' } }] }] })
+  const malicious = summarizeWindowsTaskFailure({}, { turns: [{ items: [{ kind: 'tool_result', output: { vendorReason: 'https://private.test/path', stage: 'curl command', vendorDispatched: 'false', notDispatched: { secret: 'private-key' }, effectState: 'unverified_page_text' } }] }] })
   assert.deepEqual(malicious.turns[0].toolResults[0].nativeDiagnostics, {})
 })
 
