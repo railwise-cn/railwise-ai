@@ -1,8 +1,11 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import type { TaskRunV1, TaskAttentionV1, TaskChangeEvent } from '@shared/agent-workbench'
+import type { TaskFilter } from '@shared/task-workspace-projection'
 import { taskArtifactSourceEvidenceState } from '@shared/task-artifact-source-evidence'
 
+export type TaskNavigation = { selectedTaskId: string | null; selectedAttentionId: string | null; filter: TaskFilter; search: string; allWorkspaces: boolean }
 type State = {
+  navigation: TaskNavigation
   tasks: TaskRunV1[]
   attention: TaskAttentionV1[]
   watermark: number
@@ -10,7 +13,7 @@ type State = {
   error: string | null
   generation: number
 }
-const emptyState = (): State => ({ tasks: [], attention: [], watermark: 0, ready: false, error: null, generation: 0 })
+const emptyState = (): State => ({ navigation: { selectedTaskId: null, selectedAttentionId: null, filter: 'all', search: '', allWorkspaces: false }, tasks: [], attention: [], watermark: 0, ready: false, error: null, generation: 0 })
 let state = emptyState()
 let requestedTaskId: string | null = null
 const listeners = new Set<() => void>()
@@ -21,12 +24,20 @@ let epoch = 0
 
 export function requestTaskDetail(id: string): void {
   requestedTaskId = id
+  updateTaskNavigation({ selectedTaskId: id, selectedAttentionId: null, filter: 'all', allWorkspaces: true })
   window.dispatchEvent(new CustomEvent('railwise:open-task', { detail: id }))
 }
 export function takeRequestedTask(): string | null {
   const id = requestedTaskId
   requestedTaskId = null
   return id
+}
+export function updateTaskNavigation(patch: Partial<TaskNavigation>): void {
+  const navigation = { ...state.navigation, ...patch }
+  // Selection effects also run on empty snapshots. Publishing an unchanged
+  // selection would cause a render/subscription loop without any data change.
+  if ((Object.keys(navigation) as Array<keyof TaskNavigation>).every(key => navigation[key] === state.navigation[key])) return
+  emit({ navigation })
 }
 export function getTaskState(): State { return state }
 function emit(patch: Partial<State>): void {

@@ -1,3 +1,4 @@
+import { verifiedTaskRetryLineage } from './task-retry-lineage.js'
 import { createHash } from 'node:crypto'
 import { BrowserPublicQueryAuthorization, browserVerificationPolicy, type BrowserExecutionScope } from '../contracts/browser-skill.js'
 import type { ExecutionGrant } from '../contracts/permissions.js'
@@ -22,6 +23,13 @@ export function taskPublicQueryAuthority(repository: TaskRunRepository, task: Ta
     seen.add(source.id)
     binding = repository.operations(source.id, 'browser_binding').find(receipt => receipt.id === authorization.receiptId)
     if (binding) break
+    if (source.retryOfTaskId) {
+      const lineage = verifiedTaskRetryLineage(repository, source)
+      const ancestor = lineage?.tasks.slice(1).find(value => repository.operations(value.id, 'browser_binding').some(receipt => receipt.id === authorization.receiptId))
+      if (!ancestor || authorization.duration !== 'schedule') return undefined
+      source = ancestor
+      continue
+    }
     if (options.sourceTaskId || !source.parentTaskId) return undefined
     if (!options.historical && (source.authority?.revokedAt || operationFingerprint(source.authority?.browserScope?.publicQueryAuthorization) !== operationFingerprint(authorization))) return undefined
     source = repository.get(source.parentTaskId)
@@ -163,4 +171,13 @@ export function verifiedTaskPublicQueryDocumentNavigation(repository: TaskRunRep
   if (![started, finished, issued].every(Number.isFinite) || started < issued || finished < started ||
     grant.expiresAt && (!Number.isFinite(Date.parse(grant.expiresAt)) || finished > Date.parse(grant.expiresAt))) return undefined
   return scoped
+}
+
+/** Only persistent same-purpose schedule consent survives an explicit failed-task Retry. */
+export function retryBrowserScope(repository: TaskRunRepository, task: TaskRun): BrowserExecutionScope | undefined {
+  const scope = task.authority?.browserScope
+  if (task.status !== 'failed' || task.authority?.revokedAt || !scope || scope.publicQueryAuthorization?.duration !== 'schedule' ||
+    repository.unsettledOperations(task.id).length || repository.listShellSessions(task.id).some(session => ['starting', 'running', 'outcome_unknown', 'interrupted'].includes(session.status))) return undefined
+  const authority = taskPublicQueryAuthority(repository, task, scope)
+  return authority && authority.source.goal === task.goal ? structuredClone(scope) : undefined
 }

@@ -71,6 +71,22 @@ describe('task-owned HTML auto preview', () => {
     expect(hook.current().sourceEvidenceStatus).toBe('verified')
     expect(preview).toHaveBeenCalledTimes(1)
   })
+  it('removes the obsolete source-warning after explicit local HTML revalidation without reloading the same file', async () => {
+    const report = task('one')
+    report.acceptance = { kind: 'files', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: true, requiresWebEvidence: true }
+    report.artifacts[0]!.sourceEvidenceStatus = 'draft'
+    tasks = [report]
+    const preview = vi.fn(async () => ({ ok: true, url: 'http://127.0.0.1:1/local-animation', title: '本地动画', sha256: 'hash' }))
+    Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact: preview } })
+    const hook = await mountPreview('chat')
+    expect(hook.current().sourceEvidenceStatus).toBe('draft')
+    tasks = [{ ...report, status: 'completed', acceptance: { ...report.acceptance, requiresWebEvidence: false, sourceInferenceVersion: 1 },
+      artifacts: [{ ...report.artifacts[0]!, sourceEvidenceStatus: undefined, sourceEvidenceReceiptId: undefined }] }]
+    await hook.render()
+    expect(hook.current().sourceEvidenceStatus).toBeNull()
+    expect(hook.current().url).toBe('http://127.0.0.1:1/local-animation')
+    expect(preview).toHaveBeenCalledTimes(1)
+  })
   it('does not apply a newer verified file status to an older draft that is still displayed', async () => {
     const report = task('one'); report.acceptance = { kind: 'files', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: true, requiresWebEvidence: true }
     report.artifacts[0]!.sourceEvidenceStatus = 'draft'

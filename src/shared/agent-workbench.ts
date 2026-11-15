@@ -70,6 +70,8 @@ export type TaskAcceptanceV1 = {
   requireActionableArtifactCard: boolean
   requiresExternalEffects?: boolean
   requiresWebEvidence?: boolean
+  requiredSourceOrigins?: string[]
+  sourceInferenceVersion?: 1
   effect?: Omit<TaskRequiredEffectV1, 'target'> & { target?: string; requiredEffects?: TaskRequiredEffectV1[] }
 }
 

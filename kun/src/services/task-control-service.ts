@@ -1,3 +1,7 @@
+import { ThreadTodoListSchema } from '../contracts/threads.js'
+import { ExecutionGrantSchema } from '../contracts/permissions.js'
+import { operationFingerprint } from './task-run-repository.js'
+import type { OperationReceipt } from '../contracts/tasks.js'
 import type { TaskRun } from '../contracts/tasks.js'
 import type { StartTurnResponse } from '../contracts/turns.js'
 import { StartTurnRequest } from '../contracts/turns.js'
@@ -13,14 +17,14 @@ import { toolCanProveExternalEffect } from '../loop/turn-completion-guard.js'
 import { createHash } from 'node:crypto'
 import { taskPermissionFailure } from './task-permission-recovery.js'
 
-export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget'
-export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number }
-export type TaskControlResult = { task:TaskRun; turn?:StartTurnResponse; capability?:ExternalTaskCapability; attentionId?:string; receipt?:{userMessageItemId:string;resultMessageItemId:string} }
+export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget' | 'revalidate_artifacts'
+export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number; confirmed?:boolean }
+export type TaskControlResult = { task:TaskRun; corrected?:boolean; completed?:boolean; reason?:string; turn?:StartTurnResponse; capability?:ExternalTaskCapability; attentionId?:string; receipt?:{userMessageItemId:string;resultMessageItemId:string} }
 
 /** One deterministic mutation path for chat commands and the task HTTP API. */
 export class TaskControlService {
   private readonly pending = new Map<string,Promise<unknown>>()
-  constructor(private readonly deps:{repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;nowIso():string}) {}
+  constructor(private readonly deps:{repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;validateRetryLocalSchedule?(task:TaskRun,receipt:OperationReceipt):Promise<boolean>;nowIso():string}) {}
 
   async mutate(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const previous=this.pending.get(taskId) ?? Promise.resolve()
@@ -31,6 +35,7 @@ export class TaskControlService {
 
   private async execute(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const {repository,tasks,threads,turns,nowIso}=this.deps
+    if (action === 'revalidate_artifacts') return tasks.revalidateLocalArtifacts(taskId, data)
     if (action === 'extend_budget') return repository.transact(() => {
       const previous = repository.operation(taskId, data.idempotencyKey)
       // A committed request must be replayable even after the task revision changes.
@@ -68,12 +73,12 @@ export class TaskControlService {
         return resolved
       }
       if(prior.status==='failed'||prior.status==='outcome_unknown')throw Object.assign(new Error(prior.error ?? 'previous operation requires inspection'),{code:'outcome_unknown'})
-      if(action==='retry')this.assertRetrySafe(current)
+      if(action==='retry')await this.assertRetrySafe(current)
     } else {
       if(current.revision!==data.expectedRevision)throw Object.assign(new Error('task revision conflict'),{code:'stale_request'})
       if((action==='resume'||action==='retry')&&await this.deps.isEngineeringTask?.(current))throw Object.assign(new Error('engineering_plan_typed_resume_required: continue or replan from the approved engineering plan'),{code:'invalid_state'})
       if(action==='retry'&&!['failed','cancelled'].includes(current.status))throw Object.assign(new Error('retry is only valid for failed or cancelled tasks'),{code:'invalid_state'})
-      if(action==='retry')this.assertRetrySafe(current)
+      if(action==='retry')await this.assertRetrySafe(current)
     }
     if(action==='resume'||action==='retry') {
       if (action === 'resume') {
@@ -112,6 +117,7 @@ export class TaskControlService {
     }
     if (!prior) repository.beginOperation({ownerId:taskId,idempotencyKey:data.idempotencyKey,kind:action,request:data,nowIso:nowIso()})
     let preparedRetryId:string|undefined
+    let retryHistory = ''
     let preparedResume:{previous:TaskRun;revision:number}|undefined
     try {
       if(action==='retry')this.deps.assertRetryContext?.(current)
@@ -134,8 +140,9 @@ export class TaskControlService {
       const thread=await threads.get(current.threadId)
       if(!thread)throw Object.assign(new Error('task execution thread not found'),{code:'not_found'})
       if(action==='retry') {
+        retryHistory = [tasks.retryHistory(current.id), ...current.artifacts.filter(file => file.storage === 'task').map(file => JSON.stringify({ source_task_id: current!.id, path: file.relativePath, sha256: file.sha256 }))].filter(Boolean).join('\n')
         const retryId=`task_retry_${createHash('sha256').update(turnKey).digest('hex')}`
-        current=tasks.createRetryTask({id:retryId,sourceTaskId:current.id,expectedRevision:current.revision,thread,
+        current=tasks.createRetryTask({id:retryId,sourceTaskId:current.id,expectedRevision:current.revision,thread,retryControl:{ownerId:taskId,idempotencyKey:data.idempotencyKey},
           request:{prompt:current.goal,model:data.model ?? current.model,providerId:current.providerId,reasoningEffort:current.reasoningEffort}})
         preparedRetryId=current.id
         try { if (!blockedCapability) await this.deps.validateTaskPermission?.(thread.id) }
@@ -168,7 +175,7 @@ export class TaskControlService {
       }
       const checkpoint=repository.latestCheckpoint(current.id)
       const started=await turns.startTurn({threadId:current.threadId,...(externalTaskProvider?{externalTaskProvider}:{}),continuationTaskId:current.id,request:{
-        prompt:action==='resume'?['Continue the persisted task from its last verified checkpoint.',`Goal: ${current.goal}`,checkpoint?.resumeSummary?`Checkpoint: ${checkpoint.resumeSummary}`:'','Read persisted task inputs. Reuse completed artifacts and operation receipts. Do not repeat external side effects.'].filter(Boolean).join('\n'):`Retry the failed persisted task and satisfy its original acceptance contract.\nGoal: ${current.goal}`,
+        prompt:action==='resume'?['Continue the persisted task from its last verified checkpoint.',`Goal: ${current.goal}`,checkpoint?.resumeSummary?`Checkpoint: ${checkpoint.resumeSummary}`:'','Read persisted task inputs. Reuse completed artifacts and operation receipts. Do not repeat external side effects.'].filter(Boolean).join('\n'):[`Retry the failed persisted task and satisfy its original acceptance contract.\nGoal: ${current.goal}`,tasks.retryHistory(current.id) || (retryHistory ? `Read-only ancestor drafts (read_artifact with source_task_id/path): ${retryHistory}. These are not this Task's writer or source verification. Publish your own corrected file at the same relative filename, re-read source pages and verify it. Do not replay external side effects.` : '')].filter(Boolean).join('\n'),
         displayText:action==='resume'?'继续未完成任务':'重试未完成任务',idempotencyKey:turnKey,model:data.model ?? current.model,providerId:current.providerId,reasoningEffort:current.reasoningEffort,mode:'agent'
       }})
       const next=repository.findByTurn(started.turnId)
@@ -223,7 +230,7 @@ export class TaskControlService {
   }
 
   /** A new TaskRun must never erase the old operation ledger's uncertainty or repeat writes. */
-  private assertRetrySafe(current:TaskRun):void {
+  private async assertRetrySafe(current:TaskRun):Promise<void> {
     const {repository}=this.deps,visited=new Set<string>()
     let task:TaskRun|undefined=current
     while(task){
@@ -236,7 +243,9 @@ export class TaskControlService {
         const toolName=typeof receipt.request?.toolName==='string'?receipt.request.toolName:receipt.toolName??''
         const spec=this.deps.tasks.describeToolEffect(toolName) ?? externalOperationForTool(toolName)
         const operation=spec?.operation??(typeof receipt.request?.operation==='string'?receipt.request.operation:'')
-        const externalWrite=receipt.kind==='tool'&&(['approve','reject','complete','send','transfer','upload'].includes(operation)||!spec&&toolCanProveExternalEffect(toolName))
+        const localSchedule = trustedLocalScheduleReceipt(task, receipt) && await this.deps.validateRetryLocalSchedule?.(task, receipt) === true
+        const localBookkeeping = trustedLocalBookkeepingReceipt(task, receipt)
+        const externalWrite=!localSchedule&&!localBookkeeping&&receipt.kind==='tool'&&(['approve','reject','complete','send','transfer','upload'].includes(operation)||!spec&&toolCanProveExternalEffect(toolName))
         const knownNotDispatched=receipt.status==='failed'&&(receipt.result as {approved?:boolean}|undefined)?.approved===false
         if(externalWrite&&!knownNotDispatched&&(receipt.status==='succeeded'||receipt.status==='failed'||['running','outcome_unknown'].includes(receipt.status)||resolution||receipt.dispatchApproval)) {
           throw Object.assign(new Error('原任务已派发过外部写操作，整任务重试可能重复处理同一目标。请保留原回执并核实结果；如需不同操作，请新建目标明确且重新授权的独立任务。'),{code:'external_effect_retry_blocked'})
@@ -249,4 +258,40 @@ export class TaskControlService {
       task=ancestor
     }
   }
+}
+
+/** Only the exact Runtime-owned Host and immutable original Grant establish built-in provenance. */
+function trustedLocalHostOutput(task: TaskRun, receipt: OperationReceipt, provider: string, names: string[]) {
+  const request = receipt.request, result = receipt.result as { approved?: boolean; item?: { kind?: string; status?: string; isError?: boolean; toolName?: string; callId?: string; turnId?: string; threadId?: string; output?: unknown } } | undefined
+  const item = result?.item, grant = ExecutionGrantSchema.safeParse(request?.executionGrant)
+  if (receipt.kind !== 'tool' || request?.providerId !== provider || !names.includes(String(request.toolName)) ||
+    receipt.fingerprint !== operationFingerprint(request) || !grant.success || grant.data.taskId !== task.id || grant.data.threadId !== task.threadId ||
+    grant.data.turnId !== request.turnId || result?.approved !== true || item?.kind !== 'tool_result' || item.status !== 'completed' ||
+    item.toolName !== request.toolName || item.callId !== request.callId || item.turnId !== request.turnId || item.threadId !== task.threadId ||
+    grant.data.allowedProviderIds && !grant.data.allowedProviderIds.includes(provider) || grant.data.allowedToolNames && !grant.data.allowedToolNames.includes(item.toolName!)) return undefined
+  return { output: item.output && typeof item.output === 'object' ? item.output as Record<string, unknown> : {}, isError: item.isError === true }
+}
+
+/** Reading a spill object or updating local progress never writes an external platform. */
+function trustedLocalBookkeepingReceipt(task: TaskRun, receipt: OperationReceipt): boolean {
+  const todo = trustedLocalHostOutput(task, receipt, 'todo', ['todo_list', 'todo_write'])
+  if (todo && receipt.status === 'succeeded' && !todo.isError && ThreadTodoListSchema.nullable().safeParse(todo.output.todos).success) return true
+  const context = trustedLocalHostOutput(task, receipt, 'document-delivery', ['read_task_context'])
+  return Boolean(context && receipt.status === 'succeeded' && !context.isError && context.output.untrusted === true &&
+    typeof context.output.bundleId === 'string' && typeof context.output.objectId === 'string' && typeof context.output.text === 'string' &&
+    typeof context.output.sha256 === 'string' && /^[a-f0-9]{64}$/.test(context.output.sha256) &&
+    Number.isInteger(context.output.offset) && Number.isInteger(context.output.totalBytes))
+}
+
+/** Local persisted plans have their own idempotent server ledger, not a remote write. Same-name MCP tools never qualify. */
+function trustedLocalScheduleReceipt(task: TaskRun, receipt: OperationReceipt): boolean {
+  const host = trustedLocalHostOutput(task, receipt, 'task-schedule', ['schedule_task', 'list_schedules'])
+  if (!host) return false
+  const { output } = host
+  if (receipt.status === 'failed' && host.isError && ['schedule_authority_changed', 'browser_schedule_action_scope_required'].includes(String(output.code))) return true
+  if (receipt.status !== 'succeeded' || host.isError) return false
+  const schedule = output.schedule && typeof output.schedule === 'object' ? output.schedule as Record<string, unknown> : undefined
+  const schedules = Array.isArray(output.schedules) ? output.schedules : undefined
+  const canonical = `schedule_${task.rootTaskId ?? task.id}`
+  return receipt.request?.toolName === 'schedule_task' ? schedule?.id === canonical : Boolean(schedules && schedules.every(value => value && typeof value === 'object' && (value as Record<string, unknown>).id === canonical))
 }

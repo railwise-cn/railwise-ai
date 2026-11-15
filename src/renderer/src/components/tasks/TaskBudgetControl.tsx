@@ -8,7 +8,7 @@ export function TaskBudgetControl({ task, onChanged }: { task: TaskRunV1; onChan
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const request = useRef<{ expectedRevision: number; idempotencyKey: string; additionalExecutionMs: number } | null>(null)
-  if (task.budget.version !== 2 || task.status !== 'paused' || task.parentTaskId || task.retryOfTaskId || task.rootTaskId && task.rootTaskId !== task.id) return null
+  if (task.budget.version !== 2 || !['paused', 'failed'].includes(task.status) || task.parentTaskId || task.retryOfTaskId || task.rootTaskId && task.rootTaskId !== task.id) return null
   const extend = async (): Promise<void> => {
     if (busy) return
     request.current ??= { expectedRevision: task.revision, idempotencyKey: `budget:${crypto.randomUUID()}`, additionalExecutionMs: 600_000 }
@@ -17,7 +17,7 @@ export function TaskBudgetControl({ task, onChanged }: { task: TaskRunV1; onChan
     try {
       await window.workwise.extendTaskBudget(task.id, request.current)
       request.current = null
-      setNotice(t('taskBudgetExtended'))
+      setNotice(t(task.status === 'failed' ? 'taskBudgetExtendedForRetry' : 'taskBudgetExtended'))
       await onChanged().catch(() => undefined)
     } catch (error) {
       // Preserve the same key after an uncertain response. Refreshing cannot

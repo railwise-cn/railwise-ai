@@ -1,5 +1,8 @@
+import { retryBrowserScope } from './browser-public-query-authority.js'
+import { verifiedTaskRetryLineage } from './task-retry-lineage.js'
 import type { OperationResolutionOutcome } from '../contracts/tasks.js'
-import { isBrowserTask, browserTaskOrigins, browserVerificationPolicy } from '../contracts/browser-skill.js'
+import { browserTaskOrigins, browserVerificationPolicy } from '../contracts/browser-skill.js'
+import { requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames, TASK_SOURCE_INFERENCE_VERSION } from '../contracts/task-source-intent.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { extractScheduleRequirement } from '../contracts/schedule.js'
@@ -144,6 +147,29 @@ export class TaskController {
     return resolve(this.artifactDataDir, 'task-artifacts', createHash('sha256').update(taskId).digest('hex'))
   }
 
+  /** An explicit Retry may read a proven ancestor draft, but cannot relabel its writer or source proof. */
+  async historicalArtifact(taskId: string, sourceTaskId: string, path: string) {
+    const task = this.repository.get(taskId), lineage = task && verifiedTaskRetryLineage(this.repository, task)
+    const source = lineage?.tasks.slice(1).find(value => value.id === sourceTaskId)
+    if (!source) throw Object.assign(new Error('历史成果不属于已核验的重试链。'), { code: 'artifact_history_scope' })
+    const artifact = source.artifacts.find(value => value.storage === 'task' && value.relativePath === path)
+    const root = this.managedArtifactRoot(source.id), thread = await this.threadStore.get(source.threadId)
+    if (!root || !artifact?.absolutePath || !artifact.sha256) throw Object.assign(new Error('没有该历史成果的受管理文件记录。'), { code: 'artifact_history_scope' })
+    const writes = await authorizedArtifactWrites(source, this.repository.operations(source.id, 'tool'), thread?.turns ?? [])
+    const write = writes.get(await realpath(artifact.absolutePath).catch(() => ''))
+    if (!write || write.authorizedRoot !== root || write.sha256 !== artifact.sha256 || write.executionGrantId !== artifact.executionGrantId || resolve(root, path) !== write.absolutePath) {
+      throw Object.assign(new Error('历史成果没有匹配的原始写入证据。'), { code: 'artifact_history_scope' })
+    }
+    return { root, sha256: artifact.sha256, sourceTaskId: source.id, writerReceiptId: write.operationId, executionGrantId: write.executionGrantId }
+  }
+
+  retryHistory(taskId: string): string {
+    const task = this.repository.get(taskId), lineage = task && verifiedTaskRetryLineage(this.repository, task)
+    if (!lineage || lineage.tasks.length < 2) return ''
+    const files = lineage.tasks.slice(1).flatMap(source => source.artifacts.filter(file => file.storage === 'task').map(file => ({ source_task_id: source.id, path: file.relativePath, sha256: file.sha256 }))).slice(0, 32)
+    return files.length ? `Historical drafts (read-only): ${JSON.stringify(files)}. Use read_artifact with source_task_id and path to inspect them. Publish your own corrected file using the same relative filename. Ancestor bytes are not this execution's file or source verification; re-read sources and verify the new report. Never repeat external side effects.` : ''
+  }
+
   ensureTask(input: {
     thread: ThreadRecord
     turnId: string
@@ -201,7 +227,7 @@ export class TaskController {
   }
 
   /** Prepare the retry contract before a Turn or model can run. The original ledger stays authoritative. */
-  createRetryTask(input: { id: string; sourceTaskId: string; expectedRevision: number; thread: ThreadRecord; request: StartTurnRequest }): TaskRun {
+  createRetryTask(input: { id: string; sourceTaskId: string; expectedRevision: number; thread: ThreadRecord; request: StartTurnRequest; retryControl?: { ownerId: string; idempotencyKey: string } }): TaskRun {
     return this.repository.transact(() => {
       const existing = this.repository.get(input.id)
       if (existing) return existing
@@ -209,17 +235,20 @@ export class TaskController {
       if (!source || source.revision !== input.expectedRevision) throw Object.assign(new Error('Retry source changed.'), { code: 'stale_request' })
       if (!['failed', 'cancelled'].includes(source.status) || source.threadId !== input.thread.id || source.workspaceRoot !== input.thread.workspace ||
           this.repository.currentExecution(source.id)?.id !== source.id) throw Object.assign(new Error('Retry source is no longer the terminal execution in this workspace.'), { code: 'invalid_state' })
-      const retry = this.createTask({ ...input, retrySource: source })
+      const control = input.retryControl && this.repository.operation(input.retryControl.ownerId, input.retryControl.idempotencyKey)
+      const explicit = control?.kind === 'retry' && control.status === 'prepared' && control.request?.expectedRevision === input.expectedRevision
+      const browserScope = explicit ? retryBrowserScope(this.repository, source) : undefined
+      const retry = this.createTask({ ...input, retrySource: source, retryBrowserScope: browserScope })
       if (retry.flowRunId && retry.flowId) this.repository.enqueueOutbox({
         id: `flow-task-retry:${retry.id}`, ownerId: retry.id, kind: 'flow_task_retry',
         payload: { sourceTaskId: source.id, taskId: retry.id, flowRunId: retry.flowRunId, flowId: retry.flowId }, createdAt: this.nowIso()
       })
       return this.repository.update(retry.id, retry.revision, task => task,
-        { key: `retry-of:${source.id}`, kind: 'task_retried', payload: { retryOfTaskId: source.id, rootTaskId: retry.rootTaskId }, createdAt: this.nowIso() })
+        { key: `retry-of:${source.id}`, kind: 'task_retried', payload: { retryOfTaskId: source.id, rootTaskId: retry.rootTaskId, ...(browserScope ? { browserScopeDerivation: { sourceTaskId: source.id, authorizationReceiptId: browserScope.publicQueryAuthorization!.receiptId, scopeHash: operationFingerprint(browserScope) } } : {}) }, createdAt: this.nowIso() })
     })
   }
 
-  private createTask(input: { id?: string; thread: ThreadRecord; turnId?: string; request: StartTurnRequest; engineeringExecution?: boolean; engineeringPlanId?: string; retrySource?: TaskRun }): TaskRun {
+  private createTask(input: { id?: string; thread: ThreadRecord; turnId?: string; request: StartTurnRequest; engineeringExecution?: boolean; engineeringPlanId?: string; retrySource?: TaskRun; retryBrowserScope?: import('../contracts/browser-skill.js').BrowserExecutionScope }): TaskRun {
     const now = this.nowIso()
     const consultation = input.thread.domain === 'engineering' && !input.engineeringExecution
     const source = input.retrySource
@@ -255,10 +284,11 @@ export class TaskController {
         sandboxMode: input.request.sandboxMode ?? input.thread.sandboxMode,
         externalTargets: [], grantedAt: now,
         ...(source?.authority ? { source: source.authority.source, toolAllowlist: source.authority.toolAllowlist, mcpAllowlist: source.authority.mcpAllowlist,
-          externalTargets: [...source.authority.externalTargets], approvalPolicy: source.authority.approvalPolicy, sandboxMode: source.authority.sandboxMode } : {})
+          externalTargets: [...source.authority.externalTargets], approvalPolicy: source.authority.approvalPolicy, sandboxMode: source.authority.sandboxMode,
+          ...(input.retryBrowserScope ? { browserScope: structuredClone(input.retryBrowserScope) } : {}) } : {})
       },
       executionMs: 0,
-      budget: source ? structuredClone(source.budget) : {
+      budget: source ? structuredClone(verifiedTaskRetryLineage(this.repository, source)?.root.budget ?? source.budget) : {
         maxAttempts: profile?.budget.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         maxDurationMs: profile?.budget.maxDurationMs ?? DEFAULT_MAX_DURATION_MS,
         ...(input.request.taskOriginThreadId || input.request.taskIntent==='new' ? { version: 2 as const, maxExecutionMs: profile?.budget.maxDurationMs ?? DEFAULT_MAX_DURATION_MS } : {}),
@@ -268,7 +298,8 @@ export class TaskController {
       replans: 0,
       noProgressCount: 0,
       nodes,
-      artifacts: source ? structuredClone(source.artifacts) : [],
+      // Ancestor files remain readable history, never a new Task's writer evidence.
+      artifacts: [],
       createdAt: now,
       updatedAt: now,
       revision: 0
@@ -430,7 +461,7 @@ export class TaskController {
         executionStartedAt: current.executionStartedAt ?? now,
         attempts: current.attempts + 1,
         nodes: current.nodes.map((node) =>
-          node.status === 'pending' || node.status === 'failed'
+          (node.status === 'pending' || node.status === 'failed' || node.status === 'blocked') && node.dependsOn.every(id => current.nodes.some(parent => parent.id === id && parent.status === 'completed'))
             ? { ...node, status: 'running', attempt: node.attempt + 1, startedAt: node.startedAt ?? now, revision: node.revision + 1 }
             : node
         ),
@@ -1289,6 +1320,7 @@ export class TaskController {
         const now = this.nowIso()
         this.updateExecution(task.id, current.revision, value => ({ ...value,
           artifacts: [...value.artifacts.filter(previous => previous.id !== artifact.id), artifact],
+          nodes: this.artifactExecutionNodes(value, [...value.artifacts.filter(previous => previous.id !== artifact.id), artifact], now),
           ...(value.resultEvidence ? { resultEvidence: value.resultEvidence.filter(evidence => evidence.kind !== 'file' || evidence.target !== canonical) } : {}),
           updatedAt: now
         }), { key: `artifact-published:${receipt.id}`, kind: 'artifact_published', payload: { turnId: token.turnId, artifactId: artifact.id, sha256: artifact.sha256, writerReceiptId: receipt.id }, createdAt: now })
@@ -1298,6 +1330,79 @@ export class TaskController {
       if (error instanceof TaskLeaseLostError) return false
       throw error
     }
+  }
+
+  private artifactExecutionNodes(task: TaskRun, artifacts: TaskArtifact[], now: string): TaskRun['nodes'] {
+    if (task.acceptance.kind !== 'files' || task.acceptance.requiresExternalEffects || task.acceptance.effect) return task.nodes
+    const valid = artifacts.filter(artifact => artifact.validation === 'valid' && (!task.acceptance.requiredFormats?.length || task.acceptance.requiredFormats.includes(artifact.format ?? '')))
+    if (valid.length < (task.acceptance.minimumArtifacts ?? 1)) return task.nodes
+    return task.nodes.map(node => node.kind === 'execute' ? { ...node, status: 'completed' as const, finishedAt: now,
+      evidence: [...new Set([...node.evidence, ...valid.map(artifact => artifact.relativePath)])], errorCode: undefined, errorMessage: undefined, revision: node.revision + 1 }
+      : node.kind === 'verify' && node.status !== 'completed' ? { ...node, status: 'running' as const, errorCode: undefined, errorMessage: undefined, revision: node.revision + 1 }
+        : node.kind === 'deliver' && node.status !== 'completed' ? { ...node, status: 'pending' as const, errorCode: undefined, errorMessage: undefined, revision: node.revision + 1 } : node)
+  }
+
+  /** Explicit metadata/file recheck for the bounded legacy source-classification defect. Never starts a Turn. */
+  async revalidateLocalArtifacts(taskId: string, request: { expectedRevision: number; idempotencyKey: string; confirmed?: boolean }): Promise<{ task: TaskRun; corrected: boolean; completed: boolean; reason?: string }> {
+    if (request.confirmed !== true) throw Object.assign(new Error('请明确确认重新检查已有成果。'), { code: 'invalid_state' })
+    const previous = this.repository.operation(taskId, request.idempotencyKey)
+    if (previous) {
+      this.repository.beginOperation({ ownerId: taskId, kind: 'revalidate_artifacts', idempotencyKey: request.idempotencyKey, request, nowIso: this.nowIso() })
+      if (previous.status !== 'succeeded') throw Object.assign(new Error('上次成果重验尚未确认，请检查原记录。'), { code: 'outcome_unknown' })
+      return previous.result as { task: TaskRun; corrected: boolean; completed: boolean; reason?: string }
+    }
+    const task = this.repository.get(taskId)
+    if (!task) throw Object.assign(new Error('task not found'), { code: 'not_found' })
+    const assertStopped = () => {
+      const current = this.repository.get(taskId)!
+      if (current.revision !== request.expectedRevision) throw Object.assign(new Error('task revision conflict'), { code: 'stale_request' })
+      const lease = this.repository.getLease(taskId)
+      if (!['paused', 'stalled', 'failed', 'waiting_user'].includes(current.status) || current.childTaskIds.length || current.scheduledBy ||
+        lease && Date.parse(lease.expiresAt) > Date.parse(this.nowIso()) || this.repository.execution.attempts(taskId).some(attempt => attempt.status === 'running') ||
+        this.repository.connection().prepare('SELECT 1 FROM task_work_spans WHERE root_id=? AND finished_ms IS NULL LIMIT 1').get(current.rootTaskId ?? taskId)) {
+        throw Object.assign(new Error('请等待任务停止后再重新检查成果；不会中断当前执行。'), { code: 'turn_in_progress' })
+      }
+      if (!legacyLocalArtifactSourceMismatch(current) || current.acceptance.effect ||
+        this.taskInputs(taskId).some(input => requiresWebSourceEvidence(input.text))) throw Object.assign(new Error('该任务不属于本地 HTML 来源误分类，原有来源验收保持有效。'), { code: 'invalid_state' })
+    }
+    assertStopped()
+    const thread = await this.threadStore.get(task.threadId), items = await this.sessionStore.loadItems(task.threadId)
+    const writes = await authorizedArtifactWrites(task, this.repository.operations(taskId, 'tool'), thread?.turns ?? [])
+    const collected = await this.collectArtifacts(task, items, task.activeTurnId ?? '', request.idempotencyKey)
+    const artifacts = collected.map(artifact => { const { sourceEvidenceStatus: _status, sourceEvidenceReceiptId: _proof, ...local } = artifact; return local })
+    const valid = artifacts.filter(artifact => {
+      const write = writes.get(artifact.absolutePath ?? resolve(task.workspaceRoot, artifact.relativePath))
+      if (!write) return false
+      return artifact.validation === 'valid' && write?.sha256 === artifact.sha256 &&
+        (!task.acceptance.requireActionableArtifactCard || artifact.storage === 'task' && Boolean(artifact.absolutePath) && write.authorizedRoot === this.managedArtifactRoot(task.id)) &&
+        (!task.acceptance.requiredFormats?.length || task.acceptance.requiredFormats.includes(artifact.format ?? ''))
+    })
+    const namesComplete = requiredLocalHtmlFileNames(task.goal).every(name => valid.some(artifact => artifact.relativePath.replaceAll('\\', '/') === name))
+    const finalResponse = latestAssistantText(thread?.turns.find(turn => turn.id === task.activeTurnId), items.filter(item => item.turnId === task.activeTurnId))
+    const complete = valid.length >= (task.acceptance.minimumArtifacts ?? 1) && namesComplete && (!task.acceptance.requireFinalResponse ||
+      Boolean(finalResponse.trim()) && !looksLikeProgressOnlyReply(finalResponse) && !looksLikeExternalCapabilityBlockedReply(finalResponse) && !looksLikeWebAccessFailureReply(finalResponse)) &&
+      !this.repository.unsettledOperations(taskId).length && !this.hostShellState(task).unknown.length
+    const reason = complete ? undefined : !namesComplete ? '来源误分类已纠正；尚未找到用户明确命名的 HTML 成果，不能用其他文件代替交付。' : valid.length < (task.acceptance.minimumArtifacts ?? 1)
+      ? '来源误分类已纠正；已有文件或授权写入回执尚未通过重验，原成果和历史已保留。'
+      : '来源误分类已纠正；尚缺有效交付回复或仍有待核实操作，原任务不会自动继续。'
+    const now = this.nowIso()
+    return this.repository.transact(() => {
+      assertStopped()
+      this.repository.beginOperation({ ownerId: taskId, kind: 'revalidate_artifacts', idempotencyKey: request.idempotencyKey, request, nowIso: now })
+      const acceptance: TaskAcceptance = { ...task.acceptance, sourceInferenceVersion: TASK_SOURCE_INFERENCE_VERSION, requiresWebEvidence: false, requiredSourceOrigins: [] }
+      const checked = this.repository.update(taskId, task.revision, value => ({ ...value, acceptance, artifacts,
+        ...(complete ? { status: 'completed' as const, finalResponse, finishedAt: now, waitingReason: undefined, stalledReason: undefined } : { stalledReason: reason }),
+        nodes: value.nodes.map(node => ({ ...node, status: complete ? 'completed' as const : node.kind === 'execute' && valid.length >= (acceptance.minimumArtifacts ?? 1) ? 'completed' as const : 'blocked' as const,
+          evidence: [...new Set([...node.evidence, ...valid.map(artifact => artifact.relativePath)])], errorCode: complete ? undefined : 'artifact_revalidation_pending', errorMessage: reason,
+          ...(complete || node.kind === 'execute' && valid.length ? { finishedAt: now } : {}), revision: node.revision + 1 })), updatedAt: now }), {
+        key: `local-artifact-revalidated:${request.idempotencyKey}`, kind: 'local_artifact_acceptance_revalidated', createdAt: now,
+        payload: { previousStatus: task.status, previousAcceptance: task.acceptance, previousNodeStates: task.nodes.map(node => ({ kind: node.kind, status: node.status, errorCode: node.errorCode })),
+          acceptance, completed: complete, artifacts: valid.map(artifact => ({ id: artifact.id, sha256: artifact.sha256, writerReceiptId: writes.get(artifact.absolutePath ?? resolve(task.workspaceRoot, artifact.relativePath))!.operationId })), preservedUsage: true, resumed: false }
+      })
+      const result = { task: checked, corrected: true, completed: complete, ...(reason ? { reason } : {}) }
+      this.repository.finishOperation(taskId, request.idempotencyKey, { status: 'succeeded', result }, now)
+      return result
+    })
   }
 
   /** Attach trusted readback evidence without overwriting the original unknown dispatch or resuming execution. */
@@ -1624,8 +1729,9 @@ export class TaskController {
     const shouldReplan = noProgressCount >= 3
     const replans = shouldReplan ? stored.replans + 1 : stored.replans
     const now = this.nowIso()
-    const durationExhausted = stored.budget.version === 2
-      ? this.repository.execution.usedExecutionMs(stored.rootTaskId ?? stored.id, Date.parse(now)) >= (stored.budget.maxExecutionMs ?? stored.budget.maxDurationMs) || Boolean(stored.budget.maxElapsedMs && Date.parse(now) - Date.parse(stored.createdAt) >= stored.budget.maxElapsedMs)
+    const rootBudget = this.repository.get(stored.rootTaskId ?? stored.id)?.budget ?? stored.budget
+    const durationExhausted = rootBudget.version === 2
+      ? this.repository.execution.usedExecutionMs(stored.rootTaskId ?? stored.id, Date.parse(now)) >= (rootBudget.maxExecutionMs ?? rootBudget.maxDurationMs) || Boolean(rootBudget.maxElapsedMs && Date.parse(now) - Date.parse(stored.createdAt) >= rootBudget.maxElapsedMs)
       : Math.max(0, Date.parse(now) - Date.parse(stored.createdAt)) >= stored.budget.maxDurationMs
     const attemptExhausted = stored.attempts >= stored.budget.maxAttempts
     const stalled = replans >= 2 && shouldReplan
@@ -1649,7 +1755,9 @@ export class TaskController {
           ? node
           : {
               ...node,
-              status: status === 'retrying' ? 'pending' : 'failed',
+              status: current.acceptance.kind === 'files' && current.nodes.some(step => step.kind === 'execute' && step.status === 'completed')
+                ? node.kind === 'verify' ? status === 'retrying' ? 'pending' : 'blocked' : 'blocked'
+                : node.dependsOn.some(id => current.nodes.some(parent => parent.id === id && parent.status !== 'completed')) ? 'blocked' : status === 'retrying' ? 'pending' : 'failed',
               progressFingerprint,
               errorCode: status === 'failed'
                 ? durationExhausted ? 'duration_budget_exhausted' : 'attempt_budget_exhausted'
@@ -1746,7 +1854,7 @@ export class TaskController {
       executionStartedAt: undefined,
       stalledReason: reason,
       nodes: current.nodes.map((node) =>
-        node.status === 'completed' ? node : { ...node, status: 'failed', errorMessage: reason, finishedAt: now, revision: node.revision + 1 }
+        node.status === 'completed' ? node : { ...node, status: node.dependsOn.length ? 'blocked' : 'failed', errorMessage: reason, finishedAt: now, revision: node.revision + 1 }
       ),
       updatedAt: now,
       finishedAt: now
@@ -1787,7 +1895,7 @@ export class TaskController {
     })
   }
 
-  private async collectArtifacts(task: TaskRun, items: TurnItem[], turnId: string): Promise<TaskArtifact[]> {
+  private async collectArtifacts(task: TaskRun, items: TurnItem[], turnId: string, revalidationKey?: string): Promise<TaskArtifact[]> {
     const paths = [
       ...task.artifacts.map(artifact => artifact.absolutePath ?? artifact.relativePath),
       ...items.flatMap(declaredFileOutputPaths),
@@ -1813,7 +1921,7 @@ export class TaskController {
       const info = canonical && allowed ? await stat(canonical).catch(() => null) : null
       const managedOutput = externalWrite?.authorizedRoot === this.managedArtifactRoot(task.id)
       const validFormat = !required || required.includes(extension) || Boolean(externalWrite && managedOutput)
-      const validationSpanId = artifactValidationSpanId(task.id, rawPath)
+      const validationSpanId = artifactValidationSpanId(task.id, revalidationKey ? `${rawPath}\0revalidation:${revalidationKey}` : rawPath)
       this.spans?.start({
         id: validationSpanId,
         taskId: task.id,
@@ -1925,7 +2033,7 @@ function makeToolResultForVerifiedResolution(task: TaskRun, turnId: string, call
 
 function acceptanceForPrompt(prompt: string): TaskAcceptance {
   const files = promptRequiresFileDeliverable(prompt)
-  const web = isBrowserTask(prompt) || /(?:采集|抓取|检索|获取).{0,60}(?:网页|网站|平台).{0,60}(?:信息|公告|正文)|(?:网页|网站|平台).{0,60}(?:采集|抓取|检索|获取)/i.test(prompt)
+  const web = requiresWebSourceEvidence(prompt)
   const effect = promptRequiresExternalEffect(prompt)
   const intent = effect ? externalTaskIntent(prompt) : null
   const requiredFormats = requiredFileExtensionsForPrompt(prompt)
@@ -1933,6 +2041,7 @@ function acceptanceForPrompt(prompt: string): TaskAcceptance {
     schedule: extractScheduleRequirement(prompt),
     kind: files ? 'files' : effect ? 'effect' : 'answer',
     requiredNodeKinds: files || effect ? ['execute', 'verify', 'deliver'] : ['deliver'],
+    sourceInferenceVersion: TASK_SOURCE_INFERENCE_VERSION,
     ...(requiredFormats ? { requiredFormats: [...requiredFormats] } : {}),
     ...(files ? { minimumArtifacts: 1 } : {}),
     ...(web ? {requiresWebEvidence:true,requiredSourceOrigins:browserTaskOrigins(prompt)} : {}),

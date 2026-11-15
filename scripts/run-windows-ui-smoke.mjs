@@ -324,25 +324,26 @@ export function validateWindowsTaskEvidence(evidence) {
 /** Re-select the persisted task after resume removes it from the attention filter. */
 export async function openWindowsTaskConversation(cdp, task) {
   assert.ok(task?.id && typeof task.goal === 'string' && task.goal.trim(), 'The original persisted task identity is required')
-  const workspace = 'section[aria-label="任务"]'
-  const all = `${workspace} nav[aria-label="任务筛选"] button:last-child`
-  const list = `${workspace} [aria-label="任务列表"] button`
+  const sidebar = 'section.ds-task-sidebar[aria-label="任务列表"]'
+  const all = `${sidebar} nav[aria-label="任务筛选"] button:last-child`
+  const list = `${sidebar} button[title]`
+  const target = `${list}[title=${JSON.stringify(task.goal)}]`
   await cdp.wait(`(() => {const node=document.querySelector(${JSON.stringify(all)});return node?.firstChild?.textContent.trim()==='全部任务';})()`, 'the actual All tasks filter')
   await cdp.click(all)
-  await cdp.wait(`(() => {const all=document.querySelector(${JSON.stringify(all)});const matches=Array.from(document.querySelectorAll(${JSON.stringify(list)})).filter(node=>node.querySelector('span')?.textContent.trim()===${JSON.stringify(task.goal)});return all?.getAttribute('aria-pressed')==='true' && matches.length===1;})()`, 'the same task goal uniquely visible in All tasks')
-  await cdp.click(list, task.goal)
-  await cdp.wait(`(() => {const detail=document.querySelector('article[aria-label="任务详情"]');const selected=Array.from(document.querySelectorAll(${JSON.stringify(list)})).filter(node=>node.getAttribute('aria-pressed')==='true' && node.querySelector('span')?.textContent.trim()===${JSON.stringify(task.goal)});return selected.length===1 && detail?.querySelector('h2')?.textContent.trim()===${JSON.stringify(task.goal)};})()`, 'the exact original task details after UI selection')
+  await cdp.wait(`(() => {const all=document.querySelector(${JSON.stringify(all)});const matches=Array.from(document.querySelectorAll(${JSON.stringify(list)})).filter(node=>node.getAttribute('title')===${JSON.stringify(task.goal)});return all?.getAttribute('aria-pressed')==='true' && matches.length===1;})()`, 'the same task goal uniquely visible in All tasks')
+  await cdp.click(target)
+  await cdp.wait(`(() => {const detail=document.querySelector('article[aria-label="任务详情"]');const selected=Array.from(document.querySelectorAll(${JSON.stringify(list)})).filter(node=>node.getAttribute('aria-pressed')==='true' && node.getAttribute('title')===${JSON.stringify(task.goal)});return selected.length===1 && Array.from(detail?.querySelectorAll('details p')??[]).some(node=>node.textContent.trim()===${JSON.stringify(task.goal)});})()`, 'the exact original task details after UI selection')
   await cdp.click('article[aria-label="任务详情"] button', '打开原会话')
   return { taskId: task.id, goal: task.goal, filter: 'all', exactTaskSelected: true, input: 'real-cdp-mouse' }
 }
 
 export function windowsTaskPreviewLayoutExpression() {
   return `(() => {
-    const workspace=document.querySelector('section[aria-label="任务"]'),details=workspace?.querySelector('article[aria-label="任务详情"]'),list=workspace?.querySelector('[aria-label="任务列表"]'),columns=workspace?.querySelector('.ds-task-workspace-columns');
+    const workspace=document.querySelector('section[aria-label="任务"]'),details=workspace?.querySelector('article[aria-label="任务详情"]'),sidebar=document.querySelector('section.ds-task-sidebar[aria-label="任务列表"]'),list=sidebar??workspace?.querySelector('[aria-label="任务列表"]'),columns=workspace?.querySelector('.ds-task-workspace-detail')??workspace?.querySelector('.ds-task-workspace-columns');
     if(!workspace || !details || !list || !columns || !details.getClientRects().length)return null;
     const rect=node=>{const box=node.getBoundingClientRect();return {x:box.x,y:box.y,width:box.width,height:box.height,bottom:box.bottom};};
     const css=getComputedStyle(columns),workspaceCss=getComputedStyle(workspace),scale=columns.getBoundingClientRect().width/columns.offsetWidth,workspaceScale=workspace.getBoundingClientRect().width/workspace.offsetWidth;
-    return {coordinateUnit:'viewport-css-px',scale,workspace:rect(workspace),details:rect(details),list:rect(list),
+    return {coordinateUnit:'viewport-css-px',navigationPlacement:sidebar?'sidebar':'workspace',taskListCount:document.querySelectorAll('[aria-label="任务列表"]').length,scale,workspace:rect(workspace),details:rect(details),list:rect(list),
       workspaceInlineSize:(workspace.clientWidth-parseFloat(workspaceCss.paddingLeft)-parseFloat(workspaceCss.paddingRight))*workspaceScale,
       stackThresholdPx:44*parseFloat(getComputedStyle(document.documentElement).fontSize)*workspaceScale,readableWidth:400*scale,
       availableWidth:(columns.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight))*scale,
@@ -365,7 +366,11 @@ export function validateWindowsTaskPreviewLayout(layout) {
   const overlapWidth = Math.min(layout.details.x + layout.details.width, layout.list.x + layout.list.width) - Math.max(layout.details.x, layout.list.x)
   const overlapHeight = Math.min(layout.details.bottom, layout.list.bottom) - Math.max(layout.details.y, layout.list.y)
   assert.ok(overlapWidth <= 1 || overlapHeight <= 1, 'The actual task list and details must not overlap')
-  if (layout.workspaceInlineSize <= layout.stackThresholdPx) {
+  if (layout.navigationPlacement === 'sidebar') {
+    assert.equal(layout.taskListCount, 1, 'Task navigation must appear once in the left sidebar')
+    assert.ok(layout.list.x + layout.list.width <= layout.workspace.x + 1, 'The task list must remain in the existing left sidebar')
+    assert.ok(layout.details.width >= layout.availableWidth - 2, 'The task detail must use the available work surface beside the preview')
+  } else if (layout.workspaceInlineSize <= layout.stackThresholdPx) {
     assert.ok(layout.details.width >= layout.availableWidth - 2, 'A narrow task detail must use its available width after padding')
     assert.ok(layout.details.y >= layout.list.bottom - 1, 'The narrow task list and details must stack vertically')
     assert.ok(Math.abs(layout.details.x - layout.list.x) <= 1)
@@ -2513,18 +2518,19 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       await writeFile(join(evidenceDir, 'windows-task-html-auto-preview-zh-dark.png'), Buffer.from(automaticScreenshot.data, 'base64'))
       const manualPreviewPassed = await inspectWindowsManualPreview(report, async () => {
         await cdp.click('nav[aria-label="工作区工具"] button', '任务')
-        await cdp.wait(`Boolean(document.querySelector('section[aria-label="任务"] [aria-label="任务筛选"]'))`, 'the real task workspace')
+        await cdp.wait(`Boolean(document.querySelector('section.ds-task-sidebar[aria-label="任务列表"] [aria-label="任务筛选"]'))`, 'the real task workspace')
         const completedFilter = await cdp.evaluate(`Array.from(document.querySelectorAll('[aria-label="任务筛选"] button')).find(button=>button.textContent.trim().startsWith('已完成'))?.textContent.trim()`)
         assert.ok(completedFilter, 'The completed-task filter must be available')
         await cdp.click('[aria-label="任务筛选"] button', completedFilter)
-        await cdp.wait(`Boolean(Array.from(document.querySelectorAll('[aria-label="任务列表"] button')).find(button=>button.textContent.includes(${JSON.stringify(task.goal)})))`, 'the actual completed task')
-        await cdp.click('[aria-label="任务列表"] button', task.goal)
+        await cdp.wait(`Boolean(Array.from(document.querySelectorAll('section.ds-task-sidebar[aria-label="任务列表"] button[title]')).find(button=>button.title===${JSON.stringify(task.goal)}))`, 'the actual completed task')
+        await cdp.click(`section.ds-task-sidebar[aria-label="任务列表"] button[title=${JSON.stringify(task.goal)}]`)
         await cdp.click('article[aria-label="任务详情"] button', '每日网页报告.html')
         const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
         assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
         const layout = await cdp.wait(windowsTaskPreviewLayoutExpression(), 'the measured task workspace beside its manual preview')
         report.taskExecution.preview.layout = layout
         validateWindowsTaskPreviewLayout(layout)
+        assert.equal(layout.navigationPlacement, 'sidebar', 'The exact package must use the existing left task sidebar')
       })
       const taskScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
       await writeFile(join(evidenceDir, manualPreviewPassed ? 'windows-task-html-preview-zh-dark.png' : 'windows-task-html-manual-failure.png'), Buffer.from(taskScreenshot.data, 'base64'))

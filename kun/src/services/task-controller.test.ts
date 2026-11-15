@@ -66,6 +66,13 @@ async function fixture(prompt = '完成可靠性测试。', resolveToolEffect?: 
 }
 
 describe('TaskController reliability boundaries', () => {
+  it('does not require external source receipts for a standalone local SVG animation viewed in a browser', async () => {
+    const f = await fixture('创建一个完整、独立运行的 HTML 文件，使用 SVG 绘制一只正在骑自行车的鹈鹕，并制作成二维动画。要求鹈鹕和自行车都能清晰辨认，车轮持续转动，鹈鹕的双腿能够自然地踩动踏板，身体、车轮、踏板之间的运动关系合理协调。所有代码都包含在同一个 HTML 文件中，不依赖外部图片或动画素材，打开浏览器即可直接查看动画效果。')
+    try {
+      expect(f.task.acceptance.kind).toBe('files')
+      expect(f.task.acceptance.requiresWebEvidence).not.toBe(true)
+    } finally { f.repository.close() }
+  })
   it('completes a mixed task only after both persisted operation receipts are verified', async () => {
     const f = await fixture('请先批准飞书审批，再上传测试文件。', name => name === 'lark_drive_upload'
       ? { provider: 'lark', operation: 'upload', mutation: true, targetFields: ['folderToken'] } : externalOperationForTool(name))

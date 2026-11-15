@@ -31,6 +31,7 @@ import {
   RUNTIME_SKILLS_TEMPLATE,
   RUNTIME_TASKS_TEMPLATE,
   RUNTIME_TASK_TEMPLATE,
+  RUNTIME_TASK_REVALIDATE_ARTIFACTS_TEMPLATE,
   RUNTIME_TASK_BUDGET_TEMPLATE,
   RUNTIME_TASK_RESUME_TEMPLATE,
   RUNTIME_TASK_RETRY_TEMPLATE,
@@ -305,6 +306,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_TASKS_TEMPLATE, ['GET'], ['threadId', 'workspaceRoot', 'status', 'limit', 'offset', 'search', 'pagination', 'filter', 'cursor']),
   compileEndpoint('/v1/task-commands', ['POST'], []),
   compileEndpoint(RUNTIME_TASK_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_TASK_REVALIDATE_ARTIFACTS_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_BUDGET_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_RESUME_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_RETRY_TEMPLATE, ['POST']),
@@ -458,6 +460,16 @@ export const runtimeRequestPayloadSchema = z
         && (pagination !== 'cursor' || (!url.searchParams.has('status') && !url.searchParams.has('offset')
           && (limit === null || (/^[1-9]\d*$/.test(limit) && Number(limit) <= 200))))
       if (!valid) context.addIssue({ code: 'custom', message: 'invalid task list request' })
+    }
+    const revalidate = /^\/v1\/tasks\/([^/]+)\/revalidate-artifacts$/.exec(url.pathname)
+    if (revalidate) {
+      let valid = payload.path === url.pathname && url.origin === 'http://localhost' && payload.method === 'POST' && payload.body !== undefined
+      try {
+        const id = decodeURIComponent(revalidate[1])
+        valid &&= !!id.trim() && !/[/\\?#%\s]/u.test(id) && !id.includes('\0') && !['.', '..'].includes(id)
+          && z.object({ expectedRevision: z.number().int().nonnegative(), idempotencyKey: z.string().trim().min(1).max(256), confirmed: z.literal(true) }).strict().safeParse(JSON.parse(payload.body!)).success
+      } catch { valid = false }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid explicit artifact revalidation' })
     }
     const taskBudget = /^\/v1\/tasks\/([^/]+)\/budget$/.exec(url.pathname)
     if (taskBudget) {

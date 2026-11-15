@@ -67,6 +67,7 @@ export const TaskAcceptanceSchema = z.object({
   requiredFormats: z.array(z.string().min(1)).optional(),
   minimumArtifacts: z.number().int().nonnegative().optional(),
   requiresWebEvidence: z.boolean().optional(),
+  sourceInferenceVersion: z.literal(1).optional(),
   requiredSourceOrigins: z.array(z.string()).optional(),
   requireFinalResponse: z.boolean(),
   requireActionableArtifactCard: z.boolean(),

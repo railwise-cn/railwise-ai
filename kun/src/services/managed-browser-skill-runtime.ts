@@ -1,3 +1,5 @@
+import { retryBrowserScope } from './browser-public-query-authority.js'
+import type { TaskRun } from '../contracts/tasks.js'
 import { createHash } from 'node:crypto'
 import { BrowserCapabilityConfig, browserTaskOrigins, browserVerificationPolicy, isBrowserTask, isPublicBrowserQuery, type BrowserExecutionScope, type BrowserTaskBindingConfirmation, type BrowserTaskBindingSnapshot, type BrowserVerificationPolicy, type BrowserPublicQueryAuthorization, type BrowserPublicQueryDuration } from '../contracts/browser-skill.js'
 import type { CapabilityPreflight } from '../contracts/harness.js'
@@ -56,7 +58,9 @@ export class ManagedBrowserSkillRuntime {
     return this.currentProvider
   }
 
-  async preflight(text: string, thread?: ThreadRecord, scheduledBrowserScope?: BrowserExecutionScope): Promise<CapabilityPreflight | null> {
+  async preflight(text: string, thread?: ThreadRecord, scheduledBrowserScope?: BrowserExecutionScope, retrySource?: TaskRun): Promise<CapabilityPreflight | null> {
+    const storedSource = retrySource && this.options.repository.get(retrySource.id)
+    const inheritedRetry = storedSource && thread && storedSource.threadId === thread.id && storedSource.workspaceRoot === thread.workspace && storedSource.revision === retrySource?.revision ? retryBrowserScope(this.options.repository, storedSource) : undefined
     const currentTask = thread ? this.options.repository.findActiveByThread(thread.id) : null
     if (!isBrowserTask(text) && !currentTask?.authority?.browserScope && !scheduledBrowserScope) return null
     const config = this.config
@@ -90,14 +94,14 @@ export class ManagedBrowserSkillRuntime {
       return { ...base, status: 'blocked', action, resolution: action, errorCode: 'browser_connection_unavailable',
         message: '当前浏览器连接未通过实时核验。请重新检查扩展和浏览器连接，然后继续原任务。' }
     }
-    const bound = currentTask?.authority?.browserScope ?? scheduledBrowserScope
+    const bound = currentTask?.authority?.browserScope ?? scheduledBrowserScope ?? inheritedRetry
     const requiresNativeRead = bound?.publicQueryAuthorization || bound?.interaction === 'interact' && browserVerificationPolicy(bound.verificationPolicy) === 'public_query_target' || !bound && isPublicBrowserQuery(text)
     if (browserVerificationPolicy(bound?.verificationPolicy) === 'public_query_target' && !targetPolicySupported || requiresNativeRead && !nativeReadSupported) {
       const upgrade = { kind: 'install' as const, route: 'marketplace', label: '升级 CLI 并更新或重新连接扩展' }
       return { ...base, status: 'blocked', action: upgrade, resolution: upgrade, errorCode: 'browser_target_policy_upgrade_required',
         message: '当前公开资料查询范围需要 BrowserSkill CLI 0.5.0 及服务和所选扩展协议 1.9 或以上，以核对实际页面目标。请升级 CLI、更新或重新连接官方扩展，再继续原任务；原授权和待核验操作保持保留。' }
     }
-    if (!currentTask && !scheduledBrowserScope && isPublicBrowserQuery(text)) {
+    if (!currentTask && !scheduledBrowserScope && !inheritedRetry && isPublicBrowserQuery(text)) {
       const confirmation = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认公开查询的浏览器范围' }
       return { ...base, status: 'needs_authorization', action: confirmation, resolution: confirmation, errorCode: 'browser_verification_policy_required',
         message: '请先审阅公开查询的浏览器、站点及校验范围。确认后再继续任务。' }

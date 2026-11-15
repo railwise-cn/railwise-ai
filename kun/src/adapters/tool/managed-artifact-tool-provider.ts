@@ -17,7 +17,7 @@ const Input = z.object({
   content: z.string().max(8 * 1024 * 1024)
 }).strict()
 const maxReadBytes = 3 * 8 * 1024 * 1024 + Buffer.byteLength(prepareHtmlArtifact(''))
-const ReadInput = z.object({ path: z.string().min(1).max(240), offset_bytes: z.number().int().min(0).max(maxReadBytes).default(0), limit_bytes: z.number().int().min(4).max(256 * 1024).default(64 * 1024) }).strict()
+const ReadInput = z.object({ source_task_id: z.string().min(1).max(256).optional(), path: z.string().min(1).max(240), offset_bytes: z.number().int().min(0).max(maxReadBytes).default(0), limit_bytes: z.number().int().min(4).max(256 * 1024).default(64 * 1024) }).strict()
 const readError = (code: string, message: string) => Object.assign(new Error(message), { code })
 const identity = (info: Stats, file = false) => [info.dev, info.ino, info.birthtimeMs, ...(file ? [info.size, info.mtimeMs, info.ctimeMs] : [])].join(':')
 const formats = new Set(['.html', '.htm', '.css', '.js', '.json', '.txt', '.md', '.svg', '.csv'])
@@ -32,7 +32,7 @@ function inputPath(path: string): string[] {
 }
 
 /** The model never chooses the physical output root or obtains general dataDir access. */
-export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'managedArtifactRoot' | 'getTask'> & Partial<Pick<TaskController, 'verifyWebArtifact'>>): CapabilityToolProvider[] {
+export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'managedArtifactRoot' | 'getTask'> & Partial<Pick<TaskController, 'verifyWebArtifact' | 'historicalArtifact'>>): CapabilityToolProvider[] {
   function rootFor(context: ToolHostContext): string {
     const grant = context.executionGrant
     const expected = grant?.taskId ? tasks.managedArtifactRoot(grant.taskId) : undefined
@@ -71,7 +71,10 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
   }
 
   async function readOwnArtifact(args: Record<string, unknown>, context: ToolHostContext, whole = false) {
-      const input = ReadInput.parse(args), parts = inputPath(input.path), root = await validateRead(context), target = join(root, ...parts)
+      const input = ReadInput.parse(args), parts = inputPath(input.path), ownRoot = await validateRead(context)
+      const history = input.source_task_id ? await tasks.historicalArtifact?.(context.executionGrant!.taskId!, input.source_task_id, input.path) : undefined
+      if (input.source_task_id && !history) throw readError('artifact_history_scope', '当前任务没有该历史成果的只读引用。')
+      const root = history?.root ?? ownRoot, target = join(root, ...parts)
       return serializeFileOperation(target, async () => {
         const before = await readSnapshot(root, parts)
         await validateRead(context)
@@ -98,7 +101,11 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
           while (end > start && end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end--
           const selected = bytes.subarray(start, end)
           await validateRead(context)
-          return { output: { name: input.path, storage: 'task', content: selected.toString('utf8'), encoding: 'utf-8', byte_size: bytes.length,
+          if (history) {
+            const current = await tasks.historicalArtifact?.(context.executionGrant!.taskId!, input.source_task_id!, input.path)
+            if (JSON.stringify(current) !== JSON.stringify(history) || createHash('sha256').update(bytes).digest('hex') !== history.sha256) throw readError('artifact_history_changed', '历史成果已变化，不能作为原始草稿读取。')
+          }
+          return { output: { name: input.path, storage: 'task', ...(history ? { history: true, source_task_id: history.sourceTaskId, writer_receipt_id: history.writerReceiptId, original_execution_grant_id: history.executionGrantId } : {}), content: selected.toString('utf8'), encoding: 'utf-8', byte_size: bytes.length,
             sha256: createHash('sha256').update(bytes).digest('hex'), offset_bytes: start, bytes_returned: selected.length,
             truncated: end < bytes.length, next_offset_bytes: end < bytes.length ? end : null } }
         } finally { await handle.close() }
@@ -143,14 +150,14 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
     }
   }), defineLocalTool({
     name: 'read_artifact',
-    description: 'Read the exact UTF-8 bytes of this active task’s own application-managed artifact, including HTML and local text assets saved by publish_artifact. Use the same relative filename, never its physical output path or generic read. Works with a read-only user workspace without enlarging workspace permissions. Returns bounded content, complete file byte_size/sha256 and byte paging metadata; continue with next_offset_bytes until truncated=false. This tool only reads existing files and never creates directories, republishes, executes HTML or accesses another task’s artifacts.',
+    description: 'Read the exact UTF-8 bytes of this active task’s own application-managed artifact, including HTML and local text assets saved by publish_artifact. Use the same relative filename, never its physical output path or generic read. Works with a read-only user workspace without enlarging workspace permissions. Returns bounded content, complete file byte_size/sha256 and byte paging metadata; continue with next_offset_bytes until truncated=false. This tool only reads existing files and never creates directories, republishes or executes HTML. An explicit Retry may pass source_task_id to inspect its verified ancestor draft with the same relative filename; the server checks the actual retry control lineage, original writer receipt and unchanged hash. Such history is read-only reference, not a new writer receipt or source verification; publish and verify your own corrected version.',
     inputSchema: z.toJSONSchema(ReadInput) as Record<string, unknown>, policy: 'auto',
     shouldAdvertise: context => Boolean(context.executionGrant?.managedArtifactRoot),
     validateArguments: (args, context) => { const input = ReadInput.parse(args); inputPath(input.path); rootFor(context) },
     execute: (args, context) => readOwnArtifact(args, context)
   }), ...(tasks.verifyWebArtifact ? [defineLocalTool({
     name: 'verify_web_artifact', policy: 'auto',
-    description: 'Verify an already-saved HTML research report against this task’s actual successful source-read receipts. No network or external action. First browser_get_html the real result link (discovery HTML with href), navigate to that observed URL, then browser_get_html its complete primary document (truncated=false). coverage lists exact URL/resultHash pairs for each required source. items bind a tr/article/section id in the HTML to title, source, discovery, classification (opportunity/intent/historical; source for non-procurement documents), and material field values with verbatim source quotes. The formal data region must be main[data-evidence-report]. Each item section requires id=sectionId, data-evidence-item=sectionId and data-evidence-classification. Mark each value with data-evidence-field=title/publication_date/budget/deadline/status/qualification; unverified values also need data-evidence-unverified and visible 待核验. Put the primary URL inside a[data-evidence-source] in that section. All report data rows/items/fields must be declared; one verified item cannot certify unrelated draft rows. Successful verification covers this structured data region, not arbitrary narrative. Mark unread fields unverified; do not count them as verified opportunities. Legitimate no-result pages may use noMatches with query (a term from the task purpose) and the exact returned zero-result quote. Each required origin needs its own relevant primary item or actual query-zero evidence. A user-provided exact document URL may be its own discovery reference. Existing valid prior-Turn receipts can be reused. If incomplete, continue collecting and repair the same saved artifact; do not ask the user to search/copy pages. Only actual permission/login/network blockers require user attention. Ordinary files without web-research requirements need no extra step.',
+    description: 'Verify an already-saved HTML research report against this task’s actual successful source-read receipts. No network or external action. First browser_get_html the real result link (discovery HTML with href), navigate to that observed URL, then browser_get_html its complete primary document (truncated=false), or browser_read_document its complete native actual_loaded_response representation when large SVG/iframe pages truncate the DOM; this separate response kind must pass its own identity/byte contract and is never a full-DOM claim. coverage lists exact URL/resultHash pairs for each required source. items bind a tr/article/section id in the HTML to title, source, discovery, classification (opportunity/intent/historical; source for non-procurement documents), and material field values with verbatim source quotes. The formal data region must be main[data-evidence-report]. Each item section requires id=sectionId, data-evidence-item=sectionId and data-evidence-classification. Mark each value with data-evidence-field=title/publication_date/budget/deadline/status/qualification; unverified values also need data-evidence-unverified and visible 待核验. Put the primary URL inside a[data-evidence-source] in that section. All report data rows/items/fields must be declared; one verified item cannot certify unrelated draft rows. Successful verification covers this structured data region, not arbitrary narrative. Mark unread fields unverified; do not count them as verified opportunities. Legitimate no-result pages may use noMatches with query (a term from the task purpose) and the exact returned zero-result quote. Each required origin needs its own relevant primary item or actual query-zero evidence. A user-provided exact document URL may be its own discovery reference. Existing valid prior-Turn receipts can be reused. If incomplete, continue collecting and repair the same saved artifact; do not ask the user to search/copy pages. Only actual permission/login/network blockers require user attention. Ordinary files without web-research requirements need no extra step.',
     inputSchema: z.toJSONSchema(WebArtifactEvidenceInputSchema) as Record<string, unknown>,
     shouldAdvertise: context => Boolean(context.executionGrant?.managedArtifactRoot),
     validateArguments: (args, context) => { const input = WebArtifactEvidenceInputSchema.parse(args); inputPath(input.path); if (!/\.html?$/i.test(input.path)) throw new Error('来源核验目前用于 HTML 成果。'); rootFor(context) },

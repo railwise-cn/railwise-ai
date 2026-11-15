@@ -31,6 +31,16 @@ import {
 } from '../../shared/design-document'
 
 describe('app-ipc-schemas', () => {
+  it('only permits explicitly confirmed, scoped artifact revalidation through the existing task bridge', () => {
+    const path = '/v1/tasks/task-1/revalidate-artifacts'
+    const body = { expectedRevision: 3, idempotencyKey: 'check-existing', confirmed: true }
+    expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify(body) }).success).toBe(true)
+    for (const request of [
+      { path, method: 'GET' }, { path, method: 'POST' },
+      ...[`${path}?force=1`, `${path}#force`, '/v1/tasks/task-1%2Fother/revalidate-artifacts'].map(path => ({ path, method: 'POST', body: JSON.stringify(body) })),
+      ...[{ confirmed: false }, { expectedRevision: -1 }, { forceComplete: true }, { acceptance: { requiresWebEvidence: false } }].map(extra => ({ path, method: 'POST', body: JSON.stringify({ ...body, ...extra }) }))
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success).toBe(false)
+  })
   it('allows only explicit bounded task budget additions without authority or model changes', () => {
     const path = '/v1/tasks/task-1/budget'
     const body = { expectedRevision: 4, idempotencyKey: 'add-time-once', additionalExecutionMs: 600_000 }

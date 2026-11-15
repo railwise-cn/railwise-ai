@@ -956,16 +956,16 @@ test('after an autonomous task leaves Needs you, navigation re-selects the same 
   const task = { id: 'task-original', goal: '原任务公开查询与每日两次计划' }, clicks = []
   try {
     // DOM contract only: the actual package run must later exercise CDP mouse input.
-    window.document.body.innerHTML = `<section aria-label="任务"><nav aria-label="任务筛选"><button>进行中 <span>0</span></button><button aria-pressed="true">需要你 <span>0</span></button><button>已完成 <span>1</span></button><button aria-pressed="false">全部任务 <span>1</span></button></nav><div aria-label="任务列表"></div><div id="details"></div></section>`
-    const all = window.document.querySelector('nav button:last-child'), list = window.document.querySelector('[aria-label="任务列表"]')
+    window.document.body.innerHTML = `<section class="ds-task-sidebar" aria-label="任务列表"><nav aria-label="任务筛选"><button>进行中 <span>0</span></button><button aria-pressed="true">需要你 <span>0</span></button><button>已完成 <span>1</span></button><button aria-pressed="false">全部任务 <span>1</span></button></nav><div id="task-buttons"></div></section><section aria-label="任务"><div id="details"></div></section>`
+    const all = window.document.querySelector('nav button:last-child'), list = window.document.querySelector('#task-buttons')
     all.addEventListener('click', () => {
       all.setAttribute('aria-pressed', 'true')
       list.innerHTML = '<button aria-pressed="false"><span></span></button><button><span>其他任务</span></button>'
-      const original = list.querySelector('button'); original.querySelector('span').textContent = task.goal
+      const original = list.querySelector('button'); original.title = task.goal; original.querySelector('span').textContent = '精简任务标题'
       original.addEventListener('click', () => {
         original.setAttribute('aria-pressed', 'true')
         const detail = window.document.createElement('article'); detail.setAttribute('aria-label', '任务详情')
-        const heading = window.document.createElement('h2'); heading.textContent = task.goal; detail.append(heading)
+        const heading = window.document.createElement('h2'); heading.textContent = '精简任务标题'; detail.append(heading); const full=window.document.createElement('details'); const fullGoal=window.document.createElement('p'); fullGoal.textContent=task.goal; full.append(fullGoal); detail.append(full)
         const open = window.document.createElement('button'); open.textContent = '打开原会话'; detail.append(open)
         open.addEventListener('click', () => { window.document.body.dataset.openedTask = task.id })
         window.document.querySelector('#details').replaceChildren(detail)
@@ -975,7 +975,7 @@ test('after an autonomous task leaves Needs you, navigation re-selects the same 
       wait: async expression => { assert.ok(window.eval(expression), 'Only genuine mounted UI state may satisfy navigation') },
       click: async (selector, label) => {
         const node = Array.from(window.document.querySelectorAll(selector)).find(node => !label || node.textContent.trim() === label || node.querySelector('span')?.textContent.trim() === label)
-        assert.ok(node); clicks.push(label ?? node.firstChild.textContent.trim()); node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+        assert.ok(node); clicks.push(label ?? (node.title || node.firstChild.textContent.trim())); node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
       }
     }
     assert.equal(window.document.querySelector('article'), null)
@@ -1212,6 +1212,28 @@ test('manual-preview measurement uses one viewport coordinate unit at the actual
     assert.throws(() => validateWindowsTaskPreviewLayout(measure()), /must not overlap/, 'The failed run painted details over the actual list')
     details.getBoundingClientRect = () => ({ x: 278, y: 502, width: 200, height: 600, bottom: 1102 })
     assert.throws(() => validateWindowsTaskPreviewLayout(measure()), /remain readable/)
+  } finally { await window.happyDOM.close() }
+})
+
+test('manual-preview measurement finds the relocated left sidebar and rejects a duplicated center list', async () => {
+  const { Window } = await import('happy-dom'), window = new Window()
+  try {
+    window.document.documentElement.style.fontSize = '16px'
+    window.document.body.innerHTML = '<section class="ds-task-sidebar" aria-label="任务列表"></section><section aria-label="任务" style="padding:0px"><div class="ds-task-workspace-detail" style="padding:20px"><article aria-label="任务详情"></article></div></section>'
+    const workspace=window.document.querySelector('section[aria-label="任务"]'), sidebar=window.document.querySelector('.ds-task-sidebar'), columns=workspace.querySelector('.ds-task-workspace-detail'), details=workspace.querySelector('article')
+    for (const [node,width,box] of [[sidebar,240,{x:0,y:36,width:216,height:692,bottom:728}], [workspace,368,{x:216,y:36,width:331.2,height:692,bottom:728}], [columns,368,{x:216,y:190,width:331.2,height:538,bottom:728}], [details,328,{x:234,y:208,width:295.2,height:502,bottom:710}]]) {
+      for (const field of ['offsetWidth','clientWidth','scrollWidth']) Object.defineProperty(node,field,{configurable:true,value:width})
+      node.getBoundingClientRect=()=>box; node.getClientRects=()=>[box]
+    }
+    const measure=()=>JSON.parse(JSON.stringify(window.eval(windowsTaskPreviewLayoutExpression())))
+    const layout=measure()
+    assert.equal(layout.navigationPlacement,'sidebar'); assert.equal(layout.taskListCount,1)
+    assert.equal(validateWindowsTaskPreviewLayout(layout),true)
+    const duplicate=window.document.createElement('div'); duplicate.setAttribute('aria-label','任务列表'); workspace.append(duplicate)
+    assert.throws(()=>validateWindowsTaskPreviewLayout(measure()),/appear once/)
+    duplicate.remove()
+    sidebar.getBoundingClientRect=()=>({x:230,y:36,width:216,height:692,bottom:728})
+    assert.throws(()=>validateWindowsTaskPreviewLayout(measure()),/must not overlap/)
   } finally { await window.happyDOM.close() }
 })
 

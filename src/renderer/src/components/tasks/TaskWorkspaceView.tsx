@@ -1,22 +1,24 @@
-import { useTaskState, refreshTaskState, takeRequestedTask } from '../../store/task-live-store'
+import { useTaskState, refreshTaskState, takeRequestedTask, updateTaskNavigation } from '../../store/task-live-store'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from 'react'
-import { CheckCircle2, ChevronRight, FileText, Folder, ListTodo, Loader2, MessageSquare, Pause, Play, Plus, RefreshCw, Square, X } from 'lucide-react'
+import { CheckCircle2, ChevronRight, FileText, Loader2, MessageSquare, Pause, Play, Plus, RefreshCw, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TaskAttentionV1, TaskEventV1, TaskInputV1, TaskOperationReceiptV1, TaskRunV1, TaskTemplateId, TaskTemplateStartV1, TaskTemplateV1 } from '@shared/agent-workbench'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { TaskArtifactReview } from './TaskArtifactReview'
 import { TaskExecutionEvidence } from './TaskExecutionEvidence'
 import { currentTaskBranch } from '@shared/task-projection'
-import { taskDisplayGoal, taskProgressReason } from '@shared/task-presentation'
+import { taskDisplayGoal, taskDisplayTitle } from '@shared/task-presentation'
 import { taskArtifactValidationLabelKey } from '@shared/task-artifact-source-evidence'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { BrowserApprovalDetails, browserApprovalFields } from '../chat/BrowserApprovalDetails'
 import { CapabilityRequiredCard } from '../chat/CapabilityRequiredCard'
+import { filterWorkspaceTasks, taskGroupForTask, taskGroupProgress, taskGroupArtifacts, scopeWorkspaceTasks } from '@shared/task-workspace-projection'
+export { filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from '@shared/task-workspace-projection'
+import { legacyLocalArtifactSourceMismatch } from '@shared/task-source-intent'
 import { TaskBudgetControl } from './TaskBudgetControl'
 import { TaskPermissionPanel } from '../chat/TaskPermissionPanel'
 import { useChatStore } from '../../store/chat-store'
 
-type TaskFilter = 'ongoing' | 'attention' | 'completed' | 'all'
 type Props = {
   workspaceRoot: string
   runtimeReady: boolean
@@ -30,83 +32,11 @@ type Props = {
 }
 
 const TERMINAL = new Set(['completed', 'failed', 'cancelled'])
-const ATTENTION = new Set(['waiting_user', 'waiting_approval', 'stalled', 'failed'])
-const FILTERS: TaskFilter[] = ['ongoing', 'attention', 'completed', 'all']
 const BUILTIN_TEMPLATES: TaskTemplateV1[] = [
   { id: 'monitoring-report', name: 'Monitoring report', description: 'Check sources and data, then produce a cited report.', stages: [], outputs: [], requiredInputs: [] },
   { id: 'tender-document', name: 'Tender document', description: 'Build a response matrix and draft a checked technical file.', stages: [], outputs: [], requiredInputs: [] },
   { id: 'research-document', name: 'Research and documents', description: 'Turn selected sources into cited, editable documents.', stages: [], outputs: [], requiredInputs: [] }
 ]
-
-export type TaskWorkspaceTaskGroup = {
-  root: TaskRunV1
-  children: TaskRunV1[]
-  all: TaskRunV1[]
-}
-
-function rootIdForTask(task: TaskRunV1, byId: Map<string, TaskRunV1>): string {
-  const declaredRoot = task.rootTaskId?.trim()
-  if (declaredRoot && byId.has(declaredRoot)) return declaredRoot
-  const seen = new Set<string>()
-  let current = task
-  while (current.parentTaskId && !seen.has(current.id)) {
-    seen.add(current.id)
-    const parent = byId.get(current.parentTaskId)
-    if (!parent) break
-    current = parent
-  }
-  return current.id
-}
-
-export function groupWorkspaceTasks(tasks: TaskRunV1[]): TaskWorkspaceTaskGroup[] {
-  const byId = new Map(tasks.map(task => [task.id, task]))
-  const groups = new Map<string, TaskRunV1[]>()
-  for (const task of tasks) {
-    const rootId = rootIdForTask(task, byId)
-    const members = groups.get(rootId) ?? []
-    members.push(task)
-    groups.set(rootId, members)
-  }
-  return [...groups.entries()].map(([rootId, all]) => {
-    const root = all.find(task => task.id === rootId) ?? all.find(task => !task.parentTaskId) ?? all[0]
-    return { root, children: all.filter(task => task.id !== root.id), all }
-  })
-}
-
-export function taskGroupForTask(taskId: string | null, tasks: TaskRunV1[]): TaskWorkspaceTaskGroup | null {
-  if (!taskId) return null
-  return groupWorkspaceTasks(tasks).find(group => group.all.some(task => task.id === taskId)) ?? null
-}
-
-export function taskGroupProgress(group: TaskWorkspaceTaskGroup): { completed: number; total: number } {
-  return {
-    completed: currentTaskBranch(group.all, group.root).members.reduce((count, task) => count + task.nodes.filter(node => node.status === 'completed').length, 0),
-    total: currentTaskBranch(group.all, group.root).members.reduce((count, task) => count + task.nodes.length, 0)
-  }
-}
-
-export function taskGroupArtifacts(group: TaskWorkspaceTaskGroup): Array<{ task: TaskRunV1; artifact: TaskRunV1['artifacts'][number] }> {
-  return group.all.flatMap(task => task.artifacts.map(artifact => ({ task, artifact })))
-}
-
-export function taskNeedsUser(task: TaskRunV1, inbox: TaskAttentionV1[], relatedTasks: TaskRunV1[] = []): boolean {
-  const group = currentTaskBranch([task, ...relatedTasks], task).members
-  return group.some(candidate => ATTENTION.has(candidate.status) || inbox.some(item => item.status === 'pending' && (item.taskId === candidate.id || item.threadId === candidate.threadId)))
-}
-
-export function filterWorkspaceTasks(tasks: TaskRunV1[], inbox: TaskAttentionV1[], filter: TaskFilter, search = ''): TaskRunV1[] {
-  const query = search.trim().toLocaleLowerCase()
-  return groupWorkspaceTasks(tasks).flatMap(group => {
-    const task = group.root
-    const current = currentTaskBranch(group.all, task).current
-    const searchable = group.all.flatMap(item => [taskDisplayGoal(item), item.workspaceRoot, ...item.artifacts.map(artifact => artifact.relativePath)]).join('\n')
-    if (query && !searchable.toLocaleLowerCase().includes(query)) return []
-    if (filter === 'ongoing' && (TERMINAL.has(current.status) || taskNeedsUser(task, inbox, group.children))) return []
-    if (filter === 'attention' && !taskNeedsUser(task, inbox, group.children)) return []
-    if (filter === 'completed' && current.status !== 'completed') return []
-    return [task]
-  })
-}
 
 function operationKey(): string {
   return globalThis.crypto.randomUUID()
@@ -256,11 +186,9 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const { t } = useTranslation('common')
   const live=useTaskState(runtimeReady)
   const [templates, setTemplates] = useState<TaskTemplateV1[]>(BUILTIN_TEMPLATES)
-  const [initialRequestedTask] = useState(()=>takeRequestedTask())
-  const [selectedId, setSelectedId] = useState<string | null>(initialRequestedTask)
-  const [filter, setFilter] = useState<TaskFilter>(initialRequestedTask ? 'all' : 'ongoing')
-  const [search, setSearch] = useState('')
-  const [allWorkspaces, setAllWorkspaces] = useState(false)
+  const { selectedTaskId: selectedId, filter, search, allWorkspaces, selectedAttentionId } = live.navigation
+  const setSelectedId = useCallback((id: string | null): void => updateTaskNavigation({ selectedTaskId: id, selectedAttentionId: null }), [])
+  const setFilter = useCallback((value: typeof filter): void => updateTaskNavigation({ filter: value }), [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [controlNotice, setControlNotice] = useState('')
@@ -281,14 +209,9 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const detailGeneration = useRef(0)
   const detailRootId = useRef<string | null>(null)
   const scope = allWorkspaces ? undefined : workspaceRoot
-  const tasks=useMemo(()=>{
-    const roots=live.tasks.filter(task=>!task.parentTaskId && (!task.rootTaskId || task.rootTaskId===task.id) && task.visible!==false && !['chat','internal'].includes(task.visibility??'') && (!scope||task.workspaceRoot===scope))
-    const included=new Set(roots.map(task=>task.id))
-    let changed=true
-    while(changed){changed=false;for(const task of live.tasks)if((task.rootTaskId && included.has(task.rootTaskId) || task.parentTaskId && included.has(task.parentTaskId)) && !included.has(task.id)){included.add(task.id);changed=true}}
-    return live.tasks.filter(task=>included.has(task.id))
-  },[live.tasks,scope])
+  const tasks = useMemo(() => scopeWorkspaceTasks(live.tasks, scope), [live.tasks, scope])
   const inbox=useMemo(()=>live.attention.filter(item=>!scope||item.workspaceRoot===scope||tasks.some(task=>task.id===item.taskId)),[live.attention,tasks,scope])
+  const standaloneAttention = inbox.filter(item => !tasks.some(task => item.taskId === task.id || item.threadId === task.threadId)).filter(item => !search.trim() || `${item.title}\n${item.message}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const mutationRequests = useRef(new Map<string, { expectedRevision: number; idempotencyKey: string; text?: string }>())
   const templateRequest = useRef<{ id: TaskTemplateId; request: TaskTemplateStartV1 } | null>(null)
 
@@ -298,8 +221,8 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     try { await refreshTaskState() } finally { setLoading(false) }
   },[runtimeReady])
 
-  useEffect(()=> { const requested=takeRequestedTask();if(requested){setFilter('all');setSelectedId(requested)} },[scope])
-  useEffect(()=>{const open=(event:Event)=>{setFilter('all');setSelectedId((event as CustomEvent<string>).detail)};window.addEventListener('railwise:open-task',open);return()=>window.removeEventListener('railwise:open-task',open)},[])
+  useEffect(()=> { const requested=takeRequestedTask();if(requested){setFilter('all');setSelectedId(requested)} },[scope,setFilter,setSelectedId])
+  useEffect(()=>{const open=(event:Event)=>{setFilter('all');setSelectedId((event as CustomEvent<string>).detail)};window.addEventListener('railwise:open-task',open);return()=>window.removeEventListener('railwise:open-task',open)},[setFilter,setSelectedId])
 
   useEffect(() => {
     if (!runtimeReady) return
@@ -315,8 +238,18 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const currentExecution = selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).current : null
   useEffect(() => {
     if (!live.ready) return
+    if (selectedAttentionId) {
+      if (standaloneAttention.some(item => item.id === selectedAttentionId)) return
+      updateTaskNavigation({ selectedAttentionId: null, selectedTaskId: visible[0]?.id ?? null })
+      return
+    }
+    if (selectedGroup) return
+    if ((filter === 'attention' || !visible.length) && standaloneAttention[0] && (filter === 'attention' || filter === 'all')) {
+      updateTaskNavigation({ selectedTaskId: null, selectedAttentionId: standaloneAttention[0].id })
+      return
+    }
     if (!visible.some(task => task.id === selectedId)) setSelectedId(visible[0]?.id ?? null)
-  }, [visible, selectedId, live.ready])
+  }, [visible, selectedId, live.ready, selectedGroup, selectedAttentionId, filter, standaloneAttention, setSelectedId])
 
   useEffect(() => {
     const generation = ++detailGeneration.current
@@ -344,7 +277,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     return () => { if (detailGeneration.current === generation) ++detailGeneration.current }
   }, [runtimeReady, selectedGroup, selectedGroupRevision])
 
-  const mutate = async (action: 'pause' | 'resume' | 'retry' | 'cancel' | 'input'): Promise<void> => {
+  const mutate = async (action: 'pause' | 'resume' | 'retry' | 'cancel' | 'input' | 'revalidate'): Promise<void> => {
     if (!selected || actionBusy) return
     const task = currentExecution ?? selected
     const text = drafts[selected.id]?.trim()
@@ -357,7 +290,12 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     setError('')
     setControlNotice('')
     try {
-      if (action === 'pause') await window.workwise.pauseTask(task.id, request)
+      if (action === 'revalidate') {
+        const result = await window.workwise.revalidateTaskArtifacts(task.id, { ...request, confirmed: true })
+        setControlNotice(result.reason ?? '')
+        if (result.completed) updateTaskNavigation({ filter: 'completed', selectedTaskId: selected.id, selectedAttentionId: null })
+      }
+      else if (action === 'pause') await window.workwise.pauseTask(task.id, request)
       else if (action === 'resume' || action === 'retry') {
         const result = action === 'resume' ? await window.workwise.resumeTask(task.id, request) : await window.workwise.retryTask(task.id, request)
         if (result.capability) {
@@ -415,8 +353,6 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     const root=taskGroupForTask(owner.id,tasks)?.root??owner
     return owner.originThreadId??root.originThreadId??(!owner.visibility?owner.threadId:undefined)
   }
-  const standaloneAttention = inbox.filter(item => !tasks.some(task => item.taskId === task.id || item.threadId === task.threadId)).filter(item => !search.trim() || `${item.title}\n${item.message}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
-  const count = (tab: TaskFilter): number => filterWorkspaceTasks(tasks, inbox, tab, search).length + (tab === 'attention' || tab === 'all' ? standaloneAttention.length : 0)
   const selectedAttention = selectedGroup ? inbox.filter(item => selectedGroup.all.some(task => item.taskId === task.id || (item.threadId && item.threadId === task.threadId))) : []
 
   return <section className="ds-task-workspace ds-no-drag flex h-full min-h-0 min-w-0 flex-col bg-ds-main text-ds-ink" aria-label={t('taskWorkspaceTitle')}>
@@ -430,43 +366,28 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     {controlNotice ? <p role="status" className="mx-5 mt-3 text-sm text-ds-ink">{controlNotice}</p> : null}
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="px-5 pt-4">
-        <div className="ds-task-workspace-templates grid gap-2">{templates.map(template => <button type="button" key={template.id} disabled={!runtimeReady || !workspaceRoot} onClick={() => { setTemplateId(template.id); setTemplateMessage('') }} className="rounded-xl border border-ds-border bg-ds-card p-3 text-left transition hover:border-accent disabled:opacity-50"><div className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4 text-accent" />{t(`taskTemplate_${template.id}`, { defaultValue: template.name })}</div><p className="mt-1 text-xs leading-relaxed text-ds-muted">{t(`taskTemplateDescription_${template.id}`, { defaultValue: template.description })}</p></button>)}</div>
-        <div className="my-4 flex flex-wrap items-center gap-3">
-          <label className="flex min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-ds-border bg-ds-card px-3 py-2"><ListTodo className="h-4 w-4 text-ds-muted" /><input type="search" aria-label={t('taskWorkspaceSearch')} placeholder={t('taskWorkspaceSearch')} value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
-          <label className="flex items-center gap-2 text-xs text-ds-muted"><input type="checkbox" checked={allWorkspaces} onChange={event => setAllWorkspaces(event.target.checked)} />{t('taskWorkspaceAllWorkspaces')}</label>
-        </div>
-        <nav aria-label={t('taskWorkspaceFilters')} className="flex flex-wrap gap-1 border-b border-ds-border">{FILTERS.map(tab => <button type="button" key={tab} aria-pressed={filter === tab} onClick={() => setFilter(tab)} className={`border-b-2 px-3 py-2 text-xs font-medium ${filter === tab ? 'border-accent text-accent' : 'border-transparent text-ds-muted'}`}>{t(`taskWorkspaceFilter_${tab}`)} <span className="ml-1 tabular-nums">{count(tab)}</span></button>)}</nav>
+        <details className="rounded-lg border border-ds-border bg-ds-card p-3"><summary className="cursor-pointer text-xs font-medium text-ds-muted">{t('taskWorkspaceTemplates')}</summary><div className="ds-task-workspace-templates mt-3 grid gap-2">{templates.map(template => <button type="button" key={template.id} disabled={!runtimeReady || !workspaceRoot} onClick={() => { setTemplateId(template.id); setTemplateMessage('') }} className="rounded-xl border border-ds-border bg-ds-card p-3 text-left transition hover:border-accent disabled:opacity-50"><div className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4 text-accent" />{t(`taskTemplate_${template.id}`, { defaultValue: template.name })}</div><p className="mt-1 text-xs leading-relaxed text-ds-muted">{t(`taskTemplateDescription_${template.id}`, { defaultValue: template.description })}</p></button>)}</div></details>
       </div>
-      <div className="ds-task-workspace-columns grid min-h-[360px] flex-none gap-4 p-5">
-        <div className="ds-task-workspace-list min-w-0 space-y-2" aria-label={t('taskWorkspaceTaskList')}>
-          {visible.map(task => {
-            const group = taskGroupForTask(task.id, tasks)
-            const current = group ? currentTaskBranch(group.all, task).current : task
-            const progress = group ? taskGroupProgress(group) : { completed: 0, total: task.nodes.length }
-            const artifactCount = group ? taskGroupArtifacts(group).length : task.artifacts.length
-            const reason = taskProgressReason(current, t('taskApprovalReviewHint'))
-            const hasChildAttention = group ? taskNeedsUser(task, inbox, group.children) && !taskNeedsUser(task, inbox) : false
-            return <button type="button" key={task.id} aria-pressed={selectedId === task.id} onClick={() => setSelectedId(task.id)} className={`w-full rounded-xl border bg-ds-card p-3 text-left ${selectedId === task.id ? 'border-accent ring-1 ring-accent/20' : 'border-ds-border'}`}><div className="flex items-start gap-2"><span className="line-clamp-3 min-w-0 flex-1 whitespace-pre-wrap break-words text-sm font-medium">{taskDisplayGoal(task)}</span>{current.status === 'completed' && !hasChildAttention ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <ChevronRight className="h-4 w-4 shrink-0 text-ds-faint" />}</div><div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ds-muted"><span>{t(`taskRunStatus_${current.status}`)}</span><span>{progress.completed}/{progress.total}</span>{artifactCount ? <span>{t('taskWorkspaceArtifactCount', { count: artifactCount })}</span> : null}{group && group.children.length ? <span>{t('taskWorkspaceSubtaskCount', { count: group.children.length })}</span> : null}</div>{reason ? <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{reason}</p> : null}{allWorkspaces ? <p className="mt-2 truncate text-[11px] text-ds-faint">{task.workspaceRoot}</p> : null}</button>
-          })}
-          {(filter === 'attention' || filter === 'all') ? standaloneAttention.map(item => <AttentionCard key={item.id} item={item} conversationThreadId={conversationForAttention(item)} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />) : null}
-          {!visible.length && !(standaloneAttention.length && (filter === 'attention' || filter === 'all')) ? <div className="rounded-xl border border-dashed border-ds-border p-7 text-center text-sm text-ds-muted">{loading ? t('taskWorkspaceLoading') : search ? t('taskWorkspaceNoMatches') : t('taskWorkspaceEmpty')}</div> : null}
-        </div>
+      <div className="ds-task-workspace-detail min-w-0 flex-1 p-5">
+        {selectedAttentionId ? standaloneAttention.filter(item => item.id === selectedAttentionId).map(item => <AttentionCard key={item.id} item={item} conversationThreadId={conversationForAttention(item)} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />) : null}
         {selected ? <article aria-label={t('taskWorkspaceDetails')} className="min-w-0 rounded-xl border border-ds-border bg-ds-card p-4">
-          <h2 className="whitespace-pre-wrap break-words text-base font-semibold">{taskDisplayGoal(selected)}</h2>
-          <p className="mt-2 flex items-center gap-1 break-all text-xs text-ds-muted"><Folder className="h-3.5 w-3.5 shrink-0" />{selected.workspaceRoot}</p>
+          <h2 className="break-words text-base font-semibold">{taskDisplayTitle(selected)}</h2>
+          <p className="mt-2 text-xs text-ds-muted">{t(`taskRunStatus_${(currentExecution ?? selected).status}`)} · {t('taskWorkspaceStepProgress', taskGroupProgress(selectedGroup!))}</p>
+          <details className="mt-3 text-xs text-ds-muted"><summary className="cursor-pointer">{t('taskWorkspaceOriginalRequest')}</summary><p className="mt-2 whitespace-pre-wrap break-words leading-relaxed">{taskDisplayGoal(selected)}</p><p className="mt-2 break-all">{t('taskWorkspaceLocation')}: {selected.workspaceRoot}</p></details>
           {currentExecution?.timing ? <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ds-muted" title={t(currentExecution.timing.coverage === 'complete' ? 'taskTimingComplete' : 'taskTimingPartial')}>
             <span>{t('taskTimingExecution')}: {Math.round(currentExecution.timing.executionMs / 1000)}s</span>
             <span>{t('taskTimingQueued')}: {Math.round(currentExecution.timing.queuedMs / 1000)}s</span>
             <span>{t('taskTimingHumanWait')}: {Math.round(currentExecution.timing.humanWaitMs / 1000)}s</span>
           </p> : null}
           <div className="my-4 flex flex-wrap gap-2">
+            {['stalled', 'failed', 'paused'].includes((currentExecution ?? selected).status) && legacyLocalArtifactSourceMismatch(currentExecution ?? selected) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('revalidate')} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceRevalidateArtifacts')}</button> : null}
             {selected.originThreadId || currentExecution?.originThreadId || !selected.visibility ? <button type="button" onClick={() => onOpenThread((selected.originThreadId ?? currentExecution?.originThreadId ?? selected.threadId))} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs"><MessageSquare className="h-3.5 w-3.5" />{t('taskWorkspaceOpenConversation')}</button> : null}
-            {!TERMINAL.has(currentExecution?.status ?? selected.status) && currentExecution?.status !== 'paused' ? <button type="button" disabled={actionBusy} onClick={() => void mutate('pause')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Pause className="h-3.5 w-3.5" />{t('taskWorkspacePause')}</button> : null}
+            {['running', 'queued', 'retrying'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('pause')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Pause className="h-3.5 w-3.5" />{t('taskWorkspacePause')}</button> : null}
             {['paused', 'stalled', 'waiting_user'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('resume')} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Play className="h-3.5 w-3.5" />{t('taskRunResume')}</button> : null}
             {['failed', 'cancelled'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('retry')} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskRunRetry')}</button> : null}
             {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('cancel')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Square className="h-3.5 w-3.5" />{t('taskRunCancel')}</button> : null}
           </div>
-          <TaskBudgetControl key={selected.id} task={selected} onChanged={() => refresh()} />
+          {!['running', 'queued', 'retrying'].includes((currentExecution ?? selected).status) ? <TaskBudgetControl key={selected.id} task={selected} onChanged={() => refresh()} /> : null}
           {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} conversationThreadId={conversationForAttention(item)} workspaceRoot={selectedGroup?.all.find(task => task.id === item.taskId)?.workspaceRoot} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
           <details key={`permissions:${(currentExecution ?? selected).id}`} className="mb-4 rounded-lg border border-ds-border p-3 text-xs"><summary className="cursor-pointer font-medium">{t('taskPermissionReview')}</summary><TaskPermissionPanel key={(currentExecution ?? selected).id} taskId={(currentExecution ?? selected).id} revision={(currentExecution ?? selected).revision} autoLoad onConfirmed={message => { setControlNotice(message); void refresh() }} /></details>
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunNodes')}</h3>
@@ -492,12 +413,12 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunArtifacts')}</h3>
           {artifactOpenError ? <p role="alert" className="mb-3 text-xs text-red-600">{artifactOpenError}</p> : null}
           {selectedGroup && taskGroupArtifacts(selectedGroup).length ? <ul className="mb-4 space-y-2">{taskGroupArtifacts(selectedGroup).map(({ task: artifactTask, artifact }) => <li key={`${artifactTask.id}:${artifact.id}`} className="rounded-lg border border-ds-border px-3 py-2"><button type="button" onClick={() => void openArtifact(artifactTask, artifact)} className="flex w-full items-start gap-2 text-left text-xs text-accent"><FileText className="h-4 w-4 shrink-0" /><span className="break-all">{artifact.absolutePath ? artifact.relativePath.split(/[\\/]/).at(-1) : artifact.relativePath}</span></button><p className="mt-1 text-[11px] text-ds-muted">{artifact.storage === 'task' ? `${t('taskArtifactManagedStorage')} · ` : ''}{t(taskArtifactValidationLabelKey(artifactTask, artifact))} · {dateLabel(artifact.createdAt)}</p>{artifact.validationMessage ? <p className="mt-1 text-xs text-ds-muted">{artifact.validationMessage}</p> : null}<TaskArtifactReview task={artifactTask} artifact={artifact} onOpen={() => openArtifact(artifactTask, artifact)} /></li>)}</ul> : <p className="mb-4 text-xs text-ds-faint">{t('taskRunNoArtifacts')}</p>}
-          {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <form onSubmit={event => { event.preventDefault(); void mutate('input') }} className="mb-4 rounded-xl border border-ds-border bg-ds-main p-3"><label htmlFor="task-supplement" className="text-xs font-semibold">{t('taskWorkspaceSupplement')}</label><textarea id="task-supplement" value={drafts[selected.id] ?? ''} onChange={event => setDrafts(current => ({ ...current, [selected.id]: event.target.value }))} rows={3} placeholder={t('taskWorkspaceSupplementHint')} className="mt-2 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-sm" /><button type="submit" disabled={actionBusy || !drafts[selected.id]?.trim()} className="mt-2 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceSendSupplement')}</button></form> : null}
+          {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <form onSubmit={event => { event.preventDefault(); void mutate('input') }} className="mb-4 rounded-xl border border-ds-border bg-ds-main p-3"><label htmlFor="task-supplement" className="text-xs font-semibold">{t('taskWorkspaceSupplement')}</label><textarea id="task-supplement" value={drafts[selected.id] ?? ''} onChange={event => setDrafts(current => ({ ...current, [selected.id]: event.target.value }))} rows={2} placeholder={t('taskWorkspaceSupplementHint')} className="mt-2 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-sm" /><button type="submit" disabled={actionBusy || !drafts[selected.id]?.trim()} className="mt-2 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceSendSupplement')}</button></form> : null}
           {inputs.length ? <details className="mb-4"><summary className="cursor-pointer text-xs font-semibold">{t('taskWorkspaceInputs')} ({inputs.length})</summary><ul className="mt-2 space-y-2">{inputs.map(input => <li key={input.id} className="rounded-lg bg-ds-main p-2 text-xs"><p className="whitespace-pre-wrap">{input.text}</p><p className="mt-1 text-ds-faint">{dateLabel(input.createdAt)} · {input.consumedAt ? t('taskWorkspaceInputConsumed') : input.deliveredAt ? t('taskWorkspaceInputDelivered') : t('taskWorkspaceInputSaved')}</p></li>)}</ul></details> : null}
           {selectedGroup && selectedGroup.children.length ? <div className="mb-4"><h3 className="text-xs font-semibold">{t('taskWorkspaceSubtasks')}</h3><ul className="mt-2 space-y-1.5">{selectedGroup.children.map(child => <li key={child.id} className="flex items-center gap-2 rounded-lg bg-ds-main px-3 py-2 text-xs"><span className="min-w-0 flex-1 truncate">{taskDisplayGoal(child)}</span><span className="shrink-0 text-ds-muted">{t(`taskRunStatus_${child.status}`)}</span></li>)}</ul></div> : null}
           {(currentExecution ?? selected).finalResponse ? <details className="mb-4" open={(currentExecution ?? selected).status === 'completed'}><summary className="cursor-pointer text-xs font-semibold">{t('taskWorkspaceResult')}</summary><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">{(currentExecution ?? selected).finalResponse}</p></details> : null}
           <details><summary className="cursor-pointer text-xs text-ds-muted">{t('taskWorkspaceActivity')} ({events.length})</summary><ol className="mt-2 space-y-2">{events.map(event => <li key={`${event.taskId}:${event.sequence}`} className="text-xs"><time className="text-ds-faint">{dateLabel(event.createdAt)}</time><p>{t(`taskEvent_${event.kind}`, { defaultValue: t('taskWorkspaceStatusUpdated') })}</p></li>)}</ol></details>
-        </article> : <div className="ds-task-workspace-empty rounded-xl border border-dashed border-ds-border p-8 text-center text-sm text-ds-faint">{t('taskWorkspaceSelectTask')}</div>}
+        </article> : selectedAttentionId ? null : <div className="ds-task-workspace-empty rounded-xl border border-dashed border-ds-border p-8 text-center text-sm text-ds-faint">{t('taskSidebarSelect')}</div>}
       </div>
     </div>
     {templateId ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5" onClick={() => { if (!actionBusy) setTemplateId(null) }}><form role="dialog" aria-modal="true" aria-labelledby="task-template-title" onSubmit={event => void launchTemplate(event)} onClick={event => event.stopPropagation()} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-ds-border bg-ds-card p-5 shadow-xl"><div className="flex items-center gap-3"><h2 id="task-template-title" className="flex-1 text-base font-semibold">{t(`taskTemplate_${templateId}`)}</h2><button type="button" disabled={actionBusy} aria-label={t('taskWorkspaceClose')} onClick={() => setTemplateId(null)}><X className="h-4 w-4" /></button></div><p className="mt-2 break-all text-xs text-ds-muted">{workspaceRoot}</p><div className="mt-4 space-y-2 rounded-lg border border-ds-border p-3 text-xs">

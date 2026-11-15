@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { getTaskState, refreshTaskState, resetTaskStateForTests, retainTaskState } from './task-live-store'
+import { getTaskState, refreshTaskState, resetTaskStateForTests, retainTaskState, updateTaskNavigation } from './task-live-store'
 let event: (payload: { streamId: string; events: unknown[] }) => void
 const releases: Array<() => void> = []
 beforeEach(() => {
@@ -61,4 +61,15 @@ it('applies resolved attention and leaves OS deduplication to the persistent led
   expect(window.workwise.notifyTask).toHaveBeenCalledTimes(1)
   event({ streamId, events: [{ seq: 6, kind: 'attention_changed', payload: { id: 'a', status: 'answered' } }] })
   expect(getTaskState().attention).toEqual([])
+})
+
+it('keeps unchanged navigation snapshots stable, including empty task selection', () => {
+  const before = getTaskState()
+  updateTaskNavigation({ selectedTaskId: null, selectedAttentionId: null })
+  expect(getTaskState()).toBe(before)
+  updateTaskNavigation({ search: 'report' })
+  const changed = getTaskState()
+  expect(changed.navigation.search).toBe('report')
+  updateTaskNavigation({ search: 'report' })
+  expect(getTaskState()).toBe(changed)
 })

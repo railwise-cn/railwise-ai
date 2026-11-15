@@ -224,3 +224,42 @@ it.each(['configured-observe', 'missing-identity', 'wrong-provider'])('preserves
     expect(f.repository.operations(f.task.id, 'browser_action_authorization')).toHaveLength(0)
   } finally { f.repository.close() }
 })
+
+it.each(['legacy-inert-bridge', 'real-identity-changed', 'other-provider-changed', 'bad-authority-seal'] as const)('preserves sealed legacy occurrence source provenance only for an inert bridge projection: %s', async variation => {
+  const f = await fixture()
+  try {
+    const sourceId = 'legacy-source-task', scheduleId = `schedule_${sourceId}`, scopeHash = sha('legacy-scope'), versionId = 'published-legacy-version', dueAt = fixtureTime
+    const task = f.repository.get(f.task.id)!, thread = (await f.threadStore.get(f.thread.id))!, old = thread.turns.find(turn => turn.id === 'old-turn')!
+    f.repository.create({ ...task, id: sourceId, threadId: 'source-thread', activeTurnId: undefined, scheduledBy: undefined, nodes: [], artifacts: [] })
+    const oldIdentities = { 'mcp:gui_schedule': 'a'.repeat(64), 'browser-skill': variation === 'real-identity-changed' ? 'b'.repeat(64) : 'c'.repeat(64),
+      ...(variation === 'other-provider-changed' ? { 'mcp:gui_schedule_extra': 'a'.repeat(64) } : {}) }
+    const authority = { taskId: sourceId, prompt: task.goal,
+      scope: { browserScope: old.executionGrant!.browserScope, connectorIdentityFingerprints: oldIdentities, browserScheduleActions: [] }, authorization: { scopeHash } }
+    const authorityHash = sha(JSON.stringify(authority))
+    f.repository.beginOperation({ ownerId: sourceId, kind: 'schedule_authority', idempotencyKey: 'legacy-authority', request: { scopeHash }, nowIso: fixtureTime })
+    f.repository.finishOperation(sourceId, 'legacy-authority', { status: 'succeeded', result: { authority, authorityHash } }, fixtureTime)
+    f.repository.beginOperation({ ownerId: thread.id, kind: 'scheduled_task_prepare', idempotencyKey: 'scheduled-task-context',
+      request: { scheduleId, versionId, dueAt, authorityHash: variation === 'bad-authority-seal' ? 'f'.repeat(64) : authorityHash }, nowIso: fixtureTime })
+    f.repository.finishOperation(thread.id, 'scheduled-task-context', { status: 'succeeded', result: { prepared: true } }, fixtureTime)
+    f.repository.update(task.id, task.revision, current => ({ ...current, scheduledBy: { scheduleId, dueAt } }))
+    // Import an internally consistent legacy test snapshot. It changes only
+    // this isolated SQLite fixture, never a real user receipt or profile.
+    const grant = ExecutionGrantSchema.parse({ ...old.executionGrant!, connectorIdentityFingerprints: { 'browser-skill': 'c'.repeat(64),
+      ...(variation === 'other-provider-changed' ? { 'mcp:gui_schedule_extra': 'b'.repeat(64) } : {}) }, scheduleScopeHash: scopeHash,
+      browserScheduleBinding: { scheduleId, versionId, scopeHash, sourceTaskId: sourceId, actionsHash: sha(JSON.stringify([])) } })
+    await f.threadStore.upsert({ ...thread, turns: thread.turns.map(turn => turn.id === old.id ? { ...turn, executionGrant: grant } : turn) })
+    f.repository.beginOperation({ ownerId: sourceId, kind: 'browser_binding', idempotencyKey: 'legacy-browser-binding',
+      request: { browserInstanceId: grant.browserScope!.browserInstanceId, expectedBrowserRevision: grant.browserScope!.revision }, nowIso: fixtureTime })
+    f.repository.finishOperation(sourceId, 'legacy-browser-binding', { status: 'succeeded', result: { purpose: task.goal, origins } }, fixtureTime)
+    const isolated = new Database(join(f.root, 'tasks.sqlite3'))
+    try {
+      for (const row of f.repository.operations(task.id, 'tool').filter(row => row.request?.turnId === old.id && row.request.toolName === 'browser_get_html')) {
+        const request = { ...row.request, executionGrant: grant }
+        isolated.prepare('UPDATE operation_receipts SET data_json=? WHERE owner_id=? AND idempotency_key=?').run(JSON.stringify({ ...row, request, fingerprint: operationFingerprint(request) }), row.ownerId, row.idempotencyKey)
+      }
+    } finally { isolated.close() }
+    const sealedBefore = JSON.stringify(f.repository.operations(sourceId, 'schedule_authority'))
+    expect((await f.assessment(report())).complete).toBe(variation === 'legacy-inert-bridge')
+    expect(JSON.stringify(f.repository.operations(sourceId, 'schedule_authority'))).toBe(sealedBefore)
+  } finally { f.repository.close() }
+})

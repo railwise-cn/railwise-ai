@@ -117,3 +117,29 @@ it('enforces the total cap and terminal/child restrictions at the repository tra
   const capped = repository.update(task.id, task.revision, value => ({ ...value, budget: { ...value.budget, maxExecutionMs: 28_800_000 } }), { key: 'cap', kind: 'synthetic' })
   expect(() => repository.extendExecutionBudget(task.id, capped.revision, 60_000, 'cap', new Date().toISOString())).toThrow()
 })
+
+
+it('extends a stopped failed root without clearing failure, attempts, history, authority or shared usage', async () => {
+  const { runtime, repository, task, api } = await setup()
+  const failed = repository.update(task.id, task.revision, value => ({ ...value, status: 'failed', attempts: 14,
+    budget: { ...value.budget, maxAttempts: 8 }, stalledReason: 'Previous source verification failed' }), { key: 'failed-before-retry', kind: 'synthetic' })
+  const original = repository.beginOperation({ ownerId: task.id, kind: 'tool', idempotencyKey: 'historical-unknown', request: { toolName: 'synthetic_write' }, nowIso: task.createdAt }).receipt
+  repository.finishOperation(task.id, original.idempotencyKey, { status: 'outcome_unknown' }, task.createdAt)
+  const historical = repository.operation(task.id, original.idempotencyKey)
+  const work = repository.connection().prepare('SELECT * FROM task_work_spans WHERE root_id=?').all(task.id)
+  const runTurn = vi.spyOn(runtime, 'runTurn')
+  const request = { expectedRevision: failed.revision, idempotencyKey: 'failed-extension', additionalExecutionMs: 600_000 }
+  const response = await api(request)
+  expect(response.status).toBe(200)
+  const next = TaskRunSchema.parse(await response.json())
+  expect(next).toMatchObject({ status: 'failed', attempts: 14, stalledReason: failed.stalledReason,
+    budget: { ...failed.budget, maxExecutionMs: 2_400_000 } })
+  expect(next.authority).toEqual(failed.authority)
+  expect(repository.execution.usedExecutionMs(task.id, Date.now())).toBe(1_682_941)
+  expect(repository.execution.usedCost(task.id)).toBe(0.5)
+  expect(repository.connection().prepare('SELECT * FROM task_work_spans WHERE root_id=?').all(task.id)).toEqual(work)
+  expect(repository.operation(task.id, original.idempotencyKey)).toEqual(historical)
+  expect(runTurn).not.toHaveBeenCalled()
+  expect(await (await api(request)).json()).toEqual(next)
+  expect(repository.events(task.id).filter(event => event.kind === 'task_execution_budget_extended')).toHaveLength(1)
+})

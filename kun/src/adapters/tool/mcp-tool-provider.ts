@@ -1,5 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { createHash } from 'node:crypto'
+import { isTaskScheduleBridgeServer } from '../../contracts/task-schedule-policy.js'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
@@ -351,7 +352,7 @@ function assertMcpAuthority(state: McpConnectionState, context: ToolHostContext)
 
 /** Task schedules must use their task-owned authority and readback, including on replay. */
 function taskScheduleBridgeBlock(serverId: string, context: ToolHostContext): { code: string; message: string } | undefined {
-  if (!context.executionGrant?.taskId || !['gui_schedule', 'claw_schedule'].includes(serverId)) return undefined
+  if (!context.executionGrant?.taskId || !isTaskScheduleBridgeServer(serverId)) return undefined
   return { code: 'execution_grant_scope', message: '当前任务不能使用兼容定时桥。请使用 schedule_task 建立本任务计划，再用 list_schedules 读回验收。' }
 }
 

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isLocalHtmlCreativeRequest } from './task-source-intent.js'
 
 export const BrowserOrigin = z.string().refine(value => {
   try {
@@ -68,6 +69,7 @@ export type BrowserCapabilityConfig = z.infer<typeof BrowserCapabilityConfig>
 
 export function isBrowserTask(text: string): boolean {
   if (/^(?:如何|怎么|怎样|什么是|介绍|解释|how\s+to\b|what\s+is\b)/i.test(text.trim())) return false
+  if (isLocalHtmlCreativeRequest(text) && !/(?:browser|broswer|browse)[-_ ]?skill/i.test(text)) return false
   return /(?:browser|broswer|browse)[-_ ]?skill|浏览器|网页.*(?:点击|填写|填表|操作|截图|提取|打开)|(?:点击|填写|填表|操作|截图|提取).*网页|\b(?:chrome|edge)\b/i.test(text)
 }
 
@@ -117,3 +119,31 @@ export const BrowserOperationConfirmation = z.object({
 export type BrowserOperationConfirmation = z.infer<typeof BrowserOperationConfirmation>
 export type BrowserOperationReview = { id: string; expiresAt: string; action: 'click' | 'fill'; pageUrl: string;
   observationText: string; targetLabel?: string; value?: string }
+
+
+/** A complete retained HTTP representation loaded by the owned browser. This is
+ * neither an iframe DOM snapshot nor authority to replay a request. */
+export const BrowserLoadedResponseProofSchema = z.object({
+  schemaVersion: z.literal(1), sourceKind: z.literal('actual_loaded_response'),
+  taskId: identifierForLoadedResponse(), turnId: identifierForLoadedResponse(),
+  sessionId: identifierForLoadedResponse(), tabId: z.number().int().positive(),
+  captureRunId: identifierForLoadedResponse(), captureName: identifierForLoadedResponse(),
+  parentSourceUrl: z.string().url().max(4096), responseUrl: z.string().url().max(4096),
+  parentFrameId: identifierForLoadedResponse(), loaderId: identifierForLoadedResponse(),
+  parentDocumentRequestId: identifierForLoadedResponse(), responseRequestId: identifierForLoadedResponse(),
+  grantFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  configurationFingerprint: z.string().min(1).max(512),
+  articleIdHash: z.string().regex(/^[a-f0-9]{64}$/), titleHash: z.string().regex(/^[a-f0-9]{64}$/),
+  association: z.enum(['title', 'projectName']), associationHash: z.string().regex(/^[a-f0-9]{64}$/),
+  contentPointer: z.string().min(1).max(1024),
+  responseUtf16Units: z.number().int().positive().max(65536), responseUtf8Bytes: z.number().int().positive().max(262144),
+  responseSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  htmlUtf8Bytes: z.number().int().positive().max(262144), htmlSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  responseBodyState: z.literal('available'), responseBodyRedacted: z.literal(false),
+  nativeParentIdentityMatched: z.literal(true), latestParentLoaderMatched: z.literal(true),
+  chunks: z.array(z.object({ offset: z.number().int().nonnegative(), end: z.number().int().positive(),
+    utf16Units: z.number().int().positive().max(16384), utf8Bytes: z.number().int().positive().max(65536),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict()).min(1).max(5)
+}).strict()
+export type BrowserLoadedResponseProof = z.infer<typeof BrowserLoadedResponseProofSchema>
+function identifierForLoadedResponse() { return z.string().trim().min(1).max(512) }

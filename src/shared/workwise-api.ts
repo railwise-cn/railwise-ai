@@ -415,6 +415,7 @@ export type WorkWiseApi = {
   listTaskPage: (query?: import('./agent-workbench').TaskPageQuery) => Promise<import('./agent-workbench').TaskRunPage>
   startTaskSse: (sinceSeq: number, streamId?: string) => Promise<{streamId:string}>
   listTaskRuns: (query?: TaskRunListQuery) => Promise<TaskRunV1[]>
+  revalidateTaskArtifacts: (taskId: string, request: Pick<RevisionTaskAction, 'expectedRevision' | 'idempotencyKey'> & { confirmed: true }) => Promise<{ task: TaskRunV1; corrected: boolean; completed: boolean; reason?: string }>
   extendTaskBudget: (taskId: string, request: Pick<RevisionTaskAction, 'expectedRevision' | 'idempotencyKey'> & { additionalExecutionMs: number }) => Promise<TaskRunV1>
   resumeTask: (taskId: string, request: RevisionTaskAction) => Promise<{ task: TaskRunV1; turn?: unknown; capability?: import('./task-command').ExternalTaskCapability; attentionId?: string }>
   retryTask: (taskId: string, request: RevisionTaskAction) => Promise<{ task: TaskRunV1; turn?: unknown; capability?: import('./task-command').ExternalTaskCapability; attentionId?: string }>

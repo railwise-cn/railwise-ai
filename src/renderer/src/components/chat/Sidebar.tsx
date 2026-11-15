@@ -27,6 +27,7 @@ import {
   SidebarCommandRow,
   SidebarFrame
 } from '../sidebar/SidebarPrimitives'
+import { TaskSidebar } from '../tasks/TaskSidebar'
 import { WorkspaceSecondaryNavigation } from '../sidebar/WorkspaceSecondaryNavigation'
 
 type Props = {
@@ -186,6 +187,8 @@ export function Sidebar({
           onDisconnect={(channelId) => deleteClawChannel(channelId)}
           onOpenSettings={() => onOpenSettings('claw')}
         />
+      ) : navigationRoute === 'tasks' ? (
+        <TaskSidebar workspaceRoot={workspaceRoot} runtimeReady={runtimeReady} onChooseWorkspace={() => void chooseWorkspace()} />
       ) : activeView === 'claw' ? (
         <ClawSidebarContent
           channels={clawChannels}

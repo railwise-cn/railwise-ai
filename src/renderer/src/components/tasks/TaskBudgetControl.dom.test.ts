@@ -48,3 +48,12 @@ it.each([{ status: 'running' }, { status: 'completed' }, { parentTaskId: 'parent
   const { container } = await mount(overrides as Partial<TaskRunV1>)
   expect(container.querySelector('button')).toBeNull()
 })
+
+it('adds time to a failed root while preserving its failed state and requiring a separate Retry', async () => {
+  const { container, extendTaskBudget, resumeTask, click } = await mount({ status: 'failed' })
+  await click()
+  expect(extendTaskBudget).toHaveBeenCalledOnce()
+  expect(container.textContent).toContain('任务仍失败')
+  expect(container.textContent).toContain('重试')
+  expect(resumeTask).not.toHaveBeenCalled()
+})

@@ -4,8 +4,10 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TaskAttentionV1, TaskOperationReceiptV1, TaskPermissionSnapshotV1, TaskRunV1 } from '@shared/agent-workbench'
 import i18n from '../../i18n'
+import { TaskSidebar } from './TaskSidebar'
+import { taskDisplayTitle } from '@shared/task-presentation'
 import { TaskWorkspaceView, filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from './TaskWorkspaceView'
-import { resetTaskStateForTests, refreshTaskState } from '../../store/task-live-store'
+import { resetTaskStateForTests, refreshTaskState, updateTaskNavigation } from '../../store/task-live-store'
 
 const now = '2026-11-09T01:00:00.000Z'
 function task(id: string, status: TaskRunV1['status'], goal = id): TaskRunV1 {
@@ -110,10 +112,10 @@ beforeEach(async () => {
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
-  await act(async () => root.render(createElement(TaskWorkspaceView, {
+  await act(async () => root.render(createElement('div', null, createElement(TaskSidebar, { workspaceRoot: '/workspace', runtimeReady: true, onChooseWorkspace: vi.fn() }), createElement(TaskWorkspaceView, {
     workspaceRoot: '/workspace', runtimeReady: true, leftSidebarCollapsed: false,
     onToggleLeftSidebar: vi.fn(), onOpenThread, onOpenArtifact
-  })))
+  }))))
   await settle()
   await settle()
 })
@@ -126,6 +128,62 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('leaves a resolved standalone attention card and returns to an available task', async () => {
+    inbox = [{ ...approval, id: 'standalone-review', taskId: undefined, threadId: undefined, workspaceRoot: '/workspace', title: 'Standalone review' }]
+    await act(async () => refreshTaskState())
+    await act(async () => updateTaskNavigation({ selectedTaskId: null, selectedAttentionId: 'standalone-review' }))
+    await settle()
+    expect(container.querySelector('[aria-label="Task details"]')).toBeNull()
+    inbox = []
+    await act(async () => refreshTaskState())
+    await settle()
+    expect(container.querySelector('[aria-label="Task details"]')).not.toBeNull()
+  })
+  it('renders an empty task workspace without a repeated selection update', async () => {
+    tasks = []
+    inbox = []
+    await act(async () => refreshTaskState())
+    await settle()
+    expect(container.querySelectorAll('.ds-task-sidebar button[aria-pressed="true"]')).toHaveLength(1)
+    expect(container.querySelector('.ds-task-workspace-empty')?.textContent).toContain('Select a task in the sidebar')
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('keeps one task list in the left sidebar and a single current task in the work surface', async () => {
+    await i18n.changeLanguage('zh')
+    const goal = '创建一个完整、独立运行的 HTML 文件，使用 SVG 绘制一只正在骑自行车的鹈鹕，并制作成二维动画。所有代码包含在同一个文件中。'
+    tasks[0] = { ...tasks[0], goal, status: 'stalled' }
+    await act(async () => refreshTaskState())
+    const workspace = container.querySelector('[aria-label="任务"]')!
+    expect(container.querySelectorAll('[aria-label="任务列表"]')).toHaveLength(1)
+    expect(workspace.querySelector('[aria-label="任务列表"]')).toBeNull()
+    expect(workspace.querySelector('[aria-label="任务筛选"]')).toBeNull()
+    expect(workspace.querySelector('input[type="search"]')).toBeNull()
+    expect(workspace.querySelector('h2')?.textContent).toContain('鹈鹕')
+    const original = [...workspace.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent === '原始要求')!
+    expect(original.open).toBe(false)
+    expect(original.textContent).toContain(goal)
+    expect([...workspace.querySelectorAll('button')].some(button => button.textContent === '暂停')).toBe(false)
+  })
+
+  it('explicitly rechecks an existing local HTML output without starting a model or discarding the task', async () => {
+    tasks[0] = { ...tasks[0], status: 'stalled', goal: '使用 SVG 绘制一只骑自行车的鹈鹕，生成独立 HTML 动画，打开浏览器即可查看。',
+      acceptance: { ...tasks[0].acceptance, kind: 'files', requiredFormats: ['html'], requiresWebEvidence: true, requiredSourceOrigins: [] },
+      artifacts: [{ id: 'html', relativePath: 'pelican.html', storage: 'task', validation: 'valid', sha256: 'a'.repeat(64), sourceEvidenceStatus: 'draft', createdAt: now }] }
+    const revalidate = vi.fn(async () => {
+      tasks[0] = { ...tasks[0], status: 'completed', revision: 2, acceptance: { ...tasks[0].acceptance, requiresWebEvidence: false }, artifacts: [{ ...tasks[0].artifacts[0], sourceEvidenceStatus: undefined }] }
+      return { task: tasks[0], corrected: true, completed: true, reason: 'Local output checked.' }
+    })
+    Object.assign(window.workwise, { revalidateTaskArtifacts: revalidate })
+    await act(async () => refreshTaskState())
+    await click('Recheck existing output')
+    expect(revalidate).toHaveBeenCalledWith('t1', { expectedRevision: 1, idempotencyKey: expect.any(String), confirmed: true })
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+    expect(container.querySelector('[aria-label="Task details"]')?.textContent).toContain('pelican.html')
+    expect(container.querySelector('nav[aria-label="Task filters"] button[aria-pressed="true"]')?.textContent).toContain('Completed')
+  })
+
   it('labels sourced HTML drafts and verified outputs separately while keeping ordinary file validation and draft preview', async () => {
     await i18n.changeLanguage('zh')
     tasks[0].acceptance.requiresWebEvidence = true
@@ -344,8 +402,8 @@ describe('TaskWorkspaceView', () => {
     inbox = []
     await act(async () => { await i18n.changeLanguage(language); await refreshTaskState() })
     await click(completed)
-    expect(container.querySelector(`[aria-label="${details}"] h2`)?.textContent).toBe(goal)
-    expect(container.querySelector(`[aria-label="${language === 'zh' ? '任务列表' : 'Task list'}"]`)?.textContent).toContain(goal)
+    expect(container.querySelector(`[aria-label="${details}"] h2`)?.textContent).toBe(taskDisplayTitle({ goal }))
+    expect([...container.querySelectorAll('[aria-label] button[title]')].some(button => button.getAttribute('title') === goal)).toBe(true)
     expect(container.textContent).not.toContain('propose_document')
     expect(container.textContent).not.toContain('source_refs')
     expect(container.textContent).not.toMatch(/taskWorkspace[A-Z]/)

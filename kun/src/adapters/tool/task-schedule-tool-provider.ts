@@ -10,6 +10,6 @@ export function buildTaskScheduleToolProvider(service: () => TaskScheduleService
       execute: async (_args, context) => ({ output: { schedule: await service().create(context) } }) }),
     defineLocalTool({ name: 'list_schedules', description: '读回当前任务的已保存定时计划、每日执行时刻、时区和下一次执行时间。Read back saved recurring schedules and verify the requested daily times.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false }, policy: 'auto',
-      execute: async (_args, context) => ({ output: service().readback(context) }) })
+      execute: async (_args, context) => ({ output: await service().readback(context) }) })
   ] }
 }

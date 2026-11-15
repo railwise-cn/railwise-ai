@@ -1,4 +1,5 @@
 import { recoverablePermissionFailure } from './task-permission-recovery.js'
+import { legacyLocalArtifactSourceMismatch } from '../contracts/task-source-intent.js'
 import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { BrowserScheduleActionSchema } from '../contracts/browser-schedule-actions.js'
 import { browserVerificationPolicy } from '../contracts/browser-skill.js'
@@ -134,8 +135,8 @@ export class TaskRunRepository {
       const task = this.get(taskId)
       if (!task) throw Object.assign(new Error('task not found'), { code: 'not_found' })
       if (task.revision !== expectedRevision) throw new TaskRevisionConflictError(expectedRevision, task.revision)
-      if (task.parentTaskId || task.retryOfTaskId || task.rootTaskId && task.rootTaskId !== task.id || task.status !== 'paused' || task.budget.version !== 2) {
-        throw Object.assign(new Error('请先暂停根任务；仅支持追加新版任务的执行时间。'), { code: 'invalid_state' })
+      if (task.parentTaskId || task.retryOfTaskId || task.rootTaskId && task.rootTaskId !== task.id || !['paused', 'failed'].includes(task.status) || task.budget.version !== 2) {
+        throw Object.assign(new Error('请先暂停根任务或等待其失败停止；仅支持追加新版任务的执行时间。'), { code: 'invalid_state' })
       }
       const before = task.budget.maxExecutionMs ?? task.budget.maxDurationMs
       if (!Number.isSafeInteger(additionalMs) || additionalMs! < 60_000 || additionalMs! > 3_600_000 || before + additionalMs! > 28_800_000) {
@@ -261,7 +262,7 @@ export class TaskRunRepository {
     return rows.map(row => this.parseRun(row))
   }
 
-  /** The sole terminal-state exception repairs an evidenced pre-execution permission failure.
+  /** An evidenced pre-execution permission failure can be repaired.
    * It is configuration-only: no new task, attempt, budget or executable Turn is created.
    */
   private isPermissionRepair(current: TaskRun, candidate: TaskRun, event?: { key: string; kind: string; payload?: Record<string, unknown>; createdAt?: string }): boolean {
@@ -284,6 +285,24 @@ export class TaskRunRepository {
       event.key === `permission-base-restored:${grant.id}:${receipt.request.idempotencyKey}`)
   }
 
+  /** Only an explicit, prepared local-artifact recheck may settle this legacy failed classification. */
+  private isLocalArtifactRevalidation(current: TaskRun, candidate: TaskRun, event?: { key: string; kind: string; payload?: Record<string, unknown>; createdAt?: string }): boolean {
+    if (current.status !== 'failed' || candidate.status !== 'completed' || !legacyLocalArtifactSourceMismatch(current) ||
+      event?.kind !== 'local_artifact_acceptance_revalidated' || event.payload?.completed !== true || !event.createdAt) return false
+    const control = this.operations(current.id, 'revalidate_artifacts').find(receipt => receipt.status === 'prepared' &&
+      receipt.request?.confirmed === true && receipt.request.expectedRevision === current.revision && event.key === `local-artifact-revalidated:${receipt.idempotencyKey}`)
+    if (!control || this.execution.attempts(current.id).some(attempt => attempt.status === 'running')) return false
+    const expectedAcceptance = { ...current.acceptance, sourceInferenceVersion: 1, requiresWebEvidence: false, requiredSourceOrigins: [] }
+    if (operationFingerprint(candidate.acceptance) !== operationFingerprint(expectedAcceptance) || !candidate.artifacts.length ||
+      candidate.artifacts.some(artifact => artifact.validation !== 'valid' || !current.artifacts.some(old => old.id === artifact.id && old.sha256 === artifact.sha256 && old.relativePath === artifact.relativePath))) return false
+    const stable = (task: TaskRun) => {
+      const { status: _status, acceptance: _acceptance, nodes: _nodes, artifacts: _artifacts, finalResponse: _reply, finishedAt: _finished,
+        waitingReason: _waiting, stalledReason: _stalled, updatedAt: _updated, ...rest } = task
+      return rest
+    }
+    return operationFingerprint(stable(current)) === operationFingerprint(stable(candidate))
+  }
+
   update(
     taskId: string,
     expectedRevision: number,
@@ -301,7 +320,7 @@ export class TaskRunRepository {
         throw new TaskRevisionConflictError(expectedRevision, current.revision)
       }
       const candidate = mutator(current)
-      if (TERMINAL_TASK_STATUSES.has(current.status) && candidate.status !== current.status && !this.isPermissionRepair(current, candidate, event)) {
+      if (TERMINAL_TASK_STATUSES.has(current.status) && candidate.status !== current.status && !this.isPermissionRepair(current, candidate, event) && !this.isLocalArtifactRevalidation(current, candidate, event)) {
         throw Object.assign(new Error(`terminal task cannot transition from ${current.status}`), {
           code: 'invalid_state'
         })

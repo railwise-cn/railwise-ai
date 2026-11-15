@@ -876,9 +876,9 @@ export async function createKunServeRuntime(
     nowIso
   })
   const connectorPreflight = contextualExternalTaskPreflight({
-    providerPreflight: async (text: string, thread) => {
+    providerPreflight: async (text: string, thread, sourceTask) => {
       const scheduled = thread ? await taskScheduleService?.executionScopeForThread(thread.id) : undefined
-      const browser = await browserRuntime.preflight(text, thread, scheduled?.browserScope)
+      const browser = await browserRuntime.preflight(text, thread, scheduled?.browserScope, sourceTask)
       if (browser) return browser
       if (externalTaskIntent(text)?.provider === 'dingtalk') {
         return useDws() || !dingtalkRuntime.state().enabled ? dwsRuntime.preflight(text) : dingtalkRuntime.preflight(text)
@@ -891,7 +891,7 @@ export async function createKunServeRuntime(
   })
   const localWritePreflight = workspaceWritePreflight({ workspaceTrust, restriction: (threadId, sourceTaskId) => taskExecutionRestriction(threadId, undefined, sourceTaskId) })
   const externalPreflight: typeof connectorPreflight = async (text, thread, sourceTask) => await localWritePreflight(text, thread, sourceTask) ?? await connectorPreflight(text, thread, sourceTask)
-  const taskControlService=new TaskControlService({repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>{void browserRuntime.stopThread(threadId);return delegationRuntime?.abortParent(threadId,reason)},preflightExternalTask:externalPreflight,validateTaskPermission:(threadId,sourceTaskId)=>taskExecutionRestriction(threadId,undefined,sourceTaskId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
+  const taskControlService=new TaskControlService({repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>{void browserRuntime.stopThread(threadId);return delegationRuntime?.abortParent(threadId,reason)},preflightExternalTask:externalPreflight,validateTaskPermission:(threadId,sourceTaskId)=>taskExecutionRestriction(threadId,undefined,sourceTaskId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),validateRetryLocalSchedule:(task,receipt)=>taskScheduleService?.validateRetryLocalSchedule(task,receipt) ?? Promise.resolve(false),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
   const taskCoordinator = new TaskCoordinator({ preflightExternalTask:externalPreflight, controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore,
     async classifyIntent(text, task) {
       const abort = new AbortController()

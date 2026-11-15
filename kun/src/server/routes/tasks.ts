@@ -290,15 +290,19 @@ export async function pauseTask(runtime: ServerRuntime, taskId: string, request:
 export async function extendTaskBudget(runtime: ServerRuntime, taskId: string, request: Request): Promise<JsonResponse | Response> {
   return mutateTask(runtime, taskId, request, 'extend_budget')
 }
+export async function revalidateTaskArtifacts(runtime: ServerRuntime, taskId: string, request: Request): Promise<JsonResponse | Response> {
+  return mutateTask(runtime, taskId, request, 'revalidate_artifacts')
+}
 
-type Action = 'resume' | 'retry' | 'cancel' | 'pause' | 'extend_budget'
+type Action = 'resume' | 'retry' | 'cancel' | 'pause' | 'extend_budget' | 'revalidate_artifacts'
 async function mutateTask(runtime: ServerRuntime, taskId: string, request: Request, action: Action): Promise<JsonResponse | Response> {
   const repository = runtime.taskRepository
   const controller = runtime.taskController
   if (!repository || !controller) return ERRORS.unavailable('task engine is unavailable')
   const body = await readJsonBody(request)
   if (!body.ok) return body.response
-  const schema = action === 'extend_budget' ? TaskMutationRequest.omit({ model: true }).extend({ additionalExecutionMs: z.number().int().min(60_000).max(3_600_000) }).strict() : TaskMutationRequest
+  const schema = action === 'extend_budget' ? TaskMutationRequest.omit({ model: true }).extend({ additionalExecutionMs: z.number().int().min(60_000).max(3_600_000) }).strict()
+    : action === 'revalidate_artifacts' ? TaskMutationRequest.pick({ expectedRevision: true, idempotencyKey: true }).extend({ confirmed: z.literal(true) }).strict() : TaskMutationRequest
   const parsed = schema.safeParse(body.value)
   if (!parsed.success) return ERRORS.validation(`invalid task ${action} body`, parsed.error.issues)
   try {
@@ -309,7 +313,7 @@ async function mutateTask(runtime: ServerRuntime, taskId: string, request: Reque
     }
     const result=await controls.mutate(taskId,action,parsed.data)
     if (result.capability) await runtime.taskCoordinator?.flushCommandMessages()
-    return jsonResponse(action==='resume'||action==='retry'?result:result.task,action==='resume'||action==='retry'?202:200)
+    return jsonResponse(action==='resume'||action==='retry'||action==='revalidate_artifacts'?result:result.task,action==='resume'||action==='retry'?202:200)
   } catch(error) { return taskError(error) }
 }
 
