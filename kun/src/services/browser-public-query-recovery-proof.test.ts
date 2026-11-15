@@ -156,3 +156,30 @@ it('does not consume the due consent again when settling an interrupted ordinary
   expect(f.repo.operations(source.id,'retry')[0]!.status).toBe('succeeded')
   expect(()=>recoveryExecutionScope(f.repo,f.repo.get(child.id)!,f.scopeInput,Date.parse(now))).not.toThrow()
 })
+
+
+it('rejects cross-owner and wrong-kind reference substitutions while preserving the original unknown rows', async () => {
+  const f = await fixture(), raw = [f.host, f.dispatch, f.lock].map(row => JSON.stringify(row))
+  const foreign = f.save('foreign-owner', 'foreign', 'tool', f.host.request!, 'outcome_unknown', f.host.result)
+  const audit = f.repo.operationById(f.binding.ownerTaskId, f.binding.receiptId)!
+  for (const ref of [
+    { ownerId: f.owner.id, id: foreign.id, kind: f.host.kind, fingerprint: foreign.fingerprint },
+    { ownerId: f.owner.id, id: f.host.id, kind: 'browser_action_dispatch', fingerprint: f.host.fingerprint }
+  ]) {
+    const context = { ...f.context, unknowns: [ref, ...f.context.unknowns.slice(1)] }
+    const binding = { ...f.binding, scopeHash: fp(context) }
+    const request = { ...audit.request, context }
+    f.mutate(audit, { request, fingerprint: fp(request), result: { ...audit.result as Record<string, unknown>, binding } })
+    expect(verifiedPublicQueryRecovery(f.repo, binding, false)).toBeUndefined()
+  }
+  expect([f.host, f.dispatch, f.lock].map(row => JSON.stringify(f.repo.operationById(row.ownerId, row.id)))).toEqual(raw)
+})
+
+
+it('does not skip an earlier mismatched id in favor of a later duplicate with the requested kind', async () => {
+  const f = await fixture()
+  f.mutate(f.host, { kind: 'different-kind', status: 'succeeded' })
+  const later = f.save(f.owner.id, 'later-duplicate', 'tool', f.host.request!, 'outcome_unknown', f.host.result)
+  f.mutate(later, { id: f.host.id })
+  expect(verifiedPublicQueryRecovery(f.repo, f.binding)).toBeUndefined()
+})

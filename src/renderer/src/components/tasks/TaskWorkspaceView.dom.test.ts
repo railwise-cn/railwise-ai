@@ -7,6 +7,8 @@ import i18n from '../../i18n'
 import { TaskSidebar } from './TaskSidebar'
 import { taskDisplayTitle } from '@shared/task-presentation'
 import { TaskWorkspaceView, filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from './TaskWorkspaceView'
+import { useChatStore } from '../../store/chat-store'
+import { clearFileReferenceValidationCache } from '../../lib/file-reference-validation'
 import { resetTaskStateForTests, refreshTaskState, updateTaskNavigation } from '../../store/task-live-store'
 
 const now = '2026-11-09T01:00:00.000Z'
@@ -128,6 +130,43 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('renders the static delivery note as Markdown while preserving its completed disclosure', async () => {
+    await import('../chat/StreamdownAssistant')
+    tasks[0] = { ...tasks[0], status: 'completed', finalResponse: '## 交付清单\n\n**已经保存**\n\n- 已生成报告\n- 已核对单位 `毫米`' }
+    inbox = []
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) })
+    await settle()
+    const result = [...container.querySelectorAll('details')].find(element => element.querySelector('summary')?.textContent === i18n.t('common:taskWorkspaceResult'))!
+    expect(result.open).toBe(true)
+    expect(result.querySelector('h2')?.textContent).toBe('交付清单')
+    expect(result.querySelector('[data-streamdown="strong"]')?.textContent, result.innerHTML).toBe('已经保存')
+    expect([...result.querySelectorAll('ul > li')].map(item => item.textContent)).toEqual(['已生成报告', '已核对单位 毫米'])
+    expect(result.querySelector('code')?.textContent).toBe('毫米')
+    expect(result.textContent).not.toContain('##')
+    expect(result.textContent).not.toContain('**')
+  })
+  it('resolves delivery-note links in the selected task workspace instead of the active chat', async () => {
+    await import('../chat/StreamdownAssistant')
+    const previousWorkspace = useChatStore.getState().workspaceRoot
+    const resolveWorkspaceFile = vi.fn(async (request: { path: string; workspaceRoot?: string }) => ({ ok: true, path: `${request.workspaceRoot}/${request.path}` }))
+    Object.assign(window.workwise, { resolveWorkspaceFile })
+    clearFileReferenceValidationCache()
+    try {
+      await act(async () => useChatStore.setState({ workspaceRoot: '/unrelated-chat' }))
+      tasks[0] = { ...tasks[0], status: 'completed', finalResponse: '[已保存的报告](reports/delivery.md)' }
+      inbox = []
+      await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) })
+      await settle()
+      await settle()
+      expect(resolveWorkspaceFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'reports/delivery.md', workspaceRoot: tasks[0].workspaceRoot }))
+      expect(resolveWorkspaceFile.mock.calls.every(([request]) => request.workspaceRoot !== '/unrelated-chat')).toBe(true)
+      expect(container.querySelector('a.ds-file-reference-link')?.textContent).toBe('已保存的报告')
+    } finally {
+      await act(async () => useChatStore.setState({ workspaceRoot: previousWorkspace }))
+      clearFileReferenceValidationCache()
+    }
+  })
+
   it('offers public-query recovery only from the current task server projection', async () => {
     tasks[0] = { ...tasks[0], status: 'stalled', revision: 2 }
     inbox = []

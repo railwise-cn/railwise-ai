@@ -21,7 +21,7 @@ export type PublicQueryRecoveryContext = {
 
 /** A future-consent record never changes OperationReceipt.status/resolution. */
 export function verifiedPublicQueryRecovery(repository: TaskRunRepository, binding: BrowserPublicQueryRecoveryBinding, consumed = true) {
-  const receipt = repository.operations(binding.ownerTaskId, 'browser_public_query_recovery').find(r => r.id === binding.receiptId)
+  const receipt = repository.operationById(binding.ownerTaskId, binding.receiptId, 'browser_public_query_recovery')
   const request = object(receipt?.request), result = object(receipt?.result), context = request.context as PublicQueryRecoveryContext | undefined
   const owner = repository.get(binding.ownerTaskId)
   if (!receipt || receipt.status !== 'succeeded' || receipt.fingerprint !== operationFingerprint(request) || request.confirmed !== true ||
@@ -32,10 +32,15 @@ export function verifiedPublicQueryRecovery(repository: TaskRunRepository, bindi
     operationFingerprint(result.binding) !== operationFingerprint(binding) || result.preparedTaskRevision !== Number(request.expectedRevision) + 1 ||
     !Array.isArray(context.allowedToolNames)||!context.allowedToolNames.length||!Array.isArray(context.allowedProviderIds)||!context.allowedProviderIds.includes('browser-skill')||
     !Array.isArray(context.unknowns) || !context.unknowns.length || context.unknowns.length > 64 ||
-    context.unknowns.some(ref => { const row = repository.operations(ref.ownerId).find(r => r.id === ref.id); return !row || row.kind !== ref.kind || row.fingerprint !== ref.fingerprint || row.status !== 'outcome_unknown' }) ||
     operationFingerprint(context.browserScope) !== operationFingerprint(owner.authority?.browserScope) || owner.authority?.revokedAt ||
     (binding.scheduleId !== context.plan?.scheduleId || binding.versionId !== context.plan?.versionId || binding.planScopeHash !== context.plan?.scopeHash)) return undefined
-  const refs=context.unknowns.map(ref=>repository.operations(ref.ownerId).find(r=>r.id===ref.id)!)
+  const refs: OperationReceipt[] = []
+  for (const ref of context.unknowns) {
+    if (typeof ref.ownerId !== 'string' || typeof ref.id !== 'string' || typeof ref.kind !== 'string') return undefined
+    const row = repository.operationById(ref.ownerId, ref.id)
+    if (!row || row.kind !== ref.kind || row.fingerprint !== ref.fingerprint || row.status !== 'outcome_unknown') return undefined
+    refs.push(row)
+  }
   const hosts=refs.filter(r=>r.kind==='tool')
   if(!hosts.length||hosts.some(host=>{
     const dispatches=refs.filter(r=>r.kind==='browser_action_dispatch'&&r.ownerId===host.ownerId&&r.request?.turnId===host.request?.turnId&&r.request?.toolName===host.request?.toolName&&r.request?.argumentsHash===host.request?.argumentsHash)

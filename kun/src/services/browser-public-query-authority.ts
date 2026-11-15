@@ -21,11 +21,11 @@ export function taskPublicQueryAuthority(repository: TaskRunRepository, task: Ta
   const seen = new Set<string>()
   while (source && !seen.has(source.id) && seen.size < 32) {
     seen.add(source.id)
-    binding = repository.operations(source.id, 'browser_binding').find(receipt => receipt.id === authorization.receiptId)
+    binding = repository.operationById(source.id, authorization.receiptId, 'browser_binding') ?? undefined
     if (binding) break
     if (source.retryOfTaskId) {
       const lineage = verifiedTaskRetryLineage(repository, source)
-      const ancestor = lineage?.tasks.slice(1).find(value => repository.operations(value.id, 'browser_binding').some(receipt => receipt.id === authorization.receiptId))
+      const ancestor = lineage?.tasks.slice(1).find(value => repository.operationById(value.id, authorization.receiptId, 'browser_binding'))
       if (!ancestor || authorization.duration !== 'schedule') return undefined
       source = ancestor
       continue
@@ -128,7 +128,7 @@ export function verifiedTaskPublicQueryAction(repository: TaskRunRepository, ori
     grant.turnId !== original.request?.turnId || dispatch.request?.turnId !== grant.turnId) return undefined
   const authority = taskPublicQueryAuthority(repository, task, grant.browserScope, { historical, sourceTaskId: grant.browserScheduleBinding?.sourceTaskId })
   if (!authority) return undefined
-  const receipt = repository.operations(task.id, 'browser_scope_action_authorization').find(item => item.id === dispatch.request?.scopeActionReceiptId)
+  const receipt = typeof dispatch.request?.scopeActionReceiptId === 'string' ? repository.operationById(task.id, dispatch.request.scopeActionReceiptId, 'browser_scope_action_authorization') : undefined
   const request = object(receipt?.request), result = object(receipt?.result)
   if (!receipt || receipt.status !== 'succeeded' || receipt.fingerprint !== operationFingerprint(request) || result.id !== operationFingerprint(request) ||
     request.purposeHash !== authority.authorization.purposeHash || request.requirementHash !== authority.authorization.requirementHash ||

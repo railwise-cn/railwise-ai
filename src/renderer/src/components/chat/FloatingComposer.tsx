@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -522,6 +523,23 @@ export function formatGoalElapsedSeconds(seconds: number): string {
     : `${hours}h ${remainingMinutes}m`
 }
 
+/** Reveal only within the mounted suggestion list; never scroll the input or page. */
+function revealActiveSuggestion(list: HTMLDivElement | null): void {
+  if (!list || list.clientHeight <= 0 || list.offsetHeight <= 0) return
+  const active = list.querySelector<HTMLElement>('[data-composer-active="true"]')
+  if (!active) return
+  const bounds = list.getBoundingClientRect()
+  // BCR includes actual CSS zoom; scrollTop/clientHeight use layout pixels.
+  const scale = bounds.height / list.offsetHeight
+  if (!Number.isFinite(scale) || scale <= 0) return
+  const item = active.getBoundingClientRect()
+  const top = bounds.top + list.clientTop * scale
+  const bottom = top + list.clientHeight * scale
+  const delta = item.top < top ? (item.top - top) / scale
+    : item.bottom > bottom ? (item.bottom - bottom) / scale : 0
+  list.scrollTop = Math.max(0, Math.min(list.scrollHeight - list.clientHeight, list.scrollTop + delta))
+}
+
 export function FloatingComposer({
   variant = 'default',
   composerMinHeight = 36,
@@ -694,6 +712,9 @@ export function FloatingComposer({
   const [reviewRepositoryRoot, setReviewRepositoryRoot] = useState('')
   const composerRootRef = useRef<HTMLDivElement | null>(null)
   const suggestionAnchorRef = useRef<HTMLDivElement | null>(null)
+  const slashListRef = useRef<HTMLDivElement | null>(null)
+  const skillListRef = useRef<HTMLDivElement | null>(null)
+  const fileListRef = useRef<HTMLDivElement | null>(null)
   const composerMenuButtonRef = useRef<HTMLButtonElement | null>(null)
   const composerMenuPanelRef = useRef<HTMLDivElement | null>(null)
 
@@ -930,6 +951,11 @@ export function FloatingComposer({
     fileMentionSuggestions.length > 0
       ? fileMentionSuggestions[Math.min(selectedFileMentionIndex, fileMentionSuggestions.length - 1)]
       : null
+  useLayoutEffect(() => {
+    revealActiveSuggestion(slashQuery != null ? slashListRef.current
+      : showSkillMentionMenu ? skillListRef.current : showFileMentionMenu ? fileListRef.current : null)
+  }, [slashQuery, showSkillMentionMenu, showFileMentionMenu, highlightedSlashCommand?.id,
+    highlightedSkillMention?.id, highlightedFileMention?.relativePath, suggestionMaxHeight])
   const parsedGoalCommand = parseGoalCommand(input)
   const goalPanelDraftObjective = getGoalPanelDraftObjective(input, goalPanelOpen)
   const canSetGoalPanelDraft =
@@ -1656,17 +1682,18 @@ export function FloatingComposer({
         ) : null}
 
         {slashQuery != null ? (
-          <div style={{ maxHeight: suggestionMaxHeight ?? undefined }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[760px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
+          <div style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[760px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
             <div className="flex h-7 shrink-0 items-center px-2.5 text-[11.5px] font-semibold text-ds-muted">
               {t('slashCommandMenuTitle')}
             </div>
             {filteredSlashCommands.length > 0 ? (
-              <div className="flex min-h-0 max-h-[300px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+              <div ref={slashListRef} className="flex min-h-0 max-h-[300px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
                 {filteredSlashCommands.map((command) => {
                   const active = highlightedSlashCommand?.id === command.id
                   return (
                     <button
                       key={command.id}
+                      data-composer-active={active ? 'true' : undefined}
                       type="button"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => applySlashCommand(command.id)}
@@ -1715,17 +1742,18 @@ export function FloatingComposer({
         ) : null}
 
         {showSkillMentionMenu ? (
-          <div style={{ maxHeight: suggestionMaxHeight ?? undefined }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
+          <div style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
             <div className="flex h-7 shrink-0 items-center gap-2 px-2.5 text-[11.5px] font-semibold text-ds-muted">
               <Sparkles className="h-3.5 w-3.5 text-ds-faint" strokeWidth={1.9} />
               <span>{t('composerSkillMentionMenuTitle')}</span>
             </div>
-            <div className="flex min-h-0 max-h-[280px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+            <div ref={skillListRef} className="flex min-h-0 max-h-[280px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
               {skillMentionSuggestions.map((skill) => {
                 const active = highlightedSkillMention?.id === skill.id
                 return (
                   <button
                     key={skill.id}
+                    data-composer-active={active ? 'true' : undefined}
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => applySkillMention(skill)}
@@ -1753,7 +1781,7 @@ export function FloatingComposer({
         ) : null}
 
         {showFileMentionMenu ? (
-          <div style={{ maxHeight: suggestionMaxHeight ?? undefined }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
+          <div style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
             <div className="flex h-7 shrink-0 items-center gap-2 px-2.5 text-[11.5px] font-semibold text-ds-muted">
               <FileText className="h-3.5 w-3.5 text-ds-faint" strokeWidth={1.9} />
               <span>{t('composerFileMentionMenuTitle')}</span>
@@ -1762,12 +1790,13 @@ export function FloatingComposer({
               ) : null}
             </div>
             {fileMentionSuggestions.length > 0 ? (
-              <div className="flex min-h-0 max-h-[280px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+              <div ref={fileListRef} className="flex min-h-0 max-h-[280px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
                 {fileMentionSuggestions.map((reference) => {
                   const active = highlightedFileMention?.relativePath === reference.relativePath
                   return (
                     <button
                       key={reference.relativePath}
+                      data-composer-active={active ? 'true' : undefined}
                       type="button"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => applyFileMention(reference)}

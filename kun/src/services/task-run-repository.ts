@@ -713,6 +713,27 @@ export class TaskRunRepository {
     return row ? OperationReceiptSchema.parse(JSON.parse(row.data_json)) : null
   }
 
+  /** Owner is part of the identity; receipt ids never authorize a cross-owner lookup. */
+  operationById(ownerId: string, receiptId: string, kind?: string): OperationReceipt | null {
+    return this.filteredOperations(ownerId, `json_extract(data_json, '$.id') = ?${kind ? " AND json_extract(data_json, '$.kind') = ?" : ''}`,
+      kind ? [receiptId, kind] : [receiptId]).find(receipt => receipt.id === receiptId && (!kind || receipt.kind === kind)) ?? null
+  }
+
+  /** Filter before decoding large successful HTML outputs, while corrupt safety fields still fail closed. */
+  private filteredOperations(ownerId: string, predicate: string, values: string[]): OperationReceipt[] {
+    const rows = this.db.prepare(`SELECT data_json FROM operation_receipts WHERE owner_id = ? AND CASE
+      WHEN NOT json_valid(data_json) THEN 1
+      WHEN json_type(data_json, '$.kind') IS NOT 'text' OR json_type(data_json, '$.status') IS NOT 'text'
+        OR json_extract(data_json, '$.status') NOT IN ('prepared','running','succeeded','failed','outcome_unknown')
+        OR json_type(data_json, '$.ownerId') IS NOT 'text' OR json_extract(data_json, '$.ownerId') IS NOT owner_id THEN 1
+      ELSE (${predicate}) END ORDER BY rowid`).all(ownerId, ...values) as Array<{ data_json: string }>
+    return rows.map(row => {
+      const receipt = OperationReceiptSchema.parse(JSON.parse(row.data_json))
+      if (receipt.ownerId !== ownerId) throw Object.assign(new Error('operation receipt owner mismatch'), { code: 'operation_receipt_invalid' })
+      return receipt
+    })
+  }
+
   finishOperation(ownerId: string, key: string, patch: { status: OperationReceipt['status']; result?: unknown; error?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] }, nowIso?: string): OperationReceipt
   finishOperation(ownerId: string, key: string, status: OperationReceipt['status'], result?: unknown): OperationReceipt
   finishOperation(ownerId: string, key: string, patchOrStatus: { status: OperationReceipt['status']; result?: unknown; error?: string; remoteOperationId?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] } | OperationReceipt['status'], nowOrResult?: string | unknown): OperationReceipt {
@@ -728,12 +749,11 @@ export class TaskRunRepository {
   }
 
   unsettledOperations(ownerId: string): OperationReceipt[] {
-    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>)
-      .map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json)))
-      .filter(item => item.kind !== 'im_delivery' && (
-        ['running', 'outcome_unknown'].includes(item.status) ||
-        item.kind === 'tool' && item.status === 'prepared' && item.request?.dispatchTracking !== 'host-v1'
-      ) && !this.verifiedOperationResolution(item))
+    return this.filteredOperations(ownerId, `json_extract(data_json, '$.kind') <> 'im_delivery' AND (
+      json_extract(data_json, '$.status') IN ('running','outcome_unknown') OR
+      json_extract(data_json, '$.kind') = 'tool' AND json_extract(data_json, '$.status') = 'prepared'
+        AND json_extract(data_json, '$.request.dispatchTracking') IS NOT 'host-v1')`, [])
+      .filter(item => !this.verifiedOperationResolution(item))
   }
   verifiedOperationResolution(receipt: OperationReceipt): OperationReceipt['resolution'] | undefined {
     const resolution = receipt.resolution
@@ -813,7 +833,8 @@ export class TaskRunRepository {
     this.db.prepare('UPDATE operation_receipts SET data_json = ? WHERE owner_id = ? AND idempotency_key = ?').run(JSON.stringify(next), ownerId, key)
   }
   operations(ownerId: string, kind?: string): OperationReceipt[] {
-    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id=? ORDER BY rowid').all(ownerId) as Array<{data_json:string}>).map(row=>OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item=>!kind || item.kind===kind)
+    if (kind) return this.filteredOperations(ownerId, "json_extract(data_json, '$.kind') = ?", [kind])
+    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id=? ORDER BY rowid').all(ownerId) as Array<{data_json:string}>).map(row=>OperationReceiptSchema.parse(JSON.parse(row.data_json)))
   }
 
   enqueueOutbox(item: Omit<RuntimeOutboxItem, 'attempts'>): void {

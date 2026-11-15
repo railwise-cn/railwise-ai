@@ -80,7 +80,15 @@ it('registers a successful published draft and exposes its proof over HTTP while
   const started = await f.api('/v1/task-commands', 'POST', { threadId: f.origin.id, intent: 'new', idempotencyKey: 'draft-before-final', request: { prompt: '生成并保存一份 HTML 网页报告。' } })
   expect(started.status).toBe(202)
   const command = await started.json() as { task: TaskRun }
-  await expect.poll(() => held).toBe(true)
+  // Reaching the second request includes the real writer, durable receipt and
+  // artifact projection; the default 1s poll is not a Runtime latency contract.
+  try {
+    await expect.poll(() => held, { timeout: 5_000, message: 'The local model must await its final response after durable publication.' }).toBe(true)
+  } catch (error) {
+    const current = f.runtime.taskRepository!.get(command.task.id)
+    const tools = f.runtime.taskRepository!.operations(command.task.id, 'tool').slice(-4).map(receipt => ({ tool: receipt.request?.toolName, status: receipt.status }))
+    throw new Error(`Local publication barrier was not reached: ${JSON.stringify({ held, calls, taskStatus: current?.status, tools })}`, { cause: error })
+  }
   const task = await (await f.api(`/v1/tasks/${command.task.id}`)).json() as TaskRun
   const receipt = f.runtime.taskRepository!.operations(task.id, 'tool').find(operation => operation.request?.toolName === 'publish_artifact')!
   expect(receipt.status).toBe('succeeded')

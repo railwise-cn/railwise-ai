@@ -31,7 +31,7 @@ import {
   highlightCodeHtml,
   renderFallbackCodeHtml
 } from '../../lib/code-highlighting'
-import { useChatStore } from '../../store/chat-store'
+import { useMarkdownWorkspaceRoot } from './MarkdownWorkspaceContext'
 
 const LANGUAGE_REGEX = /language-([^\s]+)/
 const TRAILING_NEWLINES_REGEX = /\n+$/
@@ -124,7 +124,7 @@ function InlineFileReferenceCode({
   target: FileReferenceTarget
   className?: string
 }): ReactNode {
-  const workspaceRoot = useChatStore((s) => s.workspaceRoot)
+  const workspaceRoot = useMarkdownWorkspaceRoot()
   const validation = useValidatedFileReference(target, workspaceRoot)
 
   if (validation.status !== 'valid') {
