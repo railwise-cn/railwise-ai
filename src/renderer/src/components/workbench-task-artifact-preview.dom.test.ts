@@ -84,7 +84,10 @@ async function mount(activeThreadId: string | null = 'chat-a') {
 it('mounts the task workspace beside its preview and keeps task URLs outside conversation detection', async () => {
   const source = await readFile(resolve('src/renderer/src/components/Workbench.tsx'), 'utf8')
   const taskRenderer = source.slice(source.indexOf('const workbenchViewRenderers'), source.indexOf('    plugins: (module)'))
-  expect(taskRenderer).toContain('{renderRightPanel()}')
+  // A single inspector now belongs to the shared shell. Keeping it outside the
+  // route renderer preserves the live page when switching dock/drawer layouts.
+  expect(source.match(/\{renderRightPanel\(\)\}/g)).toHaveLength(1)
+  expect(source.indexOf('{renderRightPanel()}')).toBeGreaterThan(source.indexOf('</main>'))
   expect(taskRenderer).toContain('await openWorkspaceArtifact({ taskId: task.id, artifactId })')
   expect(taskRenderer).toContain('workspaceArtifactPreview.error')
   expect(taskRenderer).toContain('void openWorkspaceArtifact(lastWorkspaceArtifactRequest.current)')
