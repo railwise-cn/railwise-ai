@@ -458,8 +458,25 @@ export async function startWindowsTaskModelFixture({ browser = false, postPlanQu
       observation.called = [...called]
       observation.toolResults = (body.messages ?? []).filter(message => message.role === 'tool').map(message => {
         const parsed = parseFixtureToolOutput(message.content)
-        return { callId: message.tool_call_id, parsed: Boolean(parsed), status: parsed?.status, code: parsed?.code }
+        const tool = body.messages?.flatMap(item => item.tool_calls ?? []).find(call => call.id === message.tool_call_id)
+        const summary = summarizeWindowsTaskFailure({}, { turns: [{ items: [{ kind: 'tool_result', callId: message.tool_call_id,
+          toolName: tool?.function?.name, output: parsed }] }] }).turns[0].toolResults[0]
+        const failed = message.isError === true || parsed?.isError === true || parsed?.ok === false ||
+          ['failed', 'outcome_unknown'].includes(parsed?.status) || typeof parsed?.error === 'string' || typeof parsed?.error?.message === 'string'
+        return { callId: summary.callId, toolName: summary.toolName, parsed: Boolean(parsed), status: summary.status, code: summary.code,
+          ...(failed ? { isError: true, nativeDiagnostics: summary.nativeDiagnostics } : {}) }
       })
+      const failed = observation.toolResults.find(result => result.isError)
+      if (failed || observed.failure) {
+        observed.failure ??= failed
+        observation.next = 'halt-on-tool-failure'
+        observation.prerequisiteFailure = observed.failure
+        observation.status = 200
+        response.writeHead(200, { 'content-type': 'text/event-stream' })
+        const delta = { content: `受控验收已停止：前置工具 ${observed.failure.toolName ?? observed.failure.callId} 失败（${observed.failure.code ?? observed.failure.status ?? 'tool_failed'}）。未派发后继工具，也未假定操作成功。` }
+        response.end(`data: ${JSON.stringify({ id: 'windows-task-fixture-failed', choices: [{ index: 0, delta, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`)
+        return
+      }
       const toolOutput = id => {
         const call = body.messages?.flatMap(message => message.tool_calls ?? []).find(call => call.id === `smoke-${id}`)
         const result = body.messages?.find(message => message.role === 'tool' && message.tool_call_id === call?.id)
@@ -1373,6 +1390,14 @@ export function summarizeWindowsTaskFailure(task = {}, thread = {}, receipts = [
     return message === undefined ? undefined : /\b(?:Bearer|api[_-]?key|authorization|(?:access[_-]?|refresh[_-]?)?token|secret|cookies?|headers|request[_ ]?body|password|credentials?|x-auth)\b/i.test(message) ? '<redacted-sensitive-error>' : message
       .replace(/https?:\/\/\S+/gi, '<url>').replace(/[A-Za-z0-9_+/-]{32,}/g, '<redacted>').slice(0, 1000)
   }
+  const nativeDiagnostics = value => ({
+    ...Object.fromEntries(['vendorCode', 'vendorReason', 'vendorPhase', 'vendorFailureKind', 'actionDispatch', 'stage']
+      .map(key => [key, code(value?.[key])]).filter(([, value]) => value !== undefined)),
+    ...(['none', 'unknown', 'committed'].includes(value?.effectState) ? { effectState: value.effectState } : {}),
+    ...Object.fromEntries(['vendorPressSent', 'vendorDispatched', 'pressSent', 'dispatched', 'notDispatched', 'actionNotDispatched',
+      'actionAcknowledged', 'readbackPending', 'outcomeUnknown', 'knownNotDispatched', 'refreshAttempted', 'refreshExhausted',
+      'clickDispatched', 'navigationAcknowledged'].filter(key => typeof value?.[key] === 'boolean').map(key => [key, value[key]]))
+  })
   const safeFields = value => Object.fromEntries(['taskId', 'turnId', 'callId', 'toolName', 'operationId', 'operationReceiptId', 'sourceTaskId', 'scheduleId', 'action', 'dispatchTracking', 'status', 'code', 'errorCode']
     .map(key => [key, id(value?.[key])]).filter(([, value]) => value !== undefined))
   return { task: { id: id(task.id), threadId: id(task.threadId), status: code(task.status), activeTurnId: id(task.activeTurnId),
@@ -1387,7 +1412,7 @@ export function summarizeWindowsTaskFailure(task = {}, thread = {}, receipts = [
       toolResults: (turn.items ?? []).filter(item => item.kind === 'tool_result').slice(-100).map(item => ({ callId: id(item.callId),
         toolName: code(item.toolName), isError: typeof item.isError === 'boolean' ? item.isError : undefined, status: code(item.output?.status), code: code(item.output?.code),
         error: error(item.output?.error), message: error(item.output?.message), detail: error(item.output?.detail),
-        outputErrorDetail: code(item.output?.code) ? undefined : error(item.output?.code) })) })),
+        outputErrorDetail: code(item.output?.code) ? undefined : error(item.output?.code), nativeDiagnostics: nativeDiagnostics(item.output) })) })),
     receipts: (Array.isArray(receipts) ? receipts : []).slice(-200).map(receipt => ({ id: id(receipt.id), toolName: code(receipt.toolName),
       status: code(receipt.status), errorCode: code(receipt.errorCode) })),
     operations: operations.map(receipt => ({ id: id(receipt.id), ownerId: id(receipt.ownerId), kind: code(receipt.kind), status: code(receipt.status),
@@ -1398,7 +1423,7 @@ export function summarizeWindowsTaskFailure(task = {}, thread = {}, receipts = [
         outputStatus: code(receipt.result?.item?.output?.status), outputCode: code(receipt.result?.item?.output?.code),
         outputError: error(receipt.result?.item?.output?.error), outputMessage: error(receipt.result?.item?.output?.message), outputDetail: error(receipt.result?.item?.output?.detail),
         outputErrorDetail: code(receipt.result?.item?.output?.code) ? undefined : error(receipt.result?.item?.output?.code),
-        expiresAt: time(receipt.result?.expiresAt) } })),
+        expiresAt: time(receipt.result?.expiresAt), nativeDiagnostics: nativeDiagnostics(receipt.result), outputNativeDiagnostics: nativeDiagnostics(receipt.result?.item?.output) } })),
     events: events.map(event => ({ sequence: Number.isSafeInteger(event.sequence) ? event.sequence : undefined, kind: code(event.kind), createdAt: time(event.createdAt),
       payload: { ...safeFields(event.payload), operationIds: Array.isArray(event.payload?.operationIds) ? event.payload.operationIds.map(id).filter(Boolean).slice(0, 100) : undefined } })),
     spans: spans.map(span => ({ id: id(span.id), turnId: id(span.turnId), kind: code(span.kind), status: code(span.status),
@@ -2404,8 +2429,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const uiApprovals = []
       const reviewedRequests = []
       if (browserSmoke) report.sourceUiApprovals = uiApprovals
+      const assertFixturePrerequisites = () => assert.equal(taskModel?.observed.failure, undefined,
+        `The controlled fixture stopped after a real prerequisite failure: ${JSON.stringify(taskModel?.observed.failure)}`)
       const taskDeadline = Date.now() + 150_000
       while (Date.now() < taskDeadline && !['completed', 'failed', 'stalled', 'waiting_user'].includes(task.status)) {
+        assertFixturePrerequisites()
         if (browserSmoke) {
           const thread = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
           const pending = windowsFixturePendingApprovals(await runtimeRequest('/v1/inbox'), task)
@@ -2444,6 +2472,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         await sleep(250)
         task = await runtimeRequest(`/v1/tasks/${encodeURIComponent(task.id)}`)
       }
+      assertFixturePrerequisites()
       assert.equal(task.status, 'completed', task.stalledReason ?? task.waitingReason ?? 'Installed task did not complete')
       const artifact = task.artifacts.find(file => file.format === 'html' && file.validation === 'valid')
       assert.ok(artifact?.absolutePath && contained(root, artifact.absolutePath), 'The actual HTML must belong to the isolated task output directory')
@@ -2550,6 +2579,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       let occurrence
       const occurrenceDeadline = Date.now() + 150_000
       while (Date.now() < occurrenceDeadline) {
+        assertFixturePrerequisites()
         const list = await runtimeRequest('/v1/tasks?limit=100')
         assert.ok(Array.isArray(list), 'The actual task-list API returns an array')
         const matching = list.filter(item => item.scheduledBy?.scheduleId === schedule.id && item.scheduledBy?.dueAt === dueAt)
@@ -2559,6 +2589,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         if (occurrence && ['completed', 'failed', 'stalled', 'waiting_user'].includes(occurrence.status)) break
         await sleep(500)
       }
+      assertFixturePrerequisites()
       assert.equal(occurrence?.status, 'completed', occurrence?.waitingReason ?? occurrence?.stalledReason ?? 'The real background schedule did not complete')
       const occurrenceArtifact = occurrence.artifacts.find(file => file.format === 'html' && file.validation === 'valid' && file.absolutePath)
       assert.ok(occurrenceArtifact?.absolutePath && contained(root, occurrenceArtifact.absolutePath))
@@ -2698,7 +2729,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       }
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
-    if (taskModel) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests }
+    if (taskModel) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
     try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
