@@ -1001,7 +1001,8 @@ export class AgentLoop {
     const skillResolution = this.opts.skillRuntime?.resolveTurn({
       prompt: turn?.prompt ?? '',
       workspace: thread?.workspace ?? '',
-      preferredSkillIds
+      preferredSkillIds,
+      contextPrompt: continuationTurn?.prompt
     }) ?? {
       activeSkillIds: [],
       activations: [],
