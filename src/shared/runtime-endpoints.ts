@@ -299,3 +299,8 @@ export function normalizeThreadMode(value: unknown): RuntimeThreadMode {
 
 export const RUNTIME_ENGINEERING_MANIFEST_VERIFY_TEMPLATE = '/v1/engineering/projects/{id}/manifests/{manifestId}/verify'
 export const RUNTIME_ENGINEERING_MONITORING_REPLAY_TEMPLATE = '/v1/engineering/projects/{id}/manifests/{manifestId}/monitoring-replay'
+
+export const RUNTIME_TASK_PUBLIC_QUERY_RECOVERY_TEMPLATE = '/v1/tasks/{id}/public-query-recovery'
+export const RUNTIME_TASK_PREPARE_PUBLIC_QUERY_RECOVERY_TEMPLATE = '/v1/tasks/{id}/prepare-public-query-recovery'
+export function runtimeTaskPublicQueryRecoveryPath(taskId:string):string{return `${runtimeTaskPath(taskId)}/public-query-recovery`}
+export function runtimeTaskPreparePublicQueryRecoveryPath(taskId:string):string{return `${runtimeTaskPath(taskId)}/prepare-public-query-recovery`}

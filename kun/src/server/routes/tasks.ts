@@ -290,11 +290,18 @@ export async function pauseTask(runtime: ServerRuntime, taskId: string, request:
 export async function extendTaskBudget(runtime: ServerRuntime, taskId: string, request: Request): Promise<JsonResponse | Response> {
   return mutateTask(runtime, taskId, request, 'extend_budget')
 }
+export async function getTaskPublicQueryRecovery(runtime:ServerRuntime,taskId:string):Promise<JsonResponse> {
+  if(!runtime.getTaskPublicQueryRecovery)return ERRORS.unavailable('public query recovery is unavailable')
+  try{return jsonResponse(await runtime.getTaskPublicQueryRecovery(taskId))}catch(error){return taskError(error)}
+}
+export async function prepareTaskPublicQueryRecovery(runtime:ServerRuntime,taskId:string,request:Request):Promise<JsonResponse|Response> {
+  return mutateTask(runtime,taskId,request,'prepare_public_query_recovery')
+}
 export async function revalidateTaskArtifacts(runtime: ServerRuntime, taskId: string, request: Request): Promise<JsonResponse | Response> {
   return mutateTask(runtime, taskId, request, 'revalidate_artifacts')
 }
 
-type Action = 'resume' | 'retry' | 'cancel' | 'pause' | 'extend_budget' | 'revalidate_artifacts'
+type Action = 'resume' | 'retry' | 'cancel' | 'pause' | 'extend_budget' | 'revalidate_artifacts' | 'prepare_public_query_recovery'
 async function mutateTask(runtime: ServerRuntime, taskId: string, request: Request, action: Action): Promise<JsonResponse | Response> {
   const repository = runtime.taskRepository
   const controller = runtime.taskController
@@ -302,7 +309,7 @@ async function mutateTask(runtime: ServerRuntime, taskId: string, request: Reque
   const body = await readJsonBody(request)
   if (!body.ok) return body.response
   const schema = action === 'extend_budget' ? TaskMutationRequest.omit({ model: true }).extend({ additionalExecutionMs: z.number().int().min(60_000).max(3_600_000) }).strict()
-    : action === 'revalidate_artifacts' ? TaskMutationRequest.pick({ expectedRevision: true, idempotencyKey: true }).extend({ confirmed: z.literal(true) }).strict() : TaskMutationRequest
+    : (action === 'revalidate_artifacts'||action==='prepare_public_query_recovery') ? TaskMutationRequest.pick({ expectedRevision: true, idempotencyKey: true }).extend({ confirmed: z.literal(true) }).strict() : action==='retry' ? TaskMutationRequest.extend({publicQueryRecoveryReceiptId:z.string().min(1).max(256).optional()}).strict() : TaskMutationRequest
   const parsed = schema.safeParse(body.value)
   if (!parsed.success) return ERRORS.validation(`invalid task ${action} body`, parsed.error.issues)
   try {
@@ -313,7 +320,7 @@ async function mutateTask(runtime: ServerRuntime, taskId: string, request: Reque
     }
     const result=await controls.mutate(taskId,action,parsed.data)
     if (result.capability) await runtime.taskCoordinator?.flushCommandMessages()
-    return jsonResponse(action==='resume'||action==='retry'||action==='revalidate_artifacts'?result:result.task,action==='resume'||action==='retry'?202:200)
+    return jsonResponse(action==='resume'||action==='retry'||action==='revalidate_artifacts'||action==='prepare_public_query_recovery'?result:result.task,action==='resume'||action==='retry'?202:200)
   } catch(error) { return taskError(error) }
 }
 
@@ -328,6 +335,7 @@ function taskError(error: unknown): JsonResponse {
   if (code === 'model_provider_unavailable') return jsonResponse({ code, message }, 400)
   if (code === 'not_found') return ERRORS.notFound(message)
   if (['stale_request', 'invalid_state', 'turn_in_progress', 'idempotency_conflict','outcome_unknown','external_effect_retry_blocked'].includes(code)) return code==='external_effect_retry_blocked'?jsonResponse({code,message},409):ERRORS.conflict(message)
+  if(code.startsWith('browser_public_query_')||['browser_binding_changed','confirmation_required'].includes(code))return jsonResponse({code,message},409)
   if (code === 'resource_limit') return ERRORS.resourceLimit(message)
   return jsonResponse({ code: code || 'task_error', message }, 500)
 }

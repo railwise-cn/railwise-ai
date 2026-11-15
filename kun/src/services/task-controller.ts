@@ -1,3 +1,5 @@
+import type { BrowserPublicQueryRecoveryBinding } from '../contracts/browser-public-query-recovery.js'
+import { verifiedPublicQueryRecovery } from './browser-public-query-recovery-proof.js'
 import { retryBrowserScope } from './browser-public-query-authority.js'
 import { verifiedTaskRetryLineage } from './task-retry-lineage.js'
 import type { OperationResolutionOutcome } from '../contracts/tasks.js'
@@ -227,7 +229,7 @@ export class TaskController {
   }
 
   /** Prepare the retry contract before a Turn or model can run. The original ledger stays authoritative. */
-  createRetryTask(input: { id: string; sourceTaskId: string; expectedRevision: number; thread: ThreadRecord; request: StartTurnRequest; retryControl?: { ownerId: string; idempotencyKey: string } }): TaskRun {
+  createRetryTask(input: { id: string; sourceTaskId: string; expectedRevision: number; thread: ThreadRecord; request: StartTurnRequest; retryControl?: { ownerId: string; idempotencyKey: string }; publicQueryRecovery?: BrowserPublicQueryRecoveryBinding }): TaskRun {
     return this.repository.transact(() => {
       const existing = this.repository.get(input.id)
       if (existing) return existing
@@ -236,8 +238,10 @@ export class TaskController {
       if (!['failed', 'cancelled'].includes(source.status) || source.threadId !== input.thread.id || source.workspaceRoot !== input.thread.workspace ||
           this.repository.currentExecution(source.id)?.id !== source.id) throw Object.assign(new Error('Retry source is no longer the terminal execution in this workspace.'), { code: 'invalid_state' })
       const control = input.retryControl && this.repository.operation(input.retryControl.ownerId, input.retryControl.idempotencyKey)
-      const explicit = control?.kind === 'retry' && control.status === 'prepared' && control.request?.expectedRevision === input.expectedRevision
-      const browserScope = explicit ? retryBrowserScope(this.repository, source) : undefined
+      const explicit = control?.kind === 'retry' && control.status === 'prepared' && (control.request?.expectedRevision === input.expectedRevision || input.publicQueryRecovery && control.request?.publicQueryRecoveryReceiptId === input.publicQueryRecovery.receiptId && Number(control.request?.expectedRevision) + 1 === input.expectedRevision)
+      const recovery = input.publicQueryRecovery && verifiedPublicQueryRecovery(this.repository,input.publicQueryRecovery,input.publicQueryRecovery.ownerTaskId!==source.id)
+      if(input.publicQueryRecovery&&!recovery)throw Object.assign(new Error('公开查询恢复凭据已变化。'),{code:'browser_public_query_recovery_changed'})
+      const browserScope = explicit && recovery ? structuredClone(recovery.context.browserScope) : explicit ? retryBrowserScope(this.repository, source) : undefined
       const retry = this.createTask({ ...input, retrySource: source, retryBrowserScope: browserScope })
       if (retry.flowRunId && retry.flowId) this.repository.enqueueOutbox({
         id: `flow-task-retry:${retry.id}`, ownerId: retry.id, kind: 'flow_task_retry',
@@ -248,7 +252,7 @@ export class TaskController {
     })
   }
 
-  private createTask(input: { id?: string; thread: ThreadRecord; turnId?: string; request: StartTurnRequest; engineeringExecution?: boolean; engineeringPlanId?: string; retrySource?: TaskRun; retryBrowserScope?: import('../contracts/browser-skill.js').BrowserExecutionScope }): TaskRun {
+  private createTask(input: { id?: string; thread: ThreadRecord; turnId?: string; request: StartTurnRequest; engineeringExecution?: boolean; engineeringPlanId?: string; retrySource?: TaskRun; retryBrowserScope?: import('../contracts/browser-skill.js').BrowserExecutionScope; publicQueryRecovery?:BrowserPublicQueryRecoveryBinding }): TaskRun {
     const now = this.nowIso()
     const consultation = input.thread.domain === 'engineering' && !input.engineeringExecution
     const source = input.retrySource
@@ -264,6 +268,8 @@ export class TaskController {
       threadId: input.thread.id,
       originThreadId: source?.originThreadId ?? input.request.taskOriginThreadId,
       visibility: source?.visibility ?? input.request.taskVisibility ?? (consultation ? 'chat' : 'task'),
+      ...(input.publicQueryRecovery ? {publicQueryRecovery:input.publicQueryRecovery}:{}),
+      ...(source?.scheduledBy ? { scheduledBy: structuredClone(source.scheduledBy) } : {}),
       ...(source ? { retryOfTaskId: source.id, rootTaskId: source.rootTaskId ?? source.id, parentTaskId: source.parentTaskId,
         templateId: source.templateId, deliveryFormats: source.deliveryFormats, flowRunId: source.flowRunId, flowId: source.flowId, repositoryRoot: source.repositoryRoot } : {}),
       activeTurnId: input.turnId,

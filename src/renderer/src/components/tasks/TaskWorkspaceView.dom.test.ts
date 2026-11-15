@@ -128,6 +128,34 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('offers public-query recovery only from the current task server projection', async () => {
+    tasks[0] = { ...tasks[0], status: 'stalled', revision: 2 }
+    inbox = []
+    Object.assign(window.workwise, {
+      getTaskPublicQueryRecovery: vi.fn(async (taskId: string) => ({ taskId, taskRevision: 2, state: 'eligible', message: 'A new public search is available.', unknownOperationCount: 2 }))
+    })
+    await act(async () => refreshTaskState())
+    await settle()
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === 'Prepare a new search')).toBe(true)
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === i18n.t('common:taskRunResume'))).toBe(false)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+
+  it('keeps an expired one-off scope informational instead of offering a misleading Continue action', async () => {
+    tasks[0] = { ...tasks[0], status: 'stalled', revision: 2 }
+    inbox = []
+    Object.assign(window.workwise, {
+      getTaskPublicQueryRecovery: vi.fn(async (taskId: string) => ({ taskId, taskRevision: 2, state: 'unavailable', reason: 'browser_public_query_schedule_scope_required', message: 'Fresh scope required.', unknownOperationCount: 0 }))
+    })
+    await act(async () => refreshTaskState())
+    await settle()
+    expect(container.textContent).toContain(i18n.t('common:taskPublicQueryRecoveryFreshScopeRequired'))
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === i18n.t('common:taskRunResume'))).toBe(false)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+
   it.each(['waiting_user', 'waiting_approval', 'stalled'] as const)('lets the user explicitly pause a %s task before resolving its blocker', async status => {
     tasks[0] = { ...tasks[0], status }
     inbox = []

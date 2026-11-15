@@ -2,7 +2,7 @@ import { useTaskState, refreshTaskState, takeRequestedTask, updateTaskNavigation
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import { CheckCircle2, ChevronRight, FileText, Loader2, MessageSquare, Pause, Play, Plus, RefreshCw, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { TaskAttentionV1, TaskEventV1, TaskInputV1, TaskOperationReceiptV1, TaskRunV1, TaskTemplateId, TaskTemplateStartV1, TaskTemplateV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskEventV1, TaskInputV1, TaskOperationReceiptV1, TaskPublicQueryRecoverySnapshotV1, TaskRunV1, TaskTemplateId, TaskTemplateStartV1, TaskTemplateV1 } from '@shared/agent-workbench'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { TaskArtifactReview } from './TaskArtifactReview'
 import { TaskExecutionEvidence } from './TaskExecutionEvidence'
@@ -16,6 +16,7 @@ import { filterWorkspaceTasks, taskGroupForTask, taskGroupProgress, taskGroupArt
 export { filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from '@shared/task-workspace-projection'
 import { legacyLocalArtifactSourceMismatch } from '@shared/task-source-intent'
 import { TaskBudgetControl } from './TaskBudgetControl'
+import { TaskPublicQueryRecoveryCard } from './TaskPublicQueryRecoveryCard'
 import { TaskPermissionPanel } from '../chat/TaskPermissionPanel'
 import { useChatStore } from '../../store/chat-store'
 
@@ -193,6 +194,8 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const [error, setError] = useState('')
   const [controlNotice, setControlNotice] = useState('')
   const [actionBusy, setActionBusy] = useState(false)
+  const [publicQueryRecovery, setPublicQueryRecovery] = useState<Pick<TaskPublicQueryRecoverySnapshotV1, 'taskId' | 'state' | 'reason'> | null>(null)
+  const recoveryProjectionChanged = useCallback((projection: Pick<TaskPublicQueryRecoverySnapshotV1, 'taskId' | 'state' | 'reason'>): void => setPublicQueryRecovery(projection), [])
   const [inputs, setInputs] = useState<TaskInputV1[]>([])
   const [events, setEvents] = useState<TaskEventV1[]>([])
   const [receipts, setReceipts] = useState<TaskOperationReceiptV1[]>([])
@@ -236,6 +239,8 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const selectedGroupRevision = selectedGroup?.all.map(task => `${task.id}:${task.revision}`).join('|') ?? ''
   const selected = selectedGroup?.root ?? null
   const currentExecution = selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).current : null
+  const hasPublicQueryRecovery = publicQueryRecovery?.taskId === (currentExecution ?? selected)?.id
+    && (publicQueryRecovery?.state !== 'unavailable' || publicQueryRecovery?.reason === 'browser_public_query_schedule_scope_required')
   useEffect(() => {
     if (!live.ready) return
     if (selectedAttentionId) {
@@ -379,14 +384,15 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
             <span>{t('taskTimingQueued')}: {Math.round(currentExecution.timing.queuedMs / 1000)}s</span>
             <span>{t('taskTimingHumanWait')}: {Math.round(currentExecution.timing.humanWaitMs / 1000)}s</span>
           </p> : null}
-          <div className="my-4 flex flex-wrap gap-2">
+          <div className="my-4 flex min-w-0 max-w-full flex-wrap gap-2 [&>button]:min-w-0 [&>button]:max-w-full [&>button]:whitespace-normal">
             {['stalled', 'failed', 'paused'].includes((currentExecution ?? selected).status) && legacyLocalArtifactSourceMismatch(currentExecution ?? selected) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('revalidate')} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceRevalidateArtifacts')}</button> : null}
             {selected.originThreadId || currentExecution?.originThreadId || !selected.visibility ? <button type="button" onClick={() => onOpenThread((selected.originThreadId ?? currentExecution?.originThreadId ?? selected.threadId))} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs"><MessageSquare className="h-3.5 w-3.5" />{t('taskWorkspaceOpenConversation')}</button> : null}
             {!TERMINAL.has(currentExecution?.status ?? selected.status) && (currentExecution?.status ?? selected.status) !== 'paused' ? <button type="button" disabled={actionBusy} onClick={() => void mutate('pause')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Pause className="h-3.5 w-3.5" />{t('taskWorkspacePause')}</button> : null}
-            {['paused', 'stalled', 'waiting_user'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('resume')} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Play className="h-3.5 w-3.5" />{t('taskRunResume')}</button> : null}
+            {!hasPublicQueryRecovery && ['paused', 'stalled', 'waiting_user'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('resume')} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Play className="h-3.5 w-3.5" />{t('taskRunResume')}</button> : null}
             {['failed', 'cancelled'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('retry')} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskRunRetry')}</button> : null}
             {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('cancel')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Square className="h-3.5 w-3.5" />{t('taskRunCancel')}</button> : null}
           </div>
+          <TaskPublicQueryRecoveryCard key={`public-query-recovery:${(currentExecution ?? selected).id}`} task={currentExecution ?? selected} runtimeReady={runtimeReady} disabled={actionBusy} onChanged={() => refresh()} onProjectionChange={recoveryProjectionChanged} onNotice={setControlNotice} />
           {!['running', 'queued', 'retrying'].includes((currentExecution ?? selected).status) ? <TaskBudgetControl key={selected.id} task={selected} onChanged={() => refresh()} /> : null}
           {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} conversationThreadId={conversationForAttention(item)} workspaceRoot={selectedGroup?.all.find(task => task.id === item.taskId)?.workspaceRoot} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
           <details key={`permissions:${(currentExecution ?? selected).id}`} className="mb-4 rounded-lg border border-ds-border p-3 text-xs"><summary className="cursor-pointer font-medium">{t('taskPermissionReview')}</summary><TaskPermissionPanel key={(currentExecution ?? selected).id} taskId={(currentExecution ?? selected).id} revision={(currentExecution ?? selected).revision} autoLoad onConfirmed={message => { setControlNotice(message); void refresh() }} /></details>

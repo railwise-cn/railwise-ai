@@ -32,6 +32,8 @@ import {
   RUNTIME_TASKS_TEMPLATE,
   RUNTIME_TASK_TEMPLATE,
   RUNTIME_TASK_REVALIDATE_ARTIFACTS_TEMPLATE,
+  RUNTIME_TASK_PUBLIC_QUERY_RECOVERY_TEMPLATE,
+  RUNTIME_TASK_PREPARE_PUBLIC_QUERY_RECOVERY_TEMPLATE,
   RUNTIME_TASK_BUDGET_TEMPLATE,
   RUNTIME_TASK_RESUME_TEMPLATE,
   RUNTIME_TASK_RETRY_TEMPLATE,
@@ -307,6 +309,8 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint('/v1/task-commands', ['POST'], []),
   compileEndpoint(RUNTIME_TASK_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TASK_REVALIDATE_ARTIFACTS_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_TASK_PUBLIC_QUERY_RECOVERY_TEMPLATE,['GET']),
+  compileEndpoint(RUNTIME_TASK_PREPARE_PUBLIC_QUERY_RECOVERY_TEMPLATE,['POST']),
   compileEndpoint(RUNTIME_TASK_BUDGET_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_RESUME_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_RETRY_TEMPLATE, ['POST']),
@@ -460,6 +464,14 @@ export const runtimeRequestPayloadSchema = z
         && (pagination !== 'cursor' || (!url.searchParams.has('status') && !url.searchParams.has('offset')
           && (limit === null || (/^[1-9]\d*$/.test(limit) && Number(limit) <= 200))))
       if (!valid) context.addIssue({ code: 'custom', message: 'invalid task list request' })
+    }
+    const recovery=/^\/v1\/tasks\/([^/]+)\/(prepare-public-query-recovery|public-query-recovery)$/.exec(url.pathname)
+    if(recovery){
+      let valid=payload.path===url.pathname&&url.origin==='http://localhost'
+      try{const id=decodeURIComponent(recovery[1]);valid&&=!!id.trim()&&!/[/\\?#%\s]/u.test(id)&&!id.includes('\0')&&!['.','..'].includes(id)
+        valid&&=recovery[2]==='public-query-recovery'?(payload.method??'GET')==='GET'&&payload.body===undefined:payload.method==='POST'&&!!payload.body&&z.object({expectedRevision:z.number().int().nonnegative(),idempotencyKey:z.string().trim().min(1).max(256),confirmed:z.literal(true)}).strict().safeParse(JSON.parse(payload.body)).success
+      }catch{valid=false}
+      if(!valid)context.addIssue({code:'custom',message:'invalid public query recovery'})
     }
     const revalidate = /^\/v1\/tasks\/([^/]+)\/revalidate-artifacts$/.exec(url.pathname)
     if (revalidate) {

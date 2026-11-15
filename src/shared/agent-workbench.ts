@@ -636,3 +636,9 @@ export type WorkbenchMutationResult<T> =
 export type TaskPageQuery = { workspaceRoot?: string; threadId?: string; search?: string; filter?: 'ongoing'|'attention'|'completed'|'all'; limit?: number; cursor?: string }
 export type TaskRunPage = { items: TaskRunV1[]; relatedTasks: TaskRunV1[]; attention: TaskAttentionV1[]; total: number; counts: Record<'ongoing'|'attention'|'completed'|'all',number>; nextCursor?: string; snapshotId: string; expiresAt: string; eventWatermark: number }
 export type TaskChangeEvent = { seq:number; taskId?:string; kind:'task_changed'|'attention_changed'; payload:Record<string,unknown>; createdAt:string }
+
+/** Server eligibility and future-consent projection; never an old operation result. */
+export type TaskPublicQueryRecoverySnapshotV1 = {
+  taskId: string; taskRevision: number; state: 'unavailable' | 'eligible' | 'prepared'; message: string;
+  reason?: string; receiptId?: string; unknownOperationCount: number; origins?: string[]
+}

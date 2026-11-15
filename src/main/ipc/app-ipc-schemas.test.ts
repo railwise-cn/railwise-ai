@@ -31,6 +31,21 @@ import {
 } from '../../shared/design-document'
 
 describe('app-ipc-schemas', () => {
+  it('keeps public-query preparation separate from read-only eligibility and ordinary retry', () => {
+    const path='/v1/tasks/task-1/prepare-public-query-recovery'
+    const body={expectedRevision:4,idempotencyKey:'prepare-once',confirmed:true}
+    expect(runtimeRequestPayloadSchema.safeParse({path,method:'POST',body:JSON.stringify(body)}).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({path:'/v1/tasks/task-1/public-query-recovery'}).success).toBe(true)
+    for(const request of [
+      {path,method:'GET'}, {path,method:'POST'}, {path,method:'POST',body:'{'},
+      ...[`${path}?force=1`,`${path}#force`,path.replace('task-1','task-1%2Fother')].map(path=>({path,method:'POST',body:JSON.stringify(body)})),
+      ...[{confirmed:false},{expectedRevision:-1},{allowUnknown:true},{origins:['*']},{toolNames:['send_message']},{resume:true}].map(extra=>({path,method:'POST',body:JSON.stringify({...body,...extra})})),
+      {path:'/v1/tasks/task-1/public-query-recovery',method:'POST',body:'{}'},
+      {path:'/v1/tasks/task-1/public-query-recovery?taskId=another'},
+      {path:'/v1/tasks/task-1/public-query-recovery',body:'{}'}
+    ])expect(runtimeRequestPayloadSchema.safeParse(request).success,JSON.stringify(request)).toBe(false)
+  })
+
   it('only permits explicitly confirmed, scoped artifact revalidation through the existing task bridge', () => {
     const path = '/v1/tasks/task-1/revalidate-artifacts'
     const body = { expectedRevision: 3, idempotencyKey: 'check-existing', confirmed: true }

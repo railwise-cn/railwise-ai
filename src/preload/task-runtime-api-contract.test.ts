@@ -86,6 +86,19 @@ describe('production preload task API and main IPC contract', () => {
     await expect(api.confirmBrowserTaskBinding('task-original', { ...request, taskId: 'task-other' } as typeof request)).rejects.toThrow()
   })
 
+  it('keeps public-query recovery preparation and explicit retry as separate typed requests', async () => {
+    const request = { expectedRevision: 7, idempotencyKey: 'prepare-new-query', confirmed: true as const }
+    await api.getTaskPublicQueryRecovery('task-query')
+    await api.prepareTaskPublicQueryRecovery('task-query', request)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/public-query-recovery', method: 'GET' })
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/prepare-public-query-recovery', method: 'POST', body: JSON.stringify(request) })
+    const retry = { expectedRevision: 8, idempotencyKey: 'continue-new-query', publicQueryRecoveryReceiptId: 'recovery-confirmation' }
+    await api.retryTask('task-query', retry)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/retry', method: 'POST', body: JSON.stringify(retry) })
+    await expect(api.getTaskPublicQueryRecovery('task-query/../other')).rejects.toThrow()
+    await expect(api.prepareTaskPublicQueryRecovery('task-query/../other', request)).rejects.toThrow()
+  })
+
   it('passes real chat/model and candidate review commands, and the aggregate task stream, through their typed boundaries', async () => {
     await api.coordinateTaskCommand({ threadId: 'origin_1', intent: 'auto', idempotencyKey: 'chat-1', request: {
       prompt: '根据资料形成报告', displayText: '形成报告', mode: 'agent', model: 'deepseek-flash', providerId: 'deepseek', reasoningEffort: 'high', attachmentIds: ['attachment_1'], workspaceReferences: [{ path: 'source.md', kind: 'file' }]

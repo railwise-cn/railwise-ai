@@ -1,3 +1,4 @@
+import { assertRecoveryGrant, recoveryCoversReceipt } from '../../services/browser-public-query-recovery-proof.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -91,6 +92,7 @@ export function buildBrowserSkillToolProvider(options: {
   }
 
   const contextBlock = (context: ToolHostContext, interaction: boolean, action?: Action) => {
+    try { if(context.executionGrant)assertRecoveryGrant(options.repository,context.executionGrant) } catch { return {code:'browser_public_query_recovery_changed',message:'公开查询恢复凭据已变化，请核对原任务。'} }
     if (configurationChanged(context)) return { code: 'browser_binding_changed', message: '浏览器配置已变化，请确认当前任务的浏览器范围后继续。' }
     if (action === 'press' && isRecurring(context)) return { code: 'browser_schedule_action_scope_required', message: '周期任务的按键操作不支持持续授权，请重新观察页面并审阅明确的点击或填写动作。' }
     const config = options.config()
@@ -715,7 +717,7 @@ export function buildBrowserSkillToolProvider(options: {
     const grant = context.executionGrant, task = grant?.taskId ? options.repository.get(grant.taskId) : undefined
     const authority = grant && task && taskPublicQueryGrant(options.repository, grant, task)
     if (!authority || args.scope === 'schedule' && authority.authorization.duration !== 'schedule') return undefined
-    if (options.repository.operations(authority.source.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !options.repository.verifiedOperationResolution(receipt))) throw failure('browser_schedule_outcome_unknown')
+    if (options.repository.operations(authority.source.id, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !options.repository.verifiedOperationResolution(receipt) && !recoveryCoversReceipt(options.repository,receipt,context.executionGrant?.browserPublicQueryRecovery))) throw failure('browser_schedule_outcome_unknown')
     if (authority.authorization.duration === 'schedule') {
       if (!options.resolveSchedule) throw failure('browser_schedule_authority_changed')
       await options.resolveSchedule(context, grant!.browserScheduleBinding ? undefined : authority.binding.id)
@@ -746,6 +748,13 @@ export function buildBrowserSkillToolProvider(options: {
   }
 
   const hasScopedApproval = async (action: 'click' | 'fill', args: Json, context: ToolHostContext): Promise<boolean> => {
+    if(context.executionGrant?.browserPublicQueryRecovery){
+      if(await pendingActionReadback(action,args,context))return true
+      if(await taskScopedAction(action,args,context))return true
+      // Future consent is restricted to freshly proven finite public queries;
+      // old exact-action approvals and new business approvals cannot widen it.
+      throw failure('browser_public_query_recovery_action_required')
+    }
     if (await pendingActionReadback(action, args, context)) return true
     if (await confirmedAction(action, args, context)) return true
     if (await taskScopedAction(action, args, context)) return true
@@ -779,7 +788,7 @@ export function buildBrowserSkillToolProvider(options: {
     if (browserVerificationPolicy(reviewed.binding.verificationPolicy) === 'public_query_target' && object(saved.result).access !== 'public_query') throw failure('browser_public_query_action_required')
     const scheduleActionId = object(saved.result).scheduleActionId
     if (typeof scheduleActionId === 'string') {
-      if (options.repository.operations(reviewed.binding.taskId, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !options.repository.verifiedOperationResolution(receipt))) throw failure('browser_schedule_outcome_unknown')
+      if (options.repository.operations(reviewed.binding.taskId, 'browser_schedule_action_outcome').some(receipt => receipt.status === 'outcome_unknown' && !options.repository.verifiedOperationResolution(receipt) && !recoveryCoversReceipt(options.repository,receipt,context.executionGrant?.browserPublicQueryRecovery))) throw failure('browser_schedule_outcome_unknown')
       if (!options.resolveSchedule) throw failure('browser_schedule_authority_changed')
       try { await options.resolveSchedule(context, scheduleActionId) }
       catch (error) { throw failure((error as { code?: string }).code === 'browser_schedule_outcome_unknown' ? 'browser_schedule_outcome_unknown' : 'browser_schedule_authority_changed') }
@@ -1153,7 +1162,7 @@ export function buildBrowserSkillToolProvider(options: {
       if (action === 'navigate') return await navigateInContext(args, taskId, config, scope)
       if (mutation) {
         if (await pendingActionReadback(action as 'click' | 'fill', args, context)) throw failure('browser_readback_blocked')
-        const confirmed = action !== 'press' && await confirmedAction(action as 'click' | 'fill', args, context)
+        const confirmed = !context.executionGrant?.browserPublicQueryRecovery && action !== 'press' && await confirmedAction(action as 'click' | 'fill', args, context)
         if (confirmed) {
           const key = `browser-reuse:${context.turnId}:${operationFingerprint(raw)}:${confirmed.dispatch.id}`
           options.repository.beginOperation({ ownerId: taskId, idempotencyKey: key, kind: 'browser_action_reuse', nowIso: new Date().toISOString(),

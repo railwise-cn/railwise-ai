@@ -127,6 +127,21 @@ export class BrowserOperationVerificationService {
     })
   }
 
+  /** Historical native public-query authority for NEW-context consent; no browser command or old-result resolution. */
+  async publicQueryRecoveryProof(taskId: string, receiptId: string, revision: number) {
+    const binding = await this.binding(taskId, receiptId, revision, false)
+    const scoped = verifiedTaskPublicQueryAction(this.deps.repository, binding.receipt, binding.dispatch)
+    const host = object(object(binding.receipt.result).item), output = object(host.output)
+    if (!scoped || object(binding.receipt.result).approved!==true || host.toolName!==binding.receipt.request?.toolName || binding.receipt.fingerprint !== operationFingerprint(binding.receipt.request) ||
+      binding.dispatch.fingerprint !== operationFingerprint(binding.dispatch.request) || binding.receipt.request?.providerId !== 'browser-skill' ||
+      host.kind !== 'tool_result' || host.status !== 'completed' || host.isError !== true || host.callId !== binding.receipt.request.callId ||
+      host.turnId !== binding.original.turnId || host.threadId !== binding.task.threadId ||
+      output.provider !== 'browser-skill' || output.status !== 'outcome_unknown' ||
+      !['search_input', 'search_trigger', 'pagination', 'filter_control', 'sort_control', 'result_link'].includes(String(scoped.request.rule)) ||
+      !binding.original.allowedToolNames?.includes('browser_session_start') || binding.original.externalTargets.length) fail('browser_public_query_recovery_ineligible')
+    return { ...binding, scoped }
+  }
+
   private proof(receipt: OperationReceipt, evidence: ResultEvidence, confirmationKey: string, confirmationOwnerId: string, outcome: OperationResolutionOutcome): string {
     const key = `${confirmationKey}:proof:${receipt.id}`
     // Legacy readers recognize only effect_verification as successful proof.
@@ -142,7 +157,7 @@ export class BrowserOperationVerificationService {
     this.deps.repository.resolveOperation(receipt.ownerId, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, outcome, resolvedAt: this.deps.nowIso() })
   }
 
-  private async binding(taskId: string, receiptId: string, revision: number) {
+  private async binding(taskId: string, receiptId: string, revision: number, requireAvailableSession = true) {
     const repository = this.deps.repository
     const task = repository.get(taskId)
     if (!task) fail('not_found')
@@ -206,7 +221,7 @@ export class BrowserOperationVerificationService {
     }
     await this.validate(task, original, parsed)
     const session = repository.operations(taskId, 'browser_session').find(item => object(item.result).sessionId === request.sessionId)
-    if (!session || session.status !== 'succeeded' || object(session.result).stopped || object(session.result).tabId !== request.tabId ||
+    if (!session || session.status !== 'succeeded' || requireAvailableSession && object(session.result).stopped || object(session.result).tabId !== request.tabId ||
       object(session.result).browserInstanceId !== parsed.browserInstanceId) fail('browser_review_session_unavailable')
     return { task, receipt, dispatch, action: parsed, original, value, sessionId: request.sessionId, targetRef: request.targetRef,
       hash: operationFingerprint({ receipt: receipt.fingerprint, dispatch: dispatch.fingerprint, original, action: parsed }) }

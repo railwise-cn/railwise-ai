@@ -1,3 +1,5 @@
+import { publicQueryRecoveryForPlan, recoveryCoversReceipt, recoveryExecutionScope } from './browser-public-query-recovery-proof.js'
+import type { BrowserPublicQueryRecoveryBinding } from '../contracts/browser-public-query-recovery.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { BrowserExecutionScope, browserVerificationPolicy, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 import type { ExecutionGrant, ExecutionScope } from '../contracts/permissions.js'
@@ -233,11 +235,11 @@ export class TaskScheduleService {
     const flow = this.deps.flows.get(String(prepared.request?.scheduleId))
     if (!flow || flow.variables.archived === true || flow.variables.enabled === false || flow.publishedVersionId !== prepared.request?.versionId) fail('计划已禁用或范围已变化。')
     const authority = this.authority(flow)
-    await this.validateAuthority(authority)
+    await this.validateAuthority(authority,undefined,undefined,this.recoveryForAuthority(authority))
     const thread = await this.deps.threads.get(threadId)
     if (!thread || thread.status === 'deleted' || fingerprint(threadAuthority(thread)) !== fingerprint(authority.execution) || prepared.request?.authorityHash !== fingerprint(authority)) fail('周期执行的 Agent 或权限已变化。')
     const actions = authority.scope.browserScheduleActions
-    return { ...taskScheduleScope(authority.scope), scheduleScopeHash: authority.authorization.scopeHash,
+    return { ...taskScheduleScope(authority.scope), ...(this.recoveryForAuthority(authority)?{browserPublicQueryRecovery:this.recoveryForAuthority(authority)}:{}), scheduleScopeHash: authority.authorization.scopeHash,
       ...(actions?.length || authority.scope.browserScope?.publicQueryAuthorization?.duration === 'schedule' ? { browserScheduleBinding: {
         scheduleId: flow.id, versionId: flow.publishedVersionId!, scopeHash: authority.authorization.scopeHash,
         sourceTaskId: authority.taskId, actionsHash: fingerprint(actions ?? [])
@@ -286,7 +288,8 @@ export class TaskScheduleService {
       pending.flowId === input.scheduleId && pending.threadId === authority.originThreadId && pending.payload?.scheduleId === input.scheduleId &&
       pending.payload.dueAt === input.dueAt && pendingVersion === input.versionId
     try {
-      await this.validateAuthority(authority)
+      const recovery=this.recoveryForAuthority(authority)
+      await this.validateAuthority(authority,undefined,undefined,recovery)
       const result = await this.deps.coordinator.command({ threadId: authority.originThreadId, intent: 'new',
         idempotencyKey: `schedule:${input.scheduleId}:${input.dueAt}`,
         request: { prompt: authority.prompt, model: authority.model, providerId: authority.providerId, mode: 'agent' }
@@ -305,7 +308,7 @@ export class TaskScheduleService {
         if (task.scheduledBy) return
         this.deps.repository.update(task.id, task.revision, value => {
           const { schedule: _schedule, ...acceptance } = value.acceptance
-          return { ...value, scheduledBy: { scheduleId: input.scheduleId, dueAt: input.dueAt },
+          return { ...value, ...(recovery?{publicQueryRecovery:recovery}:{}), scheduledBy: { scheduleId: input.scheduleId, dueAt: input.dueAt },
             ...(authority.scope.browserScope ? { authority: { ...value.authority!, browserScope: authority.scope.browserScope } } : {}),
             acceptance: { ...acceptance,
               ...(authority.scope.browserScope && acceptance.requiresWebEvidence && !acceptance.requiredSourceOrigins?.length
@@ -338,13 +341,14 @@ export class TaskScheduleService {
     }
   }
 
-  private validateBrowserDispatches(task: TaskRun, actions: BrowserScheduleAction[], currentContext?: ToolHostContext) {
+  private validateBrowserDispatches(task: TaskRun, actions: BrowserScheduleAction[], currentContext?: ToolHostContext, recovery=currentContext?.executionGrant?.browserPublicQueryRecovery) {
     const receipts = this.deps.repository.operations(task.id)
     const currentOperationId = this.currentUndispatchedBrowserTool(task, receipts, currentContext)
     const dispatches = receipts.filter(receipt => receipt.kind === 'browser_action_dispatch')
     // Rebinding never settles an operation. Check every generation before
     // selecting the action evidence needed by the current forward plan.
     for (const receipt of receipts) {
+      if(recoveryCoversReceipt(this.deps.repository,receipt,recovery))continue
       if (receipt.kind === 'browser_action_dispatch' && record(receipt.result).readbackPending === true &&
         !(receipt.status === 'outcome_unknown' && this.deps.repository.verifiedOperationResolution(receipt))) {
         throw Object.assign(new Error('浏览器已确认动作，但页面结果尚未读取，不能保存计划。请只读观察原页面。'), { code: 'browser_readback_blocked' })
@@ -356,7 +360,7 @@ export class TaskScheduleService {
         !this.deps.repository.verifiedOperationResolution(receipt)) browserOutcomeUnknown()
     }
     const retired = this.retiredBrowserDispatches(task, receipts)
-    if (receipts.some(receipt => receipt.kind === 'browser_schedule_action_outcome' && receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
+    if (receipts.some(receipt => receipt.kind === 'browser_schedule_action_outcome' && receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt) && !recoveryCoversReceipt(this.deps.repository,receipt,recovery))) browserOutcomeUnknown()
     const scopedMatches = (target: Record<string, unknown>) => {
       const dispatch = dispatches.find(item => fingerprint(item.request) === fingerprint(target))
       const original = dispatch && receipts.find(item => item.kind === 'tool' && item.request?.turnId === dispatch.request?.turnId && item.request?.toolName === dispatch.request?.toolName && item.request?.argumentsHash === dispatch.request?.argumentsHash)
@@ -377,7 +381,7 @@ export class TaskScheduleService {
         action.browserRevision === target.browserRevision && browserVerificationPolicy(action.verificationPolicy) === browserVerificationPolicy(target.verificationPolicy))
     }
     for (const dispatch of dispatches) {
-      if (retired.has(dispatch.id)) continue
+      if (retired.has(dispatch.id)||recoveryCoversReceipt(this.deps.repository,dispatch,recovery)) continue
       if (record(dispatch.result).readbackPending === true &&
         !(dispatch.status === 'outcome_unknown' && this.deps.repository.verifiedOperationResolution(dispatch))) {
         throw Object.assign(new Error('浏览器已确认动作，但页面结果尚未读取，不能保存计划。请只读观察原页面。'), { code: 'browser_readback_blocked' })
@@ -391,6 +395,7 @@ export class TaskScheduleService {
       if (!matches(dispatch.request ?? {})) browserScopeRequired('已执行的浏览器动作缺少匹配的持续授权。')
     }
     for (const [index, receipt] of receipts.entries()) {
+      if(recoveryCoversReceipt(this.deps.repository,receipt,recovery))continue
       if (receipt.kind !== 'tool' || !['browser_click', 'browser_fill', 'browser_press'].includes(String(receipt.request?.toolName))) continue
       if (receipt.id === currentOperationId) continue
       if (dispatches.some(dispatch => retired.has(dispatch.id) && this.browserDispatchToolMatches(dispatch, receipt))) continue
@@ -642,7 +647,7 @@ export class TaskScheduleService {
   }
 
   /** Retry safety asks this read-only gate in addition to its exact Host proof. */
-  async validateRetryLocalSchedule(task: TaskRun, receipt: OperationReceipt): Promise<boolean> {
+  async validateRetryLocalSchedule(task: TaskRun, receipt: OperationReceipt, recovery?:BrowserPublicQueryRecoveryBinding): Promise<boolean> {
     const source = this.planSource(task), flow = this.deps.flows.get(`schedule_${source.id}`)
     const tool = receipt.request?.toolName
     if (!flow || receipt.ownerId !== task.id || receipt.kind !== 'tool' || receipt.request?.providerId !== 'task-schedule' ||
@@ -651,7 +656,8 @@ export class TaskScheduleService {
     const lineage = task.retryOfTaskId ? verifiedTaskRetryLineage(this.deps.repository, task) : { root: task, tasks: [task] }
     if (!lineage || !lineage.tasks.some(item => item.id === authority.taskId) || task.goal !== authority.prompt ||
       fingerprint(task.acceptance.schedule) !== fingerprint(authority.requirement)) return false
-    await this.validateAuthority(authority)
+    if(recovery&&fingerprint(this.recoveryForAuthority(authority))!==fingerprint(recovery))return false
+    await this.validateAuthority(authority,undefined,undefined,recovery)
     return this.snapshot(flow).enabled
   }
 
@@ -665,6 +671,7 @@ export class TaskScheduleService {
 
   /** Reuse the immutable plan, never its old Grant as this attempt's authority. */
   private async validateRetryPlan(task: TaskRun, saved: ScheduledTaskAuthority, context: ToolHostContext, preparedScope?: ExecutionScope): Promise<void> {
+    const recovery=context.executionGrant?.browserPublicQueryRecovery
     const lineage = verifiedTaskRetryLineage(this.deps.repository, task), grant = context.executionGrant
     if (!lineage || !lineage.tasks.some(item => item.id === saved.taskId) || !grant || grant.taskId !== task.id ||
       grant.threadId !== task.threadId || grant.threadId !== context.threadId || grant.turnId !== context.turnId || grant.turnId !== task.activeTurnId ||
@@ -675,7 +682,7 @@ export class TaskScheduleService {
       !['running', 'waiting_approval'].includes(task.status) || grant.expiresAt && Date.parse(grant.expiresAt) <= Date.parse(this.deps.nowIso()) ||
       task.goal !== saved.prompt || fingerprint(task.acceptance.schedule) !== fingerprint(saved.requirement)) fail('重试任务与原计划的来源、目标或有效执行凭证不同，请核对原计划。')
     await context.validateExecutionGrant?.()
-    await this.validateAuthority(saved, undefined, saved.taskId === task.id ? context : undefined)
+    await this.validateAuthority(saved, undefined, context, context.executionGrant?.browserPublicQueryRecovery)
     const permission = task.authority?.taskApprovalGrant
     if (task.authority?.revokedAt || permission?.revokedAt || permission && (permission.status !== 'active' || Date.parse(permission.expiresAt) <= Date.parse(this.deps.nowIso()))) fail('重试任务的临时权限已变化，请重新确认。')
     const execution = await this.deps.threads.get(context.threadId), origin = await this.deps.threads.get(task.originThreadId ?? context.threadId)
@@ -684,7 +691,7 @@ export class TaskScheduleService {
     const actions = listApprovedBrowserScheduleActions(this.deps.repository, task)
     this.validateBrowserDispatches(task, actions, context)
     if (this.deps.repository.operations(task.id, 'browser_schedule_action_outcome').some(receipt =>
-      receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
+      receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt) && !recoveryCoversReceipt(this.deps.repository,receipt,recovery))) browserOutcomeUnknown()
     const scope = preparedScope ?? taskScheduleScope({ allowedToolNames: grant.allowedToolNames, allowedProviderIds: grant.allowedProviderIds,
       pathAllowlist: grant.pathAllowlist, readPathAllowlist: grant.readPathAllowlist, writePathAllowlist: grant.writePathAllowlist,
       networkAllowlist: grant.networkAllowlist, connectorScopes: grant.connectorScopes, externalTargets: grant.externalTargets,
@@ -692,11 +699,25 @@ export class TaskScheduleService {
       ...(permission?.scope ? { permissionScope: permission.scope } : {}), ...(grant.workspaceWriteException ? { workspaceWriteException: true } : {}),
       ...(actions.length || query?.authorization.duration === 'schedule' ? { browserScheduleActions: actions } : {}) })
     if (!execution || !origin || fingerprint(threadAuthority(execution)) !== fingerprint(saved.execution) || fingerprint(threadAuthority(origin)) !== fingerprint(saved.origin) ||
-      fingerprint(scope) !== fingerprint(taskScheduleScope(saved.scope))) fail('重试任务的工作区、Agent、路径、站点或连接器范围与原计划不同，请重新核对授权。')
+      !this.retryScopeMatches(task,grant,scope,saved.scope)) fail('重试任务的工作区、Agent、路径、站点或连接器范围与原计划不同，请重新核对授权。')
     this.validateConnectorBindings({ ...saved, grant })
   }
 
-  private async validateAuthority(authority: ScheduledTaskAuthority, browserActions = authority.scope.browserScheduleActions ?? [], currentContext?: ToolHostContext) {
+  private retryScopeMatches(task:TaskRun,grant:ExecutionGrant,current:ExecutionScope,saved:ExecutionScope):boolean {
+    if(!grant.browserPublicQueryRecovery)return fingerprint(current)===fingerprint(taskScheduleScope(saved))
+    // Reading the already sealed Root plan needs no creation permission. Recheck
+    // the exact recovery/Retry lineage, then accept only the fresh Grant's
+    // capability intersection. The saved authority and Flow stay immutable.
+    const bounded=taskScheduleScope(recoveryExecutionScope(this.deps.repository,task,taskScheduleScope(saved),Date.parse(grant.issuedAt)))
+    const {allowedToolNames:tools,allowedProviderIds:providers,networkAllowlist:origins,expiresAt:_expires,browserPublicQueryRecovery:_recovery,...fixed}=bounded
+    const {allowedToolNames:actualTools,allowedProviderIds:actualProviders,networkAllowlist:actualOrigins,...actualFixed}=current
+    return operationFingerprint(fixed)===operationFingerprint(actualFixed)&&
+      Array.isArray(actualTools)&&Array.isArray(tools)&&actualTools.every(name=>tools.includes(name))&&
+      Array.isArray(actualProviders)&&Array.isArray(providers)&&actualProviders.every(id=>providers.includes(id))&&
+      Array.isArray(actualOrigins)&&Array.isArray(origins)&&actualOrigins.every(origin=>origins.includes(origin))
+  }
+
+  private async validateAuthority(authority: ScheduledTaskAuthority, browserActions = authority.scope.browserScheduleActions ?? [], currentContext?: ToolHostContext, recovery=currentContext?.executionGrant?.browserPublicQueryRecovery) {
     const { grant } = authority
     const source = this.deps.repository.get(authority.taskId)
     const origin = await this.deps.threads.get(authority.originThreadId)
@@ -716,19 +737,31 @@ export class TaskScheduleService {
       if (!scoped || scoped.authorization.duration !== 'schedule' || authority.authorization.sourceScopeReceiptId !== scoped.binding.id && authority.authorization.kind !== 'confirmed_scope' ||
         fingerprint(authority.scope.browserScope) !== fingerprint(grant.browserScope)) fail('持续公开查询范围已变化或尚未明确确认。')
     }
-    const browserHistory = this.validateBrowserDispatches(source, browserActions, currentContext)
+    const browserHistory = this.validateBrowserDispatches(source, browserActions, currentContext,recovery)
     if ((authority.scope.browserScheduleActions?.length || publicScope) && this.deps.repository.operations(source.id, 'browser_schedule_action_outcome').some(receipt =>
-      receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
+      receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt) && !recoveryCoversReceipt(this.deps.repository,receipt,recovery))) browserOutcomeUnknown()
     if (authority.scope.browserScheduleActions?.length) {
       const approved = listApprovedBrowserScheduleActions(this.deps.repository, source)
       if (authority.scope.browserScheduleActions.some(action => !approved.some(candidate => fingerprint(candidate) === fingerprint(action)))) fail('计划浏览器动作已撤销或范围已变化，请重新审阅。')
       if (this.deps.repository.operations(source.id, 'browser_schedule_action_outcome').some(receipt =>
-        receipt.status === 'outcome_unknown' && receipt.request?.scheduleId === `schedule_${source.id}` && !this.deps.repository.verifiedOperationResolution(receipt))) {
+        receipt.status === 'outcome_unknown' && receipt.request?.scheduleId === `schedule_${source.id}` && !this.deps.repository.verifiedOperationResolution(receipt) && !recoveryCoversReceipt(this.deps.repository,receipt,recovery))) {
         throw Object.assign(new Error('browser_schedule_outcome_unknown'), { code: 'browser_schedule_outcome_unknown' })
       }
     }
     this.validateConnectorBindings(authority)
     return browserHistory
+  }
+
+  private recoveryForAuthority(authority: ScheduledTaskAuthority) {
+    return publicQueryRecoveryForPlan(this.deps.repository,{sourceTaskId:authority.taskId,scheduleId:`schedule_${authority.taskId}`,versionId:this.deps.flows.get(`schedule_${authority.taskId}`)?.publishedVersionId??'',scopeHash:authority.authorization.scopeHash,browserIdentity:this.deps.connectorIdentities()['browser-skill']??''})
+  }
+
+  async validatePublicQueryRecoveryPlan(binding: BrowserPublicQueryRecoveryBinding): Promise<void> {
+    const flow=binding.scheduleId?this.deps.flows.get(binding.scheduleId):null
+    if(!flow||flow.variables.enabled===false||flow.variables.archived===true||flow.publishedVersionId!==binding.versionId)fail('原计划已变化。')
+    const authority=this.authority(flow)
+    if(fingerprint(this.recoveryForAuthority(authority))!==fingerprint(binding))fail('公开查询恢复计划凭据不匹配。')
+    await this.validateAuthority(authority,undefined,undefined,binding)
   }
 
   private validateConnectorBindings(authority: ScheduledTaskAuthority): void {

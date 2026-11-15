@@ -1,3 +1,5 @@
+import { recoveryCoversReceipt } from './browser-public-query-recovery-proof.js'
+import type { BrowserPublicQueryRecoveryService } from './browser-public-query-recovery.js'
 import { ThreadTodoListSchema } from '../contracts/threads.js'
 import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { operationFingerprint } from './task-run-repository.js'
@@ -17,14 +19,14 @@ import { toolCanProveExternalEffect } from '../loop/turn-completion-guard.js'
 import { createHash } from 'node:crypto'
 import { taskPermissionFailure } from './task-permission-recovery.js'
 
-export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget' | 'revalidate_artifacts'
-export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number; confirmed?:boolean }
+export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget' | 'revalidate_artifacts' | 'prepare_public_query_recovery'
+export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number; confirmed?:boolean; publicQueryRecoveryReceiptId?:string }
 export type TaskControlResult = { task:TaskRun; corrected?:boolean; completed?:boolean; reason?:string; turn?:StartTurnResponse; capability?:ExternalTaskCapability; attentionId?:string; receipt?:{userMessageItemId:string;resultMessageItemId:string} }
 
 /** One deterministic mutation path for chat commands and the task HTTP API. */
 export class TaskControlService {
   private readonly pending = new Map<string,Promise<unknown>>()
-  constructor(private readonly deps:{repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;validateRetryLocalSchedule?(task:TaskRun,receipt:OperationReceipt):Promise<boolean>;nowIso():string}) {}
+  constructor(private readonly deps:{publicQueryRecovery?:BrowserPublicQueryRecoveryService;repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;preflightRecoveryTask?(text:string,thread:import('../contracts/threads.js').ThreadRecord,binding:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):ReturnType<ExternalTaskPreflight>;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;validateRecoveryPermission?(threadId:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;validateRetryLocalSchedule?(task:TaskRun,receipt:OperationReceipt,recovery?:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):Promise<boolean>;nowIso():string}) {}
 
   async mutate(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const previous=this.pending.get(taskId) ?? Promise.resolve()
@@ -35,6 +37,7 @@ export class TaskControlService {
 
   private async execute(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const {repository,tasks,threads,turns,nowIso}=this.deps
+    if (action === 'prepare_public_query_recovery') { if (!this.deps.publicQueryRecovery) throw new Error('recovery unavailable'); return this.deps.publicQueryRecovery.prepare(taskId, data) }
     if (action === 'revalidate_artifacts') return tasks.revalidateLocalArtifacts(taskId, data)
     if (action === 'extend_budget') return repository.transact(() => {
       const previous = repository.operation(taskId, data.idempotencyKey)
@@ -55,6 +58,14 @@ export class TaskControlService {
     let blockedCapability: ExternalTaskCapability | undefined
     if(!current)throw Object.assign(new Error('task not found'),{code:'not_found'})
     const prior=repository.operation(taskId,data.idempotencyKey)
+    if(prior?.status==='prepared'&&action==='retry'){
+      repository.beginOperation({ownerId:taskId,idempotencyKey:data.idempotencyKey,kind:action,request:data,nowIso:nowIso()})
+      const childId=`task_retry_${createHash('sha256').update(`task:${taskId}:retry:${data.idempotencyKey}`).digest('hex')}`
+      const waiting=this.deps.publicQueryRecovery?.recoverPreparedRetry(taskId,prior,childId)
+      if(waiting)return {task:waiting}
+    }
+    let recovery: Awaited<ReturnType<BrowserPublicQueryRecoveryService['forRetry']>>
+    if(prior?.status!=='succeeded'&&action==='retry')recovery=await this.deps.publicQueryRecovery?.forRetry(current,data.publicQueryRecoveryReceiptId)
     if(prior) {
       repository.beginOperation({ownerId:taskId,idempotencyKey:data.idempotencyKey,kind:action,request:data,nowIso:nowIso()})
       if(prior.status==='succeeded') {
@@ -73,12 +84,12 @@ export class TaskControlService {
         return resolved
       }
       if(prior.status==='failed'||prior.status==='outcome_unknown')throw Object.assign(new Error(prior.error ?? 'previous operation requires inspection'),{code:'outcome_unknown'})
-      if(action==='retry')await this.assertRetrySafe(current)
+      if(action==='retry')await this.assertRetrySafe(current,recovery?.context.unknowns.map(ref=>ref.id),recovery?.binding,recovery?.context.previousRecovery)
     } else {
       if(current.revision!==data.expectedRevision)throw Object.assign(new Error('task revision conflict'),{code:'stale_request'})
       if((action==='resume'||action==='retry')&&await this.deps.isEngineeringTask?.(current))throw Object.assign(new Error('engineering_plan_typed_resume_required: continue or replan from the approved engineering plan'),{code:'invalid_state'})
-      if(action==='retry'&&!['failed','cancelled'].includes(current.status))throw Object.assign(new Error('retry is only valid for failed or cancelled tasks'),{code:'invalid_state'})
-      if(action==='retry')await this.assertRetrySafe(current)
+      if(action==='retry'&&!['failed','cancelled'].includes(current.status)&&!recovery?.direct)throw Object.assign(new Error('retry is only valid for failed or cancelled tasks'),{code:'invalid_state'})
+      if(action==='retry')await this.assertRetrySafe(current,recovery?.context.unknowns.map(ref=>ref.id),recovery?.binding,recovery?.context.previousRecovery)
     }
     if(action==='resume'||action==='retry') {
       if (action === 'resume') {
@@ -97,7 +108,7 @@ export class TaskControlService {
       const executionThread = await threads.get(current.threadId)
       if (!executionThread) throw Object.assign(new Error('task execution thread not found'), { code: 'not_found' })
       const capabilities = [current.goal, ...tasks.taskInputs(current.id, true).filter(input => !tasks.approvalForInput(input)).map(input => input.text)]
-        .map(text => this.deps.preflightExternalTask ? this.deps.preflightExternalTask(text, externalPreflightThreadContext(executionThread, { mode: 'agent' }), action === 'retry' ? current! : undefined) : preflightExternalTask(text))
+        .map(text => recovery&&this.deps.preflightRecoveryTask ? this.deps.preflightRecoveryTask(text,externalPreflightThreadContext(executionThread,{mode:'agent'}),recovery.binding) : this.deps.preflightExternalTask ? this.deps.preflightExternalTask(text, externalPreflightThreadContext(executionThread, { mode: 'agent' }), action === 'retry' ? current! : undefined) : preflightExternalTask(text))
       const checked = await Promise.all(capabilities)
       const requiredCapabilities = checked.filter((capability): capability is ExternalTaskCapability => capability !== null)
       const capability = requiredCapabilities.find(item => item.status !== 'available')
@@ -142,10 +153,15 @@ export class TaskControlService {
       if(action==='retry') {
         retryHistory = [tasks.retryHistory(current.id), ...current.artifacts.filter(file => file.storage === 'task').map(file => JSON.stringify({ source_task_id: current!.id, path: file.relativePath, sha256: file.sha256 }))].filter(Boolean).join('\n')
         const retryId=`task_retry_${createHash('sha256').update(turnKey).digest('hex')}`
-        current=tasks.createRetryTask({id:retryId,sourceTaskId:current.id,expectedRevision:current.revision,thread,retryControl:{ownerId:taskId,idempotencyKey:data.idempotencyKey},
-          request:{prompt:current.goal,model:data.model ?? current.model,providerId:current.providerId,reasoningEffort:current.reasoningEffort}})
+        current=repository.transact(()=>{
+          if(recovery?.direct) current=repository.update(current!.id,current!.revision,value=>({...value,status:'failed',waitingReason:'原公开查询上下文无法核验，已保留未知记录；用户要求另次受限检索。',updatedAt:nowIso()}),{key:`public-query-recovery-terminal:${recovery.binding.receiptId}`,kind:'public_query_context_abandoned',payload:{recoveryReceiptId:recovery.binding.receiptId,unresolved:true}})
+          const retry=tasks.createRetryTask({id:retryId,sourceTaskId:current!.id,expectedRevision:current!.revision,thread,retryControl:{ownerId:taskId,idempotencyKey:data.idempotencyKey},...(recovery?{publicQueryRecovery:recovery.binding}:{}),
+            request:{prompt:current!.goal,model:data.model ?? current!.model,providerId:current!.providerId,reasoningEffort:current!.reasoningEffort}})
+          if(recovery?.direct)this.deps.publicQueryRecovery!.consume(repository.get(recovery.context.taskId)!,retry,recovery.binding)
+          return retry
+        })
         preparedRetryId=current.id
-        try { if (!blockedCapability) await this.deps.validateTaskPermission?.(thread.id) }
+        try { if (!blockedCapability) {if(recovery)await this.deps.validateRecoveryPermission?.(thread.id);else await this.deps.validateTaskPermission?.(thread.id)} }
         catch(error) {
           const reason=error instanceof Error?error.message:String(error)
           blockedCapability = workspacePermissionCapability((error as {code?:string}).code ?? 'task_permission_revoked', reason)
@@ -230,7 +246,7 @@ export class TaskControlService {
   }
 
   /** A new TaskRun must never erase the old operation ledger's uncertainty or repeat writes. */
-  private async assertRetrySafe(current:TaskRun):Promise<void> {
+  private async assertRetrySafe(current:TaskRun,recoveryIds?:string[],recoveryBinding?:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding, previousRecovery?:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):Promise<void> {
     const {repository}=this.deps,visited=new Set<string>()
     let task:TaskRun|undefined=current
     while(task){
@@ -239,11 +255,11 @@ export class TaskControlService {
       for(const receipt of repository.operations(task.id)) {
         if(!['tool','host_shell'].includes(receipt.kind))continue
         const resolution=repository.verifiedOperationResolution(receipt)
-        if(['prepared','running','outcome_unknown'].includes(receipt.status)&&!resolution)throw Object.assign(new Error('原任务或其重试历史仍有待核实操作，不能通过创建新任务重放。请先核实原回执。'),{code:'outcome_unknown'})
+        if(['prepared','running','outcome_unknown'].includes(receipt.status)&&!resolution&&!recoveryIds?.includes(receipt.id)&&!recoveryCoversReceipt(repository,receipt,recoveryBinding)&&!recoveryCoversReceipt(repository,receipt,previousRecovery))throw Object.assign(new Error('原任务或其重试历史仍有待核实操作，不能通过创建新任务重放。请先核实原回执。'),{code:'outcome_unknown'})
         const toolName=typeof receipt.request?.toolName==='string'?receipt.request.toolName:receipt.toolName??''
         const spec=this.deps.tasks.describeToolEffect(toolName) ?? externalOperationForTool(toolName)
         const operation=spec?.operation??(typeof receipt.request?.operation==='string'?receipt.request.operation:'')
-        const localSchedule = trustedLocalScheduleReceipt(task, receipt) && await this.deps.validateRetryLocalSchedule?.(task, receipt) === true
+        const localSchedule = trustedLocalScheduleReceipt(task, receipt) && await this.deps.validateRetryLocalSchedule?.(task, receipt,recoveryBinding) === true
         const localBookkeeping = trustedLocalBookkeepingReceipt(task, receipt)
         const externalWrite=!localSchedule&&!localBookkeeping&&receipt.kind==='tool'&&(['approve','reject','complete','send','transfer','upload'].includes(operation)||!spec&&toolCanProveExternalEffect(toolName))
         const knownNotDispatched=receipt.status==='failed'&&(receipt.result as {approved?:boolean}|undefined)?.approved===false

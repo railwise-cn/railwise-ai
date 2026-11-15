@@ -31,3 +31,10 @@
 采用 [Google 的可用窗口尺寸分级原则](https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes)，并参考 Apple 对[侧栏自动适配](https://developer.apple.com/design/human-interface-guidelines/sidebars)及[单一锚定弹出菜单](https://developer.apple.com/design/human-interface-guidelines/popovers)的建议。这是 RailWise 的桌面实现，不声明取得这些厂商的设计认证。
 
 自动检查覆盖真实容器尺寸变化、窄窗抽屉、偏好恢复、最小内容宽度和键盘焦点。最终验收仍须在最终精确安装包中检查中文界面的窄窗、常规窗口、宽屏、短窗与界面缩放；开发服务或 DOM 测试不能代替精确包实测。既有 84ae 截图保留其原源码标记，不作为本轮新界面的截图。
+
+
+## 本轮源码验证记录
+
+工作台布局、选择菜单、设置及帮助适配已合入同一分支。桌面全量回归在固定 Node 22 下通过 4,725 项、跳过 10 项；旧成果预览测试已随单一根级面板结构更新并通过，未把面板移回多处挂载。恢复入口合并后，新增卡片、任务页、preload 与 IPC 聚焦 120 项通过，桌面及 Runtime 类型检查、相关 59 文件 lint 和生产构建通过。完整 Runtime 与最终源码 CI 另外记录其结果。
+
+上述为源码和开发环境检查。当前打开的旧候选包尚未包含这轮适配；最终新包的中文界面、受支持字号、小窗与宽窗实际操作仍待检查，不能由 DOM 或本地隔离菜单截图替代。

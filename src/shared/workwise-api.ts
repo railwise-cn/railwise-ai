@@ -417,6 +417,8 @@ export type WorkWiseApi = {
   listTaskRuns: (query?: TaskRunListQuery) => Promise<TaskRunV1[]>
   revalidateTaskArtifacts: (taskId: string, request: Pick<RevisionTaskAction, 'expectedRevision' | 'idempotencyKey'> & { confirmed: true }) => Promise<{ task: TaskRunV1; corrected: boolean; completed: boolean; reason?: string }>
   extendTaskBudget: (taskId: string, request: Pick<RevisionTaskAction, 'expectedRevision' | 'idempotencyKey'> & { additionalExecutionMs: number }) => Promise<TaskRunV1>
+  getTaskPublicQueryRecovery: (taskId: string) => Promise<import('./agent-workbench').TaskPublicQueryRecoverySnapshotV1>
+  prepareTaskPublicQueryRecovery: (taskId: string, request: Pick<RevisionTaskAction, 'expectedRevision' | 'idempotencyKey'> & { confirmed: true }) => Promise<{ task: TaskRunV1; recovery: import('./agent-workbench').TaskPublicQueryRecoverySnapshotV1; prepared: true; resumed: false }>
   resumeTask: (taskId: string, request: RevisionTaskAction) => Promise<{ task: TaskRunV1; turn?: unknown; capability?: import('./task-command').ExternalTaskCapability; attentionId?: string }>
   retryTask: (taskId: string, request: RevisionTaskAction) => Promise<{ task: TaskRunV1; turn?: unknown; capability?: import('./task-command').ExternalTaskCapability; attentionId?: string }>
   cancelTask: (taskId: string, request: RevisionTaskAction) => Promise<TaskRunV1>
@@ -788,4 +790,5 @@ export type RevisionTaskAction = {
   idempotencyKey: string
   model?: string
   reason?: string
+  publicQueryRecoveryReceiptId?: string
 }

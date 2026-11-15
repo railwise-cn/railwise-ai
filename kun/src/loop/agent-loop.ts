@@ -1929,6 +1929,7 @@ export class AgentLoop {
       ...(scope?.connectorIdentityFingerprints ? {connectorIdentityFingerprints:scope.connectorIdentityFingerprints} : {}),
       ...(scope?.connectorBackends ? { connectorBackends: scope.connectorBackends } : {}),
       ...(scope?.browserScope ? {browserScope: scope.browserScope} : {}),
+      ...(scope?.browserPublicQueryRecovery ? {browserPublicQueryRecovery: scope.browserPublicQueryRecovery} : {}),
       ...(scope?.browserScheduleBinding ? {browserScheduleBinding: scope.browserScheduleBinding} : {}),
       ...(scope?.scheduleScopeHash ? {scheduleScopeHash: scope.scheduleScopeHash} : {}),
       workspaceRevision: workspace.revision, agentRevision: thread.agentRevision ?? 0,

@@ -85,6 +85,7 @@ export type ServerRuntime = {
   refreshDingTalk?: () => Promise<unknown>
   refreshLark?: () => Promise<unknown>
   refreshDws?: () => Promise<unknown>
+  getTaskPublicQueryRecovery?(taskId:string):Promise<import('../../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoverySnapshot>
   browserTaskBinding?(taskId: string): import('../../contracts/browser-skill.js').BrowserTaskBindingSnapshot
   confirmBrowserTaskBinding?(taskId: string, input: import('../../contracts/browser-skill.js').BrowserTaskBindingConfirmation): { binding: import('../../contracts/browser-skill.js').BrowserTaskBindingSnapshot; resumed: false }
   refreshBrowserSkill?: () => Promise<unknown>

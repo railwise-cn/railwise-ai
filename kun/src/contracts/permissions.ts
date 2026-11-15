@@ -1,3 +1,4 @@
+import { BrowserPublicQueryRecoveryBindingSchema } from './browser-public-query-recovery.js'
 import { z } from 'zod'
 import { ApprovalPolicySchema, SandboxModeSchema } from './policy.js'
 import { BrowserExecutionScope } from './browser-skill.js'
@@ -37,6 +38,7 @@ export const ExecutionGrantSchema = z.object({
   managedArtifactRoot: z.string().min(1).optional(),
   scheduleScopeHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   browserScope: BrowserExecutionScope.optional(),
+  browserPublicQueryRecovery: BrowserPublicQueryRecoveryBindingSchema.optional(),
   browserScheduleBinding: BrowserScheduleBindingSchema.optional(),
   workspaceWriteException: z.boolean().optional(),
   networkAllowlist: z.array(z.string()).default([]),
@@ -94,7 +96,7 @@ export const TaskPermissionConfirmationSchema = z.object({
 export type TaskPermissionConfirmation = z.infer<typeof TaskPermissionConfirmationSchema>
 
 export type ExecutionScope = Pick<ExecutionGrant, 'networkAllowlist' | 'connectorScopes' | 'externalTargets'> &
-  Pick<Partial<ExecutionGrant>, 'connectorIdentityFingerprints' | 'connectorBackends' | 'browserScope' | 'browserScheduleBinding' | 'scheduleScopeHash'> &
+  Pick<Partial<ExecutionGrant>, 'connectorIdentityFingerprints' | 'connectorBackends' | 'browserScope' | 'browserScheduleBinding' | 'scheduleScopeHash' | 'browserPublicQueryRecovery'> &
   Pick<Partial<ExecutionGrant>, 'allowedToolNames'> &
   Pick<Partial<ExecutionGrant>, 'allowedProviderIds' | 'pathAllowlist' | 'readPathAllowlist' | 'writePathAllowlist' | 'expiresAt' | 'taskPermissionId' | 'permissionDuration'> &
   { permissionScope?: TaskPermissionScope; workspaceWriteException?: boolean; browserScheduleActions?: BrowserScheduleAction[] }

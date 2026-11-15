@@ -1,3 +1,4 @@
+import { BrowserPublicQueryRecoveryBindingSchema } from './browser-public-query-recovery.js'
 import { z } from 'zod'
 import { TaskApprovalGrantSchema } from './permissions.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
@@ -190,6 +191,7 @@ export type TaskAssignment = {
 }
 
 export const TaskRunSchema = z.object({
+  publicQueryRecovery: BrowserPublicQueryRecoveryBindingSchema.optional(),
   scheduledBy: z.object({ scheduleId: z.string().min(1), dueAt: z.string().min(1) }).optional(),
   id: z.string().min(1),
   threadId: z.string().min(1),
