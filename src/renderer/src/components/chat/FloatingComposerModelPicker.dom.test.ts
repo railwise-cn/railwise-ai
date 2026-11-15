@@ -30,11 +30,11 @@ describe('provider-aware composer selection', () => {
     await act(async () => container.querySelector('button')!.click())
     const provider = (name: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="menu"] button')].find(button => button.textContent?.includes(name))!
     await act(async () => provider('Provider A').click())
-    let menu = document.querySelector('[role="menu"][aria-label="Provider A"]')!
+    let menu = document.querySelector('[role="group"][aria-label="Provider A"]')!
     expect(menu.querySelectorAll('button')).toHaveLength(1)
     expect(menu.querySelector('.lucide-check')).toBeNull()
     await act(async () => provider('Provider B').click())
-    menu = document.querySelector('[role="menu"][aria-label="Provider B"]')!
+    menu = document.querySelector('[role="group"][aria-label="Provider B"]')!
     expect(menu.querySelectorAll('button')).toHaveLength(1)
     expect(menu.querySelector('.lucide-check')).not.toBeNull()
     await act(async () => menu.querySelector('button')!.click())
@@ -56,7 +56,7 @@ describe('provider-aware composer selection', () => {
     await act(async () => container.querySelector('button')!.click())
     await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="menu"] button')]
       .find(button => button.textContent?.includes('DeepSeek'))!.click())
-    const officialMenu = document.querySelector('[role="menu"][aria-label="DeepSeek"]')!
+    const officialMenu = document.querySelector('[role="group"][aria-label="DeepSeek"]')!
     expect(officialMenu.textContent).toContain('deepseek-flash')
     expect(officialMenu.querySelector('.lucide-check')).not.toBeNull()
     expect(officialMenu.textContent).not.toContain('deepseek-v4-flash')
@@ -79,11 +79,11 @@ describe('provider-aware composer selection', () => {
     await act(async () => container.querySelector('button')!.click())
     await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="menu"] button')]
       .find(button => button.textContent?.includes('Custom'))!.click())
-    expect(document.querySelector('[role="menu"][aria-label="Custom"]')?.textContent)
+    expect(document.querySelector('[role="group"][aria-label="Custom"]')?.textContent)
       .toContain('deepseek-v4-pro')
     await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="menu"] button')]
       .find(button => button.textContent?.includes('DeepSeek'))!.click())
-    const officialMenu = document.querySelector('[role="menu"][aria-label="DeepSeek"]')!
+    const officialMenu = document.querySelector('[role="group"][aria-label="DeepSeek"]')!
     expect(officialMenu.textContent).toContain('deepseek-flash')
     expect(officialMenu.textContent).not.toContain('deepseek-v4-pro')
   })

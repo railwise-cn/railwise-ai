@@ -129,19 +129,19 @@ export function SettingRow({
 }): ReactElement {
   return (
     <div
-      className={`flex gap-3 px-3 py-4 ${
+      className={`ds-setting-row flex min-w-0 gap-3 px-3 py-4 ${
         wideControl
           ? 'flex-col sm:gap-3.5'
           : 'flex-col sm:flex-row sm:items-start sm:justify-between sm:gap-8'
       }`}
     >
-      <div className={`min-w-0 ${wideControl ? 'w-full max-w-none shrink-0' : 'flex-1'}`}>
+      <div className={`ds-setting-row-label min-w-0 ${wideControl ? 'w-full max-w-none shrink-0' : 'flex-1'}`}>
         <div className="text-[14px] font-semibold text-ds-ink">{title}</div>
         {description ? (
           <p className="mt-0.5 text-[13px] leading-relaxed text-ds-muted">{description}</p>
         ) : null}
       </div>
-      <div className={`w-full min-w-0 ${wideControl ? '' : 'sm:max-w-[420px]'}`}>
+      <div className={`ds-setting-row-control w-full min-w-0 ${wideControl ? '' : 'sm:max-w-[420px]'}`}>
         {control}
       </div>
     </div>

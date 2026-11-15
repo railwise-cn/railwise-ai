@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useId, useRef, useState, type ReactElement } from 'react'
 import { Check, ChevronDown, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ApprovalPolicy, SandboxMode } from '@shared/app-settings'
+import { AnchoredMenu } from '../ui/AnchoredMenu'
 
 export type ComposerExecutionSettings = {
   approvalPolicy: ApprovalPolicy
@@ -56,30 +57,23 @@ export function FloatingComposerExecutionPicker({
 }: Props): ReactElement {
   const { t } = useTranslation('common')
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => { if (disabled || applying) setOpen(false) }, [disabled, applying])
+  const anchorRef = useRef<HTMLButtonElement>(null)
+  const id = useId()
   const fullAccess = value.sandboxMode === 'danger-full-access'
   const Icon = fullAccess ? ShieldAlert : ShieldCheck
   const title = `${t('composerApprovalShort')}: ${t(approvalLabelKey(value.approvalPolicy))} / ${t('composerAccessShort')}: ${t(sandboxLabelKey(value.sandboxMode))}`
 
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: PointerEvent): void => {
-      const target = event.target
-      if (target instanceof Node && rootRef.current?.contains(target)) return
-      setOpen(false)
-    }
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => window.removeEventListener('pointerdown', onPointerDown)
-  }, [open])
-
   const update = (patch: Partial<ComposerExecutionSettings>): void => {
     onChange(patch)
     setOpen(false)
+    anchorRef.current?.focus({ preventScroll: true })
   }
 
   return (
-    <div ref={rootRef} className="ds-no-drag relative shrink-0">
+    <div className="ds-no-drag min-w-0 shrink">
       <button
+        ref={anchorRef}
         type="button"
         disabled={disabled || applying}
         onClick={() => setOpen((current) => !current)}
@@ -91,7 +85,9 @@ export function FloatingComposerExecutionPicker({
         title={title}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-controls={open ? id : undefined}
         aria-label={t('composerExecutionLabel')}
+        onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true) } }}
       >
         <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
         <span className="max-w-[120px] truncate">
@@ -100,11 +96,8 @@ export function FloatingComposerExecutionPicker({
         <ChevronDown className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
       </button>
 
-      {open ? (
-        <div
-          role="menu"
-          className="absolute bottom-full left-0 z-40 mb-2 w-[260px] overflow-hidden rounded-2xl border border-ds-border bg-white p-2 text-[13px] text-ds-muted shadow-[0_18px_48px_rgba(15,23,42,0.16)] dark:bg-ds-card"
-        >
+      <AnchoredMenu id={id} open={open && !disabled && !applying} onOpenChange={setOpen} anchorRef={anchorRef}
+        label={t('composerExecutionLabel')} width={264}>
           <div className="px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ds-faint">
             {t('composerApprovalShort')}
           </div>
@@ -130,8 +123,7 @@ export function FloatingComposerExecutionPicker({
               onClick={() => update({ sandboxMode: option.value })}
             />
           ))}
-        </div>
-      ) : null}
+      </AnchoredMenu>
     </div>
   )
 }

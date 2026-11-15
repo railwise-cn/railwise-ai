@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
-import { act, createElement } from 'react'
+import { act, createElement, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useWorkbenchDrawerFocus } from './use-workbench-drawer-focus'
+import { AnchoredMenu } from './ui/AnchoredMenu'
 
 let host: HTMLDivElement, root: Root
 function Drawer({ open, close }: { open: boolean; close: () => void }) {
@@ -10,6 +11,15 @@ function Drawer({ open, close }: { open: boolean; close: () => void }) {
   return open ? createElement('div', { id: 'test-drawer', role: 'dialog', tabIndex: -1 },
     createElement('button', { id: 'first' }, 'first'), createElement('button', { id: 'hidden', hidden: true }, 'hidden'),
     createElement('input', { id: 'last' })) : null
+}
+function DrawerWithMenu() {
+  const [open, setOpen] = useState(true), [menuOpen, setMenuOpen] = useState(false)
+  const anchor = useRef<HTMLButtonElement>(null)
+  useWorkbenchDrawerFocus(open, 'nested-drawer', () => setOpen(false))
+  return open ? createElement('div', { id: 'nested-drawer', role: 'dialog', tabIndex: -1 },
+    createElement('button', { ref: anchor, id: 'menu-trigger', onClick: () => setMenuOpen(true) }, 'choose'),
+    createElement(AnchoredMenu, { id: 'nested-menu', open: menuOpen, anchorRef: anchor, onOpenChange: setMenuOpen, label: 'choose',
+      children: createElement('button', { role: 'menuitemradio', 'aria-checked': true }, 'General') })) : null
 }
 beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
@@ -42,5 +52,18 @@ describe('adaptive drawer keyboard session', () => {
     document.dispatchEvent(consumed); expect(current).not.toHaveBeenCalled()
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
     expect(current).toHaveBeenCalledOnce(); expect(previous).not.toHaveBeenCalled()
+  })
+
+  it('closes the real portal menu before its enclosing drawer on successive Escape presses', async () => {
+    await act(async () => root.render(createElement(DrawerWithMenu)))
+    await act(async () => host.querySelector<HTMLButtonElement>('#menu-trigger')!.click())
+    const item = document.querySelector<HTMLButtonElement>('[role="menuitemradio"]')!
+    expect(item).not.toBeNull()
+    await act(async () => item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
+    expect(document.querySelector('#nested-menu')).toBeNull()
+    expect(document.querySelector('#nested-drawer')).not.toBeNull()
+    expect(document.activeElement?.id).toBe('menu-trigger')
+    await act(async () => host.querySelector('#menu-trigger')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
+    expect(document.querySelector('#nested-drawer')).toBeNull()
   })
 })

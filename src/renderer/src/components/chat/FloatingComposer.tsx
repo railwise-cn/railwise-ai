@@ -13,7 +13,6 @@ import {
 import {
   Archive,
   BarChart3,
-  Bot,
   FileEdit,
   FileText,
   GitFork,
@@ -75,6 +74,7 @@ import {
   useThreadUsageState
 } from '../../hooks/use-thread-usage'
 import { GitBranchPicker } from './GitBranchPicker'
+import { FloatingComposerAgentPicker } from './FloatingComposerAgentPicker'
 import {
   FloatingComposerModelPicker,
   type ComposerReasoningEffort
@@ -2119,46 +2119,18 @@ export function FloatingComposer({
               </div>
             ) : null}
             <div
-              className={`flex min-w-0 items-center justify-end gap-1.5 ${
-                stretchModelPicker ? 'flex-1' : 'shrink-0'
+              className={`ds-composer-selectors flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 ${
+                stretchModelPicker ? 'flex-1' : 'flex-[0_1_auto]'
               }`}
             >
               {onAgentChange && agentProfiles.length > 0 ? (
-                <label
-                  className="ds-no-drag relative inline-flex h-9 max-w-44 shrink-0 items-center gap-1.5 rounded-full border border-ds-border-muted bg-ds-card/72 px-2.5 text-[12px] font-medium text-ds-muted transition focus-within:border-ds-border-strong hover:bg-ds-hover"
-                  title={t('agentSwitcherTitleWith', {
-                    agent: agentProfiles.find((profile) => profile.id === activeAgentId)?.name
-                      ?? activeAgentId
-                  })}
-                >
-                  {agentSelectionApplying ? (
-                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" strokeWidth={1.9} />
-                  ) : (
-                    <Bot className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-                  )}
-                  <select
-                    aria-label={t('agentSwitcherMenuTitle')}
-                    value={
-                      agentProfiles.some((profile) => profile.id === activeAgentId)
-                        ? activeAgentId
-                        : ''
-                    }
-                    disabled={busy || !runtimeReady || agentSelectionApplying}
-                    onChange={(event) => onAgentChange(event.currentTarget.value)}
-                    className="min-w-0 max-w-32 cursor-pointer appearance-none truncate bg-transparent pr-2 text-ds-muted outline-none disabled:cursor-not-allowed disabled:opacity-55"
-                  >
-                    {!agentProfiles.some((profile) => profile.id === activeAgentId) ? (
-                      <option value="" disabled>
-                        {t('agentUnavailable')}
-                      </option>
-                    ) : null}
-                    {agentProfiles.map((profile) => (
-                      <option key={profile.id} value={profile.id} title={profile.role}>
-                        {profile.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <FloatingComposerAgentPicker
+                  profiles={agentProfiles}
+                  value={activeAgentId ?? ''}
+                  applying={agentSelectionApplying}
+                  disabled={busy || !runtimeReady}
+                  onChange={onAgentChange}
+                />
               ) : null}
               {hideModelPicker ? null : (
                 <FloatingComposerModelPicker

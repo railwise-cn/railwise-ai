@@ -1,0 +1,154 @@
+/* Settings follow their available CSS width, including the application UI scale. */
+.ds-settings-adaptive-container {
+  container: settings / inline-size;
+}
+
+/* Match the legacy material selector specificity; navigation stays opaque. */
+.ds-settings-shell .ds-settings-sidebar,
+:root[data-window-transparency] .ds-settings-shell .ds-settings-sidebar {
+  background: var(--ds-bg-sidebar);
+  background-image: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-window-transparency] .ds-settings-shell .ds-settings-sidebar::before {
+  display: none;
+}
+
+.ds-settings-content {
+  container: settings-content / inline-size;
+}
+
+.ds-settings-content-body,
+.ds-setting-row-label,
+.ds-setting-row-control {
+  overflow-wrap: anywhere;
+}
+
+.ds-settings-categories {
+  overscroll-behavior: contain;
+}
+
+.ds-settings-categories > button {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+
+.ds-help-reader {
+  container: help-reader / inline-size;
+}
+
+.ds-help-search {
+  width: min(100%, 18rem);
+}
+
+.ds-help-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ds-help-outline-nav {
+  max-height: min(26rem, 50dvh);
+  overscroll-behavior: contain;
+}
+
+.ds-help-article {
+  overflow-wrap: anywhere;
+}
+
+.ds-help-article :is(pre, table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.ds-help-article img {
+  max-width: 100%;
+  height: auto;
+}
+
+@container help-reader (min-width: 760px) {
+  .ds-help-layout {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  .ds-help-outline {
+    position: sticky;
+    top: 0;
+  }
+
+  .ds-help-outline-toggle {
+    display: none;
+  }
+
+  .ds-help-outline-nav {
+    max-height: min(36rem, 65dvh);
+  }
+}
+
+@container help-reader (max-width: 759.98px) {
+  .ds-help-search {
+    width: 100%;
+  }
+}
+
+@container settings (max-width: 860px) {
+  .ds-settings-layout {
+    flex-direction: column;
+  }
+
+  .ds-settings-sidebar {
+    width: 100%;
+    border-right: 0;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+  }
+
+  .ds-settings-sidebar-head {
+    padding-bottom: 0.25rem;
+  }
+
+  .ds-settings-categories {
+    flex: 0 1 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem 0.5rem;
+  }
+
+  .ds-settings-categories > button {
+    width: auto;
+    max-width: 100%;
+    white-space: nowrap;
+  }
+
+  .ds-settings-footer {
+    display: none;
+  }
+
+  .ds-settings-content {
+    padding: 1.25rem 1rem;
+  }
+}
+
+@container settings-content (max-width: 560px) {
+  .ds-setting-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .ds-setting-row-control {
+    max-width: none;
+  }
+
+  .ds-setting-row-control > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ds-settings-content-body .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

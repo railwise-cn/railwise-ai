@@ -846,10 +846,12 @@ export function SettingsView(): ReactElement {
 
   return (
     <div className="ds-settings-shell ds-drag flex h-full min-h-0 w-full min-w-0 bg-transparent">
+      <div className="ds-settings-adaptive-container min-h-0 min-w-0 flex-1">
+      <div className="ds-settings-layout flex h-full min-h-0 min-w-0">
       <SettingsSidebar category={category} setCategory={setCategory} goBack={goBack} t={t} />
 
-      <div className="ds-opaque-work-surface ds-no-drag min-h-0 min-w-0 flex-1 overflow-y-auto px-10 py-10">
-        <div className="mx-auto max-w-3xl">
+      <div className="ds-settings-content ds-opaque-work-surface ds-no-drag min-h-0 min-w-0 flex-1 overflow-y-auto px-10 py-10">
+        <div className="ds-settings-content-body mx-auto min-w-0 max-w-3xl">
           {!activeApiKey.trim() ? (
             <div className="mb-6 rounded-2xl border border-amber-300/80 bg-amber-50/95 px-5 py-4 text-amber-950 shadow-sm dark:border-amber-700/60 dark:bg-amber-950/35 dark:text-amber-100">
               <div className="text-[15px] font-semibold">{t('apiKeyRequiredTitle')}</div>
@@ -859,8 +861,8 @@ export function SettingsView(): ReactElement {
             </div>
           ) : null}
 
-          <div className="mb-8 flex items-start justify-between gap-4">
-            <div>
+          <div className="ds-settings-header mb-8 flex min-w-0 flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-semibold tracking-tight text-ds-ink">{t('title')}</h1>
               <p className="mt-1 text-[14px] text-ds-muted">{t('subtitle')}</p>
             </div>
@@ -897,6 +899,8 @@ export function SettingsView(): ReactElement {
           {category === 'claw' ? <ClawSettingsSection ctx={settingsSectionContext} /> : null}
           {category === 'help' ? <HelpSettingsSection ctx={settingsSectionContext} /> : null}
         </div>
+      </div>
+      </div>
       </div>
       {writeDebugModalOpen ? (
         <WriteDebugLogModal

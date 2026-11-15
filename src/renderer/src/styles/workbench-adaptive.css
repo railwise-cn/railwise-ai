@@ -1,4 +1,8 @@
 /* A single desktop layout contract. Work surfaces stay opaque and readable. */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
+}
+
 .ds-workbench-shell {
   --ds-stage-gradient: var(--ds-bg-canvas);
   --ds-topbar-bg: var(--ds-bg-canvas);
@@ -64,15 +68,24 @@ body[data-workbench-resizing='true'] .ds-workbench-shell iframe {
   scrollbar-gutter: stable;
 }
 
-:root .ds-workbench-shell .ds-sidebar-shell {
+:root .ds-workbench-shell .ds-sidebar-shell,
+:root[data-theme] .ds-workbench-shell .ds-sidebar-shell {
   background: var(--ds-bg-sidebar);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: none;
 }
 
-:root .ds-workbench-shell .ds-sidebar-shell::before {
+:root .ds-workbench-shell .ds-sidebar-shell::before,
+:root[data-theme] .ds-workbench-shell .ds-sidebar-shell::before {
   content: none;
+}
+
+:root[data-theme] .ds-workbench-shell .ds-topbar-surface,
+:root[data-theme] .ds-workbench-shell .ds-chat-composer {
+  background: var(--ds-bg-canvas);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .ds-sidebar-content > :not(.flex-1) {
