@@ -12,29 +12,54 @@ Installers use the `RailWise-AI` name while retaining the existing installation 
 - Direct mirror downloads: [Download and installation](https://www.railwise.cn/products/workwise/#download)
 - Documentation: [kb.railwise.cn/products/workwise](https://kb.railwise.cn/products/workwise/)
 - Public releases: [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases)
-- Latest stable version: [Download](https://github.com/railwise-cn/railwise-ai/releases/latest), or check for updates in the installed application.
+- Current stable version, 0.5.6: [Download](https://github.com/railwise-cn/railwise-ai/releases/latest), or check for updates in the installed application.
 
-## Version 0.5.7
+## Version 0.5.7 candidate
 
-[Release notes](./release/release-v0.5.7.md) describe the changes. See the [acceptance record](./docs/qa/general-execution-delivery-2026-11-13.md) for the exact validation scope and limits.
+0.5.7 is a candidate release. Public procurement collection and recurring delivery have not passed complete acceptance testing. [Release notes](./release/release-v0.5.7.md) describe the changes. See the [acceptance record](./docs/qa/general-execution-delivery-2026-11-13.md) for the exact validation scope and limits.
 
-| Platform | Installer filename | Download |
-| --- | --- | --- |
-| macOS Apple Silicon | `RailWise-AI-0.5.7-mac-Apple-Silicon.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
-| macOS Intel | `RailWise-AI-0.5.7-mac-Intel.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
-| Windows x64 | `RailWise-AI-0.5.7-win-x64.exe` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
+The following names identify candidate packages; use the published release list for available downloads and checksums.
+
+| Platform | Candidate installer filename |
+| --- | --- |
+| macOS Apple Silicon | `RailWise-AI-0.5.7-mac-Apple-Silicon.dmg` |
+| macOS Intel | `RailWise-AI-0.5.7-mac-Intel.dmg` |
+| Windows x64 | `RailWise-AI-0.5.7-win-x64.exe` |
 
 Published installers remain available from GitHub Releases and the official update channel. [Published versions](https://github.com/railwise-cn/railwise-ai/releases)
 
-## Changes in 0.5.7
+## Changes in the 0.5.7 candidate
 
 - **BrowserSkill** checks the managed CLI, official extension, selected Chrome/Edge instance and permitted sites. Skill installation and activation synchronize with the running application. Missing dependencies or permissions leave an actionable item on the original task.
-- **HTML deliverables** register actual generated files as task results. The first verified HTML result in the active conversation opens automatically in the right-hand preview. Reopen it from the task center or result card to inspect its content, sources and saved location.
+- **HTML deliverables** register actual generated files as task results and distinguish drafts from versions with verified sources. The first previewable HTML file in the active conversation opens in the right-hand preview. Reopen it from the task center or result card to inspect the content, field evidence and saved location.
 - **File permissions** allow new reports to use application-managed task storage in a read-only workspace. Requests to write to a specified directory require review of the target path and permission scope.
+- **Task workspace** keeps the task list and status filters in the left sidebar, the current task in the center, and an optional result preview on the right. Local HTML/SVG work is checked as a file deliverable, with separate execution, verification and delivery progress.
+- **Permission recovery** preserves the original task and history when a temporary grant expires or its scope changes. Repair the permission card, then continue separately; permission failures do not trigger automatic retries.
 - **Daily schedules** support multiple times and an explicit timezone. For delivery deadlines, review the earlier start time. Recurring browser interactions use reviewed, finite scopes and recheck the site, element, input and browser binding on subsequent runs.
 - **Conversation display** focuses on concise progress, pending actions and results. Tool parameters and long output are available in expandable work details.
 
 The Chinese manual includes setup and operating instructions for browser tasks, file delivery and daily schedules. [User guide](./docs/USER_GUIDE.zh-CN.md)
+
+After one explicit task-scope review, permitted public searches, filters and paging run autonomously. Account actions, business submissions and new sites require separate review. Confirming the scope and continuing the task remain separate actions. HTML reports are saved as file artifacts, with source verification shown separately in the side preview. Each required source is checked independently; older drafts cannot borrow another file’s proof. Failed sources, unverified fields and unknown outcomes remain visible. Daily schedules show their start time, delivery target and timezone, and execute while the local application is running.
+
+## 0.5.7 Chinese interface
+
+These screenshots were captured on November 15, 2026 from the exact macOS 0.5.7 candidate package (source `84ae4a85`), in Chinese with the light theme. They retain the original PNG bytes with no computer-use cursor. The local HTML image is 2560 × 1680; the other three are 2672 × 1462. [Capture provenance, dimensions and hashes](./docs/images/v0.5.7/capture.json)
+
+Survey uses a local copy of real COSA IN2 planar-network observations for import checks only. The coordinate and height datums remain unconfirmed, and no adjustment was performed. The datum and results await engineering review.
+
+| Local HTML tasks and result previews | Real survey-data import checks |
+| --- | --- |
+| A saved local HTML/SVG file opens in the side preview, with execution, verification and delivery all complete. The procurement tasks shown retain their unfinished states. | Real COSA data identifies 61 points, 20 stations, 268 observations and 2 known points; computation is blocked until the datum is confirmed. |
+| ![Local HTML task and result preview](./docs/images/v0.5.7/local-html-task-zh-light.png) | ![Real COSA planar-network import checks](./docs/images/v0.5.7/survey-import-zh-light.png) |
+
+| Skills marketplace | Offline help center |
+| --- | --- |
+| Skills, Plugins and Connectors have separate tabs. The 227 indexed items reflect this environment; execution still depends on installation, dependencies, connections and authorization. | Browse the bundled Chinese manual by chapter for offline survey, writing, coding and delivery instructions. |
+| ![Skills marketplace and engineering resources](./docs/images/v0.5.7/skills-market-zh-light.png) | ![Chinese offline help center](./docs/images/v0.5.7/help-center-zh-light.png) |
+
+<details>
+<summary>View the 0.5.6 interface history</summary>
 
 ## 0.5.6 Chinese interface
 
@@ -75,6 +100,9 @@ Edit a demonstration review draft in the **writing workbench**, using a source t
 Inspect the upstream source, pinned version, license status and environment requirements of the **CAD redraw skills** before installation. The right panel shows the image-to-CAD skill details.
 
 ![RailWise AI 0.5.6 CAD redraw skills and installation requirements](./docs/images/v0.5.6/09-cad-skills.jpg)
+
+
+</details>
 
 ## RailWise Survey
 
@@ -153,7 +181,7 @@ Keep Markdown/MDX files in your local workspace and use a document workflow:
 
 Read more: [Write and document export](https://kb.railwise.cn/products/workwise/write-export/).
 
-For the exact WorkWise adapter scope and data boundaries, see the [DeepSeek Harness integration note](./docs/DEEPSEEK_HARNESS.zh-CN.md) (Chinese).
+For the exact RailWise AI adapter scope and data boundaries, see the [DeepSeek Harness integration note](./docs/DEEPSEEK_HARNESS.zh-CN.md) (Chinese).
 
 ### Document attachments and retrieval
 
@@ -261,7 +289,7 @@ npm run test
 npm run build
 ```
 
-The local agent is provided by WorkWise Agent Runtime through a stable HTTP/SSE boundary with the desktop application.
+The local agent is provided by RailWise AI Runtime through a stable HTTP/SSE boundary with the desktop application.
 
 ## Release policy
 
@@ -276,7 +304,7 @@ The local agent is provided by WorkWise Agent Runtime through a stable HTTP/SSE 
 
 Please report issues or ideas through [GitHub Issues](https://github.com/railwise-cn/railwise-ai/issues). Include where possible:
 
-- WorkWise version, operating system, and chip architecture.
+- RailWise AI version, operating system, and chip architecture.
 - Reproducible steps, screenshots, or error logs.
 - A minimal Markdown example for document-export issues.
 - The source, trigger, and error message for Skills or MCP issues.

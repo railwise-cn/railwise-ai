@@ -1,0 +1,77 @@
+{
+  "product": "RailWise AI",
+  "version": "0.5.7",
+  "releaseStatus": "private candidate; not publicly released",
+  "sourceHead": "84ae4a8590e2187f5b9d8b7d56cb525ab118bfae",
+  "appAsarSha256": "20c7af85679decfc0e9f74ad033de386d1b6707a8134286fad9e50b6f8b992ce",
+  "capturedDate": "2026-11-15",
+  "timezone": "Asia/Shanghai",
+  "platform": "macOS",
+  "locale": "zh-CN",
+  "theme": "light",
+  "captureMethod": "Native packaged application-window screenshots with cursor capture disabled",
+  "imageProcessing": "Original PNG bytes; no cropping, compositing or image editing",
+  "computerUseCursorVisible": false,
+  "visualInspection": "AI visual inspection of all four images; this is not engineering or professional sign-off",
+  "survey": {
+    "format": "COSA IN2",
+    "networkType": "planar control network",
+    "dataOrigin": "Local copy of user-provided real observations; raw data is not included",
+    "points": 61,
+    "stations": 20,
+    "observations": 268,
+    "knownPoints": 2,
+    "coordinateDatum": "unconfirmed",
+    "heightDatum": "unconfirmed",
+    "adjustmentPerformed": false,
+    "professionalApproval": "pending; import preflight only"
+  },
+  "marketplace": {
+    "indexedSkills": 227,
+    "indexCountMeaning": "Environment-specific indexed resources; not a count of executable or business-validated tools"
+  },
+  "notes": [
+    "The HTML image documents a completed local HTML/SVG file task and its built-in preview.",
+    "Unfinished procurement tasks remain visible in the task list. Public procurement collection and recurring-delivery acceptance are not complete.",
+    "The Survey image shows missing-datum blocking before computation; it does not document a CPIII classification or completed adjustment.",
+    "Stable downloads remain version 0.5.6 at the time of capture."
+  ],
+  "screenshots": [
+    {
+      "file": "local-html-task-zh-light.png",
+      "description": "Local HTML/SVG task and saved-file preview",
+      "capturedAt": "2026-11-15T11:17:11.361829+00:00",
+      "width": 2560,
+      "height": 1680,
+      "size": 1105199,
+      "sha256": "0ca59773da7df76e90dd259f9c0269f0863a15151f272eb2d23b6ca165ffa040"
+    },
+    {
+      "file": "survey-import-zh-light.png",
+      "description": "Real COSA IN2 import preflight; datum unconfirmed",
+      "capturedAt": "2026-11-15T11:35:40.560069+00:00",
+      "width": 2672,
+      "height": 1462,
+      "size": 444636,
+      "sha256": "b289c3e6a4e7743f2cc124459dd4ad473f2a27ed3e92e66d9161875de3dcbeda"
+    },
+    {
+      "file": "skills-market-zh-light.png",
+      "description": "Skills marketplace and indexed resource states",
+      "capturedAt": "2026-11-15T11:36:40.898202+00:00",
+      "width": 2672,
+      "height": 1462,
+      "size": 664148,
+      "sha256": "b291f7b11b7eff752fe00c6eb05bb6c05b8b4364303abbf8bdc516ab8997ff6d"
+    },
+    {
+      "file": "help-center-zh-light.png",
+      "description": "Bundled Chinese offline help",
+      "capturedAt": "2026-11-15T11:38:04.279393+00:00",
+      "width": 2672,
+      "height": 1462,
+      "size": 456129,
+      "sha256": "8a00051f3a0eb908f3eaa994cccc057ea616b629765ecd6a8ac486120a3e2e39"
+    }
+  ]
+}
