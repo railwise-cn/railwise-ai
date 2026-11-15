@@ -44,14 +44,14 @@ After one explicit task-scope review, permitted public searches, filters and pag
 
 ## 0.5.7 Chinese interface
 
-These screenshots were captured on November 15, 2026 from the exact macOS 0.5.7 candidate package (source `84ae4a85`), in Chinese with the light theme. They retain the original PNG bytes with no computer-use cursor. The local HTML image is 2560 × 1680; the other three are 2672 × 1462. [Capture provenance, dimensions and hashes](./docs/images/v0.5.7/capture.json)
+The task overview and compact-window menu were captured on November 16, 2026 from the exact macOS 0.5.7 candidate (source `64c5a5f0`). The survey, skills and help images retain their November 15 source `84ae4a85`. All use the Chinese light interface and original native PNG bytes, with no computer-use cursor. The task image is 2560 × 1680; the other three are 2672 × 1462. [Capture provenance, dimensions and hashes](./docs/images/v0.5.7/capture.json) · [General menu at 960 × 640 with large UI text](./docs/images/v0.5.7/adaptive-agent-menu-zh-light.png)
 
 Survey uses a local copy of real COSA IN2 planar-network observations for import checks only. The coordinate and height datums remain unconfirmed, and no adjustment was performed. The datum and results await engineering review.
 
-| Local HTML tasks and result previews | Real survey-data import checks |
+| Adaptive tasks and result previews | Real survey-data import checks |
 | --- | --- |
 | A saved local HTML/SVG file opens in the side preview, with execution, verification and delivery all complete. The procurement tasks shown retain their unfinished states. | Real COSA data identifies 61 points, 20 stations, 268 observations and 2 known points; computation is blocked until the datum is confirmed. |
-| ![Local HTML task and result preview](./docs/images/v0.5.7/local-html-task-zh-light.png) | ![Real COSA planar-network import checks](./docs/images/v0.5.7/survey-import-zh-light.png) |
+| ![Adaptive task sidebar and real HTML result preview](./docs/images/v0.5.7/adaptive-task-overview-zh-light.png) | ![Real COSA planar-network import checks](./docs/images/v0.5.7/survey-import-zh-light.png) |
 
 | Skills marketplace | Offline help center |
 | --- | --- |

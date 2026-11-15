@@ -40,14 +40,14 @@ BrowserSkill 配置、文件交付和定时任务的操作步骤见[使用手册
 
 ## 0.5.7 中文界面
 
-以下截图于 2026 年 11 月 15 日采自 macOS 上的精确 0.5.7 候选包（源码 `84ae4a85`），使用中文浅色界面，保留原始 PNG，无 computer use 光标。本地 HTML 图为 2560 × 1680，另外三图为 2672 × 1462。[截图来源、尺寸与哈希清单](./docs/images/v0.5.7/capture.json)
+任务概览与小窗菜单截图更新于 2026 年 11 月 16 日，来自 macOS 精确 0.5.7 候选包（源码 `64c5a5f0`）；资料预检、技能和帮助三图保留 11 月 15 日的 `84ae4a85` 来源。均为中文浅色界面的原生 PNG，无 computer use 光标；任务图为 2560 × 1680，另外三图为 2672 × 1462。[截图来源、尺寸与哈希清单](./docs/images/v0.5.7/capture.json) · [960 × 640、大字号的 General 菜单实拍](./docs/images/v0.5.7/adaptive-agent-menu-zh-light.png)
 
 测量画面使用真实 COSA IN2 平面控制网资料的本地副本，仅展示导入预检；坐标及高程基准尚未确认，未进行平差，基准与成果待工程复核。
 
-| 本地 HTML 任务与成果预览 | 真实控制网资料预检 |
+| 自适应任务与成果预览 | 真实控制网资料预检 |
 | --- | --- |
 | 本地 HTML/SVG 文件已保存并在右侧打开，执行、验证和交付 3 / 3 完成。图中的采购任务仍保留各自未完成状态。 | 真实 COSA 资料识别出 61 点、20 站、268 条观测和 2 个已知点；基准未确认时阻止计算。 |
-| ![本地 HTML 任务与右侧成果预览](./docs/images/v0.5.7/local-html-task-zh-light.png) | ![真实 COSA 平面控制网资料导入预检](./docs/images/v0.5.7/survey-import-zh-light.png) |
+| ![自适应任务侧栏与真实 HTML 成果预览](./docs/images/v0.5.7/adaptive-task-overview-zh-light.png) | ![真实 COSA 平面控制网资料导入预检](./docs/images/v0.5.7/survey-import-zh-light.png) |
 
 | 技能市场 | 离线帮助中心 |
 | --- | --- |
