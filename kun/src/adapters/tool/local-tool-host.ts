@@ -30,6 +30,30 @@ import {
 } from './read-tracker.js'
 import { effectiveApprovalPolicy, sandboxBlockForTool, type SandboxBlock } from './sandbox-policy.js'
 import { defineLocalTool } from './local-tool-definition.js'
+
+type BrowserArgumentRepair = {
+  kind: 'correct_tool_arguments'
+  fields: Array<{ path: string; code: string; required: boolean; expected?: string }>
+  instruction: string
+}
+
+/** Schema facts only: never echo caller values, custom messages, or page content. */
+function browserArgumentRepair(call: ToolCallLike, error: unknown): BrowserArgumentRepair | undefined {
+  if (!call.toolName.startsWith('browser_') || !error || typeof error !== 'object' || !('issues' in error) || !Array.isArray(error.issues)) return undefined
+  const fields: BrowserArgumentRepair['fields'] = []
+  for (const raw of error.issues.slice(0, 12)) {
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.path) || raw.path.length > 8 ||
+      raw.path.some((part: unknown) => typeof part !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(part))) continue
+    const code = ['invalid_type', 'invalid_value', 'invalid_format', 'too_small', 'too_big', 'unrecognized_keys', 'custom'].includes(raw.code) ? raw.code : 'invalid_argument'
+    let supplied: unknown = call.arguments
+    for (const part of raw.path as string[]) supplied = supplied && typeof supplied === 'object' ? (supplied as Record<string, unknown>)[part] : undefined
+    const expected = typeof raw.expected === 'string' && /^[a-z ]{1,32}$/.test(raw.expected) ? raw.expected : undefined
+    fields.push({ path: raw.path.join('.') || '$', code, required: raw.path.length > 0 && supplied === undefined, ...(expected ? { expected } : {}) })
+  }
+  if (!fields.length) return undefined
+  return { kind: 'correct_tool_arguments', fields,
+    instruction: 'Construct a new call using the advertised schema and real results. browser_observe may omit sessionId to prepare the authorized Task session. For actions, use the returned sessionId, fresh context_id, exact target, action and complete value when required; never guess a target or replay an unknown action.' }
+}
 import type { ToolEffectDefinition } from '../../ports/tool-effect.js'
 import { waitForApprovalDecision } from '../../ports/approval-gate.js'
 
@@ -182,8 +206,10 @@ export class LocalToolHost implements ToolHost {
       tool.validateArguments?.(activeCall.arguments, context)
     } catch (error) {
       const code = (error as { code?: unknown })?.code
+      const repair = browserArgumentRepair(activeCall, error)
       return {
-        item: this.errorToolResult(context, activeCall, tool, error instanceof Error ? error.message : String(error), typeof code === 'string' ? code : 'invalid_tool_arguments'),
+        item: this.errorToolResult(context, activeCall, tool, repair ? 'Browser arguments do not match the tool schema.' : error instanceof Error ? error.message : String(error),
+          typeof code === 'string' ? code : 'invalid_tool_arguments', repair ? { repair } : undefined),
         approved: false
       }
     }
@@ -440,7 +466,8 @@ export class LocalToolHost implements ToolHost {
     call: ToolCallLike,
     tool: Pick<LocalTool, 'toolKind'>,
     message: string,
-    code: string
+    code: string,
+    details?: { repair: BrowserArgumentRepair }
   ): TurnItem {
     return makeToolResultItem({
       id: `item_${call.callId}`,
@@ -449,7 +476,7 @@ export class LocalToolHost implements ToolHost {
       callId: call.callId,
       toolName: call.toolName,
       toolKind: call.toolKind ?? tool.toolKind,
-      output: { code, error: message },
+      output: { code, error: message, ...details },
       isError: true
     })
   }

@@ -5,9 +5,13 @@ import { isDeepStrictEqual } from 'node:util'
 
 const STAPLER_MAX_ATTEMPTS = 3
 const STAPLER_RETRY_DELAYS_MS = [500, 1_000]
+// Only a successful exact-target preflight in this process can mint a seal.
+// An installed bundle, a serialized record or a caller-made object cannot.
+const verifiedTargetSeals = new WeakMap()
+const SEALED_FILES = ['Contents/Info.plist', 'Contents/CodeResources', 'Contents/_CodeSignature/CodeResources']
 
 function ticketFileFingerprints(app) {
-  return ['Contents/Info.plist', 'Contents/CodeResources', 'Contents/_CodeSignature/CodeResources'].flatMap(name => {
+  return SEALED_FILES.flatMap(name => {
     const path = join(app, name)
     if (!existsSync(path)) return []
     const stat = lstatSync(path)
@@ -17,9 +21,19 @@ function ticketFileFingerprints(app) {
 
 function staplerIdentity(result) {
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
-  const hash = /^\s*cdhash = \{length = (20|32), bytes = 0x([a-f0-9]+)\};\s*$/im.exec(output)
-  const identifier = /^\s*signingId = ([A-Za-z0-9.-]+);\s*$/m.exec(output)?.[1]
-  const team = /^\s*teamId = ([A-Z0-9]{10});\s*$/m.exec(output)?.[1]
+  const lines = output.split(/\r?\n/)
+  const hashLines = lines.filter(line => /^\s*cdhash\s*=/i.test(line))
+  const hash = hashLines.length === 1 ? /^\s*cdhash = \{length = (20|32), bytes = 0x([a-f0-9]+)\};\s*$/i.exec(hashLines[0]) : undefined
+  const property = (name, pattern) => {
+    // CoreFoundation emits either an unquoted identifier or a balanced quoted
+    // string. Accept only the same strict identifier alphabet in both forms.
+    const properties = lines.filter(line => new RegExp(`^\\s*${name}\\s*=`).test(line))
+    if (properties.length !== 1) return undefined
+    const match = new RegExp(`^\\s*${name} = (?:"(${pattern})"|(${pattern}));\\s*$`).exec(properties[0])
+    return match?.[1] ?? match?.[2]
+  }
+  const identifier = property('signingId', '[A-Za-z0-9.-]+')
+  const team = property('teamId', '[A-Z0-9]{10}')
   if (!hash || hash[2].length !== Number(hash[1]) * 2 || !identifier || !team) return undefined
   return { cdhash: hash[2].toLowerCase(), identifier, team }
 }
@@ -97,7 +111,7 @@ export function captureMacosTrustEnvironment({ run, record = () => {} }) {
 
 // Boundary labels and diagnostic streams are retained before an exception can
 // stop the harness. A failed command never becomes a successful trust result.
-export function verifyMacosUpdaterTrust(app, { boundary, run, record = () => {}, waitForRetry = waitForTrustRetry }) {
+export function verifyMacosUpdaterTrust(app, { boundary, run, record = () => {}, waitForRetry = waitForTrustRetry, expectedPreflightSeal, onVerifiedSeal }) {
   if (!/^[a-z][a-z0-9-]{2,80}$/.test(boundary ?? '')) throw new Error('A precise bundle trust boundary is required.')
   record({ operation: 'bundle-trust-boundary', status: 'started', boundary })
   const execute = (command, args, label, { attempt, ...options } = {}) => run(command, args, {
@@ -133,13 +147,23 @@ export function verifyMacosUpdaterTrust(app, { boundary, run, record = () => {},
   const signature = execute('/usr/bin/codesign', ['--verify', '--deep', '--strict', app], 'codesign-verify', { allowedExitCodes: observedExitCodes })
   let staple = execute('/usr/bin/xcrun', ['stapler', 'validate', '-v', app], 'stapler-validate', { allowedExitCodes: observedExitCodes, attempt: 1 })
   const originalIdentity = staplerIdentity(staple)
+  const requiresTargetSeal = boundary === 'native-installed-target'
+  const priorSeal = expectedPreflightSeal && verifiedTargetSeals.get(expectedPreflightSeal)
+  let matchesTargetSeal = !requiresTargetSeal
+  if (requiresTargetSeal) {
+    const identity = codesignIdentity(execute('/usr/bin/codesign', ['--display', '--verbose=4', app], 'codesign-preflight-seal-identity', { allowedExitCodes: observedExitCodes }))
+    matchesTargetSeal = Boolean(!signature.error && signature.status === 0 && priorSeal && isDeepStrictEqual(priorSeal.identity, identity) &&
+      isDeepStrictEqual(priorSeal.identity, originalIdentity) && isDeepStrictEqual(priorSeal.files, ticketFiles))
+    record({ operation: 'bundle-preflight-seal-check', boundary, status: matchesTargetSeal ? 'verified' : 'failed',
+      reason: priorSeal ? 'exact-target-identity-and-bytes' : 'verified-target-preflight-seal-required' })
+  }
   let gatekeeperEnabled = true
   try { validateGatekeeperStatus(gatekeeperStatus) } catch { gatekeeperEnabled = false }
   for (let attempt = 2; attempt <= STAPLER_MAX_ATTEMPTS && isCloudKitConnectionLoss(staple)
     && !signature.error && signature.status === 0 && gatekeeperEnabled; attempt += 1) {
     // Without both a signed code identity and its resource seal, fail closed
     // rather than validating a potentially replaced bundle on another attempt.
-    if (!originalIdentity || !['Contents/Info.plist', 'Contents/_CodeSignature/CodeResources'].every(path => ticketFiles.some(file => file.path === path && file.sha256))) {
+    if (!originalIdentity || !matchesTargetSeal || !SEALED_FILES.every(path => ticketFiles.some(file => file.path === path && file.sha256))) {
       record({ operation: 'bundle-trust-retry', boundary, command: 'stapler-validate', status: 'declined', reason: 'sealed-identity-unavailable', failedAttempt: attempt - 1 })
       break
     }
@@ -153,7 +177,7 @@ export function verifyMacosUpdaterTrust(app, { boundary, run, record = () => {},
     const unchanged = !retrySignature.error && retrySignature.status === 0
       && isDeepStrictEqual(files, ticketFiles) && isDeepStrictEqual(identity, originalIdentity)
     record({ operation: 'bundle-trust-retry-identity', boundary, attempt, status: unchanged ? 'verified' : 'failed', files, identity })
-    if (!unchanged) throw new Error('Bundle sealed identity changed or could not be verified before notarization retry.')
+    if (!unchanged || requiresTargetSeal && (!isDeepStrictEqual(identity, priorSeal.identity) || !isDeepStrictEqual(files, priorSeal.files))) throw new Error('Bundle sealed identity changed or could not be verified before notarization retry.')
     staple = execute('/usr/bin/xcrun', ['stapler', 'validate', '-v', app], 'stapler-validate', { allowedExitCodes: observedExitCodes, attempt })
     const sameResultIdentity = isDeepStrictEqual(staplerIdentity(staple), originalIdentity)
       && isDeepStrictEqual(ticketFileFingerprints(app), ticketFiles)
@@ -163,8 +187,28 @@ export function verifyMacosUpdaterTrust(app, { boundary, run, record = () => {},
   const assessment = execute('/usr/sbin/spctl', ['--assess', '--type', 'execute', '--verbose=4', app], 'gatekeeper-assess', { allowedExitCodes: observedExitCodes })
   validateGatekeeperStatus(gatekeeperStatus)
   if (signature.error || signature.status !== 0) throw new Error('Deep code-signature verification failed at the bundle trust boundary.')
+  if (!matchesTargetSeal) throw new Error('Installed bundle does not match a verified exact-target preflight seal.')
   if (staple.error || staple.status !== 0) throw new Error(`Stapled notarization validation failed at the bundle trust boundary (exit ${staple.status}).`)
   const gatekeeper = validateGatekeeperEvidence(gatekeeperStatus, assessment)
+  if (requiresTargetSeal) {
+    const finalSignature = execute('/usr/bin/codesign', ['--verify', '--deep', '--strict', app], 'codesign-installed-seal-verify', { allowedExitCodes: observedExitCodes })
+    const identity = codesignIdentity(execute('/usr/bin/codesign', ['--display', '--verbose=4', app], 'codesign-installed-seal-identity', { allowedExitCodes: observedExitCodes }))
+    if (finalSignature.error || finalSignature.status !== 0 || !isDeepStrictEqual(identity, priorSeal.identity)
+      || !isDeepStrictEqual(staplerIdentity(staple), priorSeal.identity)
+      || !isDeepStrictEqual(ticketFileFingerprints(app), priorSeal.files)) throw new Error('Installed bundle changed during verification of its exact-target preflight seal.')
+  }
+  if (onVerifiedSeal) {
+    if (boundary !== 'target-zip-preflight') throw new Error('Only an exact target ZIP preflight can produce a trusted seal.')
+    const finalSignature = execute('/usr/bin/codesign', ['--verify', '--deep', '--strict', app], 'codesign-preflight-seal-verify', { allowedExitCodes: observedExitCodes })
+    const identity = codesignIdentity(execute('/usr/bin/codesign', ['--display', '--verbose=4', app], 'codesign-preflight-seal-identity', { allowedExitCodes: observedExitCodes }))
+    const files = ticketFileFingerprints(app)
+    if (finalSignature.error || finalSignature.status !== 0 || !identity || !isDeepStrictEqual(identity, staplerIdentity(staple)) || !isDeepStrictEqual(files, ticketFiles) ||
+      !SEALED_FILES.every(path => files.some(file => file.path === path && file.sha256))) throw new Error('Exact target preflight seal identity or bytes could not be verified.')
+    const seal = Object.freeze({})
+    verifiedTargetSeals.set(seal, { identity: structuredClone(identity), files: structuredClone(files) })
+    onVerifiedSeal(seal)
+    record({ operation: 'bundle-preflight-seal', boundary, status: 'verified', identity, files })
+  }
   record({ operation: 'bundle-trust-boundary', boundary, status: 'completed' })
   return { signature: 'verified', stapledNotarization: 'verified', ...gatekeeper }
 }

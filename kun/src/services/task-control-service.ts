@@ -13,8 +13,8 @@ import { toolCanProveExternalEffect } from '../loop/turn-completion-guard.js'
 import { createHash } from 'node:crypto'
 import { taskPermissionFailure } from './task-permission-recovery.js'
 
-export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel'
-export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string }
+export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget'
+export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number }
 export type TaskControlResult = { task:TaskRun; turn?:StartTurnResponse; capability?:ExternalTaskCapability; attentionId?:string; receipt?:{userMessageItemId:string;resultMessageItemId:string} }
 
 /** One deterministic mutation path for chat commands and the task HTTP API. */
@@ -31,6 +31,20 @@ export class TaskControlService {
 
   private async execute(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const {repository,tasks,threads,turns,nowIso}=this.deps
+    if (action === 'extend_budget') return repository.transact(() => {
+      const previous = repository.operation(taskId, data.idempotencyKey)
+      // A committed request must be replayable even after the task revision changes.
+      if (previous) {
+        repository.beginOperation({ ownerId: taskId, idempotencyKey: data.idempotencyKey, kind: action, request: data, nowIso: nowIso() })
+        if (previous.status !== 'succeeded') throw Object.assign(new Error('预算变更记录需要核验，请刷新后重试。'), { code: 'outcome_unknown' })
+        return { task: previous.result as TaskRun }
+      }
+      const now = nowIso()
+      const task = repository.extendExecutionBudget(taskId, data.expectedRevision, data.additionalExecutionMs, data.idempotencyKey, now)
+      repository.beginOperation({ ownerId: taskId, idempotencyKey: data.idempotencyKey, kind: action, request: data, nowIso: now })
+      repository.finishOperation(taskId, data.idempotencyKey, { status: 'succeeded', result: task }, now)
+      return { task }
+    })
     let current=repository.currentExecution(taskId)
     let externalTaskProvider: 'dingtalk' | 'lark' | undefined
     let blockedCapability: ExternalTaskCapability | undefined

@@ -78,7 +78,7 @@ import { flowRoutes } from './flows.js'
 import { isAuthorized, bearerToken } from '../auth.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
-import { taskBrowserBinding, appendTaskInput, cancelTask, getTask, getTaskArtifactProof, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, revokeTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, confirmBrowserOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
+import { taskBrowserBinding, appendTaskInput, cancelTask, getTask, getTaskArtifactProof, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, revokeTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, confirmBrowserOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, extendTaskBudget, resumeTask, retryTask } from './tasks.js'
 import { externalProviderAmbiguity } from '../../services/external-task-capability.js'
 import { classifyTaskInput } from '../../services/task-coordinator.js'
 import { listShellSessions, terminateShellSession } from './shell-sessions.js'
@@ -418,6 +418,7 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('POST', '/v1/tasks/:id/inputs', async (request, ctx) => authorize(request, runtime) ? appendTaskInput(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/subscriptions', async (request, ctx) => authorize(request, runtime) ? getTaskSubscriptions(runtime,ctx.params.id) : ERRORS.unauthorized())
   router.add('POST', '/v1/tasks/:id/subscriptions', async (request, ctx) => authorize(request, runtime) ? subscribeTaskSource(runtime,ctx.params.id,request) : ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/budget', async (request, ctx) => authorize(request, runtime) ? extendTaskBudget(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/tasks/:id/pause', async (request, ctx) => authorize(request, runtime) ? pauseTask(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/stream', async (request) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()

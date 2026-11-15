@@ -11,6 +11,7 @@ import {
   runtimeShellSessionTerminatePath,
   runtimeTaskCancelPath,
   runtimeTaskPath,
+  runtimeTaskBudgetPath,
   runtimeTaskResumePath,
   runtimeTaskRetryPath,
   runtimeTaskDiagnosticsPath,
@@ -122,6 +123,7 @@ const api = {
     if (query?.cursor) params.set('cursor', query.cursor)
     return runtimeJson(`${RUNTIME_TASKS_PATH}${params.size ? `?${params}` : ''}`)
   },
+  extendTaskBudget: (taskId, request) => runtimeJson(runtimeTaskBudgetPath(taskId), 'POST', request),
   resumeTask: (taskId, request) => runtimeJson(runtimeTaskResumePath(taskId), 'POST', request),
   retryTask: (taskId, request) => runtimeJson(runtimeTaskRetryPath(taskId), 'POST', request),
   cancelTask: (taskId, request) => runtimeJson(runtimeTaskCancelPath(taskId), 'POST', request),

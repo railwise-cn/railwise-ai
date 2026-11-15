@@ -287,15 +287,19 @@ export async function cancelTask(runtime: ServerRuntime, taskId: string, request
 export async function pauseTask(runtime: ServerRuntime, taskId: string, request: Request): Promise<JsonResponse | Response> {
   return mutateTask(runtime, taskId, request, 'pause')
 }
+export async function extendTaskBudget(runtime: ServerRuntime, taskId: string, request: Request): Promise<JsonResponse | Response> {
+  return mutateTask(runtime, taskId, request, 'extend_budget')
+}
 
-type Action = 'resume' | 'retry' | 'cancel' | 'pause'
+type Action = 'resume' | 'retry' | 'cancel' | 'pause' | 'extend_budget'
 async function mutateTask(runtime: ServerRuntime, taskId: string, request: Request, action: Action): Promise<JsonResponse | Response> {
   const repository = runtime.taskRepository
   const controller = runtime.taskController
   if (!repository || !controller) return ERRORS.unavailable('task engine is unavailable')
   const body = await readJsonBody(request)
   if (!body.ok) return body.response
-  const parsed = TaskMutationRequest.safeParse(body.value)
+  const schema = action === 'extend_budget' ? TaskMutationRequest.omit({ model: true }).extend({ additionalExecutionMs: z.number().int().min(60_000).max(3_600_000) }).strict() : TaskMutationRequest
+  const parsed = schema.safeParse(body.value)
   if (!parsed.success) return ERRORS.validation(`invalid task ${action} body`, parsed.error.issues)
   try {
     let controls=runtime.taskControlService ?? fallbackControls.get(runtime)

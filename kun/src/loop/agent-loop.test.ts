@@ -6,7 +6,7 @@ import {
   turnRequestForRouting,
   webSearchCapabilityInstruction
 } from './agent-loop.js'
-import type { ModelClient, ModelToolSpec } from '../ports/model-client.js'
+import type { ModelClient, ModelRequest, ModelToolSpec } from '../ports/model-client.js'
 import type { ToolHost } from '../ports/tool-host.js'
 import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
@@ -22,7 +22,7 @@ import { ContextCompactor } from './context-compactor.js'
 import { SequentialIdGenerator } from '../ports/id-generator.js'
 import { createImmutablePrefix } from '../cache/immutable-prefix.js'
 import { createThreadRecord } from '../domain/thread.js'
-import { makeToolResultItem } from '../domain/item.js'
+import { makeToolCallItem, makeToolResultItem } from '../domain/item.js'
 import type { TaskController } from '../services/task-controller.js'
 import type { RuntimeSpanService } from '../services/runtime-span-service.js'
 
@@ -209,6 +209,35 @@ describe('turnRequestForRouting', () => {
 })
 
 describe('AgentLoop completion guard', () => {
+  it('marks a real current no-argument call as available rather than inferring omission from an empty object', async () => {
+    const threadId = 'current-empty-arguments', nowIso = () => new Date().toISOString()
+    const threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore(), eventBus = new InMemoryEventBus()
+    const ids = new SequentialIdGenerator(), inflight = new InflightTracker(), steering = new SteeringQueue(), compactor = new ContextCompactor()
+    const events = new RuntimeEventRecorder({ eventBus, sessionStore, allocateSeq: id => eventBus.allocateSeq(id), nowIso })
+    const turns = new TurnService({ threadStore, sessionStore, events, inflight, steering, compactor, ids, nowIso })
+    const requests: ModelRequest[] = []
+    const dispatched: Record<string, unknown>[] = []
+    const model: ModelClient = { provider: 'test', model: 'synthetic', async *stream(request) {
+      requests.push(request)
+      if (requests.length === 1) {
+        yield { kind: 'tool_call_complete', callId: 'start-current', toolName: 'browser_session_start', arguments: {} }
+        yield { kind: 'completed', stopReason: 'tool_calls' }
+      } else { yield { kind: 'assistant_text_delta', text: '已读取合成页面。' }; yield { kind: 'completed', stopReason: 'stop' } }
+    } }
+    const toolHost: ToolHost = { id: 'synthetic-host', async listTools() { return [spec('browser_session_start')] }, async execute(call, context) {
+      dispatched.push(call.arguments)
+      return { approved: true, item: makeToolResultItem({ id: 'current-start-result', threadId, turnId: context.turnId, callId: call.callId, toolName: call.toolName, output: { sessionId: 'synthetic-session' } }) }
+    } }
+    await threadStore.upsert(createThreadRecord({ id: threadId, title: 'Current zero-argument call', workspace: '', model: model.model, createdAt: nowIso() }))
+    const started = await turns.startTurn({ threadId, request: { prompt: '读取合成页面。' } })
+    const loop = new AgentLoop({ threadStore, sessionStore, approvalGate: new InMemoryApprovalGate(), userInputGate: new InMemoryUserInputGate(), model,
+      toolHost, usage: new UsageService(), events, turns, inflight, steering, compactor, prefix: createImmutablePrefix(), ids, nowIso })
+    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    expect(dispatched).toEqual([{}])
+    expect(requests[1].toolArgumentAvailability).toContainEqual({ turnId: started.turnId, callId: 'start-current', state: 'available' })
+    expect(requests[1].history.find(item => item.kind === 'tool_call')).toMatchObject({ arguments: {} })
+  })
+
   it('persists bounded tool-call character deltas without argument contents', async () => {
     const threadId = 'thread_tool_delta_usage'
     const nowIso = () => '2026-08-20T00:00:00.000Z'
@@ -312,10 +341,12 @@ describe('AgentLoop completion guard', () => {
       threadStore, sessionStore, events, inflight, steering, compactor, ids, nowIso
     })
     let modelStep = 0
+    const actualRequests: ModelRequest[] = []
     const model: ModelClient = {
       provider: 'test',
       model: 'fixture-model',
-      async *stream() {
+      async *stream(request) {
+        actualRequests.push(request)
         modelStep += 1
         if (modelStep === 1) {
           yield { kind: 'tool_call_complete', callId: 'call_1', toolName: 'knowledge_search', arguments: { token: 'secret' } }
@@ -358,6 +389,8 @@ describe('AgentLoop completion guard', () => {
       model: model.model,
       createdAt: nowIso()
     }))
+    await sessionStore.appendItem(threadId, makeToolCallItem({ id: 'omitted-old-call', threadId, turnId: 'prior-turn', callId: 'prior-call', toolName: 'knowledge_search', arguments: { query: 'old-private-query' } }))
+    await sessionStore.appendItem(threadId, makeToolResultItem({ id: 'omitted-old-result', threadId, turnId: 'prior-turn', callId: 'prior-call', toolName: 'knowledge_search', output: { matches: 1 } }))
     const started = await turns.startTurn({ threadId, request: { prompt: '检索并回答。' } })
     const loop = new AgentLoop({
       threadStore, sessionStore, approvalGate, userInputGate, model, toolHost,
@@ -375,6 +408,9 @@ describe('AgentLoop completion guard', () => {
       status: 'ok', attributes: { approved: true, isError: false }
     })
     expect(dispatchedArguments).toEqual({ token: 'secret' })
+    expect(actualRequests[0].toolArgumentAvailability).toContainEqual({ turnId: 'prior-turn', callId: 'prior-call', state: 'omitted' })
+    expect(actualRequests[1].toolArgumentAvailability).toContainEqual({ turnId: started.turnId, callId: 'call_1', state: 'available' })
+    expect(actualRequests[1].history.find(item => item.kind === 'tool_call' && item.callId === 'call_1')).toMatchObject({ arguments: { token: 'secret' } })
     const persistedItems = await sessionStore.loadItems(threadId)
     const persistedEvents = await sessionStore.loadEventsSince(threadId, 0)
     expect(JSON.stringify(persistedItems)).not.toContain('secret')

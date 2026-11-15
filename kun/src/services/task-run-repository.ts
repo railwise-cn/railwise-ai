@@ -128,6 +128,35 @@ export class TaskRunRepository {
     return row ? this.parseRun(row) : null
   }
 
+  /** Explicitly extend a stopped root's execution allowance; never reset usage or resume it. */
+  extendExecutionBudget(taskId: string, expectedRevision: number, additionalMs: number | undefined, key: string, now: string): TaskRun {
+    return this.transact(() => {
+      const task = this.get(taskId)
+      if (!task) throw Object.assign(new Error('task not found'), { code: 'not_found' })
+      if (task.revision !== expectedRevision) throw new TaskRevisionConflictError(expectedRevision, task.revision)
+      if (task.parentTaskId || task.retryOfTaskId || task.rootTaskId && task.rootTaskId !== task.id || task.status !== 'paused' || task.budget.version !== 2) {
+        throw Object.assign(new Error('请先暂停根任务；仅支持追加新版任务的执行时间。'), { code: 'invalid_state' })
+      }
+      const before = task.budget.maxExecutionMs ?? task.budget.maxDurationMs
+      if (!Number.isSafeInteger(additionalMs) || additionalMs! < 60_000 || additionalMs! > 3_600_000 || before + additionalMs! > 28_800_000) {
+        throw Object.assign(new Error('每次可追加 1–60 分钟，累计执行上限为 8 小时。'), { code: 'invalid_state' })
+      }
+      // Inspect the entire family in SQLite, not a truncated UI task list. A paused
+      // parent cannot change the allowance while a descendant is still executing.
+      const family = `WITH RECURSIVE family(id) AS (SELECT ? UNION SELECT t.id FROM task_runs t JOIN family f ON
+        json_extract(t.data_json,'$.parentTaskId')=f.id OR json_extract(t.data_json,'$.rootTaskId')=f.id OR json_extract(t.data_json,'$.retryOfTaskId')=f.id)`
+      const active = this.db.prepare(`${family} SELECT 1 FROM execution_attempts a JOIN family f ON a.task_id=f.id
+        WHERE json_extract(a.data_json,'$.status')='running' UNION ALL SELECT 1 FROM task_runs t JOIN family f ON t.id=f.id
+        WHERE t.status IN ('queued','running','retrying') UNION ALL SELECT 1 FROM shell_sessions s JOIN family f ON s.task_id=f.id
+        WHERE s.status IN ('starting','running') LIMIT 1`).get(taskId)
+      const openWork = this.db.prepare('SELECT 1 FROM task_work_spans WHERE root_id=? AND finished_ms IS NULL LIMIT 1').get(taskId)
+      if (active || openWork) throw Object.assign(new Error('执行仍在停止中，请等候安全边界后再追加时间。'), { code: 'turn_in_progress' })
+      const used = this.execution.usedExecutionMs(taskId, Date.parse(now))
+      return this.update(taskId, expectedRevision, current => ({ ...current, budget: { ...current.budget, maxExecutionMs: before + additionalMs! }, updatedAt: now }),
+        { key: `execution-budget:${key}`, kind: 'task_execution_budget_extended', payload: { previousMaxExecutionMs: before, additionalExecutionMs: additionalMs!, maxExecutionMs: before + additionalMs!, usedExecutionMs: used, resumed: false }, createdAt: now })
+    })
+  }
+
   /** The visible root keeps its identity while controls target the latest retry. */
   currentExecution(taskId:string):TaskRun|null {
     let task=this.get(taskId)

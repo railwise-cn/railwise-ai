@@ -31,6 +31,16 @@ import {
 } from '../../shared/design-document'
 
 describe('app-ipc-schemas', () => {
+  it('allows only explicit bounded task budget additions without authority or model changes', () => {
+    const path = '/v1/tasks/task-1/budget'
+    const body = { expectedRevision: 4, idempotencyKey: 'add-time-once', additionalExecutionMs: 600_000 }
+    expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify(body) }).success).toBe(true)
+    for (const request of [
+      { path, method: 'GET' }, { path, method: 'POST' },
+      ...[`${path}?force=true`, `${path}#force`, '/v1/tasks/task-1%2Fother/budget', '/v1/tasks/%252F/budget'].map(path => ({ path, method: 'POST', body: JSON.stringify(body) })),
+      ...[{ additionalExecutionMs: -1 }, { additionalExecutionMs: 3_600_001 }, { model: 'new' }, { allowedTools: ['bash'] }, { resetUsage: true }].map(extra => ({ path, method: 'POST', body: JSON.stringify({ ...body, ...extra }) }))
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success).toBe(false)
+  })
   it('allows only a scoped explicit browser result confirmation and rejects replay or scope overrides', () => {
     const path = '/v1/tasks/task-1/receipts/receipt-1/browser-confirm'
     const body = { expectedRevision: 4, idempotencyKey: 'verify-once', reviewId: 'review-1', decision: 'confirmed_complete' }

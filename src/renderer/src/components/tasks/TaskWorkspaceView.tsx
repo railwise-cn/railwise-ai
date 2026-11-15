@@ -12,6 +12,7 @@ import { taskArtifactValidationLabelKey } from '@shared/task-artifact-source-evi
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { BrowserApprovalDetails, browserApprovalFields } from '../chat/BrowserApprovalDetails'
 import { CapabilityRequiredCard } from '../chat/CapabilityRequiredCard'
+import { TaskBudgetControl } from './TaskBudgetControl'
 import { TaskPermissionPanel } from '../chat/TaskPermissionPanel'
 import { useChatStore } from '../../store/chat-store'
 
@@ -465,6 +466,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
             {['failed', 'cancelled'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('retry')} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskRunRetry')}</button> : null}
             {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('cancel')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Square className="h-3.5 w-3.5" />{t('taskRunCancel')}</button> : null}
           </div>
+          <TaskBudgetControl key={selected.id} task={selected} onChanged={() => refresh()} />
           {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} conversationThreadId={conversationForAttention(item)} workspaceRoot={selectedGroup?.all.find(task => task.id === item.taskId)?.workspaceRoot} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
           <details key={`permissions:${(currentExecution ?? selected).id}`} className="mb-4 rounded-lg border border-ds-border p-3 text-xs"><summary className="cursor-pointer font-medium">{t('taskPermissionReview')}</summary><TaskPermissionPanel key={(currentExecution ?? selected).id} taskId={(currentExecution ?? selected).id} revision={(currentExecution ?? selected).revision} autoLoad onConfirmed={message => { setControlNotice(message); void refresh() }} /></details>
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunNodes')}</h3>

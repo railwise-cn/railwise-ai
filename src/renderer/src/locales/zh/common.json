@@ -4786,5 +4786,9 @@
   "taskBrowserReviewReason_browser_review_plan_changed": "原周期计划已停用或范围发生变化，不能沿用旧范围核验。",
   "taskApprovalReviewHint": "请在任务工作台核对本次操作的目标与范围。",
   "browserTaskTargetUpgradeRequired": "公开资料查询需要 BrowserSkill CLI 0.5.0 及服务和所选扩展协议 1.9 或以上。请先更新并重新连接浏览器，再重新加载本任务范围。原授权和待核验操作会保留，任务不会自动继续。",
-  "browserTaskOpenConnector": "打开浏览器连接器"
+  "browserTaskOpenConnector": "打开浏览器连接器",
+  "taskBudgetExtend": "追加 10 分钟执行时间",
+  "taskBudgetExtendHint": "保留已用时间、费用上限和权限；追加后仍保持暂停。",
+  "taskBudgetExtended": "已追加 10 分钟。任务仍暂停，可单独点击“继续”。",
+  "taskBudgetExtendFailed": "追加失败，请重试或刷新任务。"
 }

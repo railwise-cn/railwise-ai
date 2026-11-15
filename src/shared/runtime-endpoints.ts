@@ -122,6 +122,7 @@ export const RUNTIME_THREADS_TEMPLATE = '/v1/threads'
 export const RUNTIME_TASKS_PATH = '/v1/tasks'
 export const RUNTIME_TASKS_TEMPLATE = '/v1/tasks'
 export const RUNTIME_TASK_TEMPLATE = '/v1/tasks/{id}'
+export const RUNTIME_TASK_BUDGET_TEMPLATE = '/v1/tasks/{id}/budget'
 export const RUNTIME_TASK_RESUME_TEMPLATE = '/v1/tasks/{id}/resume'
 export const RUNTIME_TASK_RETRY_TEMPLATE = '/v1/tasks/{id}/retry'
 export const RUNTIME_TASK_CANCEL_TEMPLATE = '/v1/tasks/{id}/cancel'
@@ -141,6 +142,9 @@ export const RUNTIME_TASK_TEMPLATE_START_TEMPLATE = '/v1/task-templates/{id}/sta
 export const RUNTIME_TASK_TEMPLATE_SAVE_TEMPLATE = '/v1/task-templates/{id}/save'
 export function runtimeTaskPath(taskId: string): string {
   return `/v1/tasks/${encodeURIComponent(taskId)}`
+}
+export function runtimeTaskBudgetPath(taskId: string): string {
+  return `${runtimeTaskPath(taskId)}/budget`
 }
 export function runtimeTaskResumePath(taskId: string): string {
   return `${runtimeTaskPath(taskId)}/resume`

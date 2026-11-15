@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -11,11 +11,105 @@ import { test } from 'node:test'
 import { parse, stringify } from 'yaml'
 import { parseByteRange, startFrozenReleaseFeed, validateFrozenFeed } from './frozen-release-updater-feed.mjs'
 import { assertHistoricalRowsPreserved, assertRetainedFiles, fixtureServiceIdentity, persistedJsonValue, prepareCompatibilityService, resolveFixtureService, SERVICE_MODULES, snapshotFiles, validateFixtureExecution } from './frozen-release-updater-data.mjs'
-import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireExactPackageRunner, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance, verifyExactPackageArtifacts, waitForFrozenManifest, waitForTunnelConnection } from './run-frozen-release-updater-acceptance.mjs'
+import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireExactPackageRunner, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance, verifyBundle, verifyExactPackageArtifacts, waitForFrozenManifest, waitForTunnelConnection } from './run-frozen-release-updater-acceptance.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, validateReviewedBuild } from './verify-reviewed-release-artifacts.mjs'
 import { FROZEN_BASE_VERSION, readFrozenSourceVersion, resolveUpdaterBaseline, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 function temporary(t) { const root = mkdtempSync(join(tmpdir(), 'railwise-frozen-updater-test-')); t.after(() => rmSync(root, { recursive: true, force: true })); return root }
+
+// Real temporary ASAR/metadata bytes; native trust commands are deterministic
+// unit fixtures, not signature/notarization or real updater acceptance evidence.
+async function preflightBundleFixture(t, metadataPatch = {}) {
+  const root = temporary(t); const app = join(root, 'Target ZIP fixture.app'); const source = join(root, 'asar-source')
+  const resources = join(app, 'Contents/Resources'); const head = 'a'.repeat(40); const version = '0.5.7'
+  const info = { CFBundleIdentifier: PUBLIC_IDENTITY.bundleId, CFBundleExecutable: PUBLIC_IDENTITY.productName, CFBundleShortVersionString: version }
+  const metadata = { name: PUBLIC_IDENTITY.packageName, productName: PUBLIC_IDENTITY.productName, version,
+    buildHints: { macSigningEnabled: true, notarizationEnabled: true }, buildProvenance: { sourceHead: head }, updateChannel: 'stable', ...metadataPatch }
+  mkdirSync(source); mkdirSync(resources, { recursive: true }); mkdirSync(join(app, 'Contents/_CodeSignature'))
+  writeFileSync(join(source, 'package.json'), JSON.stringify(metadata))
+  await createRequire(import.meta.url)('@electron/asar').createPackage(source, join(resources, 'app.asar'))
+  writeFileSync(join(app, 'Contents/Info.plist'), JSON.stringify(info))
+  writeFileSync(join(app, 'Contents/CodeResources'), 'unit-only stapled ticket bytes')
+  writeFileSync(join(app, 'Contents/_CodeSignature/CodeResources'), 'unit-only signed resource seal')
+  writeFileSync(join(resources, 'app-update.yml'), stringify({ provider: 'generic',
+    url: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/', updaterCacheDirName: 'workwise-updater' }))
+  return { root, app, head, version, info }
+}
+
+function bundleTrustRunner(info, { staplerSequence = ['success'], requirement = `designated => identifier "${PUBLIC_IDENTITY.bundleId}"`, beforeCommand = () => {} } = {}) {
+  const calls = []; let attempt = 0
+  const cdhash = '4a21cb5f50b94c31e4c9f72503b60460e85120ca'
+  const props = `Props are {\n    cdhash = {length = 20, bytes = 0x${cdhash}};\n    signingId = "${PUBLIC_IDENTITY.bundleId}";\n    teamId = R35G7F4A9U;\n}\n`
+  const run = (command, args, options = {}) => {
+    calls.push([command, ...args]); beforeCommand(command, args)
+    const result = { status: 0, stdout: '', stderr: '' }
+    if (command === '/usr/bin/plutil') result.stdout = JSON.stringify(info)
+    else if (command === '/usr/bin/xattr') { /* no attributes in this fixture */ }
+    else if (command === '/usr/bin/codesign') {
+      if (args[0] === '--display') result.stderr = `Identifier=${PUBLIC_IDENTITY.bundleId}\nCDHash=${cdhash}\nTeamIdentifier=R35G7F4A9U\n`
+      else if (args[0] === '-d') result.stderr = requirement
+      else assert.deepEqual(args.slice(0, 3), ['--verify', '--deep', '--strict'])
+    } else if (command === '/usr/sbin/spctl') result.stderr = args[0] === '--status' ? 'assessments enabled\n' : 'accepted\nsource=Notarized Developer ID\n'
+    else if (command === '/usr/bin/xcrun') {
+      assert.deepEqual(args.slice(0, 3), ['stapler', 'validate', '-v'])
+      const state = staplerSequence[Math.min(attempt++, staplerSequence.length - 1)]
+      result.stdout = props
+      if (state === 'success') result.stdout += 'The validate action worked!\n'
+      else if (state === 'cloudkit') {
+        result.status = 68
+        result.stdout += 'Domain is api.apple-cloudkit.com\nResponse is (null)\n'
+          + 'error is Error Domain=NSURLErrorDomain Code=-1005 "The network connection was lost." UserInfo={}\n'
+          + "Size of data is 0\nCloudKit's response is inconsistent with expections: (null)\nThe validate action failed! Error 68.\n"
+      } else { result.status = 68; result.stdout += 'The ticket is invalid.\n' }
+    } else assert.fail(`Unexpected native command ${command}`)
+    options.onResult?.(result)
+    return result
+  }
+  return { run, calls }
+}
+
+test('exact target ZIP preflight transfers its opaque seal to a separate installed copy for bounded read-only notarization retry', async t => {
+  const { root, app, head, version, info } = await preflightBundleFixture(t)
+  let expectedPreflightSeal
+  const events = []; const preflight = bundleTrustRunner(info)
+  const targetIdentity = verifyBundle(app, version, head, preflight.run, { boundary: 'target-zip-preflight',
+    record: event => events.push(event), onVerifiedSeal: seal => { expectedPreflightSeal = seal } })
+  assert.equal(targetIdentity.stapledNotarization, 'verified')
+  assert.ok(expectedPreflightSeal)
+  const installed = join(root, 'Installed fixture.app'); cpSync(app, installed, { recursive: true })
+  const before = snapshotFiles(installed); const native = bundleTrustRunner(info, { staplerSequence: ['cloudkit', 'success'] })
+  assert.deepEqual(verifyBundle(installed, version, head, native.run, { boundary: 'native-installed-target', expectedPreflightSeal,
+    record: event => events.push(event) }), targetIdentity)
+  assert.deepEqual(snapshotFiles(installed), before)
+  assert.equal(native.calls.filter(call => call.includes('stapler')).length, 2)
+  assert.deepEqual(events.filter(event => event.operation === 'bundle-trust-boundary' && event.status === 'completed')
+    .map(event => event.boundary), ['target-zip-preflight', 'native-installed-target'])
+  assert.equal(events.find(event => event.operation === 'bundle-preflight-seal-check').status, 'verified')
+  assert.equal([...preflight.calls, ...native.calls].every(call => ['/usr/bin/plutil', '/usr/bin/xattr', '/usr/bin/codesign', '/usr/bin/xcrun', '/usr/sbin/spctl'].includes(call[0])), true)
+})
+
+test('an installed copy cannot self-seal, and a failed target preflight never exports a token', async t => {
+  const { app, head, version, info } = await preflightBundleFixture(t)
+  const native = bundleTrustRunner(info)
+  assert.throws(() => verifyBundle(app, version, head, native.run, { boundary: 'native-installed-target' }), /preflight seal/)
+  for (const options of [{ staplerSequence: ['invalid'] }, { requirement: 'designated => first\ndesignated => second' }]) {
+    const runner = bundleTrustRunner(info, options); let captured
+    assert.throws(() => verifyBundle(app, version, head, runner.run, { boundary: 'target-zip-preflight',
+      onVerifiedSeal: seal => { captured = seal } }), /notarization validation failed|designated requirement/)
+    assert.equal(captured, undefined)
+  }
+})
+
+test('preflight metadata failure precedes native trust and cannot mint the target seal', async t => {
+  for (const patch of [{ buildProvenance: { sourceHead: 'b'.repeat(40) } }, { version: '0.5.6' }, { buildHints: { macSigningEnabled: false, notarizationEnabled: true } }]) {
+    const { app, head, version, info } = await preflightBundleFixture(t, patch)
+    const native = bundleTrustRunner(info); let captured
+    assert.throws(() => verifyBundle(app, version, head, native.run, { boundary: 'target-zip-preflight',
+      onVerifiedSeal: seal => { captured = seal } }), /mismatch/)
+    assert.equal(captured, undefined)
+    assert.equal(native.calls.length, 1, 'Only metadata conversion is reached before rejection')
+  }
+})
 function hostedEnvironment() {
   return { GITHUB_ACTIONS: 'true', RUNNER_OS: 'macOS', RUNNER_ENVIRONMENT: 'github-hosted', RUNNER_TEMP: '/runner/temp', GITHUB_REPOSITORY: RELEASE_REPOSITORY,
     GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/main`,

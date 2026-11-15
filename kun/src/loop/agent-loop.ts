@@ -1208,6 +1208,11 @@ export class AgentLoop {
       ...(contextInstructions.length ? { contextInstructions } : {}),
       prefix: this.opts.prefix.fewShots,
       history,
+      toolArgumentAvailability: [...this.opts.prefix.fewShots, ...history].filter((item): item is Extract<TurnItem, { kind: 'tool_call' }> => item.kind === 'tool_call').map(item => ({
+        turnId: item.turnId, callId: item.callId,
+        state: Object.keys(item.arguments).length > 0 || item.turnId === turnId && this.ephemeralToolArgumentsByTurn.get(turnId)?.has(item.callId)
+          ? 'available' as const : 'omitted' as const
+      })),
       ...(attachments.imageAttachments.length ? { attachments: attachments.imageAttachments } : {}),
       tools: effectiveToolSpecs,
       ...(requiredToolName ? { requiredToolName } : {}),

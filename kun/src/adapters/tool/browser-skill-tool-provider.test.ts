@@ -75,6 +75,105 @@ function publicQueryFixture() {
 }
 
 describe('typed BrowserSkill production provider', () => {
+  it('prepares a real owned session for an authorized empty observe call without changing the original Host arguments', async () => {
+    const f = publicQueryFixture()
+    f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant!, allowedToolNames: ['browser_session_start', 'browser_observe'] })
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    expect((f.provider.tools.find(tool => tool.name === 'browser_observe')!.inputSchema.required ?? [])).not.toContain('sessionId')
+    expect(f.provider.tools.find(tool => tool.name === 'browser_click')!.inputSchema.required).toEqual(['sessionId', 'contextId', 'target'])
+    const args = {}
+    const result = await host.execute({ toolName: 'browser_observe', callId: 'implicit-observe', arguments: args }, f.context)
+    expect(result.item).toMatchObject({ isError: false, output: { status: 'succeeded', sessionId: 'session-one', observation: { context_id: 'context-one' },
+      sessionPreparation: { actualAction: 'start', sessionId: 'session-one' } } })
+    expect(args).toEqual({})
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'session' && argv[1] === 'start')).toHaveLength(1)
+    expect(f.repository.operations('task', 'browser_session_readiness')).toMatchObject([{ status: 'succeeded', request: {
+      requestedToolName: 'browser_observe', argumentsHash: operationFingerprint({}), turnId: 'turn'
+    }, result: { sessionId: 'session-one', actualAction: 'start', observationCompleted: true } }])
+    expect(f.repository.operations('task', 'browser_action_dispatch')).toHaveLength(0)
+  })
+
+  it('returns bounded schema repair facts for incomplete actions without guessing a target or dispatching', async () => {
+    const f = publicQueryFixture(), human = vi.fn(async () => 'allow' as const)
+    f.context.awaitApproval = human
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    const result = await host.execute({ toolName: 'browser_authorize_action', callId: 'missing-action', arguments: {} }, f.context)
+    expect(result.item).toMatchObject({ isError: true, output: { code: 'invalid_tool_arguments', repair: {
+      kind: 'correct_tool_arguments', fields: [
+        { path: 'sessionId', code: 'invalid_type', expected: 'string', required: true },
+        { path: 'contextId', code: 'invalid_type', expected: 'string', required: true },
+        { path: 'target', code: 'invalid_type', expected: 'string', required: true },
+        { path: 'action', code: 'invalid_value', required: true }
+      ]
+    } } })
+    expect(result.approved).toBe(false)
+    expect(human).not.toHaveBeenCalled()
+    expect(f.runner).not.toHaveBeenCalled()
+    expect(f.repository.operations('task')).toHaveLength(0)
+    const badValue = 'private-input-must-not-be-echoed'
+    const wrongType = await host.execute({ toolName: 'browser_fill', callId: 'wrong-fill', arguments: { sessionId: { secret: badValue } } }, f.context)
+    expect(JSON.stringify(wrongType.item)).not.toContain(badValue)
+    expect(JSON.stringify(wrongType.item)).not.toContain('secret')
+  })
+
+  it('reuses the unique persisted session after Provider recreation and serializes concurrent implicit observations', async () => {
+    const f = publicQueryFixture()
+    f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant!, allowedToolNames: ['browser_session_start', 'browser_observe'] })
+    const first = await f.execute('browser_observe')
+    expect(first).toMatchObject({ output: { status: 'succeeded', sessionId: 'session-one' } })
+    const provider = buildBrowserSkillToolProvider({ config: () => f.config, repository: f.repository, dataDir: f.context.workspace, run: f.runner })
+    const observe = provider.tools.find(tool => tool.name === 'browser_observe')!
+    const results = await Promise.all([observe.execute({}, f.context), observe.execute({}, f.context)])
+    expect(results).toMatchObject([{ output: { sessionId: 'session-one', sessionPreparation: { actualAction: 'reuse' } } }, { output: { sessionId: 'session-one' } }])
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'session' && argv[1] === 'start')).toHaveLength(1)
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate')).toHaveLength(3)
+    expect(f.repository.operations('task', 'browser_session_readiness')).toHaveLength(3)
+  })
+
+  it('does not invent an observation context when native session preparation succeeded but sync omitted its ID', async () => {
+    const f = publicQueryFixture(), original = f.runner.getMockImplementation()!
+    f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant!, allowedToolNames: ['browser_session_start', 'browser_observe'] })
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] === 'cooperate') return { ok: true, output: { ready: true, control_policy: 'target', observation: { text: 'Actual read without a context identifier' } } }
+      return original(config, argv, signal)
+    })
+    expect(await f.execute('browser_observe')).toMatchObject({ isError: true, output: { code: 'browser_observation_required' } })
+    expect(f.repository.operations('task', 'browser_session_readiness')).toMatchObject([{ status: 'failed', result: { sessionId: 'session-one', observationCompleted: false } }])
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'session' && argv[1] === 'start')).toHaveLength(1)
+  })
+
+  it.each(['not_allowed', 'skill_filter', 'provider_filter', 'expired', 'paused', 'revoked', 'wrong_turn', 'scope_changed', 'ambiguous', 'unknown', 'cancelled'] as const)(
+    'blocks implicit session preparation for %s without creating another window', async boundary => {
+      const f = publicQueryFixture(), abort = new AbortController()
+      f.context.abortSignal = abort.signal
+      f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant!, allowedToolNames: ['browser_session_start', 'browser_observe'] })
+      if (boundary === 'not_allowed') f.context.executionGrant.allowedToolNames = ['browser_observe']
+      if (boundary === 'skill_filter') f.context.allowedToolNames = ['browser_observe']
+      if (boundary === 'provider_filter') f.context.allowedProviderIds = ['other']
+      if (boundary === 'expired') f.context.executionGrant.expiresAt = new Date(Date.now() - 1000).toISOString()
+      if (boundary === 'paused') f.repository.update('task', f.repository.get('task')!.revision, task => ({ ...task, status: 'paused' }))
+      if (boundary === 'revoked') f.repository.update('task', f.repository.get('task')!.revision, task => ({ ...task, authority: { ...task.authority!, revokedAt: new Date().toISOString() } }))
+      if (boundary === 'wrong_turn') f.context.turnId = 'different-turn'
+      if (boundary === 'scope_changed') f.context.executionGrant.browserScope!.origins.push('https://other.example')
+      if (boundary === 'ambiguous' || boundary === 'unknown') {
+        await f.execute('browser_session_start')
+        const original = f.repository.operations('task', 'browser_session')[0]!
+        if (boundary === 'ambiguous') {
+          const copy = f.repository.beginOperation({ ownerId: 'task', kind: 'browser_session', idempotencyKey: original.idempotencyKey + ':another', request: original.request!, nowIso: new Date().toISOString() })
+          f.repository.finishOperation('task', copy.receipt.idempotencyKey, { status: 'succeeded', result: { ...original.result as object, sessionId: 'different-session' } })
+        } else {
+          f.repository.beginOperation({ ownerId: 'task', kind: 'browser_action_dispatch', idempotencyKey: 'unknown-action', request: { sessionId: 'session-one' }, nowIso: new Date().toISOString() })
+          f.repository.finishOperation('task', 'unknown-action', { status: 'outcome_unknown' })
+        }
+      }
+      if (boundary === 'cancelled') abort.abort()
+      const before = f.runner.mock.calls.filter(([, argv]) => argv[0] === 'session' && argv[1] === 'start').length
+      const result = await f.execute('browser_observe')
+      expect(result.isError).toBe(true)
+      expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'session' && argv[1] === 'start')).toHaveLength(before)
+      expect(f.repository.operations('task', 'browser_session_readiness')).toHaveLength(0)
+    })
+
   it('selects the exact page authorization when identical controls have legacy derived receipts without context hashes', async () => {
     const f = fixture()
     f.repository.update('task', 0, task => ({ ...task, acceptance: { ...task.acceptance, schedule: { kind: 'daily', times: ['09:00'], timezone: 'Asia/Shanghai' } },
