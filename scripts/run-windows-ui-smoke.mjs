@@ -44,6 +44,40 @@ export function validateWindowsComposerMenuGeometry(value) {
   return true
 }
 
+export function windowsComposerMenuKeyboardExpression(label) {
+  return `(() => {
+    const anchor=document.querySelector('button[aria-label='+JSON.stringify(${JSON.stringify(label)})+']');
+    const menu=anchor?.getAttribute('aria-controls')&&document.getElementById(anchor.getAttribute('aria-controls'));
+    const active=document.activeElement;
+    const menuOpen=Boolean(menu?.getClientRects().length&&getComputedStyle(menu).visibility!=='hidden');
+    const items=menu?Array.from(menu.querySelectorAll('[role="menuitem"],[role="menuitemradio"],[role="menuitemcheckbox"]')).filter(item=>!item.hasAttribute('disabled')&&item.getAttribute('aria-disabled')!=='true'):[];
+    const selected=items.find(item=>item.getAttribute('aria-checked')==='true')??items[0];
+    const menuOwnsFocus=Boolean(menu&&active&&menu.contains(active));
+    const selectionFocused=Boolean(selected&&active===selected);
+    const focusRole=active?.getAttribute('role')??null;
+    return {menuOpen,openMenuCount:document.querySelectorAll('.ds-anchored-menu').length,menuOwnsFocus,selectionFocused,focusRole,focusTag:active?.tagName??null,
+      documentVisibility:document.visibilityState,documentHasFocus:document.hasFocus(),
+      triggerFocused:Boolean(anchor&&active===anchor),triggerExpanded:anchor?.getAttribute('aria-expanded')==='true',
+      focusReady:menuOpen&&menuOwnsFocus&&selectionFocused&&['menuitem','menuitemradio','menuitemcheckbox'].includes(focusRole)};
+  })()`
+}
+
+export function validateWindowsComposerMenuKeyboardReceipt(before, after) {
+  assert.equal(before?.focusReady, true, 'Keyboard input must target the real focused menu selection')
+  assert.equal(before.menuOpen, true)
+  assert.equal(before.openMenuCount, 1)
+  assert.equal(before.menuOwnsFocus, true)
+  assert.equal(before.selectionFocused, true)
+  assert.equal(before.triggerExpanded, true)
+  assert.ok(['menuitem', 'menuitemradio', 'menuitemcheckbox'].includes(before.focusRole))
+  assert.equal(after?.menuOpen, false, 'Escape must actually close the menu')
+  assert.equal(after.openMenuCount, 0, 'Escape must retain the original all-menus-closed gate')
+  assert.equal(after.triggerExpanded, false)
+  assert.equal(after.triggerFocused, true, 'Escape must restore focus to the same trigger')
+  assert.equal(after.focusTag, 'BUTTON')
+  return true
+}
+
 export function validateWindowsAdaptiveWorkbenchEvidence(evidence) {
   assert.equal(evidence?.status, 'passed')
   assert.equal(evidence.input, 'renderer-cdp-real-input')
@@ -53,6 +87,7 @@ export function validateWindowsAdaptiveWorkbenchEvidence(evidence) {
     validateWindowsComposerMenuGeometry(menu)
     assert.ok(Math.abs(menu.bodyZoom - [0.9, 1.1][index]) < 0.01)
     assert.equal(menu.escapeFocusRestored, true)
+    validateWindowsComposerMenuKeyboardReceipt(menu.keyboard?.before, menu.keyboard?.after)
   }
   const navigation = evidence.scenarios[1].navigation
   assert.equal(navigation.modal, true)
@@ -92,7 +127,7 @@ if(-not [RailWiseSmokeWindow]::GetWindowRect($ownedHandle,[ref]$ownedRect)){thro
 @{ownerVerified=$true;left=$ownedRect.Left;top=$ownedRect.Top;width=$ownedRect.Right-$ownedRect.Left;height=$ownedRect.Bottom-$ownedRect.Top;windowState=$(if([RailWiseSmokeWindow]::IsZoomed($ownedHandle)){'maximized'}else{'normal'})}|ConvertTo-Json -Compress`
 }
 
-async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment }) {
+async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment, audit }) {
   const { execFile } = await import('node:child_process')
   const { promisify } = await import('node:util')
   const osWindow = async bounds => {
@@ -130,12 +165,27 @@ async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment }) {
     await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]'))`, 'the same composer after settings')
   }
   const menu = async label => {
+    const receipt = { label, stage: 'opening', openedAt: Date.now() }
+    audit.menus.push(receipt)
     await cdp.click(`button[aria-label=${JSON.stringify(label)}]`)
     const value = await cdp.wait(windowsComposerMenuExpression(label), 'the actual anchored composer menu')
     validateWindowsComposerMenuGeometry(value)
+    receipt.geometry = value
+    const state = windowsComposerMenuKeyboardExpression(label)
+    receipt.keyboardAtGeometry = await cdp.evaluate(state)
+    receipt.stage = 'waiting-for-menu-focus'
+    // Keep the original 30s keyboard budget; wait for real focus, not a sleep.
+    const keyboardDeadline = Date.now() + 30_000
+    const before = await cdp.wait(`(() => {const state=${state};return state.focusReady&&state;})()`, `${label} real menu selection keyboard focus`, Math.max(1, keyboardDeadline - Date.now()))
+    receipt.keyboardBefore = before
+    receipt.escapeSentAt = Date.now()
+    receipt.stage = 'escape-sent'
     await escape()
-    await cdp.wait(`!document.querySelector('.ds-anchored-menu') && document.activeElement?.getAttribute('aria-label')===${JSON.stringify(label)}`, 'Escape closes the menu and restores trigger focus')
-    return { ...value, escapeFocusRestored: true }
+    const after = await cdp.wait(`(() => {const state=${state};return !document.querySelector('.ds-anchored-menu')&&!state.menuOpen&&state.triggerFocused&&state;})()`, 'Escape closes the menu and restores trigger focus', Math.max(1, keyboardDeadline - Date.now()))
+    validateWindowsComposerMenuKeyboardReceipt(before, after)
+    receipt.keyboardAfter = after
+    receipt.stage = 'passed'
+    return { ...value, escapeFocusRestored: true, keyboard: { before, after } }
   }
   await cdp.wait(`Boolean(document.querySelector('button[aria-label="切换智能体"]:not(:disabled)')&&document.querySelector('button[aria-label="模型与推理设置"]:not(:disabled)'))`, 'actual enabled composer controls')
   const baseline = { font: 'small', agent: await menu('切换智能体'), model: await menu('模型与推理设置') }
@@ -151,7 +201,7 @@ async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment }) {
     assert.equal(narrow.navigation.modal, true); assert.equal(narrow.navigation.mainInert, true)
     assert.ok(narrow.navigation.width > 0 && narrow.navigation.width <= narrow.navigation.viewportWidth)
     await escape(); await cdp.wait(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay!== 'navigation'`, 'the navigation drawer closes on Escape')
-    return { status: 'passed', input: 'renderer-cdp-real-input', resizeMethod, scenarios: [baseline, narrow] }
+    return { status: 'passed', input: 'renderer-cdp-real-input', resizeMethod, scenarios: [baseline, narrow], menus: audit.menus }
   } finally {
     try { await escape(); await font('small') } finally { await osWindow(original) }
     await cdp.wait(`Math.abs(Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ds-ui-scale'))-0.9)<0.01`, 'the restored original font scale')
@@ -2444,7 +2494,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
       await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]:not(:disabled)'))`, 'the active conversation composer')
       if (browserSmoke) {
-        report.adaptiveWorkbench = await runWindowsAdaptiveComposerAcceptance(cdp, { pid: child.pid, environment })
+        report.adaptiveWorkbench = { status: 'running', menus: [] }
+        report.adaptiveWorkbench = await runWindowsAdaptiveComposerAcceptance(cdp, { pid: child.pid, environment, audit: report.adaptiveWorkbench })
         report.checks.push('native-window-composer-menus-and-narrow-navigation')
       }
       const newThreads = (await runtimeRequest('/v1/threads')).threads.filter(thread => !previousThreads.has(thread.id))

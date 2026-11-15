@@ -13,13 +13,14 @@ import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyIn
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact } from './run-windows-ui-smoke.mjs'
-import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
+import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 
 test('composer menu geometry uses actual viewport rectangles at both supported font scales', () => {
   const actual = { coordinateUnit: 'viewport-css-px', side: 'top', menuCount: 1, itemCount: 3, hitTest: true,
     viewport: { left: 0, top: 0, width: 960, height: 640 },
     anchor: { left: 450, top: 580, right: 650, bottom: 616, width: 200, height: 36 },
-    menu: { left: 550, top: 272, right: 850, bottom: 572, width: 300, height: 300 } }
+    menu: { left: 550, top: 272, right: 850, bottom: 572, width: 300, height: 300 },
+    keyboard: { before: { focusReady: true, menuOpen: true, openMenuCount: 1, menuOwnsFocus: true, selectionFocused: true, triggerExpanded: true, focusRole: 'menuitemradio' }, after: { menuOpen: false, openMenuCount: 0, triggerExpanded: false, triggerFocused: true, focusTag: 'BUTTON' } } }
   for (const bodyZoom of [0.9, 1.1]) assert.equal(validateWindowsComposerMenuGeometry({ ...actual, bodyZoom }), true)
   const scenario = (font, bodyZoom) => ({ font, agent: { ...actual, bodyZoom, escapeFocusRestored: true }, model: { ...actual, bodyZoom, escapeFocusRestored: true } })
   const evidence = { status: 'passed', input: 'renderer-cdp-real-input', resizeMethod: 'verified-pid-native-window', scenarios: [scenario('small', 0.9), { ...scenario('large', 1.1), navigation: { modal: true, mainInert: true, width: 280, viewportWidth: 960 } }] }
@@ -32,6 +33,18 @@ test('composer menu geometry uses actual viewport rectangles at both supported f
   assert.throws(() => validateWindowsComposerMenuGeometry({ ...actual, menu: { ...actual.menu, top: -8 } }), /visual viewport/)
   assert.throws(() => validateWindowsComposerMenuGeometry({ ...actual, hitTest: false }), /pointer input/)
   assert.throws(() => validateWindowsComposerMenuGeometry({ ...actual, menuCount: 2 }), /One composer menu/)
+})
+
+test('composer keyboard receipts require actual selection focus before Escape and retain the original close/focus gate', () => {
+  const before = { focusReady: true, menuOpen: true, openMenuCount: 1, menuOwnsFocus: true, selectionFocused: true, triggerExpanded: true, focusRole: 'menuitemradio' }
+  const after = { menuOpen: false, openMenuCount: 0, triggerExpanded: false, triggerFocused: true, focusTag: 'BUTTON' }
+  assert.equal(validateWindowsComposerMenuKeyboardReceipt(before, after), true)
+  for (const change of [{ focusReady: false }, { menuOwnsFocus: false }, { selectionFocused: false }, { focusRole: null }]) assert.throws(() => validateWindowsComposerMenuKeyboardReceipt({ ...before, ...change }, after))
+  for (const change of [{ menuOpen: true }, { openMenuCount: 1 }, { triggerFocused: false }, { triggerExpanded: true }]) assert.throws(() => validateWindowsComposerMenuKeyboardReceipt(before, { ...after, ...change }))
+  const probe = windowsComposerMenuKeyboardExpression('切换智能体')
+  assert.match(probe, /menu.contains\(active\)/)
+  assert.match(probe, /active===selected/)
+  assert.doesNotMatch(probe, /\.focus\(|dispatchEvent|scrollIntoView/)
 })
 
 test('installed UI probes select the actual controlled menu and constrain native resizing to an owned numeric PID', () => {
