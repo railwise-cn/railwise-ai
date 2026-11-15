@@ -160,7 +160,7 @@ describe('task permission revocation through authenticated production routes', (
         thread: (await f.runtime.threadService.get(source.threadId))!, request: { prompt: source.goal } })
     }
     const response = await f.api(`/v1/tasks/${source.id}/retry`, 'POST', retryRequest)
-    expect(response.status).toBe(202)
+    expect(response.status, await response.clone().text()).toBe(202)
     const retried = await response.json() as { task: TaskRun; turn?: { turnId: string } }
     expect(retried.turn).toBeUndefined()
     expect(retried.task).toMatchObject({ status: 'waiting_user', retryOfTaskId: source.id })
@@ -180,6 +180,23 @@ describe('task permission revocation through authenticated production routes', (
     expect(f.current().id).toBe(retried.task.id)
     expect(f.runtime.taskRepository!.list({ workspaceRoot: f.workspace }).filter(task => task.retryOfTaskId === source.id)).toHaveLength(1)
     await expect(f.runtime.taskPermissionService!.executionRestriction(source.threadId, f.permissionId)).rejects.toMatchObject({ code: 'task_permission_revoked' })
+  })
+
+  it('rejects a partial retry that claims browser recovery without the child binding', async () => {
+    const f=await fixture(), first=await f.start()
+    f.runtime.taskController!.recordAttemptFailure(f.task.threadId,first.id,'max_tokens','Synthetic failure before retry')
+    await f.runtime.turnService.interruptTurn({threadId:f.task.threadId,turnId:first.id})
+    await expect.poll(f.closed,{timeout:5_000}).toBe(1)
+    const source=f.current(), request={expectedRevision:source.revision,idempotencyKey:'missing-recovery-binding',publicQueryRecoveryReceiptId:'missing-recovery'}
+    f.runtime.taskRepository!.beginOperation({ownerId:source.id,idempotencyKey:request.idempotencyKey,kind:'retry',request,nowIso:f.runtime.nowIso()})
+    const id=`task_retry_${createHash('sha256').update(`task:${source.id}:retry:${request.idempotencyKey}`).digest('hex')}`
+    f.runtime.taskController!.createRetryTask({id,sourceTaskId:source.id,expectedRevision:source.revision,thread:(await f.runtime.threadService.get(source.threadId))!,request:{prompt:source.goal}})
+    const before=f.current(), response=await f.api(`/v1/tasks/${source.id}/retry`,'POST',request)
+    expect(response.status,await response.clone().text()).toBe(409)
+    expect(await response.json()).toMatchObject({code:'browser_public_query_recovery_changed'})
+    expect(f.current()).toEqual(before)
+    expect(f.requests()).toBe(1)
+    expect((await f.runtime.threadService.get(source.threadId))!.turns).toHaveLength(1)
   })
 
   it('recovers after revocation commits but the response snapshot is interrupted', async () => {

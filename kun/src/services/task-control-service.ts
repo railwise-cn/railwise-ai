@@ -61,8 +61,15 @@ export class TaskControlService {
     if(prior?.status==='prepared'&&action==='retry'){
       repository.beginOperation({ownerId:taskId,idempotencyKey:data.idempotencyKey,kind:action,request:data,nowIso:nowIso()})
       const childId=`task_retry_${createHash('sha256').update(`task:${taskId}:retry:${data.idempotencyKey}`).digest('hex')}`
-      const waiting=this.deps.publicQueryRecovery?.recoverPreparedRetry(taskId,prior,childId)
-      if(waiting)return {task:waiting}
+      const child=repository.get(childId), source=child?.retryOfTaskId?repository.get(child.retryOfTaskId):repository.get(taskId)
+      const explicitRecovery=Boolean(data.publicQueryRecoveryReceiptId||child?.publicQueryRecovery||source?.publicQueryRecovery)
+      const inheritedRecovery=!explicitRecovery&&source?await this.deps.publicQueryRecovery?.forRetry(source):undefined
+      // Ordinary partial retries retain their existing permission-recovery path.
+      // A claimed or inherited browser recovery still requires its exact child binding.
+      if(explicitRecovery||inheritedRecovery){
+        const waiting=this.deps.publicQueryRecovery?.recoverPreparedRetry(taskId,prior,childId)
+        if(waiting)return {task:waiting}
+      }
     }
     let recovery: Awaited<ReturnType<BrowserPublicQueryRecoveryService['forRetry']>>
     if(prior?.status!=='succeeded'&&action==='retry')recovery=await this.deps.publicQueryRecovery?.forRetry(current,data.publicQueryRecoveryReceiptId)
