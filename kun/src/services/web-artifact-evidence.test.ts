@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { TaskController } from './task-controller.js'
 import { TaskRunRepository, operationFingerprint } from './task-run-repository.js'
 import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
@@ -18,7 +18,17 @@ import type { ToolHostContext } from '../ports/tool-host.js'
 import { assessWebArtifactEvidence } from './web-artifact-evidence.js'
 
 const roots: string[] = []
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
+const fixtureTime = '2026-11-15T00:00:00.000Z'
+beforeEach(() => {
+  // The grant, source receipts, and bulletin dates share one deterministic clock.
+  // Fake Date only: SQLite/file work and real asynchronous cleanup keep their timers.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(fixtureTime)
+})
+afterEach(async () => {
+  try { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) }
+  finally { vi.useRealTimers() }
+})
 const sha = (text: string) => createHash('sha256').update(text).digest('hex')
 const origins = ['https://a.example.test', 'https://b.example.test']
 const title = '工程测量监测服务项目公开招标公告'
@@ -46,7 +56,7 @@ async function fixture() {
   const root = await realpath(temporary), workspace = join(root, '只读 工作区'); await mkdir(workspace)
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite3')), threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore()
   const thread = createThreadRecord({ id: 'thread', workspace, title: 'Web source evidence', model: 'synthetic-no-model' }); await threadStore.upsert(thread)
-  const now = () => '2026-11-15T00:00:00.000Z'
+  const now = () => fixtureTime
   const controller = new TaskController({ repository, threadStore, sessionStore, nowIso: now, dataDir: root })
   const task = controller.ensureTask({ thread, turnId: 'old-turn', request: { prompt: '使用浏览器采集两个平台的工程测量招标公告正文并交付 report.html。' } })
   repository.update(task.id, task.revision, current => ({ ...current, acceptance: { ...current.acceptance, requiredSourceOrigins: origins } }))
@@ -135,6 +145,16 @@ it('invalidates a proof after the exact file or requested goal changes without d
     expect(await readFile(f.path, 'utf8')).toContain(title)
     await writeFile(f.path, report('<p>外部修改</p>'))
     expect((await f.controller.assessCandidate(f.thread.id, 'new-turn')).kind).not.toBe('completed')
+  } finally { f.repository.close() }
+})
+
+it('rejects an expired execution grant without making the fixture depend on the host clock', async () => {
+  const f = await fixture()
+  try {
+    vi.setSystemTime('2026-11-15T00:41:00.000Z')
+    await expect(f.call('verify_web_artifact', input())).rejects.toMatchObject({ code: 'execution_grant_expired' })
+    vi.setSystemTime(fixtureTime)
+    expect(await f.call('verify_web_artifact', input())).toMatchObject({ complete: true })
   } finally { f.repository.close() }
 })
 

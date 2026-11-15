@@ -64,6 +64,7 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/macos-updater-trust.test.mjs',
   // Excluded by kun/tsconfig.build.json and the runtime packaging filter.
   'kun/src/services/task-controller.test.ts',
+  'kun/src/services/web-artifact-evidence.test.ts',
   'docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md',
   'docs/runtime-architecture.md',
   // Read only by the publication workflow, outside the application file sets.
