@@ -78,7 +78,7 @@ import { flowRoutes } from './flows.js'
 import { isAuthorized, bearerToken } from '../auth.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
-import { getTaskPublicQueryRecovery,prepareTaskPublicQueryRecovery,taskBrowserBinding, appendTaskInput, cancelTask, getTask, getTaskArtifactProof, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, revokeTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, confirmBrowserOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, extendTaskBudget, revalidateTaskArtifacts, resumeTask, retryTask } from './tasks.js'
+import { revokeTaskPublicQueryRecovery,getTaskPublicQueryRecovery,prepareTaskPublicQueryRecovery,taskBrowserBinding, appendTaskInput, cancelTask, getTask, getTaskArtifactProof, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, revokeTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, confirmBrowserOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, extendTaskBudget, revalidateTaskArtifacts, resumeTask, retryTask } from './tasks.js'
 import { externalProviderAmbiguity } from '../../services/external-task-capability.js'
 import { classifyTaskInput } from '../../services/task-coordinator.js'
 import { listShellSessions, terminateShellSession } from './shell-sessions.js'
@@ -406,6 +406,7 @@ export function buildRouter(runtime: ServerRuntime): Router {
   for (const method of ['GET', 'POST']) router.add(method, '/v1/tasks/:id/browser-binding', async (request, ctx) => authorize(request, runtime) ? taskBrowserBinding(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/public-query-recovery', async(request,ctx)=>authorize(request,runtime)?getTaskPublicQueryRecovery(runtime,ctx.params.id):ERRORS.unauthorized())
   router.add('POST', '/v1/tasks/:id/prepare-public-query-recovery', async(request,ctx)=>authorize(request,runtime)?prepareTaskPublicQueryRecovery(runtime,ctx.params.id,request):ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/revoke-public-query-recovery', async(request,ctx)=>authorize(request,runtime)?revokeTaskPublicQueryRecovery(runtime,ctx.params.id,request):ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? getTaskPermissions(runtime, ctx.params.id) : ERRORS.unauthorized())
   router.add('POST', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? confirmTaskPermissions(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('DELETE', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? revokeTaskPermissions(runtime, ctx.params.id, request) : ERRORS.unauthorized())

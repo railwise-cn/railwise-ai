@@ -1,3 +1,4 @@
+import { oneOffConsumer,activeOneOffConsent } from './one-off-public-query-proof.js'
 import { verifiedTaskRetryLineage } from './task-retry-lineage.js'
 import { createHash } from 'node:crypto'
 import { BrowserPublicQueryAuthorization, browserVerificationPolicy, type BrowserExecutionScope } from '../contracts/browser-skill.js'
@@ -46,6 +47,7 @@ export function taskPublicQueryAuthority(repository: TaskRunRepository, task: Ta
     scope.origins.some(origin => !(result.origins as unknown[]).includes(origin)) ||
     browserVerificationPolicy(result.verificationPolicy) !== browserVerificationPolicy(scope.verificationPolicy)) return undefined
   if (!options.historical) {
+    if(task.publicQueryRecovery?.mode==='task_reauthorization'){if(!oneOffConsumer(repository,task))return undefined;try{activeOneOffConsent(repository,task.publicQueryRecovery)}catch{return undefined}}
     const sourceScope = source.authority?.browserScope, currentScope = task.authority?.browserScope
     if (source.authority?.revokedAt || task.authority?.revokedAt || publicQueryPurposeHash(source) !== authorization.purposeHash ||
       operationFingerprint(sourceScope?.publicQueryAuthorization) !== operationFingerprint(authorization) ||

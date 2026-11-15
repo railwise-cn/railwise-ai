@@ -99,6 +99,11 @@ export class CapabilityRegistry {
     for (const [name, tool] of next.tools) this.tools.set(name, tool)
   }
 
+  /** Scope-review metadata only. This never advertises or authorizes a tool for execution. */
+  registeredTools():Array<{name:string;providerId:string}>{
+    return [...this.tools.values()].filter(record=>record.provider.enabled&&record.provider.available).map(record=>({name:record.tool.name,providerId:record.provider.id}))
+  }
+
   listTools(context?: ToolHostContext): CapabilityToolSpec[] {
     const specs: CapabilityToolSpec[] = []
     for (const record of this.tools.values()) {

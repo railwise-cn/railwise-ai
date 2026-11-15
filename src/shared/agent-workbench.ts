@@ -639,6 +639,7 @@ export type TaskChangeEvent = { seq:number; taskId?:string; kind:'task_changed'|
 
 /** Server eligibility and future-consent projection; never an old operation result. */
 export type TaskPublicQueryRecoverySnapshotV1 = {
-  taskId: string; taskRevision: number; state: 'unavailable' | 'eligible' | 'prepared'; message: string;
-  reason?: string; receiptId?: string; unknownOperationCount: number; origins?: string[]
+  taskId: string; taskRevision: number; state: 'unavailable' | 'eligible' | 'prepared' | 'needs_scope_review'; message: string;
+  reason?: string; receiptId?: string; unknownOperationCount: number; origins?: string[];
+  mode?:'task_reauthorization';scopeReview?:import('../../kun/src/contracts/browser-public-query-recovery').OneOffScopeReview;consentReceiptId?:string;consentExpiresAt?:string;consentRevoked?:boolean
 }

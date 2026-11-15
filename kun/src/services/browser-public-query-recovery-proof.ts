@@ -1,3 +1,4 @@
+import { verifiedOneOffRecovery,oneOffExecutionScope,assertOneOffGrant } from './one-off-public-query-proof.js'
 import { assertGrantAllowsNetwork } from '../adapters/tool/sandbox-policy.js'
 import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { verifiedTaskRetryLineage } from './task-retry-lineage.js'
@@ -21,6 +22,7 @@ export type PublicQueryRecoveryContext = {
 
 /** A future-consent record never changes OperationReceipt.status/resolution. */
 export function verifiedPublicQueryRecovery(repository: TaskRunRepository, binding: BrowserPublicQueryRecoveryBinding, consumed = true) {
+  if(binding.mode==='task_reauthorization')return verifiedOneOffRecovery(repository,binding,consumed)
   const receipt = repository.operationById(binding.ownerTaskId, binding.receiptId, 'browser_public_query_recovery')
   const request = object(receipt?.request), result = object(receipt?.result), context = request.context as PublicQueryRecoveryContext | undefined
   const owner = repository.get(binding.ownerTaskId)
@@ -92,7 +94,7 @@ export function recoveryCoversReceipt(repository: TaskRunRepository, receipt: Op
     if(!proof)return false
     if(proof.context.unknowns.some(ref=>ref.ownerId===receipt.ownerId&&ref.id===receipt.id&&ref.kind===receipt.kind&&ref.fingerprint===receipt.fingerprint))return true
     const previous=proof.context.previousRecovery
-    if(previous&&(previous.sourceTaskId!==current.sourceTaskId||previous.scheduleId!==current.scheduleId||previous.versionId!==current.versionId||previous.planScopeHash!==current.planScopeHash||previous.browserIdentity!==current.browserIdentity))return false
+    if(current.mode!=='task_reauthorization'&&previous&&(previous.sourceTaskId!==current.sourceTaskId||previous.scheduleId!==current.scheduleId||previous.versionId!==current.versionId||previous.planScopeHash!==current.planScopeHash||previous.browserIdentity!==current.browserIdentity))return false
     current=previous
   }
   return false
@@ -114,6 +116,7 @@ export function publicQueryRecoveryForPlan(repository: TaskRunRepository, input:
 export function recoveryExecutionScope(repository: TaskRunRepository, task: TaskRun, scope: ExecutionScope, now=Date.now()): ExecutionScope {
   const binding = task.publicQueryRecovery ?? scope.browserPublicQueryRecovery
   if (!binding) return scope
+  if(binding.mode==='task_reauthorization')return oneOffExecutionScope(repository,task,scope,now)
   const proof = verifiedPublicQueryRecovery(repository, binding)
   if (!proof || task.id === binding.ownerTaskId || operationFingerprint(task.goal) !== proof.context.goalHash ||
     ![proof.context.acceptanceHash, proof.context.sourceAcceptanceHash].includes(operationFingerprint(task.acceptance)) || !recoveryConsumer(repository, task, binding, proof.use) || operationFingerprint(scope.browserScope) !== operationFingerprint(proof.context.browserScope) ||
@@ -130,6 +133,7 @@ export function recoveryExecutionScope(repository: TaskRunRepository, task: Task
 
 export function assertRecoveryGrant(repository: TaskRunRepository, grant: ExecutionGrant): void {
   if (!grant.browserPublicQueryRecovery) return
+  if(grant.browserPublicQueryRecovery.mode==='task_reauthorization')return assertOneOffGrant(repository,grant)
   const task = grant.taskId ? repository.get(grant.taskId) : null, binding = grant.browserPublicQueryRecovery
   const proof = verifiedPublicQueryRecovery(repository, binding)
   if (!task || !proof || task.id === binding.ownerTaskId || !recoveryConsumer(repository, task, binding, proof.use) || operationFingerprint(grant.browserScope) !== operationFingerprint(proof.context.browserScope) ||

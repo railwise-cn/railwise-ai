@@ -1,3 +1,4 @@
+import { oneOffPermissionContext } from './one-off-public-query-proof.js'
 import { randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
 import { TaskPermissionRevocationSchema, type TaskPermissionRevocation, TaskApprovalGrantSchema, TaskPermissionConfirmationSchema, type TaskPermissionConfirmation, type TaskApprovalGrant, type TaskPermissionScope, type ExecutionGrant, type WorkspaceTrustLevel } from '../contracts/permissions.js'
@@ -143,6 +144,8 @@ export class TaskPermissionService {
     if(sourceTaskId && (!task || task.threadId!==threadId || active && active.id!==task.id || !active && !['failed','cancelled'].includes(task.status)))fail('task_permission_revoked','The retry preflight source does not match this execution context.')
     if(!task){if(expectedPermissionId)fail('task_permission_revoked','The task permission no longer has an active task.');return {}}
     if(task.authority?.revokedAt)fail('task_permission_revoked','Task authority was revoked.')
+    const fresh=oneOffPermissionContext(this.deps.repository,task)
+    if(fresh?.context.taskPermissionRequired&&!task.authority?.taskApprovalGrant)fail('task_permission_expired','新的检索需要在当前任务权限卡重新确认临时权限，旧任务授权不会沿用。')
     const permission=await this.permissionScope(task)
     if(!permission){if(expectedPermissionId)fail('task_permission_revoked','The scoped task permission was removed.');return {}}
     const {grant,scope}=permission
@@ -242,6 +245,7 @@ export class TaskPermissionService {
       visited.add(current.id)
       revoked ||= Boolean(current.authority?.revokedAt || current.authority?.taskApprovalGrant?.revokedAt)
       if(current.authority?.taskApprovalGrant)return {owner:current,revoked}
+      if(oneOffPermissionContext(this.deps.repository,current))return undefined
       if(!current.retryOfTaskId)return undefined
       const parent=this.deps.repository.get(current.retryOfTaskId)
       if(!parent || parent.threadId!==current.threadId || parent.workspaceRoot!==current.workspaceRoot ||

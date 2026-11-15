@@ -1,3 +1,5 @@
+import { operationFingerprint } from '../services/task-run-repository.js'
+import { OneOffPublicQueryRecoveryService } from '../services/one-off-public-query-recovery.js'
 import { BrowserPublicQueryRecoveryService } from '../services/browser-public-query-recovery.js'
 import { recoveryExecutionScope,verifiedPublicQueryRecovery } from '../services/browser-public-query-recovery-proof.js'
 import { HostShellVerificationService } from '../services/host-shell-verification.js'
@@ -747,7 +749,15 @@ export async function createKunServeRuntime(
   const browserVerification = new BrowserOperationVerificationService({ repository: taskRepository, controller: taskController,
     toolHost, threadStore, workspaceTrust, flows: flowService, nowIso, browserState: () => browserRuntime.state(), browserIdentity: () => browserRuntime.identityFingerprint(),
     validatePermission: (threadId, permissionId) => taskPermissionService.executionRestriction(threadId, permissionId) })
-  const publicQueryRecovery = new BrowserPublicQueryRecoveryService({repository:taskRepository,verification:browserVerification,nowIso,browserIdentity:()=>browserRuntime.identityFingerprint(),validatePlan:binding=>taskScheduleService!.validatePublicQueryRecoveryPlan(binding)})
+  const oneOffRecovery=new OneOffPublicQueryRecoveryService({repository:taskRepository,verification:browserVerification,nowIso,review:async(task,ceiling)=>{
+    const thread=await threadService.get(task.threadId),workspace=await workspaceTrust.get(task.workspaceRoot)
+    if(!thread||thread.status==='deleted'||workspace.canonicalRoot!==task.workspaceRoot||thread.workspace!==task.workspaceRoot)throw Object.assign(new Error('workspace_trust_changed'),{code:'workspace_trust_changed'})
+    const allowed=(name:string)=>[thread.agentProfile?.toolAllowlist,task.authority?.toolAllowlist].every(list=>!list?.length||list.includes('*')||list.includes(name))
+    const permissionScope=task.authority?.taskApprovalGrant?.scope
+    const catalog=toolHost.registeredTools().filter(t=>allowed(t.name)&&(!permissionScope?.providerIds||permissionScope.providerIds.includes(t.providerId)))
+    return browserRuntime.oneOffScopeReview(task,ceiling,operationFingerprint({workspace,agentRevision:thread.agentRevision,agent:thread.agentProfile,approvalPolicy:thread.approvalPolicy,sandboxMode:thread.sandboxMode,permissionScope}),catalog.map(t=>t.name),[...new Set(catalog.map(t=>t.providerId).filter((v):v is string=>Boolean(v)))],permissionScope?.networkOrigins)
+  }})
+  const publicQueryRecovery = new BrowserPublicQueryRecoveryService({oneOff:oneOffRecovery,repository:taskRepository,verification:browserVerification,nowIso,browserIdentity:()=>browserRuntime.identityFingerprint(),validatePlan:binding=>taskScheduleService!.validatePublicQueryRecoveryPlan(binding)})
   const operationVerification = new ExternalOperationVerificationService({ repository: taskRepository, controller: taskController,
     toolHost, threadStore, workspaceTrust, nowIso, refreshProvider: async (provider,originalGrant) => {
       if(provider==='lark')return larkRuntime.refresh()
@@ -808,6 +818,7 @@ export async function createKunServeRuntime(
     }
     const scheduledScope = task ? await taskScheduleService?.executionScope(task) : undefined
     const effective = { ...providerScope, connectorIdentityFingerprints: { ...mcpRuntime.state().authorityFingerprints, ...providerScope.connectorIdentityFingerprints }, allowedProviderIds, ...restriction, ...scheduledScope }
+    if(task?.publicQueryRecovery?.mode==='task_reauthorization')await oneOffRecovery.validateCurrent(task)
     return task ? recoveryExecutionScope(taskRepository,task,effective,Date.parse(nowIso())) : effective
   }
   loop = new AgentLoop({
@@ -895,7 +906,7 @@ export async function createKunServeRuntime(
   })
   const localWritePreflight = workspaceWritePreflight({ workspaceTrust, restriction: (threadId, sourceTaskId) => taskExecutionRestriction(threadId, undefined, sourceTaskId) })
   const externalPreflight: typeof connectorPreflight = async (text, thread, sourceTask) => await localWritePreflight(text, thread, sourceTask) ?? await connectorPreflight(text, thread, sourceTask)
-  const taskControlService=new TaskControlService({publicQueryRecovery,preflightRecoveryTask:(text,thread,binding)=>externalTaskIntent(text)?.kind==='external_task'?Promise.resolve(workspacePermissionCapability('public_query_recovery_read_only','重新检索仅允许公开查询与本机成果，不能执行外部业务写入。')):browserRuntime.preflight(text,thread,verifiedPublicQueryRecovery(taskRepository,binding,false)?.context.browserScope),validateRecoveryPermission:threadId=>taskPermissionService.executionRestriction(threadId),repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>{void browserRuntime.stopThread(threadId);return delegationRuntime?.abortParent(threadId,reason)},preflightExternalTask:externalPreflight,validateTaskPermission:(threadId,sourceTaskId)=>taskExecutionRestriction(threadId,undefined,sourceTaskId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),validateRetryLocalSchedule:(task,receipt,recovery)=>taskScheduleService?.validateRetryLocalSchedule(task,receipt,recovery) ?? Promise.resolve(false),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
+  const taskControlService=new TaskControlService({publicQueryRecovery,preflightRecoveryTask:(text,thread,binding)=>externalTaskIntent(text)?.kind==='external_task'?Promise.resolve(workspacePermissionCapability('public_query_recovery_read_only','重新检索仅允许公开查询与本机成果，不能执行外部业务写入。')):browserRuntime.preflight(text,thread,publicQueryRecovery.reviewedBrowserScope(binding),undefined,binding.mode==='task_reauthorization'?publicQueryRecovery.reviewedBrowserScope(binding):undefined),validateRecoveryPermission:threadId=>taskPermissionService.executionRestriction(threadId),repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>{void browserRuntime.stopThread(threadId);return delegationRuntime?.abortParent(threadId,reason)},preflightExternalTask:externalPreflight,validateTaskPermission:(threadId,sourceTaskId)=>taskExecutionRestriction(threadId,undefined,sourceTaskId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),validateRetryLocalSchedule:(task,receipt,recovery)=>taskScheduleService?.validateRetryLocalSchedule(task,receipt,recovery) ?? Promise.resolve(false),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
   const taskCoordinator = new TaskCoordinator({ preflightExternalTask:externalPreflight, controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore,
     async classifyIntent(text, task) {
       const abort = new AbortController()

@@ -1,3 +1,5 @@
+import { OneOffPublicQueryRecoveryService,type OneOffPrepare } from './one-off-public-query-recovery.js'
+import { oneOffChildBinding,verifiedOneOffRecovery } from './one-off-public-query-proof.js'
 import type { BrowserPublicQueryRecoveryBinding, BrowserPublicQueryRecoverySnapshot } from '../contracts/browser-public-query-recovery.js'
 import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
 import type { BrowserOperationVerificationService } from './browser-operation-verification.js'
@@ -9,11 +11,12 @@ const object = (v: unknown): Record<string, unknown> => v && typeof v === 'objec
 function fail(code:string):never { throw Object.assign(new Error(code),{code}) }
 export class BrowserPublicQueryRecoveryService {
   constructor(private readonly deps: { repository: TaskRunRepository; verification: BrowserOperationVerificationService; nowIso(): string;
-    browserIdentity(): string; validatePlan(binding: BrowserPublicQueryRecoveryBinding): Promise<void> }) {}
+    oneOff?:OneOffPublicQueryRecoveryService; browserIdentity(): string; validatePlan(binding: BrowserPublicQueryRecoveryBinding): Promise<void> }) {}
 
   async snapshot(taskId: string): Promise<BrowserPublicQueryRecoverySnapshot> {
     const task = this.deps.repository.get(taskId)
     if (!task) fail('not_found')
+    if(this.deps.oneOff&&(task.publicQueryRecovery?.mode==='task_reauthorization'||task.authority?.browserScope?.publicQueryAuthorization?.duration==='task'&&!task.acceptance.schedule&&!task.scheduledBy))return this.deps.oneOff.snapshot(task)
     try {
       const context = await this.context(task)
       const binding = task.publicQueryRecovery, saved = binding && verifiedPublicQueryRecovery(this.deps.repository, binding, false)
@@ -28,7 +31,9 @@ export class BrowserPublicQueryRecoveryService {
     }
   }
 
-  async prepare(taskId: string, input: { expectedRevision: number; idempotencyKey: string; confirmed?: boolean }) {
+  async prepare(taskId: string, input: OneOffPrepare) {
+    const candidate=this.deps.repository.get(taskId)
+    if(this.deps.oneOff&&(input.scopeConfirmation||candidate?.publicQueryRecovery?.mode==='task_reauthorization'||candidate?.authority?.browserScope?.publicQueryAuthorization?.duration==='task'&&!candidate.acceptance.schedule))return this.deps.oneOff.prepare(taskId,input)
     const repository = this.deps.repository, key = `public-query-recovery:${input.idempotencyKey}`
     const previous = repository.operation(taskId, key)
     if (previous) {
@@ -57,6 +62,7 @@ export class BrowserPublicQueryRecoveryService {
   }
 
   async forRetry(task: TaskRun, receiptId?: string) {
+    if(task.publicQueryRecovery?.mode==='task_reauthorization')return this.deps.oneOff?.forRetry(task,receiptId)??fail('browser_public_query_recovery_changed')
     if (!receiptId) {
       if(task.publicQueryRecovery&&verifiedPublicQueryRecovery(this.deps.repository,task.publicQueryRecovery)){
         await this.deps.validatePlan(task.publicQueryRecovery)
@@ -96,7 +102,7 @@ export class BrowserPublicQueryRecoveryService {
       child.goal!==source.goal||operationFingerprint(child.acceptance)!==operationFingerprint(source.acceptance)||operationFingerprint(child.scheduledBy)!==operationFingerprint(source.scheduledBy)||
       operationFingerprint(child.publicQueryRecovery)!==operationFingerprint(binding)||!repository.events(child.id).some(e=>e.kind==='task_retried'&&e.payload?.retryOfTaskId===source.id)||
       direct&&!repository.events(source.id).some(e=>e.kind==='public_query_context_abandoned'&&e.payload?.recoveryReceiptId===binding.receiptId))fail('browser_public_query_recovery_changed')
-    if(child.activeTurnId||!['queued','waiting_user'].includes(child.status)||repository.operations(child.id).length||repository.getLease(child.id)||
+    if(child.activeTurnId||!['queued','waiting_user'].includes(child.status)||repository.operations(child.id).some(r=>binding.mode!=='task_reauthorization'||!oneOffChildBinding(repository,child,binding,proof.context as import('./one-off-public-query-proof.js').OneOffContext)||r.id!==oneOffChildBinding(repository,child,binding,proof.context as import('./one-off-public-query-proof.js').OneOffContext)?.id)||repository.getLease(child.id)||
       repository.listShellSessions(child.id).length)fail('outcome_unknown')
     return repository.transact(()=>{
       const now=this.deps.nowIso()
@@ -107,6 +113,10 @@ export class BrowserPublicQueryRecoveryService {
       return waiting
     })
   }
+
+  issueOneOffChildScope(task:TaskRun,childId:string,binding:BrowserPublicQueryRecoveryBinding){return this.deps.oneOff?.issueChildScope(task,childId,binding)??fail('browser_public_query_recovery_changed')}
+  reviewedBrowserScope(binding:BrowserPublicQueryRecoveryBinding){return binding.mode==='task_reauthorization'?verifiedOneOffRecovery(this.deps.repository,binding,false)?.context.review.scope:verifiedPublicQueryRecovery(this.deps.repository,binding,false)?.context.browserScope}
+  revoke(task:TaskRun,input:Parameters<OneOffPublicQueryRecoveryService['revoke']>[1]){return this.deps.oneOff?.revoke(task,input)??fail('browser_public_query_recovery_changed')}
 
   consume(task: TaskRun, retry: TaskRun, binding: BrowserPublicQueryRecoveryBinding) {
     const repository = this.deps.repository, now = this.deps.nowIso(), key = `public-query-recovery-use:${binding.receiptId}`

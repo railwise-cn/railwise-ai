@@ -1,3 +1,5 @@
+import { settleUnstartedOneOffRetry } from './one-off-public-query-recovery.js'
+import { oneOffChildBinding } from './one-off-public-query-proof.js'
 import type { BrowserPublicQueryRecoveryBinding } from '../contracts/browser-public-query-recovery.js'
 import { verifiedPublicQueryRecovery } from './browser-public-query-recovery-proof.js'
 import { retryBrowserScope } from './browser-public-query-authority.js'
@@ -229,7 +231,7 @@ export class TaskController {
   }
 
   /** Prepare the retry contract before a Turn or model can run. The original ledger stays authoritative. */
-  createRetryTask(input: { id: string; sourceTaskId: string; expectedRevision: number; thread: ThreadRecord; request: StartTurnRequest; retryControl?: { ownerId: string; idempotencyKey: string }; publicQueryRecovery?: BrowserPublicQueryRecoveryBinding }): TaskRun {
+  createRetryTask(input: { id: string; sourceTaskId: string; expectedRevision: number; thread: ThreadRecord; request: StartTurnRequest; retryControl?: { ownerId: string; idempotencyKey: string }; publicQueryRecovery?: BrowserPublicQueryRecoveryBinding; oneOffBrowserScope?: import('../contracts/browser-skill.js').BrowserExecutionScope }): TaskRun {
     return this.repository.transact(() => {
       const existing = this.repository.get(input.id)
       if (existing) return existing
@@ -241,8 +243,9 @@ export class TaskController {
       const explicit = control?.kind === 'retry' && control.status === 'prepared' && (control.request?.expectedRevision === input.expectedRevision || input.publicQueryRecovery && control.request?.publicQueryRecoveryReceiptId === input.publicQueryRecovery.receiptId && Number(control.request?.expectedRevision) + 1 === input.expectedRevision)
       const recovery = input.publicQueryRecovery && verifiedPublicQueryRecovery(this.repository,input.publicQueryRecovery,input.publicQueryRecovery.ownerTaskId!==source.id)
       if(input.publicQueryRecovery&&!recovery)throw Object.assign(new Error('公开查询恢复凭据已变化。'),{code:'browser_public_query_recovery_changed'})
-      const browserScope = explicit && recovery ? structuredClone(recovery.context.browserScope) : explicit ? retryBrowserScope(this.repository, source) : undefined
+      const browserScope = explicit && recovery && input.publicQueryRecovery?.mode==='task_reauthorization' ? input.oneOffBrowserScope : explicit && recovery ? structuredClone(recovery.context.browserScope) : explicit ? retryBrowserScope(this.repository, source) : undefined
       const retry = this.createTask({ ...input, retrySource: source, retryBrowserScope: browserScope })
+      if(input.publicQueryRecovery?.mode==='task_reauthorization'&&(!recovery||!oneOffChildBinding(this.repository,retry,input.publicQueryRecovery,recovery.context as import('./one-off-public-query-proof.js').OneOffContext)))throw Object.assign(new Error('Fresh child browser binding is missing'),{code:'browser_public_query_recovery_changed'})
       if (retry.flowRunId && retry.flowId) this.repository.enqueueOutbox({
         id: `flow-task-retry:${retry.id}`, ownerId: retry.id, kind: 'flow_task_retry',
         payload: { sourceTaskId: source.id, taskId: retry.id, flowRunId: retry.flowRunId, flowId: retry.flowId }, createdAt: this.nowIso()
@@ -1612,6 +1615,9 @@ export class TaskController {
       const lease = this.repository.getLease(task.id)
       if (lastAttempt) this.repository.execution.finishOrphanedWork(lastAttempt.executionId, Math.min(Date.parse(now), Date.parse(lastAttempt.finishedAt ?? lease?.expiresAt ?? task.updatedAt)))
       this.settleUndispatched(task.id)
+      const oneOffWaiting=settleUnstartedOneOffRetry(this.repository,task,now)
+      if(oneOffWaiting)return oneOffWaiting
+      if(task.publicQueryRecovery?.mode==='task_reauthorization'&&!task.activeTurnId&&!lastAttempt)return this.repository.update(task.id,task.revision,current=>({...current,status:'waiting_user',waitingReason:'上次查询启动尚未核实，请检查原任务记录后继续。',updatedAt:now}),{key:`one-off-unstarted-blocked:${task.revision}`,kind:'task_waiting_user',createdAt:now})
       const unknownShell = this.repository.listShellSessions(task.id).some(session => ['running', 'starting', 'outcome_unknown'].includes(session.status))
       const unknown = this.repository.unsettledOperations(task.id)
       if (unknown.length || unknownShell) {

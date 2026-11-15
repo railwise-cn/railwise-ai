@@ -19,8 +19,8 @@ import { toolCanProveExternalEffect } from '../loop/turn-completion-guard.js'
 import { createHash } from 'node:crypto'
 import { taskPermissionFailure } from './task-permission-recovery.js'
 
-export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget' | 'revalidate_artifacts' | 'prepare_public_query_recovery'
-export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number; confirmed?:boolean; publicQueryRecoveryReceiptId?:string }
+export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget' | 'revalidate_artifacts' | 'prepare_public_query_recovery' | 'revoke_public_query_recovery'
+export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number; confirmed?:boolean; publicQueryRecoveryReceiptId?:string; scopeConfirmation?:import('../contracts/browser-public-query-recovery.js').OneOffScopeConfirmation; consentReceiptId?:string }
 export type TaskControlResult = { task:TaskRun; corrected?:boolean; completed?:boolean; reason?:string; turn?:StartTurnResponse; capability?:ExternalTaskCapability; attentionId?:string; receipt?:{userMessageItemId:string;resultMessageItemId:string} }
 
 /** One deterministic mutation path for chat commands and the task HTTP API. */
@@ -38,6 +38,7 @@ export class TaskControlService {
   private async execute(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const {repository,tasks,threads,turns,nowIso}=this.deps
     if (action === 'prepare_public_query_recovery') { if (!this.deps.publicQueryRecovery) throw new Error('recovery unavailable'); return this.deps.publicQueryRecovery.prepare(taskId, data) }
+    if(action==='revoke_public_query_recovery'){const task=repository.get(taskId);if(!task||!this.deps.publicQueryRecovery)throw new Error('recovery unavailable');return this.deps.publicQueryRecovery.revoke(task,data)}
     if (action === 'revalidate_artifacts') return tasks.revalidateLocalArtifacts(taskId, data)
     if (action === 'extend_budget') return repository.transact(() => {
       const previous = repository.operation(taskId, data.idempotencyKey)
@@ -173,7 +174,8 @@ export class TaskControlService {
         const retryId=`task_retry_${createHash('sha256').update(turnKey).digest('hex')}`
         current=repository.transact(()=>{
           if(recovery?.direct) current=repository.update(current!.id,current!.revision,value=>({...value,status:'failed',waitingReason:'原公开查询上下文无法核验，已保留未知记录；用户要求另次受限检索。',updatedAt:nowIso()}),{key:`public-query-recovery-terminal:${recovery.binding.receiptId}`,kind:'public_query_context_abandoned',payload:{recoveryReceiptId:recovery.binding.receiptId,unresolved:true}})
-          const retry=tasks.createRetryTask({id:retryId,sourceTaskId:current!.id,expectedRevision:current!.revision,thread,retryControl:{ownerId:taskId,idempotencyKey:data.idempotencyKey},...(recovery?{publicQueryRecovery:recovery.binding}:{}),
+          const oneOffBrowserScope=recovery?.binding.mode==='task_reauthorization'?this.deps.publicQueryRecovery!.issueOneOffChildScope(current!,retryId,recovery.binding):undefined
+          const retry=tasks.createRetryTask({id:retryId,...(oneOffBrowserScope?{oneOffBrowserScope}:{}),sourceTaskId:current!.id,expectedRevision:current!.revision,thread,retryControl:{ownerId:taskId,idempotencyKey:data.idempotencyKey},...(recovery?{publicQueryRecovery:recovery.binding}:{}),
             request:{prompt:current!.goal,model:data.model ?? current!.model,providerId:current!.providerId,reasoningEffort:current!.reasoningEffort}})
           if(recovery?.direct)this.deps.publicQueryRecovery!.consume(repository.get(recovery.context.taskId)!,retry,recovery.binding)
           return retry

@@ -304,3 +304,6 @@ export const RUNTIME_TASK_PUBLIC_QUERY_RECOVERY_TEMPLATE = '/v1/tasks/{id}/publi
 export const RUNTIME_TASK_PREPARE_PUBLIC_QUERY_RECOVERY_TEMPLATE = '/v1/tasks/{id}/prepare-public-query-recovery'
 export function runtimeTaskPublicQueryRecoveryPath(taskId:string):string{return `${runtimeTaskPath(taskId)}/public-query-recovery`}
 export function runtimeTaskPreparePublicQueryRecoveryPath(taskId:string):string{return `${runtimeTaskPath(taskId)}/prepare-public-query-recovery`}
+
+export const RUNTIME_TASK_REVOKE_PUBLIC_QUERY_RECOVERY_TEMPLATE='/v1/tasks/{id}/revoke-public-query-recovery'
+export function runtimeTaskRevokePublicQueryRecoveryPath(taskId:string):string{return `${runtimeTaskPath(taskId)}/revoke-public-query-recovery`}

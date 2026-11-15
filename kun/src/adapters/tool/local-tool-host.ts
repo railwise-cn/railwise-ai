@@ -136,6 +136,8 @@ export class LocalToolHost implements ToolHost {
     this.readTracker = new ReadTracker(normalizeReadTrackerOptions(options.readTracker))
   }
 
+  registeredTools() { return this.registry.registeredTools() }
+
   listTools(context?: ToolHostContext) {
     return Promise.resolve(this.registry.listTools(context))
   }

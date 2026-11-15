@@ -4815,5 +4815,18 @@
   "taskWorkspaceOriginalRequest": "Original request",
   "taskWorkspaceLocation": "Workspace",
   "taskWorkspaceStepProgress": "{{completed}} of {{total}} steps completed",
-  "taskWorkspaceRevalidateArtifacts": "Recheck existing output"
+  "taskWorkspaceRevalidateArtifacts": "Recheck existing output",
+  "taskPublicQueryRecoveryOneOffHint": "The old query result is still unknown and its record will be kept. Review the purpose, browser and sites below. This scope covers public queries and output for this task only, for up to 15 minutes.",
+  "taskPublicQueryRecoveryScopeActive": "This public query scope is still active. Use the task controls to continue, or revoke this scope.",
+  "taskPublicQueryRecoveryPurpose": "Purpose",
+  "taskPublicQueryRecoveryBrowser": "Browser",
+  "taskPublicQueryRecoveryScopeExpires": "Scope expires at",
+  "taskPublicQueryRecoveryConfirmScope": "I reviewed this scope and agree to a new search for this task only (up to 15 minutes).",
+  "taskPublicQueryRecoveryPrepareScope": "Confirm scope and prepare a new search",
+  "taskPublicQueryRecoveryOneOffPrepared": "The scope is confirmed. No new search has started. Choose Continue to observe the page in a fresh session; the old result remains unknown.",
+  "taskPublicQueryRecoveryRevoke": "Revoke this scope",
+  "taskPublicQueryRecoveryRevoked": "This scope was revoked. The old query result remains unknown.",
+  "taskPublicQueryRecoveryRevokeFailed": "The scope revocation could not be confirmed. Try again to check it.",
+  "taskNodeExecutionStopped": "Stopped",
+  "taskNodeExecutionNeedsReview": "Needs review"
 }

@@ -4815,5 +4815,18 @@
   "taskWorkspaceOriginalRequest": "原始要求",
   "taskWorkspaceLocation": "工作位置",
   "taskWorkspaceStepProgress": "{{completed}} / {{total}} 步已完成",
-  "taskWorkspaceRevalidateArtifacts": "重新检查成果"
+  "taskWorkspaceRevalidateArtifacts": "重新检查成果",
+  "taskPublicQueryRecoveryOneOffHint": "旧查询结果仍未知，原记录会保留。请核对本次用途、浏览器和网站；范围仅用于本次任务的公开查询与成果保存，最长15分钟。",
+  "taskPublicQueryRecoveryScopeActive": "本次公开查询范围仍有效。可通过原任务控件继续，也可以撤销本次范围。",
+  "taskPublicQueryRecoveryPurpose": "用途",
+  "taskPublicQueryRecoveryBrowser": "浏览器",
+  "taskPublicQueryRecoveryScopeExpires": "本次范围截止时间",
+  "taskPublicQueryRecoveryConfirmScope": "我已核对以上范围，同意仅为本次任务重新检索（最长15分钟）。",
+  "taskPublicQueryRecoveryPrepareScope": "确认范围并准备重新检索",
+  "taskPublicQueryRecoveryOneOffPrepared": "范围已确认，尚未开始重新检索。单独点击继续后，将使用全新会话重新观察页面；旧结果仍未知。",
+  "taskPublicQueryRecoveryRevoke": "撤销本次范围",
+  "taskPublicQueryRecoveryRevoked": "本次范围已撤销，原查询结果仍保持未知。",
+  "taskPublicQueryRecoveryRevokeFailed": "暂时无法确认范围是否撤销，请重试核对。",
+  "taskNodeExecutionStopped": "已停止",
+  "taskNodeExecutionNeedsReview": "待核验"
 }

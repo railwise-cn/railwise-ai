@@ -99,6 +99,21 @@ describe('production preload task API and main IPC contract', () => {
     await expect(api.prepareTaskPublicQueryRecovery('task-query/../other', request)).rejects.toThrow()
   })
 
+
+  it('passes explicit one-off scope consent and exact revocation through the production validator', async () => {
+    const scopeConfirmation = { reviewHash: 'a'.repeat(64), expectedBrowserRevision: 6, browserInstanceId: 'chrome-current', origins: ['https://public.example.test'], duration: 'task' as const, ttlSeconds: 900, confirmed: true as const }
+    const prepare = { expectedRevision: 3, idempotencyKey: 'fresh-scope', confirmed: true as const, scopeConfirmation }
+    await api.prepareTaskPublicQueryRecovery('task-query', prepare)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/prepare-public-query-recovery', method: 'POST', body: JSON.stringify(prepare) })
+    const revoke = { expectedRevision: 4, idempotencyKey: 'revoke-this-scope', confirmed: true as const, consentReceiptId: 'exact-consent' }
+    await api.revokeTaskPublicQueryRecovery('task-query', revoke)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/revoke-public-query-recovery', method: 'POST', body: JSON.stringify(revoke) })
+    await expect(api.revokeTaskPublicQueryRecovery('task-query/../other', revoke)).rejects.toThrow()
+    await expect(api.prepareTaskPublicQueryRecovery('task-query', { ...prepare, scopeConfirmation: { ...scopeConfirmation, ttlSeconds: 901 } })).rejects.toThrow()
+    await expect(api.prepareTaskPublicQueryRecovery('task-query', { ...prepare, scopeConfirmation: { ...scopeConfirmation, duration: 'schedule' } } as unknown as typeof prepare)).rejects.toThrow()
+    await expect(api.revokeTaskPublicQueryRecovery('task-query', { ...revoke, extraPermission: true } as typeof revoke)).rejects.toThrow()
+  })
+
   it('passes real chat/model and candidate review commands, and the aggregate task stream, through their typed boundaries', async () => {
     await api.coordinateTaskCommand({ threadId: 'origin_1', intent: 'auto', idempotencyKey: 'chat-1', request: {
       prompt: '根据资料形成报告', displayText: '形成报告', mode: 'agent', model: 'deepseek-flash', providerId: 'deepseek', reasoningEffort: 'high', attachmentIds: ['attachment_1'], workspaceReferences: [{ path: 'source.md', kind: 'file' }]

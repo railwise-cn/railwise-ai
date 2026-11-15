@@ -130,6 +130,45 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it.each([
+    ['stalled', 'taskNodeStatus_blocked'], ['paused', 'taskRunStatus_paused'], ['waiting_user', 'taskRunStatus_waiting_user'],
+    ['waiting_approval', 'taskRunStatus_waiting_approval'], ['queued', 'taskRunStatus_queued']
+  ] as const)('does not call a historical running step active when the execution task is %s', async (status, label) => {
+    tasks[0] = { ...tasks[0], status, nodes: [{ id: 'historical-running', taskId: tasks[0].id, kind: 'execute', title: 'Read public notices', status: 'running', dependsOn: [], attempt: 1, maxAttempts: 8, idempotencyKey: 'original-node', evidence: [], revision: 1 }] }
+    const originalNodes = JSON.stringify(tasks[0].nodes)
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) }); await settle()
+    const steps = container.querySelector('article ol')!
+    expect(steps.textContent).toContain(i18n.t(`common:${label}`))
+    expect(steps.textContent).not.toContain(i18n.t('common:taskNodeStatus_running'))
+    expect(JSON.stringify(tasks[0].nodes)).toBe(originalNodes)
+  })
+
+  it.each(['failed', 'cancelled'] as const)('shows stopped execution for a running node of a %s task, preserving completed and other nodes', async status => {
+    tasks[0] = { ...tasks[0], status, nodes: (['completed', 'running', 'pending', 'failed'] as const).map((nodeStatus, index) => ({ id: `history-${index}`, taskId: tasks[0].id, kind: 'execute', title: `Step ${index}`, status: nodeStatus, dependsOn: [], attempt: 1, maxAttempts: 8, idempotencyKey: `original-${index}`, evidence: [], revision: 1 })) }
+    const originalNodes = JSON.stringify(tasks[0].nodes)
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) }); await settle()
+    const rows = [...container.querySelectorAll('article ol > li')]
+    expect(rows.map(row => row.lastElementChild?.textContent)).toEqual([i18n.t('common:taskNodeStatus_completed'), 'Stopped', i18n.t('common:taskNodeStatus_pending'), i18n.t('common:taskNodeStatus_failed')])
+    expect(JSON.stringify(tasks[0].nodes)).toBe(originalNodes)
+    expect(taskGroupProgress(groupWorkspaceTasks(tasks)[0])).toEqual({ completed: 1, total: 4 })
+  })
+
+  it('marks a running step under a completed task for review without claiming step completion', async () => {
+    tasks[0] = { ...tasks[0], status: 'completed', nodes: [{ id: 'contradictory-running', taskId: tasks[0].id, kind: 'execute', title: 'Check source', status: 'running', dependsOn: [], attempt: 1, maxAttempts: 8, idempotencyKey: 'old-running', evidence: [], revision: 1 }] }
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) }); await settle()
+    const steps = container.querySelector('article ol')!
+    expect(steps.textContent).toContain('Needs review')
+    expect(steps.textContent).not.toContain(i18n.t('common:taskNodeStatus_completed'))
+    expect(tasks[0].nodes[0].status).toBe('running')
+    expect(taskGroupProgress(groupWorkspaceTasks(tasks)[0])).toEqual({ completed: 0, total: 1 })
+  })
+
+  it('keeps an actually running task step labelled running', async () => {
+    tasks[0] = { ...tasks[0], nodes: [{ id: 'active-node', taskId: tasks[0].id, kind: 'execute', title: 'Read source', status: 'running', dependsOn: [], attempt: 1, maxAttempts: 8, idempotencyKey: 'active', evidence: [], revision: 1 }] }
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) }); await settle()
+    expect(container.querySelector('article ol')?.textContent).toContain(i18n.t('common:taskNodeStatus_running'))
+  })
+
   it('renders the static delivery note as Markdown while preserving its completed disclosure', async () => {
     await import('../chat/StreamdownAssistant')
     tasks[0] = { ...tasks[0], status: 'completed', finalResponse: '## 交付清单\n\n**已经保存**\n\n- 已生成报告\n- 已核对单位 `毫米`' }

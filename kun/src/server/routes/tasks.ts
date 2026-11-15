@@ -1,3 +1,4 @@
+import { OneOffScopeConfirmationSchema } from '../../contracts/browser-public-query-recovery.js'
 import { BrowserTaskBindingConfirmation, BrowserOperationConfirmation } from '../../contracts/browser-skill.js'
 import { browserReceiptProjection } from '../../services/browser-operation-verification.js'
 import { hostShellReceiptProjection } from '../../services/host-shell-verification.js'
@@ -297,11 +298,13 @@ export async function getTaskPublicQueryRecovery(runtime:ServerRuntime,taskId:st
 export async function prepareTaskPublicQueryRecovery(runtime:ServerRuntime,taskId:string,request:Request):Promise<JsonResponse|Response> {
   return mutateTask(runtime,taskId,request,'prepare_public_query_recovery')
 }
+export async function revokeTaskPublicQueryRecovery(runtime:ServerRuntime,taskId:string,request:Request){return mutateTask(runtime,taskId,request,'revoke_public_query_recovery')}
+
 export async function revalidateTaskArtifacts(runtime: ServerRuntime, taskId: string, request: Request): Promise<JsonResponse | Response> {
   return mutateTask(runtime, taskId, request, 'revalidate_artifacts')
 }
 
-type Action = 'resume' | 'retry' | 'cancel' | 'pause' | 'extend_budget' | 'revalidate_artifacts' | 'prepare_public_query_recovery'
+type Action = 'resume' | 'retry' | 'cancel' | 'pause' | 'extend_budget' | 'revalidate_artifacts' | 'prepare_public_query_recovery' | 'revoke_public_query_recovery'
 async function mutateTask(runtime: ServerRuntime, taskId: string, request: Request, action: Action): Promise<JsonResponse | Response> {
   const repository = runtime.taskRepository
   const controller = runtime.taskController
@@ -309,7 +312,7 @@ async function mutateTask(runtime: ServerRuntime, taskId: string, request: Reque
   const body = await readJsonBody(request)
   if (!body.ok) return body.response
   const schema = action === 'extend_budget' ? TaskMutationRequest.omit({ model: true }).extend({ additionalExecutionMs: z.number().int().min(60_000).max(3_600_000) }).strict()
-    : (action === 'revalidate_artifacts'||action==='prepare_public_query_recovery') ? TaskMutationRequest.pick({ expectedRevision: true, idempotencyKey: true }).extend({ confirmed: z.literal(true) }).strict() : action==='retry' ? TaskMutationRequest.extend({publicQueryRecoveryReceiptId:z.string().min(1).max(256).optional()}).strict() : TaskMutationRequest
+    : action==='prepare_public_query_recovery' ? TaskMutationRequest.pick({expectedRevision:true,idempotencyKey:true}).extend({confirmed:z.literal(true),scopeConfirmation:OneOffScopeConfirmationSchema.optional()}).strict() : action==='revoke_public_query_recovery' ? TaskMutationRequest.pick({expectedRevision:true,idempotencyKey:true}).extend({confirmed:z.literal(true),consentReceiptId:z.string().min(1).max(256)}).strict() : action==='revalidate_artifacts' ? TaskMutationRequest.pick({ expectedRevision: true, idempotencyKey: true }).extend({ confirmed: z.literal(true) }).strict() : action==='retry' ? TaskMutationRequest.extend({publicQueryRecoveryReceiptId:z.string().min(1).max(256).optional()}).strict() : TaskMutationRequest
   const parsed = schema.safeParse(body.value)
   if (!parsed.success) return ERRORS.validation(`invalid task ${action} body`, parsed.error.issues)
   try {
@@ -320,7 +323,7 @@ async function mutateTask(runtime: ServerRuntime, taskId: string, request: Reque
     }
     const result=await controls.mutate(taskId,action,parsed.data)
     if (result.capability) await runtime.taskCoordinator?.flushCommandMessages()
-    return jsonResponse(action==='resume'||action==='retry'||action==='revalidate_artifacts'||action==='prepare_public_query_recovery'?result:result.task,action==='resume'||action==='retry'?202:200)
+    return jsonResponse(action==='resume'||action==='retry'||action==='revalidate_artifacts'||action==='prepare_public_query_recovery'||action==='revoke_public_query_recovery'?result:result.task,action==='resume'||action==='retry'?202:200)
   } catch(error) { return taskError(error) }
 }
 

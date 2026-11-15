@@ -128,9 +128,11 @@ export class BrowserOperationVerificationService {
   }
 
   /** Historical native public-query authority for NEW-context consent; no browser command or old-result resolution. */
-  async publicQueryRecoveryProof(taskId: string, receiptId: string, revision: number) {
-    const binding = await this.binding(taskId, receiptId, revision, false)
-    const scoped = verifiedTaskPublicQueryAction(this.deps.repository, binding.receipt, binding.dispatch)
+  async publicQueryRecoveryProof(taskId: string, receiptId: string, revision: number) { return this.recoveryProvenance(taskId,receiptId,revision,false) }
+  async oneOffRecoveryProvenance(taskId:string,receiptId:string,revision:number) { return this.recoveryProvenance(taskId,receiptId,revision,true) }
+  private async recoveryProvenance(taskId:string,receiptId:string,revision:number,historical:boolean) {
+    const binding = await this.binding(taskId, receiptId, revision, false, historical)
+    const scoped = verifiedTaskPublicQueryAction(this.deps.repository, binding.receipt, binding.dispatch, historical)
     const host = object(object(binding.receipt.result).item), output = object(host.output)
     if (!scoped || object(binding.receipt.result).approved!==true || host.toolName!==binding.receipt.request?.toolName || binding.receipt.fingerprint !== operationFingerprint(binding.receipt.request) ||
       binding.dispatch.fingerprint !== operationFingerprint(binding.dispatch.request) || binding.receipt.request?.providerId !== 'browser-skill' ||
@@ -157,7 +159,7 @@ export class BrowserOperationVerificationService {
     this.deps.repository.resolveOperation(receipt.ownerId, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, outcome, resolvedAt: this.deps.nowIso() })
   }
 
-  private async binding(taskId: string, receiptId: string, revision: number, requireAvailableSession = true) {
+  private async binding(taskId: string, receiptId: string, revision: number, requireAvailableSession = true, historical = false) {
     const repository = this.deps.repository
     const task = repository.get(taskId)
     if (!task) fail('not_found')
@@ -179,7 +181,7 @@ export class BrowserOperationVerificationService {
     const sourceId = original.browserScheduleBinding?.sourceTaskId ?? taskId
     const source = repository.get(sourceId)
     if (!source || source.authority?.revokedAt) fail('browser_review_authority_revoked')
-    const scopedAction = verifiedTaskPublicQueryAction(repository, receipt, dispatch)
+    const scopedAction = verifiedTaskPublicQueryAction(repository, receipt, dispatch, historical)
     if (!scopedAction && (request.authorizationSource === 'task_scope' || request.scopeActionReceiptId !== undefined || request.scopeAuthorizationReceiptId !== undefined)) fail('browser_review_public_query_scope_missing')
     let parsed: ReviewedBrowserAction
     if (scopedAction) {
@@ -219,7 +221,10 @@ export class BrowserOperationVerificationService {
           operationFingerprint(scope.browserScheduleActions) !== operationFingerprint(listApprovedBrowserScheduleActions(repository, source)) ||
           !Array.isArray(scope.browserScheduleActions) || !scope.browserScheduleActions.some(item => operationFingerprint(item) === operationFingerprint(parsed)))) fail('browser_review_plan_changed')
     }
-    await this.validate(task, original, parsed)
+    if (historical) {
+      const thread=await this.deps.threadStore.get(task.threadId)
+      if (!thread || thread.status==='deleted' || !thread.turns.some(turn=>turn.id===original.turnId&&operationFingerprint(turn.executionGrant)===operationFingerprint(original))) fail('execution_grant_revoked')
+    } else await this.validate(task, original, parsed)
     const session = repository.operations(taskId, 'browser_session').find(item => object(item.result).sessionId === request.sessionId)
     if (!session || session.status !== 'succeeded' || requireAvailableSession && object(session.result).stopped || object(session.result).tabId !== request.tabId ||
       object(session.result).browserInstanceId !== parsed.browserInstanceId) fail('browser_review_session_unavailable')

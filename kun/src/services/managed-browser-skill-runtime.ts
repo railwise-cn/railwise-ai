@@ -1,3 +1,6 @@
+import { ONE_OFF_TOOLS, ONE_OFF_PROVIDERS, type OneOffScopeReview } from '../contracts/browser-public-query-recovery.js'
+import { assertGrantAllowsNetwork } from '../adapters/tool/sandbox-policy.js'
+import type { ExecutionGrant } from '../contracts/permissions.js'
 import { retryBrowserScope } from './browser-public-query-authority.js'
 import type { TaskRun } from '../contracts/tasks.js'
 import { createHash } from 'node:crypto'
@@ -58,7 +61,7 @@ export class ManagedBrowserSkillRuntime {
     return this.currentProvider
   }
 
-  async preflight(text: string, thread?: ThreadRecord, scheduledBrowserScope?: BrowserExecutionScope, retrySource?: TaskRun): Promise<CapabilityPreflight | null> {
+  async preflight(text: string, thread?: ThreadRecord, scheduledBrowserScope?: BrowserExecutionScope, retrySource?: TaskRun, freshScope?: BrowserExecutionScope): Promise<CapabilityPreflight | null> {
     const storedSource = retrySource && this.options.repository.get(retrySource.id)
     const inheritedRetry = storedSource && thread && storedSource.threadId === thread.id && storedSource.workspaceRoot === thread.workspace && storedSource.revision === retrySource?.revision ? retryBrowserScope(this.options.repository, storedSource) : undefined
     const currentTask = thread ? this.options.repository.findActiveByThread(thread.id) : null
@@ -94,7 +97,7 @@ export class ManagedBrowserSkillRuntime {
       return { ...base, status: 'blocked', action, resolution: action, errorCode: 'browser_connection_unavailable',
         message: '当前浏览器连接未通过实时核验。请重新检查扩展和浏览器连接，然后继续原任务。' }
     }
-    const bound = currentTask?.authority?.browserScope ?? scheduledBrowserScope ?? inheritedRetry
+    const bound = freshScope ?? currentTask?.authority?.browserScope ?? scheduledBrowserScope ?? inheritedRetry
     const requiresNativeRead = bound?.publicQueryAuthorization || bound?.interaction === 'interact' && browserVerificationPolicy(bound.verificationPolicy) === 'public_query_target' || !bound && isPublicBrowserQuery(text)
     if (browserVerificationPolicy(bound?.verificationPolicy) === 'public_query_target' && !targetPolicySupported || requiresNativeRead && !nativeReadSupported) {
       const upgrade = { kind: 'install' as const, route: 'marketplace', label: '升级 CLI 并更新或重新连接扩展' }
@@ -139,6 +142,19 @@ export class ManagedBrowserSkillRuntime {
     return { networkAllowlist: origins, connectorScopes: [], externalTargets: [], ...(scope ? {
       browserScope: scope, connectorIdentityFingerprints: { 'browser-skill': this.configurationFingerprint }
     } : {}) }
+  }
+
+  /** A current scope review is not authority and does not modify an unknown old binding. */
+  oneOffScopeReview(task:TaskRun,ceiling:ExecutionGrant,environmentHash:string,tools:readonly string[],providers:readonly string[],networkOrigins?:string[]):OneOffScopeReview {
+    const config=this.config,browser=config.browsers.find(b=>b.id===config.browserInstanceId&&b.connected)
+    if(config.interaction!=='interact')throw new Error('browser_interaction_scope_required')
+    if(!config.enabled||config.state!=='ready'||!browser||!supportsBrowserNativeRead(config.version,config.daemonProtocolVersion,browser.protocolVersion))throw new Error('browser_connection_unavailable')
+    const origins=(task.authority?.browserScope?.origins??[]).filter(origin=>ceiling.browserScope?.origins.includes(origin)&&(!config.origins.length||config.origins.includes(origin))&&(()=>{try{assertGrantAllowsNetwork(origin,{executionGrant:ceiling});if(networkOrigins!==undefined)assertGrantAllowsNetwork(origin,{executionGrant:{networkAllowlist:networkOrigins} as ExecutionGrant});return true}catch{return false}})())
+    const allowedToolNames=ONE_OFF_TOOLS.filter(t=>ceiling.allowedToolNames?.includes(t)&&tools.includes(t)),allowedProviderIds=ONE_OFF_PROVIDERS.filter(p=>ceiling.allowedProviderIds?.includes(p)&&providers.includes(p))
+    if(!origins.length||!['browser_session_start','browser_observe','browser_navigate'].every(t=>allowedToolNames.includes(t))||!allowedProviderIds.includes('browser-skill'))throw new Error('execution_grant_scope')
+    const review={purpose:task.goal,browserLabel:browser.label||browser.name,browserIdentity:this.configurationFingerprint,environmentHash,
+      scope:{browserInstanceId:browser.id,revision:config.revision,origins,interaction:'interact' as const,verificationPolicy:'public_query_target' as const},allowedToolNames,allowedProviderIds,maxTtlSeconds:900 as const}
+    return {...review,reviewHash:operationFingerprint(review)}
   }
 
   bindingSnapshot(taskId: string): BrowserTaskBindingSnapshot {

@@ -20,7 +20,7 @@ let current: TaskRunV1
 let runtimeReady: boolean
 let disabled: boolean
 const api = {
-  getTaskPublicQueryRecovery: vi.fn(), prepareTaskPublicQueryRecovery: vi.fn(), retryTask: vi.fn(), resumeTask: vi.fn()
+  getTaskPublicQueryRecovery: vi.fn(), prepareTaskPublicQueryRecovery: vi.fn(), retryTask: vi.fn(), resumeTask: vi.fn(), revokeTaskPublicQueryRecovery: vi.fn()
 }
 const onChanged = vi.fn(async () => undefined)
 const onProjectionChange = vi.fn()
@@ -37,6 +37,7 @@ beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   await i18n.changeLanguage('en')
   vi.clearAllMocks()
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-16T04:00:00.000Z'))
   current = { ...original }
   runtimeReady = true
   disabled = false
@@ -44,6 +45,7 @@ beforeEach(async () => {
   api.prepareTaskPublicQueryRecovery.mockReset().mockResolvedValue({ task: { ...original, revision: 4 }, recovery: prepared, prepared: true, resumed: false })
   api.retryTask.mockReset().mockResolvedValue({ task: { ...original, id: 'new-query-attempt', revision: 0 } })
   api.resumeTask.mockReset()
+  api.revokeTaskPublicQueryRecovery.mockReset().mockResolvedValue({ task: { ...original, revision: 5 } })
   Object.defineProperty(window, 'workwise', { configurable: true, value: api })
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
 })
@@ -190,5 +192,178 @@ describe('TaskPublicQueryRecoveryCard', () => {
     expect(button()?.disabled).toBe(true)
     expect(container.textContent).not.toContain('receiptId')
     expect(container.textContent).not.toContain(original.id)
+  })
+})
+
+
+const oneOffReview: NonNullable<TaskPublicQueryRecoverySnapshotV1['scopeReview']> = {
+  reviewHash: 'a'.repeat(64), environmentHash: 'b'.repeat(64), purpose: 'Read the public engineering notices', browserLabel: 'Personal Chrome', browserIdentity: 'c'.repeat(64),
+  scope: { browserInstanceId: 'private-browser-instance', revision: 6, origins: ['https://public.example.test'], interaction: 'interact', verificationPolicy: 'public_query_target' },
+  allowedToolNames: ['browser_get_html', 'publish_artifact'], allowedProviderIds: ['browser-skill', 'managed-artifacts'], maxTtlSeconds: 900
+}
+const freshScope: TaskPublicQueryRecoverySnapshotV1 = { ...eligible, state: 'needs_scope_review', mode: 'task_reauthorization', scopeReview: oneOffReview }
+const freshPrepared: TaskPublicQueryRecoverySnapshotV1 = { ...prepared, mode: 'task_reauthorization', scopeReview: oneOffReview, consentReceiptId: 'private-consent-id', consentExpiresAt: '2026-11-16T04:15:00.000Z' }
+async function confirmScope(): Promise<void> {
+  const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]')
+  expect(checkbox).not.toBeNull()
+  await act(async () => checkbox!.click()); await settle()
+}
+function action(label: string): HTMLButtonElement | undefined { return [...container.querySelectorAll('button')].find(element => element.textContent === label) }
+
+describe('fresh one-off public query scope', () => {
+  it('refreshes an already expired projection without offering continue or mutating consent', async () => {
+    current.revision = freshPrepared.taskRevision
+    api.getTaskPublicQueryRecovery.mockResolvedValueOnce({ ...freshPrepared, consentExpiresAt: '2026-11-16T03:59:59.000Z' })
+      .mockResolvedValue({ ...freshScope, taskRevision: current.revision })
+    await render()
+    expect(api.getTaskPublicQueryRecovery).toHaveBeenCalledTimes(2)
+    expect(action('Continue the new search')).toBeUndefined()
+    expect(container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false)
+    expect(button()?.disabled).toBe(true)
+    expect(api.prepareTaskPublicQueryRecovery).not.toHaveBeenCalled()
+    expect(api.retryTask).not.toHaveBeenCalled()
+    expect(api.revokeTaskPublicQueryRecovery).not.toHaveBeenCalled()
+  })
+
+  it('refreshes once at absolute expiry and requires a new unchecked server review', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    let now = Date.parse('2026-11-16T04:00:00.000Z')
+    vi.mocked(Date.now).mockImplementation(() => now)
+    current.revision = freshPrepared.taskRevision
+    api.getTaskPublicQueryRecovery.mockResolvedValueOnce({ ...freshPrepared, consentExpiresAt: '2026-11-16T04:00:01.000Z' })
+      .mockResolvedValue({ ...freshScope, taskRevision: current.revision })
+    try {
+      await act(async () => root.render(createElement(TaskPublicQueryRecoveryCard, { task: current, runtimeReady, disabled, onChanged, onProjectionChange, onNotice })))
+      expect(action('Continue the new search')).toBeDefined()
+      now += 1001
+      await act(async () => { await vi.advanceTimersByTimeAsync(1001) })
+      expect(api.getTaskPublicQueryRecovery).toHaveBeenCalledTimes(2)
+      expect(action('Continue the new search')).toBeUndefined()
+      expect(container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false)
+      expect(button()?.disabled).toBe(true)
+      expect(api.prepareTaskPublicQueryRecovery).not.toHaveBeenCalled()
+      expect(api.retryTask).not.toHaveBeenCalled()
+      expect(api.revokeTaskPublicQueryRecovery).not.toHaveBeenCalled()
+    } finally { vi.useRealTimers() }
+  })
+
+  it.each([
+    { ...freshScope, scopeReview: undefined },
+    { ...freshScope, scopeReview: { ...oneOffReview, scope: { ...oneOffReview.scope, origins: [] } } },
+    { ...freshPrepared, consentReceiptId: undefined },
+    { ...freshPrepared, consentExpiresAt: undefined },
+    { ...freshPrepared, consentRevoked: true }
+  ])('offers no action for an incomplete or revoked one-off projection (%j)', async snapshot => {
+    current.revision = snapshot.taskRevision
+    api.getTaskPublicQueryRecovery.mockResolvedValue(snapshot)
+    await render()
+    expect(button()).toBeNull()
+    expect(api.prepareTaskPublicQueryRecovery).not.toHaveBeenCalled()
+    expect(api.retryTask).not.toHaveBeenCalled()
+    expect(api.revokeTaskPublicQueryRecovery).not.toHaveBeenCalled()
+  })
+
+  it('keeps checked consent through unrelated UI changes', async () => {
+    api.getTaskPublicQueryRecovery.mockResolvedValue(freshScope)
+    await render(); await confirmScope()
+    disabled = true; await render()
+    disabled = false; await render()
+    expect(container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true)
+    expect(button()?.disabled).toBe(false)
+    expect(api.getTaskPublicQueryRecovery).toHaveBeenCalledTimes(1)
+    expect(api.prepareTaskPublicQueryRecovery).not.toHaveBeenCalled()
+  })
+
+  it('resets checked consent on a changed browser identity even when the task revision is unchanged', async () => {
+    api.getTaskPublicQueryRecovery.mockResolvedValue(freshScope)
+    api.prepareTaskPublicQueryRecovery.mockRejectedValueOnce(Object.assign(new Error('identity changed'), { status: 409 }))
+    await render(); await confirmScope()
+    api.getTaskPublicQueryRecovery.mockResolvedValue({ ...freshScope, scopeReview: { ...oneOffReview, scope: { ...oneOffReview.scope, browserInstanceId: 'new-private-browser', revision: 7 } } })
+    await click()
+    expect(container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false)
+    expect(button()?.disabled).toBe(true)
+    expect(api.prepareTaskPublicQueryRecovery).toHaveBeenCalledTimes(1)
+    expect(api.retryTask).not.toHaveBeenCalled()
+  })
+
+  it('requires fresh scope consent and keeps prepare separate from continue', async () => {
+    api.getTaskPublicQueryRecovery.mockResolvedValue(freshScope)
+    api.prepareTaskPublicQueryRecovery.mockResolvedValue({ task: { ...original, revision: 4 }, recovery: freshPrepared, prepared: true, resumed: false })
+    await render()
+    expect(container.textContent).toContain(oneOffReview.purpose)
+    expect(container.textContent).toContain(oneOffReview.browserLabel)
+    expect(container.textContent).toContain('https://public.example.test')
+    expect(button()?.disabled).toBe(true)
+    await click(); expect(api.prepareTaskPublicQueryRecovery).not.toHaveBeenCalled()
+    await confirmScope(); await click()
+    expect(api.prepareTaskPublicQueryRecovery).toHaveBeenCalledExactlyOnceWith(original.id, expect.objectContaining({ expectedRevision: 3, confirmed: true, scopeConfirmation: {
+      reviewHash: oneOffReview.reviewHash, expectedBrowserRevision: 6, browserInstanceId: oneOffReview.scope.browserInstanceId, origins: oneOffReview.scope.origins, duration: 'task', ttlSeconds: 900, confirmed: true
+    } }))
+    expect(api.retryTask).not.toHaveBeenCalled()
+    expect(container.querySelector('time')?.dateTime).toBe(freshPrepared.consentExpiresAt)
+    expect(container.textContent).not.toContain('private-consent-id')
+    expect(container.textContent).not.toContain('private-browser-instance')
+    expect(container.textContent).not.toContain(oneOffReview.reviewHash)
+    await act(async () => action('Continue the new search')!.click()); await settle()
+    expect(api.retryTask).toHaveBeenCalledExactlyOnceWith(original.id, expect.objectContaining({ expectedRevision: 4, publicQueryRecoveryReceiptId: prepared.receiptId }))
+  })
+
+  it('resets the checkbox when the reviewed task/revision/range changes', async () => {
+    api.getTaskPublicQueryRecovery.mockResolvedValue(freshScope)
+    await render(); await confirmScope(); expect(button()?.disabled).toBe(false)
+    current = { ...current, revision: 4 }
+    api.getTaskPublicQueryRecovery.mockResolvedValue({ ...freshScope, taskRevision: 4, scopeReview: { ...oneOffReview, reviewHash: 'd'.repeat(64), scope: { ...oneOffReview.scope, origins: ['https://changed.example.test'] } } })
+    await render()
+    expect(container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false)
+    expect(button()?.disabled).toBe(true)
+    expect(container.textContent).not.toContain('https://public.example.test')
+    expect(container.textContent).toContain('https://changed.example.test')
+    expect(api.prepareTaskPublicQueryRecovery).not.toHaveBeenCalled()
+  })
+
+  it('reuses the same explicit consent and idempotency key after transport uncertainty', async () => {
+    api.getTaskPublicQueryRecovery.mockResolvedValue(freshScope)
+    api.prepareTaskPublicQueryRecovery.mockRejectedValueOnce(new Error('private transport details'))
+    api.prepareTaskPublicQueryRecovery.mockResolvedValueOnce({ task: { ...original, revision: 4 }, recovery: freshPrepared, prepared: true, resumed: false })
+    await render(); await confirmScope(); await click(); await click()
+    expect(api.prepareTaskPublicQueryRecovery.mock.calls[0][1]).toEqual(api.prepareTaskPublicQueryRecovery.mock.calls[1][1])
+    expect(api.retryTask).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain('private transport details')
+  })
+
+  it('uses the server active-scope projection for revoke without offering prepare/continue', async () => {
+    api.getTaskPublicQueryRecovery.mockResolvedValue({ ...freshPrepared, taskRevision: 3, state: 'unavailable', reason: 'browser_public_query_current_scope_active', unknownOperationCount: 0 })
+    await render()
+    expect(action('Prepare a new search')).toBeUndefined()
+    expect(action('Continue the new search')).toBeUndefined()
+    const revoke = action('Revoke this scope'); expect(revoke).toBeDefined()
+    api.revokeTaskPublicQueryRecovery.mockRejectedValueOnce(new Error('transport uncertainty'))
+    await act(async () => revoke!.click()); await settle()
+    await act(async () => action('Revoke this scope')!.click()); await settle()
+    expect(api.revokeTaskPublicQueryRecovery.mock.calls[0][1]).toEqual(api.revokeTaskPublicQueryRecovery.mock.calls[1][1])
+    expect(api.revokeTaskPublicQueryRecovery).toHaveBeenCalledWith(original.id, expect.objectContaining({ expectedRevision: 3, confirmed: true, consentReceiptId: freshPrepared.consentReceiptId }))
+    expect(api.retryTask).not.toHaveBeenCalled(); expect(api.prepareTaskPublicQueryRecovery).not.toHaveBeenCalled()
+    expect(onChanged).toHaveBeenCalled()
+  })
+
+  it('never continues an expired/revoked server projection without a new checked review', async () => {
+    api.getTaskPublicQueryRecovery.mockResolvedValue({ ...freshScope, consentExpiresAt: '2026-01-01T00:00:00.000Z', consentRevoked: true, consentReceiptId: 'old-private-consent' })
+    await render()
+    expect(button()?.disabled).toBe(true)
+    expect(action('Continue the new search')).toBeUndefined()
+    expect(action('Revoke this scope')).toBeUndefined()
+    expect(container.textContent).not.toContain('old-private-consent')
+    expect(api.retryTask).not.toHaveBeenCalled()
+  })
+
+  it('does not reuse checked consent after a stale server review conflict', async () => {
+    api.getTaskPublicQueryRecovery.mockResolvedValue(freshScope)
+    api.prepareTaskPublicQueryRecovery.mockRejectedValueOnce(Object.assign(new Error('changed browser revision'), { status: 409 }))
+    await render(); await confirmScope()
+    api.getTaskPublicQueryRecovery.mockResolvedValue({ ...freshScope, scopeReview: { ...oneOffReview, reviewHash: 'f'.repeat(64) } })
+    await click()
+    expect(container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false)
+    expect(button()?.disabled).toBe(true)
+    expect(api.retryTask).not.toHaveBeenCalled()
   })
 })

@@ -1,3 +1,4 @@
+import { OneOffScopeConfirmationSchema } from '../../../kun/src/contracts/browser-public-query-recovery'
 import { SurveyQualityAssessmentPlanCreateV1, SurveyQualityAssessmentCreateV1, SurveyQualityAssessmentReverifyV1, QUALITY_ASSESSMENT_LIMITS, parseAssessmentJson } from '../../shared/survey-quality-assessment'
 import { SurveyQualityScoringCreateV1, SurveyQualityScoringReverifyRequestV1, SURVEY_QUALITY_SCORING_WORKSPACE_LIMITS, SurveyQualityScoringInputV1, parseQualityScoringJson } from '../../shared/survey-quality-scoring'
 import { SurveySamplingPopulationCreateV1, SurveySamplingRunCreateV1, SurveySamplingVerifyRequestV1, SURVEY_SAMPLING_WORKSPACE_LIMITS } from '../../shared/survey-quality-sampling-workspace'
@@ -32,6 +33,7 @@ import {
   RUNTIME_TASKS_TEMPLATE,
   RUNTIME_TASK_TEMPLATE,
   RUNTIME_TASK_REVALIDATE_ARTIFACTS_TEMPLATE,
+  RUNTIME_TASK_REVOKE_PUBLIC_QUERY_RECOVERY_TEMPLATE,
   RUNTIME_TASK_PUBLIC_QUERY_RECOVERY_TEMPLATE,
   RUNTIME_TASK_PREPARE_PUBLIC_QUERY_RECOVERY_TEMPLATE,
   RUNTIME_TASK_BUDGET_TEMPLATE,
@@ -309,6 +311,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint('/v1/task-commands', ['POST'], []),
   compileEndpoint(RUNTIME_TASK_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TASK_REVALIDATE_ARTIFACTS_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_TASK_REVOKE_PUBLIC_QUERY_RECOVERY_TEMPLATE,['POST']),
   compileEndpoint(RUNTIME_TASK_PUBLIC_QUERY_RECOVERY_TEMPLATE,['GET']),
   compileEndpoint(RUNTIME_TASK_PREPARE_PUBLIC_QUERY_RECOVERY_TEMPLATE,['POST']),
   compileEndpoint(RUNTIME_TASK_BUDGET_TEMPLATE, ['POST']),
@@ -465,11 +468,11 @@ export const runtimeRequestPayloadSchema = z
           && (limit === null || (/^[1-9]\d*$/.test(limit) && Number(limit) <= 200))))
       if (!valid) context.addIssue({ code: 'custom', message: 'invalid task list request' })
     }
-    const recovery=/^\/v1\/tasks\/([^/]+)\/(prepare-public-query-recovery|public-query-recovery)$/.exec(url.pathname)
+    const recovery=/^\/v1\/tasks\/([^/]+)\/(prepare-public-query-recovery|public-query-recovery|revoke-public-query-recovery)$/.exec(url.pathname)
     if(recovery){
       let valid=payload.path===url.pathname&&url.origin==='http://localhost'
       try{const id=decodeURIComponent(recovery[1]);valid&&=!!id.trim()&&!/[/\\?#%\s]/u.test(id)&&!id.includes('\0')&&!['.','..'].includes(id)
-        valid&&=recovery[2]==='public-query-recovery'?(payload.method??'GET')==='GET'&&payload.body===undefined:payload.method==='POST'&&!!payload.body&&z.object({expectedRevision:z.number().int().nonnegative(),idempotencyKey:z.string().trim().min(1).max(256),confirmed:z.literal(true)}).strict().safeParse(JSON.parse(payload.body)).success
+        valid&&=recovery[2]==='public-query-recovery'?(payload.method??'GET')==='GET'&&payload.body===undefined:payload.method==='POST'&&!!payload.body&&(recovery[2]==='revoke-public-query-recovery'?z.object({expectedRevision:z.number().int().nonnegative(),idempotencyKey:z.string().trim().min(1).max(256),confirmed:z.literal(true),consentReceiptId:z.string().min(1).max(256)}).strict():z.object({expectedRevision:z.number().int().nonnegative(),idempotencyKey:z.string().trim().min(1).max(256),confirmed:z.literal(true),scopeConfirmation:OneOffScopeConfirmationSchema.optional()}).strict()).safeParse(JSON.parse(payload.body)).success
       }catch{valid=false}
       if(!valid)context.addIssue({code:'custom',message:'invalid public query recovery'})
     }

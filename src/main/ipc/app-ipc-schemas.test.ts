@@ -46,6 +46,19 @@ describe('app-ipc-schemas', () => {
     ])expect(runtimeRequestPayloadSchema.safeParse(request).success,JSON.stringify(request)).toBe(false)
   })
 
+  it('requires exact fresh scope confirmation and separates consent revocation from continuation',()=>{
+    const scopeConfirmation={reviewHash:'a'.repeat(64),expectedBrowserRevision:3,browserInstanceId:'current-browser',origins:['https://public.test'],duration:'task',ttlSeconds:900,confirmed:true}
+    const path='/v1/tasks/once/prepare-public-query-recovery',base={expectedRevision:4,idempotencyKey:'fresh-consent',confirmed:true}
+    const parse=(path:string,body:unknown)=>runtimeRequestPayloadSchema.safeParse({path,method:'POST',body:JSON.stringify(body)}).success
+    expect(parse(path,{...base,scopeConfirmation})).toBe(true)
+    for(const changed of [{ttlSeconds:901},{duration:'schedule'},{confirmed:false},{reviewHash:'bad'},{expiresAt:'2099-01-01T00:00:00Z'},{taskId:'another'}])expect(parse(path,{...base,scopeConfirmation:{...scopeConfirmation,...changed}})).toBe(false)
+    const revoke='/v1/tasks/once/revoke-public-query-recovery'
+    expect(parse(revoke,{...base,consentReceiptId:'fresh-receipt'})).toBe(true)
+    expect(parse(revoke,base)).toBe(false)
+    expect(parse(revoke,{...base,consentReceiptId:'fresh-receipt',resume:true})).toBe(false)
+    expect(parse(revoke+'?force=1',{...base,consentReceiptId:'fresh-receipt'})).toBe(false)
+  })
+
   it('only permits explicitly confirmed, scoped artifact revalidation through the existing task bridge', () => {
     const path = '/v1/tasks/task-1/revalidate-artifacts'
     const body = { expectedRevision: 3, idempotencyKey: 'check-existing', confirmed: true }
