@@ -609,6 +609,28 @@ test('the model fixture reads exact published artifact bytes before scheduling o
   } finally { await fixture.close() }
 })
 
+test('the model fixture stops on the real failed prerequisite and records only its safe native diagnostics', async () => {
+  const fixture = await startWindowsTaskModelFixture({ browser: true, documentLinkClick: true })
+  try {
+    const output = { provider: 'browser-skill', status: 'failed', code: 'browser_action_not_dispatched', vendorCode: 'precondition_failed',
+      vendorReason: 'cooperation_sync_required', vendorPhase: 'precondition', effectState: 'none', vendorPressSent: false, vendorDispatched: false,
+      notDispatched: true, actionDispatch: 'not_sent', stage: 'action', html: 'private page text', stderr: 'private command and credentials', token: 'private-key' }
+    const response = await fixtureRequest(fixture, browserToolNames, fixtureMessages('click', 'browser_click', output))
+    assert.equal(response.status, 200)
+    const stream = await response.text()
+    assert.doesNotMatch(stream, /tool_calls|private page|private command|private-key/)
+    assert.match(stream, /browser_action_not_dispatched/)
+    assert.equal(fixture.observed.failure.callId, 'smoke-click')
+    assert.equal(fixture.observed.failure.toolName, 'browser_click')
+    assert.equal(fixture.observed.failure.code, output.code)
+    assert.deepEqual(fixture.observed.failure.nativeDiagnostics, { vendorCode: 'precondition_failed', vendorReason: 'cooperation_sync_required', vendorPhase: 'precondition',
+      effectState: 'none', actionDispatch: 'not_sent', stage: 'action', vendorPressSent: false, vendorDispatched: false, notDispatched: true })
+    assert.equal(fixture.observed.requests.at(-1).next, 'halt-on-tool-failure')
+    assert.deepEqual(fixture.observed.requests.at(-1).prerequisiteFailure, fixture.observed.failure)
+    assert.doesNotMatch(JSON.stringify(fixture.observed), /private page|private command|private-key/)
+  } finally { await fixture.close() }
+})
+
 test('the Windows controlled page requires real shared-class candidate and nested generic-input proof', async () => {
   const { Window } = await import('happy-dom')
   const window = new Window(), fixture = await startWindowsTaskModelFixture({ browser: true })
@@ -1485,6 +1507,24 @@ test('failed task evidence retains status and codes without exporting prompts, a
   assert.equal(providerFailure.spans[0].errorMessage, 'TypeError: CLI child closed')
   assert.doesNotMatch(JSON.stringify(providerFailure), /private|Authorization|headers|body/)
   assert.deepEqual(providerFailure.operations[0].request, {})
+})
+
+test('failure diagnostics retain exact native scalar proof from both Host output and dispatch result without exporting other fields', () => {
+  const diagnostics = { vendorCode: 'precondition_failed', vendorReason: 'context_stale', vendorPhase: 'preparation', vendorFailureKind: 'context_stale',
+    effectState: 'none', vendorPressSent: false, vendorDispatched: false, notDispatched: true, actionDispatch: 'not_sent', stage: 'action',
+    actionAcknowledged: false, readbackPending: false, outcomeUnknown: false, refreshAttempted: true, refreshExhausted: true }
+  const output = { ...diagnostics, provider: 'browser-skill', status: 'failed', code: 'browser_action_not_dispatched', html: 'private html', arguments: 'private arguments', stderr: 'private stderr', token: 'private-key', surprise: true }
+  const report = summarizeWindowsTaskFailure({}, { turns: [{ items: [{ kind: 'tool_result', toolName: 'browser_click', callId: 'call', isError: true, output }] }] }, [],
+    [{ id: 'dispatch', kind: 'browser_action_dispatch', result: { ...output, item: { output } } }])
+  assert.deepEqual(report.turns[0].toolResults[0].nativeDiagnostics, diagnostics)
+  assert.deepEqual(report.operations[0].result.nativeDiagnostics, diagnostics)
+  assert.deepEqual(report.operations[0].result.outputNativeDiagnostics, diagnostics)
+  const separate = summarizeWindowsTaskFailure({}, {}, [], [{ result: { vendorPhase: 'preparation', item: { output: { vendorPhase: 'precondition' } } } }])
+  assert.equal(separate.operations[0].result.nativeDiagnostics.vendorPhase, 'preparation')
+  assert.equal(separate.operations[0].result.outputNativeDiagnostics.vendorPhase, 'precondition')
+  assert.doesNotMatch(JSON.stringify(report), /private|html|arguments|stderr|token|surprise/)
+  const malicious = summarizeWindowsTaskFailure({}, { turns: [{ items: [{ kind: 'tool_result', output: { vendorReason: 'https:\/\/private.test/path', stage: 'curl command', vendorDispatched: 'false', notDispatched: { secret: 'private-key' }, effectState: 'unverified_page_text' } }] }] })
+  assert.deepEqual(malicious.turns[0].toolResults[0].nativeDiagnostics, {})
 })
 
 test('failure collection reads each due task and its own thread even when external receipt projection is empty or unavailable', async () => {
