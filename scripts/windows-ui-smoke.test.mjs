@@ -13,6 +13,38 @@ import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyIn
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact } from './run-windows-ui-smoke.mjs'
+import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
+
+test('composer menu geometry uses actual viewport rectangles at both supported font scales', () => {
+  const actual = { coordinateUnit: 'viewport-css-px', side: 'top', menuCount: 1, itemCount: 3, hitTest: true,
+    viewport: { left: 0, top: 0, width: 960, height: 640 },
+    anchor: { left: 450, top: 580, right: 650, bottom: 616, width: 200, height: 36 },
+    menu: { left: 550, top: 272, right: 850, bottom: 572, width: 300, height: 300 } }
+  for (const bodyZoom of [0.9, 1.1]) assert.equal(validateWindowsComposerMenuGeometry({ ...actual, bodyZoom }), true)
+  const scenario = (font, bodyZoom) => ({ font, agent: { ...actual, bodyZoom, escapeFocusRestored: true }, model: { ...actual, bodyZoom, escapeFocusRestored: true } })
+  const evidence = { status: 'passed', input: 'renderer-cdp-real-input', resizeMethod: 'verified-pid-native-window', scenarios: [scenario('small', 0.9), { ...scenario('large', 1.1), navigation: { modal: true, mainInert: true, width: 280, viewportWidth: 960 } }] }
+  assert.equal(validateWindowsAdaptiveWorkbenchEvidence(evidence), true)
+  assert.throws(() => validateWindowsAdaptiveWorkbenchEvidence(undefined))
+  assert.throws(() => validateWindowsAdaptiveWorkbenchEvidence({ ...evidence, status: 'not_executed' }))
+  assert.throws(() => validateWindowsAdaptiveWorkbenchEvidence({ ...evidence, scenarios: [evidence.scenarios[0]] }))
+  assert.throws(() => validateWindowsAdaptiveWorkbenchEvidence({ ...evidence, scenarios: [evidence.scenarios[0], { ...evidence.scenarios[1], navigation: { modal: true, mainInert: false, width: 280, viewportWidth: 960 } }] }))
+  assert.throws(() => validateWindowsComposerMenuGeometry({ ...actual, menu: { ...actual.menu, left: 5, right: 305 } }), /real composer trigger/)
+  assert.throws(() => validateWindowsComposerMenuGeometry({ ...actual, menu: { ...actual.menu, top: -8 } }), /visual viewport/)
+  assert.throws(() => validateWindowsComposerMenuGeometry({ ...actual, hitTest: false }), /pointer input/)
+  assert.throws(() => validateWindowsComposerMenuGeometry({ ...actual, menuCount: 2 }), /One composer menu/)
+})
+
+test('installed UI probes select the actual controlled menu and constrain native resizing to an owned numeric PID', () => {
+  assert.match(windowsComposerMenuExpression('模型与推理设置'), /getBoundingClientRect/)
+  assert.match(windowsComposerMenuExpression('切换智能体'), /getElementById/)
+  assert.throws(() => windowsOwnedWindowScript('7; other-command'), /assertion|expression|false/i)
+  assert.throws(() => windowsOwnedWindowScript(7, { left: 0, top: 0, width: 1, height: 680 }))
+  const script = windowsOwnedWindowScript(7, { left: 0, top: 0, width: 960, height: 680, windowState: 'normal' })
+  assert.match(script, /GetWindowThreadProcessId/)
+  assert.match(script, /windowOwnerId -ne 7/)
+  assert.match(script, /SetWindowPos/)
+  assert.doesNotMatch(script, /MainModule|runtimeRequest|Invoke-Expression|Start-Process/)
+})
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
 // Validator input only; these synthetic projections are never acceptance receipts.
@@ -392,7 +424,7 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   assert.match(ui, /document\.activeElement\?\.matches\('input\[aria-label="搜索帮助"\]'\)/)
   assert.match(ui, /'the typed search query'/)
   assert.ok(ui.indexOf("text: '版本更新'") < ui.indexOf("'1.4 现有界面截图'"))
-  const leaveHelp = ui.indexOf("cdp.click('.ds-settings-sidebar button', '返回')")
+  const leaveHelp = ui.indexOf("cdp.click('.ds-settings-sidebar button', '返回')", ui.indexOf("report.checks.push('offline-help-images')"))
   assert.ok(leaveHelp > ui.indexOf("report.checks.push('offline-help-images')"))
   assert.ok(leaveHelp < ui.indexOf("'the main workspace after leaving help'"))
   assert.ok(ui.indexOf("'the main workspace after leaving help'") < ui.indexOf("cdp.click('.ds-sidebar-shell button.w-full', '新建会话')"))

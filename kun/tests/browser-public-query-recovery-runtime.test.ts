@@ -16,6 +16,7 @@ import { buildRouter } from '../src/server/routes/index.js'
 import { dispatchRequest } from '../src/server/http-server.js'
 import { ManagedBrowserSkillRuntime } from '../src/services/managed-browser-skill-runtime.js'
 import { operationFingerprint } from '../src/services/task-run-repository.js'
+import { RuntimeEventRecorder } from '../src/services/runtime-event-recorder.js'
 // @ts-expect-error The exact-package smoke driver is deliberately native JavaScript.
 import { startWindowsTaskModelFixture, windowsTaskPrompt, inspectWindowsPersistedWebArtifact, inspectWindowsDocumentNavigation } from '../../scripts/run-windows-ui-smoke.mjs'
 
@@ -101,6 +102,19 @@ async function recoveryScenario(sourceProviderFailure: boolean): Promise<void> {
   let count = 0
   cleanup.push(async () => { for (const window of windows) await window.happyDOM.close() })
   const nativeTrace: Array<{ argv: string[]; state: string; code?: string }> = []
+  // Hold the genuine async event boundary after Task becomes stalled but
+  // before the original Turn is durably terminal. No Runtime row is edited.
+  let releaseUnknownTurn: (() => void) | undefined
+  let heldUnknownTurn: { threadId: string; turnId: string } | undefined
+  const unknownTurnBarrier = new Promise<void>(resolve => { releaseUnknownTurn = resolve })
+  const originalRecord = RuntimeEventRecorder.prototype.record
+  if (sourceProviderFailure) vi.spyOn(RuntimeEventRecorder.prototype, 'record').mockImplementation(async function (this: RuntimeEventRecorder, draft) {
+    if (!heldUnknownTurn && draft.kind === 'error' && draft.code === 'outcome_unknown' && draft.turnId) {
+      heldUnknownTurn = { threadId: draft.threadId, turnId: draft.turnId }
+      await unknownTurnBarrier
+    }
+    return originalRecord.call(this, draft)
+  })
   const protocolRunner: BrowserCommandRunner = async (_configuration, args) => {
     if (args[0] === 'status') return { ok: true, output: { protocol_version: '1.9', pid: 7,
       browsers: [{ instance_id: 'synthetic-browser', browser_name: 'Chrome', extension_version: '0.5.0', extension_protocol_version: '1.9' }],
@@ -207,6 +221,7 @@ async function recoveryScenario(sourceProviderFailure: boolean): Promise<void> {
       version: '0.5.0', daemonProtocolVersion: '1.9', browserInstanceId: 'synthetic-browser', origins: [new URL(fixture.fixtureUrl).origin], interaction: 'interact', revision: 1,
       browsers: [{ id: 'synthetic-browser', name: 'Chrome', label: 'Controlled protocol fixture', connected: true, versionSkew: false, extensionVersion: '0.5.0', protocolVersion: '1.9' }] } }) })
   cleanup.push(async () => runtime.shutdown?.())
+  cleanup.push(async () => { releaseUnknownTurn?.() })
   const repository = runtime.taskRepository!, router = buildRouter(runtime)
   const api = (path: string, method = 'POST', body?: unknown) => dispatchRequest(router, new Request('http://localhost' + path,
     { method, headers: { authorization: 'Bearer synthetic-windows-web', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) }))
@@ -336,6 +351,29 @@ async function recoveryScenario(sourceProviderFailure: boolean): Promise<void> {
   expect((await duplicatePrepare.json() as Prepared).recovery.receiptId).toBe(prepared.recovery.receiptId)
   expect(repository.operations(dueId, 'browser_public_query_recovery')).toHaveLength(1)
   unchangedUnknowns()
+  if (sourceProviderFailure) {
+    expect(heldUnknownTurn).toEqual({ threadId: beforePrepare.threadId, turnId: beforePrepare.activeTurnId })
+    const settlingThread = (await runtime.threadService.get(beforePrepare.threadId))!
+    expect(settlingThread.turns.find(turn => turn.id === heldUnknownTurn!.turnId)?.status).toBe('running')
+    const durableState = () => JSON.stringify({ tasks: repository.list(), sourceOperations: repository.operations(sourceId), dueOperations: repository.operations(dueId), attention: repository.attention(`unknown_${dueId}`) })
+    const beforeBusy = durableState(), beforeBusyModelCalls = fixture.observed.requests.length
+    try {
+      const busyResponse = await api(`/v1/tasks/${dueId}/retry`, 'POST', { expectedRevision: prepared.task.revision, idempotencyKey: 'continue-new-query', publicQueryRecoveryReceiptId: prepared.recovery.receiptId })
+      const busyBody = await busyResponse.json(), afterBusy = durableState()
+      console.info('[controlled-public-query-turn-settlement]', JSON.stringify({ actualBrowser: false, realRuntimeHttpSqliteFlow: true,
+        status: busyResponse.status, persistentStateUnchanged: beforeBusy === afterBusy,
+        modelCallsUnchanged: fixture.observed.requests.length === beforeBusyModelCalls, activeNativeRunners: nativeTrace.filter(entry => entry.state === 'running').length }))
+      expect(busyResponse.status).toBe(409)
+      expect(busyBody).toMatchObject({ code: 'conflict', message: 'a turn is already running for this thread' })
+      expect(fixture.observed.requests).toHaveLength(beforeBusyModelCalls)
+      expect(afterBusy, 'A busy original Turn must be rejected before any control receipt, child, consumption or task mutation').toBe(beforeBusy)
+      unchangedUnknowns()
+    } finally { releaseUnknownTurn!() }
+  }
+  // Task state is persisted before the async error event and Turn completion.
+  // Await that real boundary before expecting a successful continuation.
+  await expect.poll(async () => (await runtime.threadService.get(beforePrepare.threadId))!.turns.filter(turn => turn.status === 'queued' || turn.status === 'running').length, { timeout: 30_000 }).toBe(0)
+  if (sourceProviderFailure) expect((await runtime.threadService.get(beforePrepare.threadId))!.turns.find(turn => turn.id === heldUnknownTurn!.turnId)?.status).toBe('failed')
   isolateCurrentTurn = true
   delete fixture.observed.failure // Isolated model-fixture bookkeeping, never Runtime history.
   const retryRequest = { expectedRevision: prepared.task.revision, idempotencyKey: 'continue-new-query', publicQueryRecoveryReceiptId: prepared.recovery.receiptId }

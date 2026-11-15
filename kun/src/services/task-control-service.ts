@@ -58,6 +58,17 @@ export class TaskControlService {
     let blockedCapability: ExternalTaskCapability | undefined
     if(!current)throw Object.assign(new Error('task not found'),{code:'not_found'})
     const prior=repository.operation(taskId,data.idempotencyKey)
+    if(action==='retry'&&prior?.status!=='succeeded'){
+      const recoveryRequested=Boolean(data.publicQueryRecoveryReceiptId||current.publicQueryRecovery||repository.get(taskId)?.publicQueryRecovery||
+        repository.operations(taskId,'browser_public_query_recovery_plan').some(receipt=>receipt.status==='succeeded'))
+      if(recoveryRequested){
+        // A stalled Task may precede its old Turn's durable terminal update.
+        // Do not consume future consent or create a retry while that Turn settles.
+        const thread=await threads.get(current.threadId)
+        if(!thread)throw Object.assign(new Error('task execution thread not found'),{code:'not_found'})
+        if(thread.turns.some(turn=>turn.status==='queued'||turn.status==='running'))throw Object.assign(new Error('a turn is already running for this thread'),{code:'turn_in_progress'})
+      }
+    }
     if(prior?.status==='prepared'&&action==='retry'){
       repository.beginOperation({ownerId:taskId,idempotencyKey:data.idempotencyKey,kind:action,request:data,nowIso:nowIso()})
       const childId=`task_retry_${createHash('sha256').update(`task:${taskId}:retry:${data.idempotencyKey}`).digest('hex')}`

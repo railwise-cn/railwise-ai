@@ -13,6 +13,151 @@ import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
+
+export function windowsComposerMenuExpression(label) {
+  return `(() => {
+    const anchor=document.querySelector('button[aria-label='+JSON.stringify(${JSON.stringify(label)})+']');
+    const menu=anchor?.getAttribute('aria-controls')&&document.getElementById(anchor.getAttribute('aria-controls'));
+    if(!anchor||!menu||!menu.matches('[role="menu"]')||!menu.getClientRects().length||getComputedStyle(menu).visibility==='hidden')return null;
+    const rect=node=>{const b=node.getBoundingClientRect();return {left:b.left,top:b.top,right:b.right,bottom:b.bottom,width:b.width,height:b.height}};
+    const b=menu.getBoundingClientRect(),v=visualViewport;
+    return {coordinateUnit:'viewport-css-px',bodyZoom:Number.parseFloat(getComputedStyle(document.body).zoom)||1,side:menu.dataset.side,
+      viewport:{left:v?.offsetLeft??0,top:v?.offsetTop??0,width:v?.width??innerWidth,height:v?.height??innerHeight},anchor:rect(anchor),menu:rect(menu),
+      menuCount:document.querySelectorAll('.ds-anchored-menu[role="menu"]').length,itemCount:menu.querySelectorAll('[role^="menuitem"]').length,
+      hitTest:menu.contains(document.elementFromPoint(b.left+b.width/2,b.top+Math.min(20,b.height/2)))};
+  })()`
+}
+
+export function validateWindowsComposerMenuGeometry(value) {
+  assert.equal(value?.coordinateUnit, 'viewport-css-px')
+  assert.equal(value.menuCount, 1, 'One composer menu must be mounted')
+  assert.ok(value.itemCount > 0, 'The actual menu must contain actionable entries')
+  assert.equal(value.hitTest, true, 'The actual menu must receive pointer input')
+  assert.ok(['top', 'bottom'].includes(value.side))
+  for (const box of [value.anchor, value.menu]) for (const key of ['left', 'top', 'right', 'bottom', 'width', 'height']) assert.ok(Number.isFinite(box[key]))
+  const { menu, anchor, viewport } = value
+  assert.ok(menu.width > 0 && menu.height > 0 && anchor.width > 0 && anchor.height > 0)
+  assert.ok(menu.left >= viewport.left - 1 && menu.right <= viewport.left + viewport.width + 1 && menu.top >= viewport.top - 1 && menu.bottom <= viewport.top + viewport.height + 1, 'Menu bounds must remain inside the visual viewport')
+  assert.ok(Math.min(menu.right, anchor.right) - Math.max(menu.left, anchor.left) > 1, 'The menu must align with its real composer trigger')
+  const gap = value.side === 'top' ? anchor.top - menu.bottom : menu.top - anchor.bottom
+  assert.ok(gap >= -1 && gap <= 24, 'The menu must remain adjacent to its actual trigger')
+  return true
+}
+
+export function validateWindowsAdaptiveWorkbenchEvidence(evidence) {
+  assert.equal(evidence?.status, 'passed')
+  assert.equal(evidence.input, 'renderer-cdp-real-input')
+  assert.ok(['browser-cdp', 'verified-pid-native-window'].includes(evidence.resizeMethod))
+  assert.deepEqual(evidence.scenarios.map(scenario => scenario.font), ['small', 'large'])
+  for (const [index, scenario] of evidence.scenarios.entries()) for (const menu of [scenario.agent, scenario.model]) {
+    validateWindowsComposerMenuGeometry(menu)
+    assert.ok(Math.abs(menu.bodyZoom - [0.9, 1.1][index]) < 0.01)
+    assert.equal(menu.escapeFocusRestored, true)
+  }
+  const navigation = evidence.scenarios[1].navigation
+  assert.equal(navigation.modal, true)
+  assert.equal(navigation.mainInert, true)
+  assert.ok(navigation.width > 0 && navigation.width <= navigation.viewportWidth)
+  return true
+}
+
+/** Standard OS window API, restricted to the already verified installed EXE PID. */
+export function windowsOwnedWindowScript(pid, bounds) {
+  assert.ok(Number.isSafeInteger(pid) && pid > 0)
+  if (bounds) for (const key of ['left', 'top', 'width', 'height']) assert.ok(Number.isSafeInteger(bounds[key]))
+  if (bounds) assert.ok(bounds.width >= 640 && bounds.width <= 8192 && bounds.height >= 480 && bounds.height <= 8192)
+  return `$ErrorActionPreference='Stop'
+Add-Type @'
+using System; using System.Runtime.InteropServices;
+public static class RailWiseSmokeWindow {
+ [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left,Top,Right,Bottom; }
+ [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out Rect r);
+ [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint owner);
+ [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+ [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr h);
+ [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int command);
+ [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h,IntPtr order,int x,int y,int width,int height,uint flags);
+}
+'@
+$ownedProcess=Get-Process -Id ${pid}
+$ownedHandle=$ownedProcess.MainWindowHandle
+[uint32]$windowOwnerId=0
+[void][RailWiseSmokeWindow]::GetWindowThreadProcessId($ownedHandle,[ref]$windowOwnerId)
+if($ownedHandle -eq [IntPtr]::Zero -or $windowOwnerId -ne ${pid} -or -not [RailWiseSmokeWindow]::IsWindowVisible($ownedHandle)){throw 'Owned visible window unavailable'}
+${bounds ? `[void][RailWiseSmokeWindow]::ShowWindow($ownedHandle,9)
+if(-not [RailWiseSmokeWindow]::SetWindowPos($ownedHandle,[IntPtr]::Zero,${bounds.left},${bounds.top},${bounds.width},${bounds.height},20)){throw 'Owned window resize failed'}
+${bounds.windowState === 'maximized' ? '[void][RailWiseSmokeWindow]::ShowWindow($ownedHandle,3)' : ''}` : ''}
+$ownedRect=New-Object RailWiseSmokeWindow+Rect
+if(-not [RailWiseSmokeWindow]::GetWindowRect($ownedHandle,[ref]$ownedRect)){throw 'Owned window bounds unavailable'}
+@{ownerVerified=$true;left=$ownedRect.Left;top=$ownedRect.Top;width=$ownedRect.Right-$ownedRect.Left;height=$ownedRect.Bottom-$ownedRect.Top;windowState=$(if([RailWiseSmokeWindow]::IsZoomed($ownedHandle)){'maximized'}else{'normal'})}|ConvertTo-Json -Compress`
+}
+
+async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment }) {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const osWindow = async bounds => {
+    const { stdout } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', windowsOwnedWindowScript(pid, bounds)], { env: environment, windowsHide: true, shell: false, timeout: 15_000, maxBuffer: 16_384 })
+    const value = JSON.parse(stdout.trim()); assert.equal(value.ownerVerified, true); return value
+  }
+  const original = await osWindow()
+  const navigationWasVisible = await cdp.evaluate(`Boolean(document.querySelector('#workbench-navigation')?.getClientRects().length)`)
+  let browserWindow
+  try { browserWindow = await cdp.send('Browser.getWindowForTarget'); assert.ok(Number.isSafeInteger(browserWindow.windowId)) } catch { browserWindow = undefined }
+  let resizeMethod = browserWindow ? 'browser-cdp' : 'verified-pid-native-window'
+  const resize = async () => {
+    if (browserWindow) try {
+      await cdp.send('Browser.setWindowBounds', { windowId: browserWindow.windowId, bounds: { windowState: 'normal' } })
+      await cdp.send('Browser.setWindowBounds', { windowId: browserWindow.windowId, bounds: { width: 960, height: 680 } })
+      return
+    } catch { resizeMethod = 'verified-pid-native-window' }
+    await osWindow({ ...original, width: 960, height: 680, windowState: 'normal' })
+  }
+  const escape = async () => { for (const type of ['keyDown', 'keyUp']) await cdp.send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }) }
+  const openNavigation = async () => {
+    if (await cdp.evaluate(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay==='inspector'`)) await cdp.click('button[aria-label="返回当前任务"]')
+    if (!await cdp.evaluate(`Boolean(document.querySelector('#workbench-navigation')?.getClientRects().length)`)) await cdp.click('button[aria-label="展开侧边栏"]')
+  }
+  const font = async value => {
+    if (!await cdp.evaluate(`Boolean(document.querySelector('.ds-settings-sidebar'))`)) { await openNavigation(); await cdp.click('.ds-sidebar-shell button', '设置') }
+    await cdp.click('.ds-settings-sidebar nav button', '通用')
+    const selector = 'select:has(option[value="small"]):has(option[value="large"])'
+    await cdp.click(selector)
+    const key = value === 'large' ? 'End' : 'Home', windowsVirtualKeyCode = value === 'large' ? 35 : 36
+    for (const type of ['keyDown', 'keyUp']) await cdp.send('Input.dispatchKeyEvent', { type, key, code: key, windowsVirtualKeyCode })
+    for (const type of ['keyDown', 'keyUp']) await cdp.send('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+    await cdp.wait(`document.querySelector(${JSON.stringify(selector)})?.value===${JSON.stringify(value)} && Math.abs(Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ds-ui-scale'))-${value === 'large' ? 1.1 : 0.9})<0.01`, 'the actual settings font control and applied UI scale')
+    await cdp.click('.ds-settings-sidebar button', '返回')
+    await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]'))`, 'the same composer after settings')
+  }
+  const menu = async label => {
+    await cdp.click(`button[aria-label=${JSON.stringify(label)}]`)
+    const value = await cdp.wait(windowsComposerMenuExpression(label), 'the actual anchored composer menu')
+    validateWindowsComposerMenuGeometry(value)
+    await escape()
+    await cdp.wait(`!document.querySelector('.ds-anchored-menu') && document.activeElement?.getAttribute('aria-label')===${JSON.stringify(label)}`, 'Escape closes the menu and restores trigger focus')
+    return { ...value, escapeFocusRestored: true }
+  }
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="切换智能体"]:not(:disabled)')&&document.querySelector('button[aria-label="模型与推理设置"]:not(:disabled)'))`, 'actual enabled composer controls')
+  const baseline = { font: 'small', agent: await menu('切换智能体'), model: await menu('模型与推理设置') }
+  assert.ok(Math.abs(baseline.model.bodyZoom - 0.9) < 0.01)
+  try {
+    await resize(); await font('large')
+    await cdp.wait(`document.querySelector('.ds-workbench-shell')?.dataset.navigationOverlay==='true'`, 'the actual narrow workbench drawer layout')
+    if (await cdp.evaluate(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay==='navigation'`)) await cdp.click('button[aria-label="关闭导航"]')
+    const narrow = { font: 'large', agent: await menu('切换智能体'), model: await menu('模型与推理设置') }
+    assert.ok(Math.abs(narrow.model.bodyZoom - 1.1) < 0.01)
+    await openNavigation()
+    narrow.navigation = await cdp.wait(`(() => {const shell=document.querySelector('.ds-workbench-shell'),nav=document.getElementById('workbench-navigation'),main=document.querySelector('.ds-workbench-shell > main');if(shell?.dataset.activeOverlay!=='navigation'||nav?.getAttribute('role')!=='dialog')return null;const r=nav.getBoundingClientRect();return {modal:nav.getAttribute('aria-modal')==='true',mainInert:Boolean(main?.inert),width:r.width,viewportWidth:innerWidth}})()`, 'the visible standard navigation drawer')
+    assert.equal(narrow.navigation.modal, true); assert.equal(narrow.navigation.mainInert, true)
+    assert.ok(narrow.navigation.width > 0 && narrow.navigation.width <= narrow.navigation.viewportWidth)
+    await escape(); await cdp.wait(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay!== 'navigation'`, 'the navigation drawer closes on Escape')
+    return { status: 'passed', input: 'renderer-cdp-real-input', resizeMethod, scenarios: [baseline, narrow] }
+  } finally {
+    try { await escape(); await font('small') } finally { await osWindow(original) }
+    await cdp.wait(`Math.abs(Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ds-ui-scale'))-0.9)<0.01`, 'the restored original font scale')
+    if (navigationWasVisible) await openNavigation()
+  }
+}
 export const windowsSmokeWorkspaceName = '中文 验收工作区'
 const requiredChecks = [
   'installed-chinese-renderer', 'skills-default-and-tab-order', 'plugins-tab',
@@ -173,6 +318,8 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   if (requireBrowserExecution || report.browserSmokeRequested) {
     assert.equal(report.browserSmokeRequested, true)
     assert.equal(report.taskSmokeRequested, true)
+    validateWindowsAdaptiveWorkbenchEvidence(report.adaptiveWorkbench)
+    assert.ok(report.checks.includes('native-window-composer-menus-and-narrow-navigation'), 'Missing actual adaptive composer and navigation observation')
     validateWindowsBrowserEvidence(report.taskExecution?.browserSkill)
     validateWindowsBrowserRecoveryEvidence(report.taskSetup?.browserRecovery, report.taskSetup?.browser?.browserInstanceId)
     validateWindowsScheduledQueryEvidence(report.taskExecution)
@@ -2283,6 +2430,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.checks.push('offline-help-search-and-navigation')
     const helpScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
     await writeFile(join(evidenceDir, 'windows-help-zh-dark.png'), Buffer.from(helpScreenshot.data, 'base64'))
+    if (await cdp.evaluate(`document.querySelector('.ds-help-outline')?.open===false`)) await cdp.click('.ds-help-outline > summary', '章节目录')
     await cdp.click('[aria-label="手册目录"] button', '1.4 现有界面截图')
     await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="用户使用手册"] img')).some(image=>image.complete && image.naturalWidth>0)`, 'a packaged manual image offline')
     report.checks.push('offline-help-images')
@@ -2295,6 +2443,10 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const prompt = windowsTaskPrompt(taskModel, browserSmoke)
       await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
       await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]:not(:disabled)'))`, 'the active conversation composer')
+      if (browserSmoke) {
+        report.adaptiveWorkbench = await runWindowsAdaptiveComposerAcceptance(cdp, { pid: child.pid, environment })
+        report.checks.push('native-window-composer-menus-and-narrow-navigation')
+      }
       const newThreads = (await runtimeRequest('/v1/threads')).threads.filter(thread => !previousThreads.has(thread.id))
       assert.equal(newThreads.length, 1, 'The normal UI must create one existing conversation before Skill installation')
       const originThreadId = newThreads[0].id
@@ -2546,6 +2698,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const automaticScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
       await writeFile(join(evidenceDir, 'windows-task-html-auto-preview-zh-dark.png'), Buffer.from(automaticScreenshot.data, 'base64'))
       const manualPreviewPassed = await inspectWindowsManualPreview(report, async () => {
+        if (await cdp.evaluate(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay==='inspector'`)) await cdp.click('button[aria-label="返回当前任务"]')
         await cdp.click('nav[aria-label="工作区工具"] button', '任务')
         await cdp.wait(`Boolean(document.querySelector('section.ds-task-sidebar[aria-label="任务列表"] [aria-label="任务筛选"]'))`, 'the real task workspace')
         const completedFilter = await cdp.evaluate(`Array.from(document.querySelectorAll('[aria-label="任务筛选"] button')).find(button=>button.textContent.trim().startsWith('已完成'))?.textContent.trim()`)
