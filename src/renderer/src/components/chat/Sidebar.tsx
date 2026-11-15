@@ -61,6 +61,7 @@ type Props = {
   onTasksOpen?: () => void
   onEngineeringOpen: () => void
   onToggleSidebar: () => void
+  onNavigate?: () => void
 }
 
 export function Sidebar({
@@ -93,7 +94,8 @@ export function Sidebar({
   onDesignOpen,
   onTasksOpen,
   onEngineeringOpen,
-  onToggleSidebar
+  onToggleSidebar,
+  onNavigate
 }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
@@ -188,7 +190,7 @@ export function Sidebar({
           onOpenSettings={() => onOpenSettings('claw')}
         />
       ) : navigationRoute === 'tasks' ? (
-        <TaskSidebar workspaceRoot={workspaceRoot} runtimeReady={runtimeReady} onChooseWorkspace={() => void chooseWorkspace()} />
+        <TaskSidebar workspaceRoot={workspaceRoot} runtimeReady={runtimeReady} onChooseWorkspace={() => void chooseWorkspace()} onNavigate={onNavigate} />
       ) : activeView === 'claw' ? (
         <ClawSidebarContent
           channels={clawChannels}

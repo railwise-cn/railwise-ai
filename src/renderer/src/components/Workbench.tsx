@@ -75,6 +75,7 @@ import { parseGuiPlanCommand } from '../plan/plan-command'
 import { DevPreviewLaunchCard } from './DevPreviewLaunchCard'
 import { RuntimeBanner } from './RuntimeBanner'
 import { useWorkbenchLayout } from './workbench-layout'
+import { useWorkbenchDrawerFocus } from './use-workbench-drawer-focus'
 import { useWorkbenchPlanController } from './workbench-plan-controller'
 import { prepareImageAttachmentUpload } from '../lib/image-attachment-upload'
 import { isChatAttachmentUploadEnabled } from '../lib/attachment-upload-availability'
@@ -635,6 +636,12 @@ export function Workbench(): ReactElement {
     beginLeftResize,
     beginRightResize,
     closeDevPreview,
+    closeCompactNavigation,
+    activeOverlay,
+    leftSidebarOverlay,
+    rightSidebarOverlay,
+    resizeLeftBy,
+    resizeRightBy,
     filePreviewTarget,
     leftSidebarCollapsed,
     leftSidebarWidth,
@@ -2166,6 +2173,9 @@ export function Workbench(): ReactElement {
     }
   }
 
+  useWorkbenchDrawerFocus(activeOverlay === 'navigation', 'workbench-navigation', closeCompactNavigation)
+  useWorkbenchDrawerFocus(activeOverlay === 'inspector', 'workbench-inspector', closeRightPanel)
+
   const renderRightPanel = (): ReactElement | null => {
     if (!rightPanelVisible || !resolvedRightPanelId) return null
     const context: BuiltinRightPanelContext = {
@@ -2180,10 +2190,20 @@ export function Workbench(): ReactElement {
         <div
           role="separator"
           aria-orientation="vertical"
+          aria-label={t('inspectorResize')}
+          aria-valuenow={Math.round(rightSidebarWidth)}
+          tabIndex={0}
+          onKeyDown={event => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); resizeRightBy(event.key === 'ArrowLeft' ? 16 : -16) } }}
           className="ds-workbench-right-divider ds-workbench-divider ds-no-drag relative z-20 shrink-0 cursor-col-resize"
           onPointerDown={beginRightResize}
-        />
-        <div className="ds-workbench-right-panel h-full min-h-0 shrink-0" style={{ width: rightSidebarWidth }}>
+        ><span aria-hidden className="ds-workbench-divider-hit" /></div>
+        <div id="workbench-inspector"
+          role={rightSidebarOverlay ? 'dialog' : 'complementary'}
+          aria-modal={rightSidebarOverlay && activeOverlay === 'inspector' ? true : undefined}
+          aria-label={t('workbenchInspector')}
+          tabIndex={-1}
+          inert={activeOverlay === 'navigation' ? true : undefined}
+          className="ds-workbench-right-panel h-full min-h-0 min-w-0 shrink-0" style={{ width: rightSidebarWidth }}>
           <WorkbenchPanelLoader
             registry={builtinRightPanels}
             panelId={resolvedRightPanelId}
@@ -2219,7 +2239,6 @@ export function Workbench(): ReactElement {
         }
       }} onOpenFlow={(flowId, flowRunId) => { requestFlowDetail({flowId,flowRunId}); openFlow() }} onConfigureReplyDelivery={() => openSettings('claw')} onConfigureProvider={provider => { setConnectPhoneSidebarOpen(false); openPlugins(sidebarView === 'claw' ? 'claw' : 'chat', provider === 'lark' || provider === 'feishu' ? 'lark' : provider === 'dingtalk' ? 'dingtalk' : undefined) }} />
         </div>
-        {renderRightPanel()}
       </div>
     },
     plugins: (module) => {
@@ -2263,11 +2282,20 @@ export function Workbench(): ReactElement {
   return (
     <div
       ref={shellRef}
+      data-navigation-overlay={leftSidebarOverlay}
+      data-inspector-overlay={rightSidebarOverlay}
+      data-active-overlay={activeOverlay ?? ''}
       className="ds-workbench-shell ds-drag relative flex h-full min-h-0 w-full min-w-0 bg-ds-main"
     >
+      {activeOverlay ? <button type="button" className="ds-workbench-drawer-backdrop ds-no-drag" tabIndex={-1}
+        aria-label={t(activeOverlay === 'navigation' ? 'workbenchDismissNavigation' : 'workbenchDismissInspector')}
+        onClick={activeOverlay === 'navigation' ? closeCompactNavigation : closeRightPanel} /> : null}
       {!leftSidebarCollapsed ? (
         <>
-          <div className="ds-workbench-left-panel min-h-0 shrink-0" style={{ width: leftSidebarWidth }}>
+          <div id="workbench-navigation" role={leftSidebarOverlay ? 'dialog' : undefined}
+            aria-modal={leftSidebarOverlay ? true : undefined} aria-label={t('workbenchNavigation')}
+            tabIndex={-1} inert={activeOverlay === 'inspector' ? true : undefined}
+            className="ds-workbench-left-panel min-h-0 min-w-0 shrink-0" style={{ width: leftSidebarWidth }}>
             {route === 'write' ? (
               <WriteSidebar
                 navigationRoute={route}
@@ -2286,6 +2314,7 @@ export function Workbench(): ReactElement {
                 onToggleFocusMode={toggleFocusMode}
                 onToggleConnectPhone={toggleConnectPhone}
                 onToggleSidebar={toggleLeftSidebar}
+                onNavigate={closeCompactNavigation}
               />
             ) : (
             <Sidebar
@@ -2300,7 +2329,7 @@ export function Workbench(): ReactElement {
               showArchivedThreads={showArchivedThreads}
               onThreadSearchChange={setThreadSearch}
               onShowArchivedThreadsChange={setShowArchivedThreads}
-              onSelectThread={openThread}
+              onSelectThread={id => { openThread(id); closeCompactNavigation() }}
               onRenameThread={renameThread}
               onArchiveThread={(id) => archiveThread(id, true)}
               onDeleteThread={deleteThread}
@@ -2319,19 +2348,25 @@ export function Workbench(): ReactElement {
               onDesignOpen={openDesignView}
               onEngineeringOpen={openEngineeringMode}
               onToggleSidebar={toggleLeftSidebar}
+              onNavigate={closeCompactNavigation}
             />
             )}
           </div>
           <div
             role="separator"
             aria-orientation="vertical"
+            aria-label={t('sidebarResize')}
+            aria-valuenow={Math.round(leftSidebarWidth)}
+            tabIndex={0}
+            onKeyDown={event => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); resizeLeftBy(event.key === 'ArrowRight' ? 16 : -16) } }}
             className="ds-workbench-left-divider ds-workbench-divider ds-no-drag relative z-20 shrink-0 cursor-col-resize"
             onPointerDown={beginLeftResize}
-          />
+          ><span aria-hidden className="ds-workbench-divider-hit" /></div>
         </>
       ) : null}
 
       <main
+        inert={activeOverlay ? true : undefined}
         className={`ds-drag ds-stage-surface relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
           route === 'plugins' ? 'px-0' : ''
         }`}
@@ -2377,7 +2412,6 @@ export function Workbench(): ReactElement {
                   onSubmitPrompt={sendWritePrompt}
                 />
               )}
-              {renderRightPanel()}
             </div>
           </>
         ) : (
@@ -2543,15 +2577,15 @@ export function Workbench(): ReactElement {
           </div>
 
           {route === 'chat' && !activeSddDraft ? (
-            <SideConversationPanel rightOffset={rightPanelVisible ? rightSidebarWidth + 24 : 24} />
+            <SideConversationPanel rightOffset={rightPanelVisible && !rightSidebarOverlay ? rightSidebarWidth + 24 : 24} />
           ) : null}
 
-          {renderRightPanel()}
         </div>
 
           </>
         )}
       </main>
+      {renderRightPanel()}
     </div>
   )
 }
