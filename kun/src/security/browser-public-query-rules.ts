@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto'
 import { browserPublicQueryTargetBlocked } from './browser-approval-summary.js'
 import type { PublicQueryActionRule } from '../services/browser-public-query-authority.js'
 
 export type PublicQueryDomContext = { search: boolean; pagination: boolean; filter: boolean; sort: boolean; sensitive: boolean; targetPresent: boolean;
   /** Host-only proof of the complete native date group, canonical target, frame and safe parent. */
-  dateFacet?: boolean }
+  dateFacet?: boolean
+  /** Exact native anchor proof. The model and page text cannot supply this marker. */
+  documentLink?: { hrefHash: string; destinationHash: string; canonicalTarget?: string; frameHash?: string } }
 const decode = (s: string) => s.replace(/&#(x[0-9a-f]+|\d+);/gi, (_m, n: string) => { const cp = Number.parseInt(n[0].toLowerCase() === 'x' ? n.slice(1) : n, n[0].toLowerCase() === 'x' ? 16 : 10); return cp <= 0x10ffff ? String.fromCodePoint(cp) : '' }).replace(/&(?:nbsp|amp|quot|apos|lt|gt);/gi, x => ({ '&nbsp;': ' ', '&amp;': '&', '&quot;': '"', '&apos;': "'", '&lt;': '<', '&gt;': '>' })[x.toLowerCase()] ?? '')
 export function publicQueryElement(html: string) {
   const open = /^\s*<([a-z][\w:-]*)\b([^>]*)>/i.exec(html)
@@ -20,12 +23,42 @@ const searchField = /关键[字词]|搜索|检索|查询|(?:^|[\s_-])(?:q|search
 const filter = /(?:filter|category|筛选|分类|公告类型|项目类型|地区|区域|时间范围|日期范围|开始日期|起始日期|截止日期|结束日期|近[0-9一二三七]+[日天]|最近[0-9一二三七]+[日天])/i
 const sort = /(?:sort|orderBy|排序|发布日期|发布时间|按时间|升序|降序|最新|最早)/i
 const pageLabel = /^(?:下一页|上一页|首页|末页|尾页|next(?:page)?|previous(?:page)?|prev|first|last|[1-9]\d{0,3})$/i
+const digest = (value: string) => createHash('sha256').update(value).digest('hex')
+
+/** A document GET, never a DOM click or a download. Dynamic HTML routes are valid. */
+export function publicDocumentLinkDestination(html: string, pageUrl: string): string | undefined {
+  const element = publicQueryElement(html)
+  if (!element || element.tag !== 'a' || !element.attributes.href || html.length > 8192) return undefined
+  const a = element.attributes
+  if ('download' in a || 'disabled' in a || a['aria-disabled'] === 'true' || a.role && a.role !== 'link' ||
+    a.target && !['_self', '_blank'].includes(a.target) || Object.keys(a).some(key => key.startsWith('on') || key.startsWith('form')) ||
+    a.type && !['text/html', 'application/xhtml+xml'].includes(a.type.toLowerCase()) || /<(?:input|textarea|select|button|form|iframe|object|embed)\b/i.test(html)) return undefined
+  if (browserPublicQueryTargetBlocked(`<a aria-label="${a['aria-label'] ?? ''}" title="${a.title ?? ''}"></a>`)) return undefined
+  if (!a.href.trim() || a.href.length > 4096 || [...a.href].some(char => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127)) return undefined
+  try {
+    const page = new URL(pageUrl), url = new URL(a.href, page)
+    if (!['http:', 'https:'].includes(url.protocol) || url.origin !== page.origin || url.username || url.password) return undefined
+    const route = decodeURIComponent(url.pathname + (/^#!?\//.test(url.hash) ? url.hash : ''))
+    if (/(?:account|profile|auth|oauth|login|register|logout|delete|remove|submit|upload|download|attachment|payment|purchase|checkout|approve|reject|transfer|send|save)/i.test(route)) return undefined
+    if ([...url.searchParams.keys()].some(key => /(?:token|secret|password|authorization|session|oauth|download|attachment|action|method|command|operation|redirect|returnurl|callback|nexturl)/i.test(key) || /^(?:op|cmd)$/i.test(key))) return undefined
+    const extension = /\.([a-z0-9]{1,8})$/i.exec(url.pathname)?.[1].toLowerCase()
+    if (extension && !['html', 'htm', 'xhtml', 'php', 'aspx', 'asp', 'jsp', 'do', 'action'].includes(extension)) return undefined
+    const ordinaryAnchor = url.origin === page.origin && url.pathname === page.pathname && url.search === page.search && !/^#!?\//.test(url.hash)
+    if (url.href === page.href || ordinaryAnchor) return undefined
+    return url.href
+  } catch { return undefined }
+}
 
 /** Positive structural rules. A page's claims about safety never grant permission. */
 export function classifyPublicQueryAction(input: { action: 'click' | 'fill'; html: string; value?: string; pageUrl: string;
   context?: PublicQueryDomContext; priorSearchInput?: boolean }): PublicQueryActionRule | undefined {
   try { const page = new URL(input.pageUrl); if (!['https:', 'http:'].includes(page.protocol) || page.username || page.password || [...page.searchParams.keys()].some(key => /token|secret|password|authorization|session|oauth/i.test(key))) return undefined } catch { return undefined }
-  if (!input.html.trim() || input.html.length > 8192 || browserPublicQueryTargetBlocked(input.html)) return undefined
+  if (!input.html.trim() || input.html.length > 8192) return undefined
+  const documentLink = input.context?.targetPresent && !input.context.sensitive && input.context.documentLink
+  const destination = documentLink && input.action === 'click' && publicDocumentLinkDestination(input.html, input.pageUrl)
+  if (destination && documentLink && documentLink.destinationHash === digest(destination) &&
+    documentLink.hrefHash === digest(publicQueryElement(input.html)!.attributes.href)) return 'result_link'
+  if (browserPublicQueryTargetBlocked(input.html)) return undefined
   const element = publicQueryElement(input.html)
   if (!element || 'disabled' in element.attributes || element.attributes['aria-disabled'] === 'true' || input.context?.sensitive) return undefined
   const { tag, attributes: a, label } = element, type = (a.type ?? 'text').toLowerCase()

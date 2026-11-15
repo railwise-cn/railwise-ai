@@ -3,6 +3,7 @@ import { BrowserPublicQueryAuthorization, browserVerificationPolicy, type Browse
 import type { ExecutionGrant } from '../contracts/permissions.js'
 import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
 import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
+import { publicDocumentLinkDestination } from '../security/browser-public-query-rules.js'
 
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 export const publicQueryPurposeHash = (task: Pick<TaskRun, 'goal'>) => operationFingerprint({ purpose: task.goal })
@@ -59,9 +60,10 @@ export function taskPublicQueryGrant(repository: TaskRunRepository, grant: Execu
   return taskPublicQueryAuthority(repository, task, grant.browserScope, { sourceTaskId: grant.browserScheduleBinding?.sourceTaskId })
 }
 
-export type PublicQueryActionRule = 'search_input' | 'search_trigger' | 'pagination' | 'filter_control' | 'sort_control'
+export type PublicQueryActionRule = 'search_input' | 'search_trigger' | 'pagination' | 'filter_control' | 'sort_control' | 'result_link'
 export type ScopeActionBinding = { taskId: string; sessionId: string; browserInstanceId: string; browserRevision: number;
-  pageUrl: string; origin: string; elementHash: string; valueHash?: string; action: 'click' | 'fill'; verificationPolicy?: 'strict' | 'public_query_target' }
+  pageUrl: string; origin: string; elementHash: string; valueHash?: string; action: 'click' | 'fill'; verificationPolicy?: 'strict' | 'public_query_target';
+  documentLinkProof?: { hrefHash: string; destinationHash: string; canonicalTarget: string; frameHash: string } }
 
 /** Every exact action has its own evidence; this is not a fabricated human approval. */
 export function saveTaskPublicQueryAction(repository: TaskRunRepository, grant: ExecutionGrant, binding: ScopeActionBinding,
@@ -129,4 +131,36 @@ export function verifiedTaskPublicQueryAction(repository: TaskRunRepository, ori
     dispatch.request?.scopeAuthorizationReceiptId !== authority.binding.id ||
     ['action', 'sessionId', 'pageUrl', 'elementHash', 'valueHash', 'browserInstanceId', 'browserRevision', 'verificationPolicy', 'contextHash'].some(key => request[key] !== dispatch.request?.[key])) return undefined
   return { authority, receipt, request, result }
+}
+
+/** A native GET has its own proof; it must never impersonate a DOM click ACK. */
+export function verifiedTaskPublicQueryDocumentNavigation(repository: TaskRunRepository, original: OperationReceipt, dispatch: OperationReceipt, historical = false) {
+  const scoped = verifiedTaskPublicQueryAction(repository, original, dispatch, historical)
+  const request = object(dispatch.request), result = object(dispatch.result), proof = object(request.documentLinkProof)
+  const host = object(object(original.result).item), output = object(host.output), grant = object(original.request?.executionGrant) as ExecutionGrant
+  const destination = typeof result.sourceUrl === 'string' && typeof request.pageUrl === 'string'
+    ? publicDocumentLinkDestination(`<a href="${result.sourceUrl}">Document</a>`, request.pageUrl) : undefined
+  if (!scoped || scoped.request.rule !== 'result_link' || original.kind !== 'tool' || original.status !== 'succeeded' ||
+    original.fingerprint !== operationFingerprint(original.request) || original.request?.providerId !== 'browser-skill' || dispatch.kind !== 'browser_action_dispatch' || dispatch.status !== 'succeeded' ||
+    dispatch.fingerprint !== operationFingerprint(request) || original.request?.toolName !== 'browser_click' || request.toolName !== 'browser_click' ||
+    original.request?.argumentsHash !== request.argumentsHash || original.request?.turnId !== request.turnId ||
+    request.action !== 'click' || request.nativeAction !== 'navigate' || result.nativeAction !== 'navigate' || result.requestedAction !== 'click' ||
+    result.actionAcknowledged !== false || result.clickDispatched !== false || result.navigationAcknowledged !== true || result.readbackPending !== false ||
+    operationFingerprint(scoped.request.documentLinkProof) !== operationFingerprint(proof) ||
+    !['hrefHash', 'destinationHash', 'frameHash'].every(key => typeof proof[key] === 'string' && /^[a-f0-9]{64}$/.test(String(proof[key]))) ||
+    typeof proof.canonicalTarget !== 'string' || !/^@?e\d+$/.test(proof.canonicalTarget) ||
+    request.navigationDestinationHash !== proof.destinationHash || result.navigationDestinationHash !== proof.destinationHash ||
+    typeof result.navigationContextHash !== 'string' || !/^[a-f0-9]{64}$/.test(result.navigationContextHash) || result.navigationContextHash === request.contextHash ||
+    typeof result.resultHash !== 'string' || !/^[a-f0-9]{64}$/.test(result.resultHash) || typeof result.sourceUrl !== 'string' || typeof request.pageUrl !== 'string' ||
+    !destination || destination !== result.sourceUrl || !grant.browserScope?.origins.includes(new URL(destination).origin) ||
+    object(original.result).approved !== true || host.isError === true || host.kind !== 'tool_result' || host.status !== 'completed' || host.toolName !== 'browser_click' ||
+    output.status !== 'succeeded' || output.provider !== 'browser-skill' ||
+    host.callId !== original.request.callId || host.turnId !== grant.turnId || host.threadId !== grant.threadId || output.dispatchReceiptId !== dispatch.id || output.action !== 'navigate' ||
+    output.requestedAction !== 'click' || output.clickDispatched !== false || output.nativeAction !== 'navigate' ||
+    output.sourceUrl !== result.sourceUrl || output.resultHash !== result.resultHash ||
+    operationFingerprint(output.documentLinkProof) !== operationFingerprint(proof)) return undefined
+  const started = Date.parse(dispatch.createdAt), finished = Date.parse(dispatch.updatedAt), issued = Date.parse(grant.issuedAt)
+  if (![started, finished, issued].every(Number.isFinite) || started < issued || finished < started ||
+    grant.expiresAt && (!Number.isFinite(Date.parse(grant.expiresAt)) || finished > Date.parse(grant.expiresAt))) return undefined
+  return scoped
 }

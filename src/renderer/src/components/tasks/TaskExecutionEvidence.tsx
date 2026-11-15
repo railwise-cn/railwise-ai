@@ -46,14 +46,35 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
   const browser = receipts.filter(receipt => receipt.purpose === 'browser_action' && (receipt.status === 'outcome_unknown' || receipt.resolution))
   const effects = receipts.filter(receipt => receipt.purpose !== 'assistant_reply' && receipt.purpose !== 'host_shell' && receipt.purpose !== 'browser_action')
   const effect = task.acceptance.effect
+  const requiresEffects = [task, ...relatedTasks].some(item => item.acceptance.effect || item.acceptance.kind === 'effect' || item.acceptance.requiresExternalEffects)
   const evidence = [...new Map(relatedTasks.flatMap(item => item.resultEvidence ?? []).filter(item => !(item.provider === 'browser-skill' && item.kind === 'human_confirmation')).map(item =>
     [JSON.stringify([item.provider, item.operation, item.target, item.resultHash]), item] as const)).values()]
-  if (!effect && !evidence.length && !receipts.length) return null
-  const provider = (name: string) => t(`taskEffectProvider_${name}`, { defaultValue: name })
-  const operation = (name: string) => t(`taskEffectOperation_${name}`, { defaultValue: name })
+  if (!requiresEffects && !evidence.length && !receipts.length) return null
+  const provider = (name: string) => t(`taskEffectProvider_${name}`, { defaultValue: t('taskEvidenceService') })
+  const operation = (name: string) => t(`taskEffectOperation_${name}`, { defaultValue: t('taskEvidenceOperationResult') })
+  const hasFileEvidence = evidence.some(item => item.kind === 'file')
+  const hasExternalEvidence = evidence.some(item => item.kind === 'external_operation')
+  const showEffects = requiresEffects || effects.length > 0 || hasExternalEvidence
+  const sectionTitle = showEffects ? hasFileEvidence ? 'taskEvidenceMixed' : 'taskEffectExecution' : 'taskEvidenceFiles'
+  const requiredEffectState = task.status === 'waiting_approval' ? 'taskEffectWaitingAuthorization'
+    : task.status === 'waiting_user' ? 'taskEffectWaitingUser'
+      : task.status === 'failed' ? 'taskEffectFailedWithoutReceipt' : 'taskEffectRequiredNotExecuted'
+  const targetLabel = (value: string): string => /^(?:[a-z]:[\\/]|[\\/])/i.test(value)
+    ? value.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || t('taskEffectTargetPending') : value
+  const evidenceLabel = (item: TaskResultEvidenceV1): string => item.kind === 'file'
+    ? `${t('taskEvidenceFile')} · ${item.target.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || t('taskEvidenceFile')}`
+    : item.kind === 'external_operation' ? `${provider(item.provider)} · ${operation(item.operation)} · ${targetLabel(item.target)}`
+      : t(item.kind === 'human_confirmation' ? 'taskEvidenceHumanConfirmation' : 'taskEvidenceToolResult')
+  const evidenceStatus = (item: TaskResultEvidenceV1): string => !item.verified ? 'taskEffectUnverified'
+    : item.kind !== 'file' ? 'taskEffectVerified'
+      : item.provider === 'managed-artifacts' && item.operation === 'verify_web_artifact' && item.status === 'source_verified' && item.sourceVersion?.trim()
+        ? 'taskArtifactSourceEvidenceVerified' : 'taskEvidenceFileVerified'
   const evidenceDetails = (item: TaskResultEvidenceV1): ReactElement => <details className="mt-2 text-[11px] text-ds-muted">
-    <summary className="cursor-pointer">{t('taskEffectVerificationDetails')}</summary>
+    <summary className="cursor-pointer">{t('taskEvidenceExecutionDetails')}</summary>
     <dl className="mt-2 space-y-1 break-all">
+      <div><dt className="inline font-medium">{t('taskEffectProvider')}: </dt><dd className="inline">{item.provider}</dd></div>
+      <div><dt className="inline font-medium">{t('taskEvidenceOperation')}: </dt><dd className="inline">{item.operation}</dd></div>
+      <div><dt className="inline font-medium">{t('taskEffectTarget')}: </dt><dd className="inline">{item.target}</dd></div>
       <div><dt className="inline font-medium">{t('taskEffectRemoteStatus')}: </dt><dd className="inline">{item.status}</dd></div>
       {item.remoteOperationId ? <div><dt className="inline font-medium">{t('taskEffectRemoteOperation')}: </dt><dd className="inline">{item.remoteOperationId}</dd></div> : null}
       <div><dt className="inline font-medium">{t('taskEffectResultHash')}: </dt><dd className="inline">{item.resultHash}</dd></div>
@@ -69,26 +90,24 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
       {onVerify && ['running', 'outcome_unknown', 'prepared'].includes(receipt.status) ? <button type="button" disabled={verifying !== null} onClick={() => { pollAttempts.current.set(receipt.id, 0); void verify(receipt) }} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t(verifying === receipt.id ? 'taskEffectVerifying' : 'taskHostShellReadback')}</button> : null}
       <details className="mt-2 text-ds-muted"><summary className="cursor-pointer">{t('taskEffectReceiptDetails')}</summary><p className="mt-1 break-all">{receipt.id}</p>{receipt.shell?.outputSha256 ? <p className="break-all">SHA256 {receipt.shell.outputSha256}</p> : null}</details>
     </li>)}</ul>
-  </section> : null}{effect || evidence.length || effects.length ? <section aria-label={t('taskEffectExecution')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
-    <h3 className="text-xs font-semibold">{t('taskEffectExecution')}</h3>
+  </section> : null}{requiresEffects || evidence.length || effects.length ? <section aria-label={t(sectionTitle)} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
+    <h3 className="text-xs font-semibold">{t(sectionTitle)}</h3>
     {effect ? <div className="mt-2 text-xs">
       <p><span className="text-ds-muted">{t('taskEffectProvider')}: </span>{provider(effect.provider)}</p>
-      {effect.requiredEffects?.length ? <ul className="mt-2 space-y-1">{effect.requiredEffects.map((item, index) => <li key={`${item.provider}:${item.operation}:${item.target}:${index}`} className="break-all">{operation(item.operation)} · {item.target}</li>)}</ul>
-        : <p className="mt-1 break-all"><span className="text-ds-muted">{t('taskEffectTarget')}: </span>{effect.target ? `${operation(effect.operation)} · ${effect.target}` : t('taskEffectTargetPending')}</p>}
+      {effect.requiredEffects?.length ? <ul className="mt-2 space-y-1">{effect.requiredEffects.map((item, index) => <li key={`${item.provider}:${item.operation}:${item.target}:${index}`} className="break-all">{operation(item.operation)} · {targetLabel(item.target)}</li>)}</ul>
+        : <p className="mt-1 break-all"><span className="text-ds-muted">{t('taskEffectTarget')}: </span>{effect.target ? `${operation(effect.operation)} · ${targetLabel(effect.target)}` : t('taskEffectTargetPending')}</p>}
     </div> : null}
     <h4 className="mt-3 text-xs font-semibold text-ds-muted">{t('taskEffectEvidence')}</h4>
     {evidence.length ? <ul className="mt-2 space-y-2">{evidence.map((item, index) => <li key={`${item.provider}:${item.target}:${item.resultHash}:${index}`} className="rounded-lg bg-ds-main p-2 text-xs">
-      <p className="break-all">{provider(item.provider)} · {operation(item.operation)} · {item.target}</p>
-      <p className={`mt-1 ${item.verified ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>{t(item.verified ? 'taskEffectVerified' : 'taskEffectUnverified')} · {dateLabel(item.verifiedAt)}</p>
+      <p className="break-all">{evidenceLabel(item)}</p>
+      <p className={`mt-1 ${item.verified ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>{t(evidenceStatus(item))} · {dateLabel(item.verifiedAt)}</p>
       {evidenceDetails(item)}
     </li>)}</ul> : <p className="mt-1 text-xs text-ds-muted">{t('taskEffectNoEvidence')}</p>}
-    <h4 className="mt-3 text-xs font-semibold text-ds-muted">{t('taskEffectReceipts')} ({effects.length})</h4>
+    {showEffects ? <><h4 className="mt-3 text-xs font-semibold text-ds-muted">{t('taskEffectReceipts')} ({effects.length})</h4>
     {effects.length ? <ul className="mt-2 space-y-2">{effects.map(receipt => <li key={receipt.id} className="rounded-lg border border-ds-border p-2 text-xs">
-      <p className="break-all">{provider(receipt.provider)} · {operation(receipt.operation)} · {receipt.target || t('taskEffectTargetPending')}</p>
+      <p className="break-all">{provider(receipt.provider)} · {operation(receipt.operation)} · {receipt.target ? targetLabel(receipt.target) : t('taskEffectTargetPending')}</p>
       <p className={`mt-1 ${receipt.status === 'failed' ? 'text-red-700 dark:text-red-300' : receipt.status === 'outcome_unknown' && !receipt.resolution ? 'text-amber-700 dark:text-amber-300' : 'text-ds-muted'}`}>{t(receipt.resolution ? 'taskEffectReadbackVerified' : receipt.status === 'succeeded' && receipt.evidence?.verified ? 'taskEffectVerified' : `taskReceiptStatus_${receipt.status}`)} · {dateLabel(receipt.resolution?.resolvedAt ?? receipt.updatedAt)}</p>
-      {receipt.errorCode ? <p className="mt-1 break-all text-ds-muted">{t('taskEffectErrorCode')}: {receipt.errorCode}</p> : null}
       {receipt.status === 'failed' ? <p className="mt-1 text-ds-muted">{t('taskEffectFailedRetryGuidance')}</p> : null}
-      {receipt.remoteOperationId && !receipt.evidence?.remoteOperationId ? <p className="mt-1 break-all text-ds-muted">{t('taskEffectRemoteOperation')}: {receipt.remoteOperationId}</p> : null}
       {receipt.status === 'outcome_unknown' && !receipt.resolution ? <>
         <p className="mt-1 text-amber-700 dark:text-amber-300">{t('taskEffectUnknownGuidance')}</p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -99,8 +118,18 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
       {messages[receipt.id] ? <p role="status" className="mt-2 text-ds-muted">{messages[receipt.id]}</p> : null}
       {receipt.evidence ? evidenceDetails(receipt.evidence) : null}
       {receipt.resolution ? <><p className="mt-1 text-ds-muted">{t('taskEffectOriginalUnknownPreserved')}</p>{evidenceDetails(receipt.resolution.evidence)}</> : null}
-      <details className="mt-2 text-[11px] text-ds-muted"><summary className="cursor-pointer">{t('taskEffectReceiptDetails')}</summary><dl className="mt-2 space-y-1 break-all"><div><dt className="inline font-medium">{t('taskEffectReceiptReference')}: </dt><dd className="inline">{receipt.id}</dd></div><div><dt className="inline font-medium">{t('taskEffectRequestHash')}: </dt><dd className="inline">{receipt.requestHash}</dd></div></dl></details>
-    </li>)}</ul> : <p className="mt-1 text-xs text-ds-muted">{t('taskEffectNotExecuted')}</p>}
+      <details className="mt-2 text-[11px] text-ds-muted"><summary className="cursor-pointer">{t('taskEvidenceExecutionDetails')}</summary><dl className="mt-2 space-y-1 break-all">
+        <div><dt className="inline font-medium">{t('taskEffectProvider')}: </dt><dd className="inline">{receipt.provider}</dd></div>
+        <div><dt className="inline font-medium">{t('taskEvidenceOperation')}: </dt><dd className="inline">{receipt.operation}</dd></div>
+        <div><dt className="inline font-medium">{t('taskEvidenceTool')}: </dt><dd className="inline">{receipt.toolName}</dd></div>
+        {receipt.target ? <div><dt className="inline font-medium">{t('taskEffectTarget')}: </dt><dd className="inline">{receipt.target}</dd></div> : null}
+        <div><dt className="inline font-medium">{t('taskEffectReceiptReference')}: </dt><dd className="inline">{receipt.id}</dd></div>
+        <div><dt className="inline font-medium">{t('taskEffectRequestHash')}: </dt><dd className="inline">{receipt.requestHash}</dd></div>
+        {receipt.remoteOperationId ? <div><dt className="inline font-medium">{t('taskEffectRemoteOperation')}: </dt><dd className="inline">{receipt.remoteOperationId}</dd></div> : null}
+        {receipt.errorCode ? <div><dt className="inline font-medium">{t('taskEffectErrorCode')}: </dt><dd className="inline">{receipt.errorCode}</dd></div> : null}
+      </dl></details>
+    </li>)}</ul> : <><p className="mt-1 text-xs text-ds-muted">{t('taskEffectNotExecuted')}</p>{requiresEffects && !evidence.some(item => item.kind === 'external_operation' && item.verified) && !deliveries.length && !receipts.some(receipt => receipt.purpose === 'browser_action') ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{t(requiredEffectState)}</p> : null}</>}
+    </> : null}
   </section> : null}
     {deliveries.length ? <section aria-label={t('taskReplyDelivery')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
       <h3 className="text-xs font-semibold">{t('taskReplyDelivery')}</h3>

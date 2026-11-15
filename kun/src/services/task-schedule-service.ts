@@ -14,7 +14,7 @@ import { operationFingerprint, type TaskRunRepository } from './task-run-reposit
 import type { TaskController } from './task-controller.js'
 import type { TaskCoordinator } from './task-coordinator.js'
 import type { WorkspaceTrustReader } from './workspace-trust-reader.js'
-import { taskPublicQueryAuthority, taskPublicQueryGrant, verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
+import { taskPublicQueryAuthority, taskPublicQueryGrant, verifiedTaskPublicQueryAction, verifiedTaskPublicQueryDocumentNavigation } from './browser-public-query-authority.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { BrowserScheduleActionSchema, type BrowserScheduleAction, type BrowserScheduleBinding } from '../contracts/browser-schedule-actions.js'
 import { browserScheduleApprovalSummary, sanitizeBrowserApprovalSummary } from '../security/browser-approval-summary.js'
@@ -231,7 +231,7 @@ export class TaskScheduleService {
       const flow = this.deps.flows.get(`schedule_${task.id}`)
       if (!flow) return undefined
       if (flow.variables.archived === true || flow.variables.enabled === false || !flow.publishedVersionId) fail('计划已停用，当前任务的计划动作授权不再可用。')
-      await this.validateAuthority(this.authority(flow))
+      await this.validateAuthority(this.authority(flow), undefined, context)
       return undefined
     }
     const scope = await this.executionScope(task)
@@ -283,8 +283,9 @@ export class TaskScheduleService {
     }
   }
 
-  private validateBrowserDispatches(task: TaskRun, actions: BrowserScheduleAction[]) {
+  private validateBrowserDispatches(task: TaskRun, actions: BrowserScheduleAction[], currentContext?: ToolHostContext) {
     const receipts = this.deps.repository.operations(task.id)
+    const currentOperationId = this.currentUndispatchedBrowserTool(task, receipts, currentContext)
     const dispatches = receipts.filter(receipt => receipt.kind === 'browser_action_dispatch')
     // Rebinding never settles an operation. Check every generation before
     // selecting the action evidence needed by the current forward plan.
@@ -296,7 +297,7 @@ export class TaskScheduleService {
       const actionTool = receipt.kind === 'tool' && ['browser_click', 'browser_fill', 'browser_press'].includes(String(receipt.request?.toolName))
       const tracked = ['browser_session', 'browser_action_dispatch', 'browser_schedule_action_outcome'].includes(receipt.kind) || actionTool
       if (tracked && ['prepared', 'running', 'outcome_unknown'].includes(receipt.status) &&
-        !(actionTool && receipt.status === 'prepared' && receipt.request?.dispatchTracking === 'host-v1') &&
+        !(actionTool && receipt.status === 'prepared' && receipt.request?.dispatchTracking === 'host-v1') && receipt.id !== currentOperationId &&
         !this.deps.repository.verifiedOperationResolution(receipt)) browserOutcomeUnknown()
     }
     const retired = this.retiredBrowserDispatches(task, receipts)
@@ -305,10 +306,14 @@ export class TaskScheduleService {
       const dispatch = dispatches.find(item => fingerprint(item.request) === fingerprint(target))
       const original = dispatch && receipts.find(item => item.kind === 'tool' && item.request?.turnId === dispatch.request?.turnId && item.request?.toolName === dispatch.request?.toolName && item.request?.argumentsHash === dispatch.request?.argumentsHash)
       const scoped = original && dispatch && verifiedTaskPublicQueryAction(this.deps.repository, original, dispatch)
+      if (scoped?.request.rule === 'result_link' || target.nativeAction !== undefined) {
+        if (!original || !dispatch || !verifiedTaskPublicQueryDocumentNavigation(this.deps.repository, original, dispatch)) return false
+      }
       return Boolean(scoped && scoped.authority.authorization.duration === 'schedule' &&
         (target.scheduleActionId === undefined || target.scheduleActionId === scoped.result.id))
     }
     const matches = (target: Record<string, unknown>) => {
+      if (target.nativeAction !== undefined) return scopedMatches(target)
       const exact = receipts.find(item => item.id === target.authorizationReceiptId && item.kind === 'browser_action_authorization')
       const approvedId = record(exact?.result).scheduleActionId
       if (target.scheduleActionId !== undefined && approvedId !== undefined && target.scheduleActionId !== approvedId) return false
@@ -332,6 +337,7 @@ export class TaskScheduleService {
     }
     for (const [index, receipt] of receipts.entries()) {
       if (receipt.kind !== 'tool' || !['browser_click', 'browser_fill', 'browser_press'].includes(String(receipt.request?.toolName))) continue
+      if (receipt.id === currentOperationId) continue
       if (dispatches.some(dispatch => retired.has(dispatch.id) && this.browserDispatchToolMatches(dispatch, receipt))) continue
       if (this.deps.repository.verifiedOperationResolution(receipt)?.evidence.kind === 'human_confirmation') {
         const dispatch = dispatches.find(candidate => candidate.request?.turnId === receipt.request?.turnId && candidate.request?.toolName === receipt.request?.toolName &&
@@ -430,11 +436,13 @@ export class TaskScheduleService {
         !oldScope.origins.includes(new URL(target.pageUrl).origin) ||
         typeof grant.issuedAt !== 'string' || !Number.isFinite(Date.parse(grant.issuedAt)) || Date.parse(grant.issuedAt) < Date.parse(previous.createdAt) || Date.parse(grant.issuedAt) > Date.parse(dispatch.createdAt) ||
         typeof grant.expiresAt === 'string' && (!Number.isFinite(Date.parse(grant.expiresAt)) || Date.parse(grant.expiresAt) <= Date.parse(dispatch.createdAt))) continue
-      if (!settled && (dispatch.status !== 'succeeded' || record(dispatch.result).actionAcknowledged !== true ||
+      const historical = verifiedTaskPublicQueryAction(this.deps.repository, tool, dispatch, true)
+      const nativeNavigation = verifiedTaskPublicQueryDocumentNavigation(this.deps.repository, tool, dispatch, true)
+      if ((historical?.request.rule === 'result_link' || target.nativeAction !== undefined) && !nativeNavigation) continue
+      if (!settled && !nativeNavigation && (dispatch.status !== 'succeeded' || record(dispatch.result).actionAcknowledged !== true ||
         typeof record(dispatch.result).acknowledgementHash !== 'string' || record(dispatch.result).readbackPending !== false ||
         typeof record(dispatch.result).resultHash !== 'string' || tool.status !== 'succeeded' || output.provider !== 'browser-skill' ||
         output.status !== 'succeeded' || output.resultHash !== record(dispatch.result).resultHash)) continue
-      const historical = verifiedTaskPublicQueryAction(this.deps.repository, tool, dispatch, true)
       const scoped = historical?.authority.source.id === task.id && historical.authority.authorization.purposeHash === current.authorization.purposeHash &&
         (historical.authority.authorization.duration !== 'schedule' || historical.authority.authorization.requirementHash === current.authorization.requirementHash)
       const exact = this.historicalBrowserScheduleAction(task, dispatch, tool, receipts)
@@ -549,7 +557,36 @@ export class TaskScheduleService {
       browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision }
   }
 
-  private async validateAuthority(authority: ScheduledTaskAuthority, browserActions = authority.scope.browserScheduleActions ?? []) {
+  /** Only the provider's current pre-dispatch resolution may identify its own Host row.
+   * Save, tick and generic authority checks never receive this runtime-only context.
+   */
+  private currentUndispatchedBrowserTool(task: TaskRun, receipts: OperationReceipt[], context?: ToolHostContext): string | undefined {
+    if (!context?.currentToolOperation) return undefined
+    const current = context.currentToolOperation()
+    const grant = context.executionGrant
+    const receipt = receipts.find(item => item.id === current.operationId)
+    if (!grant || current.taskId !== task.id || grant.taskId !== task.id || task.threadId !== context.threadId ||
+      task.activeTurnId !== context.turnId || current.turnId !== context.turnId || grant.turnId !== context.turnId ||
+      grant.threadId !== context.threadId || !['running', 'waiting_approval'].includes(task.status) ||
+      !receipt || receipt.kind !== 'tool' || receipt.status !== 'running' || receipt.idempotencyKey !== current.idempotencyKey ||
+      current.providerId !== 'browser-skill' || !['browser_click', 'browser_fill', 'browser_press'].includes(current.toolName) ||
+      receipt.request?.dispatchTracking !== 'host-v1' || receipt.request.executionId !== current.executionId ||
+      receipt.request.turnId !== current.turnId || receipt.request.toolName !== current.toolName ||
+      receipt.request.callId !== current.callId || receipt.request.providerId !== current.providerId ||
+      receipt.request.argumentsHash !== current.argumentsHash ||
+      operationFingerprint(grant) !== current.executionGrantFingerprint ||
+      operationFingerprint(receipt.request.executionGrant) !== current.executionGrantFingerprint ||
+      grant.expiresAt && Date.parse(grant.expiresAt) <= Date.parse(this.deps.nowIso())) return undefined
+    // Older dispatches lack a Host operation id. Matching the complete Turn,
+    // tool and argument digest is deliberately conservative: even a settled
+    // identical invocation is not grounds to replay it under this exemption.
+    if (receipts.some(item => item.kind === 'browser_action_dispatch' &&
+      (item.request?.hostOperationId === receipt.id || item.request?.turnId === current.turnId &&
+        item.request.toolName === current.toolName && item.request.argumentsHash === current.argumentsHash))) return undefined
+    return receipt.id
+  }
+
+  private async validateAuthority(authority: ScheduledTaskAuthority, browserActions = authority.scope.browserScheduleActions ?? [], currentContext?: ToolHostContext) {
     const { grant } = authority
     const source = this.deps.repository.get(authority.taskId)
     const origin = await this.deps.threads.get(authority.originThreadId)
@@ -569,7 +606,7 @@ export class TaskScheduleService {
       if (!scoped || scoped.authorization.duration !== 'schedule' || authority.authorization.sourceScopeReceiptId !== scoped.binding.id && authority.authorization.kind !== 'confirmed_scope' ||
         fingerprint(authority.scope.browserScope) !== fingerprint(grant.browserScope)) fail('持续公开查询范围已变化或尚未明确确认。')
     }
-    const browserHistory = this.validateBrowserDispatches(source, browserActions)
+    const browserHistory = this.validateBrowserDispatches(source, browserActions, currentContext)
     if ((authority.scope.browserScheduleActions?.length || publicScope) && this.deps.repository.operations(source.id, 'browser_schedule_action_outcome').some(receipt =>
       receipt.status === 'outcome_unknown' && !this.deps.repository.verifiedOperationResolution(receipt))) browserOutcomeUnknown()
     if (authority.scope.browserScheduleActions?.length) {

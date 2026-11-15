@@ -408,7 +408,7 @@ function validateGuiScheduleMcpEvidence(server) {
   assert.equal(server.toolCount, 8, 'The fixed schedule bridge must discover all eight registered tools')
 }
 
-export async function startWindowsTaskModelFixture({ browser = false } = {}) {
+export async function startWindowsTaskModelFixture({ browser = false, postPlanQuery = false, documentLinkClick = false } = {}) {
   const observed = { catalogs: [], requests: [] }
   const marker = `RAILWISE_BROWSER_${randomUUID()}`
   const query = '轨道交通监测合成验收'
@@ -466,15 +466,24 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
         ['start', 'browser_session_start'], ['navigate', 'browser_navigate'], ['read-fill-target', 'browser_get_html'],
         ...(initial ? [['authorize-fill', 'browser_authorize_action']] : []), ['fill', 'browser_fill'],
         ['read-click-target', 'browser_get_html'], ...(initial ? [['authorize-click', 'browser_authorize_action']] : []),
-        ['click', 'browser_click'], ['read-results', 'browser_get_html'], ['navigate-detail', 'browser_navigate'],
+        ['click', 'browser_click'], ['read-results', 'browser_get_html'], ...(documentLinkClick ? [
+          ['read-link-target', 'browser_get_html'], ['open-detail', 'browser_click']
+        ] : [['navigate-detail', 'browser_navigate']]),
         ['read-detail', 'browser_get_html'], ['stop', 'browser_session_stop']
       ] : []), ['artifact', 'publish_artifact'], ['read-artifact', 'read_artifact'], ...(browser ? [['verify-web-artifact', 'verify_web_artifact']] : []),
-      ...(initial ? [['schedule', 'schedule_task'], ['read-schedule', 'list_schedules']] : [])]
+      ...(initial ? [['schedule', 'schedule_task'], ['read-schedule', 'list_schedules'], ...(browser && postPlanQuery ? [
+        ['post-plan-start', 'browser_session_start'], ['post-plan-navigate', 'browser_navigate'],
+        ['post-plan-read-fill-target', 'browser_get_html'], ['post-plan-fill', 'browser_fill'],
+        ['post-plan-read-click-target', 'browser_get_html'], ['post-plan-click', 'browser_click'],
+        ['post-plan-read-results', 'browser_get_html'], ['post-plan-stop', 'browser_session_stop']
+      ] : [])] : [])]
       const step = steps.find(([id]) => !called.has(`smoke-${id}`))
       const [id, next] = step ?? []
       if (next) assert.ok(names.includes(next), `The actual tool catalog must advertise ${next}`)
       observation.next = id ?? 'final-response'
-      const session = toolOutput('start')
+      const queryPhase = id?.startsWith('post-plan-') ? 'post-plan-' : ''
+      const queryStep = queryPhase ? id.slice(queryPhase.length) : id
+      const session = toolOutput(queryPhase + 'start')
       if (called.has('smoke-read-artifact')) {
         const published = toolOutput('artifact'), read = toolOutput('read-artifact')
         assert.ok(published?.read_artifact?.path && typeof read?.content === 'string', 'The task must read its own published artifact through the actual managed reader')
@@ -487,16 +496,36 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
         observation.artifactReadback = { name: read.name, bytes: read.byte_size, sha256: read.sha256, toolName: 'read_artifact', complete: true }
       }
       let args = {}
-      if (id === 'navigate') args = { sessionId: session?.sessionId, url: fixtureUrl }
+      if (queryStep === 'navigate') args = { sessionId: session?.sessionId, url: fixtureUrl }
       if (id === 'navigate-detail') {
         const html = toolOutput('read-results')?.html
         validateWindowsFixtureQueryHtml(html, { marker, query })
         assert.ok(html.includes('href="/fixture/detail"'), 'The actual read list must discover the primary document link')
         args = { sessionId: session?.sessionId, url: new URL('/fixture/detail', fixtureUrl).href }
       }
-      if (['read-fill-target', 'authorize-fill', 'fill', 'read-click-target', 'authorize-click', 'click'].includes(id)) {
-        const page = toolOutput(['read-fill-target', 'authorize-fill', 'fill'].includes(id) ? 'navigate' : 'fill')
-        const filling = ['read-fill-target', 'authorize-fill', 'fill'].includes(id)
+      if (id === 'read-link-target' || id === 'open-detail') {
+        const list = toolOutput('read-results'), search = toolOutput('click')
+        validateWindowsFixtureQueryHtml(list?.html, { marker, query })
+        assert.ok(list.html.includes('href="/fixture/detail"'), 'The list must discover the exact primary-document href')
+        const lines = String(search?.observation?.observation?.text ?? '').split('\n')
+          .filter(line => line.includes(title) && /\blink\b|链接/.test(line) && /@?e\d+/.test(line))
+        assert.equal(lines.length, 1, 'A document click requires the unique real observed link ref, never a guessed target')
+        const target = /@?e\d+/.exec(lines[0])?.[0]
+        assert.ok(target && search.observation.context_id)
+        args = { sessionId: session?.sessionId, target }
+        if (id === 'open-detail') {
+          const element = toolOutput('read-link-target')
+          assert.equal(element?.sourceUrl, fixtureUrl)
+          assert.equal(element.truncated, false)
+          assert.ok(/^<a\b/.test(element.html) && element.html.includes('href="/fixture/detail"') && element.html.includes(title))
+          args.contextId = search.observation.context_id
+          observation.documentNavigation = { callId: 'smoke-open-detail', sessionId: args.sessionId, targetRef: target,
+            contextHash: createHash('sha256').update(args.contextId).digest('hex') }
+        }
+      }
+      if (['read-fill-target', 'authorize-fill', 'fill', 'read-click-target', 'authorize-click', 'click'].includes(queryStep)) {
+        const page = toolOutput(queryPhase + (['read-fill-target', 'authorize-fill', 'fill'].includes(queryStep) ? 'navigate' : 'fill'))
+        const filling = ['read-fill-target', 'authorize-fill', 'fill'].includes(queryStep)
         const label = filling ? '请输入内容' : '搜标题'
         const text = String(page?.observation?.observation?.text ?? '')
         const lines = text.split('\n').filter(line => line.includes(label) && /@?e\d+/.test(line) && (filling ? /\b(?:textbox|searchbox|input)\b/.test(line) : /\bbutton\b/.test(line)))
@@ -504,12 +533,12 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
         const target = /@?e\d+/.exec(lines[0] ?? '')?.[0]
         assert.ok(target && page?.observation?.context_id, 'The protocol fixture requires fresh actual observed element references')
         args = { sessionId: session?.sessionId, target }
-        if (!id.startsWith('read-')) args.contextId = page.observation.context_id
-        if (id.includes('fill') && !id.startsWith('read-')) args.value = query
-        if (id.startsWith('authorize-')) Object.assign(args, { action: id.endsWith('fill') ? 'fill' : 'click', scope: 'schedule', scheduleAccess: 'public_query' })
+        if (!queryStep.startsWith('read-')) args.contextId = page.observation.context_id
+        if (queryStep.includes('fill') && !queryStep.startsWith('read-')) args.value = query
+        if (queryStep.startsWith('authorize-')) Object.assign(args, { action: queryStep.endsWith('fill') ? 'fill' : 'click', scope: 'schedule', scheduleAccess: 'public_query' })
       }
-      if (id === 'read-results' || id === 'read-detail' || id === 'stop') args = { sessionId: session?.sessionId }
-      if (id === 'fill' || id === 'click') observation.browserAction = { action: id, sessionId: args.sessionId, targetRef: args.target,
+      if (queryStep === 'read-results' || queryStep === 'read-detail' || queryStep === 'stop') args = { sessionId: session?.sessionId }
+      if (queryStep === 'fill' || queryStep === 'click') observation.browserAction = { action: queryStep, phase: queryPhase ? 'post_plan' : 'initial', callId: `smoke-${id}`, sessionId: args.sessionId, targetRef: args.target,
         contextHash: createHash('sha256').update(args.contextId).digest('hex') }
       if (next === 'publish_artifact') {
         const content = browser ? buildWindowsFixtureWebReport({ list: toolOutput('read-results'), detail: toolOutput('read-detail'), fixtureUrl, marker, query }).content
@@ -541,7 +570,7 @@ export async function startWindowsTaskModelFixture({ browser = false } = {}) {
   })
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
   fixtureUrl = `http://127.0.0.1:${server.address().port}/fixture`
-  return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, fixtureUrl, detailUrl: new URL('/fixture/detail', fixtureUrl).href, marker, query, inputHtml, buttonHtml, fullButtonHtml, observed,
+  return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, postPlanQuery, documentLinkClick, fixtureUrl, detailUrl: new URL('/fixture/detail', fixtureUrl).href, marker, query, inputHtml, buttonHtml, fullButtonHtml, observed,
     close: () => new Promise(done => { server.close(done); server.closeAllConnections() }) }
 }
 
@@ -967,14 +996,19 @@ export function validateWindowsScheduledQueryEvidence(evidence) {
     assert.equal(item.htmlReadbackVerified, true)
     assert.equal(item.primaryDocumentReadbackVerified, true)
     assert.deepEqual(item.verifiedFields, ['title', 'publication_date', 'budget', 'deadline', 'status', 'qualification'])
-    assert.equal(item.actions, 2)
+    assert.equal(item.actions, item === source ? 4 : 2)
     assert.equal(item.unknownOutcomes, 0)
     assert.equal(item.accountState, 'unknown')
     assert.equal(item.access, 'public_query')
+    assert.ok(item.documentNavigation?.receiptId && item.documentNavigation.hostReceiptId)
+    for (const key of ['verified', 'navigationAcknowledged', 'freshContextVerified', 'primaryDocumentReadbackVerified', 'taskConsentVerified', 'scopeActionVerified']) assert.equal(item.documentNavigation[key], true)
+    assert.equal(item.documentNavigation.intent, 'click'); assert.equal(item.documentNavigation.nativeAction, 'navigate')
+    assert.equal(item.documentNavigation.clickDispatched, false); assert.equal(item.documentNavigation.actionAcknowledged, false)
+    assert.equal(item.documentNavigation.readbackPending, false)
     assert.equal(item.policyExecution?.verificationPolicy, 'public_query_target')
     assert.ok(item.policyExecution.grants.length >= 1)
     assert.ok(item.policyExecution.grants.every(grant => grant.verificationPolicy === 'public_query_target'))
-    assert.equal(item.policyExecution.dispatches.length, 2)
+    assert.equal(item.policyExecution.dispatches.length, item === source ? 4 : 2)
     for (const dispatch of item.policyExecution.dispatches) {
       assert.equal(dispatch.verificationPolicy, 'public_query_target')
       assert.equal(dispatch.derivedVerificationPolicy, 'public_query_target')
@@ -987,6 +1021,10 @@ export function validateWindowsScheduledQueryEvidence(evidence) {
       assert.ok(item.policyExecution.grants.some(grant => grant.id === dispatch.grantId))
     }
   }
+  assert.deepEqual(source.postPlanQuery, { verified: true, actions: 2, planId: source.postPlanQuery?.planId,
+    startedAfterScheduleReadback: true, freshSession: true, acknowledgementAndReadbackVerified: true })
+  assert.ok(source.postPlanQuery.planId)
+  assert.equal(source.policyExecution.dispatches.filter(item => item.phase === 'post_plan').length, 2)
   if (source.taskScopeAuthorization) {
     const consent = source.taskScopeAuthorization
     assert.equal(consent.authorizationSource, 'task_scope')
@@ -997,8 +1035,8 @@ export function validateWindowsScheduledQueryEvidence(evidence) {
     assert.match(consent.requirementHash, /^[a-f0-9]{64}$/)
     assert.equal(source.uiApprovals.length, 0, 'Task-scope public queries cannot require hidden per-action operator approvals')
     assert.equal(source.persistentActionAuthorizations, 0)
-    assert.equal(source.scopeActionAuthorizations, 2)
-    assert.equal(due.scopeActionAuthorizations, 2)
+    assert.equal(source.scopeActionAuthorizations, 5)
+    assert.equal(due.scopeActionAuthorizations, 3)
     for (const item of [source, due]) {
       for (const grant of item.policyExecution.grants) assert.deepEqual(grant.publicQueryAuthorization,
         { receiptId: consent.receiptId, duration: consent.duration, purposeHash: consent.purposeHash, requirementHash: consent.requirementHash })
@@ -1018,7 +1056,7 @@ export function validateWindowsScheduledQueryEvidence(evidence) {
   }
   assert.ok(due.policyExecution.grants.every(grant => !source.policyExecution.grants.some(previous => previous.id === grant.id)))
   assert.equal(due.addedApprovals, 0)
-  assert.equal(due.derivedActionAuthorizations, 2)
+  assert.equal(due.derivedActionAuthorizations, 3)
   assert.equal(due.publishedPlanVersionVerified, true)
   assert.equal(due.enabledPlanVerified, true)
   assert.equal(due.shortAuthorizationVerified, true)
@@ -1059,7 +1097,27 @@ export function inspectWindowsQueryThread(thread, fixture, { initial }) {
   assert.equal(detail.sourceUrl, fixture.detailUrl)
   assert.equal(detail.truncated, false)
   assert.equal(output('verify-web-artifact').complete, true)
-  return { actions: 2, domReadbackVerified: true, htmlReadbackVerified: true, primaryDocumentReadbackVerified: true,
+  let postPlan
+  if (initial && fixture.postPlanQuery) {
+    const schedule = output('read-schedule').schedules?.[0]
+    assert.ok(schedule?.id && schedule.enabled === true, 'The post-plan query needs an enabled, actually read-back plan')
+    const readIndex = items.findIndex(item => item.kind === 'tool_result' && item.callId === 'smoke-read-schedule')
+    const startIndex = items.findIndex(item => item.kind === 'tool_call' && item.callId === 'smoke-post-plan-start')
+    assert.ok(readIndex >= 0 && startIndex > readIndex, 'The extra query must start after the real plan readback')
+    assert.notEqual(output('post-plan-start').sessionId, output('start').sessionId)
+    for (const action of ['fill', 'click']) {
+      const result = output('post-plan-' + action)
+      assert.equal(result.status, 'succeeded')
+      assert.equal(result.sourceUrl, fixture.fixtureUrl)
+      assert.equal(result.evidence?.kind, 'browser_observation')
+      assert.ok(JSON.stringify(result.observation).includes(fixture.query))
+    }
+    validateWindowsFixtureQueryHtml(output('post-plan-read-results').html, fixture)
+    assert.equal(output('post-plan-stop').stopped, true)
+    postPlan = { verified: true, actions: 2, planId: schedule.id, startedAfterScheduleReadback: true,
+      freshSession: true, acknowledgementAndReadbackVerified: true }
+  }
+  return { actions: postPlan ? 4 : 2, ...(postPlan ? { postPlanQuery: postPlan } : {}), domReadbackVerified: true, htmlReadbackVerified: true, primaryDocumentReadbackVerified: true,
     verifiedFields: report.verification.items[0].fields.map(field => field.field), accountState: 'unknown', access: 'public_query' }
 }
 
@@ -1081,16 +1139,76 @@ export function windowsFixtureNativeExpectations(fixture, { action, targetRef, i
   return [...facts(targetRef, fixture.buttonHtml, 'text', text), ...facts(inputTargetRef, fixture.inputHtml, 'value', fixture.query)]
 }
 
+/** Verify the click intent was converted into an exact native GET, with no DOM click. */
+export function inspectWindowsDocumentNavigation(task, thread, receipts, fixture) {
+  const turn = thread.turns.find(turn => turn.items.some(item => item.kind === 'tool_call' && item.callId === 'smoke-open-detail'))
+  assert.ok(turn, 'The real model must request the observed result link through browser_click')
+  const call = turn.items.find(item => item.kind === 'tool_call' && item.callId === 'smoke-open-detail')
+  const item = turn.items.find(item => item.kind === 'tool_result' && item.callId === call.callId)
+  assert.equal(call.toolName, 'browser_click'); assert.equal(item?.toolName, 'browser_click'); assert.equal(item.isError, false)
+  const host = receipts.find(receipt => receipt.ownerId === task.id && receipt.kind === 'tool' && receipt.request?.callId === call.callId && receipt.request.turnId === turn.id)
+  assert.equal(host?.status, 'succeeded'); assert.equal(host.fingerprint, windowsReceiptFingerprint(host.request))
+  assert.equal(host.request.toolName, call.toolName); assert.equal(host.request.providerId, 'browser-skill')
+  assert.equal(windowsReceiptFingerprint(host.request.executionGrant), windowsReceiptFingerprint(turn.executionGrant))
+  assert.equal(host.result.approved, true); assert.equal(host.result.item.callId, call.callId)
+  assert.equal(host.result.item.threadId, thread.id); assert.equal(host.result.item.turnId, turn.id)
+  assert.equal(host.result.item.isError, false); assert.deepEqual(host.result.item.output, item.output)
+  const output = item.output, grant = turn.executionGrant
+  assert.equal(grant.taskId, task.id); assert.equal(grant.threadId, thread.id); assert.equal(grant.turnId, turn.id)
+  assert.equal(output.status, 'succeeded'); assert.equal(output.action, 'navigate'); assert.equal(output.requestedAction, 'click')
+  assert.equal(output.nativeAction, 'navigate'); assert.equal(output.clickDispatched, false); assert.equal(output.sourceUrl, fixture.detailUrl)
+  const dispatch = receipts.find(receipt => receipt.ownerId === task.id && receipt.id === output.dispatchReceiptId && receipt.kind === 'browser_action_dispatch')
+  assert.equal(dispatch?.status, 'succeeded'); assert.equal(dispatch.fingerprint, windowsReceiptFingerprint(dispatch.request))
+  const request = dispatch.request, result = dispatch.result, proof = request.documentLinkProof
+  assert.equal(request.toolName, 'browser_click'); assert.equal(request.action, 'click'); assert.equal(request.nativeAction, 'navigate')
+  assert.equal(request.turnId, turn.id); assert.equal(request.argumentsHash, host.request.argumentsHash)
+  assert.equal(request.pageUrl, fixture.fixtureUrl); assert.equal(request.verificationPolicy, 'public_query_target')
+  assert.equal(result.nativeAction, 'navigate'); assert.equal(result.requestedAction, 'click')
+  assert.equal(result.actionAcknowledged, false); assert.equal(result.clickDispatched, false)
+  assert.equal(result.navigationAcknowledged, true); assert.equal(result.readbackPending, false)
+  assert.equal(result.sourceUrl, fixture.detailUrl); assert.equal(result.resultHash, output.resultHash)
+  assert.match(result.resultHash, /^[a-f0-9]{64}$/)
+  assert.ok(Date.parse(dispatch.createdAt) >= Date.parse(grant.issuedAt) && Date.parse(dispatch.updatedAt) >= Date.parse(dispatch.createdAt))
+  assert.ok(!grant.expiresAt || Date.parse(dispatch.updatedAt) <= Date.parse(grant.expiresAt))
+  const actual = fixture.observed.requests.map(value => value.documentNavigation).filter(value => value?.sessionId === request.sessionId)
+  assert.equal(actual.length, 1); assert.equal(request.targetRef, actual[0].targetRef); assert.equal(request.contextHash, actual[0].contextHash)
+  // Official native read resolves the observed alias, then allocates a
+  // canonical node ref. Their numeric ids need not be equal. The persisted
+  // scope proof, original target/context and exact element hash bind the pair.
+  assert.match(proof?.canonicalTarget, /^@?e\d+$/)
+  assert.equal(proof.hrefHash, createHash('sha256').update('/fixture/detail').digest('hex'))
+  assert.equal(proof.destinationHash, createHash('sha256').update(fixture.detailUrl).digest('hex')); assert.match(proof.frameHash, /^[a-f0-9]{64}$/)
+  assert.equal(request.navigationDestinationHash, proof.destinationHash); assert.equal(result.navigationDestinationHash, proof.destinationHash)
+  assert.deepEqual(output.documentLinkProof, proof)
+  assert.equal(result.navigationContextHash, createHash('sha256').update(output.observation.context_id).digest('hex'))
+  assert.notEqual(result.navigationContextHash, request.contextHash)
+  const read = turn.items.find(item => item.kind === 'tool_result' && item.callId === 'smoke-read-link-target')
+  assert.equal(read?.toolName, 'browser_get_html'); assert.equal(read.isError, false); assert.equal(read.output.sourceUrl, fixture.fixtureUrl)
+  assert.equal(read.output.truncated, false); assert.equal(createHash('sha256').update(read.output.html).digest('hex'), request.elementHash)
+  const scoped = receipts.find(receipt => receipt.id === request.scopeActionReceiptId)
+  assert.equal(scoped?.request.rule, 'result_link'); assert.deepEqual(scoped.request.documentLinkProof, proof)
+  const derived = receipts.find(receipt => receipt.ownerId === task.id && receipt.kind === 'browser_derived_action_authorization' &&
+    receipt.request?.scopeActionReceiptId === scoped.id && receipt.request.sessionId === request.sessionId && receipt.request.turnId === turn.id)
+  assert.ok(derived)
+  const scopeProof = inspectWindowsTaskScopeAction({ task, grant, dispatch, derived, receipts, actualRequest: actual[0] })
+  return { verified: true, intent: 'click', nativeAction: 'navigate', clickDispatched: false, actionAcknowledged: false,
+    navigationAcknowledged: true, readbackPending: false, freshContextVerified: true, primaryDocumentReadbackVerified: true,
+    receiptId: dispatch.id, hostReceiptId: host.id, grantId: grant.id, ...scopeProof }
+}
+
 /** Read only the owned test task's actual Grants and dispatches; export no complete Grant or tool arguments. */
 export function inspectWindowsBrowserPolicy(task, thread, receipts, fixture, expectedPolicy = 'public_query_target') {
   const policy = value => { const result = value === undefined ? 'strict' : value; assert.ok(['strict', 'public_query_target'].includes(result)); return result }
   assert.equal(policy(task.authority?.browserScope?.verificationPolicy), expectedPolicy)
-  const dispatches = receipts.filter(receipt => receipt.ownerId === task.id && receipt.kind === 'browser_action_dispatch')
-  assert.equal(dispatches.length, 2, 'The controlled normal chain must dispatch exactly its two reviewed actions')
+  const dispatches = receipts.filter(receipt => receipt.ownerId === task.id && receipt.kind === 'browser_action_dispatch' && receipt.request?.nativeAction !== 'navigate')
+  const postPlan = fixture.postPlanQuery && !task.scheduledBy
+  assert.equal(dispatches.length, postPlan ? 4 : 2, 'Only the exact initial and configured post-plan query actions may dispatch')
   const grants = new Map(), checked = []
-  for (const action of ['fill', 'click']) {
-    const turn = thread.turns.find(turn => turn.items.some(item => item.kind === 'tool_call' && item.callId === `smoke-${action}`))
-    const call = turn?.items.find(item => item.kind === 'tool_call' && item.callId === `smoke-${action}`)
+  for (const label of ['fill', 'click', ...(postPlan ? ['post-plan-fill', 'post-plan-click'] : [])]) {
+    const action = label.endsWith('fill') ? 'fill' : 'click'
+    const phase = label.startsWith('post-plan-') ? 'post_plan' : 'initial'
+    const turn = thread.turns.find(turn => turn.items.some(item => item.kind === 'tool_call' && item.callId === `smoke-${label}`))
+    const call = turn?.items.find(item => item.kind === 'tool_call' && item.callId === `smoke-${label}`)
     assert.equal(call?.toolName, `browser_${action}`)
     const grant = turn.executionGrant
     assert.ok(grant?.id)
@@ -1099,12 +1217,14 @@ export function inspectWindowsBrowserPolicy(task, thread, receipts, fixture, exp
     assert.deepEqual(grant.browserScope, task.authority.browserScope)
     grants.set(grant.id, { id: grant.id, turnId: turn.id, taskId: grant.taskId, verificationPolicy: policy(grant.browserScope.verificationPolicy),
       ...(grant.browserScope.publicQueryAuthorization ? { publicQueryAuthorization: grant.browserScope.publicQueryAuthorization } : {}) })
-    const matching = dispatches.filter(receipt => receipt.request?.action === action)
+    const actualRequests = fixture.observed.requests.map(item => item.browserAction).filter(item => item?.action === action &&
+      (phase === 'post_plan' ? item.phase === phase : item.phase !== 'post_plan') &&
+      dispatches.some(receipt => receipt.request?.action === action && receipt.request.sessionId === item.sessionId))
+    assert.equal(actualRequests.length, 1, 'The target must come from the distinct real model query phase and fresh session')
+    const actualRequest = actualRequests[0]
+    const matching = dispatches.filter(receipt => receipt.request?.action === action && receipt.request.sessionId === actualRequest.sessionId)
     assert.equal(matching.length, 1)
     const receipt = matching[0], request = receipt.request
-    const actualRequests = fixture.observed.requests.map(item => item.browserAction).filter(item => item?.action === action && item.sessionId === request.sessionId)
-    assert.equal(actualRequests.length, 1, 'The target must come from the real observed ref actually sent by the model protocol fixture')
-    const actualRequest = actualRequests[0]
     assert.match(actualRequest.targetRef, /^@?e\d+$/)
     assert.equal(receipt.status, 'succeeded')
     assert.equal(request.turnId, turn.id)
@@ -1139,7 +1259,7 @@ export function inspectWindowsBrowserPolicy(task, thread, receipts, fixture, exp
     assert.equal(policy(derived[0].result.verificationPolicy), expectedPolicy)
     const scopeProof = grant.browserScope.publicQueryAuthorization
       ? inspectWindowsTaskScopeAction({ task, grant, dispatch: receipt, derived: derived[0], receipts, actualRequest }) : undefined
-    checked.push({ receiptId: receipt.id, action, turnId: turn.id, grantId: grant.id, verificationPolicy: policy(request.verificationPolicy), targetRef: request.targetRef,
+    checked.push({ receiptId: receipt.id, action, phase, turnId: turn.id, grantId: grant.id, verificationPolicy: policy(request.verificationPolicy), targetRef: request.targetRef,
       dependsOn: request.dependsOn ?? [], ...(expectedPolicy === 'public_query_target' ? { expectationVersion: request.expectationVersion,
         expectationHash: request.expectationHash, nativeExpectationVerified: true, inputBindingVerified: true } : {}),
       derivedAuthorizationId: derived[0].id, derivedVerificationPolicy: policy(derived[0].result.verificationPolicy),
@@ -1204,7 +1324,7 @@ export function inspectWindowsTaskScopeAction({ task, grant, dispatch, derived, 
   assert.equal(scoped.request.requirementHash, authorization.requirementHash)
   assert.equal(scoped.request.contextHash, actualRequest.contextHash)
   assert.match(scoped.request.contextHash, /^[a-f0-9]{64}$/)
-  assert.ok(['search_input', 'search_trigger', 'pagination', 'filter_control', 'sort_control'].includes(scoped.request.rule), 'A fixed positive query rule must be recorded')
+  assert.ok(['search_input', 'search_trigger', 'pagination', 'filter_control', 'sort_control', 'result_link'].includes(scoped.request.rule), 'A fixed positive query rule must be recorded')
   assert.equal(scoped.request.origin, new URL(dispatch.request.pageUrl).origin)
   assert.ok(grant.browserScope.origins.includes(scoped.request.origin))
   assert.equal(derived.request.actionId, scoped.result.id)
@@ -1234,7 +1354,7 @@ async function readWindowsQueryAuthorizations(root, sourceId, occurrenceId) {
   const { DatabaseSync } = await import('node:sqlite')
   const database = new DatabaseSync(path, { readOnly: true })
   try {
-    return database.prepare(`SELECT data_json FROM operation_receipts WHERE owner_id IN (?, ?) AND json_extract(data_json, '$.kind') IN ('browser_binding','browser_scope_action_authorization','browser_schedule_action_authorization','browser_derived_action_authorization','browser_schedule_action_outcome','browser_action_dispatch','web_artifact_evidence')`)
+    return database.prepare(`SELECT data_json FROM operation_receipts WHERE owner_id IN (?, ?) AND json_extract(data_json, '$.kind') IN ('tool','browser_binding','browser_scope_action_authorization','browser_schedule_action_authorization','browser_derived_action_authorization','browser_schedule_action_outcome','browser_action_dispatch','web_artifact_evidence')`)
       .all(sourceId, occurrenceId).map(row => JSON.parse(row.data_json))
   } finally { database.close() }
 }
@@ -1922,7 +2042,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const workspace = join(root, windowsSmokeWorkspaceName)
   const environment = windowsUiEnvironment(process.env, root)
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
-  const taskModel = taskSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke }) : undefined
+  const taskModel = taskSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke }) : undefined
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
   await writeFile(settingsPath, JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
@@ -2366,13 +2486,14 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         const queryReceipts = await readWindowsQueryAuthorizations(root, task.id, task.id)
         report.taskExecution.browserSkill.webArtifactEvidence = inspectWindowsPersistedWebArtifact(task, execution, queryReceipts, artifact, taskModel)
         const scopedActions = queryReceipts.filter(item => item.ownerId === task.id && item.kind === 'browser_scope_action_authorization')
-        assert.equal(scopedActions.length, 2)
+        assert.equal(scopedActions.length, 5)
         assert.ok(queryReceipts.every(item => item.status === 'succeeded'))
         report.taskExecution.browserSkill.publicQuery = { ...inspectWindowsQueryThread(execution, taskModel, { initial: true }),
           uiApprovals, persistentActionAuthorizations: actions.length, scopeActionAuthorizations: scopedActions.length, unknownOutcomes: 0,
           taskScopeAuthorization: { ...task.authority.browserScope.publicQueryAuthorization, authorizationSource: 'task_scope',
             uiConsentVerified: report.taskSetup.browserRecovery.publicQueryAuthorizationReview.selected.checked === true },
-          policyExecution: inspectWindowsBrowserPolicy(task, execution, queryReceipts, taskModel) }
+          policyExecution: inspectWindowsBrowserPolicy(task, execution, queryReceipts, taskModel),
+          documentNavigation: inspectWindowsDocumentNavigation(task, execution, queryReceipts, taskModel) }
         validateWindowsBrowserEvidence(report.taskExecution.browserSkill)
         report.checks.push('real-browser-skill-html-and-schedule')
       }
@@ -2467,8 +2588,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         const scopeActions = receipts.filter(item => item.ownerId === occurrence.id && item.kind === 'browser_scope_action_authorization')
         const derived = receipts.filter(item => item.ownerId === occurrence.id && item.kind === 'browser_derived_action_authorization')
         assert.equal(persistent.length, 0)
-        assert.equal(scopeActions.length, 2)
-        assert.equal(derived.length, 2)
+        assert.equal(scopeActions.length, 3)
+        assert.equal(derived.length, 3)
         assert.ok(receipts.every(item => item.status === 'succeeded'), 'Unknown browser outcomes must stop acceptance')
         for (const receipt of derived) {
           assert.equal(receipt.request.binding.versionId, dueReadback.flow.publishedVersionId)
@@ -2490,6 +2611,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         report.taskExecution.dueOccurrence.publicQuery = { ...inspectWindowsQueryThread(occurrenceThread, taskModel, { initial: false }),
           addedApprovals: 0, derivedActionAuthorizations: derived.length, scopeActionAuthorizations: scopeActions.length, unknownOutcomes: 0,
           policyExecution: inspectWindowsBrowserPolicy(occurrence, occurrenceThread, receipts, taskModel),
+          documentNavigation: inspectWindowsDocumentNavigation(occurrence, occurrenceThread, receipts, taskModel),
           publishedPlanVersionVerified: true, enabledPlanVerified: true, shortAuthorizationVerified: true,
           publishedVersionId: dueReadback.flow.publishedVersionId,
           authorizationExpirations: derived.map(item => item.result.expiresAt) }

@@ -13,7 +13,7 @@ import { ExecutionGrantSchema, HostShellAuthorizationSchema, type ExecutionGrant
 import { randomUUID as executionUUID } from 'node:crypto'
 import type { ExecutionToken, InputDelivery, ProcessIdentity } from '../contracts/execution.js'
 import { processIdentity, inspectProcess } from './process-identity.js'
-import type { ToolCallLike, ToolHostResult } from '../ports/tool-host.js'
+import type { CurrentToolOperation, ToolCallLike, ToolHostResult } from '../ports/tool-host.js'
 import { makeToolResultItem } from '../domain/item.js'
 import type { ApprovalRequest } from '../domain/approval.js'
 import { createHash, randomUUID } from 'node:crypto'
@@ -1083,7 +1083,7 @@ export class TaskController {
       // canonical digest belongs in the durable operation ledger.
       const scope = effect ? this.repository.get(token.taskId)?.acceptance.effect : undefined
       const verificationLocator = effect ? externalVerificationLocator(call.arguments) : undefined
-      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, callId: call.callId, dispatchTracking: 'host-v1', providerId: call.providerId, ...effect, ...(effect ? { effectDefinition: effect } : {}), target, turnId, argumentsHash: operationFingerprint(call.arguments), approvalRequestHash: createHash('sha256').update(JSON.stringify(call.arguments)).digest('hex'), ...(verificationLocator ? { verificationLocator } : {}), ...(executionGrant ? { executionGrant } : {}), ...(scope?.scopeConfirmationId ? { scopeConfirmationId: scope.scopeConfirmationId, scopeRevision: scope.scopeRevision } : {}) }, nowIso: this.nowIso() })
+      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, callId: call.callId, executionId: token.executionId, dispatchTracking: 'host-v1', providerId: call.providerId, ...effect, ...(effect ? { effectDefinition: effect } : {}), target, turnId, argumentsHash: operationFingerprint(call.arguments), approvalRequestHash: createHash('sha256').update(JSON.stringify(call.arguments)).digest('hex'), ...(verificationLocator ? { verificationLocator } : {}), ...(executionGrant ? { executionGrant } : {}), ...(scope?.scopeConfirmationId ? { scopeConfirmationId: scope.scopeConfirmationId, scopeRevision: scope.scopeRevision } : {}) }, nowIso: this.nowIso() })
       if (!prepared.created) {
         if (prepared.receipt.status === 'succeeded' && prepared.receipt.result) return { key, token, prior: prepared.receipt.result as ToolHostResult }
         if (['running', 'outcome_unknown'].includes(prepared.receipt.status)) throw Object.assign(new Error('Previous tool outcome must be verified before another dispatch.'), { code: 'outcome_unknown' })
@@ -1149,6 +1149,26 @@ export class TaskController {
       }
       return false
     })
+  }
+
+  /** The closure captures the original call/attempt; a later lease cannot lend it authority. */
+  currentToolOperation(token: ExecutionToken, key: string, call: ToolCallLike, executionGrant?: ExecutionGrant): CurrentToolOperation {
+    this.assertToken(token)
+    const receipt = this.repository.operation(token.taskId, key)
+    const grant = ExecutionGrantSchema.safeParse(receipt?.request?.executionGrant)
+    if (!receipt || receipt.kind !== 'tool' || !['prepared', 'running'].includes(receipt.status) ||
+      receipt.request?.dispatchTracking !== 'host-v1' || receipt.request.executionId !== token.executionId ||
+      receipt.request.turnId !== token.turnId || receipt.request.callId !== call.callId || receipt.request.toolName !== call.toolName ||
+      receipt.request.providerId !== call.providerId || receipt.request.argumentsHash !== operationFingerprint(call.arguments) ||
+      !grant.success || !executionGrant || operationFingerprint(receipt.request.executionGrant) !== operationFingerprint(executionGrant) ||
+      grant.data.taskId !== token.taskId || grant.data.turnId !== token.turnId ||
+      grant.data.threadId !== this.repository.get(token.taskId)?.threadId ||
+      grant.data.expiresAt && Date.parse(grant.data.expiresAt) <= Date.parse(this.nowIso())) {
+      throw Object.assign(new Error('The current Host invocation no longer matches its original attempt and grant.'), { code: 'execution_grant_scope' })
+    }
+    return { operationId: receipt.id, idempotencyKey: key, taskId: token.taskId, turnId: token.turnId,
+      executionId: token.executionId, callId: call.callId, toolName: call.toolName, providerId: call.providerId,
+      argumentsHash: operationFingerprint(call.arguments), executionGrantFingerprint: operationFingerprint(executionGrant) }
   }
 
   recordToolDispatch(token: ExecutionToken, key: string): void {
@@ -1235,6 +1255,49 @@ export class TaskController {
       status: unknown ? 'outcome_unknown' : failed ? 'failed' : 'succeeded',
       ...(result ? { result: { ...result, item: sanitizeTurnItemForPersistence(result.item) } } : {})
     }, this.nowIso())
+  }
+
+  /** Register exact saved bytes after the writer receipt and transcript are durable, without accepting their sources or completing work. */
+  async recordArtifactPublication(token: ExecutionToken, key: string): Promise<boolean> {
+    try {
+      this.assertToken(token)
+      const task = this.repository.get(token.taskId)!
+      if (task.status !== 'running') return false
+      const receipt = this.repository.operation(task.id, key)
+      const result = receipt?.result as ToolHostResult | undefined
+      const item = result?.item
+      if (receipt?.kind !== 'tool' || receipt.status !== 'succeeded' || receipt.request?.toolName !== 'publish_artifact' || receipt.request.turnId !== token.turnId || receipt.request.executionId !== token.executionId ||
+        result?.approved !== true || item?.kind !== 'tool_result' || item.toolName !== 'publish_artifact' || item.callId !== receipt.request.callId || item.turnId !== token.turnId || item.status !== 'completed' || item.isError) return false
+      const output = item.output && typeof item.output === 'object' ? item.output as Record<string, unknown> : {}
+      if (typeof output.path !== 'string' || typeof output.sha256 !== 'string') return false
+      const canonical = await realpath(output.path).catch(() => '')
+      const thread = await this.threadStore.get(task.threadId)
+      const writes = await authorizedArtifactWrites(task, this.repository.operations(task.id, 'tool'), thread?.turns ?? [])
+      const write = writes.get(canonical)
+      if (!write || write.operationId !== receipt.id || write.turnId !== token.turnId || write.sha256 !== output.sha256 || write.authorizedRoot !== this.managedArtifactRoot(task.id)) return false
+      const candidate = (await this.collectArtifacts(task, [item], token.turnId)).find(artifact => artifact.absolutePath === canonical)
+      if (!candidate || candidate.validation !== 'valid' || candidate.sha256 !== write.sha256 || candidate.executionGrantId !== write.executionGrantId) return false
+      const { sourceEvidenceReceiptId: _proof, sourceEvidenceStatus: _status, ...saved } = candidate
+      const artifact: TaskArtifact = { ...saved, ...(task.acceptance.requiresWebEvidence && ['html', 'htm'].includes(saved.format ?? '') ? { sourceEvidenceStatus: 'draft' as const } : {}) }
+      return this.repository.transact(() => {
+        // Keep the captured attempt, not a later token for the same Turn. A pause
+        // or takeover during file validation cannot publish metadata or resume work.
+        this.assertToken(token)
+        const current = this.repository.get(task.id)!
+        if (current.status !== 'running' || current.activeTurnId !== token.turnId) return false
+        if (this.repository.events(task.id).some(event => event.eventKey === `artifact-published:${receipt.id}`)) return true
+        const now = this.nowIso()
+        this.updateExecution(task.id, current.revision, value => ({ ...value,
+          artifacts: [...value.artifacts.filter(previous => previous.id !== artifact.id), artifact],
+          ...(value.resultEvidence ? { resultEvidence: value.resultEvidence.filter(evidence => evidence.kind !== 'file' || evidence.target !== canonical) } : {}),
+          updatedAt: now
+        }), { key: `artifact-published:${receipt.id}`, kind: 'artifact_published', payload: { turnId: token.turnId, artifactId: artifact.id, sha256: artifact.sha256, writerReceiptId: receipt.id }, createdAt: now })
+        return true
+      })
+    } catch (error) {
+      if (error instanceof TaskLeaseLostError) return false
+      throw error
+    }
   }
 
   /** Attach trusted readback evidence without overwriting the original unknown dispatch or resuming execution. */

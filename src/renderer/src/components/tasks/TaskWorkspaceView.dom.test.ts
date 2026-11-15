@@ -284,7 +284,14 @@ describe('TaskWorkspaceView', () => {
     expect(section.textContent).toContain(receipts)
     expect(section.textContent).toContain('remote-operation-42')
     expect(section.textContent).toContain('result-sha256')
-    expect(section.textContent).not.toMatch(/hidden-(?:thread|session|turn)-identifier|lark_task_complete/)
+    expect(section.textContent).not.toMatch(/hidden-(?:thread|session|turn)-identifier/)
+    const visible = section.cloneNode(true) as HTMLElement
+    visible.querySelectorAll('details:not([open])').forEach(details => details.replaceChildren(details.querySelector('summary')!.cloneNode(true)))
+    expect(visible.textContent).not.toMatch(/lark_task_complete|remote-operation-42|result-sha256|request-sha256/)
+    const executionDetails = [...section.querySelectorAll('details')].find(details => details.textContent?.includes('lark_task_complete'))!
+    expect(executionDetails.open).toBe(false)
+    executionDetails.open = true
+    expect(executionDetails.textContent).toContain('lark_task_complete')
     expect(window.workwise.listTaskOperationReceipts).toHaveBeenCalledWith('effect-task')
   })
 

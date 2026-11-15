@@ -11,6 +11,7 @@ import { TaskRunSchema } from '../../contracts/tasks.js'
 import { ExecutionGrantSchema } from '../../contracts/permissions.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import { operationFingerprint, TaskRunRepository } from '../../services/task-run-repository.js'
+import { verifiedTaskPublicQueryDocumentNavigation } from '../../services/browser-public-query-authority.js'
 import type { BrowserCommandRunner } from '../../services/browser-skill-cli.js'
 import { TaskController } from '../../services/task-controller.js'
 import { InMemoryThreadStore } from '../in-memory-thread-store.js'
@@ -1518,6 +1519,81 @@ it('does not accept a model-supplied date facet proof in tool arguments', async 
   await expect(f.execute('browser_click', { sessionId: 'session-one', contextId: 'context-one', target: '@e345', dateFacet: true })).rejects.toThrow('dateFacet')
   expect(f.runner).not.toHaveBeenCalled()
   expect(f.human).not.toHaveBeenCalled()
+})
+
+it.each(['safe', 'blank', 'real-layout', 'spa', 'missing-href', 'javascript', 'cross-origin', 'download', 'onclick', 'post-form', 'native-href-changed', 'native-ref-changed', 'wrong-frame', 'redacted', 'redirect'] as const)('reads an exact native document link by GET without a page JS click: %s', async mode => {
+  const f = taskQueryFixture()
+  await f.execute('browser_session_start'); await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/search' })
+  const window = new Window({ url: 'https://example.com/search' })
+  const href = mode === 'missing-href' ? undefined : mode === 'javascript' ? 'javascript:submit()' : mode === 'cross-origin' ? 'https://outside.example/notice/1'
+    : mode === 'spa' ? '/#/notice/1' : mode === 'real-layout' ? '/site/detail?categoryCode=ZcyAnnouncement&parentId=600007&articleId=c3ludGhldGlj==' : '/dynamic/detail?articleId=42'
+  // Safe-equivalent attributes from the independent public-site diagnostic;
+  // the actual original 1075-byte anchor is private and is not fabricated here.
+  window.document.body.innerHTML = `<main><section><a ${href ? `href="${href}"` : ''}${['blank', 'real-layout'].includes(mode) ? ' target="_blank"' : ''}${mode === 'real-layout' ? ' class="searchResList-content-itemHref"' : ''}${mode === 'download' ? ' download' : ''}${mode === 'onclick' ? ' onclick="submit()"' : ''}>${mode === 'real-layout' ? '<div>合成公开招标公告</div><p>招标文件提交时间与资格条件详见正文。</p>' : '公告正文与期限说明'}</a></section></main>`
+  const target = window.document.querySelector('a')!
+  if (mode === 'post-form') { const form = window.document.createElement('form'); form.method = 'post'; target.replaceWith(form); form.append(target) }
+  f.setElement(target.outerHTML)
+  const original = f.runner.getMockImplementation()!
+  f.runner.mockImplementation(async (configuration, argv, signal) => {
+    if (argv[0] === 'cooperate') return { ok: true, output: { ready: true, control_policy: 'target', context_id: 'fresh-document-context', observation_id: 'fresh-document-observation',
+      observation: { text: 'The owned document body is readable.' } } }
+    if (argv[0] === 'navigate' && mode === 'redirect') { f.setUrl('https://outside.example/document'); return { ok: true, output: { final_url: 'https://outside.example/document' } } }
+    if (argv[0] !== 'read') return original(configuration, argv, signal)
+    const fields = JSON.parse(argv[argv.indexOf('--fields-json') + 1]) as Array<{ key: string; read: string; attribute?: string }>
+    const selected = argv.includes('--selector') ? [...window.document.querySelectorAll(argv[argv.indexOf('--selector') + 1])] : [target]
+    const maximum = Number(argv[argv.indexOf('--max-nodes') + 1])
+    return { ok: true, output: { tab_id: 7, page_url: 'https://example.com/search', frame_url: 'https://example.com/search',
+      frame_id: mode === 'wrong-frame' && fields.length > 1 ? 'CHILD-FRAME' : 'MAIN-FRAME', scope: 'current_dom', truncated: selected.length > maximum,
+      items: selected.slice(0, maximum).map(node => ({ ref: node === target ? mode === 'native-ref-changed' && fields.length > 1 ? '@e777' : '@e999' : '@e100',
+        values: Object.fromEntries(fields.map(field => [field.key, field.read === 'exists' ? true : mode === 'native-href-changed' && field.attribute === 'href' ? '/another/document' : node.getAttribute(field.attribute!) ])),
+        redacted: mode === 'redacted' && fields.length > 1 ? ['href'] : [] })) } }
+  })
+  try {
+    const args = { sessionId: 'session-one', contextId: 'context-one', target: '@e90' }
+    const hostKey = 'test-host-document-link'
+    f.repository.beginOperation({ ownerId: 'task', idempotencyKey: hostKey, kind: 'tool', nowIso: new Date().toISOString(), request: {
+      toolName: 'browser_click', callId: 'document-link', providerId: 'browser-skill', dispatchTracking: 'host-v1', turnId: 'turn',
+      argumentsHash: operationFingerprint(args), executionGrant: f.context.executionGrant } })
+    const result = await f.host.execute({ toolName: 'browser_click', callId: 'document-link', arguments: args }, f.context)
+    if (result.item.kind !== 'tool_result') throw new Error('Expected a real ToolHost result')
+    const host = f.repository.finishOperation('task', hostKey, { status: result.item.isError ? 'failed' : 'succeeded', result: { approved: !result.item.isError, item: result.item } })
+    const allowed = ['safe', 'blank', 'real-layout', 'spa'].includes(mode)
+    expect(result.item, JSON.stringify(result.item)).toMatchObject({ isError: !allowed })
+    expect(f.human).not.toHaveBeenCalled()
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'click')).toHaveLength(0)
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(allowed || mode === 'redirect' ? 2 : 1)
+    const dispatches = f.repository.operations('task', 'browser_action_dispatch')
+    if (allowed) {
+      expect(result.item).toMatchObject({ output: { action: 'navigate', requestedAction: 'click', clickDispatched: false, sourceUrl: new URL(href!, 'https://example.com/search').href,
+        observation: { context_id: 'fresh-document-context' }, dispatchReceiptId: expect.any(String) } })
+      expect(dispatches).toMatchObject([{ status: 'succeeded', request: { nativeAction: 'navigate', targetRef: '@e90', documentLinkProof: {
+        canonicalTarget: '@e999', frameHash: expect.stringMatching(/^[a-f0-9]{64}$/), hrefHash: expect.stringMatching(/^[a-f0-9]{64}$/), destinationHash: expect.stringMatching(/^[a-f0-9]{64}$/) } },
+        result: { nativeAction: 'navigate', actionAcknowledged: false, clickDispatched: false, navigationAcknowledged: true, readbackPending: false } }])
+      expect(f.repository.operations('task', 'browser_scope_action_authorization')[0].request).toMatchObject({ rule: 'result_link' })
+      const dispatch = dispatches[0]
+      expect(verifiedTaskPublicQueryDocumentNavigation(f.repository, host, dispatch)).toBeTruthy()
+      expect(verifiedTaskPublicQueryDocumentNavigation(f.repository, host, dispatch, true)).toBeTruthy()
+      for (const patch of [{ navigationDestinationHash: 'f'.repeat(64) }, { nativeAction: 'click' }, { documentLinkProof: {} }]) {
+        const request = { ...dispatch.request, ...patch }
+        expect(verifiedTaskPublicQueryDocumentNavigation(f.repository, host, { ...dispatch, request, fingerprint: operationFingerprint(request) }, true)).toBeUndefined()
+      }
+      for (const patch of [{ actionAcknowledged: true }, { navigationAcknowledged: false }, { requestedAction: 'delete' }, { navigationContextHash: dispatch.request?.contextHash }, { sourceUrl: 'https://outside.example/document' }]) {
+        expect(verifiedTaskPublicQueryDocumentNavigation(f.repository, host, { ...dispatch, result: { ...(dispatch.result as object), ...patch } }, true)).toBeUndefined()
+      }
+      if (mode === 'safe') {
+        const request = { ...host.request, providerId: 'unrelated-provider' }
+        expect(verifiedTaskPublicQueryDocumentNavigation(f.repository, { ...host, request, fingerprint: operationFingerprint(request) }, dispatch)).toBeUndefined()
+        const saved = host.result as { approved: boolean; item: typeof result.item }
+        expect(verifiedTaskPublicQueryDocumentNavigation(f.repository, { ...host, result: { ...saved, item: { ...saved.item, status: 'failed' } } }, dispatch)).toBeUndefined()
+        for (const patch of [{ status: 'failed' }, { provider: 'unrelated-provider' }]) expect(verifiedTaskPublicQueryDocumentNavigation(f.repository, {
+          ...host, result: { ...saved, item: { ...saved.item, output: { ...(saved.item as { output: object }).output, ...patch } } }
+        }, dispatch)).toBeUndefined()
+      }
+    } else if (mode !== 'redirect') {
+      expect(dispatches).toHaveLength(0)
+      expect(f.repository.operations('task', 'browser_action_scope_request').length).toBeGreaterThan(0)
+    } else expect(dispatches).toMatchObject([{ status: 'failed', result: { nativeAction: 'navigate', clickDispatched: false, navigationAcknowledged: false } }])
+  } finally { await window.happyDOM.close() }
 })
 
 it.each(['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部'].flatMap(label => [false, true].map(selected => ({ label, selected }))))('matches date component CSS tokens and the actual canonical member: $label selected=$selected', async ({ label, selected }) => {

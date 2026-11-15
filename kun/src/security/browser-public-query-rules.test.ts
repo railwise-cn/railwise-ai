@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { expect, it } from 'vitest'
 import { classifyPublicQueryAction, type PublicQueryDomContext } from './browser-public-query-rules.js'
 
@@ -73,4 +74,21 @@ it('does not infer the host-only complete date proof from text, class or page cl
   expect(classify(html, 'click', { dateFacet: true, filter: false })).toBeUndefined()
   expect(classify(html, 'click', { dateFacet: true, filter: true, targetPresent: false })).toBeUndefined()
   expect(classify('<div class="level-content-timeItem" data-date-facet="true">今日</div>', 'click', { filter: true })).toBeUndefined()
+})
+
+it.each(['/notice/detail?id=42', '/#/notice/detail/42', '/dynamic/view.aspx?articleId=42', '/site/detail?categoryCode=ZcyAnnouncement&parentId=600007&articleId=c3ludGhldGlj=='])('recognizes only a host-proved document GET destination: %s', href => {
+  const digest = (value: string) => createHash('sha256').update(value).digest('hex')
+  const html = `<a href="${href}" target="_blank">公告正文：提交投标文件的时间详见正文</a>`
+  const destination = new URL(href, 'https://public.example/search').href
+  expect(classify(html, 'click', { documentLink: { hrefHash: digest(href), destinationHash: digest(destination) } })).toBe('result_link')
+  expect(classify(html)).toBeUndefined()
+})
+
+it.each([
+  '<a>公告正文</a>', '<a href="javascript:void(0)">公告正文</a>', '<a href="/notice/1" download>公告正文</a>',
+  '<a href="/notice/1" onclick="submit()">公告正文</a>', '<a href="https://other.example/notice/1">公告正文</a>',
+  '<a href="/notice/file.pdf">公告正文</a>', '<a href="/account/detail">公告正文</a>', '<a href="/notice/1?action=delete">公告正文</a>',
+  '<a href="/notice/1?token=untrusted">公告正文</a>', '<a href="/notice/1" form="business">公告正文</a>', '<a href="#section">公告正文</a>'
+])('does not turn a host marker into authority for an unsafe link: %s', html => {
+  expect(classify(html, 'click', { documentLink: { hrefHash: 'f'.repeat(64), destinationHash: 'f'.repeat(64) } })).toBeUndefined()
 })

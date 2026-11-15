@@ -13,7 +13,7 @@ import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import { createApprovalRequest } from '../../domain/approval.js'
 import { waitForApprovalDecision } from '../../ports/approval-gate.js'
 import { taskPublicQueryGrant, saveTaskPublicQueryAction } from '../../services/browser-public-query-authority.js'
-import { classifyPublicQueryAction, publicQueryElement, publicSearchLabel, type PublicQueryDomContext } from '../../security/browser-public-query-rules.js'
+import { classifyPublicQueryAction, publicDocumentLinkDestination, publicQueryElement, publicSearchLabel, type PublicQueryDomContext } from '../../security/browser-public-query-rules.js'
 import { BrowserScheduleActionAuthority } from '../../services/browser-schedule-action-authority.js'
 import type { BrowserScheduleResolution } from '../../contracts/browser-schedule-actions.js'
 import { browserApprovalSummary, browserPublicQueryTargetBlocked } from '../../security/browser-approval-summary.js'
@@ -332,7 +332,10 @@ export function buildBrowserSkillToolProvider(options: {
     if (!observed || observed.contextId !== args.contextId) throw failure('browser_context_stale')
     const page = await readHtml(config, sessionId, scope, context, String(args.target), 8192)
     if (page.truncated || !page.html.trim() || page.tabId !== observed.tabId || page.sourceUrl !== observed.sourceUrl) throw failure('browser_element_unverified')
-    if ((browserVerificationPolicy(scope.verificationPolicy) === 'public_query_target' || isRecurring(context)) && browserPublicQueryTargetBlocked(page.html)) throw failure('browser_public_query_target_blocked')
+    // A prose excerpt can describe submission deadlines. A structurally safe
+    // document URL still needs the native proof below and never sends a click.
+    if ((browserVerificationPolicy(scope.verificationPolicy) === 'public_query_target' || isRecurring(context)) && browserPublicQueryTargetBlocked(page.html) &&
+      !(action === 'click' && publicDocumentLinkDestination(page.html, page.sourceUrl))) throw failure('browser_public_query_target_blocked')
     const binding = { taskId, sessionId, browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision,
       grantRevision: context.executionGrant!.revision, workspaceRevision: context.executionGrant!.workspaceRevision,
       agentRevision: context.executionGrant!.agentRevision, goalHash: sha256(task.goal),
@@ -396,7 +399,8 @@ export function buildBrowserSkillToolProvider(options: {
     return { facts, frameUrl: read.frameUrl }
   }
 
-  type DomProofDiagnostic = { stage: 'canonical_target' | 'candidates' | 'form' | 'container' | 'date_members'; code: string }
+  type DomProofDiagnostic = { stage: 'canonical_target' | 'candidates' | 'form' | 'container' | 'date_members' | 'result_link'; code: string;
+    targetTag?: 'a'; hrefState?: 'missing' | 'blocked' | 'native_unverified'; hrefHash?: string; canonicalTarget?: string; frameHash?: string }
   const recordScopeRequest = (action: 'click' | 'fill', args: Json, context: ToolHostContext, reviewed: Awaited<ReturnType<typeof actionBinding>>, toolName: string, domProof?: DomProofDiagnostic) => {
     const request = { turnId: context.turnId, toolName, argumentsHash: operationFingerprint(args), action,
       pageUrl: reviewed.page.sourceUrl, elementHash: reviewed.binding.elementHash, valueHash: reviewed.binding.valueHash,
@@ -450,6 +454,33 @@ export function buildBrowserSkillToolProvider(options: {
       targetFrameId = original.frame_id
       const actual = object(original.items[0])
       if (!Array.isArray(actual.redacted) || actual.redacted.length || object(actual.values).present !== true || typeof actual.ref !== 'string' || !/^@?e\d+$/.test(actual.ref)) return undefined
+      if (element.tag === 'a' && !publicSearchLabel(element.label)) {
+        proofStage = 'result_link'
+        const metadata = { targetTag: 'a' as const, canonicalTarget: actual.ref, frameHash: sha256(original.frame_id),
+          ...(attributes.href ? { hrefHash: sha256(attributes.href) } : {}) }
+        const reject = (code: string, hrefState: 'missing' | 'blocked' | 'native_unverified') => {
+          onFailure?.({ stage: 'result_link', code, hrefState, ...metadata }); return undefined
+        }
+        const destination = publicDocumentLinkDestination(html, page.sourceUrl)
+        if (!destination) return reject(attributes.href ? 'browser_document_link_blocked' : 'browser_document_link_missing_href', attributes.href ? 'blocked' : 'missing')
+        // The href is read from this exact canonical native node, not inferred
+        // from a result label, list position, caller URL or page-owned marker.
+        const names = ['href', 'download', 'target', 'type', 'onclick', 'onmousedown', 'onpointerdown', 'form', 'formaction', 'formmethod']
+        const link = await command(config, ['read', '--session', sessionId, '--tab-id', String(page.tabId), '--ref', targetRef,
+          '--fields-json', JSON.stringify([{ key: 'present', read: 'exists' }, ...names.map(attribute => ({ key: attribute, read: 'attribute', attribute }))]), '--max-nodes', '2', '--max-bytes', '8192'], context)
+        if (link.scope !== 'current_dom' || link.truncated !== false || link.tab_id !== page.tabId || link.page_url !== page.sourceUrl ||
+          link.frame_url !== page.sourceUrl || link.frame_id !== original.frame_id || !Array.isArray(link.items) || link.items.length !== 1) return reject('browser_document_link_native_unverified', 'native_unverified')
+        const entry = object(link.items[0]), values = object(entry.values)
+        if (entry.ref !== actual.ref || !Array.isArray(entry.redacted) || entry.redacted.length || values.present !== true ||
+          names.some(name => !Object.hasOwn(values, name) || values[name] !== null && typeof values[name] !== 'string') ||
+          names.some(name => values[name] !== (attributes[name] ?? null))) return reject('browser_document_link_native_unverified', 'native_unverified')
+        const anchor = `a[href=${quote(attributes.href)}]`
+        const candidates = await probe(anchor, true)
+        if (!candidates?.canonicalRefs.includes(actual.ref.replace(/^@/, ''))) return reject('browser_document_link_native_unverified', 'native_unverified')
+        if (await probe(`form:has(${anchor})`, true)) return reject('browser_document_link_form', 'blocked')
+        return { search: false, pagination: false, filter: false, sort: false, sensitive: false, targetPresent: true,
+          documentLink: { hrefHash: sha256(attributes.href), destinationHash: sha256(destination), canonicalTarget: actual.ref, frameHash: sha256(original.frame_id) } }
+      }
       const dateLabels = ['今日', '近3日', '近1月', '近3月', '近半年', '近一年', '全部']
       if (element.tag === 'div' && dateLabels.includes(element.label) && attributes.class?.split(/\s+/).includes('level-content-timeItem')) {
         // This date facet has several identically styled siblings. Native read's
@@ -584,7 +615,12 @@ export function buildBrowserSkillToolProvider(options: {
     }
     const rule = classify(dom)
     if (!rule) return undefined
-    return saveTaskPublicQueryAction(options.repository, grant!, { ...reviewed.binding, pageUrl: reviewed.page.sourceUrl }, String(args.contextId), rule,
+    const documentLinkProof = rule === 'result_link' && dom.documentLink?.canonicalTarget && dom.documentLink.frameHash ? {
+      hrefHash: dom.documentLink.hrefHash, destinationHash: dom.documentLink.destinationHash,
+      canonicalTarget: dom.documentLink.canonicalTarget, frameHash: dom.documentLink.frameHash
+    } : undefined
+    return saveTaskPublicQueryAction(options.repository, grant!, { ...reviewed.binding, pageUrl: reviewed.page.sourceUrl,
+      ...(documentLinkProof ? { documentLinkProof } : {}) }, String(args.contextId), rule,
       requestHash => browserApprovalSummary({ action, origin: reviewed.binding.origin, pageUrl: reviewed.page.sourceUrl, targetHtml: reviewed.page.html,
         value: typeof args.value === 'string' ? args.value : undefined, requestHash, verificationPolicy: browserVerificationPolicy(scope.verificationPolicy),
         expiresAt: new Date(Math.min(Date.now() + 15 * 60_000, Date.parse(grant!.expiresAt ?? new Date(Date.now() + 15 * 60_000).toISOString()))).toISOString() }))
@@ -690,11 +726,76 @@ export function buildBrowserSkillToolProvider(options: {
     let dispatched = false
     let actionAcknowledged = false
     let actionNotDispatched = false
+    let documentNavigation = false
     let finitePublicQueryAuthorized = false
     let stage: 'preflight' | 'action' | 'readback' = 'preflight'
     let acknowledgementHash: string | undefined
     let dispatchKey: string | undefined
     let navigationDiagnostic: { exitCode?: number; navigation?: BrowserNavigationResult } | undefined
+    const navigateInContext = async (args: Json, taskId: string, config: BrowserCapabilityConfig, scope: BrowserExecutionScope, readOnlyLinkKey?: string) => {
+      const sessionId = String(args.sessionId)
+        originAllowed(String(args.url), scope, context)
+        const tab = await activeTab(config, sessionId, scope, context, true)
+        const argv = ['navigate', String(args.url), '--session', sessionId, '--tab-id', String(tab.id)]
+        const key = `${taskId}:${sessionId}`
+        if (supportsBrowserPolicyCLI(config.version) && (tab.url !== 'about:blank' || args.contextId)) {
+          let observed = observations.get(key)
+          if (args.contextId && observed?.contextId !== args.contextId) throw failure('browser_context_stale')
+          // Missing caller metadata is repaired by an actual read-only sync,
+          // never by inventing or accepting a caller-supplied observation ID.
+          if (!args.contextId) {
+            await observe(config, sessionId, scope, context)
+            observed = observations.get(key)
+          }
+          if (!observed?.observationId) throw failure('browser_observation_required')
+          if (observed.tabId !== tab.id || observed.sourceUrl !== tab.url) throw failure('browser_context_stale')
+          argv.push('--context', observed.contextId, '--observation', observed.observationId)
+        } else {
+          if (tab.url !== 'about:blank' && !args.contextId) throw failure('browser_context_required')
+          if (args.contextId) argv.push('--context', String(args.contextId))
+        }
+        observations.delete(key)
+        stage = 'action'
+        try { await command(config, argv, context) }
+        catch (error) {
+          const failed = error as { code?: string; exitCode?: number; navigation?: BrowserNavigationResult; outcomeUnknown?: boolean }
+          navigationDiagnostic = { ...(failed.exitCode !== undefined ? { exitCode: failed.exitCode } : {}), ...(failed.navigation ? { navigation: failed.navigation } : {}) }
+          if (failed.code !== 'browser_navigation_timeout' || failed.exitCode !== 4 || failed.navigation?.reached !== 'timeout' || failed.outcomeUnknown) throw error
+          const navigation = failed.navigation
+          // A timeout says nothing about page readiness or whether navigation occurred.
+          // Inspect only this owned tab once; never navigate again, settle an action,
+          // or treat vendor error_text (untrusted diagnostic data) as an instruction.
+          if (navigation.tab_id !== tab.id || navigation.url !== String(args.url)) throw failure('browser_page_changed')
+          if (navigation.final_url) originAllowed(navigation.final_url, scope, context)
+          context.abortSignal.throwIfAborted()
+          await context.validateExecutionGrant?.()
+          context.assertExecution?.()
+          const blocked = contextBlock(context, false)
+          if (blocked) throw failure(blocked.code)
+          if (options.repository.operations(taskId, 'browser_action_dispatch').some(receipt =>
+            receipt.idempotencyKey !== readOnlyLinkKey && !options.repository.verifiedOperationResolution(receipt) && (['prepared', 'running', 'outcome_unknown'].includes(receipt.status) ||
+              receipt.status === 'succeeded' && object(receipt.result).readbackPending === true))) throw failure('browser_readback_blocked')
+          stage = 'readback'
+          try {
+            const read = await observe(config, sessionId, scope, context, { tabId: tab.id, ...(navigation.final_url ? { sourceUrl: navigation.final_url } : {}) })
+            const contentRead = hasNavigationPageContent(read.observation)
+            return { isError: true, output: { status: 'failed', provider: 'browser-skill', action: 'navigate', code: 'browser_navigation_timeout', stage,
+              ...navigationDiagnostic, sessionId, ...read,
+              readback: { status: contentRead ? 'partial' : 'empty', contentRead, loadConfirmed: false, loadingState: 'unconfirmed', navigationReplayed: false },
+              message: contentRead ? '导航等待页面加载超时。已只读核对原标签，以下为实际读取的部分内容，不能据此认定页面加载完成。可继续只读检查；没有重复导航。'
+                : '导航等待页面加载超时。已只读核对原标签，但尚未读到页面正文；网址已到达也不代表内容就绪。没有重复导航。' } }
+          } catch (readError) {
+            // Preserve the original lifecycle failure separately from the readback
+            // failure; neither is converted to a successful browser observation.
+            throw Object.assign(readError instanceof Error ? readError : failure('browser_readback_blocked'), { navigationTimeout: true })
+          }
+        }
+        stage = 'readback'
+      const result = await observe(config, sessionId, scope, context)
+      return { output: { status: 'succeeded', provider: 'browser-skill', sessionId, action: 'navigate', ...result,
+        evidence: { kind: 'browser_observation', sourceUrl: result.sourceUrl, resultHash: result.resultHash, verifiedAt: new Date().toISOString(),
+          verified: result.sourceUrl !== 'about:blank', contentRead: result.sourceUrl !== 'about:blank' && hasReadableBrowserContent(result.observation), businessOutcomeVerified: false } } }
+    }
     try {
       if (action === 'press' && browserVerificationPolicy(context.executionGrant?.browserScope?.verificationPolicy) === 'public_query_target') throw failure('browser_public_query_action_required')
       if (isRecurring(context) && action === 'press') throw failure('browser_schedule_action_scope_required')
@@ -837,65 +938,7 @@ export function buildBrowserSkillToolProvider(options: {
         options.onSessionRetired?.(taskId, sessionId)
         return { output: { status: 'succeeded', sessionId, stopped: true } }
       }
-      if (action === 'navigate') {
-        originAllowed(String(args.url), scope, context)
-        const tab = await activeTab(config, sessionId, scope, context, true)
-        const argv = ['navigate', String(args.url), '--session', sessionId, '--tab-id', String(tab.id)]
-        const key = `${taskId}:${sessionId}`
-        if (supportsBrowserPolicyCLI(config.version) && (tab.url !== 'about:blank' || args.contextId)) {
-          let observed = observations.get(key)
-          if (args.contextId && observed?.contextId !== args.contextId) throw failure('browser_context_stale')
-          // Missing caller metadata is repaired by an actual read-only sync,
-          // never by inventing or accepting a caller-supplied observation ID.
-          if (!args.contextId) {
-            await observe(config, sessionId, scope, context)
-            observed = observations.get(key)
-          }
-          if (!observed?.observationId) throw failure('browser_observation_required')
-          if (observed.tabId !== tab.id || observed.sourceUrl !== tab.url) throw failure('browser_context_stale')
-          argv.push('--context', observed.contextId, '--observation', observed.observationId)
-        } else {
-          if (tab.url !== 'about:blank' && !args.contextId) throw failure('browser_context_required')
-          if (args.contextId) argv.push('--context', String(args.contextId))
-        }
-        observations.delete(key)
-        stage = 'action'
-        try { await command(config, argv, context) }
-        catch (error) {
-          const failed = error as { code?: string; exitCode?: number; navigation?: BrowserNavigationResult; outcomeUnknown?: boolean }
-          navigationDiagnostic = { ...(failed.exitCode !== undefined ? { exitCode: failed.exitCode } : {}), ...(failed.navigation ? { navigation: failed.navigation } : {}) }
-          if (failed.code !== 'browser_navigation_timeout' || failed.exitCode !== 4 || failed.navigation?.reached !== 'timeout' || failed.outcomeUnknown) throw error
-          const navigation = failed.navigation
-          // A timeout says nothing about page readiness or whether navigation occurred.
-          // Inspect only this owned tab once; never navigate again, settle an action,
-          // or treat vendor error_text (untrusted diagnostic data) as an instruction.
-          if (navigation.tab_id !== tab.id || navigation.url !== String(args.url)) throw failure('browser_page_changed')
-          if (navigation.final_url) originAllowed(navigation.final_url, scope, context)
-          context.abortSignal.throwIfAborted()
-          await context.validateExecutionGrant?.()
-          context.assertExecution?.()
-          const blocked = contextBlock(context, false)
-          if (blocked) throw failure(blocked.code)
-          if (options.repository.operations(taskId, 'browser_action_dispatch').some(receipt =>
-            !options.repository.verifiedOperationResolution(receipt) && (['prepared', 'running', 'outcome_unknown'].includes(receipt.status) ||
-              receipt.status === 'succeeded' && object(receipt.result).readbackPending === true))) throw failure('browser_readback_blocked')
-          stage = 'readback'
-          try {
-            const read = await observe(config, sessionId, scope, context, { tabId: tab.id, ...(navigation.final_url ? { sourceUrl: navigation.final_url } : {}) })
-            const contentRead = hasNavigationPageContent(read.observation)
-            return { isError: true, output: { status: 'failed', provider: 'browser-skill', action, code: 'browser_navigation_timeout', stage,
-              ...navigationDiagnostic, sessionId, ...read,
-              readback: { status: contentRead ? 'partial' : 'empty', contentRead, loadConfirmed: false, loadingState: 'unconfirmed', navigationReplayed: false },
-              message: contentRead ? '导航等待页面加载超时。已只读核对原标签，以下为实际读取的部分内容，不能据此认定页面加载完成。可继续只读检查；没有重复导航。'
-                : '导航等待页面加载超时。已只读核对原标签，但尚未读到页面正文；网址已到达也不代表内容就绪。没有重复导航。' } }
-          } catch (readError) {
-            // Preserve the original lifecycle failure separately from the readback
-            // failure; neither is converted to a successful browser observation.
-            throw Object.assign(readError instanceof Error ? readError : failure('browser_readback_blocked'), { navigationTimeout: true })
-          }
-        }
-        stage = 'readback'
-      }
+      if (action === 'navigate') return await navigateInContext(args, taskId, config, scope)
       if (mutation) {
         if (await pendingActionReadback(action as 'click' | 'fill', args, context)) throw failure('browser_readback_blocked')
         const confirmed = action !== 'press' && await confirmedAction(action as 'click' | 'fill', args, context)
@@ -930,6 +973,44 @@ export function buildBrowserSkillToolProvider(options: {
         finitePublicQueryAuthorized = Boolean(target && scoped && (derived || object(authorization?.result).access === 'public_query'))
         if (verificationPolicy === 'public_query_target' && !derived && (!authorization || object(authorization.result).access !== 'public_query')) throw failure('browser_public_query_action_required')
         const scopeAction = derived && object(derived.result).authorizationSource === 'task_scope' ? derived : undefined
+        if (action === 'click' && target && scopeAction?.request?.rule === 'result_link') {
+          documentNavigation = true
+          const destination = publicDocumentLinkDestination(target.page.html, target.page.sourceUrl)
+          const proof = object(scopeAction.request.documentLinkProof)
+          if (!destination || proof.hrefHash !== sha256(publicQueryElement(target.page.html)!.attributes.href) || proof.destinationHash !== sha256(destination)) throw failure('browser_document_link_changed')
+          if (context.executionGrant?.allowedToolNames && !context.executionGrant.allowedToolNames.includes('browser_navigate')) throw failure('tool_not_allowed')
+          const fresh = await scopeDomContext(target.page.html, target.page, sessionId, String(args.target), scope, config, context)
+          if (operationFingerprint(fresh?.documentLink) !== operationFingerprint(proof)) throw failure('browser_document_link_changed')
+          // Preserve the caller's click intent, but perform only a GET in the
+          // owned Agent tab. No page onclick or target=_blank handler is run.
+          dispatchKey = `browser-document-navigation:${randomUUID()}`
+          options.repository.beginOperation({ ownerId: taskId, idempotencyKey: dispatchKey, kind: 'browser_action_dispatch', nowIso: new Date().toISOString(),
+            request: { turnId: context.turnId, toolName: 'browser_click', argumentsHash: operationFingerprint(raw), action: 'click', nativeAction: 'navigate',
+              navigationDestinationHash: sha256(destination), documentLinkProof: proof, pageUrl: target.page.sourceUrl, sessionId, tabId: tab.id,
+              targetRef: args.target, browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision, contextHash: sha256(String(args.contextId)),
+              elementHash: target.binding.elementHash, verificationPolicy, scheduleActionId: derived?.request?.actionId,
+              authorizationSource: 'task_scope', scopeAuthorizationReceiptId: scopeAction.request.scopeAuthorizationReceiptId, scopeActionReceiptId: scopeAction.request.scopeActionReceiptId } })
+          options.repository.finishOperation(taskId, dispatchKey, { status: 'running', result: { nativeAction: 'navigate', clickDispatched: false } })
+          try {
+            const navigation = await navigateInContext({ sessionId, contextId: args.contextId, url: destination }, taskId, config, scope, dispatchKey)
+            const successful = !('isError' in navigation && navigation.isError)
+            const freshContext = object(navigation.output.observation).context_id
+            if (successful && (!publicDocumentLinkDestination(`<a href="${navigation.output.sourceUrl}">Document</a>`, target.page.sourceUrl) ||
+              typeof freshContext !== 'string' || !freshContext || freshContext === args.contextId || !hasReadableBrowserContent(navigation.output.observation))) throw failure('browser_document_link_readback_unverified')
+            const receipt = options.repository.finishOperation(taskId, dispatchKey, { status: successful ? 'succeeded' : 'failed', result: {
+              nativeAction: 'navigate', requestedAction: 'click', clickDispatched: false, actionAcknowledged: false, navigationAcknowledged: successful,
+              navigationDestinationHash: sha256(destination), readbackPending: false, sourceUrl: navigation.output.sourceUrl, resultHash: navigation.output.resultHash,
+              ...(typeof freshContext === 'string' ? { navigationContextHash: sha256(freshContext) } : {}),
+              ...(successful ? {} : { code: navigation.output.code }) } })
+            return { ...navigation, output: { ...navigation.output, requestedAction: 'click', nativeAction: 'navigate', clickDispatched: false,
+              dispatchReceiptId: receipt.id, documentLinkProof: proof } }
+          } catch (error) {
+            options.repository.finishOperation(taskId, dispatchKey, { status: 'failed', result: { nativeAction: 'navigate', requestedAction: 'click', clickDispatched: false,
+              actionAcknowledged: false, navigationAcknowledged: false, readbackPending: false, ...browserCommandDiagnostics({ ok: false, output: {}, ...object(error) }) } })
+            dispatchKey = undefined
+            throw error
+          }
+        }
         const expectations = (verificationPolicy === 'public_query_target' || scopeAction) && target
           ? await publicQueryExpectations(action as 'click' | 'fill', args, context, target, config, scope) : undefined
         if (expectations) argv.push('--expect', JSON.stringify(expectations.facts))
@@ -1041,6 +1122,7 @@ export function buildBrowserSkillToolProvider(options: {
       if (dispatchKey && context.executionGrant?.taskId && !actionAcknowledged) options.repository.finishOperation(context.executionGrant.taskId, dispatchKey, { status: unknown ? 'outcome_unknown' : 'failed', result: { stage, ...diagnostic, ...(dispatched ? {} : { notDispatched: true }), ...(actionNotDispatched ? { actionDispatch: 'not_sent' } : {}) }, error: 'Browser action result requires verification.' })
       if (unknown && (action === 'click' || action === 'fill')) scheduleAuthority.recordUnknown(context, action)
       return { isError: true, output: { status: unknown ? 'outcome_unknown' : 'failed', provider: 'browser-skill', action, stage, ...diagnostic,
+        ...(documentNavigation ? { nativeAction: 'navigate', requestedAction: 'click', clickDispatched: false } : {}),
         ...(navigationDiagnostic ?? {}), ...(object(error).navigationTimeout === true ? { navigationTimeout: true } : {}),
         ...(actionNotDispatched ? { actionDispatch: 'not_sent', notDispatched: true } : {}),
         ...(actionAcknowledged ? { actionAcknowledged: true, readbackPending: true, acknowledgementHash,

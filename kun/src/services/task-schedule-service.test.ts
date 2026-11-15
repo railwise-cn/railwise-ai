@@ -9,7 +9,7 @@ import { buildCoreFlowAdapters } from '../flow/core-adapters.js'
 import { buildFlowNodeRegistry } from '../flow/node-registry.js'
 import { TaskRunRepository, operationFingerprint } from './task-run-repository.js'
 import { ManagedBrowserSkillRuntime } from './managed-browser-skill-runtime.js'
-import { saveTaskPublicQueryAction } from './browser-public-query-authority.js'
+import { saveTaskPublicQueryAction, verifiedTaskPublicQueryDocumentNavigation } from './browser-public-query-authority.js'
 import { TaskRunSchema } from '../contracts/tasks.js'
 import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { ThreadSchema } from '../contracts/threads.js'
@@ -192,8 +192,10 @@ function rewriteReceipt(f: ReturnType<typeof reboundBrowserFixture>, id: string,
     .run(JSON.stringify(value), value.ownerId, value.idempotencyKey)
 }
 
-function twiceReboundBrowserFixture() {
-  const f = reboundBrowserFixture(), before = f.repository.operations(f.task.id).map(row => JSON.stringify(row))
+function twiceReboundBrowserFixture(prepare?: (f: ReturnType<typeof reboundBrowserFixture>) => void) {
+  const f = reboundBrowserFixture()
+  prepare?.(f)
+  const before = f.repository.operations(f.task.id).map(row => JSON.stringify(row))
   vi.setSystemTime(new Date('2026-11-13T00:02:00Z'))
   f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision, task => ({ ...task, status: 'paused' }))
   Object.assign(f.browser, { browserInstanceId: 'browser-three', revision: 3, browsers: [
@@ -206,6 +208,54 @@ function twiceReboundBrowserFixture() {
 }
 
 describe('task-owned recurring execution', () => {
+  it.each(['valid', 'forged-destination', 'fake-click-ack', 'unknown'] as const)('retires only a fully verified native document GET across a later browser binding: %s', async mode => {
+    let navigation!: OperationReceipt
+    const prepare = () => twiceReboundBrowserFixture(base => {
+      const grant = structuredClone(base.context.executionGrant!), scope = grant.browserScope!, argsHash = digest('native-document-intent')
+      const destination = 'https://example.test/notice/detail?articleId=42', href = '/notice/detail?articleId=42'
+      const proof = { hrefHash: digest(href), destinationHash: digest(destination), canonicalTarget: '@e999', frameHash: digest('native-frame') }
+      const contextHash = digest('old-document-context'), resultHash = digest('real-owned-document-observation')
+      const scoped = saveTaskPublicQueryAction(base.repository, grant, { taskId: base.task.id, sessionId: 'session-two', browserInstanceId: scope.browserInstanceId,
+        browserRevision: scope.revision, pageUrl: 'https://example.test/search', origin: 'https://example.test', action: 'click',
+        elementHash: digest(`<a href="${href}" target="_blank">公告正文</a>`), verificationPolicy: 'public_query_target', documentLinkProof: proof },
+      'old-document-context', 'result_link', 'Native document GET fixture')!
+      const key = 'native-document-host', callId = 'native-document-call'
+      base.repository.beginOperation({ ownerId: base.task.id, idempotencyKey: key, kind: 'tool', nowIso: new Date().toISOString(), request: {
+        toolName: 'browser_click', providerId: 'browser-skill', callId, turnId: grant.turnId, argumentsHash: argsHash, executionGrant: grant } })
+      navigation = base.browserDispatch('click', 'succeeded', { turnId: grant.turnId, argumentsHash: argsHash, sessionId: 'session-two', nativeAction: 'navigate',
+        navigationDestinationHash: proof.destinationHash, documentLinkProof: proof, browserInstanceId: scope.browserInstanceId, browserRevision: scope.revision,
+        verificationPolicy: 'public_query_target', contextHash, elementHash: scoped.receipt.request!.elementHash, scheduleActionId: scoped.result.id,
+        authorizationSource: 'task_scope', scopeActionReceiptId: scoped.receipt.id, scopeAuthorizationReceiptId: base.currentBinding.id })
+      navigation = base.repository.finishOperation(base.task.id, navigation.idempotencyKey, { status: 'succeeded', result: {
+        nativeAction: 'navigate', requestedAction: 'click', clickDispatched: false, actionAcknowledged: false, navigationAcknowledged: true, readbackPending: false,
+        navigationDestinationHash: proof.destinationHash, navigationContextHash: digest('fresh-document-context'), sourceUrl: destination, resultHash } })
+      const host = base.repository.finishOperation(base.task.id, key, { status: 'succeeded', result: { approved: true, item: {
+        kind: 'tool_result', status: 'completed', toolName: 'browser_click', threadId: grant.threadId, turnId: grant.turnId, callId, isError: false,
+        output: { provider: 'browser-skill', status: 'succeeded', action: 'navigate', requestedAction: 'click', nativeAction: 'navigate', clickDispatched: false,
+          sourceUrl: destination, resultHash, dispatchReceiptId: navigation.id, documentLinkProof: proof }
+      } } })
+      expect(verifiedTaskPublicQueryDocumentNavigation(base.repository, host, navigation)).toBeTruthy()
+      if (mode === 'forged-destination') rewriteReceipt(base, navigation.id, row => { row.request!.navigationDestinationHash = digest('another-document') })
+      if (mode === 'fake-click-ack') rewriteReceipt(base, navigation.id, row => { (row.result as Record<string, unknown>).actionAcknowledged = true })
+      if (mode === 'unknown') rewriteReceipt(base, navigation.id, row => { row.status = 'outcome_unknown' })
+    })
+    if (mode === 'unknown') {
+      // The normal binding entry blocks an unresolved operation even before a
+      // later schedule could attempt to retire it.
+      expect(prepare).toThrow('browser_unresolved_operation')
+      return
+    }
+    const f = prepare()
+    if (mode !== 'valid') await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'browser_schedule_action_scope_required' })
+    else {
+      expect((await f.service.create(f.context)).scope.browserScope).toMatchObject({ browserInstanceId: 'browser-three', revision: 3 })
+      const audit = (f.repository.operations(f.task.id, 'schedule_authority')[0].result as { retiredBrowserActions: Array<{ dispatchReceiptId: string }> }).retiredBrowserActions
+      expect(audit.some(row => row.dispatchReceiptId === navigation.id)).toBe(true)
+      expect(f.repository.operations(f.task.id).slice(0, f.before.length).map(row => JSON.stringify(row))).toEqual(f.before)
+    }
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+  })
+
   it('retires proven ancestors across two explicit browser rebindings without copying either generation into the new plan', async () => {
     const f = twiceReboundBrowserFixture()
     const saved = await f.service.create(f.context)

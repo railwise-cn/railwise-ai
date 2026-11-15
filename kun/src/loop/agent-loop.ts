@@ -470,6 +470,7 @@ export type AgentLoopOptions = {
  * cancellable through the AbortSignal returned by `getAbortController`.
  */
 export class AgentLoop {
+  private readonly artifactPublications = new WeakMap<ToolHostResult, NonNullable<ReturnType<TaskController['beginToolOperation']>>>()
   private readonly activeRuns = new Map<string, Promise<'completed' | 'failed' | 'aborted'>>()
   private readonly opts: AgentLoopOptions
   private readonly workspaceReferences: Pick<WorkspaceReferenceService, 'validateReferences'>
@@ -2050,6 +2051,7 @@ export class AgentLoop {
             claimUndispatchedApproval: approval => this.opts.tasks!.claimUndispatchedApproval(dispatchOperation.token, dispatchOperation.key, approval),
             recordExplicitApproval: approval => this.opts.tasks!.recordToolApproval(dispatchOperation.token, dispatchOperation.key, approval),
             recordToolDispatch: () => this.opts.tasks!.recordToolDispatch(dispatchOperation.token, dispatchOperation.key),
+            currentToolOperation: () => this.opts.tasks!.currentToolOperation(dispatchOperation.token, dispatchOperation.key, input.call, input.context.executionGrant),
             ...(input.context.executionGrant?.taskPermissionId ? { claimTaskPermission: () => this.opts.claimTaskPermission!(input.threadId, input.context.executionGrant!.taskPermissionId!, dispatchOperation.key) } : {}),
             ...(!/^(?:bash|user_input|request_user_input|delegate.*|.*subagent.*|spawn_agent)$/.test(input.call.toolName) ? {
               beginExecutionWork: () => this.opts.tasks?.beginWork(input.turnId,
@@ -2066,6 +2068,7 @@ export class AgentLoop {
             await this.opts.turns.applyItem(input.threadId, item)
           })
           if (operation) this.opts.tasks?.finishToolOperation(operation.token, operation.key, result)
+          if (operation && input.call.toolName === 'publish_artifact') this.artifactPublications.set(result, operation)
           if (operation) this.opts.tasks?.assertToken(operation.token)
           const isError = result.item.kind === 'tool_result' && result.item.isError === true
           if (spanId) {
@@ -2174,6 +2177,11 @@ export class AgentLoop {
     call: ToolCallLike,
     result: ToolHostResult
   ): Promise<void> {
+    if (call.toolName === 'publish_artifact') {
+      const publication = this.artifactPublications.get(result)
+      this.artifactPublications.delete(result)
+      if (publication) await this.opts.tasks?.recordArtifactPublication(publication.token, publication.key)
+    }
     if (call.toolName !== CREATE_PLAN_TOOL_NAME) return
     if (result.item.kind !== 'tool_result' || result.item.isError === true) return
     const output = result.item.output

@@ -61,6 +61,20 @@ export type GuiDesignContext = {
   turnId?: string
 }
 
+/** Minted from the current server-owned Host operation, never model arguments. */
+export type CurrentToolOperation = {
+  operationId: string
+  idempotencyKey: string
+  taskId: string
+  turnId: string
+  executionId: string
+  callId: string
+  toolName: string
+  providerId?: string
+  argumentsHash: string
+  executionGrantFingerprint: string
+}
+
 export type ToolHostContext = {
   threadId: string
   turnId: string
@@ -114,6 +128,8 @@ export type ToolHostContext = {
   recordExplicitApproval?: (approval: { toolName: string; requestHash: string }) => void
   /** Persist the dispatch boundary after approval and before invoking the tool. */
   recordToolDispatch?: () => void
+  /** Reassert the original attempt and identify only this exact Host invocation. */
+  currentToolOperation?: () => CurrentToolOperation
   abortSignal: AbortSignal
   /** Recheck the immutable task lease immediately before dispatch, after approvals. */
   assertExecution?: () => void
