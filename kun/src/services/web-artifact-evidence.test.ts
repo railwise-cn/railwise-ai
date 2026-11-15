@@ -16,6 +16,7 @@ import { WebArtifactEvidenceInputSchema } from '../contracts/web-artifact-eviden
 import { buildManagedArtifactToolProviders } from '../adapters/tool/managed-artifact-tool-provider.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
 import { assessWebArtifactEvidence } from './web-artifact-evidence.js'
+import { renderStructuredWebReport } from './structured-web-report.js'
 
 const roots: string[] = []
 const fixtureTime = '2026-11-15T00:00:00.000Z'
@@ -276,5 +277,67 @@ it.each([
   try {
     expect((await f.assessment(report())).complete).toBe(false)
     expect((await f.call('verify_web_artifact', input())).complete).toBe(false)
+  } finally { f.repository.close() }
+})
+
+
+it('does not extend a verbatim Chinese 14时00分 deadline to the end of that day', async () => {
+  const f = await fixture()
+  try {
+    const raw = '2026年12月1日14时00分', body = document.replaceAll('2026-12-01', raw), proof = input()
+    await f.source(origins[0] + '/notice/1', body)
+    proof.items[0]!.source.resultHash = sha(body)
+    const field = proof.items[0]!.fields.find(field => field.field === 'deadline')!
+    field.value = raw; field.quote = field.quote.replace('2026-12-01', raw)
+    const html = report().replaceAll('2026-12-01', raw)
+    const result = assessWebArtifactEvidence(f.repository, f.repository.get(f.task.id)!, await f.sessionStore.loadItems(f.thread.id), (await f.threadStore.get(f.thread.id))!.turns, html, proof, '2026-12-01T06:01:00.000Z')
+    expect(result.reasons).toContainEqual(expect.stringContaining('有效截止时间'))
+    expect(result.complete).toBe(false)
+  } finally { f.repository.close() }
+})
+
+
+it('round trips the structured manifest through the real unchanged source evidence guards', async () => {
+  const f = await fixture()
+  try {
+    const proof = input(), { path: _path, ...evidence } = proof
+    const generated = renderStructuredWebReport(proof.path, { title: '工程测量招标资料', evidence })
+    expect(generated.verificationInput).toEqual(proof)
+    expect((await f.assessment(generated.content, generated.verificationInput)).complete).toBe(true)
+    expect((await f.assessment(generated.content.replace('100000元', '999999元'), generated.verificationInput)).complete).toBe(false)
+    const missingRequiredSource = { ...generated.verificationInput, noMatches: [] }
+    expect((await f.assessment(generated.content, missingRequiredSource)).reasons).toContainEqual(expect.stringContaining('正式公告正文尚未核验'))
+  } finally { f.repository.close() }
+})
+
+it('renders unknown fields honestly while preserving title, full source, discovery and required origins', async () => {
+  const f = await fixture()
+  try {
+    const proof = input()
+    proof.items[0]!.fields = proof.items[0]!.fields.filter(field => field.field !== 'budget' && field.field !== 'qualification')
+    proof.items[0]!.unverifiedFields = ['budget', 'qualification']
+    const { path, ...evidence } = proof
+    const generated = renderStructuredWebReport(path, { title: '含待核验字段的资料草稿', evidence })
+    expect(generated.content).toContain('data-evidence-unverified>待核验')
+    expect((await f.assessment(generated.content, generated.verificationInput)).complete).toBe(true)
+    const forgedZero = structuredClone(generated.verificationInput)
+    forgedZero.noMatches[0]!.quote = '工程测量：共找到0条虚构记录'
+    expect((await f.assessment(generated.content, forgedZero)).complete).toBe(false)
+  } finally { f.repository.close() }
+})
+
+
+it('round trips entity-represented original values through the real verifier', async () => {
+  const f = await fixture()
+  try {
+    const raw = 'R&amp;D测绘资质乙级及以上', body = document.replaceAll('测绘资质乙级及以上', raw), proof = input()
+    await f.source(origins[0] + '/notice/1', body)
+    proof.items[0]!.source.resultHash = sha(body)
+    const field = proof.items[0]!.fields.find(field => field.field === 'qualification')!
+    field.value = raw
+    for (const entry of proof.items[0]!.fields) entry.quote = entry.quote.replaceAll('测绘资质乙级及以上', raw)
+    const { path, ...evidence } = proof
+    const generated = renderStructuredWebReport(path, { title: '原文字段实体测试', evidence })
+    expect((await f.assessment(generated.content, generated.verificationInput)).complete).toBe(true)
   } finally { f.repository.close() }
 })

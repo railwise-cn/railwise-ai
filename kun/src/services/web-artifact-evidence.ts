@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { evidenceDeadlineCutoff } from './web-evidence-deadline.js'
 import { taskScheduleConnectorIdentities } from '../contracts/task-schedule-policy.js'
 import type { TaskRun, TaskArtifact, OperationReceipt } from '../contracts/tasks.js'
 import type { Turn } from '../contracts/turns.js'
@@ -183,11 +184,8 @@ export function assessWebArtifactEvidence(repository: TaskRunRepository, task: T
     const discovered = explicitUrl || source.url !== discovery.url && links(discovery.content, discovery.url).has(source.url)
     const deadline = item.fields.find(field => field.field === 'deadline')?.value
     if (item.classification === 'opportunity' && deadline) {
-      const match = /(20\d{2})[-年](\d{1,2})[-月](\d{1,2})(?:日)?(?:[T\s]*(\d{1,2})[:：](\d{2}))?/.exec(deadline)
-      const calendar = match ? new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))) : undefined
-      const calendarValid = Boolean(match && calendar?.getUTCFullYear() === Number(match[1]) && calendar?.getUTCMonth() === Number(match[2]) - 1 && calendar?.getUTCDate() === Number(match[3]) && Number(match[4] ?? '23') < 24 && Number(match[5] ?? '59') < 60)
-      const cutoff = match && calendarValid ? Date.parse(`${match[1]}-${match[2]!.padStart(2, '0')}-${match[3]!.padStart(2, '0')}T${(match[4] ?? '23').padStart(2, '0')}:${match[5] ?? '59'}:59+08:00`) : NaN
-      if (!Number.isFinite(cutoff) || cutoff <= Date.parse(nowIso)) reasons.push(`当前机会缺少可核验的有效截止时间，请保留为历史或待核验：${item.sectionId}`)
+      const cutoff = evidenceDeadlineCutoff(deadline)
+      if (cutoff === undefined || cutoff <= Date.parse(nowIso)) reasons.push(`当前机会缺少可核验的有效截止时间，请保留为历史或待核验：${item.sectionId}`)
     }
     if (item.classification === 'opportunity' && item.fields.some(field => field.field === 'status' && /已结束|已截止|已中标|已成交|已定标|已完成采购|closed|awarded/i.test(field.value))) reasons.push(`已结束条目不能标为当前机会：${item.sectionId}`)
     if (!source.full || !discovered || !text(source.content).includes(text(item.title))) reasons.push(`条目尚缺真实链接发现及完整正文读取：${item.sectionId}`)
@@ -234,5 +232,5 @@ export function verifiedWebArtifactEvidence(repository: TaskRunRepository, task:
 }
 
 export function webEvidenceRepair(task: TaskRun): string {
-  return `成果文件已保留为草稿，但尚未通过来源验收。继续原任务，使用已授权工具实际读取${(task.acceptance.requiredSourceOrigins ?? []).join('、') || '所需来源'}；使用 browser_get_html 读取真实结果链接元素以取得 href，再打开并完整读取正文。遇到SVG/iframe使HTML截断或缺body时，browser_get_html会在原授权内自动检查本会话已加载且身份匹配的完整原文响应。sourceKind=actual_loaded_response是独立的响应文档表示，不是完整DOM；未取得完整响应仍须保持草稿，不重复导航。更新同一成果文件，逐条提供原文URL、实际字段与原文依据；历史合同、采购意向和当前可投标公告分开。调用 verify_web_artifact(path, coverage[{url,resultHash}], items[{sectionId,title,source,discovery,classification,fields[{field,value,quote}],unverifiedFields}]) 核验。正式数据区使用main[data-evidence-report]；每个tr/article/section同时用id及data-evidence-item=sectionId、data-evidence-classification，正文链接加data-evidence-source。每个title/publication_date/budget/deadline/status/qualification值用data-evidence-field对应字段名，未读字段再加data-evidence-unverified并写待核验。所有报告数据行/条目/字段都须声明，不能用一条真实数据为其余旧草稿背书。只有实际列表明确零匹配才使用noMatches；不能虚构线索。待核验不等于已完成核验；不要让用户手工搜索或复制网页。有效跨Turn原文回执可以复用，无须无条件重采。只有真实登录、权限或网络阻断才说明影响并等待；不得凭旧入口访问或自写说明完成任务。`
+  return `成果文件已保留为草稿，但尚未通过来源验收。继续原任务，使用已授权工具实际读取${(task.acceptance.requiredSourceOrigins ?? []).join('、') || '所需来源'}；使用 browser_get_html 读取真实结果链接元素以取得 href，再打开并完整读取正文。遇到SVG/iframe使HTML截断或缺body时，browser_get_html会在原授权内自动检查本会话已加载且身份匹配的完整原文响应。sourceKind=actual_loaded_response是独立的响应文档表示，不是完整DOM；未取得完整响应仍须保持草稿，不重复导航。更新同一成果文件，逐条提供原文URL、实际字段与原文依据。value必须是quote中的逐字连续原文片段（仅忽略空白），quote必须实际存在于已读正文；HTML中data-evidence-field的可见文本须直接等于同一value。不要把日期改为ISO、给金额增加限定词、推断状态或改写资质。可用publish_artifact的report结构化模式，从同一typed数据生成HTML并返回verificationInput，再显式调用verify_web_artifact；发布仍是草稿，不会自动完成。不能逐字支持的字段须从fields删除，列入unverifiedFields，并只显示带data-evidence-unverified的“待核验”；同一字段不得两边同时声明。title、真实发现链接、完整正文与必需来源不能用待核验替代。历史合同、采购意向和当前可投标公告分开。调用 verify_web_artifact(path, coverage[{url,resultHash}], items[{sectionId,title,source,discovery,classification,fields[{field,value,quote}],unverifiedFields}]) 核验。正式数据区使用main[data-evidence-report]；每个tr/article/section同时用id及data-evidence-item=sectionId、data-evidence-classification，正文链接加data-evidence-source。每个title/publication_date/budget/deadline/status/qualification值用data-evidence-field对应字段名，未读字段再加data-evidence-unverified并写待核验。所有报告数据行/条目/字段都须声明，不能用一条真实数据为其余旧草稿背书。只有实际列表明确零匹配才使用noMatches；不能虚构线索。待核验不等于已完成核验；不要让用户手工搜索或复制网页。有效跨Turn原文回执可以复用，无须无条件重采。只有真实登录、权限或网络阻断才说明影响并等待；不得凭旧入口访问或自写说明完成任务。`
 }
