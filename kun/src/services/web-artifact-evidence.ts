@@ -70,10 +70,13 @@ function sources(repository: TaskRunRepository, task: TaskRun, items: TurnItem[]
     const at = Date.parse(receipt.createdAt), finished = Date.parse(receipt.updatedAt)
     if (!Number.isFinite(at) || !Number.isFinite(finished) || finished < at || Date.parse(grant.issuedAt) > at || grant.expiresAt && Date.parse(grant.expiresAt) < finished) continue
     const output = object(item.output), evidence = object(output.evidence)
-    const browser = /^browser_(?:navigate|observe|get_html|read_document|read|extract|click)$/.test(item.toolName)
+    const browser = /^browser_(?:navigate|observe|get_html|read|extract|click)$/.test(item.toolName)
     const web = item.toolName === 'web_fetch'
     if ((!browser && !web) || browser && (request.providerId !== 'browser-skill' || output.status !== 'succeeded' || evidence.verified !== true || evidence.contentRead !== true)) continue
-    if (item.toolName === 'browser_read_document' ? !validLoadedResponseEvidence(output, grant) : output.sourceKind === 'actual_loaded_response') continue
+    const loadedResponse = output.sourceKind === 'actual_loaded_response'
+    if (browser && output.sourceKind !== undefined && !loadedResponse) continue
+    if ((output.readScope === 'response_document' || output.nativeProof !== undefined) && !loadedResponse) continue
+    if (loadedResponse && (item.toolName !== 'browser_get_html' || object(request.arguments).target !== undefined || !validLoadedResponseEvidence(output, grant))) continue
     const url = canonical(String(browser ? output.sourceUrl : output.finalUrl ?? output.url ?? ''))
     if (!url || task.acceptance.requiredSourceOrigins?.length && !task.acceptance.requiredSourceOrigins.includes(new URL(url).origin)) continue
     if (browser) {
@@ -123,7 +126,7 @@ function sources(repository: TaskRunRepository, task: TaskRun, items: TurnItem[]
     const resultHash = typeof output.resultHash === 'string' ? output.resultHash : web ? hash(content) : undefined
     if (!resultHash || !/^[a-f0-9]{64}$/i.test(resultHash)) continue
     if (typeof output.html === 'string' && hash(output.html) !== resultHash) continue
-    const full = item.toolName === 'browser_read_document' && validLoadedResponseEvidence(output, grant) || web && output.truncated === false || item.toolName === 'browser_get_html' && output.truncated === false && (output.readScope === 'document' || output.readScope === undefined && /<html\b/i.test(content) && /<body\b/i.test(content) && /<\/html\s*>/i.test(content))
+    const full = item.toolName === 'browser_get_html' && output.sourceKind === 'actual_loaded_response' && validLoadedResponseEvidence(output, grant) || web && output.truncated === false || item.toolName === 'browser_get_html' && output.truncated === false && (output.readScope === 'document' || output.readScope === undefined && /<html\b/i.test(content) && /<body\b/i.test(content) && /<\/html\s*>/i.test(content))
     result.push({ receiptId: receipt.id, receiptHash: operationFingerprint({ request: receipt.request, status: receipt.status, result: receipt.result }), turnId: item.turnId, url, resultHash, content, full, readAt: receipt.updatedAt })
   }
   return result
@@ -231,5 +234,5 @@ export function verifiedWebArtifactEvidence(repository: TaskRunRepository, task:
 }
 
 export function webEvidenceRepair(task: TaskRun): string {
-  return `成果文件已保留为草稿，但尚未通过来源验收。继续原任务，使用已授权工具实际读取${(task.acceptance.requiredSourceOrigins ?? []).join('、') || '所需来源'}；使用 browser_get_html 读取真实结果链接元素以取得 href，再打开并完整读取正文。遇到SVG/iframe使HTML截断时，用 browser_read_document 读取本会话实际载入且身份匹配的原文响应；它是独立的响应文档表示，不是完整DOM，未取得完整响应仍须保持草稿。更新同一成果文件，逐条提供原文URL、实际字段与原文依据；历史合同、采购意向和当前可投标公告分开。调用 verify_web_artifact(path, coverage[{url,resultHash}], items[{sectionId,title,source,discovery,classification,fields[{field,value,quote}],unverifiedFields}]) 核验。正式数据区使用main[data-evidence-report]；每个tr/article/section同时用id及data-evidence-item=sectionId、data-evidence-classification，正文链接加data-evidence-source。每个title/publication_date/budget/deadline/status/qualification值用data-evidence-field对应字段名，未读字段再加data-evidence-unverified并写待核验。所有报告数据行/条目/字段都须声明，不能用一条真实数据为其余旧草稿背书。只有实际列表明确零匹配才使用noMatches；不能虚构线索。待核验不等于已完成核验；不要让用户手工搜索或复制网页。有效跨Turn原文回执可以复用，无须无条件重采。只有真实登录、权限或网络阻断才说明影响并等待；不得凭旧入口访问或自写说明完成任务。`
+  return `成果文件已保留为草稿，但尚未通过来源验收。继续原任务，使用已授权工具实际读取${(task.acceptance.requiredSourceOrigins ?? []).join('、') || '所需来源'}；使用 browser_get_html 读取真实结果链接元素以取得 href，再打开并完整读取正文。遇到SVG/iframe使HTML截断或缺body时，browser_get_html会在原授权内自动检查本会话已加载且身份匹配的完整原文响应。sourceKind=actual_loaded_response是独立的响应文档表示，不是完整DOM；未取得完整响应仍须保持草稿，不重复导航。更新同一成果文件，逐条提供原文URL、实际字段与原文依据；历史合同、采购意向和当前可投标公告分开。调用 verify_web_artifact(path, coverage[{url,resultHash}], items[{sectionId,title,source,discovery,classification,fields[{field,value,quote}],unverifiedFields}]) 核验。正式数据区使用main[data-evidence-report]；每个tr/article/section同时用id及data-evidence-item=sectionId、data-evidence-classification，正文链接加data-evidence-source。每个title/publication_date/budget/deadline/status/qualification值用data-evidence-field对应字段名，未读字段再加data-evidence-unverified并写待核验。所有报告数据行/条目/字段都须声明，不能用一条真实数据为其余旧草稿背书。只有实际列表明确零匹配才使用noMatches；不能虚构线索。待核验不等于已完成核验；不要让用户手工搜索或复制网页。有效跨Turn原文回执可以复用，无须无条件重采。只有真实登录、权限或网络阻断才说明影响并等待；不得凭旧入口访问或自写说明完成任务。`
 }

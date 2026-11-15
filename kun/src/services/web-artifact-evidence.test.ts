@@ -51,7 +51,7 @@ function input() {
 function report(extra = '') {
   return `<!doctype html><html lang="zh-CN"><head><title>招标报告</title></head><body><h1>招标报告</h1>${origins.map(origin => `<a href="${origin}/list">检索来源</a>`).join('')}<main data-evidence-report><article id="notice-1" data-evidence-item="notice-1" data-evidence-classification="opportunity">${values.map(([field, value]) => `<span data-evidence-field="${field}">${value}</span>`).join('')}<a data-evidence-source href="${origins[0]}/notice/1">原文</a></article><p>工程测量：共找到0条内容</p>${extra}</main></body></html>`
 }
-async function fixture() {
+async function fixture(primaryOutput: Record<string, unknown> = {}) {
   const temporary = await mkdtemp(join(tmpdir(), 'railwise-web-artifact-evidence-')); roots.push(temporary)
   const root = await realpath(temporary), workspace = join(root, '只读 工作区'); await mkdir(workspace)
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite3')), threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore()
@@ -81,7 +81,7 @@ async function fixture() {
     const operation = controller.beginToolOperation(grant.turnId, call, grant)!
     await sessionStore.appendItem(thread.id, makeToolCallItem({ id: `call-${call.callId}`, threadId: thread.id, turnId: grant.turnId, ...call }))
     const item = makeToolResultItem({ id: `item-${call.callId}`, threadId: thread.id, turnId: grant.turnId, callId: call.callId, toolName: call.toolName,
-      output: { status: 'succeeded', sourceUrl: url, html, resultHash: sha(html), truncated: false, readScope: target ? 'element' : 'document', evidence: { verified: true, contentRead: true } } })
+      output: { status: 'succeeded', sourceUrl: url, html, resultHash: sha(html), truncated: false, readScope: target ? 'element' : 'document', evidence: { verified: true, contentRead: true }, ...(url.endsWith('/notice/1') ? primaryOutput : {}) } })
     controller.finishToolOperation(operation.token, operation.key, { approved: true, item }); await sessionStore.appendItem(thread.id, item)
   }
   const tools = buildManagedArtifactToolProviders(controller)[0]!.tools
@@ -261,5 +261,20 @@ it.each(['legacy-inert-bridge', 'real-identity-changed', 'other-provider-changed
     const sealedBefore = JSON.stringify(f.repository.operations(sourceId, 'schedule_authority'))
     expect((await f.assessment(report())).complete).toBe(variation === 'legacy-inert-bridge')
     expect(JSON.stringify(f.repository.operations(sourceId, 'schedule_authority'))).toBe(sealedBefore)
+  } finally { f.repository.close() }
+})
+
+
+it.each([
+  { sourceKind: 'actual_loaded_response', readScope: 'response_document' },
+  { sourceKind: 'actual_loaded_response', readScope: 'document', nativeProof: {} },
+  { readScope: 'response_document' },
+  { readScope: 'document', nativeProof: {} },
+  { sourceKind: 'fullDOM', readScope: 'document' }
+])('refuses response-source labels or full-DOM claims without the independent native proof: %j', async primaryOutput => {
+  const f = await fixture(primaryOutput)
+  try {
+    expect((await f.assessment(report())).complete).toBe(false)
+    expect((await f.call('verify_web_artifact', input())).complete).toBe(false)
   } finally { f.repository.close() }
 })

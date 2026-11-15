@@ -13,7 +13,7 @@ const configuration = 'f'.repeat(64)
 function fixture() {
   const grant = ExecutionGrantSchema.parse({ id: 'grant', taskId: 'task', turnId: 'turn', threadId: 'thread', workspaceRoot: '/tmp',
     workspaceTrust: 'read-only', agentTrust: 'read-only', sandboxMode: 'read-only', approvalPolicy: 'on-request', workspaceRevision: 0, agentRevision: 0,
-    revision: 1, idempotencyKey: 'grant', issuedAt: new Date().toISOString(), allowedToolNames: ['browser_read_document'], allowedProviderIds: ['browser-skill'],
+    revision: 1, idempotencyKey: 'grant', issuedAt: new Date().toISOString(), allowedToolNames: ['browser_get_html'], allowedProviderIds: ['browser-skill'],
     connectorIdentityFingerprints: { 'browser-skill': configuration }, networkAllowlist: ['https://source.example.test'],
     browserScope: { browserInstanceId: 'browser', origins: ['https://source.example.test'], interaction: 'observe', verificationPolicy: 'public_query_target', revision: 1 } })
   const capture: BrowserResponseCapture = { taskId: 'task', turnId: 'turn', sessionId: 'session', tabId: 1, parentSourceUrl: PARENT,

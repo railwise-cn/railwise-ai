@@ -9,6 +9,9 @@ import { buildRouter } from '../src/server/routes/index.js'
 import { dispatchRequest } from '../src/server/http-server.js'
 import type { BrowserTaskBindingSnapshot } from '../src/contracts/browser-skill.js'
 
+// Existing released 67-name tool scope; only public tool identifiers, no user identity or captured content.
+const LEGACY_TOOL_NAMES = ["read", "grep", "find", "ls", "ppt_master", "ppt_master_env", "echo", "user_input", "request_user_input", "web_fetch", "list_attachment_sections", "search_attachment", "read_attachment_section", "read_delivery_sources", "read_task_context", "publish_artifact", "read_artifact", "verify_web_artifact", "run_flow", "schedule_task", "list_schedules", "browser_session_start", "browser_observe", "browser_navigate", "browser_get_html", "browser_authorize_action", "browser_click", "browser_fill", "browser_screenshot", "browser_session_stop", "monitoring_csv", "railwise.monitoring_csv", "deformation_rate", "railwise.deformation_rate", "monitoring_data_first_check", "railwise.monitoring_data_first_check", "chart_generator", "railwise.chart_generator", "report_export", "railwise.report_export", "excel_export", "railwise.excel_export", "standard_query", "tool_norm_cite", "survey_network_validate", "survey_adjustment_read", "survey_calculator", "control_network", "cpiii_adjustment", "coord_transform", "distance_calculator", "angle_convert", "railwise.survey_network_validate", "railwise.survey_adjustment_read", "railwise.survey_calculator", "railwise.control_network", "railwise.cpiii_adjustment", "railwise.coord_transform", "railwise.distance_calculator", "railwise.angle_convert", "request_host_shell", "host_shell_session", "get_goal", "create_goal", "update_goal", "todo_list", "todo_write"]
+
 const PARENT = 'https://primary.example.test/detail?articleId=article-one'
 const PROJECT = '轨道控制网测量公开测试项目'
 const TITLE = `关于${PROJECT}的公开公告`
@@ -33,7 +36,11 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
     if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: 1, url: page.url, title: TITLE, scope: 'agent' }] } }
     if (args[0] === 'navigate') { page.url = args[1]!; page.at = Date.now() - 50; return { ok: true, output: { final_url: page.url } } }
     if (args[0] === 'cooperate') return { ok: true, output: { tab_id: 1, control_policy: 'target', context_id: `native-context-${++page.context}`, observation_id: `native-observation-${page.context}`, observation: { text: `RootWebArea "${TITLE}"\n  Iframe\n    StaticText "${PROJECT}"`, truncated: false, ref_count: 0 } } }
-    if (args[0] === 'get-html') return { ok: true, output: { tab_id: 1, html: '<html><body><svg>loaded shell, original document does not fit</svg>', truncated: true, byte_size: 3234390 } }
+    if (args[0] === 'get-html') {
+      const html = page.mode === 'complete-dom' ? `<!doctype html><html><head><title>${TITLE}</title></head><body>${SOURCE_HTML}</body></html>` : page.mode === 'bodyless' ? `<html><head><title>${TITLE}</title></head></html>` : '<html><body><svg>loaded shell, original document does not fit</svg>'
+      return { ok: true, output: { tab_id: 1, html, truncated: !['complete-dom', 'bodyless'].includes(page.mode), byte_size: ['complete-dom', 'bodyless'].includes(page.mode) ? Buffer.byteLength(html) : 3234390 } }
+    }
+    if (args[0] === 'wait-for-element') return { ok: true, output: { tab_id: 1, used_selector: 'body', satisfied: false, attached: false, visible: false, elapsed_ms: 5000 } }
     if (args[0] === 'read') return { ok: true, output: { tab_id: 1, page_url: PARENT, frame_url: PARENT, frame_id: 'root-frame', title: TITLE,
       captured_at: new Date().toISOString(), scope: 'current_dom', truncated: false, items: [{ ref: '@e1', values: { present: true }, redacted: [] }] } }
     if (args[0] === 'debug' && args[1] === 'start') { page.name = args[args.indexOf('--name') + 1]!; page.capturing = true; return { ok: true, output: { session_id: 'owned-session', run: { ...run(), ...(page.mode === 'foreign-capture' ? { name: 'different-owner', id: 'foreign-run' } : {}) } } } }
@@ -52,7 +59,7 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
 const cleanup: Array<() => Promise<unknown>> = []
 afterEach(async () => { while (cleanup.length) await cleanup.pop()!() })
 
-async function fixture(mode: 'valid' | 'masked' | 'injected-args' | 'cleanup-failed' | 'foreign-capture') {
+async function fixture(mode: 'valid' | 'masked' | 'injected-args' | 'cleanup-failed' | 'foreign-capture' | 'complete-dom' | 'bodyless' | 'subtree') {
   page.started = false; page.url = 'about:blank'; page.name = ''; page.capturing = false; page.calls = []; page.context = 0; page.mode = mode; page.at = Date.now() - 50
   const root = await realpath(await mkdtemp(join(tmpdir(), 'browser-loaded-response-runtime-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
@@ -60,20 +67,21 @@ async function fixture(mode: 'valid' | 'masked' | 'injected-args' | 'cleanup-fai
   let runtime: Awaited<ReturnType<typeof createKunServeRuntime>> | undefined, taskId = '', modelCalls = 0
   let advertised: Array<{ function: { name: string; parameters: Record<string, unknown> } }> = []
   const output = (name: string) => ((runtime!.taskRepository!.operations(taskId, 'tool').find(row => row.request?.toolName === name)?.result as { item?: { output?: Record<string, unknown> } } | undefined)?.item?.output ?? {})
-  const steps = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_read_document', 'publish_artifact', 'read_artifact', 'verify_web_artifact']
+  const steps = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'publish_artifact', 'read_artifact', 'verify_web_artifact']
   const model = createServer(async (request, response) => {
     let raw = ''; for await (const chunk of request) raw += chunk
     const body = JSON.parse(raw) as { tools?: typeof advertised }; advertised = body.tools ?? []
     const index = modelCalls++, tool = steps[index]
-    const source = output('browser_read_document')
-    if (!tool || index >= 4 && source.status !== 'succeeded') {
+    const source = output('browser_get_html')
+    if (!tool || index >= 3 && (source.status !== 'succeeded' || source.truncated === true)) {
       response.writeHead(200, { 'content-type': 'text/event-stream' }); response.end(`data: ${JSON.stringify({ id: 'response-model', choices: [{ index: 0, delta: { content: source.status === 'succeeded' ? '原文及报告已经保存并核验。' : '当前原文尚未取得，不能交付已核验报告。' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`); return
     }
     let args: Record<string, unknown> = index === 0 ? {} : index === 1 ? { sessionId: 'owned-session', url: PARENT } : { sessionId: 'owned-session' }
-    if (index === 3 && mode === 'injected-args') args = { ...args, requestId: 'foreign', url: 'https://foreign.example.test/steal', expression: 'not allowed' }
-    if (index === 4) args = { path: 'report.html', content: `<!doctype html><html lang="zh-CN"><head><title>原文核验报告</title></head><body><main data-evidence-report><article id="primary" data-evidence-item="primary" data-evidence-classification="source"><h1 data-evidence-field="title">${PROJECT}</h1><p data-evidence-field="other">${QUOTE}</p><a data-evidence-source href="${PARENT}">原文</a></article></main></body></html>` }
-    if (index === 5) args = { path: 'report.html' }
-    if (index === 6) args = { path: 'report.html', coverage: [{ url: PARENT, resultHash: source.resultHash }], items: [{ sectionId: 'primary', title: PROJECT,
+    if (index === 2 && mode === 'subtree') args = { ...args, target: '@e1' }
+    if (index === 2 && mode === 'injected-args') args = { ...args, requestId: 'foreign', url: 'https://foreign.example.test/steal', expression: 'not allowed' }
+    if (index === 3) args = { path: 'report.html', content: `<!doctype html><html lang="zh-CN"><head><title>原文核验报告</title></head><body><main data-evidence-report><article id="primary" data-evidence-item="primary" data-evidence-classification="source"><h1 data-evidence-field="title">${PROJECT}</h1><p data-evidence-field="other">${QUOTE}</p><a data-evidence-source href="${PARENT}">原文</a></article></main></body></html>` }
+    if (index === 4) args = { path: 'report.html' }
+    if (index === 5) args = { path: 'report.html', coverage: [{ url: PARENT, resultHash: source.resultHash }], items: [{ sectionId: 'primary', title: PROJECT,
       source: { url: PARENT, resultHash: source.resultHash }, discovery: { url: PARENT, resultHash: source.resultHash }, classification: 'source',
       fields: [{ field: 'title', value: PROJECT, quote: PROJECT }, { field: 'other', value: QUOTE, quote: QUOTE }], unverifiedFields: [] }] }
     response.writeHead(200, { 'content-type': 'text/event-stream' }); response.end(`data: ${JSON.stringify({ id: 'response-model', choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: `response-${index}`, type: 'function', function: { name: tool, arguments: JSON.stringify(args) } }] }, finish_reason: 'tool_calls' }] })}\n\ndata: [DONE]\n\n`)
@@ -90,6 +98,9 @@ async function fixture(mode: 'valid' | 'masked' | 'injected-args' | 'cleanup-fai
   const api = (path: string, method = 'POST', body?: unknown) => dispatchRequest(router, new Request(`http://localhost${path}`, { method,
     headers: { authorization: 'Bearer response-test', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) }))
   const origin = await runtime.threadService.create({ workspace, mode: 'agent', model: 'response-model', approvalPolicy: 'on-request' })
+  await runtime.threadService.setAgent(origin.id, { agentId: 'legacy-agent', expectedRevision: origin.agentRevision, idempotencyKey: 'legacy-agent-scope',
+    profile: { id: 'legacy-agent', name: 'Legacy scope', role: 'Read public documents', color: 'blue', systemPrompt: 'Use only the existing authorized tools.',
+      toolAllowlist: [...LEGACY_TOOL_NAMES], mcpAllowlist: [], trustLevel: 'read-only', budget: { maxAttempts: 3, maxDurationMs: 600000 }, revision: 1 } })
   const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'loaded-primary', request: { prompt: `使用BrowserSkill读取 ${PARENT} 的公开文档正文，生成HTML报告。` } }); taskId = started.task!.id
   const snapshot = await api(`/v1/tasks/${taskId}/browser-binding`, 'GET'); expect(snapshot.status, await snapshot.clone().text()).toBe(200)
   const binding = await snapshot.json() as BrowserTaskBindingSnapshot
@@ -99,19 +110,20 @@ async function fixture(mode: 'valid' | 'masked' | 'injected-args' | 'cleanup-fai
   const resumed = await api(`/v1/tasks/${taskId}/resume`, 'POST', { expectedRevision: runtime.taskRepository!.get(taskId)!.revision, idempotencyKey: 'response-resume' })
   expect(resumed.status, await resumed.clone().text()).toBe(202)
   await expect.poll(() => ['completed', 'waiting_user', 'failed', 'stalled'].includes(live.taskRepository!.get(taskId)!.status), { timeout: 15000 }).toBe(true)
-  await expect.poll(() => modelCalls, { timeout: 15000 }).toBeGreaterThanOrEqual(4)
+  await expect.poll(() => modelCalls, { timeout: 15000 }).toBeGreaterThanOrEqual(3)
   return { runtime: live, taskId, output, advertised }
 }
 
 it('uses the actual catalog, immutable Grant, native representation and saved-file gate through Runtime/HTTP/SQLite', async () => {
   const f = await fixture('valid'), task = f.runtime.taskRepository!.get(f.taskId)!
-  expect(f.advertised.map(tool => tool.function.name)).toContain('browser_read_document')
-  const schema = f.advertised.find(tool => tool.function.name === 'browser_read_document')!.function.parameters
-  expect(schema).toMatchObject({ additionalProperties: false, required: ['sessionId'] })
+  expect(LEGACY_TOOL_NAMES).toHaveLength(67)
+  expect(f.advertised.map(tool => tool.function.name)).not.toContain('browser_read_document')
+  expect(f.advertised.map(tool => tool.function.name).filter(name => name.startsWith('browser_')).every(name => LEGACY_TOOL_NAMES.includes(name))).toBe(true)
   const turn = (await f.runtime.threadService.get(task.threadId))!.turns.find(turn => turn.id === task.activeTurnId)!
-  expect(turn.executionGrant!.allowedToolNames).toContain('browser_read_document')
-  expect(f.output('browser_get_html')).toMatchObject({ truncated: true, next_step: { tool: 'browser_read_document' } })
-  expect(f.output('browser_read_document')).toMatchObject({ status: 'succeeded', sourceKind: 'actual_loaded_response', html: SOURCE_HTML,
+  expect(turn.executionGrant!.allowedToolNames).not.toContain('browser_read_document')
+  expect(turn.executionGrant!.allowedToolNames).toContain('browser_get_html')
+  expect(turn.executionGrant!.allowedToolNames!.every(name => LEGACY_TOOL_NAMES.includes(name))).toBe(true)
+  expect(f.output('browser_get_html')).toMatchObject({ status: 'succeeded', sourceKind: 'actual_loaded_response', html: SOURCE_HTML,
     readScope: 'response_document', nativeProof: { responseBodyRedacted: false, association: 'projectName' } })
   expect(f.output('verify_web_artifact')).toMatchObject({ complete: true })
   expect(task.status).toBe('completed')
@@ -123,7 +135,7 @@ it('uses the actual catalog, immutable Grant, native representation and saved-fi
 
 it.each(['masked', 'injected-args'] as const)('does not expose a source, verify a file or claim completion for %s', async mode => {
   const f = await fixture(mode), task = f.runtime.taskRepository!.get(f.taskId)!
-  expect(f.output('browser_read_document').status).not.toBe('succeeded')
+  expect(f.output('browser_get_html').status).not.toBe('succeeded')
   expect(task.status).not.toBe('completed')
   expect(task.artifacts.some(artifact => artifact.sourceEvidenceStatus === 'verified')).toBe(false)
   expect(page.calls.some(args => args[0] === 'debug' && args[1] === 'request')).toBe(false)
@@ -132,8 +144,8 @@ it.each(['masked', 'injected-args'] as const)('does not expose a source, verify 
 
 it('retains an actionable failed cleanup audit and never publishes source evidence when its own capture cannot stop', async () => {
   const f = await fixture('cleanup-failed'), task = f.runtime.taskRepository!.get(f.taskId)!
-  expect(f.output('browser_read_document')).toMatchObject({ status: 'failed', code: 'browser_document_capture_cleanup_failed' })
-  expect(f.output('browser_read_document')).not.toHaveProperty('html')
+  expect(f.output('browser_get_html')).toMatchObject({ status: 'failed', code: 'browser_document_capture_cleanup_failed' })
+  expect(f.output('browser_get_html')).not.toHaveProperty('html')
   expect(f.runtime.taskRepository!.operations(f.taskId, 'browser_document_capture')).toMatchObject([{ status: 'failed', result: { active: true, cleanup: 'failed' } }])
   expect(task.status).not.toBe('completed')
   expect(task.artifacts.some(artifact => artifact.sourceEvidenceStatus === 'verified')).toBe(false)
@@ -149,4 +161,30 @@ it('neither adopts nor stops a native capture returned for a different owner', a
   expect(page.calls.filter(args => args[0] === 'debug' && args[1] === 'stop')).toHaveLength(0)
   expect(page.calls.filter(args => args[0] === 'debug' && args[1] === 'request')).toHaveLength(0)
   expect(task.status).not.toBe('completed')
+}, 25000)
+
+
+it('automatically uses the same validated response path for a bodyless document after one fixed native wait', async () => {
+  const f = await fixture('bodyless')
+  expect(f.output('browser_get_html')).toMatchObject({ status: 'succeeded', sourceKind: 'actual_loaded_response', html: SOURCE_HTML, readScope: 'response_document' })
+  expect(f.runtime.taskRepository!.get(f.taskId)!.status).toBe('completed')
+  expect(page.calls.filter(args => args[0] === 'wait-for-element')).toHaveLength(1)
+  expect(page.calls.filter(args => args[0] === 'navigate')).toHaveLength(1)
+}, 25000)
+
+it('keeps complete primary DOM reads on the original channel with no response-body access', async () => {
+  const f = await fixture('complete-dom')
+  expect(f.output('browser_get_html')).toMatchObject({ status: 'succeeded', readScope: 'document', truncated: false })
+  expect(f.output('browser_get_html')).not.toHaveProperty('nativeProof')
+  expect(f.output('browser_get_html')).not.toHaveProperty('sourceKind')
+  expect(page.calls.filter(args => args[0] === 'debug' && args[1] === 'request')).toHaveLength(0)
+  expect(f.runtime.taskRepository!.get(f.taskId)!.status).toBe('completed')
+}, 25000)
+
+it('preserves an explicitly requested element subtree without substituting the primary response', async () => {
+  const f = await fixture('subtree')
+  expect(f.output('browser_get_html')).toMatchObject({ status: 'succeeded', readScope: 'element', truncated: true })
+  expect(f.output('browser_get_html')).not.toHaveProperty('nativeProof')
+  expect(page.calls.filter(args => args[0] === 'debug' && args[1] === 'request')).toHaveLength(0)
+  expect(f.runtime.taskRepository!.get(f.taskId)!.status).not.toBe('completed')
 }, 25000)

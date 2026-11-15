@@ -128,6 +128,19 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it.each(['waiting_user', 'waiting_approval', 'stalled'] as const)('lets the user explicitly pause a %s task before resolving its blocker', async status => {
+    tasks[0] = { ...tasks[0], status }
+    inbox = []
+    await act(async () => refreshTaskState())
+    const pause = [...container.querySelectorAll('button')].find(button => button.textContent === 'Pause')
+    expect(pause).toBeTruthy()
+    await act(async () => pause!.click())
+    await settle()
+    expect(window.workwise.pauseTask).toHaveBeenCalledExactlyOnceWith('t1', expect.objectContaining({ expectedRevision: 1 }))
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === 'Pause')).toBe(false)
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === i18n.t('common:taskRunResume'))).toBe(true)
+  })
   it('leaves a resolved standalone attention card and returns to an available task', async () => {
     inbox = [{ ...approval, id: 'standalone-review', taskId: undefined, threadId: undefined, workspaceRoot: '/workspace', title: 'Standalone review' }]
     await act(async () => refreshTaskState())
@@ -163,7 +176,7 @@ describe('TaskWorkspaceView', () => {
     const original = [...workspace.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent === '原始要求')!
     expect(original.open).toBe(false)
     expect(original.textContent).toContain(goal)
-    expect([...workspace.querySelectorAll('button')].some(button => button.textContent === '暂停')).toBe(false)
+    expect([...workspace.querySelectorAll('button')].some(button => button.textContent === '暂停')).toBe(true)
   })
 
   it('explicitly rechecks an existing local HTML output without starting a model or discarding the task', async () => {

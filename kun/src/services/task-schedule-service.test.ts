@@ -879,3 +879,86 @@ describe('explicit retry keeps one business Root schedule', () => {
     expect(f.flows.list()).toHaveLength(1); expect(JSON.stringify(f.flows.get(saved.id))).toBe(before)
   })
 })
+
+describe('persistent schedule attention recovery', () => {
+  const dueAt = '2026-11-13T00:30:00.000Z'
+  async function blocked() {
+    const f = fixture(), saved = await f.service.create(f.context), input = { scheduleId: saved.id, versionId: f.flows.get(saved.id)!.publishedVersionId!, dueAt }
+    f.identities['mcp:test'] = 'b'.repeat(64)
+    await expect(f.service.dispatch(input)).rejects.toMatchObject({ code: 'schedule_authority_changed' })
+    return { ...f, saved, input, attentionId: `schedule:${saved.id}` }
+  }
+  it('keeps one notification generation while pending, resolves successful recovery, and starts a new generation only after resolution', async () => {
+    const f = await blocked(), first = f.repository.attention(f.attentionId)!
+    f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision, task => ({ ...task, status: 'paused' }))
+    const originalTask = JSON.stringify(f.repository.get(f.task.id))
+    vi.setSystemTime(new Date('2026-11-13T00:01:00Z'))
+    await expect(f.service.dispatch(f.input)).rejects.toThrow()
+    const repeated = f.repository.attention(f.attentionId)!
+    expect(repeated.createdAt).toBe(first.createdAt)
+    expect(`attention:${repeated.id}:${repeated.createdAt}`).toBe(`attention:${first.id}:${first.createdAt}`)
+    expect(repeated.revision).toBe(first.revision + 1)
+    expect(repeated.payload).toMatchObject({ ...f.input })
+    f.identities['mcp:test'] = 'a'.repeat(64)
+    await f.service.dispatch(f.input)
+    const answered = f.repository.attention(f.attentionId)!
+    expect(answered.status).toBe('answered'); expect(answered.createdAt).toBe(first.createdAt)
+    expect(answered.revision).toBe(repeated.revision + 1)
+    expect(f.repository.inbox().some(item => item.id === f.attentionId)).toBe(false)
+    expect(JSON.stringify(f.repository.get(f.task.id))).toBe(originalTask)
+    expect(f.coordinator.command).toHaveBeenCalledTimes(1)
+    expect(f.coordinator.command.mock.calls[0]![0]).toMatchObject({ intent: 'new', idempotencyKey: `schedule:${f.saved.id}:${dueAt}` })
+    // A second failure in the same millisecond must still have a new notification generation.
+    vi.setSystemTime(new Date(first.createdAt))
+    f.identities['mcp:test'] = 'b'.repeat(64)
+    await expect(f.service.dispatch(f.input)).rejects.toThrow()
+    const reopened = f.repository.attention(f.attentionId)!
+    expect(reopened.status).toBe('pending'); expect(reopened.createdAt).not.toBe(first.createdAt)
+    expect(reopened.revision).toBe(answered.revision + 1)
+    expect(f.repository.inbox().filter(item => item.id === f.attentionId)).toHaveLength(1)
+  })
+  it.each(['different-due', 'new-version', 'disabled', 'other-owner', 'newer-failure'] as const)('does not resolve %s that supersedes an in-flight dispatch', async change => {
+    const f = await blocked()
+    f.identities['mcp:test'] = 'a'.repeat(64)
+    let reached!: () => void, finish!: () => void
+    const started = new Promise<void>(resolve => { reached = resolve }), barrier = new Promise<void>(resolve => { finish = resolve })
+    f.coordinator.command.mockImplementationOnce(async () => { reached(); await barrier; return { kind: 'task_started' } })
+    const dispatch = f.service.dispatch(f.input)
+    await started
+    if (change === 'new-version' || change === 'disabled') {
+      const flow = f.flows.get(f.saved.id)!
+      f.flows.update({ ...flow, ...(change === 'new-version' ? { name: '同一业务的新计划版本' } : {}), variables: { ...flow.variables, ...(change === 'disabled' ? { enabled: false } : {}) } }, flow.revision)
+      if (change === 'new-version') expect(f.flows.publish(flow.id).published).toBe(true)
+    } else {
+      const pending = f.repository.attention(f.attentionId)!
+      f.repository.putAttention({ ...pending, revision: pending.revision + 1,
+        ...(change === 'other-owner' ? { ownerId: 'another-flow', flowId: 'another-flow' } : {}),
+        payload: { ...pending.payload, ...(change === 'different-due' ? { dueAt: '2026-11-13T08:30:00.000Z' } : {}) } })
+    }
+    const before = JSON.stringify(f.repository.attention(f.attentionId))
+    finish(); await dispatch
+    expect(JSON.stringify(f.repository.attention(f.attentionId))).toBe(before)
+    expect(f.repository.attention(f.attentionId)!.status).toBe('pending')
+  })
+  it.each([true, false])('resolves a legacy versionless pending item only when the original durable outbox proves the version (outbox=%s)', async durable => {
+    const f = fixture(), saved = await f.service.create(f.context), versionId = f.flows.get(saved.id)!.publishedVersionId!, input = { scheduleId: saved.id, versionId, dueAt }
+    f.identities['mcp:test'] = 'b'.repeat(64)
+    if (durable) await f.flows.tickSchedules(new Date(dueAt))
+    else await expect(f.service.dispatch(input)).rejects.toThrow()
+    const attentionId = `schedule:${saved.id}`, pending = f.repository.attention(attentionId)!
+    const { versionId: _version, ...legacyPayload } = pending.payload!
+    f.repository.putAttention({ ...pending, payload: legacyPayload })
+    f.identities['mcp:test'] = 'a'.repeat(64)
+    if (durable) await f.flows.flushSourceEvents()
+    else await f.service.dispatch(input)
+    expect(f.repository.attention(attentionId)!.status).toBe(durable ? 'answered' : 'pending')
+  })
+  it('does not mark a blocked coordinator result as successful recovery', async () => {
+    const f = await blocked()
+    f.identities['mcp:test'] = 'a'.repeat(64)
+    f.coordinator.command.mockResolvedValueOnce({ kind: 'capability_required' })
+    const before = JSON.stringify(f.repository.attention(f.attentionId))
+    await f.service.dispatch(f.input)
+    expect(JSON.stringify(f.repository.attention(f.attentionId))).toBe(before)
+  })
+})

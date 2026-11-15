@@ -274,9 +274,20 @@ export class TaskScheduleService {
     const version = this.deps.flows.repository.getVersion(input.versionId)
     if (!version || current.publishedVersionId !== input.versionId) fail('计划配置已变化，请核对待执行计划。')
     const authority = this.authority(version.definition)
+    const attentionId = `schedule:${input.scheduleId}`
+    const pending = this.deps.repository.attention(attentionId)
+    // Legacy items did not store versionId. Only the original durable dispatch
+    // outbox may prove their version; a matching name or current Flow is insufficient.
+    const pendingVersion = pending?.payload?.versionId ?? (pending && this.deps.flows.repository.pendingOutbox('scheduled_task_dispatch').some(item => {
+      const payload = record(item.payload)
+      return item.ownerId === input.scheduleId && payload.scheduleId === input.scheduleId && payload.dueAt === input.dueAt && payload.versionId === input.versionId
+    }) ? input.versionId : undefined)
+    const matchingPending = pending?.status === 'pending' && pending.ownerKind === 'flow' && pending.ownerId === input.scheduleId &&
+      pending.flowId === input.scheduleId && pending.threadId === authority.originThreadId && pending.payload?.scheduleId === input.scheduleId &&
+      pending.payload.dueAt === input.dueAt && pendingVersion === input.versionId
     try {
       await this.validateAuthority(authority)
-      await this.deps.coordinator.command({ threadId: authority.originThreadId, intent: 'new',
+      const result = await this.deps.coordinator.command({ threadId: authority.originThreadId, intent: 'new',
         idempotencyKey: `schedule:${input.scheduleId}:${input.dueAt}`,
         request: { prompt: authority.prompt, model: authority.model, providerId: authority.providerId, mode: 'agent' }
       }, { prepareExecutionThread: async thread => {
@@ -301,12 +312,28 @@ export class TaskScheduleService {
                 ? { requiredSourceOrigins: authority.scope.browserScope.origins } : {}) } }
         }, { key: `scheduled:${input.dueAt}`, kind: 'scheduled_task_created', payload: input, createdAt: this.deps.nowIso() })
       } })
+      if (result.kind === 'task_started' && matchingPending) this.deps.repository.transact(() => {
+        const latest = this.deps.repository.attention(attentionId), flow = this.deps.flows.get(input.scheduleId)
+        if (!latest || latest.status !== 'pending' || latest.revision !== pending.revision || fingerprint(latest) !== fingerprint(pending) ||
+          !flow || flow.variables.archived === true || flow.variables.enabled === false || flow.publishedVersionId !== input.versionId ||
+          this.deps.flows.repository.getTriggerState(input.scheduleId, 'schedule')?.enabled !== true) return
+        this.deps.repository.putAttention({ ...latest, status: 'answered', revision: latest.revision + 1, updatedAt: this.deps.nowIso() })
+      })
     } catch (error) {
       const now = this.deps.nowIso()
-      this.deps.repository.putAttention({ id: `schedule:${input.scheduleId}`, ownerKind: 'flow', ownerId: input.scheduleId,
-        flowId: input.scheduleId, threadId: authority.originThreadId, kind: 'blocked', title: '定时计划等待核对',
-        message: error instanceof Error ? error.message : String(error), status: 'pending', revision: 0, createdAt: now, updatedAt: now,
-        payload: { scheduleId: input.scheduleId, dueAt: input.dueAt } })
+      this.deps.repository.transact(() => {
+        const previous = this.deps.repository.attention(attentionId), flow = this.deps.flows.get(input.scheduleId)
+        if (!flow || flow.variables.archived === true || flow.variables.enabled === false || flow.publishedVersionId !== input.versionId ||
+          previous && (previous.ownerKind !== 'flow' || previous.ownerId !== input.scheduleId || previous.flowId !== input.scheduleId)) return
+        const previousCreated = previous ? Date.parse(previous.createdAt) : undefined
+        const createdAt = previous?.status === 'pending' ? previous.createdAt
+          : previousCreated !== undefined && Number.isFinite(previousCreated) && Date.parse(now) <= previousCreated ? new Date(previousCreated + 1).toISOString() : now
+        this.deps.repository.putAttention({ id: attentionId, ownerKind: 'flow', ownerId: input.scheduleId,
+          flowId: input.scheduleId, threadId: authority.originThreadId, kind: 'blocked', title: '定时计划等待核对',
+          message: error instanceof Error ? error.message : String(error), status: 'pending', revision: (previous?.revision ?? -1) + 1,
+          createdAt, updatedAt: Date.parse(now) < Date.parse(createdAt) ? createdAt : now,
+          payload: { scheduleId: input.scheduleId, versionId: input.versionId, dueAt: input.dueAt } })
+      })
       throw error
     }
   }
