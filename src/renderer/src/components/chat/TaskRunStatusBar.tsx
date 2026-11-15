@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import type { TaskRunStatus, TaskRunV1 } from '@shared/agent-workbench'
 import { requestTaskDetail } from '../../store/task-live-store'
 import { currentTaskBranch } from '@shared/task-projection'
-import { taskProgressReason } from '@shared/task-presentation'
+import { isExecutionGrantExpiredCapability, taskProgressReason } from '@shared/task-presentation'
 
 type Props = {
   threadId: string | null
@@ -43,7 +43,11 @@ export function TaskRunStatusBar({ threadId, runtimeReady, onOpenTasks }: Props)
 
   const attention = task ? taskNeedsAttention(task) : true
   const running = task ? ACTIVE_STATUSES.has(task.status) : false
-  const reason = task ? taskProgressReason(task, t('taskApprovalReviewHint')) : undefined
+  const rawReason = task ? taskProgressReason(task, t('taskApprovalReviewHint')) : undefined
+  const capability = task ? live.attention.find(item => item.taskId === task.id && item.status === 'pending' &&
+    item.payload?.kind === 'capability_required')?.payload?.capability : undefined
+  const reason = task?.status === 'waiting_user' && isExecutionGrantExpiredCapability(capability) && rawReason === capability.message
+    ? t('capabilityExecutionGrantExpiredSummary') : rawReason
   const statusIcon = running
     ? <Loader2 className="h-4 w-4 animate-spin" />
     : task?.status === 'completed'

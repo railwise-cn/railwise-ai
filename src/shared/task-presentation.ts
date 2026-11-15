@@ -1,4 +1,21 @@
 import type { TaskRunV1 } from './agent-workbench'
+import type { ExternalTaskCapability } from './task-command'
+
+/** Translate a structured runtime failure, never matching arbitrary message prose. */
+export function isExecutionGrantExpiredCapability(value: unknown): value is ExternalTaskCapability & {
+  provider: 'workspace'; status: 'blocked'; errorCode: 'execution_grant_expired'
+} {
+  if (!value || typeof value !== 'object') return false
+  const capability = value as Partial<ExternalTaskCapability>
+  return capability.provider === 'workspace' && capability.status === 'blocked' &&
+    capability.errorCode === 'execution_grant_expired' && typeof capability.message === 'string'
+}
+
+/** Admission and attempt counters alone do not prove that any work ran. */
+export function taskHasExecutionEvidence(task: TaskRunV1): boolean {
+  return task.nodes.some(node => node.status === 'completed' || node.status === 'running' || Boolean(node.startedAt) || node.evidence.length > 0) ||
+    task.artifacts.length > 0 || Boolean(task.resultEvidence?.length) || (task.timing?.executionMs ?? 0) > 0
+}
 
 /** Approval packets belong to the review card, never to compact progress surfaces. */
 export function taskProgressReason(task: Pick<TaskRunV1, 'status' | 'waitingReason' | 'stalledReason'>, approvalHint: string): string | undefined {

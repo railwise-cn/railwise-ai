@@ -9,6 +9,7 @@ import { TaskPermissionPanel } from './TaskPermissionPanel'
 import { requestFlowDetail } from '../../store/flow-navigation'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
 import { refreshTaskState, requestTaskDetail, useTaskState } from '../../store/task-live-store'
+import { isExecutionGrantExpiredCapability, taskHasExecutionEvidence } from '@shared/task-presentation'
 
 /** A capability failure is a durable waiting task, never a completed answer. */
 export function CapabilityRequiredCard({ card, workspaceRoot }: { card: ExternalTaskCapabilityCard; workspaceRoot?: string }): ReactElement {
@@ -61,6 +62,10 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     ownerTask?.status === 'completed' || ownerTask?.status === 'cancelled' ||
     !currentRequest && (card.attentionId || ownerTask)))
   const interactive = !settled && stateKnown && currentRequest
+  const titleKey = interactive
+    ? ownerTask && !taskHasExecutionEvidence(ownerTask) ? 'capabilityRequiredTitle' : 'capabilityBlockedAfterProgressTitle'
+    : settled ? 'capabilityHistoryTitle' : 'capabilityRecordTitle'
+  const executionGrantExpired = isExecutionGrantExpiredCapability(capability)
   const openOriginalTask = (): void => { requestTaskDetail(card.taskId); setRoute('tasks') }
   const openConfiguration = (): void => {
     if (connector) openPlugins(undefined, connector)
@@ -114,6 +119,9 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     else openSettings('general')
   }
   const execution = capability.executionContext
+  const recordedWorkspaceRoot = execution?.workspaceRoot || capability.workspaceRoot
+  const ownerWorkspaceRoot = ownerTask?.workspaceRoot || workspaceRoot
+  const displayedWorkspaceRoot = interactive ? ownerWorkspaceRoot || recordedWorkspaceRoot : recordedWorkspaceRoot || ownerWorkspaceRoot
   const run = async (operation: () => Promise<void>): Promise<void> => {
     if (pending) return
     setPending(true)
@@ -128,7 +136,8 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     })
     if (result.kind === 'capability_required' || result.kind === 'attention_required') {
       if (result.kind === 'capability_required') setRechecked({ source: card.capability, capability: result.capability })
-      setMessage(result.message)
+      setMessage(result.kind === 'capability_required' && isExecutionGrantExpiredCapability(result.capability)
+        ? t('capabilityExecutionGrantExpiredSummary') : result.message)
     } else {
       setSettled(card.capability)
       setMessage(result.kind === 'snapshot' ? t('capabilityStateChecked') : t('capabilityResumed'))
@@ -151,12 +160,17 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     await refreshTaskState()
   }
   const snapshot = (<>
-      <p className="mt-1 whitespace-pre-wrap">{capability.message}</p>
+      <p className="mt-1 whitespace-pre-wrap">{executionGrantExpired ? t('capabilityExecutionGrantExpiredMessage') : capability.message}</p>
+      {executionGrantExpired ? <details className="mt-2 text-xs text-ds-muted">
+        <summary className="cursor-pointer">{t('capabilityDiagnosticDetails')}</summary>
+        <p className="mt-1 whitespace-pre-wrap">{capability.message}</p>
+        <p>{capability.errorCode}</p>
+      </details> : null}
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-        <dt className="text-ds-muted">{t('capabilityProvider')}</dt><dd>{t(isLark ? 'capabilityLark' : isDingTalk ? 'capabilityDingTalk' : isBrowser ? 'connectorHubBrowserSkill' : capability.provider === 'schedule' ? 'capabilitySchedule' : 'capabilityWorkspaceFiles')}</dd>
+        <dt className="text-ds-muted">{t(capability.provider === 'workspace' ? 'capabilityPermissionType' : 'capabilityProvider')}</dt><dd>{t(isLark ? 'capabilityLark' : isDingTalk ? 'capabilityDingTalk' : isBrowser ? 'connectorHubBrowserSkill' : capability.provider === 'schedule' ? 'capabilitySchedule' : 'capabilityWorkspaceFiles')}</dd>
         <dt className="text-ds-muted">{t(interactive ? 'capabilityCurrentStatus' : 'capabilityRecordedStatus')}</dt><dd>{t(`capabilityStatus_${capability.status}`)}</dd>
-        <dt className="text-ds-muted">{t(interactive ? 'capabilityWorkspace' : 'capabilityRecordedWorkspace')}</dt><dd className="break-all">{execution?.workspaceRoot || capability.workspaceRoot || workspaceRoot || t('capabilityWorkspaceUnknown')}</dd>
-        <dt className="text-ds-muted">{t(interactive ? 'capabilityRequestedScope' : 'capabilityRecordedScope')}</dt><dd>{capability.requiredScopes?.join(', ') || t('capabilityScopeNotGranted')}</dd>
+        <dt className="text-ds-muted">{t(interactive ? 'capabilityWorkspace' : 'capabilityRecordedWorkspace')}</dt><dd className="break-all">{displayedWorkspaceRoot || t('capabilityWorkspaceUnknown')}</dd>
+        <dt className="text-ds-muted">{t(interactive ? 'capabilityRequestedScope' : 'capabilityRecordedScope')}</dt><dd>{capability.requiredScopes?.join(', ') || t(capability.provider === 'workspace' ? 'capabilityScopeReviewRequired' : 'capabilityScopeNotGranted')}</dd>
         {execution ? <>
           <dt className="text-ds-muted">{t('capabilityWorkspaceTrust')}</dt><dd>{t(`settings:agentCenterTrust_${execution.workspaceTrust}`)}</dd>
           <dt className="text-ds-muted">{t('capabilityAgentTrust')}</dt><dd>{t(`settings:agentCenterTrust_${execution.agentTrust}`)}</dd>
@@ -167,8 +181,8 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       {execution?.availableTools ? <details className="mt-2 text-xs text-ds-muted"><summary className="cursor-pointer">{t('capabilityAvailableTools', { count: execution.availableTools.length })}</summary><p className="mt-1 break-all">{execution.availableTools.join(', ') || t('capabilityNoTools')}</p></details> : null}
   </>)
   return (
-    <section aria-label={t(interactive ? 'capabilityRequiredTitle' : settled ? 'capabilityHistoryTitle' : 'capabilityRecordTitle')} className={`mt-3 rounded-xl border p-4 text-sm text-ds-ink dark:bg-zinc-900 ${interactive ? 'border-amber-300 bg-amber-50 dark:border-amber-800' : 'border-ds-border bg-ds-surface'}`}>
-      <div className="font-semibold">{t(interactive ? 'capabilityRequiredTitle' : settled ? 'capabilityHistoryTitle' : 'capabilityRecordTitle')}</div>
+    <section aria-label={t(titleKey)} className={`mt-3 rounded-xl border p-4 text-sm text-ds-ink dark:bg-zinc-900 ${interactive ? 'border-amber-300 bg-amber-50 dark:border-amber-800' : 'border-ds-border bg-ds-surface'}`}>
+      <div className="font-semibold">{t(titleKey)}</div>
       {interactive ? snapshot : <>
         {!settled ? <p role="status" className="mt-1 text-xs text-ds-muted">{t(live.error || stateKnown ? 'capabilityRecordUnverified' : 'capabilityRecordLoading')}</p> : null}
         <details className="mt-2 text-xs">
@@ -183,6 +197,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       {showPermissions && interactive ? <TaskPermissionPanel taskId={card.taskId} autoLoad onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
       {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {interactive ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
+        {executionGrantExpired ? <button type="button" onClick={openOriginalTask}>{t('taskRunOpenTaskWorkspace')}</button> : null}
         <button type="button" disabled={pending} onClick={configure}>{isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isDingTalk ? 'capabilityConfigureDingTalk' : 'capabilityOpenMarketplace')}</button>
         <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
         <button type="button" disabled={pending} onClick={() => void run(decline)}>{t('capabilityDecline')}</button>

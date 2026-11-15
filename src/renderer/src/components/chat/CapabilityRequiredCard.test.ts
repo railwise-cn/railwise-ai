@@ -7,6 +7,7 @@ import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
 import i18n from '../../i18n'
 import { takeRequestedFlow } from '../../store/flow-navigation'
 import { CapabilityRequiredCard } from './CapabilityRequiredCard'
+import { TaskRunStatusBar } from './TaskRunStatusBar'
 import { refreshTaskState, resetTaskStateForTests, takeRequestedTask } from '../../store/task-live-store'
 
 const state = vi.hoisted(() => ({
@@ -74,6 +75,14 @@ async function render(value = card, workspaceRoot?: string, attention = [attenti
 async function click(label: string): Promise<void> {
   await act(async () => { button(label).click(); await Promise.resolve(); await Promise.resolve() })
 }
+function visibleText(): string {
+  const visible = container.cloneNode(true) as HTMLElement
+  for (const details of visible.querySelectorAll('details:not([open])')) {
+    const summary = details.querySelector('summary')
+    details.replaceChildren(...(summary ? [summary.cloneNode(true)] : []))
+  }
+  return visible.textContent ?? ''
+}
 
 describe('capability waiting card', () => {
   beforeEach(async () => {
@@ -94,6 +103,124 @@ describe('capability waiting card', () => {
     root = createRoot(container)
   })
   afterEach(async () => { await act(async () => root.unmount()); resetTaskStateForTests(); container.remove() })
+
+  it('presents an expired execution after partial HTML work without changing its durable wait or authorizing it', async () => {
+    const raw = 'Execution grant expired; start a newly authorized Turn.'
+    const expired: ExternalTaskCapabilityCard = { ...card, capability: {
+      provider: 'workspace', status: 'blocked', errorCode: 'execution_grant_expired', message: raw,
+      checkedAt: '2026-11-13T00:02:00Z',
+      action: { kind: 'grant', route: 'task-permissions', label: '确认当前任务权限' }
+    } }
+    tasks[0] = { ...tasks[0], workspaceRoot: '/workspace/original-task', waitingReason: raw,
+      activeTurnId: 'finished-work-turn', nodes: ['completed', 'pending', 'pending'].map((status, index) => ({
+        id: `node-${index}`, taskId: card.taskId, kind: 'execute', title: `步骤 ${index + 1}`,
+        status: status as 'completed' | 'pending', dependsOn: [], attempt: index === 0 ? 1 : 0,
+        maxAttempts: 2, idempotencyKey: `node-${index}`, evidence: [], revision: 1
+      })), artifacts: [{ id: 'html-draft', relativePath: 'report.html', validation: 'pending',
+        createdAt: '2026-11-13T00:01:00Z' }] }
+    inbox = [attentionFor(expired)]
+    const before = JSON.stringify({ tasks, inbox, expired })
+    await act(async () => {
+      root.render(createElement('div', null,
+        createElement(TaskRunStatusBar, { threadId: card.threadId, runtimeReady: true }),
+        createElement(CapabilityRequiredCard, { card: expired })))
+    })
+    const visible = visibleText()
+    expect(visible).toContain('1/3 个节点完成')
+    expect(visible).toContain('执行授权已到期')
+    expect(visible).toContain('本次执行授权已到期，已有成果和记录会保留。请到原任务详情核对并确认权限，再单独继续原任务。')
+    expect(visible).toContain('任务执行受阻，等待处理')
+    expect(visible).toContain('/workspace/original-task')
+    expect(visible).toContain('权限类型')
+    expect(visible).toContain('范围待核对，请查看当前任务权限')
+    expect(visible).not.toContain('尚未执行')
+    expect(visible).not.toContain('工作区信息尚未加载')
+    expect(visible).not.toContain('外部平台')
+    expect(visible).not.toContain(raw)
+    expect(container.textContent?.split(raw)).toHaveLength(2)
+    const diagnostics = [...container.querySelectorAll('details')].find(item => item.textContent?.includes(raw))!
+    expect(diagnostics.open).toBe(false)
+    await act(async () => { diagnostics.open = true })
+    expect(visibleText()).toContain(raw)
+    expect(visibleText()).toContain('execution_grant_expired')
+    expect(button('确认当前任务权限')).toBeTruthy()
+    expect(button('重新检查并继续原任务')).toBeTruthy()
+    expect(button('打开任务工作台')).toBeTruthy()
+    expect(JSON.stringify({ tasks, inbox, expired })).toBe(before)
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(api.runtimeRequest).not.toHaveBeenCalled()
+    expect(api.openExternal).not.toHaveBeenCalled()
+  })
+
+  it('does not mistake an admitted turn or an attempt counter for completed execution', async () => {
+    tasks[0] = { ...tasks[0], activeTurnId: 'admitted-turn', attempts: 1 }
+    await render()
+    expect(visibleText()).toContain('等待连接或授权，尚未执行')
+  })
+
+  it.each(['started step', 'running step', 'timed execution', 'existing artifact', 'result evidence'] as const)('does not describe %s as an entirely unexecuted task', async evidence => {
+    if (evidence === 'started step' || evidence === 'running step') tasks[0].nodes = [{ id: 'started-node', taskId: card.taskId, kind: 'execute', title: '已开始的步骤',
+      status: evidence === 'running step' ? 'running' : 'pending', ...(evidence === 'started step' ? { startedAt: '2026-11-13T00:00:01Z' } : {}),
+      dependsOn: [], attempt: 1, maxAttempts: 2, idempotencyKey: 'started-node', evidence: [], revision: 1 }]
+    if (evidence === 'timed execution') tasks[0].timing = { executionMs: 1, queuedMs: 0, humanWaitMs: 0, pausedMs: 0,
+      sampledAt: '2026-11-13T00:00:01Z', coverage: 'partial' }
+    if (evidence === 'existing artifact') tasks[0].artifacts = [{ id: 'html', relativePath: 'report.html', validation: 'pending', createdAt: '2026-11-13T00:00:01Z' }]
+    if (evidence === 'result evidence') tasks[0].resultEvidence = [{ kind: 'file', provider: 'workspace', operation: 'write', target: 'report.html',
+      status: 'succeeded', verified: false, verifiedAt: '2026-11-13T00:00:01Z', resultHash: 'draft-hash' }]
+    await render()
+    expect(visibleText()).toContain('任务执行受阻，等待处理')
+    expect(visibleText()).not.toContain('尚未执行')
+    expect(button('重新检查并继续原任务')).toBeTruthy()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
+
+  it('keeps unknown permission failures visible instead of treating their prose as an expiry code', async () => {
+    const raw = 'Execution grant expired; start a newly authorized Turn.'
+    await render({ ...card, capability: { provider: 'workspace', status: 'blocked', message: raw, errorCode: 'future_permission_failure' } })
+    expect(visibleText()).toContain(raw)
+    expect(container.querySelector('details')).toBeNull()
+  })
+
+  it.each(['other task', 'answered attention', 'different reason', 'unknown code', 'unknown outcome'] as const)('does not let %s replace a progress blocker with the expiry summary', async scenario => {
+    const raw = 'Execution grant expired; start a newly authorized Turn.'
+    const expired: ExternalTaskCapabilityCard = { ...card, capability: { provider: 'workspace', status: 'blocked', errorCode: 'execution_grant_expired', message: raw } }
+    tasks[0].waitingReason = raw
+    const attention = attentionFor(expired)
+    if (scenario === 'other task') attention.taskId = 'unrelated-task'
+    if (scenario === 'answered attention') attention.status = 'answered'
+    if (scenario === 'different reason') tasks[0].waitingReason = '目标文件仍需核对'
+    if (scenario === 'unknown code') expired.capability.errorCode = 'future_permission_failure'
+    if (scenario === 'unknown outcome') { tasks[0].status = 'stalled'; tasks[0].stalledReason = '操作结果尚未核验' }
+    inbox = [attention]
+    const expected = tasks[0].stalledReason || tasks[0].waitingReason
+    await act(async () => root.render(createElement(TaskRunStatusBar, { threadId: card.threadId, runtimeReady: true })))
+    expect(visibleText()).toContain(expected)
+    expect(visibleText()).not.toContain('执行授权已到期')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
+
+  it('keeps a superseded expiry card historical when the same attention ID belongs to a later permission check', async () => {
+    const old: ExternalTaskCapabilityCard = { ...card, capability: { provider: 'workspace', status: 'blocked',
+      errorCode: 'execution_grant_expired', message: 'Execution grant expired; start a newly authorized Turn.',
+      checkedAt: '2026-11-13T00:00:00Z', action: { kind: 'grant', route: 'task-permissions', label: '确认当前任务权限' } } }
+    const current = { ...old, capability: { ...old.capability, checkedAt: '2026-11-13T00:01:00Z' } }
+    await render(old, undefined, [attentionFor(current)])
+    expect(visibleText()).toContain('能力处理记录')
+    expect(visibleText()).not.toContain('执行授权已到期')
+    expect(visibleText()).not.toContain('确认当前任务权限')
+    expect(visibleText()).not.toContain('重新检查并继续原任务')
+    await render(current)
+    expect(visibleText()).toContain('执行授权已到期')
+    expect(button('确认当前任务权限')).toBeTruthy()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+    await click('打开任务工作台')
+    expect(takeRequestedTask()).toBe(card.taskId)
+    expect(state.setRoute).toHaveBeenCalledWith('tasks')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+  })
 
   it('keeps a legacy card outside the loaded task snapshot neutral instead of claiming current missing capability', async () => {
     tasks = []
@@ -267,16 +394,36 @@ describe('capability waiting card', () => {
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
   })
 
-  it('shows the owner task workspace for historical cards without workspace metadata', async () => {
+  it('uses the original owner workspace without borrowing a caller workspace, and stays unknown when no owner is loaded', async () => {
     const historical = { ...card, capability: { provider: 'workspace' as const, status: 'needs_authorization' as const,
       message: '需要确认权限', action: { kind: 'grant' as const, route: 'task/permissions', label: '确认权限' } } }
-    await render(historical, '/workspace/original-task')
+    tasks[0].workspaceRoot = '/workspace/original-task'
+    await render(historical, '/workspace/unrelated-current')
     expect(container.textContent).toContain('/workspace/original-task')
+    expect(container.textContent).not.toContain('/workspace/unrelated-current')
     expect(container.textContent).not.toContain('尚未选择工作区')
     await render(historical)
+    expect(container.textContent).toContain('/workspace/original-task')
+    expect(container.textContent).not.toContain('工作区信息尚未加载')
+    tasks = []
+    await render(historical, undefined, [])
     expect(container.textContent).toContain('工作区信息尚未加载')
     expect(container.textContent).not.toContain('尚未选择工作区')
     expect(api.getTaskRun).not.toHaveBeenCalled()
+  })
+
+  it('prefers the live owner workspace for current requests while preserving a historical snapshot workspace', async () => {
+    const scoped = { ...card, capability: { ...card.capability, workspaceRoot: '/workspace/recorded-snapshot' } }
+    tasks[0].workspaceRoot = '/workspace/original-owner'
+    await render(scoped, '/workspace/unrelated-current')
+    expect(visibleText()).toContain('/workspace/original-owner')
+    expect(visibleText()).not.toContain('/workspace/recorded-snapshot')
+    expect(visibleText()).not.toContain('/workspace/unrelated-current')
+    await render(scoped, '/workspace/unrelated-current', [])
+    expect(visibleText()).toContain('能力处理记录')
+    expect(container.textContent).toContain('/workspace/recorded-snapshot')
+    expect(container.textContent).not.toContain('/workspace/original-owner')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
   })
 
   it('continues the original source task to obtain a real periodic action review without opening a nonexistent plan', async () => {
