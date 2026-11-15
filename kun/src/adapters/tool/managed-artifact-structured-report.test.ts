@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WebArtifactEvidenceInputSchema } from '../../contracts/web-artifact-evidence.js'
@@ -7,7 +8,6 @@ import { prepareHtmlArtifact } from '../../services/html-artifact.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import { buildManagedArtifactToolProviders } from './managed-artifact-tool-provider.js'
 
-const isolatedRoot = '/private/tmp/railwise-execution-acceptance-20261113/investigation-field-contract-64c5a5f0'
 const temporary: string[] = []
 afterEach(async () => { await Promise.all(temporary.splice(0).map(path => rm(path, { recursive: true, force: true }))) })
 const title = '工程测量监测服务采购项目公开招标公告'
@@ -21,7 +21,7 @@ function report() {
       unverifiedFields: ['publication_date', 'budget', 'status', 'qualification'] }], noMatches: [] } }
 }
 async function fixture() {
-  const base = await mkdtemp(join(isolatedRoot, 'adapter-fixture-')); temporary.push(base)
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'managed-artifact-report-'))); temporary.push(base)
   const root = join(base, 'task-artifacts', 'task-test'), verifyWebArtifact = vi.fn()
   const tasks = { managedArtifactRoot: (taskId: string) => taskId === 'task-test' ? root : undefined,
     getTask: () => null, verifyWebArtifact }
