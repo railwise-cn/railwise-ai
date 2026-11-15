@@ -34,6 +34,7 @@ Published installers remain available from GitHub Releases and the official upda
 - **HTML deliverables** register actual generated files as task results and distinguish drafts from versions with verified sources. The first previewable HTML file in the active conversation opens in the right-hand preview. Reopen it from the task center or result card to inspect the content, field evidence and saved location.
 - **File permissions** allow new reports to use application-managed task storage in a read-only workspace. Requests to write to a specified directory require review of the target path and permission scope.
 - **Task workspace** keeps the task list and status filters in the left sidebar, the current task in the center, and an optional result preview on the right. Local HTML/SVG work is checked as a file deliverable, with separate execution, verification and delivery progress.
+- **Adaptive layout** switches side panels between docking and drawers using the available window space and UI text size, while keeping the result page open. General, model and skill menus stay anchored within the available space and scroll long lists internally.
 - **Permission recovery** preserves the original task and history when a temporary grant expires or its scope changes. Repair the permission card, then continue separately; permission failures do not trigger automatic retries.
 - **Daily schedules** support multiple times and an explicit timezone. For delivery deadlines, review the earlier start time. Recurring browser interactions use reviewed, finite scopes and recheck the site, element, input and browser binding on subsequent runs.
 - **Conversation display** focuses on concise progress, pending actions and results. Tool parameters and long output are available in expandable work details.
@@ -44,7 +45,7 @@ After one explicit task-scope review, permitted public searches, filters and pag
 
 ## 0.5.7 Chinese interface
 
-The task overview and compact-window menu were captured on November 16, 2026 from the exact macOS 0.5.7 candidate (source `64c5a5f0`). The survey, skills and help images retain their November 15 source `84ae4a85`. All use the Chinese light interface and original native PNG bytes, with no computer-use cursor. The task image is 2560 × 1680; the other three are 2672 × 1462. [Capture provenance, dimensions and hashes](./docs/images/v0.5.7/capture.json) · [General menu at 960 × 640 with large UI text](./docs/images/v0.5.7/adaptive-agent-menu-zh-light.png)
+The task overview and compact-window menu were captured on November 16, 2026 from the exact macOS 0.5.7 candidate (source `98e94321`). The survey, skills and help images retain their November 15 source `84ae4a85`. All use the Chinese light interface and original native PNG bytes, with no computer-use cursor. The task image is 2560 × 1680; the other three are 2672 × 1462. [Capture provenance, dimensions and hashes](./docs/images/v0.5.7/capture.json) · [General menu at 960 × 640 with large UI text](./docs/images/v0.5.7/adaptive-agent-menu-zh-light.png)
 
 Survey uses a local copy of real COSA IN2 planar-network observations for import checks only. The coordinate and height datums remain unconfirmed, and no adjustment was performed. The datum and results await engineering review.
 

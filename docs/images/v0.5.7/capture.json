@@ -35,7 +35,7 @@
     "Unfinished procurement tasks remain visible in the task list. Public procurement collection and recurring-delivery acceptance are not complete.",
     "The Survey image shows missing-datum blocking before computation; it does not document a CPIII classification or completed adjustment.",
     "Stable downloads remain version 0.5.6 at the time of capture.",
-    "The two adaptive captures were taken on 2026-11-16 Asia/Shanghai from exact source 64c5a5f0. They show UI inspection of an existing completed local SVG task, not a new model run or successful public-procurement collection. Original images and their source identities are preserved."
+    "The two adaptive captures were taken on 2026-11-16 Asia/Shanghai from exact source 98e94321. They show UI inspection of an existing completed local SVG task and the actual procurement task's failed state, not a new SVG model run or successful public-procurement collection. Older private evidence retains its original source identity."
   ],
   "screenshots": [
     {
@@ -85,40 +85,42 @@
     {
       "file": "adaptive-task-overview-zh-light.png",
       "description": "Adaptive task sidebar, completed local HTML/SVG task and saved-file preview",
-      "sourceHead": "64c5a5f0cbe1dfa1d3407df497dae70ca4723947",
-      "appAsarSha256": "e8b190503caa3de318ff904d5061445387bf23fef9ce9302c11322bc1ba39b47",
-      "releaseRun": 43741210871,
-      "capturedAt": "2026-11-15T18:43:50.408682+00:00",
+      "sourceHead": "98e94321de313f70ce5106e13ff45fb5c22545a4",
+      "appAsarSha256": "1f2698d54e84c12127ee63334a3d15b3728b9646e3c66149c9842a9116f5de62",
+      "releaseRun": 43770685662,
+      "capturedAt": "2026-11-15T23:47:40.932426+00:00",
       "width": 2560,
       "height": 1680,
-      "size": 1113930,
-      "sha256": "158be26cd2d55f9eea627b8619e5f130a1f38e6fbcd68b12915c55c4defad3e8",
+      "size": 1108161,
+      "sha256": "a6238f301ec258c53eefe6fc3ecc94a0387e9fabe587da5f83dcd25b6b13f92c",
       "nativeWindow": {
         "width": 1280,
         "height": 840
       },
       "uiScale": 0.9,
       "computerUseCursorVisible": false,
-      "imageEdited": false
+      "imageEdited": false,
+      "visualInspection": "AI visual inspection by UI agent and Root of original native screenshot; not human or professional sign-off"
     },
     {
       "file": "adaptive-agent-menu-zh-light.png",
       "description": "Actual General selector at native 960x640 with large UI font",
-      "sourceHead": "64c5a5f0cbe1dfa1d3407df497dae70ca4723947",
-      "appAsarSha256": "e8b190503caa3de318ff904d5061445387bf23fef9ce9302c11322bc1ba39b47",
-      "releaseRun": 43741210871,
-      "capturedAt": "2026-11-15T18:24:14.743529+00:00",
+      "sourceHead": "98e94321de313f70ce5106e13ff45fb5c22545a4",
+      "appAsarSha256": "1f2698d54e84c12127ee63334a3d15b3728b9646e3c66149c9842a9116f5de62",
+      "releaseRun": 43770685662,
+      "capturedAt": "2026-11-15T23:45:22.781645+00:00",
       "width": 1920,
       "height": 1280,
-      "size": 563550,
-      "sha256": "3ac6efc2d07b118fa65ef78cbcdaf87d2c71f0930fadcd70f0afb39be515db7e",
+      "size": 489496,
+      "sha256": "f7f4b61e369675042ed767e3145cc68ddfca6379724b61dc99150f54591f2115",
       "nativeWindow": {
         "width": 960,
         "height": 640
       },
       "uiScale": 1.1,
       "computerUseCursorVisible": false,
-      "imageEdited": false
+      "imageEdited": false,
+      "visualInspection": "AI visual inspection by UI agent and Root of original native screenshot; not human or professional sign-off"
     }
   ],
   "schemaVersion": 2,
