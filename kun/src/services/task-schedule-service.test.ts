@@ -47,6 +47,7 @@ function fixture() {
   const identities: Record<string, string> = { 'mcp:test': 'a'.repeat(64) }
   const browser = BrowserCapabilityConfig.parse({ enabled: true, state: 'ready', browserInstanceId: 'browser-one', revision: 1,
     origins: ['https://example.test'], interaction: 'interact' })
+  const ego = { state: 'installed' as const, executablePath: '/controlled/ego-browser', executableHash: 'b'.repeat(64), version: '0.6.3.14', revision: 2 }
   const workspace = { canonicalRoot: '/workspace', level: 'workspace-write', revision: 1 }
   const execution = ThreadSchema.parse({ id: 'execution', title: 'test', workspace: '/workspace', model: 'test', mode: 'agent', status: 'idle',
     agentRevision: 1, agentProfile: { id: 'general', name: 'General', role: 'General', color: 'blue', systemPrompt: 'Test', toolAllowlist: ['*'], mcpAllowlist: ['*'], trustLevel: 'workspace-write', budget: { maxAttempts: 10, maxDurationMs: 600000 }, revision: 1 }, approvalPolicy: 'on-request', sandboxMode: 'workspace-write', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
@@ -56,7 +57,7 @@ function fixture() {
   let activeTaskId = task.id
   const service = new TaskScheduleService({ flows, repository, tasks: { activeTask: () => repository.get(activeTaskId) } as never,
     coordinator: coordinator as never, threads: { get: async (id: string) => threads.get(id), upsert: async (value: typeof execution) => { threads.set(value.id, value); return value } } as never,
-    workspaceTrust: { get: async () => workspace } as never, connectorIdentities: () => identities, browserState: () => browser, nowIso: () => new Date().toISOString() })
+    workspaceTrust: { get: async () => workspace } as never, connectorIdentities: () => identities, browserState: () => browser, egoBrowserState: () => ego, nowIso: () => new Date().toISOString() })
   flows.setTaskScheduleDispatcher(input => service.dispatch(input))
   const context = { threadId: 'execution', turnId: 'turn', workspace: '/workspace', executionGrant: grant, validateExecutionGrant: vi.fn(), abortSignal: new AbortController().signal, awaitApproval: vi.fn(async () => 'allow') } as unknown as ToolHostContext
   function temporaryPaths() {
@@ -99,7 +100,7 @@ function fixture() {
     } })
     return repository.finishOperation(task.id, key, { status })
   }
-  return { selectTask: (id: string) => { activeTaskId = id }, service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths, approveBrowserAction, browserTool, browserDispatch, browser, root }
+  return { selectTask: (id: string) => { activeTaskId = id }, service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths, approveBrowserAction, browserTool, browserDispatch, browser, ego, root }
 }
 
 /** Safe-equivalent of the real c9/rev3 -> f84/rev4 durable binding history. */
@@ -961,4 +962,49 @@ describe('persistent schedule attention recovery', () => {
     await f.service.dispatch(f.input)
     expect(JSON.stringify(f.repository.attention(f.attentionId))).toBe(before)
   })
+})
+
+it.each(['observed_feed', undefined] as const)('seals the original evidence basis into a schedule occurrence without re-inferring legacy goals: %s', async basis => {
+  const f = fixture(), current = f.repository.get(f.task.id)!
+  f.repository.update(current.id, current.revision, task => ({ ...task, goal: '汇总已订阅招标列表 https://example.test/list，每天9点生成HTML。',
+    acceptance: { ...task.acceptance, requiresWebEvidence: true, ...(basis ? { webEvidenceBasis: basis } : {}) } }))
+  const saved = await f.service.create(f.context), flow = f.flows.get(saved.id)!
+  expect((flow.variables.taskSchedule as { webEvidenceBasis?: string }).webEvidenceBasis).toBe(basis)
+  await f.service.dispatch({ scheduleId: saved.id, versionId: flow.publishedVersionId!, dueAt: '2026-11-13T00:30:00.000Z' })
+  const hooks = f.coordinator.command.mock.calls[0]![1] as { prepareTask(task: typeof current): void }
+  const child = f.repository.create({ ...f.repository.get(current.id)!, id: 'feed-occurrence', threadId: 'occurrence', revision: 0,
+    acceptance: { ...current.acceptance, requiresWebEvidence: true, webEvidenceBasis: 'observed_feed' } })
+  hooks.prepareTask(child)
+  expect(f.repository.get(child.id)!.acceptance.webEvidenceBasis).toBe(basis)
+  expect(f.repository.get(child.id)!.scheduledBy?.scheduleId).toBe(saved.id)
+})
+
+it('derives the same Ego backend and evidence basis for a daily occurrence without consulting BSK identity', async () => {
+  const f = fixture(), grant = f.context.executionGrant!
+  const scope = { provider: 'ego-browser' as const, browserInstanceId: 'ego-browser:'+f.ego.executableHash, origins: ['https://example.test'], interaction: 'observe' as const, revision: f.ego.revision }
+  grant.browserScope = scope
+  grant.allowedProviderIds = ['ego-browser', 'managed-artifacts', 'task-schedule']
+  grant.allowedToolNames = ['ego_browser_open', 'ego_browser_observe', 'ego_browser_read', 'ego_browser_next_page', 'publish_artifact', 'read_artifact', 'verify_web_artifact', 'schedule_task', 'list_schedules']
+  grant.connectorIdentityFingerprints!['ego-browser'] = operationFingerprint(f.ego)
+  f.identities['ego-browser'] = operationFingerprint(f.ego)
+  const current = f.repository.get(f.task.id)!
+  f.repository.update(current.id, current.revision, task => ({ ...task, goal: '使用Ego读取已订阅列表 https://example.test，每日汇总HTML。',
+    acceptance: { ...task.acceptance, requiresWebEvidence: true, webEvidenceBasis: 'observed_feed' },
+    authority: { source: 'user', workspaceRoot: '/workspace', externalTargets: [], grantedAt: new Date().toISOString(), browserScope: scope } }))
+  const saved = await f.service.create(f.context), flow = f.flows.get(saved.id)!
+  await f.service.dispatch({ scheduleId: saved.id, versionId: flow.publishedVersionId!, dueAt: '2026-11-13T00:30:00.000Z' })
+  const hooks = f.coordinator.command.mock.calls[0]![1] as { prepareExecutionThread(thread: unknown): Promise<void>; prepareTask(task: typeof current): void }
+  const occurrence = { ...f.threads.get('origin')!, id: 'ego-occurrence', turns: [] };f.threads.set(occurrence.id, occurrence)
+  await hooks.prepareExecutionThread(occurrence)
+  f.browser.browserInstanceId = 'unrelated-changed-BSK'
+  const derived = await f.service.executionScopeForThread(occurrence.id)
+  expect(derived?.browserScope).toEqual(scope)
+  expect(derived?.allowedProviderIds).toContain('ego-browser')
+  expect(derived?.allowedProviderIds).not.toContain('browser-skill')
+  expect(derived?.connectorIdentityFingerprints?.['ego-browser']).toBe(operationFingerprint(f.ego))
+  const child = f.repository.create({ ...f.repository.get(current.id)!, id: 'ego-due-task', threadId: occurrence.id, revision: 0 })
+  hooks.prepareTask(child)
+  expect(f.repository.get(child.id)!.acceptance.webEvidenceBasis).toBe('observed_feed')
+  f.ego.revision++
+  await expect(f.service.executionScopeForThread(occurrence.id)).rejects.toMatchObject({ code: 'schedule_authority_changed' })
 })

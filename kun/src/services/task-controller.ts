@@ -6,7 +6,7 @@ import { retryBrowserScope } from './browser-public-query-authority.js'
 import { verifiedTaskRetryLineage } from './task-retry-lineage.js'
 import type { OperationResolutionOutcome } from '../contracts/tasks.js'
 import { browserTaskOrigins, browserVerificationPolicy } from '../contracts/browser-skill.js'
-import { requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames, TASK_SOURCE_INFERENCE_VERSION } from '../contracts/task-source-intent.js'
+import { asksForObservedFeedSummary, requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames, TASK_SOURCE_INFERENCE_VERSION } from '../contracts/task-source-intent.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { extractScheduleRequirement } from '../contracts/schedule.js'
@@ -65,7 +65,7 @@ import { WebArtifactEvidenceInputSchema, type WebArtifactEvidenceInput } from '.
 import { assessWebArtifactEvidence, verifiedWebArtifactEvidence, webArtifactFailureKinds, webArtifactManifestSourceProof, webArtifactPublicationReadiness, webArtifactRequirementHash, webEvidenceRepair } from './web-artifact-evidence.js'
 import { deriveWebArtifactRepairState, type WebArtifactRepairAttempt } from './web-artifact-repair-state.js'
 
-import { taskPermissionCapability, taskPermissionFailure } from './task-permission-recovery.js'
+import { EGO_PERMISSION_CODES, taskPermissionCapability, taskPermissionFailure } from './task-permission-recovery.js'
 
 const DEFAULT_MAX_ATTEMPTS = 8
 const DEFAULT_MAX_DURATION_MS = 30 * 60 * 1000
@@ -639,7 +639,7 @@ export class TaskController {
     return { ...sourceGate, ready: sourceGate.ready && !stalled, stalled, requirementHash,
       code: stalled ? 'web_artifact_repair_stalled' : sourceGate.ready ? undefined : 'web_source_reads_required',
       reasons: stalled ? semanticRepair!.reasons : sourceGate.ready ? [] : sourceGate.missingOrigins.length
-        ? sourceGate.missingOrigins.map(origin => `正式公告正文尚未核验：${origin}`) : ['尚缺可信的完整正文来源读取或实际零匹配页面。'],
+        ? sourceGate.missingOrigins.map(origin => `${task.acceptance.webEvidenceBasis === 'observed_feed' ? '订阅列表记录尚未核验' : '正式公告正文尚未核验'}：${origin}`) : [task.acceptance.webEvidenceBasis === 'observed_feed' ? '尚缺可信的完整列表或单记录读取；加载/空DOM/截断不代表零条。' : '尚缺可信的完整正文来源读取或实际零匹配页面。'],
       ...(semanticRepair ? { semanticRepair } : {}) }
   }
 
@@ -661,6 +661,8 @@ export class TaskController {
 
   /** Stop only the exact persisted semantic stall, preserving every draft and original failure. */
   async suspendWebArtifactProgress(threadId: string, turnId: string): Promise<Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null> {
+    const egoWait = await this.suspendEgoBrowserPermission(threadId, turnId)
+    if (egoWait) return egoWait
     const block = await this.webArtifactProgressBlock(threadId, turnId)
     if (!block?.stalled) return null
     const task = this.repository.findActiveByThread(threadId), token = this.attemptTokens.get(turnId)
@@ -682,6 +684,36 @@ export class TaskController {
           nextReads: block.nextReads, fingerprint: block.semanticRepair!.fingerprint } })
       return result
     })
+  }
+
+  /** Consume only a provider's task-owned wait after its actual Host result is durable.
+   * The provider must not release this attempt while execute() is still in flight. */
+  private async suspendEgoBrowserPermission(threadId: string, turnId: string): Promise<Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null> {
+    const task = this.repository.findActiveByThread(threadId), token = this.attemptTokens.get(turnId)
+    if (!task || task.status !== 'running' || task.activeTurnId !== turnId || !token || token.taskId !== task.id) return null
+    const wait = this.repository.operation(task.id, `ego-wait:${turnId}`)
+    const request = wait?.request, result = wait?.result as { code?: string; message?: string } | undefined
+    if (!wait || wait.kind !== 'ego_browser_wait' || wait.status !== 'succeeded' || wait.fingerprint !== operationFingerprint(request) ||
+      request?.taskId !== task.id || request.turnId !== turnId || !(EGO_PERMISSION_CODES as readonly unknown[]).includes(request.code) ||
+      result?.code !== request.code || typeof request.hostOperationId !== 'string') return null
+    const host = this.repository.operationById(task.id, request.hostOperationId, 'tool'), original = host?.request
+    const saved = host?.result as ToolHostResult | undefined, item = saved?.item
+    const grant = ExecutionGrantSchema.safeParse(original?.executionGrant)
+    if (!host || host.status !== 'failed' || host.fingerprint !== operationFingerprint(original) || original?.dispatchTracking !== 'host-v1' ||
+      original.providerId !== 'ego-browser' || original.callId !== request.callId || original.turnId !== turnId || original.executionId !== token.executionId ||
+      !grant.success || grant.data.taskId !== task.id || grant.data.threadId !== threadId || grant.data.turnId !== turnId ||
+      operationFingerprint(grant.data) !== request.grantFingerprint || grant.data.browserScope?.provider !== 'ego-browser' ||
+      typeof request.configurationFingerprint !== 'string' || request.configurationFingerprint !== grant.data.connectorIdentityFingerprints?.['ego-browser'] ||
+      grant.data.allowedProviderIds && !grant.data.allowedProviderIds.includes('ego-browser') || !item || item.kind !== 'tool_result' || !item.isError ||
+      item.callId !== original.callId || item.toolName !== original.toolName || item.turnId !== turnId || item.threadId !== threadId ||
+      !item.output || typeof item.output !== 'object' || (item.output as Record<string, unknown>).code !== request.code ||
+      (item.output as Record<string, unknown>).status === 'outcome_unknown' || this.unknownToolOutcomes(task.id).length) return null
+    const [thread, items] = await Promise.all([this.threadStore.get(threadId), this.sessionStore.loadItems(threadId)])
+    if (operationFingerprint(thread?.turns.find(turn => turn.id === turnId)?.executionGrant) !== request.grantFingerprint ||
+      !items.some(actual => actual.id === item.id && operationFingerprint(actual) === operationFingerprint(item))) return null
+    this.assertToken(token)
+    const failure = { code: String(request.code), message: typeof result?.message === 'string' ? result.message : String(request.code) }
+    return this.waitForCapability(task, turnId, taskPermissionCapability(failure, task, this.nowIso()), failure.code)
   }
 
   /** Seal an exact typed manifest only for the real in-flight built-in writer. No URL is sent through generic output redaction. */
@@ -2295,11 +2327,12 @@ function makeToolResultForVerifiedResolution(task: TaskRun, turnId: string, call
 }
 
 function acceptanceForPrompt(prompt: string): TaskAcceptance {
-  const files = promptRequiresFileDeliverable(prompt)
+  const feedHtml = asksForObservedFeedSummary(prompt) && /\bhtml?\b|汇总网页|汇总页面|生成网页/i.test(prompt)
+  const files = promptRequiresFileDeliverable(prompt) || feedHtml
   const web = requiresWebSourceEvidence(prompt)
   const effect = promptRequiresExternalEffect(prompt)
   const intent = effect ? externalTaskIntent(prompt) : null
-  const requiredFormats = requiredFileExtensionsForPrompt(prompt)
+  const requiredFormats = requiredFileExtensionsForPrompt(prompt) ?? (feedHtml ? ['html'] : undefined)
   return {
     schedule: extractScheduleRequirement(prompt),
     kind: files ? 'files' : effect ? 'effect' : 'answer',
@@ -2307,7 +2340,7 @@ function acceptanceForPrompt(prompt: string): TaskAcceptance {
     sourceInferenceVersion: TASK_SOURCE_INFERENCE_VERSION,
     ...(requiredFormats ? { requiredFormats: [...requiredFormats] } : {}),
     ...(files ? { minimumArtifacts: 1 } : {}),
-    ...(web ? {requiresWebEvidence:true,requiredSourceOrigins:browserTaskOrigins(prompt)} : {}),
+    ...(web ? {requiresWebEvidence:true,requiredSourceOrigins:browserTaskOrigins(prompt), ...(asksForObservedFeedSummary(prompt) ? { webEvidenceBasis: 'observed_feed' as const } : {})} : {}),
     requireFinalResponse: true,
     requireActionableArtifactCard: files,
     ...(effect ? { requiresExternalEffects: true } : {}),

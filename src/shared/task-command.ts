@@ -1,7 +1,7 @@
 import type { TaskRunV1, TaskInputV1 } from './agent-workbench'
 /** Public capability snapshot. Runtime identities and credentials stay private. */
 export type ExternalTaskCapability = {
-  provider: 'dingtalk' | 'lark' | 'feishu' | 'browser-skill' | 'workspace' | 'schedule'
+  provider: 'dingtalk' | 'lark' | 'feishu' | 'browser-skill' | 'ego-browser' | 'workspace' | 'schedule'
   status: 'available' | 'not_installed' | 'needs_authorization' | 'unsupported' | 'blocked'
   message: string
   errorCode?: string

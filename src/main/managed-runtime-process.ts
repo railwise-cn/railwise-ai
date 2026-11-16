@@ -43,6 +43,8 @@ import type { ManagedDwsStatus } from '../shared/managed-dws'
 import { DwsCapabilityConfig } from '../../kun/src/contracts/dws.js'
 import { DingTalkCapabilityConfig } from '../../kun/src/contracts/dingtalk.js'
 import { BrowserCapabilityConfig } from '../../kun/src/contracts/browser-skill.js'
+import { EgoBrowserCapabilityConfig } from '../../kun/src/contracts/ego-browser.js'
+import { diagnoseEgoBrowser } from './services/managed-ego-browser-service'
 import { getManagedBrowserSkillService } from './services/managed-browser-skill-service'
 import { resolveLarkCliEnvironment } from '../../kun/src/services/lark-cli-environment.js'
 import { resolveDwsEnvironment } from '../../kun/src/services/dws-cli-environment.js'
@@ -494,6 +496,7 @@ export async function startManagedRuntimeChild(
     skillRoots: options.skillRoots,
     larkCli,
     dws:dwsDiagnosis.status??{state:'error'},
+    egoBrowser: await diagnoseEgoBrowser(),
     browserSkill: await getManagedBrowserSkillService().configuration().then(async config => {
       if (!config.enabled) return config
       const result = await getManagedBrowserSkillService().connect()
@@ -805,6 +808,7 @@ export async function syncManagedRuntimeConfig(
     mcpV2Servers?: Record<string, Record<string, unknown>>
     skillRoots?: string[]
     dws?:ManagedDwsStatus
+    egoBrowser?: EgoBrowserCapabilityConfig
     browserSkill?: BrowserCapabilityConfig
     larkCli?: {
       state: 'not_installed' | 'needs_login' | 'installed' | 'error'
@@ -894,6 +898,7 @@ export async function syncManagedRuntimeConfig(
       skills: skillCapability,
       imageGen: imageGenConfigForRuntime(runtime.imageGeneration, imageGen),
       dws: dwsCapabilityFromStatus(options?.dws ?? { state: 'not_installed' }, managedDwsEnabled(capabilities)),
+      ...(options?.egoBrowser ? { egoBrowser: options.egoBrowser } : capabilities.egoBrowser ? { egoBrowser: EgoBrowserCapabilityConfig.parse(capabilities.egoBrowser) } : {}),
       browserSkill: options?.browserSkill ?? BrowserCapabilityConfig.parse(capabilities.browserSkill ?? {}),
       lark: {
         ...lark,
@@ -1394,6 +1399,7 @@ function sanitizeRuntimeCapabilitiesConfig(value: unknown): Record<string, unkno
   if ('imageGen' in raw) next.imageGen = parseRuntimeConfigSection(ImageGenCapabilityConfig, raw.imageGen)
   if ('lark' in raw) next.lark = parseRuntimeConfigSection(LarkCapabilityConfig, raw.lark)
   if ('dws' in raw) next.dws=parseRuntimeConfigSection(DwsCapabilityConfig,raw.dws)
+  if ('egoBrowser' in raw) next.egoBrowser = parseRuntimeConfigSection(EgoBrowserCapabilityConfig, raw.egoBrowser)
   if ('browserSkill' in raw) next.browserSkill = parseRuntimeConfigSection(BrowserCapabilityConfig, raw.browserSkill)
   if ('dingtalk' in raw) next.dingtalk=parseRuntimeConfigSection(DingTalkCapabilityConfig,raw.dingtalk)
   return next

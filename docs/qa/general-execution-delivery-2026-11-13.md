@@ -825,3 +825,15 @@ Windows 新增独占诊断入口，仅对同一精确包、固定官方 CLI 和�
 
 
 ASAR QA 路径修正保留 canonical receipt 路径，以平台原生分隔符调用实际 ASAR API；新增使用真实依赖及 Win32 路径语义的回归先复现同一 not-found，再通过。四文件 Node 22 最终 168 项通过／1 项原平台跳过，未削弱包内源码、ASAR、unpacked entry 或完整性断言。新 Windows 原生诊断仍须以其真实运行结果另行记录。
+
+### Dadan／Ego 新任务范围与后续诊断
+
+`e0f16384` 的 [push Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43824594426) 和 [PR Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43824602977) 六个 job 成功。该提交尚未构建新的分发包，也不包含后续 Ego／订阅列表增量；不沿用旧包结果宣称新能力通过。
+
+Windows 诊断第二次仍停在 QA 路径：实际 compiled identity 模块是 extraResources，不能在 ASAR header 中查找。修正只读取安装包已有的确切模块，校验真实路径、固定 SHA256 和同源码签名 Mac 包中的字节身份，不改生产探针或放宽包／源身份。[第三次诊断](https://github.com/railwise-cn/railwise-ai/actions/runs/43831681189) 实际执行 A／B：原生产参数的首次身份探针 3,741ms，warm 参考 221ms，两个 daemon 均 ready 并存活 10 秒，按精确进程身份清理且释放端口，C 未触发。整个 workflow 仍为失败：后置 console helper 的 JSON 收集不完整，原 stdout／stderr 未留存。原 full 中 660ms 的启动失败没有复现、原因仍未知，业务执行也没有因此通过；不把后置辅助诊断追加为新发行门禁。
+
+用户将新采集来源改为已付费、在 Ego 中登录的大单网订阅列表，并明确要求由 **RailWise AI 本身**执行。没有使用 Codex 抓取该页面、代写报告或向任务植入来源。旧政府采购采集计划通过正常应用 UI 暂停，保留两个历史版本；节点、08:30／16:30 时间与原用途不变，仅 enabled 由 true 改 false，暂停正常产生新 revision／published version。旧失败、预算和 UNKNOWN 保留，新来源需要新任务与相应范围。
+
+新增 Ego 接线和明确的订阅列表验收已在源码合并。目标是实际任务工具读取 → 同条目事实绑定 → 真实 HTML／文件哈希 → 显式核验／自动预览 → 新计划读回，而非把列表称为已核验官方正文。兼容与用户动作见 [Ego 与订阅列表迁移说明](../migrations/0.5.7-ego-subscription-feed.md)。最终精确包、真实 SDK、付费登录态和每日到期任务仍未验收；没有公开发行或修改官网。
+
+合并后的 Node 22 本地验证：Runtime 12 文件 389 项通过；桌面三文件最终独立用例 93 项通过，其中能力卡修改后 48 项再次通过，首次三文件批次为 92 项。初次 Web 类型检查发现 Ego 通用市场资源被误传为原生连接器路由，保留失败日志并修正；KUN、Node、Web 最终类型检查及变更代码 lint 通过。单次生产构建、1,381 输入 freshness 与 2,443 个 authored production 文件逐字对比通过。最终精确包和实际 Ego／大单网业务仍待执行，以上不作为付费页面任务成功证据。

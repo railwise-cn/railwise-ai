@@ -2,6 +2,7 @@ import { publicQueryRecoveryForPlan, recoveryCoversReceipt, recoveryExecutionSco
 import type { BrowserPublicQueryRecoveryBinding } from '../contracts/browser-public-query-recovery.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { BrowserExecutionScope, browserVerificationPolicy, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
+import type { EgoBrowserCapabilityConfig } from '../contracts/ego-browser.js'
 import type { ExecutionGrant, ExecutionScope } from '../contracts/permissions.js'
 import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
 import type { FlowDefinitionV1 } from '../contracts/flow.js'
@@ -36,6 +37,7 @@ type ScheduledTaskAuthority = {
   model: string
   providerId?: string
   prompt: string
+  webEvidenceBasis?: 'primary_document' | 'observed_feed'
   requirement: ScheduleRequirement
   grant: ExecutionGrant
   execution: ThreadAuthority
@@ -74,7 +76,7 @@ export class TaskScheduleService {
   constructor(private readonly deps: {
     flows: FlowRuntimeService; repository: TaskRunRepository; tasks: TaskController
     coordinator: TaskCoordinator; threads: ThreadStore; workspaceTrust: WorkspaceTrustReader
-    connectorIdentities(): Record<string, string>; browserState?(): BrowserCapabilityConfig; nowIso(): string
+    connectorIdentities(): Record<string, string>; browserState?(): BrowserCapabilityConfig; egoBrowserState?(): EgoBrowserCapabilityConfig; nowIso(): string
   }) {}
 
   canCreate(context: ToolHostContext): boolean {
@@ -105,7 +107,8 @@ export class TaskScheduleService {
     const scopeHash = fingerprint({ taskId: task.id, requirement: task.acceptance.schedule, scope, execution: threadAuthority(execution), origin: threadAuthority(origin) })
     let authority: ScheduledTaskAuthority = {
       taskId: task.id, threadId: context.threadId, originThreadId: task.originThreadId ?? context.threadId,
-      model: task.model ?? context.model?.id ?? 'auto', providerId: task.providerId, prompt: task.goal, requirement: task.acceptance.schedule, grant,
+      model: task.model ?? context.model?.id ?? 'auto', providerId: task.providerId, prompt: task.goal,
+      ...(task.acceptance.webEvidenceBasis ? { webEvidenceBasis: task.acceptance.webEvidenceBasis } : {}), requirement: task.acceptance.schedule, grant,
       execution: threadAuthority(execution), origin: threadAuthority(origin), sourceAuthorityHash: fingerprint(task.authority ?? null), scope,
       authorization: { kind: scopedSchedule ? 'confirmed_task_scope' : 'requested_schedule', expiresAt: null, until: 'disabled', scopeHash,
         ...(scopedSchedule ? { sourceScopeReceiptId: scopedSchedule.binding.id } : {}) }
@@ -307,10 +310,10 @@ export class TaskScheduleService {
       }, prepareTask: task => {
         if (task.scheduledBy) return
         this.deps.repository.update(task.id, task.revision, value => {
-          const { schedule: _schedule, ...acceptance } = value.acceptance
+          const { schedule: _schedule, webEvidenceBasis: _inferredBasis, ...acceptance } = value.acceptance
           return { ...value, ...(recovery?{publicQueryRecovery:recovery}:{}), scheduledBy: { scheduleId: input.scheduleId, dueAt: input.dueAt },
             ...(authority.scope.browserScope ? { authority: { ...value.authority!, browserScope: authority.scope.browserScope } } : {}),
-            acceptance: { ...acceptance,
+            acceptance: { ...acceptance, ...(authority.webEvidenceBasis ? { webEvidenceBasis: authority.webEvidenceBasis } : {}),
               ...(authority.scope.browserScope && acceptance.requiresWebEvidence && !acceptance.requiredSourceOrigins?.length
                 ? { requiredSourceOrigins: authority.scope.browserScope.origins } : {}) } }
         }, { key: `scheduled:${input.dueAt}`, kind: 'scheduled_task_created', payload: input, createdAt: this.deps.nowIso() })
@@ -723,7 +726,7 @@ export class TaskScheduleService {
     const origin = await this.deps.threads.get(authority.originThreadId)
     const execution = await this.deps.threads.get(authority.threadId)
     const workspace = await this.deps.workspaceTrust.get(grant.workspaceRoot)
-    if (!source || source.goal !== authority.prompt || source.authority?.revokedAt || source.authority?.taskApprovalGrant?.revokedAt || fingerprint(source.authority ?? null) !== authority.sourceAuthorityHash ||
+    if (!source || source.goal !== authority.prompt || source.acceptance.webEvidenceBasis !== authority.webEvidenceBasis || source.authority?.revokedAt || source.authority?.taskApprovalGrant?.revokedAt || fingerprint(source.authority ?? null) !== authority.sourceAuthorityHash ||
       !origin || origin.status === 'deleted' || !execution || execution.status === 'deleted' ||
       fingerprint(threadAuthority(origin)) !== fingerprint(authority.origin) || fingerprint(threadAuthority(execution)) !== fingerprint(authority.execution) ||
       workspace.canonicalRoot !== grant.workspaceRoot ||
@@ -766,7 +769,10 @@ export class TaskScheduleService {
 
   private validateConnectorBindings(authority: ScheduledTaskAuthority): void {
     const { grant } = authority
-    if (grant.browserScope) {
+    if (grant.browserScope?.provider === 'ego-browser') {
+      const ego = this.deps.egoBrowserState?.()
+      if (!ego || ego.state !== 'installed' || grant.browserScope.browserInstanceId !== 'ego-browser:' + ego.executableHash || ego.revision !== grant.browserScope.revision) fail('计划绑定的 Ego 可执行文件或授权来源已变化，请核对原计划。')
+    } else if (grant.browserScope) {
       const browser = this.deps.browserState?.()
       if (!browser || !browser.enabled || browser.browserInstanceId !== grant.browserScope.browserInstanceId || browser.revision !== grant.browserScope.revision) fail('计划绑定的浏览器或授权来源已变化，请核对原计划。')
     }

@@ -456,6 +456,41 @@ describe('capability waiting card', () => {
     expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
   })
 
+  it('opens the original Ego task review without resuming, granting or selecting another browser', async () => {
+    const ego: ExternalTaskCapabilityCard = { ...card, capability: { provider: 'ego-browser', status: 'needs_authorization',
+      errorCode: 'ego_browser_user_control', message: '请在 Ego 中完成接管，再继续原任务。',
+      resolution: { kind: 'retry', route: 'task/ego-browser-review', label: '查看原任务的 Ego 浏览器' } } }
+    await render(ego)
+    expect(visibleText()).toContain('Ego 浏览器助手')
+    await click('查看原任务的 Ego 浏览器')
+    expect(takeRequestedTask()).toBe(card.taskId)
+    expect(state.setRoute).toHaveBeenCalledWith('tasks')
+    expect(state.openSettings).not.toHaveBeenCalled()
+    expect(state.openPlugins).not.toHaveBeenCalled()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+    expect(api.runtimeRequest).not.toHaveBeenCalled()
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+
+    await render(ego, undefined, [])
+    await click('查看配置')
+    expect(takeRequestedTask()).toBe(card.taskId)
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(state.openSettings).not.toHaveBeenCalled()
+    expect(state.openPlugins).not.toHaveBeenCalled()
+  })
+
+  it('opens the existing market for an unavailable Ego CLI without configuring BrowserSkill', async () => {
+    await render({ ...card, capability: { provider: 'ego-browser', status: 'not_installed', errorCode: 'ego_browser_not_installed',
+      message: 'Ego CLI 尚未安装。', action: { kind: 'connect', route: 'marketplace', label: '查看 Ego 安装入口' } } })
+    await click('查看 Ego 安装入口')
+    expect(state.openPlugins).toHaveBeenCalledWith(undefined, undefined)
+    expect(state.openSettings).not.toHaveBeenCalled()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
+  })
+
   it('routes a periodic browser scope blocker to its actual plan without resuming it', async () => {
     await render({ ...card, capability: { provider: 'schedule', status: 'needs_authorization', errorCode: 'browser_schedule_action_scope_changed',
       message: '周期网页动作需要重新核对', action: { kind: 'grant', route: 'flow/schedule_original', label: '查看并核对定时计划' } } })

@@ -5,7 +5,8 @@ import type { TaskRunRepository } from './task-run-repository.js'
 import type { CapabilityPreflight } from '../contracts/harness.js'
 import { workspacePermissionCapability } from './workspace-write-preflight.js'
 
-const permissionCodes = new Set(['task_permission_expired', 'task_permission_revoked', 'task_permission_consumed', 'task_permission_blocked',
+export const EGO_PERMISSION_CODES = ['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid'] as const
+const permissionCodes = new Set([...EGO_PERMISSION_CODES,'task_permission_expired', 'task_permission_revoked', 'task_permission_consumed', 'task_permission_blocked',
   'execution_grant_expired', 'execution_grant_revoked', 'execution_grant_scope', 'workspace_trust_changed', 'approval_policy_blocked',
   'sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
   'browser_public_query_recovery_changed', 'browser_public_query_fresh_scope_required', 'browser_binding_changed',
@@ -21,7 +22,11 @@ export function taskPermissionCapability(failure:TaskPermissionFailure,task:Pick
   checkedAt=new Date().toISOString()):CapabilityPreflight {
   const {code}=failure
   let provider:CapabilityPreflight['provider'],resolution:NonNullable<CapabilityPreflight['resolution']>,summary:string
-  if(code==='browser_binding_changed') {
+  if((EGO_PERMISSION_CODES as readonly string[]).includes(code)) {
+    provider='ego-browser'
+    resolution={kind:'retry',route:'task/ego-browser-review',label:'查看当前任务并检查Ego连接'}
+    summary='Ego只读连接、任务范围或用户控制状态需要核对。请处理后继续原任务；原TaskSpace与资料已保留，不会另建空间或重放业务操作。'
+  } else if(code==='browser_binding_changed') {
     provider='browser-skill'
     resolution={kind:'grant',route:'task/browser-binding',label:'确认当前任务的浏览器范围'}
     summary='浏览器实例或连接配置已变化。请审阅当前任务的浏览器和站点范围，确认后继续原任务。'

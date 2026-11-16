@@ -40,6 +40,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
   const isLark = capability.provider === 'lark' || capability.provider === 'feishu'
   const isDingTalk = capability.provider === 'dingtalk'
   const isBrowser = capability.provider === 'browser-skill'
+  const isEgo = capability.provider === 'ego-browser'
   const connector = isBrowser ? 'browser-skill' : isLark ? 'lark' : isDingTalk ? 'dingtalk' : undefined
   const action = capability.resolution ?? capability.action
   const attention = live.attention.find(item => item.id === (card.attentionId ?? `capability_${card.taskId}`) &&
@@ -68,7 +69,9 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
   const executionGrantExpired = isExecutionGrantExpiredCapability(capability)
   const openOriginalTask = (): void => { requestTaskDetail(card.taskId); setRoute('tasks') }
   const openConfiguration = (): void => {
-    if (connector) openPlugins(undefined, connector)
+    if (isEgo && action?.route === 'task/ego-browser-review') openOriginalTask()
+    else if (isEgo) openPlugins()
+    else if (connector) openPlugins(undefined, connector)
     else if (capability.provider === 'schedule' && action?.route.startsWith('flow/')) {
       requestFlowDetail({ flowId: action.route.slice('flow/'.length) })
       openFlow()
@@ -80,6 +83,10 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       return
     }
     const route = action?.route ?? ''
+    if (isEgo && route === 'task/ego-browser-review') {
+      openOriginalTask()
+      return
+    }
     if (isBrowser && route === 'task/public-query-recovery') {
       openOriginalTask()
       return
@@ -171,7 +178,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
         <p>{capability.errorCode}</p>
       </details> : null}
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-        <dt className="text-ds-muted">{t(capability.provider === 'workspace' ? 'capabilityPermissionType' : 'capabilityProvider')}</dt><dd>{t(isLark ? 'capabilityLark' : isDingTalk ? 'capabilityDingTalk' : isBrowser ? 'connectorHubBrowserSkill' : capability.provider === 'schedule' ? 'capabilitySchedule' : 'capabilityWorkspaceFiles')}</dd>
+        <dt className="text-ds-muted">{t(capability.provider === 'workspace' ? 'capabilityPermissionType' : 'capabilityProvider')}</dt><dd>{t(isLark ? 'capabilityLark' : isDingTalk ? 'capabilityDingTalk' : isBrowser ? 'connectorHubBrowserSkill' : isEgo ? 'pluginCliEgoTitle' : capability.provider === 'schedule' ? 'capabilitySchedule' : 'capabilityWorkspaceFiles')}</dd>
         <dt className="text-ds-muted">{t(interactive ? 'capabilityCurrentStatus' : 'capabilityRecordedStatus')}</dt><dd>{t(`capabilityStatus_${capability.status}`)}</dd>
         <dt className="text-ds-muted">{t(interactive ? 'capabilityWorkspace' : 'capabilityRecordedWorkspace')}</dt><dd className="break-all">{displayedWorkspaceRoot || t('capabilityWorkspaceUnknown')}</dd>
         <dt className="text-ds-muted">{t(interactive ? 'capabilityRequestedScope' : 'capabilityRecordedScope')}</dt><dd>{capability.requiredScopes?.join(', ') || t(capability.provider === 'workspace' ? 'capabilityScopeReviewRequired' : 'capabilityScopeNotGranted')}</dd>

@@ -28,6 +28,7 @@ export const BrowserPublicQueryAuthorization = z.object({
 export type BrowserPublicQueryAuthorization = z.infer<typeof BrowserPublicQueryAuthorization>
 
 export const BrowserExecutionScope = z.object({
+  provider: z.literal('ego-browser').optional(),
   browserInstanceId: z.string().min(1).max(512),
   origins: z.array(BrowserOrigin).max(64),
   interaction: z.enum(['observe', 'interact']),

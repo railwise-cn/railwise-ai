@@ -35,3 +35,23 @@ it('keeps an explicit BrowserSkill connection request while not turning local re
   expect(requiredLocalHtmlFileNames('创建HTML，文件命名为 other.html。')).toEqual(['other.html'])
   expect(requiredLocalHtmlFileNames('Create HTML and save as "reports/view.html".')).toEqual(['reports/view.html'])
 })
+
+it.each([
+  '读取我已订阅的大单网每天更新的招标列表 https://feed.example.test/#/subscribe/bidding，筛选工程测量、测绘、监测，汇总HTML。',
+  '读取订阅列表 https://feed.example.test/，只整理列表摘要，不需要打开公告正文。',
+  'Summarize the subscribed feed https://feed.example.test/ into an HTML digest.'
+])('chooses a feed basis only for an explicit user subscription summary: %s', async prompt => {
+  const { asksForObservedFeedSummary } = await import('./task-source-intent.js')
+  expect(asksForObservedFeedSummary(prompt)).toBe(true)
+  expect(requiresWebSourceEvidence(prompt)).toBe(true)
+})
+
+it.each([
+  '读取招标列表 https://feed.example.test/ 并逐条打开公告正文，汇总HTML。',
+  '读取已订阅招标列表 https://feed.example.test/ 并核验官方原文，汇总HTML。',
+  '创建本地HTML模拟订阅列表，不需要联网读取网页。',
+  '读取 https://gov.example.test/ 的招标公告正文，汇总HTML。'
+])('does not lower primary or local contracts merely for list/summary words: %s', async prompt => {
+  const { asksForObservedFeedSummary } = await import('./task-source-intent.js')
+  expect(asksForObservedFeedSummary(prompt)).toBe(false)
+})

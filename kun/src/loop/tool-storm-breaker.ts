@@ -4,6 +4,7 @@ import type { ToolCallLike, ToolHostResult } from '../ports/tool-host.js'
 export type ToolStormBreakerOptions = {
   windowSize?: number
   threshold?: number
+  validateEgoNavigationProgress?: (call: ToolCallLike, result: ToolHostResult, grant: ExecutionGrant) => boolean
 }
 
 type RecentToolCall = {
@@ -21,6 +22,8 @@ const DEFAULT_THRESHOLD = 3
 const MUTATING_TOOL_NAMES = new Set(['write', 'edit', 'edit_diff', 'apply_patch', 'delete', 'move'])
 const STORM_EXEMPT_TOOL_NAMES = new Set(['request_user_input', 'user_input'])
 const BROWSER_READS = new Set(['browser_observe', 'browser_get_html', 'browser_read', 'browser_extract', 'browser_screenshot'])
+const EGO_READS = new Set(['ego_browser_observe', 'ego_browser_read'])
+const EGO_ACTIONS = new Set(['ego_browser_open', 'ego_browser_next_page'])
 const BROWSER_ACTIONS = new Set(['browser_navigate', 'browser_click', 'browser_fill', 'browser_press'])
 const LOCAL_STALE_ERRORS = new Set(['browser_context_stale', 'browser_element_unverified'])
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
@@ -35,10 +38,13 @@ export class ToolStormBreaker {
   private readonly windowSize: number
   private readonly threshold: number
   private readonly recent: RecentToolCall[] = []
+  private readonly egoProgress = new Set<string>()
   private readonly browserSessions = new Map<string, string>()
+  private readonly validateEgoNavigationProgress?: ToolStormBreakerOptions['validateEgoNavigationProgress']
   private readonly browserRecovery = new Map<string, BrowserRecoveryBudget>()
 
   constructor(options: ToolStormBreakerOptions = {}) {
+    this.validateEgoNavigationProgress = options.validateEgoNavigationProgress
     this.windowSize = Math.max(1, Math.floor(options.windowSize ?? DEFAULT_WINDOW_SIZE))
     this.threshold = Math.max(2, Math.floor(options.threshold ?? DEFAULT_THRESHOLD))
   }
@@ -49,7 +55,7 @@ export class ToolStormBreaker {
     const args = stableStringify(call.arguments)
     const readOnly = !isMutatingToolCall(call)
     const scope = this.browserScope(call, grant), session = scope ? sessionId(call.arguments.sessionId) ?? this.browserSessions.get(scope) : undefined
-    const browserKey = scope && session && BROWSER_READS.has(name) ? JSON.stringify([scope, session]) : undefined
+    const browserKey = scope && session && (BROWSER_READS.has(name) || EGO_READS.has(name)) ? JSON.stringify([scope, session]) : undefined
     const recovery = scope && session && name === 'browser_observe' ? this.browserRecovery.get(scope) : undefined
     if (session && recovery?.blocked.has(session)) return { suppress: true,
       reason: 'browser_observe exhausted two fresh recovery observations without a successful action in this owned browser session. Preserve the real stale/ref error; do not replay the action or restart sessions to evade the bound.' }
@@ -80,6 +86,7 @@ export class ToolStormBreaker {
 
   reset(): void {
     this.recent.length = 0
+    this.egoProgress.clear()
     this.browserSessions.clear()
     this.browserRecovery.clear()
   }
@@ -90,6 +97,25 @@ export class ToolStormBreaker {
     if (!scope || !grant || item.kind !== 'tool_result' || item.threadId !== grant.threadId || item.turnId !== grant.turnId ||
       item.callId !== call.callId || item.toolName !== call.toolName) return
     const output = object(item.output), evidence = object(output.evidence), requested = sessionId(call.arguments.sessionId), returned = sessionId(output.sessionId)
+    if (call.providerId === 'ego-browser') {
+      const previous = this.browserSessions.get(scope)
+      if (output.provider !== 'ego-browser' || !returned || !Number.isSafeInteger(output.taskSpaceId) || String(output.taskSpaceId) !== returned ||
+        previous && previous !== returned || !result.approved || item.isError || output.status !== 'succeeded') return
+      this.browserSessions.set(scope, returned)
+      const read = this.recent.find(entry => entry.callId === call.callId && EGO_READS.has(entry.name))
+      if (read) read.browserKey = JSON.stringify([scope, returned])
+      // The callback is supplied by the server factory and checks the genuine
+      // persisted Host, TaskSpace and before/after navigation/read receipts.
+      const progressId = typeof evidence.navigationReceiptId === 'string' ? JSON.stringify([scope, evidence.navigationReceiptId]) : undefined
+      let progressed = false
+      try { progressed = Boolean(progressId && !this.egoProgress.has(progressId)) && EGO_ACTIONS.has(call.toolName) && this.validateEgoNavigationProgress?.(call, result, grant) === true } catch { /* an invalid proof never resets the guard */ }
+      if (progressed) {
+        this.egoProgress.add(progressId!)
+        const key = JSON.stringify([scope, returned])
+        for (let index = this.recent.length - 1; index >= 0; index--) if (this.recent[index]?.browserKey === key && EGO_READS.has(this.recent[index]!.name)) this.recent.splice(index, 1)
+      }
+      return
+    }
     if (output.provider !== undefined && output.provider !== 'browser-skill' || requested && returned && requested !== returned ||
       output.browserInstanceId !== undefined && output.browserInstanceId !== grant.browserScope!.browserInstanceId) return
     const session = requested ?? returned ?? this.browserSessions.get(scope)
@@ -124,7 +150,10 @@ export class ToolStormBreaker {
   }
 
   private browserScope(call: ToolCallLike, grant?: ExecutionGrant): string | undefined {
-    if (call.providerId !== 'browser-skill' || !grant?.taskId || !grant.browserScope?.browserInstanceId) return undefined
+    if (!grant?.taskId || !grant.browserScope?.browserInstanceId) return undefined
+    if (call.providerId === 'ego-browser') return grant.browserScope.provider === 'ego-browser' && grant.connectorIdentityFingerprints?.['ego-browser']
+      ? JSON.stringify(['ego-browser', grant.taskId, grant.threadId, grant.turnId, grant.id, grant.revision, grant.browserScope.browserInstanceId, grant.browserScope.revision, grant.connectorIdentityFingerprints['ego-browser']]) : undefined
+    if (call.providerId !== 'browser-skill' || grant.browserScope.provider === 'ego-browser') return undefined
     return JSON.stringify([grant.taskId, grant.threadId, grant.turnId, grant.id, grant.revision, grant.browserScope.browserInstanceId, grant.browserScope.revision])
   }
 

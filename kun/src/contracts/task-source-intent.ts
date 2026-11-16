@@ -24,7 +24,7 @@ export function isLocalHtmlCreativeRequest(text: string): boolean {
 
 export function requiresWebSourceEvidence(text: string): boolean {
   if (explanatory.test(text.trim())) return false
-  if (asksForExternalRead(text)) return true
+  if (asksForExternalRead(text) || asksForObservedFeedSummary(text)) return true
   if (isLocalHtmlCreativeRequest(text)) return false
   return browserTool.test(text) || /浏览器|网页.*(?:点击|填写|填表|操作|截图|提取|打开)|(?:点击|填写|填表|操作|截图|提取).*网页|\b(?:chrome|edge)\b/i.test(text)
 }
@@ -47,4 +47,13 @@ export function legacyLocalArtifactSourceMismatch(task: { goal: string; acceptan
     Boolean(task.acceptance.requiredFormats?.length && task.acceptance.requiredFormats.every(format => ['html', 'htm'].includes(format))) &&
     !/(?:生成|导出|保存|输出|制作|创建|\b(?:create|generate|export|save|produce)\b)[^。；\n]{0,80}\b(?:pdf|docx?|pptx?|xlsx?|markdown|png|jpe?g|dxf|dwg)\b/i.test(task.goal) &&
     !/(?:生成|导出|保存|输出|\b(?:create|generate|export|save)\b)[^。；\n]{0,50}\bsvg\s*(?:文件|files?\b)/i.test(task.goal) && isLocalHtmlCreativeRequest(task.goal)
+}
+
+/** Chosen only from the original user task; model evidence cannot change this basis. */
+export function asksForObservedFeedSummary(text: string): boolean {
+  const subscription = /订阅[\s\S]{0,60}(?:列表|推送|信息流|feed)|(?:列表|推送|信息流|feed)[\s\S]{0,60}订阅|\b(?:subscribed?\s+(?:list|feed)|subscription\s+(?:list|feed)|rss\s+feed|atom\s+feed)\b/i.test(text)
+  const summary = /汇总|整理|筛选|摘要|\b(?:summari[sz]e|digest|filter|aggregate)\b/i.test(text)
+  const affirmative = text.replace(/(?:无需|不需要|不要|禁止|不必)(?:再|逐条)?(?:打开|读取|查看|核验|采集|抓取)(?:官方|公告|正式)?(?:正文|原文|详情)/g, '')
+  const primary = /(?:打开|读取|查看|核验|采集|抓取)[^。；\n]{0,16}(?:公告正文|官方原文|正式正文|原始正文)|\b(?:read|verify|open)\b[^.;\n]{0,40}\b(?:primary\s+(?:source|document)|official\s+(?:text|document))\b/i.test(affirmative)
+  return !explanatory.test(text.trim()) && subscription && summary && !primary && !/(?:模拟|合成数据|synthetic|mock)/i.test(text) && (sourceAction.test(text) || /https?:\/\//i.test(text))
 }

@@ -1,3 +1,4 @@
+import { validEgoNavigationProgress } from '../services/ego-browser-evidence.js'
 import { operationFingerprint } from '../services/task-run-repository.js'
 import { OneOffPublicQueryRecoveryService } from '../services/one-off-public-query-recovery.js'
 import { BrowserPublicQueryRecoveryService } from '../services/browser-public-query-recovery.js'
@@ -130,6 +131,7 @@ import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provide
 import { ManagedDingTalkRuntime } from '../services/managed-dingtalk-runtime.js'
 import { ManagedLarkRuntime } from '../services/managed-lark-runtime.js'
 import { ManagedDwsRuntime } from '../services/managed-dws-runtime.js'
+import { EgoBrowserRuntime } from '../services/ego-browser-runtime.js'
 import { ManagedBrowserSkillRuntime } from '../services/managed-browser-skill-runtime.js'
 import { isBrowserTask } from '../contracts/browser-skill.js'
 import { externalTaskIntent } from '../services/external-task-capability.js'
@@ -536,6 +538,7 @@ export async function createKunServeRuntime(
   }
   dingtalkRuntime.setApply(provider => applyDingTalkProvider({ provider }))
   const useDws=()=>Boolean(dwsRuntime.toolProvider())
+  const egoRuntime = new EgoBrowserRuntime({config:options.capabilities?.egoBrowser,repository:taskRepository})
   const browserRuntime = new ManagedBrowserSkillRuntime({ config: options.capabilities?.browserSkill,
     configPath: options.configPath ?? join(options.dataDir, 'config.json'), dataDir: options.dataDir, repository: taskRepository,
     resolveSchedule: (context, sourceActionId) => taskScheduleService?.resolveBrowserActions(context, sourceActionId) ?? Promise.resolve(undefined),
@@ -614,6 +617,7 @@ export async function createKunServeRuntime(
     ...(larkProvider ? [larkProvider] : []),
     ...(dingtalkProvider ? [dingtalkProvider] : []),
     browserRuntime.provider(),
+    egoRuntime.provider(),
     ...buildRailwiseToolProviders(engineeringService, surveyService, () => engineeringAi)
   ]
   const childRegistry = new CapabilityRegistry(baseToolProviders)
@@ -800,18 +804,21 @@ export async function createKunServeRuntime(
     const effects = accepted?.requiredEffects ?? (accepted?.target
       ? [{ provider: accepted.provider, operation: accepted.operation, target: accepted.target }] : [])
     const externalTargets = effects.map(effect => externalTargetGrantKey(effect.provider, effect.operation, effect.target))
-    const browserTask = Boolean(turn && (isBrowserTask(turn.prompt) || task?.authority?.browserScope))
+    const egoTask=Boolean(turn&&egoRuntime.selected(turn.prompt,task?.authority?.browserScope))
+    const browserTask = Boolean(turn && (egoTask || isBrowserTask(turn.prompt) || task?.authority?.browserScope))
     const externalProviderIds = new Set(['lark-cli', 'dingtalk'])
     const allowedProviderIds = toolHost.diagnostics()
       .filter(provider => provider.enabled && provider.available)
       .map(provider => provider.id)
       .filter(providerId => !externalProviderIds.has(providerId) || providerId === selectedProviderId)
-      .filter(providerId => providerId !== 'browser-skill' || browserTask)
+      .filter(providerId => providerId !== 'browser-skill' || browserTask&&!egoTask)
+      .filter(providerId => providerId !== 'ego-browser' || egoTask)
+      .filter(providerId => !egoTask || ['builtin','ego-browser','managed-artifacts','document-delivery','task-schedule','todo'].includes(providerId))
     let providerScope: ExecutionScope = { networkAllowlist: ['*'], connectorScopes: [], externalTargets: [] }
     if (selectedProviderId === 'lark-cli') providerScope = larkRuntime.scope(externalTargets)
     else if (selectedProviderId === 'dingtalk') providerScope = useDws() ? dwsRuntime.scope(externalTargets) : dingtalkRuntime.scope(externalTargets)
     else if (browserTask && turn) {
-      providerScope = browserRuntime.scope(turn.prompt, task?.authority?.browserScope, restriction.permissionScope?.networkOrigins)
+      providerScope = egoTask ? egoRuntime.scope(turn.prompt,task?.authority?.browserScope,restriction.permissionScope?.networkOrigins) : browserRuntime.scope(turn.prompt, task?.authority?.browserScope, restriction.permissionScope?.networkOrigins)
       if (task && providerScope.browserScope && !task.authority?.browserScope) {
         taskRepository.update(task.id, task.revision, current => ({ ...current, authority: { ...current.authority!, browserScope: providerScope.browserScope } }))
       }
@@ -867,7 +874,10 @@ export async function createKunServeRuntime(
     skillRuntime,
     tokenEconomy,
     contextCompaction: options.contextCompaction,
-    ...(options.runtime?.toolStorm ? { toolStorm: options.runtime.toolStorm } : {}),
+    toolStorm: {...options.runtime?.toolStorm,validateEgoNavigationProgress:(call,result,grant)=>{
+      const task=grant.taskId?taskRepository.get(grant.taskId):null,output=result.item.kind==='tool_result'?result.item.output:undefined
+      return Boolean(task&&output&&typeof output==='object'&&!Array.isArray(output)&&validEgoNavigationProgress(taskRepository,task,output as Record<string,unknown>,grant,call))
+    }},
     ...(options.runtime?.toolArgumentRepair ? { toolArgumentRepair: options.runtime.toolArgumentRepair } : {}),
     ...(attachmentStore ? { attachmentStore } : {}),
     ...(visionEvidence ? { visionEvidence } : {}),
@@ -900,7 +910,9 @@ export async function createKunServeRuntime(
   const connectorPreflight = contextualExternalTaskPreflight({
     providerPreflight: async (text: string, thread, sourceTask) => {
       const scheduled = thread ? await taskScheduleService?.executionScopeForThread(thread.id) : undefined
-      const browser = await browserRuntime.preflight(text, thread, scheduled?.browserScope, sourceTask)
+      const activeBrowserScope=thread?taskRepository.findActiveByThread(thread.id)?.authority?.browserScope:undefined
+      const selectedScope=activeBrowserScope??scheduled?.browserScope??sourceTask?.authority?.browserScope
+      const browser = egoRuntime.selected(text,selectedScope) ? await egoRuntime.preflight(text,thread,selectedScope) : await browserRuntime.preflight(text, thread, scheduled?.browserScope, sourceTask)
       if (browser) return browser
       if (externalTaskIntent(text)?.provider === 'dingtalk') {
         return useDws() || !dingtalkRuntime.state().enabled ? dwsRuntime.preflight(text) : dingtalkRuntime.preflight(text)
@@ -938,9 +950,11 @@ export async function createKunServeRuntime(
   const startedAt = options.startedAt ?? nowIso()
   taskScheduleService = new TaskScheduleService({ flows: flowService, repository: taskRepository, tasks: taskController,
     browserState: () => browserRuntime.state(),
+    egoBrowserState: () => egoRuntime.state(),
     coordinator: taskCoordinator, threads: threadStore, workspaceTrust, nowIso,
     connectorIdentities: () => ({ ...mcpRuntime.state().authorityFingerprints,
       'browser-skill': browserRuntime.identityFingerprint(),
+      ...(options.capabilities?.egoBrowser ? {'ego-browser':egoRuntime.fingerprint()} : {}),
       ...larkRuntime.scope([]).connectorIdentityFingerprints,
       ...(useDws() ? dwsRuntime.scope([]) : dingtalkRuntime.scope([])).connectorIdentityFingerprints }) })
   flowService.setTaskScheduleDispatcher(input => taskScheduleService!.dispatch(input))

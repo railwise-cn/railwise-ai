@@ -26,11 +26,12 @@ export const WebArtifactEvidenceInputSchema = z.object({
     title: z.string().trim().min(4).max(500),
     source: WebSourceReferenceSchema,
     discovery: WebSourceReferenceSchema,
+    recordUrl: publicUrl.optional().describe('Observed-feed only: exact actual href of this record in the read list, not a claimed read of the destination. Source/discovery must both reference that list.'),
     classification: z.enum(['opportunity', 'intent', 'historical', 'source']),
     fields: z.array(z.object({ field: z.enum(['title', 'publication_date', 'budget', 'deadline', 'status', 'qualification', 'other']),
       value: z.string().trim().min(1).max(2000).describe('Literal continuous source text copied from quote, not a formatted display value or inferred status. Preserve original date, currency and qualification wording. The HTML data-evidence-field text must equal this value after markup/entity/whitespace normalization.'),
-      quote: z.string().trim().min(12).max(6000).describe('Verbatim source excerpt containing the complete literal value. Source receipt verification still checks that this quote occurs in the actually read primary document; a matching quote/value pair alone is not source verification.') }).strict()).min(1).max(20),
-    unverifiedFields: z.array(z.enum(['publication_date', 'budget', 'deadline', 'status', 'qualification'])).max(5).default([]).describe('Unknown fields only: omit them from fields and render the matching data-evidence-field with data-evidence-unverified and visible 待核验. No guessed value. This cannot replace title, discovery, primary-document or required-origin evidence.')
+      quote: z.string().trim().min(12).max(6000).describe('Verbatim source excerpt containing the complete literal value. Source receipt verification still checks that this quote occurs in the actually read source document or same feed record selected by the server task basis; a matching quote/value pair alone is not source verification.') }).strict()).min(1).max(20),
+    unverifiedFields: z.array(z.enum(['publication_date', 'budget', 'deadline', 'status', 'qualification'])).max(5).default([]).describe('Unknown fields only: omit them from fields and render the matching data-evidence-field with data-evidence-unverified and visible 待核验. No guessed value. This cannot replace title, discovery or the source-record/document and origin evidence required by the server task basis.')
   }).strict()).max(100).default([]),
   noMatches: z.array(z.object({ source: WebSourceReferenceSchema, query: z.string().trim().min(2).max(120), quote: z.string().min(2).max(1000) }).strict()).max(32).default([])
 }).strict().superRefine((input, context) => {
