@@ -50,3 +50,33 @@ export function validEgoNavigationProgress(repository:TaskRunRepository,task:Tas
     previousResult.sourceUrl===req.previousSourceUrl&&typeof previousResult.documentHtml==='string'&&createHash('sha256').update(previousResult.documentHtml).digest('hex')===req.previousResultHash&&
     req.previousSourceUrl!==output.sourceUrl&&req.previousResultHash!==output.resultHash)
 }
+
+/** Success cleanup proof, separate from source verification and Task completion. */
+export function verifiedEgoTaskSpaceFinish(repository:TaskRunRepository,task:TaskRun,items:import('../contracts/items.js').TurnItem[],turns:import('../contracts/threads.js').ThreadRecord['turns']):import('../contracts/tasks.js').OperationReceipt|null {
+  const operations=repository.operations(task.id),binding=operations.find(r=>r.kind==='ego_task_space'&&r.status==='succeeded')
+  if(!binding||binding.fingerprint!==operationFingerprint(binding.request))return null
+  const space=object(binding.result)
+  if(binding.request?.taskId!==task.id||binding.request.threadId!==task.threadId||typeof binding.request.nonce!=='string'||!binding.request.nonce||space.ownership!=='agent'||space.pageLabel!=='p1'||!Number.isSafeInteger(space.taskSpaceId)||Number(space.taskSpaceId)<1)return null
+  for(const receipt of operations.filter(r=>r.kind==='ego_task_space_finish'&&r.status==='succeeded').reverse()) {
+    if(receipt.fingerprint!==operationFingerprint(receipt.request)||receipt.request?.bindingReceiptId!==binding.id)continue
+    const request=object(receipt.request),output=object(receipt.result),host=repository.operationById(task.id,String(request.hostOperationId),'tool'),saved=object(host?.result),hostItem=object(saved.item),hostRequest=object(host?.request)
+    const turn=turns.find(t=>t.id===request.turnId),grant=turn?.executionGrant
+    const item=items.find(i=>i.kind==='tool_result'&&i.id===hostItem.id&&i.callId===request.callId&&i.turnId===request.turnId&&i.toolName==='ego_browser_finish')
+    if(!grant||grant.taskId!==task.id||grant.threadId!==task.threadId||grant.browserScope?.provider!=='ego-browser'||grant.workspaceRoot!==task.workspaceRoot||
+      request.taskId!==task.id||request.grantFingerprint!==operationFingerprint(grant)||request.configurationFingerprint!==grant.connectorIdentityFingerprints?.['ego-browser']||
+      binding.request?.configurationFingerprint!==request.configurationFingerprint||request.taskSpaceId!==space.taskSpaceId||request.pageLabel!==space.pageLabel||
+      !host||host.status!=='succeeded'||host.fingerprint!==operationFingerprint(host.request)||saved.approved!==true||hostItem.isError===true||
+      hostRequest.providerId!=='ego-browser'||hostRequest.toolName!=='ego_browser_finish'||hostRequest.callId!==request.callId||hostRequest.turnId!==request.turnId||
+      operationFingerprint(hostRequest.executionGrant)!==operationFingerprint(grant)||!item||item.kind!=='tool_result'||item.isError||
+      output.status!=='succeeded'||output.provider!=='ego-browser'||output.action!=='finish'||output.finishResolved!==true||output.finishReceiptId!==receipt.id||
+      output.bindingReceiptId!==binding.id||output.taskSpaceId!==space.taskSpaceId||output.pageLabel!==space.pageLabel||output.sessionId!==String(space.taskSpaceId)||output.turnId!==request.turnId||
+      output.grantFingerprint!==request.grantFingerprint||output.configurationFingerprint!==request.configurationFingerprint||!grant.allowedProviderIds?.includes('ego-browser')||!grant.allowedToolNames?.includes('ego_browser_finish')||operationFingerprint(output.keep)!==operationFingerprint([])||
+      operationFingerprint(hostItem.output)!==operationFingerprint(output)||operationFingerprint(item.output)!==operationFingerprint(output))continue
+    const at=Date.parse(receipt.createdAt),finished=Date.parse(receipt.updatedAt)
+    if(!Number.isFinite(at)||!Number.isFinite(finished)||finished<at||Date.parse(grant.issuedAt)>at||!grant.expiresAt||Date.parse(grant.expiresAt)<finished)continue
+    const index=operations.findIndex(r=>r.id===receipt.id)
+    if(operations.slice(index+1).some(r=>['ego_document_read','ego_observation','ego_page_navigation'].includes(r.kind)&&r.status==='succeeded'))continue
+    return receipt
+  }
+  return null
+}

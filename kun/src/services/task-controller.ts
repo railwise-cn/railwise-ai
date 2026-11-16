@@ -65,6 +65,7 @@ import { WebArtifactEvidenceInputSchema, type WebArtifactEvidenceInput } from '.
 import { assessWebArtifactEvidence, verifiedWebArtifactEvidence, webArtifactFailureKinds, webArtifactManifestSourceProof, webArtifactPublicationReadiness, webArtifactRequirementHash, webEvidenceRepair } from './web-artifact-evidence.js'
 import { deriveWebArtifactRepairState, type WebArtifactRepairAttempt } from './web-artifact-repair-state.js'
 
+import { validEgoDocumentEvidence, verifiedEgoTaskSpaceFinish } from './ego-browser-evidence.js'
 import { EGO_PERMISSION_CODES, taskPermissionCapability, taskPermissionFailure } from './task-permission-recovery.js'
 
 const DEFAULT_MAX_ATTEMPTS = 8
@@ -807,6 +808,51 @@ export class TaskController {
     return result
   }
 
+  /** Pure pre-cleanup check: no model, Task transition, receipt write or validation span. */
+  async egoFinishReadiness(taskId: string, turnId: string, hostOperationId?: string): Promise<{ ready: boolean; reason?: string }> {
+    const task = this.repository.get(taskId), token = this.attemptTokens.get(turnId)
+    const denied = (reason: string) => ({ ready: false, reason })
+    if (!task || task.status !== 'running' || task.activeTurnId !== turnId || !token || token.taskId !== taskId) return denied('原任务当前没有有效执行轮次。')
+    this.assertToken(token)
+    const [thread, items] = await Promise.all([this.threadStore.get(task.threadId), this.sessionStore.loadItems(task.threadId)])
+    const turn = thread?.turns.find(candidate => candidate.id === turnId), grant = turn?.executionGrant
+    const binding = this.repository.operation(taskId, 'ego-task-space')
+    if (grant?.browserScope?.provider !== 'ego-browser' || !binding || binding.kind !== 'ego_task_space' || binding.status !== 'succeeded' ||
+      binding.fingerprint !== operationFingerprint(binding.request) || binding.request?.taskId !== taskId ||
+      binding.request.configurationFingerprint !== grant.connectorIdentityFingerprints?.['ego-browser']) return denied('原Ego任务空间尚无匹配的可信身份。')
+    if (hostOperationId) {
+      const host = this.repository.operationById(taskId, hostOperationId, 'tool')
+      if (!host || !['prepared', 'running'].includes(host.status) || host.request?.providerId !== 'ego-browser' || host.request.toolName !== 'ego_browser_finish' ||
+        host.request.turnId !== turnId || host.request.executionId !== token.executionId || operationFingerprint(host.request.executionGrant) !== operationFingerprint(grant)) return denied('清理请求不是当前真实Host调用。')
+    }
+    if (this.repository.unsettledOperations(taskId).some(row => row.id !== hostOperationId && ['tool', 'ego_task_space', 'ego_task_space_finish'].includes(row.kind)) ||
+      this.unknownToolOutcomes(taskId).length || this.repository.operations(taskId, 'ego_browser_wait').some(row => row.request?.turnId === turnId)) return denied('原操作或用户控制状态尚未核验，不能清理空间。')
+    const reads = items.filter(item => item.kind === 'tool_result' && /^ego_browser_(?:open|read|next_page)$/.test(item.toolName) && !item.isError)
+    const hasRead = reads.some(item => {
+      if (item.kind !== 'tool_result' || !item.output || typeof item.output !== 'object') return false
+      const original = thread?.turns.find(candidate => candidate.id === item.turnId)?.executionGrant
+      return Boolean(original && validEgoDocumentEvidence(this.repository, task, item.output as Record<string, unknown>, original))
+    })
+    if (!hasRead) return denied('尚缺本任务真实Ego来源读取，不能把未读取空间当成功清理。')
+    const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
+    if (blocked) return denied(blocked.reason)
+    if (task.acceptance.kind === 'files') {
+      const taskTurns = new Set(this.repository.execution.attempts(taskId).map(attempt => attempt.turnId)); taskTurns.add(turnId)
+      const artifacts = await this.collectArtifacts(task, items.filter(item => taskTurns.has(item.turnId)), turnId, undefined, false)
+      const writes = await authorizedArtifactWrites(task, this.repository.operations(taskId, 'tool'), thread?.turns ?? [])
+      const valid = artifacts.filter(artifact => {
+        if (artifact.validation !== 'valid' || task.acceptance.requiredFormats?.length && !task.acceptance.requiredFormats.includes(artifact.format ?? '')) return false
+        const writer = writes.get(artifact.absolutePath ?? resolve(task.workspaceRoot, artifact.relativePath))
+        if (!writer || writer.sha256 !== artifact.sha256) return false
+        return !task.acceptance.requiresWebEvidence || !['html', 'htm'].includes(artifact.format ?? '') || Boolean(verifiedWebArtifactEvidence(this.repository, task, artifact, writer.operationId))
+      })
+      if (valid.length < (task.acceptance.minimumArtifacts ?? 1)) return denied('先保存并读回当前成果，完成真实来源核验后，再结束Ego任务空间。')
+    }
+    if ((task.acceptance.effect || task.acceptance.kind === 'effect' || task.acceptance.requiresExternalEffects) && !this.verifiedTaskEffects(task).length) return denied('外部事项尚未取得要求的真实回执。')
+    this.assertToken(token)
+    return { ready: true }
+  }
+
   async assessCandidate(threadId: string, turnId: string): Promise<TaskCandidateDecision> {
     let task = this.repository.findActiveByThread(threadId)
     if (!task) {
@@ -893,7 +939,9 @@ export class TaskController {
         if (!reads.some(receipt => receipt.request?.callId === item.callId && receipt.request?.turnId === item.turnId && receipt.request?.toolName === item.toolName)) continue
         const output = item.output as Record<string, unknown>
         const evidence = output.evidence && typeof output.evidence === 'object' ? output.evidence as Record<string,unknown> : {}
-        const source = item.toolName === 'web_fetch' && typeof output.text === 'string' && output.text.trim()
+        const egoGrant = thread?.turns.find(candidate => candidate.id === item.turnId)?.executionGrant
+        const egoSource = /^ego_browser_(?:open|read|next_page)$/.test(item.toolName) && egoGrant && validEgoDocumentEvidence(this.repository, task, output, egoGrant)
+        const source = egoSource ? output.sourceUrl : item.toolName === 'web_fetch' && typeof output.text === 'string' && output.text.trim()
           ? output.finalUrl ?? output.url
           : /^browser_(?:navigate|observe|get_html|read|extract)$/.test(item.toolName) && output.status === 'succeeded' && evidence.verified === true && evidence.contentRead === true && typeof output.resultHash === 'string'
             ? output.sourceUrl : undefined
@@ -955,6 +1003,15 @@ export class TaskController {
           turnId
         )
       }
+    }
+
+    const egoBinding = this.repository.operation(task.id, 'ego-task-space')
+    if (egoBinding) {
+      const pendingFinish = this.repository.operations(task.id, 'ego_task_space_finish').filter(row => ['prepared', 'running', 'outcome_unknown'].includes(row.status))
+      if (pendingFinish.length) return this.stallUnknown(task, pendingFinish.map(row => row.id))
+      if (!verifiedEgoTaskSpaceFinish(this.repository, task, items, thread?.turns ?? [])) return this.retry(task,
+        '成果及已请求计划已核验；请调用 ego_browser_finish 结束本任务的原Ego空间，再给出最终交付回复。不要在错误或用户接管时清理，也不要另建空间。',
+        `ego-finish:${egoBinding.id}`, turnId)
     }
 
     const now = this.nowIso()
@@ -2190,7 +2247,7 @@ export class TaskController {
     })
   }
 
-  private async collectArtifacts(task: TaskRun, items: TurnItem[], turnId: string, revalidationKey?: string): Promise<TaskArtifact[]> {
+  private async collectArtifacts(task: TaskRun, items: TurnItem[], turnId: string, revalidationKey?: string, recordValidationSpans = true): Promise<TaskArtifact[]> {
     const paths = [
       ...task.artifacts.map(artifact => artifact.absolutePath ?? artifact.relativePath),
       ...items.flatMap(declaredFileOutputPaths),
@@ -2217,7 +2274,7 @@ export class TaskController {
       const managedOutput = externalWrite?.authorizedRoot === this.managedArtifactRoot(task.id)
       const validFormat = !required || required.includes(extension) || Boolean(externalWrite && managedOutput)
       const validationSpanId = artifactValidationSpanId(task.id, revalidationKey ? `${rawPath}\0revalidation:${revalidationKey}` : rawPath)
-      this.spans?.start({
+      if (recordValidationSpans) this.spans?.start({
         id: validationSpanId,
         taskId: task.id,
         turnId: task.activeTurnId,
@@ -2242,7 +2299,7 @@ export class TaskController {
       const changedOutsideExecution = Boolean(previous?.sha256 && previous.sha256 !== validation?.sha256 && !writtenThisTurn)
       const receiptMismatch = Boolean(externalWrite && externalWrite.sha256 !== validation?.sha256)
       const valid = Boolean(validation?.valid) && !changedOutsideExecution && !receiptMismatch
-      this.spans?.finish(validationSpanId, {
+      if (recordValidationSpans) this.spans?.finish(validationSpanId, {
         status: valid ? 'ok' : 'error',
         ...(!valid ? {
           errorCode: !allowed

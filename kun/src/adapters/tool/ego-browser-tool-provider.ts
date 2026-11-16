@@ -4,13 +4,14 @@ import { LocalToolHost } from './local-tool-host.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import type { CurrentToolOperation, ToolHostContext } from '../../ports/tool-host.js'
-import { EGO_READ_TOOLS, type EgoBrowserCapabilityConfig } from '../../contracts/ego-browser.js'
+import { EGO_TOOLS, type EgoBrowserCapabilityConfig } from '../../contracts/ego-browser.js'
 import { operationFingerprint, type TaskRunRepository } from '../../services/task-run-repository.js'
 import { EGO_RESULT_MARKER, runEgoBrowserScript, type EgoBrowserCommandRunner } from '../../services/ego-browser-cli.js'
 const object = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
 const hash = (v: string) => createHash('sha256').update(v).digest('hex')
 const fail = (code: string) => Object.assign(new Error(code), { code })
 const inputs = {
+  ego_browser_finish: z.object({}).strict(),
   ego_browser_open: z.object({ url: z.string().url().max(4096) }).strict(),
   ego_browser_observe: z.object({}).strict(),
   ego_browser_read: z.object({ selector: z.string().min(1).max(256).optional(), observationId: z.string().min(1).max(256).optional(), maxBytes: z.number().int().min(4096).max(524288).optional() }).strict(),
@@ -64,7 +65,20 @@ try {
 } catch(error) { const code=typeof error?.code==='string' && /^[A-Za-z_]{1,100}$/.test(error.code)?error.code:'ego_browser_read_failed'; emit({ok:false,code,...(task?{taskSpaceId:task.spaceId,spaceName:task.name,ownership:task.ownership,pageLabel:'p1'}:{})}); }`
 }
 
-export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabilityConfig; repository: TaskRunRepository; run?: EgoBrowserCommandRunner; now?: () => number }): CapabilityToolProvider {
+/** Finish only the persisted existing agent-owned Space; no Page call after await. */
+export function egoFinishScript(input:Record<string,unknown>):string {
+  return `const p=${JSON.stringify(input)};
+const emit=v=>console.log(${JSON.stringify(EGO_RESULT_MARKER)}+JSON.stringify(v));
+try {
+ if(!Number.isSafeInteger(p.spaceId)||p.spaceId<1||Date.now()>=p.deadline)throw new Error('finish scope unavailable');
+ const task=await taskSpace(p.spaceId);
+ if(task.spaceId!==p.spaceId||task.name!==p.spaceName||task.ownership!=='agent'||Date.now()>=p.deadline)throw new Error('finish control unavailable');
+ await task.finish({keep:[]});
+ emit({ok:true,taskSpaceId:p.spaceId,spaceName:p.spaceName,finishResolved:true,keep:[]});
+} catch {emit({ok:false,code:'ego_browser_finish_unconfirmed'});}`
+}
+
+export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabilityConfig; repository: TaskRunRepository; run?: EgoBrowserCommandRunner; now?: () => number; canFinishReadiness?: (context:ToolHostContext,hostOperationId:string)=>Promise<{ready:boolean;reason?:string}> }): CapabilityToolProvider {
   const config = options.config, repository = options.repository, run = options.run ?? runEgoBrowserScript
   const identity = operationFingerprint(config), now = options.now ?? Date.now
   const guard = async (context: ToolHostContext) => {
@@ -79,12 +93,13 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
     return { grant, task }
   }
   const descriptions = {
+    ego_browser_finish: '成功交付后调用一次：先完成报告/显式核验及已要求的计划读回，再用本工具await原Ego任务空间finish({keep:[]})；成功后直接最终回复，不再调用页面工具。错误/用户接管时不要finish。重复调用只读原真实回执，未知结果不重放。',
     ego_browser_open: '在当前任务专属 Ego TaskSpace 打开已授权 URL，只读复用用户现有登录。无需传 TaskSpace 或页面ID；不要用此工具执行表单/登录/业务操作。',
     ego_browser_observe: '只读观察本任务 Ego 页面完整语义快照。用户接管或失去控制时停止，不创建替代 TaskSpace。',
     ego_browser_read: '读取本任务 Ego 当前页面的实际文本与链接HTML（移除脚本、输入控件和非内容属性），返回来源证明与有限下一页目标。来源仅代表实际订阅列表，不代表核验官方原文。',
     ego_browser_next_page: '仅打开最近一次完整读取中实际出现的同源“下一页”链接。使用返回的 observationId/targetId，最多10页；无链接式分页时停止说明，不提交按钮或业务表单。'
   }
-  return { id: 'ego-browser', kind: 'skill', enabled: true, available: config.state === 'installed', tools: EGO_READ_TOOLS.map(name => LocalToolHost.defineTool({
+  return { id: 'ego-browser', kind: 'skill', enabled: true, available: config.state === 'installed', tools: EGO_TOOLS.map(name => LocalToolHost.defineTool({
     name, description: descriptions[name], policy: 'auto', inputSchema: z.toJSONSchema(inputs[name]),
     validateArguments: raw => { inputs[name].parse(raw) },
     shouldAdvertise: context => context.executionGrant?.browserScope?.provider === 'ego-browser',
@@ -95,6 +110,29 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
         const args = inputs[name].parse(raw) as Record<string, unknown>, { grant, task } = await guard(context)
         const host=invocation
         if(!host||host.taskId!==task.id||host.turnId!==context.turnId||host.providerId!=='ego-browser'||host.toolName!==name||host.argumentsHash!==operationFingerprint(raw)||host.executionGrantFingerprint!==operationFingerprint(grant))throw fail('ego_browser_host_operation_required')
+        const originalBinding=repository.operation(task.id,'ego-task-space')
+        const finishKey=originalBinding?'ego-finish:'+originalBinding.id:undefined,previousFinish=finishKey?repository.operation(task.id,finishKey):null
+        if(previousFinish&&name!=='ego_browser_finish')throw fail('ego_browser_task_space_finished')
+        if(name==='ego_browser_finish') {
+          if(previousFinish) {if(previousFinish.status==='succeeded')return {output:{...object(previousFinish.result),reused:true}};throw fail('ego_browser_finish_unconfirmed')}
+          if(!originalBinding||originalBinding.status!=='succeeded'||originalBinding.fingerprint!==operationFingerprint(originalBinding.request)||originalBinding.request?.configurationFingerprint!==identity)throw fail('ego_browser_open_required')
+          const ready=await options.canFinishReadiness?.(context,host.operationId)
+          if(!ready?.ready)return {isError:true,output:{status:'blocked',provider:'ego-browser',code:'ego_browser_finish_not_ready',message:ready?.reason??'尚未通过本任务的成功交付核验，请先完成实际读取、成果验证与已要求的计划读回。'}}
+          await guard(context)
+          const bound=object(originalBinding.result),request={taskId:task.id,turnId:context.turnId,bindingReceiptId:originalBinding.id,taskSpaceId:bound.taskSpaceId,pageLabel:bound.pageLabel,hostOperationId:host.operationId,callId:host.callId,grantFingerprint:operationFingerprint(grant),configurationFingerprint:identity,keep:[]}
+          const receipt=repository.beginOperation({ownerId:task.id,idempotencyKey:finishKey!,kind:'ego_task_space_finish',request,nowIso:new Date(now()).toISOString()}).receipt
+          try {
+            const result=await run(config,egoFinishScript({spaceId:bound.taskSpaceId,spaceName:originalBinding.request.spaceName,deadline:Date.parse(grant.expiresAt!)}),context.abortSignal)
+            if(result.ok!==true||result.taskSpaceId!==bound.taskSpaceId||result.spaceName!==originalBinding.request.spaceName||result.finishResolved!==true||operationFingerprint(result.keep)!==operationFingerprint([]))throw fail('ego_browser_finish_unconfirmed')
+            await guard(context)
+            const output={status:'succeeded',provider:'ego-browser',action:'finish',finishResolved:true,keep:[],sessionId:String(bound.taskSpaceId),taskSpaceId:bound.taskSpaceId,pageLabel:bound.pageLabel,bindingReceiptId:originalBinding.id,finishReceiptId:receipt.id,turnId:context.turnId,grantFingerprint:operationFingerprint(grant),configurationFingerprint:identity}
+            repository.finishOperation(task.id,finishKey!,{status:'succeeded',result:output},new Date(now()).toISOString())
+            return {output}
+          } catch(error) {
+            repository.finishOperation(task.id,finishKey!,{status:'outcome_unknown',result:{code:'ego_browser_finish_unconfirmed',taskSpaceId:bound.taskSpaceId,bindingReceiptId:originalBinding.id}},new Date(now()).toISOString())
+            throw error
+          }
+        }
         const key = 'ego-task-space', origins = grant.browserScope!.origins
         let binding = repository.operation(task.id,key)
         const firstCreatedSpace=!binding, previousRead=repository.operations(task.id,'ego_document_read').filter(r=>r.status==='succeeded').at(-1), previousDocument=object(previousRead?.result)
@@ -160,7 +198,7 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
         const originalCode=String(object(error).code??(error instanceof Error?error.message:''))
         const code=originalCode==='execution_grant_expired'?'ego_browser_grant_expired':/^[A-Za-z_]{1,100}$/.test(originalCode)?originalCode:'ego_browser_read_failed',taskId=context.executionGrant?.taskId
         const message=code==='ego_browser_task_space_missing'||code==='ego_browser_task_space_ambiguous'?'原Ego任务空间尚未唯一确认。请在Ego原空间恢复智能体控制后继续；系统不会新建替代空间或重放原导航。无法确认原空间时，请保留原任务并明确创建新的独立任务。':'请检查当前任务的Ego连接、站点范围或用户控制状态后继续。'
-        if(taskId&&['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid'].includes(code)) {const waitKey='ego-wait:'+context.turnId; if(!repository.operation(taskId,waitKey)) {const operation=invocation; if(operation){repository.beginOperation({ownerId:taskId,idempotencyKey:waitKey,kind:'ego_browser_wait',request:{taskId,turnId:context.turnId,code,hostOperationId:operation.operationId,callId:operation.callId,grantFingerprint:operation.executionGrantFingerprint,configurationFingerprint:identity,...(object(repository.operation(taskId,'ego-task-space')?.result).taskSpaceId?{taskSpaceId:object(repository.operation(taskId,'ego-task-space')?.result).taskSpaceId}:{})},nowIso:new Date(now()).toISOString()});repository.finishOperation(taskId,waitKey,{status:'succeeded',result:{code,message}},new Date(now()).toISOString())}}}
+        if(taskId&&['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid','ego_browser_finish_unconfirmed'].includes(code)) {const waitKey='ego-wait:'+context.turnId; if(!repository.operation(taskId,waitKey)) {const operation=invocation; if(operation){repository.beginOperation({ownerId:taskId,idempotencyKey:waitKey,kind:'ego_browser_wait',request:{taskId,turnId:context.turnId,code,hostOperationId:operation.operationId,callId:operation.callId,grantFingerprint:operation.executionGrantFingerprint,configurationFingerprint:identity,...(object(repository.operation(taskId,'ego-task-space')?.result).taskSpaceId?{taskSpaceId:object(repository.operation(taskId,'ego-task-space')?.result).taskSpaceId}:{})},nowIso:new Date(now()).toISOString()});repository.finishOperation(taskId,waitKey,{status:'succeeded',result:{code,message}},new Date(now()).toISOString())}}}
         return {isError:true,output:{status:'blocked',provider:'ego-browser',code,message}}}
     }
   })) }

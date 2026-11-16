@@ -5,7 +5,7 @@ import type { TaskRunRepository } from './task-run-repository.js'
 import type { CapabilityPreflight } from '../contracts/harness.js'
 import { workspacePermissionCapability } from './workspace-write-preflight.js'
 
-export const EGO_PERMISSION_CODES = ['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid'] as const
+export const EGO_PERMISSION_CODES = ['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid','ego_browser_finish_unconfirmed'] as const
 const permissionCodes = new Set([...EGO_PERMISSION_CODES,'task_permission_expired', 'task_permission_revoked', 'task_permission_consumed', 'task_permission_blocked',
   'execution_grant_expired', 'execution_grant_revoked', 'execution_grant_scope', 'workspace_trust_changed', 'approval_policy_blocked',
   'sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
