@@ -1942,3 +1942,21 @@ test('diagnostic quick identity retry receives only the remaining startup budget
   assert.equal(value.result.identity.verified, true)
   assert.equal(value.result.cleanup.verifiedBirth, true)
 })
+
+test('ASAR native lookup uses the platform separator while the receipt keeps its canonical entry', async t => {
+  const { default: path } = await import('node:path')
+  const { startupIdentityAsarPath } = await import('./run-windows-ui-smoke.mjs')
+  const asar = createRequire(import.meta.url)('@electron/asar')
+  const root = await mkdtemp(join(tmpdir(), 'native-asar-path-')); t.after(() => rm(root, { recursive: true, force: true }))
+  const input = join(root, 'input'); await mkdir(join(input, 'kun', 'dist', 'services'), { recursive: true })
+  await writeFile(join(input, 'kun', 'dist', 'services', 'process-identity.js'), 'controlled compiled fixture')
+  const archive = join(root, 'app.asar'); await asar.createPackage(input, archive)
+  // Use the real dependency with Win32 path primitives to exercise its lookup
+  // contract on a Mac host; the patch is synchronous and restored in finally.
+  const original = { dirname: path.dirname, basename: path.basename, sep: path.sep }
+  try {
+    Object.assign(path, { dirname: path.win32.dirname, basename: path.win32.basename, sep: path.win32.sep })
+    assert.throws(() => asar.statFile(archive, 'kun/dist/services/process-identity.js'), /not found/)
+    assert.ok(asar.statFile(archive, startupIdentityAsarPath(path.win32)).size > 0)
+  } finally { Object.assign(path, original) }
+})

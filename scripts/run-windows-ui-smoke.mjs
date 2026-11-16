@@ -3078,6 +3078,10 @@ async function readStartupVendorEvidence(home) {
   return output
 }
 
+export function startupIdentityAsarPath(pathApi = { join }) {
+  return pathApi.join('kun', 'dist', 'services', 'process-identity.js')
+}
+
 /** Import the exact bytes from the verified installed ASAR, never a new TS probe. */
 export async function loadWindowsStartupIdentity({ asarPath, expectedAsarSha256, directory }) {
   const archive = await readFile(asarPath)
@@ -3086,7 +3090,8 @@ export async function loadWindowsStartupIdentity({ asarPath, expectedAsarSha256,
   const pinned = installIdentity(windowsStartupDiagnosticPackage.version, windowsStartupDiagnosticPackage.sourceHead)
   assert.equal(metadata.buildProvenance?.sourceHead, pinned.sourceHead); assert.equal(metadata.version, pinned.version)
   assert.equal(metadata.productName, pinned.productName); assert.equal(metadata.name, pinned.packageName)
-  const entry = 'kun/dist/services/process-identity.js', stat = asar.statFile(asarPath, entry), bytes = asar.extractFile(asarPath, entry)
+  const entry = 'kun/dist/services/process-identity.js', nativeEntry = startupIdentityAsarPath()
+  const stat = asar.statFile(asarPath, nativeEntry), bytes = asar.extractFile(asarPath, nativeEntry)
   assert.ok(!stat.link && stat.size === bytes.length, 'The compiled identity entry must be a regular ASAR file')
   assert.ok(bytes.length > 0 && bytes.length < 65536)
   const sha256 = createHash('sha256').update(bytes).digest('hex')
