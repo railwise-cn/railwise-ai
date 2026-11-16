@@ -2,7 +2,7 @@
   "status": "passed",
   "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
   "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
-  "scope": "Root-observed new exact RailWise real-clock Ego occurrence and normal temporary-plan pause, pending the existing receipt-owner/Root aggregate acceptance; paid source/report content is not copied.",
+  "scope": "Root-accepted new exact RailWise real-clock Ego occurrence and normal temporary-plan pause, confirmed by the source receipt audit and Root independent aggregate acceptance; paid source/report content is not copied.",
   "releaseRunId": 43968313921,
   "actualQaInitialTaskId": "task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
   "actualDueTaskId": "task_0d9dffaf-096c-41bc-8264-a358bd2b850a",
