@@ -2,10 +2,14 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TaskAttentionV1, TaskOperationReceiptV1, TaskRunV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskOperationReceiptV1, TaskPermissionSnapshotV1, TaskRunV1 } from '@shared/agent-workbench'
 import i18n from '../../i18n'
+import { TaskSidebar } from './TaskSidebar'
+import { taskDisplayTitle } from '@shared/task-presentation'
 import { TaskWorkspaceView, filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from './TaskWorkspaceView'
-import { resetTaskStateForTests, refreshTaskState } from '../../store/task-live-store'
+import { useChatStore } from '../../store/chat-store'
+import { clearFileReferenceValidationCache } from '../../lib/file-reference-validation'
+import { resetTaskStateForTests, refreshTaskState, updateTaskNavigation } from '../../store/task-live-store'
 
 const now = '2026-11-09T01:00:00.000Z'
 function task(id: string, status: TaskRunV1['status'], goal = id): TaskRunV1 {
@@ -110,10 +114,10 @@ beforeEach(async () => {
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
-  await act(async () => root.render(createElement(TaskWorkspaceView, {
+  await act(async () => root.render(createElement('div', null, createElement(TaskSidebar, { workspaceRoot: '/workspace', runtimeReady: true, onChooseWorkspace: vi.fn() }), createElement(TaskWorkspaceView, {
     workspaceRoot: '/workspace', runtimeReady: true, leftSidebarCollapsed: false,
     onToggleLeftSidebar: vi.fn(), onOpenThread, onOpenArtifact
-  })))
+  }))))
   await settle()
   await settle()
 })
@@ -126,6 +130,318 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('shows current retry expiry attention and keeps superseded parent data unchanged', async () => {
+    await i18n.changeLanguage('zh')
+    const raw='Execution grant expired; start a newly authorized Turn.'
+    const original={...task('original','failed'),waitingReason:raw}
+    const child={...task('retry-child','waiting_user'),rootTaskId:original.id,retryOfTaskId:original.id,waitingReason:raw}
+    tasks=[original,child]
+    inbox=tasks.map(owner=>({id:`capability_${owner.id}`,ownerKind:'task',ownerId:owner.id,taskId:owner.id,threadId:owner.threadId,
+      kind:'blocked',title:'确认任务执行权限',message:raw,status:'pending',revision:0,createdAt:now,updatedAt:now,
+      payload:{kind:'capability_required',request:{prompt:owner.goal},capability:{provider:'workspace',status:'blocked',errorCode:'execution_grant_expired',message:raw,checkedAt:now,
+        action:{kind:'grant',route:'task/permissions',label:'确认任务权限'}}}}))
+    await act(async()=>{await refreshTaskState();updateTaskNavigation({selectedTaskId:original.id,filter:'all'})});await settle();await settle()
+    const cards=[...container.querySelectorAll('h4')].filter(node=>node.textContent==='确认任务执行权限').map(node=>node.parentElement!)
+    expect(cards).toHaveLength(1)
+    expect(inbox).toHaveLength(2)
+    for(const card of cards){
+      expect(card.querySelector(':scope > p')?.textContent).toBe('执行授权已到期')
+      const diagnostics=[...card.querySelectorAll('details')].find(node=>node.textContent?.includes(raw))!
+      expect(diagnostics).toBeTruthy();expect(diagnostics.open).toBe(false)
+    }
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('hides only current retry ancestors while retaining parallel capabilities, exact owners and unresolved reviews', async () => {
+    const original=task('lineage-root','failed'),middle={...task('lineage-middle','failed'),rootTaskId:original.id,retryOfTaskId:original.id,createdAt:'2026-11-09T02:00:00.000Z'}
+    const current={...task('lineage-current','stalled'),threadId:original.threadId,rootTaskId:original.id,retryOfTaskId:middle.id,createdAt:'2026-11-09T04:00:00.000Z'}
+    const parallel={...task('parallel-child','waiting_user'),rootTaskId:original.id,parentTaskId:original.id}
+    const sibling={...task('other-retry','waiting_user'),rootTaskId:original.id,retryOfTaskId:original.id,createdAt:'2026-11-09T03:00:00.000Z'}
+    const outside={...task('outside-owner','waiting_user'),threadId:original.threadId}
+    tasks=[original,middle,current,parallel,sibling,outside]
+    const capability=(owner:TaskRunV1,message:string,browser=false):TaskAttentionV1=>({id:`capability_${owner.id}`,ownerKind:'task',ownerId:owner.id,taskId:owner.id,threadId:owner.threadId,
+      kind:'blocked',title:message,message,status:'pending',revision:0,createdAt:now,updatedAt:now,
+      payload:{kind:'capability_required',request:{prompt:owner.goal},capability:{provider:browser?'browser-skill':'workspace',status:'needs_authorization',message,checkedAt:now,
+        errorCode:browser?'browser_public_query_schedule_scope_required':'workspace_path_blocked',action:{kind:'grant',route:browser?'task/public-query-recovery':'task/permissions',label:'Review scope'}}}})
+    inbox=[capability(original,'Old parent authorization not granted',true),capability(middle,'Old middle authorization not granted'),
+      capability(current,'Current child needs permission'),capability(parallel,'Parallel child needs permission'),capability(sibling,'Other retry still needs permission'),
+      {...capability(outside,'Outside explicit owner must not leak')},
+      {id:'legacy-thread-only',ownerKind:'task',ownerId:'unknown',threadId:original.threadId,kind:'blocked',title:'Ambiguous legacy thread review',message:'Retain uncertain legacy owner',status:'pending',revision:0,createdAt:now,updatedAt:now,payload:{kind:'capability_required'}},
+      {...approval,id:'ancestor-approval',ownerId:original.id,taskId:original.id,threadId:original.threadId,title:'Preserved source approval'},
+      {id:'ancestor-unknown',ownerKind:'task',ownerId:original.id,taskId:original.id,threadId:original.threadId,kind:'blocked',title:'Preserved UNKNOWN review',message:'Unknown original action still requires review',status:'pending',revision:0,createdAt:now,updatedAt:now,payload:{kind:'operation_outcome_unknown'}},
+      {id:'ancestor-question',ownerKind:'task',ownerId:original.id,taskId:original.id,threadId:original.threadId,kind:'question',title:'Preserved source question',message:'Original user input remains pending',requestId:'question-source',status:'pending',revision:0,createdAt:now,updatedAt:now,payload:{questions:[{id:'q',label:'Source clarification'}]}}]
+    Object.assign(window.workwise,{diagnoseBrowserSkill:vi.fn(async()=>({ok:true,status:{enabled:true,state:'ready',version:'0.5.0',revision:1,browsers:[],origins:[],interaction:'observe'}})),
+      coordinateTaskCommand:vi.fn(),confirmTaskPermissions:vi.fn(),
+      getTaskPublicQueryRecovery:vi.fn(async(taskId:string)=>({taskId,taskRevision:1,state:'unavailable',reason:'browser_public_query_current_scope_active',message:'Current scope remains valid',unknownOperationCount:0,mode:'task_reauthorization',consentReceiptId:'current-consent',consentExpiresAt:new Date(Date.now()+60000).toISOString()}))})
+    const before=JSON.stringify({tasks,inbox})
+    await act(async()=>{await refreshTaskState();updateTaskNavigation({selectedTaskId:original.id,filter:'all'})});await settle();await settle()
+    const detail=container.querySelector('article')!
+    expect(detail.textContent).toContain(i18n.t('common:taskPublicQueryRecoveryScopeActive'))
+    expect(detail.textContent).not.toContain('Old parent authorization not granted');expect(detail.textContent).not.toContain('Old middle authorization not granted')
+    for(const message of ['Current child needs permission','Parallel child needs permission','Other retry still needs permission','Retain uncertain legacy owner','Preserved source approval','Preserved UNKNOWN review','Preserved source question'])expect(detail.textContent).toContain(message)
+    expect(detail.textContent).not.toContain('Outside explicit owner must not leak')
+    expect(JSON.stringify({tasks,inbox})).toBe(before)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled();expect(window.workwise.retryTask).not.toHaveBeenCalled()
+    expect(window.workwise.coordinateTaskCommand).not.toHaveBeenCalled();expect(window.workwise.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(window.workwise.runtimeRequest).not.toHaveBeenCalled()
+  })
+
+  it('updates sampled time and business phase without a Task revision change or another detail/list request', async () => {
+    await i18n.changeLanguage('zh')
+    tasks=[{...task('working','running'),activeTurnId:'turn-current',timing:{executionMs:319000,queuedMs:0,humanWaitMs:0,pausedMs:0,sampledAt:now,coverage:'complete'}}];inbox=[]
+    await act(async()=>{await refreshTaskState();updateTaskNavigation({selectedTaskId:'working',filter:'all'})});await settle()
+    expect(container.textContent).toContain('319s')
+    const pages=vi.mocked(window.workwise.listTaskPage).mock.calls.length,details=vi.mocked(window.workwise.listTaskOperationReceipts).mock.calls.length,before=JSON.stringify(tasks[0])
+    const streamId=vi.mocked(window.workwise.startTaskSse).mock.calls[0][1]!,receive=vi.mocked(window.workwise.onSseEvent).mock.calls[0][0]
+    const sampledAt=new Date().toISOString(),leaseExpiresAt=new Date(Date.now()+60000).toISOString()
+    await act(async()=>receive({streamId,events:[{kind:'task_progress',taskId:'working',payload:{taskId:'working',taskRevision:1,turnId:'turn-current',executionId:'execution-current',
+      leaseRevision:1,leaseExpiresAt,active:true,sampledAt,activity:{phase:'reading'},
+      timing:{executionMs:334000,queuedMs:0,humanWaitMs:0,pausedMs:0,sampledAt,coverage:'complete'}}}]}))
+    await settle();expect(container.textContent).toContain('334s');expect(container.textContent).toContain('正在读取页面内容')
+    expect(JSON.stringify(tasks[0])).toBe(before);expect(window.workwise.listTaskPage).toHaveBeenCalledTimes(pages);expect(window.workwise.listTaskOperationReceipts).toHaveBeenCalledTimes(details)
+    vi.spyOn(Date,'now').mockReturnValue(Date.parse(leaseExpiresAt)+1)
+    await act(async()=>receive({streamId,events:[{seq:1,kind:'attention_changed',payload:{id:'resolved-observation',status:'answered'}}]}))
+    expect(container.textContent).not.toContain('正在读取页面内容');expect(container.textContent).toContain('334s')
+  })
+
+  it.each([
+    ['stalled', 'taskNodeStatus_blocked'], ['paused', 'taskRunStatus_paused'], ['waiting_user', 'taskRunStatus_waiting_user'],
+    ['waiting_approval', 'taskRunStatus_waiting_approval'], ['queued', 'taskRunStatus_queued']
+  ] as const)('does not call a historical running step active when the execution task is %s', async (status, label) => {
+    tasks[0] = { ...tasks[0], status, nodes: [{ id: 'historical-running', taskId: tasks[0].id, kind: 'execute', title: 'Read public notices', status: 'running', dependsOn: [], attempt: 1, maxAttempts: 8, idempotencyKey: 'original-node', evidence: [], revision: 1 }] }
+    const originalNodes = JSON.stringify(tasks[0].nodes)
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) }); await settle()
+    const steps = container.querySelector('article ol')!
+    expect(steps.textContent).toContain(i18n.t(`common:${label}`))
+    expect(steps.textContent).not.toContain(i18n.t('common:taskNodeStatus_running'))
+    expect(JSON.stringify(tasks[0].nodes)).toBe(originalNodes)
+  })
+
+  it.each(['failed', 'cancelled'] as const)('shows stopped execution for a running node of a %s task, preserving completed and other nodes', async status => {
+    tasks[0] = { ...tasks[0], status, nodes: (['completed', 'running', 'pending', 'failed'] as const).map((nodeStatus, index) => ({ id: `history-${index}`, taskId: tasks[0].id, kind: 'execute', title: `Step ${index}`, status: nodeStatus, dependsOn: [], attempt: 1, maxAttempts: 8, idempotencyKey: `original-${index}`, evidence: [], revision: 1 })) }
+    const originalNodes = JSON.stringify(tasks[0].nodes)
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) }); await settle()
+    const rows = [...container.querySelectorAll('article ol > li')]
+    expect(rows.map(row => row.lastElementChild?.textContent)).toEqual([i18n.t('common:taskNodeStatus_completed'), 'Stopped', i18n.t('common:taskNodeStatus_pending'), i18n.t('common:taskNodeStatus_failed')])
+    expect(JSON.stringify(tasks[0].nodes)).toBe(originalNodes)
+    expect(taskGroupProgress(groupWorkspaceTasks(tasks)[0])).toEqual({ completed: 1, total: 4 })
+  })
+
+  it('marks a running step under a completed task for review without claiming step completion', async () => {
+    tasks[0] = { ...tasks[0], status: 'completed', nodes: [{ id: 'contradictory-running', taskId: tasks[0].id, kind: 'execute', title: 'Check source', status: 'running', dependsOn: [], attempt: 1, maxAttempts: 8, idempotencyKey: 'old-running', evidence: [], revision: 1 }] }
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) }); await settle()
+    const steps = container.querySelector('article ol')!
+    expect(steps.textContent).toContain('Needs review')
+    expect(steps.textContent).not.toContain(i18n.t('common:taskNodeStatus_completed'))
+    expect(tasks[0].nodes[0].status).toBe('running')
+    expect(taskGroupProgress(groupWorkspaceTasks(tasks)[0])).toEqual({ completed: 0, total: 1 })
+  })
+
+  it('keeps an actually running task step labelled running', async () => {
+    tasks[0] = { ...tasks[0], nodes: [{ id: 'active-node', taskId: tasks[0].id, kind: 'execute', title: 'Read source', status: 'running', dependsOn: [], attempt: 1, maxAttempts: 8, idempotencyKey: 'active', evidence: [], revision: 1 }] }
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) }); await settle()
+    expect(container.querySelector('article ol')?.textContent).toContain(i18n.t('common:taskNodeStatus_running'))
+  })
+
+  it('renders the static delivery note as Markdown while preserving its completed disclosure', async () => {
+    await import('../chat/StreamdownAssistant')
+    tasks[0] = { ...tasks[0], status: 'completed', finalResponse: '## 交付清单\n\n**已经保存**\n\n- 已生成报告\n- 已核对单位 `毫米`' }
+    inbox = []
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) })
+    await settle()
+    const result = [...container.querySelectorAll('details')].find(element => element.querySelector('summary')?.textContent === i18n.t('common:taskWorkspaceResult'))!
+    expect(result.open).toBe(true)
+    expect(result.querySelector('h2')?.textContent).toBe('交付清单')
+    expect(result.querySelector('[data-streamdown="strong"]')?.textContent, result.innerHTML).toBe('已经保存')
+    expect([...result.querySelectorAll('ul > li')].map(item => item.textContent)).toEqual(['已生成报告', '已核对单位 毫米'])
+    expect(result.querySelector('code')?.textContent).toBe('毫米')
+    expect(result.textContent).not.toContain('##')
+    expect(result.textContent).not.toContain('**')
+  })
+  it('resolves delivery-note links in the selected task workspace instead of the active chat', async () => {
+    await import('../chat/StreamdownAssistant')
+    const previousWorkspace = useChatStore.getState().workspaceRoot
+    const resolveWorkspaceFile = vi.fn(async (request: { path: string; workspaceRoot?: string }) => ({ ok: true, path: `${request.workspaceRoot}/${request.path}` }))
+    Object.assign(window.workwise, { resolveWorkspaceFile })
+    clearFileReferenceValidationCache()
+    try {
+      await act(async () => useChatStore.setState({ workspaceRoot: '/unrelated-chat' }))
+      tasks[0] = { ...tasks[0], status: 'completed', finalResponse: '[已保存的报告](reports/delivery.md)' }
+      inbox = []
+      await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) })
+      await settle()
+      await settle()
+      expect(resolveWorkspaceFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'reports/delivery.md', workspaceRoot: tasks[0].workspaceRoot }))
+      expect(resolveWorkspaceFile.mock.calls.every(([request]) => request.workspaceRoot !== '/unrelated-chat')).toBe(true)
+      expect(container.querySelector('a.ds-file-reference-link')?.textContent).toBe('已保存的报告')
+    } finally {
+      await act(async () => useChatStore.setState({ workspaceRoot: previousWorkspace }))
+      clearFileReferenceValidationCache()
+    }
+  })
+
+  it('offers public-query recovery only from the current task server projection', async () => {
+    tasks[0] = { ...tasks[0], status: 'stalled', revision: 2 }
+    inbox = []
+    Object.assign(window.workwise, {
+      getTaskPublicQueryRecovery: vi.fn(async (taskId: string) => ({ taskId, taskRevision: 2, state: 'eligible', message: 'A new public search is available.', unknownOperationCount: 2 }))
+    })
+    await act(async () => refreshTaskState())
+    await settle()
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === 'Prepare a new search')).toBe(true)
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === i18n.t('common:taskRunResume'))).toBe(false)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+
+  it('keeps an expired one-off scope informational instead of offering a misleading Continue action', async () => {
+    tasks[0] = { ...tasks[0], status: 'stalled', revision: 2 }
+    inbox = []
+    Object.assign(window.workwise, {
+      getTaskPublicQueryRecovery: vi.fn(async (taskId: string) => ({ taskId, taskRevision: 2, state: 'unavailable', reason: 'browser_public_query_schedule_scope_required', message: 'Fresh scope required.', unknownOperationCount: 0 }))
+    })
+    await act(async () => refreshTaskState())
+    await settle()
+    expect(container.textContent).toContain(i18n.t('common:taskPublicQueryRecoveryFreshScopeRequired'))
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === i18n.t('common:taskRunResume'))).toBe(false)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+
+  it.each(['waiting_user', 'waiting_approval', 'stalled'] as const)('lets the user explicitly pause a %s task before resolving its blocker', async status => {
+    tasks[0] = { ...tasks[0], status }
+    inbox = []
+    await act(async () => refreshTaskState())
+    const pause = [...container.querySelectorAll('button')].find(button => button.textContent === 'Pause')
+    expect(pause).toBeTruthy()
+    await act(async () => pause!.click())
+    await settle()
+    expect(window.workwise.pauseTask).toHaveBeenCalledExactlyOnceWith('t1', expect.objectContaining({ expectedRevision: 1 }))
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === 'Pause')).toBe(false)
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === i18n.t('common:taskRunResume'))).toBe(true)
+  })
+  it('leaves a resolved standalone attention card and returns to an available task', async () => {
+    inbox = [{ ...approval, id: 'standalone-review', taskId: undefined, threadId: undefined, workspaceRoot: '/workspace', title: 'Standalone review' }]
+    await act(async () => refreshTaskState())
+    await act(async () => updateTaskNavigation({ selectedTaskId: null, selectedAttentionId: 'standalone-review' }))
+    await settle()
+    expect(container.querySelector('[aria-label="Task details"]')).toBeNull()
+    inbox = []
+    await act(async () => refreshTaskState())
+    await settle()
+    expect(container.querySelector('[aria-label="Task details"]')).not.toBeNull()
+  })
+  it('renders an empty task workspace without a repeated selection update', async () => {
+    tasks = []
+    inbox = []
+    await act(async () => refreshTaskState())
+    await settle()
+    expect(container.querySelectorAll('.ds-task-sidebar button[aria-pressed="true"]')).toHaveLength(1)
+    expect(container.querySelector('.ds-task-workspace-empty')?.textContent).toContain('Select a task in the sidebar')
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('keeps one task list in the left sidebar and a single current task in the work surface', async () => {
+    await i18n.changeLanguage('zh')
+    const goal = '创建一个完整、独立运行的 HTML 文件，使用 SVG 绘制一只正在骑自行车的鹈鹕，并制作成二维动画。所有代码包含在同一个文件中。'
+    tasks[0] = { ...tasks[0], goal, status: 'stalled' }
+    await act(async () => refreshTaskState())
+    const workspace = container.querySelector('[aria-label="任务"]')!
+    expect(container.querySelectorAll('[aria-label="任务列表"]')).toHaveLength(1)
+    expect(workspace.querySelector('[aria-label="任务列表"]')).toBeNull()
+    expect(workspace.querySelector('[aria-label="任务筛选"]')).toBeNull()
+    expect(workspace.querySelector('input[type="search"]')).toBeNull()
+    expect(workspace.querySelector('h2')?.textContent).toContain('鹈鹕')
+    const original = [...workspace.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent === '原始要求')!
+    expect(original.open).toBe(false)
+    expect(original.textContent).toContain(goal)
+    expect([...workspace.querySelectorAll('button')].some(button => button.textContent === '暂停')).toBe(true)
+  })
+
+  it('explicitly rechecks an existing local HTML output without starting a model or discarding the task', async () => {
+    tasks[0] = { ...tasks[0], status: 'stalled', goal: '使用 SVG 绘制一只骑自行车的鹈鹕，生成独立 HTML 动画，打开浏览器即可查看。',
+      acceptance: { ...tasks[0].acceptance, kind: 'files', requiredFormats: ['html'], requiresWebEvidence: true, requiredSourceOrigins: [] },
+      artifacts: [{ id: 'html', relativePath: 'pelican.html', storage: 'task', validation: 'valid', sha256: 'a'.repeat(64), sourceEvidenceStatus: 'draft', createdAt: now }] }
+    const revalidate = vi.fn(async () => {
+      tasks[0] = { ...tasks[0], status: 'completed', revision: 2, acceptance: { ...tasks[0].acceptance, requiresWebEvidence: false }, artifacts: [{ ...tasks[0].artifacts[0], sourceEvidenceStatus: undefined }] }
+      return { task: tasks[0], corrected: true, completed: true, reason: 'Local output checked.' }
+    })
+    Object.assign(window.workwise, { revalidateTaskArtifacts: revalidate })
+    await act(async () => refreshTaskState())
+    await click('Recheck existing output')
+    expect(revalidate).toHaveBeenCalledWith('t1', { expectedRevision: 1, idempotencyKey: expect.any(String), confirmed: true })
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+    expect(container.querySelector('[aria-label="Task details"]')?.textContent).toContain('pelican.html')
+    expect(container.querySelector('nav[aria-label="Task filters"] button[aria-pressed="true"]')?.textContent).toContain('Completed')
+  })
+
+  it('labels sourced HTML drafts and verified outputs separately while keeping ordinary file validation and draft preview', async () => {
+    await i18n.changeLanguage('zh')
+    tasks[0].acceptance.requiresWebEvidence = true
+    tasks[0].artifacts = [
+      { id: 'draft', relativePath: '待核验报告.html', validation: 'valid', sourceEvidenceStatus: 'draft', sha256: 'a'.repeat(64), createdAt: now },
+      { id: 'verified', relativePath: '已核验报告.html', validation: 'valid', sourceEvidenceStatus: 'verified', sourceEvidenceReceiptId: 'proof-report', sha256: 'b'.repeat(64), createdAt: now },
+      { id: 'legacy', relativePath: '旧报告.htm', validation: 'valid', sha256: 'c'.repeat(64), createdAt: now },
+      { id: 'file', relativePath: '统计数据.csv', validation: 'valid', sha256: 'd'.repeat(64), createdAt: now }
+    ]
+    await act(async () => refreshTaskState())
+    await click('Monthly report')
+    const row = (name: string) => [...container.querySelectorAll('li')].find(item => item.textContent?.includes(name))!
+    expect(row('待核验报告.html').textContent).toContain('草稿·来源待核验')
+    expect(row('待核验报告.html').textContent).not.toContain('验证通过')
+    expect(row('旧报告.htm').textContent).toContain('草稿·来源待核验')
+    expect(row('已核验报告.html').textContent).toContain('文件及来源已核验')
+    expect(row('统计数据.csv').textContent).toContain('验证通过')
+    expect(row('统计数据.csv').textContent).not.toContain('来源待核验')
+    await click('待核验报告.html')
+    expect(onOpenArtifact).toHaveBeenCalledWith(tasks[0], '待核验报告.html', 'draft')
+  })
+
+  it('restores an eligible failed task in place and starts it only after a separate Continue', async () => {
+    const original: TaskRunV1 = {...task('original-expired','failed','Original public query'),attempts:8,
+      timing:{executionMs:1013026,queuedMs:0,humanWaitMs:0,pausedMs:0,sampledAt:now,coverage:'complete'}}
+    tasks = [original]; inbox = []
+    let permission: TaskPermissionSnapshotV1 = {
+      taskId:original.id,taskRevision:1,taskTitle:original.goal,scopeHash:'expired-scope',workspaceRoot:'/workspace',workspaceTrust:'read-only',workspaceRevision:2,agentRevision:3,
+      approvalPolicy:'on-request',targetApprovalPolicy:'on-request',maxTtlSeconds:900,canConfirm:true,recoveryEligible:true,canRestoreBase:true,
+      grant:{id:'temporary-diagnostic',status:'expired',confirmedAt:now,expiresAt:now,scope:{readPaths:['/workspace','/old/diagnostic'],writePaths:[]}}
+    }
+    Object.assign(window.workwise,{
+      getTaskPermissions:vi.fn(async()=>permission),getTaskRun:vi.fn(async()=>tasks[0]),listAgentProfiles:vi.fn(async()=>({profiles:[]})),confirmTaskPermissions:vi.fn(),
+      runtimeRequest:vi.fn(async(path:string,method:string,body?:string)=>{
+        if(method==='GET')return {ok:true,status:200,body:JSON.stringify({agentRevision:3})}
+        expect(path).toBe('/v1/tasks/original-expired/permissions'); expect(method).toBe('DELETE')
+        expect(JSON.parse(body!)).toEqual({expectedRevision:1,permissionId:'temporary-diagnostic',idempotencyKey:expect.any(String),restoreBase:true})
+        tasks = [{...tasks[0],status:'paused',revision:2}]
+        permission = {...permission,taskRevision:2,recoveryEligible:false,canRestoreBase:false,grant:undefined}
+        return {ok:true,status:200,body:JSON.stringify({task:tasks[0],permission,resumed:false})}
+      })
+    })
+    await act(async()=>refreshTaskState())
+    await click('All tasks'); await click('Original public query')
+    const summary = [...container.querySelectorAll('details > summary')].find(item=>item.textContent===i18n.t('common:taskPermissionReview'))!
+    await act(async()=>{(summary as HTMLElement).click()})
+    expect((summary.parentElement as HTMLDetailsElement).open).toBe(true)
+    await settle()
+    await click(i18n.t('common:taskPermissionRestoreBase'))
+    expect([...container.querySelectorAll('[role="status"]')].some(item=>item.textContent===i18n.t('common:taskPermissionBaseRestored'))).toBe(true)
+    expect(tasks[0]).toMatchObject({id:original.id,status:'paused',attempts:8,timing:original.timing,budget:original.budget})
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled(); expect(window.workwise.retryTask).not.toHaveBeenCalled()
+    expect(window.workwise.confirmTaskPermissions).not.toHaveBeenCalled(); expect(window.workwise.startTaskTemplate).not.toHaveBeenCalled()
+    await click(i18n.t('common:taskRunResume'))
+    expect(window.workwise.resumeTask).toHaveBeenCalledExactlyOnceWith(original.id,{expectedRevision:2,idempotencyKey:expect.any(String)})
+    expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+
+  it('keeps detailed task permissions closed until the user opens them', async () => {
+    await click('Monthly report')
+    const summary = [...container.querySelectorAll('details > summary')].find(item => item.textContent === i18n.t('common:taskPermissionReview'))
+    expect(summary).toBeTruthy()
+    expect((summary!.parentElement as HTMLDetailsElement).open).toBe(false)
+  })
+
   it('opens an authorized external artifact by task identity and displays its file name', async () => {
     const openTaskArtifact = vi.fn(async () => ({ ok: true as const }))
     Object.assign(window.workwise, { openTaskArtifact })
@@ -219,7 +535,14 @@ describe('TaskWorkspaceView', () => {
     expect(section.textContent).toContain(receipts)
     expect(section.textContent).toContain('remote-operation-42')
     expect(section.textContent).toContain('result-sha256')
-    expect(section.textContent).not.toMatch(/hidden-(?:thread|session|turn)-identifier|lark_task_complete/)
+    expect(section.textContent).not.toMatch(/hidden-(?:thread|session|turn)-identifier/)
+    const visible = section.cloneNode(true) as HTMLElement
+    visible.querySelectorAll('details:not([open])').forEach(details => details.replaceChildren(details.querySelector('summary')!.cloneNode(true)))
+    expect(visible.textContent).not.toMatch(/lark_task_complete|remote-operation-42|result-sha256|request-sha256/)
+    const executionDetails = [...section.querySelectorAll('details')].find(details => details.textContent?.includes('lark_task_complete'))!
+    expect(executionDetails.open).toBe(false)
+    executionDetails.open = true
+    expect(executionDetails.textContent).toContain('lark_task_complete')
     expect(window.workwise.listTaskOperationReceipts).toHaveBeenCalledWith('effect-task')
   })
 
@@ -272,8 +595,8 @@ describe('TaskWorkspaceView', () => {
     inbox = []
     await act(async () => { await i18n.changeLanguage(language); await refreshTaskState() })
     await click(completed)
-    expect(container.querySelector(`[aria-label="${details}"] h2`)?.textContent).toBe(goal)
-    expect(container.querySelector(`[aria-label="${language === 'zh' ? '任务列表' : 'Task list'}"]`)?.textContent).toContain(goal)
+    expect(container.querySelector(`[aria-label="${details}"] h2`)?.textContent).toBe(taskDisplayTitle({ goal }))
+    expect([...container.querySelectorAll('[aria-label] button[title]')].some(button => button.getAttribute('title') === goal)).toBe(true)
     expect(container.textContent).not.toContain('propose_document')
     expect(container.textContent).not.toContain('source_refs')
     expect(container.textContent).not.toMatch(/taskWorkspace[A-Z]/)
@@ -309,6 +632,162 @@ describe('TaskWorkspaceView', () => {
     expect(window.workwise.pauseTask).toHaveBeenCalledWith('t1', expect.objectContaining({ expectedRevision: 1 }))
     expect(container.querySelector('[aria-label="Task details"]')?.textContent).toContain('Resume')
     expect(onOpenThread).not.toHaveBeenCalled()
+  })
+
+  it.each(['completed', 'not_completed'] as const)('uses the browser review command and preserves a paused task after explicit %s confirmation', async decision => {
+    const pending = { ...task('browser-review', 'paused', 'Review original query'), revision: 7 }
+    tasks = [pending]; inbox = []
+    const receipt: TaskOperationReceiptV1 = { id: 'browser-receipt', taskId: pending.id, purpose: 'browser_action',
+      provider: 'browser-skill', operation: 'click', toolName: 'browser_click', requestHash: 'a'.repeat(64), status: 'outcome_unknown',
+      browser: { action: 'click', pageUrl: 'https://example.com/notices', canReview: true }, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([receipt])
+    vi.mocked(window.workwise.verifyTaskOperationReceipt).mockResolvedValue({ taskId: pending.id, receiptId: receipt.id, status: 'outcome_unknown',
+      browserReview: { id: 'review-1', action: 'click', pageUrl: 'https://example.com/notices', observationText: 'Public query completed', expiresAt: new Date(Date.now() + 120_000).toISOString() } })
+    const runtimeRequest = vi.mocked(window.workwise.runtimeRequest)
+    runtimeRequest.mockImplementation(async path => {
+      if (path.endsWith('/browser-confirm')) {
+        tasks = [{ ...pending, revision: 8 }]
+        return { ok: true, status: 200, body: JSON.stringify({ taskId: pending.id, receiptId: receipt.id, status: 'verified', outcome: decision === 'not_completed' ? 'not_completed' : 'succeeded', evidence: { kind: 'human_confirmation', provider: 'browser-skill', operation: 'click', target: 'https://example.com/notices', status: decision === 'not_completed' ? 'public_query_reviewed_incomplete' : 'public_query_confirmed_by_user', verified: true, verifiedAt: new Date().toISOString(), resultHash: 'b'.repeat(64) } }) }
+      }
+      return { ok: true, status: 200, body: '{}' }
+    })
+    await act(async () => { await refreshTaskState() })
+    await click('In progress')
+    await click('Check the original page')
+    const checkbox = container.querySelector<HTMLInputElement>('[aria-label="Review this browser operation"] input[type="checkbox"]')!
+    expect(checkbox).toBeTruthy()
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    await act(async () => container.querySelector<HTMLInputElement>(`input[value="${decision}"]`)!.click())
+    await act(async () => checkbox.click())
+    const refreshes = vi.mocked(window.workwise.listTaskPage).mock.calls.length
+    await click('Save my confirmation')
+    const request = runtimeRequest.mock.calls.find(([path]) => path.endsWith('/browser-confirm'))!
+    expect(request[0]).toBe('/v1/tasks/browser-review/receipts/browser-receipt/browser-confirm')
+    expect(request[1]).toBe('POST')
+    expect(JSON.parse(request[2]!)).toEqual({ expectedRevision: 7, idempotencyKey: expect.any(String), reviewId: 'review-1', decision })
+    expect(tasks[0].status).toBe('paused')
+    expect(tasks[0].revision).toBe(8)
+    expect(vi.mocked(window.workwise.listTaskPage).mock.calls.length).toBeGreaterThan(refreshes)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.appendTaskInput).not.toHaveBeenCalled()
+  })
+
+  it('keeps a failed browser review reason visible through its refresh and later updates of the same root', async () => {
+    const pending = { ...task('browser-failure', 'paused', '核对原网页'), revision: 7 }
+    tasks = [pending]; inbox = []
+    const receipt: TaskOperationReceiptV1 = { id: 'failed-browser-receipt', taskId: pending.id, purpose: 'browser_action',
+      provider: 'browser-skill', operation: 'fill', toolName: 'browser_fill', requestHash: 'a'.repeat(64), status: 'outcome_unknown',
+      browser: { action: 'fill', pageUrl: 'https://example.com/notices', canReview: true }, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([receipt])
+    vi.mocked(window.workwise.verifyTaskOperationReceipt).mockResolvedValue({ taskId: pending.id, receiptId: receipt.id,
+      status: 'outcome_unknown', errorCode: 'browser_review_read_failed' })
+    await act(async () => { await i18n.changeLanguage('zh'); await refreshTaskState() })
+    await click('进行中')
+    const originalCard = container.querySelector('[aria-label="网页操作核验"] li')!
+    expect(originalCard).toBeTruthy()
+    const refreshes = vi.mocked(window.workwise.listTaskPage).mock.calls.length
+    await click('检查原网页结果')
+    const message = i18n.t('common:taskBrowserReviewUnavailable')
+    expect(container.textContent).toContain(message)
+    expect(container.querySelector('[aria-label="网页操作核验"] li')).toBe(originalCard)
+    expect(vi.mocked(window.workwise.listTaskPage).mock.calls.length).toBeGreaterThan(refreshes)
+    const event = vi.mocked(window.workwise.onSseEvent).mock.calls.at(-1)![0]
+    const streamId = vi.mocked(window.workwise.startTaskSse).mock.calls.at(-1)![1]!
+    tasks = [{ ...pending, revision: 8 }]
+    await act(async () => event({ streamId, events: [{ seq: 1, taskId: pending.id, kind: 'task_changed', payload: tasks[0], createdAt: now }] }))
+    await settle()
+    expect(container.textContent).toContain(message)
+    expect(container.querySelector('[aria-label="网页操作核验"] li')).toBe(originalCard)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+    expect(window.workwise.appendTaskInput).not.toHaveBeenCalled()
+    expect(tasks[0].status).toBe('paused')
+  })
+
+  it('clears the previous root review immediately when switching tasks and ignores its late detail response', async () => {
+    const first = task('browser-first', 'paused', '第一个公开查询')
+    const second = task('browser-second', 'paused', '另一个独立任务')
+    tasks = [first, second]; inbox = []
+    const receipt: TaskOperationReceiptV1 = { id: 'first-browser-receipt', taskId: first.id, purpose: 'browser_action',
+      provider: 'browser-skill', operation: 'click', toolName: 'browser_click', requestHash: 'a'.repeat(64), status: 'outcome_unknown',
+      browser: { action: 'click', pageUrl: 'https://example.com/first', canReview: true }, createdAt: now, updatedAt: now }
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockImplementation(async id => id === first.id ? [receipt] : [])
+    vi.mocked(window.workwise.verifyTaskOperationReceipt).mockResolvedValue({ taskId: first.id, receiptId: receipt.id, status: 'outcome_unknown',
+      browserReview: { id: 'first-private-review', action: 'click', pageUrl: 'https://example.com/first', observationText: '只属于第一个任务的观察内容', expiresAt: new Date(Date.now() + 120_000).toISOString() } })
+    await act(async () => { await i18n.changeLanguage('zh'); await refreshTaskState() })
+    await click('进行中')
+    await click('第一个公开查询')
+    await click('检查原网页结果')
+    expect(container.textContent).toContain('只属于第一个任务的观察内容')
+    let finishOldRead: ((value: TaskOperationReceiptV1[]) => void) | undefined
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockImplementation(id => id === first.id
+      ? new Promise(resolve => { finishOldRead = resolve }) : new Promise(() => undefined))
+    tasks = [{ ...first, revision: 2 }, second]
+    await act(async () => refreshTaskState())
+    expect(finishOldRead).toBeTypeOf('function')
+    expect(container.textContent).toContain('只属于第一个任务的观察内容')
+    await click('另一个独立任务')
+    expect(container.querySelector('[aria-label="任务详情"] h2')?.textContent).toBe('另一个独立任务')
+    expect(container.textContent).not.toContain('只属于第一个任务的观察内容')
+    expect(container.textContent).not.toContain('https://example.com/first')
+    expect(container.querySelector('[aria-label="网页操作核验"]')).toBeNull()
+    await act(async () => finishOldRead!([receipt]))
+    await settle()
+    expect(container.textContent).not.toContain('只属于第一个任务的观察内容')
+    expect(container.querySelector('[aria-label="网页操作核验"]')).toBeNull()
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('uses the browser business review without exposing technical fingerprints in task attention', async () => {
+    const summary = ['确认浏览器操作', '站点 "https://example.com"', '动作 "填写网页输入框"', '目标 "采购关键词"',
+      '输入内容 "轨道交通监测"', `输入摘要 "${'a'.repeat(64)}"`, `目标摘要 "${'b'.repeat(64)}"`, `请求摘要 "${'c'.repeat(64)}"`,
+      '授权期限 "仅本次操作"', '操作说明 "执行后读取页面核验。"'].join('\n')
+    inbox = [{ ...approval, message: summary }]
+    tasks = tasks.map(item => item.id === approval.taskId ? { ...item, waitingReason: summary } : item)
+    await act(async () => refreshTaskState())
+    await click('Needs you')
+    expect(container.textContent).toContain('采购关键词')
+    expect(container.textContent).toContain('轨道交通监测')
+    expect(container.textContent).not.toContain('a'.repeat(64))
+    expect(container.textContent).not.toContain('输入摘要')
+  })
+
+  it('projects a blocked resume into its durable actionable card while preserving pause', async () => {
+    const capability = { provider: 'browser-skill', status: 'needs_authorization', errorCode: 'browser_binding_changed',
+      message: '请确认当前任务的浏览器范围。', action: { kind: 'grant', route: 'task/browser-binding', label: '确认当前任务的浏览器范围' } }
+    tasks = [{ ...tasks[0], status: 'paused' }]
+    inbox = []
+    const original = tasks[0]
+    const binding = { taskId: original.id, taskRevision: original.revision, browserRevision: 3, browserInstanceId: 'new-browser',
+      browserLabel: 'Chrome 验收', origins: ['https://example.com'], interaction: 'interact', previousInteraction: 'observe' }
+    Object.assign(window.workwise, {
+      diagnoseBrowserSkill: vi.fn(async () => ({ status: { enabled: true, state: 'ready', origins: binding.origins, interaction: 'interact', revision: 3, browsers: [] } })),
+      getBrowserTaskBinding: vi.fn(async () => binding),
+      confirmBrowserTaskBinding: vi.fn(async () => ({ binding, resumed: false })),
+      resumeTask: vi.fn(async () => {
+        inbox = [{ ...approval, id: `capability_${original.id}`, ownerId: original.id, taskId: original.id, threadId: original.threadId,
+          kind: 'blocked', title: '继续原任务前需要处理', message: capability.message, requestId: undefined,
+          payload: { kind: 'capability_required', capability, request: { prompt: original.goal } } }]
+        return { task: original, capability, attentionId: inbox[0].id }
+      })
+    })
+    await act(async () => refreshTaskState())
+    await settle()
+    await click('Resume')
+    expect(window.workwise.resumeTask).toHaveBeenCalledOnce()
+    expect(tasks[0]).toEqual(original)
+    expect(container.textContent).toContain(capability.message)
+    const workspaceValue = container.querySelector(`[aria-label="${i18n.t('common:capabilityRequiredTitle')}"] dl`)?.textContent
+    expect(workspaceValue).toContain(original.workspaceRoot)
+    expect(workspaceValue).not.toContain('No workspace selected')
+    expect(container.querySelector('nav[aria-label="Task filters"] button[aria-pressed="true"]')?.textContent).toContain('Needs you')
+    await click('确认当前任务的浏览器范围')
+    expect(window.workwise.getBrowserTaskBinding).toHaveBeenCalledWith(original.id)
+    expect(container.textContent).toContain('Chrome 验收')
+    await click('Confirm browser scope for this task')
+    expect(window.workwise.confirmBrowserTaskBinding).toHaveBeenCalledWith(original.id, expect.objectContaining({ interaction: 'interact', expectedTaskRevision: original.revision }))
+    expect(window.workwise.resumeTask).toHaveBeenCalledOnce()
+    await act(async () => refreshTaskState())
+    expect(container.textContent).toContain('继续原任务前需要处理')
   })
 
   it('shows pending decisions and resolves them through the original approval API', async () => {

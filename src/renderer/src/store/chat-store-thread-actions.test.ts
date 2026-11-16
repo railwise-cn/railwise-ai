@@ -463,6 +463,26 @@ describe('task coordinator before ordinary chat turns', () => {
     } finally { vi.unstubAllGlobals() }
   })
 
+  it('drains an older queued image supplement through the durable coordinator without waking a paused task', async () => {
+    const { actions, state } = buildHarness()
+    state.busy = false
+    const queued = { id: 'queued-image', text: '再补充这张图片', displayText: '已附加图片', model: DEEPSEEK_VISION_MODEL_ID, attachmentIds: ['image-1'], attachments: [{ id: 'image-1', kind: 'image', mimeType: 'image/png' }], providerId: 'default' }
+    state.queuedMessages = [queued]
+    const coordinateTaskCommand = vi.fn(async () => ({ kind: 'input_queued', task: { status: 'paused' }, input: { id: 'saved-image' } }))
+    const sendUserMessage = vi.fn()
+    registryMock.getProvider.mockReturnValue({ sendUserMessage })
+    vi.stubGlobal('window', { workwise: { coordinateTaskCommand } })
+    try {
+      await actions.drainQueuedMessages()
+      expect(coordinateTaskCommand).toHaveBeenCalledOnce()
+      expect(coordinateTaskCommand).toHaveBeenCalledWith(expect.objectContaining({ idempotencyKey: 'queued:thr_existing:queued-image', intent: 'auto', request: expect.objectContaining({ displayText: '已附加图片', attachmentIds: ['image-1'] }) }))
+      expect(sendUserMessage).not.toHaveBeenCalled()
+      expect(state.busy).toBe(false)
+      expect(state.queuedMessages).toEqual([])
+      expect(state.blocks.find(block => block.kind === 'user')).toMatchObject({ meta: { attachmentIds: ['image-1'] } })
+    } finally { vi.unstubAllGlobals() }
+  })
+
   it('routes Write requests through preflight and preserves an actionable capability card without creating a Turn', async () => {
     const { actions, state } = buildHarness()
     state.route = 'write'

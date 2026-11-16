@@ -70,7 +70,9 @@ describe('external effect durable recovery', () => {
     controller.recordToolDispatch(operation.token, operation.key)
     controller.finishToolOperation(operation.token, operation.key)
     expect(repository.operation(task.id, operation.key)?.status).toBe('outcome_unknown')
-    expect(() => controller.beginToolOperation('turn-1', { ...call, callId: 'unknown-2' })).toThrow(/Verify its outcome/)
+    expect(() => controller.beginToolOperation('turn-1', { ...call, callId: 'unknown-2' })).toThrow(expect.objectContaining({
+      code: 'outcome_unknown', message: 'A previous tool has an unknown outcome. Verify its original receipt before executing another tool.'
+    }))
     expect(repository.operations(task.id, 'tool')).toHaveLength(1)
     repository.close()
   })

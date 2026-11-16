@@ -27,10 +27,10 @@ export function contextualExternalTaskPreflight(deps: {
   providerPreflight: ExternalTaskPreflight
   workspaceTrust: WorkspaceTrustReader
   toolHost: Pick<ToolHost, 'listTools'>
-  validateTaskPermission?: (threadId: string) => Promise<unknown>
+  validateTaskPermission?: (threadId: string, sourceTaskId?: string) => Promise<unknown>
 }): ExternalTaskPreflight {
-  return async (text, thread) => {
-    const capability = await deps.providerPreflight(text)
+  return async (text, thread, sourceTask) => {
+    const capability = await deps.providerPreflight(text, thread, sourceTask)
     if (!capability || !thread) return capability
     const intent = externalTaskIntent(text)
     if (!intent) return capability
@@ -46,7 +46,7 @@ export function contextualExternalTaskPreflight(deps: {
       sandboxMode: effectiveSandbox(thread, workspace.level), approvalPolicy: thread.approvalPolicy
     }
     const checked: CapabilityPreflight = { ...capability, executionContext, workspaceState: 'allowed', sandboxState: 'allowed' }
-    try { await deps.validateTaskPermission?.(thread.id) }
+    try { await deps.validateTaskPermission?.(thread.id, sourceTask?.id) }
     catch (error) {
       return blocked(checked, (error as { code?: string }).code ?? 'task_permission_revoked', '当前任务的临时权限已到期或范围发生变化。请重新确认任务权限后继续。',
         { approvalState: 'denied' }, { kind: 'grant', route: 'settings', label: '重新确认当前任务权限' })

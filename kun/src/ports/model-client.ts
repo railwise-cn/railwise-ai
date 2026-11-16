@@ -40,6 +40,8 @@ export type ModelRequest = {
   contextInstructions?: string[]
   prefix: TurnItem[]
   history: TurnItem[]
+  /** Server-owned history provenance; omitted parameters are reference records, never empty function-call examples. Not provider payload or authority. */
+  toolArgumentAvailability?: Array<{ turnId: string; callId: string; state: 'available' | 'omitted' }>
   attachments?: ModelInputAttachment[]
   tools: ModelToolSpec[]
   /**

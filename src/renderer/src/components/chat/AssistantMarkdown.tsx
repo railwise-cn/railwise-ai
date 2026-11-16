@@ -8,11 +8,15 @@ const LazyStreamdownAssistant = lazy(() =>
 export function AssistantMarkdown({
   text,
   streaming,
-  className
+  className,
+  workspaceRoot,
+  restricted
 }: {
   text: string
   streaming: boolean
   className?: string
+  workspaceRoot?: string
+  restricted?: boolean
 }): ReactElement {
   return (
     <Suspense
@@ -22,7 +26,7 @@ export function AssistantMarkdown({
         </div>
       }
     >
-      <LazyStreamdownAssistant text={text} streaming={streaming} className={className} />
+      <LazyStreamdownAssistant text={text} streaming={streaming} className={className} workspaceRoot={workspaceRoot} restricted={restricted} />
     </Suspense>
   )
 }

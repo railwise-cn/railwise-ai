@@ -18,18 +18,45 @@
 
 ---
 
-RailWise AI 0.5.6 以“编程 / 内业”为主入口，支持持续任务、工程文档和外部平台协作。RailWise Survey 将原始测量资料、计算记录和候选成果组织在同一工作区，Write、Design、Flow、技能与连接器提供配套工具。
+RailWise AI 0.5.7 以“编程 / 内业”为主入口，支持持续任务、工程文档和外部平台协作。RailWise Survey 将原始测量资料、计算记录和候选成果组织在同一工作区，Write、Design、Flow、技能与连接器提供配套工具。
 
 本版安装包统一使用 `RailWise-AI` 名称，沿用既有安装身份、`.workwise` 数据与配置读取。工程成果保留来源、计算和审阅记录，专业审定仍由工程人员完成。[发行身份与迁移说明](./docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md)
 
-**[下载最新稳定版本](https://github.com/railwise-cn/railwise-ai/releases/latest)**，或在已有应用内检查更新。本轮更新与验证范围见 [0.5.6 发布说明](./release/release-v0.5.6.md)。
+**[下载当前稳定版 0.5.6](https://github.com/railwise-cn/railwise-ai/releases/latest)**，或在已有应用内检查更新。0.5.7 当前为候选版本，公开网页采购采集与周期交付尚未通过完整验收。本轮改动见 [0.5.7 发布说明](./release/release-v0.5.7.md)，实际验证范围见[验收记录](./docs/qa/general-execution-delivery-2026-11-13.md)。
 
-## 0.5.6 更新
+## 0.5.7 候选版改进
 
-- **任务中心**汇总目标、进度、待办和成果。补充要求进入原任务，暂停期间保留输入。任务详情提供执行范围、操作回执和核验结果。
-- **技能、插件、连接器**按顺序排列，默认打开技能，可按来源与安装状态查找工程工具。飞书和钉钉分别连接与授权，外部写入经过目标确认并保存回执。
-- **工程办公资源**新增资料盘点、监测质检与图表、文档差异审阅、会议纪要与待办四项技能，提供高德地图、Zotero 和 AutoCAD 重绘技能的配置与安装入口。
-- **左下角升级入口**在有更新时出现，一次点击完成下载、安全保存、安装和重启。帮助中心内置完整 13 章中文手册，支持搜索与章节跳转。
+- **BrowserSkill** 提供 CLI、官方浏览器扩展、所选 Chrome/Edge 实例和站点范围的检查入口。安装或启用技能后，应用同步可用技能；缺少依赖或授权时，原任务保留可处理的待办。
+- **HTML 成果与预览**将生成文件登记为任务成果，并区分草稿与来源已核验版本。当前会话的首个可预览 HTML 自动打开右侧预览，也可从任务中心或成果卡重新打开，核对正文、字段依据和实际保存位置。
+- **文件权限**支持在只读工作区把新报告保存到“应用任务成果”。要求写入指定目录时，任务先展示目标路径并请求相应范围授权。
+- **任务工作台**把任务列表与状态筛选放在左侧，中间专注当前工作，右侧按需预览成果。本地 HTML/SVG 创作按实际文件验收；执行、验证和交付分别显示进度。
+- **自适应工作台**按窗口实际空间和界面字号切换侧栏停靠或抽屉，保留正在查看的成果页面。General、模型和技能菜单跟随输入位置避让边界，长列表在菜单内滚动。
+- **权限恢复**在临时授权过期或范围变化时保留原任务与历史，显示可处理的权限卡；修复后单独继续，避免无效自动重试。
+- **每日计划**支持多个时刻与明确时区。需要在某时刻前交付时，应核对提前启动时间。周期网页查询的有限交互范围经过审阅，后续执行继续核对站点、元素、输入和浏览器绑定。
+- **日常对话**集中展示简短进度、待办和成果，工具参数与长输出放在可展开的工作详情中。
+
+BrowserSkill 配置、文件交付和定时任务的操作步骤见[使用手册](./docs/USER_GUIDE.zh-CN.md)。
+
+公开网页采集可以先确认一次任务范围，随后自主搜索、筛选和翻页；账号操作、业务提交与新增站点另行审阅。确认范围与继续执行分开。HTML 报告以文件成果保存，右侧预览单独显示来源核验状态；来源失败、字段待核验和结果未知保持可见。每个必需来源分别核查，旧草稿不会借后来文件的证明显示为已核验。每日计划会显示启动时刻、交付目标和时区，应用运行期间执行。
+
+## 0.5.7 中文界面
+
+任务概览与小窗菜单截图更新于 2026 年 11 月 16 日，来自 macOS 精确 0.5.7 候选包（源码 `98e94321`）；资料预检、技能和帮助三图保留 11 月 15 日的 `84ae4a85` 来源。均为中文浅色界面的原生 PNG，无 computer use 光标；任务图为 2560 × 1680，另外三图为 2672 × 1462。[截图来源、尺寸与哈希清单](./docs/images/v0.5.7/capture.json) · [960 × 640、大字号的 General 菜单实拍](./docs/images/v0.5.7/adaptive-agent-menu-zh-light.png)
+
+测量画面使用真实 COSA IN2 平面控制网资料的本地副本，仅展示导入预检；坐标及高程基准尚未确认，未进行平差，基准与成果待工程复核。
+
+| 自适应任务与成果预览 | 真实控制网资料预检 |
+| --- | --- |
+| 本地 HTML/SVG 文件已保存并在右侧打开，执行、验证和交付 3 / 3 完成。图中的采购任务仍保留各自未完成状态。 | 真实 COSA 资料识别出 61 点、20 站、268 条观测和 2 个已知点；基准未确认时阻止计算。 |
+| ![自适应任务侧栏与真实 HTML 成果预览](./docs/images/v0.5.7/adaptive-task-overview-zh-light.png) | ![真实 COSA 平面控制网资料导入预检](./docs/images/v0.5.7/survey-import-zh-light.png) |
+
+| 技能市场 | 离线帮助中心 |
+| --- | --- |
+| 技能、插件、连接器分别呈现。图中 227 为当前环境的索引数量；各项能否执行仍取决于安装、依赖、连接与授权状态。 | 从章节目录浏览随包中文手册，离线查阅测量、写作、编程和成果交付的操作流程。 |
+| ![技能市场与工程资源](./docs/images/v0.5.7/skills-market-zh-light.png) | ![中文离线帮助中心](./docs/images/v0.5.7/help-center-zh-light.png) |
+
+<details>
+<summary>查看 0.5.6 历史界面</summary>
 
 ## 0.5.6 中文界面
 
@@ -71,6 +98,9 @@ RailWise AI 0.5.6 以“编程 / 内业”为主入口，支持持续任务、�
 
 ![RailWise AI 0.5.6 CAD 重绘技能与安装条件](./docs/images/v0.5.6/09-cad-skills.jpg)
 
+
+</details>
+
 ## DeepSeek V4.1 支持
 
 默认模型使用 DeepSeek V4.1-Flash，官方模型 ID 为 `deepseek-flash`；已经保存的显式模型选择保持不变。0.5.1 保留已有显式模型配置，并包含自动选模与失败回退修复。
@@ -80,9 +110,9 @@ RailWise AI 0.5.6 以“编程 / 内业”为主入口，支持持续任务、�
 - **安装后直接配置 DeepSeek**：首次启动的模型配置只提供 DeepSeek API Key 和可选服务地址，不需要先理解或切换服务商；完成一次配置后，对话、写作和手机连接即可共用。没有 API Key 时仍可先使用本地写作和导出。
 - **统一默认模型**：主 Agent、Write、定时任务和其他 Agent 默认使用官方模型 ID `deepseek-flash`（DeepSeek V4.1-Flash）；自动模式的所有任务也使用 `deepseek-flash`，只按任务调整思考强度。定时任务与 Claw IM 中内置 DeepSeek 的旧模型选择会迁移到当前 Flash；自定义服务商的模型 ID 保持不变。
 - **V4.1 运行时适配**：模型目录配置 100 万 token 上下文与最高 384K 输出，并接入思考模式、工具调用、上下文压缩、缓存统计、JSON 和 Responses API 路径。实际能力、额度和输出上限取决于服务端与账户，不代表每种路径均已通过完整安装包验收。
-- **接入 DeepSeek Harness**：WorkWise Runtime 根据模型能力处理图片附件，支持结构化 `text/image` 消息部分；文本模型使用本机回环视觉证据分析器生成 OCR、布局、语义和视觉摘要。分析器不可用或失败时明确报告失败，不把图片退化为 Base64 文本。
+- **接入 DeepSeek Harness**：RailWise AI Runtime 根据模型能力处理图片附件，支持结构化 `text/image` 消息部分；文本模型使用本机回环视觉证据分析器生成 OCR、布局、语义和视觉摘要。分析器不可用或失败时明确报告失败，不把图片退化为 Base64 文本。
 - **结构化视觉回合**：支持 JPEG、PNG、GIF 和 WebP。V4.1-Flash 按模型能力接收结构化 `text/image` 消息部分；不支持视觉的 Provider 会明确报告并保留附件，不把图片退化为 Base64 文本。
-- 这里描述的是 WorkWise 实际接入的 Runtime 适配、附件合约和视觉证据路径，不代表客户端内置了上游 DeepSeek Harness 的全部代码或最新能力。模型服务和上游项目的变化以 [DeepSeek 官方文档](https://api-docs.deepseek.com/updates) 为准。
+- 这里描述的是 RailWise AI 实际接入的 Runtime 适配、附件合约和视觉证据路径，不代表客户端内置了上游 DeepSeek Harness 的全部代码或最新能力。模型服务和上游项目的变化以 [DeepSeek 官方文档](https://api-docs.deepseek.com/updates) 为准。
 
 完整支持范围与版本边界见[软件介绍](./docs/product-introduction.zh-CN.md)；实现边界见 [DeepSeek Harness 接入说明](./docs/DEEPSEEK_HARNESS.zh-CN.md)。DeepSeek V4.1-Flash 的公开模型参数和接口说明以[官方文档](https://api-docs.deepseek.com/updates)为准。
 
@@ -129,7 +159,7 @@ COSA IN1/IN2、Leica GSI 水准数据需通过相应单位、基准和拓扑校�
 | Code 工作台 | Write 写作工作台 |
 | --- | --- |
 | 理解项目、修改文件、运行工具、审查变更 | 编写 Markdown、调用写作助手、预览并导出文档 |
-| ![WorkWise Code 工作台](./src/asset/img/code.gif) | ![WorkWise Write 写作工作台](./src/asset/img/write.gif) |
+| ![编程工作台（早期界面）](./src/asset/img/code.gif) | ![写作工作台（早期界面）](./src/asset/img/write.gif) |
 
 Design 是独立工作区，提供可编辑多页画板、图片与组合、文档专属 Agent 会话、选中元素定向修改，以及 PNG、SVG、PPTX 和 Write 报告联动。
 
@@ -163,11 +193,11 @@ Write 是本地 Markdown 文档工作台。打开多篇文档后可切换、固�
 
 选中文字后使用“AI 写作”改写、压缩、扩写或统一术语，也可根据工作区资料生成带来源的内容。结果先显示差异，接受后才写入正文；关闭自动建议仍可手动调用 AI。写作助手支持 PDF、DOCX、XLSX、PPTX、TXT、Markdown、CSV 与图片附件；“编制投标文件”入口使用内置 Tender Master 整理评分、实质性要求和风险，再按确认的目录逐章编制。
 
-HTML、PDF 和 DOCX 导出沿用预览的本地公式、脚注和 Mermaid 语法规则；复杂 Word 公式可能以图片保留外观。DOCX 内置学术论文、行政公文、商务报告、技术文档四个模板，可调整标题、正文、表格、代码块的字体、字号、颜色、行距、对齐和缩进，再另存为自定义模板。公文模板提供小标宋标题、仿宋正文和首行缩进等样式；特殊字体需自行安装。交付前仍需检查事实、来源、分页和版式。详见[写作使用指南](./docs/USER_GUIDE.zh-CN.md#write-写作模式)。
+HTML、PDF 和 DOCX 导出沿用预览的本地公式、脚注和 Mermaid 语法规则；复杂 Word 公式可能以图片保留外观。DOCX 内置学术论文、行政公文、商务报告、技术文档四个模板，可调整标题、正文、表格、代码块的字体、字号、颜色、行距、对齐和缩进，再另存为自定义模板。公文模板提供小标宋标题、仿宋正文和首行缩进等样式；特殊字体需自行安装。交付前仍需检查事实、来源、分页和版式。详见[写作使用指南](./docs/USER_GUIDE.zh-CN.md#6-write从草稿到正式文档)。
 
 ### Design：从画板到文档和演示文稿
 
-Design 以工作区内 `.workwise/design` 为持久化边界，支持多页画板、图片资源、预设形状、结构化组合、撤销/重做和冲突保护。Agent 通过带 revision 和幂等键的画板命令修改当前文档，不会绕过 WorkWise Agent Runtime 另建一套模型通道。
+Design 以工作区内 `.workwise/design` 为持久化边界，支持多页画板、图片资源、预设形状、结构化组合、撤销/重做和冲突保护。Agent 通过带 revision 和幂等键的画板命令修改当前文档，不会绕过 RailWise AI Runtime 另建一套模型通道。
 
 导出前会先保存当前画板。PNG、SVG 可直接下载，PPTX 会验证 OOXML 结构，也可把画板插入 Write 文档。
 
@@ -209,23 +239,25 @@ Flow 默认可见并标注 Preview。未配置模型、外部账号或配套 CLI
 2. 首次启动时选择语言，配置你有权使用的模型 API Key，并选择本地工作区。
 3. 从“编程 / 内业”开始工作：内业任务使用四阶段 Survey 工作区；写作、设计和 Flow Preview 从侧边工具进入。
 
-### 支持平台
+### 0.5.7 候选安装包名称
+
+以下为候选包命名。正式下载请以已发布列表中的版本和校验信息为准。
 
 | 平台 | 架构 | 安装包 |
 | --- | --- | --- |
-| macOS | Apple Silicon | `RailWise-AI-0.5.6-mac-Apple-Silicon.dmg` |
-| macOS | Intel | `RailWise-AI-0.5.6-mac-Intel.dmg` |
-| Windows | x64 | `RailWise-AI-0.5.6-win-x64.exe` |
+| macOS | Apple Silicon | `RailWise-AI-0.5.7-mac-Apple-Silicon.dmg` |
+| macOS | Intel | `RailWise-AI-0.5.7-mac-Intel.dmg` |
+| Windows | x64 | `RailWise-AI-0.5.7-win-x64.exe` |
 
 当前不提供 Linux 桌面客户端和便携版。请始终从 [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases) 或 [RailWise AI 产品主页](https://www.railwise.cn/products/workwise/)进入下载。
 
 ## 更新与帮助
 
-RailWise AI 0.5.6 使用 `railwise.cn` 官方 Stable 更新源。
+已发布的正式版本使用 `railwise.cn` 官方 Stable 更新源。
 
 - 启动后检查，并每 24 小时在后台复查。有可用更新时，普通侧栏和写作侧栏左下角显示紧凑的“升级”入口，下载进度也显示在该位置。
 - 点击一次“升级”后，应用下载并校验安装包、保存编辑内容，并等待任务达到安全执行边界，再安装和重启。保存或停止失败时显示具体原因及重试入口。
-- 任务、草稿、历史资料及配置引用跨升级保存，已暂停或等待用户的任务保留相应状态。本版已完成正式 0.5.4 到精确 0.5.6 安装包的原生升级验证。
+- 任务、草稿、历史资料及配置引用跨升级保存，已暂停或等待用户的任务保留相应状态。0.5.6 的发布记录包含正式 0.5.4 到精确 0.5.6 安装包的历史原生升级验证。
 - 可从“帮助 → 检查更新”或“设置 → 通用 → 软件更新”手动检查、切换通道、重试或查看诊断信息。
 - 帮助中心随包提供完整 13 章中文手册，支持离线阅读、全文搜索、章节目录和内部链接。正文也可在仓库阅读。[完整使用手册](./docs/USER_GUIDE.zh-CN.md)
 
@@ -279,7 +311,7 @@ npm run build
 
 ## 反馈
 
-欢迎在 [GitHub Issues](https://github.com/railwise-cn/railwise-ai/issues) 提交问题和建议。为了更快定位，请附上 WorkWise 版本、操作系统与架构、复现步骤、截图或必要日志；不要公开 API Key、客户资料或其他敏感信息。
+欢迎在 [GitHub Issues](https://github.com/railwise-cn/railwise-ai/issues) 提交问题和建议。为了更快定位，请附上 RailWise AI 版本、操作系统与架构、复现步骤、截图或必要日志；不要公开 API Key、客户资料或其他敏感信息。
 
 ## 许可证与来源
 

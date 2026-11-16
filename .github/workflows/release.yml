@@ -28,6 +28,11 @@ on:
         required: false
         type: boolean
         default: false
+      publish_product_page:
+        description: 'Publish the product page and its download data after release promotion.'
+        required: false
+        type: boolean
+        default: true
       release_confirmation:
         description: 'Type PUBLISH-STABLE-vX.Y.Z for the exact tag being published.'
         required: false
@@ -64,10 +69,15 @@ on:
         type: boolean
         default: false
       exact_package_updater_smoke:
-        description: 'Verify this run’s exact packages privately: one official 0.5.4 to signed macOS update, plus clean Windows installation, Chinese UI, identity and uninstall checks. Never changes public feeds or releases.'
+        description: 'Verify this run’s exact packages privately: one pinned official baseline to signed macOS update, plus clean Windows installation, Chinese UI, identity and uninstall checks. Never changes public feeds or releases.'
         required: false
         type: boolean
         default: false
+      exact_updater_base_version:
+        description: 'Pinned official baseline version for this run’s exact-package updater smoke.'
+        required: false
+        type: string
+        default: '0.5.6'
       run_updater_acceptance:
         description: 'Run only the isolated native updater acceptance workflow.'
         required: false
@@ -804,7 +814,7 @@ jobs:
 
   exact-package-windows-install-smoke:
     name: Private exact-package Windows install smoke
-    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-windows.result == 'success' && inputs.existing_windows_package_run_id == '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && !cancelled() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-windows.result == 'success' && inputs.existing_windows_package_run_id == '' }}
     runs-on: windows-2022
     timeout-minutes: 15
     needs: [prepare, build-windows]
@@ -853,7 +863,7 @@ jobs:
 
   exact-package-updater-smoke:
     name: Private exact-package updater smoke
-    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-macos.result == 'success' && inputs.existing_windows_package_run_id == '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && !cancelled() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-macos.result == 'success' && inputs.existing_windows_package_run_id == '' }}
     runs-on: macos-15
     timeout-minutes: 65
     needs: [prepare, build-macos]
@@ -884,12 +894,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_VERSION: ${{ needs.prepare.outputs.version }}
+          BASE_VERSION: ${{ inputs.exact_updater_base_version }}
         run: |
           env -u RELEASE_CHANNEL -u WORKWISE_UPDATE_PROVIDER -u WORKWISE_UPDATE_BASE_URL \
             node scripts/run-frozen-release-updater-acceptance.mjs \
             --target-dist="${RUNNER_TEMP}/exact-mac-packages" \
             --target-version="${TARGET_VERSION}" \
-            --base-version=0.5.4 \
+            --base-version="${BASE_VERSION}" \
             --evidence-dir="${RUNNER_TEMP}/exact-updater-evidence"
       - name: Retain exact-package updater evidence
         if: always()
@@ -905,7 +916,7 @@ jobs:
     concurrency:
       group: production-release-public
       cancel-in-progress: false
-    if: ${{ inputs.stage_dependency_mirror != true && always() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' && inputs.existing_windows_package_run_id == '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && !cancelled() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' && inputs.existing_windows_package_run_id == '' }}
     runs-on: ubuntu-latest
     environment:
       name: production-release
@@ -1207,6 +1218,7 @@ jobs:
         run: node scripts/release-promotion-recovery.mjs publish --tag="${TAG_NAME}" --state="${RUNNER_TEMP}/official-promotion-state.json" --result="${RUNNER_TEMP}/official-promotion-result.json"
 
       - name: Generate product download data from the publication manifest
+        if: ${{ inputs.publish_product_page == true }}
         run: |
           set -euo pipefail
           node scripts/generate-website-product-manifest.cjs website-release-assets/publication-manifest.json website/data/workwise-product.json
@@ -1214,14 +1226,16 @@ jobs:
 
       - name: Deploy the generated product download page
         id: product_page_deploy
+        if: ${{ inputs.publish_product_page == true }}
         run: node scripts/deploy-workwise-product-page.mjs deploy --source website --version "${RELEASE_VERSION}" --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Verify the generated public product download page
         id: product_page_verify
+        if: ${{ inputs.publish_product_page == true }}
         run: node scripts/deploy-workwise-product-page.mjs verify-public --source website --version "${RELEASE_VERSION}"
 
       - name: Restore only the previous product page if its public verification fails
-        if: ${{ always() && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}
+        if: ${{ always() && inputs.publish_product_page == true && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}
         run: node scripts/deploy-workwise-product-page.mjs rollback --source website --version "${RELEASE_VERSION}" --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Restore the previous official pointers if this promotion attempt fails

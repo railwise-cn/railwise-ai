@@ -54,11 +54,11 @@ export function SidebarFrame({
     <aside
       aria-label={title}
       className={cx(
-        'ds-drag ds-sidebar-shell relative flex h-full w-full shrink-0 flex-col overflow-hidden px-4 pb-3',
+        'ds-drag ds-sidebar-shell relative flex h-full w-full min-w-0 shrink-0 flex-col overflow-hidden px-3 pb-3',
         className
       )}
     >
-      <div className="ds-sidebar-titlebar-spacer shrink-0 pb-5 pt-3">
+      <div className="ds-sidebar-titlebar-spacer shrink-0 pb-3 pt-3">
         <div className="ds-sidebar-titlebar-row flex min-h-[34px] items-start justify-between">
           <div aria-hidden className="ds-titlebar-safe-block min-w-[86px]" />
           {onCollapse ? (
@@ -72,10 +72,12 @@ export function SidebarFrame({
         </div>
       </div>
 
-      {children}
+      <div className="ds-sidebar-content flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
+        {children}
+      </div>
 
       {footer ? (
-        <div className="ds-no-drag mt-2 border-t border-[var(--ds-sidebar-divider)] px-1.5 pt-3">
+        <div className="ds-sidebar-footer ds-no-drag mt-2 shrink-0 border-t border-[var(--ds-sidebar-divider)] px-1.5 pt-2">
           {footer}
         </div>
       ) : null}

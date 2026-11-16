@@ -1,8 +1,11 @@
+import { BrowserPublicQueryRecoveryBindingSchema } from './browser-public-query-recovery.js'
 import { z } from 'zod'
 import { TaskApprovalGrantSchema } from './permissions.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
 import type { ContextBundle, HandoffPacket } from './task-context.js'
 import { ResultEvidenceSchema } from './harness.js'
+import { ScheduleRequirementSchema } from './schedule.js'
+import { BrowserExecutionScope } from './browser-skill.js'
 
 export const TaskRunStatusSchema = z.enum([
   'queued',
@@ -29,6 +32,7 @@ export const TaskNodeStatusSchema = z.enum([
 ])
 
 export const TaskArtifactSchema = z.object({
+  storage: z.literal('task').optional(),
   id: z.string().min(1),
   relativePath: z.string().min(1),
   absolutePath: z.string().min(1).optional(),
@@ -40,6 +44,8 @@ export const TaskArtifactSchema = z.object({
   sha256: z.string().optional(),
   validation: z.enum(['pending', 'valid', 'invalid']),
   validationMessage: z.string().optional(),
+  sourceEvidenceStatus: z.enum(['draft', 'verified']).optional(),
+  sourceEvidenceReceiptId: z.string().min(1).optional(),
   createdAt: z.string().min(1)
 })
 export type TaskArtifact = z.infer<typeof TaskArtifactSchema>
@@ -56,10 +62,15 @@ export const RequiredEffectSchema = z.object({
 export type RequiredEffect = z.infer<typeof RequiredEffectSchema>
 
 export const TaskAcceptanceSchema = z.object({
+  schedule: ScheduleRequirementSchema.optional(),
   kind: z.enum(['answer', 'files', 'effect']),
   requiredNodeKinds: z.array(TaskNodeKindSchema),
   requiredFormats: z.array(z.string().min(1)).optional(),
   minimumArtifacts: z.number().int().nonnegative().optional(),
+  requiresWebEvidence: z.boolean().optional(),
+  webEvidenceBasis: z.enum(['primary_document', 'observed_feed']).optional(),
+  sourceInferenceVersion: z.literal(1).optional(),
+  requiredSourceOrigins: z.array(z.string()).optional(),
   requireFinalResponse: z.boolean(),
   requireActionableArtifactCard: z.boolean(),
   requiresExternalEffects: z.boolean().optional(),
@@ -118,6 +129,7 @@ export const TaskCheckpointSchema = z.object({
 export type TaskCheckpoint = z.infer<typeof TaskCheckpointSchema>
 
 export const TaskAuthoritySchema = z.object({
+  browserScope: BrowserExecutionScope.optional(),
   source: z.enum(['user', 'inherited', 'legacy']),
   workspaceRoot: z.string().min(1),
   toolAllowlist: z.array(z.string()).optional(),
@@ -133,7 +145,7 @@ export type TaskAuthority = z.infer<typeof TaskAuthoritySchema>
 
 export const TaskInputSchema = z.object({
   id: z.string().min(1), taskId: z.string().min(1),
-  kind: z.enum(['supplement', 'user_answer', 'tool_result', 'handoff']),
+  kind: z.enum(['supplement', 'user_answer', 'approval_resolution', 'tool_result', 'handoff']),
   text: z.string().min(1), idempotencyKey: z.string().min(1),
   sourceId: z.string().optional(), createdAt: z.string(), deliveredAt: z.string().optional(), consumedAt: z.string().optional()
   ,attachmentIds: z.array(z.string().min(1)).max(32).optional()
@@ -153,6 +165,9 @@ export const AttentionItemSchema = z.object({
 })
 export type AttentionItem = z.infer<typeof AttentionItemSchema>
 
+export const OperationResolutionOutcomeSchema = z.enum(['succeeded', 'not_completed'])
+export type OperationResolutionOutcome = z.infer<typeof OperationResolutionOutcomeSchema>
+
 export const OperationReceiptSchema = z.object({
   dispatchApproval: z.object({ toolName: z.string(), requestHash: z.string(), approvedAt: z.string() }).optional(),
   id: z.string(), ownerId: z.string(), idempotencyKey: z.string(), fingerprint: z.string(), kind: z.string(),
@@ -161,7 +176,7 @@ export const OperationReceiptSchema = z.object({
   createdAt: z.string(), updatedAt: z.string(), error: z.string().optional()
   ,taskId: z.string().optional(), turnId: z.string().optional(), provider: z.string().optional(), toolName: z.string().optional(),
   remoteOperationId: z.string().optional(), target: z.string().optional(), evidence: ResultEvidenceSchema.optional(),
-  resolution: z.object({ status: z.literal('verified'), receiptId: z.string().min(1), evidence: ResultEvidenceSchema, resolvedAt: z.string() }).optional()
+  resolution: z.object({ status: z.literal('verified'), outcome: OperationResolutionOutcomeSchema.optional(), receiptId: z.string().min(1), evidence: ResultEvidenceSchema, resolvedAt: z.string() }).optional()
 })
 export type OperationReceipt = z.infer<typeof OperationReceiptSchema>
 
@@ -177,6 +192,8 @@ export type TaskAssignment = {
 }
 
 export const TaskRunSchema = z.object({
+  publicQueryRecovery: BrowserPublicQueryRecoveryBindingSchema.optional(),
+  scheduledBy: z.object({ scheduleId: z.string().min(1), dueAt: z.string().min(1) }).optional(),
   id: z.string().min(1),
   threadId: z.string().min(1),
   activeTurnId: z.string().optional(),

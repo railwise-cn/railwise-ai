@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import type { RuntimeEvent } from '../contracts/events.js'
 import type { TurnItem } from '../contracts/items.js'
 import { redactSecrets, redactSecretText } from '../config/secret-redaction.js'
+import { sanitizeBrowserApprovalSummary } from './browser-approval-summary.js'
 
 const MAX_ARGUMENT_SUMMARY_CHARS = 1_000
 const MAX_TOOL_NAME_CHARS = 120
@@ -182,6 +183,7 @@ export function sanitizeTurnItemForPersistence(item: TurnItem): TurnItem {
     }
   }
   if (item.kind === 'approval') {
+    if (item.taskInputId && item.sourceRequestId) return { ...item, summary: item.status === 'allowed' ? '已允许本次操作' : '本次操作未获授权' }
     return { ...item, summary: sanitizeApprovalSummary(item.toolName, item.summary) }
   }
   return item
@@ -331,6 +333,9 @@ export function summarizeBashCommandForPersistence(command: string): string {
 }
 
 function normalizeArgumentSummary(toolName: string, summary: string | undefined): string {
+  if (['browser_click', 'browser_fill', 'browser_press', 'browser_authorize_action'].includes(toolName) || toolName === 'schedule_task' && summary?.startsWith('确认周期浏览器权限\n')) {
+    return sanitizeBrowserApprovalSummary(summary ?? '') ?? '浏览器操作详情不可核验，请重新发起操作确认。'
+  }
   if (!summary?.trim()) {
     return buildToolArgumentSummary({ toolName, arguments: {} })
   }

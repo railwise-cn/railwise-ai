@@ -314,6 +314,8 @@ export type ScheduleSkillSettingsV1 = {
 }
 
 export type ScheduledTaskScheduleV1 = {
+  times?: string[]
+  timezone?: string
   kind: ScheduleKind
   everyMinutes: number
   timeOfDay: string

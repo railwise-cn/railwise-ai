@@ -14,7 +14,7 @@ import settings051 from '../../../../website/products/screenshots/workwise/09-su
 import { version } from '../../../../package.json'
 
 export const HELP_VERSION = version
-export const HELP_UPDATED_AT = '2026-11-11'
+export const HELP_UPDATED_AT = '2026-11-14'
 export const HELP_HOME = 'USER_GUIDE.zh-CN.md'
 export const helpDocuments: Record<string, string> = {
   [HELP_HOME]: guide,

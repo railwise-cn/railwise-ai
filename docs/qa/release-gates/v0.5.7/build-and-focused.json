@@ -1,0 +1,106 @@
+{
+  "status": "passed",
+  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
+  "scope": "Exact committed-byte-bound local production build, focused tests, types and lint only; no official CI, distributed package or new actual business acceptance is claimed",
+  "recordedAt": "2026-11-16T22:15:22.153768+00:00",
+  "runtimeFocused": {
+    "files": 2,
+    "passed": 169,
+    "failed": 0,
+    "serviceAndLoopTogether": true,
+    "maxWorkers": 2
+  },
+  "desktopFocused": {
+    "files": 2,
+    "passed": 15,
+    "rerunInCombinedValidation": false,
+    "basis": "Root earlier active-banner focused RED/GREEN on byte-identical two source/test files, then bound to this committed source"
+  },
+  "checks": [
+    {
+      "name": "runtimeTests",
+      "exitCode": 0,
+      "logFileName": "active-banner-local-combined-runtime-tests.log",
+      "logSha256": "91f7ad32933f4b0cd5b1e0197d81146b8a0bfd0de364915ded0421c95aa8f5f9"
+    },
+    {
+      "name": "kunTypes",
+      "exitCode": 0,
+      "logFileName": "active-banner-local-combined-kun-types.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "eslint",
+      "exitCode": 0,
+      "logFileName": "active-banner-local-combined-eslint.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "productionBuild",
+      "exitCode": 0,
+      "logFileName": "active-banner-local-combined-production-build-final.log",
+      "logSha256": "00a8e58a1ebcf2c14e350a5b0991416df306fd59d4f667d59448f2b90105d420"
+    },
+    {
+      "name": "freshness",
+      "exitCode": 0,
+      "logFileName": "active-banner-local-combined-freshness.log",
+      "logSha256": "8deb5d70674856640360101a0a65426c5637ffeb96810a3abb80f52b3d474501"
+    }
+  ],
+  "nodeWebTypeReuse": [
+    {
+      "name": "node-types",
+      "exitCode": 0,
+      "executedAgain": false,
+      "basis": "Only later changes were KUN-only; both previously checked active-banner source files remain exact, and combined KUN types passed",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "web-types",
+      "exitCode": 0,
+      "executedAgain": false,
+      "basis": "Only later changes were KUN-only; both previously checked active-banner source files remain exact, and combined KUN types passed",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "productionBuild": {
+    "actualNpmInvocations": 1,
+    "exitCode": 0,
+    "freshnessExitCode": 0,
+    "freshnessProductionInputs": 1381,
+    "launcherAttempts": 2,
+    "firstLauncherFailureBeforeNpmStartup": true,
+    "firstLauncherFailureStartedCompilation": false
+  },
+  "sourceBinding": {
+    "preCommitDirtyValidationPreservedAsRecorded": true,
+    "committedBytesBound": true,
+    "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+    "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
+    "sixSyncedCodeFilesExact": true,
+    "authoredProductionFilesChecked": 2443,
+    "mismatches": [],
+    "physicalGitHead": "6219fbca413b7d7e777737a8a91fcb342acf10c5",
+    "physicalGitHeadIsReviewedSource": false,
+    "basis": "Separate physical dependency/build tree has an older Git HEAD, but authored production bytes match the canonical final commit; official distribution must be built from the new source by the new Release run."
+  },
+  "originalEvidence": [
+    {
+      "fileName": "active-banner-local-final-combined-validation.json",
+      "bytes": 10383,
+      "sha256": "6b90f69727dab7906be38937d16b3b8d395540f2a855a7860b0031cc0db266e0"
+    },
+    {
+      "fileName": "7d19a3fb-local-validation-committed-source-binding.json",
+      "bytes": 1049,
+      "sha256": "73e13cbddfd84ad2f3451ba6435f3a834061d14b4119e8930769722a125ea29e"
+    }
+  ],
+  "uiFocusedOriginalProof": {
+    "fileName": "summary.json",
+    "sha256": "644ce9eeec59e93e88054c25c9c8aa6fffce6ac979a6eda1b99d29c1706fff30"
+  },
+  "sourceExceptionOrProvenanceOverride": false
+}

@@ -3,7 +3,7 @@ import type { ThreadRecord } from '../contracts/threads.js'
 export type { ExternalTaskProvider } from '../contracts/harness.js'
 export type ExternalTaskCapability = CapabilityPreflight
 /** The context comes from the persisted thread store, never a request's arbitrary Grant. */
-export type ExternalTaskPreflight = (text: string, thread?: ThreadRecord) => ExternalTaskCapability | null | Promise<ExternalTaskCapability | null>
+export type ExternalTaskPreflight = (text: string, thread?: ThreadRecord, sourceTask?: import('../contracts/tasks.js').TaskRun) => ExternalTaskCapability | null | Promise<ExternalTaskCapability | null>
 
 const KNOWLEDGE = /^(?:(?:请|帮我)\s*)?(?:如何|怎么|怎样|介绍|解释|什么是|对比|比较|how\s+(?:to|do|does)|what\s+is|explain|compare\b)/i
 const WORK = /待办|审批|任务|工单|处理|办理|代办|办结|同意|批准|拒绝|驳回|完成|查询|列出|查看|详情|发送|消息|邮件|邮箱|上传|云盘|转交|转办|approvals?|todo|task|complete|approve|reject|send|upload|transfer|detail|list|show/i

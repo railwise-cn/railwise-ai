@@ -1,3 +1,9 @@
+import { validEgoNavigationProgress } from '../services/ego-browser-evidence.js'
+import { operationFingerprint } from '../services/task-run-repository.js'
+import { OneOffPublicQueryRecoveryService } from '../services/one-off-public-query-recovery.js'
+import { BrowserPublicQueryRecoveryService } from '../services/browser-public-query-recovery.js'
+import { recoveryExecutionScope,verifiedPublicQueryRecovery } from '../services/browser-public-query-recovery-proof.js'
+import { HostShellVerificationService } from '../services/host-shell-verification.js'
 import { RuntimeUpdateLifecycle, type UpdateActiveWork } from '../services/runtime-update-lifecycle.js'
 import { FileWorkspaceTrustReader } from '../services/workspace-trust-reader.js'
 import { ExternalOperationVerificationService } from '../services/external-operation-verification.js'
@@ -47,6 +53,7 @@ import { buildImageGenToolProviders } from '../adapters/tool/image-gen-tool-prov
 import { buildPptMasterToolProviders } from '../adapters/tool/ppt-master-tool-provider.js'
 import { buildDesignToolProviders } from '../adapters/tool/design-tool-provider.js'
 import { buildDocumentDeliveryToolProviders } from '../adapters/tool/document-delivery-tool-provider.js'
+import { buildManagedArtifactToolProviders } from '../adapters/tool/managed-artifact-tool-provider.js'
 import { buildExternalEffectScopeToolProviders } from '../adapters/tool/external-effect-scope-tool-provider.js'
 import { buildScopedHostShellToolProviders } from '../adapters/tool/scoped-host-shell-tool-provider.js'
 import { LocalWorkspaceInspector } from '../adapters/workspace/local-workspace-inspector.js'
@@ -60,6 +67,8 @@ import { RUNTIME_RESOURCE_LIMITS_V1 } from '../contracts/resource-limits.js'
 import { buildCoreFlowAdapters } from '../flow/core-adapters.js'
 import { buildFlowNodeRegistry } from '../flow/node-registry.js'
 import { FlowRepository } from '../flow/repository.js'
+import { TaskScheduleService } from '../services/task-schedule-service.js'
+import { buildTaskScheduleToolProvider } from '../adapters/tool/task-schedule-tool-provider.js'
 import { FlowRuntimeService } from '../flow/service.js'
 import { assertFlowTaskRetryAllowed, buildTaskDeliveryAdapters, TaskDeliveryCoordinator } from '../delivery/runtime.js'
 import { EncryptedFileFlowSecretStore, FlowWebhookSecurity, UnavailableFlowSecretStore } from '../flow/webhook-security.js'
@@ -78,6 +87,7 @@ import {
 import {
   DEFAULT_STORAGE_CONFIG,
   expandHomePath,
+  readOptionalKunConfigFile,
   type RuntimeTuningConfig,
   type StorageConfig
 } from '../config/kun-config.js'
@@ -93,6 +103,7 @@ import { TurnService } from '../services/turn-service.js'
 import { UiActionService } from '../services/ui-action-service.js'
 import { TaskController } from '../services/task-controller.js'
 import { TaskRunRepository } from '../services/task-run-repository.js'
+import { BrowserOperationVerificationService } from '../services/browser-operation-verification.js'
 import { RuntimeSpanService } from '../services/runtime-span-service.js'
 import { GitCheckpointCoordinator } from '../services/git-checkpoint-coordinator.js'
 import { ReviewService } from '../services/review-service.js'
@@ -120,8 +131,12 @@ import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provide
 import { ManagedDingTalkRuntime } from '../services/managed-dingtalk-runtime.js'
 import { ManagedLarkRuntime } from '../services/managed-lark-runtime.js'
 import { ManagedDwsRuntime } from '../services/managed-dws-runtime.js'
+import { EgoBrowserRuntime } from '../services/ego-browser-runtime.js'
+import { ManagedBrowserSkillRuntime } from '../services/managed-browser-skill-runtime.js'
+import { isBrowserTask } from '../contracts/browser-skill.js'
 import { externalTaskIntent } from '../services/external-task-capability.js'
 import { contextualExternalTaskPreflight } from '../services/contextual-external-task-preflight.js'
+import { workspaceWritePreflight,workspacePermissionCapability } from '../services/workspace-write-preflight.js'
 import { SurveyService } from '../engineering/survey-service.js'
 import { SurveyAdvancedTrialsWorkspaceService } from '../engineering/survey-advanced-trials-workspace.js'
 import { SurveySamplingWorkspaceService } from '../engineering/survey-sampling-workspace.js'
@@ -209,14 +224,18 @@ export async function createKunServeRuntime(
   const events = new RuntimeEventRecorder({ eventBus, sessionStore, allocateSeq, nowIso })
   const spanService = new RuntimeSpanService(taskRepository, nowIso)
   spanService.prune()
+  const hostShellVerification = new HostShellVerificationService(taskRepository, join(options.dataDir, 'shell-output'), nowIso)
+  let taskScheduleService: TaskScheduleService | undefined
   const taskController = new TaskController({
+    dataDir: options.dataDir,
     repository: taskRepository,
     threadStore,
     sessionStore,
     nowIso,
     spans: spanService,
     resolveToolEffect: name => activeToolRegistry?.describeEffect(name),
-    completionGuard: input => engineeringAi.assessCompletion(input)
+    reconcileHostShell: taskId => hostShellVerification.reconcile(taskId),
+    completionGuard: input => taskScheduleService?.assessCompletion(input.task) ?? engineeringAi.assessCompletion(input)
   })
   taskRepository.reconcileShellSessionsStartup(nowIso())
   const recoveredTasks = backgroundTaskScheduling?taskController.reconcileStartup().filter(task => task.status === 'retrying'):[]
@@ -519,6 +538,14 @@ export async function createKunServeRuntime(
   }
   dingtalkRuntime.setApply(provider => applyDingTalkProvider({ provider }))
   const useDws=()=>Boolean(dwsRuntime.toolProvider())
+  const egoRuntime = new EgoBrowserRuntime({config:options.capabilities?.egoBrowser,repository:taskRepository,
+    canFinishReadiness:(context,hostOperationId)=>taskController.egoFinishReadiness(context.executionGrant!.taskId!,context.turnId,hostOperationId),
+    canReopenClosedSpace:(context,hostOperationId,bindingReceiptId)=>taskController.egoTaskSpaceReopenAuthorization(context.executionGrant!.taskId!,context.turnId,hostOperationId,bindingReceiptId)})
+  const browserRuntime = new ManagedBrowserSkillRuntime({ config: options.capabilities?.browserSkill,
+    configPath: options.configPath ?? join(options.dataDir, 'config.json'), dataDir: options.dataDir, repository: taskRepository,
+    resolveSchedule: (context, sourceActionId) => taskScheduleService?.resolveBrowserActions(context, sourceActionId) ?? Promise.resolve(undefined),
+    hasActiveAttempt: turnId => Boolean(taskController.tokenForTurn(turnId)),
+    apply: provider => { activeToolRegistry?.replaceProvider('browser-skill', provider); activeChildToolRegistry?.replaceProvider('browser-skill', provider) } })
   const larkRuntime = new ManagedLarkRuntime(options.capabilities?.lark, options.configPath ?? join(options.dataDir, 'config.json'), provider => {
     activeToolRegistry?.replaceProvider('lark-cli', provider)
     activeChildToolRegistry?.replaceProvider('lark-cli', provider)
@@ -581,14 +608,19 @@ export async function createKunServeRuntime(
     ...webProviders.providers,
     ...buildMemoryToolProviders(memoryStore),
     ...buildAttachmentToolProviders(attachmentStore),
-    ...buildDocumentDeliveryToolProviders(taskRepository, { contextRuntime: taskContextRuntime, engineeringService }),
+    ...buildDocumentDeliveryToolProviders(taskRepository, { contextRuntime: taskContextRuntime, engineeringService,
+      observedFeedCollectionContext: (taskId, turnId) => taskController.observedFeedCollectionContext(taskId, turnId) }),
+    ...buildManagedArtifactToolProviders(taskController),
     ...buildExternalEffectScopeToolProviders(taskController),
     ...buildFlowToolProviders(flowService),
+    buildTaskScheduleToolProvider(() => { if (!taskScheduleService) throw new Error('Schedule Runtime is starting'); return taskScheduleService }),
     ...imageGenProviders.providers,
     ...pptMasterProviders.providers,
     ...designProviders.providers,
     ...(larkProvider ? [larkProvider] : []),
     ...(dingtalkProvider ? [dingtalkProvider] : []),
+    browserRuntime.provider(),
+    egoRuntime.provider(),
     ...buildRailwiseToolProviders(engineeringService, surveyService, () => engineeringAi)
   ]
   const childRegistry = new CapabilityRegistry(baseToolProviders)
@@ -631,7 +663,7 @@ export async function createKunServeRuntime(
           ...(memoryStore ? { memoryStore } : {}),
           workspaceTrust,
           executionScope: executionScopeForTurn,
-          validateTaskPermission: (threadId, permissionId) => taskPermissionService.executionRestriction(threadId, permissionId),
+          validateTaskPermission: (threadId, permissionId) => taskExecutionRestriction(threadId, permissionId),
           claimTaskPermission: (threadId, permissionId, operationId) => taskPermissionService.claimOperation(threadId, permissionId, operationId),
           nowIso
         }),
@@ -721,6 +753,18 @@ export async function createKunServeRuntime(
   const mcpRuntime = new ManagedMcpRuntime(mcpProviders, options.capabilities?.mcp, [registry, childRegistry])
   let engineeringAi: EngineeringAiOrchestrator
   const toolHost = new LocalToolHost({ registry, readTracker: true })
+  const browserVerification = new BrowserOperationVerificationService({ repository: taskRepository, controller: taskController,
+    toolHost, threadStore, workspaceTrust, flows: flowService, nowIso, browserState: () => browserRuntime.state(), browserIdentity: () => browserRuntime.identityFingerprint(),
+    validatePermission: (threadId, permissionId) => taskPermissionService.executionRestriction(threadId, permissionId) })
+  const oneOffRecovery=new OneOffPublicQueryRecoveryService({repository:taskRepository,verification:browserVerification,nowIso,review:async(task,ceiling)=>{
+    const thread=await threadService.get(task.threadId),workspace=await workspaceTrust.get(task.workspaceRoot)
+    if(!thread||thread.status==='deleted'||workspace.canonicalRoot!==task.workspaceRoot||thread.workspace!==task.workspaceRoot)throw Object.assign(new Error('workspace_trust_changed'),{code:'workspace_trust_changed'})
+    const allowed=(name:string)=>[thread.agentProfile?.toolAllowlist,task.authority?.toolAllowlist].every(list=>!list?.length||list.includes('*')||list.includes(name))
+    const permissionScope=task.authority?.taskApprovalGrant?.scope
+    const catalog=toolHost.registeredTools().filter(t=>allowed(t.name)&&(!permissionScope?.providerIds||permissionScope.providerIds.includes(t.providerId)))
+    return browserRuntime.oneOffScopeReview(task,ceiling,operationFingerprint({workspace,agentRevision:thread.agentRevision,agent:thread.agentProfile,approvalPolicy:thread.approvalPolicy,sandboxMode:thread.sandboxMode,permissionScope}),catalog.map(t=>t.name),[...new Set(catalog.map(t=>t.providerId).filter((v):v is string=>Boolean(v)))],permissionScope?.networkOrigins)
+  }})
+  const publicQueryRecovery = new BrowserPublicQueryRecoveryService({oneOff:oneOffRecovery,repository:taskRepository,verification:browserVerification,nowIso,browserIdentity:()=>browserRuntime.identityFingerprint(),validatePlan:binding=>taskScheduleService!.validatePublicQueryRecoveryPlan(binding)})
   const operationVerification = new ExternalOperationVerificationService({ repository: taskRepository, controller: taskController,
     toolHost, threadStore, workspaceTrust, nowIso, refreshProvider: async (provider,originalGrant) => {
       if(provider==='lark')return larkRuntime.refresh()
@@ -735,8 +779,22 @@ export async function createKunServeRuntime(
     scoring: surveyQualityScoringWorkspaceService, retention: surveyQualityWorkspaceService,
     sampling: surveySamplingWorkspaceService, assessment: surveyQualityAssessmentService
   })))
+  async function taskExecutionRestriction(threadId: string, permissionId?: string, sourceTaskId?: string) {
+    const restriction = await taskPermissionService.executionRestriction(threadId, permissionId, sourceTaskId)
+    let scheduledScope: ExecutionScope | undefined
+    try {
+      scheduledScope = await taskScheduleService?.executionScopeForThread(threadId)
+    } catch (error) {
+      const task = taskRepository.findActiveByThread(threadId)
+      if (task?.scheduledBy && task.authority?.browserScope && (error as { code?: string }).code === 'schedule_authority_changed') {
+        throw Object.assign(new Error('browser_schedule_authority_changed'), { code: 'browser_schedule_authority_changed' })
+      }
+      throw error
+    }
+    return { ...restriction, ...scheduledScope }
+  }
   async function executionScopeForTurn(threadId: string, turnId: string): Promise<ExecutionScope> {
-    const restriction = await taskPermissionService.executionRestriction(threadId)
+    const restriction = await taskExecutionRestriction(threadId)
     const turn = (await threadStore.get(threadId))?.turns.find(item => item.id === turnId)
     const intent = turn?.externalTaskProvider
       ? { kind: 'external_task' as const, provider: turn.externalTaskProvider }
@@ -749,20 +807,41 @@ export async function createKunServeRuntime(
     const effects = accepted?.requiredEffects ?? (accepted?.target
       ? [{ provider: accepted.provider, operation: accepted.operation, target: accepted.target }] : [])
     const externalTargets = effects.map(effect => externalTargetGrantKey(effect.provider, effect.operation, effect.target))
+    const egoTask=Boolean(turn&&egoRuntime.selected(turn.prompt,task?.authority?.browserScope))
+    const browserTask = Boolean(turn && (egoTask || isBrowserTask(turn.prompt) || task?.authority?.browserScope))
     const externalProviderIds = new Set(['lark-cli', 'dingtalk'])
     const allowedProviderIds = toolHost.diagnostics()
       .filter(provider => provider.enabled && provider.available)
       .map(provider => provider.id)
       .filter(providerId => !externalProviderIds.has(providerId) || providerId === selectedProviderId)
+      .filter(providerId => providerId !== 'browser-skill' || browserTask&&!egoTask)
+      .filter(providerId => providerId !== 'ego-browser' || egoTask)
+      .filter(providerId => !egoTask || ['builtin','ego-browser','managed-artifacts','document-delivery','task-schedule','todo'].includes(providerId))
     let providerScope: ExecutionScope = { networkAllowlist: ['*'], connectorScopes: [], externalTargets: [] }
     if (selectedProviderId === 'lark-cli') providerScope = larkRuntime.scope(externalTargets)
     else if (selectedProviderId === 'dingtalk') providerScope = useDws() ? dwsRuntime.scope(externalTargets) : dingtalkRuntime.scope(externalTargets)
-    return { ...providerScope, connectorIdentityFingerprints: { ...mcpRuntime.state().authorityFingerprints, ...providerScope.connectorIdentityFingerprints }, allowedProviderIds, ...restriction }
+    else if (browserTask && turn) {
+      providerScope = egoTask ? egoRuntime.scope(turn.prompt,task?.authority?.browserScope,restriction.permissionScope?.networkOrigins) : browserRuntime.scope(turn.prompt, task?.authority?.browserScope, restriction.permissionScope?.networkOrigins)
+      if (task && providerScope.browserScope && !task.authority?.browserScope) {
+        taskRepository.update(task.id, task.revision, current => ({ ...current, authority: { ...current.authority!, browserScope: providerScope.browserScope } }))
+      }
+    }
+    const scheduledScope = task ? await taskScheduleService?.executionScope(task) : undefined
+    const effective = { ...providerScope, connectorIdentityFingerprints: { ...mcpRuntime.state().authorityFingerprints, ...providerScope.connectorIdentityFingerprints }, allowedProviderIds, ...restriction, ...scheduledScope }
+    if(task?.publicQueryRecovery?.mode==='task_reauthorization')await oneOffRecovery.validateCurrent(task)
+    return task ? recoveryExecutionScope(taskRepository,task,effective,Date.parse(nowIso())) : effective
+  }
+  async function validateRecoveryExecution(task:import('../contracts/tasks.js').TaskRun):Promise<void> {
+    // One-off reauthorization has its separate fresh-child token admission path.
+    if(!task.publicQueryRecovery||task.publicQueryRecovery.mode==='task_reauthorization')return
+    const browserScope=browserRuntime.scope(task.goal,task.authority?.browserScope)
+    const scheduledScope=await taskScheduleService?.executionScope(task)
+    recoveryExecutionScope(taskRepository,task,{...browserScope,...scheduledScope},Date.parse(nowIso()))
   }
   loop = new AgentLoop({
     workspaceTrust,
     executionScope: executionScopeForTurn,
-    validateTaskPermission: (threadId, permissionId) => taskPermissionService.executionRestriction(threadId, permissionId),
+    validateTaskPermission: (threadId, permissionId) => taskExecutionRestriction(threadId, permissionId),
     claimTaskPermission: (threadId, permissionId, operationId) => taskPermissionService.claimOperation(threadId, permissionId, operationId),
     onExecutionGrant: grant => {
       if (!grant.taskId) return
@@ -798,7 +877,10 @@ export async function createKunServeRuntime(
     skillRuntime,
     tokenEconomy,
     contextCompaction: options.contextCompaction,
-    ...(options.runtime?.toolStorm ? { toolStorm: options.runtime.toolStorm } : {}),
+    toolStorm: {...options.runtime?.toolStorm,validateEgoNavigationProgress:(call,result,grant)=>{
+      const task=grant.taskId?taskRepository.get(grant.taskId):null,output=result.item.kind==='tool_result'?result.item.output:undefined
+      return Boolean(task&&output&&typeof output==='object'&&!Array.isArray(output)&&validEgoNavigationProgress(taskRepository,task,output as Record<string,unknown>,grant,call))
+    }},
     ...(options.runtime?.toolArgumentRepair ? { toolArgumentRepair: options.runtime.toolArgumentRepair } : {}),
     ...(attachmentStore ? { attachmentStore } : {}),
     ...(visionEvidence ? { visionEvidence } : {}),
@@ -828,8 +910,13 @@ export async function createKunServeRuntime(
     events,
     nowIso
   })
-  const externalPreflight = contextualExternalTaskPreflight({
-    providerPreflight: async (text: string) => {
+  const connectorPreflight = contextualExternalTaskPreflight({
+    providerPreflight: async (text: string, thread, sourceTask) => {
+      const scheduled = thread ? await taskScheduleService?.executionScopeForThread(thread.id) : undefined
+      const activeBrowserScope=thread?taskRepository.findActiveByThread(thread.id)?.authority?.browserScope:undefined
+      const selectedScope=activeBrowserScope??scheduled?.browserScope??sourceTask?.authority?.browserScope
+      const browser = egoRuntime.selected(text,selectedScope) ? await egoRuntime.preflight(text,thread,selectedScope) : await browserRuntime.preflight(text, thread, scheduled?.browserScope, sourceTask)
+      if (browser) return browser
       if (externalTaskIntent(text)?.provider === 'dingtalk') {
         return useDws() || !dingtalkRuntime.state().enabled ? dwsRuntime.preflight(text) : dingtalkRuntime.preflight(text)
       }
@@ -837,9 +924,11 @@ export async function createKunServeRuntime(
     },
     workspaceTrust,
     toolHost,
-    validateTaskPermission: threadId => taskPermissionService.executionRestriction(threadId)
+    validateTaskPermission: (threadId, sourceTaskId) => taskExecutionRestriction(threadId, undefined, sourceTaskId)
   })
-  const taskControlService=new TaskControlService({repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>delegationRuntime?.abortParent(threadId,reason),preflightExternalTask:externalPreflight,validateTaskPermission:threadId=>taskPermissionService.executionRestriction(threadId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
+  const localWritePreflight = workspaceWritePreflight({ workspaceTrust, restriction: (threadId, sourceTaskId) => taskExecutionRestriction(threadId, undefined, sourceTaskId) })
+  const externalPreflight: typeof connectorPreflight = async (text, thread, sourceTask) => await localWritePreflight(text, thread, sourceTask) ?? await connectorPreflight(text, thread, sourceTask)
+  const taskControlService=new TaskControlService({publicQueryRecovery,validateRecoveryExecution,preflightRecoveryTask:(text,thread,binding)=>externalTaskIntent(text)?.kind==='external_task'?Promise.resolve(workspacePermissionCapability('public_query_recovery_read_only','重新检索仅允许公开查询与本机成果，不能执行外部业务写入。')):browserRuntime.preflight(text,thread,publicQueryRecovery.reviewedBrowserScope(binding),undefined,binding.mode==='task_reauthorization'?publicQueryRecovery.reviewedBrowserScope(binding):undefined),validateRecoveryPermission:threadId=>taskPermissionService.executionRestriction(threadId),repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>{void browserRuntime.stopThread(threadId);return delegationRuntime?.abortParent(threadId,reason)},preflightExternalTask:externalPreflight,validateTaskPermission:(threadId,sourceTaskId)=>taskExecutionRestriction(threadId,undefined,sourceTaskId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),validateRetryLocalSchedule:(task,receipt,recovery)=>taskScheduleService?.validateRetryLocalSchedule(task,receipt,recovery) ?? Promise.resolve(false),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
   const taskCoordinator = new TaskCoordinator({ preflightExternalTask:externalPreflight, controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore,
     async classifyIntent(text, task) {
       const abort = new AbortController()
@@ -862,6 +951,16 @@ export async function createKunServeRuntime(
   const stopContextObserver = taskRepository.onChange(() => { taskContextRuntime.reconcileSourceConsumption(); taskContextRuntime.flushHandoffs();void taskCoordinator.flushCommandMessages().catch(error=>process.stderr.write(`[task-command-history] ${error instanceof Error?error.message:String(error)}\n`)) })
   await taskCoordinator.flushCommandMessages()
   const startedAt = options.startedAt ?? nowIso()
+  taskScheduleService = new TaskScheduleService({ flows: flowService, repository: taskRepository, tasks: taskController,
+    browserState: () => browserRuntime.state(),
+    egoBrowserState: () => egoRuntime.state(),
+    coordinator: taskCoordinator, threads: threadStore, workspaceTrust, nowIso,
+    connectorIdentities: () => ({ ...mcpRuntime.state().authorityFingerprints,
+      'browser-skill': browserRuntime.identityFingerprint(),
+      ...(options.capabilities?.egoBrowser ? {'ego-browser':egoRuntime.fingerprint()} : {}),
+      ...larkRuntime.scope([]).connectorIdentityFingerprints,
+      ...(useDws() ? dwsRuntime.scope([]) : dingtalkRuntime.scope([])).connectorIdentityFingerprints }) })
+  flowService.setTaskScheduleDispatcher(input => taskScheduleService!.dispatch(input))
   const runtime: ServerRuntime = {
     threadService,
     turnService,
@@ -910,6 +1009,7 @@ export async function createKunServeRuntime(
       return loop.runTurn(threadId, turnId)
     },
     cancelChildRuns(parentThreadId, reason) {
+      void browserRuntime.stopThread(parentThreadId)
       return delegationRuntime?.abortParent(parentThreadId, reason) ?? 0
     },
     runReview(input) {
@@ -922,7 +1022,17 @@ export async function createKunServeRuntime(
     refreshDingTalk() { return dingtalkRuntime.refresh() },
     refreshLark() { return larkRuntime.refresh() },
     refreshDws() { return dwsRuntime.refresh() },
-    verifyTaskOperationReceipt(taskId, receiptId, input) { return operationVerification.verify(taskId, receiptId, input) },
+    refreshBrowserSkill() { return browserRuntime.refresh() },
+    browserTaskBinding(taskId) { return browserRuntime.bindingSnapshot(taskId) },
+    confirmBrowserTaskBinding(taskId, input) { return browserRuntime.confirmBinding(taskId, input) },
+    async refreshSkills() {
+      const saved = readOptionalKunConfigFile(options.configPath ?? join(options.dataDir, 'config.json'))?.config.capabilities.skills
+      if (!saved) throw new Error('Skill configuration is unavailable')
+      return skillRuntime.updateConfiguration(saved)
+    },
+    verifyTaskOperationReceipt(taskId, receiptId, input) { return browserVerification.handles(taskId, receiptId) ? browserVerification.verify(taskId, receiptId, input) : hostShellVerification.handles(taskId, receiptId) ? hostShellVerification.verify(taskId, receiptId, input) : operationVerification.verify(taskId, receiptId, input) },
+    getTaskPublicQueryRecovery(taskId) { return publicQueryRecovery.snapshot(taskId) },
+    confirmBrowserOperationReceipt(taskId, receiptId, input) { return browserVerification.confirm(taskId, receiptId, input) },
     runtimeToken: options.runtimeToken,
     insecure: options.insecure,
     allocateSeq,
@@ -995,19 +1105,32 @@ export async function createKunServeRuntime(
       return skillRuntime.diagnostics()
     },
     shutdown: async () => {
+      // SIGTERM also reaches this path directly, without update preparation.
+      // Fence producers before awaiting anything that can admit a late Turn.
+      turnService.setAdmissionSuspended(true)
+      taskController.setAdmissionSuspended(true)
+      flowService.setUpdateSuspended(true)
       deliveryCoordinator.shutdown()
+      taskController.stopWatchdog()
+      flowService.executor.checkpointActiveRuns()
+      await turnService.awaitPendingStarts()
       dingtalkRuntime.close()
       stopContextObserver()
-      taskContextRepository.close()
-      taskController.stopWatchdog()
       if (attachmentCleanupTimer) clearInterval(attachmentCleanupTimer)
       turnService.abortAll('application_exit')
       delegationRuntime?.abortAll('application_exit')
       approvalGate.expireAll('application_exit')
       userInputGate.reset()
+      await browserRuntime.close()
       await stopAllBashSessions('application_exit')
+      await flowService.awaitSourceDispatch()
+      await deliveryCoordinator.awaitIdle()
+      await flowService.executor.awaitIdle()
       await loop.awaitIdle()
       await delegationRuntime?.awaitIdle()
+      await flowService.awaitSourceDispatch()
+      await taskCoordinator.flushCommandMessages()
+      taskContextRepository.close()
       try {
         await mcpRuntime.close()
       } finally {

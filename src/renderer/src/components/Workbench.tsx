@@ -1,4 +1,5 @@
 import { requestTaskDetail } from '../store/task-live-store'
+import { useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -74,6 +75,7 @@ import { parseGuiPlanCommand } from '../plan/plan-command'
 import { DevPreviewLaunchCard } from './DevPreviewLaunchCard'
 import { RuntimeBanner } from './RuntimeBanner'
 import { useWorkbenchLayout } from './workbench-layout'
+import { useWorkbenchDrawerFocus } from './use-workbench-drawer-focus'
 import { useWorkbenchPlanController } from './workbench-plan-controller'
 import { prepareImageAttachmentUpload } from '../lib/image-attachment-upload'
 import { isChatAttachmentUploadEnabled } from '../lib/attachment-upload-availability'
@@ -555,8 +557,14 @@ export function Workbench(): ReactElement {
     () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
     [activeSkillWorkspace, timelineBlocks]
   )
-  const latestDevPreviewUrl = detectedDevPreviewUrls[0] ?? null
-  const latestAutoOpenDevPreviewUrl = autoOpenDevPreviewUrls[0] ?? null
+  const conversationArtifactPreview = useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready' && route !== 'tasks')
+  // Follow only the selected task's current execution, independently of chat.
+  const workspaceArtifactPreview = useTaskArtifactPreview(null, runtimeConnection === 'ready' && route === 'tasks', { followSelectedTask: true })
+  const taskArtifactPreview = route === 'tasks' ? workspaceArtifactPreview : conversationArtifactPreview
+  const artifactPreviewRouteRef = useRef(route)
+  artifactPreviewRouteRef.current = route
+  const latestDevPreviewUrl = taskArtifactPreview.url ?? (route === 'tasks' ? null : detectedDevPreviewUrls[0]) ?? null
+  const latestAutoOpenDevPreviewUrl = taskArtifactPreview.url ?? (route === 'tasks' ? null : autoOpenDevPreviewUrls[0]) ?? null
   const currentSideConversations = useMemo(
     () =>
       Object.values(sideConversations)
@@ -625,6 +633,13 @@ export function Workbench(): ReactElement {
   const {
     beginLeftResize,
     beginRightResize,
+    closeDevPreview,
+    closeCompactNavigation,
+    activeOverlay,
+    leftSidebarOverlay,
+    rightSidebarOverlay,
+    resizeLeftBy,
+    resizeRightBy,
     filePreviewTarget,
     leftSidebarCollapsed,
     leftSidebarWidth,
@@ -639,7 +654,8 @@ export function Workbench(): ReactElement {
     toggleLeftSidebar,
     toggleRightPanelMode,
   } = useWorkbenchLayout({
-    activeThreadId,
+    activeThreadId: route === 'tasks' ? workspaceArtifactPreview.scopeKey ?? 'task-workspace-preview' : activeThreadId,
+    latestAutoOpenDevPreviewKey: taskArtifactPreview.key,
     latestAutoOpenDevPreviewUrl,
     latestDevPreviewUrl,
     route,
@@ -1968,6 +1984,10 @@ export function Workbench(): ReactElement {
       : 'chat'
 
   const closeRightPanel = (): void => {
+    if (rightPanelMode === 'browser') {
+      closeDevPreview()
+      return
+    }
     if (route === 'write' && rightPanelMode === 'sdd-ai') {
       setRightPanelMode(null)
       return
@@ -1978,6 +1998,15 @@ export function Workbench(): ReactElement {
     }
     setRightPanelMode(null)
     setFilePreviewTarget(null)
+  }
+
+  const openWorkspaceArtifact = async (request: { taskId: string; artifactId: string }): Promise<void> => {
+    try {
+      await workspaceArtifactPreview.open(request)
+      if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
+    } catch {
+      // The preview hook retains the error for the task workspace retry card.
+    }
   }
 
   const startNewWriteAssistantConversation = (): void => {
@@ -2129,7 +2158,7 @@ export function Workbench(): ReactElement {
     },
     browser: (module) => {
       const Panel = (module as typeof import('./DevBrowserPanel')).DevBrowserPanel
-      return <Panel blocks={devPreviewBlocks} preferredUrl={latestDevPreviewUrl} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
+      return <Panel blocks={route === 'tasks' ? [] : devPreviewBlocks} preferredUrl={latestDevPreviewUrl} sourceEvidenceStatus={taskArtifactPreview.sourceEvidenceStatus} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
     },
     plan: (module) => {
       const Panel = (module as typeof import('./plan/PlanPanel')).PlanPanel
@@ -2140,6 +2169,9 @@ export function Workbench(): ReactElement {
       return <Panel target={filePreviewTarget} workspaceRoot={workspaceRoot} className="h-full max-h-full w-full" onClose={closeRightPanel} />
     }
   }
+
+  useWorkbenchDrawerFocus(activeOverlay === 'navigation', 'workbench-navigation', closeCompactNavigation)
+  useWorkbenchDrawerFocus(activeOverlay === 'inspector', 'workbench-inspector', closeRightPanel)
 
   const renderRightPanel = (): ReactElement | null => {
     if (!rightPanelVisible || !resolvedRightPanelId) return null
@@ -2155,10 +2187,20 @@ export function Workbench(): ReactElement {
         <div
           role="separator"
           aria-orientation="vertical"
+          aria-label={t('inspectorResize')}
+          aria-valuenow={Math.round(rightSidebarWidth)}
+          tabIndex={0}
+          onKeyDown={event => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); resizeRightBy(event.key === 'ArrowLeft' ? 16 : -16) } }}
           className="ds-workbench-right-divider ds-workbench-divider ds-no-drag relative z-20 shrink-0 cursor-col-resize"
           onPointerDown={beginRightResize}
-        />
-        <div className="ds-workbench-right-panel h-full min-h-0 shrink-0" style={{ width: rightSidebarWidth }}>
+        ><span aria-hidden className="ds-workbench-divider-hit" /></div>
+        <div id="workbench-inspector"
+          role={rightSidebarOverlay ? 'dialog' : 'complementary'}
+          aria-modal={rightSidebarOverlay && activeOverlay === 'inspector' ? true : undefined}
+          aria-label={t('workbenchInspector')}
+          tabIndex={-1}
+          inert={activeOverlay === 'navigation' ? true : undefined}
+          className="ds-workbench-right-panel h-full min-h-0 min-w-0 shrink-0" style={{ width: rightSidebarWidth }}>
           <WorkbenchPanelLoader
             registry={builtinRightPanels}
             panelId={resolvedRightPanelId}
@@ -2175,14 +2217,28 @@ export function Workbench(): ReactElement {
   const workbenchViewRenderers: Record<string, (module: unknown) => ReactElement | null> = {
     tasks: (module) => {
       const View = (module as typeof import('./tasks/TaskWorkspaceView')).TaskWorkspaceView
-      return <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path) => {
-        if (/\.(?:md|mdx|markdown)$/i.test(path)) {
+      return <div className="flex min-h-0 min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {workspaceArtifactPreview.error ? <div role="alert" className="ds-no-drag m-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <p>{workspaceArtifactPreview.error}</p>
+          <button type="button" className="mt-2 text-accent" onClick={() => {
+            void workspaceArtifactPreview.retry().then(() => {
+              if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
+            }).catch(() => undefined)
+          }}>重新打开网页成果</button>
+        </div> : null}
+        <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {
+        if (/\.html?$/i.test(path) && artifactId) {
+          await openWorkspaceArtifact({ taskId: task.id, artifactId })
+        } else if (/\.(?:md|mdx|markdown)$/i.test(path)) {
           await useWriteWorkspaceStore.getState().openFile(task.workspaceRoot, path)
           setRoute('write')
         } else {
           window.dispatchEvent(new CustomEvent('kun:workspace-file-preview', { detail: { workspaceRoot: task.workspaceRoot, path } }))
         }
       }} onOpenFlow={(flowId, flowRunId) => { requestFlowDetail({flowId,flowRunId}); openFlow() }} onConfigureReplyDelivery={() => openSettings('claw')} onConfigureProvider={provider => { setConnectPhoneSidebarOpen(false); openPlugins(sidebarView === 'claw' ? 'claw' : 'chat', provider === 'lark' || provider === 'feishu' ? 'lark' : provider === 'dingtalk' ? 'dingtalk' : undefined) }} />
+        </div>
+      </div>
     },
     plugins: (module) => {
       const View = (module as typeof import('./PluginMarketplaceView')).PluginMarketplaceView
@@ -2225,11 +2281,20 @@ export function Workbench(): ReactElement {
   return (
     <div
       ref={shellRef}
+      data-navigation-overlay={leftSidebarOverlay}
+      data-inspector-overlay={rightSidebarOverlay}
+      data-active-overlay={activeOverlay ?? ''}
       className="ds-workbench-shell ds-drag relative flex h-full min-h-0 w-full min-w-0 bg-ds-main"
     >
+      {activeOverlay ? <button type="button" className="ds-workbench-drawer-backdrop ds-no-drag" tabIndex={-1}
+        aria-label={t(activeOverlay === 'navigation' ? 'workbenchDismissNavigation' : 'workbenchDismissInspector')}
+        onClick={activeOverlay === 'navigation' ? closeCompactNavigation : closeRightPanel} /> : null}
       {!leftSidebarCollapsed ? (
         <>
-          <div className="ds-workbench-left-panel min-h-0 shrink-0" style={{ width: leftSidebarWidth }}>
+          <div id="workbench-navigation" role={leftSidebarOverlay ? 'dialog' : undefined}
+            aria-modal={leftSidebarOverlay ? true : undefined} aria-label={t('workbenchNavigation')}
+            tabIndex={-1} inert={activeOverlay === 'inspector' ? true : undefined}
+            className="ds-workbench-left-panel min-h-0 min-w-0 shrink-0" style={{ width: leftSidebarWidth }}>
             {route === 'write' ? (
               <WriteSidebar
                 navigationRoute={route}
@@ -2248,6 +2313,7 @@ export function Workbench(): ReactElement {
                 onToggleFocusMode={toggleFocusMode}
                 onToggleConnectPhone={toggleConnectPhone}
                 onToggleSidebar={toggleLeftSidebar}
+                onNavigate={closeCompactNavigation}
               />
             ) : (
             <Sidebar
@@ -2262,7 +2328,7 @@ export function Workbench(): ReactElement {
               showArchivedThreads={showArchivedThreads}
               onThreadSearchChange={setThreadSearch}
               onShowArchivedThreadsChange={setShowArchivedThreads}
-              onSelectThread={openThread}
+              onSelectThread={id => { openThread(id); closeCompactNavigation() }}
               onRenameThread={renameThread}
               onArchiveThread={(id) => archiveThread(id, true)}
               onDeleteThread={deleteThread}
@@ -2281,19 +2347,25 @@ export function Workbench(): ReactElement {
               onDesignOpen={openDesignView}
               onEngineeringOpen={openEngineeringMode}
               onToggleSidebar={toggleLeftSidebar}
+              onNavigate={closeCompactNavigation}
             />
             )}
           </div>
           <div
             role="separator"
             aria-orientation="vertical"
+            aria-label={t('sidebarResize')}
+            aria-valuenow={Math.round(leftSidebarWidth)}
+            tabIndex={0}
+            onKeyDown={event => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); resizeLeftBy(event.key === 'ArrowRight' ? 16 : -16) } }}
             className="ds-workbench-left-divider ds-workbench-divider ds-no-drag relative z-20 shrink-0 cursor-col-resize"
             onPointerDown={beginLeftResize}
-          />
+          ><span aria-hidden className="ds-workbench-divider-hit" /></div>
         </>
       ) : null}
 
       <main
+        inert={activeOverlay ? true : undefined}
         className={`ds-drag ds-stage-surface relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
           route === 'plugins' ? 'px-0' : ''
         }`}
@@ -2339,7 +2411,6 @@ export function Workbench(): ReactElement {
                   onSubmitPrompt={sendWritePrompt}
                 />
               )}
-              {renderRightPanel()}
             </div>
           </>
         ) : (
@@ -2415,7 +2486,12 @@ export function Workbench(): ReactElement {
               onBuildPlan={() => void buildGuiPlan()}
               onOpenPlan={openGuiPlanPanel}
               devPreviewCard={
-                showDevPreviewCard ? (
+                taskArtifactPreview.error ? (
+                  <div role="status" className="rounded-xl border border-ds-border bg-ds-card px-4 py-3 text-sm text-ds-ink">
+                    <p>{taskArtifactPreview.error}</p>
+                    <button type="button" className="mt-2 text-accent" onClick={() => void taskArtifactPreview.retry().catch(() => undefined)}>重新打开网页成果</button>
+                  </div>
+                ) : showDevPreviewCard ? (
                   <DevPreviewLaunchCard
                     url={latestDevPreviewUrl}
                     opened={rightPanelMode === 'browser'}
@@ -2500,15 +2576,15 @@ export function Workbench(): ReactElement {
           </div>
 
           {route === 'chat' && !activeSddDraft ? (
-            <SideConversationPanel rightOffset={rightPanelVisible ? rightSidebarWidth + 24 : 24} />
+            <SideConversationPanel rightOffset={rightPanelVisible && !rightSidebarOverlay ? rightSidebarWidth + 24 : 24} />
           ) : null}
 
-          {renderRightPanel()}
         </div>
 
           </>
         )}
       </main>
+      {renderRightPanel()}
     </div>
   )
 }

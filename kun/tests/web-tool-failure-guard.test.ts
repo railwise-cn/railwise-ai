@@ -10,19 +10,21 @@ function call(toolName: string, callId = toolName) {
 }
 
 describe('WebToolFailureGuard', () => {
-  it('blocks web tools after consecutive failures in a turn', () => {
+  it('limits retries per tool and source while preserving other capabilities', () => {
     const guard = new WebToolFailureGuard({ threshold: 2 })
 
     expect(guard.inspect(call('web_fetch')).suppress).toBe(false)
     guard.observe(call('web_fetch'), true)
     expect(guard.inspect(call('web_search')).suppress).toBe(false)
-    guard.observe(call('web_search'), true)
+    guard.observe(call('web_fetch'), true)
 
     const blocked = guard.inspect(call('web_fetch', 'third'))
     expect(blocked.suppress).toBe(true)
-    expect(blocked.reason).toContain('consecutive failures')
-    expect(guard.recoveryInstruction()).toContain('final recovery opportunity')
+    expect(blocked.reason).toContain('bounded retries')
+    expect(guard.recoveryInstruction()).toContain('Other sources')
     expect(guard.shouldFailDegradedCompletion()).toBe(true)
+    expect(guard.inspect(call('web_search')).suppress).toBe(false)
+    expect(guard.inspect({ ...call('web_fetch'), arguments: {url:'https://another.example/page'} }).suppress).toBe(false)
   })
 
   it('does not block non-web tools and resets after a successful web call', () => {
@@ -45,8 +47,8 @@ describe('WebToolFailureGuard', () => {
     guard.observe(call('web_fetch', 'fetch_1'), true)
     guard.observe(call('web_fetch', 'fetch_2'), true)
 
-    expect(guard.isBlocked()).toBe(true)
+    expect(guard.isBlocked()).toBe(false)
     expect(guard.shouldFailDegradedCompletion()).toBe(false)
-    expect(guard.recoveryInstruction()).toContain('Use only already verified tool results')
+    expect(guard.recoveryInstruction()).toContain('Report source coverage accurately')
   })
 })

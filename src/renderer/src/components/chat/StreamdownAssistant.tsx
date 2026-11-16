@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { ComponentPropsWithRef, MouseEvent, ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Streamdown, type AnimateOptions, type StreamdownProps } from 'streamdown'
@@ -12,7 +13,7 @@ import {
 import { useValidatedFileReference } from '../../lib/file-reference-validation'
 import { openWorkspacePathInEditor } from '../../lib/open-workspace-path'
 import { previewWorkspaceFile } from '../../lib/workspace-file-preview'
-import { useChatStore } from '../../store/chat-store'
+import { MarkdownWorkspaceContext, useMarkdownWorkspaceRoot } from './MarkdownWorkspaceContext'
 import { StreamdownCode } from './StreamdownCode'
 
 /**
@@ -49,6 +50,16 @@ const components = {
   a: StreamdownLink
 } satisfies StreamdownProps['components']
 
+function MarkdownImageLabel({ alt }: ComponentPropsWithRef<'img'> & { node?: unknown }): ReactElement | null {
+  return typeof alt === 'string' && alt ? <span>{alt}</span> : null
+}
+
+const restrictedComponents = {
+  ...components,
+  // Delivery notes describe artifacts; rendering them does not fetch media.
+  img: MarkdownImageLabel
+} satisfies StreamdownProps['components']
+
 type StreamdownLinkProps = ComponentPropsWithRef<'a'> & { node?: unknown }
 
 function StreamdownLink({
@@ -57,8 +68,8 @@ function StreamdownLink({
   className,
   title
 }: StreamdownLinkProps): ReactElement {
-  const workspaceRoot = useChatStore((s) => s.workspaceRoot)
-  const fileTarget = parseFileReferenceHref(href)
+  const workspaceRoot = useMarkdownWorkspaceRoot()
+  const fileTarget = useMemo(() => parseFileReferenceHref(href), [href])
   const validation = useValidatedFileReference(fileTarget, workspaceRoot)
   const isExternal = href ? /^(https?:|mailto:)/i.test(href) : false
   const cleanClassName = className?.replace(/\bds-file-reference-link\b/g, '').trim()
@@ -148,26 +159,32 @@ type Props = {
    */
   streaming: boolean
   className?: string
+  workspaceRoot?: string
+  /** Task delivery notes render Markdown without raw HTML or image resources. */
+  restricted?: boolean
 }
 
-export function StreamdownAssistant({ text, streaming, className }: Props): ReactElement {
+export function StreamdownAssistant({ text, streaming, className, workspaceRoot, restricted }: Props): ReactElement {
   const { t } = useTranslation('common')
   const animated = streaming && shouldAnimateStreamingText(text) ? STREAMING_ANIMATED : false
   const isAnimating = animated !== false
 
   return (
-    <Streamdown
-      className={className}
-      mode={streaming ? 'streaming' : 'static'}
-      parseIncompleteMarkdown={streaming}
-      isAnimating={isAnimating}
-      animated={animated}
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={rehypePlugins}
-      components={components}
-      translations={{ copyTable: t('markdownCopyTable'), downloadTable: t('markdownDownloadTable'), viewFullscreen: t('markdownViewFullscreen') }}
-    >
-      {text}
-    </Streamdown>
+    <MarkdownWorkspaceContext.Provider value={workspaceRoot}>
+      <Streamdown
+        className={className}
+        mode={streaming ? 'streaming' : 'static'}
+        parseIncompleteMarkdown={streaming}
+        isAnimating={isAnimating}
+        animated={animated}
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={rehypePlugins}
+        components={restricted ? restrictedComponents : components}
+        skipHtml={restricted || undefined}
+        translations={{ copyTable: t('markdownCopyTable'), downloadTable: t('markdownDownloadTable'), viewFullscreen: t('markdownViewFullscreen') }}
+      >
+        {text}
+      </Streamdown>
+    </MarkdownWorkspaceContext.Provider>
   )
 }

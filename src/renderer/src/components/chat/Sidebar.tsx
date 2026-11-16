@@ -27,6 +27,7 @@ import {
   SidebarCommandRow,
   SidebarFrame
 } from '../sidebar/SidebarPrimitives'
+import { TaskSidebar } from '../tasks/TaskSidebar'
 import { WorkspaceSecondaryNavigation } from '../sidebar/WorkspaceSecondaryNavigation'
 
 type Props = {
@@ -60,6 +61,7 @@ type Props = {
   onTasksOpen?: () => void
   onEngineeringOpen: () => void
   onToggleSidebar: () => void
+  onNavigate?: () => void
 }
 
 export function Sidebar({
@@ -92,7 +94,8 @@ export function Sidebar({
   onDesignOpen,
   onTasksOpen,
   onEngineeringOpen,
-  onToggleSidebar
+  onToggleSidebar,
+  onNavigate
 }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
@@ -186,6 +189,8 @@ export function Sidebar({
           onDisconnect={(channelId) => deleteClawChannel(channelId)}
           onOpenSettings={() => onOpenSettings('claw')}
         />
+      ) : navigationRoute === 'tasks' ? (
+        <TaskSidebar workspaceRoot={workspaceRoot} runtimeReady={runtimeReady} onChooseWorkspace={() => void chooseWorkspace()} onNavigate={onNavigate} />
       ) : activeView === 'claw' ? (
         <ClawSidebarContent
           channels={clawChannels}

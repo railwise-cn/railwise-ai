@@ -33,6 +33,7 @@ import {
   type PreparedPluginPackageV1,
   type TrustedPluginSigningKeyV1
 } from './plugin-package-formats'
+import { downloadManagedDependency, findManagedDependency } from './managed-dependency-download'
 import { materializePypiPackage } from './pypi-package-materializer'
 import { describeNetworkFailure, systemFetch } from './system-network'
 import { parseCatalogPackageArtifact } from './marketplace-catalog-service'
@@ -665,8 +666,9 @@ async function materializeGithubPackage(
   if (source.kind !== 'github' || !/^[0-9a-f]{40}$/i.test(source.resolvedRef)) {
     throw new Error('Catalog GitHub package must use an immutable commit.')
   }
-  if (isApprovedAutocadUpstreamSkill(item)) {
-    await materializeGithubArchive(source.owner, source.repository, source.resolvedRef, targetDirectory, source.subpath, item)
+  const managedArchive = findManagedDependency(`https://codeload.github.com/${encodeURIComponent(source.owner)}/${encodeURIComponent(source.repository)}/zip/${encodeURIComponent(source.resolvedRef)}`)
+  if (managedArchive || isApprovedAutocadUpstreamSkill(item)) {
+    await materializeGithubArchive(source.owner, source.repository, source.resolvedRef, targetDirectory, source.subpath, isApprovedAutocadUpstreamSkill(item) ? item : undefined)
     return
   }
   const repository = `https://github.com/${source.owner}/${source.repository}.git`
@@ -738,6 +740,8 @@ function isGithubNetworkFailure(error: unknown): boolean {
 
 async function downloadGithubArchive(owner: string, repository: string, commit: string): Promise<Buffer> {
   const url = `https://codeload.github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/zip/${encodeURIComponent(commit)}`
+  const managed = findManagedDependency(url)
+  if (managed) return downloadManagedDependency(managed)
   let response: Response
   try {
     response = await systemFetch(url, {

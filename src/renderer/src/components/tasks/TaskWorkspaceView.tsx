@@ -1,109 +1,73 @@
-import { useTaskState, refreshTaskState, takeRequestedTask } from '../../store/task-live-store'
+import { useTaskState, refreshTaskState, takeRequestedTask, updateTaskNavigation } from '../../store/task-live-store'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from 'react'
-import { CheckCircle2, ChevronRight, FileText, Folder, ListTodo, Loader2, MessageSquare, Pause, Play, Plus, RefreshCw, Square, X } from 'lucide-react'
+import { CheckCircle2, ChevronRight, FileText, Loader2, MessageSquare, Pause, Play, Plus, RefreshCw, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { TaskAttentionV1, TaskEventV1, TaskInputV1, TaskOperationReceiptV1, TaskRunV1, TaskTemplateId, TaskTemplateStartV1, TaskTemplateV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskEventV1, TaskInputV1, TaskOperationReceiptV1, TaskPublicQueryRecoverySnapshotV1, TaskRunV1, TaskTemplateId, TaskTemplateStartV1, TaskTemplateV1 } from '@shared/agent-workbench'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { TaskArtifactReview } from './TaskArtifactReview'
+import { AssistantMarkdown } from '../chat/AssistantMarkdown'
 import { TaskExecutionEvidence } from './TaskExecutionEvidence'
 import { currentTaskBranch } from '@shared/task-projection'
-import { taskDisplayGoal } from '@shared/task-presentation'
+import { isMatchingExecutionGrantExpiredAttention, taskDisplayGoal, taskDisplayTitle } from '@shared/task-presentation'
+import { taskArtifactValidationLabelKey } from '@shared/task-artifact-source-evidence'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
+import { BrowserApprovalDetails, browserApprovalFields } from '../chat/BrowserApprovalDetails'
 import { CapabilityRequiredCard } from '../chat/CapabilityRequiredCard'
+import { filterWorkspaceTasks, taskGroupForTask, taskGroupProgress, taskGroupArtifacts, scopeWorkspaceTasks } from '@shared/task-workspace-projection'
+export { filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from '@shared/task-workspace-projection'
+import { legacyLocalArtifactSourceMismatch } from '@shared/task-source-intent'
+import { TaskBudgetControl } from './TaskBudgetControl'
+import { TaskPublicQueryRecoveryCard } from './TaskPublicQueryRecoveryCard'
 import { TaskPermissionPanel } from '../chat/TaskPermissionPanel'
 import { useChatStore } from '../../store/chat-store'
 
-type TaskFilter = 'ongoing' | 'attention' | 'completed' | 'all'
 type Props = {
   workspaceRoot: string
   runtimeReady: boolean
   leftSidebarCollapsed: boolean
   onToggleLeftSidebar: () => void
   onOpenThread: (threadId: string) => void
-  onOpenArtifact: (task: TaskRunV1, relativePath: string) => void | Promise<void>
+  onOpenArtifact: (task: TaskRunV1, relativePath: string, artifactId?: string) => void | Promise<void>
   onOpenFlow?: (flowId?: string, flowRunId?: string) => void
   onConfigureProvider?: (provider: string) => void
   onConfigureReplyDelivery?: () => void
 }
 
 const TERMINAL = new Set(['completed', 'failed', 'cancelled'])
-const ATTENTION = new Set(['waiting_user', 'waiting_approval', 'stalled', 'failed'])
-const FILTERS: TaskFilter[] = ['ongoing', 'attention', 'completed', 'all']
+
+// An explicit owner must never be replaced by another task sharing its thread.
+function attentionMatchesTask(item: TaskAttentionV1, task: TaskRunV1): boolean {
+  return item.taskId ? item.taskId === task.id : Boolean(item.threadId && item.threadId === task.threadId)
+}
+
+function retryAncestorIds(current: TaskRunV1, tasks: TaskRunV1[]): Set<string> {
+  const byId = new Map(tasks.map(task => [task.id, task]))
+  const ancestors = new Set<string>(), seen = new Set([current.id])
+  let previousId = current.retryOfTaskId
+  while (previousId) {
+    const previous = byId.get(previousId)
+    // Incomplete or cyclic lineage cannot establish that an old capability was superseded.
+    if (!previous || seen.has(previousId)) return new Set()
+    seen.add(previousId); ancestors.add(previousId)
+    previousId = previous.retryOfTaskId
+  }
+  return ancestors
+}
+
+// A stored running node is historical while its execution task is waiting or stopped.
+function nodeStatusLabelKey(taskStatus: TaskRunV1['status'], nodeStatus: TaskRunV1['nodes'][number]['status']): string {
+  if (nodeStatus !== 'running') return `taskNodeStatus_${nodeStatus}`
+  if (taskStatus === 'failed' || taskStatus === 'cancelled') return 'taskNodeExecutionStopped'
+  if (taskStatus === 'completed') return 'taskNodeExecutionNeedsReview'
+  if (taskStatus === 'stalled') return 'taskNodeStatus_blocked'
+  if (['paused', 'waiting_user', 'waiting_approval', 'queued'].includes(taskStatus)) return `taskRunStatus_${taskStatus}`
+  return 'taskNodeStatus_running'
+}
 const BUILTIN_TEMPLATES: TaskTemplateV1[] = [
   { id: 'monitoring-report', name: 'Monitoring report', description: 'Check sources and data, then produce a cited report.', stages: [], outputs: [], requiredInputs: [] },
   { id: 'tender-document', name: 'Tender document', description: 'Build a response matrix and draft a checked technical file.', stages: [], outputs: [], requiredInputs: [] },
   { id: 'research-document', name: 'Research and documents', description: 'Turn selected sources into cited, editable documents.', stages: [], outputs: [], requiredInputs: [] }
 ]
-
-export type TaskWorkspaceTaskGroup = {
-  root: TaskRunV1
-  children: TaskRunV1[]
-  all: TaskRunV1[]
-}
-
-function rootIdForTask(task: TaskRunV1, byId: Map<string, TaskRunV1>): string {
-  const declaredRoot = task.rootTaskId?.trim()
-  if (declaredRoot && byId.has(declaredRoot)) return declaredRoot
-  const seen = new Set<string>()
-  let current = task
-  while (current.parentTaskId && !seen.has(current.id)) {
-    seen.add(current.id)
-    const parent = byId.get(current.parentTaskId)
-    if (!parent) break
-    current = parent
-  }
-  return current.id
-}
-
-export function groupWorkspaceTasks(tasks: TaskRunV1[]): TaskWorkspaceTaskGroup[] {
-  const byId = new Map(tasks.map(task => [task.id, task]))
-  const groups = new Map<string, TaskRunV1[]>()
-  for (const task of tasks) {
-    const rootId = rootIdForTask(task, byId)
-    const members = groups.get(rootId) ?? []
-    members.push(task)
-    groups.set(rootId, members)
-  }
-  return [...groups.entries()].map(([rootId, all]) => {
-    const root = all.find(task => task.id === rootId) ?? all.find(task => !task.parentTaskId) ?? all[0]
-    return { root, children: all.filter(task => task.id !== root.id), all }
-  })
-}
-
-export function taskGroupForTask(taskId: string | null, tasks: TaskRunV1[]): TaskWorkspaceTaskGroup | null {
-  if (!taskId) return null
-  return groupWorkspaceTasks(tasks).find(group => group.all.some(task => task.id === taskId)) ?? null
-}
-
-export function taskGroupProgress(group: TaskWorkspaceTaskGroup): { completed: number; total: number } {
-  return {
-    completed: currentTaskBranch(group.all, group.root).members.reduce((count, task) => count + task.nodes.filter(node => node.status === 'completed').length, 0),
-    total: currentTaskBranch(group.all, group.root).members.reduce((count, task) => count + task.nodes.length, 0)
-  }
-}
-
-export function taskGroupArtifacts(group: TaskWorkspaceTaskGroup): Array<{ task: TaskRunV1; artifact: TaskRunV1['artifacts'][number] }> {
-  return group.all.flatMap(task => task.artifacts.map(artifact => ({ task, artifact })))
-}
-
-export function taskNeedsUser(task: TaskRunV1, inbox: TaskAttentionV1[], relatedTasks: TaskRunV1[] = []): boolean {
-  const group = currentTaskBranch([task, ...relatedTasks], task).members
-  return group.some(candidate => ATTENTION.has(candidate.status) || inbox.some(item => item.status === 'pending' && (item.taskId === candidate.id || item.threadId === candidate.threadId)))
-}
-
-export function filterWorkspaceTasks(tasks: TaskRunV1[], inbox: TaskAttentionV1[], filter: TaskFilter, search = ''): TaskRunV1[] {
-  const query = search.trim().toLocaleLowerCase()
-  return groupWorkspaceTasks(tasks).flatMap(group => {
-    const task = group.root
-    const current = currentTaskBranch(group.all, task).current
-    const searchable = group.all.flatMap(item => [taskDisplayGoal(item), item.workspaceRoot, ...item.artifacts.map(artifact => artifact.relativePath)]).join('\n')
-    if (query && !searchable.toLocaleLowerCase().includes(query)) return []
-    if (filter === 'ongoing' && (TERMINAL.has(current.status) || taskNeedsUser(task, inbox, group.children))) return []
-    if (filter === 'attention' && !taskNeedsUser(task, inbox, group.children)) return []
-    if (filter === 'completed' && current.status !== 'completed') return []
-    return [task]
-  })
-}
 
 function operationKey(): string {
   return globalThis.crypto.randomUUID()
@@ -134,7 +98,7 @@ function attentionQuestions(item: TaskAttentionV1): Question[] {
   })
 }
 
-function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, onOpenFlow }: { item: TaskAttentionV1; conversationThreadId?: string; onResolved: () => void; onOpenThread: (id: string) => void; onOpenFlow?: Props['onOpenFlow'] }): ReactElement {
+function AttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow }: { item: TaskAttentionV1; ownerTask?: TaskRunV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: () => void; onOpenThread: (id: string) => void; onOpenFlow?: Props['onOpenFlow'] }): ReactElement {
   const { t } = useTranslation('common')
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -147,7 +111,7 @@ function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, o
   const capabilityCard: ExternalTaskCapabilityCard | null = item.payload?.kind === 'capability_required' && item.taskId &&
     (conversationThreadId || item.threadId) && originalRequest && typeof originalRequest === 'object' &&
     'prompt' in originalRequest && typeof originalRequest.prompt === 'string' && capability && typeof capability === 'object' &&
-    'provider' in capability && ['dingtalk','lark','feishu'].includes(String(capability.provider)) &&
+    'provider' in capability && ['dingtalk','lark','feishu','browser-skill','workspace','schedule'].includes(String(capability.provider)) &&
     'status' in capability && ['available','not_installed','needs_authorization','unsupported','blocked'].includes(String(capability.status)) &&
     'message' in capability && typeof capability.message === 'string'
       ? {threadId:(conversationThreadId || item.threadId)!,taskId:item.taskId,attentionId:item.id,prompt:originalRequest.prompt,capability:capability as ExternalTaskCapabilityCard['capability']}
@@ -213,8 +177,8 @@ function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, o
   }
   return <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
     <h4 className="text-sm font-semibold">{item.title}</h4>
-    <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed">{item.message}</p>
-    {capabilityCard ? <CapabilityRequiredCard card={capabilityCard} /> : null}
+    {item.kind === 'approval' && browserApprovalFields(item.message) ? <BrowserApprovalDetails summary={item.message} /> : <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed">{capabilityCard && isMatchingExecutionGrantExpiredAttention(item, ownerTask) ? t('capabilityExecutionGrantExpiredSummary') : item.message}</p>}
+    {capabilityCard ? <CapabilityRequiredCard card={capabilityCard} workspaceRoot={item.workspaceRoot || workspaceRoot} /> : null}
     {item.payload?.kind === 'external_provider_choice' ? <div className="mt-3 space-y-2">
       <label className="block text-xs">{t('taskCommandProvider')}<select aria-label={t('taskCommandProvider')} value={selectedProvider} onChange={event => setSelectedProvider(event.target.value as 'dingtalk' | 'lark')} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink"><option value="dingtalk">{t('taskEffectProvider_dingtalk')}</option><option value="lark">{t('taskEffectProvider_lark')}</option></select></label>
       <label className="block text-xs">{t('taskCommandSingleProviderRequest')}<textarea aria-label={t('taskCommandSingleProviderRequest')} value={providerPrompt} onChange={event => setProviderPrompt(event.target.value)} rows={3} placeholder={t('taskCommandSingleProviderHint')} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink" /></label>
@@ -242,7 +206,9 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const openArtifact = async (task: TaskRunV1, artifact: TaskRunV1['artifacts'][number]): Promise<void> => {
     setArtifactOpenError('')
     try {
-      if (artifact.absolutePath) {
+      if (/\.html?$/i.test(artifact.relativePath)) {
+        await onOpenArtifact(task, artifact.relativePath, artifact.id)
+      } else if (artifact.absolutePath) {
         const result = await window.workwise.openTaskArtifact({ taskId: task.id, artifactId: artifact.id })
         if (!result.ok) throw new Error(result.message)
       } else await onOpenArtifact(task, artifact.relativePath)
@@ -251,14 +217,15 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const { t } = useTranslation('common')
   const live=useTaskState(runtimeReady)
   const [templates, setTemplates] = useState<TaskTemplateV1[]>(BUILTIN_TEMPLATES)
-  const [initialRequestedTask] = useState(()=>takeRequestedTask())
-  const [selectedId, setSelectedId] = useState<string | null>(initialRequestedTask)
-  const [filter, setFilter] = useState<TaskFilter>(initialRequestedTask ? 'all' : 'ongoing')
-  const [search, setSearch] = useState('')
-  const [allWorkspaces, setAllWorkspaces] = useState(false)
+  const { selectedTaskId: selectedId, filter, search, allWorkspaces, selectedAttentionId } = live.navigation
+  const setSelectedId = useCallback((id: string | null): void => updateTaskNavigation({ selectedTaskId: id, selectedAttentionId: null }), [])
+  const setFilter = useCallback((value: typeof filter): void => updateTaskNavigation({ filter: value }), [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [controlNotice, setControlNotice] = useState('')
   const [actionBusy, setActionBusy] = useState(false)
+  const [publicQueryRecovery, setPublicQueryRecovery] = useState<Pick<TaskPublicQueryRecoverySnapshotV1, 'taskId' | 'state' | 'reason'> | null>(null)
+  const recoveryProjectionChanged = useCallback((projection: Pick<TaskPublicQueryRecoverySnapshotV1, 'taskId' | 'state' | 'reason'>): void => setPublicQueryRecovery(projection), [])
   const [inputs, setInputs] = useState<TaskInputV1[]>([])
   const [events, setEvents] = useState<TaskEventV1[]>([])
   const [receipts, setReceipts] = useState<TaskOperationReceiptV1[]>([])
@@ -273,15 +240,11 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const activeTemplate = templates.find(template => template.id === templateId)
   const [templateMessage, setTemplateMessage] = useState('')
   const detailGeneration = useRef(0)
+  const detailRootId = useRef<string | null>(null)
   const scope = allWorkspaces ? undefined : workspaceRoot
-  const tasks=useMemo(()=>{
-    const roots=live.tasks.filter(task=>!task.parentTaskId && (!task.rootTaskId || task.rootTaskId===task.id) && task.visible!==false && !['chat','internal'].includes(task.visibility??'') && (!scope||task.workspaceRoot===scope))
-    const included=new Set(roots.map(task=>task.id))
-    let changed=true
-    while(changed){changed=false;for(const task of live.tasks)if((task.rootTaskId && included.has(task.rootTaskId) || task.parentTaskId && included.has(task.parentTaskId)) && !included.has(task.id)){included.add(task.id);changed=true}}
-    return live.tasks.filter(task=>included.has(task.id))
-  },[live.tasks,scope])
-  const inbox=useMemo(()=>live.attention.filter(item=>!scope||item.workspaceRoot===scope||tasks.some(task=>task.id===item.taskId)),[live.attention,tasks,scope])
+  const tasks = useMemo(() => scopeWorkspaceTasks(live.tasks, scope), [live.tasks, scope])
+  const inbox=useMemo(()=>live.attention.filter(item=>!scope||item.workspaceRoot===scope||tasks.some(task=>attentionMatchesTask(item,task))),[live.attention,tasks,scope])
+  const standaloneAttention = inbox.filter(item => !tasks.some(task => attentionMatchesTask(item, task))).filter(item => !search.trim() || `${item.title}\n${item.message}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const mutationRequests = useRef(new Map<string, { expectedRevision: number; idempotencyKey: string; text?: string }>())
   const templateRequest = useRef<{ id: TaskTemplateId; request: TaskTemplateStartV1 } | null>(null)
 
@@ -291,8 +254,8 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     try { await refreshTaskState() } finally { setLoading(false) }
   },[runtimeReady])
 
-  useEffect(()=> { const requested=takeRequestedTask();if(requested){setFilter('all');setSelectedId(requested)} },[scope])
-  useEffect(()=>{const open=(event:Event)=>{setFilter('all');setSelectedId((event as CustomEvent<string>).detail)};window.addEventListener('railwise:open-task',open);return()=>window.removeEventListener('railwise:open-task',open)},[])
+  useEffect(()=> { const requested=takeRequestedTask();if(requested){setFilter('all');setSelectedId(requested)} },[scope,setFilter,setSelectedId])
+  useEffect(()=>{const open=(event:Event)=>{setFilter('all');setSelectedId((event as CustomEvent<string>).detail)};window.addEventListener('railwise:open-task',open);return()=>window.removeEventListener('railwise:open-task',open)},[setFilter,setSelectedId])
 
   useEffect(() => {
     if (!runtimeReady) return
@@ -306,16 +269,39 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const selectedGroupRevision = selectedGroup?.all.map(task => `${task.id}:${task.revision}`).join('|') ?? ''
   const selected = selectedGroup?.root ?? null
   const currentExecution = selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).current : null
+  const progressSample = currentExecution ? live.progress?.[currentExecution.id] : undefined
+  const currentProgress = currentExecution && progressSample?.taskRevision === currentExecution.revision && progressSample.turnId === currentExecution.activeTurnId &&
+    ['running','retrying'].includes(currentExecution.status) ? progressSample : undefined
+  const currentTiming = currentProgress?.timing ?? currentExecution?.timing
+  const currentActivity = currentProgress?.active && Date.parse(currentProgress.leaseExpiresAt) > Date.now() ? currentProgress.activity : undefined
+  const hasPublicQueryRecovery = publicQueryRecovery?.taskId === (currentExecution ?? selected)?.id
+    && (publicQueryRecovery?.state !== 'unavailable' || publicQueryRecovery?.reason === 'browser_public_query_schedule_scope_required')
   useEffect(() => {
     if (!live.ready) return
+    if (selectedAttentionId) {
+      if (standaloneAttention.some(item => item.id === selectedAttentionId)) return
+      updateTaskNavigation({ selectedAttentionId: null, selectedTaskId: visible[0]?.id ?? null })
+      return
+    }
+    if (selectedGroup) return
+    if ((filter === 'attention' || !visible.length) && standaloneAttention[0] && (filter === 'attention' || filter === 'all')) {
+      updateTaskNavigation({ selectedTaskId: null, selectedAttentionId: standaloneAttention[0].id })
+      return
+    }
     if (!visible.some(task => task.id === selectedId)) setSelectedId(visible[0]?.id ?? null)
-  }, [visible, selectedId, live.ready])
+  }, [visible, selectedId, live.ready, selectedGroup, selectedAttentionId, filter, standaloneAttention, setSelectedId])
 
   useEffect(() => {
     const generation = ++detailGeneration.current
-    setInputs([])
-    setEvents([])
-    setReceipts([])
+    const nextRootId = runtimeReady ? selectedGroup?.root.id ?? null : null
+    if (detailRootId.current !== nextRootId) {
+      detailRootId.current = nextRootId
+      setInputs([])
+      setEvents([])
+      setReceipts([])
+    }
+    // A same-task refresh must not unmount receipt cards while they report a
+    // verification result. Replace their data only when the fresh read arrives.
     if (!selectedGroup || !runtimeReady) return
     void Promise.all(selectedGroup.all.map(async task => {
       const [nextInputs, nextEvents, nextReceipts] = await Promise.all([window.workwise.listTaskInputs(task.id), window.workwise.listTaskEvents(task.id), window.workwise.listTaskOperationReceipts(task.id)])
@@ -331,7 +317,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     return () => { if (detailGeneration.current === generation) ++detailGeneration.current }
   }, [runtimeReady, selectedGroup, selectedGroupRevision])
 
-  const mutate = async (action: 'pause' | 'resume' | 'retry' | 'cancel' | 'input'): Promise<void> => {
+  const mutate = async (action: 'pause' | 'resume' | 'retry' | 'cancel' | 'input' | 'revalidate'): Promise<void> => {
     if (!selected || actionBusy) return
     const task = currentExecution ?? selected
     const text = drafts[selected.id]?.trim()
@@ -342,10 +328,25 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     mutationRequests.current.set(key, request)
     setActionBusy(true)
     setError('')
+    setControlNotice('')
     try {
-      if (action === 'pause') await window.workwise.pauseTask(task.id, request)
-      else if (action === 'resume') await window.workwise.resumeTask(task.id, request)
-      else if (action === 'retry') await window.workwise.retryTask(task.id, request)
+      if (action === 'revalidate') {
+        const result = await window.workwise.revalidateTaskArtifacts(task.id, { ...request, confirmed: true })
+        setControlNotice(result.reason ?? '')
+        if (result.completed) updateTaskNavigation({ filter: 'completed', selectedTaskId: selected.id, selectedAttentionId: null })
+      }
+      else if (action === 'pause') await window.workwise.pauseTask(task.id, request)
+      else if (action === 'resume' || action === 'retry') {
+        const result = action === 'resume' ? await window.workwise.resumeTask(task.id, request) : await window.workwise.retryTask(task.id, request)
+        if (result.capability) {
+          mutationRequests.current.delete(key)
+          setControlNotice(result.capability.message)
+          await refresh()
+          setFilter('attention')
+          setSelectedId(selected.id)
+          return
+        }
+      }
       else if (action === 'cancel') await window.workwise.cancelTask(task.id, request)
       else {
         await window.workwise.appendTaskInput(task.id, { ...request, text: text!, kind: 'supplement' })
@@ -387,16 +388,21 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   }
 
   const conversationForAttention = (item:TaskAttentionV1):string|undefined => {
-    const owner=tasks.find(task=>task.id===item.taskId||task.threadId===item.threadId)
+    const owner=tasks.find(task=>attentionMatchesTask(item,task))
     if(!owner)return item.threadId
     const root=taskGroupForTask(owner.id,tasks)?.root??owner
     return owner.originThreadId??root.originThreadId??(!owner.visibility?owner.threadId:undefined)
   }
-  const standaloneAttention = inbox.filter(item => !tasks.some(task => item.taskId === task.id || item.threadId === task.threadId)).filter(item => !search.trim() || `${item.title}\n${item.message}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
-  const count = (tab: TaskFilter): number => filterWorkspaceTasks(tasks, inbox, tab, search).length + (tab === 'attention' || tab === 'all' ? standaloneAttention.length : 0)
-  const selectedAttention = selectedGroup ? inbox.filter(item => selectedGroup.all.some(task => item.taskId === task.id || (item.threadId && item.threadId === task.threadId))) : []
+  const supersededOwners = selectedGroup && currentExecution ? retryAncestorIds(currentExecution, selectedGroup.all) : new Set<string>()
+  const selectedAttention = selectedGroup ? inbox.filter(item => {
+    const owners = selectedGroup.all.filter(task => attentionMatchesTask(item, task))
+    if (!owners.length) return false
+    // Preserve other retry branches, parallel child blockers and every non-capability review.
+    // A legacy thread-only record stays visible if any possible owner is still current.
+    return !(item.payload?.kind === 'capability_required' && owners.every(owner => supersededOwners.has(owner.id)))
+  }) : []
 
-  return <section className="ds-no-drag flex h-full min-h-0 flex-col bg-ds-main text-ds-ink" aria-label={t('taskWorkspaceTitle')}>
+  return <section className="ds-task-workspace ds-no-drag flex h-full min-h-0 min-w-0 flex-col bg-ds-main text-ds-ink" aria-label={t('taskWorkspaceTitle')}>
     <header className="flex flex-wrap items-center gap-3 border-b border-ds-border px-5 py-4">
       <SidebarTitlebarToggleButton onClick={onToggleLeftSidebar} title={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')} ariaLabel={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')} />
       <div className="min-w-0 flex-1"><h1 className="text-lg font-semibold">{t('taskWorkspaceTitle')}</h1><p className="mt-0.5 text-xs text-ds-muted">{t('taskWorkspaceSubtitle')}</p></div>
@@ -404,63 +410,64 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     </header>
     {!runtimeReady ? <p role="status" className="m-5 rounded-xl border border-ds-border bg-ds-card p-4 text-sm text-ds-muted">{t('runtimeActionNeedsConnection')}</p> : null}
     {error || live.error ? <div role="alert" className="mx-5 mt-3 rounded-xl border border-red-300 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-100">{error || live.error}</div> : null}
+    {controlNotice ? <p role="status" className="mx-5 mt-3 text-sm text-ds-ink">{controlNotice}</p> : null}
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="px-5 pt-4">
-        <div className="grid gap-2 md:grid-cols-3">{templates.map(template => <button type="button" key={template.id} disabled={!runtimeReady || !workspaceRoot} onClick={() => { setTemplateId(template.id); setTemplateMessage('') }} className="rounded-xl border border-ds-border bg-ds-card p-3 text-left transition hover:border-accent disabled:opacity-50"><div className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4 text-accent" />{t(`taskTemplate_${template.id}`, { defaultValue: template.name })}</div><p className="mt-1 text-xs leading-relaxed text-ds-muted">{t(`taskTemplateDescription_${template.id}`, { defaultValue: template.description })}</p></button>)}</div>
-        <div className="my-4 flex flex-wrap items-center gap-3">
-          <label className="flex min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-ds-border bg-ds-card px-3 py-2"><ListTodo className="h-4 w-4 text-ds-muted" /><input type="search" aria-label={t('taskWorkspaceSearch')} placeholder={t('taskWorkspaceSearch')} value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
-          <label className="flex items-center gap-2 text-xs text-ds-muted"><input type="checkbox" checked={allWorkspaces} onChange={event => setAllWorkspaces(event.target.checked)} />{t('taskWorkspaceAllWorkspaces')}</label>
-        </div>
-        <nav aria-label={t('taskWorkspaceFilters')} className="flex flex-wrap gap-1 border-b border-ds-border">{FILTERS.map(tab => <button type="button" key={tab} aria-pressed={filter === tab} onClick={() => setFilter(tab)} className={`border-b-2 px-3 py-2 text-xs font-medium ${filter === tab ? 'border-accent text-accent' : 'border-transparent text-ds-muted'}`}>{t(`taskWorkspaceFilter_${tab}`)} <span className="ml-1 tabular-nums">{count(tab)}</span></button>)}</nav>
+        <details className="rounded-lg border border-ds-border bg-ds-card p-3"><summary className="cursor-pointer text-xs font-medium text-ds-muted">{t('taskWorkspaceTemplates')}</summary><div className="ds-task-workspace-templates mt-3 grid gap-2">{templates.map(template => <button type="button" key={template.id} disabled={!runtimeReady || !workspaceRoot} onClick={() => { setTemplateId(template.id); setTemplateMessage('') }} className="rounded-xl border border-ds-border bg-ds-card p-3 text-left transition hover:border-accent disabled:opacity-50"><div className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4 text-accent" />{t(`taskTemplate_${template.id}`, { defaultValue: template.name })}</div><p className="mt-1 text-xs leading-relaxed text-ds-muted">{t(`taskTemplateDescription_${template.id}`, { defaultValue: template.description })}</p></button>)}</div></details>
       </div>
-      <div className="grid min-h-[360px] flex-1 gap-4 p-5 lg:grid-cols-[minmax(240px,0.8fr)_minmax(0,1.4fr)]">
-        <div className="space-y-2" aria-label={t('taskWorkspaceTaskList')}>
-          {visible.map(task => {
-            const group = taskGroupForTask(task.id, tasks)
-            const current = group ? currentTaskBranch(group.all, task).current : task
-            const progress = group ? taskGroupProgress(group) : { completed: 0, total: task.nodes.length }
-            const artifactCount = group ? taskGroupArtifacts(group).length : task.artifacts.length
-            const hasChildAttention = group ? taskNeedsUser(task, inbox, group.children) && !taskNeedsUser(task, inbox) : false
-            return <button type="button" key={task.id} aria-pressed={selectedId === task.id} onClick={() => setSelectedId(task.id)} className={`w-full rounded-xl border bg-ds-card p-3 text-left ${selectedId === task.id ? 'border-accent ring-1 ring-accent/20' : 'border-ds-border'}`}><div className="flex items-start gap-2"><span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm font-medium">{taskDisplayGoal(task)}</span>{current.status === 'completed' && !hasChildAttention ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <ChevronRight className="h-4 w-4 shrink-0 text-ds-faint" />}</div><div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ds-muted"><span>{t(`taskRunStatus_${current.status}`)}</span><span>{progress.completed}/{progress.total}</span>{artifactCount ? <span>{t('taskWorkspaceArtifactCount', { count: artifactCount })}</span> : null}{group && group.children.length ? <span>{t('taskWorkspaceSubtaskCount', { count: group.children.length })}</span> : null}</div>{task.waitingReason || task.stalledReason ? <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{task.waitingReason || task.stalledReason}</p> : null}{allWorkspaces ? <p className="mt-2 truncate text-[11px] text-ds-faint">{task.workspaceRoot}</p> : null}</button>
-          })}
-          {(filter === 'attention' || filter === 'all') ? standaloneAttention.map(item => <AttentionCard key={item.id} item={item} conversationThreadId={conversationForAttention(item)} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />) : null}
-          {!visible.length && !(standaloneAttention.length && (filter === 'attention' || filter === 'all')) ? <div className="rounded-xl border border-dashed border-ds-border p-7 text-center text-sm text-ds-muted">{loading ? t('taskWorkspaceLoading') : search ? t('taskWorkspaceNoMatches') : t('taskWorkspaceEmpty')}</div> : null}
-        </div>
+      <div className="ds-task-workspace-detail min-w-0 flex-1 p-5">
+        {selectedAttentionId ? standaloneAttention.filter(item => item.id === selectedAttentionId).map(item => <AttentionCard key={item.id} item={item} conversationThreadId={conversationForAttention(item)} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />) : null}
         {selected ? <article aria-label={t('taskWorkspaceDetails')} className="min-w-0 rounded-xl border border-ds-border bg-ds-card p-4">
-          <h2 className="whitespace-pre-wrap break-words text-base font-semibold">{taskDisplayGoal(selected)}</h2>
-          <p className="mt-2 flex items-center gap-1 break-all text-xs text-ds-muted"><Folder className="h-3.5 w-3.5 shrink-0" />{selected.workspaceRoot}</p>
-          {currentExecution?.timing ? <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ds-muted" title={t(currentExecution.timing.coverage === 'complete' ? 'taskTimingComplete' : 'taskTimingPartial')}>
-            <span>{t('taskTimingExecution')}: {Math.round(currentExecution.timing.executionMs / 1000)}s</span>
-            <span>{t('taskTimingQueued')}: {Math.round(currentExecution.timing.queuedMs / 1000)}s</span>
-            <span>{t('taskTimingHumanWait')}: {Math.round(currentExecution.timing.humanWaitMs / 1000)}s</span>
+          <h2 className="break-words text-base font-semibold">{taskDisplayTitle(selected)}</h2>
+          <p className="mt-2 text-xs text-ds-muted">{t(`taskRunStatus_${(currentExecution ?? selected).status}`)} · {t('taskWorkspaceStepProgress', taskGroupProgress(selectedGroup!))}</p>
+          <details className="mt-3 text-xs text-ds-muted"><summary className="cursor-pointer">{t('taskWorkspaceOriginalRequest')}</summary><p className="mt-2 whitespace-pre-wrap break-words leading-relaxed">{taskDisplayGoal(selected)}</p><p className="mt-2 break-all">{t('taskWorkspaceLocation')}: {selected.workspaceRoot}</p></details>
+          {currentActivity ? <p role="status" className="mt-2 text-xs text-ds-muted">{t(`taskActivity_${currentActivity.phase}`)}</p> : null}
+          {currentTiming ? <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ds-muted" title={t(currentTiming.coverage === 'complete' ? 'taskTimingComplete' : 'taskTimingPartial')}>
+            <span>{t('taskTimingExecution')}: {Math.round(currentTiming.executionMs / 1000)}s</span>
+            <span>{t('taskTimingQueued')}: {Math.round(currentTiming.queuedMs / 1000)}s</span>
+            <span>{t('taskTimingHumanWait')}: {Math.round(currentTiming.humanWaitMs / 1000)}s</span>
           </p> : null}
-          <div className="my-4 flex flex-wrap gap-2">
+          <div className="my-4 flex min-w-0 max-w-full flex-wrap gap-2 [&>button]:min-w-0 [&>button]:max-w-full [&>button]:whitespace-normal">
+            {['stalled', 'failed', 'paused'].includes((currentExecution ?? selected).status) && legacyLocalArtifactSourceMismatch(currentExecution ?? selected) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('revalidate')} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceRevalidateArtifacts')}</button> : null}
             {selected.originThreadId || currentExecution?.originThreadId || !selected.visibility ? <button type="button" onClick={() => onOpenThread((selected.originThreadId ?? currentExecution?.originThreadId ?? selected.threadId))} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs"><MessageSquare className="h-3.5 w-3.5" />{t('taskWorkspaceOpenConversation')}</button> : null}
-            {!TERMINAL.has(currentExecution?.status ?? selected.status) && currentExecution?.status !== 'paused' ? <button type="button" disabled={actionBusy} onClick={() => void mutate('pause')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Pause className="h-3.5 w-3.5" />{t('taskWorkspacePause')}</button> : null}
-            {['paused', 'stalled', 'waiting_user'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('resume')} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Play className="h-3.5 w-3.5" />{t('taskRunResume')}</button> : null}
+            {!TERMINAL.has(currentExecution?.status ?? selected.status) && (currentExecution?.status ?? selected.status) !== 'paused' ? <button type="button" disabled={actionBusy} onClick={() => void mutate('pause')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Pause className="h-3.5 w-3.5" />{t('taskWorkspacePause')}</button> : null}
+            {!hasPublicQueryRecovery && ['paused', 'stalled', 'waiting_user'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('resume')} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Play className="h-3.5 w-3.5" />{t('taskRunResume')}</button> : null}
             {['failed', 'cancelled'].includes(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('retry')} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskRunRetry')}</button> : null}
             {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('cancel')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Square className="h-3.5 w-3.5" />{t('taskRunCancel')}</button> : null}
           </div>
-          {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} conversationThreadId={conversationForAttention(item)} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
-          <div className="mb-4"><TaskPermissionPanel key={(currentExecution ?? selected).id} taskId={(currentExecution ?? selected).id} revision={(currentExecution ?? selected).revision} autoLoad onConfirmed={() => void refresh()} /></div>
+          <TaskPublicQueryRecoveryCard key={`public-query-recovery:${(currentExecution ?? selected).id}`} task={currentExecution ?? selected} runtimeReady={runtimeReady} disabled={actionBusy} onChanged={() => refresh()} onProjectionChange={recoveryProjectionChanged} onNotice={setControlNotice} />
+          {!['running', 'queued', 'retrying'].includes((currentExecution ?? selected).status) ? <TaskBudgetControl key={selected.id} task={selected} onChanged={() => refresh()} /> : null}
+          {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} ownerTask={selectedGroup?.all.find(task => task.id === item.taskId)} conversationThreadId={conversationForAttention(item)} workspaceRoot={selectedGroup?.all.find(task => task.id === item.taskId)?.workspaceRoot} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
+          <details key={`permissions:${(currentExecution ?? selected).id}`} className="mb-4 rounded-lg border border-ds-border p-3 text-xs"><summary className="cursor-pointer font-medium">{t('taskPermissionReview')}</summary><TaskPermissionPanel key={(currentExecution ?? selected).id} taskId={(currentExecution ?? selected).id} revision={(currentExecution ?? selected).revision} autoLoad onConfirmed={message => { setControlNotice(message); void refresh() }} /></details>
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunNodes')}</h3>
-          <ol className="mb-4 space-y-1.5">{(currentExecution ?? selected).nodes.map(node => <li key={node.id} className="flex items-center gap-2 rounded-lg bg-ds-main px-3 py-2 text-xs"><span className="min-w-0 flex-1">{node.title}</span><span className="shrink-0 text-ds-muted">{t(`taskNodeStatus_${node.status}`)}</span></li>)}</ol>
+          <ol className="mb-4 space-y-1.5">{(currentExecution ?? selected).nodes.map(node => <li key={node.id} className="flex items-center gap-2 rounded-lg bg-ds-main px-3 py-2 text-xs"><span className="min-w-0 flex-1">{node.title}</span><span className="shrink-0 text-ds-muted">{t(nodeStatusLabelKey((currentExecution ?? selected).status, node.status))}</span></li>)}</ol>
           <TaskExecutionEvidence task={currentExecution ?? selected} relatedTasks={selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).members : [selected]} receipts={receipts.filter(receipt => (selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).members : [selected]).some(task => task.id === receipt.taskId))} onConfigureProvider={onConfigureProvider} onConfigureReplyDelivery={onConfigureReplyDelivery} onVerify={async receipt => {
             const owner = selectedGroup?.all.find(task => task.id === receipt.taskId)
             if (!owner) throw new Error(t('taskEffectReadbackUnconfirmed'))
             const result = await window.workwise.verifyTaskOperationReceipt(owner.id, receipt.id, { expectedRevision: owner.revision, idempotencyKey: operationKey() })
-            await refresh()
+            if (!result.browserReview) await refresh()
             return result
+          }} onConfirmBrowser={async (receipt, reviewId, decision) => {
+            const owner = selectedGroup?.all.find(task => task.id === receipt.taskId)
+            if (!owner) throw new Error(t('taskBrowserReviewUnavailable'))
+            const response = await window.workwise.runtimeRequest(`/v1/tasks/${encodeURIComponent(owner.id)}/receipts/${encodeURIComponent(receipt.id)}/browser-confirm`, 'POST', JSON.stringify({ expectedRevision: owner.revision, idempotencyKey: operationKey(), reviewId, decision }))
+            if (!response.ok) {
+              let code = 'browser_review_unavailable'
+              try { const body = JSON.parse(response.body); if (/^[a-z][a-z0-9_]{0,99}$/.test(body.message)) code = body.message } catch { /* Keep the safe scoped failure code. */ }
+              return { taskId: owner.id, receiptId: receipt.id, status: 'outcome_unknown' as const, errorCode: code }
+            }
+            await refresh()
+            return JSON.parse(response.body)
           }} />
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunArtifacts')}</h3>
           {artifactOpenError ? <p role="alert" className="mb-3 text-xs text-red-600">{artifactOpenError}</p> : null}
-          {selectedGroup && taskGroupArtifacts(selectedGroup).length ? <ul className="mb-4 space-y-2">{taskGroupArtifacts(selectedGroup).map(({ task: artifactTask, artifact }) => <li key={`${artifactTask.id}:${artifact.id}`} className="rounded-lg border border-ds-border px-3 py-2"><button type="button" onClick={() => void openArtifact(artifactTask, artifact)} className="flex w-full items-start gap-2 text-left text-xs text-accent"><FileText className="h-4 w-4 shrink-0" /><span className="break-all">{artifact.absolutePath ? artifact.relativePath.split(/[\\/]/).at(-1) : artifact.relativePath}</span></button><p className="mt-1 text-[11px] text-ds-muted">{t(`taskArtifactValidation_${artifact.validation}`)} · {dateLabel(artifact.createdAt)}</p>{artifact.validationMessage ? <p className="mt-1 text-xs text-ds-muted">{artifact.validationMessage}</p> : null}<TaskArtifactReview task={artifactTask} artifact={artifact} onOpen={() => openArtifact(artifactTask, artifact)} /></li>)}</ul> : <p className="mb-4 text-xs text-ds-faint">{t('taskRunNoArtifacts')}</p>}
-          {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <form onSubmit={event => { event.preventDefault(); void mutate('input') }} className="mb-4 rounded-xl border border-ds-border bg-ds-main p-3"><label htmlFor="task-supplement" className="text-xs font-semibold">{t('taskWorkspaceSupplement')}</label><textarea id="task-supplement" value={drafts[selected.id] ?? ''} onChange={event => setDrafts(current => ({ ...current, [selected.id]: event.target.value }))} rows={3} placeholder={t('taskWorkspaceSupplementHint')} className="mt-2 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-sm" /><button type="submit" disabled={actionBusy || !drafts[selected.id]?.trim()} className="mt-2 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceSendSupplement')}</button></form> : null}
+          {selectedGroup && taskGroupArtifacts(selectedGroup).length ? <ul className="mb-4 space-y-2">{taskGroupArtifacts(selectedGroup).map(({ task: artifactTask, artifact }) => <li key={`${artifactTask.id}:${artifact.id}`} className="rounded-lg border border-ds-border px-3 py-2"><button type="button" onClick={() => void openArtifact(artifactTask, artifact)} className="flex w-full items-start gap-2 text-left text-xs text-accent"><FileText className="h-4 w-4 shrink-0" /><span className="break-all">{artifact.absolutePath ? artifact.relativePath.split(/[\\/]/).at(-1) : artifact.relativePath}</span></button><p className="mt-1 text-[11px] text-ds-muted">{artifact.storage === 'task' ? `${t('taskArtifactManagedStorage')} · ` : ''}{t(taskArtifactValidationLabelKey(artifactTask, artifact))} · {dateLabel(artifact.createdAt)}</p>{artifact.validationMessage ? <p className="mt-1 text-xs text-ds-muted">{artifact.validationMessage}</p> : null}<TaskArtifactReview task={artifactTask} artifact={artifact} onOpen={() => openArtifact(artifactTask, artifact)} /></li>)}</ul> : <p className="mb-4 text-xs text-ds-faint">{t('taskRunNoArtifacts')}</p>}
+          {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <form onSubmit={event => { event.preventDefault(); void mutate('input') }} className="mb-4 rounded-xl border border-ds-border bg-ds-main p-3"><label htmlFor="task-supplement" className="text-xs font-semibold">{t('taskWorkspaceSupplement')}</label><textarea id="task-supplement" value={drafts[selected.id] ?? ''} onChange={event => setDrafts(current => ({ ...current, [selected.id]: event.target.value }))} rows={2} placeholder={t('taskWorkspaceSupplementHint')} className="mt-2 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-sm" /><button type="submit" disabled={actionBusy || !drafts[selected.id]?.trim()} className="mt-2 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceSendSupplement')}</button></form> : null}
           {inputs.length ? <details className="mb-4"><summary className="cursor-pointer text-xs font-semibold">{t('taskWorkspaceInputs')} ({inputs.length})</summary><ul className="mt-2 space-y-2">{inputs.map(input => <li key={input.id} className="rounded-lg bg-ds-main p-2 text-xs"><p className="whitespace-pre-wrap">{input.text}</p><p className="mt-1 text-ds-faint">{dateLabel(input.createdAt)} · {input.consumedAt ? t('taskWorkspaceInputConsumed') : input.deliveredAt ? t('taskWorkspaceInputDelivered') : t('taskWorkspaceInputSaved')}</p></li>)}</ul></details> : null}
           {selectedGroup && selectedGroup.children.length ? <div className="mb-4"><h3 className="text-xs font-semibold">{t('taskWorkspaceSubtasks')}</h3><ul className="mt-2 space-y-1.5">{selectedGroup.children.map(child => <li key={child.id} className="flex items-center gap-2 rounded-lg bg-ds-main px-3 py-2 text-xs"><span className="min-w-0 flex-1 truncate">{taskDisplayGoal(child)}</span><span className="shrink-0 text-ds-muted">{t(`taskRunStatus_${child.status}`)}</span></li>)}</ul></div> : null}
-          {(currentExecution ?? selected).finalResponse ? <details className="mb-4" open={(currentExecution ?? selected).status === 'completed'}><summary className="cursor-pointer text-xs font-semibold">{t('taskWorkspaceResult')}</summary><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">{(currentExecution ?? selected).finalResponse}</p></details> : null}
+          {(currentExecution ?? selected).finalResponse ? <details className="mb-4" open={(currentExecution ?? selected).status === 'completed'}><summary className="cursor-pointer text-xs font-semibold">{t('taskWorkspaceResult')}</summary><AssistantMarkdown text={(currentExecution ?? selected).finalResponse!} streaming={false} workspaceRoot={(currentExecution ?? selected).workspaceRoot} restricted className="ds-markdown mt-2 min-w-0 break-words text-sm leading-relaxed" /></details> : null}
           <details><summary className="cursor-pointer text-xs text-ds-muted">{t('taskWorkspaceActivity')} ({events.length})</summary><ol className="mt-2 space-y-2">{events.map(event => <li key={`${event.taskId}:${event.sequence}`} className="text-xs"><time className="text-ds-faint">{dateLabel(event.createdAt)}</time><p>{t(`taskEvent_${event.kind}`, { defaultValue: t('taskWorkspaceStatusUpdated') })}</p></li>)}</ol></details>
-        </article> : <div className="hidden rounded-xl border border-dashed border-ds-border p-8 text-center text-sm text-ds-faint lg:block">{t('taskWorkspaceSelectTask')}</div>}
+        </article> : selectedAttentionId ? null : <div className="ds-task-workspace-empty rounded-xl border border-dashed border-ds-border p-8 text-center text-sm text-ds-faint">{t('taskSidebarSelect')}</div>}
       </div>
     </div>
     {templateId ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5" onClick={() => { if (!actionBusy) setTemplateId(null) }}><form role="dialog" aria-modal="true" aria-labelledby="task-template-title" onSubmit={event => void launchTemplate(event)} onClick={event => event.stopPropagation()} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-ds-border bg-ds-card p-5 shadow-xl"><div className="flex items-center gap-3"><h2 id="task-template-title" className="flex-1 text-base font-semibold">{t(`taskTemplate_${templateId}`)}</h2><button type="button" disabled={actionBusy} aria-label={t('taskWorkspaceClose')} onClick={() => setTemplateId(null)}><X className="h-4 w-4" /></button></div><p className="mt-2 break-all text-xs text-ds-muted">{workspaceRoot}</p><div className="mt-4 space-y-2 rounded-lg border border-ds-border p-3 text-xs">

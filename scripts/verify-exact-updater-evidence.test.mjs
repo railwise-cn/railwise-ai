@@ -21,8 +21,8 @@ function identity(sourceHead, version, { compatibility = false } = {}) {
   }
 }
 
-function fixture(t) {
-  const sourceHead = 'a'.repeat(40); const version = '0.5.5'
+function fixture(t, { version = '0.5.5', baseVersion = '0.5.4' } = {}) {
+  const sourceHead = 'a'.repeat(40)
   const headRef = 'refs/heads/codex/durable-task-document-workbench'
   const workflowRef = `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@${headRef}`
   const build = { mode: 'exact-build', repository: RELEASE_REPOSITORY, workflowPath: RELEASE_WORKFLOW, sourceHead, headRef, workflowRef, workflowSha: sourceHead,
@@ -31,9 +31,9 @@ function fixture(t) {
     artifact: { id: 8192, name: `exact-package-updater-${build.runId}`, digest: `sha256:${'b'.repeat(64)}` } }
   const nativeBytes = Buffer.from('{"schemaVersion":1,"status":"passed","synthetic":true}\n')
   const target = identity(sourceHead, version)
-  const machine = { schemaVersion: 1, status: 'passed', platform: 'darwin', arch: 'arm64', baseVersion: '0.5.4', targetVersion: version,
+  const machine = { schemaVersion: 1, status: 'passed', platform: 'darwin', arch: 'arm64', baseVersion, targetVersion: version,
     targetAsarSha256: target.asarSha256, installedAsarSha256: target.asarSha256, targetServiceIdentity: target,
-    dataSeed: { serviceSource: 'source-bound-compatibility-service', serviceIdentity: identity(sourceHead, '0.5.4', { compatibility: true }) },
+    dataSeed: { serviceSource: 'source-bound-compatibility-service', serviceIdentity: identity(sourceHead, baseVersion, { compatibility: true }) },
     dataReadback: { serviceSource: 'target-package', serviceIdentity: structuredClone(target) }, dataRestartReadback: { serviceSource: 'target-package', serviceIdentity: structuredClone(target) },
     nativeReportSha256: reportSha256(nativeBytes),
     provenance: { repository: run.repository, workflowPath: run.workflowPath, workflowRef, workflowSha: sourceHead, sourceHead, runId: run.runId, runAttempt: run.runAttempt, mode: 'private-exact-package-smoke' },
@@ -82,6 +82,17 @@ test('same exact-build branch run retains raw reports and needs no second main f
   const archive = f.archive()
   verifyExactUpdaterEvidenceArchive({ ...f, archive })
   verifyRemoteExactUpdaterEvidence(f, f.api)
+})
+
+test('explicit pinned 0.5.6 baseline validates 0.5.7 without reinterpreting historical reports', t => {
+  const f = fixture(t, { version: '0.5.7', baseVersion: '0.5.6' })
+  assert.equal(validateExactUpdaterEvidenceRun(f.run, f.machine, f.build, f.version, '0.5.6'), f.run)
+  assert.throws(() => validateExactUpdaterEvidenceRun(f.run, f.machine, f.build, f.version), /baseline version mismatch/)
+  for (const expected of ['0.5.4', '0.5.9', 'https://example.invalid/baseline.dmg', 'v0.5.6']) {
+    assert.throws(() => validateExactUpdaterEvidenceRun(f.run, f.machine, f.build, f.version, expected))
+  }
+  f.machine.dataSeed.serviceIdentity.packageVersion = '0.5.4'
+  assert.throws(() => validateExactUpdaterEvidenceRun(f.run, f.machine, f.build, f.version, '0.5.6'), /dataSeed package version mismatch/)
 })
 
 test('raw same-run provenance, original privatePackage and exact manifest cannot be forged', async t => {

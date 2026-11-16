@@ -98,6 +98,23 @@ describe('runtime SSE IPC lifecycle', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('carries task progress without allocating a durable cursor and reconnects from the original task change', async () => {
+    vi.useFakeTimers()
+    const harness=createHarness(),progress={kind:'task_progress',taskId:'task-fixture',payload:{taskId:'task-fixture',taskRevision:2,turnId:'turn',sampledAt:'2026-11-16T12:00:15Z'}}
+    const read=vi.fn().mockResolvedValueOnce({done:false,value:new TextEncoder().encode(`id: 9\nevent: task_changed\ndata: {"seq":9,"kind":"task_changed","payload":{"id":"task-fixture"}}\n\nevent: task_progress\ndata: ${JSON.stringify(progress)}\n\n`)})
+      .mockRejectedValueOnce(new Error('network disconnected'))
+    const fetchMock=vi.fn().mockResolvedValueOnce({ok:true,body:{getReader:()=>({read})}}).mockImplementation(()=>new Promise<Response>(()=>undefined))
+    vi.stubGlobal('fetch',fetchMock)
+    await harness.start('progress-stream','unused','tasks');await vi.advanceTimersByTimeAsync(0)
+    const batches=harness.sender.send.mock.calls.filter(([name])=>name==='runtime:sse-event').flatMap(([,value])=>value.events)
+    expect(batches.find(value=>value.kind==='task_progress')).toEqual(progress)
+    expect(batches.find(value=>value.kind==='task_progress')).not.toHaveProperty('seq')
+    await vi.advanceTimersByTimeAsync(750)
+    expect(fetchMock.mock.calls[1][0].searchParams.get('since_seq')).toBe('9')
+    expect(fetchMock.mock.calls[1][1].headers['Last-Event-ID']).toBe('9')
+    await harness.stop('progress-stream')
+  })
+
   it.each(['settings', 'runtime'] as const)('keeps a stopped subscription stopped during reconnect %s refresh', async phase => {
     vi.useFakeTimers()
     const harness = createHarness()

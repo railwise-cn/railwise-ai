@@ -9,6 +9,8 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { startWorkspaceFileWatch, type WorkspaceFileWatch } from '../services/workspace-file-watch-service'
 import { z } from 'zod'
+import { BrowserOrigin } from '../../../kun/src/contracts/browser-skill.js'
+import { BROWSER_EXTENSION_URLS, getManagedBrowserSkillService } from '../services/managed-browser-skill-service'
 import {
   type AppSettingsPatch,
   type AppSettingsV1,
@@ -243,6 +245,7 @@ import { McpConfigService } from '../services/mcp-config-service'
 import { CatalogCredentialService } from '../services/catalog-credential-service'
 import { activatePluginPackage } from '../services/plugin-activation-service'
 import { openVerifiedTaskArtifact } from '../services/task-artifact-open'
+import { TaskArtifactPreviewService } from '../services/task-artifact-preview-service'
 import { MarketplaceCatalogService } from '../services/marketplace-catalog-service'
 import { PluginManagementService } from '../services/plugin-management-service'
 import type { CatalogSourceV1 } from '../../shared/marketplace'
@@ -318,6 +321,8 @@ type RegisterAppIpcHandlersOptions = {
   refreshManagedDingTalkCapabilities?: (status: import('../../shared/managed-dws').ManagedDwsStatus) => Promise<void | { enabled: boolean }>
   setManagedDingTalkEnabled?: (enabled: boolean) => Promise<import('../../shared/managed-dws').ManagedDwsResult>
   onMcpServersChanged?: (snapshot: import('../services/mcp-config-service').McpRuntimeSnapshotV1) => Promise<void>
+  onSkillsChanged?: () => Promise<void>
+  refreshBrowserSkill?: (status: import('../../../kun/src/contracts/browser-skill.js').BrowserCapabilityConfig) => Promise<void>
   onRuntimeMcpConfigWritten?: (path: string, content: string) => Promise<void> | void
   showTurnCompleteNotification: (
     payload: TurnCompleteNotificationPayload
@@ -684,6 +689,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     resolveLogDirectory,
     logError
   } = options
+  const taskArtifactPreview = new TaskArtifactPreviewService(runtimeRequest)
+  app.once('before-quit', () => { void taskArtifactPreview.dispose() })
   const workspaceFileWatchers = new Map<string, WorkspaceFileWatchRecord>()
   const agentProfileService = new AgentProfileService()
   const workspaceTrustService = new WorkspaceTrustService()
@@ -712,10 +719,18 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ;(app as typeof app & { once?: typeof app.once }).once?.('before-quit', () => mcpConfigService.dispose())
   let skillCatalogGeneration = 1
 
-  const notifySkillsChanged = (): number => {
+  const notifySkillsChanged = async (): Promise<number> => {
     skillCatalogGeneration += 1
     getMainWindow()?.webContents.send('skills:changed', skillCatalogGeneration)
+    await options.onSkillsChanged?.()
     return skillCatalogGeneration
+  }
+
+  const notifyPluginCapabilitiesChanged = async (mcpChanged: boolean): Promise<void> => {
+    const results = await Promise.allSettled([notifySkillsChanged(), mcpChanged ? notifyMcpServersChanged() : undefined])
+    const errors = results.filter(result => result.status === 'rejected').map(result => result.reason)
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, '插件已保存，但技能与连接器均未能完成 Runtime 更新。请重试刷新。')
   }
 
   const loadSkillCatalog = async (workspaceRoot?: string) => {
@@ -955,6 +970,11 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const request = parseIpcPayload('task-artifact:open', z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict(), payload)
     return openVerifiedTaskArtifact(request, { runtimeRequest, openPath: path => shell.openPath(path) })
   })
+  ipcMain.handle('task-artifact:preview', async (_, payload: unknown) => {
+    const request = parseIpcPayload('task-artifact:preview', z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict(), payload)
+    try { return { ok: true, ...await taskArtifactPreview.open(request) } }
+    catch (error) { return { ok: false, message: error instanceof Error ? error.message : '网页成果暂时无法预览。' } }
+  })
   ipcMain.handle('mcp-server:save', async (_, payload: unknown) => {
     const request = parseIpcPayload('mcp-server:save', mcpServerSavePayloadSchema, payload)
     if (request.config.managedPreset === 'zotero-readonly') {
@@ -1110,34 +1130,40 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   ipcMain.handle('plugin:install', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:install', pluginInstallPayloadSchema, payload)
+    let mcpChanged = false
     const installed = await pluginManagementService.installPrepared(
       request,
-      async (record, item) => activatePluginPackage({
-        item,
-        installed: record,
-        workspaceRoot: record.workspaceRoot,
-        mcpConfigService,
-        idempotencyKey: request.idempotencyKey
-      })
+      async (record, item) => {
+        const applied = await activatePluginPackage({
+          item,
+          installed: record,
+          workspaceRoot: record.workspaceRoot,
+          mcpConfigService,
+          idempotencyKey: request.idempotencyKey
+        })
+        mcpChanged = applied.mcpChanged
+      }
     )
-    notifySkillsChanged()
-    await notifyMcpServersChanged()
+    await notifyPluginCapabilitiesChanged(mcpChanged)
     return installed
   })
   ipcMain.handle('plugin:rollback', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:rollback', pluginRollbackPayloadSchema, payload)
+    let mcpChanged = false
     const installed = await pluginManagementService.rollback(
       request,
-      async (record, item) => activatePluginPackage({
-        item,
-        installed: record,
-        workspaceRoot: record.workspaceRoot,
-        mcpConfigService,
-        idempotencyKey: `${request.idempotencyKey}:activate`
-      })
+      async (record, item) => {
+        const applied = await activatePluginPackage({
+          item,
+          installed: record,
+          workspaceRoot: record.workspaceRoot,
+          mcpConfigService,
+          idempotencyKey: `${request.idempotencyKey}:activate`
+        })
+        mcpChanged = applied.mcpChanged
+      }
     )
-    notifySkillsChanged()
-    await notifyMcpServersChanged()
+    await notifyPluginCapabilitiesChanged(mcpChanged)
     return installed
   })
   ipcMain.handle('plugin:update-permissions', async (_, payload: unknown) => {
@@ -1150,17 +1176,23 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       candidate.package.id === request.packageId && candidate.package.source.id === installed.source.id
     )
     if (!entry) throw new Error('Installed package is not available in the current catalog.')
-    return pluginManagementService.updatePermissions(
+    let mcpChanged = false
+    const updated = await pluginManagementService.updatePermissions(
       entry.package,
       request,
-      async (record, item) => activatePluginPackage({
-        item,
-        installed: record,
-        workspaceRoot: record.workspaceRoot,
-        mcpConfigService,
-        idempotencyKey: `${request.idempotencyKey}:activate`
-      })
+      async (record, item) => {
+        const applied = await activatePluginPackage({
+          item,
+          installed: record,
+          workspaceRoot: record.workspaceRoot,
+          mcpConfigService,
+          idempotencyKey: `${request.idempotencyKey}:activate`
+        })
+        mcpChanged = applied.mcpChanged
+      }
     )
+    await notifyPluginCapabilitiesChanged(mcpChanged)
+    return updated
   })
   ipcMain.handle('document-engine:list', async () => {
     const settings = await store.load()
@@ -1655,7 +1687,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         const filePath = join(skillDir, 'SKILL.md')
         await mkdir(skillDir, { recursive: true })
         await durableWriteFile(filePath, request.content)
-        notifySkillsChanged()
+        await notifySkillsChanged()
         return { ok: true as const, path: filePath }
       } catch (error) {
         return {
@@ -1673,20 +1705,21 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
 
   ipcMain.handle('skill:refresh', async (_, payload: unknown) => {
     const request = parseIpcPayload('skill:refresh', skillListPayloadSchema, payload)
+    await notifySkillsChanged()
     return loadSkillCatalog(request.workspaceRoot)
   })
 
   ipcMain.handle('skill:install-github', async (_, payload: unknown) => {
     const request = parseIpcPayload('skill:install-github', githubSkillInstallPayloadSchema, payload)
     const result = await installGithubSkill(request.rootPath, request.source)
-    if (result.ok) notifySkillsChanged()
+    if (result.ok) await notifySkillsChanged()
     return result
   })
 
   ipcMain.handle('skill:install-bundled', async (_, payload: unknown) => {
     const request = parseIpcPayload('skill:install-bundled', bundledSkillInstallPayloadSchema, payload)
     const result = await installBundledSkill(request.rootPath, request.source)
-    if (result.ok) notifySkillsChanged()
+    if (result.ok) await notifySkillsChanged()
     return result
   })
 
@@ -1699,7 +1732,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const request = parseIpcPayload('skill:sync-github', githubSkillSyncPayloadSchema, payload)
     const settings = await store.load()
     const result = await syncGithubManagedSkills(settings, request.workspaceRoot)
-    if (result.ok && result.updated > 0) notifySkillsChanged()
+    if (result.ok && result.updated > 0) await notifySkillsChanged()
     return result
   })
 
@@ -1713,6 +1746,40 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     }
     return result
   }
+  const refreshBrowser = async (result: import('../../shared/managed-browser-skill').ManagedBrowserSkillResult) => {
+    const { ownedDaemon: _owned, skillInstalled: _skill, ...status } = result.status
+    try { await options.refreshBrowserSkill?.(status) }
+    catch { return { ...result, ok: false, message: '浏览器状态已保存，Runtime 刷新失败。请重新检查连接。' } }
+    return result
+  }
+  ipcMain.handle('tool:browser-skill:diagnose', async () => refreshBrowser(await getManagedBrowserSkillService().diagnose()))
+  ipcMain.handle('tool:browser-skill:connect', async () => refreshBrowser(await getManagedBrowserSkillService().connect()))
+  ipcMain.handle('tool:browser-skill:configure', async (_, payload: unknown) => {
+    const request = parseIpcPayload('tool:browser-skill:configure', z.object({
+      enabled: z.boolean(), browserInstanceId: z.string().min(1).max(512).optional(),
+      origins: z.array(BrowserOrigin).max(64), interaction: z.enum(['observe', 'interact']),
+      expectedRevision: z.number().int().nonnegative()
+    }).strict(), payload)
+    return refreshBrowser(await getManagedBrowserSkillService().configure(request))
+  })
+  ipcMain.handle('tool:browser-skill:extension', async (_, payload: unknown) => {
+    const browser = parseIpcPayload('tool:browser-skill:extension', z.enum(['chrome', 'edge']), payload)
+    await shell.openExternal(BROWSER_EXTENSION_URLS[browser])
+  })
+  ipcMain.handle('tool:browser-skill:install', async () => {
+    const result = await getManagedBrowserSkillService().install()
+    if (!result.ok) return result
+    const installed = await pluginManagementService.listInstalled()
+    if (!installed.some(item => item.packageId === 'browser-skill')) {
+      const entry = (await marketplaceCatalogService.listPackages()).packages.find(item => item.package.id === 'browser-skill')
+      if (!entry) throw new Error('BrowserSkill 技能来源当前不可用。CLI 已保留，可稍后重试安装配套技能。')
+      const prepared = await pluginManagementService.prepareCatalogPackage(entry.package)
+      await pluginManagementService.installPrepared({ preparedId: prepared.id, reviewSha256: prepared.reviewSha256,
+        expectedCurrentVersion: null, scope: 'user', permissions: [], idempotencyKey: 'browser-skill-companion-' + prepared.reviewSha256 })
+    }
+    await notifySkillsChanged()
+    return refreshBrowser({ ...result, status: { ...result.status, skillInstalled: true } })
+  })
   ipcMain.handle('tool:dingtalk:diagnose', async () => refreshDingTalk(await diagnoseManagedDingTalk()))
   let taskAccessCheck: Promise<import('../../shared/managed-dws').ManagedDwsTaskAccessResult> | undefined
   ipcMain.handle('tool:dingtalk:check-task-access', async (_, payload: unknown) => {
@@ -1742,7 +1809,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('tool:lark-login:complete', async () => {
     const result = await completeManagedLarkLogin()
     if (result.ok) {
-      notifySkillsChanged()
+      await notifySkillsChanged()
       try { await refreshManagedCapabilities?.(result.status) } catch { return { ok: false, message: 'Account connected, but Runtime capabilities could not refresh. Retry the capability check.' } }
     }
     return result
@@ -1752,7 +1819,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const id = parseIpcPayload('tool:install-managed', managedToolIdSchema, payload)
     const result = await installManagedTool(id)
     if (result.ok) {
-      notifySkillsChanged()
+      await notifySkillsChanged()
       if (id === 'lark-cli') await refreshManagedCapabilities?.(result.status).catch(() => undefined)
     }
     return result
@@ -1762,7 +1829,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const id = parseIpcPayload('tool:update-managed', managedToolIdSchema, payload)
     const result = await updateManagedTool(id)
     if (result.ok) {
-      notifySkillsChanged()
+      await notifySkillsChanged()
       if (id === 'lark-cli') await refreshManagedCapabilities?.(result.status).catch(() => undefined)
     }
     return result
@@ -1781,7 +1848,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const id = parseIpcPayload('tool:remove-managed', managedToolIdSchema, payload)
     const result = await removeManagedTool(id)
     if (result.ok) {
-      notifySkillsChanged()
+      await notifySkillsChanged()
       if (id === 'lark-cli') await refreshManagedCapabilities?.(result.status).catch(() => undefined)
     }
     return result

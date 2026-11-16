@@ -6,9 +6,12 @@ import { isDeepStrictEqual } from 'node:util'
 import { githubApi, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, verifyUpdaterEvidenceArchive } from './verify-frozen-updater-evidence.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
+import { resolveUpdaterBaseline } from './frozen-release-version.mjs'
 
 export const EXACT_UPDATER_WORKFLOW = RELEASE_WORKFLOW
 export const EXACT_UPDATER_JOB = 'Private exact-package updater smoke'
+// Historical manifests omit the baseline. New evidence supplies its reviewed
+// baseline explicitly without reinterpreting the original reports.
 export const EXACT_UPDATER_BASE_VERSION = '0.5.4'
 const RUN_STEP = 'Exercise official baseline to exact artifact once'
 const RETAIN_STEP = 'Retain exact-package updater evidence'
@@ -60,7 +63,8 @@ function validateRawReport(run, machine) {
   if (!/^[a-f0-9]{64}$/.test(machine.nativeReportSha256 ?? '')) fail('retained native report SHA256 is required')
 }
 
-export function validateExactUpdaterEvidenceRun(run, machine, reviewedBuild, version) {
+export function validateExactUpdaterEvidenceRun(run, machine, reviewedBuild, version, baseVersion = EXACT_UPDATER_BASE_VERSION) {
+  resolveUpdaterBaseline(baseVersion)
   validateRawReport(run, machine)
   object(reviewedBuild, 'exact reviewed build')
   equal(reviewedBuild.mode, 'exact-build', 'reviewed build mode')
@@ -70,7 +74,7 @@ export function validateExactUpdaterEvidenceRun(run, machine, reviewedBuild, ver
   if (!Array.isArray(reviewedBuild.files)) fail('exact reviewed file manifest is required')
   const files = reviewedBuild.files.filter(file => file.artifact === 'release-mac')
   if (!isDeepStrictEqual(machine.privatePackage.files, files)) fail('raw private package files differ from the exact reviewed build')
-  validateUpdaterServiceEvidence(machine, { sourceHead: run.sourceHead, version, baseVersion: EXACT_UPDATER_BASE_VERSION })
+  validateUpdaterServiceEvidence(machine, { sourceHead: run.sourceHead, version, baseVersion })
   return run
 }
 

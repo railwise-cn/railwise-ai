@@ -8,6 +8,9 @@ export function HelpReader(): ReactElement {
   const [query, setQuery] = useState('')
   const [error, setError] = useState('')
   const [headings, setHeadings] = useState<Array<{ id: string; text: string; level: number }>>([])
+  const [compact, setCompact] = useState(false)
+  const [outlineOpen, setOutlineOpen] = useState(false)
+  const reader = useRef<HTMLElement>(null)
   const article = useRef<HTMLDivElement>(null)
   const body = helpDocuments[location.document] ?? helpDocuments[HELP_HOME]
   const html = useMemo(() => renderWriteAdvancedPreview(body), [body])
@@ -18,6 +21,16 @@ export function HelpReader(): ReactElement {
     setError('')
     setLocation({ document, anchor })
   }
+
+  useEffect(() => {
+    if (!reader.current || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect.width
+      if (width !== undefined) setCompact(width < 760)
+    })
+    observer.observe(reader.current)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     const root = article.current
@@ -59,11 +72,11 @@ export function HelpReader(): ReactElement {
     void window.workwise.openExternal(target).catch(() => setError('浏览器未能打开链接，请稍后重试。'))
   }
 
-  return <section className="min-w-0" aria-label="用户使用手册">
+  return <section ref={reader} className="ds-help-reader min-w-0" aria-label="用户使用手册">
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="flex items-center gap-2 text-lg font-semibold"><BookOpen className="h-5 w-5" />用户使用手册</h2>
         <p className="mt-1 text-xs text-ds-muted">应用 {HELP_VERSION} · 手册更新 {HELP_UPDATED_AT} · 离线可读</p></div>
-      <label className="relative w-full sm:w-72"><Search className="absolute left-3 top-2.5 h-4 w-4 text-ds-muted" />
+      <label className="ds-help-search relative min-w-0 max-w-full"><Search className="absolute left-3 top-2.5 h-4 w-4 text-ds-muted" />
         <input aria-label="搜索帮助" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索操作、功能或问题" className="h-9 w-full rounded-lg border border-ds-border bg-ds-card pl-9 pr-3 text-sm" /></label>
     </div>
     {error ? <p role="alert" className="mb-3 text-sm text-red-600">{error}</p> : null}
@@ -71,12 +84,15 @@ export function HelpReader(): ReactElement {
       {matches.length ? matches.map((match, index) => <button type="button" key={`${match.document}:${index}`} onClick={() => navigate(match.document, match.anchor)} className="block w-full rounded-lg border border-ds-border bg-ds-card p-3 text-left hover:bg-ds-hover">
         <span className="block text-sm font-medium">{match.heading}</span><span className="mt-1 block text-xs leading-5 text-ds-muted">{match.excerpt}</span>
       </button>) : <p className="py-8 text-sm text-ds-muted">没有找到相关内容，请换一个关键词。</p>}
-    </div> : <div className="grid gap-6 xl:grid-cols-[210px_minmax(0,1fr)]">
-      <nav aria-label="手册目录" className="max-h-[65vh] overflow-y-auto rounded-lg border border-ds-border bg-ds-card p-3 xl:sticky xl:top-0">
+    </div> : <div className="ds-help-layout grid min-w-0 gap-6">
+      <details className="ds-help-outline min-w-0 self-start rounded-lg border border-ds-border bg-ds-card" open={!compact || outlineOpen} onToggle={event => { if (compact) setOutlineOpen(event.currentTarget.open) }}>
+      <summary className="ds-help-outline-toggle cursor-pointer px-3 py-3 text-sm font-medium">章节目录</summary>
+      <nav aria-label="手册目录" className="ds-help-outline-nav min-w-0 overflow-y-auto p-3">
         {location.document !== HELP_HOME ? <button type="button" onClick={() => navigate(HELP_HOME)} className="mb-3 flex items-center gap-1 text-xs text-accent"><ArrowLeft className="h-3.5 w-3.5" />返回完整手册</button> : null}
-        {headings.map(heading => <button type="button" key={heading.id} onClick={() => navigate(location.document, heading.id)} className={`block w-full rounded px-2 py-1.5 text-left text-xs leading-5 hover:bg-ds-hover ${heading.level === 3 ? 'pl-4 text-ds-muted' : 'font-medium'}`}>{heading.text}</button>)}
+        {headings.map(heading => <button type="button" key={heading.id} onClick={() => { navigate(location.document, heading.id); if (compact) setOutlineOpen(false) }} className={`block w-full break-words rounded px-2 py-1.5 text-left text-xs leading-5 hover:bg-ds-hover ${heading.level === 3 ? 'pl-4 text-ds-muted' : 'font-medium'}`}>{heading.text}</button>)}
       </nav>
-      <div ref={article} className="write-markdown-preview prose min-w-0 max-w-none text-ds-ink" onClick={event => {
+      </details>
+      <div ref={article} className="ds-help-article write-markdown-preview prose min-w-0 max-w-none text-ds-ink" onClick={event => {
         const link = (event.target as Element).closest<HTMLAnchorElement>('a')
         if (!link) return
         event.preventDefault()

@@ -21,8 +21,16 @@ function signedFixture() {
   const app = mkdtempSync(join(tmpdir(), 'updater-trust-sealed-'))
   mkdirSync(join(app, 'Contents/_CodeSignature'), { recursive: true })
   writeFileSync(join(app, 'Contents/Info.plist'), 'synthetic bundle metadata')
+  writeFileSync(join(app, 'Contents/CodeResources'), 'synthetic stapled ticket')
   writeFileSync(join(app, 'Contents/_CodeSignature/CodeResources'), 'synthetic signed resource seal')
   return app
+}
+
+function targetPreflightSeal(app) {
+  let seal
+  const { run } = fakeRunner({ staplerResults: [stapleSuccess] })
+  verifyMacosUpdaterTrust(app, { boundary: 'target-zip-preflight', run, onVerifiedSeal: value => { seal = value } })
+  return seal
 }
 
 test('trust diagnostic streams redact credential values and every URL before retention', () => {
@@ -132,7 +140,7 @@ test('CloudKit -1005 retries only stapler, preserves failed attempts, and requir
   try {
     const { run, calls } = fakeRunner({ staplerResults: [cloudKitFailure, stapleSuccess] })
     const events = []; const delays = []
-    const result = verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+    const result = verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run, expectedPreflightSeal: targetPreflightSeal(app),
       record: event => events.push(event), waitForRetry: ms => delays.push(ms) })
     assert.equal(result.stapledNotarization, 'verified')
     assert.deepEqual(delays, [500])
@@ -154,7 +162,7 @@ test('persistent CloudKit transport interruption stops after three recorded atte
   try {
     const { run, calls } = fakeRunner({ staplerResults: [cloudKitFailure] })
     const events = []; const delays = []
-    assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+    assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run, expectedPreflightSeal: targetPreflightSeal(app),
       record: event => events.push(event), waitForRetry: ms => delays.push(ms) }), /Stapled notarization validation failed.*exit 68/)
     assert.deepEqual(delays, [500, 1_000])
     assert.deepEqual(events.filter(event => event.operation === 'bundle-trust-diagnostic' && event.command === 'stapler-validate')
@@ -195,12 +203,13 @@ test('a replaced resource seal or code identity prevents the next stapler attemp
       const { run, calls } = fakeRunner({ staplerResults: [cloudKitFailure, stapleSuccess],
         ...(mutation === 'code-identity' ? { identityOutput: codeIdentity.replace(cdhash, 'f'.repeat(40)) } : {}) })
       const events = []
-      assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+      assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run, expectedPreflightSeal: targetPreflightSeal(app),
         record: event => events.push(event), waitForRetry: () => {
           if (mutation === 'resource-seal') writeFileSync(join(app, 'Contents/_CodeSignature/CodeResources'), 'replaced seal')
-        } }), /sealed identity changed.*before notarization retry/)
+        } }), mutation === 'resource-seal' ? /sealed identity changed.*before notarization retry/ : /preflight seal/)
       assert.equal(calls.filter(call => call.includes('stapler')).length, 1)
-      assert.equal(events.find(event => event.operation === 'bundle-trust-retry-identity').status, 'failed')
+      assert.equal(events.find(event => event.operation === (mutation === 'resource-seal'
+        ? 'bundle-trust-retry-identity' : 'bundle-preflight-seal-check')).status, 'failed')
     } finally { rmSync(app, { recursive: true, force: true }) }
   }
 })
@@ -211,7 +220,7 @@ test('a different bundle returned by a successful retry cannot satisfy the trust
     const changedBundle = { ...stapleSuccess, stdout: stapleSuccess.stdout.replace(cdhash, 'f'.repeat(40)) }
     const { run, calls } = fakeRunner({ staplerResults: [cloudKitFailure, changedBundle] })
     const events = []
-    assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+    assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run, expectedPreflightSeal: targetPreflightSeal(app),
       record: event => events.push(event), waitForRetry: () => {} }), /sealed identity changed.*during notarization retry/)
     assert.equal(calls.filter(call => call.includes('stapler')).length, 2)
     assert.equal(events.find(event => event.operation === 'bundle-trust-retry-result-identity').status, 'failed')
@@ -226,7 +235,130 @@ test('missing identity evidence or failed initial signature cannot enable transp
       const failure = unavailable === 'stapler-identity' ? { ...cloudKitFailure, stdout: cloudKitFailure.stdout.replace(stapleIdentity, '') } : cloudKitFailure
       const { run, calls } = fakeRunner({ staplerResults: [failure, stapleSuccess], signatureExit: unavailable === 'code-signature' ? 1 : 0 })
       assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
-        waitForRetry: () => assert.fail('unverifiable bundle must not schedule a retry') }), /verification failed|validation failed/)
+        expectedPreflightSeal: unavailable === 'resource-seal' ? undefined : targetPreflightSeal(app),
+        waitForRetry: () => assert.fail('unverifiable bundle must not schedule a retry') }), /verification failed|validation failed|preflight seal/)
+      assert.equal(calls.filter(call => call.includes('stapler')).length, 1)
+    } finally { rmSync(app, { recursive: true, force: true }) }
+  }
+})
+
+
+test('actual quoted CoreFoundation signingId permits only the same preflight-sealed bundle to retry CloudKit', () => {
+  const app = signedFixture()
+  try {
+    const expectedPreflightSeal = targetPreflightSeal(app)
+    const quoted = stapleIdentity.replace('signingId = com.example.railwise;', 'signingId = "com.example.railwise";')
+      .replace('teamId = R35G7F4A9U;', 'teamId = "R35G7F4A9U";')
+    const { run, calls } = fakeRunner({ staplerResults: [
+      { ...cloudKitFailure, stdout: cloudKitFailure.stdout.replace(stapleIdentity, quoted) },
+      { ...stapleSuccess, stdout: stapleSuccess.stdout.replace(stapleIdentity, quoted) }
+    ] })
+    const result = verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+      expectedPreflightSeal, waitForRetry: () => {} })
+    assert.equal(result.stapledNotarization, 'verified')
+    assert.equal(calls.filter(call => call.includes('stapler')).length, 2)
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('installed verification cannot mint its own target seal after update or accept an unverified clone', () => {
+  const app = signedFixture()
+  try {
+    const original = targetPreflightSeal(app)
+    for (const expectedPreflightSeal of [undefined, {}, structuredClone(original)]) for (const initial of [stapleSuccess, cloudKitFailure]) {
+      const { run, calls } = fakeRunner({ staplerResults: [initial, stapleSuccess] })
+      let captured
+      assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+        expectedPreflightSeal, onVerifiedSeal: value => { captured = value }, waitForRetry: () => assert.fail('No retry without exact preflight') }), /preflight seal/)
+      assert.equal(captured, undefined)
+      assert.equal(calls.filter(call => call.includes('stapler')).length, 1)
+    }
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('malformed, ambiguous or different signing properties cannot authorize a CloudKit retry or mint a seal', () => {
+  const app = signedFixture()
+  try {
+    const expectedPreflightSeal = targetPreflightSeal(app)
+    const variants = [
+      stapleIdentity.replace('signingId = com.example.railwise;', 'signingId = "com.example.railwise;'),
+      stapleIdentity.replace('signingId = com.example.railwise;', 'signingId = com.example.railwise";'),
+      stapleIdentity.replace('teamId = R35G7F4A9U;', 'teamId = "R35G7F4A9U;'),
+      stapleIdentity.replace('signingId = com.example.railwise;', 'signingId = "com.example.railwise extra";'),
+      stapleIdentity + '    signingId = com.example.railwise;\n',
+      stapleIdentity + '    signingId = "unterminated;\n',
+      stapleIdentity + '    teamId = R35G7F4A9U;\n',
+      stapleIdentity + `    cdhash = {length = 20, bytes = 0x${cdhash}};\n`,
+      stapleIdentity + '    cdhash = malformed;\n',
+      stapleIdentity.replace('com.example.railwise', 'com.example.other'),
+    ]
+    for (const identity of variants) {
+      const { run, calls } = fakeRunner({ staplerResults: [
+        { ...cloudKitFailure, stdout: cloudKitFailure.stdout.replace(stapleIdentity, identity) }, stapleSuccess,
+      ] })
+      assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run, expectedPreflightSeal,
+        waitForRetry: () => assert.fail('Malformed identity must not retry') }), /preflight seal/)
+      assert.equal(calls.filter(call => call.includes('stapler')).length, 1)
+      let captured
+      const successfulNative = fakeRunner({ staplerResults: [{ ...stapleSuccess, stdout: identity }] })
+      assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'target-zip-preflight', run: successfulNative.run,
+        onVerifiedSeal: seal => { captured = seal } }), /seal identity/)
+      assert.equal(captured, undefined)
+    }
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('a verified preflight seal cannot relax a definite invalid-ticket failure', () => {
+  const app = signedFixture()
+  try {
+    const expectedPreflightSeal = targetPreflightSeal(app)
+    const { run, calls } = fakeRunner({ staplerResults: [
+      { ...cloudKitFailure, stdout: cloudKitFailure.stdout + 'The ticket is invalid.\n' }, stapleSuccess,
+    ] })
+    assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run, expectedPreflightSeal,
+      waitForRetry: () => assert.fail('Invalid ticket must not retry') }), /notarization validation failed/)
+    assert.equal(calls.filter(call => call.includes('stapler')).length, 1)
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('diagnostic objects cannot mutate the internally sealed preflight identity or bytes', () => {
+  const app = signedFixture()
+  try {
+    let expectedPreflightSeal
+    verifyMacosUpdaterTrust(app, { boundary: 'target-zip-preflight', run: fakeRunner({ staplerResults: [stapleSuccess] }).run,
+      onVerifiedSeal: seal => { expectedPreflightSeal = seal }, record: event => {
+        if (event.operation === 'bundle-preflight-seal') {
+          event.identity.cdhash = 'f'.repeat(40)
+          event.files[0].sha256 = 'f'.repeat(64)
+        }
+      } })
+    assert.equal(verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', expectedPreflightSeal,
+      run: fakeRunner({ staplerResults: [stapleSuccess] }).run }).signature, 'verified')
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('installed bytes changed during the final Gatekeeper check cannot satisfy the prior seal', () => {
+  const app = signedFixture()
+  try {
+    const expectedPreflightSeal = targetPreflightSeal(app)
+    const native = fakeRunner({ staplerResults: [stapleSuccess] })
+    const run = (command, args, options) => {
+      const result = native.run(command, args, options)
+      if (args[0] === '--assess') writeFileSync(join(app, 'Contents/Info.plist'), 'changed during check')
+      return result
+    }
+    assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run, expectedPreflightSeal }), /changed during verification/)
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('the prior target seal rejects an installed bundle changed before the first trust check', () => {
+  for (const path of ['Contents/Info.plist', 'Contents/CodeResources', 'Contents/_CodeSignature/CodeResources']) {
+    const app = signedFixture()
+    try {
+      const expectedPreflightSeal = targetPreflightSeal(app)
+      writeFileSync(join(app, path), 'different installed bytes')
+      const { run, calls } = fakeRunner({ staplerResults: [stapleSuccess] })
+      assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+        expectedPreflightSeal, waitForRetry: () => assert.fail('Different bytes cannot retry') }), /preflight seal/)
       assert.equal(calls.filter(call => call.includes('stapler')).length, 1)
     } finally { rmSync(app, { recursive: true, force: true }) }
   }

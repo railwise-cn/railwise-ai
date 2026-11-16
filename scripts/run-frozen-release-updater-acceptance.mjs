@@ -134,15 +134,18 @@ export function validatePublicBundle(info, metadata, updater, version, head) {
   }
 }
 
-function verifyBundle(app, version, head, run, { boundary, record } = {}) {
+export function verifyBundle(app, version, head, run, { boundary, record, expectedPreflightSeal, onVerifiedSeal } = {}) {
   const resources = join(app, 'Contents/Resources')
   const info = JSON.parse(run('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(app, 'Contents/Info.plist')]).stdout)
   const metadata = JSON.parse(require('@electron/asar').extractFile(join(resources, 'app.asar'), 'package.json').toString('utf8'))
   validatePublicBundle(info, metadata, parse(readFileSync(join(resources, 'app-update.yml'), 'utf8')), version, head)
-  const trust = verifyMacosUpdaterTrust(app, { boundary, run, record })
+  let verifiedSeal
+  const trust = verifyMacosUpdaterTrust(app, { boundary, run, record, expectedPreflightSeal,
+    ...(onVerifiedSeal ? { onVerifiedSeal: seal => { verifiedSeal = seal } } : {}) })
   const signed = run('/usr/bin/codesign', ['-d', '-r-', app])
   const requirements = [...new Set(`${signed.stdout}\n${signed.stderr}`.split(/\r?\n/).filter(line => line.startsWith('designated => ')))]
   if (requirements.length !== 1) throw new Error('Public designated requirement is unavailable or ambiguous.')
+  if (onVerifiedSeal) onVerifiedSeal(verifiedSeal)
   return { version, bundleId: info.CFBundleIdentifier, ...trust, designatedRequirement: requirements[0] }
 }
 
@@ -504,7 +507,9 @@ export async function main() {
     if (zipEntries.some(name => !/^(?:RailWise AI\.app|__MACOSX)(?:\/|$)/.test(name) || name.split('/').includes('..'))) throw new Error('Target ZIP has entries outside its public app bundle.')
     run('/usr/bin/ditto', ['-x', '-k', targetZip, targetRoot])
     const target = join(targetRoot, 'RailWise AI.app')
-    report.targetIdentity = verifyBundle(target, targetVersion, build.sourceHead, run, { boundary: 'target-zip-preflight', record: progress })
+    let targetPreflightSeal
+    report.targetIdentity = verifyBundle(target, targetVersion, build.sourceHead, run, { boundary: 'target-zip-preflight', record: progress,
+      onVerifiedSeal: seal => { targetPreflightSeal = seal } })
     equal(report.targetIdentity.designatedRequirement, report.baselineIdentity.designatedRequirement, 'Baseline/target signing requirement')
     report.targetZipSha256 = await hashFile(targetZip)
     report.targetAsarSha256 = await hashFile(join(target, 'Contents/Resources/app.asar'))
@@ -543,7 +548,7 @@ export async function main() {
     const nativeRoots = readdirSync(join(root, 'native-temp')).filter(name => /^workwise-native-updater-/.test(name))
     equal(nativeRoots.length, 1, 'Owned native installation count')
     const installed = join(root, 'native-temp', nativeRoots[0], 'Applications/RailWise AI.app')
-    report.installedIdentity = verifyBundle(installed, targetVersion, build.sourceHead, run, { boundary: 'native-installed-target', record: progress })
+    report.installedIdentity = verifyBundle(installed, targetVersion, build.sourceHead, run, { boundary: 'native-installed-target', record: progress, expectedPreflightSeal: targetPreflightSeal })
     report.installedAsarSha256 = await hashFile(join(installed, 'Contents/Resources/app.asar'))
     equal(report.installedAsarSha256, report.targetAsarSha256, 'Installed/exact frozen ZIP ASAR')
     equal(readFileSync(join(paths.profile, 'frozen-release-sentinel.json')).toString(), beforeSentinel.toString(), 'Independent user-data sentinel')

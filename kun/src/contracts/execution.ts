@@ -49,4 +49,4 @@ export type TaskCommandResult = (
   | { kind: 'task_started' | 'chat_started'; task?: TaskRun; turn: StartTurnResponse }
   | { kind: 'attention_required'; task?: TaskRun; message: string; attentionId?: string }
   | { kind: 'capability_required'; task?: TaskRun; attentionId?: string; capability: CapabilityPreflight; message: string }
-) & { receipt?: {userMessageItemId:string;resultMessageItemId:string} }
+) & { receipt?: {userMessageItemId:string;resultMessageItemId:string}; intentCard?: import('./items.js').TaskIntentCard }

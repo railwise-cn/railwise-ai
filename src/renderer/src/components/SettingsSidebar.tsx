@@ -1,5 +1,5 @@
 import brand from '@shared/product-brand.json'
-import type { Dispatch, ReactElement, SetStateAction } from 'react'
+import { useEffect, useRef, type Dispatch, type ReactElement, type SetStateAction } from 'react'
 import { Bot, ChevronLeft, Globe, HelpCircle, ImageIcon, Keyboard, PencilLine, ServerCog, Settings, Smartphone } from 'lucide-react'
 
 type SettingsCategory = 'general' | 'providers' | 'write' | 'imageGeneration' | 'agents' | 'shortcuts' | 'claw' | 'help'
@@ -15,6 +15,15 @@ export function SettingsSidebar({
   setCategory: Dispatch<SetStateAction<SettingsCategory>>
   t: (key: string) => string
 }): ReactElement {
+  const navigation = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const reveal = (): void => navigation.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    reveal()
+    if (!navigation.current || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(reveal)
+    observer.observe(navigation.current)
+    return () => observer.disconnect()
+  }, [category])
   const catCls = (c: SettingsCategory): string =>
     `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14px] font-medium transition ${
       category === c
@@ -23,8 +32,8 @@ export function SettingsSidebar({
     }`
 
   return (
-    <aside className="ds-settings-sidebar ds-drag flex w-[248px] shrink-0 flex-col border-r border-ds-border bg-ds-sidebar backdrop-blur-md">
-      <div className="px-3 pb-3 pt-3">
+    <aside className="ds-settings-sidebar ds-drag flex min-h-0 w-[248px] shrink-0 flex-col border-r border-ds-border bg-ds-sidebar backdrop-blur-md">
+      <div className="ds-settings-sidebar-head shrink-0 px-3 pb-3 pt-3">
         <div aria-hidden className="ds-titlebar-safe-block" />
         <button
           type="button"
@@ -35,45 +44,45 @@ export function SettingsSidebar({
           {t('back')}
         </button>
       </div>
-      <nav className="ds-no-drag flex flex-col gap-0.5 px-2">
-        <button type="button" className={catCls('general')} onClick={() => setCategory('general')}>
+      <nav ref={navigation} aria-label={t('title')} className="ds-settings-categories ds-no-drag flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2">
+        <button type="button" aria-current={category === 'general' ? 'page' : undefined} className={catCls('general')} onClick={() => setCategory('general')}>
           <Globe className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('general')}
         </button>
-        <button type="button" className={catCls('providers')} onClick={() => setCategory('providers')}>
+        <button type="button" aria-current={category === 'providers' ? 'page' : undefined} className={catCls('providers')} onClick={() => setCategory('providers')}>
           <ServerCog className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('providers')}
         </button>
-        <button type="button" className={catCls('write')} onClick={() => setCategory('write')}>
+        <button type="button" aria-current={category === 'write' ? 'page' : undefined} className={catCls('write')} onClick={() => setCategory('write')}>
           <PencilLine className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('write')}
         </button>
         <button
           type="button"
-          className={catCls('imageGeneration')}
+          aria-current={category === 'imageGeneration' ? 'page' : undefined} className={catCls('imageGeneration')}
           onClick={() => setCategory('imageGeneration')}
         >
           <ImageIcon className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('imageGen')}
         </button>
-        <button type="button" className={catCls('agents')} onClick={() => setCategory('agents')}>
+        <button type="button" aria-current={category === 'agents' ? 'page' : undefined} className={catCls('agents')} onClick={() => setCategory('agents')}>
           <Bot className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('agents')}
         </button>
-        <button type="button" className={catCls('shortcuts')} onClick={() => setCategory('shortcuts')}>
+        <button type="button" aria-current={category === 'shortcuts' ? 'page' : undefined} className={catCls('shortcuts')} onClick={() => setCategory('shortcuts')}>
           <Keyboard className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('keyboardShortcuts')}
         </button>
-        <button type="button" className={catCls('claw')} onClick={() => setCategory('claw')}>
+        <button type="button" aria-current={category === 'claw' ? 'page' : undefined} className={catCls('claw')} onClick={() => setCategory('claw')}>
           <Smartphone className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('claw')}
         </button>
-        <button type="button" className={catCls('help')} onClick={() => setCategory('help')}>
+        <button type="button" aria-current={category === 'help' ? 'page' : undefined} className={catCls('help')} onClick={() => setCategory('help')}>
           <HelpCircle className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('help')}
         </button>
       </nav>
-      <div className="ds-no-drag mt-auto border-t border-ds-border p-3">
+      <div className="ds-settings-footer ds-no-drag mt-auto shrink-0 border-t border-ds-border p-3">
         <div className="flex items-center gap-2 rounded-xl px-2 py-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ds-subtle text-ds-muted">
             <Settings className="h-4 w-4" strokeWidth={1.75} />

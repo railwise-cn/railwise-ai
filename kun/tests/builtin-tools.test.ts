@@ -74,7 +74,8 @@ async function executeTool(
   host: LocalToolHost,
   workspace: string,
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  overrides: Partial<ToolHostContext> = {}
 ) {
   const result = await host.execute(
     {
@@ -82,13 +83,86 @@ async function executeTool(
       toolName,
       arguments: args
     },
-    buildContext(workspace)
+    buildContext(workspace, overrides)
   )
   expect(result.item.kind).toBe('tool_result')
   if (result.item.kind !== 'tool_result') {
     throw new Error('expected tool_result')
   }
   return result.item.output as Record<string, unknown>
+}
+
+/** Keep the command alive until the test releases it, independently of shell startup time. */
+async function withBashSessionBarrier(
+  host: LocalToolHost,
+  workspace: string,
+  inspect: (session: {
+    initial: Record<string, unknown>
+    ready: Record<string, unknown>
+    sessionId: string
+    release(): Promise<void>
+    waitForExit(): Promise<void>
+  }) => Promise<void>
+) {
+  const releasePath = join(workspace, 'shell-session-release.txt')
+  const readyPath = join(workspace, 'shell-session-ready.json')
+  const script = String.raw`const fs = require('node:fs')
+const path = require('node:path')
+const release = path.join(__dirname, 'shell-session-release.txt')
+process.stdin.setEncoding('utf8')
+process.stdin.on('data', input => process.stdout.write('input:' + input))
+process.stdout.write('ready\n')
+fs.writeFileSync(path.join(__dirname, 'shell-session-ready.json'), JSON.stringify({ pid: process.pid }))
+const timer = setInterval(() => {
+  if (!fs.existsSync(release)) return
+  clearInterval(timer)
+  process.stdin.pause()
+  process.stdout.write('done\n', () => process.exit(0))
+}, 25)
+`
+  await writeFile(join(workspace, 'shell-session-barrier.cjs'), script)
+  const abort = new AbortController()
+  let sessionId: string | undefined
+  let pid: number | undefined
+  const release = () => writeFile(releasePath, 'release')
+  const waitForExit = async () => {
+    if (!pid) return
+    await expect.poll(() => {
+      try { process.kill(pid!, 0); return false } catch (error) {
+        return (error as NodeJS.ErrnoException).code === 'ESRCH'
+      }
+    }, { timeout: 5000 }).toBe(true)
+  }
+  try {
+    // Like the existing node -e cases, a fixed relative filename works in both
+    // PowerShell and POSIX shells without embedding JavaScript or path quotes.
+    const initial = await executeTool(host, workspace, 'bash', {
+      command: 'node ./shell-session-barrier.cjs', yield_seconds: 1, timeout: 10
+    }, { abortSignal: abort.signal })
+    if (typeof initial.session_id === 'string') sessionId = initial.session_id
+    expect(typeof sessionId).toBe('string')
+    await expect.poll(async () => {
+      try {
+        const ready = JSON.parse(await readFile(readyPath, 'utf8')) as { pid?: number }
+        if (!Number.isInteger(ready.pid) || ready.pid! <= 0) return false
+        pid = ready.pid
+        return true
+      } catch { return false }
+    }, { timeout: 5000 }).toBe(true)
+    const ready = String(initial.output).includes('ready') ? initial : await executeTool(host, workspace, 'bash', {
+      action: 'poll', session_id: sessionId, yield_seconds: 1
+    })
+    expect(String(ready.output)).toContain('ready')
+    expect(ready.status).toBe('running')
+    await inspect({ initial, ready, sessionId: sessionId!, release, waitForExit })
+  } finally {
+    // Release even after a failed assertion; abort also covers a start that
+    // throws before returning a session ID. Stop reaps an owned live session.
+    await release()
+    abort.abort()
+    if (sessionId) await executeTool(host, workspace, 'bash', { action: 'stop', session_id: sessionId })
+    await waitForExit()
+  }
 }
 
 describe('Kun built-in tools', () => {
@@ -593,88 +667,66 @@ describe('Kun built-in tools', () => {
   })
 
   it('returns a pollable bash session for foreground long-running commands', async () => {
-    const startedAt = Date.now()
-    const output = await executeTool(host, workspace, 'bash', {
-      command: 'echo ready; sleep 5',
-      yield_seconds: 1,
-      timeout: 10
+    await withBashSessionBarrier(host, workspace, async ({ initial, sessionId }) => {
+      // A returned running session while the release barrier is closed proves
+      // yielding; Windows process fingerprint collection is not a sleep timer.
+      expect(initial.exit_code).toBe(null)
+      expect(initial.status).toBe('running')
+      const written = await executeTool(host, workspace, 'bash', {
+        action: 'write', session_id: sessionId, input: 'from-test\n', yield_seconds: 1
+      })
+      expect(written.status).toBe('running')
+      expect(String(written.output)).toContain('input:from-test')
+      const stopped = await executeTool(host, workspace, 'bash', { action: 'stop', session_id: sessionId })
+      expect(stopped.status).toBe('stopped')
+      expect(stopped.stop_sent).toBe(true)
     })
-
-    expect(output.exit_code).toBe(null)
-    expect(output.status).toBe('running')
-    expect(typeof output.session_id).toBe('string')
-    expect(String(output.output)).toContain('ready')
-    expect(Date.now() - startedAt).toBeLessThan(2500)
-
-    const stopped = await executeTool(host, workspace, 'bash', {
-      action: 'stop',
-      session_id: String(output.session_id)
-    })
-    expect(stopped.status).toBe('stopped')
-    expect(stopped.stop_sent).toBe(true)
   })
 
   it('polls completed bash sessions for final output', async () => {
-    const output = await executeTool(host, workspace, 'bash', {
-      command: 'echo ready; sleep 2; echo done',
-      yield_seconds: 1,
-      timeout: 10
+    await withBashSessionBarrier(host, workspace, async ({ sessionId, release, waitForExit }) => {
+      await release()
+      await waitForExit()
+      const polled = await executeTool(host, workspace, 'bash', { action: 'poll', session_id: sessionId })
+      expect(polled.status).toBe('completed')
+      expect(polled.exit_code).toBe(0)
+      expect(String(polled.output)).toContain('ready')
+      expect(String(polled.output)).toContain('done')
     })
-
-    expect(output.status).toBe('running')
-    await new Promise((resolve) => setTimeout(resolve, 2500))
-    const polled = await executeTool(host, workspace, 'bash', {
-      action: 'poll',
-      session_id: String(output.session_id)
-    })
-    expect(polled.status).toBe('completed')
-    expect(polled.exit_code).toBe(0)
-    expect(String(polled.output)).toContain('done')
   })
 
   it('blocks the poll action for at least yield_seconds while the session keeps running', async () => {
-    const output = await executeTool(host, workspace, 'bash', {
-      command: 'echo ready; sleep 5; echo done',
-      yield_seconds: 1,
-      timeout: 10
-    })
-    expect(output.status).toBe('running')
-
-    const startedAt = Date.now()
-    const polled = await executeTool(host, workspace, 'bash', {
-      action: 'poll',
-      session_id: String(output.session_id),
-      yield_seconds: 2
-    })
-    const elapsed = Date.now() - startedAt
-    expect(elapsed).toBeGreaterThanOrEqual(1800)
-    expect(polled.status).toBe('running')
-
-    await executeTool(host, workspace, 'bash', {
-      action: 'stop',
-      session_id: String(output.session_id)
+    await withBashSessionBarrier(host, workspace, async ({ sessionId }) => {
+      const startedAt = Date.now()
+      const polled = await executeTool(host, workspace, 'bash', {
+        action: 'poll', session_id: sessionId, yield_seconds: 2
+      })
+      const elapsed = Date.now() - startedAt
+      expect(elapsed).toBeGreaterThanOrEqual(1800)
+      expect(polled.status).toBe('running')
+      expect(polled.exit_code).toBe(null)
+      expect(String(polled.output)).toContain('ready')
     })
   })
 
   it('returns from poll early once the session exits before yield_seconds', async () => {
-    const output = await executeTool(host, workspace, 'bash', {
-      command: 'echo ready; sleep 1; echo done',
-      yield_seconds: 1,
-      timeout: 10
+    await withBashSessionBarrier(host, workspace, async ({ sessionId, release }) => {
+      const startedAt = Date.now()
+      let settled = false
+      const pending = executeTool(host, workspace, 'bash', {
+        action: 'poll', session_id: sessionId, yield_seconds: 10
+      }).finally(() => { settled = true })
+      // Yield the test turn so the real poll is pending before releasing the
+      // child, rather than hoping a one-second sleep survives shell startup.
+      await new Promise<void>(resolve => setImmediate(resolve))
+      expect(settled).toBe(false)
+      await release()
+      const polled = await pending
+      expect(Date.now() - startedAt).toBeLessThan(3000)
+      expect(polled.status).toBe('completed')
+      expect(polled.exit_code).toBe(0)
+      expect(String(polled.output)).toContain('done')
     })
-    expect(output.status).toBe('running')
-
-    const startedAt = Date.now()
-    const polled = await executeTool(host, workspace, 'bash', {
-      action: 'poll',
-      session_id: String(output.session_id),
-      yield_seconds: 10
-    })
-    const elapsed = Date.now() - startedAt
-    expect(elapsed).toBeLessThan(3000)
-    expect(polled.status).toBe('completed')
-    expect(polled.exit_code).toBe(0)
-    expect(String(polled.output)).toContain('done')
   })
 
   it('includes the active shell in bash partial updates', async () => {

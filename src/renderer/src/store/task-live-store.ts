@@ -1,15 +1,20 @@
 import { useCallback, useSyncExternalStore } from 'react'
-import type { TaskRunV1, TaskAttentionV1, TaskChangeEvent } from '@shared/agent-workbench'
+import type { TaskRunV1, TaskAttentionV1, TaskChangeEvent, TaskProgressV1 } from '@shared/agent-workbench'
+import type { TaskFilter } from '@shared/task-workspace-projection'
+import { taskArtifactSourceEvidenceState } from '@shared/task-artifact-source-evidence'
 
+export type TaskNavigation = { selectedTaskId: string | null; selectedAttentionId: string | null; filter: TaskFilter; search: string; allWorkspaces: boolean }
 type State = {
+  navigation: TaskNavigation
   tasks: TaskRunV1[]
   attention: TaskAttentionV1[]
   watermark: number
   ready: boolean
   error: string | null
   generation: number
+  progress: Record<string, TaskProgressV1>
 }
-const emptyState = (): State => ({ tasks: [], attention: [], watermark: 0, ready: false, error: null, generation: 0 })
+const emptyState = (): State => ({ navigation: { selectedTaskId: null, selectedAttentionId: null, filter: 'all', search: '', allWorkspaces: false }, tasks: [], attention: [], watermark: 0, ready: false, error: null, generation: 0, progress: {} })
 let state = emptyState()
 let requestedTaskId: string | null = null
 const listeners = new Set<() => void>()
@@ -20,12 +25,20 @@ let epoch = 0
 
 export function requestTaskDetail(id: string): void {
   requestedTaskId = id
+  updateTaskNavigation({ selectedTaskId: id, selectedAttentionId: null, filter: 'all', allWorkspaces: true })
   window.dispatchEvent(new CustomEvent('railwise:open-task', { detail: id }))
 }
 export function takeRequestedTask(): string | null {
   const id = requestedTaskId
   requestedTaskId = null
   return id
+}
+export function updateTaskNavigation(patch: Partial<TaskNavigation>): void {
+  const navigation = { ...state.navigation, ...patch }
+  // Selection effects also run on empty snapshots. Publishing an unchanged
+  // selection would cause a render/subscription loop without any data change.
+  if ((Object.keys(navigation) as Array<keyof TaskNavigation>).every(key => navigation[key] === state.navigation[key])) return
+  emit({ navigation })
 }
 export function getTaskState(): State { return state }
 function emit(patch: Partial<State>): void {
@@ -67,18 +80,36 @@ export async function refreshTaskState(): Promise<void> {
 }
 function apply(value: unknown): void {
   const event = value as TaskChangeEvent
+  if (event?.kind === 'task_progress') {
+    const sample = event.payload, task = state.tasks.find(task => task.id === event.taskId)
+    if (!task || sample?.taskId !== task.id || !Number.isSafeInteger(sample.taskRevision) || sample.taskRevision < 0 || sample.taskRevision !== task.revision || !sample.turnId || sample.turnId !== task.activeTurnId ||
+      !sample.executionId || !Number.isSafeInteger(sample.leaseRevision) || sample.leaseRevision < 0 || !Number.isFinite(Date.parse(sample.leaseExpiresAt)) || typeof sample.active !== 'boolean' ||
+      !['running','retrying'].includes(task.status) || !Number.isFinite(Date.parse(sample.sampledAt))) return
+    const previous = state.progress[task.id]
+    if (previous && (Date.parse(sample.sampledAt) <= Date.parse(previous.sampledAt) || sample.leaseRevision < previous.leaseRevision)) return
+    const phases = ['thinking','searching','reading','writing','verifying','working']
+    if (sample.activity && (!sample.active || Date.parse(sample.leaseExpiresAt) <= Date.parse(sample.sampledAt) || !phases.includes(sample.activity.phase))) return
+    const timing = sample.timing
+    if (timing && (timing.sampledAt !== sample.sampledAt || !['complete','partial'].includes(timing.coverage) ||
+      [timing.executionMs,timing.queuedMs,timing.humanWaitMs,timing.pausedMs].some(value => !Number.isFinite(value) || value < 0))) return
+    // Projection data has its own clock. Never advance the durable cursor or replace task/Grant bytes.
+    emit({ progress: { ...state.progress, [task.id]: sample }, error: null })
+    return
+  }
   if (!event || !Number.isSafeInteger(event.seq) || event.seq <= state.watermark) return
   if (event.kind === 'task_changed') {
     const task = event.payload as unknown as TaskRunV1
     if (typeof task.id !== 'string') return
     for (const artifact of task.artifacts ?? []) {
-      if (artifact.validation !== 'valid') continue
+      if (artifact.validation !== 'valid' || taskArtifactSourceEvidenceState(task, artifact) === 'draft') continue
       void window.workwise.notifyTask({
         key: `artifact:${task.id}:${artifact.id}:${artifact.sha256 ?? artifact.createdAt}`,
         taskId: task.rootTaskId ?? task.id, kind: 'artifact', title: 'RailWise AI', body: artifact.relativePath
       }).catch(() => undefined)
     }
-    emit({ tasks: [...state.tasks.filter(t => t.id !== task.id), task], watermark: event.seq, error: null, generation: state.generation + 1 })
+    const progress = { ...state.progress }
+    if (progress[task.id] && (progress[task.id].taskRevision !== task.revision || progress[task.id].turnId !== task.activeTurnId || !['running','retrying'].includes(task.status))) delete progress[task.id]
+    emit({ tasks: [...state.tasks.filter(t => t.id !== task.id), task], progress, watermark: event.seq, error: null, generation: state.generation + 1 })
   } else if (event.kind === 'attention_changed') {
     const item = event.payload as unknown as TaskAttentionV1
     if (typeof item.id !== 'string') return
@@ -91,17 +122,22 @@ function connect(): () => void {
   let streamId = ''
   let retry: ReturnType<typeof setTimeout> | undefined
   let delay = 1_000
+  const clearActivity = (): void => {
+    if (!Object.values(state.progress).some(sample => sample.activity || sample.active)) return
+    emit({ progress: Object.fromEntries(Object.entries(state.progress).map(([id,sample]) => [id,{...sample,active:false,activity:undefined}])) })
+  }
   const offEvent = window.workwise.onSseEvent(payload => {
-    if (payload.streamId === streamId) for (const event of payload.events) apply(event)
+    if (!disposed && payload.streamId === streamId) for (const event of payload.events) apply(event)
   })
   const restart = (): void => {
     if (disposed || retry) return
     retry = setTimeout(() => { retry = undefined; void start() }, delay)
     delay = Math.min(delay * 2, 30_000)
   }
-  const offEnd = window.workwise.onSseEnd(payload => { if (payload.streamId === streamId) restart() })
+  const offEnd = window.workwise.onSseEnd(payload => { if (!disposed && payload.streamId === streamId) { clearActivity();restart() } })
   const offError = window.workwise.onSseError(payload => {
-    if (payload.streamId !== streamId) return
+    if (disposed || payload.streamId !== streamId) return
+    clearActivity()
     emit({ error: payload.message ?? 'Task connection interrupted.' })
     // The main bridge reconnects an open stream. If it terminates, onSseEnd
     // starts one bounded retry; no independent full-list polling is allocated.
@@ -117,6 +153,7 @@ function connect(): () => void {
     disposed = true
     if (retry) clearTimeout(retry)
     offEvent(); offEnd(); offError()
+    clearActivity()
     if (streamId) void window.workwise.stopSse(streamId)
   }
 }

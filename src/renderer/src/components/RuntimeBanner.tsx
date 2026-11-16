@@ -37,7 +37,7 @@ export function RuntimeBanner({
     technicalDetailText,
     cleanedLogPath ? `${t('runtimeErrorLogPath')}: ${cleanedLogPath}` : ''
   ].filter(Boolean).join('\n\n')
-  const hasDetail = technicalDetailText.trim().length > 0
+  const hasDetail = detailText.trim().length > 0
 
   const copyDetails = async (): Promise<void> => {
     if (!hasDetail || !navigator?.clipboard?.writeText) return
@@ -99,7 +99,7 @@ export function RuntimeBanner({
             ) : null}
           </div>
         </div>
-        {cleanedLogPath ? (
+        {cleanedLogPath && detailsOpen ? (
           <div className="flex min-w-0 flex-wrap items-center gap-2 text-[12px] leading-5 text-amber-900/80 dark:text-amber-100/85">
             <span className="font-medium">{t('runtimeErrorLogPath')}</span>
             <code className="min-w-0 max-w-full break-all rounded-md bg-white/70 px-2 py-0.5 font-mono text-[12px] text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">

@@ -99,12 +99,18 @@ export class CapabilityRegistry {
     for (const [name, tool] of next.tools) this.tools.set(name, tool)
   }
 
+  /** Scope-review metadata only. This never advertises or authorizes a tool for execution. */
+  registeredTools():Array<{name:string;providerId:string}>{
+    return [...this.tools.values()].filter(record=>record.provider.enabled&&record.provider.available).map(record=>({name:record.tool.name,providerId:record.provider.id}))
+  }
+
   listTools(context?: ToolHostContext): CapabilityToolSpec[] {
     const specs: CapabilityToolSpec[] = []
     for (const record of this.tools.values()) {
       if (!this.canUseProvider(record.provider, context)) continue
       if (!this.canUseTool(record.tool.name, context)) continue
       if (!isToolAdvertisedInSandbox(record.tool, context)) continue
+      if (context && record.tool.contextBlock?.(context)) continue
       if (record.tool.shouldAdvertise) {
         if (!context || !record.tool.shouldAdvertise(context)) continue
       }
@@ -133,6 +139,8 @@ export class CapabilityRegistry {
     if (!this.canUseProvider(record.provider, context)) {
       throw new Error(`tool ${toolName} is not advertised by provider ${record.provider.id}`)
     }
+    const contextBlock = record.tool.contextBlock?.(context)
+    if (contextBlock) throw Object.assign(new Error(contextBlock.message), { code: contextBlock.code })
     if (!this.canUseTool(toolName, context)) {
       throw new Error(`tool ${toolName} is not advertised by active tool policy`)
     }

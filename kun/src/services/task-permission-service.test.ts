@@ -124,7 +124,38 @@ describe('task-only finite approval permission',()=>{
     expect((await f.threadStore.get(f.origin.id))?.approvalPolicy).toBe('never')
   })
 
-  it('rejects wildcard scope, relative paths, credential-bearing URLs and writes through read-only authority', async () => {
+  it('revokes a reviewed scope durably and makes the previous immutable Grant unusable', async () => {
+    const f = await fixture()
+    const confirmed = await f.service.confirm(f.task.id,{...await f.request(),scope:{writePaths:[f.root]}})
+    const permissionId=confirmed.permission.grant!.id
+    const request={expectedRevision:confirmed.task.revision,permissionId,idempotencyKey:'revoke-original'}
+    const revoked=await f.service.revoke(f.task.id,request)
+    expect(revoked.permission.grant).toMatchObject({id:permissionId,status:'invalid'})
+    await expect(f.service.executionRestriction(f.hidden.id,permissionId)).rejects.toMatchObject({code:'task_permission_revoked'})
+    expect(await f.service.revoke(f.task.id,request)).toEqual(revoked)
+    expect(f.repository.operations(f.task.id,'task_permission_revoke')).toHaveLength(1)
+    expect(f.repository.get(f.task.id)?.authority?.taskApprovalGrant?.revokedAt).toBeDefined()
+  })
+
+  it('replaces an idle task scope with a new immutable permission and rejects the old Grant identity', async () => {
+    const f = await fixture()
+    const first = await f.service.confirm(f.task.id, {...await f.request('initial-path'), scope:{writePaths:[f.root]}})
+    const replacement = await f.service.confirm(f.task.id, {...await f.request('revised-path'), scope:{writePaths:[join(f.root,'reports')]}})
+    expect(replacement.permission.grant?.id).not.toBe(first.permission.grant?.id)
+    await expect(f.service.executionRestriction(f.hidden.id,first.permission.grant!.id)).rejects.toMatchObject({code:'task_permission_revoked'})
+    expect(await f.service.executionRestriction(f.hidden.id,replacement.permission.grant!.id)).toMatchObject({permissionScope:{writePaths:[join(f.root,'reports')]}})
+    expect(replacement.task.status).toBe('waiting_user')
+  })
+
+  it('keeps an explicit read-only thread as a hard limit when granting a task path', async () => {
+    const f = await fixture()
+    await f.threadStore.upsert({...f.hidden,sandboxMode:'read-only'})
+    expect((await f.service.snapshot(f.task.id)).canWritePaths).toBe(false)
+    await expect(f.service.confirm(f.task.id,{...await f.request(),scope:{writePaths:[f.root]}})).rejects.toMatchObject({code:'sandbox_read_only'})
+    expect(f.repository.operations(f.task.id)).toHaveLength(0)
+  })
+
+  it('rejects invalid scopes and grants a bounded task-only exception for an external read-only workspace', async () => {
     const f = await fixture()
     const credentialUrl = new URL('https://example.invalid')
     credentialUrl.username = 'test-user'
@@ -133,8 +164,10 @@ describe('task-only finite approval permission',()=>{
       await expect(f.service.confirm(f.task.id, { ...await f.request(), scope })).rejects.toThrow()
     }
     f.setWorkspace({ canonicalRoot: f.root, level: 'read-only', revision: 4 })
-    await expect(f.service.confirm(f.task.id, { ...await f.request(), scope: { writePaths: [f.root] } })).rejects.toMatchObject({ code: 'sandbox_read_only' })
-    expect(f.repository.operations(f.task.id)).toHaveLength(0)
+    const confirmed = await f.service.confirm(f.task.id, { ...await f.request(), scope: { writePaths: [f.root] } })
+    expect(confirmed.task.authority?.taskApprovalGrant).toMatchObject({workspaceWriteException:true,scope:{writePaths:[f.root]}})
+    expect(await f.service.executionRestriction(f.hidden.id)).toMatchObject({workspaceWriteException:true})
+    expect(confirmed.permission.workspaceTrust).toBe('read-only')
   })
 
   it('consumes one-operation permission after approval, preserves it on rejection, and never returns it after unknown results', async () => {
@@ -212,7 +245,7 @@ describe('task-only finite approval permission',()=>{
     const f=await fixture(),snapshot=await f.service.snapshot(f.task.id),request=await f.request()
     expect(snapshot).toMatchObject({canConfirm:true,approvalPolicy:'never',targetApprovalPolicy:'on-request',workspaceRoot:f.root,maxTtlSeconds:900})
     const result=await f.service.confirm(f.task.id,request)
-    expect(result).toMatchObject({resumed:false,task:{status:'waiting_user',attempts:0,authority:{approvalPolicy:'on-request',taskApprovalGrant:{status:'active',confirmed:true,expiresAt:'2026-11-10T00:15:00.000Z'}}},permission:{canConfirm:false,grant:{status:'active'}}})
+    expect(result).toMatchObject({resumed:false,task:{status:'waiting_user',attempts:0,authority:{approvalPolicy:'on-request',taskApprovalGrant:{status:'active',confirmed:true,expiresAt:'2026-11-10T00:15:00.000Z'}}},permission:{canConfirm:true,grant:{status:'active'}}})
     expect((await f.threadStore.get(f.hidden.id))).toMatchObject({approvalPolicy:'on-request',sandboxMode:'workspace-write',turns:[]})
     expect(await f.threadStore.get(f.origin.id)).toEqual(f.origin)
     expect(f.repository.operations(f.task.id,'task_permission')).toMatchObject([{status:'succeeded',request:{confirmed:true,scopeHash:snapshot.scopeHash,approvalPolicy:'on-request',ttlSeconds:900}}])

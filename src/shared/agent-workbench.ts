@@ -44,6 +44,7 @@ export type RevisionMutation = {
 }
 
 export type TaskArtifactV1 = {
+  storage?: 'task'
   id: string
   relativePath: string
   absolutePath?: string
@@ -55,6 +56,8 @@ export type TaskArtifactV1 = {
   sha256?: string
   validation: 'pending' | 'valid' | 'invalid'
   validationMessage?: string
+  sourceEvidenceStatus?: 'draft' | 'verified'
+  sourceEvidenceReceiptId?: string
   createdAt: string
 }
 
@@ -66,6 +69,9 @@ export type TaskAcceptanceV1 = {
   requireFinalResponse: boolean
   requireActionableArtifactCard: boolean
   requiresExternalEffects?: boolean
+  requiresWebEvidence?: boolean
+  requiredSourceOrigins?: string[]
+  sourceInferenceVersion?: 1
   effect?: Omit<TaskRequiredEffectV1, 'target'> & { target?: string; requiredEffects?: TaskRequiredEffectV1[] }
 }
 
@@ -95,8 +101,10 @@ export type TaskResultEvidenceV1 = {
 
 /** Read-only projection: raw requests, results, credentials and execution IDs stay in Runtime. */
 export type TaskOperationReceiptV1 = {
-  purpose?: 'assistant_reply'
+  purpose?: 'assistant_reply' | 'host_shell' | 'browser_action'
   phase?: 'upload' | 'send'
+  shell?: { canPoll?: boolean; exitCode?: number; outputSha256?: string; message?: string }
+  browser?: { action: 'click' | 'fill'; pageUrl?: string; canReview: boolean }
   id: string
   taskId: string
   provider: string
@@ -107,22 +115,26 @@ export type TaskOperationReceiptV1 = {
   status: 'prepared' | 'running' | 'succeeded' | 'failed' | 'outcome_unknown'
   remoteOperationId?: string
   evidence?: TaskResultEvidenceV1
-  resolution?: { status: 'verified'; receiptId: string; evidence: TaskResultEvidenceV1; resolvedAt: string }
+  resolution?: { status: 'verified'; receiptId: string; evidence: TaskResultEvidenceV1; resolvedAt: string; outcome?: 'succeeded' | 'not_completed' }
   errorCode?: string
   createdAt: string
   updatedAt: string
 }
 
-export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown'; evidence?: TaskResultEvidenceV1; errorCode?: string }
+export type BrowserOperationReviewV1 = { id: string; expiresAt: string; action: 'click' | 'fill'; pageUrl: string; observationText: string; targetLabel?: string; value?: string }
+export type BrowserOperationConfirmationV1 = { expectedRevision: number; idempotencyKey: string; reviewId: string; decision: 'confirmed_complete' | 'completed' | 'not_completed' }
+export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown' | 'running' | 'failed'; evidence?: TaskResultEvidenceV1; outcome?: 'succeeded' | 'not_completed'; errorCode?: string; browserReview?: BrowserOperationReviewV1; shell?: { status: 'verified' | 'running' | 'failed' | 'outcome_unknown'; message: string; exitCode?: number; outputSha256?: string } }
 
 export type TaskPermissionScopeV1 = {
   readPaths?: string[]; writePaths?: string[]; networkOrigins?: string[]; providerIds?: string[]; externalTargets?: string[]
 }
 export type TaskExecutionPermissionV1 = {
+  id?: string
   turnId: string; workspaceRoot: string; workspaceTrust: WorkspaceTrustLevel; agentTrust: WorkspaceTrustLevel
   sandboxMode: string; approvalPolicy: string; allowedToolNames?: string[]; allowedProviderIds?: string[]
   pathAllowlist: string[]; readPathAllowlist?: string[]; writePathAllowlist?: string[]; networkAllowlist: string[]
   connectorScopes: string[]; externalTargets: string[]; issuedAt: string; expiresAt?: string
+  browserScope?: import('../../kun/src/contracts/browser-skill').BrowserExecutionScope
 }
 export type TaskPermissionSnapshotV1 = {
   taskId: string; taskRevision: number; taskTitle: string; scopeHash: string
@@ -132,7 +144,10 @@ export type TaskPermissionSnapshotV1 = {
   sandboxMode?: string; agentTrust?: WorkspaceTrustLevel; agentName?: string
   toolAllowlist?: string[]; mcpAllowlist?: string[]; externalTargets?: string[]
   connectorScopeSources?: Array<{ provider: string; scopes: string[]; source: 'task_requirements' | 'tool_catalog' | 'last_execution_grant'; issuedAt?: string; expiresAt?: string }>
+  canWritePaths?: boolean
   canConfirm: boolean; reason?: string
+  /** Server-verified in-place permission recovery; never inferred from an error string. */
+  canRestoreBase?: boolean; recoveryEligible?: boolean
   executionGrants?: TaskExecutionPermissionV1[]
   grant?: { id: string; status: 'active' | 'expired' | 'invalid' | 'prepared' | 'consumed'; confirmedAt: string; expiresAt: string; scope?: TaskPermissionScopeV1; duration?: 'task'|'next_operation' }
 }
@@ -231,7 +246,7 @@ export type TaskRunListQuery = {
 export type TaskInputV1 = {
   id: string
   taskId: string
-  kind: 'supplement' | 'user_answer' | 'tool_result' | 'handoff'
+  kind: 'supplement' | 'user_answer' | 'approval_resolution' | 'tool_result' | 'handoff'
   text: string
   createdAt: string
   deliveredAt?: string
@@ -620,4 +635,18 @@ export type WorkbenchMutationResult<T> =
 
 export type TaskPageQuery = { workspaceRoot?: string; threadId?: string; search?: string; filter?: 'ongoing'|'attention'|'completed'|'all'; limit?: number; cursor?: string }
 export type TaskRunPage = { items: TaskRunV1[]; relatedTasks: TaskRunV1[]; attention: TaskAttentionV1[]; total: number; counts: Record<'ongoing'|'attention'|'completed'|'all',number>; nextCursor?: string; snapshotId: string; expiresAt: string; eventWatermark: number }
-export type TaskChangeEvent = { seq:number; taskId?:string; kind:'task_changed'|'attention_changed'; payload:Record<string,unknown>; createdAt:string }
+export type TaskProgressV1 = {
+  taskId: string; taskRevision: number; turnId: string; sampledAt: string
+  executionId: string; leaseRevision: number; leaseExpiresAt: string; active: boolean
+  timing?: TaskRunV1['timing']
+  activity?: { phase: 'thinking' | 'searching' | 'reading' | 'writing' | 'verifying' | 'working' }
+}
+export type TaskChangeEvent = { seq:number; taskId?:string; kind:'task_changed'|'attention_changed'; payload:Record<string,unknown>; createdAt:string } |
+  { kind:'task_progress'; taskId:string; payload:TaskProgressV1; createdAt:string }
+
+/** Server eligibility and future-consent projection; never an old operation result. */
+export type TaskPublicQueryRecoverySnapshotV1 = {
+  taskId: string; taskRevision: number; state: 'unavailable' | 'eligible' | 'prepared' | 'needs_scope_review'; message: string;
+  reason?: string; receiptId?: string; unknownOperationCount: number; origins?: string[];
+  mode?:'task_reauthorization';scopeReview?:import('../../kun/src/contracts/browser-public-query-recovery').OneOffScopeReview;consentReceiptId?:string;consentExpiresAt?:string;consentRevoked?:boolean
+}

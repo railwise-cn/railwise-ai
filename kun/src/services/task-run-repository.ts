@@ -1,3 +1,9 @@
+import { recoverablePermissionFailure } from './task-permission-recovery.js'
+import { legacyLocalArtifactSourceMismatch } from '../contracts/task-source-intent.js'
+import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
+import { BrowserScheduleActionSchema } from '../contracts/browser-schedule-actions.js'
+import { browserVerificationPolicy } from '../contracts/browser-skill.js'
+import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { ExecutionStore } from './execution-store.js'
 import { inspectProcess } from './process-identity.js'
 import { existsSync, mkdirSync } from 'node:fs'
@@ -123,6 +129,35 @@ export class TaskRunRepository {
     return row ? this.parseRun(row) : null
   }
 
+  /** Explicitly extend a stopped root's execution allowance; never reset usage or resume it. */
+  extendExecutionBudget(taskId: string, expectedRevision: number, additionalMs: number | undefined, key: string, now: string): TaskRun {
+    return this.transact(() => {
+      const task = this.get(taskId)
+      if (!task) throw Object.assign(new Error('task not found'), { code: 'not_found' })
+      if (task.revision !== expectedRevision) throw new TaskRevisionConflictError(expectedRevision, task.revision)
+      if (task.parentTaskId || task.retryOfTaskId || task.rootTaskId && task.rootTaskId !== task.id || !['paused', 'failed'].includes(task.status) || task.budget.version !== 2) {
+        throw Object.assign(new Error('请先暂停根任务或等待其失败停止；仅支持追加新版任务的执行时间。'), { code: 'invalid_state' })
+      }
+      const before = task.budget.maxExecutionMs ?? task.budget.maxDurationMs
+      if (!Number.isSafeInteger(additionalMs) || additionalMs! < 60_000 || additionalMs! > 3_600_000 || before + additionalMs! > 28_800_000) {
+        throw Object.assign(new Error('每次可追加 1–60 分钟，累计执行上限为 8 小时。'), { code: 'invalid_state' })
+      }
+      // Inspect the entire family in SQLite, not a truncated UI task list. A paused
+      // parent cannot change the allowance while a descendant is still executing.
+      const family = `WITH RECURSIVE family(id) AS (SELECT ? UNION SELECT t.id FROM task_runs t JOIN family f ON
+        json_extract(t.data_json,'$.parentTaskId')=f.id OR json_extract(t.data_json,'$.rootTaskId')=f.id OR json_extract(t.data_json,'$.retryOfTaskId')=f.id)`
+      const active = this.db.prepare(`${family} SELECT 1 FROM execution_attempts a JOIN family f ON a.task_id=f.id
+        WHERE json_extract(a.data_json,'$.status')='running' UNION ALL SELECT 1 FROM task_runs t JOIN family f ON t.id=f.id
+        WHERE t.status IN ('queued','running','retrying') UNION ALL SELECT 1 FROM shell_sessions s JOIN family f ON s.task_id=f.id
+        WHERE s.status IN ('starting','running') LIMIT 1`).get(taskId)
+      const openWork = this.db.prepare('SELECT 1 FROM task_work_spans WHERE root_id=? AND finished_ms IS NULL LIMIT 1').get(taskId)
+      if (active || openWork) throw Object.assign(new Error('执行仍在停止中，请等候安全边界后再追加时间。'), { code: 'turn_in_progress' })
+      const used = this.execution.usedExecutionMs(taskId, Date.parse(now))
+      return this.update(taskId, expectedRevision, current => ({ ...current, budget: { ...current.budget, maxExecutionMs: before + additionalMs! }, updatedAt: now }),
+        { key: `execution-budget:${key}`, kind: 'task_execution_budget_extended', payload: { previousMaxExecutionMs: before, additionalExecutionMs: additionalMs!, maxExecutionMs: before + additionalMs!, usedExecutionMs: used, resumed: false }, createdAt: now })
+    })
+  }
+
   /** The visible root keeps its identity while controls target the latest retry. */
   currentExecution(taskId:string):TaskRun|null {
     let task=this.get(taskId)
@@ -227,6 +262,47 @@ export class TaskRunRepository {
     return rows.map(row => this.parseRun(row))
   }
 
+  /** An evidenced pre-execution permission failure can be repaired.
+   * It is configuration-only: no new task, attempt, budget or executable Turn is created.
+   */
+  private isPermissionRepair(current: TaskRun, candidate: TaskRun, event?: { key: string; kind: string; payload?: Record<string, unknown>; createdAt?: string }): boolean {
+    if (!event?.createdAt || candidate.status !== 'paused' || !['task_permission_confirmed', 'task_permission_base_restored'].includes(event.kind) ||
+      !recoverablePermissionFailure(this, current, event.createdAt)) return false
+    const stable = (task: TaskRun) => ({ id: task.id, threadId: task.threadId, originThreadId: task.originThreadId, activeTurnId: task.activeTurnId,
+      rootTaskId: task.rootTaskId, parentTaskId: task.parentTaskId, retryOfTaskId: task.retryOfTaskId, goal: task.goal, workspaceRoot: task.workspaceRoot,
+      attempts: task.attempts, budget: task.budget, nodes: task.nodes, acceptance: task.acceptance, artifacts: task.artifacts, executionMs: task.executionMs,
+      authority: task.authority ? { ...task.authority, taskApprovalGrant: undefined, approvalPolicy: undefined } : undefined })
+    if (operationFingerprint(stable(current)) !== operationFingerprint(stable(candidate))) return false
+    const grant = current.authority?.taskApprovalGrant
+    if (!grant || event.payload?.permissionId !== grant.id) return false
+    if (event.kind === 'task_permission_confirmed') {
+      const receipt = this.operation(current.id, `task-permission:${grant.idempotencyKey}`)
+      return receipt?.kind === 'task_permission' && receipt.status === 'prepared' && receipt.request?.confirmed === true &&
+        grant.status === 'prepared' && operationFingerprint(candidate.authority?.taskApprovalGrant) === operationFingerprint({ ...grant, status: 'active' })
+    }
+    return !candidate.authority?.taskApprovalGrant && Boolean(grant.revokedAt) && this.operations(current.id, 'task_permission_revoke').some(receipt =>
+      receipt.status === 'prepared' && receipt.request?.restoreBase === true && receipt.request.permissionId === grant.id &&
+      event.key === `permission-base-restored:${grant.id}:${receipt.request.idempotencyKey}`)
+  }
+
+  /** Only an explicit, prepared local-artifact recheck may settle this legacy failed classification. */
+  private isLocalArtifactRevalidation(current: TaskRun, candidate: TaskRun, event?: { key: string; kind: string; payload?: Record<string, unknown>; createdAt?: string }): boolean {
+    if (current.status !== 'failed' || candidate.status !== 'completed' || !legacyLocalArtifactSourceMismatch(current) ||
+      event?.kind !== 'local_artifact_acceptance_revalidated' || event.payload?.completed !== true || !event.createdAt) return false
+    const control = this.operations(current.id, 'revalidate_artifacts').find(receipt => receipt.status === 'prepared' &&
+      receipt.request?.confirmed === true && receipt.request.expectedRevision === current.revision && event.key === `local-artifact-revalidated:${receipt.idempotencyKey}`)
+    if (!control || this.execution.attempts(current.id).some(attempt => attempt.status === 'running')) return false
+    const expectedAcceptance = { ...current.acceptance, sourceInferenceVersion: 1, requiresWebEvidence: false, requiredSourceOrigins: [] }
+    if (operationFingerprint(candidate.acceptance) !== operationFingerprint(expectedAcceptance) || !candidate.artifacts.length ||
+      candidate.artifacts.some(artifact => artifact.validation !== 'valid' || !current.artifacts.some(old => old.id === artifact.id && old.sha256 === artifact.sha256 && old.relativePath === artifact.relativePath))) return false
+    const stable = (task: TaskRun) => {
+      const { status: _status, acceptance: _acceptance, nodes: _nodes, artifacts: _artifacts, finalResponse: _reply, finishedAt: _finished,
+        waitingReason: _waiting, stalledReason: _stalled, updatedAt: _updated, ...rest } = task
+      return rest
+    }
+    return operationFingerprint(stable(current)) === operationFingerprint(stable(candidate))
+  }
+
   update(
     taskId: string,
     expectedRevision: number,
@@ -244,7 +320,7 @@ export class TaskRunRepository {
         throw new TaskRevisionConflictError(expectedRevision, current.revision)
       }
       const candidate = mutator(current)
-      if (TERMINAL_TASK_STATUSES.has(current.status) && candidate.status !== current.status) {
+      if (TERMINAL_TASK_STATUSES.has(current.status) && candidate.status !== current.status && !this.isPermissionRepair(current, candidate, event) && !this.isLocalArtifactRevalidation(current, candidate, event)) {
         throw Object.assign(new Error(`terminal task cannot transition from ${current.status}`), {
           code: 'invalid_state'
         })
@@ -637,6 +713,27 @@ export class TaskRunRepository {
     return row ? OperationReceiptSchema.parse(JSON.parse(row.data_json)) : null
   }
 
+  /** Owner is part of the identity; receipt ids never authorize a cross-owner lookup. */
+  operationById(ownerId: string, receiptId: string, kind?: string): OperationReceipt | null {
+    return this.filteredOperations(ownerId, `json_extract(data_json, '$.id') = ?${kind ? " AND json_extract(data_json, '$.kind') = ?" : ''}`,
+      kind ? [receiptId, kind] : [receiptId]).find(receipt => receipt.id === receiptId && (!kind || receipt.kind === kind)) ?? null
+  }
+
+  /** Filter before decoding large successful HTML outputs, while corrupt safety fields still fail closed. */
+  private filteredOperations(ownerId: string, predicate: string, values: string[]): OperationReceipt[] {
+    const rows = this.db.prepare(`SELECT data_json FROM operation_receipts WHERE owner_id = ? AND CASE
+      WHEN NOT json_valid(data_json) THEN 1
+      WHEN json_type(data_json, '$.kind') IS NOT 'text' OR json_type(data_json, '$.status') IS NOT 'text'
+        OR json_extract(data_json, '$.status') NOT IN ('prepared','running','succeeded','failed','outcome_unknown')
+        OR json_type(data_json, '$.ownerId') IS NOT 'text' OR json_extract(data_json, '$.ownerId') IS NOT owner_id THEN 1
+      ELSE (${predicate}) END ORDER BY rowid`).all(ownerId, ...values) as Array<{ data_json: string }>
+    return rows.map(row => {
+      const receipt = OperationReceiptSchema.parse(JSON.parse(row.data_json))
+      if (receipt.ownerId !== ownerId) throw Object.assign(new Error('operation receipt owner mismatch'), { code: 'operation_receipt_invalid' })
+      return receipt
+    })
+  }
+
   finishOperation(ownerId: string, key: string, patch: { status: OperationReceipt['status']; result?: unknown; error?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] }, nowIso?: string): OperationReceipt
   finishOperation(ownerId: string, key: string, status: OperationReceipt['status'], result?: unknown): OperationReceipt
   finishOperation(ownerId: string, key: string, patchOrStatus: { status: OperationReceipt['status']; result?: unknown; error?: string; remoteOperationId?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] } | OperationReceipt['status'], nowOrResult?: string | unknown): OperationReceipt {
@@ -652,30 +749,92 @@ export class TaskRunRepository {
   }
 
   unsettledOperations(ownerId: string): OperationReceipt[] {
-    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>)
-      .map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json)))
-      .filter(item => item.kind !== 'im_delivery' && (
-        ['running', 'outcome_unknown'].includes(item.status) ||
-        item.kind === 'tool' && item.status === 'prepared' && item.request?.dispatchTracking !== 'host-v1'
-      ) && !this.verifiedOperationResolution(item))
+    return this.filteredOperations(ownerId, `json_extract(data_json, '$.kind') <> 'im_delivery' AND (
+      json_extract(data_json, '$.status') IN ('running','outcome_unknown') OR
+      json_extract(data_json, '$.kind') = 'tool' AND json_extract(data_json, '$.status') = 'prepared'
+        AND json_extract(data_json, '$.request.dispatchTracking') IS NOT 'host-v1')`, [])
+      .filter(item => !this.verifiedOperationResolution(item))
   }
   verifiedOperationResolution(receipt: OperationReceipt): OperationReceipt['resolution'] | undefined {
     const resolution = receipt.resolution
     if (!resolution) return undefined
-    const proof = this.operations(receipt.ownerId, 'effect_verification').find(item => item.id === resolution.receiptId)
+    const outcome = resolution.outcome ?? 'succeeded'
+    const proof = this.operations(receipt.ownerId, outcome === 'not_completed' ? 'effect_verification_incomplete' : 'effect_verification').find(item => item.id === resolution.receiptId)
     if (proof?.status !== 'succeeded' || proof.request?.originalReceiptId !== receipt.id || proof.request?.originalFingerprint !== receipt.fingerprint) return undefined
-    const result = proof.result as { evidence?: unknown } | undefined
-    return operationFingerprint(result?.evidence) === operationFingerprint(resolution.evidence) ? resolution : undefined
+    const result = proof.result as { evidence?: unknown; outcome?: unknown } | undefined
+    if ((result?.outcome ?? 'succeeded') !== outcome || operationFingerprint(result?.evidence) !== operationFingerprint(resolution.evidence)) return undefined
+    if (outcome === 'not_completed' ? !this.negativeBrowserReviewProof(receipt, proof, resolution.evidence) : resolution.evidence.status === 'public_query_reviewed_incomplete') return undefined
+    return { ...resolution, outcome }
+  }
+  /** A negative outcome is scoped to one durable, finite public-query review, never arbitrary tool text. */
+  private negativeBrowserReviewProof(receipt: OperationReceipt, proof: OperationReceipt, evidence: NonNullable<OperationReceipt['resolution']>['evidence'], validateCurrent = false): boolean {
+    const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+    const owner = proof.request?.confirmationOwnerId, key = proof.request?.confirmationKey
+    if (typeof owner !== 'string' || typeof key !== 'string' || evidence.kind !== 'human_confirmation' || evidence.provider !== 'browser-skill' ||
+      evidence.status !== 'public_query_reviewed_incomplete' || evidence.verified !== true) return false
+    const confirmation = this.operation(owner, key)
+    if (!confirmation || confirmation.kind !== 'browser_confirmation' || !['prepared', 'succeeded'].includes(confirmation.status) ||
+      confirmation.request?.decision !== 'not_completed' || typeof confirmation.request.reviewId !== 'string') return false
+    const original = this.operations(owner, 'tool').find(item => item.id === confirmation.request?.originalReceiptId)
+    const action = original?.request?.toolName === 'browser_click' ? 'click' : original?.request?.toolName === 'browser_fill' ? 'fill' : undefined
+    if (!original || original.status !== 'outcome_unknown' || original.request?.providerId !== 'browser-skill' || !action || evidence.operation !== action) return false
+    const review = this.operations(owner, 'browser_action_review').find(item => object(object(item.result).review).id === confirmation.request?.reviewId)
+    if (!review || review.status !== 'succeeded' || review.request?.originalReceiptId !== original.id || review.request.originalFingerprint !== original.fingerprint ||
+      review.request.expectedRevision !== confirmation.request.expectedRevision) return false
+    const dispatch = this.operations(owner, 'browser_action_dispatch').find(item => item.id === object(review.result).dispatchId)
+    if (!dispatch || !dispatch.request || dispatch.status !== 'outcome_unknown' || dispatch.request?.turnId !== original.request.turnId ||
+      dispatch.request?.argumentsHash !== original.request.argumentsHash || dispatch.request.action !== action || evidence.target !== dispatch.request.pageUrl) return false
+    const dispatchRequest = dispatch.request
+    const scopedAction = verifiedTaskPublicQueryAction(this, original, dispatch, !validateCurrent)
+    if (!scopedAction && (dispatchRequest.authorizationSource === 'task_scope' || dispatchRequest.scopeActionReceiptId !== undefined || dispatchRequest.scopeAuthorizationReceiptId !== undefined)) return false
+    if (scopedAction) {
+      if (receipt.kind === 'tool') return receipt.id === original.id
+      if (receipt.kind === 'browser_action_dispatch') return receipt.id === dispatch.id
+      return receipt.kind === 'browser_schedule_action_outcome' && receipt.ownerId === scopedAction.authority.source.id && receipt.request?.taskId === owner &&
+        receipt.request.turnId === original.request.turnId && receipt.request.action === action && receipt.request.scheduleId === `schedule_${scopedAction.authority.source.id}`
+    }
+    const grant = object(original.request.executionGrant), scope = object(grant.browserScope), task = this.get(owner)
+    if (!task || grant.taskId !== owner || grant.threadId !== task.threadId || grant.turnId !== original.request.turnId || scope.interaction !== 'interact') return false
+    if (validateCurrent && (task.authority?.revokedAt || operationFingerprint(task.authority?.browserScope) !== operationFingerprint(scope))) return false
+    const sourceId = object(grant.browserScheduleBinding).sourceTaskId ?? owner
+    if (typeof sourceId !== 'string') return false
+    const source = this.get(sourceId)
+    if (validateCurrent && (!source || !listApprovedBrowserScheduleActions(this, source).some(item => item.id === dispatchRequest.scheduleActionId))) return false
+    const authorization = this.operations(sourceId, 'browser_schedule_action_authorization').find(item =>
+      item.status === 'succeeded' && object(item.result).id === dispatchRequest.scheduleActionId)
+    const parsed = BrowserScheduleActionSchema.safeParse(authorization?.result)
+    if (!parsed.success) return false
+    const approved = parsed.data, human = typeof approved.approvalId === 'string' ? this.humanRequest(approved.approvalId) : null
+    if (!authorization || validateCurrent && authorization.request?.revoked === true || approved.sourceTaskId !== sourceId || approved.scheduleId !== `schedule_${sourceId}` ||
+      approved.access !== 'public_query' || approved.action !== action || browserVerificationPolicy(approved.verificationPolicy) !== browserVerificationPolicy(scope.verificationPolicy) ||
+      approved.pageUrl !== dispatch.request.pageUrl || approved.elementHash !== dispatch.request.elementHash || approved.valueHash !== dispatch.request.valueHash ||
+      approved.browserInstanceId !== scope.browserInstanceId || approved.browserRevision !== scope.revision ||
+      !human || human.threadId !== this.get(sourceId)?.threadId || human.status !== 'answered' || object(human.resolution).decision !== 'allow' ||
+      object(human.payload.approval).toolName !== 'browser_authorize_action' || object(human.payload.approval).summary !== approved.summary ||
+      object(human.payload.approval).requestHash !== createHash('sha256').update(JSON.stringify(authorization.request)).digest('hex')) return false
+    if (receipt.kind === 'tool') return receipt.id === original.id
+    if (receipt.kind === 'browser_action_dispatch') return receipt.id === dispatch.id
+    return receipt.kind === 'browser_schedule_action_outcome' && receipt.ownerId === sourceId && receipt.request?.taskId === owner &&
+      receipt.request.turnId === original.request.turnId && receipt.request.action === action && receipt.request.scheduleId === approved.scheduleId
   }
   resolveOperation(ownerId: string, key: string, resolution: NonNullable<OperationReceipt['resolution']>): void {
     const receipt = this.operation(ownerId, key)
     if (!receipt || receipt.status !== 'outcome_unknown') throw Object.assign(new Error('Unknown operation not found.'), { code: 'invalid_state' })
+    if (receipt.resolution) {
+      if (operationFingerprint({ ...receipt.resolution, outcome: receipt.resolution.outcome ?? 'succeeded' }) !== operationFingerprint({ ...resolution, outcome: resolution.outcome ?? 'succeeded' })) throw Object.assign(new Error('Operation resolution is immutable.'), { code: 'idempotency_conflict' })
+      return
+    }
     const next = OperationReceiptSchema.parse({ ...receipt, resolution })
     if (!this.verifiedOperationResolution(next)) throw Object.assign(new Error('Verified readback proof is missing.'), { code: 'invalid_state' })
+    if (resolution.outcome === 'not_completed') {
+      const proof = this.operations(ownerId, 'effect_verification_incomplete').find(item => item.id === resolution.receiptId)
+      if (!proof || !this.negativeBrowserReviewProof(next, proof, resolution.evidence, true)) throw Object.assign(new Error('Current public-query review authority is missing.'), { code: 'invalid_state' })
+    }
     this.db.prepare('UPDATE operation_receipts SET data_json = ? WHERE owner_id = ? AND idempotency_key = ?').run(JSON.stringify(next), ownerId, key)
   }
   operations(ownerId: string, kind?: string): OperationReceipt[] {
-    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id=? ORDER BY rowid').all(ownerId) as Array<{data_json:string}>).map(row=>OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item=>!kind || item.kind===kind)
+    if (kind) return this.filteredOperations(ownerId, "json_extract(data_json, '$.kind') = ?", [kind])
+    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id=? ORDER BY rowid').all(ownerId) as Array<{data_json:string}>).map(row=>OperationReceiptSchema.parse(JSON.parse(row.data_json)))
   }
 
   enqueueOutbox(item: Omit<RuntimeOutboxItem, 'attempts'>): void {
@@ -748,7 +907,7 @@ export class TaskRunRepository {
         this.putAttention({ ...attention, status, updatedAt: nowIso, revision: attention.revision + 1 })
         const task = attention.taskId ? this.get(attention.taskId) : null
         if (task && !TERMINAL_TASK_STATUSES.has(task.status)) {
-          this.appendInput({ taskId: task.id, expectedRevision: task.revision, idempotencyKey: `human:${id}`, kind: 'user_answer', sourceId: id, text: JSON.stringify({ request: request.message, resolution }), nowIso })
+          this.appendInput({ taskId: task.id, expectedRevision: task.revision, idempotencyKey: `human:${id}`, kind: request.kind === 'approval' ? 'approval_resolution' : 'user_answer', sourceId: id, text: JSON.stringify({ request: request.message, resolution }), nowIso })
           this.enqueueOutbox({ id: `human:${id}`, ownerId: task.id, kind: 'human_answer', payload: { taskId: task.id, requestId: id }, createdAt: nowIso })
         }
       }

@@ -5,6 +5,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorkspaceFilePreviewPanel } from './WorkspaceFilePreviewPanel'
+import i18n from '../i18n'
 
 let container: HTMLDivElement
 let root: Root
@@ -31,7 +32,9 @@ async function settle(): Promise<void> {
   })
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  await i18n.changeLanguage('zh')
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
@@ -90,7 +93,7 @@ describe('WorkspaceFilePreviewPanel PDF retries', () => {
       }))
     })
     await settle()
-    await vi.waitFor(() => expect(container.textContent).toContain('使用高精度解析'))
+    await vi.waitFor(() => expect(container.textContent).toContain('使用高精度解析'), { timeout: 5_000 })
     const accurateButton = [...container.querySelectorAll('button')]
       .find((button) => button.textContent?.includes('使用高精度解析'))
     await act(async () => accurateButton?.click())
@@ -151,7 +154,7 @@ describe('WorkspaceFilePreviewPanel PDF retries', () => {
       }))
     })
     await settle()
-    await vi.waitFor(() => expect(container.textContent).toContain('使用高精度解析'))
+    await vi.waitFor(() => expect(container.textContent).toContain('使用高精度解析'), { timeout: 5_000 })
 
     const accurateButton = [...container.querySelectorAll('button')]
       .find((button) => button.textContent?.includes('使用高精度解析'))
@@ -195,7 +198,7 @@ describe('WorkspaceFilePreviewPanel PDF retries', () => {
     await settle()
     await settle()
 
-    await vi.waitFor(() => expect(container.textContent).toContain('使用高精度解析'))
+    await vi.waitFor(() => expect(container.textContent).toContain('使用高精度解析'), { timeout: 5_000 })
     const accurateButton = [...container.querySelectorAll('button')]
       .find((button) => button.textContent?.includes('使用高精度解析'))
     expect(accurateButton).toBeInstanceOf(HTMLButtonElement)

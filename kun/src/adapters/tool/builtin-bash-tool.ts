@@ -125,6 +125,15 @@ export async function stopBashSession(sessionId: string): Promise<boolean> {
   return true
 }
 
+/** Read-only polling of an already owned child. This path never spawns or signals a process. */
+export async function pollBashSessionReadonly(sessionId: string, waitMs = 1000): Promise<boolean> {
+  const session = bashSessions.get(sessionId)
+  if (!session) return false
+  if (session.status === 'running') await waitForSessionExitOrDelay(session, Math.min(1000, Math.max(0, waitMs)))
+  if (session.status !== 'running') await sessionPayload(session)
+  return true
+}
+
 async function bashExecute(
   command: string,
   cwd: string,
@@ -483,6 +492,7 @@ async function startBashSession(
     turnId: string
     workspaceRoot: string
     sessionOutputRoot?: string
+    sessionId?: string
     lifecycle?: BashSessionLifecycle
     capacityManager?: CapacityManager
   },
@@ -505,7 +515,8 @@ async function startBashSession(
     })
   }
   const shellRuntime = shellRuntimeInfo()
-  const sessionId = nextSessionId()
+  const sessionId = input.sessionId ?? nextSessionId()
+  if (bashSessions.has(sessionId)) throw new Error('Shell session identity is already in use')
   const capacityPermit = input.capacityManager?.reserve({ id: `shell:${sessionId}`, workspaceRoot: input.workspaceRoot, resources: { shell: 1 } })
   const outputFilePath = input.sessionOutputRoot
     ? join(input.sessionOutputRoot, `${sessionId}.log`)
@@ -744,6 +755,7 @@ export function createBashLocalTool(options: BashLocalToolOptions = {}): LocalTo
               threadId: context.threadId,
               turnId: context.turnId,
               workspaceRoot: context.workspace,
+              ...(context.hostShellSessionId ? { sessionId: context.hostShellSessionId } : {}),
               ...(options.capacityManager ? { capacityManager: options.capacityManager } : {}),
               ...(options.sessionOutputRoot ? { sessionOutputRoot: options.sessionOutputRoot } : {}),
               ...(options.sessionLifecycle ? { lifecycle: options.sessionLifecycle } : {})

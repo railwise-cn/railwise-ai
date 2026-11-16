@@ -558,7 +558,7 @@ describe('official marketplace catalog', () => {
 
   it('ships the five GitHub skills as pinned, installable packages with license evidence', () => {
     const expected = new Map([
-      ['browser-skill', ['9cfba53582cb04d48da36aabd0a5017987d4daea', 'MIT', 'crates/bsk-cli/skill']],
+      ['browser-skill', ['361da1d75798b99b358dfb434b8ce1921fb90d9e', 'MIT', 'crates/bsk-cli/skill']],
       ['blender-skills', ['8f778d2405a214b508d4c7d80742be8e43acdd52', 'MIT', '.claude/skills']],
       ['video-shotcraft', ['1266a3ec4831289c4d893d42dd5102723658039a', 'Apache-2.0', undefined]],
       ['diagram-design', ['0cf73c3fcc56667ad91a9a04c439ac6ccfabc9d1', 'MIT', undefined]],

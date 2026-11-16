@@ -13,6 +13,15 @@ afterEach(async () => {
   vi.unstubAllEnvs()
 })
 
+async function settleDispatch(runtime: Awaited<ReturnType<typeof createKunServeRuntime>>): Promise<void> {
+  // Flow.run returns before its adapter has finished creating the task/Turn.
+  // Join those producers before checking their checkpoint or closing SQLite.
+  await runtime.flowService!.executor.awaitIdle()
+  await runtime.flowService!.awaitSourceDispatch()
+  await runtime.turnService.awaitPendingStarts()
+  await runtime.taskCoordinator!.flushCommandMessages()
+}
+
 async function fixture(parallel = false) {
   vi.stubEnv('RAILWISE_TASK_SCHEDULING_DISABLED', '1')
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-flow-retry-')))
@@ -32,7 +41,7 @@ async function fixture(parallel = false) {
     tokenEconomyMode: false, insecure: false,
     storage: { backend: 'file' as const }, capabilities: KunCapabilitiesConfig.parse({}), approvalPolicy: 'auto' as const, sandboxMode: 'workspace-write' as const }
   let runtime = await createKunServeRuntime(options)
-  cleanup.push(async () => runtime.shutdown?.())
+  cleanup.push(async () => { await settleDispatch(runtime); await runtime.shutdown?.() })
   let coordinator = new TaskDeliveryCoordinator(runtime)
   const policy = { timeoutMs: 10_000, retryAttempts: 0, retryBackoffMs: 0, concurrencyLimit: parallel ? 2 : 1,
     errorBehavior: 'fail' as const, resumable: true, breakpoint: false }
@@ -48,7 +57,8 @@ async function fixture(parallel = false) {
   runtime.flowService!.create(definition)
   expect(runtime.flowService!.publish(definition.id).published).toBe(true)
   const flow = await runtime.flowService!.run(definition.id, {})
-  await expect.poll(() => runtime.flowService!.repository.getRun(flow.id)?.status).toBe('paused')
+  await settleDispatch(runtime)
+  expect(runtime.flowService!.repository.getRun(flow.id)?.status).toBe('paused')
   await expect.poll(() => runtime.taskRepository!.list({ workspaceRoot: root }).filter(task => task.status === 'failed').length).toBe(parallel ? 2 : 1)
   const source = runtime.taskRepository!.get(String(runtime.flowService!.repository.getRun(flow.id)!.checkpoint!.taskId))!
   await expect.poll(async () => (await runtime.threadService.get(source.threadId))?.turns[0]?.status).not.toBe('running')
@@ -57,6 +67,7 @@ async function fixture(parallel = false) {
     return runtime.taskControlService!.mutate(task.id, 'retry', { expectedRevision: runtime.taskRepository!.get(task.id)!.revision, idempotencyKey: 'retry-flow-task' })
   }
   const restart = async () => {
+    await settleDispatch(runtime)
     await runtime.shutdown?.()
     runtime = await createKunServeRuntime(options)
     coordinator = new TaskDeliveryCoordinator(runtime)
@@ -149,7 +160,8 @@ describe('Flow task retry through the production Runtime and synthetic model pro
     f.runtime.flowService!.create(otherDefinition)
     expect(f.runtime.flowService!.publish(otherDefinition.id).published).toBe(true)
     const other = await f.runtime.flowService!.run(otherDefinition.id, {})
-    await expect.poll(() => f.runtime.flowService!.repository.getRun(other.id)?.status).toBe('paused')
+    await settleDispatch(f.runtime)
+    expect(f.runtime.flowService!.repository.getRun(other.id)?.status).toBe('paused')
     await expect.poll(() => f.runtime.taskRepository!.list({ workspaceRoot: f.source.workspaceRoot }).find(task => task.flowRunId === other.id)?.status).toBe('completed')
     await f.coordinator.tick()
     await expect.poll(() => f.runtime.flowService!.repository.getRun(other.id)?.status).toBe('succeeded')

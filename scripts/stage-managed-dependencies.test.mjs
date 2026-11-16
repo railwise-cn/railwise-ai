@@ -14,7 +14,8 @@ const file = { id: 'fixture', component: 'fixture', version: '1.0.0', name: 'fix
 file.mirrorPath = `${file.component}/${file.version}/${file.sha256}/${file.name}`
 
 test('committed manifest pins all runtime targets, sources, licenses and Python metadata', () => {
-  assert.equal(validateManifest(manifest).files.length, 31)
+  assert.equal(validateManifest(manifest).files.length, 36)
+  assert.deepEqual(manifest.files.filter(item => item.component === 'browser-skill').map(item => item.id), ['browser-skill-darwin-arm64', 'browser-skill-darwin-x64', 'browser-skill-win32-x64', 'browser-skill-license', 'browser-skill-source'])
   for (const [target, entry] of Object.entries(manifest.pythonDownloads)) {
     const runtime = manifest.files.find(item => item.id === `python-${target}`)
     assert.equal(entry.metadata.sha256, runtime.sha256)

@@ -11,6 +11,7 @@ import {
 } from '../src/adapters/tool/mcp-tool-provider.js'
 import { REDACTED_SECRET } from '../src/config/secret-redaction.js'
 import { KunCapabilitiesConfig, type McpServerConfig } from '../src/contracts/capabilities.js'
+import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
 import type { ToolHostContext } from '../src/ports/tool-host.js'
 
 function buildContext(workspace: string): ToolHostContext {
@@ -77,6 +78,74 @@ describe('MCP secret references', () => {
 })
 
 describe('MCP tool provider', () => {
+  it.each(['gui_schedule', 'claw_schedule'])('blocks the internal %s bridge in task catalogs and direct replay without disabling other MCPs', async serverId => {
+    const bridgeTools = ['claw', 'gui'].flatMap(prefix => ['list', 'create', 'update', 'delete'].map(action => `${prefix}_schedule_${action}`))
+    const dispatched: string[] = []
+    const config = KunCapabilitiesConfig.parse({ mcp: { enabled: true, search: { mode: 'direct' }, servers: {
+      [serverId]: { transport: 'stdio', command: 'synthetic-unused', trustScope: 'user' },
+      notes: { transport: 'stdio', command: 'synthetic-unused', trustScope: 'user' }
+    } } })
+    const built = await buildMcpToolProviders(config.mcp, { clientFactory: async id => ({
+      listTools: async () => ({ tools: (id === serverId ? bridgeTools : ['read']).map(name => ({ name })) }),
+      callTool: async input => { dispatched.push(`${id}/${input.name}`); return { ok: true } }, close: async () => undefined
+    }) })
+    try {
+      const registry = new CapabilityRegistry(built.providers)
+      const host = new LocalToolHost({ registry })
+      const context = buildContext('/tmp/project')
+      context.executionGrant = ExecutionGrantSchema.parse({ id: 'task-grant', taskId: 'active-task', threadId: context.threadId, turnId: context.turnId,
+        workspaceRoot: context.workspace, workspaceTrust: 'read-only', agentTrust: 'full-access', approvalPolicy: 'auto', sandboxMode: 'read-only',
+        pathAllowlist: [context.workspace], networkAllowlist: ['https://example.test'], connectorIdentityFingerprints: built.authorityFingerprints,
+        workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'task-grant', issuedAt: new Date().toISOString() })
+      // Include old persisted names to prove dispatch cannot rely on catalog removal alone.
+      context.executionGrant.allowedToolNames = [...bridgeTools.map(name => normalizeMcpToolName(serverId, name)), 'mcp_notes_read']
+      expect((await host.listTools(context)).map(tool => tool.name)).toEqual(['mcp_notes_read'])
+      for (const name of bridgeTools) {
+        const toolName = normalizeMcpToolName(serverId, name)
+        expect(() => registry.resolveTool(toolName, context)).toThrow('schedule_task')
+        const rejected = await host.execute({ callId: `blocked-${name}`, toolName, arguments: {} }, context)
+        expect(rejected.item).toMatchObject({ kind: 'tool_result', isError: true,
+          output: { code: 'execution_grant_scope', error: expect.stringContaining('list_schedules') } })
+      }
+      expect(dispatched).toEqual([])
+      await host.execute({ callId: 'normal-mcp', toolName: 'mcp_notes_read', arguments: {} }, context)
+      expect(dispatched).toEqual(['notes/read'])
+      const compatibility = buildContext('/tmp/project')
+      expect((await host.listTools(compatibility)).filter(tool => tool.providerId === `mcp:${serverId}`)).toHaveLength(8)
+      await host.execute({ callId: 'compatibility', toolName: normalizeMcpToolName(serverId, 'gui_schedule_list'), arguments: {} }, compatibility)
+      expect(dispatched).toEqual(['notes/read', `${serverId}/gui_schedule_list`])
+    } finally { await built.close() }
+  })
+
+  it('excludes task-internal schedule bridges from MCP search and rejects known canonical ids before dispatch', async () => {
+    let dispatches = 0
+    const config = KunCapabilitiesConfig.parse({ mcp: { enabled: true, search: { enabled: true, mode: 'search' }, servers: {
+      gui_schedule: { transport: 'stdio', command: 'synthetic-unused', trustScope: 'user' }
+    } } })
+    const built = await buildMcpToolProviders(config.mcp, { clientFactory: async () => ({
+      listTools: async () => ({ tools: [{ name: 'gui_schedule_create' }, { name: 'gui_schedule_list' }] }),
+      callTool: async () => { dispatches++; return {} }, close: async () => undefined
+    }) })
+    try {
+      const host = new LocalToolHost({ registry: new CapabilityRegistry(built.providers) })
+      const context = buildContext('/tmp/project')
+      context.executionGrant = ExecutionGrantSchema.parse({ id: 'task-grant', taskId: 'active-task', threadId: context.threadId, turnId: context.turnId,
+        workspaceRoot: context.workspace, workspaceTrust: 'read-only', agentTrust: 'full-access', approvalPolicy: 'auto', sandboxMode: 'read-only',
+        pathAllowlist: [context.workspace], networkAllowlist: ['https://example.test'], connectorIdentityFingerprints: built.authorityFingerprints,
+        workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'task-grant', issuedAt: new Date().toISOString() })
+      const searched = await host.execute({ callId: 'search', toolName: 'mcp_search', arguments: { query: 'schedule' } }, context)
+      expect(searched.item).toMatchObject({ kind: 'tool_result', output: { searchedTools: 0, results: [] } })
+      for (const toolName of ['mcp_call', 'mcp_describe']) {
+        const rejected = await host.execute({ callId: toolName, toolName, arguments: { toolId: 'gui_schedule/gui_schedule_create', arguments: {} } }, context)
+        expect(rejected.item).toMatchObject({ kind: 'tool_result', isError: true,
+          output: { code: 'execution_grant_scope', error: expect.stringContaining('schedule_task') } })
+      }
+      expect(dispatches).toBe(0)
+      await host.execute({ callId: 'compatibility', toolName: 'mcp_call', arguments: { toolId: 'gui_schedule/gui_schedule_list', arguments: {} } }, buildContext('/tmp/project'))
+      expect(dispatches).toBe(1)
+    } finally { await built.close() }
+  })
+
   it('exposes only the reviewed local connector tools and rejects hidden writes', async () => {
     const config = KunCapabilitiesConfig.parse({ mcp: { enabled: true, servers: { zotero: {
       transport: 'stdio', command: 'node', trustScope: 'user',

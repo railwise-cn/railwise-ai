@@ -130,7 +130,7 @@ export function scheduleTaskSummary(
     return t('scheduleEvery', { minutes: task.schedule.everyMinutes })
   }
   if (task.schedule.kind === 'daily') {
-    return t('scheduleDailyAt', { time: task.schedule.timeOfDay })
+    return t('scheduleDailyAt', { time: (task.schedule.times ?? [task.schedule.timeOfDay]).join(', ') }) + (task.schedule.timezone ? ` · ${task.schedule.timezone}` : '')
   }
   return t('scheduleManual')
 }
@@ -154,7 +154,7 @@ export function validateScheduledTaskDraft(
   if (task.schedule.kind === 'interval' && (!Number.isFinite(task.schedule.everyMinutes) || task.schedule.everyMinutes < 1)) {
     return t('scheduleIntervalInvalid')
   }
-  if (task.schedule.kind === 'daily' && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(task.schedule.timeOfDay)) {
+  if (task.schedule.kind === 'daily' && !(task.schedule.times ?? [task.schedule.timeOfDay]).every(time => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time))) {
     return t('scheduleDailyTimeInvalid')
   }
   if (task.schedule.kind === 'at') {
@@ -815,7 +815,7 @@ function ScheduleTaskDialog({
                     <FieldLabel>{t('scheduleDailyTime')}</FieldLabel>
                     <ScheduleTimePicker
                       value={draft.schedule.timeOfDay}
-                      onChange={(timeOfDay) => updateSchedule({ timeOfDay })}
+                      onChange={(timeOfDay) => updateSchedule({ timeOfDay, times: [timeOfDay] })}
                       t={t}
                     />
                   </div>

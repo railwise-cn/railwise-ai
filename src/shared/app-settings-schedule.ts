@@ -51,7 +51,9 @@ export function normalizeScheduledTask(
       kind: normalizeScheduleKind(schedule?.kind),
       everyMinutes: normalizePositiveInteger(schedule?.everyMinutes, 60, 1, 10_080),
       timeOfDay: normalizeTimeOfDay(schedule?.timeOfDay),
-      atTime: normalizeAtTime(schedule?.atTime)
+      atTime: normalizeAtTime(schedule?.atTime),
+      ...(Array.isArray(schedule?.times) ? { times: [...new Set(schedule.times.map(value => normalizeTimeOfDay(value)))].sort() } : {}),
+      ...(typeof schedule?.timezone === 'string' && schedule.timezone ? { timezone: schedule.timezone } : {})
     },
     createdAt: typeof task.createdAt === 'string' && task.createdAt ? task.createdAt : now,
     updatedAt: typeof task.updatedAt === 'string' && task.updatedAt ? task.updatedAt : now,
@@ -135,3 +137,5 @@ export function mergeScheduleSettings(
     tasks: patch.tasks ?? current.tasks
   }, providerId)
 }
+
+export { normalizeScheduleSpec } from '../../kun/src/contracts/schedule'

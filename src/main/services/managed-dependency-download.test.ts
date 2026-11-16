@@ -39,4 +39,21 @@ describe('managed dependency download', () => {
       expect(managedPythonDownload(target).metadata.sha256).toBe(managedDependency(`python-${target}`).sha256)
     }
   })
+
+  it('pins every BrowserSkill platform, source and license to immutable 0.5.0 downloads', () => {
+    for (const target of ['darwin-arm64', 'darwin-x64', 'win32-x64']) {
+      const browser = managedDependency(`browser-skill-${target}`)
+      expect(browser.version).toBe('0.5.0')
+      expect(browser.sourceUrl).toContain('/Tencent/BrowserSkill/releases/download/cli-v0.5.0/')
+      expect(browser.mirrorPath).toBe(`browser-skill/0.5.0/${browser.sha256}/${browser.name}`)
+      expect(browser.license).toBe('MIT')
+    }
+    const source = managedDependency('browser-skill-source'), license = managedDependency('browser-skill-license')
+    expect(source.sourceUrl).toBe('https://codeload.github.com/Tencent/BrowserSkill/zip/361da1d75798b99b358dfb434b8ce1921fb90d9e')
+    expect(license.sourceUrl).toBe('https://raw.githubusercontent.com/Tencent/BrowserSkill/361da1d75798b99b358dfb434b8ce1921fb90d9e/LICENSE')
+    for (const asset of [source, license]) {
+      expect(asset.version).toBe('0.5.0')
+      expect(asset.mirrorPath).toBe(`browser-skill/0.5.0/${asset.sha256}/${asset.name}`)
+    }
+  })
 })

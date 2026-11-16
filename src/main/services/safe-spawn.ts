@@ -18,19 +18,19 @@ export class SafeSpawnError extends Error {
 export async function safeSpawn(
   command: string,
   args: readonly string[],
-  options: SpawnOptions & { workspaceRoot?: string } = {}
+  options: SpawnOptions & { workspaceRoot?: string; beforeSpawn?: () => void } = {}
 ): Promise<ChildProcess> {
   const executable = await resolveExecutable(command, options.env)
   const cwd = await resolveSpawnCwd(options.cwd, options.workspaceRoot)
-  const spawnOptions: SpawnOptions = { ...options, cwd }
+  const { beforeSpawn, ...spawnOptions }: SpawnOptions & { workspaceRoot?: string; beforeSpawn?: () => void } = { ...options, cwd }
   delete (spawnOptions as SpawnOptions & { workspaceRoot?: string }).workspaceRoot
   try {
-    return await spawnOnce(executable, args, spawnOptions)
+    return await spawnOnce(executable, args, spawnOptions, beforeSpawn)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EPERM') {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 75))
       try {
-        return await spawnOnce(executable, args, spawnOptions)
+        return await spawnOnce(executable, args, spawnOptions, beforeSpawn)
       } catch (retryError) {
         throw new SafeSpawnError(`Permission denied while starting ${command}.`, 'spawn_denied', retryError)
       }
@@ -44,7 +44,8 @@ export async function safeSpawn(
   }
 }
 
-async function spawnOnce(command: string, args: readonly string[], options: SpawnOptions): Promise<ChildProcess> {
+async function spawnOnce(command: string, args: readonly string[], options: SpawnOptions, beforeSpawn?: () => void): Promise<ChildProcess> {
+  beforeSpawn?.()
   const child = spawn(command, [...args], options)
   return new Promise((resolveChild, reject) => {
     const onSpawn = (): void => {

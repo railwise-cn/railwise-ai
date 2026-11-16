@@ -263,12 +263,7 @@ describe('runtime factory official Responses search wiring', () => {
         capabilities: KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true, fetchEnabled: false } })
       })
       expect((await runtime.toolDiagnostics?.())?.webProviders).toEqual([expect.objectContaining({ searchAvailable: false })])
-      const result = await runtime.toolHost!.execute({ callId: 'unsupported-search', toolName: 'web_search', arguments: { query: 'synthetic query' } }, {
-        threadId: 'search-thread', turnId: 'search-turn', workspace: dataDir, approvalPolicy: 'on-request', sandboxMode: 'workspace-write',
-        abortSignal: new AbortController().signal, awaitApproval: async () => 'allow'
-      })
-      expect(result.item).toMatchObject({ kind: 'tool_result', isError: true })
-      expect(JSON.stringify(result.item)).toContain('provider_unavailable')
+      expect((await runtime.toolHost!.listTools()).map(tool => tool.name)).not.toContain('web_search')
       expect(fetchImpl).not.toHaveBeenCalled()
     } finally {
       await runtime?.shutdown?.(); vi.unstubAllGlobals(); await rm(dataDir, { recursive: true, force: true })

@@ -530,9 +530,23 @@ export function createThreadActions(
       }
     }
     let coordinatedTurn: {threadId:string;turnId:string;userMessageItemId?:string}|undefined
-    const canCoordinate = !queued && !overrides?.guiPlan && !overrides?.guiDesign && ['chat', 'write'].includes(get().route) && typeof window !== 'undefined' && typeof window.workwise?.coordinateTaskCommand === 'function'
+    const canCoordinate = !queued?.guiPlan && !overrides?.guiPlan && !overrides?.guiDesign && ['chat', 'write'].includes(get().route) && typeof window !== 'undefined' && typeof window.workwise?.coordinateTaskCommand === 'function'
+    const commandAttachmentIds = queued?.attachmentIds ?? overrides?.attachmentIds?.filter(id => id.trim()) ?? messageAttachments.map(item => item.id)
+    const commandReferences = queued?.workspaceReferences ?? overrides?.workspaceReferences
+    const commandDisplayText = queued?.displayText ?? overrides?.displayText ?? trimmedText
+    const commandReasoning = queued?.reasoningEffort ?? overrides?.reasoningEffort
     const coordinate = async (threadId:string,prompt:string,appendUser=true,optimisticUserId?:string):Promise<boolean> => {
-      const result=await window.workwise.coordinateTaskCommand({threadId,intent:'auto',idempotencyKey:crypto.randomUUID(),request:{prompt,displayText:overrides?.displayText??trimmedText,mode:mode??'agent',...(composerModel?{model:composerModel}:{}),...(providerId?{providerId}:{}),...(overrides?.reasoningEffort?{reasoningEffort:overrides.reasoningEffort}:{}),...((overrides?.attachmentIds?.length || messageAttachments.length)?{attachmentIds:overrides?.attachmentIds?.length?overrides.attachmentIds:messageAttachments.map(item=>item.id)}:{}),...(overrides?.workspaceReferences?.length?{workspaceReferences:overrides.workspaceReferences}:{})}})
+      const result = await window.workwise.coordinateTaskCommand({
+        threadId, intent: 'auto', idempotencyKey: queued ? `queued:${threadId}:${queued.id}` : crypto.randomUUID(),
+        request: {
+          prompt, displayText: commandDisplayText, mode: queued?.mode ?? mode ?? 'agent',
+          ...(composerModel ? { model: composerModel } : {}),
+          ...(providerId ? { providerId } : {}),
+          ...(commandReasoning ? { reasoningEffort: commandReasoning } : {}),
+          ...(commandAttachmentIds.length ? { attachmentIds: commandAttachmentIds } : {}),
+          ...(commandReferences?.length ? { workspaceReferences: commandReferences } : {})
+        }
+      })
       if(result.kind==='chat_started'){coordinatedTurn=result.turn;return false}
       const localText=result.kind==='snapshot'?(result.task?`${result.task.goal}\n${i18n.t(`common:taskRunStatus_${result.task.status}`)}${result.task.waitingReason?`\n${result.task.waitingReason}`:''}`:i18n.t('common:taskCommandNoTask')):result.kind==='task_updated'?i18n.t(`common:taskRunStatus_${result.task.status}`):result.kind==='input_queued'?i18n.t('common:taskCommandQueued'):result.kind==='task_started'?i18n.t('common:taskCommandStarted'):('message' in result?result.message:i18n.t('common:taskCommandStarted'))
       set(state=>{
@@ -540,7 +554,22 @@ export function createThreadActions(
         const resultId=result.receipt?.resultMessageItemId??`task-command-result-${crypto.randomUUID()}`
         const optimistic=optimisticUserId?state.blocks.find(block=>block.id===optimisticUserId):undefined
         const blocks=state.blocks.filter(block=>block.id!==userId&&block.id!==resultId&&block.id!==optimisticUserId)
-        return {blocks:[...blocks,...(appendUser||optimistic||result.receipt?[optimistic?{...optimistic,id:userId}:{kind:'user' as const,id:userId,text:overrides?.displayText??trimmedText,createdAt:new Date().toISOString()}]:[]),{kind:'assistant' as const,id:resultId,text:localText,createdAt:new Date().toISOString(),...(result.kind==='capability_required' && result.task ? {capabilityCard:{threadId,taskId:result.task.id,attentionId:result.attentionId,prompt,capability:result.capability}}:{})}],error:null}
+        const userBlock = optimistic ? { ...optimistic, id: userId } : {
+          kind: 'user' as const, id: userId, text: commandDisplayText, createdAt: new Date().toISOString(),
+          ...(commandAttachmentIds.length ? { meta: { attachmentIds: commandAttachmentIds, attachments: messageAttachments } } : {})
+        }
+        const resultBlock = {
+          kind: 'assistant' as const, id: resultId, text: localText, createdAt: new Date().toISOString(),
+          ...(result.intentCard ? { intentCard: result.intentCard } : {}),
+          ...(result.kind === 'capability_required' && result.task ? {
+            capabilityCard: { threadId, taskId: result.task.id, attentionId: result.attentionId, prompt, capability: result.capability }
+          } : {})
+        }
+        return {
+          ...(queued ? { queuedMessages: state.queuedMessages.filter(message => message.id !== queued.id) } : {}),
+          blocks: [...blocks, ...(appendUser || optimistic || result.receipt ? [userBlock] : []), resultBlock],
+          error: null
+        }
       })
       return true
     }

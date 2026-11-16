@@ -1,4 +1,5 @@
 import type { FlowDefinitionV1, FlowNodeRegistryEntryV1, FlowValidationIssueV1 } from '../contracts/flow.js'
+import { normalizeScheduleSpec } from '../contracts/schedule.js'
 import { portsCompatible } from './node-registry.js'
 
 export function validateFlowDefinition(definition: FlowDefinitionV1, registry: FlowNodeRegistryEntryV1[]): { valid: boolean; issues: FlowValidationIssueV1[] } {
@@ -15,6 +16,11 @@ export function validateFlowDefinition(definition: FlowDefinitionV1, registry: F
     for (const port of entry.inputs.filter((candidate) => candidate.required)) {
       if (!(port.id in node.bindings) && !definition.edges.some((edge) => edge.targetNodeId === node.id && edge.targetPortId === port.id)) {
         issue({ code: 'required_input_missing', severity: 'error', message: `Required input is missing: ${port.label}`, nodeId: node.id })
+      }
+    }
+    if (node.type === 'schedule_trigger' && !node.disabled) {
+      try { normalizeScheduleSpec(node.config) } catch {
+        issue({ code: 'invalid_schedule', severity: 'error', message: '请填写有效的计划类型、时刻和 IANA 时区。', nodeId: node.id })
       }
     }
     if (node.type === 'loop') {

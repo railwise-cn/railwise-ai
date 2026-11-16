@@ -2,10 +2,10 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { WorkWiseApi } from '../shared/workwise-api'
 import { mcpServerSavePayloadSchema, runtimeRequestPayloadSchema, sseStartPayloadSchema } from '../main/ipc/app-ipc-schemas'
 
-const bridge = vi.hoisted(() => ({ exposed: new Map<string, unknown>(), invoke: vi.fn() }))
+const bridge = vi.hoisted(() => ({ exposed: new Map<string, unknown>(), invoke: vi.fn(), on: vi.fn(), removeListener: vi.fn() }))
 vi.mock('electron', () => ({
   contextBridge: { exposeInMainWorld: (name: string, api: unknown) => bridge.exposed.set(name, api) },
-  ipcRenderer: { invoke: bridge.invoke, on: vi.fn(), removeListener: vi.fn() },
+  ipcRenderer: { invoke: bridge.invoke, on: bridge.on, removeListener: bridge.removeListener },
   webUtils: { getPathForFile: vi.fn() }
 }))
 
@@ -25,6 +25,17 @@ describe('production preload task API and main IPC contract', () => {
     })
     await import('./index')
     api = bridge.exposed.get('workwise') as WorkWiseApi
+  })
+
+  it('forwards cursor-free task progress through the existing preload event subscription and cleans up that exact listener', () => {
+    const receive=vi.fn(),release=api.onSseEvent(receive)
+    const [name,listener]=bridge.on.mock.calls.at(-1)!
+    expect(name).toBe('runtime:sse-event')
+    const payload={streamId:'tasks-progress',events:[{kind:'task_progress',taskId:'task-owned',payload:{taskId:'task-owned',taskRevision:3,turnId:'turn-owned',sampledAt:'2026-11-16T12:00:15Z'}}]}
+    listener({},payload)
+    expect(receive).toHaveBeenCalledExactlyOnceWith(payload)
+    expect(payload.events[0]).not.toHaveProperty('seq')
+    release();expect(bridge.removeListener).toHaveBeenCalledWith(name,listener)
   })
 
   it('passes the fixed DingTalk desktop action without renderer-supplied launch arguments', async () => {
@@ -69,6 +80,49 @@ describe('production preload task API and main IPC contract', () => {
     expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks?pagination=cursor&filter=all&limit=200', method: 'GET' })
     expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task_1/receipts', method: 'GET' })
     expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task_1/receipts/receipt_1/verify', method: 'POST', body: JSON.stringify(mutation) })
+  })
+
+  it('passes both browser binding methods used by the review panel through the real main validator', async () => {
+    const request = { expectedTaskRevision: 6, expectedBrowserRevision: 8, browserInstanceId: 'chrome-current',
+      origins: ['https://example.com'], interaction: 'interact' as const, confirmed: true as const, idempotencyKey: 'binding-reviewed' }
+    await api.getBrowserTaskBinding('task-original')
+    await api.confirmBrowserTaskBinding('task-original', request)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-original/browser-binding', method: 'GET' })
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-original/browser-binding', method: 'POST', body: JSON.stringify(request) })
+    for (const duration of ['task', 'schedule'] as const) {
+      await api.confirmBrowserTaskBinding('task-original', { ...request, publicQueryAuthorization: duration })
+      expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-original/browser-binding', method: 'POST', body: JSON.stringify({ ...request, publicQueryAuthorization: duration }) })
+    }
+    await expect(api.getBrowserTaskBinding('task-original/../task-other')).rejects.toThrow()
+    await expect(api.confirmBrowserTaskBinding('task-original', { ...request, taskId: 'task-other' } as typeof request)).rejects.toThrow()
+  })
+
+  it('keeps public-query recovery preparation and explicit retry as separate typed requests', async () => {
+    const request = { expectedRevision: 7, idempotencyKey: 'prepare-new-query', confirmed: true as const }
+    await api.getTaskPublicQueryRecovery('task-query')
+    await api.prepareTaskPublicQueryRecovery('task-query', request)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/public-query-recovery', method: 'GET' })
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/prepare-public-query-recovery', method: 'POST', body: JSON.stringify(request) })
+    const retry = { expectedRevision: 8, idempotencyKey: 'continue-new-query', publicQueryRecoveryReceiptId: 'recovery-confirmation' }
+    await api.retryTask('task-query', retry)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/retry', method: 'POST', body: JSON.stringify(retry) })
+    await expect(api.getTaskPublicQueryRecovery('task-query/../other')).rejects.toThrow()
+    await expect(api.prepareTaskPublicQueryRecovery('task-query/../other', request)).rejects.toThrow()
+  })
+
+
+  it('passes explicit one-off scope consent and exact revocation through the production validator', async () => {
+    const scopeConfirmation = { reviewHash: 'a'.repeat(64), expectedBrowserRevision: 6, browserInstanceId: 'chrome-current', origins: ['https://public.example.test'], duration: 'task' as const, ttlSeconds: 900, confirmed: true as const }
+    const prepare = { expectedRevision: 3, idempotencyKey: 'fresh-scope', confirmed: true as const, scopeConfirmation }
+    await api.prepareTaskPublicQueryRecovery('task-query', prepare)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/prepare-public-query-recovery', method: 'POST', body: JSON.stringify(prepare) })
+    const revoke = { expectedRevision: 4, idempotencyKey: 'revoke-this-scope', confirmed: true as const, consentReceiptId: 'exact-consent' }
+    await api.revokeTaskPublicQueryRecovery('task-query', revoke)
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task-query/revoke-public-query-recovery', method: 'POST', body: JSON.stringify(revoke) })
+    await expect(api.revokeTaskPublicQueryRecovery('task-query/../other', revoke)).rejects.toThrow()
+    await expect(api.prepareTaskPublicQueryRecovery('task-query', { ...prepare, scopeConfirmation: { ...scopeConfirmation, ttlSeconds: 901 } })).rejects.toThrow()
+    await expect(api.prepareTaskPublicQueryRecovery('task-query', { ...prepare, scopeConfirmation: { ...scopeConfirmation, duration: 'schedule' } } as unknown as typeof prepare)).rejects.toThrow()
+    await expect(api.revokeTaskPublicQueryRecovery('task-query', { ...revoke, extraPermission: true } as typeof revoke)).rejects.toThrow()
   })
 
   it('passes real chat/model and candidate review commands, and the aggregate task stream, through their typed boundaries', async () => {

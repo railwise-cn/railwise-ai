@@ -1,3 +1,4 @@
+import i18n from '../../i18n'
 import type { ConversationViewMode } from '@shared/app-settings'
 import type { ChatBlock } from '../../agent/types'
 
@@ -31,10 +32,10 @@ function redactBlock(block: ChatBlock, includeDetail: boolean): ChatBlock {
   if (block.kind === 'tool') {
     return {
       ...block,
-      summary: redactRuntimeText(block.summary),
+      summary: includeDetail ? redactRuntimeText(block.summary) : semanticToolSummary(block),
       ...(includeDetail && block.detail ? { detail: redactRuntimeText(block.detail) } : { detail: undefined }),
       ...(block.filePath ? { filePath: redactRuntimeText(block.filePath) } : {}),
-      ...(block.meta ? { meta: redactUnknown(block.meta) as Record<string, unknown> } : {})
+      meta: { ...(redactUnknown(block.meta) as Record<string, unknown> ?? {}), ...(!includeDetail ? { presentationSummary: semanticToolSummary(block) } : {}) }
     }
   }
   if (block.kind === 'compaction') {
@@ -60,6 +61,14 @@ function redactBlock(block: ChatBlock, includeDetail: boolean): ChatBlock {
     }
   }
   return block
+}
+
+function semanticToolSummary(block: Extract<ChatBlock, { kind: 'tool' }>): string {
+  if (block.meta?.outcomeUnknown) return i18n.t('common:taskReceiptStatus_outcome_unknown')
+  if (block.status === 'error') return i18n.t('common:taskReceiptStatus_failed')
+  if (block.status === 'success') return i18n.t('common:processed')
+  const phase = deriveSemanticProgress([block], true).phase
+  return i18n.t(`common:semanticProgress_${phase}`)
 }
 
 export function isCriticalProcessBlock(block: ChatBlock): boolean {

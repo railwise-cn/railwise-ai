@@ -1,0 +1,156 @@
+/* A single desktop layout contract. Work surfaces stay opaque and readable. */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
+}
+
+.ds-workbench-shell {
+  --ds-stage-gradient: var(--ds-bg-canvas);
+  --ds-topbar-bg: var(--ds-bg-canvas);
+  --ds-topbar-shadow: none;
+  --ds-sidebar-gradient: var(--ds-bg-sidebar);
+  --ds-sidebar-haze: none;
+  --ds-shadow-composer: 0 4px 20px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+:root:not([data-theme='dark']) .ds-workbench-shell {
+  --ds-bg-sidebar: #f5f6f8;
+}
+
+[data-theme='dark'] .ds-workbench-shell {
+  --ds-bg-sidebar: #17191c;
+  --ds-stage-gradient: #1d1f23;
+  --ds-topbar-bg: #1d1f23;
+  --ds-shadow-composer: 0 4px 20px rgba(0, 0, 0, 0.16);
+}
+
+.ds-workbench-left-panel,
+.ds-workbench-right-panel {
+  position: relative;
+  max-width: 100%;
+  background: var(--ds-bg-sidebar);
+}
+
+.ds-workbench-right-panel {
+  border-left: 1px solid var(--ds-border-muted);
+  background: var(--ds-bg-canvas);
+}
+
+.ds-workbench-left-panel {
+  border-right: 1px solid var(--ds-sidebar-divider);
+}
+
+.ds-workbench-shell .ds-workbench-divider {
+  opacity: 1;
+  outline-offset: -1px;
+}
+
+.ds-workbench-divider:focus-visible {
+  outline: 2px solid var(--ds-accent);
+}
+
+.ds-workbench-divider-hit {
+  position: absolute;
+  inset-block: 0;
+  left: -4px;
+  right: -4px;
+}
+
+.ds-workbench-divider:hover { background: var(--ds-accent); }
+
+body[data-workbench-resizing='true'] .ds-workbench-shell webview,
+body[data-workbench-resizing='true'] .ds-workbench-shell iframe {
+  pointer-events: none;
+}
+
+.ds-sidebar-content {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+:root .ds-workbench-shell .ds-sidebar-shell,
+:root[data-theme] .ds-workbench-shell .ds-sidebar-shell {
+  background: var(--ds-bg-sidebar);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+:root .ds-workbench-shell .ds-sidebar-shell::before,
+:root[data-theme] .ds-workbench-shell .ds-sidebar-shell::before {
+  content: none;
+}
+
+:root[data-theme] .ds-workbench-shell .ds-topbar-surface,
+:root[data-theme] .ds-workbench-shell .ds-chat-composer {
+  background: var(--ds-bg-canvas);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.ds-sidebar-content > :not(.flex-1) {
+  flex-shrink: 0;
+}
+
+.ds-sidebar-content > .flex-1 {
+  min-height: 140px;
+}
+
+.ds-workbench-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  border: 0;
+  background: rgba(15, 23, 42, 0.18);
+  cursor: default;
+}
+
+.ds-workbench-shell[data-navigation-overlay='true'] .ds-workbench-left-panel {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  z-index: 60;
+  box-shadow: 12px 0 32px rgba(15, 23, 42, 0.14);
+}
+
+.ds-workbench-shell[data-inspector-overlay='true'] .ds-workbench-right-panel {
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  z-index: 55;
+  box-shadow: -12px 0 32px rgba(15, 23, 42, 0.14);
+}
+
+.ds-workbench-shell[data-active-overlay='navigation'] .ds-workbench-right-panel {
+  visibility: hidden;
+}
+
+.ds-workbench-shell[data-navigation-overlay='true'] .ds-workbench-left-divider,
+.ds-workbench-shell[data-inspector-overlay='true'] .ds-workbench-right-divider {
+  display: none;
+}
+
+.ds-workbench-shell .chat-topbar {
+  margin-top: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+@media (max-height: 700px) {
+  .ds-sidebar-titlebar-spacer { padding-bottom: 0.5rem; }
+  .ds-sidebar-content > .flex-1 { min-height: 96px; }
+  .ds-sidebar-footer { margin-top: 0.375rem; padding-top: 0.375rem; }
+}
+
+/* Keep task filters from consuming the whole task list in a short/scaled window.
+ * The shared navigation scroller absorbs the extra height instead. */
+.ds-sidebar-content > .ds-task-sidebar {
+  flex: 1 0 280px;
+  min-height: 280px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-workbench-shell *, .ds-workbench-shell *::before, .ds-workbench-shell *::after {
+    scroll-behavior: auto;
+  }
+}

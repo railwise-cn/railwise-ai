@@ -1,7 +1,9 @@
 import { McpConfigService, type McpRuntimeSnapshotV1 } from './services/mcp-config-service'
+import { assertMcpConfigurationApplied } from './services/runtime-mcp-application'
 import { loadManagedMcpConfigForRefresh } from './managed-runtime-process'
 import { createGuiUpdateShutdown } from './gui-update-shutdown'
 import brand from '../shared/product-brand.json'
+import { taskArtifactPreviewScope } from '../shared/task-artifact-preview'
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, shell, Tray, type MessageBoxOptions } from 'electron'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, openAsBlob } from 'node:fs'
@@ -69,7 +71,10 @@ import {
   runtimeAuthHeaders,
   runtimeRequestViaHost
 } from './runtime/managed-runtime-adapter'
-import { getManagedRuntimeActualPort, resolveManagedRuntimeDataDir, setManagedDwsEnabled, syncManagedDwsCapability, syncManagedLarkCapability } from './managed-runtime-process'
+import { getManagedRuntimeActualPort, resolveManagedRuntimeDataDir, setManagedDwsEnabled, syncManagedDwsCapability, syncManagedLarkCapability, syncManagedBrowserSkillCapability, syncManagedSkillCapability } from './managed-runtime-process'
+import { getManagedBrowserSkillService } from './services/managed-browser-skill-service'
+import { disposeBrowserAfterRuntimeStop } from './runtime/browser-daemon-preservation'
+import { createConfirmedQuit, stopRuntimeAfterCleanup } from './runtime/confirmed-shutdown'
 import { waitForRuntimeTurnsIdle } from './runtime/managed-runtime-idle'
 import { configureLogger, logError, logWarn, pruneOnStartup } from './logger'
 import { createClawRuntime, type ClawRuntime } from './claw-runtime'
@@ -79,6 +84,7 @@ import { migrateSchedulesToFlows } from './schedule-flow-migration'
 import { runClawScheduleMcpServerFromArgv } from './claw-schedule-mcp-server'
 import {
   clawScheduleMcpSettingsChanged,
+  restoreManagedScheduleMcpEnvironment,
   resolveRuntimeMcpJsonPath,
   syncClawScheduleMcpConfig,
   type ClawScheduleMcpLaunchConfig
@@ -288,6 +294,7 @@ if (candidateRuntimePaths) {
   process.env.WORKWISE_TOOLS_ROOT = candidateRuntimePaths.toolsRoot
   process.env.WORKWISE_UPDATE_PROVIDER = 'none'
   configureManagedRuntimeStartOptions({
+    allowStart: allowManagedRuntimeStart,
     candidateRoot: candidateRuntimePaths.root,
     homeDir: candidateRuntimePaths.home,
     workwiseHome: candidateRuntimePaths.workwiseHome,
@@ -298,6 +305,8 @@ if (candidateRuntimePaths) {
     runtimeToken,
     flowSecretStoreKey
   })
+} else {
+  configureManagedRuntimeStartOptions({ allowStart: allowManagedRuntimeStart })
 }
 
 function clawScheduleMcpConfigPaths(): { mcpJsonPath?: string } {
@@ -356,6 +365,8 @@ let appBehavior: AppBehaviorConfigV1 = normalizeAppBehaviorSettings()
 let tray: Tray | null = null
 let currentLocale: AppSettingsV1['locale'] = 'en'
 let isQuitting = false
+
+function allowManagedRuntimeStart(): boolean { return !isQuitting && !updateRuntimePrepared }
 let candidateServiceReservations: Awaited<ReturnType<typeof reserveCandidateServicePorts>> | null = null
 let gracefulShutdownPromise: Promise<void> | null = null
 let imCredentialService: ImCredentialService | null = null
@@ -425,6 +436,31 @@ type GuiUpdaterModule = typeof import('./gui-updater')
 
 let guiUpdaterModulePromise: Promise<GuiUpdaterModule> | null = null
 let guiUpdaterInitialized = false
+let browserDisposedForQuit = false
+let browserShutdownPromise: Promise<void> | undefined
+
+async function disposeManagedBrowserForExit(): Promise<void> {
+  if (!browserShutdownPromise) {
+    browserShutdownPromise = disposeBrowserAfterRuntimeStop({
+      // The GUI deadline flag is not a process-exit acknowledgement.
+      runtimeStopped: !managedRuntimeAdapter.isChildRunning(),
+      databasePath: async () => {
+        const settings = await store.load()
+        const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime')
+          : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
+        return join(dataDir, 'tasks.sqlite3')
+      },
+      dispose: options => getManagedBrowserSkillService().dispose(options)
+    }).then(result => {
+      if (result.preserveDaemon) console.info('[browser-skill] preserving idle browser driver for result verification', { reason: result.reason })
+      browserDisposedForQuit = true
+    }).catch(error => {
+      browserShutdownPromise = undefined
+      throw error
+    })
+  }
+  await browserShutdownPromise
+}
 
 function emitClawChannelActivity(payload: { channelId: string; threadId: string }): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
@@ -435,21 +471,26 @@ async function stopManagedRuntimes(requireCleanExit = false): Promise<void> {
   if (managedRuntimesStoppedForQuit) return
   if (!gracefulShutdownPromise) {
     gracefulShutdownPromise = (async () => {
-      await appCancellationRegistry.cancelAll('application_exit')
-      if (imHealthTimer) {
-        clearInterval(imHealthTimer)
-        imHealthTimer = null
-      }
-      await stopAllRuntimeSse('application_exit')
-      scheduleRuntime?.stop()
-      await clawRuntime?.stop()
-      await stopWeixinBridgeRuntime()
-      stopCredentialHelperProcesses()
-      await drainSerializedWrites()
-      await imHealthService?.flush()
-      imDeliveryLedger?.close()
-      imDeliveryLedger = null
-      await managedRuntimeAdapter.stopAndWait(requireCleanExit ? { requireCleanExit: true, timeoutMs: 30_000 } : undefined)
+      await stopRuntimeAfterCleanup({
+        cleanup: async () => {
+          await appCancellationRegistry.cancelAll('application_exit')
+          if (imHealthTimer) {
+            clearInterval(imHealthTimer)
+            imHealthTimer = null
+          }
+          await stopAllRuntimeSse('application_exit')
+          scheduleRuntime?.stop()
+          await clawRuntime?.stop()
+          await stopWeixinBridgeRuntime()
+          stopCredentialHelperProcesses()
+          await drainSerializedWrites()
+          await imHealthService?.flush()
+          imDeliveryLedger?.close()
+          imDeliveryLedger = null
+        },
+        stopRuntime: () => managedRuntimeAdapter.stopAndWait(requireCleanExit ? { requireCleanExit: true, timeoutMs: 30_000 } : undefined),
+        isRuntimeRunning: () => managedRuntimeAdapter.isChildRunning()
+      })
       await candidateServiceReservations?.close()
       candidateServiceReservations = null
     })().catch(error => {
@@ -472,10 +513,37 @@ const stopManagedRuntimesForUpdate = createGuiUpdateShutdown(async () => {
 })
 
 async function stopManagedRuntimesForQuit(): Promise<void> {
-  const timeout = new Promise<void>((resolve) => setTimeout(resolve, 5_000))
-  await Promise.race([stopManagedRuntimes(), timeout])
-  managedRuntimesStoppedForQuit = true
+  await stopManagedRuntimes()
+  await disposeManagedBrowserForExit()
 }
+
+const requestConfirmedQuit = createConfirmedQuit({
+  stop: stopManagedRuntimesForQuit,
+  quit: () => app.quit(),
+  onFailure: error => {
+    isQuitting = false
+    managedRuntimesStoppedForQuit = false
+    gracefulShutdownPromise = null
+    const runtimeRunning = managedRuntimeAdapter.isChildRunning()
+    console.error('[workwise] application exit was stopped because shutdown failed:', error)
+    logError('shutdown', 'Application exit was stopped because shutdown failed.', {
+      code: runtimeRunning ? 'runtime_exit_unconfirmed' : 'application_cleanup_failed',
+      message: error instanceof Error ? error.message : String(error),
+      causes: error instanceof AggregateError ? error.errors.map(cause => cause instanceof Error ? cause.message : String(cause)) : undefined
+    })
+    if (candidateHeadless) return
+    revealMainWindow()
+    void dialog.showMessageBox({
+      type: 'error',
+      title: currentLocale === 'zh' ? '尚未完成退出' : 'Application shutdown incomplete',
+      message: currentLocale === 'zh'
+        ? runtimeRunning
+          ? '任务执行服务尚未确认停止，已取消本次退出。请稍后再次退出；问题持续时可打开日志查看原因。'
+          : '应用尚未完成保存与清理，已取消本次退出。请稍后再次退出；问题持续时可打开日志查看原因。'
+        : 'Saving and shutdown have not completed. The application remains open. Try quitting again shortly, or open the logs if the problem continues.'
+    })
+  }
+})
 
 async function loadGuiUpdaterModule(): Promise<GuiUpdaterModule> {
   if (!guiUpdaterModulePromise) {
@@ -535,11 +603,14 @@ function installDevPreviewWebviewGuards(): void {
 
     contents.on('will-navigate', (event, navigationUrl) => {
       if (contents.getType() !== 'webview') return
+      const artifactScope = taskArtifactPreviewScope(contents.getURL())
+      if (artifactScope && taskArtifactPreviewScope(navigationUrl) !== artifactScope) { event.preventDefault(); return }
       if (!isAllowedDevPreviewUrl(navigationUrl)) event.preventDefault()
     })
 
     contents.setWindowOpenHandler(({ url }) => {
       if (contents.getType() !== 'webview') return { action: 'allow' }
+      if (taskArtifactPreviewScope(contents.getURL())) return { action: 'deny' }
       return isAllowedDevPreviewUrl(url) ? { action: 'allow' } : { action: 'deny' }
     })
   })
@@ -906,6 +977,7 @@ function runtimeFingerprint(settings: AppSettingsV1): string {
 }
 
 async function ensureRuntime(settings: AppSettingsV1): Promise<void> {
+  if (isQuitting) throw new Error('应用正在退出，任务执行服务保持停止。')
   if (updateRuntimePrepared) throw new Error('应用正在完成更新，Runtime 保持停止。')
   const fingerprint = runtimeFingerprint(settings)
   const pending = runtimeEnsurePromise
@@ -962,6 +1034,7 @@ async function ensureManagedRuntime(settings: AppSettingsV1): Promise<void> {
     throw runtimeJsonError('runtime_port_conflict', reclaim.message)
   }
   try {
+    if (isQuitting) throw new Error('应用正在退出，任务执行服务保持停止。')
     await adapter.ensureRunning(settings)
   } catch (e) {
     console.error('[workwise] failed to start runtime:', e)
@@ -1152,7 +1225,7 @@ async function restartManagedRuntimeForSettingsChange(
     await waitForManagedRuntimeReadyBeforeStop(prev, 'settings-apply')
     await adapter.stopAndWait()
   }
-  if (!runtime.autoStart) return
+  if (!runtime.autoStart || isQuitting) return
 
   try {
     await adapter.ensureRunning(next)
@@ -1485,12 +1558,13 @@ app.whenReady().then(async () => {
       const settings = await store.load()
       const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime') : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
       const path = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'mcp.json') : resolveRuntimeMcpJsonPath()
-      const config = await loadManagedMcpConfigForRefresh(dataDir, path, snapshot.servers)
+      const managedSnapshot = restoreManagedScheduleMcpEnvironment(snapshot, await mcpConfigService.list(), settings, getClawScheduleMcpLaunchConfig())
+      const config = await loadManagedMcpConfigForRefresh(dataDir, path, managedSnapshot.servers)
+      const revision = ++mcpApplyRevision
       const response = await runtimeRequest(settings, '/v1/runtime/mcp-config', {
-        method: 'POST', body: JSON.stringify({ config, environment: snapshot.environment, revision: ++mcpApplyRevision })
+        method: 'POST', body: JSON.stringify({ config, environment: managedSnapshot.environment, revision })
       })
-      const result = response.ok ? JSON.parse(response.body) as { ok?: unknown } : undefined
-      if (!response.ok || result?.ok !== true) throw new Error('连接配置已保存，但 Runtime 尚未完成更新。请重试检查或启用。')
+      assertMcpConfigurationApplied(response, revision)
     })
     mcpApplyQueue = apply
     return apply
@@ -1500,6 +1574,20 @@ app.whenReady().then(async () => {
     store,
     mcpConfigService,
     onMcpServersChanged: applyMcpServers,
+    onSkillsChanged: async () => {
+      const settings = await store.load()
+      const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime') : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
+      await syncManagedSkillCapability(dataDir, settings)
+      const response = await runtimeRequest(settings, '/v1/runtime/skills/refresh', { method: 'POST' })
+      if (!response.ok) throw new Error('技能资料已保存，Runtime 尚未确认加载。请点击刷新技能重试。')
+    },
+    refreshBrowserSkill: async status => {
+      const settings = await store.load()
+      const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime') : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
+      await syncManagedBrowserSkillCapability(dataDir, status)
+      const response = await runtimeRequest(settings, '/v1/connectors/browser-skill/refresh', { method: 'POST' })
+      if (!response.ok) throw new Error('浏览器状态已保存，Runtime 刷新失败。')
+    },
     onGuiUpdatePrepared: () => { updateRuntimePrepared = true },
     getMainWindow: () => mainWindow,
     applySettingsPatch,
@@ -1648,10 +1736,10 @@ app.whenReady().then(async () => {
   if (!shouldShowStartupErrorDialog(candidateHeadless)) {
     isQuitting = true
     void stopManagedRuntimesForQuit()
+      .then(() => app.exit(1))
       .catch((stopError) => {
         console.warn('[workwise] failed to clean up after headless startup failure:', stopError)
       })
-      .finally(() => app.exit(1))
     return
   }
   dialog.showErrorBox('RailWise AI Runtime failed to start', message)
@@ -1663,25 +1751,13 @@ if (!runningImCredentialHelper) {
   app.on('window-all-closed', () => {
     if (!shouldStopServicesWhenAllWindowsClose(process.platform, Boolean(candidateRuntimePaths))) return
     isQuitting = true
-    void stopManagedRuntimesForQuit()
-      .catch((error) => {
-        console.warn('[workwise] failed to stop RailWise AI Runtime runtime:', error)
-        managedRuntimesStoppedForQuit = true
-      })
-      .finally(() => app.quit())
+    void requestConfirmedQuit()
   })
 
   app.on('before-quit', (event) => {
     isQuitting = true
-    if (managedRuntimesStoppedForQuit) return
+    if (managedRuntimesStoppedForQuit && browserDisposedForQuit) return
     event.preventDefault()
-    void stopManagedRuntimesForQuit()
-      .catch((error) => {
-        console.warn('[workwise] failed to stop RailWise AI Runtime runtime:', error)
-        managedRuntimesStoppedForQuit = true
-      })
-      .finally(() => {
-        app.quit()
-      })
+    void requestConfirmedQuit()
   })
 }

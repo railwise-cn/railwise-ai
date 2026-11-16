@@ -122,6 +122,8 @@ export const RUNTIME_THREADS_TEMPLATE = '/v1/threads'
 export const RUNTIME_TASKS_PATH = '/v1/tasks'
 export const RUNTIME_TASKS_TEMPLATE = '/v1/tasks'
 export const RUNTIME_TASK_TEMPLATE = '/v1/tasks/{id}'
+export const RUNTIME_TASK_REVALIDATE_ARTIFACTS_TEMPLATE = '/v1/tasks/{id}/revalidate-artifacts'
+export const RUNTIME_TASK_BUDGET_TEMPLATE = '/v1/tasks/{id}/budget'
 export const RUNTIME_TASK_RESUME_TEMPLATE = '/v1/tasks/{id}/resume'
 export const RUNTIME_TASK_RETRY_TEMPLATE = '/v1/tasks/{id}/retry'
 export const RUNTIME_TASK_CANCEL_TEMPLATE = '/v1/tasks/{id}/cancel'
@@ -131,7 +133,9 @@ export const RUNTIME_TASK_INPUTS_TEMPLATE = '/v1/tasks/{id}/inputs'
 export const RUNTIME_TASK_EVENTS_TEMPLATE = '/v1/tasks/{id}/events'
 export const RUNTIME_TASK_RECEIPTS_TEMPLATE = '/v1/tasks/{id}/receipts'
 export const RUNTIME_TASK_PERMISSIONS_TEMPLATE = '/v1/tasks/{id}/permissions'
+export const RUNTIME_TASK_BROWSER_BINDING_TEMPLATE = '/v1/tasks/{id}/browser-binding'
 export const RUNTIME_TASK_RECEIPT_VERIFY_TEMPLATE = '/v1/tasks/{id}/receipts/{turn}/verify'
+export const RUNTIME_TASK_BROWSER_CONFIRM_TEMPLATE = '/v1/tasks/{id}/receipts/{turn}/browser-confirm'
 export const RUNTIME_TASK_SUMMARY_TEMPLATE = '/v1/tasks/summary'
 export const RUNTIME_INBOX_TEMPLATE = '/v1/inbox'
 export const RUNTIME_TASK_TEMPLATES_TEMPLATE = '/v1/task-templates'
@@ -139,6 +143,12 @@ export const RUNTIME_TASK_TEMPLATE_START_TEMPLATE = '/v1/task-templates/{id}/sta
 export const RUNTIME_TASK_TEMPLATE_SAVE_TEMPLATE = '/v1/task-templates/{id}/save'
 export function runtimeTaskPath(taskId: string): string {
   return `/v1/tasks/${encodeURIComponent(taskId)}`
+}
+export function runtimeTaskRevalidateArtifactsPath(taskId: string): string {
+  return `${runtimeTaskPath(taskId)}/revalidate-artifacts`
+}
+export function runtimeTaskBudgetPath(taskId: string): string {
+  return `${runtimeTaskPath(taskId)}/budget`
 }
 export function runtimeTaskResumePath(taskId: string): string {
   return `${runtimeTaskPath(taskId)}/resume`
@@ -166,6 +176,9 @@ export function runtimeTaskReceiptsPath(taskId: string): string {
 }
 export function runtimeTaskPermissionsPath(taskId: string): string {
   return `${runtimeTaskPath(taskId)}/permissions`
+}
+export function runtimeTaskBrowserBindingPath(taskId: string): string {
+  return `${runtimeTaskPath(taskId)}/browser-binding`
 }
 export function runtimeTaskReceiptVerifyPath(taskId: string, receiptId: string): string {
   return `${runtimeTaskReceiptsPath(taskId)}/${encodeURIComponent(receiptId)}/verify`
@@ -286,3 +299,11 @@ export function normalizeThreadMode(value: unknown): RuntimeThreadMode {
 
 export const RUNTIME_ENGINEERING_MANIFEST_VERIFY_TEMPLATE = '/v1/engineering/projects/{id}/manifests/{manifestId}/verify'
 export const RUNTIME_ENGINEERING_MONITORING_REPLAY_TEMPLATE = '/v1/engineering/projects/{id}/manifests/{manifestId}/monitoring-replay'
+
+export const RUNTIME_TASK_PUBLIC_QUERY_RECOVERY_TEMPLATE = '/v1/tasks/{id}/public-query-recovery'
+export const RUNTIME_TASK_PREPARE_PUBLIC_QUERY_RECOVERY_TEMPLATE = '/v1/tasks/{id}/prepare-public-query-recovery'
+export function runtimeTaskPublicQueryRecoveryPath(taskId:string):string{return `${runtimeTaskPath(taskId)}/public-query-recovery`}
+export function runtimeTaskPreparePublicQueryRecoveryPath(taskId:string):string{return `${runtimeTaskPath(taskId)}/prepare-public-query-recovery`}
+
+export const RUNTIME_TASK_REVOKE_PUBLIC_QUERY_RECOVERY_TEMPLATE='/v1/tasks/{id}/revoke-public-query-recovery'
+export function runtimeTaskRevokePublicQueryRecoveryPath(taskId:string):string{return `${runtimeTaskPath(taskId)}/revoke-public-query-recovery`}

@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { cp, lstat, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
-import { basename, dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import type { AppSettingsV1 } from '../../shared/app-settings'
 import type { InstalledPackageV1 } from '../../shared/marketplace'
 import type {
@@ -402,6 +402,12 @@ export async function discoverInstalledPluginSkillRoots(
     await collectInstalledSkillRoots(record.artifact.location, roots, 0, 6)
   }
   return uniqueStrings(roots)
+}
+
+/** Versioned package roots are selected by the installation manifest, including legacy Runtime configs. */
+export function isManagedPluginSkillRoot(value: string): boolean {
+  const path = relative(join(homedir(), '.workwise', 'plugins', 'packages'), resolve(value)).split(sep)
+  return path.length >= 3 && path[0] !== '..' && path[1] === 'versions' && /^[a-f0-9]{64}$/.test(path[2])
 }
 
 async function collectInstalledSkillRoots(

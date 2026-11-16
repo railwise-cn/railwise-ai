@@ -19,8 +19,8 @@ describe('RuntimeBanner', () => {
 
     expect(html).toContain('Runtime request failed.')
     expect(html).toContain('runtimeErrorDetails')
-    expect(html).toContain('runtimeErrorLogPath')
-    expect(html).toContain('/tmp/workwise/logs')
-    expect(html).toContain('windowsMenuOpenLogDir')
+    expect(html).not.toContain('runtimeErrorLogPath')
+    expect(html).not.toContain('/tmp/workwise/logs')
+    expect(html).not.toContain('windowsMenuOpenLogDir')
   })
 })

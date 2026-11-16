@@ -9,26 +9,19 @@ import {
 } from '../lib/browser-storage'
 import { WORKSPACE_FILE_PREVIEW_EVENT, type WorkspaceFilePreviewDetail } from '../lib/workspace-file-preview'
 import type { RightPanelMode } from './chat/WorkbenchTopBar'
+import { clampPanelWidth, computeWorkbenchLayout, WORKBENCH_NAV_DRAWER_BELOW, WORKBENCH_NAV_MIN, WORKBENCH_NAV_MAX, WORKBENCH_INSPECTOR_MIN, WORKBENCH_INSPECTOR_MAX } from './workbench-layout-model'
 
 const LEFT_PANEL_WIDTH_KEY = 'workwise.layout.leftSidebarWidth'
 const LEFT_PANEL_COLLAPSED_KEY = 'workwise.layout.leftSidebarCollapsed'
 const RIGHT_PANEL_WIDTH_KEY = 'workwise.layout.rightInspectorWidth'
 const RIGHT_PANEL_MODE_KEY = 'workwise.layout.rightPanelMode'
-const LEFT_PANEL_DEFAULT = 304
+const LEFT_PANEL_DEFAULT = 264
 const RIGHT_PANEL_DEFAULT = 360
 const WRITE_ASSISTANT_MIN = 320
 const WRITE_ASSISTANT_MAX = 420
 export const CODE_PANEL_PREFERRED = 560
-const LEFT_PANEL_MIN = 280
-const LEFT_PANEL_MAX = 480
-const RIGHT_PANEL_MIN = 280
-const RIGHT_PANEL_MAX = 760
-const SIDEBAR_HARD_MIN = 180
-const MAIN_MIN_WIDTH = 560
-const PANEL_RESIZE_HANDLE_WIDTH = 5
-
 function clampWidth(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
+  return clampPanelWidth(value, min, max)
 }
 
 function readStoredWidth(key: string, fallback: number): number {
@@ -67,86 +60,9 @@ function persistRightPanelMode(mode: RightPanelMode): void {
   }
 }
 
-function fitWorkbenchWidths(
-  containerWidth: number,
-  leftWidth: number,
-  rightWidth: number,
-  panels: { leftPanelVisible: boolean; rightPanelVisible: boolean }
-): { left: number; right: number } {
-  const handleWidth =
-    (panels.leftPanelVisible ? PANEL_RESIZE_HANDLE_WIDTH : 0) +
-    (panels.rightPanelVisible ? PANEL_RESIZE_HANDLE_WIDTH : 0)
-  const usableWidth = Math.max(0, containerWidth - handleWidth)
-
-  if (!panels.leftPanelVisible) {
-    if (!panels.rightPanelVisible) {
-      return {
-        left: clampWidth(leftWidth, LEFT_PANEL_MIN, LEFT_PANEL_MAX),
-        right: clampWidth(rightWidth, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX)
-      }
-    }
-    const safeContainer = Math.max(usableWidth, MAIN_MIN_WIDTH + SIDEBAR_HARD_MIN)
-    const rightFloor =
-      safeContainer - MAIN_MIN_WIDTH >= RIGHT_PANEL_MIN ? RIGHT_PANEL_MIN : SIDEBAR_HARD_MIN
-    const rightCeil = Math.min(
-      RIGHT_PANEL_MAX,
-      Math.max(rightFloor, safeContainer - MAIN_MIN_WIDTH)
-    )
-    return {
-      left: clampWidth(leftWidth, LEFT_PANEL_MIN, LEFT_PANEL_MAX),
-      right: clampWidth(rightWidth, rightFloor, rightCeil)
-    }
-  }
-
-  const safeContainer = Math.max(
-    usableWidth,
-    MAIN_MIN_WIDTH + SIDEBAR_HARD_MIN + (panels.rightPanelVisible ? SIDEBAR_HARD_MIN : 0)
-  )
-  if (!panels.rightPanelVisible) {
-    const leftFloor =
-      safeContainer - MAIN_MIN_WIDTH >= LEFT_PANEL_MIN ? LEFT_PANEL_MIN : SIDEBAR_HARD_MIN
-    const leftCeil = Math.min(
-      LEFT_PANEL_MAX,
-      Math.max(leftFloor, safeContainer - MAIN_MIN_WIDTH)
-    )
-    return {
-      left: clampWidth(leftWidth, leftFloor, leftCeil),
-      right: clampWidth(rightWidth, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX)
-    }
-  }
-
-  const availableSides = Math.max(
-    SIDEBAR_HARD_MIN * 2,
-    safeContainer - MAIN_MIN_WIDTH
-  )
-  const leftFloor =
-    availableSides - SIDEBAR_HARD_MIN >= LEFT_PANEL_MIN ? LEFT_PANEL_MIN : SIDEBAR_HARD_MIN
-  const rightFloor =
-    availableSides - SIDEBAR_HARD_MIN >= RIGHT_PANEL_MIN ? RIGHT_PANEL_MIN : SIDEBAR_HARD_MIN
-
-  let nextLeft = clampWidth(leftWidth, leftFloor, LEFT_PANEL_MAX)
-  let nextRight = clampWidth(rightWidth, rightFloor, RIGHT_PANEL_MAX)
-
-  if (nextLeft + nextRight > availableSides) {
-    const overflow = nextLeft + nextRight - availableSides
-    const rightShrink = Math.min(overflow, nextRight - rightFloor)
-    nextRight -= rightShrink
-    const remaining = overflow - rightShrink
-    if (remaining > 0) {
-      nextLeft = Math.max(leftFloor, nextLeft - remaining)
-    }
-  }
-
-  const maxLeft = Math.min(LEFT_PANEL_MAX, availableSides - rightFloor)
-  nextLeft = clampWidth(nextLeft, leftFloor, Math.max(leftFloor, maxLeft))
-  const maxRight = Math.min(RIGHT_PANEL_MAX, availableSides - nextLeft)
-  nextRight = clampWidth(nextRight, rightFloor, Math.max(rightFloor, maxRight))
-
-  return { left: nextLeft, right: nextRight }
-}
-
 export function useWorkbenchLayout({
   activeThreadId,
+  latestAutoOpenDevPreviewKey,
   latestAutoOpenDevPreviewUrl,
   latestDevPreviewUrl,
   route,
@@ -154,6 +70,7 @@ export function useWorkbenchLayout({
   writeAssistantOpen
 }: {
   activeThreadId: string | null
+  latestAutoOpenDevPreviewKey?: string | null
   latestAutoOpenDevPreviewUrl: string | null
   latestDevPreviewUrl: string | null
   route: AppRoute
@@ -162,21 +79,37 @@ export function useWorkbenchLayout({
 }) {
   const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>(readStoredRightPanelMode)
   const [filePreviewTarget, setFilePreviewTarget] = useState<WorkspaceFileTarget | null>(null)
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(() =>
+  const [preferredLeftWidth, setLeftSidebarWidth] = useState(() =>
     readStoredWidth(LEFT_PANEL_WIDTH_KEY, LEFT_PANEL_DEFAULT)
   )
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(() =>
+  const [preferredLeftCollapsed, setLeftSidebarCollapsed] = useState(() =>
     readStoredBoolean(LEFT_PANEL_COLLAPSED_KEY, false)
   )
-  const [rightSidebarWidth, setRightSidebarWidth] = useState(() =>
+  const [preferredRightWidth, setRightSidebarWidth] = useState(() =>
     readStoredWidth(RIGHT_PANEL_WIDTH_KEY, RIGHT_PANEL_DEFAULT)
   )
   const shellRef = useRef<HTMLDivElement | null>(null)
+  const [containerWidth, setContainerWidth] = useState(() => window.innerWidth / (Number.parseFloat(getComputedStyle(document.body).zoom) || 1))
+  const [compactNavigationOpen, setCompactNavigationOpen] = useState(false)
+  const compactNavigation = containerWidth < WORKBENCH_NAV_DRAWER_BELOW
+  const leftSidebarCollapsed = compactNavigation ? !compactNavigationOpen : preferredLeftCollapsed
   const previewThreadId = useRef<string | null>(activeThreadId)
-  const autoOpenedPreviewUrlRef = useRef<string | null>(null)
+  const autoOpenedPreviewKeyRef = useRef<string | null>(null)
+  const dismissedPreviews = useRef(new Map<string | null, string>())
+  const currentPreviewKey = latestAutoOpenDevPreviewKey ?? latestAutoOpenDevPreviewUrl
   const rightPanelVisible = route === 'write'
     ? writeAssistantOpen || rightPanelMode === 'sdd-ai'
-    : rightPanelMode !== null
+    : ['chat', 'claw', 'tasks'].includes(route) && rightPanelMode !== null
+  const layout = computeWorkbenchLayout(containerWidth, preferredLeftWidth, preferredRightWidth,
+    { leftVisible: !leftSidebarCollapsed, rightVisible: rightPanelVisible })
+  const leftSidebarWidth = layout.left
+  const rightSidebarWidth = layout.right
+  const leftSidebarOverlay = layout.leftOverlay
+  const rightSidebarOverlay = layout.rightOverlay
+  const activeOverlay = !leftSidebarCollapsed && leftSidebarOverlay ? 'navigation' : rightPanelVisible && rightSidebarOverlay ? 'inspector' : null
+  const closeCompactNavigation = (): void => setCompactNavigationOpen(false)
+
+  useEffect(() => { setCompactNavigationOpen(false) }, [compactNavigation, route, activeThreadId, workspaceRoot])
 
   useEffect(() => {
     if (!rightPanelVisible) return
@@ -188,16 +121,16 @@ export function useWorkbenchLayout({
   }, [rightPanelVisible, route])
 
   useEffect(() => {
-    persistWidth(LEFT_PANEL_WIDTH_KEY, leftSidebarWidth)
-  }, [leftSidebarWidth])
+    persistWidth(LEFT_PANEL_WIDTH_KEY, preferredLeftWidth)
+  }, [preferredLeftWidth])
 
   useEffect(() => {
-    persistBoolean(LEFT_PANEL_COLLAPSED_KEY, leftSidebarCollapsed)
-  }, [leftSidebarCollapsed])
+    persistBoolean(LEFT_PANEL_COLLAPSED_KEY, preferredLeftCollapsed)
+  }, [preferredLeftCollapsed])
 
   useEffect(() => {
-    persistWidth(RIGHT_PANEL_WIDTH_KEY, rightSidebarWidth)
-  }, [rightSidebarWidth])
+    persistWidth(RIGHT_PANEL_WIDTH_KEY, preferredRightWidth)
+  }, [preferredRightWidth])
 
   useEffect(() => {
     persistRightPanelMode(rightPanelMode)
@@ -222,7 +155,7 @@ export function useWorkbenchLayout({
   useEffect(() => {
     if (previewThreadId.current === activeThreadId) return
     previewThreadId.current = activeThreadId
-    autoOpenedPreviewUrlRef.current = null
+    autoOpenedPreviewKeyRef.current = null
     if (rightPanelMode === 'browser') setRightPanelMode(null)
     if (rightPanelMode === 'file') {
       setRightPanelMode(null)
@@ -231,11 +164,12 @@ export function useWorkbenchLayout({
   }, [activeThreadId, rightPanelMode])
 
   useEffect(() => {
-    if (!latestAutoOpenDevPreviewUrl || route !== 'chat') return
-    if (autoOpenedPreviewUrlRef.current === latestAutoOpenDevPreviewUrl) return
-    autoOpenedPreviewUrlRef.current = latestAutoOpenDevPreviewUrl
+    if (!latestAutoOpenDevPreviewUrl || !currentPreviewKey || (route !== 'chat' && route !== 'tasks')) return
+    if (dismissedPreviews.current.get(activeThreadId) === currentPreviewKey) return
+    if (autoOpenedPreviewKeyRef.current === currentPreviewKey) return
+    autoOpenedPreviewKeyRef.current = currentPreviewKey
     setRightPanelMode('browser')
-  }, [latestAutoOpenDevPreviewUrl, route])
+  }, [activeThreadId, currentPreviewKey, latestAutoOpenDevPreviewUrl, route])
 
   useEffect(() => {
     if (route !== 'write') return
@@ -243,123 +177,111 @@ export function useWorkbenchLayout({
   }, [route, rightPanelMode])
 
   useLayoutEffect(() => {
+    const shell = shellRef.current
     const sync = (): void => {
-      const containerWidth = shellRef.current?.clientWidth ?? window.innerWidth
-      const next = fitWorkbenchWidths(
-        containerWidth,
-        leftSidebarWidth,
-        rightSidebarWidth,
-        {
-          leftPanelVisible: !leftSidebarCollapsed,
-          rightPanelVisible
-        }
-      )
-      if (next.left !== leftSidebarWidth) setLeftSidebarWidth(next.left)
-      if (next.right !== rightSidebarWidth) setRightSidebarWidth(next.right)
+      const width = shell?.clientWidth
+      if (width && width > 0) setContainerWidth(width)
     }
     sync()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync)
+    if (shell) observer?.observe(shell)
     window.addEventListener('resize', sync)
-    return () => window.removeEventListener('resize', sync)
-  }, [leftSidebarCollapsed, leftSidebarWidth, rightPanelVisible, rightSidebarWidth])
+    return () => { observer?.disconnect(); window.removeEventListener('resize', sync) }
+  }, [])
 
   const toggleRightPanelMode = (nextMode: Exclude<RightPanelMode, null>): void => {
+    if (rightPanelMode === 'browser' && currentPreviewKey) dismissedPreviews.current.set(activeThreadId, currentPreviewKey)
+    if (nextMode === 'browser' && rightPanelMode !== 'browser') dismissedPreviews.current.delete(activeThreadId)
     setRightPanelMode((current) => (current === nextMode ? null : nextMode))
   }
 
   const toggleLeftSidebar = (): void => {
-    setLeftSidebarCollapsed((current) => !current)
+    if (compactNavigation) setCompactNavigationOpen(current => !current)
+    else setLeftSidebarCollapsed(current => !current)
   }
 
   const openDevPreview = (): void => {
-    if (latestDevPreviewUrl) {
-      autoOpenedPreviewUrlRef.current = latestDevPreviewUrl
-    }
+    dismissedPreviews.current.delete(activeThreadId)
+    autoOpenedPreviewKeyRef.current = currentPreviewKey ?? latestDevPreviewUrl
     setRightPanelMode('browser')
   }
 
-  const beginLeftResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (leftSidebarCollapsed || event.button !== 0) return
+  const closeDevPreview = (): void => {
+    if (currentPreviewKey) dismissedPreviews.current.set(activeThreadId, currentPreviewKey)
+    setRightPanelMode(null)
+  }
+
+  const dragCleanup = useRef<(() => void) | null>(null)
+  useEffect(() => () => dragCleanup.current?.(), [])
+  const beginPanelDrag = (event: ReactPointerEvent<HTMLDivElement>, onDelta: (delta: number) => void): void => {
     event.preventDefault()
+    dragCleanup.current?.()
     const startX = event.clientX
-    const startLeft = leftSidebarWidth
-    const startRight = rightSidebarWidth
-    const prevCursor = document.body.style.cursor
-    const prevUserSelect = document.body.style.userSelect
+    const previousCursor = document.body.style.cursor
+    const previousSelect = document.body.style.userSelect
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
-
-    const onMove = (moveEvent: PointerEvent): void => {
-      const containerWidth = shellRef.current?.clientWidth ?? window.innerWidth
-      const delta = moveEvent.clientX - startX
-      const next = fitWorkbenchWidths(
-        containerWidth,
-        startLeft + delta,
-        startRight,
-        {
-          leftPanelVisible: true,
-          rightPanelVisible
-        }
-      )
-      setLeftSidebarWidth(next.left)
-      if (next.right !== rightSidebarWidth) setRightSidebarWidth(next.right)
+    document.body.dataset.workbenchResizing = 'true'
+    const onMove = (move: PointerEvent): void => {
+      const shell = shellRef.current
+      // Pointer coordinates are visual pixels; stored widths are layout pixels.
+      const measured = shell && shell.clientWidth > 0 ? shell.getBoundingClientRect().width / shell.clientWidth : 0
+      const scale = measured > 0 ? measured : Number.parseFloat(getComputedStyle(document.body).zoom) || 1
+      onDelta((move.clientX - startX) / scale)
     }
-
-    const onUp = (): void => {
-      document.body.style.cursor = prevCursor
-      document.body.style.userSelect = prevUserSelect
+    const stop = (): void => {
+      document.body.style.cursor = previousCursor
+      document.body.style.userSelect = previousSelect
+      delete document.body.dataset.workbenchResizing
       window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+      window.removeEventListener('blur', stop)
+      if (dragCleanup.current === stop) dragCleanup.current = null
     }
-
+    dragCleanup.current = stop
     window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+    window.addEventListener('blur', stop)
+  }
+
+  const beginLeftResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (leftSidebarCollapsed || leftSidebarOverlay || event.button !== 0) return
+    const startLeft = leftSidebarWidth, startRight = rightSidebarWidth
+    beginPanelDrag(event, delta => {
+      const next = computeWorkbenchLayout(shellRef.current?.clientWidth ?? containerWidth, startLeft + delta, startRight,
+        { leftVisible: true, rightVisible: rightPanelVisible })
+      setLeftSidebarWidth(next.left)
+      setRightSidebarWidth(next.right)
+    })
   }
 
   const beginRightResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (event.button !== 0 || !rightPanelVisible) return
-    event.preventDefault()
-    const startX = event.clientX
-    const startLeft = leftSidebarWidth
-    const startRight = rightSidebarWidth
-    const prevCursor = document.body.style.cursor
-    const prevUserSelect = document.body.style.userSelect
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-
-    const onMove = (moveEvent: PointerEvent): void => {
-      const containerWidth = shellRef.current?.clientWidth ?? window.innerWidth
-      const delta = moveEvent.clientX - startX
-      const next = fitWorkbenchWidths(
-        containerWidth,
-        startLeft,
-        startRight - delta,
-        {
-          leftPanelVisible: !leftSidebarCollapsed,
-          rightPanelVisible: true
-        }
-      )
-      if (next.left !== leftSidebarWidth) setLeftSidebarWidth(next.left)
+    if (event.button !== 0 || !rightPanelVisible || rightSidebarOverlay) return
+    const startLeft = leftSidebarWidth, startRight = rightSidebarWidth
+    beginPanelDrag(event, delta => {
+      const next = computeWorkbenchLayout(shellRef.current?.clientWidth ?? containerWidth, startLeft, startRight - delta,
+        { leftVisible: !leftSidebarCollapsed, rightVisible: true })
+      setLeftSidebarWidth(next.left)
       setRightSidebarWidth(next.right)
-    }
-
-    const onUp = (): void => {
-      document.body.style.cursor = prevCursor
-      document.body.style.userSelect = prevUserSelect
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
+    })
   }
 
   return {
     beginLeftResize,
     beginRightResize,
+    closeDevPreview,
+    closeCompactNavigation,
+    activeOverlay,
+    leftSidebarOverlay,
+    rightSidebarOverlay,
     filePreviewTarget,
     leftSidebarCollapsed,
     leftSidebarWidth,
     openDevPreview,
+    resizeLeftBy: (delta: number) => setLeftSidebarWidth(clampWidth(leftSidebarWidth + delta, WORKBENCH_NAV_MIN, WORKBENCH_NAV_MAX)),
+    resizeRightBy: (delta: number) => setRightSidebarWidth(clampWidth(rightSidebarWidth + delta, WORKBENCH_INSPECTOR_MIN, WORKBENCH_INSPECTOR_MAX)),
     rightPanelMode,
     rightPanelVisible,
     rightSidebarWidth,

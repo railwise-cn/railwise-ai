@@ -14,8 +14,6 @@ import {
 } from './FloatingComposer'
 import {
   FloatingComposerModelPicker,
-  calculateFloatingMenuPlacement,
-  calculateFloatingSubmenuPlacement,
   composerReasoningEffortRequestValue,
 } from './FloatingComposerModelPicker'
 import { getGoalPanelDraftObjective, getSkillMentionAtCursor, replaceSkillMentionInInput } from './floating-composer-commands'
@@ -181,55 +179,6 @@ describe('FloatingComposer model controls', () => {
     expect(composerReasoningEffortRequestValue('max')).toBe('max')
   })
 
-  it('anchors the model menu to the trigger using the rendered menu height', () => {
-    const placement = calculateFloatingMenuPlacement({
-      anchorRect: { top: 780, right: 920, bottom: 816 },
-      menuHeight: 140,
-      viewportHeight: 900,
-      viewportWidth: 1000
-    })
-
-    expect(placement.left).toBe(712)
-    expect(placement.top).toBe(633)
-  })
-
-  it('keeps the model menu anchored when the app UI is zoomed', () => {
-    const placement = calculateFloatingMenuPlacement({
-      anchorRect: { top: 624, right: 736, bottom: 652.8 },
-      menuHeight: 140,
-      viewportHeight: 720,
-      viewportWidth: 800,
-      coordinateScale: 0.8
-    })
-
-    expect(placement.left).toBe(712)
-    expect(placement.top).toBe(633)
-  })
-
-  it('places the model submenu beside the active provider row', () => {
-    const placement = calculateFloatingSubmenuPlacement({
-      anchorRect: { top: 650, right: 700, bottom: 686, left: 492 },
-      submenuHeight: 140,
-      viewportHeight: 900,
-      viewportWidth: 1000
-    })
-
-    expect(placement.left).toBe(706)
-    expect(placement.top).toBe(642)
-  })
-
-  it('flips the model submenu left when there is not enough room on the right', () => {
-    const placement = calculateFloatingSubmenuPlacement({
-      anchorRect: { top: 650, right: 920, bottom: 686, left: 712 },
-      submenuHeight: 140,
-      viewportHeight: 900,
-      viewportWidth: 1000
-    })
-
-    expect(placement.left).toBe(474)
-    expect(placement.top).toBe(642)
-  })
-
   it('keeps the reasoning strength visible in the model control', () => {
     const html = renderToStaticMarkup(
       createElement(FloatingComposerModelPicker, {
@@ -281,7 +230,8 @@ describe('FloatingComposer model controls', () => {
     )
 
     expect(html).toContain('aria-label="Switch agent"')
-    expect(html).toMatch(/value="tender-master"[^>]*selected=""/)
+    expect(html).toContain('title="Current agent: 招投标编制专家"')
+    expect(html).not.toContain('<select')
     expect(html).toContain('招投标编制专家')
   })
 
@@ -318,7 +268,7 @@ describe('FloatingComposer model controls', () => {
       })
     )
 
-    expect(html).toMatch(/<select[^>]*disabled=""/)
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Switch agent"/)
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*title="Send"/)
   })
 })

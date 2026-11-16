@@ -61,6 +61,20 @@ export type GuiDesignContext = {
   turnId?: string
 }
 
+/** Minted from the current server-owned Host operation, never model arguments. */
+export type CurrentToolOperation = {
+  operationId: string
+  idempotencyKey: string
+  taskId: string
+  turnId: string
+  executionId: string
+  callId: string
+  toolName: string
+  providerId?: string
+  argumentsHash: string
+  executionGrantFingerprint: string
+}
+
 export type ToolHostContext = {
   threadId: string
   turnId: string
@@ -104,6 +118,8 @@ export type ToolHostContext = {
   sandboxMode?: SandboxMode
   /** Immutable effective workspace/agent grant for this execution attempt. */
   executionGrant?: ExecutionGrant
+  /** Server-reserved session identity for one explicitly authorized host command. */
+  hostShellSessionId?: string
   /** Supplied by LocalToolHost only after this exact call received an allow decision. */
   explicitApproval?: { approvalId?: string; callId: string; toolName: string; requestHash: string }
   /** Claim an exact, durably approved operation that was proven undispatched before restart. */
@@ -112,6 +128,8 @@ export type ToolHostContext = {
   recordExplicitApproval?: (approval: { toolName: string; requestHash: string }) => void
   /** Persist the dispatch boundary after approval and before invoking the tool. */
   recordToolDispatch?: () => void
+  /** Reassert the original attempt and identify only this exact Host invocation. */
+  currentToolOperation?: () => CurrentToolOperation
   abortSignal: AbortSignal
   /** Recheck the immutable task lease immediately before dispatch, after approvals. */
   assertExecution?: () => void
@@ -121,6 +139,7 @@ export type ToolHostContext = {
   validateExecutionGrant?: () => Promise<void>
   /** Atomically reserve a one-operation permission after all approval checks. */
   claimTaskPermission?: () => Promise<void>
+  /** Starts a fresh work segment; internal human waits finish it before a later restart. */
   beginExecutionWork?: () => (() => void) | undefined
   /** Resolves a pending approval with the user's decision. */
   awaitApproval: (approval: ApprovalRequest) => Promise<'allow' | 'deny'>

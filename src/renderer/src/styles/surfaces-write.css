@@ -31,41 +31,6 @@
   container-name: write-workspace;
 }
 
-@media (max-width: 960px) {
-  .ds-workbench-right-divider {
-    display: none;
-  }
-
-  .ds-workbench-right-panel {
-    position: absolute;
-    inset-block: 0;
-    right: 0;
-    z-index: 50;
-    width: min(92vw, 420px) !important;
-    max-width: 100%;
-    border-left: 1px solid var(--ds-sidebar-divider);
-    background: var(--ds-bg-canvas);
-    box-shadow: -18px 0 48px rgba(15, 23, 42, 0.16);
-  }
-}
-
-@media (max-width: 720px) {
-  .ds-workbench-left-divider {
-    display: none;
-  }
-
-  .ds-workbench-left-panel {
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-    z-index: 60;
-    width: min(86vw, 304px) !important;
-    max-width: 100%;
-    border-right: 1px solid var(--ds-sidebar-divider);
-    box-shadow: 18px 0 48px rgba(15, 23, 42, 0.16);
-  }
-}
-
 .write-workspace-toolbar-grid {
   grid-template-columns: minmax(0, 1fr);
 }

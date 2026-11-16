@@ -29,7 +29,7 @@ export async function authorizedArtifactWrites(task: TaskRun, receipts: Operatio
     const result = receipt.result as { approved?: boolean; item?: { kind?: string; status?: string; isError?: boolean; toolName?: string; toolKind?: string; turnId?: string; output?: unknown } } | undefined
     const item = result?.item
     if (result?.approved !== true || item?.kind !== 'tool_result' || item.status !== 'completed' || item.isError) continue
-    if (!['write', 'edit', 'export_document', 'propose_document'].includes(item.toolName ?? '') || receipt.request?.toolName !== item.toolName) continue
+    if (!['write', 'edit', 'export_document', 'propose_document', 'publish_artifact'].includes(item.toolName ?? '') || receipt.request?.toolName !== item.toolName) continue
     const parsed = ExecutionGrantSchema.safeParse(receipt.request?.executionGrant)
     if (!parsed.success) continue
     const grant = parsed.data
@@ -46,7 +46,8 @@ export async function authorizedArtifactWrites(task: TaskRun, receipts: Operatio
       if (typeof path !== 'string' || typeof record.sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(record.sha256)) continue
       const target = await realpath(resolve(task.workspaceRoot, path)).catch(() => '')
       if (!target) continue
-      for (const scope of grant.writePathAllowlist ?? []) {
+      const roots = item.toolName === 'publish_artifact' ? (grant.managedArtifactRoot ? [grant.managedArtifactRoot] : []) : grant.writePathAllowlist ?? []
+      for (const scope of roots) {
         if (!isAbsolute(scope)) continue
         const root = await realpath(scope).catch(() => '')
         if (!root || !containedArtifact(root, target) || !containedArtifact(root, resolve(scope)) || !containedArtifact(resolve(scope), root)) continue

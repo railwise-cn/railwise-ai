@@ -84,6 +84,7 @@ export type McpSearchToolDescriptor = {
 
 export type McpSearchCatalogRecord = {
   isAvailable?: (context: ToolHostContext) => boolean
+  contextBlock?: (context: ToolHostContext) => { code: string; message: string } | undefined
   toolId: string
   serverId: string
   server: McpServerConfig
@@ -322,6 +323,7 @@ function createMcpSearchTools(options: McpSearchProviderOptions): LocalTool[] {
 
 function trustedRecords(options: McpSearchProviderOptions, context: ToolHostContext): McpSearchCatalogRecord[] {
   return options.state.records.filter(record => {
+    if (record.contextBlock?.(context)) return false
     if (record.isAvailable && !record.isAvailable(context)) return false
     if (!options.isServerTrusted(record.server, context.workspace)) return false
     if (record.server.toolPolicy && !record.server.toolPolicy.allowedTools.includes(record.descriptor.name)) return false
@@ -338,6 +340,8 @@ function resolveTrustedRecord(
   toolId: string
 ): McpSearchCatalogRecord | undefined {
   if (!toolId) return undefined
+  const block = options.state.records.find(record => record.toolId === toolId)?.contextBlock?.(context)
+  if (block) throw Object.assign(new Error(block.message), { code: block.code })
   return trustedRecords(options, context).find((record) => record.toolId === toolId)
 }
 

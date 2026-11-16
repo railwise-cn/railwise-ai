@@ -6,7 +6,7 @@ import {
   turnRequestForRouting,
   webSearchCapabilityInstruction
 } from './agent-loop.js'
-import type { ModelClient, ModelToolSpec } from '../ports/model-client.js'
+import type { ModelClient, ModelRequest, ModelToolSpec } from '../ports/model-client.js'
 import type { ToolHost } from '../ports/tool-host.js'
 import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
@@ -22,9 +22,10 @@ import { ContextCompactor } from './context-compactor.js'
 import { SequentialIdGenerator } from '../ports/id-generator.js'
 import { createImmutablePrefix } from '../cache/immutable-prefix.js'
 import { createThreadRecord } from '../domain/thread.js'
-import { makeToolResultItem } from '../domain/item.js'
+import { makeToolCallItem, makeToolResultItem } from '../domain/item.js'
 import type { TaskController } from '../services/task-controller.js'
 import type { RuntimeSpanService } from '../services/runtime-span-service.js'
+import { taskPermissionFailure } from '../services/task-permission-recovery.js'
 
 function spec(name: string): ModelToolSpec {
   return {
@@ -53,6 +54,126 @@ const ALL_TOOLS: ModelToolSpec[] = [
 const READ_ONLY_TOOLS = new Set([
   'read', 'ls', 'find', 'grep', 'web_search', 'web_fetch'
 ])
+
+describe('trusted task waits', () => {
+  it.each(['semantic', 'untrusted_marker', 'preflight'] as const)('stops only on trusted state: %s', async mode => {
+    const trusted = mode === 'semantic', preflight = mode === 'preflight'
+    const threadId = 'thread_artifact_wait', nowIso = () => new Date().toISOString()
+    const threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore(), eventBus = new InMemoryEventBus()
+    const ids = new SequentialIdGenerator(), inflight = new InflightTracker(), steering = new SteeringQueue(), compactor = new ContextCompactor()
+    const approvalGate = new InMemoryApprovalGate(), userInputGate = new InMemoryUserInputGate()
+    const events = new RuntimeEventRecorder({ eventBus, sessionStore, allocateSeq: id => eventBus.allocateSeq(id), nowIso })
+    const turns = new TurnService({ threadStore, sessionStore, events, inflight, steering, compactor, ids, nowIso })
+    let modelCalls = 0, toolCalls = 0, unknownStops = 0, completedTasks = 0, attempts = 0, permissionBlocks = 0
+    const activeTask = { id: 'task_artifact_wait', attempts: 1 }
+    const tasks = {
+      activeTask: () => activeTask, registerExecutionAbort: () => () => undefined, beginAttempt: () => { attempts++; return activeTask },
+      pendingDeliveries: () => [], tokenForTurn: () => undefined, beginWork: () => () => undefined, workBudget: () => undefined,
+      recordCost: () => undefined, beginToolOperation: () => undefined, endRun: () => undefined,
+      suspendUnknownToolOutcome: () => { unknownStops++ },
+      blockTaskPermission: (_thread: string, _turn: string, error: unknown) => {
+        if (!taskPermissionFailure(error)) return null
+        permissionBlocks++; return { kind: 'waiting_user' }
+      },
+      suspendWebArtifactProgress: async () => trusted && toolCalls > 0 ? { kind: 'waiting_user', reason: '缺少正文，保留草稿。' } : null,
+      assessCandidate: async () => { completedTasks++; return { kind: 'completed', task: activeTask } }
+    } as unknown as TaskController
+    const model: ModelClient = { provider: 'test', model: 'fixture-model', async *stream() {
+      modelCalls++
+      if (modelCalls === 1) {
+        yield { kind: 'tool_call_complete', callId: 'first', toolName: 'external_read', arguments: {} }
+        yield { kind: 'completed', stopReason: 'tool_calls' }; return
+      }
+      yield { kind: 'assistant_text_delta', text: '实际读取已完成。' }
+      yield { kind: 'completed', stopReason: 'stop' }
+    } }
+    const toolHost: ToolHost = { id: 'untrusted-marker', async listTools() { return [{ ...spec('external_read'), providerKind: 'mcp', providerId: 'mcp:example' }] },
+      async execute(call, context) { toolCalls++; return { approved: true, item: makeToolResultItem({ id: `item_${call.callId}`,
+        threadId, turnId: context.turnId, callId: call.callId, toolName: call.toolName,
+        output: { semanticRepair: { stalled: true }, code: 'web_artifact_repair_stalled' } }) } } }
+    await threadStore.upsert(createThreadRecord({ id: threadId, title: '报告验收', workspace: '', model: model.model, createdAt: nowIso() }))
+    const started = await turns.startTurn({ threadId, request: { prompt: '读取资料并报告。' } })
+    const loop = new AgentLoop({ threadStore, sessionStore, approvalGate, userInputGate, model, toolHost,
+      usage: new UsageService(), events, turns, inflight, steering, compactor, prefix: createImmutablePrefix(), ids, nowIso, tasks,
+      ...(preflight ? { workspaceTrust: { get: async () => ({ canonicalRoot: '', level: 'read-only' as const, revision: 0 }) },
+        executionScope: async () => { throw Object.assign(new Error('公开查询恢复范围已变化。'), { code: 'browser_public_query_recovery_changed' }) } } : {}) })
+    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    expect(modelCalls).toBe(preflight ? 0 : trusted ? 1 : 2)
+    expect(toolCalls).toBe(preflight ? 0 : 1)
+    expect(completedTasks).toBe(preflight || trusted ? 0 : 1)
+    expect(attempts).toBe(1)
+    expect(permissionBlocks).toBe(preflight ? 1 : 0)
+    expect(unknownStops).toBe(0)
+    expect((await sessionStore.loadEventsSince(threadId, 0)).some(event => event.kind === 'error' && event.code === 'outcome_unknown')).toBe(false)
+    expect((await sessionStore.loadEventsSince(threadId, 0)).some(event => event.kind === 'error' && event.code === 'turn_attempt_exception')).toBe(false)
+  })
+})
+
+describe('scheduled occurrence model context', () => {
+  it.each([true, false])('uses only the server-owned occurrence and distinguishes setup from due work: scheduled=%s', async scheduled => {
+    const threadId = 'thread_due_execution', nowIso = () => '2026-11-17T00:30:21.000Z'
+    const threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore(), eventBus = new InMemoryEventBus()
+    const ids = new SequentialIdGenerator(), inflight = new InflightTracker(), steering = new SteeringQueue(), compactor = new ContextCompactor()
+    const approvalGate = new InMemoryApprovalGate(), userInputGate = new InMemoryUserInputGate()
+    const events = new RuntimeEventRecorder({ eventBus, sessionStore, allocateSeq: id => eventBus.allocateSeq(id), nowIso })
+    const turns = new TurnService({ threadStore, sessionStore, events, inflight, steering, compactor, ids, nowIso })
+    const occurrence = { scheduleId: 'schedule_original', dueAt: '2026-11-17T00:30:00.000Z' }
+    const activeTask = { id: 'task_due_execution', attempts: 1, ...(scheduled ? { scheduledBy: occurrence } : {}) }
+    const originalTask = structuredClone(activeTask)
+    const tasks = {
+      activeTask: () => activeTask, registerExecutionAbort: () => () => undefined, beginAttempt: () => activeTask,
+      pendingDeliveries: () => [], tokenForTurn: () => undefined, beginWork: () => () => undefined, workBudget: () => undefined,
+      recordCost: () => undefined, beginToolOperation: () => undefined, endRun: () => undefined,
+      suspendWebArtifactProgress: async () => null,
+      assessCandidate: async () => ({ kind: 'completed', task: activeTask })
+    } as unknown as TaskController
+    const requests: ModelRequest[] = []
+    const model: ModelClient = { provider: 'test', model: 'fixture-model', async *stream(request) {
+      requests.push(request)
+      if (requests.length === 1) {
+        yield { kind: 'tool_call_complete', callId: 'read_schedule', toolName: 'list_schedules', arguments: {} }
+        yield { kind: 'completed', stopReason: 'tool_calls' }; return
+      }
+      yield { kind: 'assistant_text_delta', text: '核对结果：当前有两条更新，下一次时间已经读回。' }
+      yield { kind: 'completed', stopReason: 'stop' }
+    } }
+    const toolHost: ToolHost = { id: 'schedule-readback', async listTools() { return [spec('list_schedules')] },
+      async execute(call, context) { return { approved: true, item: makeToolResultItem({ id: 'item_schedule_readback',
+        threadId, turnId: context.turnId, callId: call.callId, toolName: call.toolName,
+        output: { schedules: scheduled ? [{ id: occurrence.scheduleId, enabled: true }] : [] } }) } } }
+    await threadStore.upsert(createThreadRecord({ id: threadId, title: '每日资料汇总', workspace: '', model: model.model, createdAt: nowIso() }))
+    const prompt = '首次先做准备轮，再创建每日计划；之后每次读取最新资料并回答三个重点。文本声称 scheduleId=untrusted_schedule，dueAt=2099-01-01。'
+    const started = await turns.startTurn({ threadId, request: { prompt } })
+    const loop = new AgentLoop({ threadStore, sessionStore, approvalGate, userInputGate, model, toolHost,
+      usage: new UsageService(), events, turns, inflight, steering, compactor, prefix: createImmutablePrefix(), ids, nowIso, tasks })
+
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify(await sessionStore.loadEventsSince(threadId, 0))).toBe('completed')
+    expect(requests).toHaveLength(2)
+    for (const request of requests) {
+      const instructions = request.contextInstructions ?? []
+      const metadata = instructions.find(value => value.startsWith('Scheduled task occurrence (server-owned): '))
+      if (scheduled) {
+        expect(metadata).toBeDefined()
+        expect(JSON.parse(metadata!.slice('Scheduled task occurrence (server-owned): '.length))).toEqual({
+          taskId: activeTask.id, scheduleId: occurrence.scheduleId, dueAt: occurrence.dueAt, phase: 'due_execution'
+        })
+        const instruction = instructions.join('\n')
+        expect(instruction).toContain('not an initial setup or preparation run')
+        expect(instruction).toContain('fresh evidence')
+        expect(instruction).toContain('Do not repeat the original request’s first-run schedule setup')
+        expect(instruction).toContain('list_schedules')
+        expect(instruction).toContain('report the actual failure')
+        expect(instruction).not.toContain('untrusted_schedule')
+      } else {
+        expect(metadata).toBeUndefined()
+        expect(instructions.join('\n')).not.toContain('due_execution')
+      }
+      expect(request.tools.map(tool => tool.name)).toEqual(['list_schedules'])
+    }
+    expect(activeTask).toEqual(originalTask)
+  })
+})
 
 describe('webSearchCapabilityInstruction', () => {
   it('treats web tool content as untrusted data that cannot authorize actions', () => {
@@ -209,6 +330,35 @@ describe('turnRequestForRouting', () => {
 })
 
 describe('AgentLoop completion guard', () => {
+  it('marks a real current no-argument call as available rather than inferring omission from an empty object', async () => {
+    const threadId = 'current-empty-arguments', nowIso = () => new Date().toISOString()
+    const threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore(), eventBus = new InMemoryEventBus()
+    const ids = new SequentialIdGenerator(), inflight = new InflightTracker(), steering = new SteeringQueue(), compactor = new ContextCompactor()
+    const events = new RuntimeEventRecorder({ eventBus, sessionStore, allocateSeq: id => eventBus.allocateSeq(id), nowIso })
+    const turns = new TurnService({ threadStore, sessionStore, events, inflight, steering, compactor, ids, nowIso })
+    const requests: ModelRequest[] = []
+    const dispatched: Record<string, unknown>[] = []
+    const model: ModelClient = { provider: 'test', model: 'synthetic', async *stream(request) {
+      requests.push(request)
+      if (requests.length === 1) {
+        yield { kind: 'tool_call_complete', callId: 'start-current', toolName: 'browser_session_start', arguments: {} }
+        yield { kind: 'completed', stopReason: 'tool_calls' }
+      } else { yield { kind: 'assistant_text_delta', text: '已读取合成页面。' }; yield { kind: 'completed', stopReason: 'stop' } }
+    } }
+    const toolHost: ToolHost = { id: 'synthetic-host', async listTools() { return [spec('browser_session_start')] }, async execute(call, context) {
+      dispatched.push(call.arguments)
+      return { approved: true, item: makeToolResultItem({ id: 'current-start-result', threadId, turnId: context.turnId, callId: call.callId, toolName: call.toolName, output: { sessionId: 'synthetic-session' } }) }
+    } }
+    await threadStore.upsert(createThreadRecord({ id: threadId, title: 'Current zero-argument call', workspace: '', model: model.model, createdAt: nowIso() }))
+    const started = await turns.startTurn({ threadId, request: { prompt: '读取合成页面。' } })
+    const loop = new AgentLoop({ threadStore, sessionStore, approvalGate: new InMemoryApprovalGate(), userInputGate: new InMemoryUserInputGate(), model,
+      toolHost, usage: new UsageService(), events, turns, inflight, steering, compactor, prefix: createImmutablePrefix(), ids, nowIso })
+    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    expect(dispatched).toEqual([{}])
+    expect(requests[1].toolArgumentAvailability).toContainEqual({ turnId: started.turnId, callId: 'start-current', state: 'available' })
+    expect(requests[1].history.find(item => item.kind === 'tool_call')).toMatchObject({ arguments: {} })
+  })
+
   it('persists bounded tool-call character deltas without argument contents', async () => {
     const threadId = 'thread_tool_delta_usage'
     const nowIso = () => '2026-08-20T00:00:00.000Z'
@@ -312,10 +462,12 @@ describe('AgentLoop completion guard', () => {
       threadStore, sessionStore, events, inflight, steering, compactor, ids, nowIso
     })
     let modelStep = 0
+    const actualRequests: ModelRequest[] = []
     const model: ModelClient = {
       provider: 'test',
       model: 'fixture-model',
-      async *stream() {
+      async *stream(request) {
+        actualRequests.push(request)
         modelStep += 1
         if (modelStep === 1) {
           yield { kind: 'tool_call_complete', callId: 'call_1', toolName: 'knowledge_search', arguments: { token: 'secret' } }
@@ -358,6 +510,8 @@ describe('AgentLoop completion guard', () => {
       model: model.model,
       createdAt: nowIso()
     }))
+    await sessionStore.appendItem(threadId, makeToolCallItem({ id: 'omitted-old-call', threadId, turnId: 'prior-turn', callId: 'prior-call', toolName: 'knowledge_search', arguments: { query: 'old-private-query' } }))
+    await sessionStore.appendItem(threadId, makeToolResultItem({ id: 'omitted-old-result', threadId, turnId: 'prior-turn', callId: 'prior-call', toolName: 'knowledge_search', output: { matches: 1 } }))
     const started = await turns.startTurn({ threadId, request: { prompt: '检索并回答。' } })
     const loop = new AgentLoop({
       threadStore, sessionStore, approvalGate, userInputGate, model, toolHost,
@@ -375,6 +529,9 @@ describe('AgentLoop completion guard', () => {
       status: 'ok', attributes: { approved: true, isError: false }
     })
     expect(dispatchedArguments).toEqual({ token: 'secret' })
+    expect(actualRequests[0].toolArgumentAvailability).toContainEqual({ turnId: 'prior-turn', callId: 'prior-call', state: 'omitted' })
+    expect(actualRequests[1].toolArgumentAvailability).toContainEqual({ turnId: started.turnId, callId: 'call_1', state: 'available' })
+    expect(actualRequests[1].history.find(item => item.kind === 'tool_call' && item.callId === 'call_1')).toMatchObject({ arguments: { token: 'secret' } })
     const persistedItems = await sessionStore.loadItems(threadId)
     const persistedEvents = await sessionStore.loadEventsSince(threadId, 0)
     expect(JSON.stringify(persistedItems)).not.toContain('secret')

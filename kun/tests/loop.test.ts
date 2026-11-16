@@ -421,7 +421,7 @@ describe('AgentLoop', () => {
           yield { kind: 'completed', stopReason: 'tool_calls' }
           return
         }
-        expect(request.contextInstructions?.join('\n')).toContain('final recovery opportunity')
+        expect(request.contextInstructions?.join('\n')).toContain('Other sources and authorized browser tools remain available')
         yield {
           kind: 'assistant_text_delta',
           text: '在线搜索连续失败，我暂时无法核实今天的资讯。请稍后重试或提供可访问的来源。'
@@ -518,9 +518,9 @@ describe('AgentLoop', () => {
           yield { kind: 'completed', stopReason: 'tool_calls' }
           return
         }
-        expect(request.contextInstructions?.join('\n')).toContain('Use only already verified tool results')
-        expect(request.tools.map((tool) => tool.name)).not.toContain('web_search')
-        expect(request.tools.map((tool) => tool.name)).not.toContain('web_fetch')
+        expect(request.contextInstructions?.join('\n')).toContain('Report source coverage accurately')
+        expect(request.tools.map((tool) => tool.name)).toContain('web_search')
+        expect(request.tools.map((tool) => tool.name)).toContain('web_fetch')
         yield {
           kind: 'assistant_text_delta',
           text: [

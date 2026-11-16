@@ -1,0 +1,345 @@
+{
+  "status": "passed",
+  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
+  "scope": "Root-accepted new exact RailWise real-clock Ego occurrence and normal temporary-plan pause, confirmed by the source receipt audit and Root independent aggregate acceptance; paid source/report content is not copied.",
+  "releaseRunId": 43968313921,
+  "actualQaInitialTaskId": "task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
+  "actualDueTaskId": "task_0d9dffaf-096c-41bc-8264-a358bd2b850a",
+  "scheduledBy": {
+    "scheduleId": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
+    "dueAt": "2026-11-16T23:21:00.000Z"
+  },
+  "naturalSchedulerNotManual": true,
+  "newIndependentRunAndHtml": true,
+  "actualDueCurrentBrowserSource": {
+    "status": "passed",
+    "count": 3,
+    "receipts": [
+      {
+        "id": "operation_5437af25-5707-430d-8a17-d00e28e010f1",
+        "createdAt": "2026-11-16T23:21:32.305Z",
+        "resultHash": "a8881ecf94e35048b5b1fc83bac6ea3271a7b9e3698c6dffbbec047da3452a6f",
+        "truncated": false,
+        "taskId": "task_0d9dffaf-096c-41bc-8264-a358bd2b850a",
+        "turnId": "turn_miyqit4c",
+        "hostOperationId": "operation_dce8b320-087e-4a86-b5fd-24bf60e34bf4"
+      },
+      {
+        "id": "operation_8e3cf9fa-8088-4947-9af3-dfc156548fbe",
+        "createdAt": "2026-11-16T23:21:44.147Z",
+        "resultHash": "45bcedaf5e9298a5de5dac00a0576b48dbea0e11554e40a7b27eab17ed3f88d3",
+        "truncated": false,
+        "taskId": "task_0d9dffaf-096c-41bc-8264-a358bd2b850a",
+        "turnId": "turn_miyqit4c",
+        "hostOperationId": "operation_21810c63-b772-408b-9a5f-d8239f5c59d4"
+      },
+      {
+        "id": "operation_eb3e0f0e-f5ea-4b4e-9b26-2239500308d5",
+        "createdAt": "2026-11-16T23:21:54.810Z",
+        "resultHash": "45bcedaf5e9298a5de5dac00a0576b48dbea0e11554e40a7b27eab17ed3f88d3",
+        "truncated": false,
+        "taskId": "task_0d9dffaf-096c-41bc-8264-a358bd2b850a",
+        "turnId": "turn_miyqit4c",
+        "hostOperationId": "operation_44faf6b3-2094-4831-9416-52475dcc4eba"
+      }
+    ],
+    "verifiedSources": [
+      {
+        "receiptId": "operation_21810c63-b772-408b-9a5f-d8239f5c59d4",
+        "receiptHash": "631e0b88d768418d1b91b4d86c608b86f11bf3129f4751d33c230af1e8b901b0",
+        "turnId": "turn_miyqit4c",
+        "resultHash": "45bcedaf5e9298a5de5dac00a0576b48dbea0e11554e40a7b27eab17ed3f88d3",
+        "fullCapturedDocument": true,
+        "readAt": "2026-11-16T23:21:44.150Z"
+      }
+    ],
+    "allReadsBoundToCurrentOccurrence": true,
+    "fullCapturedDocumentDoesNotMeanAllSourcePages": true,
+    "sourceHashNeedNotChangeWhenPageIsUnchanged": true,
+    "rawSourceHtmlCopied": false
+  },
+  "actualDueNewHtmlHash": "b77c8d8e0749e23d189d14e66242ef7cc7177e6316af770f7414078abb6bae9c",
+  "actualDueAutoPreview": true,
+  "parentPlanReadback": {
+    "receiptId": "operation_4230c8f9-ff8c-42a7-a521-c4202462119b",
+    "at": "2026-11-16T23:21:29.856Z",
+    "request": {
+      "scheduleId": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
+      "versionId": "flowver_1641b1a09b7c9107d3bf89b3",
+      "dueAt": "2026-11-16T23:21:00.000Z",
+      "sourceTaskId": "task_ced01703-3b9e-45b3-a660-9ddcc33ae205"
+    },
+    "resultId": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
+    "enabledAtOccurrenceReadback": true,
+    "nextRunAt": "2026-11-17T23:21:00.000Z",
+    "scopeHash": "89a202c2cf1425be6e9af4fa320985a1d23c3cd1d4f6b76f787cc9e5b31fd5e2",
+    "sameParentPlanPositiveResult": true,
+    "bindingAuditStatus": "passed"
+  },
+  "parentPlanPermissionsBoundToOccurrence": {
+    "status": "passed",
+    "requestKeysExact": [
+      "scheduleId",
+      "versionId",
+      "dueAt",
+      "sourceTaskId"
+    ],
+    "currentOccurrenceAndParentVersionBound": true,
+    "sameSourceTaskIdBound": true,
+    "readbackScopeHash": "89a202c2cf1425be6e9af4fa320985a1d23c3cd1d4f6b76f787cc9e5b31fd5e2",
+    "originalReadbackResultEnabled": true,
+    "basis": "Existing receipt-owner summary and Root independent assertions; not an additional review gate."
+  },
+  "finalResponseCorrectlyDescribesDueOccurrence": {
+    "passed": true,
+    "describesScheduledOccurrence": true,
+    "mislabelsAsPreparation": false,
+    "falseMissingPlanClaim": false,
+    "rawFinalResponseSha256": "bf4eea58c4cd38adfae2a19f52aa19b02db004387442a8c2d84d38097b38599b",
+    "textCopied": false,
+    "receiptOwnerAndRootAssertionsAdopted": true
+  },
+  "manualPlanRecreationGuidanceAbsent": true,
+  "temporaryQaPlanId": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
+  "onlyTemporaryQaPlanPaused": {
+    "id": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
+    "enabled": false,
+    "revision": 2,
+    "normalUiPauseAttestedByRoot": true,
+    "otherThreeDefinitionsByteUnchanged": true,
+    "afterOccurrenceReadback": true
+  },
+  "originalFormalDadanPlanUnchanged": {
+    "passed": true,
+    "originalDefinitionBytesUnchanged": true,
+    "formalPlanPreservedAlongWithOtherTwoOriginalDefinitions": true
+  },
+  "oldGovernmentPlanRemainedPaused": {
+    "passed": true,
+    "originalPausedDefinitionBytesUnchanged": true
+  },
+  "unknownOperationsAndBudgetPreserved": {
+    "newOccurrenceUnknownCount": 0,
+    "legacyUnknownCount": 16,
+    "legacyUnknown16Preserved": true,
+    "originalTaskRemainsCompletedAttempt7": true,
+    "originalTaskNotResumedOrRetried8": true,
+    "directProfileOrTaskMutation": false,
+    "manualClockOrFutureTrigger": false,
+    "basis": "Root accepted preserved Task row/operation/UNKNOWN/plan comparison and normal execution; no task budget or attempt reset."
+  },
+  "codexPaidSourceCollection": false,
+  "privateEvidenceDigests": [
+    {
+      "fileName": "7d19-initial-qa-completion-private.json",
+      "bytes": 2093,
+      "sha256": "857208360361d9cbe8c3c909be2a4e4cd17b943cff1df1a60701d5163b2440c6",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-initial-schedule-receipts-private.json",
+      "bytes": 13422,
+      "sha256": "5535c69ad769ec30d72b0aefec62501760bfa32d24f6d56fe8e36f09a4228458",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-ego-temporary-qa-actual-binding-private.json",
+      "bytes": 867,
+      "sha256": "3b502583cdf01d2bccef7bc345107a07446f3b969b406bcf50b2a52a73db55a3",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-due-running-task-private.json",
+      "bytes": 12277,
+      "sha256": "650fea01e8b725fda3e565cb4f2d424da5dd163be97a311537d9bf84570998f4",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-due-receipt-audit-private.json",
+      "bytes": 42676,
+      "sha256": "7645d667379be15463f9cb9b6db94b89c1406a0257aec09e800d98cbc39a6e50",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-due-completed-auto-preview-ui-private.json",
+      "bytes": 28113,
+      "sha256": "87e934fec2c2056db624744dd78919ab6e3e7f4a5c71dd42c210fa94cfdb789d",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-temporary-qa-pause-readback-private.json",
+      "bytes": 1296,
+      "sha256": "499a12746991322da8d52e2506d9661beea882760e1d7aada1fbf3c21d747c9d",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-due-completed-auto-preview-native-private.png",
+      "bytes": 1285574,
+      "sha256": "e6643b5485c3009d49955f0d20f8168cc703ff8c6710853073840567f5fab3c2",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-real-ego-actual-due-root-acceptance-private.json",
+      "bytes": 6425,
+      "sha256": "fbac1e4cd11decf552a3838c88d60d46dda4ce9e3ce7fa33eb0043720e33c58a",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-due-receipt-audit-summary-private.json",
+      "bytes": 7509,
+      "sha256": "2b9ac21a35d6fa4e86abd9212ae9c9a22e666ed47c7cf9ca382894a07c5e33cd",
+      "privateSourceOnly": true
+    }
+  ],
+  "coverageLimits": "Actual collection covers only the visible first subscription-list page. It is a subscription-list summary with five selected rows, not complete site coverage; official announcement bodies were not independently verified and missing budget/deadline/qualification/detail-link fields remain pending. The true collection timestamp is November17 Beijing; the artifact filename contains November18 as a minor naming defect. All review of business relevance/content here is AI review, not professional or human sign-off.",
+  "finalBusinessAcceptance": true,
+  "initialPreparation": {
+    "status": "completed",
+    "attempts": 4,
+    "artifact": {
+      "bytes": 13868,
+      "sha256": "86be4be13eb301cc1a74a5b4b8fe264d75caee4ce3628550d5f5df98b394925f",
+      "actualHashMatched": true,
+      "validation": "valid",
+      "sourceEvidenceStatus": "verified"
+    },
+    "finalToolStatuses": [
+      {
+        "name": "ego_browser_read",
+        "status": "succeeded"
+      },
+      {
+        "name": "read_task_context",
+        "status": "succeeded"
+      },
+      {
+        "name": "publish_artifact",
+        "status": "succeeded"
+      },
+      {
+        "name": "read_artifact",
+        "status": "succeeded"
+      },
+      {
+        "name": "verify_web_artifact",
+        "status": "succeeded"
+      },
+      {
+        "name": "schedule_task",
+        "status": "succeeded"
+      },
+      {
+        "name": "list_schedules",
+        "status": "succeeded"
+      },
+      {
+        "name": "ego_browser_finish",
+        "status": "succeeded"
+      }
+    ],
+    "reportAutoPreview": true,
+    "scheduleReadBack": {
+      "id": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
+      "enabled": true,
+      "kind": "daily",
+      "times": [
+        "07:21"
+      ],
+      "timezone": "Asia/Shanghai",
+      "leadMinutes": 0,
+      "nextRunAt": "2026-11-16T23:21:00.000Z",
+      "sourceTaskId": "task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
+      "listReadbackMatched": true
+    },
+    "nativeScreenshotPhase": "completed; prior active DOM captured internal repair present and hidden in UI",
+    "countsAsActualDue": false
+  },
+  "handoffPreservation": {
+    "allOriginalTaskRowsAndOperationsUnchanged": true,
+    "legacyUnknown16Unchanged": true,
+    "allExistingPlansAndRunsUnchangedAtFirstOpen": true,
+    "allOriginalPlansUntouchedByInitialQa": true
+  },
+  "actualDueResult": {
+    "status": "completed",
+    "attempts": 4,
+    "nodesCompleted": 3,
+    "createdAt": "2026-11-16T23:21:28.303Z",
+    "finishedAt": "2026-11-16T23:24:24.002Z",
+    "artifactBytes": 9080,
+    "validation": "valid",
+    "sourceEvidenceStatus": "verified",
+    "newOccurrenceUnknownReceipts": 0,
+    "sourceReceiptMetadataCount": 3,
+    "runtimeSnapshotFileIsCompletedDespiteRunningInName": true
+  },
+  "minorDefects": [
+    {
+      "kind": "artifact-filename-date-mismatch",
+      "severity": "minor",
+      "filenameDate": "2026-11-18",
+      "actualCollectedAtUtc": "2026-11-16T23:22:30Z",
+      "actualCollectedAtBeijing": "2026-11-17T07:22:30+08:00",
+      "actualCollectedLocalDate": "2026-11-17",
+      "reportCollectionTimestampCorrect": true,
+      "impact": "Filename contains the next-day schedule date; the report collection timestamp records the actual current run. No claim that the occurrence or collection happened on November 18.",
+      "notFixedInThisDraft": true
+    }
+  ],
+  "rootAcceptedAt": "2026-11-16T23:31:49.303829+00:00",
+  "rootAcceptanceScope": "Actual new exact-package RailWise Ego scheduled occurrence, report/source verification, automatic preview, current parent-plan readback/phase, and normal pause of only the independent QA plan.",
+  "semanticAIContentCheck": {
+    "label": "AI semantic content review; not human, vendor, regulatory or licensed professional sign-off",
+    "correctDuePhase": true,
+    "noFalseMissingScheduleClaim": true,
+    "noNeedUserRecreatePlan": true,
+    "coverageTruthfulPartial": true,
+    "officialBodyIndependentlyVerified": false,
+    "reportCollectionTimestamp": "2026-11-16T23:22:30Z",
+    "filenameHasTomorrowDate": true,
+    "reportClaimsTomorrowCollection": false,
+    "unknownFieldsRemainUnknown": [
+      "budget",
+      "deadline",
+      "qualification",
+      "status"
+    ]
+  },
+  "coverage": {
+    "pagesRead": 1,
+    "selectedRows": 5,
+    "officialAnnouncementBodiesIndependentlyVerified": false,
+    "allSiteCoverageClaimed": false,
+    "observedPublicationDates": [
+      "2026-11-16"
+    ],
+    "collectionTimestamp": "2026-11-16T23:22:30Z",
+    "filenameDateMismatchMinorRetained": true
+  },
+  "finish": {
+    "status": "succeeded",
+    "finishResolved": true,
+    "sameCurrentTaskAndTurnVerifiedByRoot": true
+  },
+  "boundedRecovery": {
+    "recoveredReadOrArgumentErrors": 4,
+    "finalArtifactAndSourceVerified": true,
+    "newUnknownOperations": 0,
+    "manualUserPlanRecreationRequired": false
+  },
+  "finalAcceptanceEvidence": [
+    {
+      "fileName": "7d19-real-ego-actual-due-root-acceptance-private.json",
+      "bytes": 6425,
+      "sha256": "fbac1e4cd11decf552a3838c88d60d46dda4ce9e3ce7fa33eb0043720e33c58a",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-due-receipt-audit-summary-private.json",
+      "bytes": 7509,
+      "sha256": "2b9ac21a35d6fa4e86abd9212ae9c9a22e666ed47c7cf9ca382894a07c5e33cd",
+      "privateSourceOnly": true
+    }
+  ]
+}

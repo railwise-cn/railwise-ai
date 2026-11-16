@@ -19,7 +19,9 @@ import { resolveGeneratedFileWorkspaceRoot } from '../../lib/generated-file-path
 import { safeMediaPreviewUrl } from '../../lib/safe-media-preview-url'
 import { projectDshUiText } from '../../lib/dsh-ui-stream'
 import { DshUiBlocks } from './DshUiBlocks'
+import { BrowserApprovalDetails, browserApprovalFields } from './BrowserApprovalDetails'
 import { CapabilityRequiredCard } from './CapabilityRequiredCard'
+import { TaskIntentChoiceCard } from './TaskIntentChoiceCard'
 import { DiffView } from '../DiffView'
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { ModelMetaTag, WritePromptMetaDisclosure } from './message-timeline-cards'
@@ -1462,7 +1464,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
     return (
       <div className="group/message flex min-w-0 max-w-full flex-col">
         <div className="ds-markdown ds-chat-answer min-w-0 max-w-full text-ds-ink">
-          {!streaming && block.capabilityCard ? <CapabilityRequiredCard card={block.capabilityCard} /> : <AssistantMarkdown text={displayedText} streaming={streaming} />}
+          {!streaming && block.capabilityCard ? <CapabilityRequiredCard card={block.capabilityCard} /> : !streaming && block.intentCard ? <TaskIntentChoiceCard card={block.intentCard} message={displayedText} /> : <AssistantMarkdown text={displayedText} streaming={streaming} />}
           {uiBlocks?.length ? (
             <DshUiBlocks
               blocks={uiBlocks}
@@ -1521,12 +1523,10 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
         }`}
       >
         <div className="font-semibold text-accent">{t('approvalTitle')}</div>
-        {block.toolName ? (
-          <div className="mt-1 text-[12px] text-ds-muted">
-            {t('approvalTool', { name: block.toolName })}
-          </div>
-        ) : null}
-        <p className="mt-2 max-h-96 overflow-y-auto whitespace-pre-wrap break-words text-[14px] text-ds-ink">{block.summary}</p>
+        <p className="mt-2 text-[14px] text-ds-ink">{t('approvalScopeSummary')}</p>
+        {(block.toolName?.startsWith('browser_') || block.toolName === 'schedule_task' && browserApprovalFields(block.summary)) ? <BrowserApprovalDetails summary={block.summary} /> : <details className="mt-2 text-[12px] text-ds-muted"><summary className="cursor-pointer">{t('approvalScopeDetails')}</summary>
+          <p className="mt-2 max-h-96 overflow-y-auto whitespace-pre-wrap break-words">{block.summary}</p>
+        </details>}
         {block.errorMessage ? (
           <p className="mt-2 text-[12px] text-red-700 dark:text-red-300">{block.errorMessage}</p>
         ) : null}

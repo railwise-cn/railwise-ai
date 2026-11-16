@@ -93,6 +93,8 @@ try {
   if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows') {
     throw 'Exact installer smoke requires a clean GitHub-hosted Windows runner'
   }
+  $startupDiagnostic = $env:RAILWISE_WINDOWS_BROWSER_STARTUP_DIAGNOSTIC -eq 'true'
+  if ($startupDiagnostic -and ($env:RAILWISE_WINDOWS_TASK_SMOKE -eq 'true' -or $env:RAILWISE_WINDOWS_BROWSER_SMOKE -eq 'true')) { throw 'Startup diagnostic is exclusive with task/browser execution' }
   $report.provenance = Invoke-NodeJson -Arguments @('provenance', $Version, $SourceHead)
   if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { throw 'RUNNER_TEMP is unavailable' }
   $EvidenceDir = [IO.Path]::GetFullPath($EvidenceDir)
@@ -166,10 +168,22 @@ try {
   # before uninstalling this same owned instance. The child creates a separate
   # synthetic profile and uses the ordinary packaged renderer and IPC services.
   $uiScript = Join-Path $PSScriptRoot 'run-windows-ui-smoke.mjs'
-  & node $uiScript $executable $Version $SourceHead $EvidenceDir
-  if ($LASTEXITCODE -ne 0) { throw "Installed Chinese UI smoke failed ($LASTEXITCODE)" }
-  $report.ui = Get-Content -LiteralPath (Join-Path $EvidenceDir 'windows-ui-smoke.json') -Raw | ConvertFrom-Json
-  if ($report.ui.status -ne 'passed') { throw 'Installed Chinese UI evidence is incomplete' }
+  if ($startupDiagnostic) {
+    & node $uiScript $executable $Version $SourceHead $EvidenceDir '--browser-startup-diagnostic'
+    if ($LASTEXITCODE -ne 0) { throw "Isolated browser startup diagnostic incomplete ($LASTEXITCODE)" }
+    $report.browserStartupDiagnostic = Get-Content -LiteralPath (Join-Path $EvidenceDir 'windows-browser-startup-diagnostic.json') -Raw | ConvertFrom-Json
+    if ($report.browserStartupDiagnostic.scope -ne 'private-exact-package-browser-startup-diagnostic' -or $report.browserStartupDiagnostic.status -ne 'completed' -or $report.browserStartupDiagnostic.notFullAcceptance -ne $true) { throw 'Wrong or incomplete diagnostic evidence' }
+    $diagnostic = $report.browserStartupDiagnostic
+    if ($diagnostic.sourceHead -ne $SourceHead -or $diagnostic.version -ne $Version -or $diagnostic.installedAsarSha256 -ne $report.target.package.asarSha256) { throw 'Diagnostic package identity mismatch' }
+    if ($diagnostic.applicationLaunched -ne $false -or $diagnostic.permissionWorkerLaunched -ne $false -or $diagnostic.browserLaunched -ne $false -or $diagnostic.productionTouched -ne $false -or $diagnostic.packageUnchanged -ne $true -or $diagnostic.modelCalls -ne 0 -or $diagnostic.tasksCreated -ne 0 -or $diagnostic.grantsCreated -ne 0) { throw 'Diagnostic entered an application or business execution path' }
+    if ($diagnostic.identityModule.source -ne 'exact-installed-extra-resource' -or $diagnostic.identityModule.entry -ne 'app.asar.unpacked/kun/dist/services/process-identity.js' -or $diagnostic.identityModule.asarSha256 -ne $report.target.package.asarSha256 -or $diagnostic.identityModule.pinSource -ne 'same-source-signed-Mac245' -or $diagnostic.identityModule.bytes -ne 3430 -or $diagnostic.identityModule.sha256 -ne '112ccee06a9e75ef68a3912a4b316606364dd36dd77404d3958a6d092be8f3ad' -or $diagnostic.identityModule.sha256 -ne $diagnostic.identityModule.importedSha256) { throw 'Diagnostic identity probe provenance mismatch' }
+
+  } else {
+    & node $uiScript $executable $Version $SourceHead $EvidenceDir
+    if ($LASTEXITCODE -ne 0) { throw "Installed Chinese UI smoke failed ($LASTEXITCODE)" }
+    $report.ui = Get-Content -LiteralPath (Join-Path $EvidenceDir 'windows-ui-smoke.json') -Raw | ConvertFrom-Json
+    if ($report.ui.status -ne 'passed') { throw 'Installed Chinese UI evidence is incomplete' }
+  }
 } catch {
   $report.errors.Add($_.Exception.Message)
 } finally {

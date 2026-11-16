@@ -57,6 +57,7 @@ type Props = {
   onToggleFocusMode: () => void
   onToggleConnectPhone: () => void
   onToggleSidebar: () => void
+  onNavigate?: () => void
 }
 
 type EntryDialog =
@@ -84,7 +85,8 @@ export function WriteSidebar({
   onOpenSettings,
   onToggleFocusMode,
   onToggleConnectPhone,
-  onToggleSidebar
+  onToggleSidebar,
+  onNavigate
 }: Props): ReactElement {
   const { t } = useTranslation('common')
   const clawChannels = useChatStore((s) => s.clawChannels)
@@ -494,7 +496,7 @@ export function WriteSidebar({
                       error={treeError}
                       rootLoading={rootLoading}
                       onToggleDir={(path) => void toggleDirectory(workspaceRoot, path)}
-                      onSelectFile={(path) => void openFile(workspaceRoot, path)}
+                      onSelectFile={(path) => { void openFile(workspaceRoot, path); onNavigate?.() }}
                       onCreateFile={(directoryPath) => void openCreateFileDialog(directoryPath)}
                       onCreateDirectory={(directoryPath) => void openCreateDirectoryDialog(directoryPath)}
                       onRenameEntry={openRenameEntryDialog}

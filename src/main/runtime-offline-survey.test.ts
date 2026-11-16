@@ -24,7 +24,9 @@ describe('local survey runtime without a model provider credential', () => {
   it('keeps a credential-free local runtime available after settings changes', () => {
     const body = bodyBetween('async function restartManagedRuntimeForSettingsChange(', 'async function waitForManagedRuntimeReadyBeforeStop(')
     expect(body).not.toContain('resolveConfiguredApiKey')
-    expect(body).toContain('if (!runtime.autoStart) return')
+    const restartGuard = 'if (!runtime.autoStart || isQuitting) return'
+    expect(body).toContain(restartGuard)
+    expect(body.indexOf(restartGuard)).toBeLessThan(body.indexOf('await adapter.ensureRunning(next)'))
     expect(body).toContain('if (!wasRunning) return')
   })
 
@@ -35,6 +37,6 @@ describe('local survey runtime without a model provider credential', () => {
     expect(body).not.toContain('restartManagedRuntime')
     expect(body).toContain('loadManagedMcpConfigForRefresh')
     expect(body).toContain("'/v1/runtime/mcp-config'")
-    expect(body).toContain('result?.ok !== true')
+    expect(body).toContain('assertMcpConfigurationApplied(response, revision)')
   })
 })

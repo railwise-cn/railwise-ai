@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import type { KunCapabilitiesConfig, WebCapabilityConfig } from '../../contracts/capabilities.js'
 import type { WebFetchResult, WebProvider, WebSearchResult } from '../../ports/web-provider.js'
@@ -61,15 +62,15 @@ export function buildWebToolProviders(
   const fetchProvider = options.fetchProvider ?? fallbackProvider
   const searchProvider = options.searchProvider ?? fallbackProvider
   const tools = []
-  if (web.fetchEnabled) {
+  if (web.fetchEnabled && fetchProvider.fetch) {
     tools.push(createFetchTool(web, fetchProvider))
   }
-  if (web.searchEnabled) {
+  if (web.searchEnabled && searchProvider.search) {
     tools.push(createSearchTool(web, searchProvider))
   }
   const fetchAvailable = Boolean(web.fetchEnabled && fetchProvider.fetch)
   const searchAvailable = Boolean(web.searchEnabled && searchProvider.search)
-  const reason = !tools.length
+  const reason = !web.fetchEnabled && !web.searchEnabled
     ? 'web tools are disabled by config'
     : !fetchAvailable && !searchAvailable
       ? 'web provider is unavailable'
@@ -256,7 +257,11 @@ class FetchWebProvider implements WebProvider {
       totalTimeoutMs: Math.min(request.timeoutMs, DEFAULT_WEB_TIMEOUT_MS)
     }, request.signal)
     const contentType = response.headers['content-type']
-    const raw = response.body.toString('utf8')
+    const declared = contentType?.match(/charset\s*=\s*["']?([a-zA-Z0-9_-]+)/i)?.[1]
+      ?? response.body.subarray(0, 4096).toString('latin1').match(/<meta[^>]+charset\s*=\s*["']?([a-zA-Z0-9_-]+)/i)?.[1]
+    let raw: string
+    try { raw = new TextDecoder(declared ?? 'utf-8').decode(response.body) }
+    catch { throw new SafeWebFetchError('invalid_response', 'The page declares an unsupported text encoding.') }
     const extracted = extractReadableText(raw, contentType)
     return {
       sourceId: sourceIdFor('fetch', response.finalUrl),
@@ -288,6 +293,7 @@ function fetchOutput(result: WebFetchResult, toolTelemetry: Record<string, unkno
     retrievedAt: result.retrievedAt,
     contentType: result.contentType,
     text: result.text,
+    resultHash: createHash('sha256').update(result.text).digest('hex'),
     byteCount: result.byteCount,
     truncated: result.truncated,
     sources: [source],

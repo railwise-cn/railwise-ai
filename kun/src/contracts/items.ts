@@ -33,6 +33,8 @@ export const TurnItemBase = z.object({
   status: TurnItemStatus,
   /** Local coordination history; its grouping ID is not an execution Turn. */
   conversationReceiptId: z.string().min(1).optional(),
+  taskInputId: z.string().min(1).optional(),
+  sourceRequestId: z.string().min(1).optional(),
   createdAt: z.string(),
   finishedAt: z.string().optional()
 })
@@ -58,10 +60,18 @@ export const UserTurnItem = TurnItemBase.extend({
 })
 export type UserTurnItem = z.infer<typeof UserTurnItem>
 
+export const TaskIntentCardSchema = z.object({
+  threadId: z.string(), taskId: z.string().optional(), attentionId: z.string(),
+  request: z.object({ prompt: z.string() }).catchall(z.unknown()),
+  choices: z.array(z.enum(['supplement', 'new'])).min(1).max(2)
+})
+export type TaskIntentCard = z.infer<typeof TaskIntentCardSchema>
+
 export const AssistantTextTurnItem = TurnItemBase.extend({
   kind: z.literal('assistant_text'),
   text: z.string(),
   capabilityCard: z.object({ threadId: z.string(), taskId: z.string(), attentionId: z.string().optional(), prompt: z.string(), capability: CapabilityPreflightSchema }).optional(),
+  intentCard: TaskIntentCardSchema.optional(),
   uiBlocks: z.array(DshUiBlock).max(20).optional()
 })
 export type AssistantTextTurnItem = z.infer<typeof AssistantTextTurnItem>

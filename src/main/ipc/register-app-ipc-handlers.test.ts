@@ -70,6 +70,7 @@ vi.mock('../services/managed-tool-service', () => ({
 
 vi.mock('electron', () => ({
   app: {
+    once: vi.fn(),
     quit: vi.fn(),
     getPath: vi.fn(() => '/tmp')
   },
@@ -300,6 +301,49 @@ describe('registerAppIpcHandlers', () => {
     }
   })
 
+  it('forwards exact browser scope preview and confirmation through the real IPC handler', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const response = { ok: true, status: 200, body: '{"resumed":false}' }
+    const runtimeRequest = vi.fn(async () => response)
+    registerAppIpcHandlers(registerOptions({ runtimeRequest: runtimeRequest as never }))
+    const path = '/v1/tasks/task-1/browser-binding'
+    const confirmation = { expectedTaskRevision: 2, expectedBrowserRevision: 4, browserInstanceId: 'chrome-test',
+      origins: ['https://example.com'], interaction: 'interact', confirmed: true, idempotencyKey: 'binding-1' }
+    const body = JSON.stringify(confirmation)
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'GET' })).resolves.toEqual(response)
+    expect(runtimeRequest).toHaveBeenLastCalledWith(path, 'GET', undefined)
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'POST', body })).resolves.toEqual(response)
+    expect(runtimeRequest).toHaveBeenLastCalledWith(path, 'POST', body)
+    for (const request of [
+      { path, method: 'DELETE', body },
+      { path, method: 'GET', body },
+      { path, method: 'POST', body: JSON.stringify({ ...confirmation, taskId: 'task-2' }) },
+      { path, method: 'POST', body: JSON.stringify({ ...confirmation, allowedTools: ['bash'] }) },
+      { path: `${path}?taskId=task-2`, method: 'GET' },
+      { path: '/v1/tasks/task-1/../task-2/browser-binding', method: 'GET' }
+    ]) await expect(handlers.get('runtime:request')?.({}, request)).rejects.toThrow(/Invalid payload for runtime:request/)
+    expect(runtimeRequest).toHaveBeenCalledTimes(2)
+    runtimeRequest.mockResolvedValueOnce({ ok: false, status: 409, body: '{"code":"browser_binding_changed"}' })
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'POST', body })).resolves.toMatchObject({ ok: false, status: 409 })
+  })
+
+  it.each(['confirmed_complete', 'completed', 'not_completed'])('forwards a browser outcome confirmation only for its exact receipt and explicit %s decision', async decision => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const response = { ok: true, status: 200, body: '{"status":"verified"}' }
+    const runtimeRequest = vi.fn(async () => response)
+    registerAppIpcHandlers(registerOptions({ runtimeRequest: runtimeRequest as never }))
+    const path = '/v1/tasks/task-1/receipts/receipt-1/browser-confirm'
+    const confirmation = { expectedRevision: 4, idempotencyKey: 'confirm-once', reviewId: 'review-1', decision }
+    const body = JSON.stringify(confirmation)
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'POST', body })).resolves.toEqual(response)
+    expect(runtimeRequest).toHaveBeenCalledExactlyOnceWith(path, 'POST', body)
+    for (const request of [{ path, method: 'GET' }, { path, method: 'POST', body: JSON.stringify({ ...confirmation, force: true }) },
+      { path: `${path}?taskId=other`, method: 'POST', body }, { path: path.replace('receipt-1', '%252Fother'), method: 'POST', body }]) {
+      await expect(handlers.get('runtime:request')?.({}, request)).rejects.toThrow(/Invalid payload for runtime:request/)
+    }
+    expect(runtimeRequest).toHaveBeenCalledTimes(1)
+  })
+
   it('forwards valid Survey draft requests through the desktop runtime handler', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const response = { ok: true, status: 200, body: '{"drafts":[]}' }
@@ -344,6 +388,20 @@ describe('registerAppIpcHandlers', () => {
       { path: '/v1/task-commands', method: 'POST', body: JSON.stringify({ ...command, request: { prompt: 'x', arbitrary: true } }) }
     ]) await expect(handlers.get('runtime:request')?.({}, request)).rejects.toThrow(/Invalid payload for runtime:request/)
     expect(runtimeRequest).toHaveBeenCalledTimes(calls)
+  })
+
+  it('forwards a scoped permission revocation and rejects widening fields before reaching Runtime', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const response = { ok: true, status: 200, body: '{"task":{"status":"paused"},"resumed":false}' }
+    const runtimeRequest = vi.fn(async () => response)
+    registerAppIpcHandlers(registerOptions({ runtimeRequest: runtimeRequest as never }))
+    const path = '/v1/tasks/task-1/permissions'
+    const request = { expectedRevision: 3, permissionId: 'reviewed-permission', idempotencyKey: 'revoke' }
+    const body = JSON.stringify(request)
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'DELETE', body })).resolves.toEqual(response)
+    expect(runtimeRequest).toHaveBeenCalledExactlyOnceWith(path, 'DELETE', body)
+    await expect(handlers.get('runtime:request')?.({}, { path, method: 'DELETE', body: JSON.stringify({ ...request, allowedTools: ['bash'] }) })).rejects.toThrow(/Invalid payload for runtime:request/)
+    expect(runtimeRequest).toHaveBeenCalledTimes(1)
   })
 
   it('registers native PPTX revision IPC channels and rejects malformed payloads', async () => {
@@ -451,6 +509,78 @@ describe('registerAppIpcHandlers', () => {
     mcpConfigService.test.mockResolvedValueOnce({ ...result, state: 'needs_authorization', authorized: false })
     await handlers.get('mcp-server:test')?.({}, { serverId: 'amap' })
     expect(onMcpServersChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('acknowledges a real HTTP Runtime configuration apply while retaining the unavailable MCP diagnosis', async () => {
+    const { startKunServe } = await import('../../../kun/src/server/runtime-factory.js')
+    const { KunCapabilitiesConfig } = await import('../../../kun/src/contracts/capabilities.js')
+    const { McpConfigService } = await import('../services/mcp-config-service')
+    const { assertMcpConfigurationApplied } = await import('../services/runtime-mcp-application')
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'railwise-ipc-mcp-apply-')))
+    const mcpConfigService = new McpConfigService({ manifestPath: join(root, 'mcp-v2.json'),
+      legacyPath: join(root, 'mcp.json'), credentialRoot: join(root, 'credentials') })
+    const runtime = await startKunServe({ host: '127.0.0.1', port: 0, dataDir: join(root, 'runtime'), runtimeToken: 'synthetic-main-token',
+      apiKey: '', baseUrl: 'http://127.0.0.1:1/v1', model: 'unused-synthetic', approvalPolicy: 'on-request', sandboxMode: 'workspace-write',
+      tokenEconomyMode: false, insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({}) })
+    const acknowledgements: unknown[] = []
+    try {
+      registerAppIpcHandlers(registerOptions({ mcpConfigService, onMcpServersChanged: async snapshot => {
+        const config = KunCapabilitiesConfig.parse({ mcp: { enabled: true, servers: snapshot.servers } }).mcp
+        const result = await fetch(`http://127.0.0.1:${runtime.port}/v1/runtime/mcp-config`, {
+          method: 'POST', headers: { authorization: 'Bearer synthetic-main-token', 'content-type': 'application/json' },
+          body: JSON.stringify({ config, environment: snapshot.environment, revision: snapshot.revision })
+        })
+        const body = await result.text()
+        acknowledgements.push(JSON.parse(body))
+        assertMcpConfigurationApplied({ ok: result.ok, status: result.status, body }, snapshot.revision)
+      } }))
+      const config = { id: 'unavailable', name: 'Unavailable synthetic MCP', scope: 'global', transport: 'stdio',
+        command: join(root, 'missing-mcp-executable'), args: [], timeoutMs: 1000, source: 'user', toolPolicy: {}, enabled: true }
+      await expect(handlers.get('mcp-server:save')?.({}, { config, expectedRevision: 0, idempotencyKey: 'enable-missing' }))
+        .resolves.toMatchObject({ id: 'unavailable', enabled: true, revision: 1 })
+      expect(acknowledgements[0]).toMatchObject({ applied: true, revision: 1, ok: false, connectedServers: 0, errors: [{ id: 'unavailable' }] })
+      expect((await runtime.runtime.toolDiagnostics!()).mcpServers).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'unavailable', status: 'error', enabled: true })
+      ]))
+      await expect(handlers.get('mcp-server:save')?.({}, { config: { ...config, enabled: false }, expectedRevision: 1, idempotencyKey: 'disable-missing' }))
+        .resolves.toMatchObject({ enabled: false, revision: 2 })
+      expect(acknowledgements[1]).toMatchObject({ applied: true, revision: 2, ok: true, errors: [] })
+      const conflict = await fetch(`http://127.0.0.1:${runtime.port}/v1/runtime/mcp-config`, {
+        method: 'POST', headers: { authorization: 'Bearer synthetic-main-token', 'content-type': 'application/json' },
+        body: JSON.stringify({ config: KunCapabilitiesConfig.parse({}).mcp, environment: {}, revision: 1 })
+      })
+      const conflictBody = await conflict.text()
+      expect(conflict.status).toBe(409)
+      expect(JSON.parse(conflictBody)).toMatchObject({ code: 'mcp_configuration_conflict' })
+      expect(() => assertMcpConfigurationApplied({ ok: conflict.ok, status: conflict.status, body: conflictBody }, 1)).toThrow()
+    } finally {
+      mcpConfigService.dispose()
+      runtime.server.closeAllConnections()
+      await runtime.close()
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 15_000)
+
+  it('refreshes only Skills after a pure Skill installation even when unrelated MCP refresh would fail', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const installed = { packageId: 'browser-skill', scope: 'user', permissions: [], rollback: { available: false } }
+    const item = { permissions: [], components: [{ id: 'browser-skill', type: 'skill' }] }
+    const onSkillsChanged = vi.fn(async () => undefined)
+    const onMcpServersChanged = vi.fn(async () => { throw new Error('Unrelated MCP is offline') })
+    const runtimeSnapshot = vi.fn()
+    registerAppIpcHandlers(registerOptions({ onSkillsChanged, onMcpServersChanged,
+      mcpConfigService: { runtimeSnapshot } as never,
+      pluginManagementService: { installPrepared: async (_request: unknown, activate: (record: unknown, item: unknown) => Promise<void>) => {
+        await activate(installed, item)
+        return installed
+      } } as never
+    }))
+    await expect(handlers.get('plugin:install')?.({}, { preparedId: 'prepared-skill', reviewSha256: 'a'.repeat(64),
+      expectedCurrentVersion: null, scope: 'user', permissions: [], idempotencyKey: 'install-skill' })).resolves.toEqual(installed)
+    expect(onSkillsChanged).toHaveBeenCalledOnce()
+    expect(runtimeSnapshot).not.toHaveBeenCalled()
+    expect(onMcpServersChanged).not.toHaveBeenCalled()
   })
 
   it('forwards real MCP check evidence and rejects renderer-injected verification fields', async () => {
@@ -1394,9 +1524,10 @@ describe('registerAppIpcHandlers', () => {
       await afterRollback(installed, item)
       return installed
     })
-    const updatePermissions = vi.fn(async (_catalogItem, _request, afterUpdate) => {
-      await afterUpdate(installed, item)
-      return installed
+    const updatePermissions = vi.fn(async (_catalogItem, request, afterUpdate) => {
+      const updated = { ...installed, permissions: request.permissions }
+      await afterUpdate(updated, item)
+      return updated
     })
     const pluginService = {
       listInstalled: vi.fn(async () => [installed]),
@@ -1404,7 +1535,11 @@ describe('registerAppIpcHandlers', () => {
       updatePermissions
     }
     const save = vi.fn(async ({ config }) => ({ ...config, revision: 1 }))
+    const onSkillsChanged = vi.fn(async () => undefined)
+    const onMcpServersChanged = vi.fn(async () => undefined)
     registerAppIpcHandlers(registerOptions({
+      onSkillsChanged,
+      onMcpServersChanged,
       marketplaceCatalogService: {
         listPackages: vi.fn(async () => ({
           packages: [{ key: 'official:remote-plugin', sourceId: 'workwise-official', package: item, conflicted: false }],
@@ -1412,7 +1547,7 @@ describe('registerAppIpcHandlers', () => {
         }))
       } as never,
       pluginManagementService: pluginService as never,
-      mcpConfigService: { list: vi.fn(async () => []), save, dispose: vi.fn() } as never
+      mcpConfigService: { list: vi.fn(async () => []), save, dispose: vi.fn(), runtimeSnapshot: async () => ({ revision: 1, servers: {}, environment: {} }) } as never
     }))
 
     await expect(handlers.get('plugin:rollback')?.({}, {
@@ -1424,9 +1559,9 @@ describe('registerAppIpcHandlers', () => {
       packageId: item.id,
       expectedCurrentVersion: item.version,
       reviewSha256: 'a'.repeat(64),
-      permissions: [{ permissionId: 'network-connect', decision: 'granted' }],
+      permissions: [{ permissionId: 'network-connect', decision: 'denied' }],
       idempotencyKey: 'permissions-remote-plugin'
-    })).resolves.toEqual(installed)
+    })).resolves.toMatchObject({ packageId: item.id, permissions: [{ permissionId: 'network-connect', decision: 'denied' }] })
 
     expect(rollback).toHaveBeenCalledWith(expect.objectContaining({ packageId: item.id }), expect.any(Function))
     expect(updatePermissions).toHaveBeenCalledWith(
@@ -1435,14 +1570,23 @@ describe('registerAppIpcHandlers', () => {
       expect.any(Function)
     )
     expect(save).toHaveBeenCalledTimes(2)
+    expect(onSkillsChanged).toHaveBeenCalledTimes(2)
+    expect(onMcpServersChanged).toHaveBeenCalledTimes(2)
     expect(save).toHaveBeenLastCalledWith(expect.objectContaining({
       config: expect.objectContaining({
         id: 'remote-mcp',
         transport: 'http',
         url: source.location,
-        enabled: true
+        enabled: false
       })
     }))
+    onSkillsChanged.mockRejectedValueOnce(new Error('Skill refresh failed'))
+    await expect(handlers.get('plugin:update-permissions')?.({}, {
+      packageId: item.id, expectedCurrentVersion: item.version, reviewSha256: 'a'.repeat(64),
+      permissions: [{ permissionId: 'network-connect', decision: 'denied' }], idempotencyKey: 'revoke-with-skill-refresh-error'
+    })).rejects.toThrow('Skill refresh failed')
+    expect(onMcpServersChanged).toHaveBeenCalledTimes(3)
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ config: expect.objectContaining({ enabled: false }) }))
   })
 
   it('saves generated files to a user-selected path', async () => {

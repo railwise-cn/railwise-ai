@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -13,7 +14,6 @@ import {
 import {
   Archive,
   BarChart3,
-  Bot,
   FileEdit,
   FileText,
   GitFork,
@@ -75,6 +75,7 @@ import {
   useThreadUsageState
 } from '../../hooks/use-thread-usage'
 import { GitBranchPicker } from './GitBranchPicker'
+import { FloatingComposerAgentPicker } from './FloatingComposerAgentPicker'
 import {
   FloatingComposerModelPicker,
   type ComposerReasoningEffort
@@ -87,6 +88,7 @@ import {
   type ComposerExecutionSettings
 } from './FloatingComposerExecutionPicker'
 import { useComposerDraft } from './use-composer-draft'
+import { useComposerSuggestionBounds } from './use-composer-suggestion-bounds'
 import type { ComposerChangedFile } from '../../lib/composer-change-summary'
 import { rendererRuntimeClient } from '../../agent/runtime-client'
 import { resolveUsageTokenDisplay } from '../../store/live-usage-projection'
@@ -521,6 +523,23 @@ export function formatGoalElapsedSeconds(seconds: number): string {
     : `${hours}h ${remainingMinutes}m`
 }
 
+/** Reveal only within the mounted suggestion list; never scroll the input or page. */
+function revealActiveSuggestion(list: HTMLDivElement | null): void {
+  if (!list || list.clientHeight <= 0 || list.offsetHeight <= 0) return
+  const active = list.querySelector<HTMLElement>('[data-composer-active="true"]')
+  if (!active) return
+  const bounds = list.getBoundingClientRect()
+  // BCR includes actual CSS zoom; scrollTop/clientHeight use layout pixels.
+  const scale = bounds.height / list.offsetHeight
+  if (!Number.isFinite(scale) || scale <= 0) return
+  const item = active.getBoundingClientRect()
+  const top = bounds.top + list.clientTop * scale
+  const bottom = top + list.clientHeight * scale
+  const delta = item.top < top ? (item.top - top) / scale
+    : item.bottom > bottom ? (item.bottom - bottom) / scale : 0
+  list.scrollTop = Math.max(0, Math.min(list.scrollHeight - list.clientHeight, list.scrollTop + delta))
+}
+
 export function FloatingComposer({
   variant = 'default',
   composerMinHeight = 36,
@@ -692,6 +711,10 @@ export function FloatingComposer({
   const [goalRuntimeNowMs, setGoalRuntimeNowMs] = useState(() => Date.now())
   const [reviewRepositoryRoot, setReviewRepositoryRoot] = useState('')
   const composerRootRef = useRef<HTMLDivElement | null>(null)
+  const suggestionAnchorRef = useRef<HTMLDivElement | null>(null)
+  const slashListRef = useRef<HTMLDivElement | null>(null)
+  const skillListRef = useRef<HTMLDivElement | null>(null)
+  const fileListRef = useRef<HTMLDivElement | null>(null)
   const composerMenuButtonRef = useRef<HTMLButtonElement | null>(null)
   const composerMenuPanelRef = useRef<HTMLDivElement | null>(null)
 
@@ -921,10 +944,18 @@ export function FloatingComposer({
     activeFileMentionKey !== dismissedFileMentionKey &&
     !composerMenuOpen &&
     !goalPanelOpen
+  const suggestionMaxHeight = useComposerSuggestionBounds(
+    slashQuery != null || showSkillMentionMenu || showFileMentionMenu, suggestionAnchorRef
+  )
   const highlightedFileMention =
     fileMentionSuggestions.length > 0
       ? fileMentionSuggestions[Math.min(selectedFileMentionIndex, fileMentionSuggestions.length - 1)]
       : null
+  useLayoutEffect(() => {
+    revealActiveSuggestion(slashQuery != null ? slashListRef.current
+      : showSkillMentionMenu ? skillListRef.current : showFileMentionMenu ? fileListRef.current : null)
+  }, [slashQuery, showSkillMentionMenu, showFileMentionMenu, highlightedSlashCommand?.id,
+    highlightedSkillMention?.id, highlightedFileMention?.relativePath, suggestionMaxHeight])
   const parsedGoalCommand = parseGoalCommand(input)
   const goalPanelDraftObjective = getGoalPanelDraftObjective(input, goalPanelOpen)
   const canSetGoalPanelDraft =
@@ -1514,7 +1545,7 @@ export function FloatingComposer({
         onRemove={onRemoveQueuedMessage}
       />
 
-      <div className="relative">
+      <div ref={suggestionAnchorRef} className="relative">
         {!compact && activeThreadGoal && slashQuery == null && !goalPanelOpen && !composerMenuOpen ? (
           <div className="pointer-events-none absolute inset-x-3 bottom-full z-20 mb-2 flex justify-center">
             <div className="pointer-events-auto flex min-h-11 w-full max-w-[46rem] items-center gap-2 rounded-full border border-ds-border bg-ds-card/95 px-3 py-1.5 text-ds-muted shadow-[0_12px_34px_rgba(15,23,42,0.10)] backdrop-blur-xl dark:bg-ds-card/90">
@@ -1651,17 +1682,18 @@ export function FloatingComposer({
         ) : null}
 
         {slashQuery != null ? (
-          <div className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 w-[calc(100%_-_1rem)] max-w-[760px] -translate-x-1/2 overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
-            <div className="flex h-7 items-center px-2.5 text-[11.5px] font-semibold text-ds-muted">
+          <div style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[760px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
+            <div className="flex h-7 shrink-0 items-center px-2.5 text-[11.5px] font-semibold text-ds-muted">
               {t('slashCommandMenuTitle')}
             </div>
             {filteredSlashCommands.length > 0 ? (
-              <div className="flex max-h-[min(300px,calc(100vh-260px))] flex-col gap-0.5 overflow-y-auto pr-1">
+              <div ref={slashListRef} className="flex min-h-0 max-h-[300px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
                 {filteredSlashCommands.map((command) => {
                   const active = highlightedSlashCommand?.id === command.id
                   return (
                     <button
                       key={command.id}
+                      data-composer-active={active ? 'true' : undefined}
                       type="button"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => applySlashCommand(command.id)}
@@ -1710,17 +1742,18 @@ export function FloatingComposer({
         ) : null}
 
         {showSkillMentionMenu ? (
-          <div className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
-            <div className="flex h-7 items-center gap-2 px-2.5 text-[11.5px] font-semibold text-ds-muted">
+          <div style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
+            <div className="flex h-7 shrink-0 items-center gap-2 px-2.5 text-[11.5px] font-semibold text-ds-muted">
               <Sparkles className="h-3.5 w-3.5 text-ds-faint" strokeWidth={1.9} />
               <span>{t('composerSkillMentionMenuTitle')}</span>
             </div>
-            <div className="flex max-h-[min(280px,calc(100vh-260px))] flex-col gap-0.5 overflow-y-auto pr-1">
+            <div ref={skillListRef} className="flex min-h-0 max-h-[280px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
               {skillMentionSuggestions.map((skill) => {
                 const active = highlightedSkillMention?.id === skill.id
                 return (
                   <button
                     key={skill.id}
+                    data-composer-active={active ? 'true' : undefined}
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => applySkillMention(skill)}
@@ -1748,8 +1781,8 @@ export function FloatingComposer({
         ) : null}
 
         {showFileMentionMenu ? (
-          <div className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
-            <div className="flex h-7 items-center gap-2 px-2.5 text-[11.5px] font-semibold text-ds-muted">
+          <div style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
+            <div className="flex h-7 shrink-0 items-center gap-2 px-2.5 text-[11.5px] font-semibold text-ds-muted">
               <FileText className="h-3.5 w-3.5 text-ds-faint" strokeWidth={1.9} />
               <span>{t('composerFileMentionMenuTitle')}</span>
               {fileMentionLoading ? (
@@ -1757,12 +1790,13 @@ export function FloatingComposer({
               ) : null}
             </div>
             {fileMentionSuggestions.length > 0 ? (
-              <div className="flex max-h-[min(280px,calc(100vh-260px))] flex-col gap-0.5 overflow-y-auto pr-1">
+              <div ref={fileListRef} className="flex min-h-0 max-h-[280px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
                 {fileMentionSuggestions.map((reference) => {
                   const active = highlightedFileMention?.relativePath === reference.relativePath
                   return (
                     <button
                       key={reference.relativePath}
+                      data-composer-active={active ? 'true' : undefined}
                       type="button"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => applyFileMention(reference)}
@@ -2119,46 +2153,18 @@ export function FloatingComposer({
               </div>
             ) : null}
             <div
-              className={`flex min-w-0 items-center justify-end gap-1.5 ${
-                stretchModelPicker ? 'flex-1' : 'shrink-0'
+              className={`ds-composer-selectors flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 ${
+                stretchModelPicker ? 'flex-1' : 'flex-[0_1_auto]'
               }`}
             >
               {onAgentChange && agentProfiles.length > 0 ? (
-                <label
-                  className="ds-no-drag relative inline-flex h-9 max-w-44 shrink-0 items-center gap-1.5 rounded-full border border-ds-border-muted bg-ds-card/72 px-2.5 text-[12px] font-medium text-ds-muted transition focus-within:border-ds-border-strong hover:bg-ds-hover"
-                  title={t('agentSwitcherTitleWith', {
-                    agent: agentProfiles.find((profile) => profile.id === activeAgentId)?.name
-                      ?? activeAgentId
-                  })}
-                >
-                  {agentSelectionApplying ? (
-                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" strokeWidth={1.9} />
-                  ) : (
-                    <Bot className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-                  )}
-                  <select
-                    aria-label={t('agentSwitcherMenuTitle')}
-                    value={
-                      agentProfiles.some((profile) => profile.id === activeAgentId)
-                        ? activeAgentId
-                        : ''
-                    }
-                    disabled={busy || !runtimeReady || agentSelectionApplying}
-                    onChange={(event) => onAgentChange(event.currentTarget.value)}
-                    className="min-w-0 max-w-32 cursor-pointer appearance-none truncate bg-transparent pr-2 text-ds-muted outline-none disabled:cursor-not-allowed disabled:opacity-55"
-                  >
-                    {!agentProfiles.some((profile) => profile.id === activeAgentId) ? (
-                      <option value="" disabled>
-                        {t('agentUnavailable')}
-                      </option>
-                    ) : null}
-                    {agentProfiles.map((profile) => (
-                      <option key={profile.id} value={profile.id} title={profile.role}>
-                        {profile.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <FloatingComposerAgentPicker
+                  profiles={agentProfiles}
+                  value={activeAgentId ?? ''}
+                  applying={agentSelectionApplying}
+                  disabled={busy || !runtimeReady}
+                  onChange={onAgentChange}
+                />
               ) : null}
               {hideModelPicker ? null : (
                 <FloatingComposerModelPicker

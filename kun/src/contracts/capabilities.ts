@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { DingTalkCapabilityConfig } from './dingtalk.js'
 import { DwsCapabilityConfig } from './dws.js'
+import { BrowserCapabilityConfig } from './browser-skill.js'
+import { EgoBrowserCapabilityConfig } from './ego-browser.js'
 
 export const RUNTIME_CAPABILITY_CONTRACT_VERSION = 1
 
@@ -162,6 +164,8 @@ export type WebCapabilityConfig = z.infer<typeof WebCapabilityConfig>
 
 export const SkillsCapabilityConfig = CapabilityToggleConfig.extend({
   roots: z.array(z.string().min(1)).default([]),
+  managedRoots: z.array(z.string().min(1)).optional(),
+  revision: z.number().int().nonnegative().optional(),
   legacySkillMd: z.boolean().default(true)
 }).strict()
 export type SkillsCapabilityConfig = z.infer<typeof SkillsCapabilityConfig>
@@ -248,7 +252,9 @@ export const KunCapabilitiesConfig = z.preprocess(input => {
   imageGen: ImageGenCapabilityConfig.default(() => ImageGenCapabilityConfig.parse({})),
   lark: LarkCapabilityConfig.default(() => LarkCapabilityConfig.parse({})),
   dingtalk: DingTalkCapabilityConfig.default(() => DingTalkCapabilityConfig.parse({})),
-  dws: DwsCapabilityConfig.default(() => DwsCapabilityConfig.parse({}))
+  dws: DwsCapabilityConfig.default(() => DwsCapabilityConfig.parse({})),
+  egoBrowser: EgoBrowserCapabilityConfig.optional(),
+  browserSkill: BrowserCapabilityConfig.default(() => BrowserCapabilityConfig.parse({}))
 }).strict())
 
 export type KunCapabilitiesConfig = z.infer<typeof KunCapabilitiesConfig>
