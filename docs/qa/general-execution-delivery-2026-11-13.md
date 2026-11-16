@@ -906,3 +906,13 @@ Node 22 九文件 116 项、KUN／Node／Web 类型及九文件 lint 通过，�
 该增量已完成本地合并验证：Node 22、仓库标准 KUN runner 的九文件 161 项通过，KUN／Node／Web 类型和十二代码文件 lint 通过。真实 Factory／Coordinator／Host 的新增用例先在完全旧 15d 代码上功能性失败，再验证旧稿优先发布被拒但原 Task 仍可继续，随后实际经过固定 SDK 替身的关闭状态核对、原任务追加绑定、新读取、同哈希新回执、文件／来源核验、daily 读回和当前空间 finish，三节点完成；它是离线回归，不代表付费网站通过。旧字段失败保持二次停滞，未读时的一次纠正机会单独有界，换文件名、回看上下文或同轮重复同内容读取不能洗去旧计数。首轮、定时轮、真实补充输入、多来源及旧清单字节兼容均覆盖。
 
 另从真实草稿发现结构化输入已有必填项目名称，但未重复提供标题字段时，生成页面会漏掉项目名称。订阅报告生成器现从该完整名称提出候选标题字段并统一展示，随后仍须通过同一条真实记录的严格核验；短标题必须使用实际较长原文摘录，不生成填充文字。显式证据、正文报告、原内容模式与事实防线保留。对应生成器先两红五绿，再七项通过。首次生产构建成功后补入这项新发现，随后完成包含全部增量的最终生产构建及 1,381 输入 freshness，2,443 个 authored production 文件与物理构建树逐字一致；没有将首次较早构建冒充最终字节。后继完整 CI、精确包和原账号任务仍待验证。
+
+
+### c961 集成回归发现标题清单比较不一致，候选未接受
+
+`c9615487` 的 [push Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43924412577) 与 [PR Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43924427394) 六项成功，两轮均 Desktop 4,818 通过／17 跳过、Runtime 5,218 通过／24 跳过。后续真实 Factory 回归保留原坏稿的显式标题，只在恢复成功的模型发布参数中省略重复 `fields.title`，两个完整恢复分支均出现 `artifact_manifest_scope`，最终停滞而未完成；其余七项通过。旧 Controller 字节与 c961 一致，失败并非缺少新方法或绕开真实 Host 的模拟断言。
+
+根因是生成器补入候选标题字段后，Controller 仍将归一化清单与未补入的原始报告字段直接比较。原 Host 参数哈希必须保留，修正应让可信清单比较采用同一确定性生成规则，而非重写原调用或放宽字段、来源及 writer 身份校验。[该私有构建](https://github.com/railwise-cn/railwise-ai/actions/runs/43924862771)因此停止接受。普通取消后唯一 macOS always job 仍活动，一次 force-cancel 后官方确认 completed／cancelled、无活动 job；Mac 下载、安装和原任务再执行均为零，Windows 只完成原包及 basic 的只读核对，没有派发 full。原真实应用仍为 15d，同一任务保留六次执行、一个待核验草稿及零新计划。六项 CI 成功不覆盖这个新发现，也不代表账号业务通过。
+
+
+最小修正只在 Controller 中按服务端持久的 `observed_feed` 合同调用同一生成器重建候选清单，然后精确比较；原始 Host 参数哈希、writer／Grant／Token 身份校验保持。实际 Host 下篡改候选标题值、标题摘录或预算字段仍被拒绝；原参数变更仍由 writer 身份校验拒绝。伪造 MCP、未完成 writer、旧来源和普通正文兼容回归保留。修复后完整 Factory 九项通过，来源／生成器相邻九十二项通过；合并树的 Node 22 标准 KUN runner 九文件 165 项、KUN／Node／Web 类型、三文件 lint、包含该修正的一次生产构建和 freshness 均通过，2,443 个 authored production 文件与物理构建树逐字一致。初次合并检查遇到临时 checkout 指向已失效依赖目录，保留缺依赖和错误 runner 的日志；修正该可弃置依赖链接后使用仓库 KUN Vitest 4.1.8 得到上述最终结果，未改生产源码来绕过环境错误。后继完整 CI、新精确包和原账号任务的实际浏览、报告及计划仍须验收。

@@ -366,6 +366,31 @@ it('cannot activate a sealed manifest before the original managed writer has act
   } finally { f.repository.close() }
 })
 
+it.each(['title-value', 'title-quote', 'budget-value', 'raw-arguments'] as const)('rejects %s tampering on the normalized feed manifest under a genuine Host operation', async variation => {
+  const f = await observedCollectionFixture()
+  try {
+    await f.source(origins[0] + '/notice/1', document)
+    const proof = structuredClone(f.proof)
+    proof.items[0]!.fields = proof.items[0]!.fields.filter(field => field.field !== 'title')
+    const args = { path: proof.path, report: { title: '真实原始Host参数', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } }
+    const rendered = renderStructuredWebReport(proof.path, args.report, 'observed_feed'), changed = structuredClone(rendered.verificationInput)
+    if (variation === 'title-value') changed.items[0]!.fields.find(field => field.field === 'title')!.value = title.slice(0, -1)
+    if (variation === 'title-quote') changed.items[0]!.fields.find(field => field.field === 'title')!.quote = `项目名称：${title}`
+    if (variation === 'budget-value') changed.items[0]!.fields.find(field => field.field === 'budget')!.value = '1000'
+    const grant = (await f.threadStore.get(f.thread.id))!.turns.find(turn => turn.id === 'new-turn')!.executionGrant!
+    const call = { callId: `normalized-${variation}`, toolName: 'publish_artifact', providerId: 'managed-artifacts', arguments: args }
+    const operation = f.controller.beginToolOperation('new-turn', call, grant)!
+    const host = f.controller.currentToolOperation(operation.token, operation.key, call, grant)
+    const before = f.repository.operations(f.task.id, 'web_artifact_publication_manifest'), bytes = await readFile(f.path)
+    const claimed = variation === 'raw-arguments' ? { ...args, report: { ...args.report, title: '与真实Host不一致的原始参数' } } : args
+    await expect(f.controller.recordWebArtifactPublicationManifest(f.task.id, 'new-turn', proof.path, sha(rendered.content), changed, claimed, host)).rejects.toMatchObject({
+      code: variation === 'raw-arguments' ? 'artifact_manifest_writer_required' : 'artifact_manifest_scope' })
+    expect(f.repository.operation(f.task.id, operation.key)!.request!.argumentsHash).toBe(operationFingerprint(args))
+    expect(f.repository.operations(f.task.id, 'web_artifact_publication_manifest')).toEqual(before)
+    expect(await readFile(f.path)).toEqual(bytes)
+  } finally { f.repository.close() }
+})
+
 it('requires exact source-linked evidence before completion, then reuses legitimate prior-Turn/retired-browser reads', async () => {
   const f = await fixture()
   try {

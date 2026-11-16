@@ -13,6 +13,7 @@ import { createThreadRecord } from '../domain/thread.js'
 import { createTurnRecord } from '../domain/turn.js'
 import { makeAssistantTextItem } from '../domain/item.js'
 import { TaskController } from './task-controller.js'
+import { operationFingerprint } from './task-run-repository.js'
 import { RuntimeSpanService } from './runtime-span-service.js'
 import type { TurnItem } from '../contracts/items.js'
 
@@ -131,7 +132,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
     const workspace = join(root, 'workspace'); await mkdir(workspace)
     let resumed = false, reachedReadBarrier = false, releaseNativeRead = () => {}
     const nativeReadAllowed = new Promise<void>(resolve => { releaseNativeRead = resolve })
-    let cachedSourceRef: Record<string, unknown> | undefined
+    let cachedSourceRef: Record<string, unknown> | undefined, successfulPublishArguments: Record<string, unknown> | undefined
     const initialReads = [['open', 'ego_browser_open'], ['read', 'ego_browser_read']]
     const initialSteps = resumeWithOldDraft ? [...initialReads,
       ['publish-bad-1', 'publish_artifact'], ['read-bad-1', 'read_artifact'], ['verify-bad-1', 'verify_web_artifact'],
@@ -141,7 +142,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
       ['schedule', 'schedule_task'], ['read-schedule', 'list_schedules'], ['finish', 'ego_browser_finish']]
     const reportFor = (ref: Record<string, unknown>, badBudget: boolean) => {
       const title = '离线恢复后的测绘监测项目', quote = title + ' 2026-11-16'
-      return { path: 'recovered-feed.html', report: { title: '订阅列表恢复汇总', evidence: { coverage: [ref],
+      const input = { path: 'recovered-feed.html', report: { title: '订阅列表恢复汇总', evidence: { coverage: [ref],
         items: [{ sectionId: 'one-record', title, source: ref, discovery: ref, classification: 'source',
           fields: [{ field: 'title', value: title, quote }, { field: 'publication_date', value: '2026-11-16', quote }],
           unverifiedFields: ['budget', 'deadline', 'status', 'qualification'] }, ...(resumeWithOldDraft ? [{
@@ -151,6 +152,10 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
             { field: 'budget', value: badBudget ? '人民币999元' : '人民币300元',
               quote: badBudget ? '预算报价人民币999元，来源原文。' : '另一条离线记录 2026-11-16 预算人民币300元' }],
           unverifiedFields: ['deadline', 'status', 'qualification'] }] : [])], noMatches: [] } } }
+      // Keep the old bad drafts unchanged. The successful model request supplies
+      // each title once; short titles retain their real same-record date quote.
+      if (!badBudget) for (const item of input.report.evidence.items) item.fields = item.fields.filter(field => field.field !== 'title')
+      return input
     }
     const model = createServer(async (request, response) => {
       const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk))
@@ -174,6 +179,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
         const ref = read ? { url: read.sourceUrl, resultHash: read.resultHash } : cachedSourceRef!
         if (!resumed) cachedSourceRef = ref
         args = reportFor(ref, next[0] !== 'publish')
+        if (next[0] === 'publish') successfulPublishArguments = args
       }
       if (next?.[1] === 'read_artifact') args = { path: 'recovered-feed.html' }
       if (next?.[0] === 'verify') args = result('publish').verificationInput as Record<string, unknown>
@@ -261,6 +267,15 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
     const toolOutput = (name: string) => (repo.operations(taskId, 'tool').filter(receipt => receipt.request?.toolName === name).at(-1)!.result as { item: { output: Record<string, unknown> } }).item.output
     expect(toolOutput('ego_browser_read')).toMatchObject({ evidence: { bindingReceiptId: currentBinding.id, taskSpaceId: 28, turnId: continued.turn!.turnId } })
     expect(toolOutput('verify_web_artifact')).toMatchObject({ complete: true })
+    const rawReport = successfulPublishArguments!.report as { evidence: { items: Array<{ title: string; fields: Array<{ field: string; quote: string }> }> } }
+    expect(rawReport.evidence.items.every(item => item.fields.every(field => field.field !== 'title'))).toBe(true)
+    const writer = repo.operations(taskId, 'tool').filter(receipt => receipt.request?.turnId === continued.turn!.turnId && receipt.request.toolName === 'publish_artifact' && receipt.status === 'succeeded').at(-1)!
+    expect(writer.request!.argumentsHash).toBe(operationFingerprint(successfulPublishArguments))
+    const manifest = repo.operations(taskId, 'web_artifact_publication_manifest').find(receipt => receipt.request?.writerReceiptId === writer.id)!
+    const normalized = manifest.request!.input as { items: Array<{ title: string; fields: Array<{ field: string; value: string; quote: string }> }> }
+    for (const item of normalized.items) expect(item.fields).toContainEqual(expect.objectContaining({ field: 'title', value: item.title }))
+    expect(toolOutput('publish_artifact')).toMatchObject({ verificationInput: { manifestRef: manifest.idempotencyKey } })
+
     if (resumeWithOldDraft) {
       const reads = repo.operations(taskId, 'ego_document_read')
       expect(new Set(reads.map(read => (read.result as { resultHash: string }).resultHash)).size).toBe(1)

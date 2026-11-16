@@ -64,6 +64,7 @@ import { verifyTaskDelivery } from '../delivery/verification.js'
 import { WebArtifactEvidenceInputSchema, type WebArtifactEvidenceInput } from '../contracts/web-artifact-evidence.js'
 import { assessWebArtifactEvidence, observedFeedCollectionFreshness, type ObservedFeedCollectionFreshness, verifiedWebArtifactEvidence, webArtifactFailureKinds, webArtifactManifestSourceProof, webArtifactPublicationReadiness, webArtifactRequirementHash, webEvidenceRepair } from './web-artifact-evidence.js'
 import { deriveWebArtifactRepairState, type WebArtifactRepairAttempt } from './web-artifact-repair-state.js'
+import { renderStructuredWebReport, type StructuredWebReport } from './structured-web-report.js'
 
 import { currentEgoTaskSpaceBinding, validEgoDocumentEvidence, verifiedEgoTaskSpaceFinish, type EgoClosedSpaceReopenAuthorization } from './ego-browser-evidence.js'
 import { EGO_PERMISSION_CODES, taskPermissionCapability, taskPermissionFailure } from './task-permission-recovery.js'
@@ -761,8 +762,13 @@ export class TaskController {
     const normalized = WebArtifactEvidenceInputSchema.parse(input), artifactPath = resolve(this.managedArtifactRoot(taskId)!, path)
     if (normalized.path !== path || !/^[a-f0-9]{64}$/.test(artifactHash)) throw Object.assign(new Error('Publication manifest path or hash does not match its writer.'), { code: 'artifact_manifest_scope' })
     const report = args.report && typeof args.report === 'object' ? args.report as Record<string, unknown> : undefined
-    const proposed = WebArtifactEvidenceInputSchema.safeParse({ path, ...(report?.evidence && typeof report.evidence === 'object' ? report.evidence : {}) })
-    if (!proposed.success || operationFingerprint(proposed.data) !== operationFingerprint(normalized)) throw Object.assign(new Error('Publication manifest differs from the real writer arguments.'), { code: 'artifact_manifest_scope' })
+    let proposed: WebArtifactEvidenceInput | undefined
+    try {
+      proposed = task.acceptance.webEvidenceBasis === 'observed_feed'
+        ? renderStructuredWebReport(path, args.report as StructuredWebReport, 'observed_feed').verificationInput
+        : WebArtifactEvidenceInputSchema.parse({ path, ...(report?.evidence && typeof report.evidence === 'object' ? report.evidence : {}) })
+    } catch { /* Only the deterministic renderer's candidate may differ from the raw feed declaration. */ }
+    if (!proposed || operationFingerprint(proposed) !== operationFingerprint(normalized)) throw Object.assign(new Error('Publication manifest differs from the real writer arguments.'), { code: 'artifact_manifest_scope' })
     const writer = hostOperation && this.repository.operation(taskId, hostOperation.idempotencyKey)
     if (!hostOperation || !writer || writer.id !== hostOperation.operationId || writer.kind !== 'tool' || !['prepared', 'running'].includes(writer.status) ||
       writer.fingerprint !== operationFingerprint(writer.request) || writer.request?.dispatchTracking !== 'host-v1' || writer.request.toolName !== 'publish_artifact' ||
