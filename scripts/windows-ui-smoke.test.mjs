@@ -1847,32 +1847,61 @@ test('startup diagnostic distinguishes vendor signal exit, startup errors and a 
   assert.equal(classifyWindowsDaemonStartup({ naturalExit: true, identity: { verified: false }, vendor: {} }), 'early_exit_identity_unavailable')
 })
 
-test('diagnostic imports the installed compiled identity bytes and rejects altered ASAR/source', async t => {
-  const { loadWindowsStartupIdentity, windowsStartupDiagnosticPackage } = await import('./run-windows-ui-smoke.mjs')
+async function startupExtraResourceFixture(t) {
+  const { windowsStartupDiagnosticPackage } = await import('./run-windows-ui-smoke.mjs')
   const { readFile } = await import('node:fs/promises')
-  const root = await mkdtemp(join(tmpdir(), 'startup-identity-asar-')); t.after(() => rm(root, { recursive: true, force: true }))
-  const input = join(root, 'input'); await mkdir(join(input, 'kun', 'dist', 'services'), { recursive: true })
-  const pin = windowsStartupDiagnosticPackage
-  await writeFile(join(input, 'package.json'), JSON.stringify({ name: 'workwise', productName: 'RailWise AI', version: pin.version, buildProvenance: { sourceHead: pin.sourceHead } }))
+  const asar = createRequire(import.meta.url)('@electron/asar')
+  const root = await mkdtemp(join(tmpdir(), 'startup-extra-resource-')); t.after(() => rm(root, { recursive: true, force: true }))
+  const input = join(root, 'input'), resources = join(root, 'resources'); await mkdir(input); await mkdir(resources)
+  const metadata = { name: 'workwise', productName: 'RailWise AI', version: windowsStartupDiagnosticPackage.version, buildProvenance: { sourceHead: windowsStartupDiagnosticPackage.sourceHead } }
+  await writeFile(join(input, 'package.json'), JSON.stringify(metadata))
+  const archive = join(resources, 'app.asar'); await asar.createPackage(input, archive)
+  // electron-builder copies kun/dist as an extraResource; this file is absent
+  // from the ASAR header even though its installed directory says .unpacked.
+  const modulePath = join(resources, 'app.asar.unpacked', 'kun', 'dist', 'services', 'process-identity.js')
+  await mkdir(join(modulePath, '..'), { recursive: true })
   const bytes = 'export async function processIdentityAsync(pid) { return {pid, fingerprint:"installed-compiled-module"} }\n'
-  await writeFile(join(input, 'kun', 'dist', 'services', 'process-identity.js'), bytes)
-  const archive = join(root, 'app.asar'); await createRequire(import.meta.url)('@electron/asar').createPackage(input, archive)
+  await writeFile(modulePath, bytes)
   const digest = createHash('sha256').update(await readFile(archive)).digest('hex')
-  const loaded = await loadWindowsStartupIdentity({ asarPath: archive, expectedAsarSha256: digest, directory: join(root, 'imported') })
+  const modulePin = { sha256: createHash('sha256').update(bytes).digest('hex'), bytes: Buffer.byteLength(bytes), source: 'controlled-compiled-fixture' }
+  return { root, input, archive, modulePath, metadata, bytes, digest, modulePin, asar }
+}
+
+test('diagnostic imports the real installed extraResource without an ASAR module entry', async t => {
+  const { loadWindowsStartupIdentity, windowsStartupIdentityModule } = await import('./run-windows-ui-smoke.mjs')
+  const fixture = await startupExtraResourceFixture(t)
+  assert.throws(() => fixture.asar.statFile(fixture.archive, join('kun', 'dist', 'services', 'process-identity.js')), /not found/)
+  const loaded = await loadWindowsStartupIdentity({ asarPath: fixture.archive, expectedAsarSha256: fixture.digest, directory: join(fixture.root, 'imported'), modulePin: fixture.modulePin })
   assert.deepEqual(await loaded.identity(7), { pid: 7, fingerprint: 'installed-compiled-module' })
-  assert.equal(loaded.proof.sha256, createHash('sha256').update(bytes).digest('hex'))
-  assert.equal(loaded.proof.entry, 'kun/dist/services/process-identity.js')
-  assert.equal(loaded.proof.packageSourceHead, pin.sourceHead)
-  await assert.rejects(loadWindowsStartupIdentity({ asarPath: archive, expectedAsarSha256: '0'.repeat(64), directory: join(root, 'wrong') }))
-  const unpacked = join(root, 'unpacked.asar')
-  await createRequire(import.meta.url)('@electron/asar').createPackageWithOptions(input, unpacked, { unpack: '**/process-identity.js' })
-  const unpackedDigest = createHash('sha256').update(await readFile(unpacked)).digest('hex')
-  await writeFile(join(unpacked + '.unpacked', 'kun', 'dist', 'services', 'process-identity.js'), bytes.replace('installed-compiled-module', 'tampered-compiled-module!'))
-  await assert.rejects(loadWindowsStartupIdentity({ asarPath: unpacked, expectedAsarSha256: unpackedDigest, directory: join(root, 'tampered') }), /integrity|regular ASAR/)
-  const wrongSource = join(root, 'wrong-source.asar')
-  await writeFile(join(input, 'package.json'), JSON.stringify({ name: 'workwise', productName: 'RailWise AI', version: pin.version, buildProvenance: { sourceHead: 'b'.repeat(40) } }))
-  await createRequire(import.meta.url)('@electron/asar').createPackage(input, wrongSource)
-  await assert.rejects(loadWindowsStartupIdentity({ asarPath: wrongSource, expectedAsarSha256: createHash('sha256').update(await readFile(wrongSource)).digest('hex'), directory: join(root, 'wrong-source') }))
+  assert.equal(loaded.proof.source, 'exact-installed-extra-resource')
+  assert.equal(loaded.proof.entry, 'app.asar.unpacked/kun/dist/services/process-identity.js')
+  assert.equal(loaded.proof.sha256, fixture.modulePin.sha256)
+  assert.equal(loaded.proof.importedSha256, fixture.modulePin.sha256)
+  assert.equal(loaded.proof.pinSource, fixture.modulePin.source)
+  assert.equal(loaded.proof.entryIntegritySha256, undefined, 'An extraResource must not claim ASAR header integrity')
+  assert.equal(loaded.proof.packageSourceHead, fixture.metadata.buildProvenance.sourceHead)
+  assert.deepEqual(windowsStartupIdentityModule, { sha256: '112ccee06a9e75ef68a3912a4b316606364dd36dd77404d3958a6d092be8f3ad', bytes: 3430, source: 'same-source-signed-Mac245' })
+  await loaded.verifyUnchanged()
+  await writeFile(fixture.modulePath, fixture.bytes.replace('installed-compiled-module', 'tampered-compiled-module!'))
+  await assert.rejects(loaded.verifyUnchanged(), /module pin/)
+})
+
+test('diagnostic refuses wrong ASAR, source, extraResource pin and path escape before import', async t => {
+  const { loadWindowsStartupIdentity } = await import('./run-windows-ui-smoke.mjs')
+  const { readFile, symlink } = await import('node:fs/promises')
+  const fixture = await startupExtraResourceFixture(t)
+  const options = { asarPath: fixture.archive, expectedAsarSha256: fixture.digest, directory: join(fixture.root, 'rejected-import'), modulePin: fixture.modulePin }
+  await assert.rejects(loadWindowsStartupIdentity({ ...options, expectedAsarSha256: '0'.repeat(64) }))
+  await assert.rejects(loadWindowsStartupIdentity({ ...options, modulePin: undefined }), /module pin/, 'The diagnostic defaults to the immutable signed-package pin')
+  await assert.rejects(loadWindowsStartupIdentity({ ...options, modulePin: { ...fixture.modulePin, sha256: '0'.repeat(64) } }), /module pin/)
+  const wrongSource = join(fixture.root, 'resources', 'wrong-source.asar')
+  await writeFile(join(fixture.input, 'package.json'), JSON.stringify({ ...fixture.metadata, buildProvenance: { sourceHead: 'b'.repeat(40) } }))
+  await fixture.asar.createPackage(fixture.input, wrongSource)
+  await assert.rejects(loadWindowsStartupIdentity({ ...options, asarPath: wrongSource, expectedAsarSha256: createHash('sha256').update(await readFile(wrongSource)).digest('hex') }))
+  const services = join(fixture.modulePath, '..'), outside = join(fixture.root, 'outside')
+  await mkdir(outside); await writeFile(join(outside, 'process-identity.js'), fixture.bytes)
+  await rm(services, { recursive: true }); await symlink(outside, services, process.platform === 'win32' ? 'junction' : 'dir')
+  await assert.rejects(loadWindowsStartupIdentity(options), /symbolic link|contained/)
 })
 
 async function startupCaseFixture({ identityResult, closeDuringIdentity = false, changedExecutable = false, exhausted = false, quickUnavailable = false } = {}) {
@@ -1941,22 +1970,4 @@ test('diagnostic quick identity retry receives only the remaining startup budget
   assert.deepEqual(attempts.slice(0, 2), [['identity', 77, 10000], ['identity', 77, 9000]])
   assert.equal(value.result.identity.verified, true)
   assert.equal(value.result.cleanup.verifiedBirth, true)
-})
-
-test('ASAR native lookup uses the platform separator while the receipt keeps its canonical entry', async t => {
-  const { default: path } = await import('node:path')
-  const { startupIdentityAsarPath } = await import('./run-windows-ui-smoke.mjs')
-  const asar = createRequire(import.meta.url)('@electron/asar')
-  const root = await mkdtemp(join(tmpdir(), 'native-asar-path-')); t.after(() => rm(root, { recursive: true, force: true }))
-  const input = join(root, 'input'); await mkdir(join(input, 'kun', 'dist', 'services'), { recursive: true })
-  await writeFile(join(input, 'kun', 'dist', 'services', 'process-identity.js'), 'controlled compiled fixture')
-  const archive = join(root, 'app.asar'); await asar.createPackage(input, archive)
-  // Use the real dependency with Win32 path primitives to exercise its lookup
-  // contract on a Mac host; the patch is synchronous and restored in finally.
-  const original = { dirname: path.dirname, basename: path.basename, sep: path.sep }
-  try {
-    Object.assign(path, { dirname: path.win32.dirname, basename: path.win32.basename, sep: path.win32.sep })
-    assert.throws(() => asar.statFile(archive, 'kun/dist/services/process-identity.js'), /not found/)
-    assert.ok(asar.statFile(archive, startupIdentityAsarPath(path.win32)).size > 0)
-  } finally { Object.assign(path, original) }
 })

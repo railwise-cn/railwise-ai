@@ -3014,6 +3014,10 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
 
 export const windowsStartupDiagnosticPackage = Object.freeze({ sourceHead: '245f00f776693685812ab3bb7f32088494c5eb65', version: '0.5.7',
   asarSha256: '2f2f733442f51c889d2bef5bccd491157f83045e38c8bb21c45f68fb26ea9b85' })
+// The same tsc output is copied unchanged into extraResources on both OSes.
+// This independent pin comes from the signed/notarized same-source Mac package.
+export const windowsStartupIdentityModule = Object.freeze({ sha256: '112ccee06a9e75ef68a3912a4b316606364dd36dd77404d3958a6d092be8f3ad',
+  bytes: 3430, source: 'same-source-signed-Mac245' })
 const startupArgv = ['daemon', 'start', '--foreground', '--session-idle', '30m']
 const startupPlans = [
   { label: 'A', options: { detached: true, windowsHide: true, shell: false, stdio: 'ignore' } },
@@ -3078,33 +3082,52 @@ async function readStartupVendorEvidence(home) {
   return output
 }
 
-export function startupIdentityAsarPath(pathApi = { join }) {
-  return pathApi.join('kun', 'dist', 'services', 'process-identity.js')
-}
-
-/** Import the exact bytes from the verified installed ASAR, never a new TS probe. */
-export async function loadWindowsStartupIdentity({ asarPath, expectedAsarSha256, directory }) {
+/** Import the pinned installed extraResource, never a new TS probe or ASAR entry. */
+export async function loadWindowsStartupIdentity({ asarPath, expectedAsarSha256, directory, modulePin = windowsStartupIdentityModule }) {
+  const resources = dirname(asarPath), resourceRoot = await realpath(resources)
+  assert.ok((await lstat(resources)).isDirectory() && !(await lstat(resources)).isSymbolicLink(), 'Resources must be a regular directory')
+  assert.ok((await lstat(asarPath)).isFile() && !(await lstat(asarPath)).isSymbolicLink(), 'ASAR must be a regular file')
+  assert.ok(contained(resourceRoot, await realpath(asarPath)), 'ASAR must be contained in installed resources')
   const archive = await readFile(asarPath)
   assert.equal(createHash('sha256').update(archive).digest('hex'), expectedAsarSha256)
   const metadata = JSON.parse(asar.extractFile(asarPath, 'package.json').toString())
   const pinned = installIdentity(windowsStartupDiagnosticPackage.version, windowsStartupDiagnosticPackage.sourceHead)
   assert.equal(metadata.buildProvenance?.sourceHead, pinned.sourceHead); assert.equal(metadata.version, pinned.version)
   assert.equal(metadata.productName, pinned.productName); assert.equal(metadata.name, pinned.packageName)
-  const entry = 'kun/dist/services/process-identity.js', nativeEntry = startupIdentityAsarPath()
-  const stat = asar.statFile(asarPath, nativeEntry), bytes = asar.extractFile(asarPath, nativeEntry)
-  assert.ok(!stat.link && stat.size === bytes.length, 'The compiled identity entry must be a regular ASAR file')
-  assert.ok(bytes.length > 0 && bytes.length < 65536)
-  const sha256 = createHash('sha256').update(bytes).digest('hex')
-  if (stat.unpacked || stat.integrity) {
-    assert.equal(stat.integrity?.algorithm, 'SHA256'); assert.equal(stat.integrity.hash, sha256, 'Compiled identity bytes must match the ASAR integrity header')
+  const parts = ['app.asar.unpacked', 'kun', 'dist', 'services', 'process-identity.js'], entry = parts.join('/')
+  const sourcePath = join(resources, ...parts)
+  const readModule = async () => {
+    let path = resources
+    for (const [index, part] of parts.entries()) {
+      path = join(path, part)
+      const stat = await lstat(path)
+      assert.ok(!stat.isSymbolicLink(), 'The installed identity path must not contain a symbolic link')
+      assert.ok(index === parts.length - 1 ? stat.isFile() : stat.isDirectory(), 'The identity extraResource must be a regular file')
+      if (index === parts.length - 1) assert.equal(stat.size, modulePin.bytes, 'Installed identity module pin size mismatch')
+      assert.ok(contained(resourceRoot, await realpath(path)), 'The identity extraResource must be contained in installed resources')
+    }
+    const bytes = await readFile(sourcePath)
+    assert.equal(bytes.length, modulePin.bytes, 'Installed identity module pin size mismatch')
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), modulePin.sha256, 'Installed identity module pin hash mismatch')
+    return bytes
   }
+  const bytes = await readModule(), sourceRealPath = await realpath(sourcePath)
+  const sha256 = createHash('sha256').update(bytes).digest('hex')
   await mkdir(directory, { recursive: true })
   await writeFile(join(directory, 'package.json'), '{"type":"module"}', { flag: 'wx' })
   const path = join(directory, 'process-identity.js'); await writeFile(path, bytes, { flag: 'wx' })
   assert.equal(createHash('sha256').update(await readFile(path)).digest('hex'), sha256)
   const module = await import(pathToFileURL(path).href)
   assert.equal(typeof module.processIdentityAsync, 'function')
-  return { identity: module.processIdentityAsync, proof: { entry, sha256, importedSha256: sha256, entryIntegritySha256: stat.integrity?.hash, unpacked: stat.unpacked === true, asarSha256: expectedAsarSha256, path, source: 'exact-installed-asar', packageSourceHead: metadata.buildProvenance.sourceHead, version: metadata.version } }
+  const verifyUnchanged = async () => {
+    await readModule()
+    assert.equal(await realpath(sourcePath), sourceRealPath)
+    assert.equal(createHash('sha256').update(await readFile(path)).digest('hex'), sha256)
+  }
+  await verifyUnchanged()
+  return { identity: module.processIdentityAsync, verifyUnchanged, proof: { entry, sha256, bytes: bytes.length, importedSha256: sha256,
+    pinSource: modulePin.source, asarSha256: expectedAsarSha256, path, sourcePath, sourceRealPath,
+    source: 'exact-installed-extra-resource', packageSourceHead: metadata.buildProvenance.sourceHead, version: metadata.version } }
 }
 
 function observeStartupIdentityProbe(pid, records, now = Date.now) {
@@ -3254,6 +3277,7 @@ export async function runWindowsBrowserStartupDiagnostic({ executable, version, 
       return { ...summary, collected: result.exitCode === 0 && !result.childStillLive, processCount: data.processCount, handlerRegistered: data.handlerRegistered, handlerError: data.handlerError }
     } catch { return { ...summary, collected: false, spawnError: result.spawnError } }
   } })
+  await loaded.verifyUnchanged()
   const after = inspectInstalledPackage(dirname(executable), installIdentity(version, sourceHead)); assert.equal(after.asarSha256, installed.asarSha256)
   const report = { schemaVersion: 1, scope: 'private-exact-package-browser-startup-diagnostic', ...result, sourceHead, version,
     provenance, installedAsarSha256: installed.asarSha256, identityModule: loaded.proof, cli,
