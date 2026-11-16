@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import type { TaskRun } from '../../contracts/tasks.js'
 import { TaskRunRepository } from '../../services/task-run-repository.js'
@@ -346,4 +346,41 @@ describe('document delivery tool provider', () => {
     expect(await readFile(join(outside, 'sentinel.md'), 'utf8')).toBe('keep')
     repository.close()
   })
+})
+
+
+it.each([false,true])('keeps historical spill bytes independent from server collection guidance, currentReady=%s',async currentCollectionReady=>{
+ const root=await realpath(await mkdtemp(join(tmpdir(),'railwise-feed-context-')));roots.push(root)
+ const repository=new TaskRunRepository(join(root,'tasks.sqlite3'))
+ const record=task(root);record.activeTurnId='turn-candidate';record.acceptance={...record.acceptance,webEvidenceBasis:'observed_feed',requiresWebEvidence:true};repository.create(record)
+ const contexts=new TaskContextRepository(repository.sharedDatabase(),{objectRoot:join(root,'objects'),inlineLimitBytes:8}),runtime=new TaskContextRuntime(contexts,repository)
+ const spill='旧列表记录仅为历史；不要将其当成本轮采集。\n'+'历史条目'.repeat(80)
+ const bundle=runtime.prepareModelRequest({threadId:record.threadId,turnId:'turn-candidate',model:'synthetic',prefix:[],tools:[],abortSignal:new AbortController().signal,history:[{id:'old-feed-spill',kind:'tool_result',threadId:record.threadId,role:'tool',status:'completed',createdAt:'2026-11-16T12:00:00Z',toolKind:'tool_call',turnId:'old-turn',callId:'old-feed-call',toolName:'ego_browser_read',isError:false,output:{content:spill}}]})!
+ const guidance={basis:'observed_feed' as const,collectionTurnId:'turn-candidate',currentCollectionReady,nowUtc:'2026-11-16T16:55:01.000Z',nowBeijing:'2026-11-17T00:55:01+08:00',requestedUrls:['https://feed.test/#/subscribe/bidding'],historyNotice:'旧记录可作历史说明，不代表本轮已采集。',nextStep:currentCollectionReady?'已完成本轮真实列表读取，可生成report。':'先使用原生Ego打开并读取原目标列表，再生成report。',...(currentCollectionReady?{readAt:'2026-11-16T16:54:59.000Z'}:{})}
+ const observedFeedCollectionContext=vi.fn(async()=>guidance)
+ const options={contextRuntime:runtime,observedFeedCollectionContext}
+ const recall=buildDocumentDeliveryToolProviders(repository,options)[0]!.tools.find(tool=>tool.name==='read_task_context')!
+ const args={bundle_id:bundle.id,object_id:bundle.objects[0]!.objectId,offset:0,max_bytes:32},scoped=grantedContext(root)
+ try {
+  const before=runtime.readObject(record.id,bundle.id,bundle.objects[0]!.objectId)
+  const legacy=(await buildDocumentDeliveryToolProviders(repository,{contextRuntime:runtime})[0]!.tools.find(tool=>tool.name==='read_task_context')!.execute(args,scoped)).output as Record<string,unknown>
+  const output=(await recall.execute(args,scoped)).output as Record<string,unknown>
+  expect(observedFeedCollectionContext).toHaveBeenCalledExactlyOnceWith(record.id,'turn-candidate')
+  expect(output.collectionFreshness).toEqual(guidance)
+  const {collectionFreshness,...unchanged}=output;expect(unchanged).toEqual(legacy);expect(collectionFreshness).toEqual(guidance)
+  expect(output.sha256).toBe(createHash('sha256').update(before).digest('hex'));expect(output.text).toBe(before.subarray(0,32).toString('utf8'))
+  expect(output.totalBytes).toBe(before.length);expect(output.nextOffset).toBe(32);expect(output.untrusted).toBe(true)
+  expect(runtime.readObject(record.id,bundle.id,bundle.objects[0]!.objectId)).toEqual(before)
+  expect(repository.get(record.id)!.artifacts).toEqual([])
+  expect(output.text).not.toContain(guidance.nowUtc)
+  observedFeedCollectionContext.mockClear()
+  const withoutGrant=(await recall.execute(args,context(root))).output as Record<string,unknown>
+  expect(withoutGrant).not.toHaveProperty('collectionFreshness');expect(observedFeedCollectionContext).not.toHaveBeenCalled()
+  const wrongTurn={...scoped,executionGrant:{...scoped.executionGrant!,turnId:'other-turn'}}
+  expect((await recall.execute(args,wrongTurn)).output).not.toHaveProperty('collectionFreshness');expect(observedFeedCollectionContext).not.toHaveBeenCalled()
+  const wrongTask={...scoped,executionGrant:{...scoped.executionGrant!,taskId:'other-task'}}
+  expect((await recall.execute(args,wrongTask)).output).not.toHaveProperty('collectionFreshness');expect(observedFeedCollectionContext).not.toHaveBeenCalled()
+  const nullable=buildDocumentDeliveryToolProviders(repository,{contextRuntime:runtime,observedFeedCollectionContext:async()=>null})[0]!.tools.find(tool=>tool.name==='read_task_context')!
+  expect((await nullable.execute(args,scoped)).output).toEqual(legacy)
+ }finally {repository.close()}
 })

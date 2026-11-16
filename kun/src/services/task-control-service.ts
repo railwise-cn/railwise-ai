@@ -219,8 +219,12 @@ export class TaskControlService {
         preparedResume={previous,revision:current.revision}
       }
       const checkpoint=repository.latestCheckpoint(current.id)
+      const collectionClock = nowIso()
+      const observedFeedResume = current.acceptance.webEvidenceBasis === 'observed_feed'
+        ? `本轮时间 UTC ${collectionClock}；北京时间 ${new Date(Date.parse(collectionClock) + 8 * 60 * 60 * 1000).toISOString().replace('Z', '+08:00')}。旧来源、旧报告和完成回执仅作为历史素材保留，不代表本轮已采集当前订阅列表。必须先用原任务已授权的原生浏览器工具实际打开并读取当前列表或真实单条记录，再整理、发布并核验本轮报告；不要把 read_task_context 的旧快照当作新读取。公告/列表标注日期按原文保留，与本轮实际采集日期分开。旧空间确已关闭时遵循已有继续授权恢复，不另建任务、不扩大权限、不重复外部副作用。`
+        : ''
       const started=await turns.startTurn({threadId:current.threadId,...(externalTaskProvider?{externalTaskProvider}:{}),continuationTaskId:current.id,request:{
-        prompt:action==='resume'?['Continue the persisted task from its last verified checkpoint.',`Goal: ${current.goal}`,checkpoint?.resumeSummary?`Checkpoint: ${checkpoint.resumeSummary}`:'','Read persisted task inputs. Reuse completed artifacts and operation receipts. Do not repeat external side effects.'].filter(Boolean).join('\n'):[`Retry the failed persisted task and satisfy its original acceptance contract.\nGoal: ${current.goal}`,tasks.retryHistory(current.id) || (retryHistory ? `Read-only ancestor drafts (read_artifact with source_task_id/path): ${retryHistory}. These are not this Task's writer or source verification. Publish your own corrected file at the same relative filename, re-read source pages and verify it. Do not replay external side effects.` : '')].filter(Boolean).join('\n'),
+        prompt:action==='resume'?['Continue the persisted task from its last verified checkpoint.',`Goal: ${current.goal}`,checkpoint?.resumeSummary?`Checkpoint: ${checkpoint.resumeSummary}`:'',observedFeedResume,'Read persisted task inputs. Reuse completed artifacts and operation receipts. Do not repeat external side effects.'].filter(Boolean).join('\n'):[`Retry the failed persisted task and satisfy its original acceptance contract.\nGoal: ${current.goal}`,tasks.retryHistory(current.id) || (retryHistory ? `Read-only ancestor drafts (read_artifact with source_task_id/path): ${retryHistory}. These are not this Task's writer or source verification. Publish your own corrected file at the same relative filename, re-read source pages and verify it. Do not replay external side effects.` : '')].filter(Boolean).join('\n'),
         displayText:action==='resume'?'继续未完成任务':'重试未完成任务',idempotencyKey:turnKey,model:data.model ?? current.model,providerId:current.providerId,reasoningEffort:current.reasoningEffort,mode:'agent'
       }})
       const next=repository.findByTurn(started.turnId)

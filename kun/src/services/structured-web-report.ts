@@ -21,7 +21,15 @@ const fieldOrder = ['title', 'publication_date', 'budget', 'deadline', 'status',
 export function renderStructuredWebReport(path: string, value: StructuredWebReport, basis?: 'primary_document' | 'observed_feed') {
   const feed = basis === 'observed_feed'
   const report = StructuredWebReportSchema.parse(value)
-  const verificationInput = WebArtifactEvidenceInputSchema.parse({ path, ...report.evidence })
+  const evidence = feed ? { ...report.evidence, items: report.evidence.items.map(item => {
+    if (item.fields.some(field => field.field === 'title')) return item
+    // The required name must appear in both the page and its candidate manifest.
+    // This proposes literal evidence; the authenticated same-record check still decides truth.
+    const quote = item.title.length >= 12 ? item.title : item.fields.find(field => field.quote.includes(item.title))?.quote
+    if (!quote) throw Object.assign(new Error('订阅记录标题较短，请提供同一记录中包含完整标题的原文 title quote（至少12个字符）。'), { code: 'artifact_title_quote_required' })
+    return { ...item, fields: [{ field: 'title' as const, value: item.title, quote }, ...item.fields] }
+  }) } : report.evidence
+  const verificationInput = WebArtifactEvidenceInputSchema.parse({ path, ...evidence })
   const sourceLinks = verificationInput.coverage.map(source => `<a href="${escape(source.url)}">${escape(new URL(source.url).hostname)}</a>`).join('')
   const cards = verificationInput.items.map(item => {
     const fields = [...item.fields].sort((a, b) => fieldOrder.indexOf(a.field) - fieldOrder.indexOf(b.field)).map(field => `<div class="field"><dt>${escape(feed && field.field === 'publication_date' ? '列表标注日期' : feed && field.field === 'other' ? '匹配依据（列表原文）' : labels[field.field]!)}</dt><dd><span data-evidence-field="${field.field}">${escape(evidenceDisplayText(field.value))}</span></dd></div>`).join('')

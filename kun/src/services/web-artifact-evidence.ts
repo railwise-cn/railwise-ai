@@ -53,7 +53,80 @@ function nodes(html: string): HtmlNode[] | undefined {
 }
 const inside = (node: HtmlNode, parent: HtmlNode) => node.start > parent.start && node.end <= parent.end
 
-type Source = { receiptId: string; receiptHash: string; turnId: string; url: string; resultHash: string; content: string; title?: string; full: boolean; feedElement?: boolean; loadingObserved?: boolean; emptyObserved?: boolean; readAt: string }
+type Source = { receiptId: string; receiptHash: string; turnId: string; url: string; resultHash: string; content: string; title?: string; full: boolean; feedElement?: boolean; loadingObserved?: boolean; emptyObserved?: boolean; startedAt: string; readAt: string }
+export type ObservedFeedCollectionFreshness = {
+  basis: 'observed_feed'; collectionTurnId: string; currentCollectionReady: boolean
+  nowUtc: string; nowBeijing: string; requestedUrls: string[]; historyNotice: string; nextStep: string; readAt?: string
+}
+
+/** Authority comes from the persisted user control/input path, never a model-selected epoch. */
+function collectionAuthority(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[]): { epoch: string; notBefore: number } | undefined {
+  const turn = turns.find(row => row.id === task.activeTurnId)
+  if (!turn?.executionGrant || turn.executionGrant.taskId !== task.id || turn.executionGrant.threadId !== task.threadId || turn.executionGrant.turnId !== turn.id) return undefined
+  const candidates: Array<{ epoch: string; notBefore: number }> = []
+  const initial = repository.execution.attempts(task.id)[0]?.turnId ?? turns.find(row => row.executionGrant?.taskId === task.id)?.id
+  if (initial === turn.id) candidates.push({ epoch: `initial:${task.id}:${turn.id}`, notBefore: Date.parse(task.createdAt) })
+  const seen = new Set<string>(); let owner: TaskRun | null = task
+  while (owner && !seen.has(owner.id)) {
+    seen.add(owner.id)
+    if (repository.currentExecution(owner.id)?.id !== task.id) break
+    for (const receipt of repository.operations(owner.id, 'resume')) {
+      const result = object(receipt.result), resumed = object(result.task), started = object(result.turn)
+      if (receipt.status === 'succeeded' && receipt.fingerprint === operationFingerprint(receipt.request) && receipt.request?.idempotencyKey === receipt.idempotencyKey &&
+        turn.idempotencyKey === `task:${owner.id}:resume:${receipt.idempotencyKey}` && result.capability === undefined &&
+        resumed.id === task.id && resumed.threadId === task.threadId && started.threadId === task.threadId && started.turnId === turn.id &&
+        typeof started.userMessageItemId === 'string' && started.userMessageItemId) candidates.push({ epoch: `resume:${receipt.id}`, notBefore: Date.parse(receipt.createdAt) })
+    }
+    owner = owner.retryOfTaskId ? repository.get(owner.retryOfTaskId) : null
+  }
+  // A genuinely delivered user supplement may begin a new collection within a Turn.
+  // Recalling history, capability-original input and automatic re-prompts cannot.
+  const deliveries = repository.execution.deliveriesForThread(task.threadId)
+  for (const input of repository.inputs(task.id)) {
+    if (input.kind !== 'supplement' || input.sourceId) continue
+    const message = items.find(item => item.kind === 'user_message' && item.turnId === turn.id && item.threadId === task.threadId && item.taskInputId === input.id && item.text === input.text)
+    if (message && deliveries.some(delivery => {
+      if (delivery.taskId !== task.id || delivery.inputId !== input.id || delivery.status === 'queued' || delivery.messageItemId !== message.id || !delivery.sessionHash) return false
+      const group = deliveries.filter(row => row.taskId === task.id && row.status !== 'queued' && row.sessionHash === delivery.sessionHash && row.sessionItemId === delivery.sessionItemId)
+      const included = items.filter(item => group.some(row => row.messageItemId === item.id))
+      return included.length === group.length && included.at(-1)?.id === delivery.sessionItemId && hash(JSON.stringify(included)) === delivery.sessionHash
+    })) {
+      candidates.push({ epoch: `input:${input.id}:${turn.id}`, notBefore: Date.parse(message.createdAt) })
+    }
+  }
+  return candidates.filter(row => Number.isFinite(row.notBefore)).sort((a, b) => b.notBefore - a.notBefore)[0]
+}
+
+function actualCollectionRead(source: Source): boolean {
+  const clean = markup(source.content), visible = text(clean)
+  return Boolean((source.full || source.feedElement) && !source.loadingObserved && !source.emptyObserved && visible &&
+    !/aria-busy\s*=\s*["']true/i.test(clean) && !/^(?:(?:页面|数据)?(?:加载中|正在加载)|请稍[候等]|loading)[.。…!！,，]*(?:请稍[候等])?[.。…!！]*$/i.test(visible))
+}
+
+function collectionSources(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], history: Source[]) {
+  if (!isObservedFeedReport(task)) return { available: history, epoch: undefined }
+  const authority = collectionAuthority(repository, task, items, turns)
+  const available = history.filter(source => source.turnId === task.activeTurnId && (!authority || Date.parse(source.startedAt) >= authority.notBefore))
+  const actual = available.some(actualCollectionRead)
+  return { available, epoch: actual ? authority?.epoch : undefined }
+}
+
+export function observedFeedCollectionFreshness(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], allowedOrigins: readonly string[] = [], nowIso = new Date().toISOString()): ObservedFeedCollectionFreshness | null {
+  if (!isObservedFeedReport(task) || !task.activeTurnId) return null
+  const { available } = collectionSources(repository, task, items, turns, sources(repository, task, items, turns))
+  const actual = available.filter(actualCollectionRead)
+  const requestedUrls = [...new Set([...task.goal.matchAll(/https?:\/\/[^\s<>"'`）)，。]+/gi)].flatMap(match => {
+    try { const url = new URL(match[0]); return !url.username && !url.password && allowedOrigins.includes(url.origin) ? [url.href] : [] } catch { return [] }
+  }))]
+  const required = task.acceptance.requiredSourceOrigins?.length ? task.acceptance.requiredSourceOrigins
+    : requestedUrls.length ? [...new Set(requestedUrls.map(url => new URL(url).origin))] : allowedOrigins
+  const covered = new Set(actual.map(source => new URL(source.url).origin))
+  return { basis: 'observed_feed', collectionTurnId: task.activeTurnId, currentCollectionReady: required.length > 0 && required.every(origin => covered.has(origin)),
+    nowUtc: nowIso, nowBeijing: new Date(Date.parse(nowIso) + 8 * 60 * 60 * 1000).toISOString().replace('Z', '+08:00'), requestedUrls,
+    ...(actual.length ? { readAt: actual.map(source => source.readAt).sort().at(-1) } : {}),
+    historyNotice: '此前读取和成果保留为历史素材；回看旧内容不代表本轮已采集当前列表。',
+    nextStep: '先用原任务已授权的原生浏览器工具打开并完整读取当前订阅列表或真实单条记录，再整理、发布并核验本轮报告。旧空间确已关闭时，仅按已有用户继续授权恢复；不要另建任务或扩大权限。' }
+}
 // Only independently validated loaded-response metadata has a title. Legacy DOM reads
 // without metadata may coexist; two actual metadata identities for the same bytes may not.
 function findSource(available: Source[], reference: WebSourceReference): Source | undefined {
@@ -93,11 +166,12 @@ function feedRecord(source: Source | undefined, discovery: Source | undefined, i
   }
   return undefined
 }
-export type WebArtifactEvidenceAssessment = { complete: boolean; reasons: string[]; sourceReceipts: Array<Omit<Source, 'content'>> }
+export type WebArtifactEvidenceAssessment = { complete: boolean; reasons: string[]; sourceReceipts: Array<Omit<Source, 'content' | 'startedAt'>> }
 export type WebArtifactSourceGate = {
   ready: boolean; missingOrigins: string[]; evidenceFingerprint: string
   failureEvidenceFingerprints: Record<string, string>
   reportManifestRequired: boolean
+  collectionFreshness?: ObservedFeedCollectionFreshness
   nextReads: Array<{ origin: string; url: string; discovery: WebSourceReference }>
 }
 
@@ -108,21 +182,27 @@ function actualZeroMatch(task: TaskRun, source: Source | undefined, entry: WebAr
 
 /** Publication readiness reuses the exact authenticated read extractor; it never verifies a report. */
 export function webArtifactPublicationReadiness(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], input?: WebArtifactEvidenceInput, allowedOrigins: string[] = [], progressInputs: readonly WebArtifactEvidenceInput[] = []): WebArtifactSourceGate {
-  const available = sources(repository, task, items, turns)
-  const evidenceFingerprint = operationFingerprint([...new Set(available.map(source => JSON.stringify({ url: source.url, resultHash: source.resultHash, full: source.full, title: source.title, ...(source.feedElement ? { feedElement: true } : {}) })))].sort())
+  const history = sources(repository, task, items, turns), { available, epoch } = collectionSources(repository, task, items, turns, history)
+  const baseline = isObservedFeedReport(task) && !epoch ? repository.operations(task.id).reverse().find(receipt =>
+    ['web_artifact_evidence', 'web_artifact_source_gate'].includes(receipt.kind) && receipt.status === 'failed' && receipt.fingerprint === operationFingerprint(receipt.request) &&
+    receipt.request?.requirementHash === webArtifactRequirementHash(task) && /^[a-f0-9]{64}$/.test(String(receipt.request.evidenceFingerprint)) && object(receipt.result).complete === false)?.request : undefined
+  const material = (pool: Source[]) => [...new Set(pool.map(source => JSON.stringify({ url: source.url, resultHash: source.resultHash, full: source.full, title: source.title, ...(source.feedElement ? { feedElement: true } : {}) })))].sort()
+  // Preserve the exact old fingerprint until an authorized collection has a real read.
+  // Neither loading this version nor a receipt with the same bytes can reset a stall.
+  const evidenceFingerprint = epoch ? operationFingerprint({ collection: epoch, sources: material(available.filter(actualCollectionRead)) }) : typeof baseline?.evidenceFingerprint === 'string' ? baseline.evidenceFingerprint : operationFingerprint(material(history))
   const required = task.acceptance.requiredSourceOrigins?.length ? task.acceptance.requiredSourceOrigins
-    : [...new Set((input ? input.coverage : available).map(source => new URL(source.url).origin))]
+    : [...new Set((input ? input.coverage : history).map(source => new URL(source.url).origin))]
   const covered = new Set<string>(), primary = needsPrimaryWebDocuments(task), feed = isObservedFeedReport(task)
   const qualifying = new Map<string, Set<string>>()
   const remember = (source: Source) => {
     const origin = new URL(source.url).origin
     const proofs = qualifying.get(origin) ?? new Set<string>()
-    proofs.add(JSON.stringify({ url: source.url, resultHash: source.resultHash, full: source.full, title: source.title, ...(source.feedElement ? { feedElement: true } : {}) }))
+    proofs.add(JSON.stringify({ url: source.url, resultHash: source.resultHash, full: source.full, title: source.title, ...(source.feedElement ? { feedElement: true } : {}), ...(epoch ? { collection: epoch } : {}) }))
     qualifying.set(origin, proofs)
   }
-  const find = (reference: WebSourceReference) => findSource(available, reference)
   const explicitlyRequested = (source: Source) => [...task.goal.matchAll(/https?:\/\/[^\s<>"'）)，。]+/gi)].some(match => canonical(match[0]) === source.url)
-  const qualify = (proof: WebArtifactEvidenceInput, accept: (source: Source) => void) => {
+  const qualify = (proof: WebArtifactEvidenceInput, accept: (source: Source) => void, pool = available) => {
+    const find = (reference: WebSourceReference) => findSource(pool, reference)
     if (!primary && !feed) for (const reference of proof.coverage) {
       const source = find(reference)
       if (source?.full) accept(source)
@@ -148,11 +228,12 @@ export function webArtifactPublicationReadiness(repository: TaskRunRepository, t
   // Recompute progress from authenticated source bytes and trusted prior typed
   // declarations. Dropping a manifest or changing its path cannot roll back a
   // completed source repair. This union never supplies current report coverage.
-  for (const prior of progressInputs) qualify(prior, remember)
+  if (isObservedFeedReport(task) && !epoch && input) qualify(input, remember, history)
+  for (const prior of progressInputs) qualify(prior, remember, epoch ? available : history)
   const missingOrigins = required.filter(origin => !covered.has(origin))
   const nextReads: WebArtifactSourceGate['nextReads'] = []
   const seen = new Set<string>()
-  for (const discovery of available) for (const url of links(discovery.content, discovery.url)) {
+  for (const discovery of history) for (const url of links(discovery.content, discovery.url)) {
     const origin = new URL(url).origin
     if (!missingOrigins.includes(origin) || !allowedOrigins.includes(origin) || seen.has(url) || nextReads.length >= 20) continue
     seen.add(url); nextReads.push({ origin, url, discovery: { url: discovery.url, resultHash: discovery.resultHash } })
@@ -160,14 +241,17 @@ export function webArtifactPublicationReadiness(repository: TaskRunRepository, t
   // A source deficit can advance only through the same primary/zero-match
   // predicate that actually covers that origin. Raw observations, truncated
   // lists, unrelated full pages and another origin's progress are not repairs.
-  const failureEvidenceFingerprints = Object.fromEntries(required.map(origin => [
+  let failureEvidenceFingerprints = Object.fromEntries(required.map(origin => [
     `source_origin:${origin}`, operationFingerprint([...(qualifying.get(origin) ?? [])].sort())
   ]))
   const qualifiedFingerprint = operationFingerprint(required.flatMap(origin => [...(qualifying.get(origin) ?? [])]).sort())
   failureEvidenceFingerprints.source_manifest_required = qualifiedFingerprint
   failureEvidenceFingerprints.source_read_required = qualifiedFingerprint
+  const preserved = object(baseline?.failureEvidenceFingerprints)
+  if (Object.keys(preserved).length && Object.values(preserved).every(value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value))) failureEvidenceFingerprints = preserved as Record<string, string>
+  const collectionFreshness = observedFeedCollectionFreshness(repository, task, items, turns, allowedOrigins)
   return { ready: required.length > 0 && missingOrigins.length === 0, missingOrigins, evidenceFingerprint,
-    failureEvidenceFingerprints, nextReads, reportManifestRequired: (primary || feed) && !input }
+    failureEvidenceFingerprints, nextReads, reportManifestRequired: (primary || feed) && !input, ...(collectionFreshness ? { collectionFreshness } : {}) }
 }
 
 /** Canonical validator failures exclude model-chosen section IDs and artifact byte churn. */
@@ -258,14 +342,16 @@ function sources(repository: TaskRunRepository, task: TaskRun, items: TurnItem[]
     if (!resultHash || !/^[a-f0-9]{64}$/i.test(resultHash)) continue
     if (typeof output.html === 'string' && hash(output.html) !== resultHash) continue
     const full = ego && output.readScope === 'document' || item.toolName === 'browser_get_html' && output.sourceKind === 'actual_loaded_response' && validLoadedResponseEvidence(output, grant) || web && output.truncated === false || item.toolName === 'browser_get_html' && output.truncated === false && (output.readScope === 'document' || output.readScope === undefined && /<html\b/i.test(content) && /<body\b/i.test(content) && /<\/html\s*>/i.test(content))
-    result.push({ receiptId: receipt.id, receiptHash: operationFingerprint({ request: receipt.request, status: receipt.status, result: receipt.result }), turnId: item.turnId, url, resultHash, content, ...(loadedResponse && typeof output.title === 'string' ? { title: output.title } : {}), full, ...(ego && output.readScope === 'element' ? { feedElement: true } : {}), ...(ego && output.loadingObserved === true ? { loadingObserved: true } : {}), ...(ego && output.emptyObserved === true ? { emptyObserved: true } : {}), readAt: receipt.updatedAt })
+    result.push({ receiptId: receipt.id, receiptHash: operationFingerprint({ request: receipt.request, status: receipt.status, result: receipt.result }), turnId: item.turnId, url, resultHash, content, ...(loadedResponse && typeof output.title === 'string' ? { title: output.title } : {}), full, ...(ego && output.readScope === 'element' ? { feedElement: true } : {}), ...(output.loadingObserved === true ? { loadingObserved: true } : {}), ...(output.emptyObserved === true ? { emptyObserved: true } : {}), startedAt: receipt.createdAt, readAt: receipt.updatedAt })
   }
   return result
 }
 
 /** Private publication manifests may refer only to this task's authenticated source bytes. */
-export function webArtifactManifestSourceProof(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], input: WebArtifactEvidenceInput) {
-  const available = sources(repository, task, items, turns), used = new Map<string, Source>()
+export function webArtifactManifestSourceProof(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], input: WebArtifactEvidenceInput, sealedProof?: unknown) {
+  const history = sources(repository, task, items, turns), used = new Map<string, Source>()
+  const available = sealedProof === undefined ? collectionSources(repository, task, items, turns, history).available
+    : history.filter(source => Array.isArray(sealedProof) && sealedProof.some(proof => object(proof).receiptId === source.receiptId && object(proof).receiptHash === source.receiptHash))
   const references = [...input.coverage, ...input.items.flatMap(item => [item.source, item.discovery]), ...input.noMatches.map(entry => entry.source)]
   for (const reference of references) {
     const source = findSource(available, reference)
@@ -276,7 +362,8 @@ export function webArtifactManifestSourceProof(repository: TaskRunRepository, ta
 }
 
 export function assessWebArtifactEvidence(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], html: string, input: WebArtifactEvidenceInput, nowIso = new Date().toISOString()): WebArtifactEvidenceAssessment {
-  const reasons: string[] = [], used = new Map<string, Source>(), available = sources(repository, task, items, turns), artifactLinks = links(html)
+  const reasons: string[] = [], used = new Map<string, Source>(), history = sources(repository, task, items, turns),
+    available = collectionSources(repository, task, items, turns, history).available, artifactLinks = links(html)
   const find = (reference: WebSourceReference) => {
     const source = findSource(available, reference)
     if (!source) reasons.push(`来源没有匹配的可信读取回执：${reference.url}`)
@@ -369,16 +456,17 @@ export function assessWebArtifactEvidence(repository: TaskRunRepository, task: T
       reasons.push('正式数据区存在未绑定字段证据的正文；请将事实放入已声明 data-evidence-field 或保留为区外未核验说明。')
     }
   }
-  return { complete: reasons.length === 0, reasons: [...new Set(reasons)].slice(0, 30), sourceReceipts: [...used.values()].map(({ content: _content, ...source }) => source) }
+  return { complete: reasons.length === 0, reasons: [...new Set(reasons)].slice(0, 30), sourceReceipts: [...used.values()].map(({ content: _content, startedAt: _startedAt, ...source }) => source) }
 }
 
 export function verifiedWebArtifactEvidence(repository: TaskRunRepository, task: TaskRun, artifact: TaskArtifact, writerReceiptId: string): OperationReceipt | undefined {
   return repository.operations(task.id, 'web_artifact_evidence').reverse().find(receipt => receipt.status === 'succeeded' && receipt.fingerprint === operationFingerprint(receipt.request) && receipt.request?.artifactHash === artifact.sha256 &&
+    (!isObservedFeedReport(task) || receipt.request?.turnId === task.activeTurnId) &&
     receipt.request?.artifactPath === (artifact.absolutePath ?? artifact.relativePath) && receipt.request.writerReceiptId === writerReceiptId &&
     receipt.request.requirementHash === webArtifactRequirementHash(task) && object(receipt.result).complete === true &&
     Array.isArray(object(receipt.result).sourceReceipts) && (object(receipt.result).sourceReceipts as Array<Record<string, unknown>>).every(reference => {
       const source = repository.operations(task.id, 'tool').find(source => source.id === reference.receiptId)
-      return source?.status === 'succeeded' && operationFingerprint({ request: source.request, status: source.status, result: source.result }) === reference.receiptHash
+      return source?.status === 'succeeded' && (!isObservedFeedReport(task) || source.request?.turnId === task.activeTurnId) && operationFingerprint({ request: source.request, status: source.status, result: source.result }) === reference.receiptHash
     }))
 }
 

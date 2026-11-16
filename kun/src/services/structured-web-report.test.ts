@@ -51,3 +51,29 @@ it('normalizes source entity representation once, then safely escapes visible fi
   expect(rendered.content).not.toContain('R&amp;amp;D')
   expect(rendered.verificationInput.items[0]!.fields[0]!.value).toBe('R&amp;D工程监测服务项目公开招标公告')
 })
+
+it('renders a feed item name and proposes literal title evidence from the required title without attesting it', () => {
+  const value = report(); value.evidence.items[0]!.fields.shift()
+  const original = structuredClone(value)
+  const rendered = renderStructuredWebReport('feed.html', value, 'observed_feed')
+  const item = rendered.verificationInput.items[0]!
+  expect(rendered.content).toContain(`data-evidence-field="title">${item.title}</span>`)
+  expect(item.fields.find(field => field.field === 'title')).toEqual({ field: 'title', value: item.title, quote: item.title })
+  expect(value).toEqual(original)
+  expect(rendered).not.toHaveProperty('complete')
+  expect(rendered).not.toHaveProperty('verified')
+})
+
+it('keeps explicit title quotes and the legacy primary-document manifest unchanged', () => {
+  const value = report(); value.evidence.items[0]!.fields[0]!.quote = `项目名称：${value.evidence.items[0]!.title}，详见公告。`
+  expect(renderStructuredWebReport('feed.html', value, 'observed_feed').verificationInput).toEqual({ path: 'feed.html', ...value.evidence })
+  value.evidence.items[0]!.fields.shift()
+  expect(renderStructuredWebReport('primary.html', value).verificationInput).toEqual({ path: 'primary.html', ...value.evidence })
+})
+
+it('requires an actual longer source quote for a short feed title instead of manufacturing padding', () => {
+  const value = report(); value.evidence.items[0]!.title = '测绘服务'; value.evidence.items[0]!.fields.shift()
+  expect(() => renderStructuredWebReport('feed.html', value, 'observed_feed')).toThrow(/标题.*原文/)
+  value.evidence.items[0]!.fields[0]!.quote = '本次测绘服务项目预算为808870元（含税）。'
+  expect(renderStructuredWebReport('feed.html', value, 'observed_feed').verificationInput.items[0]!.fields.find(field => field.field === 'title')?.quote).toBe(value.evidence.items[0]!.fields[0]!.quote)
+})

@@ -10,12 +10,12 @@ import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
 import { createThreadRecord } from '../domain/thread.js'
 import { createTurnRecord } from '../domain/turn.js'
-import { makeAssistantTextItem, makeToolCallItem, makeToolResultItem } from '../domain/item.js'
+import { makeAssistantTextItem, makeToolCallItem, makeToolResultItem, makeUserItem } from '../domain/item.js'
 import { ExecutionGrantSchema, type ExecutionGrant } from '../contracts/permissions.js'
 import { WebArtifactEvidenceInputSchema } from '../contracts/web-artifact-evidence.js'
 import { buildManagedArtifactToolProviders } from '../adapters/tool/managed-artifact-tool-provider.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
-import { assessWebArtifactEvidence } from './web-artifact-evidence.js'
+import { assessWebArtifactEvidence, webArtifactRequirementHash } from './web-artifact-evidence.js'
 import { renderStructuredWebReport } from './structured-web-report.js'
 
 const roots: string[] = []
@@ -52,7 +52,11 @@ function input() {
 function report(extra = '') {
   return `<!doctype html><html lang="zh-CN"><head><title>招标报告</title></head><body><h1>招标报告</h1>${origins.map(origin => `<a href="${origin}/list">检索来源</a>`).join('')}<main data-evidence-report><article id="notice-1" data-evidence-item="notice-1" data-evidence-classification="opportunity">${values.map(([field, value]) => `<span data-evidence-field="${field}">${value}</span>`).join('')}<a data-evidence-source href="${origins[0]}/notice/1">原文</a></article><p>工程测量：共找到0条内容</p>${extra}</main></body></html>`
 }
-async function fixture(primaryOutput: Record<string, unknown> = {}) {
+function feedInput() {
+  const proof = input(), reference = { url: origins[0] + '/notice/1', resultHash: sha(document) }
+  return WebArtifactEvidenceInputSchema.parse({ ...proof, coverage: [reference], noMatches: [], items: [{ ...proof.items[0], source: reference, discovery: reference, classification: 'source' }] })
+}
+async function fixture(primaryOutput: Record<string, unknown> = {}, basis?: 'observed_feed') {
   const temporary = await mkdtemp(join(tmpdir(), 'railwise-web-artifact-evidence-')); roots.push(temporary)
   const root = await realpath(temporary), workspace = join(root, '只读 工作区'); await mkdir(workspace)
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite3')), threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore()
@@ -60,7 +64,7 @@ async function fixture(primaryOutput: Record<string, unknown> = {}) {
   const now = () => fixtureTime
   const controller = new TaskController({ repository, threadStore, sessionStore, nowIso: now, dataDir: root })
   const task = controller.ensureTask({ thread, turnId: 'old-turn', request: { prompt: '使用浏览器采集两个平台的工程测量招标公告正文并交付 report.html。' } })
-  repository.update(task.id, task.revision, current => ({ ...current, acceptance: { ...current.acceptance, requiredSourceOrigins: origins } }))
+  repository.update(task.id, task.revision, current => ({ ...current, acceptance: { ...current.acceptance, ...(basis ? { webEvidenceBasis: basis } : {}), requiredSourceOrigins: basis ? [origins[0]!] : origins } }))
   let grant: ExecutionGrant
   const bind = async (turnId: string, browserInstanceId: string, revision: number) => {
     grant = ExecutionGrantSchema.parse({ id: `grant-${turnId}`, taskId: task.id, threadId: thread.id, turnId, workspaceRoot: workspace,
@@ -99,7 +103,7 @@ async function fixture(primaryOutput: Record<string, unknown> = {}) {
     return (item as { output: unknown }).output as Record<string, unknown>
   }
   await source(origins[0] + '/list', discovery, 'e1'); await source(origins[1] + '/list', empty, 'e1'); await source(origins[0] + '/notice/1', document)
-  const proof = input()
+  const proof = basis ? feedInput() : input()
   const publication = await call('publish_artifact', { path: 'report.html', report: { title: '招标报告', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } })
   const current = repository.get(task.id)!; controller.pauseTask(task.id, current.revision); controller.prepareResume(task.id, repository.get(task.id)!.revision)
   controller.ensureTask({ thread: (await threadStore.get(thread.id))!, turnId: 'new-turn', continuationTaskId: task.id, request: { prompt: '继续核验同一报告。' } })
@@ -108,6 +112,164 @@ async function fixture(primaryOutput: Record<string, unknown> = {}) {
   return { repository, threadStore, sessionStore, thread, task, controller, call, root, publication, path: join(controller.managedArtifactRoot(task.id)!, 'report.html'),
     source, async assessment(html: string, proof = input()) { return assessWebArtifactEvidence(repository, repository.get(task.id)!, await sessionStore.loadItems(thread.id), (await threadStore.get(thread.id))!.turns, html, proof) } }
 }
+
+async function observedCollectionFixture(legacyFailures = false, explicitResume = true) {
+  const f = await fixture({}, 'observed_feed'), proof = feedInput(), task = f.repository.get(f.task.id)!
+  const stored = (await f.threadStore.get(f.thread.id))!, key = 'explicit-collection-continue'
+  if (explicitResume) {
+    await f.threadStore.upsert({ ...stored, turns: stored.turns.map(turn => turn.id === 'new-turn' ? { ...turn, idempotencyKey: `task:${task.id}:resume:${key}` } : turn) })
+    f.repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'resume', request: { expectedRevision: task.revision, idempotencyKey: key }, nowIso: fixtureTime })
+    f.repository.finishOperation(task.id, key, { status: 'succeeded', result: { task, turn: { threadId: task.threadId, turnId: 'new-turn', userMessageItemId: 'explicit-user-continue' } } }, fixtureTime)
+  }
+  const legacySourceFingerprint = operationFingerprint([
+    JSON.stringify({ url: origins[0] + '/list', resultHash: sha(discovery), full: false }),
+    JSON.stringify({ url: origins[0] + '/notice/1', resultHash: sha(document), full: true })
+  ].sort())
+  if (legacyFailures) for (let index = 0; index < 2; index++) {
+    const idempotencyKey = `legacy-feed-field-failure-${index}`, request = { artifactPath: f.path, artifactHash: f.publication.sha256,
+      requirementHash: webArtifactRequirementHash(task), evidenceFingerprint: legacySourceFingerprint, turnId: 'old-turn', input: proof }
+    f.repository.beginOperation({ ownerId: task.id, idempotencyKey, kind: 'web_artifact_evidence', request, nowIso: fixtureTime })
+    f.repository.finishOperation(task.id, idempotencyKey, { status: 'failed', result: { complete: false, reasons: ['字段缺少正文与成果的精确依据：notice-1/budget'], failureKinds: ['field_evidence:budget'] } }, fixtureTime)
+  }
+  const oldFailures = f.repository.operations(task.id, 'web_artifact_evidence')
+  return { ...f, proof, legacySourceFingerprint, oldFailures }
+}
+
+it('refuses an observed-feed old snapshot after explicit Continue before any new publish or verification, while keeping the old draft readable', async () => {
+  const f = await observedCollectionFixture()
+  try {
+    const bytes = await readFile(f.path, 'utf8'), before = f.repository.get(f.task.id)!
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', f.proof.path, f.proof)).toMatchObject({ ready: false,
+      collectionFreshness: { collectionTurnId: 'new-turn', currentCollectionReady: false } })
+    expect(await f.call('publish_artifact', { path: f.proof.path, report: { title: '本轮列表报告', evidence: { coverage: f.proof.coverage, items: f.proof.items, noMatches: f.proof.noMatches } } })).toMatchObject({ ready: false })
+    expect(await readFile(f.path, 'utf8')).toBe(bytes)
+    const reference = f.publication.verificationInput as { path: string; manifestRef: string }
+    expect(await f.controller.resolveWebArtifactPublicationManifest(f.task.id, 'new-turn', reference.path, reference.manifestRef, String(f.publication.sha256))).toEqual(f.proof)
+    expect(await f.call('verify_web_artifact', reference)).toMatchObject({ complete: false })
+    expect(f.repository.get(f.task.id)!.budget).toEqual(before.budget)
+    expect(f.repository.get(f.task.id)!.attempts).toBe(before.attempts)
+  } finally { f.repository.close() }
+})
+
+it('does not migrate an observed-feed legacy stall into a fresh collection merely by starting or querying the resumed Turn', async () => {
+  const f = await observedCollectionFixture(true)
+  try {
+    const before = JSON.stringify(f.repository.operations(f.task.id)), task = f.repository.get(f.task.id)!
+    const gate = await f.controller.webArtifactPublicationGate(task.id, 'new-turn', f.proof.path, f.proof)
+    expect(gate).toMatchObject({ ready: false, evidenceFingerprint: f.legacySourceFingerprint, semanticRepair: { failureCount: 2, stalled: true },
+      collectionFreshness: { currentCollectionReady: false } })
+    expect(JSON.stringify(f.repository.operations(f.task.id))).toBe(before)
+    expect(f.repository.get(task.id)).toEqual(task)
+  } finally { f.repository.close() }
+})
+
+it('admits an explicit new collection with an actual same-hash Host read, seals its new receipt, and keeps repeated same-Turn reads in one repair epoch', async () => {
+  const f = await observedCollectionFixture(true)
+  try {
+    expect(await f.call('publish_artifact', { path: f.proof.path, report: { title: '尚未采集的旧列表', evidence: { coverage: f.proof.coverage, items: f.proof.items, noMatches: f.proof.noMatches } } })).toMatchObject({ code: 'web_source_reads_required', stalled: false, semanticRepair: { failureCount: 2, stalled: true } })
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')).toBeNull()
+    await f.source(origins[0] + '/notice/1', document)
+    const gate = await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', f.proof.path, f.proof)
+    expect(gate).toMatchObject({ ready: true, collectionFreshness: { currentCollectionReady: true } })
+    const publication = await f.call('publish_artifact', { path: f.proof.path, report: { title: '本轮列表报告', evidence: { coverage: f.proof.coverage, items: f.proof.items, noMatches: f.proof.noMatches } } })
+    const request = publication.verificationInput as { path: string; manifestRef: string }
+    const manifest = f.repository.operation(f.task.id, request.manifestRef)!
+    const ids = manifest.request!.sourceProof as Array<{ receiptId: string }>
+    expect(ids.every(source => f.repository.operationById(f.task.id, source.receiptId)!.request!.turnId === 'new-turn')).toBe(true)
+    const invalid = structuredClone(f.proof); invalid.items[0]!.fields.find(field => field.field === 'budget')!.quote = '预算金额为100001元'
+    invalid.items[0]!.fields.find(field => field.field === 'budget')!.value = '100001元'
+    expect(await f.call('verify_web_artifact', invalid)).toMatchObject({ complete: false, semanticRepair: { failureCount: 1 } })
+    expect(await f.call('verify_web_artifact', invalid)).toMatchObject({ complete: false, semanticRepair: { failureCount: 2, stalled: true } })
+    await f.source(origins[0] + '/notice/1', document)
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', f.proof.path, invalid)).toMatchObject({ semanticRepair: { failureCount: 2, stalled: true } })
+    expect(f.repository.operations(f.task.id, 'web_artifact_evidence').filter(row => f.oldFailures.some(old => old.id === row.id))).toEqual(f.oldFailures)
+  } finally { f.repository.close() }
+})
+
+it('cannot mint a new observed-feed repair epoch from an automatic Turn with no persisted explicit continuation authority', async () => {
+  const f = await observedCollectionFixture(true, false)
+  try {
+    await f.source(origins[0] + '/notice/1', document)
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', f.proof.path, f.proof)).toMatchObject({ evidenceFingerprint: f.legacySourceFingerprint, semanticRepair: { failureCount: 2, stalled: true } })
+  } finally { f.repository.close() }
+})
+
+it('keeps legacy field failures while allowing one current-read repair after the first premature publish, then bounds a second attempt across filenames', async () => {
+  const f = await observedCollectionFixture(true)
+  try {
+    const evidence = { coverage: f.proof.coverage, items: f.proof.items, noMatches: f.proof.noMatches }, before = f.repository.get(f.task.id)!
+    expect(await f.call('publish_artifact', { path: 'new-name-one.html', report: { title: '本轮列表', evidence } })).toMatchObject({ code: 'web_source_reads_required', stalled: false,
+      collectionFreshness: { currentCollectionReady: false }, semanticRepair: { failureCount: 2, stalled: true } })
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')).toBeNull()
+    expect(f.repository.get(f.task.id)!.status).toBe('running')
+    expect(await f.call('publish_artifact', { path: 'new-name-two.html', report: { title: '改名仍非读取', evidence } })).toMatchObject({ stalled: true, collectionReadFailures: 2,
+      semanticRepair: { failureCount: 2, stalled: true } })
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')).toMatchObject({ kind: 'waiting_user', reason: expect.stringContaining('本轮订阅列表尚未重新读取') })
+    const waiting = f.repository.get(f.task.id)!
+    expect(waiting.waitingReason).not.toMatch(/notice-1|field_evidence|budget/)
+    expect(waiting.budget).toEqual(before.budget); expect(waiting.attempts).toBe(before.attempts)
+    expect(f.repository.operations(f.task.id, 'web_artifact_evidence')).toEqual(f.oldFailures)
+  } finally { f.repository.close() }
+})
+
+it('restores a pre-freshness sealed manifest with explicitly legacy source-proof bytes, without turning that history into current collection evidence', async () => {
+  const f = await observedCollectionFixture()
+  try {
+    const source = f.repository.operations(f.task.id, 'tool').find(row => row.request?.turnId === 'old-turn' && row.request.toolName === 'browser_get_html' &&
+      (row.result as { item: { output: { sourceUrl: string } } }).item.output.sourceUrl === origins[0] + '/notice/1')!
+    const writer = f.repository.operations(f.task.id, 'tool').find(row => row.request?.turnId === 'old-turn' && row.request.toolName === 'publish_artifact')!
+    const legacyProof = [{ receiptId: source.id, receiptHash: operationFingerprint({ request: source.request, status: source.status, result: source.result }) }]
+    const request = { taskId: f.task.id, threadId: f.thread.id, path: f.proof.path, artifactPath: f.path, artifactHash: f.publication.sha256,
+      inputHash: operationFingerprint(f.proof), writerReceiptId: writer.id, requirementHash: webArtifactRequirementHash(f.repository.get(f.task.id)!), input: f.proof, sourceProof: legacyProof }
+    const key = `web-manifest:${operationFingerprint(request)}`
+    if (!f.repository.operation(f.task.id, key)) {
+      f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: key, kind: 'web_artifact_publication_manifest', request, nowIso: fixtureTime })
+      f.repository.finishOperation(f.task.id, key, { status: 'succeeded', result: { sealed: true, inputHash: request.inputHash, artifactHash: request.artifactHash } }, fixtureTime)
+    }
+    expect(Object.keys(legacyProof[0]!)).toEqual(['receiptId', 'receiptHash'])
+    expect(await f.controller.resolveWebArtifactPublicationManifest(f.task.id, 'new-turn', f.proof.path, key, String(f.publication.sha256))).toEqual(f.proof)
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', f.proof.path, f.proof)).toMatchObject({ ready: false })
+    await f.source(origins[0] + '/notice/1', document)
+    const assessment = await f.assessment(renderStructuredWebReport(f.proof.path, { title: '本轮列表', evidence: { coverage: f.proof.coverage, items: f.proof.items, noMatches: [] } }, 'observed_feed').content, f.proof)
+    expect(assessment.complete).toBe(true)
+    expect(assessment.sourceReceipts.every(source => !('startedAt' in source))).toBe(true)
+  } finally { f.repository.close() }
+})
+
+it.each(['loading', 'empty', 'truncated'] as const)('does not replace the old stalled epoch with an incomplete current %s read', async variation => {
+  const f = await observedCollectionFixture(true)
+  try {
+    await f.source(origins[0] + '/notice/1', document, undefined, variation === 'loading' ? { loadingObserved: true } : variation === 'empty' ? { emptyObserved: true } : { truncated: true })
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', f.proof.path, f.proof)).toMatchObject({ evidenceFingerprint: f.legacySourceFingerprint,
+      collectionFreshness: { currentCollectionReady: false }, semanticRepair: { failureCount: 2, stalled: true } })
+  } finally { f.repository.close() }
+})
+
+it('requires every requested origin before projecting a current collection as read', async () => {
+  const f = await observedCollectionFixture()
+  try {
+    const task = f.repository.get(f.task.id)!
+    f.repository.update(task.id, task.revision, current => ({ ...current, acceptance: { ...current.acceptance, requiredSourceOrigins: origins } }))
+    await f.source(origins[0] + '/notice/1', document)
+    expect(await f.controller.observedFeedCollectionContext(task.id, 'new-turn')).toMatchObject({ currentCollectionReady: false })
+  } finally { f.repository.close() }
+})
+
+it('admits a genuine durable user supplement after a current Host read without letting a queued or recalled input mint an epoch', async () => {
+  const f = await observedCollectionFixture(true, false)
+  try {
+    const task = f.repository.get(f.task.id)!, saved = f.controller.appendInput(task.id, task.revision, 'genuine-user-supplement', '只汇总这次实际读取的列表。')
+    await f.source(origins[0] + '/notice/1', document)
+    expect(await f.controller.webArtifactPublicationGate(task.id, 'new-turn', f.proof.path, f.proof)).toMatchObject({ semanticRepair: { failureCount: 2, stalled: true } })
+    const entries = f.controller.pendingDeliveries(f.thread.id, 'new-turn'), delivery = entries.find(entry => entry.input.id === saved.input.id)!.delivery
+    const message = { ...makeUserItem({ id: delivery.messageItemId, threadId: f.thread.id, turnId: 'new-turn', text: saved.input.text }), createdAt: fixtureTime, taskInputId: saved.input.id }
+    await f.sessionStore.appendItem(f.thread.id, message)
+    const digest = sha(JSON.stringify([message]))
+    f.controller.markInputsDelivered('new-turn', [delivery], message.id, digest)
+    await f.source(origins[0] + '/notice/1', document)
+    expect(await f.controller.webArtifactPublicationGate(task.id, 'new-turn', f.proof.path, f.proof)).toMatchObject({ ready: true, collectionFreshness: { currentCollectionReady: true } })
+  } finally { f.repository.close() }
+})
 
 it('keeps the exact publication manifest private and restores it across a legitimate Turn and controller/database restart', async () => {
   const f = await fixture()

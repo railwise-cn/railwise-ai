@@ -4,6 +4,7 @@ import { mkdir, open, realpath } from 'node:fs/promises'
 import { basename, dirname, relative, resolve, sep } from 'node:path'
 import type { TaskRunRepository } from '../../services/task-run-repository.js'
 import type { TaskContextRuntime } from '../../services/task-context-runtime.js'
+import type { ObservedFeedCollectionFreshness } from '../../services/web-artifact-evidence.js'
 import type { EngineeringService } from '../../engineering/engineering-service.js'
 import { EngineeringProjectCreateRequest, FieldMappingV1 } from '../../contracts/engineering.js'
 import { stableContextStringify } from '../../contracts/task-context.js'
@@ -110,7 +111,7 @@ async function normalizeCandidateImages(content: string, candidatePath: string, 
  * Existing Markdown is submitted through the Write workspace review path and
  * is never replaced by an agent tool call.
  */
-export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository, options: { contextRuntime?: TaskContextRuntime; engineeringService?: EngineeringService } = {}): CapabilityToolProvider[] {
+export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository, options: { contextRuntime?: TaskContextRuntime; engineeringService?: EngineeringService; observedFeedCollectionContext?: (taskId:string,turnId:string)=>Promise<ObservedFeedCollectionFreshness|null> } = {}): CapabilityToolProvider[] {
   const propose = defineLocalTool({
     name: 'propose_document',
     description: 'Create or update a Markdown delivery candidate under the current task sidecar. Existing user documents are never overwritten. Return the candidate path and source references for review.',
@@ -396,7 +397,12 @@ export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository
       const offset = typeof args.offset === 'number' ? Math.max(0, Math.trunc(args.offset)) : 0
       const maxBytes = typeof args.max_bytes === 'number' ? Math.min(65536, Math.max(1, Math.trunc(args.max_bytes))) : 32768
       const end = Math.min(bytes.length, offset + maxBytes)
-      return { output: { untrusted: true, bundleId: args.bundle_id, objectId: args.object_id, offset, nextOffset: end < bytes.length ? end : null, totalBytes: bytes.length, sha256: hash(bytes), text: bytes.subarray(offset, end).toString('utf8') } }
+      const grant = context.executionGrant
+      // Guidance is current server state, kept separate from immutable historical spill text.
+      const collectionFreshness = grant?.taskId === task.id && grant.threadId === context.threadId && grant.turnId === context.turnId
+        ? await options.observedFeedCollectionContext?.(grant.taskId, context.turnId) : null
+      return { output: { untrusted: true, bundleId: args.bundle_id, objectId: args.object_id, offset, nextOffset: end < bytes.length ? end : null, totalBytes: bytes.length, sha256: hash(bytes), text: bytes.subarray(offset, end).toString('utf8'),
+        ...(collectionFreshness ? { collectionFreshness } : {}) } }
     }
   })
   return [{ id: 'document-delivery', kind: 'built-in', enabled: true, available: true, tools: [propose, readSources, exportDocument, ...(options.engineeringService ? [monitoring] : []), ...(options.contextRuntime ? [recall] : [])] }]

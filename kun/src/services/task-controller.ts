@@ -62,7 +62,7 @@ import { validateArtifactFile } from './artifact-validator.js'
 import type { RuntimeSpanService } from './runtime-span-service.js'
 import { verifyTaskDelivery } from '../delivery/verification.js'
 import { WebArtifactEvidenceInputSchema, type WebArtifactEvidenceInput } from '../contracts/web-artifact-evidence.js'
-import { assessWebArtifactEvidence, verifiedWebArtifactEvidence, webArtifactFailureKinds, webArtifactManifestSourceProof, webArtifactPublicationReadiness, webArtifactRequirementHash, webEvidenceRepair } from './web-artifact-evidence.js'
+import { assessWebArtifactEvidence, observedFeedCollectionFreshness, type ObservedFeedCollectionFreshness, verifiedWebArtifactEvidence, webArtifactFailureKinds, webArtifactManifestSourceProof, webArtifactPublicationReadiness, webArtifactRequirementHash, webEvidenceRepair } from './web-artifact-evidence.js'
 import { deriveWebArtifactRepairState, type WebArtifactRepairAttempt } from './web-artifact-repair-state.js'
 
 import { currentEgoTaskSpaceBinding, validEgoDocumentEvidence, verifiedEgoTaskSpaceFinish, type EgoClosedSpaceReopenAuthorization } from './ego-browser-evidence.js'
@@ -509,7 +509,7 @@ export class TaskController {
   private webArtifactRepairAttempts(task: TaskRun): WebArtifactRepairAttempt[] {
     return this.repository.operations(task.id).flatMap(receipt => {
       const result = receipt.result as { complete?: boolean; reasons?: unknown; failureKinds?: unknown } | undefined
-      if (!['web_artifact_evidence', 'web_artifact_source_gate'].includes(receipt.kind) || receipt.status !== 'failed' || receipt.fingerprint !== operationFingerprint(receipt.request) || typeof receipt.request?.artifactPath !== 'string' ||
+      if (!['web_artifact_evidence', 'web_artifact_source_gate'].includes(receipt.kind) || receipt.status !== 'failed' || receipt.fingerprint !== operationFingerprint(receipt.request) || receipt.request?.collectionReadRequired === true || typeof receipt.request?.artifactPath !== 'string' ||
         typeof receipt.request.requirementHash !== 'string' || typeof receipt.request.evidenceFingerprint !== 'string' || result?.complete !== false ||
         !Array.isArray(result.reasons) || !result.reasons.every(value => typeof value === 'string') ||
         !Array.isArray(result.failureKinds) || !result.failureKinds.every(value => typeof value === 'string')) return []
@@ -522,6 +522,12 @@ export class TaskController {
         ...(failureEvidenceFingerprints ? { failureEvidenceFingerprints } : {}),
         failureKinds: result.failureKinds, reasons: result.reasons }]
     })
+  }
+
+  private webArtifactCollectionReadBlocks(task: TaskRun, turnId: string): number {
+    return this.repository.operations(task.id, 'web_artifact_source_gate').filter(receipt => receipt.status === 'failed' && receipt.fingerprint === operationFingerprint(receipt.request) &&
+      receipt.request?.collectionReadRequired === true && receipt.request.turnId === turnId && receipt.request.requirementHash === webArtifactRequirementHash(task) &&
+      (receipt.result as { complete?: unknown } | undefined)?.complete === false).length
   }
 
   /** Prior declarations contribute progress only after the original source predicates pass again. */
@@ -593,6 +599,16 @@ export class TaskController {
     const gate = await this.webArtifactPublicationGate(taskId, turnId, path, evidence, candidate)
     if (!gate || gate.ready) return gate
     const task = this.repository.get(taskId)!, artifactPath = resolve(this.managedArtifactRoot(taskId)!, path)
+    if (gate.collectionFreshness?.currentCollectionReady === false) {
+      const count = this.webArtifactCollectionReadBlocks(task, turnId)
+      if (count >= 2) return gate
+      const request = { artifactPath, requirementHash: gate.requirementHash, evidenceFingerprint: gate.evidenceFingerprint, turnId,
+        failureEvidenceFingerprints: gate.failureEvidenceFingerprints, collectionReadRequired: true, ...(evidence ? { input: evidence } : {}) }
+      const key = `web-source-gate:${turnId}:collection:${operationFingerprint(request)}:${count}`
+      this.repository.beginOperation({ ownerId: taskId, kind: 'web_artifact_source_gate', idempotencyKey: key, request, nowIso: this.nowIso() })
+      this.repository.finishOperation(taskId, key, { status: 'failed', result: { complete: false, failureKinds: ['source_read_required'], reasons: gate.reasons } }, this.nowIso())
+      return { ...gate, stalled: count + 1 >= 2, code: count + 1 >= 2 ? 'web_artifact_repair_stalled' : 'web_source_reads_required', collectionReadFailures: count + 1 }
+    }
     const attempts = this.webArtifactRepairAttempts(task)
     if (gate.stalled && attempts.some(attempt => attempt.turnId === turnId)) return gate
     const failureKinds = gate.stalled && attempts.length ? [...attempts.at(-1)!.failureKinds] : [
@@ -632,6 +648,8 @@ export class TaskController {
     const semanticRepair = latest ? deriveWebArtifactRepairState(attempts, undefined, { requirementHash,
       evidenceFingerprint: sourceGate.evidenceFingerprint, failureEvidenceFingerprints: sourceGate.failureEvidenceFingerprints }) : undefined
     let stalled = semanticRepair?.stalled === true
+    const collectionPending = sourceGate.collectionFreshness?.currentCollectionReady === false
+    if (collectionPending) stalled = this.webArtifactCollectionReadBlocks(task, turnId) >= 2
     if (stalled && sourceGate.ready && latest?.failureKinds.length && latest.failureKinds.every(kind => kind.startsWith('field_evidence:'))) {
       if (candidate && evidence?.path === path && assessWebArtifactEvidence(this.repository, task, items, thread?.turns ?? [], candidate.html, evidence, this.nowIso()).complete) stalled = false
       else if (candidate === undefined && await this.currentWebArtifactFieldRepair(task, turnId, path, effectiveEvidence)) stalled = false
@@ -639,9 +657,22 @@ export class TaskController {
     }
     return { ...sourceGate, ready: sourceGate.ready && !stalled, stalled, requirementHash,
       code: stalled ? 'web_artifact_repair_stalled' : sourceGate.ready ? undefined : 'web_source_reads_required',
-      reasons: stalled ? semanticRepair!.reasons : sourceGate.ready ? [] : sourceGate.missingOrigins.length
+      reasons: collectionPending ? ['本轮订阅列表尚未实际重新读取；旧来源和草稿保留为历史素材。'] : stalled ? semanticRepair!.reasons : sourceGate.ready ? [] : sourceGate.missingOrigins.length
         ? sourceGate.missingOrigins.map(origin => `${task.acceptance.webEvidenceBasis === 'observed_feed' ? '订阅列表记录尚未核验' : '正式公告正文尚未核验'}：${origin}`) : [task.acceptance.webEvidenceBasis === 'observed_feed' ? '尚缺可信的完整列表或单记录读取；加载/空DOM/截断不代表零条。' : '尚缺可信的完整正文来源读取或实际零匹配页面。'],
       ...(semanticRepair ? { semanticRepair } : {}) }
+  }
+
+  /** Shared read-only projection for tool guidance; it cannot authorize a read or reset an epoch. */
+  async observedFeedCollectionContext(taskId: string, turnId: string): Promise<ObservedFeedCollectionFreshness | null> {
+    const task = this.repository.get(taskId), token = this.attemptTokens.get(turnId)
+    if (!task || task.acceptance.webEvidenceBasis !== 'observed_feed' || task.status !== 'running' || task.activeTurnId !== turnId || token?.taskId !== taskId) return null
+    this.assertToken(token)
+    const [thread, items] = await Promise.all([this.threadStore.get(task.threadId), this.sessionStore.loadItems(task.threadId)])
+    this.assertToken(token)
+    const grant = ExecutionGrantSchema.safeParse(thread?.turns.find(turn => turn.id === turnId)?.executionGrant), now = this.nowIso()
+    if (!grant.success || grant.data.taskId !== taskId || grant.data.threadId !== task.threadId || grant.data.turnId !== turnId || grant.data.workspaceRoot !== task.workspaceRoot ||
+      Date.parse(grant.data.issuedAt) > Date.parse(now) || !grant.data.expiresAt || Date.parse(grant.data.expiresAt) <= Date.parse(now)) return null
+    return observedFeedCollectionFreshness(this.repository, task, items, thread!.turns, grant.data.browserScope?.origins ?? grant.data.networkAllowlist, now)
   }
 
   /** Trusted query for AgentLoop; tool/MCP output cannot manufacture this blocker. */
@@ -671,10 +702,15 @@ export class TaskController {
     // A user-authorized new Turn may read and repair the old deficit. Its first
     // still-invalid publication/verification is recorded above and stops it;
     // the old count and every old failure remain intact throughout.
-    if (!this.webArtifactRepairAttempts(task).some(attempt => attempt.turnId === turnId)) return null
+    if (!this.webArtifactRepairAttempts(task).some(attempt => attempt.turnId === turnId) && this.webArtifactCollectionReadBlocks(task, turnId) < 2) return null
     this.assertToken(token)
-    const fingerprint = `web-artifact-repair:${block.semanticRepair!.fingerprint}`
-    const reason = `相同来源或字段问题在一次修复后仍未解决，已停止重复发布；已有草稿和原始核验记录已保留。${block.reasons.join('；')}`
+    const repairFingerprint = block.collectionFreshness?.currentCollectionReady === false
+      ? operationFingerprint({ taskId: task.id, turnId, requirementHash: block.requirementHash, collectionReadRequired: true }) : block.semanticRepair!.fingerprint
+    const fingerprint = `web-artifact-repair:${repairFingerprint}`
+    const reason = task.acceptance.webEvidenceBasis === 'observed_feed'
+      ? block.collectionFreshness?.currentCollectionReady === false ? '本轮订阅列表尚未重新读取，旧来源和草稿已保留。请在原任务中实际打开并读取当前列表后继续。'
+        : '部分订阅记录的字段仍待核验，草稿已保留。请核对原始列表后继续。'
+      : `相同来源或字段问题在一次修复后仍未解决，已停止重复发布；已有草稿和原始核验记录已保留。${block.reasons.join('；')}`
     return this.repository.transact(() => {
       const result = this.waitForUser(task, reason, task.finalResponse ?? '', fingerprint, turnId)
       const id = `web_evidence_${task.id}`, prior = this.repository.attention(id), now = this.nowIso()
@@ -682,7 +718,7 @@ export class TaskController {
         workspaceRoot: task.workspaceRoot, kind: 'blocked', title: '网页来源核验需要处理', message: reason, status: 'pending',
         revision: (prior?.revision ?? -1) + 1, createdAt: prior?.createdAt ?? now, updatedAt: now,
         payload: { kind: 'web_artifact_repair_stalled', code: block.code, reasons: block.reasons, missingOrigins: block.missingOrigins,
-          nextReads: block.nextReads, fingerprint: block.semanticRepair!.fingerprint } })
+          nextReads: block.nextReads, fingerprint: repairFingerprint } })
       return result
     })
   }
@@ -775,7 +811,7 @@ export class TaskController {
     if (!writer || writer.operationId !== request!.writerReceiptId || writer.sha256 !== artifactHash || writer.authorizedRoot !== this.managedArtifactRoot(taskId)) fail()
     const writerReceipt = this.repository.operations(taskId, 'tool').find(row => row.id === writer!.operationId)
     if (!writerReceipt || writerReceipt.fingerprint !== operationFingerprint(writerReceipt.request) || writerReceipt.request?.providerId !== 'managed-artifacts') fail()
-    const sourceProof = webArtifactManifestSourceProof(this.repository, task, items, thread?.turns ?? [], input)
+    const sourceProof = webArtifactManifestSourceProof(this.repository, task, items, thread?.turns ?? [], input, request!.sourceProof)
     if (operationFingerprint(sourceProof) !== operationFingerprint(request!.sourceProof)) fail()
     return input
   }
