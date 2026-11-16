@@ -156,3 +156,13 @@ test('Windows smoke preserves failure evidence and restricts uninstallation to i
   assert.match(script, /windows-install-smoke\.json/)
   assert.match(script, /\$report\.status = 'failed'/)
 })
+
+test('startup-only installation route stays exclusive and retains the original full UI gate', () => {
+  const script = readFileSync(new URL('./run-windows-install-smoke.ps1', import.meta.url), 'utf8')
+  assert.match(script, /Startup diagnostic is exclusive with task\/browser execution/)
+  assert.match(script, /--browser-startup-diagnostic/)
+  assert.match(script, /windows-browser-startup-diagnostic\.json/)
+  assert.match(script, /notFullAcceptance -ne \$true/)
+  assert.match(script, /Installed Chinese UI evidence is incomplete/)
+  assert.match(script, /Invoke-OwnedProcess \$uninstaller '\/S \/currentuser'/)
+})

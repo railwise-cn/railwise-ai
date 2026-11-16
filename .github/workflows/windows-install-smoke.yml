@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_browser_startup_diagnostic:
+        description: 'Collect isolated pinned daemon startup diagnostics only; no application, model or task execution'
+        type: boolean
+        required: false
+        default: false
       run_browser_execution:
         description: 'Load the fixed official BrowserSkill extension in isolated Chrome for Testing and read a controlled page through real task tools'
         type: boolean
@@ -28,6 +33,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_browser_startup_diagnostic:
+        description: 'Collect isolated pinned daemon startup diagnostics only; no application, model or task execution'
+        type: boolean
+        required: false
+        default: false
       run_browser_execution:
         description: 'Load the fixed official BrowserSkill extension in isolated Chrome for Testing and read a controlled page through real task tools'
         type: boolean
@@ -40,7 +50,7 @@ permissions:
 
 jobs:
   windows-install:
-    name: Install and inspect the existing Windows package
+    name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_browser_execution && 25 || 15 }}
     steps:
@@ -49,6 +59,9 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Reject mixed diagnostic and business acceptance modes
+        if: inputs.run_browser_startup_diagnostic && (inputs.run_task_execution || inputs.run_browser_execution)
+        run: throw 'Browser startup diagnostic is exclusive with task and browser execution'
       - uses: actions/setup-node@v7
         with:
           node-version: '22.22.0'
@@ -76,6 +89,7 @@ jobs:
         env:
           PACKAGE_SOURCE_HEAD: ${{ steps.source.outputs.package_source_head }}
           WORKWISE_WINDOWS_SMOKE_SOURCE_FILE: ${{ runner.temp }}/windows-package-source.json
+          RAILWISE_WINDOWS_BROWSER_STARTUP_DIAGNOSTIC: ${{ inputs.run_browser_startup_diagnostic }}
           RAILWISE_WINDOWS_TASK_SMOKE: ${{ inputs.run_task_execution }}
           RAILWISE_WINDOWS_BROWSER_SMOKE: ${{ inputs.run_browser_execution }}
         run: |
