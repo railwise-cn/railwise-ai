@@ -886,3 +886,7 @@ Mac 正常退出旧包、停止 Main／Runtime 并作一致性 SQLite 备份后�
 恢复增量已合并完成本地检查。完全旧 cbb 生产代码配新完整链用例，实际 resume 后仍等待并误报 user_control，形成一项功能性 RED；修复后通过真实 Factory／Coordinator／Host／TaskControlService 链，在同 Task 的新 Turn 追加空间绑定，实际写盘、读回哈希、显式核验、计划读回和当前空间 finish 后三节点完成。旧绑定、旧操作、Grant、预算上限和无关 UNKNOWN 原字节保留，attempt 只正常增加一次。新增授权方法的缺方法基线日志与这项功能性 RED 分开记录，未冒充额外现场复现。
 
 Node 22 九文件 116 项、KUN／Node／Web 类型及九文件 lint 通过，单次生产构建、1,381 输入 freshness 和 2,443 个 authored production 文件对比通过。额外的只读原生协议检查发现默认用户空间使用 ID 0，已补齐兼容；使用本次编译后的固定元数据脚本和真实固定 CLI 成功核实旧 ID／名称缺失。该诊断不读取 Page、不创建空间、不修改控制权或任务，不是采集成功证据。新完整 CI、精确包及原账号任务的实际恢复仍待执行。
+
+`f21fd462` 的完整 Quality 为五绿一红：PR Runtime 5,198 项通过，push 为 5,197 通过／一项失败，两轮各保留 24 跳过；两轮 Desktop 均为 4,818 通过／17 跳过。唯一失败是旧的首次导航超时用例：只等待 Task waiting_user 就继续，而原 Thread Turn 尚为 running，被现有 `turn_in_progress` 保护正确拒绝。固定测试中的首次 finishTurn 屏障后，可确定复现此时序；改为释放屏障并等待原 Turn 实际终态，再正常继续，原三项及相邻八项完整链全部通过，原导航、Grant、请求数、完成断言和超时值保留。没有更改生产并发保护或增加验收豁免。
+
+对应私有构建 `43894678187` 未被接受、下载或安装。普通取消后 macOS always job 仍在运行，另获授权的一次 force-cancel 后官方确认 completed／cancelled、无活动 job；旧红灯及取消记录保留。测试时序修正后的本地 KUN 类型、单文件 lint 和两文件 11 项再次通过，2,443 个生产输入与前述已构建版本完全相同，freshness 仍通过。后继提交将重新运行完整 CI 并生成对应源码身份的正常私有包，不沿用红灯构建作业务验收。

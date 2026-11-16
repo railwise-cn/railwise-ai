@@ -61,6 +61,16 @@ it.each([false,true])('completes the real Factory/Coordinator/Host chain through
  await new Promise<void>(resolve=>model.listen(0,'127.0.0.1',resolve));clean.push(()=>new Promise<void>(resolve=>{model.close(()=>resolve());model.closeAllConnections()}))
  const runtime=await createKunServeRuntime({host:'127.0.0.1',port:0,dataDir:join(root,'runtime'),runtimeToken:'controlled',apiKey:'controlled-local-only',baseUrl:`http://127.0.0.1:${(model.address() as {port:number}).port}/v1`,endpointFormat:'chat_completions',model:'controlled',approvalPolicy:'on-request',sandboxMode:'read-only',insecure:false,tokenEconomyMode:false,storage:{backend:'file'},capabilities:KunCapabilitiesConfig.parse({egoBrowser:{state:'installed',executablePath:'/controlled/ego-browser',executableHash:'a'.repeat(64),version:'0.6.3.14',revision:0}})})
  clean.push(async()=>runtime.shutdown?.())
+ let firstFinalizationEntered=false,releaseFirstFinalization=()=>{}
+ if(recoverInitialTimeout){
+  const finalizeAllowed=new Promise<void>(resolve=>{releaseFirstFinalization=resolve})
+  const finishTurn=runtime.turnService.finishTurn.bind(runtime.turnService)
+  const finalization=vi.spyOn(runtime.turnService,'finishTurn').mockImplementation(async input=>{
+   if(!firstFinalizationEntered){firstFinalizationEntered=true;await finalizeAllowed}
+   return finishTurn(input)
+  })
+  clean.push(async()=>{releaseFirstFinalization();finalization.mockRestore()})
+ }
  const origin=await runtime.threadService.create({workspace,mode:'agent',model:'controlled',approvalPolicy:'on-request'}),started=await runtime.taskCoordinator!.command({threadId:origin.id,intent:'new',idempotencyKey:'ego-full-completion',request:{prompt:goal}})
  expect(started.kind).not.toBe('capability_required');const taskId=started.task!.id
  let oldNavigation:{data_json:string}|undefined,oldTurn:string|undefined
@@ -72,6 +82,14 @@ it.each([false,true])('completes the real Factory/Coordinator/Host chain through
   const nav=runtime.taskRepository!.operations(taskId,'ego_page_navigation')[0]!
   expect(nav.status).toBe('prepared');expect(runtime.taskRepository!.operations(taskId,'tool')[0]?.status).toBe('failed')
   oldNavigation=runtime.taskRepository!.connection().prepare('SELECT data_json FROM operation_receipts WHERE owner_id=? AND idempotency_key=?').get(taskId,nav.idempotencyKey) as {data_json:string}
+  // Expose the real boundary: Task waiting is persisted before Thread Turn finalization.
+  await expect.poll(()=>firstFinalizationEntered,{timeout:5000}).toBe(true)
+  expect((await runtime.threadService.get(before.threadId))!.turns.find(turn=>turn.id===oldTurn)).toMatchObject({status:'running'})
+  releaseFirstFinalization()
+  await expect.poll(async()=>{
+   const turn=(await runtime.threadService.get(before.threadId))?.turns.find(turn=>turn.id===oldTurn)
+   return turn!==undefined&&['completed','failed','aborted'].includes(turn.status)
+  },{timeout:5000}).toBe(true)
   const resumed=await runtime.taskCoordinator!.command({threadId:origin.id,taskId,intent:'resume',idempotencyKey:'same-ego-user-resume',request:{prompt:'继续原任务'}})
   expect(resumed.kind).not.toBe('capability_required');expect(resumed.task?.id).toBe(taskId)
   await expect.poll(()=>runtime.taskRepository!.get(taskId)?.activeTurnId,{timeout:5000}).not.toBe(oldTurn)
