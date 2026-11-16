@@ -8,7 +8,7 @@ import { TaskArtifactReview } from './TaskArtifactReview'
 import { AssistantMarkdown } from '../chat/AssistantMarkdown'
 import { TaskExecutionEvidence } from './TaskExecutionEvidence'
 import { currentTaskBranch } from '@shared/task-projection'
-import { taskDisplayGoal, taskDisplayTitle } from '@shared/task-presentation'
+import { isMatchingExecutionGrantExpiredAttention, taskDisplayGoal, taskDisplayTitle } from '@shared/task-presentation'
 import { taskArtifactValidationLabelKey } from '@shared/task-artifact-source-evidence'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { BrowserApprovalDetails, browserApprovalFields } from '../chat/BrowserApprovalDetails'
@@ -79,7 +79,7 @@ function attentionQuestions(item: TaskAttentionV1): Question[] {
   })
 }
 
-function AttentionCard({ item, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow }: { item: TaskAttentionV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: () => void; onOpenThread: (id: string) => void; onOpenFlow?: Props['onOpenFlow'] }): ReactElement {
+function AttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow }: { item: TaskAttentionV1; ownerTask?: TaskRunV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: () => void; onOpenThread: (id: string) => void; onOpenFlow?: Props['onOpenFlow'] }): ReactElement {
   const { t } = useTranslation('common')
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -158,7 +158,7 @@ function AttentionCard({ item, conversationThreadId, workspaceRoot, onResolved, 
   }
   return <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
     <h4 className="text-sm font-semibold">{item.title}</h4>
-    {item.kind === 'approval' && browserApprovalFields(item.message) ? <BrowserApprovalDetails summary={item.message} /> : <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed">{item.message}</p>}
+    {item.kind === 'approval' && browserApprovalFields(item.message) ? <BrowserApprovalDetails summary={item.message} /> : <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed">{capabilityCard && isMatchingExecutionGrantExpiredAttention(item, ownerTask) ? t('capabilityExecutionGrantExpiredSummary') : item.message}</p>}
     {capabilityCard ? <CapabilityRequiredCard card={capabilityCard} workspaceRoot={item.workspaceRoot || workspaceRoot} /> : null}
     {item.payload?.kind === 'external_provider_choice' ? <div className="mt-3 space-y-2">
       <label className="block text-xs">{t('taskCommandProvider')}<select aria-label={t('taskCommandProvider')} value={selectedProvider} onChange={event => setSelectedProvider(event.target.value as 'dingtalk' | 'lark')} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink"><option value="dingtalk">{t('taskEffectProvider_dingtalk')}</option><option value="lark">{t('taskEffectProvider_lark')}</option></select></label>
@@ -250,6 +250,11 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const selectedGroupRevision = selectedGroup?.all.map(task => `${task.id}:${task.revision}`).join('|') ?? ''
   const selected = selectedGroup?.root ?? null
   const currentExecution = selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).current : null
+  const progressSample = currentExecution ? live.progress?.[currentExecution.id] : undefined
+  const currentProgress = currentExecution && progressSample?.taskRevision === currentExecution.revision && progressSample.turnId === currentExecution.activeTurnId &&
+    ['running','retrying'].includes(currentExecution.status) ? progressSample : undefined
+  const currentTiming = currentProgress?.timing ?? currentExecution?.timing
+  const currentActivity = currentProgress?.active && Date.parse(currentProgress.leaseExpiresAt) > Date.now() ? currentProgress.activity : undefined
   const hasPublicQueryRecovery = publicQueryRecovery?.taskId === (currentExecution ?? selected)?.id
     && (publicQueryRecovery?.state !== 'unavailable' || publicQueryRecovery?.reason === 'browser_public_query_schedule_scope_required')
   useEffect(() => {
@@ -390,10 +395,11 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
           <h2 className="break-words text-base font-semibold">{taskDisplayTitle(selected)}</h2>
           <p className="mt-2 text-xs text-ds-muted">{t(`taskRunStatus_${(currentExecution ?? selected).status}`)} · {t('taskWorkspaceStepProgress', taskGroupProgress(selectedGroup!))}</p>
           <details className="mt-3 text-xs text-ds-muted"><summary className="cursor-pointer">{t('taskWorkspaceOriginalRequest')}</summary><p className="mt-2 whitespace-pre-wrap break-words leading-relaxed">{taskDisplayGoal(selected)}</p><p className="mt-2 break-all">{t('taskWorkspaceLocation')}: {selected.workspaceRoot}</p></details>
-          {currentExecution?.timing ? <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ds-muted" title={t(currentExecution.timing.coverage === 'complete' ? 'taskTimingComplete' : 'taskTimingPartial')}>
-            <span>{t('taskTimingExecution')}: {Math.round(currentExecution.timing.executionMs / 1000)}s</span>
-            <span>{t('taskTimingQueued')}: {Math.round(currentExecution.timing.queuedMs / 1000)}s</span>
-            <span>{t('taskTimingHumanWait')}: {Math.round(currentExecution.timing.humanWaitMs / 1000)}s</span>
+          {currentActivity ? <p role="status" className="mt-2 text-xs text-ds-muted">{t(`taskActivity_${currentActivity.phase}`)}</p> : null}
+          {currentTiming ? <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ds-muted" title={t(currentTiming.coverage === 'complete' ? 'taskTimingComplete' : 'taskTimingPartial')}>
+            <span>{t('taskTimingExecution')}: {Math.round(currentTiming.executionMs / 1000)}s</span>
+            <span>{t('taskTimingQueued')}: {Math.round(currentTiming.queuedMs / 1000)}s</span>
+            <span>{t('taskTimingHumanWait')}: {Math.round(currentTiming.humanWaitMs / 1000)}s</span>
           </p> : null}
           <div className="my-4 flex min-w-0 max-w-full flex-wrap gap-2 [&>button]:min-w-0 [&>button]:max-w-full [&>button]:whitespace-normal">
             {['stalled', 'failed', 'paused'].includes((currentExecution ?? selected).status) && legacyLocalArtifactSourceMismatch(currentExecution ?? selected) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('revalidate')} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceRevalidateArtifacts')}</button> : null}
@@ -405,7 +411,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
           </div>
           <TaskPublicQueryRecoveryCard key={`public-query-recovery:${(currentExecution ?? selected).id}`} task={currentExecution ?? selected} runtimeReady={runtimeReady} disabled={actionBusy} onChanged={() => refresh()} onProjectionChange={recoveryProjectionChanged} onNotice={setControlNotice} />
           {!['running', 'queued', 'retrying'].includes((currentExecution ?? selected).status) ? <TaskBudgetControl key={selected.id} task={selected} onChanged={() => refresh()} /> : null}
-          {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} conversationThreadId={conversationForAttention(item)} workspaceRoot={selectedGroup?.all.find(task => task.id === item.taskId)?.workspaceRoot} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
+          {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} ownerTask={selectedGroup?.all.find(task => task.id === item.taskId)} conversationThreadId={conversationForAttention(item)} workspaceRoot={selectedGroup?.all.find(task => task.id === item.taskId)?.workspaceRoot} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
           <details key={`permissions:${(currentExecution ?? selected).id}`} className="mb-4 rounded-lg border border-ds-border p-3 text-xs"><summary className="cursor-pointer font-medium">{t('taskPermissionReview')}</summary><TaskPermissionPanel key={(currentExecution ?? selected).id} taskId={(currentExecution ?? selected).id} revision={(currentExecution ?? selected).revision} autoLoad onConfirmed={message => { setControlNotice(message); void refresh() }} /></details>
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunNodes')}</h3>
           <ol className="mb-4 space-y-1.5">{(currentExecution ?? selected).nodes.map(node => <li key={node.id} className="flex items-center gap-2 rounded-lg bg-ds-main px-3 py-2 text-xs"><span className="min-w-0 flex-1">{node.title}</span><span className="shrink-0 text-ds-muted">{t(nodeStatusLabelKey((currentExecution ?? selected).status, node.status))}</span></li>)}</ol>

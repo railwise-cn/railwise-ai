@@ -1,4 +1,4 @@
-import type { TaskRunV1 } from './agent-workbench'
+import type { TaskAttentionV1, TaskRunV1 } from './agent-workbench'
 import type { ExternalTaskCapability } from './task-command'
 
 /** Translate a structured runtime failure, never matching arbitrary message prose. */
@@ -9,6 +9,14 @@ export function isExecutionGrantExpiredCapability(value: unknown): value is Exte
   const capability = value as Partial<ExternalTaskCapability>
   return capability.provider === 'workspace' && capability.status === 'blocked' &&
     capability.errorCode === 'execution_grant_expired' && typeof capability.message === 'string'
+}
+
+/** An outer attention summary may translate only the exact current typed blocker of its real owner. */
+export function isMatchingExecutionGrantExpiredAttention(item: TaskAttentionV1, owner: TaskRunV1 | undefined): boolean {
+  const capability = item.payload?.kind === 'capability_required' ? item.payload.capability : undefined
+  return Boolean(owner && item.status === 'pending' && item.ownerKind === 'task' && item.ownerId === owner.id && item.taskId === owner.id &&
+    ['waiting_user','stalled','failed'].includes(owner.status) && isExecutionGrantExpiredCapability(capability) &&
+    item.message === capability.message && [owner.waitingReason,owner.stalledReason].includes(capability.message))
 }
 
 /** Admission and attempt counters alone do not prove that any work ran. */

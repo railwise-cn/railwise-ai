@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import type { Database } from 'better-sqlite3'
 import type { AttentionItem, TaskRun } from '../contracts/tasks.js'
 import type { TaskRunRepository } from './task-run-repository.js'
+import { projectTaskProgress, type TaskProgressProjection } from './task-progress-projection.js'
 
 export type TaskViewFilter = 'ongoing' | 'attention' | 'completed' | 'all'
 export type TaskPageQuery = { workspaceRoot?: string; threadId?: string; search?: string; filter?: TaskViewFilter; limit?: number; cursor?: string }
@@ -46,10 +47,31 @@ export class TaskViewService {
   changes(after: number, limit = 200): TaskFeedEvent[] {
     return (this.db.prepare('SELECT * FROM task_change_feed WHERE seq > ? ORDER BY seq LIMIT ?').all(after, limit) as Array<{ seq: number; task_id: string | null; kind: TaskFeedEvent['kind']; payload_json: string; created_at: string }>).map(row => ({ seq: row.seq, ...(row.task_id ? { taskId: row.task_id } : {}), kind: row.kind, payload: row.kind === 'task_changed' ? this.withTiming(JSON.parse(row.payload_json) as TaskRun) as unknown as Record<string,unknown> : JSON.parse(row.payload_json) as Record<string, unknown>, createdAt: row.created_at }))
   }
-  private withTiming(task: TaskRun): TaskRun {
+  /** The authenticated global task feed may read these visible task groups, including their real child owners. */
+  progress(): TaskProgressProjection[] {
+    const active = this.db.prepare("SELECT data_json FROM task_runs WHERE status IN ('running','retrying')").all() as Array<{ data_json: string }>
+    return active.flatMap(row => {
+      const task = JSON.parse(row.data_json) as TaskRun
+      let root = task
+      const seen = new Set<string>()
+      while (root.rootTaskId || root.parentTaskId) {
+        if (seen.has(root.id)) return []
+        seen.add(root.id)
+        // Use the same persisted projection as page(), including the legacy visible flag.
+        const parent = this.db.prepare('SELECT data_json FROM task_runs WHERE id=?').get(root.rootTaskId ?? root.parentTaskId!) as { data_json: string } | undefined
+        if (!parent) return []
+        root = JSON.parse(parent.data_json) as TaskRun
+        if (root.id === root.rootTaskId) break
+      }
+      if ((root as TaskRun & { visible?: boolean }).visible === false || ['internal','chat'].includes(root.visibility ?? '')) return []
+      const now = this.now(), timed = this.withTiming(task, now) as TaskRun & { timing?: TaskProgressProjection['timing'] }
+      const sample = projectTaskProgress(this.repository, task, now, timed.timing)
+      return sample ? [sample] : []
+    })
+  }
+  private withTiming(task: TaskRun, now = this.now()): TaskRun {
     const spans = this.db.prepare('SELECT status,started_at,finished_at FROM task_status_spans WHERE task_id=? ORDER BY id').all(task.id) as Array<{status:string;started_at:string;finished_at:string|null}>
     if (!spans.length) return task
-    const now = this.now()
     const duration = (statuses: string[]) => spans.filter(span => statuses.includes(span.status)).reduce((total, span) => total + Math.max(0, (span.finished_at ? Date.parse(span.finished_at) : now) - Date.parse(span.started_at)), 0)
     const timing = { executionMs: this.repository.execution.usedExecutionMs(task.rootTaskId ?? task.id, now), queuedMs: duration(['queued']), humanWaitMs: duration(['waiting_user','waiting_approval']), pausedMs: duration(['paused']), sampledAt: new Date(now).toISOString(), coverage: spans[0].started_at === task.createdAt ? 'complete' : 'partial' }
     return { ...task, timing } as TaskRun
@@ -114,18 +136,29 @@ export function taskFeedResponse(service: TaskViewService, request: Request): Re
   return new Response(new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false
+      const progressSamples = new Map<string, string>()
       const send = (text: string) => { if (!closed) controller.enqueue(encoder.encode(text)) }
       const deliver = () => {
         if (closed) return
         try {
           let batch: TaskFeedEvent[]
           do { batch = service.changes(seq); for (const event of batch) { seq = event.seq; send(`id: ${seq}\nevent: ${event.kind}\ndata: ${JSON.stringify(event)}\n\n`) } } while (batch.length === 200)
+          const active = new Set<string>()
+          for (const payload of service.progress()) {
+            active.add(payload.taskId)
+            const sample = JSON.stringify(payload)
+            if (progressSamples.get(payload.taskId) === sample) continue
+            progressSamples.set(payload.taskId, sample)
+            // No SSE id and no durable seq: observations never advance or rewind replay cursors.
+            send(`event: task_progress\ndata: ${JSON.stringify({ kind: 'task_progress', taskId: payload.taskId, payload, createdAt: payload.sampledAt })}\n\n`)
+          }
+          for (const id of progressSamples.keys()) if (!active.has(id)) progressSamples.delete(id)
         } catch { cleanup() }
       }
       const unsubscribe = service.repository.onChange(deliver)
       const heartbeat = setInterval(() => { deliver(); send(`: heartbeat ${seq}\n\n`) }, 15_000)
       heartbeat.unref?.()
-      cleanup = () => { if (closed) return; closed = true; unsubscribe(); clearInterval(heartbeat); request.signal.removeEventListener('abort',cleanup); try { controller.close() } catch { /* already closed */ } }
+      cleanup = () => { if (closed) return; closed = true; unsubscribe(); clearInterval(heartbeat); progressSamples.clear(); request.signal.removeEventListener('abort',cleanup); try { controller.close() } catch { /* already closed */ } }
       request.signal.addEventListener('abort',cleanup, { once: true })
       if (request.signal.aborted) cleanup(); else deliver()
     }, cancel() { cleanup() }

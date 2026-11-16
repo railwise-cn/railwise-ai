@@ -77,12 +77,12 @@ async function fixture(primaryOutput: Record<string, unknown> = {}) {
   }
   await bind('old-turn', 'old-c9', 3)
   let next = 0
-  const source = async (url: string, html: string, target?: string) => {
+  const source = async (url: string, html: string, target?: string, output: Record<string, unknown> = {}) => {
     const call = { callId: `source-${++next}`, toolName: 'browser_get_html', providerId: 'browser-skill', arguments: { sessionId: 'owned', ...(target ? { target } : {}) } }
     const operation = controller.beginToolOperation(grant.turnId, call, grant)!
     await sessionStore.appendItem(thread.id, makeToolCallItem({ id: `call-${call.callId}`, threadId: thread.id, turnId: grant.turnId, ...call }))
     const item = makeToolResultItem({ id: `item-${call.callId}`, threadId: thread.id, turnId: grant.turnId, callId: call.callId, toolName: call.toolName,
-      output: { status: 'succeeded', sourceUrl: url, html, resultHash: sha(html), truncated: false, readScope: target ? 'element' : 'document', evidence: { verified: true, contentRead: true }, ...(url.endsWith('/notice/1') ? primaryOutput : {}) } })
+      output: { status: 'succeeded', sourceUrl: url, html, resultHash: sha(html), truncated: false, readScope: target ? 'element' : 'document', evidence: { verified: true, contentRead: true }, ...(url.endsWith('/notice/1') ? primaryOutput : {}), ...output } })
     controller.finishToolOperation(operation.token, operation.key, { approved: true, item }); await sessionStore.appendItem(thread.id, item)
   }
   const tools = buildManagedArtifactToolProviders(controller)[0]!.tools
@@ -253,6 +253,50 @@ it('blocks the publish/verify rewrite loop before any new report write when a re
     await expect(stat(join(f.controller.managedArtifactRoot(f.task.id)!, 'report-0.html'))).rejects.toMatchObject({ code: 'ENOENT' })
     expect(f.repository.operations(f.task.id, 'tool').filter(row => row.request?.toolName === 'publish_artifact' && row.status === 'succeeded')).toHaveLength(1)
     expect(await f.controller.webArtifactProgressBlock(f.thread.id, 'new-turn')).toMatchObject({ code: 'web_artifact_repair_stalled', stalled: true })
+  } finally { f.repository.close() }
+})
+
+it.each(['other-origin', 'truncated-search', 'homepage', 'element-observation'] as const)('does not clear a missing Gov source failure after %s changes', async variant => {
+  const f = await fixture()
+  try {
+    const gov = origins[0]!, proof = input()
+    proof.items[0]!.source.url = gov+'/notice/not-yet-read'
+    const args = { path: 'new-report.html', report: { title: '待核验来源报告', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } }
+    const oldBytes = await readFile(f.path, 'utf8')
+    expect(await f.call('publish_artifact', args)).toMatchObject({ code: 'web_source_reads_required', semanticRepair: { failureCount: 1, stalled: false } })
+    if (variant === 'other-origin') {
+      const otherDiscovery = `<main><a href="/notice/other">${title}</a></main>`, otherDocument = document+'<p>另一来源正文。</p>'
+      await f.source(origins[1]+'/list-other', otherDiscovery, 'e1')
+      await f.source(origins[1]+'/notice/other', otherDocument)
+      proof.coverage[1] = { url: origins[1]+'/list-other', resultHash: sha(otherDiscovery) }
+      proof.noMatches = []; args.report.evidence.noMatches = proof.noMatches
+      proof.items.push({ sectionId: 'notice-other', title,
+        source: { url: origins[1]+'/notice/other', resultHash: sha(otherDocument) },
+        discovery: { url: origins[1]+'/list-other', resultHash: sha(otherDiscovery) }, classification: 'opportunity',
+        fields: values.map(([field, value, quote]) => ({ field, value, quote })), unverifiedFields: [] })
+    }
+    else if (variant === 'truncated-search') await f.source(gov+'/site/search', '<main>工程测量检索列表。</main>', undefined, { truncated: true })
+    else if (variant === 'homepage') await f.source(gov+'/', '<html><body>政府采购首页。</body></html>')
+    else await f.source(gov+'/site/detail', '<main>尚未完整核实的观察。</main>', 'e1')
+    expect(await f.call('publish_artifact', args)).toMatchObject({ code: 'web_artifact_repair_stalled', semanticRepair: { failureCount: 2, stalled: true }, missingOrigins: [gov] })
+    expect(await readFile(f.path, 'utf8')).toBe(oldBytes)
+    await expect(stat(join(f.controller.managedArtifactRoot(f.task.id)!, args.path))).rejects.toMatchObject({ code: 'ENOENT' })
+  } finally { f.repository.close() }
+})
+
+it('keeps the actual missing-origin deficit when a later publication drops its typed manifest', async () => {
+  const f = await fixture()
+  try {
+    const gov = origins[0]!, proof = input()
+    proof.items[0]!.source.url = gov+'/notice/not-yet-read'
+    await f.call('publish_artifact', { path: 'new-report.html', report: { title: '待核验来源报告', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } })
+    await f.source(origins[1]+'/list', empty+'<p>列表观察变化。</p>', undefined, { truncated: true })
+    expect(await f.call('publish_artifact', { path: 'renamed-report.html', content: report() })).toMatchObject({
+      code: 'web_artifact_repair_stalled', semanticRepair: { failureCount: 2, stalled: true }
+    })
+    expect(f.repository.operations(f.task.id, 'web_artifact_source_gate').at(-1)?.result).toMatchObject({
+      failureKinds: expect.arrayContaining(['source_manifest_required', `source_origin:${gov}`])
+    })
   } finally { f.repository.close() }
 })
 
@@ -574,5 +618,255 @@ it('round trips entity-represented original values through the real verifier', a
     const { path, ...evidence } = proof
     const generated = renderStructuredWebReport(path, { title: '原文字段实体测试', evidence })
     expect((await f.assessment(generated.content, generated.verificationInput)).complete).toBe(true)
+  } finally { f.repository.close() }
+})
+
+it('clears the old-path Gov source blocker after a new exact typed draft supplies its discovered full document', async () => {
+  const f = await fixture()
+  try {
+    const gov = origins[0]!, proof = input(), oldBytes = await readFile(f.path, 'utf8')
+    proof.items[0]!.source.url = gov+'/notice/not-yet-read'
+    const missing = { path: 'gov-before-read.html', report: { title: '待核验来源报告', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } }
+    expect(await f.call('publish_artifact', missing)).toMatchObject({ code: 'web_source_reads_required', semanticRepair: { failureCount: 1, stalled: false } })
+    expect(await f.call('publish_artifact', missing)).toMatchObject({ code: 'web_artifact_repair_stalled', semanticRepair: { failureCount: 2, stalled: true }, missingOrigins: [gov] })
+    expect(await f.controller.webArtifactProgressBlock(f.thread.id, 'new-turn')).toMatchObject({ code: 'web_artifact_repair_stalled', stalled: true })
+
+    const resolvedDiscovery = `<main><a href="/notice/not-yet-read">${title}</a></main>`
+    await f.source(gov+'/list-resolved', resolvedDiscovery, 'e1')
+    await f.source(gov+'/notice/not-yet-read', document)
+    const exact = input()
+    exact.path = 'gov-resolved.html'
+    exact.coverage[0] = { url: gov+'/list-resolved', resultHash: sha(resolvedDiscovery) }
+    exact.items[0]!.source = { url: gov+'/notice/not-yet-read', resultHash: sha(document) }
+    exact.items[0]!.discovery = { url: gov+'/list-resolved', resultHash: sha(resolvedDiscovery) }
+    const publication = await f.call('publish_artifact', { path: exact.path, report: { title: '新来源证据草稿', evidence: { coverage: exact.coverage, items: exact.items, noMatches: exact.noMatches } } })
+    expect(publication).toMatchObject({ verificationInput: { path: exact.path, manifestRef: expect.stringMatching(/^web-manifest:/) } })
+    expect(await readFile(f.path, 'utf8')).toBe(oldBytes)
+    expect(await readFile(join(f.controller.managedArtifactRoot(f.task.id)!, exact.path), 'utf8')).toContain('data-evidence-report')
+    expect(f.repository.get(f.task.id)!.status).not.toBe('completed')
+    expect(f.repository.operations(f.task.id, 'web_artifact_evidence')).toHaveLength(0)
+    expect(await f.controller.webArtifactProgressBlock(f.thread.id, 'new-turn')).toMatchObject({ stalled: false, semanticRepair: { failureCount: 0 } })
+    expect(await f.call('verify_web_artifact', publication.verificationInput as Record<string, unknown>)).toMatchObject({ complete: true })
+  } finally { f.repository.close() }
+})
+
+it('preserves the twice-stalled Gov source epoch across normal resume and repository/controller restart', async () => {
+  const f = await fixture()
+  let reopened: TaskRunRepository | undefined
+  try {
+    const gov = origins[0]!, proof = input(), oldBytes = await readFile(f.path, 'utf8')
+    proof.items[0]!.source.url = gov+'/notice/not-yet-read'
+    const args = { path: 'gov-before-restart.html', report: { title: '待核验来源报告', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } }
+    expect(await f.call('publish_artifact', args)).toMatchObject({ code: 'web_source_reads_required', semanticRepair: { failureCount: 1, stalled: false } })
+    expect(await f.call('publish_artifact', args)).toMatchObject({ code: 'web_artifact_repair_stalled', semanticRepair: { failureCount: 2, stalled: true }, missingOrigins: [gov] })
+    const current = f.repository.get(f.task.id)!
+    f.controller.pauseTask(f.task.id, current.revision)
+    f.controller.prepareResume(f.task.id, f.repository.get(f.task.id)!.revision)
+    f.repository.close()
+    reopened = new TaskRunRepository(join(f.root, 'tasks.sqlite3'))
+    const restarted = new TaskController({ repository: reopened, threadStore: f.threadStore, sessionStore: f.sessionStore, nowIso: () => fixtureTime, dataDir: f.root })
+    const thread = (await f.threadStore.get(f.thread.id))!, priorGrant = thread.turns.find(turn => turn.id === 'new-turn')!.executionGrant!
+    const grant = ExecutionGrantSchema.parse({ ...priorGrant, id: 'grant-source-restored', turnId: 'source-restored-turn', idempotencyKey: 'source-restored-grant' })
+    await f.threadStore.upsert({ ...thread, turns: [...thread.turns, { ...createTurnRecord({ id: 'source-restored-turn', threadId: thread.id, prompt: '继续核验同一来源缺口。' }), executionGrant: grant }] })
+    restarted.ensureTask({ thread: (await f.threadStore.get(thread.id))!, turnId: 'source-restored-turn', continuationTaskId: f.task.id, request: { prompt: '继续核验同一来源缺口。' } })
+    restarted.beginAttempt(thread.id, 'source-restored-turn')
+    expect(await restarted.webArtifactProgressBlock(thread.id, 'source-restored-turn')).toMatchObject({
+      code: 'web_artifact_repair_stalled', stalled: true, missingOrigins: expect.arrayContaining([gov]), semanticRepair: { failureCount: 2, stalled: true }
+    })
+    expect(await readFile(f.path, 'utf8')).toBe(oldBytes)
+    expect(reopened.get(f.task.id)!.status).not.toBe('completed')
+    expect(reopened.operations(f.task.id, 'web_artifact_evidence')).toHaveLength(0)
+    await expect(stat(join(restarted.managedArtifactRoot(f.task.id)!, args.path))).rejects.toMatchObject({ code: 'ENOENT' })
+  } finally { (reopened ?? f.repository).close() }
+})
+
+it('permits a resumed Turn to read a repair source but stops its first still-premature publication without resetting old failures', async () => {
+  const f = await fixture()
+  let reopened: TaskRunRepository | undefined
+  try {
+    const proof = input(), gov = origins[0]!, oldBytes = await readFile(f.path, 'utf8')
+    proof.items[0]!.source.url = gov+'/notice/not-yet-read'
+    const args = { path: 'before-manual-resume.html', report: { title: '待核验来源报告', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } }
+    await f.call('publish_artifact', args)
+    await f.call('publish_artifact', args)
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')).toMatchObject({ kind: 'waiting_user' })
+    const oldReceipts = f.repository.operations(f.task.id, 'web_artifact_source_gate').map(receipt => JSON.stringify(receipt))
+    f.controller.prepareResume(f.task.id, f.repository.get(f.task.id)!.revision)
+    f.repository.close()
+    reopened = new TaskRunRepository(join(f.root, 'tasks.sqlite3'))
+    const restarted = new TaskController({ repository: reopened, threadStore: f.threadStore, sessionStore: f.sessionStore, nowIso: () => fixtureTime, dataDir: f.root })
+    const thread = (await f.threadStore.get(f.thread.id))!, previous = thread.turns.find(turn => turn.id === 'new-turn')!.executionGrant!
+    const turnId = 'manual-source-repair', grant = ExecutionGrantSchema.parse({ ...previous, id: 'grant-manual-source-repair', turnId, idempotencyKey: 'grant-manual-source-repair' })
+    await f.threadStore.upsert({ ...thread, turns: [...thread.turns, { ...createTurnRecord({ id: turnId, threadId: thread.id, prompt: '继续读取并修复原来源缺口。' }), executionGrant: grant }] })
+    restarted.ensureTask({ thread: (await f.threadStore.get(thread.id))!, turnId, continuationTaskId: f.task.id, request: { prompt: '继续读取并修复原来源缺口。' } })
+    restarted.beginAttempt(thread.id, turnId)
+    expect(await restarted.suspendWebArtifactProgress(thread.id, turnId)).toBeNull()
+    const call = { callId: 'manual-source-read', toolName: 'browser_get_html', providerId: 'browser-skill', arguments: { sessionId: 'owned' } }
+    const operation = restarted.beginToolOperation(turnId, call, grant)!
+    const html = '<main>仍需读取完整公告。</main>'
+    const item = makeToolResultItem({ id: 'manual-source-result', threadId: thread.id, turnId, callId: call.callId, toolName: call.toolName,
+      output: { status: 'succeeded', sourceUrl: gov+'/site/search', html, resultHash: sha(html), truncated: true, readScope: 'document', evidence: { verified: true, contentRead: true } } })
+    restarted.finishToolOperation(operation.token, operation.key, { approved: true, item })
+    await f.sessionStore.appendItem(thread.id, item)
+    expect(await restarted.suspendWebArtifactProgress(thread.id, turnId)).toBeNull()
+    expect(await restarted.recordWebArtifactPublicationBlock(f.task.id, turnId, 'still-premature.html', proof)).toMatchObject({
+      stalled: true, semanticRepair: { failureCount: 3, stalled: true }
+    })
+    expect(await restarted.suspendWebArtifactProgress(thread.id, turnId)).toMatchObject({ kind: 'waiting_user' })
+    expect(reopened.operations(f.task.id, 'web_artifact_source_gate').slice(0, 2).map(receipt => JSON.stringify(receipt))).toEqual(oldReceipts)
+    expect(reopened.operations(f.task.id, 'web_artifact_source_gate').at(-1)?.request?.turnId).toBe(turnId)
+    expect(await readFile(f.path, 'utf8')).toBe(oldBytes)
+    await expect(stat(join(restarted.managedArtifactRoot(f.task.id)!, 'still-premature.html'))).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(reopened.get(f.task.id)!.status).toBe('waiting_user')
+  } finally { (reopened ?? f.repository).close() }
+})
+
+it('allows a resumed Turn to correct literal fields without new source bytes while retaining the old failure ledger', async () => {
+  const f = await fixture()
+  try {
+    const invalid = input()
+    invalid.items[0]!.fields.find(field => field.field === 'budget')!.quote = '原文没有这段预算100000元的句子。'
+    expect(await f.call('verify_web_artifact', invalid)).toMatchObject({ complete: false, semanticRepair: { failureCount: 1, stalled: false } })
+    await f.call('publish_artifact', { path: 'report.html', content: report().replace('<head>', '<head><style>body{color:#123}</style>') })
+    expect(await f.call('verify_web_artifact', invalid)).toMatchObject({ complete: false, semanticRepair: { failureCount: 2, stalled: true } })
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', 'rename-only.html', invalid)).toMatchObject({
+      stalled: true, semanticRepair: { failureCount: 2 }
+    })
+    const oldFailures = f.repository.operations(f.task.id, 'web_artifact_evidence').map(row => JSON.stringify(row))
+    const sourceRows = f.repository.operations(f.task.id, 'tool').filter(row => row.request?.toolName === 'browser_get_html').map(row => JSON.stringify(row))
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')).toMatchObject({ kind: 'waiting_user' })
+    f.controller.prepareResume(f.task.id, f.repository.get(f.task.id)!.revision)
+    const thread = (await f.threadStore.get(f.thread.id))!, previous = thread.turns.find(turn => turn.id === 'new-turn')!.executionGrant!
+    const turnId = 'manual-field-repair', grant = ExecutionGrantSchema.parse({ ...previous, id: 'grant-manual-field-repair', turnId, idempotencyKey: 'grant-manual-field-repair' })
+    await f.threadStore.upsert({ ...thread, turns: [...thread.turns, { ...createTurnRecord({ id: turnId, threadId: thread.id, prompt: '继续修复同一字段原文绑定。' }), executionGrant: grant }] })
+    f.controller.ensureTask({ thread: (await f.threadStore.get(thread.id))!, turnId, continuationTaskId: f.task.id, request: { prompt: '继续修复同一字段原文绑定。' } })
+    f.controller.beginAttempt(thread.id, turnId)
+    expect(await f.controller.suspendWebArtifactProgress(thread.id, turnId)).toBeNull()
+    const tools = buildManagedArtifactToolProviders(f.controller)[0]!.tools
+    const call = async (toolName: string, args: Record<string, unknown>) => {
+      const tool = tools.find(tool => tool.name === toolName)!, request = { callId: `manual-field-${toolName}`, toolName, providerId: 'managed-artifacts', arguments: args }
+      const operation = f.controller.beginToolOperation(turnId, request, grant)!
+      const context: ToolHostContext = { threadId: thread.id, turnId, workspace: thread.workspace, threadMode: 'agent', sandboxMode: 'read-only', approvalPolicy: 'auto',
+        abortSignal: new AbortController().signal, awaitApproval: async () => 'allow', executionGrant: grant,
+        currentToolOperation: () => f.controller.currentToolOperation(operation.token, operation.key, request, grant) }
+      tool.validateArguments?.(args, context)
+      const result = await tool.execute(args, context), item = makeToolResultItem({ id: request.callId+'-result', threadId: thread.id, turnId, callId: request.callId, toolName,
+        output: result.output, isError: result.isError, toolKind: tool.toolKind })
+      f.controller.finishToolOperation(operation.token, operation.key, { approved: true, item }); await f.sessionStore.appendItem(thread.id, item)
+      return (item as { output: unknown }).output as Record<string, unknown>
+    }
+    const exact = input(); exact.path = 'field-corrected.html'
+    expect((await f.assessment(report(), exact)).complete).toBe(true)
+    expect(f.repository.operations(f.task.id, 'web_artifact_evidence').map(row => JSON.stringify(row))).toEqual(oldFailures)
+    expect(f.repository.operations(f.task.id, 'tool').filter(row => row.request?.toolName === 'browser_get_html').map(row => JSON.stringify(row))).toEqual(sourceRows)
+    const publication = await call('publish_artifact', { path: exact.path, report: { title: '修正原文绑定的草稿', evidence: { coverage: exact.coverage, items: exact.items, noMatches: exact.noMatches } } })
+    expect(publication).toHaveProperty('bytes_written')
+    expect(f.repository.get(f.task.id)!.status).not.toBe('completed')
+    expect(f.repository.operations(f.task.id, 'web_artifact_evidence').map(row => JSON.stringify(row))).toEqual(oldFailures)
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, turnId)).toBeNull()
+    const saved = await readFile(join(f.controller.managedArtifactRoot(f.task.id)!, exact.path), 'utf8')
+    const read = await call('read_artifact', { path: exact.path, limit_bytes: 256 * 1024 })
+    expect(read).toMatchObject({ content: saved, sha256: publication.sha256, byte_size: Buffer.byteLength(saved),
+      bytes_returned: Buffer.byteLength(saved), offset_bytes: 0, truncated: false, next_offset_bytes: null })
+    expect(sha(saved)).toBe(publication.sha256)
+    expect(await call('verify_web_artifact', publication.verificationInput as Record<string, unknown>)).toMatchObject({ complete: true })
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, turnId)).toBeNull()
+    expect(f.repository.operations(f.task.id, 'web_artifact_evidence').slice(0, 2).map(row => JSON.stringify(row))).toEqual(oldFailures)
+    expect(f.repository.operations(f.task.id, 'tool').filter(row => row.request?.toolName === 'browser_get_html').map(row => JSON.stringify(row))).toEqual(sourceRows)
+  } finally { f.repository.close() }
+})
+
+/** New boundary cases retain an intact older writer while two distinct bad quotes stall its field epoch. */
+async function resumedLiteralRepairFixture() {
+  const f = await fixture()
+  try {
+    const invalid = input(), field = invalid.items[0]!.fields.find(field => field.field === 'budget')!
+    field.quote = '原文没有第一段预算100000元的句子。'
+    expect(await f.call('verify_web_artifact', invalid)).toMatchObject({ complete: false, semanticRepair: { failureCount: 1, stalled: false } })
+    field.quote = '原文没有第二段预算100000元的句子。'
+    expect(await f.call('verify_web_artifact', invalid)).toMatchObject({ complete: false, semanticRepair: { failureCount: 2, stalled: true } })
+    const oldFailures = f.repository.operations(f.task.id, 'web_artifact_evidence').map(row => JSON.stringify(row))
+    const sourceRows = f.repository.operations(f.task.id, 'tool').filter(row => row.request?.toolName === 'browser_get_html').map(row => JSON.stringify(row))
+    const oldBytes = await readFile(f.path, 'utf8')
+    expect(sha(oldBytes)).toBe(f.publication.sha256)
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')).toMatchObject({ kind: 'waiting_user' })
+    f.controller.prepareResume(f.task.id, f.repository.get(f.task.id)!.revision)
+    const thread = (await f.threadStore.get(f.thread.id))!, previous = thread.turns.find(turn => turn.id === 'new-turn')!.executionGrant!
+    const turnId = 'literal-boundary-repair', grant = ExecutionGrantSchema.parse({ ...previous, id: 'grant-literal-boundary', turnId, idempotencyKey: 'grant-literal-boundary' })
+    await f.threadStore.upsert({ ...thread, turns: [...thread.turns, { ...createTurnRecord({ id: turnId, threadId: thread.id, prompt: '继续修复同一字段原文绑定。' }), executionGrant: grant }] })
+    f.controller.ensureTask({ thread: (await f.threadStore.get(thread.id))!, turnId, continuationTaskId: f.task.id, request: { prompt: '继续修复同一字段原文绑定。' } })
+    f.controller.beginAttempt(thread.id, turnId)
+    const tools = buildManagedArtifactToolProviders(f.controller)[0]!.tools
+    let serial = 0
+    const call = async (toolName: string, args: Record<string, unknown>) => {
+      const tool = tools.find(tool => tool.name === toolName)!, request = { callId: `literal-boundary-${++serial}`, toolName, providerId: 'managed-artifacts', arguments: args }
+      const operation = f.controller.beginToolOperation(turnId, request, grant)!
+      const context: ToolHostContext = { threadId: thread.id, turnId, workspace: thread.workspace, threadMode: 'agent', sandboxMode: 'read-only', approvalPolicy: 'auto',
+        abortSignal: new AbortController().signal, awaitApproval: async () => 'allow', executionGrant: grant,
+        currentToolOperation: () => f.controller.currentToolOperation(operation.token, operation.key, request, grant) }
+      tool.validateArguments?.(args, context)
+      const result = await tool.execute(args, context), item = makeToolResultItem({ id: request.callId+'-result', threadId: thread.id, turnId, callId: request.callId, toolName,
+        output: result.output, isError: result.isError, toolKind: tool.toolKind })
+      f.controller.finishToolOperation(operation.token, operation.key, { approved: true, item }); await f.sessionStore.appendItem(thread.id, item)
+      return (item as { output: unknown }).output as Record<string, unknown>
+    }
+    return { ...f, turnId, resumedCall: call, oldFailures, sourceRows, oldBytes, invalid }
+  } catch (error) { f.repository.close(); throw error }
+}
+
+it.each(['bad-literal', 'legacy-content', 'forged-content'] as const)('rejects a resumed literal repair candidate with %s without replacing its stalled field epoch', async variation => {
+  const f = await resumedLiteralRepairFixture()
+  try {
+    const path = variation === 'legacy-content' ? 'report.html' : 'invalid-literal-copy.html'
+    const args = variation === 'bad-literal'
+      ? { path, report: { title: '仍然错误的原文绑定', evidence: { coverage: f.invalid.coverage, items: f.invalid.items, noMatches: f.invalid.noMatches } } }
+      : { path, content: report().replace('100000元', '999999元') }
+    expect(await f.resumedCall('publish_artifact', args)).toMatchObject({ code: 'web_artifact_repair_stalled', semanticRepair: { failureCount: 3, stalled: true } })
+    expect(await readFile(f.path, 'utf8')).toBe(f.oldBytes)
+    if (path !== 'report.html') await expect(stat(join(f.controller.managedArtifactRoot(f.task.id)!, path))).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(await f.controller.webArtifactProgressBlock(f.thread.id, f.turnId)).toMatchObject({ stalled: true, semanticRepair: { failureCount: 3 } })
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, f.turnId)).toMatchObject({ kind: 'waiting_user' })
+    expect(f.repository.operations(f.task.id, 'web_artifact_evidence').map(row => JSON.stringify(row))).toEqual(f.oldFailures)
+    expect(f.repository.operations(f.task.id, 'tool').filter(row => row.request?.toolName === 'browser_get_html').map(row => JSON.stringify(row))).toEqual(f.sourceRows)
+    expect(f.repository.get(f.task.id)!.status).not.toBe('completed')
+  } finally { f.repository.close() }
+})
+
+it('does not let an intact writer older than the field failures clear a resumed literal repair stall', async () => {
+  const f = await resumedLiteralRepairFixture()
+  try {
+    const request = f.publication.verificationInput as { path: string; manifestRef: string }
+    expect(await f.controller.resolveWebArtifactPublicationManifest(f.task.id, f.turnId, request.path, request.manifestRef, String(f.publication.sha256))).toEqual(input())
+    const read = await f.resumedCall('read_artifact', { path: request.path, limit_bytes: 256 * 1024 })
+    expect(read).toMatchObject({ content: f.oldBytes, sha256: f.publication.sha256, truncated: false })
+    expect(await f.controller.webArtifactProgressBlock(f.thread.id, f.turnId)).toMatchObject({ stalled: true, semanticRepair: { failureCount: 2 } })
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, f.turnId, request.path, input())).toMatchObject({ stalled: true, semanticRepair: { failureCount: 2 } })
+    expect(await f.resumedCall('verify_web_artifact', request)).toMatchObject({ complete: false, code: 'web_artifact_repair_stalled', semanticRepair: { failureCount: 3, stalled: true } })
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, f.turnId)).toMatchObject({ kind: 'waiting_user' })
+    expect(f.repository.operations(f.task.id, 'web_artifact_evidence').map(row => JSON.stringify(row))).toEqual(f.oldFailures)
+    expect(await readFile(f.path, 'utf8')).toBe(f.oldBytes)
+    expect(f.repository.get(f.task.id)!.status).not.toBe('completed')
+  } finally { f.repository.close() }
+})
+
+it.each(['cross-path', 'changed-bytes'] as const)('rejects %s reuse of the newly corrected literal repair manifest', async variation => {
+  const f = await resumedLiteralRepairFixture()
+  try {
+    const exact = input(); exact.path = 'new-literal-writer.html'
+    const publication = await f.resumedCall('publish_artifact', { path: exact.path, report: { title: '修正原文绑定的草稿', evidence: { coverage: exact.coverage, items: exact.items, noMatches: exact.noMatches } } })
+    expect(publication).toHaveProperty('bytes_written')
+    const request = publication.verificationInput as { path: string; manifestRef: string }
+    const target = join(f.controller.managedArtifactRoot(f.task.id)!, exact.path), bytes = await readFile(target, 'utf8')
+    expect(await f.controller.suspendWebArtifactProgress(f.thread.id, f.turnId)).toBeNull()
+    if (variation === 'cross-path') {
+      request.path = 'borrowed-literal-manifest.html'
+      await writeFile(join(f.controller.managedArtifactRoot(f.task.id)!, request.path), bytes)
+    } else await writeFile(target, bytes.replace('100000元', '999999元'))
+    await expect(f.resumedCall('verify_web_artifact', request)).rejects.toMatchObject({ code: 'artifact_manifest_scope' })
+    if (variation === 'changed-bytes') expect(await f.controller.webArtifactProgressBlock(f.thread.id, f.turnId)).toMatchObject({ stalled: true, semanticRepair: { failureCount: 2 } })
+    expect(f.repository.operations(f.task.id, 'web_artifact_evidence').map(row => JSON.stringify(row))).toEqual(f.oldFailures)
+    expect(f.repository.operations(f.task.id, 'tool').filter(row => row.request?.toolName === 'browser_get_html').map(row => JSON.stringify(row))).toEqual(f.sourceRows)
+    expect(await readFile(f.path, 'utf8')).toBe(f.oldBytes)
+    expect(f.repository.get(f.task.id)!.status).not.toBe('completed')
   } finally { f.repository.close() }
 })

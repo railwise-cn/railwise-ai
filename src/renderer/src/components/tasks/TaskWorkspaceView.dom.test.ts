@@ -130,6 +130,45 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('summarizes matching typed expiry attention for the real root and retry owners while preserving collapsed raw diagnostics', async () => {
+    await i18n.changeLanguage('zh')
+    const raw='Execution grant expired; start a newly authorized Turn.'
+    const original={...task('original','failed'),waitingReason:raw}
+    const child={...task('retry-child','waiting_user'),rootTaskId:original.id,retryOfTaskId:original.id,waitingReason:raw}
+    tasks=[original,child]
+    inbox=tasks.map(owner=>({id:`capability_${owner.id}`,ownerKind:'task',ownerId:owner.id,taskId:owner.id,threadId:owner.threadId,
+      kind:'blocked',title:'确认任务执行权限',message:raw,status:'pending',revision:0,createdAt:now,updatedAt:now,
+      payload:{kind:'capability_required',request:{prompt:owner.goal},capability:{provider:'workspace',status:'blocked',errorCode:'execution_grant_expired',message:raw,checkedAt:now,
+        action:{kind:'grant',route:'task/permissions',label:'确认任务权限'}}}}))
+    await act(async()=>{await refreshTaskState();updateTaskNavigation({selectedTaskId:original.id,filter:'all'})});await settle();await settle()
+    const cards=[...container.querySelectorAll('h4')].filter(node=>node.textContent==='确认任务执行权限').map(node=>node.parentElement!)
+    expect(cards).toHaveLength(2)
+    for(const card of cards){
+      expect(card.querySelector(':scope > p')?.textContent).toBe('执行授权已到期')
+      const diagnostics=[...card.querySelectorAll('details')].find(node=>node.textContent?.includes(raw))!
+      expect(diagnostics).toBeTruthy();expect(diagnostics.open).toBe(false)
+    }
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('updates sampled time and business phase without a Task revision change or another detail/list request', async () => {
+    await i18n.changeLanguage('zh')
+    tasks=[{...task('working','running'),activeTurnId:'turn-current',timing:{executionMs:319000,queuedMs:0,humanWaitMs:0,pausedMs:0,sampledAt:now,coverage:'complete'}}];inbox=[]
+    await act(async()=>{await refreshTaskState();updateTaskNavigation({selectedTaskId:'working',filter:'all'})});await settle()
+    expect(container.textContent).toContain('319s')
+    const pages=vi.mocked(window.workwise.listTaskPage).mock.calls.length,details=vi.mocked(window.workwise.listTaskOperationReceipts).mock.calls.length,before=JSON.stringify(tasks[0])
+    const streamId=vi.mocked(window.workwise.startTaskSse).mock.calls[0][1]!,receive=vi.mocked(window.workwise.onSseEvent).mock.calls[0][0]
+    const sampledAt=new Date().toISOString(),leaseExpiresAt=new Date(Date.now()+60000).toISOString()
+    await act(async()=>receive({streamId,events:[{kind:'task_progress',taskId:'working',payload:{taskId:'working',taskRevision:1,turnId:'turn-current',executionId:'execution-current',
+      leaseRevision:1,leaseExpiresAt,active:true,sampledAt,activity:{phase:'reading'},
+      timing:{executionMs:334000,queuedMs:0,humanWaitMs:0,pausedMs:0,sampledAt,coverage:'complete'}}}]}))
+    await settle();expect(container.textContent).toContain('334s');expect(container.textContent).toContain('正在读取页面内容')
+    expect(JSON.stringify(tasks[0])).toBe(before);expect(window.workwise.listTaskPage).toHaveBeenCalledTimes(pages);expect(window.workwise.listTaskOperationReceipts).toHaveBeenCalledTimes(details)
+    vi.spyOn(Date,'now').mockReturnValue(Date.parse(leaseExpiresAt)+1)
+    await act(async()=>receive({streamId,events:[{seq:1,kind:'attention_changed',payload:{id:'resolved-observation',status:'answered'}}]}))
+    expect(container.textContent).not.toContain('正在读取页面内容');expect(container.textContent).toContain('334s')
+  })
+
   it.each([
     ['stalled', 'taskNodeStatus_blocked'], ['paused', 'taskRunStatus_paused'], ['waiting_user', 'taskRunStatus_waiting_user'],
     ['waiting_approval', 'taskRunStatus_waiting_approval'], ['queued', 'taskRunStatus_queued']

@@ -140,8 +140,9 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
       const content = /\.html?$/i.test(input.path) ? prepareHtmlArtifact(rawContent) : rawContent
       const root = rootFor(context)
       const target = join(root, ...parts)
-      let gate = await tasks.webArtifactPublicationGate?.(context.executionGrant!.taskId!, context.turnId, input.path, rendered?.verificationInput)
-      if (gate && !gate.ready) gate = await tasks.recordWebArtifactPublicationBlock?.(context.executionGrant!.taskId!, context.turnId, input.path, rendered?.verificationInput) ?? gate
+      const candidate = rendered ? { html: content } : null
+      let gate = await tasks.webArtifactPublicationGate?.(context.executionGrant!.taskId!, context.turnId, input.path, rendered?.verificationInput, candidate)
+      if (gate && !gate.ready) gate = await tasks.recordWebArtifactPublicationBlock?.(context.executionGrant!.taskId!, context.turnId, input.path, rendered?.verificationInput, candidate) ?? gate
       if (gate && !gate.ready) return { isError: true, output: { ...gate,
         message: gate.stalled ? '相同来源或字段问题在一次修复后仍未解决，已停止重复发布。已有草稿及原始核验记录保留。' : gate.reportManifestRequired
           ? '网页采集首次发布须使用现有report结构化模式，声明已读正文或可信零匹配。legacy content仅用于原文件已有可信核验输入的修复；未写入新报告。'

@@ -1,10 +1,16 @@
 import { createHash } from 'node:crypto'
 
 /** Supplied only from trusted verification receipts and their source-read epoch. */
-export type WebArtifactRepairAttempt = {
-  id?: string
+export type WebArtifactRepairEpoch = {
   requirementHash: string
   evidenceFingerprint: string
+  /** Only trusted qualifying progress for this specific validator category. */
+  failureEvidenceFingerprints?: Readonly<Record<string, string>>
+}
+
+export type WebArtifactRepairAttempt = WebArtifactRepairEpoch & {
+  id?: string
+  turnId?: string
   /** Canonical validator categories, never HTML bytes, paths or model-chosen section IDs. */
   failureKinds: readonly string[]
   reasons: readonly string[]
@@ -18,12 +24,16 @@ export type WebArtifactRepairState = {
 }
 
 function fingerprint(attempt: WebArtifactRepairAttempt): string {
+  const kinds = [...new Set(attempt.failureKinds)].sort()
   return createHash('sha256').update(JSON.stringify({
     requirementHash: attempt.requirementHash,
-    evidenceFingerprint: attempt.evidenceFingerprint,
-    failureKinds: [...new Set(attempt.failureKinds)].sort()
+    ...(attempt.failureEvidenceFingerprints ? { failureEvidenceFingerprints: Object.fromEntries(kinds.map(kind => [kind, evidenceEpoch(attempt, kind)])) }
+      : { evidenceFingerprint: attempt.evidenceFingerprint }),
+    failureKinds: kinds
   })).digest('hex')
 }
+
+const evidenceEpoch = (attempt: WebArtifactRepairEpoch, kind: string) => attempt.failureEvidenceFingerprints?.[kind] ?? attempt.evidenceFingerprint
 
 /**
  * The first failed assessment permits one repair. Repeating the same semantic
@@ -32,37 +42,30 @@ function fingerprint(attempt: WebArtifactRepairAttempt): string {
  */
 export function deriveWebArtifactRepairState(
   priorAttempts: readonly WebArtifactRepairAttempt[],
-  current?: WebArtifactRepairAttempt
+  current?: WebArtifactRepairAttempt,
+  /** Query current trusted progress without inventing another failed assessment. */
+  currentEpoch?: WebArtifactRepairEpoch
 ): WebArtifactRepairState {
-  const target = current ?? priorAttempts.at(-1)
-  if (!target) return { fingerprint: '', failureCount: 0, stalled: false, reasons: [] }
+  const latest = current ?? priorAttempts.at(-1)
+  if (!latest) return { fingerprint: '', failureCount: 0, stalled: false, reasons: [] }
+  const target = currentEpoch ? { ...latest, ...currentEpoch } : latest
   const key = fingerprint(target)
   const reasons = [...target.reasons]
   if (!target.failureKinds.length) return { fingerprint: key, failureCount: 0, stalled: false, reasons }
 
   const attempts = current ? [...priorAttempts, current] : priorAttempts
-  // An evidence/requirement transition begins a new epoch, including a later
-  // return to previously seen bytes. Old counters must not cross that boundary.
-  let epochStart = attempts.length - 1
-  while (epochStart > 0) {
-    const previous = attempts[epochStart - 1]!
-    if (previous.requirementHash !== target.requirementHash || previous.evidenceFingerprint !== target.evidenceFingerprint) break
-    epochStart--
-  }
-
   // Track each remaining defect independently. Fixing a different field, or
-  // adding another error, cannot erase a still-unresolved semantic failure.
+  // reading another origin, cannot erase a still-unresolved semantic failure.
   const counts = new Map([...new Set(target.failureKinds)].map(kind => [kind, 0]))
-  const seen = new Map<string, Set<string>>()
-  for (let index = epochStart; index < attempts.length; index++) {
-    const attempt = attempts[index]!
-    for (const kind of new Set(attempt.failureKinds)) {
-      if (!counts.has(kind)) continue
+  for (const kind of counts.keys()) {
+    const seen = new Set<string>()
+    for (let index = attempts.length - 1; index >= 0; index--) {
+      const attempt = attempts[index]!
+      if (attempt.requirementHash !== target.requirementHash || evidenceEpoch(attempt, kind) !== evidenceEpoch(target, kind)) break
+      if (!attempt.failureKinds.includes(kind)) continue
       if (attempt.id !== undefined) {
-        const receipts = seen.get(kind) ?? new Set<string>()
-        if (receipts.has(attempt.id)) continue
-        receipts.add(attempt.id)
-        seen.set(kind, receipts)
+        if (seen.has(attempt.id)) continue
+        seen.add(attempt.id)
       }
       counts.set(kind, counts.get(kind)! + 1)
     }

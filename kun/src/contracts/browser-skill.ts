@@ -134,7 +134,7 @@ export const BrowserLoadedResponseProofSchema = z.object({
   grantFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
   configurationFingerprint: z.string().min(1).max(512),
   articleIdHash: z.string().regex(/^[a-f0-9]{64}$/), titleHash: z.string().regex(/^[a-f0-9]{64}$/),
-  association: z.enum(['title', 'projectName']), associationHash: z.string().regex(/^[a-f0-9]{64}$/),
+  association: z.enum(['title', 'projectName', 'metadata_identity']), associationHash: z.string().regex(/^[a-f0-9]{64}$/),
   contentPointer: z.string().min(1).max(1024),
   responseUtf16Units: z.number().int().positive().max(65536), responseUtf8Bytes: z.number().int().positive().max(262144),
   responseSha256: z.string().regex(/^[a-f0-9]{64}$/),

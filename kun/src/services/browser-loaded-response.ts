@@ -17,8 +17,19 @@ const normalize = (text: string) => text.replace(/\s/gu, '')
 
 export function publicArticleId(value: string): string | undefined {
   try {
-    const url = new URL(value), values = url.searchParams.getAll('articleId')
-    if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || [...url.searchParams.keys()].some(key => /token|password|secret|cookie|authorization|signature/i.test(key)) || values.length !== 1 || !identifier(values[0])) return undefined
+    const url = new URL(value)
+    // These are URI identifiers, not submitted form fields. URLSearchParams
+    // converts a literal '+' into a space and breaks a browser URL's base64 ID
+    // when its own loaded response correctly encodes that byte as '%2B'.
+    // Decode exactly once: an encoded space or '%252B' is a different value.
+    const entries = url.search.slice(1).split('&').map(pair => {
+      const separator = pair.indexOf('=')
+      return [decodeURIComponent(separator < 0 ? pair : pair.slice(0, separator)),
+        decodeURIComponent(separator < 0 ? '' : pair.slice(separator + 1))] as const
+    })
+    const values = entries.filter(([key]) => key === 'articleId').map(([, id]) => id)
+    if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || entries.some(([key]) => /token|password|secret|cookie|authorization|signature/i.test(key)) ||
+      values.length !== 1 || !identifier(values[0]) || /[\s\p{Cc}]/u.test(values[0])) return undefined
     return values[0]
   } catch { return undefined }
 }
@@ -31,13 +42,14 @@ function plainHtml(html: string): string {
   parser.ontext = text => { if (!hidden) parts.push(text) }
   parser.oncdata = text => { if (!hidden) parts.push(text) }
   parser.onerror = () => { parser.resume() }
-  try { parser.write(html).close() } catch { return '' }
+  try { parser.write(`<body>${html}</body>`).close() } catch { return '' }
   return normalize(parts.join(' '))
 }
 
-export type PrimaryResponseRepresentation = { html: string; title: string; pointer: string; association: 'title' | 'projectName'; associationHash: string }
+export type PrimaryResponseRepresentation = { html: string; title: string; pointer: string; association: 'title' | 'projectName' | 'metadata_identity'; associationHash: string }
 /** A narrow representation contract, independent of hostnames and API paths.
- * A JSON wrapper is not authority: ID, native title and actual HTML must agree. */
+ * A JSON wrapper is not authority: the independent URL ID and current native title
+ * must exactly match one response object. Its visible body need not repeat metadata. */
 export function primaryResponseRepresentation(text: string, articleId: string, nativeTitle: string): PrimaryResponseRepresentation | undefined {
   let parsed: unknown
   try { parsed = JSON.parse(text) } catch { return undefined }
@@ -52,9 +64,17 @@ export function primaryResponseRepresentation(text: string, articleId: string, n
         item.articleId === articleId && item.title === nativeTitle && typeof item.content === 'string' && item.content.trim() &&
         Buffer.byteLength(item.content) <= 262144 && /<[a-z][^>]*>/i.test(item.content)) {
         const body = plainHtml(item.content), title = normalize(nativeTitle), project = typeof item.projectName === 'string' ? normalize(item.projectName) : ''
-        const association = title && body.includes(title) ? 'title' : [...project].length >= 8 && title.includes(project) && body.includes(project) ? 'projectName' : undefined
-        if (association && body) matches.push({ html: item.content, title: nativeTitle,
-          pointer: `${pointer}/content`, association, associationHash: hash(association === 'title' ? title : project) })
+        // A title alone, hidden script/style payload or an empty app shell is not a document body.
+        // Keep existing body associations first for old proof compatibility; metadata identity
+        // proves only which complete response was read, never its facts or a full DOM.
+        if (body && body !== title && (!project || body !== project)) {
+          const contentPointer = `${pointer}/content`
+          const association = title && body.includes(title) ? 'title' : [...project].length >= 8 && title.includes(project) && body.includes(project) ? 'projectName' : 'metadata_identity'
+          const associationHash = association === 'metadata_identity'
+            ? hash(JSON.stringify({ association, articleId, nativeTitle, contentPointer, htmlSha256: hash(item.content) }))
+            : hash(association === 'title' ? title : project)
+          matches.push({ html: item.content, title: nativeTitle, pointer: contentPointer, association, associationHash })
+        }
       }
     }
     for (const [key, child] of Object.entries(value)) visit(child, `${pointer}/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`, depth + 1)

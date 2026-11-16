@@ -7,6 +7,32 @@ function failure(overrides: Partial<WebArtifactRepairAttempt> = {}): WebArtifact
 }
 
 describe('web artifact semantic repair state', () => {
+  it('keeps a missing origin in its own epoch while other origins and incomplete observations change', () => {
+    const gov = 'source_origin:https://gov.example.test', other = 'source_origin:https://other.example.test'
+    const first = failure({ id: 'gate-1', failureKinds: [gov, other], evidenceFingerprint: 'all-reads-1',
+      failureEvidenceFingerprints: { [gov]: 'no-qualified-gov', [other]: 'no-qualified-other' } })
+    const next = failure({ id: 'gate-2', failureKinds: [gov], evidenceFingerprint: 'all-reads-2',
+      failureEvidenceFingerprints: { [gov]: 'no-qualified-gov', [other]: 'qualified-other-document' } })
+    expect(deriveWebArtifactRepairState([first], next)).toMatchObject({ failureCount: 2, stalled: true })
+    const qualifiedGov = failure({ id: 'gate-3', failureKinds: [gov], evidenceFingerprint: 'all-reads-3',
+      failureEvidenceFingerprints: { [gov]: 'qualified-gov-document', [other]: 'qualified-other-document' } })
+    expect(deriveWebArtifactRepairState([first, next], qualifiedGov)).toMatchObject({ failureCount: 1, stalled: false })
+  })
+
+  it('queries current per-failure progress without adding an assessment', () => {
+    const kind = 'source_origin:https://gov.example.test'
+    const first = failure({ id: 'gate-1', failureKinds: [kind], failureEvidenceFingerprints: { [kind]: 'no-source' } })
+    const second = failure({ ...first, id: 'gate-2' })
+    expect(deriveWebArtifactRepairState([first, second], undefined, {
+      requirementHash: first.requirementHash, evidenceFingerprint: 'different-observation',
+      failureEvidenceFingerprints: { [kind]: 'no-source' }
+    })).toMatchObject({ failureCount: 2, stalled: true })
+    expect(deriveWebArtifactRepairState([first, second], undefined, {
+      requirementHash: first.requirementHash, evidenceFingerprint: 'qualified-source',
+      failureEvidenceFingerprints: { [kind]: 'qualified-source' }
+    })).toMatchObject({ failureCount: 0, stalled: false })
+  })
+
   it('allows one bounded repair and stalls the same source deficit on its second trusted failure', () => {
     const first = failure({ id: 'verify-1' })
     expect(deriveWebArtifactRepairState([], first)).toMatchObject({ failureCount: 1, stalled: false, reasons: first.reasons })

@@ -39,6 +39,8 @@ export function TaskRunStatusBar({ threadId, runtimeReady, onOpenTasks }: Props)
   const error=live.error
 
   const progress = useMemo(() => task ? taskProgress(task) : { completed: 0, total: 0 }, [task])
+  const sample = task ? live.progress?.[task.id] : undefined
+  const activity = task && sample?.active && Date.parse(sample.leaseExpiresAt) > Date.now() && sample.taskRevision === task.revision && sample.turnId === task.activeTurnId && ACTIVE_STATUSES.has(task.status) ? sample.activity : undefined
   if (!task && !error) return null
 
   const attention = task ? taskNeedsAttention(task) : true
@@ -59,6 +61,7 @@ export function TaskRunStatusBar({ threadId, runtimeReady, onOpenTasks }: Props)
       <div className="flex flex-wrap items-center gap-2 px-3 py-2">
         <span className="inline-flex items-center gap-2 text-[12.5px] font-semibold">{statusIcon}{task ? t(`taskRunStatus_${task.status}`) : t('taskRunUnavailable')}</span>
         {task && progress.total > 0 ? <span className="text-[11.5px] opacity-75">{t('taskRunProgress', progress)}</span> : null}
+        {activity ? <span className="text-[11.5px] opacity-75">{t(`taskActivity_${activity.phase}`)}</span> : null}
         {reason ? <span className="min-w-0 flex-1 truncate text-[11.5px] opacity-80">{reason}</span> : <span className="flex-1" />}
         {onOpenTasks ? <button type="button" onClick={() => { if (task) requestTaskDetail(task.rootTaskId ?? task.id); onOpenTasks() }} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-current/20 px-2.5 py-1.5 text-[11.5px] font-medium hover:bg-black/5 dark:hover:bg-white/5"><ExternalLink className="h-3.5 w-3.5" />{t('taskRunOpenTaskWorkspace')}</button> : null}
       </div>

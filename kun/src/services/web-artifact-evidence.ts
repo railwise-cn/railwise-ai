@@ -17,7 +17,7 @@ export const webArtifactRequirementHash = (task: TaskRun) => operationFingerprin
 export const isProcurementWebReport = (task: TaskRun) => /招标|投标|采购|tender|procurement/i.test(task.goal)
 export const needsPrimaryWebDocuments = (task: TaskRun) => /招标|投标|采购|公告|正文|详情|primary\s+(?:source|document)|tender|procurement/i.test(task.goal)
 const decode = (value: string) => value.replace(/&#(?:x([a-f0-9]+)|(\d+));/gi, (_, hex, decimal) => { const code = parseInt(hex ?? decimal, hex ? 16 : 10); return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '' }).replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (_, key) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' })[key as 'amp'])
-const markup = (value: string) => value.replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style|template)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+const markup = (value: string) => value.replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style|template|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
 const text = (value: string) => decode(markup(value).replace(/<[^>]*>/g, ' ')).replace(/\s+/g, '')
 const attr = (tag: string, key: string) => {
   const match = new RegExp(`(?:^|\\s)${key}(?:\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))|(?=\\s|/?>))`, 'i').exec(tag)
@@ -51,10 +51,19 @@ function nodes(html: string): HtmlNode[] | undefined {
 }
 const inside = (node: HtmlNode, parent: HtmlNode) => node.start > parent.start && node.end <= parent.end
 
-type Source = { receiptId: string; receiptHash: string; turnId: string; url: string; resultHash: string; content: string; full: boolean; readAt: string }
+type Source = { receiptId: string; receiptHash: string; turnId: string; url: string; resultHash: string; content: string; title?: string; full: boolean; readAt: string }
+// Only independently validated loaded-response metadata has a title. Legacy DOM reads
+// without metadata may coexist; two actual metadata identities for the same bytes may not.
+function findSource(available: Source[], reference: WebSourceReference): Source | undefined {
+  const matches = available.filter(source => source.url === canonical(reference.url) && source.resultHash === reference.resultHash)
+  if (new Set(matches.flatMap(source => source.title ? [source.title] : [])).size > 1) return undefined
+  return matches.find(source => source.title) ?? matches[0]
+}
+const sourceHasTitle = (source: Source, title: string) => text(source.content).includes(text(title)) || Boolean(source.title && text(source.title) === text(title))
 export type WebArtifactEvidenceAssessment = { complete: boolean; reasons: string[]; sourceReceipts: Array<Omit<Source, 'content'>> }
 export type WebArtifactSourceGate = {
   ready: boolean; missingOrigins: string[]; evidenceFingerprint: string
+  failureEvidenceFingerprints: Record<string, string>
   reportManifestRequired: boolean
   nextReads: Array<{ origin: string; url: string; discovery: WebSourceReference }>
 }
@@ -65,30 +74,48 @@ function actualZeroMatch(task: TaskRun, source: Source | undefined, entry: WebAr
 }
 
 /** Publication readiness reuses the exact authenticated read extractor; it never verifies a report. */
-export function webArtifactPublicationReadiness(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], input?: WebArtifactEvidenceInput, allowedOrigins: string[] = []): WebArtifactSourceGate {
+export function webArtifactPublicationReadiness(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], input?: WebArtifactEvidenceInput, allowedOrigins: string[] = [], progressInputs: readonly WebArtifactEvidenceInput[] = []): WebArtifactSourceGate {
   const available = sources(repository, task, items, turns)
-  const evidenceFingerprint = operationFingerprint([...new Set(available.map(source => JSON.stringify({ url: source.url, resultHash: source.resultHash, full: source.full })))].sort())
+  const evidenceFingerprint = operationFingerprint([...new Set(available.map(source => JSON.stringify({ url: source.url, resultHash: source.resultHash, full: source.full, title: source.title })))].sort())
   const required = task.acceptance.requiredSourceOrigins?.length ? task.acceptance.requiredSourceOrigins
     : [...new Set((input ? input.coverage : available).map(source => new URL(source.url).origin))]
   const covered = new Set<string>(), primary = needsPrimaryWebDocuments(task)
-  const find = (reference: WebSourceReference) => available.find(source => source.url === canonical(reference.url) && source.resultHash === reference.resultHash)
+  const qualifying = new Map<string, Set<string>>()
+  const remember = (source: Source) => {
+    const origin = new URL(source.url).origin
+    const proofs = qualifying.get(origin) ?? new Set<string>()
+    proofs.add(JSON.stringify({ url: source.url, resultHash: source.resultHash, full: source.full, title: source.title }))
+    qualifying.set(origin, proofs)
+  }
+  const find = (reference: WebSourceReference) => findSource(available, reference)
   const explicitlyRequested = (source: Source) => [...task.goal.matchAll(/https?:\/\/[^\s<>"'）)，。]+/gi)].some(match => canonical(match[0]) === source.url)
-  if (input) {
-    if (!primary) for (const reference of input.coverage) {
+  const qualify = (proof: WebArtifactEvidenceInput, accept: (source: Source) => void) => {
+    if (!primary) for (const reference of proof.coverage) {
       const source = find(reference)
-      if (source?.full) covered.add(new URL(source.url).origin)
+      if (source?.full) accept(source)
     }
-    for (const item of input.items) {
+    for (const item of proof.items) {
       const source = find(item.source), discovery = find(item.discovery)
       if (source?.full && discovery && (explicitlyRequested(source) || source.url !== discovery.url && links(discovery.content, discovery.url).has(source.url)) &&
-        text(source.content).includes(text(item.title)) && (!isProcurementWebReport(task) || item.classification !== 'historical')) covered.add(new URL(source.url).origin)
+        sourceHasTitle(source, item.title) && (!isProcurementWebReport(task) || item.classification !== 'historical')) accept(source)
     }
-    for (const entry of input.noMatches) if (actualZeroMatch(task, find(entry.source), entry)) covered.add(new URL(entry.source.url).origin)
+    for (const entry of proof.noMatches) {
+      const source = find(entry.source)
+      if (actualZeroMatch(task, source, entry)) accept(source!)
+    }
+  }
+  const cover = (source: Source) => { covered.add(new URL(source.url).origin); remember(source) }
+  if (input) {
+    qualify(input, cover)
   } else {
     // A homepage/list can be full and linked. Without a typed primary-source
     // manifest it must never stand in for a formal document or a query-zero proof.
-    if (!primary) for (const source of available) if (source.full) covered.add(new URL(source.url).origin)
+    if (!primary) for (const source of available) if (source.full) cover(source)
   }
+  // Recompute progress from authenticated source bytes and trusted prior typed
+  // declarations. Dropping a manifest or changing its path cannot roll back a
+  // completed source repair. This union never supplies current report coverage.
+  for (const prior of progressInputs) qualify(prior, remember)
   const missingOrigins = required.filter(origin => !covered.has(origin))
   const nextReads: WebArtifactSourceGate['nextReads'] = []
   const seen = new Set<string>()
@@ -97,7 +124,17 @@ export function webArtifactPublicationReadiness(repository: TaskRunRepository, t
     if (!missingOrigins.includes(origin) || !allowedOrigins.includes(origin) || seen.has(url) || nextReads.length >= 20) continue
     seen.add(url); nextReads.push({ origin, url, discovery: { url: discovery.url, resultHash: discovery.resultHash } })
   }
-  return { ready: required.length > 0 && missingOrigins.length === 0, missingOrigins, evidenceFingerprint, nextReads, reportManifestRequired: primary && !input }
+  // A source deficit can advance only through the same primary/zero-match
+  // predicate that actually covers that origin. Raw observations, truncated
+  // lists, unrelated full pages and another origin's progress are not repairs.
+  const failureEvidenceFingerprints = Object.fromEntries(required.map(origin => [
+    `source_origin:${origin}`, operationFingerprint([...(qualifying.get(origin) ?? [])].sort())
+  ]))
+  const qualifiedFingerprint = operationFingerprint(required.flatMap(origin => [...(qualifying.get(origin) ?? [])]).sort())
+  failureEvidenceFingerprints.source_manifest_required = qualifiedFingerprint
+  failureEvidenceFingerprints.source_read_required = qualifiedFingerprint
+  return { ready: required.length > 0 && missingOrigins.length === 0, missingOrigins, evidenceFingerprint,
+    failureEvidenceFingerprints, nextReads, reportManifestRequired: primary && !input }
 }
 
 /** Canonical validator failures exclude model-chosen section IDs and artifact byte churn. */
@@ -186,7 +223,7 @@ function sources(repository: TaskRunRepository, task: TaskRun, items: TurnItem[]
     if (!resultHash || !/^[a-f0-9]{64}$/i.test(resultHash)) continue
     if (typeof output.html === 'string' && hash(output.html) !== resultHash) continue
     const full = item.toolName === 'browser_get_html' && output.sourceKind === 'actual_loaded_response' && validLoadedResponseEvidence(output, grant) || web && output.truncated === false || item.toolName === 'browser_get_html' && output.truncated === false && (output.readScope === 'document' || output.readScope === undefined && /<html\b/i.test(content) && /<body\b/i.test(content) && /<\/html\s*>/i.test(content))
-    result.push({ receiptId: receipt.id, receiptHash: operationFingerprint({ request: receipt.request, status: receipt.status, result: receipt.result }), turnId: item.turnId, url, resultHash, content, full, readAt: receipt.updatedAt })
+    result.push({ receiptId: receipt.id, receiptHash: operationFingerprint({ request: receipt.request, status: receipt.status, result: receipt.result }), turnId: item.turnId, url, resultHash, content, ...(loadedResponse && typeof output.title === 'string' ? { title: output.title } : {}), full, readAt: receipt.updatedAt })
   }
   return result
 }
@@ -196,7 +233,7 @@ export function webArtifactManifestSourceProof(repository: TaskRunRepository, ta
   const available = sources(repository, task, items, turns), used = new Map<string, Source>()
   const references = [...input.coverage, ...input.items.flatMap(item => [item.source, item.discovery]), ...input.noMatches.map(entry => entry.source)]
   for (const reference of references) {
-    const source = available.find(source => source.url === canonical(reference.url) && source.resultHash === reference.resultHash)
+    const source = findSource(available, reference)
     if (!source) throw Object.assign(new Error('发布清单引用的URL没有本任务可信来源读取回执。'), { code: 'artifact_manifest_source_proof_required' })
     used.set(source.receiptId, source)
   }
@@ -206,7 +243,7 @@ export function webArtifactManifestSourceProof(repository: TaskRunRepository, ta
 export function assessWebArtifactEvidence(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], html: string, input: WebArtifactEvidenceInput, nowIso = new Date().toISOString()): WebArtifactEvidenceAssessment {
   const reasons: string[] = [], used = new Map<string, Source>(), available = sources(repository, task, items, turns), artifactLinks = links(html)
   const find = (reference: WebSourceReference) => {
-    const source = available.find(source => source.url === canonical(reference.url) && source.resultHash === reference.resultHash)
+    const source = findSource(available, reference)
     if (!source) reasons.push(`来源没有匹配的可信读取回执：${reference.url}`)
     else used.set(source.receiptId, source)
     return source
@@ -258,10 +295,12 @@ export function assessWebArtifactEvidence(repository: TaskRunRepository, task: T
       if (cutoff === undefined || cutoff <= Date.parse(nowIso)) reasons.push(`当前机会缺少可核验的有效截止时间，请保留为历史或待核验：${item.sectionId}`)
     }
     if (item.classification === 'opportunity' && item.fields.some(field => field.field === 'status' && /已结束|已截止|已中标|已成交|已定标|已完成采购|closed|awarded/i.test(field.value))) reasons.push(`已结束条目不能标为当前机会：${item.sectionId}`)
-    if (!source.full || !discovered || !text(source.content).includes(text(item.title))) reasons.push(`条目尚缺真实链接发现及完整正文读取：${item.sectionId}`)
+    if (!source.full || !discovered || !sourceHasTitle(source, item.title)) reasons.push(`条目尚缺真实链接发现及完整正文读取：${item.sectionId}`)
     if (source.full && discovered && (!procurement || item.classification !== 'historical')) primaryOrigins.add(new URL(source.url).origin)
     for (const field of item.fields) {
-      if (!text(source.content).includes(text(field.quote)) || !text(field.quote).includes(text(field.value)) || !fieldNodes.some(node => attr(node.attrs, 'data-evidence-field') === field.field && attr(node.attrs, 'data-evidence-unverified') === undefined && text(clean.slice(node.start, node.end)) === text(field.value))) reasons.push(`字段缺少正文与成果的精确依据：${item.sectionId}/${field.field}`)
+      const metadataTitle = field.field === 'title' && source.title && text(field.value) === text(source.title) && text(field.quote) === text(source.title)
+      const bodyQuote = text(source.content).includes(text(field.quote)) && text(field.quote).includes(text(field.value))
+      if ((!metadataTitle && !bodyQuote) || !fieldNodes.some(node => attr(node.attrs, 'data-evidence-field') === field.field && attr(node.attrs, 'data-evidence-unverified') === undefined && text(clean.slice(node.start, node.end)) === text(field.value))) reasons.push(`字段缺少正文与成果的精确依据：${item.sectionId}/${field.field}`)
     }
     if (!item.fields.some(field => field.field === 'title' && text(field.value) === text(item.title))) reasons.push(`条目缺少正文标题证据：${item.sectionId}`)
     if (procurement && item.classification === 'opportunity' && !item.fields.some(field => ['deadline', 'status'].includes(field.field))) reasons.push(`当前可跟进条目缺少截止或有效状态证据：${item.sectionId}`)
@@ -302,5 +341,5 @@ export function verifiedWebArtifactEvidence(repository: TaskRunRepository, task:
 }
 
 export function webEvidenceRepair(task: TaskRun): string {
-  return `成果文件已保留为草稿，但尚未通过来源验收。继续原任务，使用已授权工具实际读取${(task.acceptance.requiredSourceOrigins ?? []).join('、') || '所需来源'}；使用 browser_get_html 读取真实结果链接元素以取得 href，再打开并完整读取正文。遇到SVG/iframe使HTML截断或缺body时，browser_get_html会在原授权内自动检查本会话已加载且身份匹配的完整原文响应。sourceKind=actual_loaded_response是独立的响应文档表示，不是完整DOM；未取得完整响应仍须保持草稿，不重复导航。更新同一成果文件，逐条提供原文URL、实际字段与原文依据。value必须是quote中的逐字连续原文片段（仅忽略空白），quote必须实际存在于已读正文；HTML中data-evidence-field的可见文本须直接等于同一value。不要把日期改为ISO、给金额增加限定词、推断状态或改写资质。网页采集首次发布必须使用publish_artifact的report结构化模式，从同一typed数据生成HTML并返回verificationInput，再显式调用verify_web_artifact；仅同一文件已有可信核验输入时可用legacy content修复，普通本地HTML/SVG创作不受此限制。发布仍是草稿，不会自动完成。不能逐字支持的字段须从fields删除，列入unverifiedFields，并只显示带data-evidence-unverified的“待核验”；同一字段不得两边同时声明。title、真实发现链接、完整正文与必需来源不能用待核验替代。历史合同、采购意向和当前可投标公告分开。调用 verify_web_artifact(path, coverage[{url,resultHash}], items[{sectionId,title,source,discovery,classification,fields[{field,value,quote}],unverifiedFields}]) 核验。正式数据区使用main[data-evidence-report]；每个tr/article/section同时用id及data-evidence-item=sectionId、data-evidence-classification，正文链接加data-evidence-source。每个title/publication_date/budget/deadline/status/qualification值用data-evidence-field对应字段名，未读字段再加data-evidence-unverified并写待核验。所有报告数据行/条目/字段都须声明，不能用一条真实数据为其余旧草稿背书。只有实际列表明确零匹配才使用noMatches；不能虚构线索。待核验不等于已完成核验；不要让用户手工搜索或复制网页。有效跨Turn原文回执可以复用，无须无条件重采。只有真实登录、权限或网络阻断才说明影响并等待；不得凭旧入口访问或自写说明完成任务。`
+  return `成果文件已保留为草稿，但尚未通过来源验收。继续原任务，使用已授权工具实际读取${(task.acceptance.requiredSourceOrigins ?? []).join('、') || '所需来源'}；使用 browser_get_html 读取真实结果链接元素以取得 href，再打开并完整读取正文。遇到SVG/iframe使HTML截断或缺body时，browser_get_html会在原授权内自动检查本会话已加载且身份匹配的完整原文响应。sourceKind=actual_loaded_response是独立的响应文档表示，不是完整DOM；未取得完整响应仍须保持草稿，不重复导航。更新同一成果文件，逐条提供原文URL、实际字段与原文依据。value必须是quote中的逐字连续原文片段（仅忽略空白），quote必须实际存在于已读正文；仅经独立原生标题与响应JSON共同核验的actual_loaded_response标题，可将完整实际metadata标题同时用作title的value和quote，其它字段仍只能引用正文。HTML中data-evidence-field的可见文本须直接等于同一value。不要把日期改为ISO、给金额增加限定词、推断状态或改写资质。网页采集首次发布必须使用publish_artifact的report结构化模式，从同一typed数据生成HTML并返回verificationInput，再显式调用verify_web_artifact；仅同一文件已有可信核验输入时可用legacy content修复，普通本地HTML/SVG创作不受此限制。发布仍是草稿，不会自动完成。不能逐字支持的字段须从fields删除，列入unverifiedFields，并只显示带data-evidence-unverified的“待核验”；同一字段不得两边同时声明。title、真实发现链接、完整正文与必需来源不能用待核验替代。历史合同、采购意向和当前可投标公告分开。调用 verify_web_artifact(path, coverage[{url,resultHash}], items[{sectionId,title,source,discovery,classification,fields[{field,value,quote}],unverifiedFields}]) 核验。正式数据区使用main[data-evidence-report]；每个tr/article/section同时用id及data-evidence-item=sectionId、data-evidence-classification，正文链接加data-evidence-source。每个title/publication_date/budget/deadline/status/qualification值用data-evidence-field对应字段名，未读字段再加data-evidence-unverified并写待核验。所有报告数据行/条目/字段都须声明，不能用一条真实数据为其余旧草稿背书。只有实际列表明确零匹配才使用noMatches；不能虚构线索。待核验不等于已完成核验；不要让用户手工搜索或复制网页。有效跨Turn原文回执可以复用，无须无条件重采。只有真实登录、权限或网络阻断才说明影响并等待；不得凭旧入口访问或自写说明完成任务。`
 }

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { operationFingerprint } from './task-run-repository.js'
@@ -10,24 +11,24 @@ const TITLE = `关于${PROJECT}的公开公告`
 const HTML = `<section><h1>${PROJECT}</h1><p>预算金额（元）：400000；此处为完整的公开原文正文。</p></section>`
 const JSON_BODY = JSON.stringify({ anyWrapper: { articleId: 'article-one', title: TITLE, projectName: PROJECT, content: HTML } })
 const configuration = 'f'.repeat(64)
-function fixture() {
+function fixture(parentUrl = PARENT, articleId = 'article-one') {
   const grant = ExecutionGrantSchema.parse({ id: 'grant', taskId: 'task', turnId: 'turn', threadId: 'thread', workspaceRoot: '/tmp',
     workspaceTrust: 'read-only', agentTrust: 'read-only', sandboxMode: 'read-only', approvalPolicy: 'on-request', workspaceRevision: 0, agentRevision: 0,
     revision: 1, idempotencyKey: 'grant', issuedAt: new Date().toISOString(), allowedToolNames: ['browser_get_html'], allowedProviderIds: ['browser-skill'],
     connectorIdentityFingerprints: { 'browser-skill': configuration }, networkAllowlist: ['https://source.example.test'],
     browserScope: { browserInstanceId: 'browser', origins: ['https://source.example.test'], interaction: 'observe', verificationPolicy: 'public_query_target', revision: 1 } })
-  const capture: BrowserResponseCapture = { taskId: 'task', turnId: 'turn', sessionId: 'session', tabId: 1, parentSourceUrl: PARENT,
+  const capture: BrowserResponseCapture = { taskId: 'task', turnId: 'turn', sessionId: 'session', tabId: 1, parentSourceUrl: parentUrl,
     runId: 'native-run', name: 'owned-capture', grantFingerprint: operationFingerprint(grant), configurationFingerprint: configuration }
   const now = Date.now() - 100
   const run = { id: capture.runId, name: capture.name, session_id: capture.sessionId, tab_id: capture.tabId, state: 'capturing', requests: 2,
     dropped_requests: 0, active_rules: 0, coverage: ['from_start', 'task_tab'] }
-  const parent = { id: 'native-run:n1', run_id: run.id, url: PARENT, method: 'GET', status: 200, state: 'complete', frame_id: 'frame', loader_id: 'loader', resource_type: 'Document', started_at: now }
-  const response = { id: 'native-run:n2', run_id: run.id, url: 'https://source.example.test/observed-document?articleId=article-one&timestamp=1', method: 'GET', status: 200,
+  const parent = { id: 'native-run:n1', run_id: run.id, url: parentUrl, method: 'GET', status: 200, state: 'complete', frame_id: 'frame', loader_id: 'loader', resource_type: 'Document', started_at: now }
+  const response = { id: 'native-run:n2', run_id: run.id, url: `https://source.example.test/observed-document?articleId=${encodeURIComponent(articleId)}&timestamp=1`, method: 'GET', status: 200,
     state: 'complete', frame_id: 'frame', loader_id: 'loader', resource_type: 'XHR', mime_type: 'application/json', started_at: now + 1, finished_at: now + 2,
     integrity: { url: 'complete', metadata: 'complete' }, request_body: { state: 'empty' }, response_body: { state: 'available', redacted: false, replay_safe: false, chars: JSON_BODY.length } }
-  const native = { tab_id: 1, page_url: PARENT, frame_url: PARENT, frame_id: 'frame', title: TITLE, captured_at: new Date().toISOString(), scope: 'current_dom',
+  const native = { tab_id: 1, page_url: parentUrl, frame_url: parentUrl, frame_id: 'frame', title: TITLE, captured_at: new Date().toISOString(), scope: 'current_dom',
     truncated: false, items: [{ ref: '@e1', values: { present: true }, redacted: [] }] }
-  let body = JSON_BODY, nativeReads = 0
+  let body = JSON_BODY.replace('"article-one"', JSON.stringify(articleId)), nativeReads = 0
   const calls: string[][] = []
   let mutation: ((value: Record<string, unknown>, action: string) => void) | undefined
   const command: BrowserDocumentCommand = async args => {
@@ -45,24 +46,67 @@ function fixture() {
     mutation?.(value, args[0] === 'read' ? `native-${nativeReads}` : String(args[1]))
     return value
   }
-  const read = () => readBrowserLoadedDocument({ capture, command, guard: async () => {}, currentTab: async () => ({ id: 1, url: PARENT }),
+  const read = () => readBrowserLoadedDocument({ capture, command, guard: async () => {}, currentTab: async () => ({ id: 1, url: parentUrl }),
     allowResponseUrl: url => { expect(new URL(url).origin).toBe('https://source.example.test') } })
   return { grant, capture, response, parent, native, calls, command, read, change: (fn: typeof mutation) => { mutation = fn }, setBody: (text: string) => { body = text } }
 }
 
 describe('fixed native loaded-response representation', () => {
+  it.each(['synthetic+article==', 'synthetic/article==', 'synthetic%article', '原文+编号=='])('preserves URI identifier bytes in %s without form decoding or a second decode', async articleId => {
+    const encoded = encodeURIComponent(articleId)
+    const parent = `https://source.example.test/detail?articleId=${encoded.replaceAll('%2B', '+')}`
+    const responseUrl = `https://source.example.test/observed-document?articleId=${encoded}`
+    expect(publicArticleId(parent)).toBe(articleId)
+    expect(publicArticleId(responseUrl)).toBe(articleId)
+    const f = fixture(parent, articleId), output = await f.read()
+    expect(output).toMatchObject({ html: HTML, sourceUrl: parent, sourceKind: 'actual_loaded_response', truncated: false })
+    expect(validLoadedResponseEvidence(output, f.grant)).toBe(true)
+    expect(f.calls.some(args => ['navigate', 'evaluate', 'replay'].includes(args[0]!))).toBe(false)
+  })
+  it.each(['articleId=a+id&articleId=a%2Bid', 'articleId=a+id&article%49d=a%2Bid', 'articleId=a%20id', 'articleId=a%09id', 'articleId=a%00id', 'articleId=%E0%A4%A', 'articleId=%', 'articleId='])('rejects ambiguous, whitespace or malformed URI identifiers: %s', query => {
+    expect(publicArticleId(`https://source.example.test/detail?${query}`)).toBeUndefined()
+  })
+  it('does not equate literal plus, an encoded space or a doubly encoded plus', async () => {
+    expect(publicArticleId('https://source.example.test/detail?articleId=a%252Bid')).toBe('a%2Bid')
+    const f = fixture('https://source.example.test/detail?articleId=a+id', 'a+id')
+    f.response.url = 'https://source.example.test/observed-document?articleId=a%252Bid'
+    await expect(f.read()).rejects.toHaveProperty('code', 'browser_document_response_unavailable')
+  })
   it('accepts the proved short project-name representation without hard-coding a wrapper or endpoint', () => {
     expect(primaryResponseRepresentation(JSON_BODY, 'article-one', TITLE)).toMatchObject({ html: HTML, association: 'projectName', pointer: '/anyWrapper/content' })
   })
-  it.each(['title-only', 'body-only', 'similar-value', 'short-project', 'duplicate', 'script-only'] as const)('rejects %s as a primary representation', mode => {
+  it.each(['title-only', 'body-only', 'similar-value', 'wrong-json-id', 'duplicate', 'script-only', 'empty-shell'] as const)('rejects %s as a primary representation', mode => {
     const doc = JSON.parse(JSON_BODY) as { anyWrapper: { articleId: string; title: string; projectName: string; content: string } }
-    if (mode === 'title-only') doc.anyWrapper.content = '<p>这里只包含不相符的正文，不能借标题证明。</p>'
+    if (mode === 'title-only') doc.anyWrapper.content = `<h1>${TITLE}</h1>`
+    if (mode === 'wrong-json-id') doc.anyWrapper.articleId = 'different'
     if (mode === 'body-only') doc.anyWrapper.title = '不包含项目名称的其他页面标题'
-    if (mode === 'similar-value') doc.anyWrapper.projectName += '变更'
-    if (mode === 'short-project') { doc.anyWrapper.projectName = '项目'; doc.anyWrapper.content = '<p>项目正文。</p>' }
-    if (mode === 'script-only') doc.anyWrapper.content = `<script>const text=${JSON.stringify(PROJECT)}</script><p>无匹配正文</p>`
+    if (mode === 'similar-value') doc.anyWrapper.title += '变更'
+    if (mode === 'script-only') doc.anyWrapper.content = `<script>const text=${JSON.stringify(PROJECT)}</script><style>${PROJECT}</style><template><p>${TITLE}</p></template><noscript>${TITLE}</noscript>`
+    if (mode === 'empty-shell') doc.anyWrapper.content = '<div id=app><svg></svg></div>'
     const value = mode === 'duplicate' ? { one: doc.anyWrapper, two: doc.anyWrapper } : doc
-    expect(primaryResponseRepresentation(JSON.stringify(value), 'article-one', mode === 'body-only' ? doc.anyWrapper.title : TITLE)).toBeUndefined()
+    expect(primaryResponseRepresentation(JSON.stringify(value), 'article-one', TITLE)).toBeUndefined()
+  })
+  it('does not impose a body length threshold or require optional project metadata', () => {
+    const html = '<p>项目正文。</p>'
+    for (const projectName of [undefined, '项目', `${PROJECT}变更`]) {
+      const body = JSON.stringify({ document: { articleId: 'article-one', title: TITLE, projectName, content: html } })
+      expect(primaryResponseRepresentation(body, 'article-one', TITLE)).toMatchObject({ html, association: 'metadata_identity' })
+    }
+  })
+  it('proves metadata identity for an ordinary complete body that does not repeat its title', async () => {
+    const f = fixture(), html = '<article><p>预算金额（元）：400000；此处为完整公开正文。</p></article>'
+    const response = JSON.stringify({ anyWrapper: { articleId: 'article-one', title: TITLE, projectName: PROJECT, content: html } })
+    f.setBody(response)
+    const output = await f.read()
+    expect(output).toMatchObject({ html, responseText: response, title: TITLE, sourceKind: 'actual_loaded_response', readScope: 'response_document',
+      resultHash: createHash('sha256').update(html).digest('hex'), nativeProof: { association: 'metadata_identity', contentPointer: '/anyWrapper/content' } })
+    expect(validLoadedResponseEvidence(output, f.grant)).toBe(true)
+    for (const change of [(value: Record<string, unknown>) => { value.title = '其他公告' },
+      (value: Record<string, unknown>) => { (value.nativeProof as Record<string, unknown>).articleIdHash = '0'.repeat(64) },
+      (value: Record<string, unknown>) => { (value.nativeProof as Record<string, unknown>).associationHash = '0'.repeat(64) }]) {
+      const changed = structuredClone(output); change(changed)
+      expect(validLoadedResponseEvidence(changed, f.grant)).toBe(false)
+    }
   })
   it('keeps URL, loader, native title, source bytes and chunks bound without treating replay_safe as read authorization', async () => {
     const f = fixture(), output = await f.read()

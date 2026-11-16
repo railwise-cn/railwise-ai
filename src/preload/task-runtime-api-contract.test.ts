@@ -2,10 +2,10 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { WorkWiseApi } from '../shared/workwise-api'
 import { mcpServerSavePayloadSchema, runtimeRequestPayloadSchema, sseStartPayloadSchema } from '../main/ipc/app-ipc-schemas'
 
-const bridge = vi.hoisted(() => ({ exposed: new Map<string, unknown>(), invoke: vi.fn() }))
+const bridge = vi.hoisted(() => ({ exposed: new Map<string, unknown>(), invoke: vi.fn(), on: vi.fn(), removeListener: vi.fn() }))
 vi.mock('electron', () => ({
   contextBridge: { exposeInMainWorld: (name: string, api: unknown) => bridge.exposed.set(name, api) },
-  ipcRenderer: { invoke: bridge.invoke, on: vi.fn(), removeListener: vi.fn() },
+  ipcRenderer: { invoke: bridge.invoke, on: bridge.on, removeListener: bridge.removeListener },
   webUtils: { getPathForFile: vi.fn() }
 }))
 
@@ -25,6 +25,17 @@ describe('production preload task API and main IPC contract', () => {
     })
     await import('./index')
     api = bridge.exposed.get('workwise') as WorkWiseApi
+  })
+
+  it('forwards cursor-free task progress through the existing preload event subscription and cleans up that exact listener', () => {
+    const receive=vi.fn(),release=api.onSseEvent(receive)
+    const [name,listener]=bridge.on.mock.calls.at(-1)!
+    expect(name).toBe('runtime:sse-event')
+    const payload={streamId:'tasks-progress',events:[{kind:'task_progress',taskId:'task-owned',payload:{taskId:'task-owned',taskRevision:3,turnId:'turn-owned',sampledAt:'2026-11-16T12:00:15Z'}}]}
+    listener({},payload)
+    expect(receive).toHaveBeenCalledExactlyOnceWith(payload)
+    expect(payload.events[0]).not.toHaveProperty('seq')
+    release();expect(bridge.removeListener).toHaveBeenCalledWith(name,listener)
   })
 
   it('passes the fixed DingTalk desktop action without renderer-supplied launch arguments', async () => {
