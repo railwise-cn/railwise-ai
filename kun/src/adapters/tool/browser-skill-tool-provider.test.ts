@@ -396,6 +396,79 @@ describe('typed BrowserSkill production provider', () => {
     expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate').every(([, argv]) => argv[argv.indexOf('--policy') + 1] === 'strict')).toBe(true)
   })
 
+  it('returns the actual refreshed observation after head-only HTML recovers its body', async () => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    let syncs = 0
+    const replies: Record<string, unknown>[] = []
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] === 'wait-for-element') {
+        f.setElement('<html><head><title>Normal source</title></head><body>Actual recovered article</body></html>')
+        return { ok: true, output: { tab_id: 7, used_selector: 'body', satisfied: true, attached: true } }
+      }
+      const result = await original(config, argv, signal)
+      if (argv[0] !== 'cooperate') return result
+      const reply = { ...result.output as object, context_id: `official-context-${++syncs}`,
+        observation_id: `official-observation-${syncs}` }
+      replies.push(reply)
+      return { ...result, output: reply }
+    })
+    await f.execute('browser_session_start')
+    f.setUrl('https://example.com/one')
+    await f.execute('browser_observe', { sessionId: 'session-one' })
+    f.setElement('<html><head><title>Normal source</title></head></html>')
+    const recovered = await f.execute('browser_get_html', { sessionId: 'session-one' })
+    expect(recovered).toMatchObject({ output: { status: 'succeeded', sessionId: 'session-one',
+      sourceUrl: 'https://example.com/one', tabId: 7, readScope: 'document' } })
+    const refreshed = (recovered.output as { observation: { context_id: string; observation_id: string } }).observation
+    expect(refreshed).toEqual(replies[1])
+    expect(syncs).toBe(2)
+    const nextContext = refreshed.context_id
+    expect(await f.execute('browser_navigate', { sessionId: 'session-one', url: 'https://example.com/two', contextId: nextContext }))
+      .toMatchObject({ output: { status: 'succeeded' } })
+    const argv = f.runner.mock.calls.find(([, args]) => args[0] === 'navigate')![1]
+    expect(argv[argv.indexOf('--context') + 1]).toBe('official-context-2')
+    expect(argv[argv.indexOf('--observation') + 1]).toBe('official-observation-2')
+  })
+
+  it('does not add a cached pair or synchronize during an ordinary HTML read', async () => {
+    const f = fixture()
+    await f.execute('browser_session_start')
+    f.setUrl('https://example.com/one')
+    await f.execute('browser_observe', { sessionId: 'session-one' })
+    const syncs = f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate').length
+    const result = await f.execute('browser_get_html', { sessionId: 'session-one' })
+    expect(result).toMatchObject({ output: { status: 'succeeded', sourceUrl: 'https://example.com/one' } })
+    expect(result.output).not.toHaveProperty('observation')
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate')).toHaveLength(syncs)
+  })
+
+  it.each(['missing_context', 'missing_observation', 'page_changed'] as const)(
+    'does not publish a fabricated or mismatched refreshed pair after HTML recovery: %s', async boundary => {
+      const f = fixture(), original = f.runner.getMockImplementation()!
+      await f.execute('browser_session_start')
+      f.setUrl('https://example.com/one')
+      f.setElement('<html><head><title>Normal source</title></head></html>')
+      f.runner.mockImplementation(async (config, argv, signal) => {
+        if (argv[0] === 'wait-for-element') {
+          f.setElement('<html><head><title>Normal source</title></head><body>Recovered article</body></html>')
+          return { ok: true, output: { tab_id: 7, used_selector: 'body', satisfied: true, attached: true } }
+        }
+        const result = await original(config, argv, signal)
+        if (argv[0] !== 'cooperate') return result
+        if (boundary === 'page_changed') f.setUrl('https://example.com/another-source')
+        return { ...result, output: { ...result.output as object,
+          ...(boundary === 'missing_context' ? { context_id: undefined } : {}),
+          ...(boundary === 'missing_observation' ? { observation_id: undefined } : {}) } }
+      })
+      const result = await f.execute('browser_get_html', { sessionId: 'session-one' })
+      expect(result.output).not.toHaveProperty('observation')
+      if (boundary === 'page_changed') expect(result).toMatchObject({ isError: true, output: { code: 'browser_page_changed' } })
+      else expect(result).toMatchObject({ output: { status: 'succeeded', sourceUrl: 'https://example.com/one' } })
+      expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'cooperate')).toHaveLength(1)
+      expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(0)
+    },
+  )
+
   it('rejects fabricated caller context/observation and a pair from a different page before navigation', async () => {
     const f = fixture()
     await f.execute('browser_session_start')

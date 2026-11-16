@@ -3,14 +3,14 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
+import { createRequire, syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { createServer } from 'node:net'
 import { createServer as createHttpServer } from 'node:http'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
-import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
+import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency, preparePinnedBrowserStartupCli, browserStartupDependency } from './prepare-browser-skill-smoke.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 
@@ -3012,7 +3012,268 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   return report
 }
 
+export const windowsStartupDiagnosticPackage = Object.freeze({ sourceHead: '245f00f776693685812ab3bb7f32088494c5eb65', version: '0.5.7',
+  asarSha256: '2f2f733442f51c889d2bef5bccd491157f83045e38c8bb21c45f68fb26ea9b85' })
+const startupArgv = ['daemon', 'start', '--foreground', '--session-idle', '30m']
+const startupPlans = [
+  { label: 'A', options: { detached: true, windowsHide: true, shell: false, stdio: 'ignore' } },
+  { label: 'B', options: { detached: false, windowsHide: false, shell: false, stdio: 'ignore' } },
+  { label: 'C', options: { detached: true, windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] } }
+]
+
+export function classifyWindowsDaemonStartup(value) {
+  if (value.spawnError) return 'spawn_error'
+  if (value.naturalExit && value.vendor?.signal) return 'vendor_signal_exit'
+  if (value.vendor?.error) return 'vendor_startup_error'
+  if (!value.naturalExit && !value.identity?.verified) return 'identity_probe_unverified'
+  if (value.naturalExit && !value.identity?.verified && value.identity?.attempts?.some(attempt => attempt.identity?.fingerprint && !attempt.childStillLive)) return 'child_exited_before_identity_acceptance'
+  if (value.naturalExit && !value.identity?.verified) return 'early_exit_identity_unavailable'
+  return value.naturalExit ? 'daemon_early_exit' : 'observed_running'
+}
+
+/** One A and one B; C is predeclared and only diagnoses A's unlogged early exit. */
+export async function runWindowsDaemonDiagnosticCases({ runCase, readConsole }) {
+  const cases = []
+  for (const plan of startupPlans.slice(0, 2)) {
+    const result = await runCase(structuredClone(plan)); cases.push(result)
+    if (!result.endpointReleased) return { status: 'incomplete', cases, console: [], stopReason: 'previous_child_or_endpoint_not_released' }
+  }
+  if (cases[0].naturalExit && Number.isSafeInteger(cases[0].pid) && cases[0].pid > 0 && !cases[0].spawnError && !cases[0].vendor?.informative) {
+    const result = await runCase(structuredClone(startupPlans[2])); cases.push(result)
+    if (!result.endpointReleased) return { status: 'incomplete', cases, console: [], stopReason: 'previous_child_or_endpoint_not_released' }
+  }
+  // Console helpers run last. Only A is the first cold probe; B/C are ordered references.
+  const console = []
+  for (const plan of startupPlans.slice(0, 2)) {
+    const value = await readConsole(structuredClone(plan)); console.push(value)
+    if (value?.collected !== true || value?.timedOut || value?.childStillLive) return { status: 'incomplete', cases, console, stopReason: 'console_helper_not_released' }
+  }
+  return { status: 'completed', cases, console }
+}
+
+export function sanitizeWindowsStartupText(bytes) {
+  const text = Buffer.isBuffer(bytes) ? bytes.toString('utf8') : String(bytes)
+  return text.split(/\r?\n/).map(line => /token|password|secret|authorization|cookie|credential|pairing/i.test(line) ? '[sensitive diagnostic redacted]'
+    : line.replace(/\b(?:https?|wss?):\/\/[^\s"'<>]+/gi, '[URL redacted]').replace(/[A-Za-z0-9+/_=-]{40,}/g, '[opaque value redacted]')).join('\n').slice(-16384)
+}
+
+async function readStartupVendorEvidence(home) {
+  const output = { logs: [], informative: false, signal: false, error: false }
+  for (const name of (await readdir(home)).filter(name => /^daemon\.log\.\d{4}-\d{2}-\d{2}$/.test(name)).sort().slice(-2)) {
+    const file = await open(join(home, name), 'r')
+    try {
+      const info = await file.stat(); assert.ok(info.isFile())
+      const bytes = Buffer.alloc(Math.min(info.size, 65536)); await file.read(bytes, 0, bytes.length, Math.max(0, info.size - bytes.length))
+      output.logs.push({ name, bytes: info.size, tailOnly: info.size > bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), text: sanitizeWindowsStartupText(bytes) })
+      output.signal ||= bytes.includes(Buffer.from('bsk daemon shutting down (signal)'))
+      output.error ||= bytes.includes(Buffer.from('daemon stopped with an error'))
+    } finally { await file.close() }
+  }
+  output.informative = output.signal || output.error
+  try {
+    const info = JSON.parse(await readFile(join(home, 'daemon.json'), 'utf8'))
+    output.info = { pid: Number.isSafeInteger(info.pid) ? info.pid : null, wsPort: Number.isSafeInteger(info.ws_port) ? info.ws_port : null,
+      version: typeof info.version === 'string' && /^\d+\.\d+\.\d+$/.test(info.version) ? info.version : null }
+  } catch (error) { output.info = { absent: error.code === 'ENOENT', errorCategory: diagnosticError(error) } }
+  return output
+}
+
+export function startupIdentityAsarPath(pathApi = { join }) {
+  return pathApi.join('kun', 'dist', 'services', 'process-identity.js')
+}
+
+/** Import the exact bytes from the verified installed ASAR, never a new TS probe. */
+export async function loadWindowsStartupIdentity({ asarPath, expectedAsarSha256, directory }) {
+  const archive = await readFile(asarPath)
+  assert.equal(createHash('sha256').update(archive).digest('hex'), expectedAsarSha256)
+  const metadata = JSON.parse(asar.extractFile(asarPath, 'package.json').toString())
+  const pinned = installIdentity(windowsStartupDiagnosticPackage.version, windowsStartupDiagnosticPackage.sourceHead)
+  assert.equal(metadata.buildProvenance?.sourceHead, pinned.sourceHead); assert.equal(metadata.version, pinned.version)
+  assert.equal(metadata.productName, pinned.productName); assert.equal(metadata.name, pinned.packageName)
+  const entry = 'kun/dist/services/process-identity.js', nativeEntry = startupIdentityAsarPath()
+  const stat = asar.statFile(asarPath, nativeEntry), bytes = asar.extractFile(asarPath, nativeEntry)
+  assert.ok(!stat.link && stat.size === bytes.length, 'The compiled identity entry must be a regular ASAR file')
+  assert.ok(bytes.length > 0 && bytes.length < 65536)
+  const sha256 = createHash('sha256').update(bytes).digest('hex')
+  if (stat.unpacked || stat.integrity) {
+    assert.equal(stat.integrity?.algorithm, 'SHA256'); assert.equal(stat.integrity.hash, sha256, 'Compiled identity bytes must match the ASAR integrity header')
+  }
+  await mkdir(directory, { recursive: true })
+  await writeFile(join(directory, 'package.json'), '{"type":"module"}', { flag: 'wx' })
+  const path = join(directory, 'process-identity.js'); await writeFile(path, bytes, { flag: 'wx' })
+  assert.equal(createHash('sha256').update(await readFile(path)).digest('hex'), sha256)
+  const module = await import(pathToFileURL(path).href)
+  assert.equal(typeof module.processIdentityAsync, 'function')
+  return { identity: module.processIdentityAsync, proof: { entry, sha256, importedSha256: sha256, entryIntegritySha256: stat.integrity?.hash, unpacked: stat.unpacked === true, asarSha256: expectedAsarSha256, path, source: 'exact-installed-asar', packageSourceHead: metadata.buildProvenance.sourceHead, version: metadata.version } }
+}
+
+function observeStartupIdentityProbe(pid, records, now = Date.now) {
+  const childProcess = createRequire(import.meta.url)('node:child_process'), original = childProcess.execFile
+  const command = `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().Ticks`
+  childProcess.execFile = function(file, args, options, callback) {
+    if (file !== 'powershell.exe' || args?.at(-1) !== command) return original.apply(this, arguments)
+    const startedAt = now()
+    return original.call(this, file, args, options, (error, stdout, stderr) => {
+      records.push(sanitizeWindowsBrowserProcessQuery({ durationMs: now() - startedAt, exitCode: error?.code ?? 0, signal: error?.signal,
+        timedOut: error?.killed === true, errorCode: typeof error?.code === 'string' ? error.code : undefined, stdout, stderr }, { ticks: true }))
+      callback(error, stdout, stderr)
+    })
+  }
+  syncBuiltinESMExports()
+  return () => { childProcess.execFile = original; syncBuiltinESMExports() }
+}
+
+export async function collectWindowsDaemonStartupCase({ plan, executable, home, environment, identity, observeMs = 10000,
+  start = spawn, now = Date.now, wait = sleep, vendor = readStartupVendorEvidence, fileHash = async path => createHash('sha256').update(await readFile(path)).digest('hex'),
+  endpointReleased = async () => true, observeProbe = observeStartupIdentityProbe }) {
+  const result = { label: plan.label, argv: [...startupArgv], options: structuredClone(plan.options), home,
+    environment: { BSK_AUTO_START: '0', BSK_CANCEL_ON_STDIN_CLOSE: '1', BSK_HOME: home }, startedAt: now(), events: [], identity: { verified: false, attempts: [], osQueries: [] } }
+  const child = start(executable, startupArgv, { ...plan.options, env: { ...environment, ...result.environment } })
+  result.pid = child.pid ?? null
+  let closed = false
+  child.once('spawn', () => result.events.push({ event: 'spawn', at: now(), pid: child.pid }))
+  child.once('error', error => { result.spawnError = diagnosticError(error); result.events.push({ event: 'error', at: now(), code: result.spawnError }) })
+  child.once('close', (code, signal) => { closed = true; result.events.push({ event: 'close', at: now(), exitCode: code, signal }); result.exitCode = code; result.signal = signal })
+  const streams = []
+  for (const [name, stream] of [['stdout', child.stdout], ['stderr', child.stderr]]) if (stream) {
+    const state = { name, bytes: 0, hash: createHash('sha256'), text: '' }; streams.push(state)
+    stream.on('data', data => { if (state.finished) return; const bytes = Buffer.from(data); state.bytes += bytes.length; state.hash.update(bytes); state.text = (state.text + bytes.toString()).slice(-16384) })
+  }
+  const live = () => !closed && !result.spawnError && child.exitCode === null && child.signalCode === null
+  const deadline = now() + 10000, restore = child.pid ? observeProbe(child.pid, result.identity.osQueries, now) : () => {}
+  try {
+    const identify = async () => {
+      const remaining = deadline - now()
+      if (!child.pid || !live() || remaining <= 0) return null
+      const at = now(); let found
+      try { found = await identity(child.pid, { timeoutMs: remaining }) } catch { found = null }
+      const accepted = now() <= deadline && live() && found?.pid === child.pid && typeof found.fingerprint === 'string' && found.fingerprint && !found.fingerprint.startsWith('unverified:')
+      result.identity.attempts.push({ startedAt: at, durationMs: now() - at, timeoutMs: remaining, childStillLive: live(), identity: found ?? null, accepted: Boolean(accepted) })
+      return accepted ? found : null
+    }
+    let found = await identify()
+    if (!found && live() && now() < deadline) { await wait(500); found = await identify() }
+    result.identity.verified = Boolean(found)
+    while (live() && now() - result.startedAt < observeMs) await wait(Math.min(100, observeMs))
+    result.naturalExit = closed
+    result.vendor = await vendor(home)
+    result.classification = classifyWindowsDaemonStartup(result)
+    result.cleanup = { attempted: false, verifiedBirth: false }
+    if (live() && found) {
+      result.cleanup.startedAt = now()
+      const current = await identity(child.pid, { timeoutMs: 3000 }); result.cleanup.identity = current ?? null
+      const same = current?.pid === found.pid && current.fingerprint === found.fingerprint && await fileHash(executable) === browserStartupDependency.executableSha256
+      result.cleanup.verifiedBirth = same
+      if (same && live()) {
+        result.cleanup.attempted = true; child.kill('SIGTERM')
+        const until = now() + 3000; while (!closed && now() < until) await wait(50)
+      }
+    }
+    result.childClosed = closed
+    result.endpointReleased = closed && await endpointReleased(result)
+    result.vendorAfterCleanup = closed ? await vendor(home) : undefined
+    result.streams = streams.map(value => { value.finished = true; return { name: value.name, bytes: value.bytes, sha256: value.hash.digest('hex'), text: sanitizeWindowsStartupText(value.text) } })
+    result.finishedAt = now()
+    return result
+  } catch (error) {
+    result.diagnosticError = diagnosticError(error); result.childClosed = closed; result.naturalExit = closed; result.endpointReleased = false
+    return result
+  } finally {
+    for (const value of streams) value.finished = true
+    restore()
+    if (!closed) { child.unref(); child.stdout?.unref?.(); child.stderr?.unref?.() }
+  }
+}
+
+async function runStartupNativeQuery(command, options, environment, identity) {
+  const path = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  const executableHash = createHash('sha256').update(await readFile(path)).digest('hex')
+  const child = spawn(path, ['-NoProfile', '-NonInteractive', '-Command', command], { ...options, env: environment, stdio: ['ignore', 'pipe', 'pipe'] })
+  let stdout = '', stderr = '', closed = false, spawnError
+  child.stdout.on('data', bytes => { stdout = (stdout + bytes).slice(-16384) }); child.stderr.on('data', bytes => { stderr = (stderr + bytes).slice(-16384) })
+  child.once('close', () => { closed = true }); child.once('error', error => { spawnError = diagnosticError(error) })
+  const birth = child.pid ? identity(child.pid, { timeoutMs: 3000 }).catch(() => null) : Promise.resolve(null)
+  const deadline = Date.now() + 10000
+  while (!closed && Date.now() < deadline) await sleep(100)
+  const timedOut = !closed, owned = await birth
+  if (!closed) {
+    const current = child.pid ? await identity(child.pid, { timeoutMs: 3000 }) : null
+    if (owned?.pid === child.pid && current?.pid === child.pid && current.fingerprint === owned.fingerprint && !String(owned.fingerprint).startsWith('unverified:') &&
+      createHash('sha256').update(await readFile(path)).digest('hex') === executableHash && child.exitCode === null) child.kill('SIGTERM')
+    const until = Date.now() + 3000; while (!closed && Date.now() < until) await sleep(50)
+  }
+  if (!closed) { child.unref(); child.stdout.unref?.(); child.stderr.unref?.() }
+  return { pid: child.pid ?? null, identity: owned ?? null, executableSha256: executableHash, exitCode: child.exitCode, spawnError, timedOut, childStillLive: !closed, stdout, stderr }
+}
+
+const startupConsoleCommand = `Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public static class StartupConsoleProbe {
+ public delegate bool Handler(uint type);
+ [DllImport("kernel32.dll",SetLastError=true)] public static extern uint GetConsoleProcessList(uint[] ids,uint count);
+ [DllImport("kernel32.dll",SetLastError=true)] public static extern bool SetConsoleCtrlHandler(Handler handler,bool add);
+ public static Handler Keep = value => false;
+}
+'@;
+$ids=New-Object uint[] 16; $count=[StartupConsoleProbe]::GetConsoleProcessList($ids,16); $ok=[StartupConsoleProbe]::SetConsoleCtrlHandler([StartupConsoleProbe]::Keep,$true); $errorCode=if($ok){0}else{[Runtime.InteropServices.Marshal]::GetLastWin32Error()}; [pscustomobject]@{processCount=$count;handlerRegistered=$ok;handlerError=$errorCode}|ConvertTo-Json -Compress`
+
+export async function runWindowsBrowserStartupDiagnostic({ executable, version, sourceHead, evidenceDir }) {
+  assert.equal(process.platform, 'win32'); assert.equal(process.arch, 'x64'); assert.equal(process.env.RUNNER_OS, 'Windows'); assert.equal(process.env.GITHUB_ACTIONS, 'true'); assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
+  assert.equal(sourceHead, windowsStartupDiagnosticPackage.sourceHead); assert.equal(version, windowsStartupDiagnosticPackage.version)
+  const provenance = windowsSmokeProvenance(sourceHead)
+  const temporary = resolve(process.env.RUNNER_TEMP)
+  for (const path of [executable, evidenceDir]) assert.ok(contained(temporary, resolve(path)))
+  const installed = inspectInstalledPackage(dirname(executable), installIdentity(version, sourceHead))
+  assert.equal(installed.asarSha256, windowsStartupDiagnosticPackage.asarSha256)
+  const root = await mkdtemp(join(temporary, 'railwise-startup-diagnostic-')), environment = windowsUiEnvironment(process.env, root)
+  await Promise.all([environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
+  await mkdir(evidenceDir, { recursive: true })
+  const loaded = await loadWindowsStartupIdentity({ asarPath: join(dirname(executable), 'resources', 'app.asar'), expectedAsarSha256: installed.asarSha256, directory: join(root, 'installed-runtime') })
+  const cli = await preparePinnedBrowserStartupCli(join(root, 'fixed-cli'))
+  const portReleased = async caseResult => {
+    const query = await runStartupNativeQuery('$ErrorActionPreference="Stop"; ConvertTo-Json -Compress -InputObject @(Get-NetTCPConnection -LocalPort 52800 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{pid=[int]$_.OwningProcess;port=[int]$_.LocalPort} })',
+      { detached: false, windowsHide: true, shell: false }, environment, loaded.identity)
+    let owners
+    try {
+      owners = JSON.parse(query.stdout.trim()); assert.ok(Array.isArray(owners))
+      assert.ok(owners.every(owner => Number.isInteger(owner.pid) && owner.pid > 0 && owner.port === 52800))
+    } catch { owners = null }
+    caseResult.endpoint = { queryPid: query.pid, queryIdentity: query.identity, queryExitCode: query.exitCode, timedOut: query.timedOut, queryChildStillLive: query.childStillLive, owners,
+      pipeReleaseProof: 'exact-child-close-releases-its-kernel-handles' }
+    return !query.childStillLive && !query.timedOut && query.exitCode === 0 && owners?.length === 0
+  }
+  const result = await runWindowsDaemonDiagnosticCases({ runCase: async plan => {
+    const home = join(root, `bsk-${plan.label}`); await mkdir(home)
+    return collectWindowsDaemonStartupCase({ plan, executable: cli.path, home, environment, identity: loaded.identity, endpointReleased: portReleased })
+  }, readConsole: async plan => {
+    const result = await runStartupNativeQuery(startupConsoleCommand, plan.options, environment, loaded.identity)
+    const summary = { label: plan.label, spawnOptions: { ...plan.options, stdio: ['ignore', 'pipe', 'pipe'] }, pid: result.pid, identity: result.identity, executableSha256: result.executableSha256, exitCode: result.exitCode, timedOut: result.timedOut, childStillLive: result.childStillLive }
+    try {
+      const data = JSON.parse(result.stdout.trim())
+      assert.ok(Number.isInteger(data.processCount) && data.processCount >= 0 && typeof data.handlerRegistered === 'boolean' && Number.isInteger(data.handlerError))
+      return { ...summary, collected: result.exitCode === 0 && !result.childStillLive, processCount: data.processCount, handlerRegistered: data.handlerRegistered, handlerError: data.handlerError }
+    } catch { return { ...summary, collected: false, spawnError: result.spawnError } }
+  } })
+  const after = inspectInstalledPackage(dirname(executable), installIdentity(version, sourceHead)); assert.equal(after.asarSha256, installed.asarSha256)
+  const report = { schemaVersion: 1, scope: 'private-exact-package-browser-startup-diagnostic', ...result, sourceHead, version,
+    provenance, installedAsarSha256: installed.asarSha256, identityModule: loaded.proof, cli,
+    runner: { nodeVersion: process.version, platform: process.platform, arch: process.arch, environment: process.env.RUNNER_ENVIRONMENT },
+    isolatedUserProfile: environment.USERPROFILE, applicationLaunched: false, permissionWorkerLaunched: false, modelCalls: 0, tasksCreated: 0, grantsCreated: 0, browserLaunched: false, productionTouched: false, notFullAcceptance: true, packageUnchanged: true }
+  await writeFile(join(evidenceDir, 'windows-browser-startup-diagnostic.json'), JSON.stringify(report, null, 2) + '\n')
+  assert.equal(result.status, 'completed', 'Unknown live child or endpoint stops later diagnostics')
+  return report
+}
+
+export async function dispatchWindowsSmokeEntry(args, environment = process.env, { runUi = runWindowsUiSmoke, runDiagnostic = runWindowsBrowserStartupDiagnostic } = {}) {
+  const [executable, version, sourceHead, evidenceDir, flag] = args
+  const diagnostic = args.includes('--browser-startup-diagnostic') || environment.RAILWISE_WINDOWS_BROWSER_STARTUP_DIAGNOSTIC === 'true'
+  if (diagnostic) {
+    assert.ok(environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' && !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup diagnostic is exclusive with task/browser execution')
+    return runDiagnostic({ executable, version, sourceHead, evidenceDir })
+  }
+  return runUi({ executable, version, sourceHead, evidenceDir, ...(flag === '--task-smoke' ? { taskSmoke: true } : {}), ...(flag === '--browser-smoke' ? { browserSmoke: true } : {}) })
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [executable, version, sourceHead, evidenceDir, taskFlag] = process.argv.slice(2)
-  await runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, ...(taskFlag === '--task-smoke' ? { taskSmoke: true } : {}), ...(taskFlag === '--browser-smoke' ? { browserSmoke: true } : {}) })
+  await dispatchWindowsSmokeEntry(process.argv.slice(2))
 }

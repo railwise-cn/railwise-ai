@@ -800,3 +800,28 @@ Windows 同包首次完整回放 `43798022449` 失败于旧预览 QA 谓词：�
 
 
 本组修正合并后的本地验证已经完成：Runtime 10 文件 432 项、桌面与 IPC 7 文件 131 项通过；三组类型检查、23 个变更代码文件 lint、3,380 文件品牌检查及单次生产构建通过，freshness 核对 1,375 个输入。2,437 个按本文记录范围选取的 authored production 文件在实施目录与物理构建目录逐字相同。首次合并类型检查的两个类型收口问题已修正并保留失败日志，相关 70 项回归再次通过；没有放宽执行门禁。新的完整 CI 与精确安装包实测仍待执行，旧 da6 真实公共采集的失败结论保留。
+
+### 245f00f7 精确包已打开；网页业务仍未通过
+
+上述代码提交为 `245f00f7`。[push Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43808527823) 与 [PR Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43808533900) 六个 job 全部成功，Desktop 4,809 通过／17 跳过，Runtime 5,042 通过／24 跳过。[同源码唯一私有构建](https://github.com/railwise-cn/railwise-ai/actions/runs/43808764990) 成功；macOS arm64 正常身份 0.5.7、严格签名及 stapler 通过，实际安装并打开的 ASAR 为 `89bba458e995203221379df34233d7cc5c4f3c0f10a65ce40d6d7f6d3e1b5962`。同构建的正式 0.5.6 → 此精确包真实升级通过，重启后的 ASAR 完全相同；干净 CI 的 Gatekeeper 为 enabled／accepted，所覆盖的任务、草稿和资料连续性通过。本机已有的 Gatekeeper override 单列，未修改系统信任，也不冒充本机干净 Gatekeeper 验收。
+
+旧包通过正常退出后，确认 Main／Runtime 停止并使用 SQLite 一致性备份。退出前后全部 SQLite 表、原 Task／Grant／预算、16 条 UNKNOWN、资料、设置及凭据引用均保持；只有 Chromium Local Storage 的自然退出刷盘发生变化，原检查记录保留。新包沿用原 profile 和已保存模型配置，未要求重填 Key、导出密钥、恢复旧数据库或清零预算。中文浅色 1280×840 实际窗口已检查：任务位于左侧导航，业务进展和真实计时随执行更新，默认未出现命令或审批 JSON，原始截图没有 Computer Use 光标／覆盖层。这是进展界面证据，不是成功报告图片。
+
+真实 Mac 在界面先核对并确认到期任务权限，再单独继续原任务。浏览器实际打开政府采购网，读取主页、输入搜索并点击；随后多次新观察被全 Turn 的第三次相同参数保护阻止。最终自然达到 8 次上限，30 次工具结果、0 成果、0 新 UNKNOWN；原 16 条 UNKNOWN 整行保持。实际累计执行 1,204,888ms、剩余 595,112ms，没有追加或重置。此轮尚未到达新 metadata 正文证明，不能将其写成正文修复已实测通过。
+
+[Windows 同包完整任务回放](https://github.com/railwise-cn/railwise-ai/actions/runs/43812070709) 则在 BrowserSkill connect 阶段返回 `browser_daemon_identity_unverified`：0 模型请求、0 Turn、0 成果，初次任务、实际到期执行与预览均未运行。安装／卸载检查仍通过；安装器 SHA256 为 `519ab08dc7e4ff40c2b1e644760a0971cdb8cff81bc1f80084427c0176cfa86a`，ASAR 为 `2f2f733442f51c889d2bef5bccd491157f83045e38c8bb21c45f68fb26ea9b85`，安装器与 EXE 仍 **NotSigned**。与旧通过包相比，五个启动生产文件及固定 CLI／扩展逐字相同；未把一次失败擅自称为供应商故障或偶发网络问题。
+
+### 浏览器观察恢复的确定修正与诊断边界
+
+真实形状的受控 LocalToolHost／Task／Turn 回归先复现：导航返回明确未派发的 `observation_changed` 后，必要的新观察在 Provider 前被第三次调用保护拦住；后续元素操作只能得到旧 context。修正仅允许可信 Host、同 Task／Turn／Grant／浏览器／会话的明确无副作用失效结果取得一次只读新观察，连续没有真实动作进展时合计最多两次。成功的浏览器动作只清理同会话的读取计数；其它工具、重复点击、UNKNOWN、已确认派发待回读、权限和身份校验均保留。MCP 自述、跨会话和跨授权不能借用恢复额度。
+
+另一个独立回归先证实：head-only HTML 等待正文时内部执行了真实 sync，却没有返回新的观察凭据。现在只有缓存、原生 context／observation ID、页面与标签均精确匹配，才返回这次实际新观察；普通 HTML 读取不凭空附加缓存观察。合并后的 Node 22 聚焦检查共 8 文件 429 项通过，KUN、桌面 Node／Web 类型检查、12 个变更代码文件 lint、单次生产构建及 freshness 通过；2,437 个 authored production 文件在实施树与物理构建树逐字相同。仍须完整 CI 和其对应精确包业务操作；上述 245 包不覆盖尚未入包的修正。
+
+独立只读 CLI 诊断均未改 Task／Grant／来源或预算，不作为任务成果：固定 0.5.0 CLI／扩展／协议下，稳定本机页面的 tab list、get-html、debug capture start／stop 后，使用原实际 sync 凭据导航均成功；三个诊断会话分别明确停止。浙江主页 sync 后等待 12 秒导航至已知详情也没有复现 `observation_changed`，但到达真实 URL 后仍发生 load 超时。由此不能断言某条读取或 capture 命令必然改变原生观察，也没有取消加载／正文要求来获得通过。
+
+Windows 新增独占诊断入口，仅对同一精确包、固定官方 CLI 和实际 compiled identity 探针取证，不打开 App、模型、Chrome 或任务，不改变完整任务回放的断言与源码等价白名单。QA 提交 `893b7d89` 的三项 Quality 成功；[首个诊断运行](https://github.com/railwise-cn/railwise-ai/actions/runs/43822157498) 在 Windows 预置测试中发现 ASAR 路径分隔符错误，安装与 A／B 原生启动均未执行。这次 QA 失败保留，不能把它算作原启动问题复现或诊断完成；修正只涉及该跨平台 QA 读取路径。
+
+当前结论仍为业务验收未通过。没有公开 Release、提升 Stable、打 tag 或修改官网；新范围一次性恢复的独立精确包 UI 验收也仍待执行。此前 0.5.6 已验收的保留范围不因这次浏览器缺陷被重新标成全部未完成，用户取消的邮件与审批转交不再作为发行条件。
+
+
+ASAR QA 路径修正保留 canonical receipt 路径，以平台原生分隔符调用实际 ASAR API；新增使用真实依赖及 Win32 路径语义的回归先复现同一 not-found，再通过。四文件 Node 22 最终 168 项通过／1 项原平台跳过，未削弱包内源码、ASAR、unpacked entry 或完整性断言。新 Windows 原生诊断仍须以其真实运行结果另行记录。

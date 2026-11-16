@@ -1801,3 +1801,162 @@ test('document-navigation acceptance joins real-shaped immutable Host, native GE
     const invalid = structuredClone(input); mutate(invalid); finalize(invalid); assert.throws(() => inspect(invalid))
   }
 })
+
+test('startup diagnostic dispatch never enters the application/model/task smoke path', async () => {
+  const { dispatchWindowsSmokeEntry } = await import('./run-windows-ui-smoke.mjs')
+  const calls = []
+  await dispatchWindowsSmokeEntry(['installed.exe', '0.5.7', 'a'.repeat(40), 'evidence', '--browser-startup-diagnostic'], {}, {
+    runUi: () => { throw new Error('The application/model/task path must not run') },
+    runDiagnostic: async value => { calls.push(value); return { scope: 'startup-diagnostic' } }
+  })
+  assert.equal(calls.length, 1)
+  await assert.rejects(dispatchWindowsSmokeEntry(['installed.exe', '0.5.7', 'a'.repeat(40), 'evidence', '--browser-smoke'], { RAILWISE_WINDOWS_BROWSER_STARTUP_DIAGNOSTIC: 'true' }, { runUi: () => assert.fail(), runDiagnostic: () => assert.fail() }), /exclusive/)
+  for (const environment of [{ RAILWISE_WINDOWS_TASK_SMOKE: 'true' }, { RAILWISE_WINDOWS_BROWSER_SMOKE: 'true' }]) {
+    await assert.rejects(dispatchWindowsSmokeEntry(['installed.exe', '0.5.7', 'a'.repeat(40), 'evidence', '--browser-startup-diagnostic'], environment, {
+      runUi: () => assert.fail('UI must not start'), runDiagnostic: () => assert.fail('mixed-mode diagnostic must not start')
+    }), /exclusive/)
+  }
+})
+
+test('startup A/B preserve ignored stdio and conditional C never follows a live unknown child', async () => {
+  const { runWindowsDaemonDiagnosticCases } = await import('./run-windows-ui-smoke.mjs')
+  const calls = [], consoles = []
+  const runCase = async plan => { calls.push(plan); return { label: plan.label, pid: 77, naturalExit: true, endpointReleased: true, vendor: { informative: plan.label !== 'A' } } }
+  const result = await runWindowsDaemonDiagnosticCases({ runCase, readConsole: async plan => { consoles.push(plan.label); return { collected: true } } })
+  assert.deepEqual(calls.map(x => x.label), ['A', 'B', 'C'])
+  assert.deepEqual(calls[0].options, { detached: true, windowsHide: true, shell: false, stdio: 'ignore' })
+  assert.deepEqual(calls[1].options, { detached: false, windowsHide: false, shell: false, stdio: 'ignore' })
+  assert.deepEqual(calls[2].options, { detached: true, windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
+  assert.deepEqual(consoles, ['A', 'B'])
+  assert.equal(result.status, 'completed')
+  const onlyAB = await runWindowsDaemonDiagnosticCases({ runCase: async plan => ({ label: plan.label, pid: 7, naturalExit: true, endpointReleased: true, vendor: { informative: true } }), readConsole: async () => ({ collected: true }) })
+  assert.deepEqual(onlyAB.cases.map(value => value.label), ['A', 'B'])
+  calls.length = 0; consoles.length = 0
+  const stopped = await runWindowsDaemonDiagnosticCases({ runCase: async plan => { calls.push(plan); return { label: plan.label, endpointReleased: false, naturalExit: false, vendor: { informative: false } } },
+    readConsole: async plan => { consoles.push(plan.label) } })
+  assert.deepEqual(calls.map(x => x.label), ['A'])
+  assert.deepEqual(consoles, [])
+  assert.equal(stopped.status, 'incomplete')
+})
+
+test('startup diagnostic distinguishes vendor signal exit, startup errors and a still-live unverified identity', async () => {
+  const { classifyWindowsDaemonStartup } = await import('./run-windows-ui-smoke.mjs')
+  assert.equal(classifyWindowsDaemonStartup({ naturalExit: true, vendor: { signal: true } }), 'vendor_signal_exit')
+  assert.equal(classifyWindowsDaemonStartup({ naturalExit: true, vendor: { error: true } }), 'vendor_startup_error')
+  assert.equal(classifyWindowsDaemonStartup({ naturalExit: false, identity: { verified: false } }), 'identity_probe_unverified')
+  assert.equal(classifyWindowsDaemonStartup({ naturalExit: true, identity: { verified: false }, vendor: {} }), 'early_exit_identity_unavailable')
+})
+
+test('diagnostic imports the installed compiled identity bytes and rejects altered ASAR/source', async t => {
+  const { loadWindowsStartupIdentity, windowsStartupDiagnosticPackage } = await import('./run-windows-ui-smoke.mjs')
+  const { readFile } = await import('node:fs/promises')
+  const root = await mkdtemp(join(tmpdir(), 'startup-identity-asar-')); t.after(() => rm(root, { recursive: true, force: true }))
+  const input = join(root, 'input'); await mkdir(join(input, 'kun', 'dist', 'services'), { recursive: true })
+  const pin = windowsStartupDiagnosticPackage
+  await writeFile(join(input, 'package.json'), JSON.stringify({ name: 'workwise', productName: 'RailWise AI', version: pin.version, buildProvenance: { sourceHead: pin.sourceHead } }))
+  const bytes = 'export async function processIdentityAsync(pid) { return {pid, fingerprint:"installed-compiled-module"} }\n'
+  await writeFile(join(input, 'kun', 'dist', 'services', 'process-identity.js'), bytes)
+  const archive = join(root, 'app.asar'); await createRequire(import.meta.url)('@electron/asar').createPackage(input, archive)
+  const digest = createHash('sha256').update(await readFile(archive)).digest('hex')
+  const loaded = await loadWindowsStartupIdentity({ asarPath: archive, expectedAsarSha256: digest, directory: join(root, 'imported') })
+  assert.deepEqual(await loaded.identity(7), { pid: 7, fingerprint: 'installed-compiled-module' })
+  assert.equal(loaded.proof.sha256, createHash('sha256').update(bytes).digest('hex'))
+  assert.equal(loaded.proof.entry, 'kun/dist/services/process-identity.js')
+  assert.equal(loaded.proof.packageSourceHead, pin.sourceHead)
+  await assert.rejects(loadWindowsStartupIdentity({ asarPath: archive, expectedAsarSha256: '0'.repeat(64), directory: join(root, 'wrong') }))
+  const unpacked = join(root, 'unpacked.asar')
+  await createRequire(import.meta.url)('@electron/asar').createPackageWithOptions(input, unpacked, { unpack: '**/process-identity.js' })
+  const unpackedDigest = createHash('sha256').update(await readFile(unpacked)).digest('hex')
+  await writeFile(join(unpacked + '.unpacked', 'kun', 'dist', 'services', 'process-identity.js'), bytes.replace('installed-compiled-module', 'tampered-compiled-module!'))
+  await assert.rejects(loadWindowsStartupIdentity({ asarPath: unpacked, expectedAsarSha256: unpackedDigest, directory: join(root, 'tampered') }), /integrity|regular ASAR/)
+  const wrongSource = join(root, 'wrong-source.asar')
+  await writeFile(join(input, 'package.json'), JSON.stringify({ name: 'workwise', productName: 'RailWise AI', version: pin.version, buildProvenance: { sourceHead: 'b'.repeat(40) } }))
+  await createRequire(import.meta.url)('@electron/asar').createPackage(input, wrongSource)
+  await assert.rejects(loadWindowsStartupIdentity({ asarPath: wrongSource, expectedAsarSha256: createHash('sha256').update(await readFile(wrongSource)).digest('hex'), directory: join(root, 'wrong-source') }))
+})
+
+async function startupCaseFixture({ identityResult, closeDuringIdentity = false, changedExecutable = false, exhausted = false, quickUnavailable = false } = {}) {
+  const { EventEmitter } = await import('node:events')
+  const { collectWindowsDaemonStartupCase } = await import('./run-windows-ui-smoke.mjs')
+  const { browserStartupDependency } = await import('./prepare-browser-skill-smoke.mjs')
+  const child = new EventEmitter(); child.pid = 77; child.exitCode = null; child.signalCode = null; child.stdout = child.stderr = null
+  const calls = []; let clock = 0, probes = 0, restored = false
+  child.unref = () => calls.push('unref')
+  child.kill = signal => { calls.push(['kill', signal]); child.exitCode = 0; child.signalCode = signal; child.emit('close', 0, signal) }
+  const identity = async (pid, options) => {
+    calls.push(['identity', pid, options.timeoutMs]); probes++
+    if (exhausted) { clock += 10000; return null }
+    if (quickUnavailable && probes === 1) { clock += 500; return null }
+    if (closeDuringIdentity) { child.exitCode = 0; child.emit('close', 0, null) }
+    return identityResult === undefined ? { pid, fingerprint: 'win32:123456' } : identityResult
+  }
+  const result = await collectWindowsDaemonStartupCase({ plan: { label: 'A', options: { detached: true, windowsHide: true, shell: false, stdio: 'ignore' } },
+    executable: 'fixed-bsk.exe', home: 'fresh-home', environment: {}, identity, start: (...args) => { calls.push(['spawn', ...args]); return child },
+    now: () => clock, wait: async ms => { clock += ms }, observeMs: 1000,
+    vendor: async () => ({ informative: false, signal: child.signalCode === 'SIGTERM', logs: [] }),
+    fileHash: async () => changedExecutable ? '0'.repeat(64) : browserStartupDependency.executableSha256,
+    endpointReleased: async () => true, observeProbe: () => () => { restored = true } })
+  return { result, calls, probes, restored }
+}
+
+test('diagnostic retains the ten-second budget and never kills a live unverified or changed child', async () => {
+  const exhausted = await startupCaseFixture({ exhausted: true })
+  assert.equal(exhausted.probes, 1)
+  assert.equal(exhausted.result.endpointReleased, false)
+  assert.equal(exhausted.calls.some(call => Array.isArray(call) && call[0] === 'kill'), false)
+  const changed = await startupCaseFixture({ changedExecutable: true })
+  assert.equal(changed.result.cleanup.verifiedBirth, false)
+  assert.equal(changed.result.endpointReleased, false)
+  assert.equal(changed.calls.some(call => Array.isArray(call) && call[0] === 'kill'), false)
+  assert.equal(changed.restored, true)
+})
+
+test('diagnostic records child close before the identity callback and separates cleanup signals from natural exit', async () => {
+  const exited = await startupCaseFixture({ closeDuringIdentity: true })
+  assert.equal(exited.result.identity.verified, false)
+  assert.equal(exited.result.identity.attempts[0].childStillLive, false)
+  assert.equal(exited.result.naturalExit, true)
+  assert.equal(exited.result.classification, 'child_exited_before_identity_acceptance')
+  assert.equal(exited.result.events[0].event, 'close')
+  assert.equal(exited.calls.some(call => Array.isArray(call) && call[0] === 'kill'), false)
+  const owned = await startupCaseFixture()
+  assert.equal(owned.result.identity.verified, true)
+  assert.equal(owned.result.naturalExit, false)
+  assert.equal(owned.result.vendor.signal, false)
+  assert.equal(owned.result.vendorAfterCleanup.signal, true)
+  assert.equal(owned.result.cleanup.verifiedBirth, true)
+  assert.equal(owned.result.endpointReleased, true)
+})
+
+test('diagnostic logs redact credentials, URLs and opaque values before persistence', async () => {
+  const { sanitizeWindowsStartupText } = await import('./run-windows-ui-smoke.mjs')
+  const text = sanitizeWindowsStartupText('daemon ready\nsecret=synthetic-test-secret\nfailed https://example.invalid/?signature=synthetic\nopaque ' + 'z'.repeat(64))
+  assert.match(text, /daemon ready/)
+  assert.doesNotMatch(text, /synthetic-test-secret|signature=synthetic|https:|zzzzzzzz/)
+})
+
+test('diagnostic quick identity retry receives only the remaining startup budget', async () => {
+  const value = await startupCaseFixture({ quickUnavailable: true })
+  const attempts = value.calls.filter(call => Array.isArray(call) && call[0] === 'identity')
+  assert.deepEqual(attempts.slice(0, 2), [['identity', 77, 10000], ['identity', 77, 9000]])
+  assert.equal(value.result.identity.verified, true)
+  assert.equal(value.result.cleanup.verifiedBirth, true)
+})
+
+test('ASAR native lookup uses the platform separator while the receipt keeps its canonical entry', async t => {
+  const { default: path } = await import('node:path')
+  const { startupIdentityAsarPath } = await import('./run-windows-ui-smoke.mjs')
+  const asar = createRequire(import.meta.url)('@electron/asar')
+  const root = await mkdtemp(join(tmpdir(), 'native-asar-path-')); t.after(() => rm(root, { recursive: true, force: true }))
+  const input = join(root, 'input'); await mkdir(join(input, 'kun', 'dist', 'services'), { recursive: true })
+  await writeFile(join(input, 'kun', 'dist', 'services', 'process-identity.js'), 'controlled compiled fixture')
+  const archive = join(root, 'app.asar'); await asar.createPackage(input, archive)
+  // Use the real dependency with Win32 path primitives to exercise its lookup
+  // contract on a Mac host; the patch is synchronous and restored in finally.
+  const original = { dirname: path.dirname, basename: path.basename, sep: path.sep }
+  try {
+    Object.assign(path, { dirname: path.win32.dirname, basename: path.win32.basename, sep: path.win32.sep })
+    assert.throws(() => asar.statFile(archive, 'kun/dist/services/process-identity.js'), /not found/)
+    assert.ok(asar.statFile(archive, startupIdentityAsarPath(path.win32)).size > 0)
+  } finally { Object.assign(path, original) }
+})

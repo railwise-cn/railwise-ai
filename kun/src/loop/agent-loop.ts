@@ -1804,7 +1804,7 @@ export class AgentLoop {
         continue
       }
 
-      const storm = this.toolStormBreakers.get(input.turnId)?.inspect(call)
+      const storm = this.toolStormBreakers.get(input.turnId)?.inspect(call, input.executionGrant)
       if (storm?.suppress) {
         await this.persistSuppressedToolCall({
           threadId: input.threadId,
@@ -1841,7 +1841,7 @@ export class AgentLoop {
         if (!next) break
         if (!this.isParallelSafeToolCall(next, input.approvalPolicy, input.toolProviderKinds)) break
 
-        const nextStorm = this.toolStormBreakers.get(input.turnId)?.inspect(next)
+        const nextStorm = this.toolStormBreakers.get(input.turnId)?.inspect(next, input.executionGrant)
         if (nextStorm?.suppress) {
           suppressedAfterBatch = { call: next, reason: nextStorm.reason }
           index += 1
@@ -2086,6 +2086,7 @@ export class AgentLoop {
           if (operation) this.opts.tasks?.finishToolOperation(operation.token, operation.key, result)
           if (operation && input.call.toolName === 'publish_artifact') this.artifactPublications.set(result, operation)
           if (operation) this.opts.tasks?.assertToken(operation.token)
+          this.toolStormBreakers.get(input.turnId)?.observeResult(input.call, result, input.context.executionGrant)
           const isError = result.item.kind === 'tool_result' && result.item.isError === true
           if (spanId) {
             this.opts.spanService?.finish(spanId, {

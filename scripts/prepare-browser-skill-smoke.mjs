@@ -118,3 +118,32 @@ export function launchBrowserSkillSmoke(prepared, profile, environment = process
       }
     } }
 }
+
+// Diagnostic-only: the exact vendor dependency already pinned by package 245f00f7.
+export const browserStartupDependency = Object.freeze({ version: '0.5.0',
+  url: 'https://github.com/Tencent/BrowserSkill/releases/download/cli-v0.5.0/bsk-v0.5.0-x86_64-pc-windows-msvc.zip',
+  size: 9017258, sha256: '1bba7cd6d771df48485c396b8d5f1e06f9bc93cd648b0552013c30f90aeaaa40',
+  executableSha256: 'd6e2875707ca89cb506fa0bebc881a638d721178974c4b26d8b4bf9070bc03f2' })
+
+export async function extractPinnedBrowserStartupCli(bytes, directory, dependency = browserStartupDependency) {
+  assert.equal(bytes.length, dependency.size)
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), dependency.sha256)
+  const archive = await JSZip.loadAsync(bytes), entries = Object.values(archive.files)
+  for (const entry of entries) assert.ok(!isAbsolute(entry.unsafeOriginalName ?? entry.name) && !(entry.unsafeOriginalName ?? entry.name).split(/[\\/]/).includes('..'))
+  const matches = entries.filter(entry => !entry.dir && /(?:^|\/)bsk\.exe$/.test(entry.name))
+  assert.equal(matches.length, 1)
+  const executableBytes = await matches[0].async('nodebuffer')
+  assert.equal(createHash('sha256').update(executableBytes).digest('hex'), dependency.executableSha256)
+  await mkdir(directory, { recursive: true })
+  const path = join(directory, 'bsk.exe')
+  await import('node:fs/promises').then(fs => fs.writeFile(path, executableBytes, { flag: 'wx' }))
+  assert.equal(await fileHash(path), dependency.executableSha256)
+  return { path, version: dependency.version, archiveSha256: dependency.sha256, executableSha256: dependency.executableSha256 }
+}
+
+export async function preparePinnedBrowserStartupCli(directory) {
+  await mkdir(directory, { recursive: true })
+  const path = join(directory, 'fixed-vendor.zip')
+  await download(browserStartupDependency.url, path, browserStartupDependency.sha256)
+  return extractPinnedBrowserStartupCli(await readFile(path), join(directory, 'extracted'))
+}

@@ -1090,7 +1090,14 @@ export function buildBrowserSkillToolProvider(options: {
           verificationPolicy, ...(publicQuery ? { access: 'public_query' } : {}) } })
         return { output: { status: 'succeeded', authorizationId: current.key, expiresAt, action: authorizedAction, origin: current.binding.origin, elementHash: current.binding.elementHash } }
       }
-      const readCapturedDocument = async () => {
+      const refreshedHtmlObservation = (result: { sourceUrl?: unknown; tabId?: unknown }, refreshed?: Awaited<ReturnType<typeof observe>>): Json => {
+        const native = object(refreshed?.observation), current = observations.get(`${taskId}:${sessionId}`)
+        if (!refreshed || !current?.observationId || current.contextId !== native.context_id || current.observationId !== native.observation_id ||
+          refreshed.sourceUrl !== result.sourceUrl || refreshed.tabId !== result.tabId || current.sourceUrl !== result.sourceUrl || current.tabId !== result.tabId) return {}
+        return { observation: native,
+          message: '正文加载期间已重新观察当前网页；后续操作请使用本次 observation 中的新 context_id 和元素引用，不要复用旧观察。' }
+      }
+      const readCapturedDocument = async (refreshed?: Awaited<ReturnType<typeof observe>>) => {
         const record = documentCaptures.get(`${taskId}:${sessionId}`)
         if (!record || record.capture.turnId !== context.turnId || record.capture.grantFingerprint !== operationFingerprint(context.executionGrant) ||
           record.capture.configurationFingerprint !== context.executionGrant?.connectorIdentityFingerprints?.['browser-skill']) throw failure('browser_document_capture_required')
@@ -1103,7 +1110,7 @@ export function buildBrowserSkillToolProvider(options: {
             allowResponseUrl: url => originAllowed(url, scope, context) })
           await closeDocumentCapture(record, 'document_read_complete')
           await documentGuard(context)
-          return { output: { status: 'succeeded', provider: 'browser-skill', sessionId, ...result,
+          return { output: { status: 'succeeded', provider: 'browser-skill', sessionId, ...result, ...refreshedHtmlObservation(result, refreshed),
             evidence: { kind: 'browser_observation', sourceUrl: result.sourceUrl, resultHash: result.resultHash,
               verifiedAt: new Date().toISOString(), verified: true, contentRead: true, sourceKind: 'actual_loaded_response' } } }
         } catch (error) {
@@ -1112,6 +1119,7 @@ export function buildBrowserSkillToolProvider(options: {
         }
       }
       if (action === 'get_html') {
+        let refreshed: Awaited<ReturnType<typeof observe>> | undefined
         let result = await readHtml(config, sessionId, scope, context, args.target as string | undefined, Number(args.maxBytes))
         if (!args.target && !result.truncated && headOnlyDocument(result.html)) {
           stage = 'readback'
@@ -1130,7 +1138,7 @@ export function buildBrowserSkillToolProvider(options: {
           if (current.id !== result.tabId || current.url !== result.sourceUrl) throw failure('browser_page_changed')
           if (waiting && (waiting.tab_id !== result.tabId || waiting.used_selector !== 'body')) throw failure('browser_document_not_ready')
           if (waiting?.satisfied === true && waiting.attached === true) {
-            await observe(config, sessionId, scope, context, { tabId: result.tabId, sourceUrl: result.sourceUrl })
+            refreshed = await observe(config, sessionId, scope, context, { tabId: result.tabId, sourceUrl: result.sourceUrl })
             const reread = await readHtml(config, sessionId, scope, context, undefined, Number(args.maxBytes))
             if (reread.tabId !== result.tabId || reread.sourceUrl !== result.sourceUrl) throw failure('browser_page_changed')
             result = reread
@@ -1140,7 +1148,7 @@ export function buildBrowserSkillToolProvider(options: {
         }
         if (!args.target && (result.truncated || headOnlyDocument(result.html)) && documentCaptures.has(`${taskId}:${sessionId}`)) {
           stage = 'readback'
-          try { return await readCapturedDocument() }
+          try { return await readCapturedDocument(refreshed) }
           catch (error) {
             documentReadback = { status: 'unverified', contentRead: false, sourceUrl: result.sourceUrl,
               navigationReplayed: false, readScope: 'response_document' }
@@ -1150,6 +1158,7 @@ export function buildBrowserSkillToolProvider(options: {
         const resultHash = sha256(result.html)
         if (!args.target && !result.truncated && result.html.trim()) settleReadback(taskId, sessionId, result.sourceUrl, result.tabId, resultHash)
         return { output: { status: 'succeeded', provider: 'browser-skill', sessionId, ...result, resultHash, readScope: args.target ? 'element' : 'document',
+          ...refreshedHtmlObservation(result, refreshed),
           ...(!args.target && result.truncated ? { next_step: documentNextStep(taskId, sessionId) } : {}),
           evidence: { kind: 'browser_observation', sourceUrl: result.sourceUrl, resultHash, verifiedAt: new Date().toISOString(), verified: true, contentRead: Boolean(result.html.trim()) } } }
       }
