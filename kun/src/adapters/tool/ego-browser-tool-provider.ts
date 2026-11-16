@@ -6,6 +6,7 @@ import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import type { CurrentToolOperation, ToolHostContext } from '../../ports/tool-host.js'
 import { EGO_TOOLS, type EgoBrowserCapabilityConfig } from '../../contracts/ego-browser.js'
 import { operationFingerprint, type TaskRunRepository } from '../../services/task-run-repository.js'
+import { currentEgoTaskSpaceBinding, type EgoClosedSpaceReopenAuthorization } from '../../services/ego-browser-evidence.js'
 import { EGO_RESULT_MARKER, runEgoBrowserScript, type EgoBrowserCommandRunner } from '../../services/ego-browser-cli.js'
 const object = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
 const hash = (v: string) => createHash('sha256').update(v).digest('hex')
@@ -28,9 +29,9 @@ let task, page, failurePhase="control";
 const check = () => { if (Date.now() >= p.deadline) {failurePhase='control';throw Object.assign(new Error(), {code:'ego_browser_grant_expired'});} if (task && task.ownership !== 'agent') {failurePhase='control';throw Object.assign(new Error(), {code:'ego_browser_user_control'});} };
 try {
  check();
- if(p.recoverExistingOnly) {const matches=(await listTaskSpaces()).filter(s=>s.name===p.spaceName);if(matches.length!==1)throw Object.assign(new Error(),{code:matches.length?'ego_browser_task_space_ambiguous':'ego_browser_task_space_missing'});if(matches[0].ownership!=='agent'||p.spaceId&&matches[0].id!==p.spaceId)throw Object.assign(new Error(),{code:'ego_browser_user_control'});task=await taskSpace(matches[0].id)}
+ if(p.recoverExistingOnly) {const matches=(await listTaskSpaces()).filter(s=>s.name===p.spaceName);if(matches.length!==1)throw Object.assign(new Error(),{code:matches.length?'ego_browser_task_space_ambiguous':'ego_browser_task_space_missing'});if(matches[0].ownership!=='agent')throw Object.assign(new Error(),{code:'ego_browser_user_control'});if(p.spaceId&&matches[0].id!==p.spaceId)throw Object.assign(new Error(),{code:'ego_browser_task_space_unconfirmed'});task=await taskSpace(matches[0].id)}
  else task = await taskSpace(p.spaceId ?? p.spaceName); check();
- if(task.name !== p.spaceName || p.spaceId && task.spaceId !== p.spaceId) throw Object.assign(new Error(),{code:'ego_browser_task_space_changed'});
+ if(task.name !== p.spaceName || p.spaceId && task.spaceId !== p.spaceId) throw Object.assign(new Error(),{code:'ego_browser_task_space_unconfirmed'});
  page = task.page('p1');
  const identity = {taskSpaceId:task.spaceId,spaceName:task.name,ownership:task.ownership,pageLabel:page.label};
  const allowed = url => { const u=new URL(url); return ['http:','https:'].includes(u.protocol) && !u.username && !u.password && p.origins.includes(u.origin); };
@@ -82,6 +83,22 @@ try {
 } catch(error) { const code=typeof error?.code==='string' && /^[A-Za-z_]{1,100}$/.test(error.code)?error.code:'ego_browser_read_failed'; emit({ok:false,code,failurePhase,...(task?{taskSpaceId:task.spaceId,spaceName:task.name,ownership:task.ownership,pageLabel:'p1'}:{})}); }`
 }
 
+/** Fixed metadata-only query; never opens a Space or reads a Page. */
+export function egoSpaceStatusScript(input:Record<string,unknown>):string {
+ return `const p = ${JSON.stringify(input)};
+const emit=v=>console.log(${JSON.stringify(EGO_RESULT_MARKER)}+JSON.stringify(v));
+try {
+ if(!Number.isSafeInteger(p.spaceId)||p.spaceId<1||typeof p.spaceName!=='string'||!p.spaceName)throw Object.assign(new Error(),{code:'ego_browser_protocol_invalid'});
+ if(Date.now()>=p.deadline)throw Object.assign(new Error(),{code:'ego_browser_grant_expired'});
+ const spaces=await listTaskSpaces();
+ if(!Array.isArray(spaces)||spaces.some(s=>!s||!Number.isSafeInteger(s.id)||s.id<0||typeof s.name!=='string'||typeof s.ownership!=='string'))throw Object.assign(new Error(),{code:'ego_browser_protocol_invalid'});
+ const ids=spaces.filter(s=>s.id===p.spaceId),names=spaces.filter(s=>s.name===p.spaceName);
+ if(ids.length>1)throw Object.assign(new Error(),{code:'ego_browser_protocol_invalid'});
+ if(Date.now()>=p.deadline)throw Object.assign(new Error(),{code:'ego_browser_grant_expired'});
+ emit({ok:true,kind:'ego_space_status',version:1,taskSpaceId:p.spaceId,spaceName:p.spaceName,idMatch:ids.length===1,nameMatches:names.length,spaceStatus:!ids.length&&!names.length?'closed':'existing',identityMatches:ids.length===1&&ids[0].name===p.spaceName&&names.length===1&&names[0].id===p.spaceId,...(ids.length?{ownership:ids[0].ownership}:{})});
+}catch(error){const code=typeof error?.code==='string'&&/^ego_browser_[a-z_]+$/.test(error.code)?error.code:'ego_browser_read_failed';emit({ok:false,code,failurePhase:'control'});}`
+}
+
 /** Finish only the persisted existing agent-owned Space; no Page call after await. */
 export function egoFinishScript(input:Record<string,unknown>):string {
   return `const p=${JSON.stringify(input)};
@@ -95,7 +112,7 @@ try {
 } catch {emit({ok:false,code:'ego_browser_finish_unconfirmed'});}`
 }
 
-export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabilityConfig; repository: TaskRunRepository; run?: EgoBrowserCommandRunner; now?: () => number; canFinishReadiness?: (context:ToolHostContext,hostOperationId:string)=>Promise<{ready:boolean;reason?:string}> }): CapabilityToolProvider {
+export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabilityConfig; repository: TaskRunRepository; run?: EgoBrowserCommandRunner; now?: () => number; canFinishReadiness?: (context:ToolHostContext,hostOperationId:string)=>Promise<{ready:boolean;reason?:string}>; canReopenClosedSpace?: (context:ToolHostContext,hostOperationId:string,priorBindingReceiptId:string)=>Promise<EgoClosedSpaceReopenAuthorization|null> }): CapabilityToolProvider {
   const config = options.config, repository = options.repository, run = options.run ?? runEgoBrowserScript
   const identity = operationFingerprint(config), now = options.now ?? Date.now
   const guard = async (context: ToolHostContext) => {
@@ -121,13 +138,47 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
     validateArguments: raw => { inputs[name].parse(raw) },
     shouldAdvertise: context => context.executionGrant?.browserScope?.provider === 'ego-browser',
     execute: async (raw, context) => {
-      let invocation: CurrentToolOperation | undefined, failurePhase:string|undefined='control'
+      let invocation: CurrentToolOperation | undefined, failurePhase:string|undefined='control', currentSpaceId:unknown
       try {
         invocation=context.currentToolOperation?.()
         const args = inputs[name].parse(raw) as Record<string, unknown>, { grant, task } = await guard(context)
         const host=invocation
         if(!host||host.taskId!==task.id||host.turnId!==context.turnId||host.providerId!=='ego-browser'||host.toolName!==name||host.argumentsHash!==operationFingerprint(raw)||host.executionGrantFingerprint!==operationFingerprint(grant))throw fail('ego_browser_host_operation_required')
-        const originalBinding=repository.operation(task.id,'ego-task-space')
+        let originalBinding=currentEgoTaskSpaceBinding(repository,task.id), firstCreatedSpace=!originalBinding
+        currentSpaceId=object(originalBinding?.result).taskSpaceId
+        if(name==='ego_browser_open') {
+          const target=new URL(String(args.url)), goalUrls=[...task.goal.matchAll(/https?:\/\/[^\s<>"'`）)，。]+/gi)].flatMap(match=>{try{const u=new URL(match[0]);return u.username||u.password?[]:[u.href]}catch{return []}})
+          if(target.username||target.password||!goalUrls.includes(target.href))throw fail('ego_browser_target_required')
+          assertGrantAllowsNetwork(target.href,context);if(!grant.browserScope!.origins.includes(target.origin))throw fail('ego_browser_origin_denied')
+        }
+        if(name==='ego_browser_open'&&originalBinding?.status==='succeeded'&&options.canReopenClosedSpace) {
+          const prior=originalBinding, priorSpace=object(prior.result)
+          if(prior.request?.configurationFingerprint!==identity||operationFingerprint(prior.request.origins)!==operationFingerprint(grant.browserScope!.origins)||!Number.isSafeInteger(priorSpace.taskSpaceId)||Number(priorSpace.taskSpaceId)<1)throw fail('ego_browser_task_space_unconfirmed')
+          const status=await run(config,egoSpaceStatusScript({action:'space_status',spaceId:priorSpace.taskSpaceId,spaceName:prior.request.spaceName,deadline:Date.parse(grant.expiresAt!)}),context.abortSignal)
+          await guard(context)
+          if(status.ok!==true)throw fail(typeof status.code==='string'&&status.code.startsWith('ego_browser_')?status.code:'ego_browser_read_failed')
+          if(status.kind!=='ego_space_status'||status.version!==1||status.taskSpaceId!==priorSpace.taskSpaceId||status.spaceName!==prior.request.spaceName||typeof status.idMatch!=='boolean'||!Number.isSafeInteger(status.nameMatches)||Number(status.nameMatches)<0)throw fail('ego_browser_protocol_invalid')
+          if(status.spaceStatus==='closed'&&status.idMatch===false&&status.nameMatches===0) {
+            if(prior.request.createdTurnId===context.turnId||repository.operations(task.id).some(row=>row.id!==host.operationId&&((row.kind==='tool'&&['prepared','running','outcome_unknown'].includes(row.status))||(row.kind==='ego_task_space_finish'&&['prepared','running','outcome_unknown'].includes(row.status)))))throw fail('ego_browser_task_space_missing')
+            const auth=await options.canReopenClosedSpace?.(context,host.operationId,prior.id)
+            if(!auth||auth.turnId!==context.turnId||auth.priorBindingReceiptId!==prior.id||!auth.resumeReceiptId||!auth.controlOwnerId)throw fail('ego_browser_task_space_missing')
+            await guard(context)
+            const consumeKey='ego-reopen:'+auth.resumeReceiptId,newBindingKey='ego-task-space:resume:'+auth.resumeReceiptId,nonce=randomUUID(),spaceName='RailWise read-only '+task.id+' '+nonce
+            originalBinding=repository.transact(()=>{
+              if(currentEgoTaskSpaceBinding(repository,task.id)?.id!==prior.id||repository.operation(task.id,consumeKey))throw fail('ego_browser_task_space_missing')
+              const request={taskId:task.id,...auth,newBindingKey,spaceName,nonce,hostOperationId:host.operationId,callId:host.callId,grantFingerprint:operationFingerprint(grant),configurationFingerprint:identity,priorTaskSpaceId:priorSpace.taskSpaceId,priorSpaceName:prior.request!.spaceName}
+              const consume=repository.beginOperation({ownerId:task.id,idempotencyKey:consumeKey,kind:'ego_task_space_reopen',request,nowIso:new Date(now()).toISOString()}).receipt
+              const binding=repository.beginOperation({ownerId:task.id,idempotencyKey:newBindingKey,kind:'ego_task_space',request:{taskId:task.id,threadId:task.threadId,spaceName,nonce,createdTurnId:context.turnId,configurationFingerprint:identity,origins:grant.browserScope!.origins,priorBindingReceiptId:prior.id,resumeReceiptId:auth.resumeReceiptId,controlOwnerId:auth.controlOwnerId,reopenReceiptId:consume.id},nowIso:new Date(now()).toISOString()}).receipt
+              repository.finishOperation(task.id,consumeKey,{status:'succeeded',result:{closed:true,priorTaskSpaceId:priorSpace.taskSpaceId,priorSpaceName:prior.request!.spaceName,idMatch:false,nameMatches:0}},new Date(now()).toISOString())
+              return binding
+            })
+            firstCreatedSpace=true;currentSpaceId=undefined
+          } else {
+            if(status.spaceStatus!=='existing'||status.idMatch!==true||status.nameMatches!==1||status.identityMatches!==true)throw fail('ego_browser_task_space_unconfirmed')
+            if(typeof status.ownership!=='string')throw fail('ego_browser_protocol_invalid')
+            if(status.ownership!=='agent')throw fail('ego_browser_user_control')
+          }
+        }
         const finishKey=originalBinding?'ego-finish:'+originalBinding.id:undefined,previousFinish=finishKey?repository.operation(task.id,finishKey):null
         if(previousFinish&&name!=='ego_browser_finish')throw fail('ego_browser_task_space_finished')
         if(name==='ego_browser_finish') {
@@ -150,18 +201,13 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
             throw error
           }
         }
-        const key = 'ego-task-space', origins = grant.browserScope!.origins
-        let binding = repository.operation(task.id,key)
-        const firstCreatedSpace=!binding, previousRead=repository.operations(task.id,'ego_document_read').filter(r=>r.status==='succeeded').at(-1), previousDocument=object(previousRead?.result)
-        const nonce=String(binding?.request?.nonce??randomUUID()), spaceName='RailWise read-only '+task.id+' '+nonce
-        const bindingRequest = { taskId: task.id, threadId: task.threadId, spaceName,nonce,createdTurnId:binding?.request?.createdTurnId??context.turnId,configurationFingerprint: identity, origins }
-        if(name==='ego_browser_open') {
-          const target=new URL(String(args.url)), goalUrls=[...task.goal.matchAll(/https?:\/\/[^\s<>"'`）)，。]+/gi)].flatMap(match=>{try{const u=new URL(match[0]);return u.username||u.password?[]:[u.href]}catch{return []}})
-          if(target.username||target.password||!goalUrls.includes(target.href))throw fail('ego_browser_target_required')
-          assertGrantAllowsNetwork(target.href,context);if(!origins.includes(target.origin))throw fail('ego_browser_origin_denied')
-        }
+        const key = originalBinding?.idempotencyKey??'ego-task-space', origins = grant.browserScope!.origins
+        let binding = originalBinding
+        const previousRead=repository.operations(task.id,'ego_document_read').filter(r=>r.status==='succeeded'&&object(r.result).taskSpaceId===object(binding?.result).taskSpaceId).at(-1), previousDocument=object(previousRead?.result)
+        const nonce=String(binding?.request?.nonce??randomUUID()), spaceName=String(binding?.request?.spaceName??'RailWise read-only '+task.id+' '+nonce)
+        const bindingRequest = { taskId: task.id, threadId: task.threadId, spaceName,nonce,createdTurnId:binding?.request?.createdTurnId??context.turnId,configurationFingerprint: identity, origins,...(binding?.request?.priorBindingReceiptId?{priorBindingReceiptId:binding.request.priorBindingReceiptId,resumeReceiptId:binding.request.resumeReceiptId,controlOwnerId:binding.request.controlOwnerId,reopenReceiptId:binding.request.reopenReceiptId}:{}) }
         if(['ego_browser_open','ego_browser_next_page'].includes(name)&&repository.operations(task.id,'ego_page_navigation').filter(r=>r.status==='succeeded').length>=10)throw fail('ego_browser_page_limit')
-        if (binding && (binding.fingerprint !== operationFingerprint(bindingRequest) || binding.status !== 'succeeded' && !(binding.status==='prepared'&&binding.request?.createdTurnId!==context.turnId))) throw fail('ego_browser_task_space_unconfirmed')
+        if (binding && (binding.fingerprint !== operationFingerprint(bindingRequest) || binding.status !== 'succeeded' && !(binding.status==='prepared'&&(firstCreatedSpace||binding.request?.createdTurnId!==context.turnId)))) throw fail('ego_browser_task_space_unconfirmed')
         if (!binding && name !== 'ego_browser_open') throw fail('ego_browser_open_required')
         if (!binding) binding = repository.beginOperation({ownerId:task.id,idempotencyKey:key,kind:'ego_task_space',request:bindingRequest,nowIso:new Date(now()).toISOString()}).receipt
         const recoverExistingOnly=binding.status==='prepared'&&!firstCreatedSpace
@@ -192,10 +238,12 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
         const result=await run(config,egoReadScript(params),context.abortSignal)
         const reportedPhase=safeFailurePhase(result.failurePhase)
         failurePhase='control'
-        if (result.spaceName!==spaceName || result.ownership!=='agent' || !Number.isSafeInteger(result.taskSpaceId) || Number(result.taskSpaceId)<1 || result.pageLabel!=='p1' || bound.taskSpaceId && result.taskSpaceId!==bound.taskSpaceId)throw fail('ego_browser_user_control')
-        if (binding.status==='prepared') binding=repository.finishOperation(task.id,key,{status:'succeeded',result:{taskSpaceId:result.taskSpaceId,pageLabel:'p1',ownership:'agent'}},new Date(now()).toISOString())
         await guard(context)
-        if(result.ok!==true) {failurePhase=reportedPhase;repository.finishOperation(task.id,dispatchKey,{status:'failed',result:{code:result.code,...(failurePhase?{failurePhase}:{})}},new Date(now()).toISOString());throw fail(typeof result.code==='string'&&result.code.startsWith('ego_browser_')?result.code:'ego_browser_read_failed')}
+        if(result.ok!==true) {failurePhase=reportedPhase;const knownSpace=result.spaceName===spaceName&&Number.isSafeInteger(result.taskSpaceId)&&Number(result.taskSpaceId)>0&&result.pageLabel==='p1'&&(!bound.taskSpaceId||result.taskSpaceId===bound.taskSpaceId);const lostControl=knownSpace&&typeof result.ownership==='string'&&result.ownership!=='agent';if(lostControl)failurePhase='control';const code=lostControl?'ego_browser_user_control':typeof result.code==='string'&&result.code.startsWith('ego_browser_')?result.code:'ego_browser_read_failed';repository.finishOperation(task.id,dispatchKey,{status:'failed',result:{code,...(failurePhase?{failurePhase}:{})}},new Date(now()).toISOString());throw fail(code)}
+        if(typeof result.ownership==='string'&&result.ownership!=='agent')throw fail('ego_browser_user_control')
+        if (result.spaceName!==spaceName || result.ownership!=='agent' || !Number.isSafeInteger(result.taskSpaceId) || Number(result.taskSpaceId)<1 || result.pageLabel!=='p1' || bound.taskSpaceId && result.taskSpaceId!==bound.taskSpaceId)throw fail('ego_browser_task_space_unconfirmed')
+        currentSpaceId=result.taskSpaceId
+        if (binding.status==='prepared') binding=repository.finishOperation(task.id,key,{status:'succeeded',result:{taskSpaceId:result.taskSpaceId,pageLabel:'p1',ownership:'agent'}},new Date(now()).toISOString())
         const sourceUrl=String(result.sourceUrl??'');assertGrantAllowsNetwork(sourceUrl,context)
         if(!origins.includes(new URL(sourceUrl).origin))throw fail('ego_browser_origin_denied')
         if(name==='ego_browser_observe') {repository.finishOperation(task.id,dispatchKey,{status:'succeeded',result:{sourceUrl,taskSpaceId:result.taskSpaceId}},new Date(now()).toISOString());const observationKey='ego-observe:'+randomUUID();const observation=repository.beginOperation({ownerId:task.id,idempotencyKey:observationKey,kind:'ego_observation',request:{...request,taskSpaceId:result.taskSpaceId,...(args.selector?{selector:args.selector,contextReceiptId:params.contextReceiptId}:{})},nowIso:new Date(now()).toISOString()}).receipt;repository.finishOperation(task.id,observationKey,{status:'succeeded',result:{sourceUrl,taskSpaceId:result.taskSpaceId,documentHtml:result.documentHtml}},new Date(now()).toISOString());return {output:{status:'succeeded',provider:'ego-browser',sessionId:String(result.taskSpaceId),sourceUrl,snapshot:result.snapshot,loadingObserved:result.loadingObserved===true,emptyObserved:result.visibleText===false,observationId:observation.id}}}
@@ -218,8 +266,8 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
         failurePhase=safeFailurePhase(object(error).failurePhase)??failurePhase
         const originalCode=String(object(error).code??(error instanceof Error?error.message:''))
         const code=originalCode==='execution_grant_expired'?'ego_browser_grant_expired':/^[A-Za-z_]{1,100}$/.test(originalCode)?originalCode:'ego_browser_read_failed',taskId=context.executionGrant?.taskId
-        const message=selectionErrors.has(code)?'读取选择未完成：请使用标准CSS，恰好匹配一个当前可见内容元素，并传入最近一次观察的observationId。请先ego_browser_observe，再依据当前DOM重新选择；无需更换连接、TaskSpace或授权。':code==='ego_browser_observation_stale'||code==='ego_browser_page_changed'?'页面或观察已变化。请先ego_browser_observe，再用最新observationId与当前DOM重选；不要重放旧选择。':code==='ego_browser_task_space_missing'||code==='ego_browser_task_space_ambiguous'?'原Ego任务空间尚未唯一确认。请在Ego原空间恢复智能体控制后继续；系统不会新建替代空间或重放原导航。无法确认原空间时，请保留原任务并明确创建新的独立任务。':'请检查当前任务的Ego连接、站点范围或用户控制状态后继续。'
-        if(taskId&&['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid','ego_browser_finish_unconfirmed'].includes(code)) {const waitKey='ego-wait:'+context.turnId; if(!repository.operation(taskId,waitKey)) {const operation=invocation; if(operation){repository.beginOperation({ownerId:taskId,idempotencyKey:waitKey,kind:'ego_browser_wait',request:{taskId,turnId:context.turnId,code,hostOperationId:operation.operationId,callId:operation.callId,grantFingerprint:operation.executionGrantFingerprint,configurationFingerprint:identity,...(object(repository.operation(taskId,'ego-task-space')?.result).taskSpaceId?{taskSpaceId:object(repository.operation(taskId,'ego-task-space')?.result).taskSpaceId}:{})},nowIso:new Date(now()).toISOString()});repository.finishOperation(taskId,waitKey,{status:'succeeded',result:{code,message}},new Date(now()).toISOString())}}}
+        const message=selectionErrors.has(code)?'读取选择未完成：请使用标准CSS，恰好匹配一个当前可见内容元素，并传入最近一次观察的observationId。请先ego_browser_observe，再依据当前DOM重新选择；无需更换连接、TaskSpace或授权。':code==='ego_browser_observation_stale'||code==='ego_browser_page_changed'?'页面或观察已变化。请先ego_browser_observe，再用最新observationId与当前DOM重选；不要重放旧选择。':code==='ego_browser_task_space_missing'||code==='ego_browser_task_space_ambiguous'?'原Ego任务空间尚未确认。已确定关闭的空间只能在你明确继续原任务并核验本次授权后重新建立；结果未知或仍存在的空间不会被替代。请检查原任务的Ego控制状态后继续。':'请检查当前任务的Ego连接、站点范围或用户控制状态后继续。'
+        if(taskId&&['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid','ego_browser_finish_unconfirmed'].includes(code)) {const waitKey='ego-wait:'+context.turnId; if(!repository.operation(taskId,waitKey)) {const operation=invocation; if(operation){repository.beginOperation({ownerId:taskId,idempotencyKey:waitKey,kind:'ego_browser_wait',request:{taskId,turnId:context.turnId,code,hostOperationId:operation.operationId,callId:operation.callId,grantFingerprint:operation.executionGrantFingerprint,configurationFingerprint:identity,...(currentSpaceId?{taskSpaceId:currentSpaceId}:{})},nowIso:new Date(now()).toISOString()});repository.finishOperation(taskId,waitKey,{status:'succeeded',result:{code,message}},new Date(now()).toISOString())}}}
         return {isError:true,output:{status:'blocked',provider:'ego-browser',code,message,...(failurePhase?{failurePhase}:{})}}}
     }
   })) }

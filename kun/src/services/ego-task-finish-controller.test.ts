@@ -1,4 +1,11 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
+import { createServer } from 'node:http'
+import { createHash } from 'node:crypto'
+import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { createKunServeRuntime } from '../server/runtime-factory.js'
+import { KunCapabilitiesConfig } from '../contracts/capabilities.js'
 import { createEgoBrowserFixture } from '../../tests/ego-browser-test-fixture.js'
 import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
@@ -67,3 +74,153 @@ it.each(['files-not-written', 'hard-wait', 'unknown-operation', 'wrong-host', 'w
     expect(f.controller.tokenForTurn(f.grant().turnId)).toBe(token)
   } finally { await f.dispose() }
 })
+
+
+// Offline SDK transport injection: the real Factory/Coordinator/Host/Grant pipeline
+// runs unchanged. No external CLI, browser, user profile or paid source is used.
+const closedSpaceSdk = vi.hoisted(() => ({
+  calls: [] as Record<string, unknown>[], names: new Map<number, string>(), closed: false,
+  finishes: [] as number[], onStatus: undefined as (() => void) | undefined,
+  html: '<body><article><h2>离线恢复后的测绘监测项目</h2><time>2026-11-16</time></article></body>'
+}))
+vi.mock('./ego-browser-cli.js', async original => ({
+  ...await original<typeof import('./ego-browser-cli.js')>(),
+  runEgoBrowserScript: vi.fn(async (_config: unknown, script: string) => {
+    const first = script.split('\n')[0]!
+    const p = JSON.parse(first.slice(first.startsWith('const p = ') ? 10 : 8, -1)) as Record<string, unknown>
+    closedSpaceSdk.calls.push(p)
+    if (p.action === 'space_status') {
+      closedSpaceSdk.onStatus?.()
+      expect(p.spaceId).toBe(27)
+      expect(p.spaceName).toBe(closedSpaceSdk.names.get(27))
+      return { ok: true, kind: 'ego_space_status', version: 1, taskSpaceId: 27, spaceName: p.spaceName,
+        idMatch: false, nameMatches: 0, spaceStatus: 'closed' }
+    }
+    if (!p.action) {
+      expect(p.spaceId).toBe(28)
+      closedSpaceSdk.finishes.push(Number(p.spaceId))
+      return { ok: true, taskSpaceId: 28, spaceName: p.spaceName, finishResolved: true, keep: [] }
+    }
+    let id = Number(p.spaceId)
+    if (!id) {
+      expect(p.action).toBe('open')
+      id = closedSpaceSdk.names.size ? 28 : 27
+      expect(closedSpaceSdk.names.has(id)).toBe(false)
+      closedSpaceSdk.names.set(id, String(p.spaceName))
+    }
+    if (id === 27 && (closedSpaceSdk.closed || p.action === 'read')) {
+      closedSpaceSdk.closed = true
+      // Native-like loss before taskSpace(id) supplies identity; no source proof.
+      return { ok: false, code: 'ego_browser_task_space_missing', failurePhase: 'control' }
+    }
+    expect(p.spaceName).toBe(closedSpaceSdk.names.get(id))
+    return { ok: true, taskSpaceId: id, spaceName: p.spaceName, ownership: 'agent', pageLabel: 'p1',
+      sourceUrl: 'https://feed.test/list', html: closedSpaceSdk.html, documentHtml: closedSpaceSdk.html,
+      truncated: false, loadingObserved: false, visibleText: true, candidates: [] }
+  })
+}))
+
+it('resumes the same Task through a fresh Grant, provider-proven closed Space successor, verified report, daily readback and current-Space finish', async () => {
+  closedSpaceSdk.calls = []; closedSpaceSdk.names.clear(); closedSpaceSdk.closed = false; closedSpaceSdk.finishes = []
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'ego-closed-space-fullchain-')))
+  const cleanup: Array<() => Promise<unknown>> = [() => rm(root, { recursive: true, force: true })]
+  try {
+    const workspace = join(root, 'workspace'); await mkdir(workspace)
+    let resumed = false
+    const initialSteps = [['open', 'ego_browser_open'], ['read', 'ego_browser_read']]
+    const recoverySteps = [...initialSteps, ['publish', 'publish_artifact'], ['read-file', 'read_artifact'],
+      ['verify', 'verify_web_artifact'], ['schedule', 'schedule_task'], ['read-schedule', 'list_schedules'], ['finish', 'ego_browser_finish']]
+    const model = createServer(async (request, response) => {
+      const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      const body = JSON.parse(Buffer.concat(chunks).toString()) as { messages?: Array<{ tool_call_id?: string; content?: string; tool_calls?: Array<{ id: string }> }> }
+      const prefix = resumed ? 'recovered-' : 'original-'
+      const called = new Set(body.messages?.flatMap(message => message.tool_calls?.map(call => call.id) ?? []))
+      const next = (resumed ? recoverySteps : initialSteps).find(([id]) => !called.has(prefix + id))
+      const result = (id: string) => {
+        const content = body.messages?.find(message => message.tool_call_id === prefix + id)?.content
+        if (!content) throw new Error('Missing real Host result: ' + id)
+        return JSON.parse(content.slice(content.indexOf('{'))) as Record<string, unknown>
+      }
+      let args: Record<string, unknown> = {}
+      if (next?.[0] === 'open') args = { url: 'https://feed.test/list' }
+      if (next?.[0] === 'publish') {
+        const read = result('read'), ref = { url: read.sourceUrl, resultHash: read.resultHash }
+        const title = '离线恢复后的测绘监测项目', quote = title + ' 2026-11-16'
+        args = { path: 'recovered-feed.html', report: { title: '订阅列表恢复汇总', evidence: { coverage: [ref],
+          items: [{ sectionId: 'one-record', title, source: ref, discovery: ref, classification: 'source',
+            fields: [{ field: 'title', value: title, quote }, { field: 'publication_date', value: '2026-11-16', quote }],
+            unverifiedFields: ['budget', 'deadline', 'status', 'qualification'] }], noMatches: [] } } }
+      }
+      if (next?.[0] === 'read-file') args = { path: 'recovered-feed.html' }
+      if (next?.[0] === 'verify') args = result('publish').verificationInput as Record<string, unknown>
+      const delta = next ? { tool_calls: [{ index: 0, id: prefix + next[0], type: 'function',
+        function: { name: next[1], arguments: JSON.stringify(args) } }] } :
+        { content: '已保存并核验订阅列表HTML，按每日09:00建立并读回计划，Ego任务空间已完成收尾。列表正文、预算与资质未核验。' }
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(`data: ${JSON.stringify({ id: 'offline-closed-space', choices: [{ index: 0, delta, finish_reason: next ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\ndata: [DONE]\n\n`)
+    })
+    await new Promise<void>(resolve => model.listen(0, '127.0.0.1', resolve))
+    cleanup.push(() => new Promise<void>(resolve => { model.close(() => resolve()); model.closeAllConnections() }))
+    const runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: join(root, 'runtime'),
+      runtimeToken: 'offline', apiKey: 'offline-model-fixture', baseUrl: `http://127.0.0.1:${(model.address() as { port: number }).port}/v1`,
+      endpointFormat: 'chat_completions', model: 'offline', approvalPolicy: 'on-request', sandboxMode: 'read-only',
+      insecure: false, tokenEconomyMode: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({ egoBrowser: {
+        state: 'installed', executablePath: '/controlled/ego-browser', executableHash: 'a'.repeat(64), version: '0.6.3.14', revision: 0 } }) })
+    cleanup.push(async () => runtime.shutdown?.())
+    const origin = await runtime.threadService.create({ workspace, mode: 'agent', model: 'offline', approvalPolicy: 'on-request' })
+    const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'closed-space-original', request: {
+      prompt: '每天09:00使用Ego浏览器只读 https://feed.test/list 我已订阅的招标列表，按工程测量、测绘、监测筛选汇总为HTML，只核对列表，不需要公告正文。' } })
+    const taskId = started.task!.id, repo = runtime.taskRepository!
+    await expect.poll(() => repo.get(taskId)?.status, { timeout: 5000 }).toBe('waiting_user')
+    const before = repo.get(taskId)!, oldTurnId = before.activeTurnId!, oldBinding = repo.operation(taskId, 'ego-task-space')!
+    await expect.poll(async () => (await runtime.threadService.get(before.threadId))!.turns.filter(turn => ['queued', 'running'].includes(turn.status)).length, { timeout: 5000 }).toBe(0)
+    expect(oldBinding.status).toBe('succeeded'); expect(oldBinding.result).toMatchObject({ taskSpaceId: 27 })
+    expect(repo.operations(taskId, 'ego_document_read')).toHaveLength(1)
+    const raw = (owner: string, key: string) => (repo.connection().prepare('SELECT data_json FROM operation_receipts WHERE owner_id=? AND idempotency_key=?').get(owner, key) as { data_json: string }).data_json
+    const preserved = repo.operations(taskId).map(receipt => ({ key: receipt.idempotencyKey, raw: raw(taskId, receipt.idempotencyKey) }))
+    const unknownOwner = 'unrelated-preserved-unknown'
+    repo.create({ ...before, id: unknownOwner, threadId: unknownOwner, activeTurnId: undefined, childTaskIds: [], nodes: [], artifacts: [], status: 'failed' })
+    repo.beginOperation({ ownerId: unknownOwner, idempotencyKey: 'old-unknown', kind: 'tool', request: { callId: 'old-unrelated', toolName: 'ego_browser_open' }, nowIso: runtime.nowIso() })
+    repo.finishOperation(unknownOwner, 'old-unknown', { status: 'outcome_unknown' }, runtime.nowIso())
+    const oldUnknown = raw(unknownOwner, 'old-unknown'), oldGrant = (await runtime.threadService.get(before.threadId))!.turns.find(turn => turn.id === oldTurnId)!.executionGrant!
+    expect(repo.operations(taskId, 'tool').map(receipt => receipt.status)).toEqual(['succeeded', 'failed'])
+    closedSpaceSdk.onStatus = () => {
+      expect(repo.operation(taskId, 'explicit-same-task-resume')).toMatchObject({ kind: 'resume', status: 'succeeded' })
+      expect(repo.get(taskId)!.activeTurnId).not.toBe(oldTurnId)
+    }
+    resumed = true
+    const continued = await runtime.taskControlService!.mutate(taskId, 'resume', { expectedRevision: repo.get(taskId)!.revision, idempotencyKey: 'explicit-same-task-resume' })
+    expect(continued.task.id).toBe(taskId); expect(continued.turn!.turnId).not.toBe(oldTurnId)
+    await expect.poll(() => ({ status: repo.get(taskId)?.status, codes: repo.operations(taskId, 'tool').slice(2).filter(receipt => receipt.status !== 'succeeded').map(receipt => (receipt.result as { item?: { output?: { code?: string } } }).item?.output?.code) }), { timeout: 10000 }).toEqual({ status: 'completed', codes: [] })
+    const task = repo.get(taskId)!, bindings = repo.operations(taskId, 'ego_task_space'), currentBinding = bindings.find(binding => binding.id !== oldBinding.id)!
+    expect(bindings).toHaveLength(2); expect(currentBinding.status).toBe('succeeded')
+    expect(currentBinding.request).toMatchObject({ priorBindingReceiptId: oldBinding.id, createdTurnId: continued.turn!.turnId, origins: oldBinding.request!.origins })
+    expect(currentBinding.request!.spaceName).not.toBe(oldBinding.request!.spaceName)
+    expect(currentBinding.result).toMatchObject({ taskSpaceId: 28 })
+    expect(repo.operations(taskId, 'ego_task_space_reopen')).toEqual([expect.objectContaining({ status: 'succeeded',
+      request: expect.objectContaining({ priorBindingReceiptId: oldBinding.id, resumeReceiptId: repo.operation(taskId, 'explicit-same-task-resume')!.id }),
+      result: expect.objectContaining({ closed: true, idMatch: false, nameMatches: 0 }) })])
+    expect(closedSpaceSdk.calls.filter(call => call.action === 'space_status')).toHaveLength(1)
+    expect(closedSpaceSdk.calls.filter(call => call.action === 'open' && !call.spaceId)).toHaveLength(2)
+    expect(closedSpaceSdk.finishes).toEqual([28])
+    expect(repo.operations(taskId, 'ego_task_space_finish')).toEqual([expect.objectContaining({ status: 'succeeded', request: expect.objectContaining({ bindingReceiptId: currentBinding.id }) })])
+    expect(task.nodes.filter(node => ['execute', 'verify', 'deliver'].includes(node.kind)).map(node => [node.kind, node.status])).toEqual([['execute', 'completed'], ['verify', 'completed'], ['deliver', 'completed']])
+    expect(task.artifacts).toEqual([expect.objectContaining({ relativePath: 'recovered-feed.html', validation: 'valid', sourceEvidenceStatus: 'verified' })])
+    const artifactBytes = await readFile(task.artifacts[0]!.absolutePath!)
+    expect(createHash('sha256').update(artifactBytes).digest('hex')).toBe(task.artifacts[0]!.sha256)
+    const toolOutput = (name: string) => (repo.operations(taskId, 'tool').filter(receipt => receipt.request?.toolName === name).at(-1)!.result as { item: { output: Record<string, unknown> } }).item.output
+    expect(toolOutput('ego_browser_read')).toMatchObject({ evidence: { bindingReceiptId: currentBinding.id, taskSpaceId: 28, turnId: continued.turn!.turnId } })
+    expect(toolOutput('verify_web_artifact')).toMatchObject({ complete: true })
+    expect(toolOutput('list_schedules')).toMatchObject({ schedules: [expect.objectContaining({ enabled: true, requirement: expect.objectContaining({ kind: 'daily', times: ['09:00'] }) })] })
+    const thread = (await runtime.threadService.get(task.threadId))!, grant = thread.turns.find(turn => turn.id === continued.turn!.turnId)!.executionGrant!
+    expect(grant.id).not.toBe(oldGrant.id); expect(grant).toMatchObject({ taskId, turnId: continued.turn!.turnId, browserScope: oldGrant.browserScope })
+    expect(thread.turns.find(turn => turn.id === oldTurnId)!.executionGrant).toEqual(oldGrant)
+    expect(task.budget).toEqual(before.budget); expect(task.attempts).toBe(before.attempts + 1); expect(task.childTaskIds).toEqual(before.childTaskIds)
+    for (const receipt of preserved) expect(raw(taskId, receipt.key)).toBe(receipt.raw)
+    expect(raw(unknownOwner, 'old-unknown')).toBe(oldUnknown)
+    expect(repo.events(taskId).some(event => event.kind === 'task_execution_budget_extended')).toBe(false)
+  } finally {
+    closedSpaceSdk.onStatus = undefined
+    while (cleanup.length) await cleanup.pop()!()
+  }
+}, 20000)

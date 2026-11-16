@@ -538,7 +538,9 @@ export async function createKunServeRuntime(
   }
   dingtalkRuntime.setApply(provider => applyDingTalkProvider({ provider }))
   const useDws=()=>Boolean(dwsRuntime.toolProvider())
-  const egoRuntime = new EgoBrowserRuntime({config:options.capabilities?.egoBrowser,repository:taskRepository,canFinishReadiness:(context,hostOperationId)=>taskController.egoFinishReadiness(context.executionGrant!.taskId!,context.turnId,hostOperationId)})
+  const egoRuntime = new EgoBrowserRuntime({config:options.capabilities?.egoBrowser,repository:taskRepository,
+    canFinishReadiness:(context,hostOperationId)=>taskController.egoFinishReadiness(context.executionGrant!.taskId!,context.turnId,hostOperationId),
+    canReopenClosedSpace:(context,hostOperationId,bindingReceiptId)=>taskController.egoTaskSpaceReopenAuthorization(context.executionGrant!.taskId!,context.turnId,hostOperationId,bindingReceiptId)})
   const browserRuntime = new ManagedBrowserSkillRuntime({ config: options.capabilities?.browserSkill,
     configPath: options.configPath ?? join(options.dataDir, 'config.json'), dataDir: options.dataDir, repository: taskRepository,
     resolveSchedule: (context, sourceActionId) => taskScheduleService?.resolveBrowserActions(context, sourceActionId) ?? Promise.resolve(undefined),

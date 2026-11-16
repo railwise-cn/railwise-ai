@@ -65,7 +65,7 @@ import { WebArtifactEvidenceInputSchema, type WebArtifactEvidenceInput } from '.
 import { assessWebArtifactEvidence, verifiedWebArtifactEvidence, webArtifactFailureKinds, webArtifactManifestSourceProof, webArtifactPublicationReadiness, webArtifactRequirementHash, webEvidenceRepair } from './web-artifact-evidence.js'
 import { deriveWebArtifactRepairState, type WebArtifactRepairAttempt } from './web-artifact-repair-state.js'
 
-import { validEgoDocumentEvidence, verifiedEgoTaskSpaceFinish } from './ego-browser-evidence.js'
+import { currentEgoTaskSpaceBinding, validEgoDocumentEvidence, verifiedEgoTaskSpaceFinish, type EgoClosedSpaceReopenAuthorization } from './ego-browser-evidence.js'
 import { EGO_PERMISSION_CODES, taskPermissionCapability, taskPermissionFailure } from './task-permission-recovery.js'
 
 const DEFAULT_MAX_ATTEMPTS = 8
@@ -808,6 +808,50 @@ export class TaskController {
     return result
   }
 
+  /** Only a persisted explicit Continue for this exact Turn can admit one closed-Space replacement. */
+  async egoTaskSpaceReopenAuthorization(taskId: string, turnId: string, hostOperationId: string, priorBindingReceiptId: string): Promise<EgoClosedSpaceReopenAuthorization | null> {
+    const task = this.repository.get(taskId), token = this.attemptTokens.get(turnId)
+    const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+    if (!task || task.status !== 'running' || task.activeTurnId !== turnId || !token || token.taskId !== taskId) return null
+    try {
+      this.assertToken(token)
+      const thread = await this.threadStore.get(task.threadId), turn = thread?.turns.find(row => row.id === turnId)
+      const parsed = ExecutionGrantSchema.safeParse(turn?.executionGrant)
+      if (!parsed.success || !turn || !['queued', 'running'].includes(turn.status)) return null
+      const grant = parsed.data, now = Date.parse(this.nowIso()), binding = currentEgoTaskSpaceBinding(this.repository, taskId)
+      const host = this.repository.operationById(taskId, hostOperationId, 'tool')
+      if (grant.taskId !== taskId || grant.threadId !== task.threadId || grant.turnId !== turnId || grant.workspaceRoot !== task.workspaceRoot ||
+        grant.browserScope?.provider !== 'ego-browser' || !grant.allowedProviderIds?.includes('ego-browser') || !grant.allowedToolNames?.includes('ego_browser_open') ||
+        !grant.expiresAt || Date.parse(grant.expiresAt) <= now || Date.parse(grant.issuedAt) > now ||
+        !binding || binding.id !== priorBindingReceiptId || binding.status !== 'succeeded' || binding.request?.createdTurnId === turnId ||
+        binding.request?.configurationFingerprint !== grant.connectorIdentityFingerprints?.['ego-browser'] || operationFingerprint(binding.request?.origins) !== operationFingerprint(grant.browserScope.origins) ||
+        !host || !['prepared', 'running'].includes(host.status) || host.fingerprint !== operationFingerprint(host.request) ||
+        host.request?.dispatchTracking !== 'host-v1' || host.request.providerId !== 'ego-browser' || host.request.toolName !== 'ego_browser_open' ||
+        typeof host.request.callId !== 'string' || !host.request.callId || typeof host.request.argumentsHash !== 'string' || !/^[a-f0-9]{64}$/.test(host.request.argumentsHash) ||
+        host.request.turnId !== turnId || host.request.executionId !== token.executionId || operationFingerprint(host.request.executionGrant) !== operationFingerprint(grant) ||
+        this.repository.operations(taskId, 'ego_browser_wait').some(row => row.request?.turnId === turnId)) return null
+      const seen = new Set<string>(); let owner: TaskRun | null = task
+      while (owner && !seen.has(owner.id)) {
+        seen.add(owner.id)
+        if (this.repository.currentExecution(owner.id)?.id !== taskId) return null
+        for (const receipt of this.repository.operations(owner.id, 'resume')) {
+          if (receipt.status !== 'succeeded' || receipt.fingerprint !== operationFingerprint(receipt.request) ||
+            receipt.request?.idempotencyKey !== receipt.idempotencyKey || !Number.isSafeInteger(receipt.request.expectedRevision) || Number(receipt.request.expectedRevision) < 0 ||
+            turn.idempotencyKey !== `task:${owner.id}:resume:${receipt.idempotencyKey}` || this.repository.operation(taskId, `ego-reopen:${receipt.id}`)) continue
+          const result = record(receipt.result), resumed = record(result.task), started = record(result.turn)
+          if (resumed.id !== taskId || resumed.threadId !== task.threadId || started.threadId !== task.threadId || started.turnId !== turnId ||
+            typeof started.userMessageItemId !== 'string' || !started.userMessageItemId || result.capability !== undefined) continue
+          this.assertToken(token)
+          const latest = this.repository.get(taskId)
+          if (latest?.status !== 'running' || latest.activeTurnId !== turnId || latest.threadId !== task.threadId || latest.workspaceRoot !== task.workspaceRoot) return null
+          return { controlOwnerId: owner.id, resumeReceiptId: receipt.id, turnId, priorBindingReceiptId }
+        }
+        owner = owner.retryOfTaskId ? this.repository.get(owner.retryOfTaskId) : null
+      }
+    } catch { /* Stale leases, corrupt chains and absent authority fail closed without changing ledgers. */ }
+    return null
+  }
+
   /** Pure pre-cleanup check: no model, Task transition, receipt write or validation span. */
   async egoFinishReadiness(taskId: string, turnId: string, hostOperationId?: string): Promise<{ ready: boolean; reason?: string }> {
     const task = this.repository.get(taskId), token = this.attemptTokens.get(turnId)
@@ -816,7 +860,7 @@ export class TaskController {
     this.assertToken(token)
     const [thread, items] = await Promise.all([this.threadStore.get(task.threadId), this.sessionStore.loadItems(task.threadId)])
     const turn = thread?.turns.find(candidate => candidate.id === turnId), grant = turn?.executionGrant
-    const binding = this.repository.operation(taskId, 'ego-task-space')
+    const binding = currentEgoTaskSpaceBinding(this.repository, taskId)
     if (grant?.browserScope?.provider !== 'ego-browser' || !binding || binding.kind !== 'ego_task_space' || binding.status !== 'succeeded' ||
       binding.fingerprint !== operationFingerprint(binding.request) || binding.request?.taskId !== taskId ||
       binding.request.configurationFingerprint !== grant.connectorIdentityFingerprints?.['ego-browser']) return denied('原Ego任务空间尚无匹配的可信身份。')
@@ -830,8 +874,9 @@ export class TaskController {
     const reads = items.filter(item => item.kind === 'tool_result' && /^ego_browser_(?:open|read|next_page)$/.test(item.toolName) && !item.isError)
     const hasRead = reads.some(item => {
       if (item.kind !== 'tool_result' || !item.output || typeof item.output !== 'object') return false
+      const output = item.output as Record<string, unknown>, evidence = output.evidence as Record<string, unknown> | undefined
       const original = thread?.turns.find(candidate => candidate.id === item.turnId)?.executionGrant
-      return Boolean(original && validEgoDocumentEvidence(this.repository, task, item.output as Record<string, unknown>, original))
+      return Boolean(original && evidence?.bindingReceiptId === binding.id && validEgoDocumentEvidence(this.repository, task, output, original))
     })
     if (!hasRead) return denied('尚缺本任务真实Ego来源读取，不能把未读取空间当成功清理。')
     const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
@@ -1005,7 +1050,7 @@ export class TaskController {
       }
     }
 
-    const egoBinding = this.repository.operation(task.id, 'ego-task-space')
+    const egoBinding = currentEgoTaskSpaceBinding(this.repository, task.id)
     if (egoBinding) {
       const pendingFinish = this.repository.operations(task.id, 'ego_task_space_finish').filter(row => ['prepared', 'running', 'outcome_unknown'].includes(row.status))
       if (pendingFinish.length) return this.stallUnknown(task, pendingFinish.map(row => row.id))

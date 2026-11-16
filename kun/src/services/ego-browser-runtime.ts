@@ -7,13 +7,14 @@ import type { ExecutionScope } from '../contracts/permissions.js'
 import { EgoBrowserCapabilityConfig, EGO_TOOLS, isEgoBrowserTask } from '../contracts/ego-browser.js'
 import { buildEgoBrowserToolProvider } from '../adapters/tool/ego-browser-tool-provider.js'
 import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
+import type { EgoClosedSpaceReopenAuthorization } from './ego-browser-evidence.js'
 /** One connector inside the existing KUN process, with task-scoped selection. */
 export class EgoBrowserRuntime {
   private readonly config: EgoBrowserCapabilityConfig
-  constructor(private readonly options: {config?: EgoBrowserCapabilityConfig;repository:TaskRunRepository;canFinishReadiness?:(context:ToolHostContext,hostOperationId:string)=>Promise<{ready:boolean;reason?:string}>}) { this.config=EgoBrowserCapabilityConfig.parse(options.config??{state:'not_installed',revision:0}) }
+  constructor(private readonly options: {config?: EgoBrowserCapabilityConfig;repository:TaskRunRepository;canFinishReadiness?:(context:ToolHostContext,hostOperationId:string)=>Promise<{ready:boolean;reason?:string}>;canReopenClosedSpace?:(context:ToolHostContext,hostOperationId:string,bindingReceiptId:string)=>Promise<EgoClosedSpaceReopenAuthorization|null>}) { this.config=EgoBrowserCapabilityConfig.parse(options.config??{state:'not_installed',revision:0}) }
   state():EgoBrowserCapabilityConfig {return structuredClone(this.config)}
   selected(text:string,scope?:BrowserExecutionScope):boolean { return scope?.provider==='ego-browser'||!scope&&isEgoBrowserTask(text) }
-  provider() {return buildEgoBrowserToolProvider({config:this.config,repository:this.options.repository,canFinishReadiness:this.options.canFinishReadiness})}
+  provider() {return buildEgoBrowserToolProvider({config:this.config,repository:this.options.repository,canFinishReadiness:this.options.canFinishReadiness,canReopenClosedSpace:this.options.canReopenClosedSpace})}
   fingerprint() {return operationFingerprint(this.config)}
   scope(text:string,inherited?:BrowserExecutionScope,networkOrigins?:readonly string[]):ExecutionScope {
     const origins=inherited?.origins??[...new Set([...browserTaskOrigins(text),...(networkOrigins??[]).filter(v=>v!=='*')])]

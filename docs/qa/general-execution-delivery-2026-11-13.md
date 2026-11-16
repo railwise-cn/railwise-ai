@@ -870,3 +870,19 @@ Windows 诊断第二次仍停在 QA 路径：实际 compiled identity 模块是 
 该次原生界面检查另发现：当前重试任务已有有效范围时，仍展示祖先任务旧的“尚未授权”卡片。修正仅从当前执行的 retryOfTaskId 追溯被取代祖先，保留平行分支、当前待办和 UNKNOWN 入口，不创建授权或自动继续。页面读取与卡片修正仍须完成合并检查、新精确包及同一账号任务验证；公开 Release、Stable、tag 和官网均未改动。
 
 两处修正合并后，Node 22 Runtime 四文件 55 项、任务界面 51 项通过，KUN／Node／Web 类型和四文件 lint 通过；单次生产构建与 freshness 通过，2,443 个 authored production 文件在实施树与物理构建树逐字相同。界面用例先复现两项失败，并核对当前、平行及其它重试分支待办保留，输入数据不变且没有授权／继续调用。新完整 CI、精确包和原账号任务仍待验证。
+
+### cbb 精确包与已关闭 Ego 空间的恢复缺口
+
+`cbb2df6e` 的 [push Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43875248618)／[PR Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43875257780)六项成功（Desktop 4,818、Runtime 5,156 通过，各保留原平台跳过项）。[唯一私有构建](https://github.com/railwise-cn/railwise-ai/actions/runs/43875810826)的正常身份 Mac 包已安装、验签并实际打开，ASAR 为 `8abf63afd458a1484bf5ea171f3c0c973feec7947da7c44254a6e41d44be7b35`。同 run 的真实 0.5.6 → 精确包更新严格通过，目标、更新安装后和本机 ASAR 一致，干净 CI 的 Gatekeeper enabled／accepted、签名、公证、nonce 及任务资料连续性通过。本机原有 Gatekeeper override 与未在本机完整下载外层 ZIP 的限制保留。
+
+[Windows 同包完整验收](https://github.com/railwise-cn/railwise-ai/actions/runs/43886581001)成功。初始任务与真实时钟到期的独立任务均完成，产生不同 HTML 哈希；两次正文来源及字段、持久核验回执、自动／手动预览和 daily 08:30／16:30 Asia/Shanghai 读回通过，UNKNOWN 为零。其 at-time 到期验证使用明确标记的合成授权任务，随后恢复 daily；不是修改用户计划。该项使用受控 BrowserSkill 页面与模型，不能代表真实大单网或 Ego Windows；安装器仍为 NotSigned，全部辅助进程已结束。
+
+Mac 正常退出旧包、停止 Main／Runtime 并作一致性 SQLite 备份后，沿用原 profile、供应商和未完成任务。原 16 条 UNKNOWN 集合及预算保留；中文浅色 1280×840 的新包原生窗口已打开检查，General／模型按钮对齐、侧栏正常，默认无命令或审批 JSON。这是当前界面检查，不是重新运行祖先卡片的隔离现场；该归属修正的证明仍为先失败、后通过的 DOM 回归。
+
+22:28 经实际 UI 继续同一大单网任务，累计第五次执行。工具在进入 DOM 前返回 `ego_browser_user_control`／control 阶段，随后等待，零新成果／计划。源码发现身份检查早于错误消费：SDK 失败缺少任务空间字段时也会被改写为此码，因此不能据此声称用户实际接管。之后的固定 CLI 只读空间状态查询确认原数字 ID 和服务端唯一名称均不存在，未调用 Page、读取付费网站、创建／认领空间或改 Task／Grant。旧回执没有保留实际 SDK 原异常，不能反推关闭的时间或原因。
+
+同一固定 CLI 当时返回的完整指南已为 v2.2.1，与先前保存的 v2.2.0 区别记录保留；该指南明确同一目标继续时可以重开已关闭空间，同时禁止绕过卡住的页面或用户接管。当前修复在隔离源码中推进：复用服务端显式 resume 回执限定一次接续，由 Provider 自己重新核验关闭状态，追加新绑定并保留旧证据，真实 Factory 链验证后再构建新包。上述 cbb 包、升级和 Windows 通过不覆盖这项尚未入包的修复。实际大单网报告、预览、新计划与到期验收仍未通过，尚不公开发布。
+
+恢复增量已合并完成本地检查。完全旧 cbb 生产代码配新完整链用例，实际 resume 后仍等待并误报 user_control，形成一项功能性 RED；修复后通过真实 Factory／Coordinator／Host／TaskControlService 链，在同 Task 的新 Turn 追加空间绑定，实际写盘、读回哈希、显式核验、计划读回和当前空间 finish 后三节点完成。旧绑定、旧操作、Grant、预算上限和无关 UNKNOWN 原字节保留，attempt 只正常增加一次。新增授权方法的缺方法基线日志与这项功能性 RED 分开记录，未冒充额外现场复现。
+
+Node 22 九文件 116 项、KUN／Node／Web 类型及九文件 lint 通过，单次生产构建、1,381 输入 freshness 和 2,443 个 authored production 文件对比通过。额外的只读原生协议检查发现默认用户空间使用 ID 0，已补齐兼容；使用本次编译后的固定元数据脚本和真实固定 CLI 成功核实旧 ID／名称缺失。该诊断不读取 Page、不创建空间、不修改控制权或任务，不是采集成功证据。新完整 CI、精确包及原账号任务的实际恢复仍待执行。
