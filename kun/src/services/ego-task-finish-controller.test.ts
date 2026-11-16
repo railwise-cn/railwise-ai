@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createKunServeRuntime } from '../server/runtime-factory.js'
+import { createKunServeRuntime, type KunServeRuntimeOptions } from '../server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../contracts/capabilities.js'
 import { createEgoBrowserFixture } from '../../tests/ego-browser-test-fixture.js'
 import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
@@ -130,7 +130,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
   const cleanup: Array<() => Promise<unknown>> = [() => rm(root, { recursive: true, force: true })]
   try {
     const workspace = join(root, 'workspace'); await mkdir(workspace)
-    let resumed = false, reachedReadBarrier = false, releaseNativeRead = () => {}
+    let resumed = false, reachedReadBarrier = false, releaseNativeRead = () => {}, modelRequests = 0
     const nativeReadAllowed = new Promise<void>(resolve => { releaseNativeRead = resolve })
     let cachedSourceRef: Record<string, unknown> | undefined, successfulPublishArguments: Record<string, unknown> | undefined
     const initialReads = [['open', 'ego_browser_open'], ['read', 'ego_browser_read']]
@@ -158,6 +158,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
       return input
     }
     const model = createServer(async (request, response) => {
+      modelRequests++
       const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk))
       const body = JSON.parse(Buffer.concat(chunks).toString()) as { messages?: Array<{ tool_call_id?: string; content?: string; tool_calls?: Array<{ id: string }> }> }
       const prefix = resumed ? 'recovered-' : 'original-'
@@ -192,12 +193,14 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
     })
     await new Promise<void>(resolve => model.listen(0, '127.0.0.1', resolve))
     cleanup.push(() => new Promise<void>(resolve => { model.close(() => resolve()); model.closeAllConnections() }))
-    const runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: join(root, 'runtime'),
+    const runtimeOptions: KunServeRuntimeOptions = { host: '127.0.0.1', port: 0, dataDir: join(root, 'runtime'),
       runtimeToken: 'offline', apiKey: 'offline-model-fixture', baseUrl: `http://127.0.0.1:${(model.address() as { port: number }).port}/v1`,
       endpointFormat: 'chat_completions', model: 'offline', approvalPolicy: 'on-request', sandboxMode: 'read-only',
       insecure: false, tokenEconomyMode: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({ egoBrowser: {
-        state: 'installed', executablePath: '/controlled/ego-browser', executableHash: 'a'.repeat(64), version: '0.6.3.14', revision: 0 } }) })
-    cleanup.push(async () => runtime.shutdown?.())
+        state: 'installed', executablePath: '/controlled/ego-browser', executableHash: 'a'.repeat(64), version: '0.6.3.14', revision: 0 } }) }
+    const runtime = await createKunServeRuntime(runtimeOptions)
+    let activeRuntime = runtime
+    cleanup.push(async () => activeRuntime.shutdown?.())
     cleanup.push(async () => releaseNativeRead())
     const origin = await runtime.threadService.create({ workspace, mode: 'agent', model: 'offline', approvalPolicy: 'on-request' })
     const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'closed-space-original', request: {
@@ -211,8 +214,10 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
     const priorTools = repo.operations(taskId, 'tool'), oldFailure = repo.operations(taskId, 'web_artifact_evidence').at(-1)
     const oldSemantic = (oldFailure?.result as { semanticRepair?: Record<string, unknown> } | undefined)?.semanticRepair
     const oldDraft = resumeWithOldDraft ? await readFile(before.artifacts[0]!.absolutePath!) : undefined
+    const oldWebAttention = repo.attention(`web_evidence_${taskId}`)
     if (resumeWithOldDraft) {
       expect(oldSemantic).toMatchObject({ failureCount: 2, stalled: true })
+      expect(oldWebAttention).toMatchObject({ status: 'pending', kind: 'blocked', payload: { kind: 'web_artifact_repair_stalled' } })
       expect(repo.operations(taskId, 'web_artifact_evidence')).toHaveLength(2)
       closedSpaceSdk.closed = true
     }
@@ -262,6 +267,11 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
     expect(repo.operations(taskId, 'ego_task_space_finish')).toEqual([expect.objectContaining({ status: 'succeeded', request: expect.objectContaining({ bindingReceiptId: currentBinding.id }) })])
     expect(task.nodes.filter(node => ['execute', 'verify', 'deliver'].includes(node.kind)).map(node => [node.kind, node.status])).toEqual([['execute', 'completed'], ['verify', 'completed'], ['deliver', 'completed']])
     expect(task.artifacts).toEqual([expect.objectContaining({ relativePath: 'recovered-feed.html', validation: 'valid', sourceEvidenceStatus: 'verified' })])
+    if (resumeWithOldDraft) {
+      expect(repo.attention(`web_evidence_${taskId}`)).toMatchObject({ status: 'answered', message: oldWebAttention!.message,
+        payload: { ...oldWebAttention!.payload, resolution: { kind: 'completed_web_evidence', turnId: continued.turn!.turnId } } })
+      expect(repo.inbox().some(item => item.id === oldWebAttention!.id)).toBe(false)
+    }
     const artifactBytes = await readFile(task.artifacts[0]!.absolutePath!)
     expect(createHash('sha256').update(artifactBytes).digest('hex')).toBe(task.artifacts[0]!.sha256)
     const toolOutput = (name: string) => (repo.operations(taskId, 'tool').filter(receipt => receipt.request?.toolName === name).at(-1)!.result as { item: { output: Record<string, unknown> } }).item.output
@@ -291,6 +301,30 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
     for (const receipt of preserved) expect(raw(taskId, receipt.key)).toBe(receipt.raw)
     expect(raw(unknownOwner, 'old-unknown')).toBe(oldUnknown)
     expect(repo.events(taskId).some(event => event.kind === 'task_execution_budget_extended')).toBe(false)
+    if (resumeWithOldDraft) {
+      await expect.poll(async () => (await runtime.threadService.get(before.threadId))!.turns.filter(turn => ['queued', 'running'].includes(turn.status)).length, { timeout: 5000 }).toBe(0)
+      // Persist the actual pre-fix attention shape beside the successfully
+      // completed Task, as an upgraded installation can already contain it.
+      repo.putAttention(oldWebAttention!)
+      const state = (repository: typeof repo) => JSON.stringify({ task: repository.get(taskId),
+        operations: repository.connection().prepare('SELECT owner_id, idempotency_key, data_json FROM operation_receipts ORDER BY owner_id, idempotency_key').all(),
+        events: repository.events(taskId) })
+      const completedState = state(repo), nativeCalls = closedSpaceSdk.calls.length, requestCount = modelRequests
+      await activeRuntime.shutdown?.()
+      activeRuntime = await createKunServeRuntime(runtimeOptions)
+      const upgraded = activeRuntime.taskRepository!
+      const settled = upgraded.attention(oldWebAttention!.id)!
+      expect(settled).toMatchObject({ status: 'answered', revision: oldWebAttention!.revision + 1, message: oldWebAttention!.message,
+        payload: { ...oldWebAttention!.payload, resolution: { kind: 'completed_web_evidence', turnId: continued.turn!.turnId } } })
+      expect(upgraded.inbox().some(item => item.id === settled.id)).toBe(false)
+      expect(state(upgraded)).toBe(completedState)
+      await activeRuntime.shutdown?.()
+      activeRuntime = await createKunServeRuntime(runtimeOptions)
+      expect(activeRuntime.taskRepository!.attention(settled.id)).toEqual(settled)
+      expect(state(activeRuntime.taskRepository!)).toBe(completedState)
+      expect(closedSpaceSdk.calls).toHaveLength(nativeCalls)
+      expect(modelRequests).toBe(requestCount)
+    }
   } finally {
     closedSpaceSdk.onStatus = undefined
     while (cleanup.length) await cleanup.pop()!()

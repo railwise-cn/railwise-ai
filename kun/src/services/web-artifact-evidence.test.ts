@@ -564,6 +564,42 @@ it('suspends only a trusted persisted semantic stall, keeps its draft and record
   } finally { f.repository.close() }
 })
 
+it.each(['completed', 'running', 'draft', 'wrong-owner', 'approval', 'other-blocker', 'changed-proof'] as const)(
+  'reconciles only the completed Task\'s exact accepted web-source attention at service startup: %s', async boundary => {
+    const f = await fixture()
+    try {
+      expect(await f.call('verify_web_artifact', input())).toMatchObject({ complete: true })
+      if (boundary !== 'running') expect(await f.controller.assessCandidate(f.thread.id, 'new-turn')).toMatchObject({ kind: 'completed' })
+      if (boundary === 'draft' || boundary === 'changed-proof') {
+        const task = f.repository.get(f.task.id)!
+        f.repository.update(task.id, task.revision, current => ({ ...current, artifacts: current.artifacts.map(artifact => ({ ...artifact,
+          ...(boundary === 'draft' ? { sourceEvidenceStatus: 'draft' as const } : { sha256: 'f'.repeat(64) }) })) }))
+      }
+      const attention = f.repository.putAttention({ id: `web_evidence_${f.task.id}`, ownerKind: 'task',
+        ownerId: boundary === 'wrong-owner' ? 'another-task' : f.task.id, taskId: f.task.id, threadId: f.thread.id,
+        kind: boundary === 'approval' ? 'approval' : 'blocked', title: '网页来源核验需要处理', message: '旧来源与字段诊断应保留。',
+        status: 'pending', revision: 4, createdAt: fixtureTime, updatedAt: fixtureTime,
+        payload: { kind: boundary === 'other-blocker' ? 'permission_required' : 'web_artifact_repair_stalled', reasons: ['旧字段缺少来源'], fingerprint: 'old-repair' } })
+      const others = [f.repository.putAttention({ ...attention, id: `capability_${f.task.id}`, kind: 'blocked', payload: { kind: 'capability_required' } }),
+        f.repository.putAttention({ ...attention, id: 'another-task-web-attention', ownerId: 'another-task', taskId: 'another-task' })]
+      const taskBefore = f.repository.get(f.task.id), operations = JSON.stringify(f.repository.operations(f.task.id)), events = f.repository.events(f.task.id)
+      const start = () => new TaskController({ repository: f.repository, threadStore: f.threadStore, sessionStore: f.sessionStore, dataDir: f.root, nowIso: () => fixtureTime })
+      start()
+      const settled = f.repository.attention(attention.id)!
+      if (boundary === 'completed') {
+        expect(settled).toMatchObject({ status: 'answered', revision: 5, message: attention.message,
+          payload: { ...attention.payload, resolution: { kind: 'completed_web_evidence', taskId: f.task.id, turnId: 'new-turn',
+            artifacts: [expect.objectContaining({ sourceEvidenceReceiptId: taskBefore!.artifacts[0]!.sourceEvidenceReceiptId })] } } })
+      } else expect(settled).toEqual(attention)
+      start()
+      expect(f.repository.attention(attention.id)).toEqual(settled)
+      expect(f.repository.get(f.task.id)).toEqual(taskBefore)
+      expect(JSON.stringify(f.repository.operations(f.task.id))).toBe(operations)
+      expect(f.repository.events(f.task.id)).toEqual(events)
+      for (const other of others) expect(f.repository.attention(other.id)).toEqual(other)
+    } finally { f.repository.close() }
+  })
+
 it('returns only observed missing-source hrefs within the original browser scope', async () => {
   const f = await fixture({ readScope: 'response_document' })
   try {

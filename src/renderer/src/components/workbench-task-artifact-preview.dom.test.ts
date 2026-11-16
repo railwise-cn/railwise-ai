@@ -11,7 +11,8 @@ import { DevBrowserPanel } from './DevBrowserPanel'
 import i18n from '../i18n'
 
 let tasks: TaskRunV1[] = []
-vi.mock('../store/task-live-store', () => ({ useTaskState: () => ({ tasks }) }))
+let selectedTaskId: string | null = null
+vi.mock('../store/task-live-store', () => ({ useTaskState: () => ({ tasks, navigation: { selectedTaskId } }) }))
 let root: Root | undefined
 let container: HTMLDivElement | undefined
 beforeEach(() => {
@@ -23,6 +24,7 @@ afterEach(async () => {
   root = undefined
   container?.remove()
   tasks = []
+  selectedTaskId = null
   localStorage.clear()
   Reflect.deleteProperty(window, 'workwise')
   vi.restoreAllMocks()
@@ -31,7 +33,7 @@ afterEach(async () => {
 
 function task(id: string, originThreadId?: string): TaskRunV1 {
   return { id, threadId: `worker-${id}`, ...(originThreadId ? { originThreadId } : {}),
-    updatedAt: '2026-11-13T00:00:00Z', artifacts: [{ id: 'html', relativePath: '报告.html',
+    createdAt: '2026-11-13T00:00:00Z', updatedAt: '2026-11-13T00:00:00Z', artifacts: [{ id: 'html', relativePath: '报告.html',
       sha256: 'html-v1', validation: 'valid', createdAt: 'now' }] } as TaskRunV1
 }
 
@@ -40,17 +42,15 @@ async function mount(activeThreadId: string | null = 'chat-a') {
   document.body.append(container)
   root = createRoot(container)
   function Probe({ route }: { route: 'chat' | 'tasks' }) {
-    const conversation = useTaskArtifactPreview(activeThreadId, true)
-    const workspace = useTaskArtifactPreview(null, route === 'tasks')
-    const lastRequest = useRef<{ taskId: string; artifactId: string } | null>(null)
+    const conversation = useTaskArtifactPreview(activeThreadId, route !== 'tasks')
+    const workspace = useTaskArtifactPreview(null, route === 'tasks', { followSelectedTask: true })
     const preview = route === 'tasks' ? workspace : conversation
     const routeRef = useRef(route)
     routeRef.current = route
-    const layout = useWorkbenchLayout({ activeThreadId: route === 'tasks' ? 'task-workspace-preview' : activeThreadId,
+    const layout = useWorkbenchLayout({ activeThreadId: route === 'tasks' ? workspace.scopeKey ?? 'task-workspace-preview' : activeThreadId,
       latestAutoOpenDevPreviewKey: preview.key, latestAutoOpenDevPreviewUrl: preview.url,
       latestDevPreviewUrl: preview.url, route, workspaceRoot: '', writeAssistantOpen: false })
     const openArtifact = async (request: { taskId: string; artifactId: string }) => {
-      lastRequest.current = request
       try {
         await workspace.open(request)
         if (routeRef.current === 'tasks') layout.setRightPanelMode('browser')
@@ -59,7 +59,9 @@ async function mount(activeThreadId: string | null = 'chat-a') {
     return createElement('div', { className: 'flex min-h-0 min-w-0 flex-1' },
       createElement('section', { 'aria-label': route === 'tasks' ? '任务工作台' : '聊天' },
         route === 'tasks' && workspace.error ? createElement('div', { role: 'alert' }, workspace.error,
-          createElement('button', { onClick: () => { if (lastRequest.current) void openArtifact(lastRequest.current) } }, '重新打开网页成果')) : null,
+          createElement('button', { onClick: () => { void workspace.retry().then(() => {
+            if (routeRef.current === 'tasks') layout.setRightPanelMode('browser')
+          }).catch(() => undefined) } }, '重新打开网页成果')) : null,
         ...tasks.map(item => createElement('button', { key: item.id,
           onClick: () => void openArtifact({ taskId: item.id, artifactId: 'html' }) }, `打开${item.id}`))),
       layout.rightPanelVisible && layout.rightPanelMode === 'browser'
@@ -90,11 +92,12 @@ it('mounts the task workspace beside its preview and keeps task URLs outside con
   expect(source.indexOf('{renderRightPanel()}')).toBeGreaterThan(source.indexOf('</main>'))
   expect(taskRenderer).toContain('await openWorkspaceArtifact({ taskId: task.id, artifactId })')
   expect(taskRenderer).toContain('workspaceArtifactPreview.error')
-  expect(taskRenderer).toContain('void openWorkspaceArtifact(lastWorkspaceArtifactRequest.current)')
-  expect(taskRenderer).not.toContain('workspaceArtifactPreview.retry(')
+  expect(taskRenderer).toContain('workspaceArtifactPreview.retry()')
   expect(taskRenderer).not.toContain('selectThread(')
   expect(taskRenderer).not.toContain('await taskArtifactPreview.open(')
-  expect(source).toContain("activeThreadId: route === 'tasks' ? 'task-workspace-preview' : activeThreadId")
+  expect(source).toContain("useTaskArtifactPreview(null, runtimeConnection === 'ready' && route === 'tasks', { followSelectedTask: true })")
+  expect(source).toContain("useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready' && route !== 'tasks')")
+  expect(source).toContain("activeThreadId: route === 'tasks' ? workspaceArtifactPreview.scopeKey ?? 'task-workspace-preview' : activeThreadId")
   expect(source).toContain("blocks={route === 'tasks' ? [] : devPreviewBlocks}")
 })
 
@@ -141,6 +144,59 @@ it('keeps a dismissed chat preview closed after a separate task preview and igno
   await view.render('chat')
   await act(async () => completeTaskPreview({ ok: true, title: '报告', url: `http://127.0.0.1:1234/task-preview/${'a'.repeat(48)}/selected.html` }))
   expect(view.browser()).toBeNull()
+})
+
+it('automatically previews the selected task new hash, ignores parallel tasks and preserves dismissal for the same version', async () => {
+  const selected = task('selected', 'chat-b')
+  selected.acceptance = { kind: 'files', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: true, requiresWebEvidence: true }
+  selected.artifacts[0] = { ...selected.artifacts[0]!, sourceEvidenceStatus: 'draft' }
+  selectedTaskId = selected.id
+  tasks = [{ ...selected, artifacts: [] }, task('parallel', 'chat-b')]
+  const previewTaskArtifact = vi.fn(async ({ taskId, artifactId }: { taskId: string; artifactId: string }) => {
+    const artifact = tasks.find(item => item.id === taskId)!.artifacts.find(item => item.id === artifactId)!
+    return { ok: true, title: '报告', sha256: artifact.sha256,
+      url: `http://127.0.0.1:1234/task-preview/${'a'.repeat(48)}/${taskId}-${artifact.sha256}.html` }
+  })
+  Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact, openExternal: vi.fn() } })
+  const view = await mount('chat-a')
+  await view.render('tasks')
+  expect(view.browser()).toBeNull()
+  tasks = [selected, task('parallel', 'chat-b')]
+  await view.render('tasks')
+  tasks = [{ ...selected, status: 'completed', artifacts: [{ ...selected.artifacts[0]!, sha256: 'verified-v2', sourceEvidenceStatus: 'verified', sourceEvidenceReceiptId: 'proof-v2' }] },
+    { ...task('parallel', 'chat-b'), updatedAt: '2027-01-01T00:00:00Z' }]
+  await view.render('tasks')
+  expect(view.browser()).not.toBeNull()
+  expect(view.browser()?.getAttribute('src')).toContain('/selected-verified-v2.html')
+  expect(previewTaskArtifact.mock.calls.map(([request]) => request.taskId)).toEqual(['selected', 'selected'])
+  await view.close()
+  tasks = tasks.map(item => ({ ...item, artifacts: [...item.artifacts] }))
+  await view.render('tasks')
+  expect(view.browser()).toBeNull()
+  expect(previewTaskArtifact).toHaveBeenCalledTimes(2)
+  tasks = tasks.map(item => item.id === selected.id ? { ...item, artifacts: [{ ...item.artifacts[0]!, sha256: 'verified-v3', sourceEvidenceReceiptId: 'proof-v3' }] } : item)
+  await view.render('tasks')
+  expect(view.browser()?.getAttribute('src')).toContain('/selected-verified-v3.html')
+  expect(previewTaskArtifact).toHaveBeenCalledTimes(3)
+})
+
+it('discards the selected task late preview when the user selects another task', async () => {
+  tasks = [task('one', 'chat-b'), task('two', 'chat-c')]
+  selectedTaskId = 'one'
+  let finish!: (value: unknown) => void
+  const previewTaskArtifact = vi.fn(({ taskId }: { taskId: string }) => taskId === 'one'
+    ? new Promise(resolve => { finish = resolve })
+    : Promise.resolve({ ok: true, title: '报告', sha256: 'html-v1', url: `http://127.0.0.1:1234/task-preview/${'b'.repeat(48)}/two.html` }))
+  Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact, openExternal: vi.fn() } })
+  const view = await mount('chat-a')
+  await view.render('tasks')
+  expect(previewTaskArtifact).toHaveBeenCalledWith({ taskId: 'one', artifactId: 'html' })
+  selectedTaskId = 'two'
+  await view.render('tasks')
+  expect(view.browser()?.getAttribute('src')).toContain('/two.html')
+  await act(async () => finish({ ok: true, title: '旧报告', sha256: 'html-v1', url: `http://127.0.0.1:1234/task-preview/${'a'.repeat(48)}/one.html` }))
+  expect(view.browser()?.getAttribute('src')).toContain('/two.html')
+  expect(previewTaskArtifact).toHaveBeenCalledTimes(2)
 })
 
 it.each(['business', 'transport'])('shows a %s preview error and retries the exact manual artifact without a chat', async failure => {

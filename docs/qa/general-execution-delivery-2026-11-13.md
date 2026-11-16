@@ -916,3 +916,18 @@ Node 22 九文件 116 项、KUN／Node／Web 类型及九文件 lint 通过，�
 
 
 最小修正只在 Controller 中按服务端持久的 `observed_feed` 合同调用同一生成器重建候选清单，然后精确比较；原始 Host 参数哈希、writer／Grant／Token 身份校验保持。实际 Host 下篡改候选标题值、标题摘录或预算字段仍被拒绝；原参数变更仍由 writer 身份校验拒绝。伪造 MCP、未完成 writer、旧来源和普通正文兼容回归保留。修复后完整 Factory 九项通过，来源／生成器相邻九十二项通过；合并树的 Node 22 标准 KUN runner 九文件 165 项、KUN／Node／Web 类型、三文件 lint、包含该修正的一次生产构建和 freshness 均通过，2,443 个 authored production 文件与物理构建树逐字一致。初次合并检查遇到临时 checkout 指向已失效依赖目录，保留缺依赖和错误 runner 的日志；修正该可弃置依赖链接后使用仓库 KUN Vitest 4.1.8 得到上述最终结果，未改生产源码来绕过环境错误。后继完整 CI、新精确包和原账号任务的实际浏览、报告及计划仍须验收。
+
+
+### 6caf 精确包完成真实采集，发现两项交付界面缺口
+
+`6caf1996` 的 [push Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43931544558)／[PR Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/43931556768)六项成功，两轮各 Desktop 4,818 通过／17 跳过、Runtime 5,222 通过／24 跳过。[唯一正常身份私有构建](https://github.com/railwise-cn/railwise-ai/actions/runs/43932259017)成功；arm64 DMG SHA256 为 `68410730baf382f8cc327aa81dcc211352d2c769a3778806e20cd360c1ce3343`，本机安装 ASAR 为 `545acc6f42d05efde7225b880ff5c0bbbd5ae08e7a15fce1e9694c40c7a2c717`。正常 0.5.7／bundle／Team、严格签名和 stapler 均通过。同 run 的 0.5.6→该精确包 updater 官方及严格校验通过，更新后 ASAR 与本机相同；干净 CI Gatekeeper enabled／accepted 与资料连续性通过，本机既有 override 和外层 ZIP 未完整本机哈希继续明确保留。
+
+[同包 Windows 完整受控回放](https://github.com/railwise-cn/railwise-ai/actions/runs/43937227695)官方及严格校验通过，实际安装 ASAR `562559c6bc253875d424fe4400aff10e0e8c3bdef3ef89b915095d1873c0a9b8`。初次报告、独立真实时钟到期报告、来源／文件、自动和手动预览及 daily 两次读回均通过，UNKNOWN 为零。范围为受控 BrowserSkill／模型／页面，不包括 Ego Windows、外部真实模型或付费站点；Windows NotSigned 继续保留。首次本地收证缺少临时 checkout 的 yaml 依赖，接入现成依赖后继续原验证，未重下载或改校验算法。
+
+Root 独立核验后正常退出旧实例一次、确认 Main／Runtime 全停并完成一致性 SQLite 备份。旧任务、预算、配置、未知操作及原政府采购计划均保留；03:38 实际打开新包，检查中文浅色 1280×840 原生窗口。03:41 通过真实界面只继续同一任务一次，累计第七次执行；没有新建无关联任务规避历史或再填写 Key。
+
+本轮 RailWise 自己实际打开 Ego 页面、观察并读取。两次元素读取因整页／URL 比对返回观察过期，模型随后自行重新打开；第二次 open 本就包含固定原生导航和完整 HTML 读取，持久的 33,650 字节当前来源具有新的 Host、Turn、读取回执及 hash，既不同旧快照，也不同本轮首读。当前 writer／manifest／verify 仅关联该当前来源，未把旧缓存重贴时标。实际报告选入五条，声明仅读首页、列表批次为 11 月 16 日而采集时间为北京时间 11 月 17 日凌晨，不将加载中的临时空列表当零结果，不声称今日全量。实际文件 8,828 字节，SHA256 `271a30a9751c7161481d57f3a32425fe023935fb3f5bd0aee253510185e8a335`，保存、读回和显式来源核验通过。持久计划读回为 enabled、Asia/Shanghai、08:30／16:30 启动、09:00／17:00 交付，下一次启动为 11 月 17 日 08:30；原暂停政府采购定义逐字不变，全部 16 条 UNKNOWN 集合也不变。Ego finish 成功后，原任务三个节点于 03:44 完成。
+
+真实界面仍有两项未通过：已完成任务保留此前的 pending Web 核验阻断卡并重复计入“需要你”；选中的任务工作台没有自动打开新 hash 的报告。完成后稳定 DOM 无预览 frame、右侧面板未打开，Root 当时没有手动打开或关闭成果；随后正常点击成果可加载并显示中文报告，这次仅算手动预览通过。原生图片和付费内容均留在私有证据目录，不提交公开资料。故本包尚未通过完整业务交付验收，尚未公开发布。
+
+后续最小修正已先复现再通过聚焦检查。Controller 在完成事务及正式初始化中，仅依据完成任务的真实核验证据处理同 Task 的精确 Web 阻断卡，保留旧诊断并追加解决依据；旧 Task、操作、事件、Grant、预算与 UNKNOWN 不重写，错误 owner／审批／其它阻断／草稿不处理，两次真实 Factory 重启验证补偿幂等。界面按选中任务的当前执行分支接入候选，并允许任务路由自动展开预览；Task／artifact／资源 hash、并行隔离、关闭同版本及新版本再打开规则保留。实际工作台形状在旧生产代码上两项功能性失败，完成后的旧提醒也有完整 Factory 功能性失败；合并后 Node 22 Runtime 十文件 240 项、桌面四文件 27 项、KUN／Node／Web 类型和七文件 lint 通过，一次包含全部增量的生产构建、freshness 及 2,443 个 authored production 文件对比通过。后继完整 CI、新精确包的已完成记录升级、实际自动预览与 Ego 实钟到期仍待验收；不再继续已完成任务来消耗第八次执行。

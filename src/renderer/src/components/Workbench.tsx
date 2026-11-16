@@ -557,11 +557,9 @@ export function Workbench(): ReactElement {
     () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
     [activeSkillWorkspace, timelineBlocks]
   )
-  const conversationArtifactPreview = useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready')
-  // Task/Flow artifacts can have no user chat. Keep manual previews separate
-  // from the active conversation so opening another task cannot replace it.
-  const workspaceArtifactPreview = useTaskArtifactPreview(null, runtimeConnection === 'ready' && route === 'tasks')
-  const lastWorkspaceArtifactRequest = useRef<{ taskId: string; artifactId: string } | null>(null)
+  const conversationArtifactPreview = useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready' && route !== 'tasks')
+  // Follow only the selected task's current execution, independently of chat.
+  const workspaceArtifactPreview = useTaskArtifactPreview(null, runtimeConnection === 'ready' && route === 'tasks', { followSelectedTask: true })
   const taskArtifactPreview = route === 'tasks' ? workspaceArtifactPreview : conversationArtifactPreview
   const artifactPreviewRouteRef = useRef(route)
   artifactPreviewRouteRef.current = route
@@ -656,7 +654,7 @@ export function Workbench(): ReactElement {
     toggleLeftSidebar,
     toggleRightPanelMode,
   } = useWorkbenchLayout({
-    activeThreadId: route === 'tasks' ? 'task-workspace-preview' : activeThreadId,
+    activeThreadId: route === 'tasks' ? workspaceArtifactPreview.scopeKey ?? 'task-workspace-preview' : activeThreadId,
     latestAutoOpenDevPreviewKey: taskArtifactPreview.key,
     latestAutoOpenDevPreviewUrl,
     latestDevPreviewUrl,
@@ -2003,7 +2001,6 @@ export function Workbench(): ReactElement {
   }
 
   const openWorkspaceArtifact = async (request: { taskId: string; artifactId: string }): Promise<void> => {
-    lastWorkspaceArtifactRequest.current = request
     try {
       await workspaceArtifactPreview.open(request)
       if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
@@ -2225,7 +2222,9 @@ export function Workbench(): ReactElement {
         {workspaceArtifactPreview.error ? <div role="alert" className="ds-no-drag m-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
           <p>{workspaceArtifactPreview.error}</p>
           <button type="button" className="mt-2 text-accent" onClick={() => {
-            if (lastWorkspaceArtifactRequest.current) void openWorkspaceArtifact(lastWorkspaceArtifactRequest.current)
+            void workspaceArtifactPreview.retry().then(() => {
+              if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
+            }).catch(() => undefined)
           }}>重新打开网页成果</button>
         </div> : null}
         <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {

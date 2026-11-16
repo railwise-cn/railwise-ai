@@ -147,6 +147,16 @@ export class TaskController {
     this.completionGuard = deps.completionGuard
     this.reconcileHostShell = deps.reconcileHostShell
     this.resolveToolEffect = deps.resolveToolEffect ?? externalOperationForTool
+    // Older versions completed Tasks without settling their source-repair todo.
+    // Reconcile only this server-owned projection, using the persisted acceptance
+    // proof; no execution, Task revision or original audit receipt is changed.
+    this.repository.transact(() => {
+      for (const item of this.repository.inbox()) {
+        if (item.id !== `web_evidence_${item.taskId}`) continue
+        const task = item.taskId ? this.repository.get(item.taskId) : null
+        if (task) this.resolveCompletedWebEvidenceAttention(task)
+      }
+    })
   }
 
   managedArtifactRoot(taskId: string): string | undefined {
@@ -1102,7 +1112,8 @@ export class TaskController {
     }
 
     const now = this.nowIso()
-    const completed = this.updateExecution(task.id, task.revision, (current) => ({
+    const completed = this.repository.transact(() => {
+      const result = this.updateExecution(task.id, task.revision, (current) => ({
       ...current,
       status: 'completed',
       waitingReason: undefined,
@@ -1126,6 +1137,9 @@ export class TaskController {
       payload: { turnId, artifactCount: artifacts.length },
       createdAt: now
     })
+      this.resolveCompletedWebEvidenceAttention(result)
+      return result
+    })
     this.releaseExecutionLease(task.id)
     this.spans?.finishTurn(task.id, turnId, {
       status: 'ok',
@@ -1136,6 +1150,28 @@ export class TaskController {
       attributes: { attempts: completed.attempts, artifactCount: artifacts.length }
     })
     return { kind: 'completed', task: completed }
+  }
+
+  /** Settle this Task's source-repair todo only after its accepted web artifact. */
+  private resolveCompletedWebEvidenceAttention(task: TaskRun): void {
+    const attention = this.repository.attention(`web_evidence_${task.id}`)
+    if (task.status !== 'completed' || task.acceptance.kind !== 'files' || !task.acceptance.requiresWebEvidence ||
+      attention?.status !== 'pending' || attention.ownerKind !== 'task' || attention.ownerId !== task.id || attention.taskId !== task.id ||
+      attention.kind !== 'blocked' || attention.requestId !== undefined || attention.payload?.kind !== 'web_artifact_repair_stalled') return
+    const evidence = task.artifacts.flatMap(artifact => {
+      if (artifact.validation !== 'valid' || artifact.sourceEvidenceStatus !== 'verified' || !['html', 'htm'].includes(artifact.format ?? '') ||
+        task.acceptance.requiredFormats?.length && !task.acceptance.requiredFormats.includes(artifact.format ?? '') || !artifact.sourceEvidenceReceiptId) return []
+      const proof = this.repository.operationById(task.id, artifact.sourceEvidenceReceiptId, 'web_artifact_evidence')
+      const writerId = proof?.request?.writerReceiptId
+      if (!proof || typeof writerId !== 'string' || verifiedWebArtifactEvidence(this.repository, task, artifact, writerId)?.id !== proof.id ||
+        !task.resultEvidence?.some(result => result.kind === 'file' && result.provider === 'managed-artifacts' && result.operation === 'verify_web_artifact' &&
+          result.verified && result.status === 'source_verified' && result.resultHash === artifact.sha256 && result.sourceVersion === proof.id)) return []
+      return [{ artifactId: artifact.id, sha256: artifact.sha256, sourceEvidenceReceiptId: proof.id }]
+    })
+    if (!evidence.length) return
+    this.repository.putAttention({ ...attention, status: 'answered', revision: attention.revision + 1, updatedAt: this.nowIso(),
+      payload: { ...attention.payload, resolution: { kind: 'completed_web_evidence', taskId: task.id, turnId: task.activeTurnId,
+        completedAt: task.finishedAt ?? task.updatedAt, artifacts: evidence } } })
   }
 
   /** A terminal execution block also wins when the explanatory model call fails. */

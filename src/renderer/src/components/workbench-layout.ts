@@ -164,7 +164,7 @@ export function useWorkbenchLayout({
   }, [activeThreadId, rightPanelMode])
 
   useEffect(() => {
-    if (!latestAutoOpenDevPreviewUrl || !currentPreviewKey || route !== 'chat') return
+    if (!latestAutoOpenDevPreviewUrl || !currentPreviewKey || (route !== 'chat' && route !== 'tasks')) return
     if (dismissedPreviews.current.get(activeThreadId) === currentPreviewKey) return
     if (autoOpenedPreviewKeyRef.current === currentPreviewKey) return
     autoOpenedPreviewKeyRef.current = currentPreviewKey
