@@ -25,8 +25,9 @@ export function taskHasExecutionEvidence(task: TaskRunV1): boolean {
     task.artifacts.length > 0 || Boolean(task.resultEvidence?.length) || (task.timing?.executionMs ?? 0) > 0
 }
 
-/** Approval packets belong to the review card, never to compact progress surfaces. */
+/** Active repair diagnostics stay internal; approval packets belong to the review card. */
 export function taskProgressReason(task: Pick<TaskRunV1, 'status' | 'waitingReason' | 'stalledReason'>, approvalHint: string): string | undefined {
+  if (['queued', 'running', 'retrying'].includes(task.status)) return undefined
   return task.status === 'waiting_approval' ? approvalHint : task.stalledReason || task.waitingReason
 }
 

@@ -189,19 +189,59 @@ export class TaskScheduleService {
   async readback(context: ToolHostContext) {
     const task = this.deps.tasks.activeTask(context.threadId)
     if (!task) fail('当前任务不存在。')
-    const source = this.planSource(task)
-    const flows = this.deps.flows.list().filter(flow => flow.id === `schedule_${source.id}` && flow.workspace === context.workspace)
+    const occurrence = task.scheduledBy ? await this.occurrenceReadbackPlan(task, context) : undefined
+    const source = occurrence ? undefined : this.planSource(task)
+    const flows = occurrence ? [occurrence] : this.deps.flows.list().filter(flow => flow.id === `schedule_${source!.id}` && flow.workspace === context.workspace)
     const schedules = []
     for (const flow of flows) {
       const authority = this.authority(flow)
-      if (task.retryOfTaskId) await this.validateRetryPlan(task, authority, context)
-      else await this.validateAuthority(authority)
+      if (!occurrence) {
+        if (task.retryOfTaskId) await this.validateRetryPlan(task, authority, context)
+        else await this.validateAuthority(authority)
+      }
       schedules.push(this.snapshot(flow))
     }
     const key = `schedule-readback:${fingerprint(schedules)}`
-    this.deps.repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'schedule_readback', request: { schedules, ...(task.retryOfTaskId ? { retrySourceTaskId: source.id, taskAuthorityHash: fingerprint(task.authority ?? null) } : {}) }, nowIso: this.deps.nowIso() })
+    this.deps.repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'schedule_readback', request: { schedules,
+      ...(occurrence ? { scheduleId: occurrence.id, versionId: occurrence.publishedVersionId, dueAt: task.scheduledBy!.dueAt, sourceTaskId: this.authority(occurrence).taskId }
+        : task.retryOfTaskId ? { retrySourceTaskId: source!.id, taskAuthorityHash: fingerprint(task.authority ?? null) } : {}) }, nowIso: this.deps.nowIso() })
     this.deps.repository.finishOperation(task.id, key, { status: 'succeeded', result: { schedules } }, this.deps.nowIso())
     return { schedules }
+  }
+
+  /** An occurrence may read only its server-prepared source plan, never a workspace-wide list. */
+  private async occurrenceReadbackPlan(task: TaskRun, context: ToolHostContext): Promise<FlowDefinitionV1> {
+    const grant = context.executionGrant, prepared = this.deps.repository.operation(task.threadId, 'scheduled-task-context')
+    if (!task.scheduledBy || !grant || grant.taskId !== task.id || task.threadId !== context.threadId ||
+      grant.threadId !== task.threadId || grant.turnId !== context.turnId || task.activeTurnId !== context.turnId ||
+      !['running', 'waiting_approval'].includes(task.status) || task.authority?.revokedAt || task.authority?.taskApprovalGrant?.revokedAt ||
+      task.retryOfTaskId && !verifiedTaskRetryLineage(this.deps.repository, task) ||
+      !validTimes(grant.issuedAt) || Date.parse(grant.issuedAt) > Date.parse(this.deps.nowIso()) ||
+      grant.expiresAt && (!validTimes(grant.expiresAt) || Date.parse(grant.expiresAt) <= Date.parse(this.deps.nowIso())) ||
+      !prepared || prepared.ownerId !== task.threadId || prepared.idempotencyKey !== 'scheduled-task-context' ||
+      prepared.kind !== 'scheduled_task_prepare' || prepared.status !== 'succeeded' ||
+      prepared.fingerprint !== operationFingerprint(prepared.request)) fail('周期计划读回缺少当前任务的有效执行凭证或准备记录。')
+    await context.validateExecutionGrant?.()
+    const scope = await this.executionScope(task)
+    const flow = this.deps.flows.get(task.scheduledBy.scheduleId)
+    if (!scope || !flow) fail('周期计划的来源尚未核验。')
+    const authority = this.authority(flow)
+    const source = this.deps.repository.get(authority.taskId)
+    const planId = source ? `schedule_${this.planSource(source).id}` : undefined
+    const effective = recoveryExecutionScope(this.deps.repository, task, scope, Date.parse(grant.issuedAt))
+    if (flow.variables.archived === true || flow.variables.enabled === false || flow.publishedVersionId !== prepared.request?.versionId ||
+      fingerprint(authority) !== prepared.request?.authorityHash || flow.id !== planId || task.goal !== authority.prompt || task.workspaceRoot !== flow.workspace ||
+      context.workspace !== flow.workspace || grant.workspaceRoot !== flow.workspace ||
+      grant.workspaceTrust !== authority.grant.workspaceTrust || grant.workspaceRevision !== authority.grant.workspaceRevision ||
+      grant.agentTrust !== authority.grant.agentTrust || grant.agentRevision !== authority.grant.agentRevision ||
+      grant.approvalPolicy !== authority.grant.approvalPolicy || grant.sandboxMode !== authority.grant.sandboxMode ||
+      grant.scheduleScopeHash !== effective.scheduleScopeHash ||
+      operationFingerprint(grant.browserScheduleBinding) !== operationFingerprint(effective.browserScheduleBinding) ||
+      operationFingerprint(grant.browserScope) !== operationFingerprint(effective.browserScope) ||
+      operationFingerprint(taskScheduleConnectorIdentities(grant.connectorIdentityFingerprints)) !== operationFingerprint(taskScheduleConnectorIdentities(effective.connectorIdentityFingerprints))) {
+      fail('周期任务与原计划的目标、工作区或有效执行范围不同。')
+    }
+    return flow
   }
 
   assessCompletion(task: TaskRun): { reason: string; fingerprint: string; retryable?: boolean } | null {

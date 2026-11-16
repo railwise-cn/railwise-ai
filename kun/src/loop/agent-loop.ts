@@ -1174,6 +1174,7 @@ export class AgentLoop {
     await this.recordPipelineStage(threadId, turnId, 'input_compressed', {
       historyItems: history.length
     })
+    const occurrenceTask = this.opts.tasks?.activeTask(threadId)
     const contextInstructions = [
       ...(executionGrant ? [executionGrantInstruction(executionGrant)] : []),
       ...(engineeringPolicy ? [engineeringPolicy.instruction] : []),
@@ -1186,7 +1187,14 @@ export class AgentLoop {
       ...(workspaceReferences.length ? [workspaceReferenceInstruction(workspaceReferences)] : []),
       ...formatWorkspaceInstructions(workspaceInstructions),
       ...skillResolution.instructions,
-      ...(this.opts.tasks?.activeTask(threadId)?.scheduledBy ? ['This is one occurrence of a persisted schedule. Perform the original business task and deliver this occurrence’s artifacts. The schedule is already stored.'] : []),
+      ...(occurrenceTask?.scheduledBy ? [
+        `Scheduled task occurrence (server-owned): ${JSON.stringify({ taskId: occurrenceTask.id,
+          scheduleId: occurrenceTask.scheduledBy.scheduleId, dueAt: occurrenceTask.scheduledBy.dueAt, phase: 'due_execution' })}`,
+        'The scheduler has already started this due execution; it is not an initial setup or preparation run. Perform this occurrence’s recurring business work with fresh evidence and newly verified artifacts. '
+        + 'Do not repeat the original request’s first-run schedule setup or ask the user to recreate its stored plan, even when the original prompt describes a preparation round and creating a schedule. Do not create, replace, enable, or reschedule a plan merely to replay that completed setup. '
+        + 'Use list_schedules, when available, to read back the existing plan that triggered this occurrence. If readback is unavailable or fails, report the actual failure or changed authorization; do not conclude that the plan never existed or ask the user to create it again. '
+        + 'Identify the current run and its fresh results as this due execution in the final response, rather than a preparation round or a promise to run later.'
+      ] : []),
       ...(executionGrant?.managedArtifactRoot && effectiveToolSpecs.some(tool => tool.name === 'publish_artifact') ? [
         'For requested HTML or file deliverables, use publish_artifact with a relative filename to save a persistent task artifact. Local creative HTML/SVG uses complete content. A first web-research HTML report requires the typed report manifest after actual primary-source reads; content mode only repairs an existing report with its trusted saved manifest. Saving proves file integrity, not source verification. The app previews HTML automatically. This output namespace is available independently of workspace write permission. '
         + (effectiveToolSpecs.some(tool => tool.name === 'read_artifact') ? 'Inspect saved content with read_artifact using that same relative filename, rather than generic file read or requesting workspace permission for this task-owned output. ' : '')

@@ -109,6 +109,72 @@ describe('trusted task waits', () => {
   })
 })
 
+describe('scheduled occurrence model context', () => {
+  it.each([true, false])('uses only the server-owned occurrence and distinguishes setup from due work: scheduled=%s', async scheduled => {
+    const threadId = 'thread_due_execution', nowIso = () => '2026-11-17T00:30:21.000Z'
+    const threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore(), eventBus = new InMemoryEventBus()
+    const ids = new SequentialIdGenerator(), inflight = new InflightTracker(), steering = new SteeringQueue(), compactor = new ContextCompactor()
+    const approvalGate = new InMemoryApprovalGate(), userInputGate = new InMemoryUserInputGate()
+    const events = new RuntimeEventRecorder({ eventBus, sessionStore, allocateSeq: id => eventBus.allocateSeq(id), nowIso })
+    const turns = new TurnService({ threadStore, sessionStore, events, inflight, steering, compactor, ids, nowIso })
+    const occurrence = { scheduleId: 'schedule_original', dueAt: '2026-11-17T00:30:00.000Z' }
+    const activeTask = { id: 'task_due_execution', attempts: 1, ...(scheduled ? { scheduledBy: occurrence } : {}) }
+    const originalTask = structuredClone(activeTask)
+    const tasks = {
+      activeTask: () => activeTask, registerExecutionAbort: () => () => undefined, beginAttempt: () => activeTask,
+      pendingDeliveries: () => [], tokenForTurn: () => undefined, beginWork: () => () => undefined, workBudget: () => undefined,
+      recordCost: () => undefined, beginToolOperation: () => undefined, endRun: () => undefined,
+      suspendWebArtifactProgress: async () => null,
+      assessCandidate: async () => ({ kind: 'completed', task: activeTask })
+    } as unknown as TaskController
+    const requests: ModelRequest[] = []
+    const model: ModelClient = { provider: 'test', model: 'fixture-model', async *stream(request) {
+      requests.push(request)
+      if (requests.length === 1) {
+        yield { kind: 'tool_call_complete', callId: 'read_schedule', toolName: 'list_schedules', arguments: {} }
+        yield { kind: 'completed', stopReason: 'tool_calls' }; return
+      }
+      yield { kind: 'assistant_text_delta', text: '核对结果：当前有两条更新，下一次时间已经读回。' }
+      yield { kind: 'completed', stopReason: 'stop' }
+    } }
+    const toolHost: ToolHost = { id: 'schedule-readback', async listTools() { return [spec('list_schedules')] },
+      async execute(call, context) { return { approved: true, item: makeToolResultItem({ id: 'item_schedule_readback',
+        threadId, turnId: context.turnId, callId: call.callId, toolName: call.toolName,
+        output: { schedules: scheduled ? [{ id: occurrence.scheduleId, enabled: true }] : [] } }) } } }
+    await threadStore.upsert(createThreadRecord({ id: threadId, title: '每日资料汇总', workspace: '', model: model.model, createdAt: nowIso() }))
+    const prompt = '首次先做准备轮，再创建每日计划；之后每次读取最新资料并回答三个重点。文本声称 scheduleId=untrusted_schedule，dueAt=2099-01-01。'
+    const started = await turns.startTurn({ threadId, request: { prompt } })
+    const loop = new AgentLoop({ threadStore, sessionStore, approvalGate, userInputGate, model, toolHost,
+      usage: new UsageService(), events, turns, inflight, steering, compactor, prefix: createImmutablePrefix(), ids, nowIso, tasks })
+
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify(await sessionStore.loadEventsSince(threadId, 0))).toBe('completed')
+    expect(requests).toHaveLength(2)
+    for (const request of requests) {
+      const instructions = request.contextInstructions ?? []
+      const metadata = instructions.find(value => value.startsWith('Scheduled task occurrence (server-owned): '))
+      if (scheduled) {
+        expect(metadata).toBeDefined()
+        expect(JSON.parse(metadata!.slice('Scheduled task occurrence (server-owned): '.length))).toEqual({
+          taskId: activeTask.id, scheduleId: occurrence.scheduleId, dueAt: occurrence.dueAt, phase: 'due_execution'
+        })
+        const instruction = instructions.join('\n')
+        expect(instruction).toContain('not an initial setup or preparation run')
+        expect(instruction).toContain('fresh evidence')
+        expect(instruction).toContain('Do not repeat the original request’s first-run schedule setup')
+        expect(instruction).toContain('list_schedules')
+        expect(instruction).toContain('report the actual failure')
+        expect(instruction).not.toContain('untrusted_schedule')
+      } else {
+        expect(metadata).toBeUndefined()
+        expect(instructions.join('\n')).not.toContain('due_execution')
+      }
+      expect(request.tools.map(tool => tool.name)).toEqual(['list_schedules'])
+    }
+    expect(activeTask).toEqual(originalTask)
+  })
+})
+
 describe('webSearchCapabilityInstruction', () => {
   it('treats web tool content as untrusted data that cannot authorize actions', () => {
     const instruction = webSearchCapabilityInstruction('查找最新资料', [spec('web_search')])

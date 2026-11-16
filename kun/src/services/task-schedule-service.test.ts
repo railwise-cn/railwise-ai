@@ -1008,3 +1008,144 @@ it('derives the same Ego backend and evidence basis for a daily occurrence witho
   f.ego.revision++
   await expect(f.service.executionScopeForThread(occurrence.id)).rejects.toMatchObject({ code: 'schedule_authority_changed' })
 })
+
+function retryReadbackTask(f: Pick<ReturnType<typeof fixture>, 'repository' | 'context' | 'selectTask'>, original: ReturnType<typeof fixture>['task']) {
+  const source = f.repository.update(original.id, f.repository.get(original.id)!.revision, task => ({ ...task, status: 'failed', activeTurnId: undefined }))
+  const rootTaskId = source.rootTaskId ?? source.id, key = `readback-retry:${source.id}`
+  f.repository.beginOperation({ ownerId: source.id, idempotencyKey: key, kind: 'retry', request: { expectedRevision: source.revision }, nowIso: new Date().toISOString() })
+  const created = f.repository.create({ ...source, id: `retry-${source.id}`, retryOfTaskId: source.id, rootTaskId, status: 'running', activeTurnId: `retry-turn-${source.id}`, revision: 0 })
+  const child = f.repository.update(created.id, created.revision, task => task, { key, kind: 'task_retried', payload: { retryOfTaskId: source.id, rootTaskId }, createdAt: new Date().toISOString() })
+  f.repository.finishOperation(source.id, key, { status: 'succeeded', result: { task: child } }, new Date().toISOString())
+  f.context.turnId = child.activeTurnId!
+  f.context.executionGrant = { ...structuredClone(f.context.executionGrant!), id: `grant-${child.id}`, taskId: child.id, turnId: child.activeTurnId!, idempotencyKey: `grant-${child.id}` }
+  f.selectTask(child.id)
+  return child
+}
+
+async function scheduledReadbackFixture(sourceRetry = false) {
+  const f = fixture(), grant = f.context.executionGrant!
+  grant.browserScope = { provider: 'ego-browser', browserInstanceId: 'ego-browser:' + f.ego.executableHash,
+    origins: ['https://example.test'], interaction: 'observe', revision: f.ego.revision }
+  grant.connectorIdentityFingerprints!['ego-browser'] = operationFingerprint(f.ego)
+  grant.expiresAt = '2026-11-13T00:15:00.000Z'
+  f.identities['ego-browser'] = operationFingerprint(f.ego)
+  f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision, task => ({ ...task,
+    authority: { source: 'user', workspaceRoot: '/workspace', externalTargets: [], grantedAt: new Date().toISOString(), browserScope: grant.browserScope } }))
+  const source = sourceRetry ? retryReadbackTask(f, f.task) : f.repository.get(f.task.id)!
+  const sourceGrant = f.context.executionGrant!
+  const saved = await f.service.create(f.context), flow = f.flows.get(saved.id)!
+  const unrelated = f.repository.create({ ...source, id: 'unrelated-task', goal: '另一个独立计划。', retryOfTaskId: undefined, rootTaskId: undefined, revision: 0 })
+  f.selectTask(unrelated.id)
+  const otherPlan = await f.service.create({ ...f.context, executionGrant: { ...sourceGrant, taskId: unrelated.id } })
+  f.selectTask(source.id)
+  vi.setSystemTime(new Date('2026-11-13T00:30:00Z'))
+  const dueAt = new Date().toISOString()
+  await f.service.dispatch({ scheduleId: saved.id, versionId: flow.publishedVersionId!, dueAt })
+  const thread = { ...f.threads.get('origin')!, id: 'scheduled-occurrence-thread', turns: [] }
+  f.threads.set(thread.id, thread)
+  const hooks = f.coordinator.command.mock.calls[0]![1] as {
+    prepareExecutionThread(value: typeof thread): Promise<void>; prepareTask(task: typeof f.task): void
+  }
+  await hooks.prepareExecutionThread(thread)
+  const created = f.repository.create({ ...source, id: 'scheduled-occurrence', threadId: thread.id,
+    retryOfTaskId: undefined, rootTaskId: undefined, activeTurnId: 'scheduled-occurrence-turn', revision: 0 })
+  hooks.prepareTask(created)
+  const occurrence = f.repository.get(created.id)!, scope = await f.service.executionScope(occurrence)
+  const context = { ...f.context, threadId: thread.id, turnId: occurrence.activeTurnId!, executionGrant: ExecutionGrantSchema.parse({
+    ...sourceGrant, ...scope, id: 'scheduled-occurrence-grant', taskId: occurrence.id, threadId: thread.id, turnId: occurrence.activeTurnId,
+    allowedToolNames: ['list_schedules'], issuedAt: new Date().toISOString(), expiresAt: '2026-11-13T01:00:00.000Z', idempotencyKey: 'scheduled-occurrence-grant'
+  }) }
+  f.selectTask(occurrence.id)
+  return { ...f, context, occurrence, saved, flow, dueAt, otherPlan, source }
+}
+
+describe('scheduled occurrence readback', () => {
+  it('reads only its sealed source plan through the provider without changing authority or allowing a second plan', async () => {
+    const f = await scheduledReadbackFixture()
+    const flowsBefore = JSON.stringify(f.flows.list()), sourceReceipts = JSON.stringify(f.repository.operations(f.task.id))
+    const grantBefore = JSON.stringify(f.context.executionGrant), preparationBefore = JSON.stringify(f.repository.operation(f.occurrence.threadId, 'scheduled-task-context'))
+    const tools = buildTaskScheduleToolProvider(() => f.service).tools
+    expect(f.context.executionGrant?.browserScheduleBinding).toBeUndefined()
+    const read = await tools.find(tool => tool.name === 'list_schedules')!.execute({}, f.context)
+    expect(read.output).toEqual({ schedules: [f.saved] })
+    expect(f.service.canCreate(f.context)).toBe(false)
+    await expect(f.service.create(f.context)).rejects.toMatchObject({ code: 'schedule_authority_changed' })
+    expect(JSON.stringify(f.flows.list())).toBe(flowsBefore)
+    expect(JSON.stringify(f.repository.operations(f.task.id))).toBe(sourceReceipts)
+    expect(JSON.stringify(f.context.executionGrant)).toBe(grantBefore)
+    expect(JSON.stringify(f.repository.operation(f.occurrence.threadId, 'scheduled-task-context'))).toBe(preparationBefore)
+    const readback = f.repository.operations(f.occurrence.id, 'schedule_readback')
+    expect(readback).toHaveLength(1)
+    expect(readback[0]).toMatchObject({ status: 'succeeded', request: { scheduleId: f.saved.id, versionId: f.flow.publishedVersionId,
+      dueAt: f.dueAt, sourceTaskId: f.task.id }, result: { schedules: [f.saved] } })
+  })
+
+  it('reads a plan created by a verified source retry at the unchanged business Root ID', async () => {
+    const f = await scheduledReadbackFixture(true)
+    expect(f.saved.id).toBe(`schedule_${f.task.id}`)
+    expect(f.saved.sourceTaskId).toBe(f.source.id)
+    expect(f.source.id).not.toBe(f.task.id)
+    expect((await f.service.readback(f.context)).schedules).toEqual([f.saved])
+    expect(f.repository.operations(f.occurrence.id, 'schedule_readback')[0]?.request?.sourceTaskId).toBe(f.source.id)
+  })
+
+  it('reads the same plan after a verified retry of its scheduled occurrence using a fresh current Grant', async () => {
+    const f = await scheduledReadbackFixture(), before = JSON.stringify(f.flows.list())
+    const preparation = JSON.stringify(f.repository.operation(f.occurrence.threadId, 'scheduled-task-context'))
+    const retry = retryReadbackTask(f, f.occurrence)
+    expect(retry.scheduledBy).toEqual(f.occurrence.scheduledBy)
+    expect((await f.service.readback(f.context)).schedules).toEqual([f.saved])
+    expect(f.service.canCreate(f.context)).toBe(false)
+    expect(f.repository.operations(f.occurrence.id, 'schedule_readback')).toHaveLength(0)
+    expect(f.repository.operations(retry.id, 'schedule_readback')).toHaveLength(1)
+    expect(JSON.stringify(f.flows.list())).toBe(before)
+    expect(JSON.stringify(f.repository.operation(retry.threadId, 'scheduled-task-context'))).toBe(preparation)
+  })
+
+  it('rejects an occurrence retry whose explicit control lineage can no longer be verified', async () => {
+    const f = await scheduledReadbackFixture(), retry = retryReadbackTask(f, f.occurrence)
+    f.repository.finishOperation(f.occurrence.id, `readback-retry:${f.occurrence.id}`, { status: 'failed' })
+    await expect(f.service.readback(f.context)).rejects.toMatchObject({ code: 'schedule_authority_changed' })
+    expect(f.repository.operations(retry.id, 'schedule_readback')).toHaveLength(0)
+  })
+
+  it.each(['missing-preparation', 'preparation-seal', 'preparation-kind', 'different-plan', 'different-due', 'new-version', 'disabled',
+    'source-revoked', 'source-goal', 'occurrence-goal', 'connector-identity', 'grant-task', 'grant-turn', 'grant-workspace', 'grant-expired',
+    'grant-scope', 'grant-browser', 'grant-identity', 'grant-validation'] as const)('rejects %s without returning unrelated plans or writing a misleading receipt', async change => {
+    const f = await scheduledReadbackFixture(), grant = f.context.executionGrant!
+    const updateOccurrence = (edit: (task: typeof f.occurrence) => typeof f.occurrence) =>
+      f.repository.update(f.occurrence.id, f.repository.get(f.occurrence.id)!.revision, edit)
+    if (change === 'missing-preparation') f.repository.connection().prepare('DELETE FROM operation_receipts WHERE owner_id = ? AND idempotency_key = ?')
+      .run(f.occurrence.threadId, 'scheduled-task-context')
+    if (change === 'preparation-seal' || change === 'preparation-kind') {
+      const receipt = f.repository.operation(f.occurrence.threadId, 'scheduled-task-context')!
+      if (change === 'preparation-seal') receipt.fingerprint = '0'.repeat(64)
+      else receipt.kind = 'unrelated_context'
+      f.repository.connection().prepare('UPDATE operation_receipts SET data_json = ? WHERE owner_id = ? AND idempotency_key = ?')
+        .run(JSON.stringify(receipt), receipt.ownerId, receipt.idempotencyKey)
+    }
+    if (change === 'different-plan') updateOccurrence(task => ({ ...task, scheduledBy: { ...task.scheduledBy!, scheduleId: f.otherPlan.id } }))
+    if (change === 'different-due') updateOccurrence(task => ({ ...task, scheduledBy: { ...task.scheduledBy!, dueAt: '2026-11-13T08:30:00.000Z' } }))
+    if (change === 'new-version' || change === 'disabled') {
+      const flow = f.flows.get(f.saved.id)!
+      f.flows.update({ ...flow, name: '更新后的计划', variables: { ...flow.variables, ...(change === 'disabled' ? { enabled: false } : {}) } }, flow.revision)
+      f.flows.publish(flow.id)
+    }
+    if (change === 'source-revoked' || change === 'source-goal') f.repository.update(f.task.id, f.repository.get(f.task.id)!.revision, task => ({ ...task,
+      ...(change === 'source-goal' ? { goal: '变更后的目标。' } : { authority: { ...task.authority!, revokedAt: new Date().toISOString() } }) }))
+    if (change === 'occurrence-goal') updateOccurrence(task => ({ ...task, goal: '另一个未授权目标。' }))
+    if (change === 'connector-identity') f.identities['mcp:test'] = 'b'.repeat(64)
+    if (change === 'grant-task') grant.taskId = f.task.id
+    if (change === 'grant-turn') grant.turnId = 'another-turn'
+    if (change === 'grant-workspace') grant.workspaceRoot = '/other'
+    if (change === 'grant-expired') grant.expiresAt = new Date().toISOString()
+    if (change === 'grant-scope') grant.scheduleScopeHash = '0'.repeat(64)
+    if (change === 'grant-browser') grant.browserScope = { ...grant.browserScope!, origins: ['https://unrelated.test'] }
+    if (change === 'grant-identity') grant.connectorIdentityFingerprints!['mcp:test'] = 'b'.repeat(64)
+    if (change === 'grant-validation') vi.mocked(f.context.validateExecutionGrant!).mockRejectedValue(Object.assign(new Error('changed grant'), { code: 'execution_grant_revoked' }))
+    const before = JSON.stringify(f.flows.list())
+    await expect(f.service.readback(f.context)).rejects.toMatchObject({ code: change === 'grant-validation' ? 'execution_grant_revoked' : 'schedule_authority_changed' })
+    expect(f.repository.operations(f.occurrence.id, 'schedule_readback')).toHaveLength(0)
+    expect(JSON.stringify(f.flows.list())).toBe(before)
+  })
+})
