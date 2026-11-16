@@ -6,8 +6,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { BrowserExecutionScope } from '../../contracts/browser-skill.js'
 import { KunCapabilitiesConfig } from '../../contracts/capabilities.js'
 import { EGO_TOOLS } from '../../contracts/ego-browser.js'
-import { egoReadScript, egoFinishScript } from './ego-browser-tool-provider.js'
+import { buildEgoBrowserToolProvider, egoReadScript, egoFinishScript } from './ego-browser-tool-provider.js'
 import { validEgoDocumentEvidence, validEgoNavigationProgress, verifiedEgoTaskSpaceFinish } from '../../services/ego-browser-evidence.js'
+import { operationFingerprint } from '../../services/task-run-repository.js'
+import type { ToolHostContext } from '../../ports/tool-host.js'
 import { EGO_PERMISSION_CODES, taskPermissionCapability, taskPermissionFailure } from '../../services/task-permission-recovery.js'
 const clean:Array<()=>Promise<unknown>>=[]
 afterEach(async()=>{while(clean.length)await clean.pop()!()})
@@ -69,7 +71,8 @@ it('runs the fixed TaskSpace SDK script and distinguishes exact selector matches
  const globals=globalThis as unknown as Record<string,unknown>,oldDocument=globals.document,oldLocation=globals.location
  globals.document=window.document;globals.location=window.location
  const AsyncFunction=Object.getPrototypeOf(async()=>undefined).constructor as new(...args:string[])=>(...args:unknown[])=>Promise<void>
- const task={spaceId:7,name:'server-task-space-nonce',ownership:'agent',page:()=>({label:'p1',url:async()=>window.location.href,evaluate:async(fn:(arg:unknown)=>unknown,arg:unknown)=>fn(arg),snapshot:async()=> 'article 无独立链接的测绘项目'})}
+ let injectedReadError:Record<string,unknown>|undefined,unknownEvaluationFailure=false
+ const task={spaceId:7,name:'server-task-space-nonce',ownership:'agent',page:()=>({label:'p1',url:async()=>window.location.href,evaluate:async(fn:(arg:unknown)=>unknown,arg:unknown)=>{if(injectedReadError)return injectedReadError;try{if(unknownEvaluationFailure)throw new Error('private page/selector diagnostic');return JSON.parse(JSON.stringify(await fn(arg))) as unknown}catch{throw new Error('SDK remote evaluation failed')}},snapshot:async()=> 'article 无独立链接的测绘项目'})}
  const run=async(params:Record<string,unknown>)=>{const rows:Record<string,unknown>[]=[];await new AsyncFunction('taskSpace','console','listTaskSpaces','setTimeout',egoReadScript({spaceId:7,spaceName:task.name,origins:['https://feed.test'],maxBytes:4096,deadline:Date.now()+60000,...params}))(async(id:unknown)=>{if(params.recoverExistingOnly)expect(id).toBe(7);return task},{log:(s:string)=>rows.push(JSON.parse(s.slice('RAILWISE_EGO_RESULT:'.length)) as Record<string,unknown>)},async()=>params.matchingSpaces??[{id:7,name:task.name,ownership:task.ownership}],(callback:()=>void,ms:number)=>{expect(ms).toBe(500);callback()});return rows[0]!}
  try{
   const full=await run({action:'read'});expect(full).toMatchObject({ok:true,truncated:false});expect(String(full.html)).not.toContain('never export');expect(full.loadingObserved).toBe(false)
@@ -78,9 +81,19 @@ it('runs the fixed TaskSpace SDK script and distinguishes exact selector matches
   expect(await run({action:'open',recoverExistingOnly:true,matchingSpaces:[{id:7,name:task.name,ownership:'agent'},{id:8,name:task.name,ownership:'agent'}]})).toMatchObject({ok:false,code:'ego_browser_task_space_ambiguous'})
   const selected=await run({action:'read',selector:'article',expectedDocumentHtml:full.documentHtml,expectedSourceUrl:'https://feed.test/list'})
   expect(selected).toMatchObject({ok:true,selection:{selector:'article',matchedCount:1}});expect(String(selected.html)).toContain('无独立链接的测绘项目')
-  expect(await run({action:'read',selector:'textarea',expectedDocumentHtml:full.documentHtml,expectedSourceUrl:'https://feed.test/list'})).toMatchObject({ok:false,code:'ego_browser_element_unsupported'})
+  const select=(selector:string)=>run({action:'read',selector,expectedDocumentHtml:full.documentHtml,expectedSourceUrl:'https://feed.test/list'})
+  expect(await select('textarea')).toMatchObject({ok:false,code:'ego_browser_element_unsupported',failurePhase:'selection'})
+  expect(await select('[')).toMatchObject({ok:false,code:'ego_browser_selector_invalid',failurePhase:'selection'})
+  expect(await select('.absent-record')).toMatchObject({ok:false,code:'ego_browser_element_ambiguous',failurePhase:'selection'})
+  expect(await select('div[hidden]')).toMatchObject({ok:false,code:'ego_browser_element_not_visible',failurePhase:'selection'})
+  for(const readError of [{version:1,code:'ego_browser_user_control',failurePhase:'selection'},{version:1,code:'unknown',failurePhase:'selection'},{version:1,code:'ego_browser_element_ambiguous',failurePhase:'selection',raw:'private page/selector diagnostic'}]) {
+   injectedReadError={readError};const rejected=await run({action:'read'});expect(rejected).toMatchObject({ok:false,code:'ego_browser_protocol_invalid',failurePhase:'dom_read'});expect(JSON.stringify(rejected)).not.toContain('private page/selector diagnostic')
+  }
+  injectedReadError=undefined;unknownEvaluationFailure=true
+  expect(await run({action:'read'})).toMatchObject({ok:false,code:'ego_browser_read_failed',failurePhase:'dom_read'})
+  unknownEvaluationFailure=false
   window.document.body.innerHTML+='<article>第二条</article>'
-  expect(await run({action:'read',selector:'article',expectedDocumentHtml:full.documentHtml,expectedSourceUrl:'https://feed.test/list'})).toMatchObject({ok:false,code:'ego_browser_element_ambiguous'})
+  expect(await run({action:'read',selector:'article',expectedDocumentHtml:full.documentHtml,expectedSourceUrl:'https://feed.test/list'})).toMatchObject({ok:false,code:'ego_browser_element_ambiguous',failurePhase:'selection'})
   window.document.body.innerHTML+='<div role="progressbar">正在加载</div>';expect(await run({action:'read'})).toMatchObject({loadingObserved:true})
   task.ownership='user';expect(await run({action:'observe'})).toMatchObject({ok:false,code:'ego_browser_user_control'})
  }finally{globals.document=oldDocument;globals.location=oldLocation;await window.happyDOM.close()}
@@ -109,4 +122,37 @@ it('awaits the documented fixed SDK finish once, protects user control and never
  const run=async()=>new AsyncFunction('taskSpace','console',egoFinishScript({spaceId:7,spaceName:space.name,deadline:Date.now()+60000}))(async(id:unknown)=>{expect(id).toBe(7);return space},{log:(line:string)=>{expect(resolved||space.ownership==='user').toBe(true);rows.push(JSON.parse(line.slice('RAILWISE_EGO_RESULT:'.length)) as Record<string,unknown>)}})
  await run();expect(count).toBe(1);expect(rows[0]).toMatchObject({ok:true,finishResolved:true,keep:[]});space.ownership='user';await run();expect(count).toBe(1);expect(rows[1]).toMatchObject({ok:false})
  for(const forbidden of ['newPage','task.page','task.tabs','task.pages','page.close','claimTaskSpace','takeOverTaskSpace','taskSpace(p.spaceName)'])expect(egoFinishScript({})).not.toContain(forbidden)
+})
+
+
+// Host/provider integration uses the same controlled repository and Grant; no external SDK/browser.
+async function callWithReadFailure(f:Awaited<ReturnType<typeof fixture>>,observationId:unknown,code:string,phase:string) {
+ const config={state:'installed' as const,executablePath:'/controlled/ego-browser',executableHash:'a'.repeat(64),version:'0.6.3.14',revision:0}
+ const provider=buildEgoBrowserToolProvider({config,repository:f.repo,now:()=>Date.parse(date)+1000,run:async(_config,script)=>{
+  const params=JSON.parse(script.split('\n')[0]!.slice('const p = '.length,-1)) as Record<string,unknown>
+  return {ok:false,code,failurePhase:phase,taskSpaceId:7,spaceName:params.spaceName,ownership:'agent',pageLabel:'p1'}
+ }})
+ const args={selector:'article',observationId},grant=f.grant(),callId='controlled-phase-failure',key='tool:'+grant.turnId+':'+callId
+ const host=f.repo.beginOperation({ownerId:f.task.id,idempotencyKey:key,kind:'tool',request:{providerId:'ego-browser',toolName:'ego_browser_read',callId,turnId:grant.turnId,argumentsHash:operationFingerprint(args),executionGrant:grant},nowIso:date}).receipt
+ const context:ToolHostContext={threadId:f.task.threadId,turnId:grant.turnId,workspace:f.task.workspaceRoot,threadMode:'agent',sandboxMode:'read-only',approvalPolicy:'auto',executionGrant:grant,abortSignal:new AbortController().signal,awaitApproval:async()=>'allow',currentToolOperation:()=>({operationId:host.id,idempotencyKey:key,taskId:f.task.id,turnId:grant.turnId,executionId:'controlled-phase',callId,toolName:'ego_browser_read',providerId:'ego-browser',argumentsHash:operationFingerprint(args),executionGrantFingerprint:operationFingerprint(grant)})}
+ const result=await provider.tools.find(t=>t.name==='ego_browser_read')!.execute(args,context)
+ f.repo.finishOperation(f.task.id,key,{status:result.isError?'failed':'succeeded',result:{approved:true,item:{id:'phase-result',kind:'tool_result',status:'completed',threadId:f.task.threadId,turnId:grant.turnId,callId,toolName:'ego_browser_read',output:result.output,isError:Boolean(result.isError)}}},date)
+ return result.output as Record<string,unknown>
+}
+it.each(['ego_browser_selector_invalid','ego_browser_element_ambiguous','ego_browser_element_not_visible','ego_browser_element_unsupported'])('keeps %s repairable with a safe phase and no source proof or connection wait',async code=>{
+ const f=await fixture(),opened=await f.execute('ego_browser_open',{url:'https://feed.test/list'}),reads=f.repo.operations(f.task.id,'ego_document_read').length
+ const result=await callWithReadFailure(f,opened.observationId,code,'selection')
+ expect(result).toMatchObject({status:'blocked',code,failurePhase:'selection'});expect(String(result.message)).toContain('标准CSS');expect(String(result.message)).toContain('observationId')
+ expect(result).not.toHaveProperty('evidence');expect(f.repo.operations(f.task.id,'ego_document_read')).toHaveLength(reads);expect(f.repo.operations(f.task.id,'ego_browser_wait')).toHaveLength(0)
+ expect(f.repo.operations(f.task.id,'ego_page_observation').at(-1)).toMatchObject({status:'failed',result:{code,failurePhase:'selection'}})
+ expect(await f.execute('ego_browser_observe')).toMatchObject({status:'succeeded'})
+})
+it('keeps unknown read failures hard and never persists a non-enum diagnostic as failurePhase',async()=>{
+ const f=await fixture(),opened=await f.execute('ego_browser_open',{url:'https://feed.test/list'}),reads=f.repo.operations(f.task.id,'ego_document_read').length
+ const result=await callWithReadFailure(f,opened.observationId,'ego_browser_read_failed','private selector or page text')
+ expect(result).toMatchObject({code:'ego_browser_read_failed'});expect(result).not.toHaveProperty('failurePhase');expect(result).not.toHaveProperty('evidence')
+ expect(f.repo.operations(f.task.id,'ego_browser_wait')).toHaveLength(1);expect(f.repo.operations(f.task.id,'ego_document_read')).toHaveLength(reads)
+ expect(f.repo.operations(f.task.id,'ego_page_observation').at(-1)?.result).toEqual({code:'ego_browser_read_failed'})
+ const count=f.calls.length;expect(await f.execute('ego_browser_observe')).toMatchObject({code:'ego_browser_waiting_user'});expect(f.calls).toHaveLength(count)
+ expect(JSON.stringify(result)).not.toContain('private selector or page text')
 })

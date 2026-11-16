@@ -35,6 +35,25 @@ type Props = {
 
 const TERMINAL = new Set(['completed', 'failed', 'cancelled'])
 
+// An explicit owner must never be replaced by another task sharing its thread.
+function attentionMatchesTask(item: TaskAttentionV1, task: TaskRunV1): boolean {
+  return item.taskId ? item.taskId === task.id : Boolean(item.threadId && item.threadId === task.threadId)
+}
+
+function retryAncestorIds(current: TaskRunV1, tasks: TaskRunV1[]): Set<string> {
+  const byId = new Map(tasks.map(task => [task.id, task]))
+  const ancestors = new Set<string>(), seen = new Set([current.id])
+  let previousId = current.retryOfTaskId
+  while (previousId) {
+    const previous = byId.get(previousId)
+    // Incomplete or cyclic lineage cannot establish that an old capability was superseded.
+    if (!previous || seen.has(previousId)) return new Set()
+    seen.add(previousId); ancestors.add(previousId)
+    previousId = previous.retryOfTaskId
+  }
+  return ancestors
+}
+
 // A stored running node is historical while its execution task is waiting or stopped.
 function nodeStatusLabelKey(taskStatus: TaskRunV1['status'], nodeStatus: TaskRunV1['nodes'][number]['status']): string {
   if (nodeStatus !== 'running') return `taskNodeStatus_${nodeStatus}`
@@ -224,8 +243,8 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const detailRootId = useRef<string | null>(null)
   const scope = allWorkspaces ? undefined : workspaceRoot
   const tasks = useMemo(() => scopeWorkspaceTasks(live.tasks, scope), [live.tasks, scope])
-  const inbox=useMemo(()=>live.attention.filter(item=>!scope||item.workspaceRoot===scope||tasks.some(task=>task.id===item.taskId)),[live.attention,tasks,scope])
-  const standaloneAttention = inbox.filter(item => !tasks.some(task => item.taskId === task.id || item.threadId === task.threadId)).filter(item => !search.trim() || `${item.title}\n${item.message}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+  const inbox=useMemo(()=>live.attention.filter(item=>!scope||item.workspaceRoot===scope||tasks.some(task=>attentionMatchesTask(item,task))),[live.attention,tasks,scope])
+  const standaloneAttention = inbox.filter(item => !tasks.some(task => attentionMatchesTask(item, task))).filter(item => !search.trim() || `${item.title}\n${item.message}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const mutationRequests = useRef(new Map<string, { expectedRevision: number; idempotencyKey: string; text?: string }>())
   const templateRequest = useRef<{ id: TaskTemplateId; request: TaskTemplateStartV1 } | null>(null)
 
@@ -369,12 +388,19 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   }
 
   const conversationForAttention = (item:TaskAttentionV1):string|undefined => {
-    const owner=tasks.find(task=>task.id===item.taskId||task.threadId===item.threadId)
+    const owner=tasks.find(task=>attentionMatchesTask(item,task))
     if(!owner)return item.threadId
     const root=taskGroupForTask(owner.id,tasks)?.root??owner
     return owner.originThreadId??root.originThreadId??(!owner.visibility?owner.threadId:undefined)
   }
-  const selectedAttention = selectedGroup ? inbox.filter(item => selectedGroup.all.some(task => item.taskId === task.id || (item.threadId && item.threadId === task.threadId))) : []
+  const supersededOwners = selectedGroup && currentExecution ? retryAncestorIds(currentExecution, selectedGroup.all) : new Set<string>()
+  const selectedAttention = selectedGroup ? inbox.filter(item => {
+    const owners = selectedGroup.all.filter(task => attentionMatchesTask(item, task))
+    if (!owners.length) return false
+    // Preserve other retry branches, parallel child blockers and every non-capability review.
+    // A legacy thread-only record stays visible if any possible owner is still current.
+    return !(item.payload?.kind === 'capability_required' && owners.every(owner => supersededOwners.has(owner.id)))
+  }) : []
 
   return <section className="ds-task-workspace ds-no-drag flex h-full min-h-0 min-w-0 flex-col bg-ds-main text-ds-ink" aria-label={t('taskWorkspaceTitle')}>
     <header className="flex flex-wrap items-center gap-3 border-b border-ds-border px-5 py-4">

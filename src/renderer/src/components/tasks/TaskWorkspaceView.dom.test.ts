@@ -130,7 +130,7 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
-  it('summarizes matching typed expiry attention for the real root and retry owners while preserving collapsed raw diagnostics', async () => {
+  it('shows current retry expiry attention and keeps superseded parent data unchanged', async () => {
     await i18n.changeLanguage('zh')
     const raw='Execution grant expired; start a newly authorized Turn.'
     const original={...task('original','failed'),waitingReason:raw}
@@ -142,13 +142,48 @@ describe('TaskWorkspaceView', () => {
         action:{kind:'grant',route:'task/permissions',label:'确认任务权限'}}}}))
     await act(async()=>{await refreshTaskState();updateTaskNavigation({selectedTaskId:original.id,filter:'all'})});await settle();await settle()
     const cards=[...container.querySelectorAll('h4')].filter(node=>node.textContent==='确认任务执行权限').map(node=>node.parentElement!)
-    expect(cards).toHaveLength(2)
+    expect(cards).toHaveLength(1)
+    expect(inbox).toHaveLength(2)
     for(const card of cards){
       expect(card.querySelector(':scope > p')?.textContent).toBe('执行授权已到期')
       const diagnostics=[...card.querySelectorAll('details')].find(node=>node.textContent?.includes(raw))!
       expect(diagnostics).toBeTruthy();expect(diagnostics.open).toBe(false)
     }
     expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('hides only current retry ancestors while retaining parallel capabilities, exact owners and unresolved reviews', async () => {
+    const original=task('lineage-root','failed'),middle={...task('lineage-middle','failed'),rootTaskId:original.id,retryOfTaskId:original.id,createdAt:'2026-11-09T02:00:00.000Z'}
+    const current={...task('lineage-current','stalled'),threadId:original.threadId,rootTaskId:original.id,retryOfTaskId:middle.id,createdAt:'2026-11-09T04:00:00.000Z'}
+    const parallel={...task('parallel-child','waiting_user'),rootTaskId:original.id,parentTaskId:original.id}
+    const sibling={...task('other-retry','waiting_user'),rootTaskId:original.id,retryOfTaskId:original.id,createdAt:'2026-11-09T03:00:00.000Z'}
+    const outside={...task('outside-owner','waiting_user'),threadId:original.threadId}
+    tasks=[original,middle,current,parallel,sibling,outside]
+    const capability=(owner:TaskRunV1,message:string,browser=false):TaskAttentionV1=>({id:`capability_${owner.id}`,ownerKind:'task',ownerId:owner.id,taskId:owner.id,threadId:owner.threadId,
+      kind:'blocked',title:message,message,status:'pending',revision:0,createdAt:now,updatedAt:now,
+      payload:{kind:'capability_required',request:{prompt:owner.goal},capability:{provider:browser?'browser-skill':'workspace',status:'needs_authorization',message,checkedAt:now,
+        errorCode:browser?'browser_public_query_schedule_scope_required':'workspace_path_blocked',action:{kind:'grant',route:browser?'task/public-query-recovery':'task/permissions',label:'Review scope'}}}})
+    inbox=[capability(original,'Old parent authorization not granted',true),capability(middle,'Old middle authorization not granted'),
+      capability(current,'Current child needs permission'),capability(parallel,'Parallel child needs permission'),capability(sibling,'Other retry still needs permission'),
+      {...capability(outside,'Outside explicit owner must not leak')},
+      {id:'legacy-thread-only',ownerKind:'task',ownerId:'unknown',threadId:original.threadId,kind:'blocked',title:'Ambiguous legacy thread review',message:'Retain uncertain legacy owner',status:'pending',revision:0,createdAt:now,updatedAt:now,payload:{kind:'capability_required'}},
+      {...approval,id:'ancestor-approval',ownerId:original.id,taskId:original.id,threadId:original.threadId,title:'Preserved source approval'},
+      {id:'ancestor-unknown',ownerKind:'task',ownerId:original.id,taskId:original.id,threadId:original.threadId,kind:'blocked',title:'Preserved UNKNOWN review',message:'Unknown original action still requires review',status:'pending',revision:0,createdAt:now,updatedAt:now,payload:{kind:'operation_outcome_unknown'}},
+      {id:'ancestor-question',ownerKind:'task',ownerId:original.id,taskId:original.id,threadId:original.threadId,kind:'question',title:'Preserved source question',message:'Original user input remains pending',requestId:'question-source',status:'pending',revision:0,createdAt:now,updatedAt:now,payload:{questions:[{id:'q',label:'Source clarification'}]}}]
+    Object.assign(window.workwise,{diagnoseBrowserSkill:vi.fn(async()=>({ok:true,status:{enabled:true,state:'ready',version:'0.5.0',revision:1,browsers:[],origins:[],interaction:'observe'}})),
+      coordinateTaskCommand:vi.fn(),confirmTaskPermissions:vi.fn(),
+      getTaskPublicQueryRecovery:vi.fn(async(taskId:string)=>({taskId,taskRevision:1,state:'unavailable',reason:'browser_public_query_current_scope_active',message:'Current scope remains valid',unknownOperationCount:0,mode:'task_reauthorization',consentReceiptId:'current-consent',consentExpiresAt:new Date(Date.now()+60000).toISOString()}))})
+    const before=JSON.stringify({tasks,inbox})
+    await act(async()=>{await refreshTaskState();updateTaskNavigation({selectedTaskId:original.id,filter:'all'})});await settle();await settle()
+    const detail=container.querySelector('article')!
+    expect(detail.textContent).toContain(i18n.t('common:taskPublicQueryRecoveryScopeActive'))
+    expect(detail.textContent).not.toContain('Old parent authorization not granted');expect(detail.textContent).not.toContain('Old middle authorization not granted')
+    for(const message of ['Current child needs permission','Parallel child needs permission','Other retry still needs permission','Retain uncertain legacy owner','Preserved source approval','Preserved UNKNOWN review','Preserved source question'])expect(detail.textContent).toContain(message)
+    expect(detail.textContent).not.toContain('Outside explicit owner must not leak')
+    expect(JSON.stringify({tasks,inbox})).toBe(before)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled();expect(window.workwise.retryTask).not.toHaveBeenCalled()
+    expect(window.workwise.coordinateTaskCommand).not.toHaveBeenCalled();expect(window.workwise.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(window.workwise.runtimeRequest).not.toHaveBeenCalled()
   })
 
   it('updates sampled time and business phase without a Task revision change or another detail/list request', async () => {
