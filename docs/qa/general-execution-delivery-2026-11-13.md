@@ -845,3 +845,14 @@ Windows 诊断第二次仍停在 QA 路径：实际 compiled identity 模块是 
 补充类型化 `ego_browser_finish` 与只读的交付前检查：先核对当前真实文件、writer／来源证明及已请求计划，再调用原任务空间的固定 SDK finish，并等待一次真实成功回执；完成判定重新核对实际 Host、Turn、Grant、空间和清理记录。重复成功只读原回执，prepared／未知结果不重放；错误或用户接管时不清理。检查不注入最终回复、不调用模型、不提前释放执行租约或写 Task／验证 span。最终来源循环通过同一可信 Ego 文档证明接受实际读取，原正文合同保持。
 
 完整受控 Factory／Coordinator／模型协议／Host 回归现覆盖实际写盘与显式核验、计划建立与读回、SDK 收尾及 Task 三节点完成；另覆盖首次超时后同任务新 Turn、原空间恢复并完成。旧内部导航 prepared 与原 Host.failed 字节保留，真实 Host UNKNOWN 仍阻断。此前对内部导航 prepared 会造成死锁的审计假设经独立投影未复现，因为 repository 原本排除该类未派发内部记录；未把它伪记为产品 RED。新增完整链使用离线 SDK 注入，仍不代表大单网或真实 Ego 通过。最终合并 Node 22 Runtime 13 文件 401 项、KUN／Node／Web 类型及 11 个变更代码文件 lint 通过；对应新包和实网仍待执行。
+
+
+### 8a 精确包与实际 Ego 输出通道缺陷
+
+`8a5d600f` 的 push／PR Quality 六项成功，Desktop 4,814 通过／17 跳过，Runtime 5,147 通过／24 跳过。同源码正常身份 0.5.7 Mac 包已安装并实际打开，版本、bundle、Team、ASAR、签名和 stapler 核验通过；同 run 的真实 0.5.6 → 精确 0.5.7 更新通过。Windows 同源码精确安装包的完整受控 BrowserSkill 任务、HTML 自动预览、两次 daily 计划读回与真实时钟到期独立任务通过；这不代表 Ego／大单网账号业务已通过。Windows 签名未配置，本机 Gatekeeper 存在既有 override；另行通过的 CI 更新烟测在启用 Gatekeeper 的环境核验公证。没有把局部 artifact 下载称为本机完整 ZIP 哈希。
+
+正常退出旧包、确认 Main／Runtime 停止并完成一致性 SQLite 备份后，新包保留同一真实 profile 与已保存供应商配置。通过应用真实输入控件发送一次大单网订阅汇总请求，持久原任务在能力预检等待，执行次数为零；没有读取网页、生成报告或创建 Ego 任务空间。实际外置 CLI 的固定 `--version` 输出位于 stderr，原 Main 只读取 stdout，误判已安装 CLI 不兼容。进一步只执行不创建浏览器对象的固定常量输出探针，证实 `nodejs` 的 console.log 也从 stderr 返回，原 Runtime 的 stdout-only 结果解析同样不兼容。
+
+本次仅修复两个原生输出接线：固定版本探针读取两个通道；SDK 结果从两个通道合计接受恰好一个可信 marker，使用流式 UTF-8 解码保留跨 chunk 中文，并对两个通道合计施加 4 MiB 上限。其它诊断不返回、不记录；保留绝对路径、文件身份、无 Shell、超时、退出状态与取消校验。真实 Node 22 临时可执行文件先复现版本误判和四项 runner 失败，再通过对应六项 Main／四项 runner 检查；这些 fixture 不启动 Ego、不读取用户页面。修复后的新精确包、同一原任务恢复、实际订阅内容、HTML／预览和新计划验收仍待执行，旧包成功记录不覆盖本次缺陷。
+
+合并后的本地 Node 22 回归：四个 Runtime 文件 34 项、Main 六项通过，KUN／Node／Web 类型与四文件 lint 通过；单次生产构建与 freshness 通过，2,443 个 authored production 文件与物理构建树逐字匹配。实际账号任务仍处于预检等待，未将回归结果当作网站采集成功。

@@ -11,7 +11,11 @@ export async function diagnoseEgoBrowser(deps: { candidates?: string[]; run?: (p
   for (const candidate of deps.candidates ?? [join(homedir(), '.local', 'bin', 'ego-browser')]) {
     try {
       const executablePath = await realpath(candidate), executableHash = createHash('sha256').update(await readFile(executablePath)).digest('hex')
-      const output = await (deps.run ?? (async path => (await execute(path, ['--version'], { shell: false, windowsHide: true, timeout: 5000, maxBuffer: 8192 })).stdout))(executablePath)
+      const output = await (deps.run ?? (async path => {
+        const result = await execute(path, ['--version'], { shell: false, windowsHide: true, timeout: 5000, maxBuffer: 8192 })
+        // The fixed --version command may write its version banner to stderr.
+        return [result.stdout, result.stderr].join('\n')
+      }))(executablePath)
       const version = /\bego-browser\s*v?(\d+\.\d+\.\d+\.\d+)\b/.exec(output)?.[1]
       // This is the supported target CLI protocol, not the independently versioned guide.
       return EgoBrowserCapabilityConfig.parse({state: version === '0.6.3.14' ? 'installed' : 'unsupported',executablePath,executableHash,version,revision:0})
