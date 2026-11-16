@@ -3,7 +3,7 @@ import { constants, type Stats } from 'node:fs'
 import { lstat, mkdir, open, realpath } from 'node:fs/promises'
 import { dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { z } from 'zod'
-import { WebArtifactEvidenceInputSchema } from '../../contracts/web-artifact-evidence.js'
+import { WebArtifactEvidenceInputSchema, WebArtifactVerificationRequestSchema } from '../../contracts/web-artifact-evidence.js'
 import { prepareHtmlArtifact } from '../../services/html-artifact.js'
 import { renderStructuredWebReport, StructuredWebReportSchema } from '../../services/structured-web-report.js'
 import type { TaskController } from '../../services/task-controller.js'
@@ -17,7 +17,7 @@ const PublishPath = z.string().trim().min(1).max(240).describe('Relative filenam
 const Input = z.union([
   z.object({ path: PublishPath, content: z.string().max(8 * 1024 * 1024) }).strict(),
   z.object({ path: PublishPath, report: StructuredWebReportSchema }).strict()
-]).describe('Provide exactly one of complete content or a structured report. Report mode generates HTML and verificationInput from the same literal-evidence manifest; publishing never verifies sources or completes the task.')
+]).describe('Provide exactly one of complete content or a structured report. First web-research HTML publication requires report; content remains available for ordinary local files and same-file repairs with trusted existing verification input. Report mode generates HTML and verificationInput from the same literal-evidence manifest; publishing never verifies sources or completes the task.')
 const maxReadBytes = 3 * 8 * 1024 * 1024 + Buffer.byteLength(prepareHtmlArtifact(''))
 const ReadInput = z.object({ source_task_id: z.string().min(1).max(256).optional(), path: z.string().min(1).max(240), offset_bytes: z.number().int().min(0).max(maxReadBytes).default(0), limit_bytes: z.number().int().min(4).max(256 * 1024).default(64 * 1024) }).strict()
 const readError = (code: string, message: string) => Object.assign(new Error(message), { code })
@@ -34,7 +34,7 @@ function inputPath(path: string): string[] {
 }
 
 /** The model never chooses the physical output root or obtains general dataDir access. */
-export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'managedArtifactRoot' | 'getTask'> & Partial<Pick<TaskController, 'verifyWebArtifact' | 'historicalArtifact'>>): CapabilityToolProvider[] {
+export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'managedArtifactRoot' | 'getTask'> & Partial<Pick<TaskController, 'verifyWebArtifact' | 'historicalArtifact' | 'webArtifactPublicationGate' | 'recordWebArtifactPublicationBlock' | 'recordWebArtifactPublicationManifest' | 'resolveWebArtifactPublicationManifest'>>): CapabilityToolProvider[] {
   function rootFor(context: ToolHostContext): string {
     const grant = context.executionGrant
     const expected = grant?.taskId ? tasks.managedArtifactRoot(grant.taskId) : undefined
@@ -116,10 +116,10 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
 
   return [{ id: 'managed-artifacts', kind: 'built-in', enabled: true, available: true, tools: [defineLocalTool({
     name: 'publish_artifact',
-    description: 'Save a real deliverable in this task’s application-managed output directory, including HTML webpages and local CSS/JS/SVG assets. Available with a read-only user workspace. Pass a relative filename and exactly one of content or report. Legacy content mode saves complete UTF-8 content as before. For an HTML web-research report, prefer report: {title, collectedAt?, evidence:{coverage,items,noMatches}}. Report mode renders the formal HTML data region and returns verificationInput from that same manifest, preventing separate HTML and evidence values from drifting. Each fields[].value must be a literal continuous substring of its verbatim source quote after markup/entity/whitespace normalization: retain raw Chinese dates and currency wording, do not infer status or paraphrase qualifications. Unknown fields belong only in unverifiedFields and render as 待核验; they cannot replace required primary sources or origins. Call read_artifact with the same relative filename to inspect exact saved bytes, then call verify_web_artifact with returned verificationInput. Publishing remains a draft and does not verify sources or complete the task. No general workspace write permission is granted. Content-mode HTML without author styles receives an offline Chinese stylesheet. Cite only observed sources, label partial coverage and preserve the same filename when repairing evidence.',
+    description: 'Save a real deliverable in this task’s application-managed output directory, including HTML webpages and local CSS/JS/SVG assets. Available with a read-only user workspace. Pass a relative filename and exactly one of content or report. Ordinary local HTML/SVG/text creation can use content. A web-research HTML report MUST first use report: {title, collectedAt?, evidence:{coverage,items,noMatches}} after reading every required primary source or an actual query-zero page. Legacy content can repair only the same file with trusted existing verification input; it cannot bootstrap a web report or reuse another filename’s manifest. Report mode renders the formal HTML data region and returns verificationInput from that same manifest, preventing separate HTML and evidence values from drifting. Each fields[].value must be a literal continuous substring of its verbatim source quote after markup/entity/whitespace normalization: retain raw Chinese dates and currency wording, do not infer status or paraphrase qualifications. Unknown fields belong only in unverifiedFields and render as 待核验; they cannot replace required primary sources or origins. Call read_artifact with the same relative filename to inspect exact saved bytes, then call verify_web_artifact with returned verificationInput. Publishing remains a draft and does not verify sources or complete the task. No general workspace write permission is granted. Content-mode HTML without author styles receives an offline Chinese stylesheet. Cite only observed sources, label partial coverage and preserve the same filename when repairing evidence.',
     inputSchema: { type: 'object', description: 'Provide exactly one of content or report, never both. Runtime validation enforces this exclusive choice.',
       properties: { path: { type: 'string', minLength: 1, maxLength: 240, description: 'Relative filename; report mode accepts only .html or .htm.' },
-        content: { type: 'string', maxLength: 8 * 1024 * 1024, description: 'Complete legacy file content. Omit when report is supplied.' },
+        content: { type: 'string', maxLength: 8 * 1024 * 1024, description: 'Complete local file content, or a same-file web report repair with trusted existing verification input. First web-research reports must use report. Omit when report is supplied.' },
         report: z.toJSONSchema(StructuredWebReportSchema) },
       required: ['path'], additionalProperties: false },
     toolKind: 'file_change', policy: 'auto',
@@ -140,6 +140,13 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
       const content = /\.html?$/i.test(input.path) ? prepareHtmlArtifact(rawContent) : rawContent
       const root = rootFor(context)
       const target = join(root, ...parts)
+      let gate = await tasks.webArtifactPublicationGate?.(context.executionGrant!.taskId!, context.turnId, input.path, rendered?.verificationInput)
+      if (gate && !gate.ready) gate = await tasks.recordWebArtifactPublicationBlock?.(context.executionGrant!.taskId!, context.turnId, input.path, rendered?.verificationInput) ?? gate
+      if (gate && !gate.ready) return { isError: true, output: { ...gate,
+        message: gate.stalled ? '相同来源或字段问题在一次修复后仍未解决，已停止重复发布。已有草稿及原始核验记录保留。' : gate.reportManifestRequired
+          ? '网页采集首次发布须使用现有report结构化模式，声明已读正文或可信零匹配。legacy content仅用于原文件已有可信核验输入的修复；未写入新报告。'
+          : '必需来源尚缺正式正文或可信实际零匹配，未写入新报告。请先读取已观察到的真实来源。',
+        nextStep: gate.stalled ? '查看原始核验原因；取得新的真实来源证据后再继续，不要重复改写HTML。' : '先使用原授权浏览器读取nextReads中的实际href，或继续针对缺失来源检索并读取正文；真实零匹配用report.evidence.noMatches声明已读query/quote，再发布。' } }
       const verify = async (): Promise<void> => {
         await context.validateExecutionGrant?.()
         if (context.abortSignal.aborted) throw new Error('成果保存已取消。')
@@ -159,9 +166,11 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
       }
       return serializeFileOperation(target, async () => {
         await verify()
+        const sha256 = createHash('sha256').update(content).digest('hex')
+        const manifest = rendered ? await tasks.recordWebArtifactPublicationManifest?.(context.executionGrant!.taskId!, context.turnId, input.path, sha256, rendered.verificationInput, args, context.currentToolOperation?.()) : undefined
         await atomicWriteFileLocked(target, content, { beforeReplace: verify })
-        return { output: { path: target, name: input.path, storage: 'task', bytes_written: Buffer.byteLength(content), sha256: createHash('sha256').update(content).digest('hex'), read_artifact: { path: input.path },
-          ...(rendered ? { verificationInput: rendered.verificationInput, nextStep: '已保存为草稿，尚未核验来源，也未完成任务。先用 read_artifact 读回，再使用此 verificationInput 调用 verify_web_artifact；只有真实来源验收通过才可宣称完成。' } : {}) } }
+        return { output: { path: target, name: input.path, storage: 'task', bytes_written: Buffer.byteLength(content), sha256, read_artifact: { path: input.path },
+          ...(rendered ? { ...(manifest ?? { verificationInput: rendered.verificationInput }), nextStep: '已保存为草稿，尚未核验来源，也未完成任务。先用 read_artifact 读回，再原样使用返回的verificationInput调用verify_web_artifact；任务清单引用会恢复准确的原始来源URL，只有真实来源验收通过才可宣称完成。' } : {}) } }
       })
     }
   }), defineLocalTool({
@@ -174,13 +183,27 @@ export function buildManagedArtifactToolProviders(tasks: Pick<TaskController, 'm
   }), ...(tasks.verifyWebArtifact ? [defineLocalTool({
     name: 'verify_web_artifact', policy: 'auto',
     description: 'Verify an already-saved HTML research report against this task’s actual successful source-read receipts. No network or external action. Prefer the unchanged verificationInput returned by publish_artifact report mode. First browser_get_html the real result link (discovery HTML with href), navigate to that observed URL, then browser_get_html its complete primary document (truncated=false). For large SVG/iframe or bodyless pages, that same tool may internally return a complete native actual_loaded_response representation; this separate response kind must pass its own identity/byte contract and is never a full-DOM claim. coverage lists exact URL/resultHash pairs for each required source. items bind a unique tr/article/section id in HTML to title, source, discovery, classification and literal field evidence. The three checks are independent: the primary source contains quote; quote contains the complete literal value; the HTML data-evidence-field text equals value after markup/entity/whitespace normalization. ISO dates, reformatted currency, inferred status and paraphrased qualifications cannot replace source wording. Do not repair one representation alone: publish the same structured manifest and use its returned verificationInput. The formal region is main[data-evidence-report], with id=sectionId, data-evidence-item and data-evidence-classification, plus a[data-evidence-source] linking the exact primary URL. Unknown fields must be absent from fields, listed in unverifiedFields, and displayed as 待核验 with data-evidence-unverified. No field may be both verified and unverified. Unknown fields cannot replace title, real discovery, complete primary documents or required-origin evidence. All report rows, items and fields must be declared. Successful verification covers the structured data region, not arbitrary narrative. Only an actual returned query-zero page may support noMatches; a navigation error or unknown result is not zero. Each required origin needs its own relevant primary item or actual query-zero evidence. A user-provided exact document URL may be its own discovery reference. Existing valid prior-Turn receipts can be reused. If incomplete, repair the same artifact; only actual permission/login/network blockers require user attention. Ordinary files without web-research requirements need no extra step.',
-    inputSchema: z.toJSONSchema(WebArtifactEvidenceInputSchema) as Record<string, unknown>,
+    inputSchema: { type: 'object', description: 'Pass the unchanged task-owned {path,manifestRef} returned in publisher.verificationInput, or a complete legacy evidence input. Runtime validates the exclusive alternatives.',
+      properties: { ...(z.toJSONSchema(WebArtifactEvidenceInputSchema) as { properties: Record<string, unknown> }).properties,
+        manifestRef: { type: 'string', pattern: '^web-manifest:[a-f0-9]{64}$' } }, required: ['path'], additionalProperties: false },
     shouldAdvertise: context => Boolean(context.executionGrant?.managedArtifactRoot),
-    validateArguments: (args, context) => { const input = WebArtifactEvidenceInputSchema.parse(args); inputPath(input.path); if (!/\.html?$/i.test(input.path)) throw new Error('来源核验目前用于 HTML 成果。'); rootFor(context) },
+    validateArguments: (args, context) => { const input = WebArtifactVerificationRequestSchema.parse(args); inputPath(input.path); if (!/\.html?$/i.test(input.path)) throw new Error('来源核验目前用于 HTML 成果。'); rootFor(context) },
     execute: async (args, context) => {
-      const input = WebArtifactEvidenceInputSchema.parse(args)
-      inputPath(input.path)
-      const read = await readOwnArtifact({ path: input.path }, context, true)
+      const request = WebArtifactVerificationRequestSchema.parse(args)
+      inputPath(request.path)
+      await validateRead(context)
+      let captured: Awaited<ReturnType<typeof readOwnArtifact>> | undefined
+      let input: ReturnType<typeof WebArtifactEvidenceInputSchema.parse>
+      if ('manifestRef' in request) {
+        if (!tasks.resolveWebArtifactPublicationManifest) throw readError('artifact_manifest_scope', '当前执行不支持可信发布清单引用。')
+        captured = await readOwnArtifact({ path: request.path }, context, true)
+        input = await tasks.resolveWebArtifactPublicationManifest(context.executionGrant!.taskId!, context.turnId, request.path, request.manifestRef, captured.output.sha256)
+      } else input = request
+      let gate = await tasks.webArtifactPublicationGate?.(context.executionGrant!.taskId!, context.turnId, input.path, input)
+      if (gate && !gate.ready) gate = await tasks.recordWebArtifactPublicationBlock?.(context.executionGrant!.taskId!, context.turnId, input.path, input) ?? gate
+      if (gate && !gate.ready) return { isError: true, output: { ...gate, complete: false,
+        message: gate.stalled ? '相同核验问题未修复，已停止重复核验；草稿和原始错误保留。' : '请先读取必需来源的真实正文或提供已读页面的可信零匹配，再核验报告。' } }
+      const read = captured ?? await readOwnArtifact({ path: input.path }, context, true)
       await validateRead(context)
       const result = await tasks.verifyWebArtifact!(context.executionGrant!.taskId!, context.turnId, join(rootFor(context), ...inputPath(input.path)), read.output.sha256, read.output.content, input)
       await validateRead(context)

@@ -17,7 +17,7 @@ import { workspacePermissionCapability } from './workspace-write-preflight.js'
 import { externalOperationForTool } from './external-effect-evidence.js'
 import { toolCanProveExternalEffect } from '../loop/turn-completion-guard.js'
 import { createHash } from 'node:crypto'
-import { taskPermissionFailure } from './task-permission-recovery.js'
+import { taskPermissionCapability, taskPermissionFailure } from './task-permission-recovery.js'
 
 export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget' | 'revalidate_artifacts' | 'prepare_public_query_recovery' | 'revoke_public_query_recovery'
 export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number; confirmed?:boolean; publicQueryRecoveryReceiptId?:string; scopeConfirmation?:import('../contracts/browser-public-query-recovery.js').OneOffScopeConfirmation; consentReceiptId?:string }
@@ -26,7 +26,7 @@ export type TaskControlResult = { task:TaskRun; corrected?:boolean; completed?:b
 /** One deterministic mutation path for chat commands and the task HTTP API. */
 export class TaskControlService {
   private readonly pending = new Map<string,Promise<unknown>>()
-  constructor(private readonly deps:{publicQueryRecovery?:BrowserPublicQueryRecoveryService;repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;preflightRecoveryTask?(text:string,thread:import('../contracts/threads.js').ThreadRecord,binding:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):ReturnType<ExternalTaskPreflight>;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;validateRecoveryPermission?(threadId:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;validateRetryLocalSchedule?(task:TaskRun,receipt:OperationReceipt,recovery?:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):Promise<boolean>;nowIso():string}) {}
+  constructor(private readonly deps:{publicQueryRecovery?:BrowserPublicQueryRecoveryService;repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;preflightRecoveryTask?(text:string,thread:import('../contracts/threads.js').ThreadRecord,binding:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):ReturnType<ExternalTaskPreflight>;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;validateRecoveryExecution?(task:TaskRun):Promise<void>;validateRecoveryPermission?(threadId:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;validateRetryLocalSchedule?(task:TaskRun,receipt:OperationReceipt,recovery?:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):Promise<boolean>;nowIso():string}) {}
 
   async mutate(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const previous=this.pending.get(taskId) ?? Promise.resolve()
@@ -111,12 +111,21 @@ export class TaskControlService {
       if(action==='retry')await this.assertRetrySafe(current,recovery?.context.unknowns.map(ref=>ref.id),recovery?.binding,recovery?.context.previousRecovery)
     }
     if(action==='resume'||action==='retry') {
+      // Prove persisted recovery scope before a new control/child/Turn can consume an attempt.
+      // Explicit first-use preparation is validated by forRetry against the
+      // unconsumed proof; its owner is deliberately not an execution consumer.
+      try { if(!recovery?.direct)await this.deps.validateRecoveryExecution?.(current) }
+      catch(error) {
+        const failure=taskPermissionFailure(error)
+        if(action==='resume'&&failure)return this.persistResumeCapability(taskId,current,data,taskPermissionCapability(failure,current,nowIso()))
+        throw error
+      }
       if (action === 'resume') {
         try { await this.deps.validateTaskPermission?.(current.threadId, current.id) }
         catch (error) {
           const failure = taskPermissionFailure(error)
           if (!failure) throw error
-          return this.persistResumeCapability(taskId, current, data, workspacePermissionCapability(failure.code, failure.message))
+          return this.persistResumeCapability(taskId, current, data, taskPermissionCapability(failure,current,nowIso()))
         }
       }
       if (action === 'resume' && !current.retryOfTaskId && !current.activeTurnId && !repository.inputs(current.id).some(input => input.sourceId === 'capability-original')) {

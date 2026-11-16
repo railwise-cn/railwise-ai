@@ -53,6 +53,64 @@ const inside = (node: HtmlNode, parent: HtmlNode) => node.start > parent.start &
 
 type Source = { receiptId: string; receiptHash: string; turnId: string; url: string; resultHash: string; content: string; full: boolean; readAt: string }
 export type WebArtifactEvidenceAssessment = { complete: boolean; reasons: string[]; sourceReceipts: Array<Omit<Source, 'content'>> }
+export type WebArtifactSourceGate = {
+  ready: boolean; missingOrigins: string[]; evidenceFingerprint: string
+  reportManifestRequired: boolean
+  nextReads: Array<{ origin: string; url: string; discovery: WebSourceReference }>
+}
+
+function actualZeroMatch(task: TaskRun, source: Source | undefined, entry: WebArtifactEvidenceInput['noMatches'][number]): boolean {
+  return Boolean(source && text(task.goal).includes(text(entry.query)) && text(source.content).includes(text(entry.query)) &&
+    text(source.content).includes(text(entry.quote)) && /共找到\s*0\s*条|暂无(?:相关)?(?:数据|记录|结果|公告)|no\s+(?:matching\s+)?results/i.test(entry.quote))
+}
+
+/** Publication readiness reuses the exact authenticated read extractor; it never verifies a report. */
+export function webArtifactPublicationReadiness(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], input?: WebArtifactEvidenceInput, allowedOrigins: string[] = []): WebArtifactSourceGate {
+  const available = sources(repository, task, items, turns)
+  const evidenceFingerprint = operationFingerprint([...new Set(available.map(source => JSON.stringify({ url: source.url, resultHash: source.resultHash, full: source.full })))].sort())
+  const required = task.acceptance.requiredSourceOrigins?.length ? task.acceptance.requiredSourceOrigins
+    : [...new Set((input ? input.coverage : available).map(source => new URL(source.url).origin))]
+  const covered = new Set<string>(), primary = needsPrimaryWebDocuments(task)
+  const find = (reference: WebSourceReference) => available.find(source => source.url === canonical(reference.url) && source.resultHash === reference.resultHash)
+  const explicitlyRequested = (source: Source) => [...task.goal.matchAll(/https?:\/\/[^\s<>"'）)，。]+/gi)].some(match => canonical(match[0]) === source.url)
+  if (input) {
+    if (!primary) for (const reference of input.coverage) {
+      const source = find(reference)
+      if (source?.full) covered.add(new URL(source.url).origin)
+    }
+    for (const item of input.items) {
+      const source = find(item.source), discovery = find(item.discovery)
+      if (source?.full && discovery && (explicitlyRequested(source) || source.url !== discovery.url && links(discovery.content, discovery.url).has(source.url)) &&
+        text(source.content).includes(text(item.title)) && (!isProcurementWebReport(task) || item.classification !== 'historical')) covered.add(new URL(source.url).origin)
+    }
+    for (const entry of input.noMatches) if (actualZeroMatch(task, find(entry.source), entry)) covered.add(new URL(entry.source.url).origin)
+  } else {
+    // A homepage/list can be full and linked. Without a typed primary-source
+    // manifest it must never stand in for a formal document or a query-zero proof.
+    if (!primary) for (const source of available) if (source.full) covered.add(new URL(source.url).origin)
+  }
+  const missingOrigins = required.filter(origin => !covered.has(origin))
+  const nextReads: WebArtifactSourceGate['nextReads'] = []
+  const seen = new Set<string>()
+  for (const discovery of available) for (const url of links(discovery.content, discovery.url)) {
+    const origin = new URL(url).origin
+    if (!missingOrigins.includes(origin) || !allowedOrigins.includes(origin) || seen.has(url) || nextReads.length >= 20) continue
+    seen.add(url); nextReads.push({ origin, url, discovery: { url: discovery.url, resultHash: discovery.resultHash } })
+  }
+  return { ready: required.length > 0 && missingOrigins.length === 0, missingOrigins, evidenceFingerprint, nextReads, reportManifestRequired: primary && !input }
+}
+
+/** Canonical validator failures exclude model-chosen section IDs and artifact byte churn. */
+export function webArtifactFailureKinds(reasons: string[]): string[] {
+  return [...new Set(reasons.map(reason => {
+    const origin = /^(?:尚缺来源实际读取|正式公告正文尚未核验)：(.+)$/.exec(reason)?.[1]
+    if (origin) return `source_origin:${origin}`
+    if (reason.startsWith('来源没有匹配的可信读取回执：')) return 'source_receipt'
+    if (reason.startsWith('条目尚缺真实链接发现及完整正文读取：')) return 'primary_document'
+    const field = /^字段缺少正文与成果的精确依据：.+\/(title|publication_date|budget|deadline|status|qualification|other)$/.exec(reason)?.[1]
+    return field ? `field_evidence:${field}` : `validator:${reason}`
+  }))].sort()
+}
 
 /** Read receipts prove immutable source bytes, never a model's source label or a homepage visit. */
 function sources(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[]): Source[] {
@@ -133,6 +191,18 @@ function sources(repository: TaskRunRepository, task: TaskRun, items: TurnItem[]
   return result
 }
 
+/** Private publication manifests may refer only to this task's authenticated source bytes. */
+export function webArtifactManifestSourceProof(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], input: WebArtifactEvidenceInput) {
+  const available = sources(repository, task, items, turns), used = new Map<string, Source>()
+  const references = [...input.coverage, ...input.items.flatMap(item => [item.source, item.discovery]), ...input.noMatches.map(entry => entry.source)]
+  for (const reference of references) {
+    const source = available.find(source => source.url === canonical(reference.url) && source.resultHash === reference.resultHash)
+    if (!source) throw Object.assign(new Error('发布清单引用的URL没有本任务可信来源读取回执。'), { code: 'artifact_manifest_source_proof_required' })
+    used.set(source.receiptId, source)
+  }
+  return [...used.values()].map(source => ({ receiptId: source.receiptId, receiptHash: source.receiptHash })).sort((a, b) => a.receiptId.localeCompare(b.receiptId))
+}
+
 export function assessWebArtifactEvidence(repository: TaskRunRepository, task: TaskRun, items: TurnItem[], turns: Turn[], html: string, input: WebArtifactEvidenceInput, nowIso = new Date().toISOString()): WebArtifactEvidenceAssessment {
   const reasons: string[] = [], used = new Map<string, Source>(), available = sources(repository, task, items, turns), artifactLinks = links(html)
   const find = (reference: WebSourceReference) => {
@@ -202,7 +272,7 @@ export function assessWebArtifactEvidence(repository: TaskRunRepository, task: T
     const noMatchOrigins = new Set<string>()
     for (const entry of input.noMatches) {
       const source = find(entry.source)
-      if (source && text(task.goal).includes(text(entry.query)) && text(source.content).includes(text(entry.query)) && text(source.content).includes(text(entry.quote)) && /共找到\s*0\s*条|暂无(?:相关)?(?:数据|记录|结果|公告)|no\s+(?:matching\s+)?results/i.test(entry.quote) && text(html).includes(text(entry.quote))) noMatchOrigins.add(new URL(source.url).origin)
+      if (actualZeroMatch(task, source, entry) && text(html).includes(text(entry.quote))) noMatchOrigins.add(new URL(entry.source.url).origin)
       else reasons.push(`未匹配结论缺少实际零结果页面：${entry.source.url}`)
     }
     for (const origin of task.acceptance.requiredSourceOrigins?.length ? task.acceptance.requiredSourceOrigins : origins) if (!primaryOrigins.has(origin) && !noMatchOrigins.has(origin)) reasons.push(`正式公告正文尚未核验：${origin}`)
@@ -232,5 +302,5 @@ export function verifiedWebArtifactEvidence(repository: TaskRunRepository, task:
 }
 
 export function webEvidenceRepair(task: TaskRun): string {
-  return `成果文件已保留为草稿，但尚未通过来源验收。继续原任务，使用已授权工具实际读取${(task.acceptance.requiredSourceOrigins ?? []).join('、') || '所需来源'}；使用 browser_get_html 读取真实结果链接元素以取得 href，再打开并完整读取正文。遇到SVG/iframe使HTML截断或缺body时，browser_get_html会在原授权内自动检查本会话已加载且身份匹配的完整原文响应。sourceKind=actual_loaded_response是独立的响应文档表示，不是完整DOM；未取得完整响应仍须保持草稿，不重复导航。更新同一成果文件，逐条提供原文URL、实际字段与原文依据。value必须是quote中的逐字连续原文片段（仅忽略空白），quote必须实际存在于已读正文；HTML中data-evidence-field的可见文本须直接等于同一value。不要把日期改为ISO、给金额增加限定词、推断状态或改写资质。可用publish_artifact的report结构化模式，从同一typed数据生成HTML并返回verificationInput，再显式调用verify_web_artifact；发布仍是草稿，不会自动完成。不能逐字支持的字段须从fields删除，列入unverifiedFields，并只显示带data-evidence-unverified的“待核验”；同一字段不得两边同时声明。title、真实发现链接、完整正文与必需来源不能用待核验替代。历史合同、采购意向和当前可投标公告分开。调用 verify_web_artifact(path, coverage[{url,resultHash}], items[{sectionId,title,source,discovery,classification,fields[{field,value,quote}],unverifiedFields}]) 核验。正式数据区使用main[data-evidence-report]；每个tr/article/section同时用id及data-evidence-item=sectionId、data-evidence-classification，正文链接加data-evidence-source。每个title/publication_date/budget/deadline/status/qualification值用data-evidence-field对应字段名，未读字段再加data-evidence-unverified并写待核验。所有报告数据行/条目/字段都须声明，不能用一条真实数据为其余旧草稿背书。只有实际列表明确零匹配才使用noMatches；不能虚构线索。待核验不等于已完成核验；不要让用户手工搜索或复制网页。有效跨Turn原文回执可以复用，无须无条件重采。只有真实登录、权限或网络阻断才说明影响并等待；不得凭旧入口访问或自写说明完成任务。`
+  return `成果文件已保留为草稿，但尚未通过来源验收。继续原任务，使用已授权工具实际读取${(task.acceptance.requiredSourceOrigins ?? []).join('、') || '所需来源'}；使用 browser_get_html 读取真实结果链接元素以取得 href，再打开并完整读取正文。遇到SVG/iframe使HTML截断或缺body时，browser_get_html会在原授权内自动检查本会话已加载且身份匹配的完整原文响应。sourceKind=actual_loaded_response是独立的响应文档表示，不是完整DOM；未取得完整响应仍须保持草稿，不重复导航。更新同一成果文件，逐条提供原文URL、实际字段与原文依据。value必须是quote中的逐字连续原文片段（仅忽略空白），quote必须实际存在于已读正文；HTML中data-evidence-field的可见文本须直接等于同一value。不要把日期改为ISO、给金额增加限定词、推断状态或改写资质。网页采集首次发布必须使用publish_artifact的report结构化模式，从同一typed数据生成HTML并返回verificationInput，再显式调用verify_web_artifact；仅同一文件已有可信核验输入时可用legacy content修复，普通本地HTML/SVG创作不受此限制。发布仍是草稿，不会自动完成。不能逐字支持的字段须从fields删除，列入unverifiedFields，并只显示带data-evidence-unverified的“待核验”；同一字段不得两边同时声明。title、真实发现链接、完整正文与必需来源不能用待核验替代。历史合同、采购意向和当前可投标公告分开。调用 verify_web_artifact(path, coverage[{url,resultHash}], items[{sectionId,title,source,discovery,classification,fields[{field,value,quote}],unverifiedFields}]) 核验。正式数据区使用main[data-evidence-report]；每个tr/article/section同时用id及data-evidence-item=sectionId、data-evidence-classification，正文链接加data-evidence-source。每个title/publication_date/budget/deadline/status/qualification值用data-evidence-field对应字段名，未读字段再加data-evidence-unverified并写待核验。所有报告数据行/条目/字段都须声明，不能用一条真实数据为其余旧草稿背书。只有实际列表明确零匹配才使用noMatches；不能虚构线索。待核验不等于已完成核验；不要让用户手工搜索或复制网页。有效跨Turn原文回执可以复用，无须无条件重采。只有真实登录、权限或网络阻断才说明影响并等待；不得凭旧入口访问或自写说明完成任务。`
 }

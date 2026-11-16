@@ -426,6 +426,23 @@ describe('capability waiting card', () => {
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
   })
 
+  it.each(['browser_public_query_recovery_changed','browser_public_query_fresh_scope_required'])(
+    'opens the exact original recovery review for %s without executing or authorizing',async errorCode=>{
+      await render({...card,capability:{provider:'browser-skill',status:'blocked',errorCode,
+        message:'请核对原任务的恢复范围。',resolution:{kind:'grant',route:'task/public-query-recovery',label:'查看原任务的恢复范围'}}})
+      await click('查看原任务的恢复范围')
+      expect(takeRequestedTask()).toBe(card.taskId)
+      expect(state.setRoute).toHaveBeenCalledWith('tasks')
+      expect(state.openSettings).not.toHaveBeenCalled()
+      expect(state.openPlugins).not.toHaveBeenCalled()
+      expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+      expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+      expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+      expect(api.runtimeRequest).not.toHaveBeenCalled()
+      expect(api.getTaskPermissions).not.toHaveBeenCalled()
+    }
+  )
+
   it('continues the original source task to obtain a real periodic action review without opening a nonexistent plan', async () => {
     api.coordinateTaskCommand.mockResolvedValue({ kind: 'task_started', task: { id: card.taskId }, turn: { threadId: 'worker', turnId: 'new-turn' } })
     await render({ ...card, capability: { provider: 'schedule', status: 'blocked', errorCode: 'browser_schedule_action_scope_required',

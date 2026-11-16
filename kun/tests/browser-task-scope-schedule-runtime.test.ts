@@ -12,6 +12,7 @@ import type { TaskRun } from '../src/contracts/tasks.js'
 import type { BrowserTaskBindingSnapshot } from '../src/contracts/browser-skill.js'
 import type { BrowserScheduleAction } from '../src/contracts/browser-schedule-actions.js'
 import { listApprovedBrowserScheduleActions } from '../src/services/browser-schedule-action-authority.js'
+import { operationFingerprint } from '../src/services/task-run-repository.js'
 
 const sourceFixture = vi.hoisted(() => ({
   url: 'https://public.example.test/notices/monitoring-1', title: '工程监测合成公告',
@@ -134,9 +135,8 @@ it.each(['completed', 'not_completed'] as const)('runs task-scope autonomous que
       ...(next[0] === 'authorize-fill' ? { action: 'fill', scope: 'schedule', scheduleAccess: 'public_query' } : {}) }
     if (next?.[0] === 'click' || next?.[0] === 'authorize-click') args = { sessionId, contextId, target: '@e2',
       ...(next[0] === 'authorize-click' ? { action: 'click', scope: 'schedule', scheduleAccess: 'public_query' } : {}) }
-    if (next?.[0] === 'artifact') args = { path: 'report.html', content: `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>合成查询报告</title></head><body><h1>工程公告合成报告</h1><p>本报告只用于自动化回归。</p><main data-evidence-report><article id="notice-one" data-evidence-item="notice-one" data-evidence-classification="source"><h2 data-evidence-field="title">${sourceFixture.title}</h2><a data-evidence-source href="${sourceFixture.url}">原文</a></article></main></body></html>` }
     if (next?.[0] === 'read-artifact') args = { path: 'report.html' }
-    if (next?.[0] === 'verify-artifact') {
+    if (next?.[0] === 'artifact' || next?.[0] === 'verify-artifact') {
       const reference = (id: string) => {
         const content = body.messages?.find(message => message.tool_call_id === `synthetic-${id}`)?.content
         if (typeof content !== 'string') throw new Error(`Missing actual source tool result ${id}`)
@@ -146,8 +146,17 @@ it.each(['completed', 'not_completed'] as const)('runs task-scope autonomous que
         return { url: result.sourceUrl, resultHash: result.resultHash }
       }
       const primary = reference('detail'), discovery = reference('discovery')
-      args = { path: 'report.html', coverage: [primary], items: [{ sectionId: 'notice-one', title: sourceFixture.title,
-        source: primary, discovery, classification: 'source', fields: [{ field: 'title', value: sourceFixture.title, quote: sourceFixture.quote }] }] }
+      const evidence = { coverage: [primary], noMatches: [], items: [{ sectionId: 'notice-one', title: sourceFixture.title,
+        source: primary, discovery, classification: 'source', fields: [{ field: 'title', value: sourceFixture.title, quote: sourceFixture.quote }], unverifiedFields: [] }] }
+      if (next[0] === 'artifact') args = { path: 'report.html', report: { title: '工程公告合成报告', evidence } }
+      else {
+        const encoded = body.messages?.find(message => message.tool_call_id === 'synthetic-artifact')?.content
+        if (typeof encoded !== 'string') throw new Error('Missing actual publisher result')
+        const published = JSON.parse(encoded.slice(encoded.indexOf('{'))) as { verificationInput: Record<string, unknown>; verificationInputHash: string }
+        expect(published.verificationInputHash, JSON.stringify(published)).toBe(operationFingerprint({ path: 'report.html', ...evidence }))
+        expect(published.verificationInput).toMatchObject({ path: 'report.html', manifestRef: expect.any(String) })
+        args = published.verificationInput
+      }
     }
     const delta = next ? { tool_calls: [{ index: 0, id: `synthetic-${next[0]}`, type: 'function', function: { name: next[1], arguments: JSON.stringify(args) } }] }
       : { content: '已读取合成公开页面并保存HTML成果。计划按已确认范围保存和核验。' }

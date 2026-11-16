@@ -77,6 +77,24 @@ async function fixture() {
   return { get runtime() { return runtime }, api, current, snapshot, expire, resume, turns, restart, legacyFailure, requests: () => requests, workspace, origin }
 }
 
+it('wires standing recovery proof admission before any new Turn, attempt or model',async()=>{
+  const f=await fixture(),repo=f.runtime.taskRepository!,task=f.current()
+  // A synthetically missing proof must be reported before execution; no real
+  // browser/Grant or historical authorization is manufactured by this fixture.
+  repo.update(task.id,task.revision,value=>({...value,publicQueryRecovery:{ownerTaskId:'old-due',sourceTaskId:'plan-source',
+    receiptId:'missing-recovery-proof',scopeHash:'b'.repeat(64),browserIdentity:'c'.repeat(64),
+    scheduleId:'schedule_plan-source',versionId:'sealed-version',planScopeHash:'d'.repeat(64)}}))
+  const before=f.current()
+  const response=await f.resume('changed-standing-proof'),body=await response.json()
+  expect(response.status).toBe(202)
+  expect(body).toMatchObject({task:{id:before.id,status:'paused',attempts:0},
+    capability:{errorCode:'browser_public_query_recovery_changed',message:'公开查询恢复范围已变化。'}})
+  expect(await f.turns()).toHaveLength(0)
+  expect(repo.execution.attempts(before.id)).toHaveLength(0)
+  expect(f.requests()).toBe(0)
+  expect(f.current()).toEqual(before)
+})
+
 it('keeps ONE Continue with an expired persisted grant before any Turn, attempt or model and persists an idempotent repair card', async () => {
   const f = await fixture()
   f.expire()

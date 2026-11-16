@@ -23,7 +23,10 @@ vi.mock('../src/services/browser-skill-cli.js', async original => ({
     if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: 7, active: true, url: browserFixture.url, title: '合成正文来源', scope: 'agent' }] } }
     if (args[0] === 'navigate') { browserFixture.url = args[1]; return { ok: true, output: { final_url: args[1] } } }
     if (args[0] === 'cooperate') return { ok: true, output: { context_id: 'synthetic-context', observation: { text: '合成网页正文，仅供定时调度边界回归。' } } }
-    if (args[0] === 'get-html') return { ok: true, output: { tab_id: 7, html: '<html><body>合成网页正文</body></html>', byte_size: 45, truncated: false } }
+    if (args[0] === 'get-html') {
+      const html='<html><body><h1>合成网页正文</h1><p>合成网页正文，仅供定时调度边界回归。</p></body></html>'
+      return { ok: true, output: { tab_id: 7, html, byte_size: Buffer.byteLength(html), truncated: false } }
+    }
     throw new Error(`Unexpected browser dispatch in schedule-boundary test: ${args[0]}`)
   })
 }))
@@ -60,10 +63,14 @@ it('keeps browser HTML task schedules native while rejecting every legacy bridge
     }
     const next = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop', 'publish_artifact', 'read_artifact', 'verify_web_artifact', 'schedule_task', 'list_schedules'].find(name => names.includes(name) && !called.has(name))
     const source = toolOutput('browser_get_html')
-    const args = next === 'publish_artifact' ? { path: 'boundary.html', content: String(source.html).replace('</body>', '<a href="https://example.test/">合成来源原文</a></body>') }
+    const reference={url:source.sourceUrl,resultHash:source.resultHash}
+    const args = next === 'publish_artifact' ? { path: 'boundary.html', report:{title:'合成定时调度边界报告',evidence:{coverage:[reference],noMatches:[],items:[{
+      sectionId:'boundary-source',title:'合成网页正文',source:reference,discovery:reference,classification:'source',
+      fields:[{field:'title',value:'合成网页正文',quote:'合成网页正文，仅供定时调度边界回归。'}],unverifiedFields:[]
+    }]}} }
       : next === 'browser_navigate' ? { sessionId: 'synthetic-session', url: 'https://example.test/' }
         : next === 'read_artifact' ? { path: 'boundary.html' }
-        : next === 'verify_web_artifact' ? { path: 'boundary.html', coverage: [{ url: source.sourceUrl, resultHash: source.resultHash }], items: [] }
+        : next === 'verify_web_artifact' ? toolOutput('publish_artifact').verificationInput
         : next === 'browser_get_html' || next === 'browser_session_stop' ? { sessionId: 'synthetic-session' } : {}
     const delta = next ? { tool_calls: [{ index: 0, id: `call-${next}`, type: 'function', function: { name: next, arguments: JSON.stringify(args) } }] }
       : { content: '合成HTML已交付，每日计划已建立并读回。' }
@@ -102,6 +109,10 @@ it('keeps browser HTML task schedules native while rejecting every legacy bridge
     expect(context.awaitApproval).not.toHaveBeenCalled()
     expect(legacyDispatch).not.toHaveBeenCalled()
     releaseFirstRequest()
+    await expect.poll(() => {
+      const writer = runtime!.taskRepository!.operations(task.id,'tool').find(receipt=>receipt.request?.toolName==='publish_artifact')
+      return (writer?.result as {item?:{output?:unknown}}|undefined)?.item?.output
+    },{timeout:10000}).toEqual(expect.objectContaining({bytes_written:expect.any(Number)}))
     await expect.poll(() => {
       const proof = runtime!.taskRepository!.operations(task.id, 'web_artifact_evidence').at(-1)?.result as { complete: boolean; reasons: string[] } | undefined
       return proof && { complete: proof.complete, reasons: proof.reasons }

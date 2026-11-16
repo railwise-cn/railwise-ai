@@ -12,7 +12,7 @@ import { build } from 'esbuild'
 import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
-import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact } from './run-windows-ui-smoke.mjs'
+import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact } from './run-windows-ui-smoke.mjs'
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 
 test('composer menu geometry uses actual viewport rectangles at both supported font scales', () => {
@@ -703,6 +703,10 @@ test('the Windows controlled page requires real shared-class candidate and neste
 })
 
 test('browser protocol obtains fresh real refs, asks exact persistent actions, and omits approvals for a new scheduled conversation', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-fixture-report-'))
+  const renderer = join(root, 'structured-report.mjs')
+  await build({ entryPoints: [fileURLToPath(new URL('../kun/src/services/structured-web-report.ts', import.meta.url))], outfile: renderer, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' })
+  const { renderStructuredWebReport } = await import(pathToFileURL(renderer).href)
   const fixture = await startWindowsTaskModelFixture({ browser: true, postPlanQuery: true, documentLinkClick: true })
   try {
     const page = await (await fetch(fixture.fixtureUrl)).text()
@@ -727,10 +731,13 @@ test('browser protocol obtains fresh real refs, asks exact persistent actions, a
         const currentId = postPlan ? call.id.replace('smoke-post-plan-', 'smoke-') : call.id
         const contextPrefix = postPlan ? 'post-plan-' : ''
         if (call.function.name === 'publish_artifact') {
-          assert.ok(args.content.includes(`data-query="${fixture.query}"`))
-          assert.ok(args.content.includes('data-evidence-report') && args.content.includes('data-evidence-field="budget"'))
-          published = { name: args.path, read_artifact: { path: args.path }, bytes_written: Buffer.byteLength(args.content),
-            sha256: createHash('sha256').update(args.content).digest('hex'), content: args.content }
+          assert.equal(args.content, undefined)
+          const rendered = renderStructuredWebReport(args.path, args.report)
+          validateWindowsFixtureReportHtml(rendered.content, fixture)
+          assert.equal(args.report.evidence.coverage[0].resultHash, fixtureRead(fixture.fixtureUrl, fixtureResultHtml(page, fixture.query)).resultHash)
+          published = { name: args.path, read_artifact: { path: args.path }, bytes_written: Buffer.byteLength(rendered.content),
+            sha256: createHash('sha256').update(rendered.content).digest('hex'), content: rendered.content,
+            verificationInput: { path: args.path, manifestRef: 'web-manifest:' + 'a'.repeat(64) }, verificationInputHash: windowsFixtureVerificationInputHash(rendered.verificationInput) }
         }
         let output = { status: 'succeeded' }
         if (currentId === 'smoke-start') output.sessionId = postPlan ? 'synthetic-post-plan-session' : initial ? 'synthetic-source-session' : 'synthetic-due-session'
@@ -770,7 +777,8 @@ test('browser protocol obtains fresh real refs, asks exact persistent actions, a
         if (currentId === 'smoke-verify-web-artifact') {
           const expected = buildWindowsFixtureWebReport({ list: fixtureRead(fixture.fixtureUrl, fixtureResultHtml(page, fixture.query)),
             detail: fixtureRead(fixture.detailUrl, detail), ...fixture }).verification
-          assert.deepEqual(args, expected)
+          assert.deepEqual(args, published.verificationInput)
+          assert.equal(published.verificationInputHash, windowsFixtureVerificationInputHash(expected))
           // Local protocol test input, never persisted or reported as Runtime acceptance.
           output = syntheticWebArtifactVerification(fixture.fixtureUrl, published.sha256)
           inspectWindowsWebArtifactVerification(output, { sha256: published.sha256, fixtureUrl: fixture.fixtureUrl })
@@ -804,7 +812,7 @@ test('browser protocol obtains fresh real refs, asks exact persistent actions, a
       .flatMap(id => fixtureMessages(id, 'synthetic-component-call'))
     assert.equal((await fixtureRequest(fixture, browserToolNames, finished)).status, 400)
     assert.match(fixture.observed.requests.at(-1).error, /requires actual browser HTML/)
-  } finally { await fixture.close() }
+  } finally { await fixture.close(); await rm(root, { recursive: true, force: true }) }
 })
 
 test('the query fixture reads session and DOM HTML using the production model client framing', async () => {
@@ -830,7 +838,12 @@ test('the query fixture reads session and DOM HTML using the production model cl
       const result = await fixtureCall(await fixtureRequest(fixture, browserToolNames, [...calls,
         framed('read-results', 'browser_get_html', { ...fixtureRead(fixture.fixtureUrl, html), untrusted }),
         framed('read-detail', 'browser_get_html', { ...fixtureRead(fixture.detailUrl, detail), untrusted })]))
-      assert.ok(result.function.arguments.includes(fixture.query))
+      const args = JSON.parse(result.function.arguments)
+      assert.equal(args.content, undefined)
+      assert.deepEqual(args.report.evidence.coverage, [
+        { url: fixture.fixtureUrl, resultHash: fixtureRead(fixture.fixtureUrl, html).resultHash },
+        { url: fixture.detailUrl, resultHash: fixtureRead(fixture.detailUrl, detail).resultHash }
+      ])
     }
     const invalid = await fixtureRequest(fixture, browserToolNames, [...calls, { role: 'tool', tool_call_id: 'smoke-read-results', content: `<html>Recorded result:\n${JSON.stringify({ html })}</html>` }])
     assert.equal(invalid.status, 400)

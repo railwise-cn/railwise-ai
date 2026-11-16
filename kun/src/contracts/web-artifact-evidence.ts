@@ -55,3 +55,10 @@ export const WebArtifactEvidenceInputSchema = z.object({
 })
 export type WebArtifactEvidenceInput = z.infer<typeof WebArtifactEvidenceInputSchema>
 export type WebSourceReference = z.infer<typeof WebSourceReferenceSchema>
+
+/** Exact public URLs stay in the task-owned sealed manifest, outside general URL projection. */
+export const WebArtifactVerificationRequestSchema = z.union([
+  WebArtifactEvidenceInputSchema,
+  z.object({ path: WebArtifactEvidenceInputSchema.shape.path, manifestRef: z.string().regex(/^web-manifest:[a-f0-9]{64}$/) }).strict()
+])
+export type WebArtifactVerificationRequest = z.infer<typeof WebArtifactVerificationRequestSchema>

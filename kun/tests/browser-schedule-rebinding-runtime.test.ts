@@ -10,6 +10,7 @@ import type { BrowserCommandRunner } from '../src/services/browser-skill-cli.js'
 import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { buildRouter } from '../src/server/routes/index.js'
 import { dispatchRequest } from '../src/server/http-server.js'
+import { operationFingerprint } from '../src/services/task-run-repository.js'
 // @ts-expect-error The exact-package fixture is native JavaScript shared with the Windows smoke driver.
 import { startWindowsTaskModelFixture, buildWindowsFixtureWebReport } from '../../scripts/run-windows-ui-smoke.mjs'
 
@@ -133,7 +134,13 @@ async function fixture(fault: Fault = 'none') {
       ...(next![0].startsWith('authorize') ? { action: next![0].includes('fill') ? 'fill' : 'click', scope: 'schedule', scheduleAccess: 'public_query' } : {}) }
     if (next?.[0] === 'artifact' || next?.[0] === 'verify-artifact') {
       const report = buildWindowsFixtureWebReport({ list: toolOutput('read-results'), detail: toolOutput('read-detail'), ...source })
-      args = next[0] === 'artifact' ? { path: 'rebinding.html', content: report.content } : { ...report.verification, path: 'rebinding.html' }
+      if (next[0] === 'artifact') args = { path: 'rebinding.html', report: report.report }
+      else {
+        const published = toolOutput('artifact')
+        expect(published.verificationInputHash).toBe(operationFingerprint({ ...report.verification, path: 'rebinding.html' }))
+        expect(published.verificationInput).toMatchObject({ path: 'rebinding.html', manifestRef: expect.any(String) })
+        args = published.verificationInput
+      }
     }
     if (next?.[0] === 'read-artifact') args = toolOutput('artifact').read_artifact
     const delta = next ? { tool_calls: [{ index: 0, id: prefix + next[0], type: 'function', function: { name: next[1], arguments: JSON.stringify(args) } }] }

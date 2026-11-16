@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { evidenceDisplayText, evidenceLiteralText, WebArtifactEvidenceInputSchema } from './web-artifact-evidence.js'
+import { evidenceDisplayText, evidenceLiteralText, WebArtifactEvidenceInputSchema, WebArtifactVerificationRequestSchema } from './web-artifact-evidence.js'
 
 const title = '工程测量监测服务采购项目公开招标公告'
 const source = { url: 'https://a.example.test/notice/1', resultHash: 'a'.repeat(64) }
@@ -13,6 +13,19 @@ function input() {
 }
 
 describe('web evidence literal field contract', () => {
+  it('keeps complete legacy evidence inputs and accepts only an opaque task manifest request', () => {
+    const proof = input()
+    proof.coverage[0] = { ...proof.coverage[0]!, url: 'https://a.example.test/detail?articleId=actual-one' }
+    expect(WebArtifactVerificationRequestSchema.parse(proof)).toEqual(proof)
+    const reference = { path: 'report.html', manifestRef: 'web-manifest:' + 'a'.repeat(64) }
+    expect(WebArtifactVerificationRequestSchema.parse(reference)).toEqual(reference)
+    for (const invalid of [
+      { ...reference, manifestRef: '../../other-task.json' },
+      { ...reference, manifestRef: 'https://a.example.test/manifest' },
+      { ...reference, coverage: proof.coverage },
+      { ...reference, taskId: 'another-task' }
+    ]) expect(WebArtifactVerificationRequestSchema.safeParse(invalid).success).toBe(false)
+  })
   it('decodes display entities once while retaining human-readable whitespace', () => {
     expect(evidenceDisplayText('A&nbsp;&amp; B')).toBe('A & B')
     expect(evidenceLiteralText('A&nbsp;&amp; B')).toBe('A&B')

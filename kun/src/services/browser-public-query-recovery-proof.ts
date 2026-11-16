@@ -119,7 +119,7 @@ export function recoveryExecutionScope(repository: TaskRunRepository, task: Task
   if(binding.mode==='task_reauthorization')return oneOffExecutionScope(repository,task,scope,now)
   const proof = verifiedPublicQueryRecovery(repository, binding)
   if (!proof || task.id === binding.ownerTaskId || operationFingerprint(task.goal) !== proof.context.goalHash ||
-    ![proof.context.acceptanceHash, proof.context.sourceAcceptanceHash].includes(operationFingerprint(task.acceptance)) || !recoveryConsumer(repository, task, binding, proof.use) || operationFingerprint(scope.browserScope) !== operationFingerprint(proof.context.browserScope) ||
+    ![proof.context.acceptanceHash, proof.context.sourceAcceptanceHash].includes(operationFingerprint(task.acceptance)) || !recoveryConsumer(repository, task, binding, proof.use, scope, proof.context.plan) || operationFingerprint(scope.browserScope) !== operationFingerprint(proof.context.browserScope) ||
     scope.connectorIdentityFingerprints?.['browser-skill'] !== binding.browserIdentity) throw Object.assign(new Error('公开查询恢复范围已变化。'), { code: 'browser_public_query_recovery_changed' })
   const allowedToolNames = RECOVERY_TOOLS.filter(name => proof.context.allowedToolNames.includes(name) && (!scope.allowedToolNames || scope.allowedToolNames.includes(name)))
   const expiresAt=Math.min(now+15*60_000,scope.expiresAt?Date.parse(scope.expiresAt):Infinity)
@@ -136,19 +136,28 @@ export function assertRecoveryGrant(repository: TaskRunRepository, grant: Execut
   if(grant.browserPublicQueryRecovery.mode==='task_reauthorization')return assertOneOffGrant(repository,grant)
   const task = grant.taskId ? repository.get(grant.taskId) : null, binding = grant.browserPublicQueryRecovery
   const proof = verifiedPublicQueryRecovery(repository, binding)
-  if (!task || !proof || task.id === binding.ownerTaskId || !recoveryConsumer(repository, task, binding, proof.use) || operationFingerprint(grant.browserScope) !== operationFingerprint(proof.context.browserScope) ||
+  if (!task || !proof || task.id === binding.ownerTaskId || !recoveryConsumer(repository, task, binding, proof.use, grant, proof.context.plan) || operationFingerprint(grant.browserScope) !== operationFingerprint(proof.context.browserScope) ||
     grant.connectorIdentityFingerprints?.['browser-skill'] !== binding.browserIdentity ||
     grant.externalTargets.length || !Array.isArray(grant.allowedToolNames)||grant.allowedToolNames.some(name => !RECOVERY_TOOLS.includes(name)||!proof.context.allowedToolNames.includes(name)) ||
     !grant.allowedProviderIds || grant.allowedProviderIds.some(id => !RECOVERY_PROVIDERS.includes(id)||!proof.context.allowedProviderIds.includes(id)) ||
     !grant.expiresAt || Date.parse(grant.expiresAt) > Date.parse(grant.issuedAt) + 15 * 60_000 + 1000) throw Object.assign(new Error('公开查询恢复凭据不属于当前受限执行。'), { code: 'browser_public_query_recovery_changed' })
 }
 
-function recoveryConsumer(repository: TaskRunRepository, task: TaskRun, binding: BrowserPublicQueryRecoveryBinding, use?: OperationReceipt) {
+function recoveryConsumer(repository: TaskRunRepository, task: TaskRun, binding: BrowserPublicQueryRecoveryBinding, use: OperationReceipt | undefined,
+  scope: ExecutionScope, plan: PublicQueryRecoveryContext['plan']) {
   if (use?.request?.retryTaskId === task.id) return true
   if (task.retryOfTaskId) {
     const lineage = verifiedTaskRetryLineage(repository, task)
-    return Boolean(lineage && [binding.ownerTaskId, binding.sourceTaskId].includes(lineage.root.id))
+    return Boolean(lineage && ([binding.ownerTaskId, binding.sourceTaskId].includes(lineage.root.id) ||
+      operationFingerprint(lineage.root.publicQueryRecovery) === operationFingerprint(binding) &&
+      operationFingerprint(scope.browserScheduleBinding) === operationFingerprint(plan) && scope.scheduleScopeHash === binding.planScopeHash &&
+      scheduledRecoveryConsumer(repository, lineage.root, binding)))
   }
+  return scheduledRecoveryConsumer(repository, task, binding)
+}
+
+/** A later occurrence keeps the server's sealed plan context through a proven Retry family. */
+function scheduledRecoveryConsumer(repository: TaskRunRepository, task: TaskRun, binding: BrowserPublicQueryRecoveryBinding) {
   const prepared = repository.operation(task.threadId, 'scheduled-task-context')
   return Boolean(task.scheduledBy && task.scheduledBy.scheduleId === binding.scheduleId && prepared?.kind === 'scheduled_task_prepare' &&
     prepared.status === 'succeeded' && prepared.fingerprint === operationFingerprint(prepared.request) && prepared.request?.scheduleId === binding.scheduleId &&

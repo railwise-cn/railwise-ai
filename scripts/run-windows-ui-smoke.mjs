@@ -760,16 +760,23 @@ export async function startWindowsTaskModelFixture({ browser = false, postPlanQu
       if (queryStep === 'fill' || queryStep === 'click') observation.browserAction = { action: queryStep, phase: queryPhase ? 'post_plan' : 'initial', callId: `smoke-${id}`, sessionId: args.sessionId, targetRef: args.target,
         contextHash: createHash('sha256').update(args.contextId).digest('hex') }
       if (next === 'publish_artifact') {
-        const content = browser ? buildWindowsFixtureWebReport({ list: toolOutput('read-results'), detail: toolOutput('read-detail'), fixtureUrl, marker, query }).content
-          : '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Windows 合成验收报告</title></head><body><h1>每日网页报告</h1><p>这是隔离验收生成的合成内容。</p></body></html>'
-        args = { path: '每日网页报告.html', content }
+        args = browser ? { path: '每日网页报告.html', report: buildWindowsFixtureWebReport({ list: toolOutput('read-results'), detail: toolOutput('read-detail'), fixtureUrl, marker, query }).report }
+          : { path: '每日网页报告.html', content: '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Windows 合成验收报告</title></head><body><h1>每日网页报告</h1><p>这是隔离验收生成的合成内容。</p></body></html>' }
       }
       if (next === 'read_artifact') {
         const published = toolOutput('artifact')
         assert.equal(published?.read_artifact?.path, '每日网页报告.html', 'Publication must return the relative managed-reader request')
         args = published.read_artifact
       }
-      if (next === 'verify_web_artifact') args = buildWindowsFixtureWebReport({ list: toolOutput('read-results'), detail: toolOutput('read-detail'), fixtureUrl, marker, query }).verification
+      if (next === 'verify_web_artifact') {
+        const published = toolOutput('artifact')
+        args = published?.verificationInput
+        assert.deepEqual(Object.keys(args ?? {}).sort(), ['manifestRef', 'path'])
+        assert.equal(args.path, '每日网页报告.html')
+        assert.match(args.manifestRef, /^web-manifest:[a-f0-9]{64}$/)
+        assert.equal(published.verificationInputHash, windowsFixtureVerificationInputHash(buildWindowsFixtureWebReport({ list: toolOutput('read-results'), detail: toolOutput('read-detail'), fixtureUrl, marker, query }).verification),
+          'The sealed publisher manifest must retain every exact typed source and field')
+      }
       if (called.has('smoke-verify-web-artifact')) {
         const verification = toolOutput('verify-web-artifact'), published = toolOutput('artifact')
         inspectWindowsWebArtifactVerification(verification, { sha256: published?.sha256, fixtureUrl })
@@ -837,7 +844,7 @@ export function buildWindowsFixtureWebReport({ list, detail, fixtureUrl, marker,
   })
   const title = fields[0].value
   const listSource = { url: fixtureUrl, resultHash: list.resultHash }, detailSource = { url: detailUrl, resultHash: detail.resultHash }
-  const verification = { path: '每日网页报告.html', coverage: [listSource, detailSource], items: [{ sectionId: 'notice-1', title,
+  const verification = { path: '每日网页报告.html', coverage: [listSource, detailSource], noMatches: [], items: [{ sectionId: 'notice-1', title,
     source: detailSource, discovery: listSource, classification: 'opportunity', fields, unverifiedFields: [] }] }
   const result = /<output\b[^>]*>[\s\S]*?<\/output>/.exec(list.html)?.[0]
   assert.ok(result)
@@ -845,7 +852,24 @@ export function buildWindowsFixtureWebReport({ list, detail, fixtureUrl, marker,
   const readVersion = /data-read-version="([a-f0-9-]{36})"/.exec(detail.html)?.[1]
   assert.ok(readVersion, 'Each report must retain the actual independent primary-document read version')
   const content = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>每日工程公告合成报告</title><style>body{font:16px/1.7 system-ui,sans-serif;max-width:1000px;margin:32px auto;padding:0 28px;color:#16324a;background:#f8fafc}article{padding:24px;background:white;border:1px solid #dce4ed;border-radius:12px}a{color:#1764ac}dt{font-weight:bold}p{overflow-wrap:anywhere}</style></head><body><h1>每日工程公告合成报告</h1><p>${escape(marker)}</p><p>仅用于隔离技术验收；以下字段取自本轮实际完整读取的合成公告正文。</p><p>本轮正文采集版本：${readVersion}</p>${result}<p>来源覆盖：<a href="${escape(fixtureUrl)}">已读取的查询结果</a> · <a href="${escape(detailUrl)}">已读取的公告正文</a></p><main data-evidence-report><article id="notice-1" data-evidence-item="notice-1" data-evidence-classification="opportunity"><h2><span data-evidence-field="title">${escape(title)}</span></h2>${fields.slice(1).map(field => `<p><b>${labels[field.field]}：</b><span data-evidence-field="${field.field}">${escape(field.value)}</span></p>`).join('')}<a data-evidence-source href="${escape(detailUrl)}">公告原文</a></article></main></body></html>`
-  return { content, verification }
+  const { path: _path, ...evidence } = verification
+  return { content, verification, report: { title: `每日工程公告合成报告 · ${marker} · ${readVersion}`, evidence } }
+}
+
+export function windowsFixtureVerificationInputHash(value) {
+  const canonical = item => Array.isArray(item) ? item.map(canonical)
+    : item && typeof item === 'object' ? Object.fromEntries(Object.entries(item).filter(([, entry]) => entry !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [key, canonical(entry)])) : item
+  return createHash('sha256').update(JSON.stringify(canonical(value)) ?? 'null').digest('hex')
+}
+
+export function validateWindowsFixtureReportHtml(html, { marker, fixtureUrl }) {
+  assert.ok(html.includes(marker) && html.includes('每日工程公告合成报告'), 'The report must retain its owned fixture and purpose')
+  assert.ok(html.includes('main data-evidence-report') && html.includes('data-evidence-item="notice-1"'), 'The saved report needs the formal typed data region')
+  for (const field of ['title', 'publication_date', 'budget', 'deadline', 'status', 'qualification']) {
+    assert.ok(html.includes(`data-evidence-field="${field}"`), `The report is missing the verified ${field} field`)
+  }
+  assert.ok(html.includes(new URL('/fixture/detail', fixtureUrl).href), 'The rendered report needs the actual primary-document link')
 }
 
 export function inspectWindowsWebArtifactVerification(output, { sha256, fixtureUrl }) {
@@ -2681,7 +2705,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       assert.ok(artifact?.absolutePath && contained(root, artifact.absolutePath), 'The actual HTML must belong to the isolated task output directory')
       const bytes = await readFile(artifact.absolutePath)
       assert.ok(bytes.toString('utf8').includes(browserSmoke ? taskModel.marker : '合成内容'))
-      if (browserSmoke) validateWindowsFixtureQueryHtml(bytes.toString('utf8'), taskModel)
+      if (browserSmoke) validateWindowsFixtureReportHtml(bytes.toString('utf8'), taskModel)
       const execution = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
       const readback = execution.turns.flatMap(turn => turn.items).find(item => item.kind === 'tool_result' && item.toolName === 'list_schedules' && item.isError !== true)
       const schedule = readback?.output?.schedules?.[0]
@@ -2799,7 +2823,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       assert.ok(occurrenceArtifact?.absolutePath && contained(root, occurrenceArtifact.absolutePath))
       const occurrenceBytes = await readFile(occurrenceArtifact.absolutePath)
       assert.ok(occurrenceBytes.toString('utf8').includes(browserSmoke ? taskModel.marker : '合成内容'))
-      if (browserSmoke) validateWindowsFixtureQueryHtml(occurrenceBytes.toString('utf8'), taskModel)
+      if (browserSmoke) validateWindowsFixtureReportHtml(occurrenceBytes.toString('utf8'), taskModel)
       report.taskExecution.dueOccurrence = { clock: 'real', trigger: { kind: 'at', atTime: dueAt }, taskId: occurrence.id, status: occurrence.status,
         triggerEditAuthorization: { source: 'explicit-windows-acceptance-request', actor: process.env.GITHUB_TRIGGERING_ACTOR ?? process.env.GITHUB_ACTOR,
           profileScope: 'owned-synthetic-profile', api: 'Flow PUT and publish', authorizedScopeUnchanged: true },

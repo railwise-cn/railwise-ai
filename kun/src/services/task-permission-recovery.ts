@@ -2,13 +2,43 @@ import { createHash } from 'node:crypto'
 import type { TaskApprovalGrant } from '../contracts/permissions.js'
 import type { TaskRun } from '../contracts/tasks.js'
 import type { TaskRunRepository } from './task-run-repository.js'
+import type { CapabilityPreflight } from '../contracts/harness.js'
+import { workspacePermissionCapability } from './workspace-write-preflight.js'
 
 const permissionCodes = new Set(['task_permission_expired', 'task_permission_revoked', 'task_permission_consumed', 'task_permission_blocked',
   'execution_grant_expired', 'execution_grant_revoked', 'execution_grant_scope', 'workspace_trust_changed', 'approval_policy_blocked',
-  'sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked'])
-export function taskPermissionFailure(error: unknown): { code: string; message: string } | null {
+  'sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
+  'browser_public_query_recovery_changed', 'browser_public_query_fresh_scope_required', 'browser_binding_changed',
+  'browser_schedule_authority_changed', 'schedule_authority_changed'])
+export type TaskPermissionFailure = { code: string; message: string }
+export function taskPermissionFailure(error: unknown): TaskPermissionFailure | null {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
   return permissionCodes.has(code) ? { code, message: error instanceof Error ? error.message : '请重新核对当前任务权限。' } : null
+}
+
+/** Preserve the failed authority's own review surface; a browser proof is not a workspace grant. */
+export function taskPermissionCapability(failure:TaskPermissionFailure,task:Pick<TaskRun,'scheduledBy'|'publicQueryRecovery'>,
+  checkedAt=new Date().toISOString()):CapabilityPreflight {
+  const {code}=failure
+  let provider:CapabilityPreflight['provider'],resolution:NonNullable<CapabilityPreflight['resolution']>,summary:string
+  if(code==='browser_binding_changed') {
+    provider='browser-skill'
+    resolution={kind:'grant',route:'task/browser-binding',label:'确认当前任务的浏览器范围'}
+    summary='浏览器实例或连接配置已变化。请审阅当前任务的浏览器和站点范围，确认后继续原任务。'
+  } else if(code==='browser_schedule_authority_changed'||code==='schedule_authority_changed') {
+    provider='schedule'
+    const scheduleId=task.scheduledBy?.scheduleId??task.publicQueryRecovery?.scheduleId
+    resolution=scheduleId?{kind:'grant',route:`flow/${scheduleId}`,label:'查看并核对定时计划'}
+      :{kind:'retry',route:'task/schedule-review',label:'继续原任务并审阅周期动作'}
+    summary='计划的浏览器或授权范围已变化，请审阅定时计划后继续。'
+  } else if(code==='browser_public_query_recovery_changed'||code==='browser_public_query_fresh_scope_required') {
+    provider='browser-skill'
+    resolution={kind:'grant',route:'task/public-query-recovery',label:'查看原任务的恢复范围'}
+    summary='公开查询恢复范围需要重新核对。请在原任务中审阅浏览器和公开站点范围，再单独确认是否继续。'
+  } else return {...workspacePermissionCapability(code,failure.message),checkedAt}
+  return {provider,status:code==='browser_binding_changed'?'needs_authorization':'blocked',errorCode:code,
+    message:failure.message===code?summary:failure.message,credentialState:'unknown',networkState:'unknown',workspaceState:'unknown',
+    sandboxState:'allowed',approvalState:'required',action:resolution,resolution,checkedAt}
 }
 
 /** Recognize only the old pre-model expiry failure, using its immutable execution ledger.

@@ -44,7 +44,7 @@ it('prepares observe({}) through the real Runtime and resumes the same Task afte
     let name: string | undefined, callId: string | undefined, args: Record<string, unknown> = {}
     if (!observed) { name = 'browser_observe'; callId = id }
     else if (phase === 1) { requests.push({ phase, tools, next: 'held-after-observe' }); heldResponse = response; return }
-    else if (!output('readiness-navigate')) { name = 'browser_navigate'; callId = 'readiness-navigate'; args = { sessionId: observed.sessionId, url: origin + '/document' } }
+    else if (observed.sourceUrl !== origin + '/document' && !output('readiness-navigate')) { name = 'browser_navigate'; callId = 'readiness-navigate'; args = { sessionId: observed.sessionId, url: origin + '/document' } }
     else if (!output('readiness-read')) { name = 'browser_get_html'; callId = 'readiness-read'; args = { sessionId: observed.sessionId } }
     requests.push({ phase, tools, next: name ?? 'final' })
     const delta = name ? { tool_calls: [{ index: 0, id: callId, type: 'function', function: { name, arguments: JSON.stringify(args) } }] }
@@ -77,6 +77,7 @@ it('prepares observe({}) through the real Runtime and resumes the same Task afte
     expect(session).toBeTruthy()
     if (args[0] === 'tab') return { ok: true, output: { tabs: [{ tab_id: session.tab, active: true, scope: 'agent', url: session.url,
       title: session.url === 'about:blank' ? '' : '会话接续技术验收' }] } }
+    if (args[0] === 'cooperate' && session.url === 'about:blank') return { ok: false, code: 'permission_denied', output: { data: { reason: 'frame_unobservable', effect_state: 'none' } } }
     if (args[0] === 'cooperate') return { ok: true, output: { ready: true, context_id: sessionId + '-context-' + (++session.sync),
       observation_id: sessionId + '-observation-' + session.sync, tab_id: session.tab, control_policy: 'target', observation: { text: '只读来源正文' } } }
     if (args[0] === 'navigate') { expect(args[1]).toBe(origin + '/document'); session.url = args[1]!; return { ok: true, output: { final_url: session.url } } }
@@ -112,8 +113,9 @@ it('prepares observe({}) through the real Runtime and resumes the same Task afte
   await expect.poll(() => heldResponse !== undefined).toBe(true)
   expect(runtime.taskRepository!.operations(taskId, 'browser_session_readiness')).toMatchObject([{ status: 'succeeded', result: { observationCompleted: true, actualAction: 'start' } }])
   const firstObserve = runtime.taskRepository!.operations(taskId, 'tool').find(receipt => receipt.request?.toolName === 'browser_observe')!
-  expect(firstObserve.result).toMatchObject({ item: { output: { sourceUrl: 'about:blank', sessionId: 'owned-fixture-session-1',
-    observation: { context_id: 'owned-fixture-session-1-context-1' }, evidence: { verified: false, contentRead: false, businessOutcomeVerified: false } } } })
+  expect(firstObserve.result).toMatchObject({ item: { output: { sourceUrl: origin + '/document', sessionId: 'owned-fixture-session-1',
+    initialNavigation: { url: origin + '/document' }, observation: { context_id: 'owned-fixture-session-1-context-1' },
+    evidence: { verified: true, contentRead: true, businessOutcomeVerified: false } } } })
   const firstTurn = runtime.taskRepository!.get(taskId)!.activeTurnId
   expect((await api(`/v1/tasks/${taskId}/pause`, { expectedRevision: runtime.taskRepository!.get(taskId)!.revision, idempotencyKey: 'pause-before-restart' })).status).toBe(200)
   heldResponse!.end()
@@ -143,6 +145,10 @@ it('prepares observe({}) through the real Runtime and resumes the same Task afte
   expect(receipts.some(receipt => receipt.status === 'outcome_unknown' || receipt.kind === 'browser_action_dispatch')).toBe(false)
   expect(requests.every(request => request.tools.includes('browser_session_start') && request.tools.includes('browser_observe'))).toBe(true)
   expect(starts).toBe(2); expect(maximumLiveSessions).toBe(1); expect(documentReads).toBe(1)
+  expect(commands.filter(args => args[0] === 'navigate')).toHaveLength(2)
+  expect(receipts.filter(receipt => receipt.kind === 'browser_initial_navigation')).toMatchObject([
+    { status: 'succeeded', request: { url: origin + '/document' } }, { status: 'succeeded', request: { url: origin + '/document' } }
+  ])
   expect(commands.some(args => ['click', 'fill', 'press'].includes(args[0]!))).toBe(false)
   expect(runtime.approvalGate.pending()).toHaveLength(0)
 }, 30_000)

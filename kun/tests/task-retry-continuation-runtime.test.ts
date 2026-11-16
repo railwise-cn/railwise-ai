@@ -1,4 +1,5 @@
 import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { createServer, type ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,11 +12,46 @@ import { TaskControlService } from '../src/services/task-control-service.js'
 import type { ToolHostContext } from '../src/ports/tool-host.js'
 import { verifiedTaskRetryLineage } from '../src/services/task-retry-lineage.js'
 import { taskPublicQueryGrant } from '../src/services/browser-public-query-authority.js'
+import { makeToolResultItem } from '../src/domain/item.js'
+
+// A controlled BrowserSkill protocol fixture, never an actual Chrome instance.
+const browserFixture=vi.hoisted(()=>{
+  const title='工程测量监测公开资料合成公告'
+  const quote=`${title}，本页仅为受控回归中的正式来源原文。`
+  return {title,quote,discovery:`<html><body><a href="/notice/1">${title}</a></body></html>`,
+    document:`<html><body><article><h1>${title}</h1><p>${quote}</p></article></body></html>`,
+    sessions:new Map<string,{url:string;tab:number;context:number}>(),count:0}
+})
 
 vi.mock('../src/services/browser-skill-cli.js', async original => ({
   ...await original<typeof import('../src/services/browser-skill-cli.js')>(),
   runBrowserCommand: vi.fn(async (_config: unknown, args: readonly string[]) => {
-    if (args[0] === 'status') return { ok: true, output: { protocol_version: '1.9', pid: 7, browsers: [{ instance_id: 'retry-browser', browser_name: 'Chrome', label: '合成 Retry', extension_version: '0.5.0', extension_protocol_version: '1.9' }], sessions: [] } }
+    if (args[0] === 'status') return { ok: true, output: { protocol_version: '1.9', pid: 7, browsers: [{ instance_id: 'retry-browser', browser_name: 'Chrome', label: '合成 Retry', extension_version: '0.5.0', extension_protocol_version: '1.9' }], sessions: [...browserFixture.sessions.keys()].map(session_id=>({session_id,browser_instance_id:'retry-browser'})) } }
+    if(args[0]==='session'&&args[1]==='request')return {ok:true,output:{state:'prepared'}}
+    if(args[0]==='session'&&args[1]==='start'){
+      const tab=++browserFixture.count,sessionId=`retry-source-${tab}`
+      browserFixture.sessions.set(sessionId,{url:'about:blank',tab,context:0})
+      return {ok:true,output:{session_id:sessionId,browser_instance_id:'retry-browser',tab_id:tab}}
+    }
+    if(args[0]==='session'&&args[1]==='stop'){
+      expect(browserFixture.sessions.delete(args[2]!)).toBe(true)
+      return {ok:true,output:{stopped:[args[2]],failed:[]}}
+    }
+    const sessionId=args[args.indexOf('--session')+1]!,session=browserFixture.sessions.get(sessionId)
+    if(!session)throw new Error(`No controlled session for ${args[0]}`)
+    if(args[0]==='tab')return {ok:true,output:{tabs:[{tab_id:session.tab,active:true,scope:'agent',url:session.url,title:browserFixture.title}]}}
+    if(args[0]==='navigate'){
+      expect(['https://public.example.test/','https://public.example.test/notice/1']).toContain(args[1])
+      session.url=args[1]!
+      return {ok:true,output:{final_url:session.url}}
+    }
+    if(args[0]==='cooperate')return {ok:true,output:{ready:true,context_id:`${sessionId}-context-${++session.context}`,
+      observation_id:`${sessionId}-observation-${session.context}`,tab_id:session.tab,control_policy:'target',
+      observation:{text:session.url.endsWith('/notice/1')?browserFixture.quote:`link ${browserFixture.title} href=/notice/1`}}}
+    if(args[0]==='get-html'){
+      const html=session.url.endsWith('/notice/1')?browserFixture.document:browserFixture.discovery
+      return {ok:true,output:{tab_id:session.tab,html,byte_size:Buffer.byteLength(html),truncated:false}}
+    }
     throw new Error(`No browser action expected: ${args[0]}`)
   })
 }))
@@ -23,6 +59,7 @@ const cleanup: Array<() => Promise<unknown>> = []
 afterEach(async () => { while (cleanup.length) await cleanup.pop()!() })
 const goal = '使用 BrowserSkill 读取 https://public.example.test 的公开工程资料，生成 report.html，每天九点前、五点前交付。'
 async function fixture(actualLoop = false) {
+  browserFixture.sessions.clear();browserFixture.count=0
   let requestSeen!: (body: Record<string, unknown>) => void
   const requested = new Promise<Record<string, unknown>>(resolve => { requestSeen = resolve })
   const responses: ServerResponse[] = []
@@ -41,7 +78,8 @@ async function fixture(actualLoop = false) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-retry-continuation-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
   const workspace = join(root, '只读 中文目录'); await mkdir(workspace)
-  const runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: join(root, 'state'), runtimeToken: 'fixture', apiKey: actualLoop ? 'controlled-model-fixture' : '', baseUrl, model: 'fixture', approvalPolicy: 'auto', sandboxMode: 'read-only', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({ browserSkill: { enabled: true, state: 'ready', executablePath: process.execPath, executableHash: 'a'.repeat(64), version: '0.5.0', browserInstanceId: 'retry-browser', origins: ['https://public.example.test'], interaction: 'interact', revision: 1, daemonProtocolVersion: '1.9', browsers: [{ id: 'retry-browser', name: 'Chrome', label: '合成 Retry', extensionVersion: '0.5.0', protocolVersion: '1.9', connected: true, versionSkew: false }] } }) })
+  const capabilities=KunCapabilitiesConfig.parse({ browserSkill: { enabled: true, state: 'ready', executablePath: process.execPath, executableHash: 'a'.repeat(64), version: '0.5.0', browserInstanceId: 'retry-browser', origins: ['https://public.example.test'], interaction: 'interact', revision: 1, daemonProtocolVersion: '1.9', browsers: [{ id: 'retry-browser', name: 'Chrome', label: '合成 Retry', extensionVersion: '0.5.0', protocolVersion: '1.9', connected: true, versionSkew: false }] } })
+  const runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: join(root, 'state'), runtimeToken: 'fixture', apiKey: actualLoop ? 'controlled-model-fixture' : '', baseUrl, model: 'fixture', approvalPolicy: 'auto', sandboxMode: 'read-only', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' }, capabilities })
   cleanup.push(async () => runtime.shutdown?.())
   const thread = await runtime.threadService.create({ workspace, model: 'fixture', mode: 'agent' })
   const started = await runtime.turnService.startTurn({ threadId: thread.id, request: { prompt: goal, taskIntent: 'new' } })
@@ -61,14 +99,34 @@ async function fixture(actualLoop = false) {
     const descriptor = (await runtime.toolHost!.listTools(context(g))).find(tool => tool.name === toolName)
     const request = { callId: `actual-host-${++n}`, toolName, arguments: args, providerId: descriptor?.providerId }
     const operation = controller.beginToolOperation(g.turnId, request, g)!
-    const result = await runtime.toolHost!.execute(request, context(g))
+    const result = await runtime.toolHost!.execute(request, { ...context(g),
+      currentToolOperation: () => controller.currentToolOperation(operation.token, operation.key, request, g) })
     controller.finishToolOperation(operation.token, operation.key, result)
     await runtime.sessionStore.appendItem(thread.id, result.item)
     if (toolName === 'publish_artifact') await controller.recordArtifactPublication(operation.token, operation.key)
     return result
   }
-  const published = await call('publish_artifact', { path: 'report.html', content: '<html lang="zh-CN"><title>历史草稿</title><body>原任务的真实草稿文件，仍需采集正文及来源核验。</body></html>' })
+  // Import a synthetic pre-source-gate persisted writer, rather than pretending
+  // today's publisher can create a source-free research report. The real file,
+  // immutable original Grant/Turn, writer receipt and transcript remain linked;
+  // this seed supplies no source verification or authority to the Retry.
+  const legacyContent='<html lang="zh-CN"><title>历史草稿</title><body>原任务的真实草稿文件，仍需采集正文及来源核验。</body></html>'
+  const legacyRoot=controller.managedArtifactRoot(task.id)!,legacyPath=join(legacyRoot,'report.html')
+  await mkdir(legacyRoot,{recursive:true});await writeFile(legacyPath,legacyContent)
+  const legacyRequest={callId:'pre-gate-writer',toolName:'publish_artifact',providerId:'managed-artifacts',arguments:{path:'report.html',content:legacyContent}}
+  const legacyOperation=controller.beginToolOperation(grant.turnId,legacyRequest,grant)!
+  const legacyItem=makeToolResultItem({id:'pre-gate-writer-result',threadId:thread.id,turnId:grant.turnId,callId:legacyRequest.callId,
+    toolName:'publish_artifact',toolKind:'file_change',output:{path:legacyPath,name:'report.html',storage:'task',bytes_written:Buffer.byteLength(legacyContent),
+      sha256:createHash('sha256').update(legacyContent).digest('hex')}})
+  const published={approved:true,item:legacyItem}
+  controller.finishToolOperation(legacyOperation.token,legacyOperation.key,published)
   expect(published.item.kind === 'tool_result' && published.item.isError).not.toBe(true)
+  await runtime.sessionStore.appendItem(thread.id,legacyItem)
+  expect(await controller.recordArtifactPublication(legacyOperation.token,legacyOperation.key)).toBe(true)
+  expect(repository.get(task.id)!.artifacts[0]).toMatchObject({executionGrantId:grant.id,sourceEvidenceStatus:'draft'})
+  const legacyWriter=repository.operation(task.id,legacyOperation.key)!
+  const browserIdentity=new ManagedBrowserSkillRuntime({config:capabilities.browserSkill,configPath:'unused',dataDir:root,repository,
+    apply:()=>{throw new Error('No provider configuration change in the controlled fixture')}}).identityFingerprint()
   expect((await call('todo_list', {})).item).toMatchObject({ isError: false })
   expect((await call('todo_write', { todos: [{ content: '核对正文并修复同一报告', status: 'in_progress' }] })).item).toMatchObject({ isError: false })
   controller.recordAttemptFailure(thread.id, started.turnId, 'max_tokens', '合成停止，不含未知动作')
@@ -76,7 +134,7 @@ async function fixture(actualLoop = false) {
   const runTurn = vi.fn()
   const controls = new TaskControlService({ repository, tasks: controller, threads: runtime.threadService, turns: runtime.turnService, runTurn, preflightExternalTask: async () => null, nowIso: runtime.nowIso })
   const retry = () => controls.mutate(task.id, 'retry', { expectedRevision: repository.get(task.id)!.revision, idempotencyKey: 'explicit-ui-retry' })
-  return { runtime, repository, controller, thread, task: repository.get(task.id)!, root, workspace, grant, call, retry, runTurn, requested, controls }
+  return { runtime, repository, controller, thread, task: repository.get(task.id)!, root, workspace, grant, call, retry, runTurn, requested, controls,legacyWriter,browserIdentity }
 }
 function output(result: Awaited<ReturnType<Awaited<ReturnType<typeof fixture>>['call']>>) {
   if (result.item.kind !== 'tool_result') throw new Error('Expected actual Host tool result')
@@ -90,7 +148,9 @@ it('derives a fresh Retry Grant from explicit durable schedule consent and reads
   expect(f.repository.get(f.task.id)).toEqual(before)
   expect(f.runTurn).toHaveBeenCalledOnce()
   expect((await f.retry()).task.id).toBe(child.id)
-  const grant = ExecutionGrantSchema.parse({ ...f.grant, id: 'new-retry-grant', taskId: child.id, turnId: result.turn!.turnId, browserScope: child.authority!.browserScope, managedArtifactRoot: f.controller.managedArtifactRoot(child.id), idempotencyKey: 'new-retry-grant', issuedAt: new Date().toISOString() })
+  const grant = ExecutionGrantSchema.parse({ ...f.grant, id: 'new-retry-grant', taskId: child.id, turnId: result.turn!.turnId, browserScope: child.authority!.browserScope,
+    connectorIdentityFingerprints:{'browser-skill':f.browserIdentity},networkAllowlist:child.authority!.browserScope!.origins,
+    managedArtifactRoot: f.controller.managedArtifactRoot(child.id), idempotencyKey: 'new-retry-grant', issuedAt: new Date().toISOString() })
   expect(grant.managedArtifactRoot).not.toBe(f.grant.managedArtifactRoot)
   await f.runtime.turnService.updateTurnMetadata(f.thread.id, grant.turnId, { executionGrant: grant })
   f.controller.beginAttempt(f.thread.id, grant.turnId)
@@ -99,10 +159,28 @@ it('derives a fresh Retry Grant from explicit durable schedule consent and reads
   expect(output(read)).toMatchObject({ history: true, source_task_id: f.task.id, sha256: before.artifacts[0]!.sha256, content: expect.stringContaining('历史草稿') })
   expect(f.repository.get(child.id)!.artifacts).toEqual([])
   expect((await f.call('read_artifact', { path: 'report.html' }, grant)).item).toMatchObject({ isError: true })
-  await f.call('publish_artifact', { path: 'report.html', content: '<html><title>后继独立新稿</title><body>新稿仍需真正正文与计划核验，不是旧成果冒充。</body></html>' }, grant)
+  const session=output(await f.call('browser_session_start',{},grant))
+  expect(session).toMatchObject({status:'succeeded',sessionId:expect.any(String)})
+  const sessionId=session.sessionId as string
+  expect((await f.call('browser_navigate',{sessionId,url:'https://public.example.test/'},grant)).item).toMatchObject({isError:false})
+  const discovery=output(await f.call('browser_get_html',{sessionId},grant))
+  expect(discovery).toMatchObject({status:'succeeded',readScope:'document',truncated:false})
+  expect((await f.call('browser_navigate',{sessionId,url:'https://public.example.test/notice/1'},grant)).item).toMatchObject({isError:false})
+  const primary=output(await f.call('browser_get_html',{sessionId},grant))
+  expect(primary).toMatchObject({status:'succeeded',readScope:'document',truncated:false})
+  expect((await f.call('browser_session_stop',{sessionId},grant)).item).toMatchObject({isError:false})
+  const reference=(source:Record<string,unknown>)=>({url:source.sourceUrl,resultHash:source.resultHash})
+  const published=output(await f.call('publish_artifact',{path:'report.html',report:{title:'后继独立新稿',evidence:{coverage:[reference(primary)],noMatches:[],items:[{
+    sectionId:'retry-source',title:browserFixture.title,source:reference(primary),discovery:reference(discovery),classification:'source',
+    fields:[{field:'title',value:browserFixture.title,quote:browserFixture.quote}],unverifiedFields:[]
+  }]}}},grant))
+  expect(published).toMatchObject({bytes_written:expect.any(Number),verificationInput:{path:'report.html'}})
   expect(f.repository.get(child.id)!.artifacts[0]).toMatchObject({ executionGrantId: grant.id, sourceEvidenceStatus: 'draft' })
+  expect(output(await f.call('verify_web_artifact',published.verificationInput as Record<string,unknown>,grant))).toMatchObject({complete:true,reasons:[]})
   expect(output(await f.call('read_artifact', { path: 'report.html', source_task_id: f.task.id }, grant)).sha256).toBe(before.artifacts[0]!.sha256)
   expect(f.repository.operations(child.id, 'tool').some(receipt => receipt.request?.executionGrant && (receipt.request.executionGrant as { id: string }).id === f.grant.id)).toBe(false)
+  expect(f.repository.operation(f.task.id,f.legacyWriter.idempotencyKey)).toEqual(f.legacyWriter)
+  expect(f.repository.get(f.task.id)).toEqual(before)
 })
 
 it.each(['revoked', 'cancelled', 'task-only'] as const)('does not derive persistent consent from a %s predecessor', async reason => {

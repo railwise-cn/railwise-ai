@@ -551,7 +551,7 @@ export class AgentLoop {
         }
         this.opts.tasks?.beginAttempt(threadId, turnId)
         await this.drainSteering(threadId, turnId, signal)
-        let outcome: TaskAttemptOutcome
+        let outcome: TaskAttemptOutcome | { kind: 'checkpoint_waiting' }
         try {
           outcome = await this.loop(threadId, turnId, signal)
         } catch (error) {
@@ -580,6 +580,10 @@ export class AgentLoop {
               message: message.trim() || '本次模型或工具尝试异常。'
             }
           }
+        }
+        if (outcome.kind === 'checkpoint_waiting') {
+          await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
+          return 'completed'
         }
         if (outcome.kind === 'waiting_user' && signal.aborted) outcome = { kind: 'cancelled', reason: 'operation_cancelled' }
         if (outcome.kind === 'waiting_user') return await this.finishUnknownToolOutcome(threadId, turnId, outcome.message)
@@ -823,12 +827,13 @@ export class AgentLoop {
     threadId: string,
     turnId: string,
     signal: AbortSignal
-  ): Promise<TaskAttemptOutcome> {
+  ): Promise<TaskAttemptOutcome | { kind: 'checkpoint_waiting' }> {
     for (let step = 0; ; step += 1) {
       if (signal.aborted) return { kind: 'cancelled', reason: 'operation_cancelled' }
       if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) {
         return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
       }
+      if (await this.opts.tasks?.suspendWebArtifactProgress?.(threadId, turnId)) return { kind: 'checkpoint_waiting' }
       if (step >= MAX_TURN_MODEL_STEPS) {
         const message =
           `Turn stopped after ${MAX_TURN_MODEL_STEPS} model steps without reaching a final response.`
@@ -859,6 +864,7 @@ export class AgentLoop {
       }
       await this.drainSteering(threadId, turnId, signal)
       const stepResult = await this.modelStep(threadId, turnId, signal, step)
+      if (stepResult === 'checkpoint_waiting') return { kind: 'checkpoint_waiting' }
       if (stepResult === 'outcome_unknown') return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
       if (stepResult === 'stop') return { kind: 'candidate' }
       if (stepResult === 'blocked') {
@@ -898,7 +904,7 @@ export class AgentLoop {
     turnId: string,
     signal: AbortSignal,
     stepIndex = 0
-  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown'> {
+  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown' | 'checkpoint_waiting'> {
     if (shouldVerifyImmutablePrefix()) {
       verifyImmutablePrefix(this.opts.prefix)
     }
@@ -1182,9 +1188,9 @@ export class AgentLoop {
       ...skillResolution.instructions,
       ...(this.opts.tasks?.activeTask(threadId)?.scheduledBy ? ['This is one occurrence of a persisted schedule. Perform the original business task and deliver this occurrence’s artifacts. The schedule is already stored.'] : []),
       ...(executionGrant?.managedArtifactRoot && effectiveToolSpecs.some(tool => tool.name === 'publish_artifact') ? [
-        'For requested HTML or file deliverables, use publish_artifact with a relative filename and complete content to save a persistent task artifact; saving proves file integrity, not source verification. The app previews HTML automatically. This output namespace is available independently of workspace write permission. '
+        'For requested HTML or file deliverables, use publish_artifact with a relative filename to save a persistent task artifact. Local creative HTML/SVG uses complete content. A first web-research HTML report requires the typed report manifest after actual primary-source reads; content mode only repairs an existing report with its trusted saved manifest. Saving proves file integrity, not source verification. The app previews HTML automatically. This output namespace is available independently of workspace write permission. '
         + (effectiveToolSpecs.some(tool => tool.name === 'read_artifact') ? 'Inspect saved content with read_artifact using that same relative filename, rather than generic file read or requesting workspace permission for this task-owned output. ' : '')
-        + (effectiveToolSpecs.some(tool => tool.name === 'verify_web_artifact') ? 'For web-research HTML reports, first read actual source/result hrefs and complete primary documents, save the report, then call verify_web_artifact to bind exact artifact bytes and each declared field to real source receipts. Each required source needs verified relevant documents or an actual query-zero result; visiting its homepage/search alone is not enough. Keep source-linked data in the tool’s declared data-evidence report/item/field contract. Do not treat existing unverified draft leads as facts or ask the user to search/copy pages; continue reading and repair the same artifact until validated or genuinely blocked. ' : '')
+        + (effectiveToolSpecs.some(tool => tool.name === 'verify_web_artifact') ? 'For web-research HTML reports, first read actual source/result hrefs and complete primary documents, then publish report:{title,evidence:{coverage,items,noMatches}} and use the returned verificationInput unchanged in verify_web_artifact. It may be a task-owned {path,manifestRef}; do not reconstruct its URLs from redacted projections. The server resolves that sealed reference to exact saved bytes, original public URLs and actual source receipts. Legacy complete evidence inputs remain accepted. Each required source needs verified relevant documents or an actual query-zero result; visiting its homepage/search alone is not enough. Do not treat existing unverified draft leads as facts or ask the user to search/copy pages. A rejected source-first write means continue the actual source reads; changing HTML or filenames is not progress and cannot clear a repeated semantic failure. ' : '')
         + 'Refine an existing report at the same relative filename instead of publishing duplicate drafts. Saving a draft does not complete source verification or schedule creation. Deliver artifact references in the final response.'
       ] : []),
       ...(userInputDisabled ? [userInputUnavailableInstruction()] : []),
@@ -1722,6 +1728,7 @@ export class AgentLoop {
     })
     if (dispatched === 'aborted') return 'aborted'
     if (dispatched === 'outcome_unknown') return 'outcome_unknown'
+    if (dispatched === 'checkpoint_waiting') return 'checkpoint_waiting'
     if (dispatched === 'all_suppressed') {
       // A blocked Web call is persisted as a failed tool result, then the next
       // model step gets no Web tools and one final recovery instruction. This
@@ -1773,7 +1780,7 @@ export class AgentLoop {
     approvalPolicy: ToolHostContext['approvalPolicy']
     sandboxMode: NonNullable<ToolHostContext['sandboxMode']>
     signal: AbortSignal
-  }): Promise<'continue' | 'aborted' | 'all_suppressed' | 'outcome_unknown'> {
+  }): Promise<'continue' | 'aborted' | 'all_suppressed' | 'outcome_unknown' | 'checkpoint_waiting'> {
     const context = this.createToolContext(input)
     let index = 0
     let executedAny = false
@@ -1820,6 +1827,7 @@ export class AgentLoop {
         await this.persistToolCallResult(input.threadId, input.turnId, call, result)
         if (input.signal.aborted) return 'aborted'
         if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) return 'outcome_unknown'
+        if (await this.opts.tasks?.suspendWebArtifactProgress?.(input.threadId, input.turnId)) return 'checkpoint_waiting'
         index += 1
         continue
       }
@@ -1864,6 +1872,7 @@ export class AgentLoop {
       }
       if (input.signal.aborted) return 'aborted'
       if (this.opts.tasks?.hasUnknownToolOutcome?.(input.threadId, input.turnId)) return 'outcome_unknown'
+      if (await this.opts.tasks?.suspendWebArtifactProgress?.(input.threadId, input.turnId)) return 'checkpoint_waiting'
 
       if (suppressedAfterBatch) {
         await this.persistSuppressedToolCall({

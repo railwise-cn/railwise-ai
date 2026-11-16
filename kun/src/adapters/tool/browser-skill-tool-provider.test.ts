@@ -75,6 +75,73 @@ function publicQueryFixture() {
 }
 
 describe('typed BrowserSkill production provider', () => {
+  it.each([true, false])('opens the reviewed task source before observing a blank frame, explicit URL=%s', async explicitUrl => {
+    const f = publicQueryFixture(), original = f.runner.getMockImplementation()!
+    f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant!, allowedToolNames: ['browser_session_start', 'browser_observe', 'browser_navigate'] })
+    f.repository.update('task', f.repository.get('task')!.revision, task => ({ ...task,
+      goal: explicitUrl ? '用browser-skill读取 https://example.com/notices 的公开招标公告并生成HTML报告' : '用browser-skill到已确认的平台获取公开招标公告并生成HTML报告',
+      acceptance: { ...task.acceptance, requiresWebEvidence: true, requiredSourceOrigins: explicitUrl ? ['https://example.com'] : [] }
+    }))
+    let blank = true
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      if (argv[0] === 'cooperate' && blank) return { ok: false, code: 'permission_denied', output: { data: { reason: 'frame_unobservable', effect_state: 'none' } } }
+      if (argv[0] === 'navigate') blank = false
+      return original(config, argv, signal)
+    })
+    const result = await f.execute('browser_observe')
+    expect(result.output).not.toHaveProperty('code')
+    const initialUrl = explicitUrl ? 'https://example.com/notices' : 'https://example.com/'
+    expect(result).toMatchObject({ output: { status: 'succeeded', sessionId: 'session-one', sourceUrl: initialUrl,
+      initialNavigation: { url: initialUrl } } })
+    const commands = f.runner.mock.calls.map(([, argv]) => argv)
+    expect(commands.find(argv => argv[0] === 'session' && argv[1] === 'start')).toContain('--focus')
+    expect(commands.findIndex(argv => argv[0] === 'navigate')).toBeLessThan(commands.findIndex(argv => argv[0] === 'cooperate'))
+    expect(f.repository.operations('task', 'browser_initial_navigation')).toMatchObject([{ status: 'succeeded', request: { url: initialUrl } }])
+  })
+
+  it.each([false, true])('records the native window and focuses only a user Retry of a scheduled occurrence, retry=%s', async retry => {
+    const f = fixture(), original = f.runner.getMockImplementation()!
+    f.repository.update('task', f.repository.get('task')!.revision, task => ({ ...task,
+      scheduledBy: { scheduleId: 'schedule', dueAt: new Date().toISOString() }, ...(retry ? { retryOfTaskId: 'failed-occurrence' } : {})
+    }))
+    f.runner.mockImplementation(async (config, argv, signal) => {
+      const result = await original(config, argv, signal)
+      return argv[0] === 'session' && argv[1] === 'start' ? { ...result, output: { ...result.output as object, agent_window_id: 123 } } : result
+    })
+    expect(await f.execute('browser_session_start')).toMatchObject({ output: { agentWindowId: 123, focusRequested: retry } })
+    expect(f.runner.mock.calls.find(([, argv]) => argv[0] === 'session' && argv[1] === 'start')![1]).toContain(retry ? '--focus' : '--no-focus')
+  })
+
+  it.each(['grant_filter', 'agent_filter', 'network_filter', 'unknown_action', 'foreign_session'] as const)(
+    'does not bootstrap outside the current execution boundary: %s', async boundary => {
+      const f = publicQueryFixture()
+      f.repository.update('task', f.repository.get('task')!.revision, task => ({ ...task,
+        goal: '用browser-skill读取 https://example.com/notices 的公开招标公告',
+        acceptance: { ...task.acceptance, requiresWebEvidence: true, requiredSourceOrigins: ['https://example.com'] }
+      }))
+      await f.execute('browser_session_start')
+      if (boundary === 'grant_filter') f.context.executionGrant!.allowedToolNames = ['browser_observe']
+      if (boundary === 'agent_filter') f.context.allowedToolNames = ['browser_observe']
+      if (boundary === 'network_filter') f.context.executionGrant!.networkAllowlist = ['https://different.example']
+      if (boundary === 'unknown_action') f.repository.beginOperation({ ownerId: 'task', idempotencyKey: 'pending', kind: 'browser_action_dispatch', request: { sessionId: 'session-one' }, nowIso: new Date().toISOString() })
+      await f.execute('browser_observe', { sessionId: boundary === 'foreign_session' ? 'another-task-session' : 'session-one' })
+      expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(0)
+      expect(f.repository.operations('task', 'browser_initial_navigation')).toHaveLength(0)
+    })
+
+  it('does not repeat initial navigation when a failed dispatch leaves the owned frame blank', async () => {
+    const f = publicQueryFixture(), original = f.runner.getMockImplementation()!
+    f.repository.update('task', f.repository.get('task')!.revision, task => ({ ...task,
+      goal: '用browser-skill读取 https://example.com/notices 的公开招标公告'
+    }))
+    f.runner.mockImplementation(async (config, argv, signal) => argv[0] === 'navigate'
+      ? { ok: false, code: 'browser_command_failed', output: {} } : original(config, argv, signal))
+    await f.execute('browser_session_start')
+    expect(await f.execute('browser_observe', { sessionId: 'session-one' })).toMatchObject({ isError: true })
+    expect(await f.execute('browser_observe', { sessionId: 'session-one' })).toMatchObject({ isError: true, output: { code: 'browser_initial_navigation_requires_readback' } })
+    expect(f.runner.mock.calls.filter(([, argv]) => argv[0] === 'navigate')).toHaveLength(1)
+    expect(f.repository.operations('task', 'browser_initial_navigation')).toMatchObject([{ status: 'failed' }])
+  })
   it('prepares a real owned session for an authorized empty observe call without changing the original Host arguments', async () => {
     const f = publicQueryFixture()
     f.context.executionGrant = ExecutionGrantSchema.parse({ ...f.context.executionGrant!, allowedToolNames: ['browser_session_start', 'browser_observe'] })

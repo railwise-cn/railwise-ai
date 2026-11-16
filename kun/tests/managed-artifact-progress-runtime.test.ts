@@ -162,7 +162,7 @@ it('does not resume a paused task or register a late old-attempt result using a 
 })
 
 it('rechecks the captured fence after real file validation when a pause arrives before the metadata commit', async () => {
-  const f = await writerFixture(true)
+  const f = await writerFixture()
   const value = await f.dispatch('report.html', '<h1>验证期间收到暂停</h1>')
   await f.persist(value)
   const controller = f.runtime.taskController!
@@ -188,20 +188,20 @@ it('rechecks the captured fence after real file validation when a pause arrives 
   } finally { release(); await pending }
 })
 
-it('registers a web report only as a draft and preserves task status, pending nodes and idempotent events', async () => {
+it('keeps a source-incomplete web publication unwritten and preserves status, nodes and idempotent registration', async () => {
   const f = await writerFixture(true)
   const value = await f.dispatch('report.html', '<h1>来源尚待核验的草稿</h1>')
   await f.persist(value)
-  expect(await f.runtime.taskController!.recordArtifactPublication(value.operation.token, value.operation.key)).toBe(true)
+  expect(value.result.item).toMatchObject({ isError: true, output: { code: 'web_source_reads_required' } })
+  expect(await f.runtime.taskController!.recordArtifactPublication(value.operation.token, value.operation.key)).toBe(false)
   const saved = f.runtime.taskRepository!.get(f.task.id)!
-  expect(saved).toMatchObject({ status: 'running', artifacts: [{ sourceEvidenceStatus: 'draft', validation: 'valid' }] })
-  expect(saved.artifacts[0]!.sourceEvidenceReceiptId).toBeUndefined()
+  expect(saved).toMatchObject({ status: 'running', artifacts: [] })
   expect(saved.resultEvidence?.some(evidence => evidence.kind === 'file' && evidence.verified)).not.toBe(true)
   expect(saved.nodes.some(node => node.status !== 'completed')).toBe(true)
   const count = f.runtime.taskRepository!.events(f.task.id).filter(event => event.kind === 'artifact_published').length
   const revision = saved.revision
-  expect(await f.runtime.taskController!.recordArtifactPublication(value.operation.token, value.operation.key)).toBe(true)
+  expect(await f.runtime.taskController!.recordArtifactPublication(value.operation.token, value.operation.key)).toBe(false)
   expect(f.runtime.taskRepository!.get(f.task.id)!.revision).toBe(revision)
   expect(f.runtime.taskRepository!.events(f.task.id).filter(event => event.kind === 'artifact_published')).toHaveLength(count)
-  expect((await f.api(`/v1/tasks/${f.task.id}/artifacts/${saved.artifacts[0]!.id}/proof`)).status).toBe(200)
+  expect(count).toBe(0)
 })

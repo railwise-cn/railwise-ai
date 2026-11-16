@@ -61,10 +61,11 @@ import { sanitizeTurnItemForPersistence } from '../security/tool-persistence-sec
 import { validateArtifactFile } from './artifact-validator.js'
 import type { RuntimeSpanService } from './runtime-span-service.js'
 import { verifyTaskDelivery } from '../delivery/verification.js'
-import type { WebArtifactEvidenceInput } from '../contracts/web-artifact-evidence.js'
-import { assessWebArtifactEvidence, verifiedWebArtifactEvidence, webArtifactRequirementHash, webEvidenceRepair } from './web-artifact-evidence.js'
+import { WebArtifactEvidenceInputSchema, type WebArtifactEvidenceInput } from '../contracts/web-artifact-evidence.js'
+import { assessWebArtifactEvidence, verifiedWebArtifactEvidence, webArtifactFailureKinds, webArtifactManifestSourceProof, webArtifactPublicationReadiness, webArtifactRequirementHash, webEvidenceRepair } from './web-artifact-evidence.js'
+import { deriveWebArtifactRepairState, type WebArtifactRepairAttempt } from './web-artifact-repair-state.js'
 
-import { taskPermissionFailure } from './task-permission-recovery.js'
+import { taskPermissionCapability, taskPermissionFailure } from './task-permission-recovery.js'
 
 const DEFAULT_MAX_ATTEMPTS = 8
 const DEFAULT_MAX_DURATION_MS = 30 * 60 * 1000
@@ -504,6 +505,161 @@ export class TaskController {
   }
 
   /** Binds source provenance to existing exact artifact bytes; it never fetches or edits sources. */
+  private webArtifactRepairAttempts(task: TaskRun): WebArtifactRepairAttempt[] {
+    return this.repository.operations(task.id).flatMap(receipt => {
+      const result = receipt.result as { complete?: boolean; reasons?: unknown; failureKinds?: unknown } | undefined
+      if (!['web_artifact_evidence', 'web_artifact_source_gate'].includes(receipt.kind) || receipt.status !== 'failed' || receipt.fingerprint !== operationFingerprint(receipt.request) || typeof receipt.request?.artifactPath !== 'string' ||
+        typeof receipt.request.requirementHash !== 'string' || typeof receipt.request.evidenceFingerprint !== 'string' || result?.complete !== false ||
+        !Array.isArray(result.reasons) || !result.reasons.every(value => typeof value === 'string') ||
+        !Array.isArray(result.failureKinds) || !result.failureKinds.every(value => typeof value === 'string')) return []
+      return [{ id: receipt.id, requirementHash: receipt.request.requirementHash, evidenceFingerprint: receipt.request.evidenceFingerprint,
+        failureKinds: result.failureKinds, reasons: result.reasons }]
+    })
+  }
+
+  /** A rejected report write/read attempt is durable too; file changes never reset it. */
+  async recordWebArtifactPublicationBlock(taskId: string, turnId: string, path: string, evidence?: WebArtifactEvidenceInput) {
+    const gate = await this.webArtifactPublicationGate(taskId, turnId, path, evidence)
+    if (!gate || gate.ready || gate.stalled) return gate
+    const task = this.repository.get(taskId)!, artifactPath = resolve(this.managedArtifactRoot(taskId)!, path)
+    const attempts = this.webArtifactRepairAttempts(task), failureKinds = gate.reportManifestRequired ? ['source_manifest_required'] : gate.missingOrigins.length
+      ? gate.missingOrigins.map(origin => `source_origin:${origin}`).sort() : ['source_read_required']
+    const request = { artifactPath, requirementHash: gate.requirementHash, evidenceFingerprint: gate.evidenceFingerprint, turnId,
+      ...(evidence ? { input: evidence } : {}) }
+    const key = `web-source-gate:${turnId}:${operationFingerprint(request)}:${attempts.length}`
+    const receipt = this.repository.beginOperation({ ownerId: taskId, kind: 'web_artifact_source_gate', idempotencyKey: key, request, nowIso: this.nowIso() }).receipt
+    const semanticRepair = deriveWebArtifactRepairState(attempts, { id: receipt.id, requirementHash: gate.requirementHash,
+      evidenceFingerprint: gate.evidenceFingerprint, failureKinds, reasons: gate.reasons })
+    this.repository.finishOperation(taskId, key, { status: 'failed', result: { complete: false, failureKinds, reasons: gate.reasons, semanticRepair } }, this.nowIso())
+    return { ...gate, stalled: semanticRepair.stalled, code: semanticRepair.stalled ? 'web_artifact_repair_stalled' : gate.code, semanticRepair }
+  }
+
+  /** Source-first publication gate; only task-owned receipts can establish progress. */
+  async webArtifactPublicationGate(taskId: string, turnId: string, path: string, evidence?: WebArtifactEvidenceInput) {
+    const task = this.repository.get(taskId)
+    if (!task?.acceptance.requiresWebEvidence || !/\.html?$/i.test(path)) return null
+    const token = this.attemptTokens.get(turnId)
+    if (!token || token.taskId !== taskId || task.activeTurnId !== turnId || task.status !== 'running') throw Object.assign(new Error('Active task execution is required.'), { code: 'execution_grant_scope' })
+    this.assertToken(token)
+    const artifactPath = resolve(this.managedArtifactRoot(taskId)!, path), requirementHash = webArtifactRequirementHash(task)
+    const records = this.repository.operations(taskId).filter(receipt => ['web_artifact_evidence', 'web_artifact_source_gate'].includes(receipt.kind))
+    const priorInput = [...records].reverse().find(receipt => receipt.kind === 'web_artifact_evidence' && receipt.request?.input && receipt.fingerprint === operationFingerprint(receipt.request) &&
+      receipt.request?.artifactPath === artifactPath && receipt.request.requirementHash === requirementHash)?.request?.input
+    const parsed = WebArtifactEvidenceInputSchema.safeParse(priorInput)
+    const [thread, items] = await Promise.all([this.threadStore.get(task.threadId), this.sessionStore.loadItems(task.threadId)])
+    this.assertToken(token)
+    const grant = thread?.turns.find(turn => turn.id === turnId)?.executionGrant
+    const sourceGate = webArtifactPublicationReadiness(this.repository, task, items, thread?.turns ?? [], evidence ?? (parsed.success ? parsed.data : undefined), grant?.browserScope?.origins ?? [])
+    const attempts = this.webArtifactRepairAttempts(task), latest = attempts.at(-1)
+    const semanticRepair = latest?.requirementHash === requirementHash && latest.evidenceFingerprint === sourceGate.evidenceFingerprint
+      ? deriveWebArtifactRepairState(attempts) : undefined
+    const stalled = semanticRepair?.stalled === true
+    return { ...sourceGate, ready: sourceGate.ready && !stalled, stalled, requirementHash,
+      code: stalled ? 'web_artifact_repair_stalled' : sourceGate.ready ? undefined : 'web_source_reads_required',
+      reasons: stalled ? semanticRepair.reasons : sourceGate.ready ? [] : sourceGate.missingOrigins.length
+        ? sourceGate.missingOrigins.map(origin => `正式公告正文尚未核验：${origin}`) : ['尚缺可信的完整正文来源读取或实际零匹配页面。'],
+      ...(semanticRepair ? { semanticRepair } : {}) }
+  }
+
+  /** Trusted query for AgentLoop; tool/MCP output cannot manufacture this blocker. */
+  async webArtifactProgressBlock(threadId: string, turnId: string) {
+    const task = this.repository.findActiveByThread(threadId)
+    if (!task || task.activeTurnId !== turnId || task.status !== 'running' || task.acceptance.kind !== 'files' || !task.acceptance.requiresWebEvidence) return null
+    const paths = [...new Set(this.repository.operations(task.id).filter(receipt => ['web_artifact_evidence', 'web_artifact_source_gate'].includes(receipt.kind)).map(receipt => receipt.request?.artifactPath)
+      .filter((path): path is string => typeof path === 'string').map(path => relative(this.managedArtifactRoot(task.id)!, path)))]
+    for (const path of paths.reverse()) {
+      const gate = await this.webArtifactPublicationGate(task.id, turnId, path)
+      if (gate?.stalled) return gate
+    }
+    if (!task.acceptance.requiredFormats?.some(format => ['html', 'htm'].includes(format)) && !task.artifacts.some(file => /\.html?$/i.test(file.relativePath))) return null
+    const gate = await this.webArtifactPublicationGate(task.id, turnId, paths[0] ?? 'report.html')
+    return gate && !gate.ready ? gate : null
+  }
+
+  /** Stop only the exact persisted semantic stall, preserving every draft and original failure. */
+  async suspendWebArtifactProgress(threadId: string, turnId: string): Promise<Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null> {
+    const block = await this.webArtifactProgressBlock(threadId, turnId)
+    if (!block?.stalled) return null
+    const task = this.repository.findActiveByThread(threadId), token = this.attemptTokens.get(turnId)
+    if (!task || task.activeTurnId !== turnId || task.status !== 'running' || !token || token.taskId !== task.id) return null
+    this.assertToken(token)
+    const fingerprint = `web-artifact-repair:${block.semanticRepair!.fingerprint}`
+    const reason = `相同来源或字段问题在一次修复后仍未解决，已停止重复发布；已有草稿和原始核验记录已保留。${block.reasons.join('；')}`
+    return this.repository.transact(() => {
+      const result = this.waitForUser(task, reason, task.finalResponse ?? '', fingerprint, turnId)
+      const id = `web_evidence_${task.id}`, prior = this.repository.attention(id), now = this.nowIso()
+      this.repository.putAttention({ id, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: task.originThreadId ?? task.threadId,
+        workspaceRoot: task.workspaceRoot, kind: 'blocked', title: '网页来源核验需要处理', message: reason, status: 'pending',
+        revision: (prior?.revision ?? -1) + 1, createdAt: prior?.createdAt ?? now, updatedAt: now,
+        payload: { kind: 'web_artifact_repair_stalled', code: block.code, reasons: block.reasons, missingOrigins: block.missingOrigins,
+          nextReads: block.nextReads, fingerprint: block.semanticRepair!.fingerprint } })
+      return result
+    })
+  }
+
+  /** Seal an exact typed manifest only for the real in-flight built-in writer. No URL is sent through generic output redaction. */
+  async recordWebArtifactPublicationManifest(taskId: string, turnId: string, path: string, artifactHash: string, input: WebArtifactEvidenceInput, args: Record<string, unknown>, hostOperation?: CurrentToolOperation) {
+    const token = this.attemptTokens.get(turnId), task = this.repository.get(taskId)
+    if (!task || !token || token.taskId !== taskId || task.activeTurnId !== turnId || task.status !== 'running') throw Object.assign(new Error('Active task execution is required.'), { code: 'execution_grant_scope' })
+    this.assertToken(token)
+    const normalized = WebArtifactEvidenceInputSchema.parse(input), artifactPath = resolve(this.managedArtifactRoot(taskId)!, path)
+    if (normalized.path !== path || !/^[a-f0-9]{64}$/.test(artifactHash)) throw Object.assign(new Error('Publication manifest path or hash does not match its writer.'), { code: 'artifact_manifest_scope' })
+    const report = args.report && typeof args.report === 'object' ? args.report as Record<string, unknown> : undefined
+    const proposed = WebArtifactEvidenceInputSchema.safeParse({ path, ...(report?.evidence && typeof report.evidence === 'object' ? report.evidence : {}) })
+    if (!proposed.success || operationFingerprint(proposed.data) !== operationFingerprint(normalized)) throw Object.assign(new Error('Publication manifest differs from the real writer arguments.'), { code: 'artifact_manifest_scope' })
+    const writer = hostOperation && this.repository.operation(taskId, hostOperation.idempotencyKey)
+    if (!hostOperation || !writer || writer.id !== hostOperation.operationId || writer.kind !== 'tool' || !['prepared', 'running'].includes(writer.status) ||
+      writer.fingerprint !== operationFingerprint(writer.request) || writer.request?.dispatchTracking !== 'host-v1' || writer.request.toolName !== 'publish_artifact' ||
+      writer.request.providerId !== 'managed-artifacts' || writer.request.turnId !== turnId || writer.request.executionId !== token.executionId ||
+      writer.request.argumentsHash !== operationFingerprint(args) || hostOperation.taskId !== taskId || hostOperation.turnId !== turnId ||
+      hostOperation.executionId !== token.executionId || hostOperation.argumentsHash !== writer.request.argumentsHash ||
+      hostOperation.executionGrantFingerprint !== operationFingerprint(writer.request.executionGrant)) {
+      throw Object.assign(new Error('Publication manifest requires the actual managed-artifacts Host invocation.'), { code: 'artifact_manifest_writer_required' })
+    }
+    const [thread, items] = await Promise.all([this.threadStore.get(task.threadId), this.sessionStore.loadItems(task.threadId)])
+    this.assertToken(token)
+    const sourceProof = webArtifactManifestSourceProof(this.repository, task, items, thread?.turns ?? [], normalized)
+    const inputHash = operationFingerprint(normalized), request = { taskId, threadId: task.threadId, path, artifactPath, artifactHash, inputHash,
+      writerReceiptId: writer.id, requirementHash: webArtifactRequirementHash(task), input: normalized, sourceProof }
+    const manifestRef = `web-manifest:${operationFingerprint(request)}`
+    this.repository.beginOperation({ ownerId: taskId, kind: 'web_artifact_publication_manifest', idempotencyKey: manifestRef, request, nowIso: this.nowIso() })
+    this.repository.finishOperation(taskId, manifestRef, { status: 'succeeded', result: { sealed: true, inputHash, artifactHash } }, this.nowIso())
+    return { verificationInput: { path, manifestRef }, verificationInputHash: inputHash }
+  }
+
+  /** Restore exact URL identity from a private sealed manifest, including across a legitimate later Turn/restart. */
+  async resolveWebArtifactPublicationManifest(taskId: string, turnId: string, path: string, manifestRef: string, artifactHash: string): Promise<WebArtifactEvidenceInput> {
+    const token = this.attemptTokens.get(turnId), task = this.repository.get(taskId)
+    if (!task || !token || token.taskId !== taskId || task.activeTurnId !== turnId || task.status !== 'running') throw Object.assign(new Error('Active task execution is required.'), { code: 'execution_grant_scope' })
+    this.assertToken(token)
+    const fail = (): never => { throw Object.assign(new Error('发布清单不属于当前任务、原文件字节或可信来源。'), { code: 'artifact_manifest_scope' }) }
+    if (!/^web-manifest:[a-f0-9]{64}$/.test(manifestRef)) fail()
+    const receipt = this.repository.operation(taskId, manifestRef), request = receipt?.request
+    const sealed = receipt?.result as { sealed?: unknown; inputHash?: unknown; artifactHash?: unknown } | undefined
+    if (!receipt || receipt.kind !== 'web_artifact_publication_manifest' || receipt.status !== 'succeeded' || receipt.fingerprint !== operationFingerprint(request) ||
+      manifestRef !== `web-manifest:${operationFingerprint(request)}` || request?.taskId !== taskId || request.threadId !== task.threadId || request.path !== path ||
+      request.artifactPath !== resolve(this.managedArtifactRoot(taskId)!, path) || request.artifactHash !== artifactHash || request.requirementHash !== webArtifactRequirementHash(task) ||
+      sealed?.sealed !== true || sealed.inputHash !== request.inputHash || sealed.artifactHash !== artifactHash) fail()
+    const input = WebArtifactEvidenceInputSchema.parse(request!.input)
+    if (input.path !== path || operationFingerprint(input) !== request!.inputHash) fail()
+    const [thread, items] = await Promise.all([this.threadStore.get(task.threadId), this.sessionStore.loadItems(task.threadId)])
+    this.assertToken(token)
+    const currentGrant = ExecutionGrantSchema.safeParse(thread?.turns.find(turn => turn.id === turnId)?.executionGrant)
+    if (!currentGrant.success || currentGrant.data.taskId !== taskId || currentGrant.data.threadId !== task.threadId || currentGrant.data.turnId !== turnId ||
+      currentGrant.data.managedArtifactRoot !== this.managedArtifactRoot(taskId) || Date.parse(currentGrant.data.issuedAt) > Date.parse(this.nowIso()) ||
+      (currentGrant.data.expiresAt && Date.parse(currentGrant.data.expiresAt) <= Date.parse(this.nowIso())) ||
+      (currentGrant.data.allowedToolNames && !currentGrant.data.allowedToolNames.includes('verify_web_artifact'))) fail()
+    const writes = await authorizedArtifactWrites(task, this.repository.operations(taskId, 'tool'), thread?.turns ?? [])
+    this.assertToken(token)
+    const writer = writes.get(String(request!.artifactPath))
+    if (!writer || writer.operationId !== request!.writerReceiptId || writer.sha256 !== artifactHash || writer.authorizedRoot !== this.managedArtifactRoot(taskId)) fail()
+    const writerReceipt = this.repository.operations(taskId, 'tool').find(row => row.id === writer!.operationId)
+    if (!writerReceipt || writerReceipt.fingerprint !== operationFingerprint(writerReceipt.request) || writerReceipt.request?.providerId !== 'managed-artifacts') fail()
+    const sourceProof = webArtifactManifestSourceProof(this.repository, task, items, thread?.turns ?? [], input)
+    if (operationFingerprint(sourceProof) !== operationFingerprint(request!.sourceProof)) fail()
+    return input
+  }
+
   async verifyWebArtifact(taskId: string, turnId: string, artifactPath: string, artifactHash: string, html: string, input: WebArtifactEvidenceInput) {
     const token = this.attemptTokens.get(turnId)
     if (!token || token.taskId !== taskId) throw Object.assign(new Error('Active task execution is required.'), { code: 'execution_grant_scope' })
@@ -515,11 +671,17 @@ export class TaskController {
     const write = writes.get(artifactPath)
     if (!write || write.sha256 !== artifactHash || createHash('sha256').update(html).digest('hex') !== artifactHash) throw Object.assign(new Error('The exact artifact has no matching successful writer receipt.'), { code: 'artifact_write_proof_required' })
     const assessment = assessWebArtifactEvidence(this.repository, task, items, thread?.turns ?? [], html, input, this.nowIso())
+    const sourceGate = webArtifactPublicationReadiness(this.repository, task, items, thread?.turns ?? [], input,
+      thread?.turns.find(turn => turn.id === turnId)?.executionGrant?.browserScope?.origins ?? [])
     const request = { artifactPath, artifactHash, writerReceiptId: write.operationId, requirementHash: webArtifactRequirementHash(task), input,
-      sourceReceiptIds: assessment.sourceReceipts.map(source => source.receiptId).sort() }
+      sourceReceiptIds: assessment.sourceReceipts.map(source => source.receiptId).sort(), evidenceFingerprint: sourceGate.evidenceFingerprint }
     const key = `web-artifact-evidence:${operationFingerprint(request)}`
     const receipt = this.repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'web_artifact_evidence', request, nowIso: this.nowIso() }).receipt
-    const result = { ...assessment, artifactHash, evidenceReceiptId: receipt.id, ...(assessment.complete ? {} : { code: 'web_artifact_evidence_incomplete', repair: webEvidenceRepair(task) }) }
+    const failureKinds = webArtifactFailureKinds(assessment.reasons)
+    const semanticRepair = deriveWebArtifactRepairState(this.webArtifactRepairAttempts(task), {
+      id: receipt.id, requirementHash: request.requirementHash, evidenceFingerprint: sourceGate.evidenceFingerprint, failureKinds, reasons: assessment.reasons })
+    const result = { ...assessment, artifactHash, evidenceReceiptId: receipt.id, sourceGate, failureKinds, semanticRepair,
+      ...(assessment.complete ? {} : { code: semanticRepair.stalled ? 'web_artifact_repair_stalled' : 'web_artifact_evidence_incomplete', repair: webEvidenceRepair(task) }) }
     this.repository.finishOperation(task.id, key, { status: assessment.complete ? 'succeeded' : 'failed', result }, this.nowIso())
     return result
   }
@@ -759,7 +921,7 @@ export class TaskController {
     if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? failure.message }
     const unknown = this.suspendUnknownToolOutcome(threadId, turnId)
     if (unknown) return unknown
-    return this.waitForCapability(task, turnId, workspacePermissionCapability(failure.code, failure.message), failure.code)
+    return this.waitForCapability(task, turnId, taskPermissionCapability(failure,task,this.nowIso()), failure.code)
   }
 
   private waitForToolPermission(task: TaskRun, items: TurnItem[], turnId: string, currentGrant?: ExecutionGrant): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> | null {

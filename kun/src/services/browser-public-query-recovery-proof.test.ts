@@ -57,6 +57,63 @@ async function fixture(){
   const mutate=(row:OperationReceipt,change:Partial<OperationReceipt>)=>repo.connection().prepare('UPDATE operation_receipts SET data_json=? WHERE owner_id=? AND idempotency_key=?').run(JSON.stringify({...row,...change}),row.ownerId,row.idempotencyKey)
   return {repo,owner,child,grant,host,dispatch,lock,context,binding,scopeInput,mutate,save}
 }
+
+async function scheduledRetryFixture(){
+  const f=await fixture(),dueAt='2026-11-16T00:30:00.000Z'
+  // The real failure was a Retry of a later server-created scheduled occurrence,
+  // not a Retry of the old recovery owner or the original plan source.
+  const root=f.repo.create({...f.owner,id:'scheduled-next',threadId:'scheduled-next-thread',rootTaskId:undefined,retryOfTaskId:undefined,
+    scheduledBy:{scheduleId:f.binding.scheduleId!,dueAt},activeTurnId:'scheduled-turn',status:'failed',revision:0})
+  const prepared=f.save(root.threadId,'scheduled-task-context','scheduled_task_prepare',{
+    scheduleId:f.binding.scheduleId,versionId:f.binding.versionId,dueAt,authorityHash:'e'.repeat(64)
+  },'succeeded',{prepared:true})
+  const request={expectedRevision:root.revision,idempotencyKey:'scheduled-retry'}
+  f.repo.beginOperation({ownerId:root.id,idempotencyKey:request.idempotencyKey,kind:'retry',request,nowIso:now})
+  let child=f.repo.create({...root,id:'scheduled-retry',rootTaskId:root.id,retryOfTaskId:root.id,status:'running',activeTurnId:'scheduled-retry-turn',revision:0})
+  child=f.repo.update(child.id,child.revision,t=>t,{key:'scheduled-retried',kind:'task_retried',payload:{retryOfTaskId:root.id,rootTaskId:root.id},createdAt:now})
+  const control=f.repo.finishOperation(root.id,request.idempotencyKey,{status:'succeeded',result:{task:child}},now)
+  const scope={...f.scopeInput,scheduleScopeHash:f.binding.planScopeHash}
+  return {...f,root,scheduledChild:child,prepared,control,scheduledScope:scope}
+}
+
+it('accepts a trusted Retry of a later sealed scheduled occurrence without rewriting any old unknown',async()=>{
+  const f=await scheduledRetryFixture(),raw=[f.host,f.dispatch,f.lock].map(r=>JSON.stringify(r))
+  expect(f.scheduledChild.rootTaskId).not.toBe(f.binding.ownerTaskId)
+  expect(f.scheduledChild.rootTaskId).not.toBe(f.binding.sourceTaskId)
+  const scope=recoveryExecutionScope(f.repo,f.scheduledChild,f.scheduledScope,Date.parse(now))
+  expect(scope.expiresAt).toBe('2026-11-15T12:15:00.000Z')
+  expect(scope.networkAllowlist).toEqual(['https://public.test'])
+  const grant=ExecutionGrantSchema.parse({...f.grant,...scope,id:'scheduled-retry-grant',taskId:f.scheduledChild.id,
+    threadId:f.scheduledChild.threadId,turnId:f.scheduledChild.activeTurnId,issuedAt:now})
+  expect(()=>assertRecoveryGrant(f.repo,grant)).not.toThrow()
+  expect([f.host,f.dispatch,f.lock].map(r=>JSON.stringify(f.repo.operations(r.ownerId).find(x=>x.id===r.id)))).toEqual(raw)
+  expect([f.host,f.dispatch,f.lock].map(r=>f.repo.verifiedOperationResolution(r))).toEqual([undefined,undefined,undefined])
+})
+
+it.each(['plan','version','plan-scope','origin','browser','identity','preparation','prepared-plan','prepared-version','prepared-due','retry-provenance','root-binding'] as const)(
+  'rejects scheduled Retry with changed %s provenance',async field=>{
+    const f=await scheduledRetryFixture()
+    let scope=f.scheduledScope
+    if(field==='plan')scope={...scope,browserScheduleBinding:{...scope.browserScheduleBinding,scheduleId:'unrelated-plan'}}
+    if(field==='version')scope={...scope,browserScheduleBinding:{...scope.browserScheduleBinding,versionId:'unrelated-version'}}
+    if(field==='plan-scope')scope={...scope,browserScheduleBinding:{...scope.browserScheduleBinding,scopeHash:'0'.repeat(64)}}
+    if(field==='origin')scope={...scope,browserScope:{...scope.browserScope,origins:['https://unapproved.test']}}
+    if(field==='browser')scope={...scope,browserScope:{...scope.browserScope,browserInstanceId:'other-browser'}}
+    if(field==='identity')scope={...scope,connectorIdentityFingerprints:{'browser-skill':'0'.repeat(64)}}
+    if(field==='preparation')f.mutate(f.prepared,{status:'failed'})
+    if(field==='prepared-plan'||field==='prepared-version'||field==='prepared-due'){
+      const request={...f.prepared.request,...(field==='prepared-plan'?{scheduleId:'unrelated-plan'}:field==='prepared-version'?{versionId:'unrelated-version'}:{dueAt:'2026-11-17T00:30:00.000Z'})}
+      f.mutate(f.prepared,{request,fingerprint:fp(request)})
+    }
+    if(field==='retry-provenance')f.mutate(f.control,{status:'failed'})
+    if(field==='root-binding')f.repo.update(f.root.id,f.root.revision,t=>({...t,publicQueryRecovery:undefined}))
+    expect(()=>recoveryExecutionScope(f.repo,f.scheduledChild,scope,Date.parse(now))).toThrow('公开查询恢复范围已变化')
+    const grant=ExecutionGrantSchema.parse({...f.grant,...scope,externalTargets:[],allowedProviderIds:['browser-skill'],
+      allowedToolNames:['browser_observe'],id:'rejected-scheduled-grant',taskId:f.scheduledChild.id,threadId:f.scheduledChild.threadId,
+      turnId:f.scheduledChild.activeTurnId,issuedAt:now})
+    expect(()=>assertRecoveryGrant(f.repo,grant)).toThrow()
+  }
+)
 it('keeps all three unknown rows unresolved while narrowing only a fresh proven retry Grant',async()=>{
   const f=await fixture(), raw=[f.host,f.dispatch,f.lock].map(r=>JSON.stringify(r))
   expect(verifiedPublicQueryRecovery(f.repo,f.binding)).toBeTruthy()

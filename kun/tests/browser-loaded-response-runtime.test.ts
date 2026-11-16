@@ -5,8 +5,10 @@ import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
+import { WebArtifactEvidenceInputSchema } from '../src/contracts/web-artifact-evidence.js'
 import { buildRouter } from '../src/server/routes/index.js'
 import { dispatchRequest } from '../src/server/http-server.js'
+import { operationFingerprint } from '../src/services/task-run-repository.js'
 import type { BrowserTaskBindingSnapshot } from '../src/contracts/browser-skill.js'
 
 // Existing released 67-name tool scope; only public tool identifiers, no user identity or captured content.
@@ -79,11 +81,12 @@ async function fixture(mode: 'valid' | 'masked' | 'injected-args' | 'cleanup-fai
     let args: Record<string, unknown> = index === 0 ? {} : index === 1 ? { sessionId: 'owned-session', url: PARENT } : { sessionId: 'owned-session' }
     if (index === 2 && mode === 'subtree') args = { ...args, target: '@e1' }
     if (index === 2 && mode === 'injected-args') args = { ...args, requestId: 'foreign', url: 'https://foreign.example.test/steal', expression: 'not allowed' }
-    if (index === 3) args = { path: 'report.html', content: `<!doctype html><html lang="zh-CN"><head><title>原文核验报告</title></head><body><main data-evidence-report><article id="primary" data-evidence-item="primary" data-evidence-classification="source"><h1 data-evidence-field="title">${PROJECT}</h1><p data-evidence-field="other">${QUOTE}</p><a data-evidence-source href="${PARENT}">原文</a></article></main></body></html>` }
-    if (index === 4) args = { path: 'report.html' }
-    if (index === 5) args = { path: 'report.html', coverage: [{ url: PARENT, resultHash: source.resultHash }], items: [{ sectionId: 'primary', title: PROJECT,
+    const evidence = { coverage: [{ url: PARENT, resultHash: source.resultHash }], items: [{ sectionId: 'primary', title: PROJECT,
       source: { url: PARENT, resultHash: source.resultHash }, discovery: { url: PARENT, resultHash: source.resultHash }, classification: 'source',
-      fields: [{ field: 'title', value: PROJECT, quote: PROJECT }, { field: 'other', value: QUOTE, quote: QUOTE }], unverifiedFields: [] }] }
+      fields: [{ field: 'title', value: PROJECT, quote: PROJECT }, { field: 'other', value: QUOTE, quote: QUOTE }], unverifiedFields: [] }], noMatches: [] }
+    if (index === 3) args = { path: 'report.html', report: { title: '原文核验报告', evidence } }
+    if (index === 4) args = { path: 'report.html' }
+    if (index === 5) args = output('publish_artifact').verificationInput as Record<string, unknown>
     response.writeHead(200, { 'content-type': 'text/event-stream' }); response.end(`data: ${JSON.stringify({ id: 'response-model', choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: `response-${index}`, type: 'function', function: { name: tool, arguments: JSON.stringify(args) } }] }, finish_reason: 'tool_calls' }] })}\n\ndata: [DONE]\n\n`)
   })
   await new Promise<void>(resolve => model.listen(0, '127.0.0.1', resolve)); cleanup.push(() => new Promise<void>(resolve => { model.close(() => resolve()); model.closeAllConnections() }))
@@ -125,6 +128,18 @@ it('uses the actual catalog, immutable Grant, native representation and saved-fi
   expect(turn.executionGrant!.allowedToolNames!.every(name => LEGACY_TOOL_NAMES.includes(name))).toBe(true)
   expect(f.output('browser_get_html')).toMatchObject({ status: 'succeeded', sourceKind: 'actual_loaded_response', html: SOURCE_HTML,
     readScope: 'response_document', nativeProof: { responseBodyRedacted: false, association: 'projectName' } })
+  expect(f.output('publish_artifact'), 'The first publication must pass the real source-first gate before any file read or verification.').toMatchObject({ bytes_written: expect.any(Number) })
+  const originalInput = WebArtifactEvidenceInputSchema.parse({ path: 'report.html', coverage: [{ url: PARENT, resultHash: f.output('browser_get_html').resultHash }],
+    items: [{ sectionId: 'primary', title: PROJECT, source: { url: PARENT, resultHash: f.output('browser_get_html').resultHash },
+      discovery: { url: PARENT, resultHash: f.output('browser_get_html').resultHash }, classification: 'source',
+      fields: [{ field: 'title', value: PROJECT, quote: PROJECT }, { field: 'other', value: QUOTE, quote: QUOTE }], unverifiedFields: [] }], noMatches: [] })
+  const published = f.output('publish_artifact')
+  expect(published.verificationInput).toEqual({ path: 'report.html', manifestRef: expect.stringMatching(/^web-manifest:[a-f0-9]{64}$/) })
+  expect(published.verificationInputHash).toBe(operationFingerprint(originalInput))
+  const manifestRef = (published.verificationInput as { manifestRef: string }).manifestRef
+  const storedInput = WebArtifactEvidenceInputSchema.parse(f.runtime.taskRepository!.operation(f.taskId, manifestRef)?.request?.input)
+  expect(storedInput).toEqual(originalInput)
+  expect(new URL(storedInput.items[0]!.source.url).searchParams.get('articleId')).toBe('article-one')
   expect(f.output('verify_web_artifact')).toMatchObject({ complete: true })
   expect(task.status).toBe('completed')
   expect(task.artifacts[0]).toMatchObject({ validation: 'valid', sourceEvidenceStatus: 'verified', sourceEvidenceReceiptId: expect.any(String) })

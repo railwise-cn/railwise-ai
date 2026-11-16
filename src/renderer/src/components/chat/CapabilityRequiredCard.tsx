@@ -80,6 +80,10 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       return
     }
     const route = action?.route ?? ''
+    if (isBrowser && route === 'task/public-query-recovery') {
+      openOriginalTask()
+      return
+    }
     if (capability.provider === 'schedule' && route === 'task/schedule-review') {
       void run(recheck)
       return
