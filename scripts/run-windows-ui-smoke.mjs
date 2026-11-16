@@ -534,6 +534,53 @@ export async function openWindowsTaskConversation(cdp, task) {
   return { taskId: task.id, goal: task.goal, filter: 'all', exactTaskSelected: true, input: 'real-cdp-mouse' }
 }
 
+export function windowsTaskArtifactPreviewExpression({ marker, relativePath, evidence }) {
+  const expected = { marker, relativePath, evidence }
+  return `(async()=>{
+    const expected=${JSON.stringify(expected)};
+    const views=Array.from(document.querySelectorAll('webview[src*="/task-preview/"]')).filter(view=>view.getClientRects().length);
+    if(views.length!==1)return null;
+    const view=views[0];
+    try {
+      if(view.isLoading())return null;
+      const url=new URL(view.getURL()),path=url.pathname.split('/'),partition=view.getAttribute('partition');
+      if(url.protocol!=='http:' || url.hostname!=='127.0.0.1' || url.search || url.hash || path[1]!=='task-preview' || !/^[a-f0-9]{48}$/.test(path[2]) ||
+        decodeURIComponent(path.slice(3).join('/'))!==expected.relativePath || partition!=='railwise-artifact-'+path[2] || new URL(view.getAttribute('src')).href!==url.href)return null;
+      const page=await view.executeJavaScript('({title:document.title,text:document.body.innerText,state:document.readyState,url:location.href,html:document.documentElement.outerHTML})');
+      if(page.state!=='complete' || !page.text.includes(expected.marker) || new URL(page.url).href!==url.href)return null;
+      if(expected.evidence){
+        if(expected.evidence.path!==expected.relativePath)return null;
+        const document=new DOMParser().parseFromString(page.html,'text/html'),reports=document.querySelectorAll('main[data-evidence-report]');
+        if(reports.length!==1)return null;
+        const rows=Array.from(reports[0].querySelectorAll('[data-evidence-item]'));
+        if(rows.length!==expected.evidence.items.length)return null;
+        const text=value=>{
+          const node=new DOMParser().parseFromString(value,'text/html');
+          node.querySelectorAll('script,style,template').forEach(element=>element.remove());
+          return node.body.textContent.replace(/\\s+/g,'');
+        };
+        for(const item of expected.evidence.items){
+          const matches=rows.filter(row=>row.id===item.sectionId && row.getAttribute('data-evidence-item')===item.sectionId);
+          if(matches.length!==1 || matches[0].getAttribute('data-evidence-classification')!==item.classification)return null;
+          const row=matches[0],fields=Array.from(row.querySelectorAll('[data-evidence-field]')),unknown=item.unverifiedFields??[];
+          if(fields.length!==item.fields.length+unknown.length)return null;
+          for(const field of item.fields){
+            const actual=fields.filter(node=>node.getAttribute('data-evidence-field')===field.field);
+            if(actual.length!==1 || actual[0].hasAttribute('data-evidence-unverified') || actual[0].textContent.replace(/\\s+/g,'')!==text(field.value))return null;
+          }
+          for(const field of unknown){
+            const actual=fields.filter(node=>node.getAttribute('data-evidence-field')===field);
+            if(actual.length!==1 || !actual[0].hasAttribute('data-evidence-unverified') || actual[0].textContent.trim()!=='待核验')return null;
+          }
+          const links=row.querySelectorAll('a[data-evidence-source]');
+          if(links.length!==1 || new URL(links[0].getAttribute('href'),page.url).href!==new URL(item.source.url).href)return null;
+        }
+      }
+      return {title:page.title,contentVerified:true,partition};
+    } catch { return null; }
+  })()`
+}
+
 export function windowsTaskPreviewLayoutExpression() {
   return `(() => {
     const workspace=document.querySelector('section[aria-label="任务"]'),details=workspace?.querySelector('article[aria-label="任务详情"]'),sidebar=document.querySelector('section.ds-task-sidebar[aria-label="任务列表"]'),list=sidebar??workspace?.querySelector('[aria-label="任务列表"]'),columns=workspace?.querySelector('.ds-task-workspace-detail')??workspace?.querySelector('.ds-task-workspace-columns');
@@ -2517,6 +2564,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const prompt = windowsTaskPrompt(taskModel, browserSmoke)
       await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
       await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]:not(:disabled)'))`, 'the active conversation composer')
+      let previewEvidence
       if (browserSmoke) {
         report.adaptiveWorkbench = { status: 'running', menus: [] }
         report.adaptiveWorkbench = await runWindowsAdaptiveComposerAcceptance(cdp, { pid: child.pid, environment, audit: report.adaptiveWorkbench })
@@ -2757,16 +2805,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           documentNavigation: inspectWindowsDocumentNavigation(task, execution, queryReceipts, taskModel) }
         validateWindowsBrowserEvidence(report.taskExecution.browserSkill)
         report.checks.push('real-browser-skill-html-and-schedule')
+        previewEvidence = buildWindowsFixtureWebReport({ list: outputs.find(item => item.callId === 'smoke-read-results')?.output,
+          detail: outputs.find(item => item.callId === 'smoke-read-detail')?.output, ...taskModel }).verification
       }
-      const previewExpression = `(async()=>{
-        const view=document.querySelector('webview[src*="/task-preview/"]');
-        if(!view || !view.getClientRects().length)return null;
-        try {
-          if(view.isLoading())return null;
-          const page=await view.executeJavaScript('({title:document.title,text:document.body.innerText,state:document.readyState})');
-          return page.state==='complete' && page.text.includes(${JSON.stringify(browserSmoke ? taskModel.marker : '合成内容')}) ${browserSmoke ? `&& page.text.includes(${JSON.stringify(`本地查询结果：${taskModel.query}；已完成合成公开检索`)})` : ''} ? {title:page.title,contentVerified:true,partition:view.getAttribute('partition')} : null;
-        } catch { return null; }
-      })()`
+      const previewExpression = windowsTaskArtifactPreviewExpression({ marker: browserSmoke ? taskModel.marker : '合成内容',
+        relativePath: artifact.relativePath, evidence: previewEvidence })
       const automaticPreview = await cdp.wait(previewExpression, 'automatic task HTML preview in the active conversation', 30_000)
       assert.ok(automaticPreview.partition?.startsWith('railwise-artifact-'), 'The automatic task preview must use its isolated partition')
       report.taskExecution.preview = { ...automaticPreview, automatic: true, originThreadId: task.originThreadId }

@@ -12,7 +12,7 @@ import { build } from 'esbuild'
 import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
-import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact } from './run-windows-ui-smoke.mjs'
+import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact, windowsTaskArtifactPreviewExpression } from './run-windows-ui-smoke.mjs'
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 
 test('composer menu geometry uses actual viewport rectangles at both supported font scales', () => {
@@ -602,6 +602,76 @@ test('report fixture extracts exact source quotes and never manufactures missing
       assert.throws(() => buildWindowsFixtureWebReport({ list, detail: { ...detail, ...change }, ...fixture }))
     }
   } finally { await fixture.close() }
+})
+
+test('automatic task preview reads the actual typed report DOM rather than legacy query narration', async t => {
+  const { Window } = await import('happy-dom')
+  const root = await mkdtemp(join(tmpdir(), 'railwise-typed-preview-'))
+  let fixture
+  try {
+    const renderer = join(root, 'structured-report.mjs')
+    await build({ entryPoints: [fileURLToPath(new URL('../kun/src/services/structured-web-report.ts', import.meta.url))], outfile: renderer, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' })
+    const { renderStructuredWebReport } = await import(pathToFileURL(renderer).href)
+    fixture = await startWindowsTaskModelFixture({ browser: true })
+    const list = fixtureRead(fixture.fixtureUrl, fixtureResultHtml(await (await fetch(fixture.fixtureUrl)).text(), fixture.query))
+    const detail = fixtureRead(fixture.detailUrl, await (await fetch(fixture.detailUrl)).text())
+    const report = buildWindowsFixtureWebReport({ list, detail, ...fixture })
+    const rendered = renderStructuredWebReport(report.verification.path, report.report)
+    const legacyQuery = `本地查询结果：${fixture.query}；已完成合成公开检索`
+    assert.deepEqual(rendered.verificationInput, report.verification)
+    assert.ok(rendered.content.includes(fixture.marker), 'The actual typed report retains its task marker in the title')
+    assert.equal(rendered.content.includes(legacyQuery), false, 'Typed report bytes do not contain the old free-form query narration')
+    const token = 'a'.repeat(48), partition = `railwise-artifact-${token}`
+    const previewUrl = `http://127.0.0.1:1234/task-preview/${token}/${encodeURIComponent(report.verification.path)}`
+    const probe = async (change = {}) => {
+      const url = change.url ?? previewUrl
+      const shell = new Window(), preview = new Window({ url })
+      try {
+        preview.document.write(change.html ?? rendered.content)
+        preview.document.close()
+        Object.defineProperty(preview.document, 'readyState', { configurable: true, value: change.state ?? 'complete' })
+        change.mutate?.(preview.document)
+        const view = shell.document.createElement('webview')
+        view.setAttribute('src', url)
+        view.setAttribute('partition', change.partition ?? partition)
+        view.getClientRects = () => change.visible === false ? [] : [{ x: 0, y: 0, width: 960, height: 640 }]
+        view.getURL = () => url
+        view.isLoading = () => change.loading ?? false
+        let executions = 0
+        view.executeJavaScript = async expression => { executions++; return preview.eval(expression) }
+        shell.document.body.append(view)
+        const result = await shell.eval(windowsTaskArtifactPreviewExpression({ marker: change.marker ?? fixture.marker,
+          query: change.local ? undefined : fixture.query, relativePath: report.verification.path,
+          evidence: change.local ? undefined : report.verification }))
+        return { result, executions }
+      } finally { await Promise.all([shell.happyDOM.close(), preview.happyDOM.close()]) }
+    }
+    await t.test('accepts the visible complete typed report with exact fields and source links', async () => {
+      const { result, executions } = await probe()
+      assert.equal(result?.contentVerified, true)
+      assert.equal(result.partition, partition)
+      assert.ok(result.title.includes(fixture.marker))
+      assert.ok(executions > 0, 'The webview must evaluate the probe against real rendered report DOM')
+    })
+    for (const [name, change] of [
+      ['legacy marker and query text without formal report evidence', { html: `<html><head><title>${fixture.marker}</title></head><body>${fixture.marker}<p>${legacyQuery}</p></body></html>` }],
+      ['document still loading', { state: 'loading' }],
+      ['webview still loading', { loading: true }],
+      ['hidden webview', { visible: false }],
+      ['another task marker', { html: rendered.content.replaceAll(fixture.marker, 'RAILWISE_BROWSER_ANOTHER_TASK') }],
+      ['another artifact path', { url: previewUrl.replace(encodeURIComponent(report.verification.path), 'other-report.html') }],
+      ['another artifact partition', { partition: `railwise-artifact-${'b'.repeat(48)}` }],
+      ['changed formal field value', { mutate: document => { document.querySelector('[data-evidence-field="budget"]').textContent = '999999.00 元' } }],
+      ['changed formal source URL', { mutate: document => { document.querySelector('[data-evidence-source]').setAttribute('href', `${fixture.detailUrl}?articleId=unobserved`) } }],
+      ['missing formal report region', { mutate: document => { document.querySelector('[data-evidence-report]').removeAttribute('data-evidence-report') } }]
+    ]) await t.test(`rejects ${name}`, async () => {
+      assert.notEqual((await probe(change)).result?.contentVerified, true)
+    })
+    await t.test('retains ordinary local HTML compatibility without web evidence', async () => {
+      const { result } = await probe({ local: true, marker: '合成内容', html: '<html><head><title>本地报告</title></head><body><h1>合成内容</h1></body></html>' })
+      assert.equal(result?.contentVerified, true)
+    })
+  } finally { await fixture?.close(); await rm(root, { recursive: true, force: true }) }
 })
 
 test('Windows web evidence inspection binds the actual file, task receipt and exact full source reads', async () => {
