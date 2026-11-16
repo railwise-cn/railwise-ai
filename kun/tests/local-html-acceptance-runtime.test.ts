@@ -7,13 +7,17 @@ import { afterEach, expect, it } from 'vitest'
 import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { buildRouter } from '../src/server/routes/index.js'
 import { dispatchRequest } from '../src/server/http-server.js'
+import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
+import { makeAssistantTextItem, makeToolCallItem, makeToolResultItem } from '../src/domain/item.js'
+import { prepareHtmlArtifact } from '../src/services/html-artifact.js'
+import type { ToolHostContext } from '../src/ports/tool-host.js'
 
 const originalSvgRequest = '创建一个完整、独立运行的 HTML 文件，使用 SVG 绘制一只正在骑自行车的鹈鹕，并制作成二维动画。要求鹈鹕和自行车都能清晰辨认，车轮持续转动，鹈鹕的双腿能够自然地踩动踏板，身体、车轮、踏板之间的运动关系合理协调。所有代码都包含在同一个 HTML 文件中，不依赖外部图片或动画素材，打开浏览器即可直接查看动画效果。'
 const html = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>鹈鹕骑车合成验收</title><style>.wheel{transform-box:fill-box;transform-origin:center;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 300"><title>用于执行链测试的合成鹈鹕与自行车</title><g class="wheel"><circle cx="150" cy="200" r="50" fill="none" stroke="black"/></g><circle cx="350" cy="200" r="50" fill="none" stroke="black"/><path d="M150 200L230 120L350 200H150" fill="none" stroke="blue"/><ellipse cx="230" cy="90" rx="45" ry="28" fill="white" stroke="black"/><path d="M255 80L310 88L255 95" fill="orange"/></svg><p>仅为隔离执行与文件验收的合成输入，不代表实际产品视觉验收。</p></body></html>'
 const cleanup: Array<() => Promise<unknown>> = []
 afterEach(async () => { while (cleanup.length) await cleanup.pop()!() })
 
-async function fixture(prompt = originalSvgRequest, legacyContract = false) {
+async function fixture(prompt = originalSvgRequest, legacyContract = false, historicalDraft = legacyContract) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'local-html-runtime-'))), workspace = join(root, 'workspace')
   await mkdir(workspace); cleanup.push(() => rm(root, { recursive: true, force: true }))
   let requests = 0
@@ -27,13 +31,10 @@ async function fixture(prompt = originalSvgRequest, legacyContract = false) {
     const names = body.tools.map((tool: { function: { name: string } }) => tool.function.name)
     expect(names).not.toContain('browser_observe')
     const task = runtime?.taskRepository?.list()[0]
-    if (legacyContract && task?.acceptance.sourceInferenceVersion !== undefined) {
-      const { sourceInferenceVersion: _version, ...old } = task.acceptance
-      runtime!.taskRepository!.update(task.id, task.revision, value => ({ ...value, acceptance: { ...old, requiresWebEvidence: true, requiredSourceOrigins: [] } }))
-    }
     if (task) nodeObservations.push(task.nodes.map(node => ({ kind: node.kind, status: node.status })))
     let next: string | undefined, id: string | undefined, args: Record<string, unknown> = {}
     if (!calls.has('local-publish')) { next = 'publish_artifact'; id = 'local-publish'; args = { path: 'pelican-bicycle.html', content: html } }
+    else if (task?.acceptance.requiresWebEvidence && !calls.has('local-publish-repair')) { next = 'publish_artifact'; id = 'local-publish-repair'; args = { path: 'pelican-bicycle.html', content: html } }
     else if (!calls.has('local-read')) { next = 'read_artifact'; id = 'local-read'; args = { path: 'pelican-bicycle.html' } }
     if (next) expect(names).toContain(next)
     const delta = next ? { tool_calls: [{ index: 0, id, type: 'function', function: { name: next, arguments: JSON.stringify(args) } }] }
@@ -52,9 +53,56 @@ async function fixture(prompt = originalSvgRequest, legacyContract = false) {
   const api = (path: string, body?: unknown) => dispatchRequest(router, new Request('http://localhost' + path, { method: 'POST',
     headers: { authorization: 'Bearer local-html-test-token', 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) }))
   const origin = await active.threadService.create({ workspace, mode: 'agent', model: 'local-html-fixture', approvalPolicy: 'on-request' })
-  const started = await active.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'local-svg', request: { prompt } })
-  expect(started.kind).not.toBe('capability_required')
-  const taskId = started.task!.id
+  let taskId: string
+  if (historicalDraft) {
+    // Persist an old, already-written draft with its original immutable Turn,
+    // Grant, bytes and writer receipt. Today's publisher must never be used to
+    // manufacture source-free history, and this seed grants no source evidence.
+    const started = await active.turnService.startTurn({ threadId: origin.id, request: { prompt, taskIntent: 'new' } })
+    const controller = active.taskController!, repo = active.taskRepository!
+    let task = repo.findByTurn(started.turnId)!; taskId = task.id
+    if (legacyContract) {
+      const { sourceInferenceVersion: _version, ...old } = task.acceptance
+      task = repo.update(task.id, task.revision, value => ({ ...value, acceptance: { ...old, requiresWebEvidence: true, requiredSourceOrigins: [] } }))
+    }
+    const grant = ExecutionGrantSchema.parse({ id: 'pre-gate-local-grant', taskId, threadId: origin.id, turnId: started.turnId,
+      workspaceRoot: workspace, workspaceTrust: 'read-only', agentTrust: 'read-only', sandboxMode: 'read-only', approvalPolicy: 'on-request',
+      pathAllowlist: [workspace], readPathAllowlist: [workspace], writePathAllowlist: [], allowedToolNames: ['publish_artifact', 'read_artifact'],
+      managedArtifactRoot: controller.managedArtifactRoot(taskId), workspaceRevision: 0, agentRevision: 0, revision: 0,
+      idempotencyKey: 'pre-gate-local-grant', issuedAt: active.nowIso() })
+    await active.turnService.updateTurnMetadata(origin.id, started.turnId, { executionGrant: grant })
+    controller.beginAttempt(origin.id, started.turnId)
+    const bytes = prepareHtmlArtifact(html), path = join(grant.managedArtifactRoot!, 'pelican-bicycle.html')
+    await mkdir(grant.managedArtifactRoot!, { recursive: true }); await writeFile(path, bytes)
+    const call = { callId: 'pre-gate-local-publish', toolName: 'publish_artifact', providerId: 'managed-artifacts', arguments: { path: 'pelican-bicycle.html', content: html } }
+    const operation = controller.beginToolOperation(started.turnId, call, grant)!
+    await active.turnService.applyItem(origin.id, makeToolCallItem({ id: 'pre-gate-local-call', threadId: origin.id, turnId: started.turnId, ...call }))
+    const item = makeToolResultItem({ id: 'pre-gate-local-result', threadId: origin.id, turnId: started.turnId, callId: call.callId,
+      toolName: call.toolName, toolKind: 'file_change', output: { path, name: 'pelican-bicycle.html', storage: 'task', bytes_written: Buffer.byteLength(bytes), sha256: createHash('sha256').update(bytes).digest('hex') } })
+    controller.finishToolOperation(operation.token, operation.key, { approved: true, item })
+    await active.turnService.applyItem(origin.id, item)
+    expect(await controller.recordArtifactPublication(operation.token, operation.key)).toBe(true)
+    const readCall = { callId: 'pre-gate-local-read', toolName: 'read_artifact', providerId: 'managed-artifacts', arguments: { path: 'pelican-bicycle.html' } }
+    const readOperation = controller.beginToolOperation(started.turnId, readCall, grant)!
+    const context: ToolHostContext = { threadId: origin.id, turnId: started.turnId, workspace, threadMode: 'agent', approvalPolicy: 'on-request', sandboxMode: 'read-only',
+      executionGrant: grant, abortSignal: new AbortController().signal, awaitApproval: async () => 'allow',
+      currentToolOperation: () => controller.currentToolOperation(readOperation.token, readOperation.key, readCall, grant) }
+    const read = await active.toolHost!.execute(readCall, context)
+    expect(read.item).toMatchObject({ isError: false, output: { sha256: createHash('sha256').update(bytes).digest('hex'), content: bytes } })
+    controller.finishToolOperation(readOperation.token, readOperation.key, read)
+    await active.turnService.applyItem(origin.id, read.item)
+    await active.turnService.applyItem(origin.id, makeAssistantTextItem({ id: 'pre-gate-local-final', threadId: origin.id, turnId: started.turnId,
+      text: '已生成并重新读取独立 HTML/SVG 动画 pelican-bicycle.html，可在任务成果中预览。', status: 'completed' }))
+    task = controller.pauseTask(taskId, repo.get(taskId)!.revision, '导入旧版已存草稿，仅等待来源验收。')
+    await active.turnService.finishTurn({ threadId: origin.id, turnId: started.turnId, status: 'aborted' })
+    repo.update(taskId, task.revision, value => ({ ...value, status: 'stalled', waitingReason: undefined, stalledReason: '网页采集尚缺实际正文来源证据。',
+      nodes: value.nodes.map(node => node.kind === 'verify' || node.kind === 'deliver' ? { ...node, status: 'blocked' } : node) }))
+    expect(repo.get(taskId)!.artifacts[0]).toMatchObject({ executionGrantId: grant.id, sourceEvidenceStatus: 'draft', sha256: createHash('sha256').update(bytes).digest('hex') })
+  } else {
+    const started = await active.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'local-svg', request: { prompt } })
+    expect(started.kind).not.toBe('capability_required')
+    taskId = started.task!.id
+  }
   return { root, runtime: active, api, taskId, nodeObservations, requests: () => requests }
 }
 
@@ -95,8 +143,8 @@ it('delivers the original local SVG request without BrowserSkill or external sou
   expect(repo.events(f.taskId).filter(event => event.kind === 'local_artifact_acceptance_revalidated')).toHaveLength(1)
 })
 
-it('retains source requirements for a mixed fetch-and-SVG task and does not fail execution after a valid file was saved', async () => {
-  const f = await fixture('先抓取 https://example.invalid/data 的网页正文，再创建一个 HTML/SVG 图表。')
+it('retains source requirements for a mixed fetch-and-SVG task and preserves execution after a valid historical file was saved', async () => {
+  const f = await fixture('先抓取 https://example.invalid/data 的网页正文，再创建一个 HTML/SVG 图表。', false, true)
   await expect.poll(() => f.runtime.taskRepository!.get(f.taskId)!.status, { timeout: 10_000 }).toBe('stalled')
   const task = f.runtime.taskRepository!.get(f.taskId)!
   expect(task.acceptance.requiresWebEvidence).toBe(true)
@@ -105,6 +153,23 @@ it('retains source requirements for a mixed fetch-and-SVG task and does not fail
   expect(task.nodes.find(node => node.kind === 'deliver')?.status).toBe('blocked')
   expect((await f.api(`/v1/tasks/${task.id}/revalidate-artifacts`, { expectedRevision: task.revision, idempotencyKey: 'never-downgrade-web', confirmed: true })).status).toBe(409)
   expect(f.runtime.taskRepository!.get(task.id)!.acceptance.requiresWebEvidence).toBe(true)
+})
+
+it('blocks a new mixed fetch-and-SVG report before any source-free write and preserves the source requirement', async () => {
+  const f = await fixture('先抓取 https://example.invalid/data 的网页正文，再创建一个 HTML/SVG 图表。')
+  await expect.poll(() => f.runtime.taskRepository!.get(f.taskId)!.status, { timeout: 10_000 }).toBe('waiting_user')
+  const repo = f.runtime.taskRepository!, task = repo.get(f.taskId)!
+  expect(task.acceptance.requiresWebEvidence).toBe(true)
+  expect(task.artifacts).toEqual([])
+  expect(task.waitingReason).toContain('相同来源或字段问题')
+  const writes = repo.operations(task.id, 'tool').filter(row => row.request?.toolName === 'publish_artifact')
+  expect(writes).toHaveLength(2)
+  expect(writes.every(row => row.status === 'failed')).toBe(true)
+  expect(writes.map(row => (row.result as { item?: { output?: { code?: string } } }).item?.output?.code)).toEqual(['web_source_reads_required', 'web_artifact_repair_stalled'])
+  await expect(readFile(join(f.runtime.taskController!.managedArtifactRoot(task.id)!, 'pelican-bicycle.html'))).rejects.toMatchObject({ code: 'ENOENT' })
+  expect(f.requests()).toBe(2)
+  expect((await f.api(`/v1/tasks/${task.id}/revalidate-artifacts`, { expectedRevision: task.revision, idempotencyKey: 'never-downgrade-new-web', confirmed: true })).status).toBe(409)
+  expect(repo.get(task.id)!.acceptance.requiresWebEvidence).toBe(true)
 })
 
 it('preserves a changed legacy file as invalid and rejects revalidation while an execution is active', async () => {

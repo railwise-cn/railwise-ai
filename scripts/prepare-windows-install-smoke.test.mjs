@@ -34,10 +34,12 @@ for (const file of ['src/renderer/src/components/HelpReader.tsx', 'kun/package.j
 }
 
 test('only the exact undistributed execution QA and opt-in live test are allowed', () => {
-  for (const file of ['docs/qa/general-execution-delivery-2026-11-13.md', 'kun/tests/browser-skill-live.test.ts']) {
+  for (const file of ['docs/qa/general-execution-delivery-2026-11-13.md', 'kun/tests/browser-skill-live.test.ts', 'kun/tests/local-html-acceptance-runtime.test.ts']) {
     assert.doesNotThrow(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }))
   }
-  for (const file of ['docs/qa/another-execution-change.md', 'kun/tests/browser-skill-live.ts', 'kun/src/services/browser-skill-cli.ts']) {
+  for (const file of ['docs/qa/another-execution-change.md', 'kun/tests/browser-skill-live.ts', 'kun/tests/local-html-acceptance-runtime.ts',
+    'kun/tests/another-acceptance-runtime.test.ts', 'kun/src/services/browser-skill-cli.ts',
+    'kun/src/services/task-controller.ts', 'kun/tsconfig.build.json']) {
     assert.throws(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }), /application or build source changed/)
   }
 })

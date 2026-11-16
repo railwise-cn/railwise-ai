@@ -17,6 +17,7 @@ const driverFiles = new Set([
   'scripts/deploy-website-release.mjs',
   'docs/qa/general-execution-delivery-2026-11-13.md',
   'kun/tests/browser-skill-live.test.ts',
+  'kun/tests/local-html-acceptance-runtime.test.ts',
   'src/renderer/src/components/connectors/ManagedLarkConnection.test.ts'
 ])
 
