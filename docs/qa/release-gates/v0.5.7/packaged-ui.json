@@ -1,0 +1,60 @@
+{
+  "status": "passed",
+  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
+  "releaseRunId": 43968313921,
+  "scope": "Root actual new exact package Chinese/light primary 1280x840 native UI, preserved completed Task automatic preview and raw internal wait-reason hiding. No all-size matrix or fresh due success is claimed.",
+  "language": "zh-CN",
+  "theme": "light",
+  "nativeWindowSize": [
+    1280,
+    840
+  ],
+  "currentTaskBannerProjection": {
+    "rawInternalRepairReasonWasPresent": true,
+    "rawRepairReasonHiddenFromActiveChatUi": true,
+    "basis": "Root active chat DOM plus persisted binding proof, distinct from the later completed-state screenshot"
+  },
+  "completedTaskAttentionResolution": {
+    "oldResolvedAttentionNotReopened": true,
+    "originalCompletedTaskStillAttempt7": true,
+    "allTaskRowsAndOperationsUnchanged": true
+  },
+  "taskWorkspaceAutoPreviewNoArtifactClick": true,
+  "rootVisuallyInspected": true,
+  "visualDefects": [],
+  "initialQaNativeScreenshotPhase": "completed; prior active DOM captured internal repair present and hidden in UI",
+  "completedScreenshotUsedAsRunningEvidence": false,
+  "privateEvidenceDigests": [
+    {
+      "fileName": "7d19-preserved-original-task-and-auto-preview-private.json",
+      "bytes": 860,
+      "sha256": "5c8cff0a1a06a656e400a060ef4be44b4724d16c2fb7cd2e84eef7ae3f36ff4f",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-qa-active-chat-ui-private.json",
+      "bytes": 13285,
+      "sha256": "44d142a12f211cdea11569fdd2507202cf9123e429dbb0ee4b6b894522b68b56",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-ego-temporary-qa-actual-binding-private.json",
+      "bytes": 867,
+      "sha256": "3b502583cdf01d2bccef7bc345107a07446f3b969b406bcf50b2a52a73db55a3",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-initial-qa-completion-private.json",
+      "bytes": 2093,
+      "sha256": "857208360361d9cbe8c3c909be2a4e4cd17b943cff1df1a60701d5163b2440c6",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "private-native-primary-image-not-published",
+      "sha256": "542af69b6c449a303318e46c790881835a2037d98a06e3fbd2b29e5bbb8914ba",
+      "privateSourceOnly": true
+    }
+  ],
+  "privacy": "No paid page/report content, announcement entries, account data or original private screenshot bytes are copied into this report."
+}

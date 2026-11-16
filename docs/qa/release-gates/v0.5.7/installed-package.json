@@ -1,0 +1,109 @@
+{
+  "status": "passed",
+  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
+  "scope": "Root selected exact Apple Silicon Mac package disk/source/signature/stapler verification and actual native launch in the preserved acceptance profile",
+  "releaseRunId": 43968313921,
+  "architecture": "arm64",
+  "version": "0.5.7",
+  "bundleId": "com.wangjiawei508.workgpt",
+  "packageName": "workwise",
+  "productName": "RailWise AI",
+  "artifactSha256": "60417970a05fa091b588a7c7915f62d59830af8470c88aec94ecabf0eef9b950",
+  "asarSha256": "4279a7c49691e1c1c1665665445b6eab58d980c56f28cd80e9adec1aa9c9d0a7",
+  "installedMetadata": {
+    "version": "0.5.7",
+    "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+    "packageName": "workwise",
+    "productName": "RailWise AI",
+    "asarSha256": "4279a7c49691e1c1c1665665445b6eab58d980c56f28cd80e9adec1aa9c9d0a7"
+  },
+  "signature": {
+    "status": "passed",
+    "teamIdentifier": "R35G7F4A9U"
+  },
+  "notarization": {
+    "status": "passed",
+    "appStaple": "passed",
+    "dmgStapleClaimed": false,
+    "sameRunNativeEnabledGatekeeper": "accepted"
+  },
+  "nativeLaunchIdentity": {
+    "mainProcessAndRuntimeSourceBound": true,
+    "ownedRendererFileAndCdpIdentityVerified": true,
+    "domReady": "complete",
+    "nativeWindowSize": [
+      1280,
+      840
+    ],
+    "computerUseUsed": false
+  },
+  "profileContinuity": {
+    "phase": "first-open before new independent QA task",
+    "allOriginalTaskRowsAndOperationsUnchanged": true,
+    "preservedCompletedOriginalTaskAttempts": 7,
+    "legacyUnknownCount": 16,
+    "legacyUnknown16Unchanged": true,
+    "allExistingPlansAndRunsUnchanged": true,
+    "oldResolvedAttentionNotReopened": true
+  },
+  "artifactVerification": {
+    "officialMacArtifactId": 14280501870,
+    "officialMacArtifactDigest": "sha256:5a219280ce123145d44c597ea4d1ba4098c57430f620c7dab9dfce808593f235",
+    "selectedEntryCrcVerified": true,
+    "selectedDmgSha512Verified": true,
+    "fullOuterMacArchiveLocallyHashed": false
+  },
+  "localGatekeeperObservation": "security-disabled override; not local clean-policy acceptance; no system trust modification",
+  "windowsControlledReportPath": "docs/qa/release-gates/v0.5.7/windows-controlled.json",
+  "originalEvidence": [
+    {
+      "fileName": "final-7d19a3fb-ready-receipt.json",
+      "bytes": 6399,
+      "sha256": "5e70c5bcdcbe08222238552bb738d50874213bfbce6b0d62e8f7248201446ec6",
+      "privateSourceOnly": false
+    },
+    {
+      "fileName": "exact-updater-43968313921-summary.json",
+      "bytes": 13497,
+      "sha256": "6ba1b8245b9fd5ce93d9187b9191317303fbd940b84ea516eda582aaca2508e5",
+      "privateSourceOnly": false
+    },
+    {
+      "fileName": "7d19-root-independent-package-check.json",
+      "bytes": 784,
+      "sha256": "35efd9077c61ceb1f60c30f6e29752164a06ebf72f1be72b1ec3705a8dd04351",
+      "privateSourceOnly": false
+    },
+    {
+      "fileName": "7d19-root-final-package-updater-check.json",
+      "bytes": 593,
+      "sha256": "9feebc932abace0f7f3f49c39818c161cddbb1c423e633276ca2f21083bc185e",
+      "privateSourceOnly": false
+    },
+    {
+      "fileName": "7d19a3fb-first-open-native-identity-private.json",
+      "bytes": 685,
+      "sha256": "4185ccc79afd1b5daa3f8126cfed2fa0f1d193cbc258082a4b06e9fe3b04af30",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-first-open-actual-profile-state-private.json",
+      "bytes": 238520,
+      "sha256": "eea42b6309aa6296f1919c7d0a55c750b282d1effb59334bae7201f32329e275",
+      "privateSourceOnly": true
+    },
+    {
+      "fileName": "7d19-preserved-original-task-and-auto-preview-private.json",
+      "bytes": 860,
+      "sha256": "5c8cff0a1a06a656e400a060ef4be44b4724d16c2fb7cd2e84eef7ae3f36ff4f",
+      "privateSourceOnly": true
+    }
+  ],
+  "limitations": [
+    "Windows installer and installed executable are NotSigned/not-configured. Its BSK/local model/loopback fixture does not exercise Ego Windows, an external real model or paid Dadan.",
+    "Local Mac acceptance used Apple Silicon; Intel UI was not run on the local host.",
+    "Selected DMG entry CRC/SHA512/DMG SHA256 and installed ASAR were verified. The full outer release-mac archive was not locally hashed; its digest is immutable official artifact provenance.",
+    "Local Gatekeeper assessment reports a security-disabled override; no local clean-policy acceptance or system trust change is claimed. Enabled-policy accepted Gatekeeper proof comes from original same-run native updater reports."
+  ]
+}

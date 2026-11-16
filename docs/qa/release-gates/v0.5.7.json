@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 2,
+  "scope": "public-release",
+  "status": "passed",
+  "release": {
+    "tag": "v0.5.7",
+    "version": "0.5.7",
+    "previousTag": "v0.5.6",
+    "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+    "updaterPathChanged": false,
+    "visualChange": true
+  },
+  "package": {
+    "version": "0.5.7",
+    "sourceVersion": "0.5.7",
+    "buildVersion": "0.5.7",
+    "identity": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "artifactSha256": "60417970a05fa091b588a7c7915f62d59830af8470c88aec94ecabf0eef9b950",
+      "asarSha256": "4279a7c49691e1c1c1665665445b6eab58d980c56f28cd80e9adec1aa9c9d0a7"
+    },
+    "installedMetadata": {
+      "version": "0.5.7",
+      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+      "packageName": "workwise",
+      "productName": "RailWise AI",
+      "asarSha256": "4279a7c49691e1c1c1665665445b6eab58d980c56f28cd80e9adec1aa9c9d0a7"
+    },
+    "reviewedBuild": {
+      "schemaVersion": 1,
+      "mode": "exact-build",
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/release.yml",
+      "headRef": "refs/heads/codex/general-execution-delivery",
+      "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/general-execution-delivery",
+      "workflowSha": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+      "runId": 43968313921,
+      "runAttempt": 1,
+      "publicIdentity": {
+        "bundleId": "com.wangjiawei508.workgpt",
+        "packageName": "workwise",
+        "productName": "RailWise AI"
+      },
+      "artifacts": [
+        {
+          "id": 14280501870,
+          "name": "release-mac",
+          "digest": "sha256:5a219280ce123145d44c597ea4d1ba4098c57430f620c7dab9dfce808593f235"
+        },
+        {
+          "id": 14279345015,
+          "name": "release-win",
+          "digest": "sha256:81b27455fda5ac7dcd60f8a8b5b360906d93bedc8bd2784c2ed1eec768144af7"
+        }
+      ],
+      "files": [
+        {
+          "name": "RailWise-AI-0.5.7-mac-arm64.dmg",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 397692299,
+          "sha256": "60417970a05fa091b588a7c7915f62d59830af8470c88aec94ecabf0eef9b950"
+        },
+        {
+          "name": "RailWise-AI-0.5.7-mac-arm64.zip",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 404529001,
+          "sha256": "956536e6b07e0af155410b6c9c516cf5a41172d6730b975f5ef5a417a1a0f299"
+        },
+        {
+          "name": "RailWise-AI-0.5.7-mac-x64.dmg",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 406572634,
+          "sha256": "ef6d60714e6af38781e9014abd5d95a237b130db87a31e343fc7d8f8bb660e52"
+        },
+        {
+          "name": "RailWise-AI-0.5.7-mac-x64.zip",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 413693596,
+          "sha256": "5b8a20122c355ef315dc445da2ae2b87d90e4524cce584fb4abbd10364e2cb39"
+        },
+        {
+          "name": "latest-mac.yml",
+          "platform": "darwin",
+          "artifact": "release-mac",
+          "size": 839,
+          "sha256": "539b226b24666cdead3e97771c49f41b89d839c1c58cf47b52c4d1b11e21e55c"
+        },
+        {
+          "name": "RailWise-AI-0.5.7-win-x64.exe",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 317655301,
+          "sha256": "bb183e8fb9ce567be8fdf3bdc016d18b492994d2918f953a00b9ce58abe719cd"
+        },
+        {
+          "name": "RailWise-AI-0.5.7-win-x64.exe.blockmap",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 324095,
+          "sha256": "4fa8134187b51bca55273966c84e1ee93ec056576d2bcbfd4e1d565418cc4e0a"
+        },
+        {
+          "name": "latest.yml",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 355,
+          "sha256": "3104b78cb2bcb8f9202f4f87ae63318267d881bc164c82df25c8c5931bfca9ff"
+        }
+      ]
+    },
+    "signature": {
+      "status": "passed",
+      "scope": "Selected exact arm64 macOS application; Windows actual Authenticode NotSigned retained",
+      "teamIdentifier": "R35G7F4A9U",
+      "windowsAuthenticode": "NotSigned",
+      "windowsSigning": "not-configured"
+    },
+    "notarization": {
+      "status": "passed",
+      "scope": "new exact macOS app staple and same-run native Gatekeeper verification",
+      "dmgStapleClaimed": false
+    },
+    "limitations": [
+      "Windows installer and installed executable are NotSigned/not-configured. Its BSK/local model/loopback fixture does not exercise Ego Windows, an external real model or paid Dadan.",
+      "Local Mac acceptance used Apple Silicon; Intel UI was not run on the local host.",
+      "Selected DMG entry CRC/SHA512/DMG SHA256 and installed ASAR were verified. The full outer release-mac archive was not locally hashed; its digest is immutable official artifact provenance.",
+      "Local Gatekeeper assessment reports a security-disabled override; no local clean-policy acceptance or system trust change is claimed. Enabled-policy accepted Gatekeeper proof comes from original same-run native updater reports.",
+      "Real Ego acceptance covers the first visible subscription-list page and five selected rows; official announcement bodies were not independently verified and missing fields stay unverified. Minor naming defect retained: artifact filename uses2026-11-18 while the report collection timestamp is correct for2026-11-17 Beijing. Semantic business relevance/content checks are AI review, not professional/human sign-off."
+    ]
+  },
+  "checks": {
+    "productionBuild": {
+      "status": "passed",
+      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+      "path": "docs/qa/release-gates/v0.5.7/build-and-focused.json"
+    },
+    "focusedTests": {
+      "status": "passed",
+      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+      "path": "docs/qa/release-gates/v0.5.7/build-and-focused.json"
+    },
+    "requiredCI": {
+      "status": "passed",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/quality.yml",
+        "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+        "runId": 43965382885,
+        "runAttempt": 1
+      }
+    }
+  },
+  "acceptance": {
+    "installedPackage": {
+      "status": "passed",
+      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+      "path": "docs/qa/release-gates/v0.5.7/installed-package.json"
+    },
+    "packagedUI": {
+      "status": "passed",
+      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+      "path": "docs/qa/release-gates/v0.5.7/packaged-ui.json"
+    },
+    "functionalChecklist": {
+      "status": "passed",
+      "path": "docs/qa/release-gates/v0.5.7/business-acceptance.json"
+    },
+    "updaterRoundTrip": {
+      "status": "passed",
+      "mode": "exact-build",
+      "baseVersion": "0.5.6",
+      "path": "docs/qa/release-gates/v0.5.7/updater-acceptance.json",
+      "machineReportPath": "docs/qa/release-gates/v0.5.7/exact-updater-machine.json",
+      "nativeReportPath": "docs/qa/release-gates/v0.5.7/exact-updater-native.json",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/release.yml",
+        "headRef": "refs/heads/codex/general-execution-delivery",
+        "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/general-execution-delivery",
+        "workflowSha": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+        "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+        "runId": 43968313921,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14280698320,
+          "name": "exact-package-updater-43968313921",
+          "digest": "sha256:ade0950b397a5204bb63fd3e79a8b19e19db1e93d0d31f1133e00ef991b840b9"
+        }
+      }
+    }
+  }
+}
