@@ -108,5 +108,76 @@
     "newUnknownCount": 0,
     "directCodexPaidSourceCollection": false,
     "publicReleaseGate": "pending-denied"
+  },
+  "subsequentH10ActualComponentsAndH11Corrections": {
+    "sourceHead": "77d81d3f1662677e26d80f65903633729bbf9bdc",
+    "releaseRunId": 44166307752,
+    "actualMacInstalledAndOpened": true,
+    "MacAsarSha256": "dc33d529fa6974eab1cb4727b442531e0d608fb4535abc0e4a04b7c0c5411d95",
+    "MacSignatureAndNotarization": "passed",
+    "localGatekeeper": "not_evaluated_local_security_override",
+    "sameRunNativeUpdater": "passed_mac_updater_component_only",
+    "wholeReleaseAccepted": false,
+    "originalStrictFullReleaseVerifier": "failed_truthful_sibling_Windows_basic_failure",
+    "WindowsOriginalBasic": {
+      "job": 134343317383,
+      "status": "failed",
+      "cause": "unknown"
+    },
+    "WindowsNewBasic": {
+      "run": 44178773300,
+      "status": "passed",
+      "sameOriginalPackage": true,
+      "driver": "d00c401ea73a2ab6dcb02aa6f3afc37a12470d94"
+    },
+    "WindowsFull": {
+      "run": 44181573847,
+      "status": "passed",
+      "signature": "NotSigned",
+      "scope": "controlled BrowserSkill/local model protocol/loopback; no Windows Ego or paid-site real-model claim"
+    },
+    "realMacBusinessComponents": {
+      "initialAttempt": 3,
+      "initialEgoSpace": 18,
+      "initialNodesCompleted": "3/3",
+      "naturalDue": "2026-11-18 05:31 Asia/Shanghai",
+      "dueAttempt": 1,
+      "dueEgoSpace": 19,
+      "dueNodesCompleted": "3/3",
+      "newVerifiedHtmlPerRun": true,
+      "awaitedFinishBothRuns": true,
+      "backgroundPreviewStayedOnInitial": true,
+      "explicitDueArtifactSelectionOpenedDue": true,
+      "TaskSelectionAloneSwitchedPreview": false,
+      "QAOnlyPlanPausedAfterDue": true,
+      "formal0830and1630PlanUntouched": true
+    },
+    "preservation": {
+      "allOther27TasksUnchanged": true,
+      "oneIndependentDueAdded": true,
+      "other7PlanDefinitionsUnchanged": true,
+      "oldOperationRowsByteIdentical": 1414,
+      "unknownRows": 16,
+      "preparedRows": 1,
+      "opaqueConfigHashesUnchanged": true
+    },
+    "remainingDefects": [
+      "Initial report heading too long and business screening semantics absent from schema/rendering",
+      "Flow Save then Publish can restore stale revision and publish after a swallowed save conflict"
+    ],
+    "businessOverallAccepted": false,
+    "publicHold": true,
+    "privateEvidence": {
+      "componentLedgerFile": "H10-actual-initial-natural-due-preview-component-ledger-private.json",
+      "componentLedgerSha256": "29e8306eef958343ddad18dc7f508a9031ef5c825b76d1dc5a80cb440dfbecd9",
+      "rawContinuityFile": "H10-old-operation-rows-continuity-private.json",
+      "rawContinuitySha256": "30af71d5f6efb3844274816e959ce5f5eefd845e672b7ebf1bb4527160764a17"
+    },
+    "nextSourceChanges": {
+      "reportAndPagination": "36b310f630efab28251c92da375788430f0523f2",
+      "FlowRevision": "22b98308f01adffe6563c83532d8de7f205833e5",
+      "requiresFreshExactPackageAndNewOrdinaryUiBusinessTask": true,
+      "completedC998MustNotResumeA4": true
+    }
   }
 }

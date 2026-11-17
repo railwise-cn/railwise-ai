@@ -1046,3 +1046,14 @@ H9首份提交 `98150ea0` 的原始 [push44143167639](https://github.com/railwis
 同run的Mac x64在签名打包阶段三次内部尝试均遇到 `A timestamp was expected but was not found.`，目标为PPT Master的普通PNG资源；生产bundle已构建、公证凭据预检已通过，但尚未公证提交、未生成Mac成果、未安装或打开新Mac包。原日志没有TSA响应或网络阶段证据，不能断言Apple服务故障。精确依赖26.8.1/1.3.3的只读源码及真实PNG探针确认，默认签名walker以通用二进制分类选中了该0644资源。后续整改通过打包后真实格式核对，只向标准签名器添加确切PNG数据路径，并准确呈现时间戳失败；程序、动态库、脚本及未知文件继续签名，新的精确构建仍须验证实际结果。
 
 本机仍为H8，原任务仍停在A2，未添加Task输入、未继续A3，原个人Ego空间、27个其它Task、既有计划及UNKNOWN保持。公开发行继续HOLD。原始H9失败账本 `H9-cc32fe57-Mac-attempt1-FAIL-ledger-private.json`（SHA256 `d8928dd39fe67b6b43ca82639b3108bde60bcc59dae9a5a534e45e3c7aa01057`）保留。
+
+
+### 2026-11-18 H10 实际空间、初轮和自然到期完成；报告呈现仍待整改
+
+源 `77d81d3f1662677e26d80f65903633729bbf9bdc`、[精确构建44166307752](https://github.com/railwise-cn/railwise-ai/actions/runs/44166307752) 的正常0.5.7 Mac已安装并实际打开，ASAR为 `dc33d529fa6974eab1cb4727b442531e0d608fb4535abc0e4a04b7c0c5411d95`。完整外层ZIP、全部CRC、DMG和元数据、签名及公证均经独立核对。本机Gatekeeper仍因原有override记未评估，未修改系统信任。
+
+同run的Mac及真实0.5.6→精确包native updater成功；原Windows basic因更新元数据返回unknown失败，底层原因未确定。该run整体因此仍是failure，原strict全Release verifier按真实结论拒绝。单独Mac/updater组件校验保留全部原生、来源、哈希、签名、公证、启用Gatekeeper和数据连续性断言，只给组件通过，不冒充原strict或整个Release通过。两文件QA驱动 `d00c401e` 为相同Windows原包保留每次元数据结果、最多一次只读复查和全部硬断言；新[basic44178773300](https://github.com/railwise-cn/railwise-ai/actions/runs/44178773300) 首次实际读取即成功，[full44181573847](https://github.com/railwise-cn/railwise-ai/actions/runs/44181573847) 及原始ZIP/全部文件/严格checker通过。原失败不改为通过，Windows仍NotSigned，范围仅受控BSK、本地协议模型及loopback，不代替Windows Ego或付费网站真实模型。
+
+原任务仅正常继续一次至A3。RailWise自己创建Space18、读取当前订阅、生成并核验新HTML、自动打开并await finish；被动原生画面实际显示个人空间与蓝色RailWise运行空间。临时QA计划通过正常界面改到05:31，经真实时钟自然建立独立Task/Turn/Grant及Space19，重新采集、生成核验新HTML并finish。初轮和到期均3/3。后台运行前、发布期间、完成后保持初轮URL/partition/hash；明确点击到期成果后才打开对应新报告。只选Task未切换预览的现象保留，不冒充该路径通过。该临时计划随后正常暂停，正式08:30/16:30计划仍启用；未RunNow、改时钟或重评完成的父任务。其它27个Task、7份计划定义、1414条旧操作原bytes、16条UNKNOWN、一条prepared及配置opaque hash保持。付费网页、标题、报告和Key均不提交。
+
+本轮仍不能认定完整业务质量通过：报告将长覆盖说明塞入标题，并把相关与排除条目都显示为同一来源卡片；严格逐字来源核验成功不等于业务筛选呈现合格。Flow还实际显示保存后旧revision冲突，但错误被吞后仍发布当前服务器版本，真实到期没有失效。后续源码分别补独立AI业务筛选层、简短标题/覆盖说明、相关/待判断/排除分组及打印布局；来源classification和逐字字段校验保持。导航累计动作数与网页页码明确区分，总10次动作预算不重置。Flow以函数式几何更新保持新revision，保存失败停止发布并回读规范版本，保留乐观锁。旧报告、任务和失败记录不回写。修正仍须新精确包及新的普通界面真实模型任务验收；已完成c998 A3不继续为A4。公开发行继续HOLD。
