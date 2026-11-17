@@ -420,6 +420,23 @@ describe('TaskWorkspaceView', () => {
     expect([...workspace.querySelectorAll('button')].some(button => button.textContent === '暂停')).toBe(true)
   })
 
+  it('shows an explicit task name in navigation and details while preserving the full original request', async () => {
+    await i18n.changeLanguage('zh')
+    const goal = '新任务：大单网临时实钟验收（0.5.7，临时验证）。此任务与原来的正式采集计划独立。\n使用已核对的原任务范围。'
+    tasks[0] = { ...tasks[0], goal, status: 'stalled' }
+    const original = JSON.stringify(tasks[0])
+    await act(async () => refreshTaskState())
+    const details = container.querySelector('[aria-label="任务详情"]')!
+    expect(details.querySelector('h2')?.textContent).toBe('大单网临时实钟验收')
+    const item = [...container.querySelectorAll('.ds-task-sidebar button[title]')].find(item => item.getAttribute('title') === goal)!
+    expect(item.textContent).toContain('大单网临时实钟验收')
+    expect(item.textContent).not.toContain('采集计划独立')
+    const request = [...details.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent === '原始要求')!
+    expect(request.textContent).toContain(goal)
+    expect(JSON.stringify(tasks[0])).toBe(original)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
   it('explicitly rechecks an existing local HTML output without starting a model or discarding the task', async () => {
     tasks[0] = { ...tasks[0], status: 'stalled', goal: '使用 SVG 绘制一只骑自行车的鹈鹕，生成独立 HTML 动画，打开浏览器即可查看。',
       acceptance: { ...tasks[0].acceptance, kind: 'files', requiredFormats: ['html'], requiresWebEvidence: true, requiredSourceOrigins: [] },

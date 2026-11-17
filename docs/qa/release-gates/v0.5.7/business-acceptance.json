@@ -3,8 +3,8 @@
   "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
   "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
   "releaseRunId": 44024949316,
-  "scope": "Historical H4 scoped passes and H5 actual browser initial/due passes are retained. H5 chat background-preview isolation remains failed. Latest H6 exact package is installed/opened and passes scoped package/updater/Windows/General checks, but its new real Task is blocked at attempt0 before model/source/plan execution; overall release acceptance remains incomplete.",
-  "rootAuditObservedStatus": "passed-after-one-explicit-original-task-clarification-and-normal-continuation",
+  "scope": "Historical scoped passes and every H4/H5/H6/H7 failure remain retained. Current H8 exact package is installed/opened and updater/corrected-driver Windows checks pass; actual same-task A2 is waiting_user after one plain Ego control failure, with no current source/artifact. H9 preflight/diagnostic source is prepared, not packaged or accepted.",
+  "rootAuditObservedStatus": "current-candidate-incomplete-H8-A2-control-failure",
   "actor": "RailWise AI real model and Ego provider",
   "sourceBasis": "observed_feed",
   "sourceOrigin": "https://dadan.vip",
@@ -300,7 +300,7 @@
     "missedDeliveryNotReclassified": true
   },
   "rootAcceptedAt": "2026-11-17T08:21:44.983557+00:00",
-  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00",
+  "rootFinalizedAt": null,
   "laterFormal1630Occurrence": {
     "status": "failed",
     "taskId": "task_8e88f809-3767-4772-99cd-f37d63276665",
@@ -596,6 +596,129 @@
     "publicReleaseStatus": "HOLD_pending",
     "h5ChatPreviewFailureRetained": true,
     "historicalH6PreflightFailureRetained": true,
+    "noCodexPaidSourceCollectionOrReportEditing": true
+  },
+  "latestH8Candidate": {
+    "status": "partial_package_updater_windows_pass_real_A2_control_failure",
+    "sourceHead": "2ba978c63343da8c5aaf2324cf76111c8c7f3cd2",
+    "sourceTree": "5f183c1c5ff83fe5d3e26649c5843ea565279365",
+    "releaseRunId": 44120488456,
+    "runAttempt": 1,
+    "actualMacAppOpened": true,
+    "macPackage": {
+      "version": "0.5.7",
+      "bundleId": "com.wangjiawei508.workgpt",
+      "architecture": "arm64",
+      "asarSha256": "0c603ad8722f628c36fb3f2176038236822975832807e5d9f480c197ec4bd5bf",
+      "dmgSha256": "7c0b415d972a3598ae4475f38e34957bd481038467301de3d8a89395c1ff72de",
+      "signature": "passed",
+      "notarization": "passed",
+      "gatekeeper": "not_evaluated_local_security_override",
+      "localOuterMacArchiveFullHashClaimed": true,
+      "rootIdentityProof": {
+        "fileName": "2ba978c6-root-independent-package-check.json",
+        "sha256": "673a38ba9866e3fd593a95140c76d4cabf075371327e2d8c60bc35d11904f402",
+        "privateSourceOnly": true
+      }
+    },
+    "sameRunNativeUpdater": {
+      "status": "passed_original_strict_and_root_integrity",
+      "baseVersion": "0.5.6",
+      "targetVersion": "0.5.7",
+      "jobId": 134205274071,
+      "artifactId": 14350810887,
+      "targetAndInstalledAsarMatchLocal": true,
+      "cleanCiGatekeeper": "accepted_with_assessments_enabled",
+      "rootEvidence": {
+        "fileName": "2ba978c6-root-updater-original-proof-check.json",
+        "sha256": "1972d7b9b5a1d8f19c4dbcf107e0c64ff3203b46a2645635232a47437ad3f4b1",
+        "privateSourceOnly": true
+      }
+    },
+    "windowsFull": {
+      "status": "passed_corrected_QA_driver_original_strict_and_root_integrity",
+      "acceptanceRunId": 44136767946,
+      "packageSourceHead": "2ba978c63343da8c5aaf2324cf76111c8c7f3cd2",
+      "driverSourceHead": "1ba93dcacd1882563bbb8a5b4c6c0d7109aefa59",
+      "changedFiles": [
+        "scripts/run-windows-ui-smoke.mjs",
+        "scripts/windows-ui-smoke.test.mjs"
+      ],
+      "uiChecks": 17,
+      "permissionChecks": 6,
+      "localModelFixtureRequests": 42,
+      "realClockDuePassed": true,
+      "windowsSignature": "NotSigned",
+      "scope": "controlled BSK/local model/loopback; Windows Ego, external model and paid Dadan unexercised",
+      "rootEvidence": {
+        "fileName": "windows-1ba93dca-same-H8-root-full-proof-check.json",
+        "sha256": "8100fd1b68aafe2371a0e852915aca137c0192d3608e625f90aa1637020bb326",
+        "privateSourceOnly": true
+      },
+      "originalFullFailure": {
+        "runId": 44128824077,
+        "status": "failure",
+        "preserved": true,
+        "actualNullErrno": "unknown; QA publication-read gap reproduced deterministically and bounded exact-Turn/Grant wait corrected"
+      }
+    },
+    "realSameTask": {
+      "taskId": "task_capability_c9985c7ac166d00865b4724a",
+      "previousH6A0AndH7A1FailuresRetained": true,
+      "status": "waiting_user",
+      "attempts": 2,
+      "turnId": "turn_zmgjouro",
+      "listSchedulesSucceeded": true,
+      "plainReadAttempts": 1,
+      "plainReadFailedCode": "ego_browser_read_failed",
+      "failurePhase": "control",
+      "nativeCause": "unknown_not_preserved_by_old_diagnostics",
+      "newSourceCollected": false,
+      "newManagedHtmlSaved": false,
+      "previousA1DraftRetained": true,
+      "sourceVerificationPassed": false,
+      "threeNodesCompleted": false,
+      "existingTemporaryPlanReadBack": true,
+      "newPlanCreated": false,
+      "temporaryPlanTime": "21:18 Asia/Shanghai",
+      "naturalDueExecuted": false,
+      "chatBackgroundPreviewIsolationExercised": false,
+      "failureLedger": {
+        "fileName": "H8-2ba978c6-actual-A2-FAIL-ledger-private.json",
+        "sha256": "d133d46061bfb4611daaa6c2961aeb7e115e3996787ea299ab8ee222023718dd",
+        "privateSourceOnly": true
+      }
+    },
+    "preservation": {
+      "allOther27TaskRowsAndAll8PlanDefinitionsAndEnabledStatesUnchanged": true,
+      "oldUnknown16AndPrepared1RawRowsUnchanged": true,
+      "configurationOpaqueHashesUnchanged": true,
+      "oldOperationPayloadStatusAndSealsUnchanged": true,
+      "oneSuccessfulCurrentTaskScheduleReadbackUpdatedAtRefreshed": true,
+      "originalRawReadbackRetainedInBackup": true,
+      "formalPlanStillEnabled": true,
+      "rootEvidence": {
+        "fileName": "2ba978c6-A2-blocked-full-raw-preservation-private.json",
+        "sha256": "7c2e5aa9f5b1de40f1654feb14e1438d805db5e75f2a28a9f8911b8e9c2d39d2",
+        "privateSourceOnly": true
+      }
+    },
+    "nextH9": {
+      "status": "metadata_only_resumed_space_preflight_and_safe_native_diagnostics_source_prepared",
+      "sourceHead": null,
+      "sourceTree": null,
+      "releaseRunId": null,
+      "targetAsarSha256": null,
+      "expectedSameTaskAttempt": 3,
+      "currentAppRemainsH8": true,
+      "noTaskInputOrA3Yet": true,
+      "sandboxWideningAllowed": false,
+      "failureCounterResetAllowed": false,
+      "actualBusinessAcceptance": "pending",
+      "naturalDueAndChatBackgroundPreviewAcceptance": "pending"
+    },
+    "publicReleaseStatus": "HOLD_pending",
+    "h5ChatPreviewFailureRetained": true,
     "noCodexPaidSourceCollectionOrReportEditing": true
   }
 }

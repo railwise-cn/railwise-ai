@@ -1021,3 +1021,16 @@ RailWise 自己保存并自动预览 HTML，创建并读回同任务独立临时
 原27个其它任务、旧七份计划定义、16条 UNKNOWN及一条 prepared 原始记录和配置 opaque hash 保持；仅原 attempt0任务正常增至A1，并新增其临时计划。正式每日08:30/16:30计划仍启用。H5 chat 后台抢预览 FAIL、H6 A0失败和 H4正式时限失败均保留。私有 H7失败账本 `H7-41e00153-initial-A1-source-verification-HOLD-private.json`（SHA256 `e84215cb2dfd74bf8f249e89741c533ed6cd87b224950fe26e659fcabd8ac4be`）；连续性 `41e00153-A1-blocked-continuity-private.json`（`cc410411de53698de8d8870fcf3224e265572bc3b82ddb4bb0e1357d831856ad`）。付费页面、条目名、原文和 HTML 只留私有证据。
 
 该最小修复的匿名功能回归先在旧代码形成两个 RED（单字段级联、30条截断），修复后来源/订阅/计数/结构化四文件155项通过。Root 合并树再完成桌面/Runtime类型、两文件lint、包含真实Factory/Host Ego替身链的五文件133项、一次生产构建与1381输入freshness；原有跨行、唯一标题、伪href及计数防线均保留。对已保存真实来源/草稿做纯解析离线重放仍只拒绝原错误字段，没有更改现场文件、来源回执或任务状态；它不是新的Host/Grant或业务通过证明。反馈最多附三条、每条1200字符的已授权同记录原文，不猜测不完整/歧义记录。publication/source-progress 仍用原逐字quote准入，记录定位成功本身不升级为字段或报告核验通过。后继完整CI、精确包和原任务A2仍待完成。
+
+
+### 2026-11-18 H8 已安装打开，原任务 A2 在 Ego 控制阶段失败
+
+H8 源 `2ba978c63343da8c5aaf2324cf76111c8c7f3cd2`、[精确 Release 44120488456](https://github.com/railwise-cn/railwise-ai/actions/runs/44120488456) 的0.5.7 Mac已安装并实际打开，ASAR `0c603ad8722f628c36fb3f2176038236822975832807e5d9f480c197ec4bd5bf`。完整外层 Mac ZIP 已在本机独立核对官方 SHA256、大小及全部 CRC，选定 DMG/更新元数据和签名、公证通过；本机 Gatekeeper override 如实记为未评估，未改系统信任。同 run 真实0.5.6→精确包 updater、原 strict 与 Root 原始九份文件完整性核对通过，CI启用 Gatekeeper 的三套身份均 accepted。
+
+Windows原 full44128824077在权限测试驱动一次读取持久化会话得到null后失败；实际底层errno未记录。真实FileThreadStore的Windows发布空窗被确定性复现，驱动改为等待同一Task/Turn/Grant就绪，保留原20秒界限和全部六项权限断言。仅两份QA脚本的1ba后继驱动使用同一H8安装包，[full44136767946](https://github.com/railwise-cn/railwise-ai/actions/runs/44136767946) 通过17项UI、6项权限、42次本地协议模型请求和一次真实到期。原始失败保留；Windows仍NotSigned，范围不包括Windows Ego、外部模型或付费站点。
+
+Root正常退出H7一次，核对受保护状态，完成含浏览器SQLite的一致性备份并另存临时目录之外；H8打开后仅在原任务正常继续一次至A2。RailWise读回已有临时计划，随后一次无selector的Ego读取返回 `ego_browser_read_failed/control`，没有本轮新来源或新成果，保留A1草稿。旧代码抹去了具体SDK边界和原生异常类别，不能断言Space17关闭、用户接管或网络阶段。被动原生画面仅证明可见界面当时只有个人Space，不冒充SDK清单证明。其它27个Task、8份计划定义及启用状态、16条UNKNOWN、一条prepared和配置opaque hash保持；旧操作payload/status/seal保持，仅本任务真实计划读回刷新一条成功回执的updatedAt，原文仍保存在一致性备份。
+
+H9源码补上恢复前的固定元数据查询：同Task/Turn/Grant/配置/旧绑定的查询单独封存，当前已核验来源可复用，确认旧ID与名称均缺失才返回可恢复的原地址open提示。空间新建仍只能走原有显式Continue授权和fresh open检查；用户接管、身份不符、过期、配置变化及结果未知均停止。缓存依赖真实Host的批准结果与输出hash，不是网页读取证明。失败诊断仅保留白名单SDK边界、异常类别和匹配绑定的身份；Page handle标签不代表原生Page存在，不保存原生消息、stack、正文或URL token。离线原生形状替身与Factory/Host集成回归167项通过，不是实际SDK或A3通过。
+
+同时修正明确命名任务被后文“采集计划独立”覆盖的标题，并将未知Ego范围及Task审查入口改为准确的呈现文字；完整目标、权限和执行处理不改，121项聚焦UI测试通过。Root合并检查、新精确包、同任务A3、新来源/报告、自然到期和chat后台预览隔离仍待完成，公开发行持续HOLD。付费页面、标题、正文和HTML均未提交。

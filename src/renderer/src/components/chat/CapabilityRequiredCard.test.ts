@@ -466,7 +466,9 @@ describe('capability waiting card', () => {
       resolution: { kind: 'retry', route: 'task/ego-browser-review', label: '查看原任务的 Ego 浏览器' } } }
     await render(ego)
     expect(visibleText()).toContain('Ego 浏览器助手')
-    await click('查看原任务的 Ego 浏览器')
+    expect(visibleText()).toContain('恢复时重新核对原任务范围')
+    expect(visibleText()).not.toContain('尚未授予')
+    await click('查看任务与恢复选项')
     expect(takeRequestedTask()).toBe(card.taskId)
     expect(state.setRoute).toHaveBeenCalledWith('tasks')
     expect(state.openSettings).not.toHaveBeenCalled()
@@ -485,10 +487,38 @@ describe('capability waiting card', () => {
     expect(state.openPlugins).not.toHaveBeenCalled()
   })
 
-  it('opens the existing market for an unavailable Ego CLI without configuring BrowserSkill', async () => {
-    await render({ ...card, capability: { provider: 'ego-browser', status: 'not_installed', errorCode: 'ego_browser_not_installed',
-      message: 'Ego CLI 尚未安装。', action: { kind: 'connect', route: 'marketplace', label: '查看 Ego 安装入口' } } })
-    await click('查看 Ego 安装入口')
+  it.each(['zh', 'en'])('shows neutral scope and an accurate task-review action for a runtime Ego read failure in %s', async language => {
+    await i18n.changeLanguage(language)
+    const ego: ExternalTaskCapabilityCard = { ...card, capability: { provider: 'ego-browser', status: 'blocked',
+      errorCode: 'ego_browser_read_failed', message: 'Ego 页面读取受阻。',
+      resolution: { kind: 'retry', route: 'task/ego-browser-review', label: '查看当前任务并检查Ego连接' } } }
+    const before = JSON.stringify(ego)
+    await render(ego)
+    expect(visibleText()).toContain(i18n.t('capabilityScopeRecheckOnResume', { ns: 'common' }))
+    expect(visibleText()).not.toContain(i18n.t('capabilityScopeNotGranted', { ns: 'common' }))
+    expect(visibleText()).not.toContain('查看当前任务并检查Ego连接')
+    await click(i18n.t('capabilityViewTaskRecoveryOptions', { ns: 'common' }))
+    expect(takeRequestedTask()).toBe(card.taskId)
+    expect(state.setRoute).toHaveBeenCalledWith('tasks')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(api.getTaskPermissions).not.toHaveBeenCalled()
+    expect(api.runtimeRequest).not.toHaveBeenCalled()
+    expect(state.openPlugins).not.toHaveBeenCalled()
+    expect(JSON.stringify(ego)).toBe(before)
+
+    await render({ ...ego, capability: { ...ego.capability, requiredScopes: ['https://example.com: read-only'] } })
+    expect(visibleText()).toContain('https://example.com: read-only')
+    expect(visibleText()).not.toContain(i18n.t('capabilityScopeRecheckOnResume', { ns: 'common' }))
+  })
+
+  it.each(['install', 'connect'] as const)('preserves the existing Ego %s action without configuring BrowserSkill', async kind => {
+    const label = kind === 'install' ? '查看 Ego 安装入口' : '连接 Ego 浏览器'
+    await render({ ...card, capability: { provider: 'ego-browser', status: kind === 'install' ? 'not_installed' : 'needs_authorization',
+      errorCode: kind === 'install' ? 'ego_browser_not_installed' : 'ego_browser_connection_required',
+      message: 'Ego 连接需要处理。', action: { kind, route: 'marketplace', label } } })
+    expect(visibleText()).not.toContain('查看任务与恢复选项')
+    await click(label)
     expect(state.openPlugins).toHaveBeenCalledWith(undefined, undefined)
     expect(state.openSettings).not.toHaveBeenCalled()
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
