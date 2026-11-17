@@ -3,7 +3,7 @@ import brand from '@shared/product-brand.json'
 import '@xyflow/react/dist/style.css'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import {
-  Background, Controls, Handle, MiniMap, Position, ReactFlow, addEdge, applyEdgeChanges, applyNodeChanges,
+  Background, Controls, Handle, MiniMap, Position, ReactFlow, addEdge, applyEdgeChanges,
   type Connection, type Edge, type EdgeChange, type Node, type NodeChange, type NodeProps, type ReactFlowInstance
 } from '@xyflow/react'
 import { AlertTriangle, CheckCircle2, ChevronRight, Download, History, Loader2, Play, Save, Send, Square, TestTube2, Workflow } from 'lucide-react'
@@ -97,6 +97,7 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
   const [flows, setFlows] = useState<FlowDefinition[]>([]); const [registry, setRegistry] = useState<RegistryEntry[]>([])
   const [activeId, setActiveId] = useState<string | null>(null); const [draft, setDraft] = useState<FlowDefinition | null>(null)
   const activeIdRef = useRef<string | null>(null)
+  const flowWritePending = useRef(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null); const [issues, setIssues] = useState<ValidationIssue[]>([])
   const [runs, setRuns] = useState<FlowRun[]>([]); const [mockInput, setMockInput] = useState('{}'); const [busy, setBusy] = useState<string | null>(null); const [error, setError] = useState<string | null>(null)
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null); const [runDetails, setRunDetails] = useState<FlowRunDetails | null>(null)
@@ -171,35 +172,83 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
   })), [draft, registry, selectedNodeId])
   const edges = useMemo<Edge[]>(() => (draft?.edges ?? []).map((edge) => ({ id: edge.id, source: edge.sourceNodeId, sourceHandle: edge.sourcePortId, target: edge.targetNodeId, targetHandle: edge.targetPortId, animated: false, style: { stroke: '#94a3b8' } })), [draft])
   const selectedNode = draft?.nodes.find((node) => node.id === selectedNodeId) ?? null
+  const canvasFlowId = draft?.id
 
   useEffect(() => {
-    if (!flowInstance || !draft || nodes.length === 0) return
+    if (!flowInstance || !canvasFlowId || nodes.length === 0) return
     const frame = window.requestAnimationFrame(() => {
       void flowInstance.fitView({ padding: 0.2, minZoom: 0.4, maxZoom: 1.2, duration: 0 })
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [draft, flowInstance, nodes.length])
+  }, [canvasFlowId, flowInstance, nodes.length])
 
-  const onNodesChange = (changes: NodeChange<Node<FlowNodeData>>[]) => { if (!draft) return; const changed = applyNodeChanges(changes, nodes); setDraft({ ...draft, nodes: draft.nodes.map((node) => ({ ...node, position: changed.find((item) => item.id === node.id)?.position ?? node.position })) }) }
-  const onEdgesChange = (changes: EdgeChange<Edge>[]) => { if (!draft) return; const changed = applyEdgeChanges(changes, edges); setDraft({ ...draft, edges: changed.map((edge) => ({ id: edge.id, sourceNodeId: edge.source, sourcePortId: edge.sourceHandle ?? 'output', targetNodeId: edge.target, targetPortId: edge.targetHandle ?? 'input', branch: 'normal' })) }) }
-  const onConnect = (connection: Connection) => { if (!draft || !connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return; const source = registry.find((entry) => entry.type === draft.nodes.find((node) => node.id === connection.source)?.type)?.outputs.find((port) => port.id === connection.sourceHandle); const target = registry.find((entry) => entry.type === draft.nodes.find((node) => node.id === connection.target)?.type)?.inputs.find((port) => port.id === connection.targetHandle); const compatibility = source && target ? flowPortCompatibility(source.type, target.type) : null; if (!compatibility) { setError(`端口类型不兼容：${source?.type ?? '?'} → ${target?.type ?? '?'}`); return } const next = addEdge(connection, edges); const item = next.at(-1)!; if (!draft) return; setDraft({ ...draft, edges: [...draft.edges, { id: item.id, sourceNodeId: connection.source, sourcePortId: connection.sourceHandle, targetNodeId: connection.target, targetPortId: connection.targetHandle, ...(compatibility.conversionId ? { conversionId: compatibility.conversionId } : {}), branch: 'normal' }] }); setError(null) }
+  const onNodesChange = (changes: NodeChange<Node<FlowNodeData>>[]) => {
+    const flowId = draft?.id
+    if (!flowId) return
+    const positions = new Map<string, { x: number; y: number }>()
+    for (const change of changes) if (change.type === 'position' && change.position) positions.set(change.id, change.position)
+    if (positions.size === 0) return
+    setDraft(current => {
+      if (!current || current.id !== flowId) return current
+      let moved = false
+      const next = current.nodes.map(node => {
+        const position = positions.get(node.id)
+        if (!position || position.x === node.position.x && position.y === node.position.y) return node
+        moved = true
+        return { ...node, position }
+      })
+      return moved ? { ...current, nodes: next } : current
+    })
+  }
+  const onEdgesChange = (changes: EdgeChange<Edge>[]) => {
+    const flowId = draft?.id
+    if (!flowId) return
+    setDraft(current => {
+      if (!current || current.id !== flowId) return current
+      const previous: Edge[] = current.edges.map(edge => ({ id: edge.id, source: edge.sourceNodeId, sourceHandle: edge.sourcePortId, target: edge.targetNodeId, targetHandle: edge.targetPortId }))
+      const next = applyEdgeChanges(changes, previous).map(edge => {
+        const existing = current.edges.find(item => item.id === edge.id)
+        const sourcePortId = edge.sourceHandle ?? 'output', targetPortId = edge.targetHandle ?? 'input'
+        if (existing && existing.sourceNodeId === edge.source && existing.sourcePortId === sourcePortId && existing.targetNodeId === edge.target && existing.targetPortId === targetPortId) return existing
+        return { ...existing, id: edge.id, sourceNodeId: edge.source, sourcePortId, targetNodeId: edge.target, targetPortId, branch: existing?.branch ?? 'normal' as const }
+      })
+      return next.length === current.edges.length && next.every((edge, index) => edge === current.edges[index]) ? current : { ...current, edges: next }
+    })
+  }
+  const onConnect = (connection: Connection) => { if (!draft || !connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return; const source = registry.find((entry) => entry.type === draft.nodes.find((node) => node.id === connection.source)?.type)?.outputs.find((port) => port.id === connection.sourceHandle); const target = registry.find((entry) => entry.type === draft.nodes.find((node) => node.id === connection.target)?.type)?.inputs.find((port) => port.id === connection.targetHandle); const compatibility = source && target ? flowPortCompatibility(source.type, target.type) : null; if (!compatibility) { setError(`端口类型不兼容：${source?.type ?? '?'} → ${target?.type ?? '?'}`); return } const flowId = draft.id; const sourceNodeId = connection.source, sourcePortId = connection.sourceHandle, targetNodeId = connection.target, targetPortId = connection.targetHandle; setDraft(current => { if (!current || current.id !== flowId) return current; const existing: Edge[] = current.edges.map(edge => ({ id: edge.id, source: edge.sourceNodeId, sourceHandle: edge.sourcePortId, target: edge.targetNodeId, targetHandle: edge.targetPortId })); const next = addEdge(connection, existing); if (next.length === existing.length) return current; const item = next.at(-1)!; return { ...current, edges: [...current.edges, { id: item.id, sourceNodeId, sourcePortId, targetNodeId, targetPortId, ...(compatibility.conversionId ? { conversionId: compatibility.conversionId } : {}), branch: 'normal' }] } }); setError(null) }
   const addNode = (entry: RegistryEntry) => { if (!draft || !entry.available) return; const id = `${entry.type}_${crypto.randomUUID().slice(0, 8)}`; const next = { id, type: entry.type, label: entry.label, position: { x: 180 + draft.nodes.length * 24, y: 100 + draft.nodes.length * 20 }, bindings: {}, config: entry.type === 'loop' ? { maxIterations: 10 } : {}, policy: { ...DEFAULT_POLICY }, disabled: false }; setDraft({ ...draft, nodes: [...draft.nodes, next] }); setSelectedNodeId(id) }
   const createFlow = async () => { setBusy('create'); try { const id = `flow_${crypto.randomUUID()}`; const value = await runtimeJson<{ flow: FlowDefinition }>('/v1/flows', 'POST', createStarterFlowInput(id, { triggerType: filter === 'scheduled' ? 'scheduled' : 'manual' })); activeIdRef.current = id; setFlows((current) => [value.flow, ...current]); setActiveId(id); setDraft(value.flow); setSelectedNodeId(value.flow.nodes.find((node) => node.type === 'agent')?.id ?? null); setIssues([]); setError(null) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
-  const save = async () => { if (!draft) return; setBusy('save'); try { const value = await runtimeJson<{ flow: FlowDefinition }>(`/v1/flows/${draft.id}`, 'PUT', { definition: draft, expectedRevision: draft.revision }); setDraft(value.flow); setFlows((current) => current.map((flow) => flow.id === value.flow.id ? value.flow : flow)); setError(null) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
+  const adoptServerFlow = (flow: FlowDefinition) => {
+    setDraft(current => current?.id === flow.id ? flow : current)
+    setFlows(current => current.map(item => item.id === flow.id ? flow : item))
+  }
+  const persistDraft = async (definition: FlowDefinition): Promise<FlowDefinition> => {
+    const value = await runtimeJson<{ flow: FlowDefinition }>(`/v1/flows/${definition.id}`, 'PUT', { definition, expectedRevision: definition.revision })
+    adoptServerFlow(value.flow)
+    return value.flow
+  }
+  const writeFlow = async (action: string, operation: () => Promise<void>): Promise<void> => {
+    if (flowWritePending.current || busy !== null) return
+    flowWritePending.current = true
+    setBusy(action)
+    try { await operation(); setError(null) } catch (reason) { setError(message(reason)) } finally { flowWritePending.current = false; setBusy(null) }
+  }
+  const readPublishedFlow = async (id: string): Promise<void> => {
+    const value = await runtimeJson<{ flow: FlowDefinition }>(`/v1/flows/${encodeURIComponent(id)}`)
+    adoptServerFlow(value.flow)
+  }
+  const save = async () => { if (!draft) return; await writeFlow('save', async () => { await persistDraft(draft) }) }
   const setScheduleEnabled = async (enabled: boolean) => {
     if (!draft?.variables.taskSchedule) return
-    setBusy('schedule')
-    try {
-      const value = await runtimeJson<{ flow: FlowDefinition }>(`/v1/flows/${draft.id}`, 'PUT', { definition: { ...draft, variables: { ...draft.variables, enabled } }, expectedRevision: draft.revision })
-      const published = await runtimeJson<{ published: boolean }>(`/v1/flows/publish`, 'POST', { id: draft.id })
+    await writeFlow('schedule', async () => {
+      const saved = await persistDraft({ ...draft, variables: { ...draft.variables, enabled } })
+      const published = await runtimeJson<{ published: boolean }>(`/v1/flows/publish`, 'POST', { id: saved.id })
       if (!published.published) throw new Error('计划状态未能保存，请刷新核对。')
-      setDraft(value.flow)
-      setFlows(current => current.map(flow => flow.id === value.flow.id ? value.flow : flow))
-      setError(null)
-    } catch (reason) { setError(message(reason)) } finally { setBusy(null) }
+      await readPublishedFlow(saved.id)
+    })
   }
   const validate = async () => { if (!draft) return false; const result = await runtimeJson<{ valid: boolean; issues: ValidationIssue[] }>('/v1/flows/validate', 'POST', { definition: draft }); setIssues(result.issues); return result.valid }
-  const publish = async () => { if (!draft) return; setBusy('publish'); try { await save(); const result = await runtimeJson<{ published: boolean; validation: { issues: ValidationIssue[] } }>('/v1/flows/publish', 'POST', { id: draft.id }); setIssues(result.validation.issues); if (!result.published) throw new Error('发布校验未通过') } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
+  const publish = async () => { if (!draft) return; await writeFlow('publish', async () => { const saved = await persistDraft(draft); const result = await runtimeJson<{ published: boolean; validation: { issues: ValidationIssue[] } }>('/v1/flows/publish', 'POST', { id: saved.id }); setIssues(result.validation.issues); if (!result.published) throw new Error('发布校验未通过'); await readPublishedFlow(saved.id) }) }
   const run = async () => { if (!draft) return; setBusy('run'); try { const input = JSON.parse(mockInput); const result = await runtimeJson<{ run: FlowRun }>('/v1/flows/run', 'POST', { flowId: draft.id, input, invocationStack: [] }); setRuns((current) => [result.run, ...current.filter((item) => item.id !== result.run.id)]) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
   const testNode = async () => { if (!draft || !selectedNodeId) return; setBusy('test'); try { await runtimeJson('/v1/flows/test-node', 'POST', { definition: draft, nodeId: selectedNodeId, mockInput: JSON.parse(mockInput) }) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
   const cancelRun = async () => { const active = runs.find((item) => item.id === selectedRunId && ['queued', 'running', 'waiting_approval', 'paused', 'interrupted'].includes(item.status)); if (!active) return; setBusy('cancel'); try { await runtimeJson(`/v1/flow-runs/${active.id}/cancel`, 'POST', {}); const details = await runtimeJson<FlowRunDetails>(`/v1/flow-runs/${active.id}`); setRunDetails(details); setRuns(current => current.map(item => item.id === active.id ? details.run : item)); setError(null) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
@@ -222,7 +271,7 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
       <Workflow className="h-5 w-5 text-blue-600" /><h1 className="text-[16px] font-semibold">{brand.platform} Flow</h1><span className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-400/10 dark:text-blue-300">Preview</span>
       {filter === 'scheduled' ? <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">定时流程</span> : null}<select className="ds-no-drag ml-3 rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-[13px] dark:border-ds-border dark:bg-ds-main" value={activeId ?? ''} onChange={(event) => { const flow = visibleFlows.find((item) => item.id === event.target.value) ?? null; activeIdRef.current = flow?.id ?? null; setActiveId(flow?.id ?? null); setDraft(flow) }}><option value="">选择流程</option>{visibleFlows.map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select>
       <button className="ds-no-drag rounded-lg border border-[#e2e8f0] px-3 py-1.5 text-[13px] hover:bg-slate-50 dark:border-ds-border" onClick={() => void createFlow()}>新建</button>
-      <div className="ml-auto flex gap-2">{draft?.variables.taskSchedule ? <button disabled={busy !== null} className="ds-no-drag rounded-lg border border-ds-border px-3 py-1.5 text-[13px]" onClick={() => void setScheduleEnabled(draft.variables.enabled === false)}>{draft.variables.enabled === false ? '启用计划' : '暂停计划'}</button> : null}{busy ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" /> : null}<Action icon={<Save />} label="保存" onClick={() => void save()} /><Action icon={<CheckCircle2 />} label="校验" onClick={() => void validate()} /><Action icon={<Download />} label="脱敏导出" onClick={() => void exportRedacted()} /><Action icon={<Send />} label="发布" primary onClick={() => void publish()} /><Action icon={<Play />} label="运行" primary onClick={() => void run()} />{runs.some((item) => ['queued', 'running', 'waiting_approval', 'paused', 'interrupted'].includes(item.status)) ? <Action icon={<Square />} label="取消" onClick={() => void cancelRun()} /> : null}</div>
+      <div className="ml-auto flex gap-2">{draft?.variables.taskSchedule ? <button disabled={busy !== null} className="ds-no-drag rounded-lg border border-ds-border px-3 py-1.5 text-[13px]" onClick={() => void setScheduleEnabled(draft.variables.enabled === false)}>{draft.variables.enabled === false ? '启用计划' : '暂停计划'}</button> : null}{busy ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" /> : null}<Action icon={<Save />} label="保存" disabled={busy !== null || !draft} onClick={() => void save()} /><Action icon={<CheckCircle2 />} label="校验" disabled={busy !== null || !draft} onClick={() => void validate()} /><Action icon={<Download />} label="脱敏导出" disabled={busy !== null || !draft} onClick={() => void exportRedacted()} /><Action icon={<Send />} label="发布" disabled={busy !== null || !draft} primary onClick={() => void publish()} /><Action icon={<Play />} label="运行" disabled={busy !== null || !draft} primary onClick={() => void run()} />{runs.some((item) => ['queued', 'running', 'waiting_approval', 'paused', 'interrupted'].includes(item.status)) ? <Action icon={<Square />} label="取消" disabled={busy !== null || !draft} onClick={() => void cancelRun()} /> : null}</div>
     </header>
     {error ? <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-[12px] text-red-700"><AlertTriangle className="h-4 w-4" />{error}</div> : null}
     <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(320px,1fr)_auto] lg:grid-cols-[220px_minmax(360px,1fr)_320px] lg:grid-rows-1">
@@ -291,7 +340,7 @@ function utf8Base64(value: string): string { const bytes = new TextEncoder().enc
 export function flowPortCompatibility(from: PortType, to: PortType): { conversionId?: string } | null { if (from === to) return {}; const conversion = Object.entries(PORT_CONVERSIONS).find(([, value]) => value.from === from && value.to === to); return conversion ? { conversionId: conversion[0] } : null }
 export function flowRegistryAvailabilityLabel(entry: RegistryEntry): string { if (entry.available) return '可用'; return [entry.disabledReason ?? '能力未配置', entry.configurationRoute ? `配置入口：${entry.configurationRoute}` : ''].filter(Boolean).join('；') }
 function Field({ label, children }: { label: string; children: ReactElement }): ReactElement { return <label className="mt-2 block text-[11px] text-[#64748b]"><span className="mb-1 block">{label}</span><span className="[&>input]:w-full [&>input]:rounded-lg [&>input]:border [&>input]:border-[#e2e8f0] [&>input]:px-2 [&>input]:py-1.5 [&>textarea]:w-full [&>textarea]:rounded-lg [&>textarea]:border [&>textarea]:border-[#e2e8f0] [&>textarea]:p-2">{children}</span></label> }
-function Action({ icon, label, onClick, primary }: { icon: ReactElement; label: string; onClick: () => void; primary?: boolean }): ReactElement { return <button onClick={onClick} className={`ds-no-drag flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] ${primary ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border border-[#e2e8f0] bg-white hover:bg-slate-50 dark:border-ds-border dark:bg-ds-main'}`}>{<span className="[&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span>}{label}</button> }
+function Action({ icon, label, onClick, primary, disabled }: { icon: ReactElement; label: string; onClick: () => void; primary?: boolean; disabled?: boolean }): ReactElement { return <button disabled={disabled} onClick={onClick} className={`ds-no-drag flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] ${primary ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border border-[#e2e8f0] bg-white hover:bg-slate-50 dark:border-ds-border dark:bg-ds-main'}`}>{<span className="[&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span>}{label}</button> }
 export function flowStatusClass(value: string): string { if (value === 'succeeded') return 'bg-green-100 text-green-700'; if (value === 'failed') return 'bg-red-100 text-red-700'; if (value === 'paused') return 'bg-yellow-100 text-yellow-700'; if (value.includes('approval') || value === 'interrupted') return 'bg-orange-100 text-orange-700'; if (value === 'cancelled' || value === 'skipped') return 'bg-slate-100 text-slate-600'; return 'bg-blue-100 text-blue-700' }
 function Status({ value }: { value: string }): ReactElement { return <span className={`rounded px-1.5 py-0.5 ${flowStatusClass(value)}`}>{value}</span> }
 function LoadingState({ label }: { label: string }): ReactElement { return <div className="flex h-full min-h-24 items-center justify-center gap-2 text-[12px] text-blue-600"><Loader2 className="h-4 w-4 animate-spin" />{label}</div> }
