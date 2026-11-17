@@ -573,6 +573,17 @@ describe('TaskController reliability boundaries', () => {
     repository.close()
   })
 
+  it('durably fails exhausted observation feedback once without spending further attempts or accepting a candidate', async () => {
+    const { repository, controller, task } = await fixture('读取公开列表并整理汇总。')
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const decision = controller.recordAttemptFailure(task.threadId, 'turn_reliability', 'tool_storm_recovery_exhausted', '重复读取已停止，请检查现有读取结果和具体阻断。')
+    expect(decision).toMatchObject({ kind: 'failed', task: { status: 'failed', attempts: 1 } })
+    expect(repository.events(task.id).filter(event => event.kind === 'attempt_retrying')).toHaveLength(0)
+    expect(repository.events(task.id).filter(event => event.kind === 'task_failed')).toHaveLength(1)
+    expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(0)
+    repository.close()
+  })
+
   it('does not complete a task from an assistant reply that explicitly reports unverified web failure', async () => {
     const { repository, sessionStore, controller, task } = await fixture('今天宁波的天气怎么样？')
     await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
@@ -786,6 +797,50 @@ describe('TaskController reliability boundaries', () => {
     }
   })
 
+  it('does not let an older Turn clear the newer Turn lease or execution clock', async () => {
+    const { repository, controller, task, setNow } = await fixture()
+    try {
+      controller.beginAttempt(task.threadId, 'turn_reliability')
+      const previous = controller.tokenForTurn('turn_reliability')!
+      setNow('2026-07-18T00:00:01.000Z')
+      const running = repository.get(task.id)!
+      repository.update(task.id, running.revision, current => ({ ...current, activeTurnId: 'new-turn' }))
+      controller.beginAttempt(task.threadId, 'new-turn')
+      const current = controller.tokenForTurn('new-turn')!
+      const finishWork = controller.beginWork('new-turn', 'new-turn-model', 'model')
+      controller.endRun('turn_reliability')
+      expect(() => controller.assertToken(previous)).toThrow(TaskLeaseLostError)
+      expect(() => controller.assertToken(current)).not.toThrow()
+      setNow('2026-07-18T00:00:31.000Z')
+      controller.startWatchdog({ intervalMs: 60_000, leaseMs: 60_000 })
+      await (controller as unknown as { runWatchdogTick(): Promise<void> }).runWatchdogTick()
+      expect(repository.getLease(task.id)).toMatchObject({ revision: current.leaseRevision, expiresAt: '2026-07-18T00:01:31.000Z' })
+      expect(repository.execution.usedExecutionMs(task.id, Date.parse('2026-07-18T00:00:31.000Z'))).toBeGreaterThanOrEqual(30_000)
+      finishWork()
+    } finally {
+      controller.stopWatchdog()
+      repository.close()
+    }
+  })
+
+  it('recovers an expired queued admission after a crash without charging a phantom attempt', async () => {
+    const f = await fixture()
+    const created = f.controller.ensureTask({ thread: f.thread, turnId: 'admitted-turn', request: { prompt: '生成报告。', taskIntent: 'new', taskOriginThreadId: 'origin' } })
+    expect(created).toMatchObject({ status: 'queued', attempts: 0 })
+    expect(f.repository.reconcileExpired('2026-07-18T00:00:30.000Z')).toEqual([])
+    f.repository.close()
+    const repository = new TaskRunRepository(join(f.root, 'tasks.sqlite3'))
+    const controller = new TaskController({ repository, threadStore: f.threadStore, sessionStore: f.sessionStore,
+      nowIso: () => '2026-07-18T00:02:00.000Z', ownerId: 'restarted-runtime' })
+    try {
+      const recovered = controller.reconcileStartup()
+      expect(recovered).toHaveLength(1)
+      expect(recovered[0]).toMatchObject({ id: created.id, status: 'retrying', attempts: 0 })
+      controller.beginAttempt(created.threadId, created.activeTurnId!)
+      expect(repository.get(created.id)).toMatchObject({ status: 'running', attempts: 1 })
+    } finally { repository.close() }
+  })
+
   it('fences an execution after another runtime takes over its expired lease', async () => {
     const { repository, controller, task, setNow } = await fixture()
     try {
@@ -807,6 +862,9 @@ describe('TaskController reliability boundaries', () => {
   it('delivers watchdog recovery once and clears the in-flight guard after reacquiring a lease', async () => {
     const { repository, controller, task, setNow } = await fixture()
     try {
+      // The fixture initially owns a queued admission; relinquish it before
+      // installing the old runtime's expired execution lease.
+      controller.endRun(task.activeTurnId!)
       repository.update(task.id, task.revision, current => ({
         ...current,
         status: 'running',

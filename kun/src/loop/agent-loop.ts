@@ -132,6 +132,11 @@ const PARALLEL_READ_ONLY_TOOL_NAMES = new Set(['read', 'grep', 'find', 'ls'])
 const MAX_PARALLEL_TOOL_CALLS = 3
 const MAX_TURN_MODEL_STEPS = 64
 const MAX_INCOMPLETE_COMPLETION_RECOVERIES = 2
+const MAX_BROWSER_SUPPRESSION_RECOVERIES = 2
+const RECOVERABLE_BROWSER_OBSERVATIONS = new Set([
+  'ego_browser_observe', 'ego_browser_read', 'browser_observe', 'browser_get_html',
+  'browser_read', 'browser_extract', 'browser_screenshot'
+])
 const DEFAULT_COMPACTION_SUMMARY_TIMEOUT_MS = 15_000
 const DEFAULT_COMPACTION_SUMMARY_MAX_TOKENS = 1_200
 const DEFAULT_COMPACTION_SUMMARY_INPUT_MAX_BYTES = 96 * 1024
@@ -481,6 +486,7 @@ export class AgentLoop {
   private readonly toolCatalogSnapshots = new Map<string, ToolCatalogSnapshot>()
   private readonly lastNoToolTextByTurn = new Map<string, string>()
   private readonly incompleteCompletionRecoveriesByTurn = new Map<string, number>()
+  private readonly browserSuppressionRecoveriesByTurn = new Map<string, { count: number; toolNames: string[] }>()
   /**
    * Execution-private tool arguments for the active turn. Persisted history
    * deliberately contains `{}`; this map repairs the provider-visible call /
@@ -716,6 +722,7 @@ export class AgentLoop {
       this.toolStormBreakers.delete(turnId)
       this.lastNoToolTextByTurn.delete(turnId)
       this.incompleteCompletionRecoveriesByTurn.delete(turnId)
+      this.browserSuppressionRecoveriesByTurn.delete(turnId)
       this.ephemeralToolArgumentsByTurn.delete(turnId)
     }
   }
@@ -867,6 +874,12 @@ export class AgentLoop {
       if (stepResult === 'checkpoint_waiting') return { kind: 'checkpoint_waiting' }
       if (stepResult === 'outcome_unknown') return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
       if (stepResult === 'stop') return { kind: 'candidate' }
+      if (stepResult === 'suppression_exhausted') {
+        const message = '重复读取未取得新结果，已停止重复尝试；已有来源、成果和执行记录保留。'
+        await this.opts.events.record({ kind: 'error', threadId, turnId,
+          code: 'tool_storm_recovery_exhausted', message, severity: 'warning' })
+        return { kind: 'retryable', code: 'tool_storm_recovery_exhausted', message }
+      }
       if (stepResult === 'blocked') {
         return {
           kind: 'failed',
@@ -904,7 +917,7 @@ export class AgentLoop {
     turnId: string,
     signal: AbortSignal,
     stepIndex = 0
-  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown' | 'checkpoint_waiting'> {
+  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown' | 'checkpoint_waiting' | 'suppression_exhausted'> {
     if (shouldVerifyImmutablePrefix()) {
       verifyImmutablePrefix(this.opts.prefix)
     }
@@ -1203,6 +1216,13 @@ export class AgentLoop {
       ] : []),
       ...(userInputDisabled ? [userInputUnavailableInstruction()] : []),
       ...(completionRecoveryInstruction ? [completionRecoveryInstruction] : []),
+      ...(this.browserSuppressionRecoveriesByTurn.has(turnId) ? [
+        `Repeated browser observation recovery (server-owned, bounded): ${JSON.stringify(this.browserSuppressionRecoveriesByTurn.get(turnId))}. `
+        + 'Consume the persisted tool_storm_suppressed result: the blocked calls did not run, and suppression is not a completed task or verified report. '
+        + 'Do not repeat the same observation or change sessions, call IDs, arguments or authority merely to evade its repeat guard. '
+        + 'Use an already-read source and its real receipt to publish, read back and verify the requested artifact when sufficient; otherwise use a genuinely different authorized read or explain the concrete remaining blocker. '
+        + 'Do not replay mutations, reset guards, fabricate evidence or weaken verification. Existing unknown outcomes and all execution budgets remain binding.'
+      ] : []),
       ...optionalInstruction(webSearchCapabilityInstruction(workflowPrompt, toolSpecs)),
       ...optionalInstruction(webFailureGuard?.recoveryInstruction()),
       ...(effectiveToolSpecs.some((tool) => tool.name === 'bash' || tool.name === 'request_host_shell') ? [shellRuntimeInstruction()] : []),
@@ -1742,6 +1762,18 @@ export class AgentLoop {
       // model step gets no Web tools and one final recovery instruction. This
       // lets it answer from earlier successful searches when page fetches fail.
       if (this.webToolFailureGuards.get(turnId)?.isBlocked()) return 'continue'
+      if (completedToolCalls.every(call => call.toolKind !== 'file_change' && RECOVERABLE_BROWSER_OBSERVATIONS.has(call.toolName)
+        && call.providerId === (call.toolName.startsWith('ego_') ? 'ego-browser' : 'browser-skill'))) {
+        const prior = this.browserSuppressionRecoveriesByTurn.get(turnId)
+        if ((prior?.count ?? 0) >= MAX_BROWSER_SUPPRESSION_RECOVERIES) return 'suppression_exhausted'
+        this.browserSuppressionRecoveriesByTurn.set(turnId, {
+          count: (prior?.count ?? 0) + 1,
+          toolNames: [...new Set(completedToolCalls.map(call => call.toolName))]
+        })
+        // Deliver the failed tool result to the model before Task acceptance.
+        // The breaker and durable operation receipts remain untouched.
+        return 'continue'
+      }
       return 'stop'
     }
     return 'continue'

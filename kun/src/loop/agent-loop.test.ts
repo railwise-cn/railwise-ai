@@ -175,6 +175,114 @@ describe('scheduled occurrence model context', () => {
   })
 })
 
+describe('suppressed browser tool recovery', () => {
+  async function runSuppressionScenario(mode: 'deliver' | 'blocked' | 'unknown' | 'mutation' | 'spoof') {
+    const threadId = `thread_suppression_${mode}`, nowIso = () => new Date().toISOString()
+    const threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore(), eventBus = new InMemoryEventBus()
+    const ids = new SequentialIdGenerator(), inflight = new InflightTracker(), steering = new SteeringQueue(), compactor = new ContextCompactor()
+    const approvalGate = new InMemoryApprovalGate(), userInputGate = new InMemoryUserInputGate()
+    const events = new RuntimeEventRecorder({ eventBus, sessionStore, allocateSeq: id => eventBus.allocateSeq(id), nowIso })
+    const turns = new TurnService({ threadStore, sessionStore, events, inflight, steering, compactor, ids, nowIso })
+    const requests: ModelRequest[] = [], dispatched: string[] = [], failures: string[] = []
+    let attempts = 0, candidates = 0, unknown = false, unknownStops = 0, verified = false
+    const activeTask = { id: 'task_suppression', attempts: 1 }
+    const tasks = {
+      activeTask: () => activeTask, registerExecutionAbort: () => () => undefined, beginAttempt: () => { attempts++; return activeTask },
+      pendingDeliveries: () => [], tokenForTurn: () => undefined, beginWork: () => () => undefined, workBudget: () => undefined,
+      recordCost: () => undefined, beginToolOperation: () => undefined, endRun: () => undefined,
+      suspendWebArtifactProgress: async () => null, hasUnknownToolOutcome: () => unknown,
+      suspendUnknownToolOutcome: () => { unknownStops++ }, assessNonRetryableBlock: async () => null,
+      assessCandidate: async () => { candidates++; return { kind: 'completed', task: activeTask } },
+      recordAttemptFailure: (_thread: string, _turn: string, code: string) => { failures.push(code); return { kind: 'failed', task: activeTask } }
+    } as unknown as TaskController
+    const sequence = mode === 'mutation' ? ['write', 'write', 'write'] : mode === 'spoof'
+      ? ['ego_browser_observe', 'ego_browser_observe', 'ego_browser_observe'] : mode === 'blocked'
+      ? Array.from({ length: 8 }, () => 'ego_browser_observe')
+      : ['ego_browser_read', 'ego_browser_observe', 'ego_browser_observe', 'ego_browser_observe', 'publish_artifact', 'read_artifact', 'verify_web_artifact', 'ego_browser_finish']
+    const model: ModelClient = { provider: 'test', model: 'fixture-model', async *stream(request) {
+      requests.push(request)
+      const tool = sequence[requests.length - 1]
+      if (tool) {
+        yield { kind: 'tool_call_complete', callId: `call_${requests.length}`, toolName: tool, arguments: {} }
+        yield { kind: 'completed', stopReason: 'tool_calls' }; return
+      }
+      yield { kind: 'assistant_text_delta', text: '汇总成果已保存并完成核验。' }
+      yield { kind: 'completed', stopReason: 'stop' }
+    } }
+    const toolHost: ToolHost = { id: 'suppression-fixture', async listTools() {
+      return [...new Set(sequence)].map(name => ({ ...spec(name), providerKind: 'built-in' as const,
+        providerId: mode === 'spoof' ? 'mcp:unrelated' : name.startsWith('ego_') ? 'ego-browser' : 'managed-artifacts' }))
+    }, async execute(call, context) {
+      dispatched.push(call.toolName)
+      if (call.toolName === 'verify_web_artifact') verified = true
+      if (mode === 'unknown' && call.toolName === 'read_artifact') unknown = true
+      return { approved: true, item: makeToolResultItem({ id: `item_${call.callId}`, threadId, turnId: context.turnId,
+        callId: call.callId, toolName: call.toolName,
+        output: unknown ? { status: 'outcome_unknown' } : { status: 'succeeded', resultHash: 'a'.repeat(64), complete: verified } }) }
+    } }
+    await threadStore.upsert(createThreadRecord({ id: threadId, title: '已读列表汇总', workspace: '', model: model.model, createdAt: nowIso() }))
+    const started = await turns.startTurn({ threadId, request: { prompt: '读取订阅资料，整理并交付汇总结果。' } })
+    const loop = new AgentLoop({ threadStore, sessionStore, approvalGate, userInputGate, model, toolHost,
+      usage: new UsageService(), events, turns, inflight, steering, compactor, prefix: createImmutablePrefix(), ids, nowIso, tasks })
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    return { outcome, requests, dispatched, failures, attempts, candidates, unknownStops, verified,
+      items: await sessionStore.loadItems(threadId), events: await sessionStore.loadEventsSince(threadId, 0) }
+  }
+
+  it('consumes a suppressed observation before assessing the candidate and uses already-read evidence in the same attempt', async () => {
+    const r = await runSuppressionScenario('deliver')
+    expect(r.outcome).toBe('completed')
+    expect(r.verified).toBe(true)
+    expect(r.attempts).toBe(1)
+    expect(r.candidates).toBe(1)
+    expect(r.failures).toEqual([])
+    expect(r.dispatched).toEqual(['ego_browser_read', 'ego_browser_observe', 'ego_browser_observe', 'publish_artifact', 'read_artifact', 'verify_web_artifact', 'ego_browser_finish'])
+    const recovery = r.requests[4]!
+    expect(recovery.history.some(item => item.kind === 'tool_result' && item.isError && (item.output as { code?: string }).code === 'tool_storm_suppressed')).toBe(true)
+    expect(recovery.contextInstructions?.join('\n')).toContain('Repeated browser observation recovery')
+    expect(recovery.contextInstructions?.join('\n')).toContain('already-read source')
+    expect(recovery.contextInstructions?.join('\n')).toContain('Do not replay mutations')
+    expect(r.unknownStops).toBe(0)
+  })
+
+  it('stops persistent suppressed observations once after two feedback opportunities, without candidate or outer retry loops', async () => {
+    const r = await runSuppressionScenario('blocked')
+    expect(r.outcome).toBe('failed')
+    expect(r.attempts).toBe(1)
+    expect(r.requests).toHaveLength(5)
+    expect(r.dispatched).toEqual(['ego_browser_observe', 'ego_browser_observe'])
+    expect(r.failures).toEqual(['tool_storm_recovery_exhausted'])
+    expect(r.events.filter(event => event.kind === 'error' && event.code === 'tool_storm_recovery_exhausted')).toHaveLength(1)
+    expect(r.candidates).toBe(0)
+    expect(r.unknownStops).toBe(0)
+  })
+
+  it('retains unknown-outcome fencing while recovering observations', async () => {
+    const r = await runSuppressionScenario('unknown')
+    expect(r.outcome).toBe('failed')
+    expect(r.dispatched.at(-1)).toBe('read_artifact')
+    expect(r.dispatched).not.toContain('verify_web_artifact')
+    expect(r.attempts).toBe(1)
+    expect(r.failures).toEqual([])
+    expect(r.candidates).toBe(0)
+    expect(r.unknownStops).toBe(1)
+  })
+
+  it('does not grant observation-recovery feedback or replay to suppressed mutations', async () => {
+    const r = await runSuppressionScenario('mutation')
+    expect(r.dispatched).toEqual(['write', 'write'])
+    expect(r.requests).toHaveLength(3)
+    expect(r.requests.flatMap(request => request.contextInstructions ?? []).join('\n')).not.toContain('Repeated browser observation recovery')
+  })
+
+  it('does not confer browser recovery on an unrelated provider using a browser tool name', async () => {
+    const r = await runSuppressionScenario('spoof')
+    expect(r.dispatched).toEqual(['ego_browser_observe', 'ego_browser_observe'])
+    expect(r.requests).toHaveLength(3)
+    expect(r.requests.flatMap(request => request.contextInstructions ?? []).join('\n')).not.toContain('Repeated browser observation recovery')
+  })
+})
+
 describe('webSearchCapabilityInstruction', () => {
   it('treats web tool content as untrusted data that cannot authorize actions', () => {
     const instruction = webSearchCapabilityInstruction('查找最新资料', [spec('web_search')])

@@ -1,0 +1,98 @@
+{
+  "status": "local-validation-passed-exact-package-and-business-pending",
+  "at": "2026-11-17T01:17:05.211066+00:00",
+  "scope": "Formal periodic browser task admission and bounded observation recovery",
+  "observedFailure": {
+    "taskId": "task_eb5e06cd-2f57-4037-b8a5-92c3a2255cc7",
+    "dueAt": "2026-11-17T00:30:00.000Z",
+    "status": "stalled",
+    "attempts": 8,
+    "artifactCount": 0,
+    "originalRecordsUnchanged": true,
+    "authorizationAndFreshBrowserRead": "passed",
+    "completion": "failed"
+  },
+  "changes": [
+    "Queued task and admission owner lease commit atomically before observers can recover the task; first model attempt transfers the existing lease without consuming a phantom attempt.",
+    "Pre-dispatch preparation failure releases only its pending admission; a post-dispatch receipt error retains the running owner.",
+    "Stale Turn cleanup settles its own execution token and cannot clear a newer Turn lease, fence or actual model-work clock.",
+    "Only trusted read-only browser observation suppression receives at most two same-Turn model feedback opportunities; persisted rejected tool results reach the model before candidate assessment.",
+    "Persistent repetition produces one durable tool_storm_recovery_exhausted failure. No guard reset, mutation replay, scope expansion or hard-budget increase."
+  ],
+  "tests": {
+    "suppressionRedFailures": 4,
+    "admissionRedFailures": 3,
+    "compositeFiles": 6,
+    "compositePassed": 151,
+    "failed": 0,
+    "kunTypes": "passed",
+    "lint": "passed",
+    "oneProductionBuild": "passed",
+    "freshnessProductionInputs": 1381,
+    "authoredProductionInputsMatched": 2443,
+    "sourceChangedDuringValidation": false
+  },
+  "testedFiles": [
+    {
+      "path": "kun/src/loop/agent-loop.ts",
+      "sha256": "903c61edd0247bc2db4188249a57ff863dfcd1d59bc2e4caaf14cc031a90838b",
+      "bytes": 146330
+    },
+    {
+      "path": "kun/src/loop/agent-loop.test.ts",
+      "sha256": "3e93ef33077580ea125f8ef0b9a78b36cd8ff555e35aed6158dec80da0eb91e5",
+      "bytes": 44933
+    },
+    {
+      "path": "kun/src/services/task-controller.ts",
+      "sha256": "f05c9541cec52ebad5a2e138e08f0ee2cbba4561563cc878347e2881edc254b2",
+      "bytes": 194503
+    },
+    {
+      "path": "kun/src/services/task-controller.test.ts",
+      "sha256": "e2b00534a3148de73e451442f39e6fba458fbf42da6ddb4f89413e06990e47e1",
+      "bytes": 69693
+    },
+    {
+      "path": "kun/src/services/task-coordinator.ts",
+      "sha256": "2f0eb116e2061fc4c2de948c23baf0dbeb631397e9047854aea83e20d84c4d10",
+      "bytes": 29163
+    },
+    {
+      "path": "kun/src/services/task-coordinator.test.ts",
+      "sha256": "54328bb300096eae8fa54dbe8f29f909082c6550664039cd295367ddf4481a54",
+      "bytes": 34537
+    }
+  ],
+  "preservation": {
+    "actualTaskBudgetsCountersGrantsAndOperationReceiptsUnchanged": true,
+    "formalPlanRevision1StillEnabled": true,
+    "oldPausedPlansUnchanged": true,
+    "newUnknown": 0,
+    "legacyUnknown": 16,
+    "directCodexPaidSourceCollection": false
+  },
+  "privateProofs": [
+    {
+      "fileName": "formal-dadan-0830-actual-due-FAILED-audit-private.json",
+      "sha256": "579c7ec63064209c76959642b6c632b1e1b6689d65dfc3d404d5b7b317733a79",
+      "bytes": 22721
+    },
+    {
+      "fileName": "formal-suppression-fix-summary-private.json",
+      "sha256": "505d00c449d3038357ff0c002ba03612a72ecb9c1a36e222b8599e3e77f5d1ae",
+      "bytes": 4126
+    },
+    {
+      "fileName": "admission-race-summary-private.json",
+      "sha256": "416bc4b12e7ca3b19274fe823c201f937341f19c4fbb02e0871804043b89c796",
+      "bytes": 4360
+    },
+    {
+      "fileName": "formal-composite-local-validation.json",
+      "sha256": "3abb3d0bc4a1833be6c60b1122d24aba2b936b29fd2c93873ceebd1672706276",
+      "bytes": 335534
+    }
+  ],
+  "acceptanceBoundary": "Runtime changes require a new exact candidate and real-model browser/report/periodic acceptance. Previous7d19 short temporary occurrence success is preserved as historical scoped evidence. Current public release gate remains pending; Stable0.5.6 and the failed publication record are preserved."
+}

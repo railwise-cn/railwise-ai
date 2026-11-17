@@ -121,7 +121,7 @@ export class TaskController {
   private readonly spans?: RuntimeSpanService
   private readonly reconcileHostShell?: TaskControllerDeps['reconcileHostShell']
   private readonly completionGuard?: TaskControllerDeps['completionGuard']
-  private readonly leases = new Map<string, { leaseRevision: number; turnId?: string }>()
+  private readonly leases = new Map<string, { leaseRevision: number; turnId?: string; admission?: boolean }>()
   private readonly attemptTokens = new Map<string, ExecutionToken>()
   private readonly identity: ProcessIdentity = processIdentity() ?? { pid: process.pid, fingerprint: `unverified:${executionUUID()}` }
   private readonly fencedTasks = new Set<string>()
@@ -204,19 +204,23 @@ export class TaskController {
     const intent = input.request.taskIntent ?? 'auto'
     if (active && intent === 'status') return active
     if (active && (input.continuationTaskId || intent === 'supplement' || (!consultation && intent !== 'new' && shouldContinueActiveTask(input.request.prompt)))) {
-      return this.repository.update(active.id, active.revision, (current) => ({
-        ...current,
-        activeTurnId: input.turnId,
-        model: input.request.model ?? current.model,
-        providerId: input.request.providerId ?? current.providerId,
-        reasoningEffort: input.request.reasoningEffort ?? current.reasoningEffort,
-        engineeringPlanId: input.engineeringPlanId ?? current.engineeringPlanId,
-        updatedAt: now
-      }), {
-        key: `turn-attached:${input.turnId}`,
-        kind: 'turn_attached',
-        payload: { turnId: input.turnId },
-        createdAt: now
+      return this.repository.transact(() => {
+        const attached = this.repository.update(active.id, active.revision, (current) => ({
+          ...current,
+          activeTurnId: input.turnId,
+          model: input.request.model ?? current.model,
+          providerId: input.request.providerId ?? current.providerId,
+          reasoningEffort: input.request.reasoningEffort ?? current.reasoningEffort,
+          engineeringPlanId: input.engineeringPlanId ?? current.engineeringPlanId,
+          updatedAt: now
+        }), {
+          key: `turn-attached:${input.turnId}`,
+          kind: 'turn_attached',
+          payload: { turnId: input.turnId },
+          createdAt: now
+        })
+        if (['queued', 'retrying'].includes(attached.status)) this.holdAdmission(attached, input.turnId)
+        return attached
       })
     }
     // A new message never implicitly revokes or cancels another task.
@@ -279,7 +283,7 @@ export class TaskController {
     const profile = input.thread.agentProfile
     const selectedModel = input.request.model ?? profile?.model ?? input.thread.model
     const maxCostUsd = minimumDefinedPositive(profile?.budget.maxCostUsd, input.thread.costBudgetUsd)
-    const created = this.repository.create({
+    const queued: TaskRun = {
       id,
       threadId: input.thread.id,
       originThreadId: source?.originThreadId ?? input.request.taskOriginThreadId,
@@ -325,6 +329,13 @@ export class TaskController {
       createdAt: now,
       updatedAt: now,
       revision: 0
+    }
+    const created = this.repository.transact(() => {
+      const task = this.repository.create(queued)
+      // Persist ownership in the same transaction as the queued Task. The
+      // coordinator still has to prepare its schedule/receipts before dispatch.
+      if (input.turnId || source) this.holdAdmission(task, input.turnId)
+      return task
     })
     this.repository.execution.ensureSession(created, now)
     this.spans?.start({
@@ -340,6 +351,25 @@ export class TaskController {
       }
     })
     return created
+  }
+
+  private holdAdmission(task: TaskRun, turnId?: string): void {
+    const now = this.nowIso()
+    const leaseMs = Math.max(1_000, Math.trunc(this.watchdogOptions.leaseMs ?? 60_000))
+    const lease = this.repository.acquireLease(task.id, this.ownerId, now, new Date(Date.parse(now) + leaseMs).toISOString())
+    if (!lease) throw Object.assign(new Error('task admission is owned by another runtime'), { code: 'task_lease_conflict' })
+    this.leases.set(task.id, { leaseRevision: lease.revision, turnId, admission: true })
+    this.fencedTasks.add(task.id)
+  }
+
+  /** Failed preparation may release only its own not-yet-started admission. */
+  releasePendingAdmission(threadId: string, turnId: string): void {
+    for (const [taskId, lease] of this.leases) {
+      if (!lease.admission || lease.turnId !== turnId || this.repository.get(taskId)?.threadId !== threadId) continue
+      this.repository.releaseLease(taskId, this.ownerId, lease.leaseRevision)
+      this.leases.delete(taskId)
+      this.fencedTasks.delete(taskId)
+    }
   }
 
   continuationSelection(thread: ThreadRecord, request: StartTurnRequest, engineeringExecution?: boolean, continuationTaskId?: string): Pick<StartTurnRequest, 'model' | 'providerId' | 'reasoningEffort'> & { engineeringPlanId?: string } {
@@ -1352,7 +1382,7 @@ export class TaskController {
     if (code === 'operation_cancelled' || code === 'turn_total_timeout') {
       return this.finish(task, code === 'operation_cancelled' ? 'cancelled' : 'failed', message)
     }
-    if (code === 'web_access_exhausted' || code === 'max_tokens') {
+    if (code === 'web_access_exhausted' || code === 'max_tokens' || code === 'tool_storm_recovery_exhausted') {
       return this.finish(task, 'failed', message)
     }
     if (hostShell.lastFailed) return this.waitForUser(task,'最后一次已授权命令没有执行成功。请先处理失败原因，再明确授权新的检查命令。', '', `host-shell-failed:${hostShell.lastFailed.id}`,turnId)
@@ -1432,14 +1462,23 @@ export class TaskController {
 
   endRun(turnId: string): void {
     const token = this.attemptTokens.get(turnId)
-    if (!token) return
+    if (!token) {
+      for (const [taskId, lease] of this.leases) if (lease.admission && lease.turnId === turnId) {
+        const task = this.repository.get(taskId)
+        if (task) this.releasePendingAdmission(task.threadId, turnId)
+      }
+      return
+    }
     // The in-process worker has actually returned; this is stronger evidence
     // than a lease timeout or a stale lock file.
     this.repository.execution.finishAttempt(token.executionId, 'cancelled', this.nowIso())
     this.repository.releaseLease(token.taskId, token.ownerId, token.leaseRevision)
     this.attemptTokens.delete(turnId)
-    this.leases.delete(token.taskId)
-    this.fencedTasks.delete(token.taskId)
+    const current = this.leases.get(token.taskId)
+    if (current?.leaseRevision === token.leaseRevision && current.turnId === turnId) {
+      this.leases.delete(token.taskId)
+      this.fencedTasks.delete(token.taskId)
+    }
   }
 
   assertToken(token: ExecutionToken): void {
@@ -2125,7 +2164,7 @@ export class TaskController {
       }
       for (const [taskId, state] of this.leases) {
         const task = this.repository.get(taskId)
-        if (!task || TERMINAL.has(task.status) || task.status === 'paused') {
+        if (!task || TERMINAL.has(task.status) || task.status === 'paused' || state.admission && !['queued', 'retrying'].includes(task.status)) {
           this.releaseExecutionLease(taskId)
           continue
         }
