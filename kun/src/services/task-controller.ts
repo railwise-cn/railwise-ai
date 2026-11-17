@@ -356,9 +356,11 @@ export class TaskController {
   private holdAdmission(task: TaskRun, turnId: string): void {
     const now = this.nowIso()
     const leaseMs = Math.max(1_000, Math.trunc(this.watchdogOptions.leaseMs ?? 60_000))
-    const lease = this.repository.acquireAdmissionLease(task.id, turnId, this.ownerId, now, new Date(Date.parse(now) + leaseMs).toISOString())
+    const previous = this.leases.get(task.id)
+    const lease = this.repository.acquireAdmissionLease(task.id, turnId, this.ownerId, now, new Date(Date.parse(now) + leaseMs).toISOString(), previous?.admission ? undefined : previous?.leaseRevision)
     if (!lease) throw Object.assign(new Error('task admission is owned by another runtime'), { code: 'task_lease_conflict' })
     this.leases.set(task.id, { leaseRevision: lease.revision, turnId, admission: true })
+    this.fencedTasks.delete(task.id)
   }
 
   /** Failed preparation may release only its own not-yet-started admission. */

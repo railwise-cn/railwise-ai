@@ -823,6 +823,31 @@ describe('TaskController reliability boundaries', () => {
     }
   })
 
+  it('hands a retrying worker to a new admission without letting old cleanup or tool dispatch cross the handoff', async () => {
+    const { repository, controller, thread, task, setNow } = await fixture()
+    try {
+      controller.beginAttempt(task.threadId, 'turn_reliability')
+      const previous = controller.tokenForTurn('turn_reliability')!
+      const retry = controller.recordAttemptFailure(task.threadId, 'turn_reliability', 'network_unavailable', 'synthetic transient failure')!
+      expect(retry).toMatchObject({ kind: 'continue', task: { status: 'retrying' } })
+      setNow('2026-07-18T00:00:01.000Z')
+      controller.ensureTask({ thread, turnId: 'handoff-turn', continuationTaskId: task.id, request: { prompt: '继续原任务。' } })
+      const admission = repository.getAdmissionLease(task.id)!
+      expect(admission).toMatchObject({ ownerId: 'test-runtime', turnId: 'handoff-turn' })
+      expect(() => controller.assertToken(previous)).toThrow(TaskLeaseLostError)
+      expect(() => controller.beginToolOperation('turn_reliability', { callId: 'stale-dispatch', toolName: 'write_file', arguments: { path: 'stale.txt', content: 'stale' } })).toThrow(TaskLeaseLostError)
+      controller.endRun('turn_reliability')
+      expect(repository.getAdmissionLease(task.id)).toEqual(admission)
+      expect(repository.reconcileExpired('2026-07-18T00:00:30.000Z')).toEqual([])
+      controller.beginAttempt(task.threadId, 'handoff-turn')
+      const current = controller.tokenForTurn('handoff-turn')!
+      controller.endRun('turn_reliability')
+      expect(() => controller.assertToken(current)).not.toThrow()
+      expect(repository.getLease(task.id)?.revision).toBe(current.leaseRevision)
+      expect(repository.operations(task.id, 'tool')).toEqual([])
+    } finally { repository.close() }
+  })
+
   it('recovers an expired queued admission after a crash without charging a phantom attempt', async () => {
     const f = await fixture()
     const created = f.controller.ensureTask({ thread: f.thread, turnId: 'admitted-turn', request: { prompt: '生成报告。', taskIntent: 'new', taskOriginThreadId: 'origin' } })

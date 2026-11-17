@@ -428,12 +428,18 @@ export class TaskRunRepository {
     })
   }
 
-  acquireAdmissionLease(taskId: string, turnId: string, ownerId: string, nowIso: string, expiresAt: string): TaskAdmissionLease | null {
+  acquireAdmissionLease(taskId: string, turnId: string, ownerId: string, nowIso: string, expiresAt: string, executionRevision?: number): TaskAdmissionLease | null {
     return this.transaction(() => {
       const execution = this.getLease(taskId)
-      if (execution && execution.expiresAt > nowIso) return null
       const current = this.getAdmissionLease(taskId)
       if (current && current.ownerId !== ownerId && current.expiresAt > nowIso) return null
+      if (execution && execution.expiresAt > nowIso) {
+        const task = this.get(taskId)
+        if (execution.ownerId !== ownerId || execution.revision !== executionRevision || task?.activeTurnId !== turnId || !['queued', 'retrying'].includes(task.status)) return null
+        // The same controller may prepare its next Turn before the old worker's
+        // finally runs. Fence that exact revision within the admission handoff.
+        if (!this.releaseLease(taskId, ownerId, executionRevision)) return null
+      }
       const revision = (current?.revision ?? -1) + 1
       this.db.prepare(`
         INSERT INTO task_admission_leases(task_id, turn_id, owner_id, acquired_at, expires_at, revision)

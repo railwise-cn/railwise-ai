@@ -1,6 +1,6 @@
 {
   "status": "local-validation-passed-exact-package-and-business-pending",
-  "at": "2026-11-17T01:58:24.713923+00:00",
+  "at": "2026-11-17T02:25:50.310881+00:00",
   "scope": "Formal periodic browser task admission and bounded observation recovery",
   "observedFailure": {
     "taskId": "task_eb5e06cd-2f57-4037-b8a5-92c3a2255cc7",
@@ -14,6 +14,7 @@
   },
   "changes": [
     "Queued task and a separate internal admission lease commit atomically for concrete Turns; dispatch transfers admission to execution in the same transaction. Pre-Turn Retry preparation remains authorizable under the existing execution-lease guard.",
+    "A queued/retrying next Turn can receive the same Controller execution lease only with explicit current owner and revision proof. The transaction fences the old token immediately; delayed old cleanup cannot remove the new admission or execution.",
     "Pre-dispatch preparation failure releases only its pending admission; a post-dispatch receipt error retains the running owner.",
     "Stale Turn cleanup settles its own execution token and cannot clear a newer Turn lease, fence or actual model-work clock.",
     "Only trusted read-only browser observation suppression receives at most two same-Turn model feedback opportunities; persisted rejected tool results reach the model before candidate assessment.",
@@ -32,7 +33,15 @@
     "authoredProductionInputsMatched": 2443,
     "sourceChangedDuringValidation": false,
     "admissionLifecycleRedFailures": 13,
-    "allCheckedFiles": 2449
+    "allCheckedFiles": 2449,
+    "fullRuntimeFilesPassed": 364,
+    "fullRuntimeFilesSkipped": 4,
+    "fullRuntimeTestsPassed": 5269,
+    "fullRuntimeTestsSkipped": 24,
+    "fullRuntimeExitCode": 0,
+    "newHandoffRegressions": 2,
+    "finalSourceOneProductionBuild": "passed",
+    "finalSourceFreshness": "passed"
   },
   "testedFiles": [
     {
@@ -47,13 +56,13 @@
     },
     {
       "path": "kun/src/services/task-controller.ts",
-      "sha256": "3785271df373919a4b0599c510131942856fd2fc508a8078d28c9095af796e96",
-      "bytes": 194729
+      "sha256": "dec4c27e3e4f5741c29809cfcea457e6ebb50a23bc03677a2dcffd6639bba828",
+      "bytes": 194871
     },
     {
       "path": "kun/src/services/task-controller.test.ts",
-      "sha256": "e2b00534a3148de73e451442f39e6fba458fbf42da6ddb4f89413e06990e47e1",
-      "bytes": 69693
+      "sha256": "3e4409f53392922e094274480d18f5d65fcc888044bb549a2046810c0fc081a9",
+      "bytes": 71505
     },
     {
       "path": "kun/src/services/task-coordinator.ts",
@@ -67,13 +76,13 @@
     },
     {
       "path": "kun/src/services/task-run-repository.ts",
-      "sha256": "6d49b94cff1dc26db81b03a0238131d78c20cd56ce414afcc59a84dd58b6bec4",
-      "bytes": 62803
+      "sha256": "e9109048d215f9e01117e6205249e62a215e4e1efa339079d47298b8fd3dc2d2",
+      "bytes": 63290
     },
     {
       "path": "kun/src/services/task-run-repository.test.ts",
-      "sha256": "795e466d8daf63b08fa3963d058c1d23d181bdc57cd8ce3426bc7e16e1e0ef36",
-      "bytes": 9780
+      "sha256": "6ce55ef8d859370d46d31de3c68a6fccc6e85a00534cdf534a60262f8e71c652",
+      "bytes": 11541
     }
   ],
   "preservation": {
@@ -119,6 +128,21 @@
       "fileName": "quality-4b5634dd-official-terminal-identities.json",
       "sha256": "b1a0754a90ae87e38ed6282b3a4f31ecfa7628f5233247c36a117a7b2da9690c",
       "bytes": 25191
+    },
+    {
+      "fileName": "admission-host-shell-summary-private.json",
+      "sha256": "997e3e648f649e9d292a54cc30e1410596fe6b435a5f1f5e76b39e7c03da3aac",
+      "bytes": 4685
+    },
+    {
+      "fileName": "formal-composite-v3-local-validation.json",
+      "sha256": "cfe1e0ee126cc3efb7540a03cbb791ff0ec6236bcc7b8b9df10f16b68891d8de",
+      "bytes": 330992
+    },
+    {
+      "fileName": "quality-dbca360e-official-terminal-identities.json",
+      "sha256": "7b572c8ad7c3c7835db81dd0567076fbec792cecef97326b52547d842ea506d9",
+      "bytes": 25191
     }
   ],
   "acceptanceBoundary": "Runtime changes require a new exact candidate and real-model browser/report/periodic acceptance. Previous7d19 short temporary occurrence success is preserved as historical scoped evidence. Current public release gate remains pending; Stable0.5.6 and the failed publication record are preserved.",
@@ -138,6 +162,17 @@
     "originalFailingAssertionsModified": 0,
     "originalCasesNowPassed": 13,
     "newRequiredCI": "pending after corrected source commit",
+    "packageBuiltForFailedCI": false
+  },
+  "additionalCIRegression": {
+    "sourceHead": "dbca360eb37df1fefb364e528075d97ecf1fb70c",
+    "pushRun": 43999589644,
+    "prRun": 43999600351,
+    "failedTests": 1,
+    "originalHostShellAssertionsModified": 0,
+    "cause": "A known background host session returns continue/retrying while retaining the current execution lease for polling. A subsequent Turn can be attached by the same Controller before old-worker final cleanup. Admission wrongly treated this proven same-owner execution lease as a different runtime.",
+    "nowPassed": true,
+    "newRequiredCI": "pending for final source",
     "packageBuiltForFailedCI": false
   }
 }

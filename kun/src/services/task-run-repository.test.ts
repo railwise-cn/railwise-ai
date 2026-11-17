@@ -155,6 +155,27 @@ describe('TaskRunRepository', () => {
     store.close()
   })
 
+  it('hands execution back to admission only for the explicit owner and current revision of a retrying Turn', async () => {
+    const store = await repository()
+    const created = store.create(task({ status: 'running', originThreadId: 'origin_1' }))
+    const now = '2026-07-18T00:00:00.000Z', later = '2026-07-18T00:00:01.000Z', expires = '2026-07-18T00:01:00.000Z'
+    const execution = store.acquireLease(created.id, 'owner-a', now, expires)!
+    expect(store.acquireAdmissionLease(created.id, 'turn_1', 'owner-a', later, expires, execution.revision)).toBeNull()
+    store.update(created.id, created.revision, current => ({ ...current, status: 'retrying', activeTurnId: 'turn_2' }))
+    expect(store.acquireAdmissionLease(created.id, 'turn_2', 'owner-b', later, expires, execution.revision)).toBeNull()
+    expect(store.acquireAdmissionLease(created.id, 'turn_2', 'owner-a', later, expires, execution.revision + 1)).toBeNull()
+    expect(store.acquireAdmissionLease(created.id, 'wrong-turn', 'owner-a', later, expires, execution.revision)).toBeNull()
+    expect(store.getLease(created.id)).toEqual(execution)
+    expect(store.acquireAdmissionLease(created.id, 'turn_2', 'owner-a', later, expires, execution.revision)).toMatchObject({ turnId: 'turn_2', ownerId: 'owner-a' })
+    expect(store.hasLease({ ownerId: 'owner-a', leaseRevision: execution.revision, nowIso: later }, created.id)).toBe(false)
+    expect(store.reconcileExpired(later)).toEqual([])
+    const next = store.acquireLease(created.id, 'owner-a', later, expires, 'turn_2')!
+    expect(next.revision).toBe(execution.revision + 1)
+    expect(store.releaseLease(created.id, 'owner-a', execution.revision)).toBe(false)
+    expect(store.getLease(created.id)).toEqual(next)
+    store.close()
+  })
+
   it('renews a lease only for its current owner and fences stale revisions', async () => {
     const store = await repository()
     const created = store.create(task({ status: 'running' }))
