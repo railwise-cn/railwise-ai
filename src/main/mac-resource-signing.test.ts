@@ -75,7 +75,8 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-describe('macOS PNG resource signing exclusions', () => {
+// These packing fixtures require POSIX paths, file modes and symlinks.
+describe.skipIf(process.platform === 'win32')('macOS PNG resource signing exclusions', () => {
   it('configures the normal signer after packing the actual failed PNG without changing resource bytes or signing requirements', async () => {
     vi.stubEnv('MAC_SIGN', '1')
     const f = fixture('\\.kext$')
