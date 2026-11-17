@@ -1752,6 +1752,93 @@ async function readWindowsFailureLogs(profile, output) {
   return { installedProcess: summarizeWindowsFailureLogs(output), managedRuntime: files }
 }
 
+export function windowsUiClickExpression(selector, label) {
+  return `(() => {
+      const candidates = Array.from(document.querySelectorAll(${JSON.stringify(selector)}));
+      const node = candidates.find(node => node.getClientRects().length && !node.disabled &&
+        ${label ? `(node.textContent.trim() === ${JSON.stringify(label)} || node.getAttribute('aria-label') === ${JSON.stringify(label)} || node.querySelector('span')?.textContent.trim() === ${JSON.stringify(label)})` : 'true'});
+      if (!node) return null;
+      node.scrollIntoView({block:'center',inline:'center'});
+      const bounds = node.getBoundingClientRect();
+      const point = {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2};
+      const hit = document.elementFromPoint(point.x, point.y);
+      if (!hit || !node.contains(hit)) throw new Error('UI target is covered: ' + (node.getAttribute('aria-label') || node.textContent.trim()));
+      return point;
+    })()`
+}
+
+export function windowsManualArtifactTargetExpression({ stable = false, selector = 'article[aria-label="任务详情"] button', label = '每日网页报告.html' } = {}) {
+  return `(async () => {
+    const sample=()=>{
+      const node=Array.from(document.querySelectorAll(${JSON.stringify(selector)})).find(node=>node.getClientRects().length && !node.disabled && ${label ? `(node.textContent.trim()===${JSON.stringify(label)} || node.getAttribute('aria-label')===${JSON.stringify(label)})` : 'true'});
+      const shell=document.querySelector('.ds-workbench-shell'),main=shell?.querySelector('main');
+      const box=node?.getBoundingClientRect(),point=box?{x:box.x+box.width/2,y:box.y+box.height/2}:null;
+      const hit=point?document.elementFromPoint(point.x,point.y):null;
+      const scroll=[];for(let parent=node?.parentElement;parent;parent=parent.parentElement)if(parent.scrollHeight>parent.clientHeight || parent.scrollWidth>parent.clientWidth)scroll.push({top:parent.scrollTop,left:parent.scrollLeft});
+      const measurement={activeOverlay:shell?.dataset.activeOverlay||null,mainPresent:Boolean(main),mainInert:Boolean(main?.inert || main?.hasAttribute('inert')),present:Boolean(node),disabled:Boolean(node?.disabled),
+        rect:box?{x:box.x,y:box.y,width:box.width,height:box.height}:null,point,scroll,viewport:{width:innerWidth,height:innerHeight},
+        hit:{tag:hit?.tagName??null,target:Boolean(node?.contains(hit)),inspector:Boolean(hit?.closest('#workbench-inspector')),backdrop:Boolean(hit?.matches('button[aria-label="返回当前任务"]'))}};
+      return {node,measurement};
+    };
+    const initial=sample();
+    if(!${JSON.stringify(stable)})return initial.measurement;
+    initial.node?.scrollIntoView({block:'center',inline:'center',behavior:'instant'});
+    let previous,stableFrames=0,current=initial,observedFrames=0;
+    for(;observedFrames<60;) {
+      await new Promise(resolve=>requestAnimationFrame(resolve));observedFrames+=1;current=sample();
+      const value=current.measurement,point=value.point;
+      if(!current.node?.isConnected || !value.mainPresent || value.disabled || value.mainInert || value.activeOverlay || !value.hit.target || !point || value.rect.width<=0 || value.rect.height<=0 || point.x<0 || point.y<0 || point.x>=innerWidth || point.y>=innerHeight){previous=undefined;stableFrames=0;continue;}
+      const signature=JSON.stringify({rect:value.rect,scroll:value.scroll,viewport:value.viewport});
+      stableFrames=signature===previous?stableFrames+1:0;previous=signature;if(stableFrames>=2)break;
+    }
+    return {...current.measurement,ready:stableFrames>=2,stableFrames,observedFrames,initial:initial.measurement};
+  })()`
+}
+
+export async function clickWindowsManualTaskArtifact(cdp, { taskGoal, previewExpression, audit }) {
+  const closeInspector = async () => {
+    // The full-screen backdrop's center can be behind the inspector itself.
+    // Use its real, visible panel control; never bypass modal hit testing.
+    if (await cdp.evaluate(`Boolean(document.querySelector('button[aria-label="收起右侧栏"]')?.getClientRects().length)`)) {
+      await cdp.click('button[aria-label="收起右侧栏"]')
+      await cdp.wait(`(() => {const shell=document.querySelector('.ds-workbench-shell'),main=shell?.querySelector('main');return shell && shell.dataset.activeOverlay!=='inspector' && main && !main.inert && !main.hasAttribute('inert') && !document.querySelector('button[aria-label="收起右侧栏"]')?.getClientRects().length;})()`, 'the inspector to close and the actual main surface to become interactive')
+    }
+  }
+  const clickWorkspaceControl = async (selector, label) => {
+    const probe = windowsManualArtifactTargetExpression({ stable: true, selector, label: label ?? null })
+    let measurement = await cdp.wait(probe, 'the current interactive task workspace control')
+    audit.navigation ??= []
+    audit.navigation.push({ initial: measurement })
+    if (!measurement.ready && measurement.activeOverlay === 'inspector') {
+      await closeInspector()
+      measurement = await cdp.wait(probe, 'the task workspace control after dismissing its late inspector')
+      audit.navigation.at(-1).afterDismiss = measurement
+    }
+    assert.equal(measurement.ready, true, `UI target is covered or unstable: task workspace control ${JSON.stringify(measurement)}`)
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...measurement.point })
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...measurement.point })
+  }
+  audit.beforeRoute = await cdp.evaluate(windowsManualArtifactTargetExpression())
+  await closeInspector()
+  await cdp.click('nav[aria-label="工作区工具"] button', '任务')
+  await cdp.wait(`Boolean(document.querySelector('section.ds-task-sidebar[aria-label="任务列表"] [aria-label="任务筛选"]'))`, 'the real task workspace')
+  const completedFilter = await cdp.evaluate(`Array.from(document.querySelectorAll('[aria-label="任务筛选"] button')).find(button=>button.textContent.trim().startsWith('已完成'))?.textContent.trim()`)
+  assert.ok(completedFilter, 'The completed-task filter must be available')
+  await clickWorkspaceControl('[aria-label="任务筛选"] button', completedFilter)
+  await cdp.wait(`Boolean(Array.from(document.querySelectorAll('section.ds-task-sidebar[aria-label="任务列表"] button[title]')).find(button=>button.title===${JSON.stringify(taskGoal)}))`, 'the actual completed task')
+  await clickWorkspaceControl(`section.ds-task-sidebar[aria-label="任务列表"] button[title=${JSON.stringify(taskGoal)}]`)
+  // Route/scope changes request a new preview asynchronously. Let that actual
+  // projection finish before dismissing it and testing the manual entry.
+  await cdp.wait(previewExpression, 'the selected task artifact auto-preview projection', 30_000)
+  audit.afterProjection = await cdp.evaluate(windowsManualArtifactTargetExpression())
+  await closeInspector()
+  audit.target = await cdp.wait(windowsManualArtifactTargetExpression({ stable: true }), 'the current task artifact entry after two stable uncovered frames')
+  assert.equal(audit.target.ready, true, `UI target is covered or unstable: 每日网页报告.html ${JSON.stringify(audit.target)}`)
+  // No Runtime read or screenshot between the current hit test and real input.
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...audit.target.point })
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...audit.target.point })
+}
+
 export async function inspectWindowsManualPreview(report, inspect) {
   try {
     await inspect()
@@ -1820,18 +1907,7 @@ async function connectCdp(url) {
     throw new Error(`Installed UI did not show ${label}`)
   }
   const click = async (selector, label) => {
-    const expression = `(() => {
-      const candidates = Array.from(document.querySelectorAll(${JSON.stringify(selector)}));
-      const node = candidates.find(node => node.getClientRects().length && !node.disabled &&
-        ${label ? `(node.textContent.trim() === ${JSON.stringify(label)} || node.getAttribute('aria-label') === ${JSON.stringify(label)} || node.querySelector('span')?.textContent.trim() === ${JSON.stringify(label)})` : 'true'});
-      if (!node) return null;
-      node.scrollIntoView({block:'center',inline:'center'});
-      const bounds = node.getBoundingClientRect();
-      const point = {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2};
-      const hit = document.elementFromPoint(point.x, point.y);
-      if (!hit || !node.contains(hit)) throw new Error('UI target is covered: ' + (node.getAttribute('aria-label') || node.textContent.trim()));
-      return point;
-    })()`
+    const expression = windowsUiClickExpression(selector, label)
     const point = await wait(expression, label ?? selector)
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point })
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point })
@@ -2816,15 +2892,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const automaticScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
       await writeFile(join(evidenceDir, 'windows-task-html-auto-preview-zh-dark.png'), Buffer.from(automaticScreenshot.data, 'base64'))
       const manualPreviewPassed = await inspectWindowsManualPreview(report, async () => {
-        if (await cdp.evaluate(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay==='inspector'`)) await cdp.click('button[aria-label="返回当前任务"]')
-        await cdp.click('nav[aria-label="工作区工具"] button', '任务')
-        await cdp.wait(`Boolean(document.querySelector('section.ds-task-sidebar[aria-label="任务列表"] [aria-label="任务筛选"]'))`, 'the real task workspace')
-        const completedFilter = await cdp.evaluate(`Array.from(document.querySelectorAll('[aria-label="任务筛选"] button')).find(button=>button.textContent.trim().startsWith('已完成'))?.textContent.trim()`)
-        assert.ok(completedFilter, 'The completed-task filter must be available')
-        await cdp.click('[aria-label="任务筛选"] button', completedFilter)
-        await cdp.wait(`Boolean(Array.from(document.querySelectorAll('section.ds-task-sidebar[aria-label="任务列表"] button[title]')).find(button=>button.title===${JSON.stringify(task.goal)}))`, 'the actual completed task')
-        await cdp.click(`section.ds-task-sidebar[aria-label="任务列表"] button[title=${JSON.stringify(task.goal)}]`)
-        await cdp.click('article[aria-label="任务详情"] button', '每日网页报告.html')
+        const manualEntryAudit = {}
+        report.taskExecution.preview.manualEntryAudit = manualEntryAudit
+        await clickWindowsManualTaskArtifact(cdp, { taskGoal: task.goal, previewExpression, audit: manualEntryAudit })
         const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
         assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
         const layout = await cdp.wait(windowsTaskPreviewLayoutExpression(), 'the measured task workspace beside its manual preview')

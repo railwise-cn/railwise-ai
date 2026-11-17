@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
+import { windowsUiClickExpression, windowsManualArtifactTargetExpression, clickWindowsManualTaskArtifact, readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact, windowsTaskArtifactPreviewExpression } from './run-windows-ui-smoke.mjs'
@@ -1970,4 +1970,145 @@ test('diagnostic quick identity retry receives only the remaining startup budget
   assert.deepEqual(attempts.slice(0, 2), [['identity', 77, 10000], ['identity', 77, 9000]])
   assert.equal(value.result.identity.verified, true)
   assert.equal(value.result.cleanup.verifiedBirth, true)
+})
+
+// Offline renderer protocol fixture: the production layout hook, not a mocked
+// activeOverlay response, reacts to a deferred preview after the real route click.
+async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false } = {}) {
+  const { Window } = await import('happy-dom')
+  const window = new Window({ url: 'http://localhost/' }), temporary = await mkdtemp(join(tmpdir(), 'railwise-manual-route-'))
+  const prior = new Map()
+  for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'getComputedStyle', 'IS_REACT_ACT_ENVIRONMENT', 'MessageChannel']) {
+    prior.set(key, Object.getOwnPropertyDescriptor(globalThis, key))
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: key === 'MessageChannel' ? class { constructor() { this.port1 = {}; this.port2 = { postMessage: () => setImmediate(() => this.port1.onmessage?.()) } } } : key === 'IS_REACT_ACT_ENVIRONMENT' ? true : key === 'getComputedStyle' ? window.getComputedStyle.bind(window) : key === 'window' ? window : window[key] })
+  }
+  let root, fixture
+  try {
+    Object.defineProperty(window, 'innerWidth', { value: 1024 }); Object.defineProperty(window, 'innerHeight', { value: 728 })
+    const output = join(temporary, 'layout.cjs')
+    await build({ stdin: { contents: `
+      import {act,createElement as h,useState} from 'react'; import {createRoot} from 'react-dom/client';
+      import {useWorkbenchLayout} from './src/renderer/src/components/workbench-layout.ts';
+      export {act,createRoot,h};
+      export const events=[];
+      export function Harness(){
+        const [route,setRoute]=useState('chat'),[ready,setReady]=useState(0);
+        const layout=useWorkbenchLayout({route,workspaceRoot:'/synthetic-ui-only',activeThreadId:route==='tasks'?'task-workspace-preview:synthetic':'chat',latestAutoOpenDevPreviewKey:ready?'synthetic-current-hash-'+ready:null,latestAutoOpenDevPreviewUrl:ready?'http://localhost/report':null,latestDevPreviewUrl:ready?'http://localhost/report':null,writeAssistantOpen:false});
+        const artifact=()=>{events.push('artifact-click');layout.openDevPreview()};
+        const select=()=>{events.push('select-task');Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
+        return h('div',{className:'ds-workbench-shell',ref:layout.shellRef,'data-active-overlay':layout.activeOverlay??''},
+          h('nav',{'aria-label':'工作区工具'},h('button',{id:'task-route',onClick:()=>{events.push('route-tasks');setRoute('tasks');if(${JSON.stringify(latePreviewOnRoute)})Promise.resolve().then(()=>{events.push('route-preview-projection');setReady(value=>value+1)})}},'任务')),
+          layout.activeOverlay?h('button',{'aria-label':'返回当前任务',id:'backdrop',onClick:layout.closeDevPreview}):null,
+          h('main',{inert:layout.activeOverlay?true:undefined},route==='tasks'?h('section',{className:'ds-task-sidebar','aria-label':'任务列表'},h('div',{'aria-label':'任务筛选'},h('button',{id:'completed'},'已完成 1')),h('button',{id:'task-row',title:'合成 UI 任务',onClick:select},'合成 UI 任务')):null,
+            route==='tasks'?h('article',{'aria-label':'任务详情'},h('button',{id:'artifact',onClick:artifact},'每日网页报告.html')):null),
+          layout.rightPanelVisible?h('aside',{id:'workbench-inspector'},h('button',{'aria-label':'收起右侧栏',id:'collapse',onClick:()=>{events.push('collapse-panel');layout.closeDevPreview()}}),h('webview'),ready?h('div',{id:'workspace-preview-ready'}):null):null);
+      }`, resolveDir: fileURLToPath(new URL('..', import.meta.url)), loader: 'tsx' }, outfile: output, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', define: { 'process.env.NODE_ENV': '"development"' } })
+    fixture = createRequire(import.meta.url)(output)
+    const box = node => {
+      const x = node.id === 'artifact' ? 297 : node.id === 'collapse' ? 940 : node.id === 'backdrop' ? 0 : node.id === 'task-route' ? 20 : node.id === 'completed' ? 20 : 20
+      const y = node.id === 'artifact' ? 500 : node.id === 'collapse' ? 20 : node.id === 'backdrop' ? 0 : node.id === 'task-route' ? 20 : node.id === 'completed' ? 100 : 160
+      const width = node.id === 'artifact' ? 674 : node.id === 'backdrop' ? 1024 : 60, height = node.id === 'backdrop' ? 728 : 36
+      return { x, y, left: x, top: y, width, height, right: x + width, bottom: y + height }
+    }
+    window.HTMLElement.prototype.getBoundingClientRect = function () { return box(this) }
+    window.HTMLElement.prototype.getClientRects = function () { return this.isConnected ? [box(this)] : [] }
+    window.HTMLElement.prototype.scrollIntoView = function () {}
+    window.requestAnimationFrame = callback => { queueMicrotask(() => callback(Date.now())); return 1 }
+    window.document.elementFromPoint = (x, y) => {
+      const candidates = Array.from(window.document.querySelectorAll('button')).filter(node => { const b = box(node); return x >= b.x && x < b.right && y >= b.y && y < b.bottom })
+      if (window.document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay === 'inspector') return candidates.find(node => node.id === 'collapse') ?? window.document.querySelector('webview')
+      return candidates.find(node => node.id !== 'backdrop') ?? window.document.body
+    }
+    root = fixture.createRoot(window.document.body.appendChild(window.document.createElement('div')))
+    await fixture.act(async () => root.render(fixture.h(fixture.Harness)))
+    const input = []
+    const cdp = {
+      async evaluate(expression) { let value; await fixture.act(async () => { value = await window.eval(expression) }); return value },
+      async wait(expression, label) { for (let attempt = 0; attempt < 10; attempt++) { const value = await this.evaluate(expression); if (value) return value } throw new Error('Fixture UI did not show ' + label) },
+      async send(method, params) {
+        assert.equal(method, 'Input.dispatchMouseEvent'); input.push(params)
+        if (params.type === 'mouseReleased') await fixture.act(async () => { const hit = window.document.elementFromPoint(params.x, params.y); assert.equal(Boolean(hit.closest('main[inert]')), false, 'Real input cannot bypass the modal main surface'); hit.dispatchEvent(new window.MouseEvent('click', { bubbles: true, clientX: params.x, clientY: params.y })) })
+      },
+      async click(selector, label) { const point = await this.wait(windowsUiClickExpression(selector, label), label ?? selector); for (const type of ['mousePressed', 'mouseReleased']) await this.send('Input.dispatchMouseEvent', { type, button: 'left', clickCount: 1, ...point }) }
+    }
+    await run({ window, cdp, events: fixture.events, input })
+  } finally {
+    if (root) await fixture.act(async () => root.unmount())
+    for (const [key, descriptor] of prior) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key] }
+    await window.happyDOM.close(); await rm(temporary, { recursive: true, force: true })
+  }
+}
+
+test('manual artifact entry waits for the actual route late-preview overlay and dismisses its panel control before pointer input', async () => {
+  await manualPreviewRouteFixture(async ({ cdp, events, input }) => {
+    const audit = {}
+    await clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `document.querySelector('#workspace-preview-ready') && {partition:'railwise-artifact-synthetic'}`, audit })
+    assert.ok(events.indexOf('route-tasks') < events.indexOf('late-preview-projection'))
+    assert.ok(events.indexOf('late-preview-projection') < events.indexOf('collapse-panel'))
+    assert.equal(events.filter(event => event === 'artifact-click').length, 1)
+    assert.equal(events.filter(event => event === 'collapse-panel').length, 1)
+    assert.equal(audit.afterProjection.activeOverlay, 'inspector')
+    assert.equal(audit.afterProjection.mainInert, true)
+    assert.equal(audit.afterProjection.hit.target, false)
+    assert.ok(audit.target.stableFrames >= 2)
+    assert.equal(audit.target.mainInert, false)
+    assert.equal(input.at(-1).type, 'mouseReleased')
+  })
+})
+
+test('manual artifact permanent coverage stays failed with first geometry and no input behind the blocker', async () => {
+  await manualPreviewRouteFixture(async ({ window, cdp, events }) => {
+    const originalHit = window.document.elementFromPoint.bind(window.document)
+    window.document.elementFromPoint = (x, y) => { const hit = originalHit(x, y); return hit?.id === 'artifact' ? window.document.body : hit }
+    const audit = {}, evidence = report()
+    assert.equal(await inspectWindowsManualPreview(evidence, () => clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })), false)
+    assert.equal(audit.target.ready, false)
+    assert.equal(audit.target.observedFrames, 60)
+    assert.equal(audit.target.initial.hit.tag, 'BODY')
+    assert.equal(audit.target.initial.hit.target, false)
+    assert.equal(audit.target.initial.mainInert, false)
+    assert.ok(audit.target.initial.rect.width > 0)
+    assert.equal(events.includes('artifact-click'), false)
+    assert.match(evidence.errors[0], /UI target is covered or unstable/)
+    assert.throws(() => validateWindowsTaskEvidence(evidence.taskExecution))
+    assert.throws(() => validateWindowsUiReport(evidence, identity))
+  })
+})
+
+test('manual artifact pointer probe waits through a covered frame, moving geometry and DOM replacement', async () => {
+  const { Window } = await import('happy-dom'), window = new Window()
+  try {
+    window.document.body.innerHTML = '<div class="ds-workbench-shell"><main><article aria-label="任务详情"><button>每日网页报告.html</button></article></main></div>'
+    let frame = 0, scrollOptions
+    const configure = node => {
+      node.scrollIntoView = options => { scrollOptions = options }
+      node.getClientRects = () => [node.getBoundingClientRect()]
+      node.getBoundingClientRect = () => ({ x: 10, y: frame < 3 ? frame * 10 : 40, width: 100, height: 30 })
+    }
+    configure(window.document.querySelector('button'))
+    window.requestAnimationFrame = callback => { frame++; if (frame === 3) { const node = window.document.createElement('button'); node.textContent = '每日网页报告.html'; configure(node); window.document.querySelector('button').replaceWith(node) } queueMicrotask(() => callback(frame)); return frame }
+    window.document.elementFromPoint = () => frame === 2 ? window.document.body : window.document.querySelector('button')
+    const result = JSON.parse(JSON.stringify(await window.eval(windowsManualArtifactTargetExpression({ stable: true }))))
+    assert.equal(result.ready, true)
+    assert.equal(result.observedFrames, 5)
+    assert.equal(result.stableFrames, 2)
+    assert.equal(result.rect.y, 40)
+    assert.equal(scrollOptions.behavior, 'instant')
+    assert.doesNotMatch(windowsManualArtifactTargetExpression({ stable: true }), /\.click\(|dispatchEvent|\.remove\(|removeAttribute|setAttribute/)
+  } finally { await window.happyDOM.close() }
+})
+
+test('manual task navigation dismisses a late route overlay as well as the selected-task preview without bypassing either', async () => {
+  await manualPreviewRouteFixture(async ({ cdp, events }) => {
+    const audit = {}
+    await clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })
+    assert.ok(events.indexOf('route-tasks') < events.indexOf('route-preview-projection'))
+    assert.ok(events.indexOf('route-preview-projection') < events.indexOf('select-task'))
+    assert.equal(events.filter(event => event === 'collapse-panel').length, 2)
+    assert.equal(events.filter(event => event === 'artifact-click').length, 1)
+    assert.equal(audit.navigation[0].initial.activeOverlay, 'inspector')
+    assert.equal(audit.navigation[0].initial.mainInert, true)
+    assert.equal(audit.navigation[0].afterDismiss.ready, true)
+    assert.equal(audit.target.ready, true)
+  }, { latePreviewOnRoute: true })
 })
