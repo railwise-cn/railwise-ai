@@ -1,0 +1,87 @@
+{
+  "status": "passed",
+  "scope": "Nonshipped publication approval bootstrap repair; accepted application bytes and business evidence unchanged",
+  "recordedAt": "2026-11-17T00:14:18.886419+00:00",
+  "packageSourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+  "packageRunId": 43968313921,
+  "failedPublication": {
+    "runId": 43984111343,
+    "jobId": 133707732491,
+    "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/43984111343",
+    "cause": "Top-level YAML import before dependencies are installed in the clean approval job",
+    "publishJob": "skipped",
+    "publicReleaseCreated": false,
+    "allThreeStableMetadataRetained": "0.5.6"
+  },
+  "repair": "Replace static yaml import with node:createRequire and load yaml only inside existing caught workflow-exception predicate; ordinary unchanged-workflow approval uses Node builtins only",
+  "nodeVersion": "22.22.0",
+  "red": {
+    "newRegressions": 2,
+    "passed": 0,
+    "failed": 2,
+    "actualFailure": "ERR_MODULE_NOT_FOUND: Cannot find package 'yaml' on isolated verifier copy"
+  },
+  "green": {
+    "tests": 19,
+    "passed": 19,
+    "failed": 0,
+    "topLevelTests": 4,
+    "workflowNegativeSubtests": 15,
+    "exactCLIWithoutNodeModules": true,
+    "parserActuallyUnavailableAsserted": true,
+    "globalModuleSearchDisabled": true,
+    "unavailableWorkflowParserFailsClosed": true
+  },
+  "testedFiles": [
+    {
+      "path": "scripts/verify-release-approval.mjs",
+      "sha256": "3b4d78afac06680dd2d52447a1b7f541cd5777ae52b145661ee9cc4d99927fce",
+      "bytes": 34394
+    },
+    {
+      "path": "scripts/release-gate.test.mjs",
+      "sha256": "725991d2a2b817f6af102d58f9bec729eec253d873ee2d9b5271815356689171",
+      "bytes": 64808
+    }
+  ],
+  "unchangedContracts": [
+    "reviewed source ancestry and per-parent allowlist",
+    "version and installed package identity",
+    "required CI provenance",
+    "all immutable artifact bytes and raw updater reports",
+    "workflow exception semantic comparison and rejection cases"
+  ],
+  "originalEightArtifactsReused": true,
+  "additionalApplicationBuildOrSigning": false,
+  "additionalNativeUpdaterSmoke": false,
+  "actualBusinessEvidenceReusedWithoutChangingData": true,
+  "localChecks": {
+    "diffCheck": "passed",
+    "cleanSchema2ExactCLI": "passed",
+    "unavailableParserException": "rejected",
+    "existingPositiveAnd15NegativeWorkflowCases": "passed"
+  },
+  "retainedPrivateProofs": [
+    {
+      "fileName": "release-gate-bootstrap-summary-private.json",
+      "sha256": "8b72362a2a67992055b5d3bb8851ed94d6040b6bd35ef67072545466e819ba34",
+      "bytes": 2240
+    },
+    {
+      "fileName": "release-gate-bootstrap-red.log",
+      "sha256": "6062f3ca4bdefb7d16cc503cb44a183caa0e37215d2fa9b2f336b8185bc9cfcb",
+      "bytes": 6482
+    },
+    {
+      "fileName": "release-gate-bootstrap-green-final.log",
+      "sha256": "bc445f6c134378db87476ee844bbfc21f05c20e5e3a20def0ebc545efb7257fb",
+      "bytes": 3221
+    },
+    {
+      "fileName": "release-v057-failed-publish-stable-unchanged.log",
+      "sha256": "41f2b81ac7a80b0104905af983b8e7733f91869d65a23cf71d8b16be6cc9d3b0",
+      "bytes": 200
+    }
+  ],
+  "recoveryBoundary": "Correct only the unpublished version tag after normal required CI and source verification, while preserving the failed run and previous tag identity; publish the same already accepted eight files. Product-page source and deployment stay unchanged."
+}

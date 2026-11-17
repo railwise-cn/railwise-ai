@@ -12,10 +12,10 @@
 
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
-import { parse as parseYaml } from 'yaml'
 import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW, githubApi, validateReviewedBuild, verifyReviewedBuildSource } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, validateUpdaterEvidenceRun, verifyRemoteUpdaterEvidence } from './verify-frozen-updater-evidence.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
@@ -77,6 +77,9 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
 /** The whole workflow must stay equivalent apart from this publication-only opt-out. */
 export function isProductPagePublicationOnlyChange(beforeSource, afterSource) {
   try {
+    // Normal exact-build approval runs before dependency installation. Only
+    // this workflow exception needs YAML; an unavailable parser fails closed.
+    const { parse: parseYaml } = createRequire(import.meta.url)('yaml')
     const before = parseYaml(beforeSource)
     const after = parseYaml(afterSource)
     if (!before || !after || typeof before !== 'object' || typeof after !== 'object') return false
