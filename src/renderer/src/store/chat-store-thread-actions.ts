@@ -5,6 +5,7 @@ import i18n from '../i18n'
 import { applyTheme, applyUiFontScale } from '../lib/apply-theme'
 import { formatWorkspacePickerError } from '../lib/format-workspace-picker-error'
 import { formatRuntimeError, getRuntimeErrorCode } from '../lib/format-runtime-error'
+import { foregroundTaskArtifactPreview } from '../lib/use-task-artifact-preview'
 import {
   deriveThreadTitleFromPrompt,
   getDefaultThreadTitle,
@@ -548,6 +549,9 @@ export function createThreadActions(
         }
       })
       if(result.kind==='chat_started'){coordinatedTurn=result.turn;return false}
+      if (result.kind === 'task_started' && result.task && result.turn?.turnId) {
+        foregroundTaskArtifactPreview(threadId, result.task.id)
+      }
       const localText=result.kind==='snapshot'?(result.task?`${result.task.goal}\n${i18n.t(`common:taskRunStatus_${result.task.status}`)}${result.task.waitingReason?`\n${result.task.waitingReason}`:''}`:i18n.t('common:taskCommandNoTask')):result.kind==='task_updated'?i18n.t(`common:taskRunStatus_${result.task.status}`):result.kind==='input_queued'?i18n.t('common:taskCommandQueued'):result.kind==='task_started'?i18n.t('common:taskCommandStarted'):('message' in result?result.message:i18n.t('common:taskCommandStarted'))
       set(state=>{
         const userId=result.receipt?.userMessageItemId??`task-command-user-${crypto.randomUUID()}`

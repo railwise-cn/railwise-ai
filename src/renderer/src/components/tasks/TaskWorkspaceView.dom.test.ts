@@ -300,14 +300,18 @@ describe('TaskWorkspaceView', () => {
     expect(container.querySelector('article ol')?.textContent).toContain(i18n.t('common:taskNodeStatus_running'))
   })
 
-  it('renders the static delivery note as Markdown while preserving its completed disclosure', async () => {
+  it('keeps a completed delivery note collapsed until requested and preserves its Markdown and diagnostic text', async () => {
     await import('../chat/StreamdownAssistant')
-    tasks[0] = { ...tasks[0], status: 'completed', finalResponse: '## 交付清单\n\n**已经保存**\n\n- 已生成报告\n- 已核对单位 `毫米`' }
+    tasks[0] = { ...tasks[0], status: 'completed', finalResponse: '## 交付清单\n\n**已经保存**\n\n- 已生成报告\n- 已核对单位 `毫米`\n\nverify_web_artifact\n\nSHA256: ' + 'a'.repeat(64) }
     inbox = []
     await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) })
     await settle()
     const result = [...container.querySelectorAll('details')].find(element => element.querySelector('summary')?.textContent === i18n.t('common:taskWorkspaceResult'))!
+    expect(result.open).toBe(false)
+    await act(async () => result.querySelector('summary')!.click())
     expect(result.open).toBe(true)
+    expect(result.textContent).toContain('verify_web_artifact')
+    expect(result.textContent).toContain('SHA256: ' + 'a'.repeat(64))
     expect(result.querySelector('h2')?.textContent).toBe('交付清单')
     expect(result.querySelector('[data-streamdown="strong"]')?.textContent, result.innerHTML).toBe('已经保存')
     expect([...result.querySelectorAll('ul > li')].map(item => item.textContent)).toEqual(['已生成报告', '已核对单位 毫米'])
@@ -845,6 +849,24 @@ describe('TaskWorkspaceView', () => {
     expect(window.workwise.resumeTask).toHaveBeenCalledOnce()
     await act(async () => refreshTaskState())
     expect(container.textContent).toContain('继续原任务前需要处理')
+  })
+
+  it.each(['resume', 'retry', 'blocked'] as const)('marks an explicitly continued scheduled task as foreground only after a real new Turn (%s)', async action => {
+    tasks = [Object.assign({ ...tasks[0], status: action === 'retry' ? 'failed' as const : 'paused' as const,
+      originThreadId: 'original-chat' }, { scheduledBy: { scheduleId: 'daily', dueAt: now } })]
+    inbox = []
+    const result = action === 'blocked'
+      ? { task: tasks[0], capability: { provider: 'ego-browser', status: 'needs_authorization', message: '需要处理' } }
+      : { task: tasks[0], turn: { threadId: tasks[0].threadId, turnId: 'explicit-user-turn' } }
+    Object.assign(window.workwise, { resumeTask: vi.fn(async () => result), retryTask: vi.fn(async () => result) })
+    const dispatch = vi.spyOn(window, 'dispatchEvent')
+    try {
+      await act(async () => refreshTaskState())
+      await click(action === 'retry' ? i18n.t('common:taskRunRetry') : i18n.t('common:taskRunResume'))
+      const foreground = dispatch.mock.calls.map(([event]) => event as CustomEvent).filter(event => event.type === 'railwise:foreground-task-artifact-preview')
+      expect(foreground.map(event => event.detail)).toEqual(action === 'blocked'
+        ? [] : [{ threadId: 'original-chat', taskId: tasks[0].id }])
+    } finally { dispatch.mockRestore() }
   })
 
   it('shows pending decisions and resolves them through the original approval API', async () => {

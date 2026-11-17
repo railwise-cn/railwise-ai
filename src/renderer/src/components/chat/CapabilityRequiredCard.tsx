@@ -10,6 +10,7 @@ import { requestFlowDetail } from '../../store/flow-navigation'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
 import { refreshTaskState, requestTaskDetail, useTaskState } from '../../store/task-live-store'
 import { isExecutionGrantExpiredCapability, taskHasExecutionEvidence } from '@shared/task-presentation'
+import { foregroundTaskArtifactPreview } from '../../lib/use-task-artifact-preview'
 
 /** A capability failure is a durable waiting task, never a completed answer. */
 export function CapabilityRequiredCard({ card, workspaceRoot }: { card: ExternalTaskCapabilityCard; workspaceRoot?: string }): ReactElement {
@@ -145,6 +146,9 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       threadId: card.threadId, taskId: card.taskId, resolveAttentionId: card.attentionId,
       intent: 'resume', idempotencyKey: crypto.randomUUID(), request: { prompt: card.prompt }
     })
+    if (result.kind === 'task_started' && result.task && result.turn?.turnId) {
+      foregroundTaskArtifactPreview(card.threadId, result.task.id)
+    }
     if (result.kind === 'capability_required' || result.kind === 'attention_required') {
       if (result.kind === 'capability_required') setRechecked({ source: card.capability, capability: result.capability })
       setMessage(result.kind === 'capability_required' && isExecutionGrantExpiredCapability(result.capability)

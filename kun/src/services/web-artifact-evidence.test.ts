@@ -815,6 +815,27 @@ it('round trips the structured manifest through the real unchanged source eviden
   } finally { f.repository.close() }
 })
 
+it.each(['列表原文摘录', '匹配依据（列表原文）'])('accepts neutral and legacy feed excerpt captions: %s, while requiring literal owner evidence', async caption => {
+  const f = await fixture({}, 'observed_feed')
+  try {
+    const owner = '业主单位：示例工程建设有限公司', body = document.replace('</article>', `<p>${owner}</p></article>`), proof = feedInput()
+    await f.source(origins[0] + '/notice/1', body)
+    const reference = { url: origins[0] + '/notice/1', resultHash: sha(body) }
+    proof.coverage = [reference]; proof.items[0]!.source = reference; proof.items[0]!.discovery = reference
+    proof.items[0]!.fields.push({ field: 'other', value: owner, quote: owner })
+    const original = structuredClone(proof), { path, ...evidence } = proof
+    const generated = renderStructuredWebReport(path, { title: '订阅列表摘录', evidence }, 'observed_feed')
+    const html = generated.content.replace(/<dt>(?:列表原文摘录|匹配依据（列表原文）)<\/dt>/, `<dt>${caption}</dt>`)
+    expect(generated.verificationInput).toEqual(original)
+    expect(await f.assessment(html, generated.verificationInput)).toMatchObject({ complete: true, reasons: [] })
+    const inferred = structuredClone(generated.verificationInput), reason = '符合工程测量监测主营业务'
+    inferred.items[0]!.fields.find(field => field.field === 'other')!.value = reason
+    expect(await f.assessment(html.replace(owner, reason), inferred)).toMatchObject({ complete: false,
+      reasons: expect.arrayContaining(['字段缺少正文与成果的精确依据：notice-1/other']) })
+    expect(proof).toEqual(original)
+  } finally { f.repository.close() }
+})
+
 it('renders unknown fields honestly while preserving title, full source, discovery and required origins', async () => {
   const f = await fixture()
   try {

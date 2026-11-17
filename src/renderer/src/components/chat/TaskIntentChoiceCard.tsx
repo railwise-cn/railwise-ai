@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { TaskIntentCard } from '@shared/task-command'
 import { useChatStore } from '../../store/chat-store'
 import { refreshTaskState, useTaskState } from '../../store/task-live-store'
+import { foregroundTaskArtifactPreview } from '../../lib/use-task-artifact-preview'
 
 export function TaskIntentChoiceCard({ card, message }: { card: TaskIntentCard; message: string }) {
   const { t } = useTranslation('common')
@@ -19,6 +20,9 @@ export function TaskIntentChoiceCard({ card, message }: { card: TaskIntentCard; 
     try {
       const result = await window.workwise.coordinateTaskCommand({ threadId: card.threadId, taskId: card.taskId, resolveAttentionId: card.attentionId,
         intent, idempotencyKey: `attention:${card.attentionId}:${intent}`, request: card.request })
+      if (result.kind === 'task_started' && result.task && result.turn?.turnId) {
+        foregroundTaskArtifactPreview(card.threadId, result.task.id)
+      }
       setResolved(result.kind !== 'attention_required')
       if (result.kind === 'attention_required') setError(result.message)
       await refreshTaskState()

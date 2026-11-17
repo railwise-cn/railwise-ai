@@ -474,7 +474,7 @@ export function assessWebArtifactEvidence(repository: TaskRunRepository, task: T
     for (const origin of task.acceptance.requiredSourceOrigins?.length ? task.acceptance.requiredSourceOrigins : origins) if (!primaryOrigins.has(origin) && !noMatchOrigins.has(origin)) reasons.push(`${feed ? '订阅列表记录尚未核验' : '正式公告正文尚未核验'}：${origin}`)
   }
   if ((primary || feed) && reports.length === 1) {
-    const captions = new Set(['项目名称', '公告名称', '标题', '发布日期', '预算', '投标截止', '截止时间', '状态', '资格', '资质要求', '分类', '来源', '原文', '公告URL', '当前机会', '采购意向', '历史公告', '订阅记录', '列表标注日期', '匹配依据（列表原文）', '无独立条目链接（正文未读取）'])
+    const captions = new Set(['项目名称', '公告名称', '标题', '发布日期', '预算', '投标截止', '截止时间', '状态', '资格', '资质要求', '分类', '来源', '原文', '公告URL', '当前机会', '采购意向', '历史公告', '订阅记录', '列表标注日期', '匹配依据（列表原文）', '列表原文摘录', '无独立条目链接（正文未读取）'])
     let previous = 0
     for (const tag of clean.matchAll(/<\/?[a-z][a-z0-9:-]*\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi)) {
       const start = previous, end = tag.index!, literal = text(clean.slice(start, end))

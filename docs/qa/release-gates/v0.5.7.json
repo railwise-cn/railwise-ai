@@ -168,9 +168,10 @@
       "path": "docs/qa/release-gates/v0.5.7/installed-package.json"
     },
     "packagedUI": {
-      "status": "passed",
+      "status": "pending",
       "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
-      "path": "docs/qa/release-gates/v0.5.7/packaged-ui.json"
+      "path": "docs/qa/release-gates/v0.5.7/packaged-ui.json",
+      "currentBlocker": "Actual c821 package chat preview admitted an independently scheduled same-origin background artifact; the historical TaskWorkspace-only isolation result does not cover this case."
     },
     "functionalChecklist": {
       "status": "pending",
@@ -206,5 +207,16 @@
     "windowsFullStatus": "pending",
     "publicAuthorizationByThisPreparation": false
   },
-  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00"
+  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00",
+  "publicationHold": {
+    "at": "2026-11-17T11:38:26.642811+00:00",
+    "sourceHead": "c821177f3c11ddd379e6e1ff2efcf872b97757ff",
+    "runId": 44055604252,
+    "browserInitialAndNaturalDue": "passed_scoped_actual_Ego_Dadan_first_page",
+    "chatPreviewIsolation": "failed",
+    "nextProductionCandidateRequired": true,
+    "newCandidatePackageAndAcceptance": "pending",
+    "privateLedgerFileName": "H5-c821177f-browser-pass-preview-FAIL-ledger-private.json",
+    "privateLedgerSha256": "9fc3368f86f0ddf3adeaa5e39748c1b99a6276aced10c39090f83d53af87d743"
+  }
 }

@@ -3,7 +3,7 @@
   "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
   "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
   "releaseRunId": 44024949316,
-  "scope": "Earlier scoped initial and temporary-natural-due passed; later formal16:30 real occurrence failed and supersedes any overall H4 business/public acceptance",
+  "scope": "Historical scoped business passes retained. H5 actual Ego original-task continuation, independent initial and real19:00 due completed, but same-conversation background preview isolation failed; overall release acceptance remains incomplete.",
   "rootAuditObservedStatus": "passed-after-one-explicit-original-task-clarification-and-normal-continuation",
   "actor": "RailWise AI real model and Ego provider",
   "sourceBasis": "observed_feed",
@@ -322,5 +322,58 @@
       "sha256": "daa72c078562bea56e7c5fc9d9ca3050455ca8362cba63dacdf62100141f58b5"
     },
     "publicReleaseHeld": true
+  },
+  "laterH5ActualEgo": {
+    "sourceHead": "c821177f3c11ddd379e6e1ff2efcf872b97757ff",
+    "sourceTree": "396ef5a8a24e42de31eccf30ef40d3f2b0546e0e",
+    "releaseRunId": 44055604252,
+    "formal1630Continuation": {
+      "attempts": 2,
+      "completed": true,
+      "priorH4A1FailureRetained": true,
+      "missed1700DeadlineNotReclassified": true,
+      "records": 13,
+      "authorizedReplacementSpace": 13,
+      "SDKListedOldSpace12Absent": true,
+      "SDKAbsenceCauseUnknown": true
+    },
+    "independentInitial": {
+      "attempts": 1,
+      "completed": true,
+      "records": 13,
+      "extraRootClarifications": 0
+    },
+    "realClockDue": {
+      "dueAt": "2026-11-17T11:00:00.000Z",
+      "createdAt": "2026-11-17T11:00:10.202Z",
+      "attempts": 1,
+      "completed": true,
+      "records": 13,
+      "boundedLiteralEvidenceRepair": true,
+      "manualTrigger": false,
+      "freshTaskAndGrant": true
+    },
+    "rootPaidBrowserActions": 0,
+    "rootReportEdits": 0,
+    "temporaryQaPausedAfterDue": true,
+    "oldSixPlansUnchanged": true,
+    "formalPlanStillEnabled": true,
+    "coverage": "First current subscription page only; no full-day, all-site, independent item href or official primary text claim.",
+    "previewIsolation": "FAILED_same_origin_chat_background_artifact_replaced_current_report",
+    "newProductionFixAndExactPackageRequired": true,
+    "rootPrivateLedger": {
+      "fileName": "H5-c821177f-browser-pass-preview-FAIL-ledger-private.json",
+      "sha256": "9fc3368f86f0ddf3adeaa5e39748c1b99a6276aced10c39090f83d53af87d743"
+    },
+    "localIntegratedFixChecks": {
+      "fileName": "H6-combined-local-v1-validation.json",
+      "sha256": "fcecbb94c32265d96472681ad3852265c3fbf7f90962675c6ac29739d6a84c8e",
+      "desktopTests": 160,
+      "runtimeTests": 137,
+      "typesAndLint": "passed",
+      "productionBuilds": 1,
+      "freshnessInputs": 1381,
+      "newInstalledPackageClaimed": false
+    }
   }
 }

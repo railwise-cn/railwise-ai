@@ -383,6 +383,24 @@ describe('task coordinator before ordinary chat turns', () => {
   beforeEach(() => {
     vi.spyOn(rendererRuntimeClient, 'getSettings').mockResolvedValue({ codePromptPrefix: '' } as WorkWiseSettingsV2)
   })
+  it.each(['task_started', 'input_queued', 'capability_required'] as const)('marks only a user-started task as the foreground preview (%s)', async kind => {
+    const { actions, state } = buildHarness()
+    state.composerProviderId = 'default'
+    const task = { id: 'scheduled-task', status: 'running', scheduledBy: { scheduleId: 'daily' } }
+    const result = kind === 'task_started' ? { kind, task, turn: { threadId: 'worker-thread', turnId: 'user-resume-turn' } }
+      : kind === 'input_queued' ? { kind, task, input: { id: 'queued-input' } }
+      : { kind, task, message: '需要处理', capability: { provider: 'ego-browser', status: 'needs_authorization', message: '需要处理' } }
+    const dispatchEvent = vi.fn()
+    const coordinateTaskCommand = vi.fn(async () => result)
+    vi.stubGlobal('window', { workwise: { coordinateTaskCommand }, dispatchEvent })
+    try {
+      expect(await actions.sendMessage('继续这个任务')).toBe(true)
+      const foreground = dispatchEvent.mock.calls.map(([event]) => event as CustomEvent).filter(event => event.type === 'railwise:foreground-task-artifact-preview')
+      expect(foreground.map(event => event.detail)).toEqual(kind === 'task_started'
+        ? [{ threadId: 'thr_existing', taskId: task.id }] : [])
+      expect(coordinateTaskCommand).toHaveBeenCalledOnce()
+    } finally { vi.unstubAllGlobals() }
+  })
   it.each([
     {autoCreated:false,concurrentTurn:false},
     {autoCreated:true,concurrentTurn:false},

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { renderStructuredWebReport } from './structured-web-report.js'
+import { renderStructuredWebReport, type StructuredWebReport } from './structured-web-report.js'
 
 const report = () => ({ title: '工程监测招标资料', collectedAt: '2026-11-16T04:00:00+08:00', evidence: {
   coverage: [{ url: 'https://public.example.test/list?a=1&b=2', resultHash: 'a'.repeat(64) }],
@@ -69,6 +69,19 @@ it('keeps explicit title quotes and the legacy primary-document manifest unchang
   expect(renderStructuredWebReport('feed.html', value, 'observed_feed').verificationInput).toEqual({ path: 'feed.html', ...value.evidence })
   value.evidence.items[0]!.fields.shift()
   expect(renderStructuredWebReport('primary.html', value).verificationInput).toEqual({ path: 'primary.html', ...value.evidence })
+})
+
+it('labels an observed-feed other owner excerpt neutrally without changing its literal evidence', () => {
+  const value: StructuredWebReport = report(), owner = '业主单位：示例工程建设有限公司'
+  value.evidence.items[0]!.classification = 'source'
+  value.evidence.items[0]!.fields.push({ field: 'other', value: owner, quote: owner })
+  const original = structuredClone(value)
+  const rendered = renderStructuredWebReport('feed.html', value, 'observed_feed')
+  expect(rendered.content).toContain(`<dt>列表原文摘录</dt><dd><span data-evidence-field="other">${owner}</span>`)
+  expect(rendered.content).not.toContain('匹配依据（列表原文）')
+  expect(rendered.verificationInput).toEqual({ path: 'feed.html', ...original.evidence })
+  expect(value).toEqual(original)
+  expect(renderStructuredWebReport('primary.html', value).content).toContain(`<dt>原文</dt><dd><span data-evidence-field="other">${owner}</span>`)
 })
 
 it('requires an actual longer source quote for a short feed title instead of manufacturing padding', () => {

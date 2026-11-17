@@ -448,7 +448,11 @@ describe('capability waiting card', () => {
     await render({ ...card, capability: { provider: 'schedule', status: 'blocked', errorCode: 'browser_schedule_action_scope_required',
       message: '重新观察页面并审阅周期动作', action: { kind: 'retry', route: 'task/schedule-review', label: '继续原任务并审阅周期动作' } } })
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    const dispatch = vi.spyOn(window, 'dispatchEvent')
     await click('继续原任务并审阅周期动作')
+    const foreground = dispatch.mock.calls.map(([event]) => event as CustomEvent).filter(event => event.type === 'railwise:foreground-task-artifact-preview')
+    expect(foreground.map(event => event.detail)).toEqual([{ threadId: card.threadId, taskId: card.taskId }])
+    dispatch.mockRestore()
     expect(api.coordinateTaskCommand).toHaveBeenCalledWith(expect.objectContaining({ threadId: card.threadId, taskId: card.taskId,
       resolveAttentionId: card.attentionId, intent: 'resume' }))
     expect(state.openFlow).not.toHaveBeenCalled()

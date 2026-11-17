@@ -280,7 +280,7 @@ it('renders bounded coverage and literal matching excerpts without claiming all 
   const rendered = renderStructuredWebReport(proof.path, { title: '订阅列表', evidence: { coverage: proof.coverage, items: proof.items, noMatches: [] } }, 'observed_feed')
   expect(rendered.content).toContain('本报告列出 1 条列表记录，关联 1 个来源页面')
   expect(rendered.content).toContain('后续分页覆盖尚未确认，不代表今日全量')
-  expect(rendered.content).toContain('匹配依据（列表原文）')
+  expect(rendered.content).toContain('列表原文摘录')
   expect(rendered.content).toContain('列表标注日期')
   expect(rendered.content).not.toContain('当前机会</p>')
 })
