@@ -1180,3 +1180,73 @@ it.each(['active', 'expired', 'finished', 'unknown'] as const)('offers the exist
     }
   } finally { f.repository.close() }
 })
+
+
+it('isolates a feed record before checking a bad adjacent-owner quote instead of cascading into valid title and date', async () => {
+  const f = await fixture({}, 'observed_feed')
+  try {
+    const name = '匿名工程测量监测订阅记录[内容包含]', url = origins[0] + '/current-feed'
+    const body = `<main><div><div><div>${name}</div><div>发布日期：2026-11-15</div><div>预算金额：100000元</div></div><div><div>匿名工程测量服务另一条完整记录</div><div>发布日期：2026-11-15预算金额：100000元。业主单位：相邻记录单位</div></div></div></main>`
+    await f.source(url, body)
+    const reference = { url, resultHash: sha(body) }
+    const proof = WebArtifactEvidenceInputSchema.parse({ path: 'record-repair.html', coverage: [reference], items: [{ sectionId: 'x06', title: name,
+      source: reference, discovery: reference, classification: 'source', fields: [
+        { field: 'title', value: name, quote: name },
+        { field: 'publication_date', value: '2026-11-15', quote: '发布日期：2026-11-15' },
+        { field: 'budget', value: '100000元', quote: '预算金额：100000元。业主单位：相邻记录单位' }
+      ], unverifiedFields: ['deadline', 'status', 'qualification'] }] })
+    const other = structuredClone(proof.items[0]!)
+    other.sectionId = 'good-row'; other.title = '匿名工程测量服务另一条完整记录'
+    other.fields[0] = { field: 'title', value: other.title, quote: other.title }
+    other.fields[2]!.quote = '发布日期：2026-11-15预算金额：100000元'
+    proof.items.push(other)
+    const render = () => renderStructuredWebReport(proof.path, { title: '匿名订阅记录汇总', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } }, 'observed_feed')
+    const result = await f.assessment(render().content, proof)
+    expect(result.complete).toBe(false)
+    expect(result.reasons).toEqual(['字段缺少正文与成果的精确依据：x06/budget'])
+    expect(result).toMatchObject({ repairContext: { kind: 'observed_feed_fields', recordsTruncated: false, records: [{ sectionId: 'x06',
+      failedFields: ['budget'], sourceReceiptId: expect.any(String), sourceResultHash: sha(body), excerptTruncated: false }] } })
+    expect(result.repairContext!.records[0]!.excerpt).toContain('预算金额：100000元')
+    expect(result.repairContext!.records[0]!.excerpt).not.toContain('相邻记录单位')
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', proof.path, proof)).toMatchObject({ ready: true, reportReadiness: { boundRecords: 2, reportEvidenceReady: false, gaps: ['field_quote_unverified'], verificationRequired: true } })
+    const shortened = structuredClone(proof)
+    shortened.items[0]!.title = name.slice(0, -6)
+    shortened.items[0]!.fields[0]!.value = shortened.items[0]!.title
+    const unbound = await f.assessment(renderStructuredWebReport(proof.path, { title: '匿名订阅记录汇总', evidence: { coverage: shortened.coverage, items: shortened.items, noMatches: shortened.noMatches } }, 'observed_feed').content, shortened)
+    expect(unbound.reasons).toContain('订阅记录缺少同一真实记录内的标题、日期及实际链接依据：x06')
+    expect(unbound).not.toHaveProperty('repairContext')
+    const firstDraft = await f.call('publish_artifact', { path: proof.path, report: { title: '匿名订阅记录汇总', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } })
+    expect(firstDraft).toHaveProperty('bytes_written')
+    expect(await f.call('verify_web_artifact', firstDraft.verificationInput as Record<string, unknown>)).toMatchObject({ complete: false,
+      reasons: result.reasons, semanticRepair: { failureCount: 1, stalled: false } })
+    const failedReceipt = JSON.stringify(f.repository.operations(f.task.id, 'web_artifact_evidence').at(-1))
+    proof.items[0]!.fields[2]!.quote = '发布日期：2026-11-15预算金额：100000元'
+    const corrected = await f.call('publish_artifact', { path: proof.path, report: { title: '匿名订阅记录汇总', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } })
+    expect(corrected).toHaveProperty('bytes_written')
+    expect(await f.call('verify_web_artifact', corrected.verificationInput as Record<string, unknown>)).toMatchObject({ complete: true, reasons: [] })
+    expect(JSON.stringify(f.repository.operations(f.task.id, 'web_artifact_evidence').filter(row => row.status === 'failed').at(-1))).toBe(failedReceipt)
+    expect(f.repository.get(f.task.id)?.status).toBe('running')
+  } finally { f.repository.close() }
+})
+
+it('returns every bounded feed defect beyond thirty while limiting excerpts to the actually bound records', async () => {
+  const f = await fixture({}, 'observed_feed')
+  try {
+    const names = Array.from({ length: 40 }, (_, n) => `匿名工程测量订阅项目第${n + 1}项完整标题`)
+    const body = `<main>${names.map(name => `<article><h2>${name}</h2><p>发布日期：2026-11-15。预算金额：100000元。</p><p>${'匿名说明'.repeat(400)}</p></article>`).join('')}</main>`
+    const url = origins[0] + '/many-current-records'; await f.source(url, body)
+    const reference = { url, resultHash: sha(body) }
+    const proof = WebArtifactEvidenceInputSchema.parse({ path: 'many-records.html', coverage: [reference], items: names.map((name, n) => ({
+      sectionId: `x${String(n + 1).padStart(2, '0')}`, title: name, source: reference, discovery: reference, classification: 'source',
+      fields: [{ field: 'title', value: name, quote: name }, { field: 'publication_date', value: '2026-11-15', quote: '发布日期：2026-11-15' },
+        { field: 'budget', value: '100000元', quote: '不存在的预算金额：100000元及无来源的附加单位' }], unverifiedFields: ['deadline', 'status', 'qualification'] })) })
+    const result = await f.assessment(renderStructuredWebReport(proof.path, { title: '匿名多条记录汇总', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } }, 'observed_feed').content, proof)
+    expect(result.complete).toBe(false)
+    expect(result.reasons).toHaveLength(40)
+    expect(result.reasons).toContain('字段缺少正文与成果的精确依据：x40/budget')
+    expect(result).toMatchObject({ repairContext: { recordsTruncated: true, records: expect.any(Array) } })
+    expect(result.repairContext!.records).toHaveLength(3)
+    expect(result.repairContext!.records.every(record => record.excerpt.length <= 1200 && record.excerptTruncated)).toBe(true)
+    expect(JSON.stringify(result.repairContext)).not.toContain('不存在的预算金额')
+  } finally { f.repository.close() }
+})

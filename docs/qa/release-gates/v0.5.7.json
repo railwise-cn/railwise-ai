@@ -210,16 +210,17 @@
   },
   "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00",
   "publicationHold": {
-    "at": "2026-11-17T13:19:02.635030+00:00",
-    "sourceHead": "e5a0428dbce9778d4651a129044f0d84559f2286",
-    "runId": 44078752895,
-    "reason": "H6 real new Task is waiting_user at attempt0 because a task destination was misclassified as a local path. No model, source collection, HTML or new plan started.",
+    "at": "2026-11-17T15:29:23.169812+00:00",
+    "sourceHead": "41e00153dad3978357c28dce992cd9d09f2afba5",
+    "runId": 44098000303,
+    "reason": "Actual same-task H7 A1 opened its own Ego Space, read current source, saved HTML and created/read the QA plan, but strict verification rejected a cross-record quote. Report remains draft; natural due and chat background-preview isolation are not exercised.",
     "priorH5ChatPreviewFailureRetained": true,
+    "priorH6PreflightFailureRetained": true,
     "newCandidateSourceHead": null,
     "newCandidatePackageAndAcceptance": "pending",
     "privateBlockerEvidence": {
-      "fileName": "H6-e5a0428d-actual-preflight-blocker-private.json",
-      "sha256": "747ace40a6fee8ffe4349f7eaa1e265aac43b493f8af88fbcae99a5428dd7346",
+      "fileName": "H7-41e00153-initial-A1-source-verification-HOLD-private.json",
+      "sha256": "e84215cb2dfd74bf8f249e89741c533ed6cd87b224950fe26e659fcabd8ac4be",
       "privateSourceOnly": true
     }
   },
@@ -234,73 +235,120 @@
       "newCandidatePackageAndAcceptance": "pending",
       "privateLedgerFileName": "H5-c821177f-browser-pass-preview-FAIL-ledger-private.json",
       "privateLedgerSha256": "9fc3368f86f0ddf3adeaa5e39748c1b99a6276aced10c39090f83d53af87d743"
+    },
+    {
+      "at": "2026-11-17T13:19:02.635030+00:00",
+      "sourceHead": "e5a0428dbce9778d4651a129044f0d84559f2286",
+      "runId": 44078752895,
+      "reason": "H6 real new Task is waiting_user at attempt0 because a task destination was misclassified as a local path. No model, source collection, HTML or new plan started.",
+      "priorH5ChatPreviewFailureRetained": true,
+      "newCandidateSourceHead": null,
+      "newCandidatePackageAndAcceptance": "pending",
+      "privateBlockerEvidence": {
+        "fileName": "H6-e5a0428d-actual-preflight-blocker-private.json",
+        "sha256": "747ace40a6fee8ffe4349f7eaa1e265aac43b493f8af88fbcae99a5428dd7346",
+        "privateSourceOnly": true
+      }
     }
   ],
   "currentCandidateAcceptance": {
-    "status": "partial_business_blocked_before_attempt1",
-    "sourceHead": "e5a0428dbce9778d4651a129044f0d84559f2286",
-    "sourceTree": "b6de0c2366e2ddf5cdde37bfd9de4b7c5ff81a54",
-    "releaseRunId": 44078752895,
+    "status": "partial_real_browser_and_file_pass_strict_report_verification_blocked",
+    "sourceHead": "41e00153dad3978357c28dce992cd9d09f2afba5",
+    "sourceTree": "a89a16e8fb09223f0a9af3ac48de5a8d72492b74",
+    "releaseRunId": 44098000303,
     "runAttempt": 1,
     "actualMacAppOpened": true,
     "macPackage": {
       "version": "0.5.7",
       "bundleId": "com.wangjiawei508.workgpt",
       "architecture": "arm64",
-      "asarSha256": "617d5d570481b97d1673df032fbfaa1bed892ba107e03bb9941a6150ef592746",
-      "dmgSha256": "9064b434870cadce591b315e914ebed1e678405f132c1ad478bc05da17e0efd9",
+      "asarSha256": "d2f0c667830a9884da509ba46b1abdf537b269f0e0e8cd2d78d3c3529605ef1b",
+      "dmgSha256": "69e29d5091477e12b73b718f13791b9345099a9635bccb17b7d91398f28d9c9f",
       "signature": "passed",
       "notarization": "passed",
-      "localGatekeeper": "not_evaluated_local_security_override"
+      "localGatekeeper": "not_evaluated_local_security_override",
+      "localOuterMacArchiveFullHashClaimed": false,
+      "rootIdentityProof": {
+        "fileName": "41e00153-root-independent-package-check.json",
+        "sha256": "e5a2e4f4669b983fa57e6f24c2fbf7bb82e0c75ad6576434a173be4d0f5592c0",
+        "privateSourceOnly": true
+      }
     },
     "sameRunNativeUpdater": {
-      "status": "passed_official_and_unchanged_strict_validator",
+      "status": "passed_official_strict_and_root_original_integrity",
       "baseVersion": "0.5.6",
       "targetVersion": "0.5.7",
-      "rootIndependentAllRawArchiveVerificationClaimed": false
+      "jobId": 134126582437,
+      "artifactId": 14340271708,
+      "targetAndInstalledAsarMatchLocal": true,
+      "cleanCiGatekeeper": "accepted_with_assessments_enabled",
+      "rootEvidence": {
+        "fileName": "41e00153-root-updater-original-proof-check.json",
+        "sha256": "2a60404bdd117590d34294e78ffcfd639bcfc1f4d2214402ca2a1d5a737c7cb9",
+        "privateSourceOnly": true
+      }
     },
     "windowsFull": {
       "status": "passed_official_strict_and_root_original_integrity",
-      "acceptanceRunId": 44083591136,
+      "acceptanceRunId": 44103976580,
+      "packageAndDriverSourceHead": "41e00153dad3978357c28dce992cd9d09f2afba5",
       "windowsSignature": "NotSigned",
-      "scope": "controlled BrowserSkill, local protocol model and loopback; not Ego Windows, external real model or paid Dadan acceptance"
+      "scope": "controlled BrowserSkill, local protocol model and loopback; not Ego Windows, external real model or paid Dadan acceptance",
+      "rootEvidence": {
+        "fileName": "windows-41e00153-root-full-proof-check.json",
+        "sha256": "5bf4a49c28ac058e7f2b5fe51a22a432d8a7a92fd5fd24ab3cf3647bb426d6db",
+        "privateSourceOnly": true
+      }
     },
-    "generalSelectorUi": {
-      "status": "passed_scoped_two_native_sizes",
-      "sizes": [
-        {
-          "width": 960,
-          "height": 760
-        },
-        {
-          "width": 1280,
-          "height": 840
-        }
-      ]
-    },
-    "realNewTask": {
+    "realSameTask": {
       "taskId": "task_capability_c9985c7ac166d00865b4724a",
+      "previousH6Attempt0FailureRetained": true,
       "status": "waiting_user",
-      "attempts": 0,
-      "modelTurnStarted": false,
-      "sourceCollectionStarted": false,
-      "planCreated": false,
-      "artifactProduced": false,
-      "chatBackgroundPreviewIsolationExercised": false
+      "attempts": 1,
+      "turnId": "turn_xvvlax38",
+      "egoTaskSpaceId": 17,
+      "nativeTwoSpacesObserved": true,
+      "sourceCollectedBy": "RailWise AI actual model through Ego Provider",
+      "currentFullSourceBytes": 33260,
+      "managedHtmlSavedAndAutoPreviewed": true,
+      "sourceVerificationPassed": false,
+      "threeNodesCompleted": false,
+      "temporaryDailyPlanCreatedAndReadBack": true,
+      "temporaryPlanTime": "21:18 Asia/Shanghai, next day because requested time had passed before recovery",
+      "naturalDueExecuted": false,
+      "chatBackgroundPreviewIsolationExercised": false,
+      "failureLedger": {
+        "fileName": "H7-41e00153-initial-A1-source-verification-HOLD-private.json",
+        "sha256": "e84215cb2dfd74bf8f249e89741c533ed6cd87b224950fe26e659fcabd8ac4be",
+        "privateSourceOnly": true
+      }
     },
-    "nextH7": {
-      "status": "minimal_path_recognition_fix_pending_new_source_and_exact_package",
+    "rootCause": "An invalid field quote pulled neighboring-record text. Strict rejection was correct; feedRecord depends on all field quotes and therefore cascades a bad quote into title/date record-binding errors. The first reason list is truncated to30 and hides later row defects, impairing bounded repair. Existing failure counters remain unchanged.",
+    "preservation": {
+      "allOther27TaskRowsAndOld7PlanDefinitionsUnchanged": true,
+      "oldUnknown16AndPrepared1RawRowsUnchanged": true,
+      "configurationOpaqueHashesUnchanged": true,
+      "formalPlanStillEnabled": true,
+      "rootEvidence": {
+        "fileName": "41e00153-A1-blocked-continuity-private.json",
+        "sha256": "cc410411de53698de8d8870fcf3224e265572bc3b82ddb4bb0e1357d831856ad",
+        "privateSourceOnly": true
+      }
+    },
+    "nextH8": {
+      "status": "record_binding_and_actionable_verification_feedback_fix_in_progress",
       "sourceHead": null,
       "sourceTree": null,
       "releaseRunId": null,
       "targetAsarSha256": null,
       "sandboxWideningAllowed": false,
-      "newTaskSandboxInterfaceRequired": false,
+      "failureCounterResetAllowed": false,
       "actualBusinessAcceptance": "pending",
       "naturalDueAndChatBackgroundPreviewAcceptance": "pending"
     },
-    "h5PreviewFailureRetained": true,
-    "detailsPath": "docs/qa/release-gates/v0.5.7/business-acceptance.json",
-    "historicalReviewedBuildUnchanged": "Existing release/package/checks and sidecars above remain H4 historical evidence, not an H6 or H7 release approval."
+    "publicReleaseStatus": "HOLD_pending",
+    "h5ChatPreviewFailureRetained": true,
+    "historicalH6PreflightFailureRetained": true,
+    "noCodexPaidSourceCollectionOrReportEditing": true
   }
 }

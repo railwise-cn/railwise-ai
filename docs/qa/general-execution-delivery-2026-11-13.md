@@ -1006,3 +1006,18 @@ H6 源码 `e5a0428dbce9778d4651a129044f0d84559f2286`、[精确 Release 440787528
 启动后、提交新 QA 前，原27个 Task、7份计划和旧 UNKNOWN 原始记录核对保持；这些数量是当时事实，不是后续交接的固定条件。H5 的同 origin 后台任务抢占 chat 预览 FAIL、H4 的真实正式到期失败及错过目标时间仍保留，不能用 H6 的包、升级、Windows 或 General 检查覆盖。H6 尚未执行新初轮、自然到期及 chat 后台不抢占的真实浏览验收。H7 当前仅准备最小识别修复与未激活交接输入，源码、Release run 和新 ASAR 尚未绑定；必须使用后继新精确包继续验收，**总状态仍为 HOLD／pending，未公开发布**。
 
 私有证据只公开文件名和摘要：预检阻断 `H6-e5a0428d-actual-preflight-blocker-private.json`（SHA256 `747ace40a6fee8ffe4349f7eaa1e265aac43b493f8af88fbcae99a5428dd7346`）；准确已安装模块 RED `H6-e5a0428d-actual-package-write-preflight-RED-private.json`（`c5868d4e8bda5473e99d3b1f4cff577e21e38de7ba0ad9ac33e4a2d1032c5e5a`）；旧记录保留 `e5a0428d-before-new-QA-protected-history-private.json`（`0c22350046f939ed3401b83e3024c262f95aa70f150f34eecbaa46675b213750`）。付费页面、条目标题和私有报告仍未提交。
+
+
+### 2026-11-17 H7 原任务进入真实 Ego 空间，报告仍被严格核验拦截
+
+H7 源码 `41e00153dad3978357c28dce992cd9d09f2afba5`、[精确 Release 44098000303](https://github.com/railwise-cn/railwise-ai/actions/runs/44098000303) 的正常 0.5.7 Mac 已安装并实际打开。DMG SHA256 `69e29d5091477e12b73b718f13791b9345099a9635bccb17b7d91398f28d9c9f`、本机 ASAR `d2f0c667830a9884da509ba46b1abdf537b269f0e0e8cd2d78d3c3529605ef1b`，bundle、Team、签名和适用公证通过。同 run 真实 0.5.6→精确包 updater、原 strict 校验及 Root 原始 archive/全部九个文件核对通过，target/installed ASAR 与本机相同。Windows [full 44103976580](https://github.com/railwise-cn/railwise-ai/actions/runs/44103976580) 的官方、原 strict 与 Root 原始证据核对通过；仍是 NotSigned 和受控 BSK/本地模型/loopback 范围。Mac 本机 Gatekeeper override、外层 Mac ZIP 未全量本机 hash 的限制保留。
+
+Root 正常退出 H6 一次，确认 Main/Runtime 全停、所有受保护状态一致并完成 SQLite 一致性备份后，于北京时间23:05打开新精确包。23:10通过真实界面只重新检查并继续原 attempt0 任务一次，没有新建任务或修改 Agent/沙箱/默认权限。原任务正常进入 A1；RailWise 自己建立 Ego Space17、打开已授权订阅地址、读取本轮33,260字节完整列表。实际原生画面显示两个 Space：用户原空间保留，蓝色运行空间属于 RailWise。Codex 没有操作网页、采集付费来源或改写报告。
+
+RailWise 自己保存并自动预览 HTML，创建并读回同任务独立临时21:18计划；该时刻早于恢复，nextRunAt 为次日，尚未编辑时间或执行自然到期。首轮字段核验失败后，模型自行重新读取并修复大部分缺陷；第二次核验仍拒绝一个跨记录拼接的字段 quote，任务进入 waiting_user、1/3节点完成，成果保持来源待核验。真实源中的标题/日期和金额值不能为该错误 quote 背书，拦截是正确的。
+
+代码定位发现 `feedRecord` 将所有字段 quote 的成功与否纳入记录定位，一个字段错误会连带正确标题、日期报错；首轮核验原因列表又截断为30条，隐藏后段记录问题，削弱一次有界修复的反馈。后续最小修复仅分离严格记录边界与逐字段校验，并提供有界、完整、可定位的已读记录反馈；不放宽跨记录引用、不修改失败计数、权限或历史回执。H7 自身仍是 partial/HOLD，后继精确包及同任务继续必须重新验证，不把已有草稿或包检查升级为业务通过。
+
+原27个其它任务、旧七份计划定义、16条 UNKNOWN及一条 prepared 原始记录和配置 opaque hash 保持；仅原 attempt0任务正常增至A1，并新增其临时计划。正式每日08:30/16:30计划仍启用。H5 chat 后台抢预览 FAIL、H6 A0失败和 H4正式时限失败均保留。私有 H7失败账本 `H7-41e00153-initial-A1-source-verification-HOLD-private.json`（SHA256 `e84215cb2dfd74bf8f249e89741c533ed6cd87b224950fe26e659fcabd8ac4be`）；连续性 `41e00153-A1-blocked-continuity-private.json`（`cc410411de53698de8d8870fcf3224e265572bc3b82ddb4bb0e1357d831856ad`）。付费页面、条目名、原文和 HTML 只留私有证据。
+
+该最小修复的匿名功能回归先在旧代码形成两个 RED（单字段级联、30条截断），修复后来源/订阅/计数/结构化四文件155项通过。Root 合并树再完成桌面/Runtime类型、两文件lint、包含真实Factory/Host Ego替身链的五文件133项、一次生产构建与1381输入freshness；原有跨行、唯一标题、伪href及计数防线均保留。对已保存真实来源/草稿做纯解析离线重放仍只拒绝原错误字段，没有更改现场文件、来源回执或任务状态；它不是新的Host/Grant或业务通过证明。反馈最多附三条、每条1200字符的已授权同记录原文，不猜测不完整/歧义记录。publication/source-progress 仍用原逐字quote准入，记录定位成功本身不升级为字段或报告核验通过。后继完整CI、精确包和原任务A2仍待完成。
