@@ -143,7 +143,10 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
       ['schedule', 'schedule_task'], ['read-schedule', 'list_schedules'], ['finish', 'ego_browser_finish']]
     const reportFor = (ref: Record<string, unknown>, badBudget: boolean) => {
       const title = '离线恢复后的测绘监测项目', quote = title + ' 2026-11-16'
-      const input = { path: 'recovered-feed.html', report: { title: '订阅列表恢复汇总', evidence: { coverage: [ref],
+      const input = { path: 'recovered-feed.html', report: { title: '订阅列表恢复汇总', presentation: { screening: [
+        { sectionId: 'one-record', decision: 'relevant', reason: '列表标题包含测绘与监测服务范围', businessTypes: ['测绘', '监测'] },
+        ...(resumeWithOldDraft ? [{ sectionId: 'second-record', decision: 'pending', reason: '列表标题未提供足够业务范围信息' }] : [])
+      ] }, evidence: { coverage: [ref],
         items: [{ sectionId: 'one-record', title, source: ref, discovery: ref, classification: 'source',
           fields: [{ field: 'title', value: title, quote }, { field: 'publication_date', value: '2026-11-16', quote }],
           unverifiedFields: ['budget', 'deadline', 'status', 'qualification'] }, ...(resumeWithOldDraft ? [{
@@ -153,7 +156,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
             { field: 'budget', value: badBudget ? '人民币999元' : '人民币300元',
               quote: badBudget ? '预算报价人民币999元，来源原文。' : '另一条离线记录 2026-11-16 预算人民币300元' }],
           unverifiedFields: ['deadline', 'status', 'qualification'] }] : [])], noMatches: [] } } }
-      // Keep the old bad drafts unchanged. The successful model request supplies
+      // Keep the bad source fields unchanged. The successful model request supplies
       // each title once; short titles retain their real same-record date quote.
       if (!badBudget) for (const item of input.report.evidence.items) item.fields = item.fields.filter(field => field.field !== 'title')
       return input

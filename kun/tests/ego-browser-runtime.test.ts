@@ -51,7 +51,7 @@ it.each([false,true])('completes the real Factory/Coordinator/Host chain through
   if(next?.[0]==='open')args={url:'https://feed.test/list'}
   if(next?.[0]==='publish'){
    const read=result('read'),ref={url:read.sourceUrl,resultHash:read.resultHash},title='离线合成测绘项目',quote=title+' 2026-11-16'
-   args={path:'feed.html',report:{title:'离线订阅列表汇总',evidence:{coverage:[ref],items:[{sectionId:'record-one',title,source:ref,discovery:ref,classification:'source',fields:[{field:'title',value:title,quote},{field:'publication_date',value:'2026-11-16',quote}],unverifiedFields:['budget','deadline','status','qualification']}],noMatches:[]}}}
+   args={path:'feed.html',report:{title:'离线订阅列表汇总',presentation:{screening:[{sectionId:'record-one',decision:'relevant',reason:'列表标题明确包含测绘服务范围',businessTypes:['测绘']}]},evidence:{coverage:[ref],items:[{sectionId:'record-one',title,source:ref,discovery:ref,classification:'source',fields:[{field:'title',value:title,quote},{field:'publication_date',value:'2026-11-16',quote}],unverifiedFields:['budget','deadline','status','qualification']}],noMatches:[]}}}
   }
   if(next?.[0]==='read-file')args={path:'feed.html'}
   if(next?.[0]==='verify')args=result('publish').verificationInput as Record<string,unknown>
