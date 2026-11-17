@@ -14,6 +14,55 @@ import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependen
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 
+const windowsUpdateFailureCodes = new Set(['not_configured', 'unsupported', 'unsigned_build', 'manifest_unavailable', 'network',
+  'signature_invalid', 'withdrawn', 'download_failed', 'install_failed', 'github_repo_not_found', 'github_forbidden',
+  'github_rate_limited', 'no_stable_version', 'unknown'])
+
+export function summarizeWindowsUpdateMetadata(update) {
+  const code = windowsUpdateFailureCodes.has(update?.code) ? update.code : 'unknown'
+  // Inspect the IPC message only in memory. Never retain it, release URLs, bodies, headers or arbitrary error codes.
+  const message = typeof update?.message === 'string' ? update.message.split(/\r?\n/, 1)[0].trim() : ''
+  let category = 'unclassified'
+  if (update?.ok === true) category = 'none'
+  else if (code === 'signature_invalid' || /signature|code.?sign|not notarized|not signed|sha512|checksum/i.test(message)) category = 'integrity'
+  else if (['not_configured', 'unsupported', 'unsigned_build', 'withdrawn', 'download_failed', 'install_failed',
+    'github_repo_not_found', 'github_forbidden', 'no_stable_version'].includes(code)
+    || /^(?:No online update source is configured\.|GitHub update provider is configured, but release metadata could not be read\.)$/.test(message)) category = 'configuration'
+  else if (code === 'github_rate_limited'
+    || /^The (?:stable|frontier) update feed is rate limited right now\. Please try again later\.$/.test(message)
+    || /^(?:HttpError:\s*|HTTP(?:\/\d(?:\.\d)?)?\s+|The (?:stable|frontier) update feed returned HTTP\s+)429\b/i.test(message)) category = 'http_429'
+  else if (/^The (?:stable|frontier) update feed is temporarily unavailable\. Please try again later\.$/.test(message)
+    || /^(?:HttpError:\s*|HTTP(?:\/\d(?:\.\d)?)?\s+|The (?:stable|frontier) update feed returned HTTP\s+)5\d\d\b/i.test(message)) category = 'http_5xx'
+  else if (code === 'manifest_unavailable'
+    || /^(?:Cannot parse update info|(?:Failed|Unable) to parse (?:update )?(?:manifest|metadata)|The (?:stable|frontier) update feed (?:is not available right now|is missing release metadata right now|is not published correctly yet|did not return update metadata|is missing a version))/i.test(message)) category = 'manifest'
+  else if (code === 'network'
+    || /^(?:(?:Error|TypeError):\s*)?(?:connect\s+ECONN\w*\b|(?:getaddrinfo\s+)?ENOTFOUND\b|fetch failed\b|network (?:error|request failed)\b|socket hang up\b|(?:request|connection) timed out\b|timeout\b|net::ERR_(?:CONNECTION_\w+|NAME_NOT_RESOLVED|NETWORK_\w+|TIMED_OUT)\b)/i.test(message)) category = 'network'
+  const version = value => typeof value === 'string' && /^\d{1,6}\.\d{1,6}\.\d{1,6}$/.test(value) ? value : undefined
+  return { ok: typeof update?.ok === 'boolean' ? update.ok : undefined,
+    hasUpdate: typeof update?.hasUpdate === 'boolean' ? update.hasUpdate : undefined,
+    currentVersion: version(update?.currentVersion), latestVersion: version(update?.latestVersion),
+    ...(update?.ok === true ? {} : { code }), category, phase: 'metadata-check' }
+}
+
+export async function checkWindowsUpdateMetadata(read, { attempts = [], wait = sleep } = {}) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let update
+    try { update = await read() } catch {
+      attempts.push({ attempt, ok: false, category: 'ipc_exception', phase: 'ipc' })
+      // A thrown IPC/closed renderer is terminal. Do not export its potentially sensitive exception text.
+      throw new Error('The real updater metadata IPC did not return a result')
+    }
+    const summary = summarizeWindowsUpdateMetadata(update)
+    attempts.push({ attempt, ...summary })
+    const mayRecheck = update?.ok === false && update.hasUpdate !== true
+      && ['unknown', 'network', 'manifest_unavailable', 'github_rate_limited'].includes(update.code)
+      && ['unclassified', 'network', 'manifest', 'http_429', 'http_5xx'].includes(summary.category)
+    if (attempt === 2 || !mayRecheck) return summary
+    // One delayed, real metadata reread; a later success does not establish why the first call failed.
+    await wait(2_000)
+  }
+}
+
 export function windowsComposerMenuExpression(label) {
   return `(() => {
     const anchor=document.querySelector('button[aria-label='+JSON.stringify(${JSON.stringify(label)})+']');
@@ -2609,8 +2658,10 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.checks.push('github-actionable-setup')
     await cdp.click('button[aria-label="关闭 GitHub 连接详情"]')
 
-    const update = await cdp.evaluate('window.workwise.checkGuiUpdate()')
-    report.update = { ok: update.ok, hasUpdate: update.hasUpdate, currentVersion: update.currentVersion, latestVersion: update.latestVersion, code: update.code }
+    report.updateChecks = { mode: 'read-only-metadata', maxAttempts: 2, recheckDelayMs: 2_000, attempts: [] }
+    const update = await checkWindowsUpdateMetadata(() => cdp.evaluate('window.workwise.checkGuiUpdate()', 30_000),
+      { attempts: report.updateChecks.attempts })
+    report.update = update
     assert.equal(update.ok, true, 'The real updater metadata check must succeed')
     assert.equal(update.hasUpdate, false, 'This exact private target must have no newer published update')
     await cdp.wait(`window.workwise.getGuiUpdateState().then(state=>state.status==='not_available')`, 'no-update state')

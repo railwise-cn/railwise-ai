@@ -15,6 +15,136 @@ import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact, windowsTaskArtifactPreviewExpression } from './run-windows-ui-smoke.mjs'
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
+import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
+
+test('updater metadata diagnostics retain only safe fields and known categories, leaving unexplained failures unclassified', () => {
+  const secret = 'private-query-token-do-not-export'
+  for (const [message, category] of [
+    ['The stable update feed is rate limited right now. Please try again later.', 'http_429'],
+    ['HttpError: 429 Too Many Requests', 'http_429'],
+    ['The stable update feed is temporarily unavailable. Please try again later.', 'http_5xx'],
+    ['HTTP 503 Service Unavailable', 'http_5xx'],
+    ['Cannot parse update info from latest.yml', 'manifest'],
+    ['connect ECONNRESET', 'network'],
+    ['unexplained failure', 'unclassified'],
+    ['unexplained 429', 'unclassified'],
+    ['unexplained failure https://example.invalid/?token=network&status=HTTP503', 'unclassified'],
+    ['unexplained failure\nnetwork error in response body', 'unclassified']
+  ]) {
+    const summary = summarizeWindowsUpdateMetadata({ ok: false, code: 'unknown', currentVersion: '0.5.7',
+      latestVersion: secret, message: `${message}\nHeaders: ${secret}\nData: ${secret}`,
+      releaseUrl: `https://example.invalid/?token=${secret}`, headers: { authorization: secret }, body: secret })
+    assert.equal(summary.category, category)
+    assert.equal(summary.phase, 'metadata-check')
+    assert.equal(summary.code, 'unknown', 'A diagnostic hint must not replace the actual updater failure code')
+    assert.equal(summary.currentVersion, '0.5.7')
+    assert.equal(summary.latestVersion, undefined)
+    assert.doesNotMatch(JSON.stringify(summary), new RegExp(`${secret}|message|releaseUrl|headers|body`))
+  }
+  assert.equal(summarizeWindowsUpdateMetadata({ ok: false, code: secret }).code, 'unknown')
+})
+
+test('successful first metadata response requires one real read and retains no raw updater payload', async () => {
+  const attempts = []
+  let calls = 0
+  const result = await checkWindowsUpdateMetadata(async () => {
+    calls++
+    return { ok: true, hasUpdate: false, currentVersion: '0.5.7', latestVersion: '0.5.7', releaseUrl: 'private-url' }
+  }, { attempts, wait: async () => assert.fail('A successful first check must not wait or reread') })
+  assert.equal(calls, 1)
+  assert.equal(result.ok, true)
+  assert.equal(result.hasUpdate, false)
+  assert.equal(attempts.length, 1)
+  assert.deepEqual(attempts[0], { attempt: 1, ...result })
+  assert.doesNotMatch(JSON.stringify({ attempts, result }), /private-url|releaseUrl/)
+})
+
+test('one bounded metadata reread preserves the first unknown or network failure before a real second success', async () => {
+  for (const code of ['unknown', 'network']) {
+    const attempts = [], order = []
+    let calls = 0
+    const result = await checkWindowsUpdateMetadata(async () => {
+      order.push('read')
+      return ++calls === 1 ? { ok: false, code, currentVersion: '0.5.7', message: code === 'unknown' ? 'unexplained' : 'connect ECONNRESET' }
+        : { ok: true, hasUpdate: false, currentVersion: '0.5.7', latestVersion: '0.5.7' }
+    }, { attempts, wait: async milliseconds => { order.push(milliseconds) } })
+    assert.deepEqual(order, ['read', 2_000, 'read'])
+    assert.equal(calls, 2)
+    assert.equal(result.ok, true)
+    assert.deepEqual(attempts.map(item => item.ok), [false, true])
+    assert.equal(attempts[0].code, code)
+    assert.equal(attempts[0].category, code === 'unknown' ? 'unclassified' : 'network')
+    assert.doesNotMatch(JSON.stringify(attempts), /transient|message|unexplained|ECONNRESET/)
+  }
+})
+
+test('persistent metadata failures stop after two reads and retain a failed final result', async () => {
+  const attempts = []
+  let calls = 0, waits = 0
+  const result = await checkWindowsUpdateMetadata(async () => {
+    calls++
+    return { ok: false, code: 'unknown', currentVersion: '0.5.7', message: 'still unexplained' }
+  }, { attempts, wait: async milliseconds => { assert.equal(milliseconds, 2_000); waits++ } })
+  assert.equal(calls, 2)
+  assert.equal(waits, 1)
+  assert.equal(result.ok, false)
+  assert.equal(result.code, 'unknown')
+  assert.equal(result.category, 'unclassified')
+  assert.deepEqual(attempts.map(item => item.ok), [false, false])
+  assert.throws(() => validateWindowsUiReport({ ...report(), update: result }, identity), 'Persistent failure must still fail acceptance')
+})
+
+test('integrity, configuration, available updates and malformed responses do not get an extra metadata read', async () => {
+  for (const response of [
+    { ok: false, code: 'signature_invalid' }, { ok: false, code: 'not_configured' },
+    { ok: false, code: 'unsupported' }, { ok: false, code: 'unsigned_build' },
+    { ok: false, code: 'github_forbidden' }, { ok: false, code: 'github_repo_not_found' },
+    { ok: false, code: 'unknown', message: 'SHA512 checksum mismatch' },
+    { ok: false, code: 'unknown', message: 'No online update source is configured.' },
+    { ok: true, hasUpdate: true }, { ok: false, hasUpdate: true, code: 'network' },
+    { ok: false, code: 'unexpected-private-code' }, undefined
+  ]) {
+    let calls = 0
+    const attempts = []
+    const result = await checkWindowsUpdateMetadata(async () => { calls++; return response },
+      { attempts, wait: async () => assert.fail('This result must not be retried') })
+    assert.equal(calls, 1)
+    assert.equal(attempts.length, 1)
+    assert.equal(result.ok, response?.ok)
+    assert.equal(result.hasUpdate, response?.hasUpdate)
+  }
+})
+
+test('thrown metadata IPC is terminal and its raw exception is never exported, including after the one reread', async () => {
+  for (const failAt of [1, 2]) {
+    let calls = 0, waits = 0
+    const attempts = []
+    await assert.rejects(checkWindowsUpdateMetadata(async () => {
+      if (++calls === failAt) throw new Error('private-message https://example.invalid/?token=secret Headers: private-header Data: private-body')
+      return { ok: false, code: 'unknown' }
+    }, { attempts, wait: async () => { waits++ } }), { message: 'The real updater metadata IPC did not return a result' })
+    assert.equal(calls, failAt)
+    assert.equal(waits, failAt - 1)
+    assert.equal(attempts.length, failAt)
+    assert.deepEqual(attempts.at(-1), { attempt: failAt, ok: false, category: 'ipc_exception', phase: 'ipc' })
+    assert.doesNotMatch(JSON.stringify(attempts), /private|secret|Headers|Data|message/)
+  }
+})
+
+test('default metadata reread waits exactly two seconds and never schedules a third read', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let calls = 0
+  const result = checkWindowsUpdateMetadata(async () => { calls++; return { ok: false, code: 'network' } })
+  await Promise.resolve()
+  t.mock.timers.tick(1_999)
+  await Promise.resolve()
+  assert.equal(calls, 1)
+  t.mock.timers.tick(1)
+  assert.equal((await result).ok, false)
+  assert.equal(calls, 2)
+  t.mock.timers.tick(60_000)
+  assert.equal(calls, 2)
+})
 
 test('composer menu geometry uses actual viewport rectangles at both supported font scales', () => {
   const actual = { coordinateUnit: 'viewport-css-px', side: 'top', menuCount: 1, itemCount: 3, hitTest: true,
