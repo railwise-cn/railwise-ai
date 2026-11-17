@@ -2163,6 +2163,19 @@ async function installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeReq
     originThreadId, installationAuthorization: 'explicit-acceptance-in-owned-synthetic-profile' }
 }
 
+/** Readiness probe only; authorization and negative permission assertions remain below. */
+export async function readWindowsPermissionExecutionTurn(runtime, taskId, turnId) {
+  const task = runtime.taskRepository.get(taskId)
+  if (!task || task.id !== taskId || !task.threadId || task.activeTurnId !== turnId) return null
+  const thread = await runtime.threadService.get(task.threadId)
+  if (!thread || thread.id !== task.threadId || !Array.isArray(thread.turns)) return null
+  const turn = thread.turns.find(item => item.id === turnId)
+  const grant = turn?.executionGrant
+  if (!grant || grant.taskId !== taskId || grant.threadId !== task.threadId || grant.turnId !== turnId) return null
+  const latest = runtime.taskRepository.get(taskId)
+  return latest?.threadId === task.threadId && latest.activeTurnId === turnId ? turn : null
+}
+
 /** Package-external acceptance helper. No production patch, keys, app profile or external network. */
 export async function installedPermissionWorker({ moduleRoot, ownedRoot, requireWindows = true }) {
   const assert = (await import('node:assert/strict')).default
@@ -2273,7 +2286,7 @@ export async function installedPermissionWorker({ moduleRoot, ownedRoot, require
     assert.ok(resume.turn?.turnId)
     await poll(() => exists(exportFile), 'actual exported file')
     assert.equal(await fs.readFile(exportFile, 'utf8'), actualHtml)
-    const turn = (await runtime.threadService.get(getTask().threadId)).turns.find(item => item.id === resume.turn.turnId)
+    const turn = await poll(() => readWindowsPermissionExecutionTurn(runtime, taskId, resume.turn.turnId), 'persisted export execution Grant')
     const grant = turn.executionGrant
     assert.equal(grant.taskPermissionId, permissionId)
     assert.equal(grant.workspaceTrust, 'read-only')
@@ -2329,7 +2342,7 @@ export async function installedPermissionWorker({ moduleRoot, ownedRoot, require
     report.checks.push('replacement-does-not-revive-the-old-immutable-grant')
     const resumedAgain = await api(`/v1/tasks/${taskId}/resume`, 'POST', { expectedRevision: getTask().revision, idempotencyKey: 'capture-replacement-grant' }, 202)
     await poll(() => held.size > 0, 'resumed local fixture')
-    const renewed = (await runtime.threadService.get(getTask().threadId)).turns.find(item => item.id === resumedAgain.turn.turnId).executionGrant
+    const renewed = (await poll(() => readWindowsPermissionExecutionTurn(runtime, taskId, resumedAgain.turn.turnId), 'persisted replacement execution Grant')).executionGrant
     assert.equal(renewed.taskPermissionId, replaced.permission.grant.id)
     await api(`/v1/tasks/${taskId}/permissions`, 'DELETE', { expectedRevision: getTask().revision, permissionId: renewed.taskPermissionId, idempotencyKey: 'revoke-export-scope' })
     report.revocation = { taskPaused: getTask().status === 'paused', code: await negativeWrite(renewed, path.join(destination, '撤销.html'), ['task_permission_revoked']) }
@@ -2366,7 +2379,7 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
   assert.equal((await fs.stat(path.join(moduleRoot, 'server', 'runtime-factory.js'))).isFile(), true)
   const ownedRoot = await fs.mkdtemp(path.join(temporaryRoot, 'railwise-permission-'))
   const workerFile = path.join(ownedRoot, 'installed-permission-worker.mjs')
-  await fs.writeFile(workerFile, `const report=await (${installedPermissionWorker.toString()})(${JSON.stringify({ moduleRoot, ownedRoot })}); console.log('RAILWISE_PERMISSION_EVIDENCE '+JSON.stringify(report));\n`)
+  await fs.writeFile(workerFile, `const readWindowsPermissionExecutionTurn=(${readWindowsPermissionExecutionTurn.toString()});\nconst report=await (${installedPermissionWorker.toString()})(${JSON.stringify({ moduleRoot, ownedRoot })}); console.log('RAILWISE_PERMISSION_EVIDENCE '+JSON.stringify(report));\n`)
   let childExited = true
   try {
     const result = await new Promise((resolve, reject) => {

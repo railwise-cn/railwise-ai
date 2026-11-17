@@ -1,6 +1,7 @@
+import * as permissionSmokeModule from './run-windows-ui-smoke.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { createHash } from 'node:crypto'
@@ -262,6 +263,8 @@ test('installed permission wrapper uses the exact EXE and packaged Runtime with 
   assert.match(wrapper, /'app\.asar\.unpacked', 'kun', 'dist'/)
   assert.match(wrapper, /fs\.mkdtemp\(path\.join\(temporaryRoot,/)
   assert.match(wrapper, /installedPermissionWorker\.toString\(\)/)
+  assert.match(wrapper, /readWindowsPermissionExecutionTurn\.toString\(\)/)
+  assert.equal((installedPermissionWorker.toString().match(/await poll\(\(\) => readWindowsPermissionExecutionTurn/g) ?? []).length, 2)
   assert.match(wrapper, /150_000/)
   assert.match(wrapper, /if \(childExited\) await fs\.rm\(ownedRoot/)
   assert.doesNotMatch(wrapper, /Date\.now\s*=|setSystemTime|--ignore-certificate-errors/)
@@ -2131,4 +2134,80 @@ test('manual artifact entry respects an already dismissed workspace preview when
     assert.equal(audit.target.mainInert, false)
     assert.equal(audit.target.stableFrames, 2)
   }, { latePreviewOnRoute: true, selectedTaskKeyUnchanged: true })
+})
+
+
+// Execute the worker's real capture statement and existing bounded poll, rather
+// than a duplicate mock of its readiness algorithm. The file-store is real.
+function permissionCaptureFromWorker(runtime, taskId, turnId, timeout = 1000) {
+  const code = installedPermissionWorker.toString()
+  const start = code.indexOf('    const turn =', code.indexOf("'actual exported file'"))
+  const end = code.indexOf('\n    const grant =', start)
+  assert.ok(start > 0 && end > start)
+  const pollStart = code.indexOf('  const poll = async')
+  const pollEnd = code.indexOf('  const exists =', pollStart)
+  const originalPoll = new Function(code.slice(pollStart, pollEnd) + '; return poll')()
+  const capture = new Function('runtime', 'taskId', 'getTask', 'resume', 'poll', 'readWindowsPermissionExecutionTurn',
+    `return (async () => { ${code.slice(start, end)}; return turn })()`)
+  return capture(runtime, taskId, () => runtime.taskRepository.get(taskId), { turn: { turnId } },
+    (read, label) => originalPoll(read, label, timeout), permissionSmokeModule.readWindowsPermissionExecutionTurn)
+}
+
+let permissionFileStoreModule
+async function permissionFileStore(root) {
+  permissionFileStoreModule ??= build({ entryPoints: [fileURLToPath(new URL('../kun/src/adapters/file/file-thread-store.ts', import.meta.url))],
+    bundle: true, platform: 'node', format: 'esm', write: false }).then(result => import('data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].text).toString('base64')))
+  const { FileThreadStore } = await permissionFileStoreModule
+  return new FileThreadStore({ dataDir: root })
+}
+
+test('permission execution capture waits through the real file-store publication gap for the exact Turn and Grant', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-permission-thread-publication-'))
+  try {
+    const store = await permissionFileStore(root), taskId = 'permission-task', threadId = 'permission-thread', turnId = 'permission-turn'
+    const grant = { id: 'owned-grant', taskId, threadId, turnId }
+    const thread = { id: threadId, updatedAt: new Date().toISOString(), turns: [{ id: turnId, status: 'running', executionGrant: grant }] }
+    await store.upsert(thread)
+    const file = join(root, 'threads', threadId, 'thread.json'), backup = file + '.workwise-backup'
+    // This is the Windows replace() target->backup->temp publication boundary.
+    // A barrier restores it only after the actual FileThreadStore.get saw null.
+    await rename(file, backup)
+    let observedMissing
+    const missing = new Promise(resolve => { observedMissing = resolve })
+    const runtime = { taskRepository: { get: () => ({ id: taskId, threadId, activeTurnId: turnId }) },
+      threadService: { get: async id => { const value = await store.get(id); if (value === null) observedMissing(); return value } } }
+    const captured = permissionCaptureFromWorker(runtime, taskId, turnId).then(value => ({ value }), error => ({ error }))
+    await missing
+    await rename(backup, file)
+    const result = await captured
+    assert.equal(result.error, undefined, result.error?.stack)
+    assert.equal(result.value.id, turnId)
+    assert.equal(result.value.status, 'running', 'The fixture deliberately holds the current Turn for expiry/revocation checks')
+    assert.deepEqual(result.value.executionGrant, grant)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('permission execution capture permanently missing Thread remains a bounded failure', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-permission-thread-missing-'))
+  try {
+    const store = await permissionFileStore(root), taskId = 'permission-task', threadId = 'permission-thread', turnId = 'permission-turn'
+    const runtime = { taskRepository: { get: () => ({ id: taskId, threadId, activeTurnId: turnId }) }, threadService: { get: id => store.get(id) } }
+    await assert.rejects(permissionCaptureFromWorker(runtime, taskId, turnId, 30), /Permission acceptance timed out: .*execution Grant/)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test('permission execution readiness rejects foreign and stale Task Turn or Grant snapshots', async () => {
+  const taskId = 'current-task', threadId = 'current-thread', turnId = 'current-turn'
+  const task = { id: taskId, threadId, activeTurnId: turnId }
+  const turn = { id: turnId, executionGrant: { id: 'current-grant', taskId, threadId, turnId } }
+  const read = async (taskSnapshot, threadSnapshot) => permissionSmokeModule.readWindowsPermissionExecutionTurn({ taskRepository: { get: () => taskSnapshot }, threadService: { get: async () => threadSnapshot } }, taskId, turnId)
+  assert.equal(await read(task, { id: threadId, turns: [turn] }), turn)
+  for (const [badTask, badThread] of [
+    [{ ...task, activeTurnId: 'old-turn' }, { id: threadId, turns: [turn] }],
+    [task, { id: 'foreign-thread', turns: [turn] }],
+    [task, { id: threadId, turns: [{ ...turn, executionGrant: { ...turn.executionGrant, taskId: 'foreign-task' } }] }],
+    [task, { id: threadId, turns: [{ ...turn, executionGrant: { ...turn.executionGrant, turnId: 'old-turn' } }] }],
+    [task, { id: threadId, turns: [{ id: turnId }] }]
+  ]) assert.equal(await read(badTask, badThread), null)
 })
