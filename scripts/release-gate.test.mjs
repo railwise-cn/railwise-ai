@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse, stringify as stringifyYaml } from 'yaml'
 import { classifyReleaseChanges, isProductPagePublicationOnlyChange, verifyReleaseApproval, verifyRequiredCI } from './verify-release-approval.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
@@ -31,6 +31,23 @@ const jobs = workflow.jobs ?? {}
 const websiteWorkflowSource = readFileSync(new URL('../.github/workflows/deploy-workwise-product-page.yml', import.meta.url), 'utf8')
 const websiteWorkflow = parse(websiteWorkflowSource)
 const verifierPath = fileURLToPath(new URL('./verify-release-approval.mjs', import.meta.url))
+
+function verifierWithoutDependencies(t) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'railwise-release-gate-no-deps-')))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  for (const path of [
+    'scripts/verify-release-approval.mjs', 'scripts/verify-reviewed-release-artifacts.mjs',
+    'scripts/verify-frozen-updater-evidence.mjs', 'scripts/frozen-release-updater-service-contract.mjs',
+    'scripts/frozen-release-version.mjs', 'scripts/verify-exact-updater-evidence.mjs',
+    'scripts/release-publication.cjs', 'src/shared/product-brand.json',
+    'release/updater-acceptance-baselines.json',
+  ]) {
+    mkdirSync(dirname(join(root, path)), { recursive: true })
+    writeFileSync(join(root, path), readFileSync(new URL(`../${path}`, import.meta.url)))
+  }
+  assert.equal(existsSync(join(root, 'node_modules')), false)
+  return join(root, 'scripts/verify-release-approval.mjs')
+}
 
 function releaseFixture(t, packageVersion = '0.5.4', version = '0.5.4', options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'railwise-release-gate-'))
@@ -137,8 +154,8 @@ function releaseFixture(t, packageVersion = '0.5.4', version = '0.5.4', options 
     git('tag', `v${version}`, releaseHead)
     return releaseHead
   }
-  const verify = (releaseHead, expectError) => {
-    const args = [verifierPath, `--tag=v${version}`, '--ref-type=tag', `--source-head=${releaseHead}`, `--confirmation=PUBLISH-STABLE-v${version}`]
+  const verify = (releaseHead, expectError, cliPath = verifierPath) => {
+    const args = [...(cliPath === verifierPath ? [] : ['--no-global-search-paths']), cliPath, `--tag=v${version}`, '--ref-type=tag', `--source-head=${releaseHead}`, `--confirmation=PUBLISH-STABLE-v${version}`]
     const env = { ...process.env, GITHUB_ACTIONS: '', GITHUB_OUTPUT: '', GITHUB_REF_NAME: '', GITHUB_REF_TYPE: '', GITHUB_SHA: '', RELEASE_CONFIRMATION: '', RELEASE_EVIDENCE: '' }
     if (!expectError) return execFileSync(process.execPath, args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
     let failure
@@ -797,6 +814,27 @@ test('current policy accepts focused checks and exact package inspection without
   const f = currentPolicyFixture(t)
   f.recordEvidence()
   assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('clean checkout verifies committed exact-build evidence without node_modules', t => {
+  const f = currentPolicyFixture(t, { exact: true })
+  const cleanVerifier = verifierWithoutDependencies(t)
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease(), undefined, cleanVerifier), /verified v0\.5\.5/)
+})
+
+test('clean checkout fails closed when a workflow exception needs an unavailable YAML parser', t => {
+  const cleanVerifier = verifierWithoutDependencies(t)
+  const source = `
+    import assert from 'node:assert/strict'
+    import { createRequire } from 'node:module'
+    assert.throws(() => createRequire(${JSON.stringify(cleanVerifier)}).resolve('yaml'), { code: 'MODULE_NOT_FOUND' })
+    const { isProductPagePublicationOnlyChange } = await import(${JSON.stringify(pathToFileURL(cleanVerifier).href)})
+    assert.equal(isProductPagePublicationOnlyChange('jobs: {}', 'jobs: {}'), false)
+  `
+  execFileSync(process.execPath, ['--no-global-search-paths', '--input-type=module', '--eval', source], {
+    cwd: dirname(cleanVerifier), env: { ...process.env, NODE_PATH: '' }, stdio: ['ignore', 'pipe', 'pipe']
+  })
 })
 
 test('legacy evidence remains readable without elective screenshot archives or AI review', t => {
