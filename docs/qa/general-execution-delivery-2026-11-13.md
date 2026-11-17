@@ -1036,3 +1036,13 @@ H9源码补上恢复前的固定元数据查询：同Task/Turn/Grant/配置/旧�
 同时修正明确命名任务被后文“采集计划独立”覆盖的标题，并将未知Ego范围及Task审查入口改为准确的呈现文字；完整目标、权限和执行处理不改，121项聚焦UI测试通过。Root合并检查、新精确包、同任务A3、新来源/报告、自然到期和chat后台预览隔离仍待完成，公开发行持续HOLD。付费页面、标题、正文和HTML均未提交。
 
 H9首份提交 `98150ea0` 的原始 [push44143167639](https://github.com/railwise-cn/railwise-ai/actions/runs/44143167639) 与 [PR44143181966](https://github.com/railwise-cn/railwise-ai/actions/runs/44143181966) 均未通过完整Runtime测试，四份Electron/Windows作业通过。两个相同恢复集成变体的离线SDK状态替身漏传官方状态脚本必返的 `identityMatches:false`，被新的严格合同正确拒绝。只补齐替身字段，不放宽生产校验；并让该Factory/Coordinator/Host全链回归先真实调用旧空间读取，核对可恢复的open提示，再走fresh open建立后继空间、读取、报告核验、计划读回与收尾。旧Grant、预算、失败记录及无关UNKNOWN保留断言不改。修正后该文件9项通过；两份原CI失败及原始日志保留，不重跑原提交、不据此发布。后继完整CI、精确包与真实A3仍待完成。
+
+### 2026-11-18 H9 全量CI通过，Mac精确包在签名阶段失败
+
+后继 `cc32fe571502ddc763b86da3ceb690ff6cc7fa99` 的 [push44147940457](https://github.com/railwise-cn/railwise-ai/actions/runs/44147940457) 与 [PR44147956668](https://github.com/railwise-cn/railwise-ai/actions/runs/44147956668) 六项官方检查全部通过，Root另核对官方原始结果。本地176项执行链、121项UI、类型、lint、一次生产构建及freshness通过；此前981两份Runtime失败保留。
+
+[私有精确构建44151140572](https://github.com/railwise-cn/railwise-ai/actions/runs/44151140572)实际生产版本为0.5.7，Windows包和原生安装检查通过。完整Windows ZIP大小、官方SHA、全部CRC、feed SHA512、安装程序及原生安装ASAR来源已再次独立核对；仍NotSigned。该包的受控完整任务/浏览器检查44156852440及Root原始ZIP/全部13份原文和引用hash复核通过，包含6项权限、42次本地协议模型请求、HTML自动/手动预览、daily读回与真实时钟独立到期任务；该范围不包括Windows Ego、付费大单网或外部模型。
+
+同run的Mac x64在签名打包阶段三次内部尝试均遇到 `A timestamp was expected but was not found.`，目标为PPT Master的普通PNG资源；生产bundle已构建、公证凭据预检已通过，但尚未公证提交、未生成Mac成果、未安装或打开新Mac包。原日志没有TSA响应或网络阶段证据，不能断言Apple服务故障。精确依赖26.8.1/1.3.3的只读源码及真实PNG探针确认，默认签名walker以通用二进制分类选中了该0644资源。后续整改通过打包后真实格式核对，只向标准签名器添加确切PNG数据路径，并准确呈现时间戳失败；程序、动态库、脚本及未知文件继续签名，新的精确构建仍须验证实际结果。
+
+本机仍为H8，原任务仍停在A2，未添加Task输入、未继续A3，原个人Ego空间、27个其它Task、既有计划及UNKNOWN保持。公开发行继续HOLD。原始H9失败账本 `H9-cc32fe57-Mac-attempt1-FAIL-ledger-private.json`（SHA256 `d8928dd39fe67b6b43ca82639b3108bde60bcc59dae9a5a534e45e3c7aa01057`）保留。

@@ -19,6 +19,7 @@ const { verifyMacRuntimeEntitlements } = require('./mac-notarize.cjs')._internal
 const { verifyBundledDependencyArtifacts } = require('./dependency-artifact-policy.cjs')
 const { verifyPackagedMarkdownRendering } = require('./verify-packaged-markdown-rendering.cjs')
 const { verifyPackagedCanvas } = require('./runtime-package-packaging.cjs')
+const { excludeMacPngResources } = require('./mac-resource-signing.cjs')
 
 const MAC_ENTITLEMENTS_PATH = join(__dirname, '..', 'build', 'entitlements.mac.plist')
 
@@ -199,6 +200,11 @@ function maybeAdhocSignMacApp(context) {
   verifyMacRuntimeEntitlements(appBundle)
 }
 
+function configureMacResourceSigning(context) {
+  if (normalizePlatform(context.electronPlatformName) !== 'darwin') return 0
+  return excludeMacPngResources(packedResourcesDir(context), context.packager.platformSpecificBuildOptions)
+}
+
 async function afterPack(context) {
   const candidateSourceHead = process.env.WORKWISE_CANDIDATE_SOURCE_HEAD?.trim() || undefined
   if (process.env.WORKWISE_CANDIDATE === '1') {
@@ -224,6 +230,10 @@ async function afterPack(context) {
   const canvas = verifyPackagedCanvas(packedResourcesDir(context), normalizePlatform(context.electronPlatformName), normalizeArch(context.arch))
   console.log(`[after-pack] Locked canvas packages verified: ${canvas.packages} for ${canvas.platform}-${canvas.arch}.`)
   maybeAdhocSignMacApp(context)
+  // electron-builder reads this same options object after afterPack returns.
+  // Keep the standard signer; exclude only exact paths verified as PNG data.
+  const pngResources = configureMacResourceSigning(context)
+  if (pngResources) console.log(`[after-pack] Excluded ${pngResources} validated PNG resource(s) from individual code signing.`)
 }
 
 module.exports = afterPack
@@ -239,6 +249,7 @@ module.exports._internals = {
   copyBundledMarkdownConverters,
   verifyCandidateSourceTree,
   converterDirNameForContext,
-  normalizeArch
+  normalizeArch,
+  configureMacResourceSigning
 }
 module.exports.MAC_ENTITLEMENTS_PATH = MAC_ENTITLEMENTS_PATH

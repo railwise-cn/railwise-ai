@@ -58,7 +58,7 @@ export async function runMacArtifactBuildWithRetry(arch, options = {}) {
     }
     const waitMs = baseDelayMs * attempt
     console.warn(
-      `[mac-sign-retry] Apple timestamp service was unavailable for ${arch}; retrying attempt ${attempt + 1}/${attempts} in ${Math.round(waitMs / 1000)}s.`
+      `[mac-sign-retry] Timestamp signing failed for ${arch}; retrying attempt ${attempt + 1}/${attempts} in ${Math.round(waitMs / 1000)}s.`
     )
     await wait(waitMs)
   }

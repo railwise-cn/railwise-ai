@@ -738,5 +738,70 @@
       "sha256": "93f36449ab749a7ad193cbdd7ddb21bf00a62ff0e13cc82c56b82ea9c0ac01a2",
       "privateSourceOnly": true
     }
+  },
+  "latestH9Candidate": {
+    "sourceHead": "cc32fe571502ddc763b86da3ceb690ff6cc7fa99",
+    "sourceTree": "d2eebba1c9fdd8751d58a7fcf208da8daf3ae9e4",
+    "sixOfficialQualityJobs": "passed",
+    "pushQualityRunId": 44147940457,
+    "pullRequestQualityRunId": 44147956668,
+    "privateReleaseRunId": 44151140572,
+    "privateReleaseRunAttempt": 1,
+    "actualProducerVersion": "0.5.7",
+    "Mac": {
+      "status": "failed_before_artifact",
+      "jobId": 134283007896,
+      "stage": "Build signed macOS packages",
+      "arch": "x64",
+      "timestampError": "A timestamp was expected but was not found.",
+      "internalArchitectureAttempts": 3,
+      "notarySubmissionReached": false,
+      "underlyingEndpointOrServiceCause": "unknown",
+      "artifactCreated": false,
+      "installed": false,
+      "opened": false
+    },
+    "Windows": {
+      "status": "original_basic_full_and_root_independent_checks_passed",
+      "artifactId": 14360406634,
+      "artifactSize": 317560437,
+      "artifactSha256": "e5719d8de8f36d19b837a9b27e425ac6d133c1a8826900d25e84441d823ad4ed",
+      "installerSha256": "09df0038b44af1f812ed42fe989d345b89e11b3f76f1dfcb2b9e56b6296f5de6",
+      "installedAsarSha256": "af01034c5699be7fe463c83de63a41184fa0843c30101b8bb9debb26aea3de6f",
+      "signature": "NotSigned",
+      "fullRunId": 44156852440,
+      "fullResult": "passed",
+      "scope": "controlled BSK/local protocol model/loopback; no Windows Ego/paid Dadan/external model claim",
+      "fullArtifactId": 14360644691,
+      "fullArtifactSize": 1197782,
+      "fullArtifactSha256": "4fb106a6de6730f12bc4d0f58de14d76ac57b288c124835bd6f5f64dc8b80861",
+      "rootEvidence": {
+        "fileName": "windows-cc32fe57-H9-root-full-proof-check.json",
+        "sha256": "b9efa21cee168d93813c7248dbb59bb1796e4579a3e2930a08dfbb86275769fa",
+        "privateSourceOnly": true
+      }
+    },
+    "failureEvidence": {
+      "fileName": "H9-cc32fe57-Mac-attempt1-FAIL-ledger-private.json",
+      "sha256": "d8928dd39fe67b6b43ca82639b3108bde60bcc59dae9a5a534e45e3c7aa01057",
+      "privateSourceOnly": true
+    },
+    "actualMacRemainsH8": true,
+    "actualSameTaskStillA2Waiting": true,
+    "noTaskInputOrA3": true,
+    "publicReleaseStatus": "HOLD_pending",
+    "nextPackagingCorrection": {
+      "status": "source_applied_validated_PNG_exact_path_rules_standard_signer",
+      "sourceHead": null,
+      "sourceTree": null,
+      "releaseRunId": null,
+      "MacAsarSha256": null,
+      "actualBusinessAcceptance": "pending",
+      "isolatedSourceCommit": "2e6d2dc0d12b261f86512f052c0cb2bafb56151a",
+      "focusedTestsPassed": 61,
+      "requiredTimestampPreserved": true,
+      "underlyingTSAResolutionClaimed": false,
+      "newExactMacPackageRequired": true
+    }
   }
 }
