@@ -1,9 +1,9 @@
 {
-  "status": "passed",
+  "status": "partial",
   "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
   "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
   "releaseRunId": 44024949316,
-  "scope": "Passed scoped real RailWise AI + Ego subscribed-list initial and natural due delivery, with one initial clarification disclosed; controlled Windows full separately passed",
+  "scope": "Earlier scoped initial and temporary-natural-due passed; later formal16:30 real occurrence failed and supersedes any overall H4 business/public acceptance",
   "rootAuditObservedStatus": "passed-after-one-explicit-original-task-clarification-and-normal-continuation",
   "actor": "RailWise AI real model and Ego provider",
   "sourceBasis": "observed_feed",
@@ -300,5 +300,27 @@
     "missedDeliveryNotReclassified": true
   },
   "rootAcceptedAt": "2026-11-17T08:21:44.983557+00:00",
-  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00"
+  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00",
+  "laterFormal1630Occurrence": {
+    "status": "failed",
+    "taskId": "task_8e88f809-3767-4772-99cd-f37d63276665",
+    "scheduleId": "schedule_task_capability_a308861eb3244f18abb86e32",
+    "dueAt": "2026-11-17T08:30:00.000Z",
+    "createdAt": "2026-11-17T08:30:13.525Z",
+    "waitingAt": "2026-11-17T08:32:51.209Z",
+    "actualTerminalStatus": "waiting_user",
+    "attempts": 1,
+    "artifactCount": 0,
+    "taskSpaceId": 12,
+    "newNativeSeparateSpaceObserved": true,
+    "readCapturesWereUntruncatedButOnlySpaShell": true,
+    "sourceReadinessDidNotEqualReportCompleteness": true,
+    "noManualTriggerOrContinuation": true,
+    "rawTaskAndFailurePreserved": true,
+    "privateEvidence": {
+      "fileName": "formal1630-terminal-FAILED-private.json",
+      "sha256": "daa72c078562bea56e7c5fc9d9ca3050455ca8362cba63dacdf62100141f58b5"
+    },
+    "publicReleaseHeld": true
+  }
 }

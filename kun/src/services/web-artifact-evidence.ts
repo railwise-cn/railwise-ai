@@ -57,6 +57,8 @@ type Source = { receiptId: string; receiptHash: string; turnId: string; url: str
 export type ObservedFeedCollectionFreshness = {
   basis: 'observed_feed'; collectionTurnId: string; currentCollectionReady: boolean
   nowUtc: string; nowBeijing: string; requestedUrls: string[]; historyNotice: string; nextStep: string; readAt?: string
+  /** Capture and source-row readiness are separate from explicit file verification. */
+  currentDocumentCaptured?: boolean; reportEvidenceReady?: boolean | null; readinessMeaning?: 'current_capture_only'
 }
 
 /** Authority comes from the persisted user control/input path, never a model-selected epoch. */
@@ -121,11 +123,14 @@ export function observedFeedCollectionFreshness(repository: TaskRunRepository, t
   const required = task.acceptance.requiredSourceOrigins?.length ? task.acceptance.requiredSourceOrigins
     : requestedUrls.length ? [...new Set(requestedUrls.map(url => new URL(url).origin))] : allowedOrigins
   const covered = new Set(actual.map(source => new URL(source.url).origin))
+  const documents = new Set(actual.filter(source => source.full).map(source => new URL(source.url).origin))
+  const ego = turns.find(turn => turn.id === task.activeTurnId)?.executionGrant?.browserScope?.provider === 'ego-browser'
   return { basis: 'observed_feed', collectionTurnId: task.activeTurnId, currentCollectionReady: required.length > 0 && required.every(origin => covered.has(origin)),
+    currentDocumentCaptured: required.length > 0 && required.every(origin => documents.has(origin)), reportEvidenceReady: null, readinessMeaning: 'current_capture_only',
     nowUtc: nowIso, nowBeijing: new Date(Date.parse(nowIso) + 8 * 60 * 60 * 1000).toISOString().replace('Z', '+08:00'), requestedUrls,
     ...(actual.length ? { readAt: actual.map(source => source.readAt).sort().at(-1) } : {}),
     historyNotice: '此前读取和成果保留为历史素材；回看旧内容不代表本轮已采集当前列表。',
-    nextStep: '先用原任务已授权的原生浏览器工具打开并完整读取当前订阅列表或真实单条记录，再整理、发布并核验本轮报告。旧空间确已关闭时，仅按已有用户继续授权恢复；不要另建任务或扩大权限。' }
+    nextStep: ego ? 'currentCollectionReady仅表示本轮已捕获来源，不表示报告记录已核验。已有本任务Ego空间时，读取失败或只有导航内容可先调用ego_browser_read({})读取当前完整文档；不传selector或旧observationId，不必再次open或新建空间。只按实际同记录原文生成report；没有真实列表记录或明确零结果就保持未核验，不重复发布。' : '先用原任务已授权的原生浏览器工具完整读取当前订阅列表或真实单条记录，再整理、发布并核验本轮报告。已捕获来源不代表报告记录已核验；不要另建任务或扩大权限。' }
 }
 // Only independently validated loaded-response metadata has a title. Legacy DOM reads
 // without metadata may coexist; two actual metadata identities for the same bytes may not.
@@ -173,6 +178,7 @@ export type WebArtifactSourceGate = {
   reportManifestRequired: boolean
   collectionFreshness?: ObservedFeedCollectionFreshness
   nextReads: Array<{ origin: string; url: string; discovery: WebSourceReference }>
+  reportReadiness?: { typedManifestProvided: boolean; reportEvidenceReady: boolean; declaredRecords: number; boundRecords: number; gaps: string[] }
 }
 
 function actualZeroMatch(task: TaskRun, source: Source | undefined, entry: WebArtifactEvidenceInput['noMatches'][number]): boolean {
@@ -233,7 +239,9 @@ export function webArtifactPublicationReadiness(repository: TaskRunRepository, t
   const missingOrigins = required.filter(origin => !covered.has(origin))
   const nextReads: WebArtifactSourceGate['nextReads'] = []
   const seen = new Set<string>()
-  for (const discovery of history) for (const url of links(discovery.content, discovery.url)) {
+  // Feed recovery reads the owned current document; unrelated navigation links
+  // must not replace the task's explicitly requested SPA hash route.
+  if (!feed) for (const discovery of history) for (const url of links(discovery.content, discovery.url)) {
     const origin = new URL(url).origin
     if (!missingOrigins.includes(origin) || !allowedOrigins.includes(origin) || seen.has(url) || nextReads.length >= 20) continue
     seen.add(url); nextReads.push({ origin, url, discovery: { url: discovery.url, resultHash: discovery.resultHash } })
@@ -250,8 +258,28 @@ export function webArtifactPublicationReadiness(repository: TaskRunRepository, t
   const preserved = object(baseline?.failureEvidenceFingerprints)
   if (Object.keys(preserved).length && Object.values(preserved).every(value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value))) failureEvidenceFingerprints = preserved as Record<string, string>
   const collectionFreshness = observedFeedCollectionFreshness(repository, task, items, turns, allowedOrigins)
+  let reportReadiness: WebArtifactSourceGate['reportReadiness']
+  if (feed) {
+    const gaps = new Set<string>(), declaredRecords = input?.items.length ?? 0
+    if (!input) gaps.add('typed_manifest_required')
+    if (collectionFreshness?.currentCollectionReady === false) gaps.add('current_source_read_required')
+    let boundRecords = 0
+    for (const item of input?.items ?? []) {
+      const source = findSource(available, item.source), discovery = findSource(available, item.discovery)
+      if (!source || !discovery) gaps.add('source_reference_unmatched')
+      if (item.classification === 'source' && feedRecord(source, discovery, item)) boundRecords++
+      else gaps.add('record_binding_required')
+    }
+    const zeroMatches = input?.noMatches.filter(entry => actualZeroMatch(task, findSource(available, entry.source), entry)).length ?? 0
+    if (input && !declaredRecords && !input.noMatches.length) gaps.add('records_or_actual_zero_required')
+    if (input && zeroMatches !== input.noMatches.length) gaps.add('actual_zero_unverified')
+    if (missingOrigins.length) gaps.add('source_origin_unverified')
+    reportReadiness = { typedManifestProvided: Boolean(input), declaredRecords, boundRecords,
+      reportEvidenceReady: Boolean(input && !gaps.size && (boundRecords || zeroMatches)), gaps: [...gaps] }
+    if (collectionFreshness) collectionFreshness.reportEvidenceReady = reportReadiness.reportEvidenceReady
+  }
   return { ready: required.length > 0 && missingOrigins.length === 0, missingOrigins, evidenceFingerprint,
-    failureEvidenceFingerprints, nextReads, reportManifestRequired: (primary || feed) && !input, ...(collectionFreshness ? { collectionFreshness } : {}) }
+    failureEvidenceFingerprints, nextReads, reportManifestRequired: (primary || feed) && !input, ...(collectionFreshness ? { collectionFreshness } : {}), ...(reportReadiness ? { reportReadiness } : {}) }
 }
 
 /** Canonical validator failures exclude model-chosen section IDs and artifact byte churn. */

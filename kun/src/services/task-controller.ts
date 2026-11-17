@@ -649,7 +649,7 @@ export class TaskController {
       const key = `web-source-gate:${turnId}:collection:${operationFingerprint(request)}:${count}`
       this.repository.beginOperation({ ownerId: taskId, kind: 'web_artifact_source_gate', idempotencyKey: key, request, nowIso: this.nowIso() })
       this.repository.finishOperation(taskId, key, { status: 'failed', result: { complete: false, failureKinds: ['source_read_required'], reasons: gate.reasons } }, this.nowIso())
-      return { ...gate, stalled: count + 1 >= 2, code: count + 1 >= 2 ? 'web_artifact_repair_stalled' : 'web_source_reads_required', collectionReadFailures: count + 1 }
+      return { ...gate, stalled: count + 1 >= 2, code: count + 1 >= 2 ? 'web_artifact_repair_stalled' : 'web_source_reads_required', collectionReadFailures: count + 1, ...(count + 1 >= 2 ? { readRecovery: undefined } : {}) }
     }
     const attempts = this.webArtifactRepairAttempts(task)
     if (gate.stalled && attempts.some(attempt => attempt.turnId === turnId)) return gate
@@ -666,7 +666,7 @@ export class TaskController {
     const semanticRepair = deriveWebArtifactRepairState(attempts, { id: receipt.id, requirementHash: gate.requirementHash,
       evidenceFingerprint: gate.evidenceFingerprint, failureEvidenceFingerprints: gate.failureEvidenceFingerprints, failureKinds, reasons: gate.reasons })
     this.repository.finishOperation(taskId, key, { status: 'failed', result: { complete: false, failureKinds, reasons: gate.reasons, semanticRepair } }, this.nowIso())
-    return { ...gate, stalled: semanticRepair.stalled, code: semanticRepair.stalled ? 'web_artifact_repair_stalled' : gate.code, semanticRepair }
+    return { ...gate, stalled: semanticRepair.stalled, code: semanticRepair.stalled ? 'web_artifact_repair_stalled' : gate.code, semanticRepair, ...(semanticRepair.stalled ? { readRecovery: undefined } : {}) }
   }
 
   /** Source-first publication gate; only task-owned receipts can establish progress. */
@@ -697,11 +697,31 @@ export class TaskController {
       else if (candidate === undefined && await this.currentWebArtifactFieldRepair(task, turnId, path, effectiveEvidence)) stalled = false
       this.assertToken(token)
     }
-    return { ...sourceGate, ready: sourceGate.ready && !stalled, stalled, requirementHash,
+    const readRecovery = !stalled && !sourceGate.ready ? this.observedFeedReadRecovery(task, turnId, grant, sourceGate.collectionFreshness?.requestedUrls ?? []) : undefined
+    return { ...sourceGate, ready: sourceGate.ready && !stalled, stalled, requirementHash, ...(readRecovery ? { readRecovery } : {}),
       code: stalled ? 'web_artifact_repair_stalled' : sourceGate.ready ? undefined : 'web_source_reads_required',
       reasons: collectionPending ? ['本轮订阅列表尚未实际重新读取；旧来源和草稿保留为历史素材。'] : stalled ? semanticRepair!.reasons : sourceGate.ready ? [] : sourceGate.missingOrigins.length
         ? sourceGate.missingOrigins.map(origin => `${task.acceptance.webEvidenceBasis === 'observed_feed' ? '订阅列表记录尚未核验' : '正式公告正文尚未核验'}：${origin}`) : [task.acceptance.webEvidenceBasis === 'observed_feed' ? '尚缺可信的完整列表或单记录读取；加载/空DOM/截断不代表零条。' : '尚缺可信的完整正文来源读取或实际零匹配页面。'],
       ...(semanticRepair ? { semanticRepair } : {}) }
+  }
+
+  /** A suggested existing read, never an authorization, dispatch or repair reset. */
+  private observedFeedReadRecovery(task: TaskRun, turnId: string, grant: ExecutionGrant | undefined, requestedUrls: string[]) {
+    const now = Date.parse(this.nowIso()), issued = Date.parse(grant?.issuedAt ?? ''), expires = Date.parse(grant?.expiresAt ?? '')
+    if (task.acceptance.webEvidenceBasis !== 'observed_feed' || task.status !== 'running' || task.activeTurnId !== turnId ||
+      grant?.taskId !== task.id || grant.threadId !== task.threadId || grant.turnId !== turnId || grant.workspaceRoot !== task.workspaceRoot ||
+      grant.browserScope?.provider !== 'ego-browser' || !grant.allowedToolNames?.includes('ego_browser_read') || !grant.allowedProviderIds?.includes('ego-browser') ||
+      !Number.isFinite(now) || !Number.isFinite(issued) || !Number.isFinite(expires) || expires <= now || issued > now ||
+      this.repository.operations(task.id).some(row => row.status === 'outcome_unknown' || row.kind === 'ego_browser_wait' && row.request?.turnId === turnId)) return undefined
+    try {
+      const binding = currentEgoTaskSpaceBinding(this.repository, task.id)
+      const space: Record<string, unknown> = binding?.result && typeof binding.result === 'object' && !Array.isArray(binding.result) ? binding.result as Record<string, unknown> : {}
+      if (!binding || binding.status !== 'succeeded' || binding.request?.configurationFingerprint !== grant.connectorIdentityFingerprints?.['ego-browser'] ||
+        operationFingerprint(binding.request?.origins) !== operationFingerprint(grant.browserScope.origins) ||
+        !Number.isSafeInteger(space.taskSpaceId) || this.repository.operation(task.id, 'ego-finish:' + binding.id)) return undefined
+      return { providerId: 'ego-browser' as const, toolName: 'ego_browser_read' as const, arguments: {}, taskId: task.id,
+        turnId, taskSpaceId: Number(space.taskSpaceId), bindingReceiptId: binding.id, requestedUrls, maxCalls: 1 as const, guidanceOnly: true as const }
+    } catch { return undefined }
   }
 
   /** Shared read-only projection for tool guidance; it cannot authorize a read or reset an epoch. */
@@ -749,10 +769,13 @@ export class TaskController {
     const repairFingerprint = block.collectionFreshness?.currentCollectionReady === false
       ? operationFingerprint({ taskId: task.id, turnId, requirementHash: block.requirementHash, collectionReadRequired: true }) : block.semanticRepair!.fingerprint
     const fingerprint = `web-artifact-repair:${repairFingerprint}`
+    const retained = task.artifacts.length ? '已有成果及原始核验记录已保留。' : '尚无已登记成果，原始读取和核验记录已保留。'
     const reason = task.acceptance.webEvidenceBasis === 'observed_feed'
-      ? block.collectionFreshness?.currentCollectionReady === false ? '本轮订阅列表尚未重新读取，旧来源和草稿已保留。请在原任务中实际打开并读取当前列表后继续。'
-        : '部分订阅记录的字段仍待核验，草稿已保留。请核对原始列表后继续。'
-      : `相同来源或字段问题在一次修复后仍未解决，已停止重复发布；已有草稿和原始核验记录已保留。${block.reasons.join('；')}`
+      ? block.collectionFreshness?.currentCollectionReady === false ? `本轮订阅列表尚未重新读取。${retained}`
+        : block.reportManifestRequired ? `本轮报告缺少结构化列表证据。${retained}`
+        : block.missingOrigins.length ? `本轮订阅记录尚未建立完整原文依据。${retained}`
+        : `部分订阅记录的字段仍待核验。${retained}`
+      : `相同来源或字段问题在一次修复后仍未解决，已停止重复发布。${retained}${block.reasons.join('；')}`
     return this.repository.transact(() => {
       const result = this.waitForUser(task, reason, task.finalResponse ?? '', fingerprint, turnId)
       const id = `web_evidence_${task.id}`, prior = this.repository.attention(id), now = this.nowIso()
@@ -760,7 +783,7 @@ export class TaskController {
         workspaceRoot: task.workspaceRoot, kind: 'blocked', title: '网页来源核验需要处理', message: reason, status: 'pending',
         revision: (prior?.revision ?? -1) + 1, createdAt: prior?.createdAt ?? now, updatedAt: now,
         payload: { kind: 'web_artifact_repair_stalled', code: block.code, reasons: block.reasons, missingOrigins: block.missingOrigins,
-          nextReads: block.nextReads, fingerprint: repairFingerprint } })
+          nextReads: block.nextReads, reportReadiness: block.reportReadiness, reportManifestRequired: block.reportManifestRequired, fingerprint: repairFingerprint } })
       return result
     })
   }

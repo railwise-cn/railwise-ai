@@ -484,6 +484,9 @@ it('keeps the actual missing-origin deficit when a later publication drops its t
     expect(f.repository.operations(f.task.id, 'web_artifact_source_gate').at(-1)?.result).toMatchObject({
       failureKinds: expect.arrayContaining(['source_manifest_required', `source_origin:${gov}`])
     })
+    const decision = await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')
+    expect(decision?.task.waitingReason).toContain('尚无已登记成果')
+    expect(decision?.task.waitingReason).not.toContain('草稿')
   } finally { f.repository.close() }
 })
 
@@ -1091,5 +1094,68 @@ it.each(['cross-path', 'changed-bytes'] as const)('rejects %s reuse of the newly
     expect(f.repository.operations(f.task.id, 'tool').filter(row => row.request?.toolName === 'browser_get_html').map(row => JSON.stringify(row))).toEqual(f.sourceRows)
     expect(await readFile(f.path, 'utf8')).toBe(f.oldBytes)
     expect(f.repository.get(f.task.id)!.status).not.toBe('completed')
+  } finally { f.repository.close() }
+})
+
+it('distinguishes a current captured feed document from report record evidence without treating navigation text as zero results', async () => {
+  const f = await observedCollectionFixture()
+  try {
+    const url = origins[0] + '/#/subscribe/bidding', shell = '<main><nav>工作台 资料 搜索</nav><h1>我的订阅列表</h1></main>'
+    await f.source(url, shell)
+    const proof = feedInput(), reference = { url, resultHash: sha(shell) }
+    proof.coverage = [reference]; proof.items[0]!.source = reference; proof.items[0]!.discovery = reference
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', proof.path, proof)).toMatchObject({ ready: false,
+      collectionFreshness: { currentCollectionReady: true, currentDocumentCaptured: true, reportEvidenceReady: false, readinessMeaning: 'current_capture_only' },
+      reportReadiness: { typedManifestProvided: true, reportEvidenceReady: false, declaredRecords: 1, boundRecords: 0, gaps: expect.arrayContaining(['record_binding_required']) } })
+    expect(await f.controller.recordWebArtifactPublicationBlock(f.task.id, 'new-turn', proof.path, proof)).toMatchObject({
+      code: 'web_source_reads_required', semanticRepair: { failureCount: 1, stalled: false } })
+    const second = await f.controller.recordWebArtifactPublicationBlock(f.task.id, 'new-turn', 'renamed.html')
+    expect(second).toMatchObject({ code: 'web_artifact_repair_stalled', semanticRepair: { failureCount: 2, stalled: true },
+      reportReadiness: { typedManifestProvided: false, gaps: expect.arrayContaining(['typed_manifest_required']) } })
+    expect(second!.missingOrigins).toContain(origins[0]); expect(second!.nextReads).toEqual([])
+    const before = f.repository.get(f.task.id)!, decision = await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')
+    expect(decision?.task.waitingReason).toContain('尚无已登记成果')
+    expect(decision?.task.waitingReason).not.toMatch(/草稿已保留|字段仍待核验/)
+    expect(decision?.task.budget).toEqual(before.budget); expect(decision?.task.attempts).toBe(before.attempts)
+  } finally { f.repository.close() }
+})
+
+it.each(['active', 'expired', 'finished', 'unknown'] as const)('offers the existing same-Space empty-args document read only for a live scoped Ego execution: %s', async boundary => {
+  const f = await observedCollectionFixture()
+  try {
+    const task = f.repository.get(f.task.id)!, url = origins[0] + '/#/subscribe/bidding', identity = 'e'.repeat(64), nonce = 'offline-recovery-space'
+    f.repository.update(task.id, task.revision, row => ({ ...row, goal: '汇总已授权订阅列表 ' + url }))
+    const thread = (await f.threadStore.get(f.thread.id))!
+    await f.threadStore.upsert({ ...thread, turns: thread.turns.map(turn => turn.id === 'new-turn' ? { ...turn, executionGrant: {
+      ...turn.executionGrant!, allowedProviderIds: ['ego-browser'], allowedToolNames: ['ego_browser_read', 'publish_artifact'], connectorIdentityFingerprints: { 'ego-browser': identity },
+      browserScope: { ...turn.executionGrant!.browserScope!, provider: 'ego-browser' as const }, expiresAt: boundary === 'expired' ? '2026-11-14T23:59:00.000Z' : '2026-11-15T00:30:00.000Z'
+    } } : turn) })
+    const binding = f.repository.beginOperation({ ownerId: task.id, kind: 'ego_task_space', idempotencyKey: 'ego-task-space', request: {
+      taskId: task.id, threadId: task.threadId, nonce, spaceName: `RailWise read-only ${task.id} ${nonce}`, createdTurnId: 'new-turn', configurationFingerprint: identity, origins
+    }, nowIso: fixtureTime }).receipt
+    f.repository.finishOperation(task.id, binding.idempotencyKey, { status: 'succeeded', result: { taskSpaceId: 12, pageLabel: 'p1', ownership: 'agent' } }, fixtureTime)
+    if (boundary === 'finished' || boundary === 'unknown') {
+      const key = boundary === 'finished' ? 'ego-finish:' + binding.id : 'unknown-read'
+      f.repository.beginOperation({ ownerId: task.id, kind: boundary === 'finished' ? 'ego_task_space_finish' : 'tool', idempotencyKey: key, request: { turnId: 'new-turn' }, nowIso: fixtureTime })
+      f.repository.finishOperation(task.id, key, { status: boundary === 'finished' ? 'succeeded' : 'outcome_unknown', result: {} }, fixtureTime)
+    }
+    const before = JSON.stringify(f.repository.operations(task.id)), state = f.repository.get(task.id)!
+    const gate = await f.controller.webArtifactPublicationGate(task.id, 'new-turn', 'current.html', feedInput())
+    if (boundary === 'active') {
+      expect(gate).toMatchObject({ readRecovery: { providerId: 'ego-browser', toolName: 'ego_browser_read', arguments: {}, taskId: task.id,
+        turnId: 'new-turn', taskSpaceId: 12, requestedUrls: [url], maxCalls: 1 } })
+      expect(gate!.collectionFreshness!.nextStep).toContain('ego_browser_read({})'); expect(gate!.readRecovery).not.toHaveProperty('url')
+    } else expect(gate!.readRecovery).toBeUndefined()
+    expect(JSON.stringify(f.repository.operations(task.id))).toBe(before); expect(f.repository.get(task.id)).toEqual(state)
+    if (boundary === 'active') {
+      const first = await f.controller.recordWebArtifactPublicationBlock(task.id, 'new-turn', 'current.html', feedInput())
+      expect(first).toMatchObject({ stalled: false, readRecovery: { maxCalls: 1 } })
+      const second = await f.controller.recordWebArtifactPublicationBlock(task.id, 'new-turn', 'other-name.html')
+      expect(second).toMatchObject({ code: 'web_artifact_repair_stalled', collectionReadFailures: 2, stalled: true })
+      expect(second!.readRecovery).toBeUndefined()
+      expect(f.repository.get(task.id)!.budget).toEqual(state.budget); expect(f.repository.get(task.id)!.attempts).toBe(state.attempts)
+      f.controller.pauseTask(task.id, f.repository.get(task.id)!.revision)
+      expect(await f.controller.observedFeedCollectionContext(task.id, 'new-turn')).toBeNull()
+    }
   } finally { f.repository.close() }
 })

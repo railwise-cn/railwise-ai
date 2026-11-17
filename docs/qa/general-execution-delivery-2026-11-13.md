@@ -972,3 +972,11 @@ The subsequent exact-package full run `44039630770` also remains **failed**. Its
 临时计划仅该新增项在一次自然到期后正常暂停；正式计划仍启用，Asia/Shanghai 08:30、16:30 启动，09:00、17:00 交付目标。此前五份计划定义、22 个任务和 16 条 UNKNOWN 原记录保持原样。旧版本真实 08:30 失败及错过目标时间仍保留，不追认按时成功。
 
 原生 Mac 窗口在 1024×760、实际最小 960×700、1280×840 检查 General 菜单重定位、焦点返回和无横向溢出；760 的请求被实际窗口最小宽度约束为 960，不声称测试了更窄尺寸。Windows 另覆盖大小字体、菜单定位和窄窗导航。Windows Authenticode 仍为 NotSigned/not-configured；Windows BSK/模型协议/loopback 受控验证不代表 Ego Windows 或付费大单网。Mac 本地 Intel UI 未测，本机 Gatekeeper override 与同 run CI 启用策略 accepted 证据分列。完整外层 Mac archive 未在本机全 hash 的界限保留。付费内容和原生付费页面图仅留私有证据。当前验收资料见 `docs/qa/release-gates/v0.5.7.json` 及其 sidecars。
+
+
+**后续正式 16:30 失败与暂停发行：** 原正式计划在 16:30:13 自然建立独立任务，实际打开 Space 12，原生画面显示 2 Spaces。SPA 的两次未截断读取只有导航／订阅壳，正文尚未到达；随后 selector 因观察与动态 DOM 变化两次拒绝。模型未回到当前完整只读读取，重复 publish 被严格来源核验拒绝，16:32:51 转 waiting_user，无成果。该真实失败与次数保留，不宣称交付或按时完成。H4 上述初次／临时到期及 Windows 通过仍是限定范围的历史证据；总业务状态改 partial，public gate 恢复 pending，尚未移动发行标签或公开发布。后续修正须保持同任务来源、授权和严格校验，完成新源码精确包验证后再评估发行。
+
+
+**16:30 故障的代码修正（尚待新精确包）：** Ego 工具默认引导在原 Space 直接 `ego_browser_read({})` 读取当前文档，避免重复导航及旧 selector。仅真实当前同 Task／Turn／Grant／配置／Space 的 selection-phase stale 允许一次独立的整页只读恢复；初始失败回执保留，新读取单独封存，不能冒充原局部选择成功。过期、撤销、接管、未知结果、伪造或旧观察、变更完整 URL（含 hash）均不自动恢复。URL 还在 evaluate 内任何 DOM 查询前原子核对；竞态回归由旧代码两次错误查询变为零次。截断、空 DOM 和导航壳仍是实际捕获，不被升级为完整业务或零结果。
+
+来源反馈区分当前文档捕获与报告同记录证据，明确 typed manifest／来源／记录缺口；已有合法 Ego Scope 时仅建议同一任务空间的现有只读工具，不增加授权，不派发工具，不扩大站点。订阅列表恢复不从导航链接推断新目标，保留原 hash 路由。同缺口两次即停的计数与全部严格引用核验保留；零登记成果时准确显示尚无成果。provider 回归 65 项通过（此前相关回归 138 项保留），source/controller 169 项通过；Root 最终四文件集成 261 项、桌面／Runtime 类型、五文件 lint、一次生产构建与 1,381 输入 freshness 通过。初轮类型失败保留；仅补运行时 object 类型收窄后复验通过。实际模型与新精确包尚未验收，public gate 保持 pending，正式失败次数／Space 12／原 Grant 记录不改。

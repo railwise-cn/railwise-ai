@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "scope": "public-release",
-  "status": "passed",
+  "status": "pending",
   "release": {
     "tag": "v0.5.7",
     "version": "0.5.7",
@@ -135,7 +135,8 @@
       "Initial real-model A1 failed strict evidence checks. A2 completed only after one explicit original-task clarification and normal continuation; this is not intervention-free initial first-pass success.",
       "First visible subscription-list page only: initial10/due11 selected records. No all-day/site coverage, official-body verification or independent per-item href claim. Missing facts remain unverified; relevance review is AI review, not professional sign-off.",
       "Latest initial Grant had not expired by wall clock, but its Task/Turn had completed; natural due used its own independent Task/Grant.",
-      "Paid titles, DOM, source bodies, private report files and report paths are not committed. These are acceptance records; public promotion remains a separate gated workflow."
+      "Paid titles, DOM, source bodies, private report files and report paths are not committed. These are acceptance records; public promotion remains a separate gated workflow.",
+      "Later formal16:30 automatic occurrence on H4 reached waiting_user with no artifact after SPA shell reads and repeated source validation failures. Earlier scoped QA passes remain historical; public release is held pending a production recovery correction and new exact-package acceptance."
     ]
   },
   "checks": {
@@ -172,7 +173,7 @@
       "path": "docs/qa/release-gates/v0.5.7/packaged-ui.json"
     },
     "functionalChecklist": {
-      "status": "passed",
+      "status": "pending",
       "path": "docs/qa/release-gates/v0.5.7/business-acceptance.json"
     },
     "updaterRoundTrip": {

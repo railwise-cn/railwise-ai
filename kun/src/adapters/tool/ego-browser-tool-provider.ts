@@ -37,12 +37,15 @@ try {
  const allowed = url => { const u=new URL(url); return ['http:','https:'].includes(u.protocol) && !u.username && !u.password && p.origins.includes(u.origin); };
  if(p.action==='open'&&!p.recoverExistingOnly) { if(!allowed(p.url)) throw Object.assign(new Error(),{code:'ego_browser_origin_denied'}); check(); failurePhase='navigation'; await page.goto(p.url,{timeout:25000}); }
  else if(!allowed(await page.url())) throw Object.assign(new Error(),{code:'ego_browser_origin_denied'});
+ if(p.expectedReadSourceUrl&&await page.url()!==p.expectedReadSourceUrl)throw Object.assign(new Error(),{code:'ego_browser_page_changed'});
  const read = async selector => {
   failurePhase=selector?'selection':'dom_read';
-  const result=await page.evaluate(({maxBytes,selector:argumentsSelection}) => {
-   let phase='dom_read';
+  const result=await page.evaluate(({maxBytes,selector:argumentsSelection,expectedReadSourceUrl}) => {
+   let phase='control';
    try {
    const sourceUrl=location.href;
+   if(expectedReadSourceUrl&&sourceUrl!==expectedReadSourceUrl)throw Object.assign(new Error(),{code:'ego_browser_page_changed'});
+   phase='dom_read';
    const candidates=[...document.querySelectorAll('a[href]')].filter(a => /^(?:下一页|下页|next(?: page)?|›|»|→)$/i.test((a.getAttribute('aria-label')||a.textContent||'').trim()) && !a.closest('form') && a.getAttribute('aria-disabled')!=='true').map(a=>({href:a.href,label:(a.getAttribute('aria-label')||a.textContent||'').trim()})).slice(0,10);
    const hidden=n=>{const style=document.defaultView.getComputedStyle(n);return n.hidden||n.getAttribute('aria-hidden')==='true'||style.display==='none'||['hidden','collapse'].includes(style.visibility)};
    const visibleClone=root=>{if(hidden(root))throw Object.assign(new Error(),{code:'ego_browser_element_not_visible'});const clone=root.cloneNode(true),originals=[root,...root.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];for(let i=1;i<originals.length;i++)if(hidden(originals[i]))copies[i].remove();return clone};
@@ -56,11 +59,12 @@ try {
    if(argumentsSelection) { phase='selection'; let matches;try {matches=document.querySelectorAll(argumentsSelection);}catch(error){if(error?.name==='SyntaxError'||error?.name==='DOMException')return {readError:{version:1,code:'ego_browser_selector_invalid',failurePhase:phase}};throw error;} if(matches.length!==1)throw Object.assign(new Error(),{code:'ego_browser_element_ambiguous'}); if(matches[0].matches('script,style,noscript,template,iframe,input,textarea,select,[contenteditable]')||matches[0].closest('[contenteditable]'))throw Object.assign(new Error(),{code:'ego_browser_element_unsupported'}); const selected=visibleClone(matches[0]); selected.querySelectorAll('script,style,noscript,template,iframe,input,textarea,select,[contenteditable]').forEach(n=>n.remove()); for(const n of [selected,...selected.querySelectorAll('*')])for(const a of [...n.attributes])if(!['href','title','datetime','role','aria-label'].includes(a.name))n.removeAttribute(a.name); for(const a of [selected,...selected.querySelectorAll('a[href]')])if(a.matches('a[href]')) {try{const u=new URL(a.getAttribute('href'),sourceUrl);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)a.removeAttribute('href');else a.setAttribute('href',u.href)}catch{a.removeAttribute('href')}} selection={selector:argumentsSelection,matchedCount:1}; clone.replaceChildren(selected); }
    const raw=selection?clone.innerHTML:documentHtml, bytes=new TextEncoder().encode(raw), truncated=bytes.length>maxBytes;
    return {sourceUrl,html:truncated?new TextDecoder().decode(bytes.slice(0,maxBytes)):raw,truncated,candidates,documentHtml,selection,loadingObserved,visibleText:(clone.textContent||'').trim().length>0};
-   }catch(error){const code=error?.code;if(['ego_browser_element_ambiguous','ego_browser_element_not_visible','ego_browser_element_unsupported'].includes(code))return {readError:{version:1,code,failurePhase:phase}};throw error;}
-  },{maxBytes:p.maxBytes,selector});
+   }catch(error){const code=error?.code;if(['ego_browser_element_ambiguous','ego_browser_element_not_visible','ego_browser_element_unsupported','ego_browser_page_changed'].includes(code))return {readError:{version:1,code,failurePhase:phase}};throw error;}
+  },{maxBytes:p.maxBytes,selector,expectedReadSourceUrl:p.expectedReadSourceUrl});
   if(result && Object.prototype.hasOwnProperty.call(result,'readError')) {
    const error=result.readError,keys=error&&typeof error==='object'&&!Array.isArray(error)?Object.keys(error).sort():[];
-   const valid=Object.keys(result).length===1 && keys.join(',')==='code,failurePhase,version' && error.version===1 && ['ego_browser_selector_invalid','ego_browser_element_ambiguous','ego_browser_element_not_visible','ego_browser_element_unsupported'].includes(error.code) && (error.failurePhase==='selection'||error.code==='ego_browser_element_not_visible'&&error.failurePhase==='dom_read');
+   const valid=Object.keys(result).length===1 && keys.join(',')==='code,failurePhase,version' && error.version===1 &&
+    (error.code==='ego_browser_page_changed'&&error.failurePhase==='control'||['ego_browser_selector_invalid','ego_browser_element_ambiguous','ego_browser_element_not_visible','ego_browser_element_unsupported'].includes(error.code)&&(error.failurePhase==='selection'||error.code==='ego_browser_element_not_visible'&&error.failurePhase==='dom_read'));
    if(!valid)throw Object.assign(new Error(),{code:'ego_browser_protocol_invalid'});
    failurePhase=error.failurePhase;throw Object.assign(new Error(),{code:error.code});
   }
@@ -128,9 +132,9 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
   }
   const descriptions = {
     ego_browser_finish: '成功交付后调用一次：先完成报告/显式核验及已要求的计划读回，再用本工具await原Ego任务空间finish({keep:[]})；成功后直接最终回复，不再调用页面工具。错误/用户接管时不要finish。重复调用只读原真实回执，未知结果不重放。',
-    ego_browser_open: '在当前任务专属 Ego TaskSpace 打开已授权 URL，只读复用用户现有登录。无需传 TaskSpace 或页面ID；不要用此工具执行表单/登录/业务操作。',
+    ego_browser_open: '首次在当前任务专属 Ego TaskSpace 打开已授权 URL，只读复用用户现有登录。后续读取或等待异步内容使用ego_browser_read({})，不要反复open刷新同一URL。无需传 TaskSpace 或页面ID；不要用此工具执行表单/登录/业务操作。',
     ego_browser_observe: '只读观察本任务 Ego 页面完整语义快照。用户接管或失去控制时停止，不创建替代 TaskSpace。',
-    ego_browser_read: '读取本任务 Ego 当前页面的实际文本与链接HTML（移除脚本、输入控件和非内容属性），返回来源证明与有限下一页目标。selector只接受标准CSS，必须恰好匹配一个当前可见内容元素，并携带最近一次观察返回的observationId；不要使用文本/XPath表达式。选择器不匹配或页面变化时先ego_browser_observe，再用当前DOM重新选择，不重开TaskSpace。来源仅代表实际订阅列表，不代表核验官方原文。',
+    ego_browser_read: '默认使用ego_browser_read({})直接重新读取本任务当前整页的实际文本与链接HTML，不传selector或旧observationId，无需先observe或重新open。异步页面仅有导航壳、空DOM或加载提示时继续原页实际读取，不能宣称采集完成；只有实际零结果标记才能声明零匹配。仅确需局部内容时使用标准CSS selector，恰好匹配一个当前可见元素，并携带最近一次观察的observationId；不要使用文本/XPath。旧观察或页面变化时优先ego_browser_read({})，不要重放旧选择或重开TaskSpace。来源仅代表实际订阅列表，不代表核验官方原文。',
     ego_browser_next_page: '仅打开最近一次完整读取中实际出现的同源“下一页”链接。使用返回的 observationId/targetId，最多10页；无链接式分页时停止说明，不提交按钮或业务表单。'
   }
   return { id: 'ego-browser', kind: 'skill', enabled: true, available: config.state === 'installed', tools: EGO_TOOLS.map(name => LocalToolHost.defineTool({
@@ -220,7 +224,9 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
           const current=repository.operationById(task.id,String(args.observationId),'ego_document_read')??repository.operationById(task.id,String(args.observationId),'ego_observation')
           const value=object(current?.result)
           const all=[...repository.operations(task.id,'ego_document_read'),...repository.operations(task.id,'ego_observation')].sort((a,b)=>a.createdAt.localeCompare(b.createdAt))
-          if(!current||current.status!=='succeeded'||all.at(-1)?.id!==current.id||value.taskSpaceId!==bound.taskSpaceId||typeof value.documentHtml!=='string')throw fail('ego_browser_observation_stale')
+          if(!current||current.status!=='succeeded'||current.fingerprint!==operationFingerprint(current.request)||all.at(-1)?.id!==current.id||
+            current.request?.taskId!==task.id||current.request.turnId!==context.turnId||current.request.grantFingerprint!==operationFingerprint(grant)||current.request.configurationFingerprint!==identity||
+            value.taskSpaceId!==bound.taskSpaceId||typeof value.sourceUrl!=='string'||typeof value.documentHtml!=='string')throw fail('ego_browser_observation_stale')
           params.expectedDocumentHtml=value.documentHtml;params.expectedSourceUrl=value.sourceUrl;params.contextReceiptId=current.id
         }
         if (name==='ego_browser_next_page') {
@@ -231,15 +237,45 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
           params.url=target.href;params.label=target.label;params.expectedSourceUrl=previous.sourceUrl;params.expectedHtml=previous.documentHtml
           assertGrantAllowsNetwork(String(target.href),context)
         }
-        const dispatchKey='ego-call:'+randomUUID(), request={taskId:task.id,turnId:context.turnId,taskSpaceId:bound.taskSpaceId??null,
+        let dispatchKey='ego-call:'+randomUUID(), request:Record<string,unknown>={taskId:task.id,turnId:context.turnId,taskSpaceId:bound.taskSpaceId??null,
           grantFingerprint:operationFingerprint(grant),configurationFingerprint:identity,hostOperationId:host.operationId,callId:host.callId,action,sourceUrl:params.url??null,firstCreatedSpace,previousReadReceiptId:previousRead?.id??null,previousSourceUrl:previousDocument.sourceUrl??null,previousResultHash:typeof previousDocument.documentHtml==='string'?hash(previousDocument.documentHtml):null}
         const dispatch=repository.beginOperation({ownerId:task.id,idempotencyKey:dispatchKey,kind:navigating?'ego_page_navigation':'ego_page_observation',request,nowIso:new Date(now()).toISOString()}).receipt
         failurePhase=undefined
-        const result=await run(config,egoReadScript(params),context.abortSignal)
-        const reportedPhase=safeFailurePhase(result.failurePhase)
+        let result=await run(config,egoReadScript(params),context.abortSignal), usingSelector=Boolean(args.selector)
+        let recoveredFrom:{code:string;failurePhase:string;failedDispatchReceiptId:string;contextReceiptId:string}|undefined
+        const recordFailure=(response:Record<string,unknown>)=>{
+          failurePhase=safeFailurePhase(response.failurePhase)
+          const knownSpace=response.spaceName===spaceName&&Number.isSafeInteger(response.taskSpaceId)&&Number(response.taskSpaceId)>0&&response.pageLabel==='p1'&&(!bound.taskSpaceId||response.taskSpaceId===bound.taskSpaceId)
+          const lostControl=knownSpace&&typeof response.ownership==='string'&&response.ownership!=='agent'
+          if(lostControl)failurePhase='control'
+          const code=lostControl?'ego_browser_user_control':typeof response.code==='string'&&response.code.startsWith('ego_browser_')?response.code:'ego_browser_read_failed'
+          repository.finishOperation(task.id,dispatchKey,{status:'failed',result:{code,...(failurePhase?{failurePhase}:{})}},new Date(now()).toISOString())
+          return {code,knownSpace}
+        }
+        if(result.ok!==true) {
+          const failed=recordFailure(result)
+          await guard(context)
+          const current=typeof params.contextReceiptId==='string'?repository.operationById(task.id,params.contextReceiptId):null
+          const latest=[...repository.operations(task.id,'ego_document_read'),...repository.operations(task.id,'ego_observation')].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).at(-1)
+          if(name!=='ego_browser_read'||!usingSelector||failed.code!=='ego_browser_observation_stale'||failurePhase!=='selection'||!failed.knownSpace||result.ownership!=='agent'||
+            !current||current.id!==latest?.id||current.status!=='succeeded'||current.fingerprint!==operationFingerprint(current.request)||current.request?.taskId!==task.id||
+            current.request.turnId!==context.turnId||current.request.grantFingerprint!==operationFingerprint(grant)||current.request.configurationFingerprint!==identity||
+            object(current.result).taskSpaceId!==bound.taskSpaceId||object(current.result).sourceUrl!==params.expectedSourceUrl)throw fail(failed.code)
+          recoveredFrom={code:failed.code,failurePhase:'selection',failedDispatchReceiptId:dispatch.id,contextReceiptId:current.id}
+          // A new bounded read of the same existing Page, never a selector replay or navigation.
+          const freshParams={action:'read',spaceName,spaceId:bound.taskSpaceId,recoverExistingOnly:true,origins,maxBytes,deadline:Date.parse(grant.expiresAt!),expectedReadSourceUrl:params.expectedSourceUrl}
+          await guard(context)
+          dispatchKey='ego-call:'+randomUUID()
+          request={...request,action:'read',taskSpaceId:bound.taskSpaceId,sourceUrl:params.expectedSourceUrl,firstCreatedSpace:false,recoveredFrom}
+          repository.beginOperation({ownerId:task.id,idempotencyKey:dispatchKey,kind:'ego_page_observation',request,nowIso:new Date(now()).toISOString()})
+          failurePhase=undefined
+          result=await run(config,egoReadScript(freshParams),context.abortSignal)
+          if(result.ok!==true){const failure=recordFailure(result);await guard(context);throw fail(failure.code)}
+          usingSelector=false
+          if(result.sourceUrl!==params.expectedSourceUrl) {recordFailure({code:'ego_browser_page_changed',failurePhase:'control'});throw fail('ego_browser_page_changed')}
+        }
         failurePhase='control'
         await guard(context)
-        if(result.ok!==true) {failurePhase=reportedPhase;const knownSpace=result.spaceName===spaceName&&Number.isSafeInteger(result.taskSpaceId)&&Number(result.taskSpaceId)>0&&result.pageLabel==='p1'&&(!bound.taskSpaceId||result.taskSpaceId===bound.taskSpaceId);const lostControl=knownSpace&&typeof result.ownership==='string'&&result.ownership!=='agent';if(lostControl)failurePhase='control';const code=lostControl?'ego_browser_user_control':typeof result.code==='string'&&result.code.startsWith('ego_browser_')?result.code:'ego_browser_read_failed';repository.finishOperation(task.id,dispatchKey,{status:'failed',result:{code,...(failurePhase?{failurePhase}:{})}},new Date(now()).toISOString());throw fail(code)}
         if(typeof result.ownership==='string'&&result.ownership!=='agent')throw fail('ego_browser_user_control')
         if (result.spaceName!==spaceName || result.ownership!=='agent' || !Number.isSafeInteger(result.taskSpaceId) || Number(result.taskSpaceId)<1 || result.pageLabel!=='p1' || bound.taskSpaceId && result.taskSpaceId!==bound.taskSpaceId)throw fail('ego_browser_task_space_unconfirmed')
         currentSpaceId=result.taskSpaceId
@@ -252,21 +288,22 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
         repository.finishOperation(task.id,dispatchKey,{status:'succeeded',result:{sourceUrl,resultHash,taskSpaceId:result.taskSpaceId}},new Date(now()).toISOString())
         const candidates=Array.isArray(result.candidates)?result.candidates.map(object):[]
         const nextPages=candidates.filter(t=>typeof t.href==='string'&&typeof t.label==='string'&&/^(?:下一页|下页|next(?: page)?|›|»|→)$/i.test(t.label)&&new URL(String(t.href)).origin===new URL(sourceUrl).origin).slice(0,10).map(t=>({targetId:hash(String(t.href)+'\n'+t.label),href:t.href,label:t.label}))
-        const selection=args.selector?{selector:args.selector,matchedCount:1,contextReceiptId:params.contextReceiptId,documentHash:hash(String(result.documentHtml))}:undefined
+        if(!usingSelector&&result.selection!==undefined)throw fail('ego_browser_protocol_invalid')
+        const selection=usingSelector?{selector:args.selector,matchedCount:1,contextReceiptId:params.contextReceiptId,documentHash:hash(String(result.documentHtml))}:undefined
         if(selection&&(object(result.selection).selector!==selection.selector||object(result.selection).matchedCount!==1))throw fail('ego_browser_element_ambiguous')
         const pageNumber=repository.operations(task.id,'ego_page_navigation').filter(r=>r.status==='succeeded').length
         const pagination={pageNumber,hasMore:nextPages.length?true:null,nextTargetsCount:nextPages.length,pageLimit:10,limitReached:pageNumber>=10}
-        const saved={pagination,loadingObserved:result.loadingObserved===true,emptyObserved:result.visibleText===false,sourceUrl,html:result.html,resultHash,truncated:result.truncated,taskSpaceId:result.taskSpaceId,nextPages,documentHtml:result.documentHtml,...(selection?{selection}:{})}
-        const read=repository.beginOperation({ownerId:task.id,idempotencyKey:readKey,kind:'ego_document_read',request:{...request,taskSpaceId:result.taskSpaceId,...(args.selector?{selector:args.selector,contextReceiptId:params.contextReceiptId}:{})},nowIso:new Date(now()).toISOString()}).receipt
+        const saved={pagination,loadingObserved:result.loadingObserved===true,emptyObserved:result.visibleText===false,sourceUrl,html:result.html,resultHash,truncated:result.truncated,taskSpaceId:result.taskSpaceId,nextPages,documentHtml:result.documentHtml,...(selection?{selection}:{}),...(recoveredFrom?{recoveredFrom}:{})}
+        const read=repository.beginOperation({ownerId:task.id,idempotencyKey:readKey,kind:'ego_document_read',request:{...request,taskSpaceId:result.taskSpaceId,...(usingSelector?{selector:args.selector,contextReceiptId:params.contextReceiptId}:{})},nowIso:new Date(now()).toISOString()}).receipt
         repository.finishOperation(task.id,readKey,{status:'succeeded',result:saved},new Date(now()).toISOString())
-        return {output:{status:'succeeded',provider:'ego-browser',sessionId:String(result.taskSpaceId),sourceKind:'actual_ego_document',readScope:selection?'element':'document',sourceUrl,html:result.html,resultHash,truncated:result.truncated,taskSpaceId:result.taskSpaceId,nextPages,pagination,loadingObserved:result.loadingObserved===true,emptyObserved:result.visibleText===false,observationId:read.id,
+        return {output:{status:'succeeded',provider:'ego-browser',sessionId:String(result.taskSpaceId),sourceKind:'actual_ego_document',readScope:selection?'element':'document',sourceUrl,html:result.html,resultHash,truncated:result.truncated,taskSpaceId:result.taskSpaceId,nextPages,pagination,loadingObserved:result.loadingObserved===true,emptyObserved:result.visibleText===false,observationId:read.id,...(recoveredFrom?{recoveredFrom}:{}),
           evidence:{verified:true,contentRead:Boolean(result.html.trim()),taskId:task.id,turnId:context.turnId,taskSpaceId:result.taskSpaceId,pageLabel:'p1',bindingReceiptId:binding.id,readReceiptId:read.id,...(navigating?{navigationReceiptId:dispatch.id}:{}),...(selection?{selection}:{}),
             grantFingerprint:operationFingerprint(grant),configurationFingerprint:identity,verifiedAt:new Date(now()).toISOString(),resultHash}}}
       } catch(error) {
         failurePhase=safeFailurePhase(object(error).failurePhase)??failurePhase
         const originalCode=String(object(error).code??(error instanceof Error?error.message:''))
         const code=originalCode==='execution_grant_expired'?'ego_browser_grant_expired':/^[A-Za-z_]{1,100}$/.test(originalCode)?originalCode:'ego_browser_read_failed',taskId=context.executionGrant?.taskId
-        const message=selectionErrors.has(code)?'读取选择未完成：请使用标准CSS，恰好匹配一个当前可见内容元素，并传入最近一次观察的observationId。请先ego_browser_observe，再依据当前DOM重新选择；无需更换连接、TaskSpace或授权。':code==='ego_browser_observation_stale'||code==='ego_browser_page_changed'?'页面或观察已变化。请先ego_browser_observe，再用最新observationId与当前DOM重选；不要重放旧选择。':code==='ego_browser_task_space_missing'||code==='ego_browser_task_space_ambiguous'?'原Ego任务空间尚未确认。已确定关闭的空间只能在你明确继续原任务并核验本次授权后重新建立；结果未知或仍存在的空间不会被替代。请检查原任务的Ego控制状态后继续。':'请检查当前任务的Ego连接、站点范围或用户控制状态后继续。'
+        const message=selectionErrors.has(code)?'读取选择未完成。普通读取请直接ego_browser_read({})，不传selector或旧observationId；仅确需局部内容时先ego_browser_observe，再使用恰好匹配一个可见元素的标准CSS和最新observationId。无需更换连接、TaskSpace或授权。':code==='ego_browser_observation_stale'||code==='ego_browser_page_changed'?'页面或观察已变化。请先ego_browser_read({})读取当前整页，不传selector或旧observationId；只有确需局部时再观察并重选。不要重放旧选择或重新open刷新。':code==='ego_browser_task_space_missing'||code==='ego_browser_task_space_ambiguous'?'原Ego任务空间尚未确认。已确定关闭的空间只能在你明确继续原任务并核验本次授权后重新建立；结果未知或仍存在的空间不会被替代。请检查原任务的Ego控制状态后继续。':'请检查当前任务的Ego连接、站点范围或用户控制状态后继续。'
         if(taskId&&['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid','ego_browser_finish_unconfirmed'].includes(code)) {const waitKey='ego-wait:'+context.turnId; if(!repository.operation(taskId,waitKey)) {const operation=invocation; if(operation){repository.beginOperation({ownerId:taskId,idempotencyKey:waitKey,kind:'ego_browser_wait',request:{taskId,turnId:context.turnId,code,hostOperationId:operation.operationId,callId:operation.callId,grantFingerprint:operation.executionGrantFingerprint,configurationFingerprint:identity,...(currentSpaceId?{taskSpaceId:currentSpaceId}:{})},nowIso:new Date(now()).toISOString()});repository.finishOperation(taskId,waitKey,{status:'succeeded',result:{code,message}},new Date(now()).toISOString())}}}
         return {isError:true,output:{status:'blocked',provider:'ego-browser',code,message,...(failurePhase?{failurePhase}:{})}}}
     }
