@@ -1974,7 +1974,7 @@ test('diagnostic quick identity retry receives only the remaining startup budget
 
 // Offline renderer protocol fixture: the production layout hook, not a mocked
 // activeOverlay response, reacts to a deferred preview after the real route click.
-async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false } = {}) {
+async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false, selectedTaskKeyUnchanged = false } = {}) {
   const { Window } = await import('happy-dom')
   const window = new Window({ url: 'http://localhost/' }), temporary = await mkdtemp(join(tmpdir(), 'railwise-manual-route-'))
   const prior = new Map()
@@ -1995,7 +1995,7 @@ async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false } = {
         const [route,setRoute]=useState('chat'),[ready,setReady]=useState(0);
         const layout=useWorkbenchLayout({route,workspaceRoot:'/synthetic-ui-only',activeThreadId:route==='tasks'?'task-workspace-preview:synthetic':'chat',latestAutoOpenDevPreviewKey:ready?'synthetic-current-hash-'+ready:null,latestAutoOpenDevPreviewUrl:ready?'http://localhost/report':null,latestDevPreviewUrl:ready?'http://localhost/report':null,writeAssistantOpen:false});
         const artifact=()=>{events.push('artifact-click');layout.openDevPreview()};
-        const select=()=>{events.push('select-task');Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
+        const select=()=>{events.push('select-task');if(${JSON.stringify(selectedTaskKeyUnchanged)})return;Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
         return h('div',{className:'ds-workbench-shell',ref:layout.shellRef,'data-active-overlay':layout.activeOverlay??''},
           h('nav',{'aria-label':'工作区工具'},h('button',{id:'task-route',onClick:()=>{events.push('route-tasks');setRoute('tasks');if(${JSON.stringify(latePreviewOnRoute)})Promise.resolve().then(()=>{events.push('route-preview-projection');setReady(value=>value+1)})}},'任务')),
           layout.activeOverlay?h('button',{'aria-label':'返回当前任务',id:'backdrop',onClick:layout.closeDevPreview}):null,
@@ -2111,4 +2111,24 @@ test('manual task navigation dismisses a late route overlay as well as the selec
     assert.equal(audit.navigation[0].afterDismiss.ready, true)
     assert.equal(audit.target.ready, true)
   }, { latePreviewOnRoute: true })
+})
+
+
+test('manual artifact entry respects an already dismissed workspace preview when selecting the same task and hash again', async () => {
+  await manualPreviewRouteFixture(async ({ cdp, events }) => {
+    const audit = {}
+    await clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })
+    assert.equal(events.filter(event => event === 'route-preview-projection').length, 1)
+    assert.equal(events.filter(event => event === 'late-preview-projection').length, 0, 'Selecting the current task must not invent a new IPC projection or artifact hash')
+    assert.equal(events.filter(event => event === 'collapse-panel').length, 1)
+    assert.equal(events.filter(event => event === 'artifact-click').length, 1)
+    assert.ok(events.indexOf('collapse-panel') < events.indexOf('select-task'))
+    assert.ok(events.indexOf('select-task') < events.indexOf('artifact-click'))
+    assert.equal(audit.beforeManual.activeOverlay, null)
+    assert.equal(audit.beforeManual.mainInert, false)
+    assert.equal(audit.targetBeforeDismiss, undefined)
+    assert.equal(audit.target.ready, true)
+    assert.equal(audit.target.mainInert, false)
+    assert.equal(audit.target.stableFrames, 2)
+  }, { latePreviewOnRoute: true, selectedTaskKeyUnchanged: true })
 })

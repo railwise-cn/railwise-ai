@@ -1800,6 +1800,10 @@ export async function clickWindowsManualTaskArtifact(cdp, { taskGoal, previewExp
     // The full-screen backdrop's center can be behind the inspector itself.
     // Use its real, visible panel control; never bypass modal hit testing.
     if (await cdp.evaluate(`Boolean(document.querySelector('button[aria-label="收起右侧栏"]')?.getClientRects().length)`)) {
+      if (await cdp.evaluate(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay==='inspector'`)) {
+        await cdp.wait(previewExpression, 'the actual visible inspector preview to load before dismissal', 30_000)
+        audit.afterProjection = await cdp.evaluate(windowsManualArtifactTargetExpression())
+      }
       await cdp.click('button[aria-label="收起右侧栏"]')
       await cdp.wait(`(() => {const shell=document.querySelector('.ds-workbench-shell'),main=shell?.querySelector('main');return shell && shell.dataset.activeOverlay!=='inspector' && main && !main.inert && !main.hasAttribute('inert') && !document.querySelector('button[aria-label="收起右侧栏"]')?.getClientRects().length;})()`, 'the inspector to close and the actual main surface to become interactive')
     }
@@ -1827,12 +1831,17 @@ export async function clickWindowsManualTaskArtifact(cdp, { taskGoal, previewExp
   await clickWorkspaceControl('[aria-label="任务筛选"] button', completedFilter)
   await cdp.wait(`Boolean(Array.from(document.querySelectorAll('section.ds-task-sidebar[aria-label="任务列表"] button[title]')).find(button=>button.title===${JSON.stringify(taskGoal)}))`, 'the actual completed task')
   await clickWorkspaceControl(`section.ds-task-sidebar[aria-label="任务列表"] button[title=${JSON.stringify(taskGoal)}]`)
-  // Route/scope changes request a new preview asynchronously. Let that actual
-  // projection finish before dismissing it and testing the manual entry.
-  await cdp.wait(previewExpression, 'the selected task artifact auto-preview projection', 30_000)
-  audit.afterProjection = await cdp.evaluate(windowsManualArtifactTargetExpression())
-  await closeInspector()
+  // Selecting the same task/key preserves a dismissed preview. Only an actual
+  // inspector needs its existing body to load and be dismissed; never demand a
+  // new automatic event as a prerequisite for this independent manual entry.
+  audit.beforeManual = await cdp.evaluate(windowsManualArtifactTargetExpression())
+  if (audit.beforeManual.activeOverlay === 'inspector') await closeInspector()
   audit.target = await cdp.wait(windowsManualArtifactTargetExpression({ stable: true }), 'the current task artifact entry after two stable uncovered frames')
+  if (!audit.target.ready && audit.target.activeOverlay === 'inspector') {
+    audit.targetBeforeDismiss = audit.target
+    await closeInspector()
+    audit.target = await cdp.wait(windowsManualArtifactTargetExpression({ stable: true }), 'the current task artifact entry after dismissing its late inspector')
+  }
   assert.equal(audit.target.ready, true, `UI target is covered or unstable: 每日网页报告.html ${JSON.stringify(audit.target)}`)
   // No Runtime read or screenshot between the current hit test and real input.
   await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...audit.target.point })
