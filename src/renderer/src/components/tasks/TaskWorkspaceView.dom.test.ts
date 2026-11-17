@@ -9,7 +9,7 @@ import { taskDisplayTitle } from '@shared/task-presentation'
 import { TaskWorkspaceView, filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from './TaskWorkspaceView'
 import { useChatStore } from '../../store/chat-store'
 import { clearFileReferenceValidationCache } from '../../lib/file-reference-validation'
-import { resetTaskStateForTests, refreshTaskState, updateTaskNavigation } from '../../store/task-live-store'
+import { getTaskState, resetTaskStateForTests, refreshTaskState, updateTaskNavigation } from '../../store/task-live-store'
 
 const now = '2026-11-09T01:00:00.000Z'
 function task(id: string, status: TaskRunV1['status'], goal = id): TaskRunV1 {
@@ -27,6 +27,31 @@ const approval: TaskAttentionV1 = {
 }
 
 describe('task filtering', () => {
+  it('orders task groups by current-branch business updates for snapshot and live input order', () => {
+    const original = { ...task('original', 'failed'), updatedAt: '2026-11-09T06:00:00.000Z' }
+    const retry = { ...task('retry', 'completed'), rootTaskId: original.id, retryOfTaskId: original.id, createdAt: '2026-11-09T02:00:00.000Z', updatedAt: '2026-11-09T02:00:00.000Z' }
+    const child = { ...task('child', 'completed'), rootTaskId: original.id, parentTaskId: retry.id, updatedAt: '2026-11-09T03:00:00.000Z' }
+    const other = { ...task('other', 'completed'), updatedAt: '2026-11-09T04:00:00.000Z' }
+    const inputs = [[original, retry, child, other], [other, child, retry, original], [child, other, original, retry]]
+    for (const input of inputs) {
+      expect(filterWorkspaceTasks(input, [], 'all').map(item => item.id)).toEqual([other.id, original.id])
+      const live = [...input.filter(item => item.id !== child.id), { ...child, updatedAt: '2026-11-09T05:00:00.000Z' }]
+      expect(filterWorkspaceTasks(live, [], 'all').map(item => item.id)).toEqual([original.id, other.id])
+      expect(filterWorkspaceTasks(live, [], 'completed').map(item => item.id)).toEqual([original.id, other.id])
+      expect(filterWorkspaceTasks(live, [], 'attention')).toEqual([])
+    }
+  })
+
+  it('keeps equal-time task group order stable without changing the source tasks', () => {
+    const first = task('a', 'completed'), second = task('b', 'completed')
+    for (const input of [[first, second], [second, first]]) {
+      const before = JSON.stringify(input)
+      expect(groupWorkspaceTasks(input).map(group => group.root.id)).toEqual([first.id, second.id])
+      expect(JSON.stringify(input)).toBe(before)
+      expect(groupWorkspaceTasks(input).find(group => group.root.id === first.id)?.root).toBe(first)
+    }
+  })
+
   it('keeps paused tasks visible and derives counts from the exact same filter as the list', () => {
     const tasks = [task('t1', 'running', 'Monthly monitoring'), task('t2', 'running', 'Tender'), task('t3', 'paused', 'Research'), task('t4', 'completed', 'Completed')]
     expect(filterWorkspaceTasks(tasks, [approval], 'ongoing').map(item => item.id)).toEqual(['t1', 't3'])
@@ -130,6 +155,38 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it.each(['root', 'child'] as const)('promotes live current-branch updates without reviving old failed attempts or losing %s selection', async selection => {
+    const original = task('original', 'failed', 'Recovered report')
+    const oldRetry = { ...task('old-retry', 'failed'), rootTaskId: original.id, retryOfTaskId: original.id, createdAt: '2026-11-09T01:30:00.000Z' }
+    const current = { ...task('current', 'completed'), rootTaskId: original.id, retryOfTaskId: oldRetry.id, createdAt: '2026-11-09T02:00:00.000Z', updatedAt: '2026-11-09T02:05:00.000Z' }
+    const child = { ...task('current-child', 'completed'), rootTaskId: original.id, parentTaskId: current.id, updatedAt: current.updatedAt }
+    const other = { ...task('other', 'completed', 'Other report'), updatedAt: '2026-11-09T02:10:00.000Z' }
+    tasks = [other, original, oldRetry, current, child]; inbox = []
+    const selectedTaskId = selection === 'root' ? original.id : child.id
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId, filter: 'all' }) }); await settle()
+    const rows = (): HTMLButtonElement[] => [...container.querySelectorAll<HTMLButtonElement>('.ds-task-sidebar button[title]')].filter(button => [original.goal, other.goal].includes(button.title))
+    expect(rows().map(button => button.title)).toEqual([other.goal, original.goal])
+    const streamId = vi.mocked(window.workwise.startTaskSse).mock.calls[0][1]!, receive = vi.mocked(window.workwise.onSseEvent).mock.calls[0][0]
+    const publish = async (seq: number, updated: TaskRunV1): Promise<void> => {
+      await act(async () => receive({ streamId, events: [{ seq, kind: 'task_changed', taskId: updated.id, payload: updated }] })); await settle()
+    }
+    await publish(1, { ...child, revision: 2, updatedAt: '2026-11-09T02:15:00.000Z' })
+    expect(getTaskState().tasks.at(-1)?.id).toBe(child.id)
+    expect(rows().map(button => button.title)).toEqual([original.goal, other.goal])
+    await publish(2, { ...other, revision: 2, updatedAt: '2026-11-09T02:20:00.000Z' })
+    expect(rows().map(button => button.title)).toEqual([other.goal, original.goal])
+    await publish(3, { ...original, revision: 2, updatedAt: '2026-11-09T03:00:00.000Z' })
+    await publish(4, { ...oldRetry, revision: 2, updatedAt: '2026-11-09T04:00:00.000Z' })
+    expect(rows().map(button => button.title)).toEqual([other.goal, original.goal])
+    const selected = rows().find(button => button.title === original.goal)!
+    expect(selected.getAttribute('aria-pressed')).toBe('true')
+    expect(selected.textContent).toContain(i18n.t('common:taskRunStatus_completed'))
+    expect(selected.textContent).not.toContain(i18n.t('common:taskRunStatus_failed'))
+    expect(getTaskState().navigation.selectedTaskId).toBe(selectedTaskId)
+    expect(filterWorkspaceTasks(getTaskState().tasks, [], 'attention')).toEqual([])
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled(); expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+
   it('shows current retry expiry attention and keeps superseded parent data unchanged', async () => {
     await i18n.changeLanguage('zh')
     const raw='Execution grant expired; start a newly authorized Turn.'

@@ -12,6 +12,8 @@ import { TaskContextRepository } from '../../services/task-context-repository.js
 import { TaskContextRuntime } from '../../services/task-context-runtime.js'
 import { EngineeringService } from '../../engineering/engineering-service.js'
 import { ExecutionGrantSchema } from '../../contracts/permissions.js'
+import { applyRequestHistoryHygiene } from '../../loop/request-history-hygiene.js'
+import { makeToolResultItem } from '../../domain/item.js'
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))))
@@ -348,6 +350,36 @@ describe('document delivery tool provider', () => {
   })
 })
 
+
+it('recalls immutable source objects through reader and model hygiene without skipping or duplicating Chinese or emoji bytes', async () => {
+ const root=await realpath(await mkdtemp(join(tmpdir(),'railwise-context-utf8-')));roots.push(root)
+ const repository=new TaskRunRepository(join(root,'tasks.sqlite3'));repository.create(task(root))
+ const contexts=new TaskContextRepository(repository.sharedDatabase(),{objectRoot:join(root,'objects'),inlineLimitBytes:8}),runtime=new TaskContextRuntime(contexts,repository)
+ const content=Array.from({length:20},(_,index)=>`合成记录-${index} 中文原样🙂 ${'连续原文'.repeat(160)}\n`).join('')
+ const source=makeToolResultItem({id:'utf8-source',threadId:'thread-candidate',turnId:'turn-candidate',callId:'source',toolName:'read_file',output:{text:content}})
+ const bundle=runtime.prepareModelRequest({threadId:'thread-candidate',turnId:'turn-candidate',model:'synthetic',prefix:[],tools:[{name:'read_task_context',description:'existing recall',inputSchema:{}}],abortSignal:new AbortController().signal,history:[source]})!
+ const ref=bundle.objects.find(item=>item.kind==='history-item:utf8-source')!
+ const bytes=runtime.readObject('task-candidate',bundle.id,ref.objectId)
+ const recall=buildDocumentDeliveryToolProviders(repository,{contextRuntime:runtime})[0]!.tools.find(tool=>tool.name==='read_task_context')!
+ let offset=0;const parts:Buffer[]=[]
+ try {
+  while(offset<bytes.length){
+   const actual=await recall.execute({bundle_id:bundle.id,object_id:ref.objectId,offset,max_bytes:1024},grantedContext(root));expect(actual.isError).not.toBe(true)
+   const item=makeToolResultItem({id:'chunk-'+offset,threadId:'thread-candidate',turnId:'turn-candidate',callId:'chunk-'+offset,toolName:'read_task_context',output:actual.output})
+   const projected=applyRequestHistoryHygiene([item],{maxToolResultBytes:512,maxToolResultTokens:128,maxToolResultLines:30})[0]!
+   if(projected.kind!=='tool_result')throw Error('missing recall')
+   const visible=projected.output as {text:string;nextOffset:number|null;totalBytes:number;untrusted:boolean}
+   expect(visible.untrusted).toBe(true);expect(visible.text).not.toContain('\ufffd');expect(Buffer.byteLength(visible.text)).toBeLessThanOrEqual(512)
+   parts.push(Buffer.from(visible.text));const next=visible.nextOffset??visible.totalBytes
+   expect(next).toBe(offset+Buffer.byteLength(visible.text));expect(next).toBeGreaterThan(offset);offset=next
+  }
+  expect(Buffer.concat(parts)).toEqual(bytes)
+  expect(runtime.readObject('task-candidate',bundle.id,ref.objectId)).toEqual(bytes)
+  const firstChinese=bytes.indexOf(Buffer.from('合成'))
+  expect((await recall.execute({bundle_id:bundle.id,object_id:ref.objectId,offset:firstChinese+1,max_bytes:32},grantedContext(root))).isError).toBe(true)
+  expect((await recall.execute({bundle_id:bundle.id,object_id:ref.objectId,offset:firstChinese,max_bytes:1},grantedContext(root))).isError).toBe(true)
+ }finally{contexts.close();repository.close()}
+})
 
 it.each([false,true])('keeps historical spill bytes independent from server collection guidance, currentReady=%s',async currentCollectionReady=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'railwise-feed-context-')));roots.push(root)

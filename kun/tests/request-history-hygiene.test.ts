@@ -1,8 +1,82 @@
 import { describe, expect, it } from 'vitest'
 import { applyRequestHistoryHygiene } from '../src/loop/request-history-hygiene.js'
 import { makeToolCallItem, makeToolResultItem } from '../src/domain/item.js'
+import { createHash } from 'node:crypto'
 
 describe('request history hygiene', () => {
+  it.each(['ego_browser_open', 'ego_browser_read', 'ego_browser_next_page', 'browser_get_html'])('retains every ordered %s record and link despite decorative markup and a long single content line', toolName => {
+    const entries = Array.from({ length: 20 }, (_, index) => `<article><h2>合成项目-${String(index + 1).padStart(2, '0')}</h2><p>合成地区-${index + 1} 工程服务</p><time datetime="2026-01-01">2026-01-01</time><a href="/record/${index + 1}">原文-${index + 1}</a></article>`).join('')
+    const html = `<main><svg>${'<path d="M 0 0 L 10 10"/>\n'.repeat(1500)}</svg>${entries}<script>throw Error('must not run')</script><style>.decorative { color: red }</style></main>`
+    const resultHash = createHash('sha256').update(html).digest('hex')
+    const original = makeToolResultItem({ id: 'browser-doc', threadId: 'thread', turnId: 'turn', callId: 'browser', toolName,
+      output: { sourceUrl: 'https://fixture.test/list', html, resultHash, truncated: false, observationId: 'source-receipt', evidence: { verified: true, readReceiptId: 'source-receipt' },
+        data_base64: 'a'.repeat(2000), diagnostics: Array.from({ length: 100 }, (_, index) => index) } })
+    const projected = applyRequestHistoryHygiene([original])[0]!
+    expect(projected.kind).toBe('tool_result')
+    if (projected.kind !== 'tool_result') throw Error('missing tool result')
+    const output = projected.output as Record<string, unknown>
+    for (let index = 1; index <= 20; index++) {
+      const title = `合成项目-${String(index).padStart(2, '0')}`
+      expect(output.html).toContain(title)
+      if (index > 1) expect(String(output.html).indexOf(title)).toBeGreaterThan(String(output.html).indexOf(`合成项目-${String(index - 1).padStart(2, '0')}`))
+      expect(output.html).toContain(`link="https://fixture.test/record/${index}"`)
+      expect(output.html).toContain(`合成地区-${index}`)
+    }
+    expect(output.html).not.toContain('<path')
+    expect(output.html).not.toContain('must not run')
+    expect(output.data_base64).toContain('omitted base64 data')
+    expect(output.diagnostics).toHaveLength(81)
+    expect(output).toMatchObject({ resultHash, truncated: false, observationId: 'source-receipt', evidence: { readReceiptId: 'source-receipt' },
+      modelDocumentProjection: { representation: 'text-and-links', complete: true, sourceHtmlSha256: resultHash } })
+    expect(Buffer.byteLength(String(output.html))).toBeLessThan(32 * 1024)
+    if (original.kind !== 'tool_result') throw Error('missing original tool result')
+    expect(original.output).toMatchObject({ html, resultHash })
+  })
+
+  it('keeps source recall slices contiguous and advances the original byte offset only over text the model actually sees', () => {
+    const text = '中文片段与原始空白\n'.repeat(900)
+    const original = makeToolResultItem({ id: 'recall', threadId: 'thread', turnId: 'turn', callId: 'recall', toolName: 'read_task_context',
+      output: { untrusted: true, text, offset: 81, nextOffset: 81 + Buffer.byteLength(text), totalBytes: 50000, sha256: 'a'.repeat(64) } })
+    const result = applyRequestHistoryHygiene([original], { maxToolResultBytes: 1024, maxToolResultTokens: 256, maxToolResultLines: 20 })[0]!
+    if (result.kind !== 'tool_result') throw Error('missing tool result')
+    const output = result.output as { text: string; nextOffset: number }
+    expect(text.startsWith(output.text)).toBe(true)
+    expect(output.text.length).toBeGreaterThan(0)
+    expect(Buffer.byteLength(output.text)).toBeLessThanOrEqual(1024)
+    expect(output.text.split('\n').length - Number(output.text.endsWith('\n'))).toBeLessThanOrEqual(20)
+    expect(output.nextOffset).toBe(81 + Buffer.byteLength(output.text))
+    expect(output.text + Buffer.from(text).subarray(output.nextOffset - 81).toString('utf8')).toBe(text)
+    if (original.kind !== 'tool_result') throw Error('missing original tool result')
+    expect(original.output).toMatchObject({ text, nextOffset: 81 + Buffer.byteLength(text) })
+  })
+
+  it('does not classify arbitrary nested arrays or non-browser HTML as trusted document projection contracts', () => {
+    const rows = Array.from({ length: 100 }, () => ({ html: `<div>${'合成资料'.repeat(3000)}</div>`, sourceUrl: 'https://fixture.test/list' }))
+    for (const toolName of ['ego_browser_read', 'custom_tool']) {
+      const item = makeToolResultItem({ id: toolName, threadId: 'thread', turnId: 'turn', callId: toolName, toolName, output: { rows } })
+      const projected = applyRequestHistoryHygiene([item], { maxArrayItems: 3, maxToolResultBytes: 1024 })[0]!
+      if (projected.kind !== 'tool_result') throw Error('missing projection')
+      const output = projected.output as { rows: unknown[] }
+      expect(output.rows).toHaveLength(4)
+      expect(JSON.stringify(output)).not.toContain('modelDocumentProjection')
+      expect(output.rows).toContainEqual({ cache_hygiene_omitted_items: 97 })
+    }
+  })
+
+  it('retains explicit incomplete source status and makes progress across a leading newline under a one-line limit', () => {
+    const html = `<main>${'<svg><path d="M0 0"/></svg>\n'.repeat(600)}<p>仅为已读片段</p></main>`
+    const partial = makeToolResultItem({ id: 'partial', threadId: 'thread', turnId: 'turn', callId: 'partial', toolName: 'ego_browser_read',
+      output: { sourceUrl: 'https://fixture.test/list', html, truncated: true, readScope: 'element' } })
+    const projected = applyRequestHistoryHygiene([partial])[0]!
+    if (projected.kind !== 'tool_result') throw Error('missing projection')
+    expect(projected.output).toMatchObject({ truncated: true, modelDocumentProjection: { complete: false, sourceTruncated: true, sourceReadScope: 'element' } })
+    const recall = makeToolResultItem({ id: 'newline', threadId: 'thread', turnId: 'turn', callId: 'newline', toolName: 'read_task_context',
+      output: { text: '\n中文原文\n后续', offset: 9, nextOffset: null, totalBytes: 99, sha256: 'a'.repeat(64) } })
+    const next = applyRequestHistoryHygiene([recall], { maxToolResultLines: 1 })[0]!
+    if (next.kind !== 'tool_result') throw Error('missing recall')
+    expect(next.output).toMatchObject({ text: '\n', nextOffset: 10, modelContextSlice: { complete: false, offsetUnit: 'utf8-bytes' } })
+  })
+
   it('shrinks oversized tool results while preserving head, signal lines, and tail', () => {
     const longOutput = Array.from({ length: 500 }, (_, index) => {
       if (index === 240) return 'ERROR failed to compile auth middleware'

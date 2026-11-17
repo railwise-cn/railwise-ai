@@ -8,6 +8,8 @@ import type { ModelClient, ModelRequest } from '../ports/model-client.js'
 import { TaskRunRepository } from './task-run-repository.js'
 import { TaskContextRepository } from './task-context-repository.js'
 import { TaskContextRuntime } from './task-context-runtime.js'
+import { applyRequestHistoryHygiene } from '../loop/request-history-hygiene.js'
+import { makeToolResultItem } from '../domain/item.js'
 
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
@@ -24,6 +26,39 @@ async function setup() {
 }
 
 describe('TaskContextRuntime production adapters', () => {
+  it('persists incomplete model document projections as authorized complete sources with concrete recall IDs across restart', async () => {
+    const { root, tasks, context, runtime } = await setup()
+    const html = `<main>${Array.from({ length: 20 }, (_, index) => `<article><h2>合成来源-${index}</h2><p>${'中文数据与连续文字🙂'.repeat(160)}</p><a href="/source/${index}">来源链接-${index}</a></article>`).join('')}</main>`
+    const sourceHash = createHash('sha256').update(html).digest('hex')
+    const original = makeToolResultItem({ id: 'source-doc', threadId: 'thread_task', turnId: 'turn', callId: 'source-doc', toolName: 'ego_browser_read',
+      output: { sourceUrl: 'https://fixture.test/list', html, resultHash: sourceHash, truncated: false } })
+    const history = applyRequestHistoryHygiene([original], { maxToolResultBytes: 2048, maxToolResultTokens: 512 })
+    expect(history[0]?.kind === 'tool_result' && history[0].output).toMatchObject({ modelDocumentProjection: { complete: false } })
+    let sent: ModelRequest | undefined
+    const client: ModelClient = { provider: 'test', model: 'synthetic', async *stream(request) { sent = request; yield { kind: 'completed', stopReason: 'stop' } } }
+    for await (const _chunk of runtime.wrapModel(client).stream({ threadId: 'thread_task', turnId: 'turn', model: 'synthetic', prefix: [],
+      tools: [{ name: 'read_task_context', description: 'existing bounded recall', inputSchema: {} }], abortSignal: new AbortController().signal, history })) { /* no live model */ }
+    const projected = sent!.history[0]!
+    if (projected.kind !== 'tool_result') throw Error('missing projection')
+    const output = projected.output as { complete: boolean; contextSpill: { bundle_id: string; object_id: string; sha256: string } }
+    expect(output.complete).toBe(false)
+    expect(output.contextSpill.bundle_id).toBeTruthy(); expect(output.contextSpill.object_id).toBeTruthy()
+    const bytes = runtime.readObject('task', output.contextSpill.bundle_id, output.contextSpill.object_id)
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(output.contextSpill.sha256)
+    const recalled = JSON.parse(bytes.toString())
+    expect(recalled).toMatchObject({ resultHash: sourceHash, modelDocumentProjection: { complete: true, sourceHtmlSha256: sourceHash } })
+    for (let index = 0; index < 20; index++) expect(recalled.html).toContain(`合成来源-${index}`)
+    expect(() => runtime.readObject('another-task', output.contextSpill.bundle_id, output.contextSpill.object_id)).toThrow(/authority/)
+    context.close(); tasks.close()
+    const reopenedTasks = new TaskRunRepository(join(root, 'tasks.sqlite3'))
+    const reopenedContext = new TaskContextRepository(reopenedTasks.sharedDatabase(), { objectRoot: join(root, 'objects'), inlineLimitBytes: 8 })
+    const reopened = new TaskContextRuntime(reopenedContext, reopenedTasks)
+    expect(reopened.readObject('task', output.contextSpill.bundle_id, output.contextSpill.object_id)).toEqual(bytes)
+    if (original.kind !== 'tool_result') throw Error('missing original tool result')
+    expect(original.output).toMatchObject({ html, resultHash: sourceHash })
+    reopenedContext.close(); reopenedTasks.close()
+  })
+
   it('uses the same transaction for source fan-out and task input, deduplicates overlapping subscriptions, and respects pause', async () => {
     const { root, tasks, context, runtime, wake } = await setup()
     const current = tasks.get('task')!; const session = tasks.execution.ensureSession(current, new Date().toISOString())

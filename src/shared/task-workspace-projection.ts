@@ -37,8 +37,12 @@ export function groupWorkspaceTasks(tasks: TaskRunV1[]): TaskWorkspaceTaskGroup[
   }
   return [...groups.entries()].map(([rootId, all]) => {
     const root = all.find(task => task.id === rootId) ?? all.find(task => !task.parentTaskId) ?? all[0]
-    return { root, children: all.filter(task => task.id !== root.id), all }
-  })
+    const group = { root, children: all.filter(task => task.id !== root.id), all }
+    // Historical attempts stay inspectable without changing current navigation recency.
+    const updatedAt = currentTaskBranch(all, root).members.reduce((latest, task) => task.updatedAt > latest ? task.updatedAt : latest, '')
+    return { group, updatedAt }
+  }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.group.root.id.localeCompare(b.group.root.id))
+    .map(({ group }) => group)
 }
 
 export function taskGroupForTask(taskId: string | null, tasks: TaskRunV1[]): TaskWorkspaceTaskGroup | null {
