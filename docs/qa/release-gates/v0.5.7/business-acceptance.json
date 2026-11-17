@@ -1,5 +1,5 @@
 {
-  "status": "passed",
+  "status": "partial",
   "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
   "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
   "scope": "Root-accepted new exact RailWise real-clock Ego occurrence and normal temporary-plan pause, confirmed by the source receipt audit and Root independent aggregate acceptance; paid source/report content is not copied.",
@@ -193,7 +193,7 @@
     }
   ],
   "coverageLimits": "Actual collection covers only the visible first subscription-list page. It is a subscription-list summary with five selected rows, not complete site coverage; official announcement bodies were not independently verified and missing budget/deadline/qualification/detail-link fields remain pending. The true collection timestamp is November17 Beijing; the artifact filename contains November18 as a minor naming defect. All review of business relevance/content here is AI review, not professional or human sign-off.",
-  "finalBusinessAcceptance": true,
+  "finalBusinessAcceptance": false,
   "initialPreparation": {
     "status": "completed",
     "attempts": 4,
@@ -341,5 +341,26 @@
       "sha256": "2b9ac21a35d6fa4e86abd9212ae9c9a22e666ed47c7cf9ca382894a07c5e33cd",
       "privateSourceOnly": true
     }
-  ]
+  ],
+  "priorTemporaryOccurrenceAcceptance": "passed",
+  "laterFormalOccurrence": {
+    "status": "failed",
+    "taskId": "task_eb5e06cd-2f57-4037-b8a5-92c3a2255cc7",
+    "scheduleId": "schedule_task_capability_a308861eb3244f18abb86e32",
+    "dueAt": "2026-11-17T00:30:00.000Z",
+    "createdAt": "2026-11-17T00:30:28.563Z",
+    "stalledAt": "2026-11-17T00:31:37.784Z",
+    "attempts": 8,
+    "artifactCount": 0,
+    "newUnknown": 0,
+    "originalPlanUnchanged": true,
+    "freshReadAndPlanReadbackPassed": true,
+    "failure": "One premature watchdog recovery races admission; repeated read-only observation suppression is treated as terminal candidate, consuming outer retries instead of giving bounded in-turn feedback.",
+    "privateFailureProof": {
+      "fileName": "formal-dadan-0830-actual-due-FAILED-audit-private.json",
+      "sha256": "579c7ec63064209c76959642b6c632b1e1b6689d65dfc3d404d5b7b317733a79"
+    },
+    "failedCountersGrantsReceiptsPreserved": true,
+    "noManualRetryOrBudgetReset": true
+  }
 }
