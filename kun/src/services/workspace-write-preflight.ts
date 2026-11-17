@@ -15,7 +15,8 @@ export function explicitWorkspaceWrite(text: string): { target?: string; edit: b
   if (edit) destinations.push({ text: text.slice(edit.index).replace(/^(?:修改|编辑|覆盖|替换|更新|edit|modify|overwrite|replace)\s*/i, ''), managedOutput: false })
   for (const destination of destinations) {
     const rawTarget = destination.text.trim()
-    if (destination.managedOutput && /^(?:(?:本|当前)任务的?(?:成果(?:目录|区)?|输出目录)|任务成果(?:目录|区)?)(?=$|[，,。；;！？\n]|并(?:自动)?(?:打开|预览|展示|显示|交付))/u.test(rawTarget)) continue
+    // A bare task reference needs a prose boundary; path suffixes and workspace qualifiers remain explicit.
+    if (destination.managedOutput && /^(?:(?:对应的?)?(?:(?:本轮|本次|当前|本|该|此)任务(?:的?(?:成果(?:目录|区)?|输出目录))?|任务成果(?:目录|区)?)|对应的?任务(?:的?(?:成果(?:目录|区)?|输出目录))?)(?:中|内)?(?=$|[，,。；;！？\n]|并(?:自动)?(?:打开|预览|展示|显示|交付))/u.test(rawTarget)) continue
     const targetText = rawTarget.replace(/^(?:(?:当前|本)(?:工作区|目录|项目)(?:中的|的|中|下)?|(?:工作区|目录|项目)(?:中的|的|中|下))\s*/, '')
     if (/^(?:飞书|钉钉|Lark|Feishu|DingTalk|云盘|网盘|云端|远端|GitHub|Notion|腾讯文档)/i.test(targetText)) continue
     const quoted = /["'`“]([^"'`”\n]+)["'`”]/.exec(targetText)?.[1]

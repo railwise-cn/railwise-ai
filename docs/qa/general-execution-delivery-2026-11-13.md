@@ -993,3 +993,16 @@ RailWise 自己完成了原16:30失败任务在 H5 中的正常 A2 补交：实�
 另修正报告通用 `other` 的语义标签：任意原文摘录可能是业主名称，不应一律标为“匹配依据”。新报告显示“列表原文摘录”；旧标签仍可核验，原值、逐字引用、必需字段、严格校验和旧报告不变。本修改不会凭空新增匹配理由。
 
 本地合并检查已通过：桌面和 Runtime 类型检查、所有修改文件 lint、7份 UI 用例160项、3份来源/报告用例137项、一次生产构建与1381输入 freshness。新的精确包、正式 CI 和实际预览隔离复验仍待完成；这些源码检查不代表新包已安装或整体验收通过。私有 H5 原证汇总 `H5-c821177f-browser-pass-preview-FAIL-ledger-private.json`（SHA256 `9fc3368f86f0ddf3adeaa5e39748c1b99a6276aced10c39090f83d53af87d743`）不含公开的付费正文。
+
+
+### 2026-11-17 H6 精确包已打开，真实新任务在预检 A0 阻断
+
+H6 源码 `e5a0428dbce9778d4651a129044f0d84559f2286`、[精确 Release 44078752895](https://github.com/railwise-cn/railwise-ai/actions/runs/44078752895)、正常版本 0.5.7 已安装并实际打开。Mac arm64 的正式 bundle 为 `com.wangjiawei508.workgpt`，DMG SHA256 为 `9064b434870cadce591b315e914ebed1e678405f132c1ad478bc05da17e0efd9`，实际 ASAR 为 `617d5d570481b97d1673df032fbfaa1bed892ba107e03bb9941a6150ef592746`，签名与适用公证通过。本机 Gatekeeper 因原有 security-disabled override 明确记为未评估；未改系统信任。选定 DMG 的 CRC、SHA512、SHA256 已核对，不声称本机完整下载并核验外层 Mac ZIP。
+
+同 run 的原始 0.5.6→精确 0.5.7 native updater 官方与原 strict validator 通过，target／installed ASAR 与本机包一致；干净 CI 的启用 Gatekeeper 评估通过。此处不声称 Root 已独立补查所有 updater 原始 archive。Windows [full 44083591136](https://github.com/railwise-cn/railwise-ai/actions/runs/44083591136) 的官方、原 strict checker 和 Root 原始证据完整性核对通过；安装器仍为 NotSigned，范围为受控 BrowserSkill、协议模型与 loopback，不代表 Ego Windows、外部真实模型或付费站点验收。H6 Mac 的 General 菜单在实际 960×760 和 1280×840 两个原生尺寸下位于窗口内，未发现横向溢出；这两项几何检查不代替真实业务与后台预览隔离验收。
+
+新的真实任务 `task_capability_c9985c7ac166d00865b4724a` 在 attempt0 即进入 waiting_user；模型 Turn、来源采集、HTML 成果和新计划均未启动。Root 对准确 H6 安装包中 compiled preflight 函数的只读导入／合成依赖 RED 证明：`explicitWorkspaceWrite` 将“后台到期成果保存到对应的本轮任务，并保持……”中的任务归属短语误判为本地路径，随后只读沙箱按现有规则正确拒绝该误判目标。报告保存到应用管理的任务成果本来允许只读工作区；修复目标是路径识别，不是放宽沙箱、修改默认权限或增加新的 TaskSandbox 接口。RED 回放只证明此误分类，不是业务通过。
+
+启动后、提交新 QA 前，原27个 Task、7份计划和旧 UNKNOWN 原始记录核对保持；这些数量是当时事实，不是后续交接的固定条件。H5 的同 origin 后台任务抢占 chat 预览 FAIL、H4 的真实正式到期失败及错过目标时间仍保留，不能用 H6 的包、升级、Windows 或 General 检查覆盖。H6 尚未执行新初轮、自然到期及 chat 后台不抢占的真实浏览验收。H7 当前仅准备最小识别修复与未激活交接输入，源码、Release run 和新 ASAR 尚未绑定；必须使用后继新精确包继续验收，**总状态仍为 HOLD／pending，未公开发布**。
+
+私有证据只公开文件名和摘要：预检阻断 `H6-e5a0428d-actual-preflight-blocker-private.json`（SHA256 `747ace40a6fee8ffe4349f7eaa1e265aac43b493f8af88fbcae99a5428dd7346`）；准确已安装模块 RED `H6-e5a0428d-actual-package-write-preflight-RED-private.json`（`c5868d4e8bda5473e99d3b1f4cff577e21e38de7ba0ad9ac33e4a2d1032c5e5a`）；旧记录保留 `e5a0428d-before-new-QA-protected-history-private.json`（`0c22350046f939ed3401b83e3024c262f95aa70f150f34eecbaa46675b213750`）。付费页面、条目标题和私有报告仍未提交。

@@ -3,7 +3,7 @@
   "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
   "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
   "releaseRunId": 44024949316,
-  "scope": "Historical scoped business passes retained. H5 actual Ego original-task continuation, independent initial and real19:00 due completed, but same-conversation background preview isolation failed; overall release acceptance remains incomplete.",
+  "scope": "Historical H4 scoped passes and H5 actual browser initial/due passes are retained. H5 chat background-preview isolation remains failed. Latest H6 exact package is installed/opened and passes scoped package/updater/Windows/General checks, but its new real Task is blocked at attempt0 before model/source/plan execution; overall release acceptance remains incomplete.",
   "rootAuditObservedStatus": "passed-after-one-explicit-original-task-clarification-and-normal-continuation",
   "actor": "RailWise AI real model and Ego provider",
   "sourceBasis": "observed_feed",
@@ -375,5 +375,127 @@
       "freshnessInputs": 1381,
       "newInstalledPackageClaimed": false
     }
+  },
+  "latestH6Candidate": {
+    "status": "partial_business_blocked_before_attempt1",
+    "sourceHead": "e5a0428dbce9778d4651a129044f0d84559f2286",
+    "sourceTree": "b6de0c2366e2ddf5cdde37bfd9de4b7c5ff81a54",
+    "releaseRunId": 44078752895,
+    "runAttempt": 1,
+    "actualMacAppOpened": true,
+    "macPackage": {
+      "version": "0.5.7",
+      "bundleId": "com.wangjiawei508.workgpt",
+      "architecture": "arm64",
+      "asarSha256": "617d5d570481b97d1673df032fbfaa1bed892ba107e03bb9941a6150ef592746",
+      "dmgSha256": "9064b434870cadce591b315e914ebed1e678405f132c1ad478bc05da17e0efd9",
+      "signature": "passed",
+      "notarization": "passed",
+      "localGatekeeper": "not_evaluated_local_security_override",
+      "localOuterMacArchiveFullHashClaimed": false,
+      "rootIdentityProof": {
+        "fileName": "e5a0428d-root-independent-package-check.json",
+        "sha256": "a3e6256d38a1d262ac1107051ef6edb12e5c60a68c298cae57d0dd02dc0a5be4",
+        "privateSourceOnly": true
+      }
+    },
+    "sameRunNativeUpdater": {
+      "status": "passed_official_and_unchanged_strict_validator",
+      "baseVersion": "0.5.6",
+      "targetVersion": "0.5.7",
+      "runId": 44078752895,
+      "jobId": 134050947033,
+      "artifactId": 14329777867,
+      "artifactDigest": "sha256:e6902319b28836f2fca296d02a6fa6a179b486b702ed408bffb1e8b2fe12e3e3",
+      "targetAndInstalledAsarMatchLocal": true,
+      "cleanCiGatekeeper": "accepted_with_assessments_enabled",
+      "rootIndependentAllRawArchiveVerificationClaimed": false,
+      "evidence": {
+        "fileName": "exact-updater-44078752895-summary.json",
+        "sha256": "8b975fa128d88bfc9171487628a6cf907b1007de0e68426a2d3090afa7f67f36",
+        "privateSourceOnly": true
+      }
+    },
+    "windowsFull": {
+      "status": "passed_official_strict_and_root_original_integrity",
+      "packageRunId": 44078752895,
+      "acceptanceRunId": 44083591136,
+      "runAttempt": 1,
+      "packageAndDriverSourceHead": "e5a0428dbce9778d4651a129044f0d84559f2286",
+      "windowsSignature": "NotSigned",
+      "scope": "controlled BrowserSkill, local protocol model and loopback; not Ego Windows, external real model or paid Dadan acceptance",
+      "rootEvidence": {
+        "fileName": "windows-e5a0428d-root-full-proof-check.json",
+        "sha256": "63e981f69b0be022fa8af72ee5a0ea37f4031d7c3acba0fb1d09c789464584f4",
+        "privateSourceOnly": true
+      }
+    },
+    "generalSelectorUi": {
+      "status": "passed_scoped_two_native_sizes",
+      "sizes": [
+        {
+          "width": 960,
+          "height": 760
+        },
+        {
+          "width": 1280,
+          "height": 840
+        }
+      ],
+      "menuWithinViewport": true,
+      "noHorizontalOverflow": true,
+      "doesNotEstablishBusinessOrBackgroundPreviewAcceptance": true,
+      "evidence": {
+        "fileName": "e5a0428d-General-native-two-size-geometry-private.json",
+        "sha256": "a66eaed4ffc42d8350fc366830c17fdd0e65c6b0de31205eb7c7305d78b29bf4",
+        "privateSourceOnly": true
+      }
+    },
+    "realNewTask": {
+      "taskId": "task_capability_c9985c7ac166d00865b4724a",
+      "status": "waiting_user",
+      "attempts": 0,
+      "activeTurnId": null,
+      "modelTurnStarted": false,
+      "sourceCollectionStarted": false,
+      "planCreated": false,
+      "artifactProduced": false,
+      "chatBackgroundPreviewIsolationExercised": false,
+      "rootCause": "explicitWorkspaceWrite misclassified a natural-language task destination as a local path; the inherited read-only sandbox then correctly rejected that incorrectly inferred write. Managed task HTML itself is supported under read-only.",
+      "actualCompiledPackageRedProof": {
+        "fileName": "H6-e5a0428d-actual-package-write-preflight-RED-private.json",
+        "sha256": "c5868d4e8bda5473e99d3b1f4cff577e21e38de7ba0ad9ac33e4a2d1032c5e5a",
+        "privateSourceOnly": true
+      },
+      "evidence": {
+        "fileName": "H6-e5a0428d-actual-preflight-blocker-private.json",
+        "sha256": "747ace40a6fee8ffe4349f7eaa1e265aac43b493f8af88fbcae99a5428dd7346",
+        "privateSourceOnly": true
+      }
+    },
+    "preservation": {
+      "allPriorTaskPlanAndUnknownRowsUnchangedOnLaunch": true,
+      "beforeNewQaEvidence": {
+        "fileName": "e5a0428d-before-new-QA-protected-history-private.json",
+        "sha256": "0c22350046f939ed3401b83e3024c262f95aa70f150f34eecbaa46675b213750",
+        "privateSourceOnly": true
+      },
+      "noDefaultPermissionOrExistingPlanChange": true,
+      "h5PreviewFailureRetained": true,
+      "noCodexPaidSourceCollectionOrReportEditing": true
+    },
+    "nextH7": {
+      "status": "minimal_path_recognition_fix_pending_new_source_and_exact_package",
+      "sourceHead": null,
+      "sourceTree": null,
+      "releaseRunId": null,
+      "targetAsarSha256": null,
+      "sandboxWideningAllowed": false,
+      "newTaskSandboxInterfaceRequired": false,
+      "actualBusinessAcceptance": "pending",
+      "naturalDueAndChatBackgroundPreviewAcceptance": "pending"
+    },
+    "publicReleaseStatus": "HOLD_pending",
+    "historicalReviewedBuildUnchanged": "Existing release/package/checks and sidecars above remain H4 historical evidence, not an H6 or H7 release approval."
   }
 }
