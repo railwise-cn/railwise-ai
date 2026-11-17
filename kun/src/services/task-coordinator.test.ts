@@ -73,6 +73,8 @@ describe('task commands before Turn allocation',()=>{
       expect(recovered).toEqual([])
       expect(f.repository.list()[0]).toMatchObject({ status: 'queued', attempts: 0, scheduledBy: { scheduleId: 'formal' } })
       expect(f.repository.reconcileExpired(now)).toEqual([])
+      expect(f.repository.getLease(f.repository.list()[0]!.id)).toBeNull()
+      expect(f.repository.getAdmissionLease(f.repository.list()[0]!.id)).toMatchObject({ turnId: f.repository.list()[0]!.activeTurnId })
       release()
       const started = await starting
       expect(started.kind).toBe('task_started')
@@ -95,7 +97,8 @@ describe('task commands before Turn allocation',()=>{
     const task = f.repository.list()[0]!
     expect(task).toMatchObject({ status: 'queued', attempts: 0 })
     expect(f.runTurn).not.toHaveBeenCalled()
-    expect(f.repository.getLease(task.id)?.expiresAt).toBe('1970-01-01T00:00:00.000Z')
+    expect(f.repository.getLease(task.id)).toBeNull()
+    expect(f.repository.getAdmissionLease(task.id)?.expiresAt).toBe('1970-01-01T00:00:00.000Z')
     expect(f.tasks.reconcileStartup()).toMatchObject([{ id: task.id, status: 'retrying', attempts: 0 }])
   })
 
@@ -107,7 +110,8 @@ describe('task commands before Turn allocation',()=>{
     const task = f.repository.list()[0]!
     expect(f.runTurn).toHaveBeenCalledTimes(1)
     expect(task).toMatchObject({ status: 'queued', attempts: 0 })
-    expect(Date.parse(f.repository.getLease(task.id)!.expiresAt)).toBeGreaterThan(Date.now())
+    expect(f.repository.getLease(task.id)).toBeNull()
+    expect(Date.parse(f.repository.getAdmissionLease(task.id)!.expiresAt)).toBeGreaterThan(Date.now())
     expect(f.repository.reconcileExpired(new Date().toISOString())).toEqual([])
     receipt.mockRestore()
   })

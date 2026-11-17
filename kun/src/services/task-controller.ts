@@ -334,7 +334,7 @@ export class TaskController {
       const task = this.repository.create(queued)
       // Persist ownership in the same transaction as the queued Task. The
       // coordinator still has to prepare its schedule/receipts before dispatch.
-      if (input.turnId || source) this.holdAdmission(task, input.turnId)
+      if (input.turnId) this.holdAdmission(task, input.turnId)
       return task
     })
     this.repository.execution.ensureSession(created, now)
@@ -353,20 +353,19 @@ export class TaskController {
     return created
   }
 
-  private holdAdmission(task: TaskRun, turnId?: string): void {
+  private holdAdmission(task: TaskRun, turnId: string): void {
     const now = this.nowIso()
     const leaseMs = Math.max(1_000, Math.trunc(this.watchdogOptions.leaseMs ?? 60_000))
-    const lease = this.repository.acquireLease(task.id, this.ownerId, now, new Date(Date.parse(now) + leaseMs).toISOString())
+    const lease = this.repository.acquireAdmissionLease(task.id, turnId, this.ownerId, now, new Date(Date.parse(now) + leaseMs).toISOString())
     if (!lease) throw Object.assign(new Error('task admission is owned by another runtime'), { code: 'task_lease_conflict' })
     this.leases.set(task.id, { leaseRevision: lease.revision, turnId, admission: true })
-    this.fencedTasks.add(task.id)
   }
 
   /** Failed preparation may release only its own not-yet-started admission. */
   releasePendingAdmission(threadId: string, turnId: string): void {
     for (const [taskId, lease] of this.leases) {
       if (!lease.admission || lease.turnId !== turnId || this.repository.get(taskId)?.threadId !== threadId) continue
-      this.repository.releaseLease(taskId, this.ownerId, lease.leaseRevision)
+      this.repository.releaseAdmissionLease(taskId, this.ownerId, lease.leaseRevision)
       this.leases.delete(taskId)
       this.fencedTasks.delete(taskId)
     }
@@ -488,7 +487,7 @@ export class TaskController {
     const now = this.nowIso()
     const leaseMs = Math.max(1_000, Math.trunc(this.watchdogOptions.leaseMs ?? 60_000))
     const expiresAt = new Date(Date.parse(now) + leaseMs).toISOString()
-    const lease = this.repository.acquireLease(task.id, this.ownerId, now, expiresAt)
+    const lease = this.repository.acquireLease(task.id, this.ownerId, now, expiresAt, turnId)
     if (!lease) {
       throw Object.assign(new Error('task is already running in another runtime'), {
         code: 'task_lease_conflict'
@@ -1475,7 +1474,7 @@ export class TaskController {
     this.repository.releaseLease(token.taskId, token.ownerId, token.leaseRevision)
     this.attemptTokens.delete(turnId)
     const current = this.leases.get(token.taskId)
-    if (current?.leaseRevision === token.leaseRevision && current.turnId === turnId) {
+    if (!current?.admission && current?.leaseRevision === token.leaseRevision && current.turnId === turnId) {
       this.leases.delete(token.taskId)
       this.fencedTasks.delete(token.taskId)
     }
@@ -2168,7 +2167,7 @@ export class TaskController {
           this.releaseExecutionLease(taskId)
           continue
         }
-        const renewed = this.repository.renewLease(
+        const renewed = (state.admission ? this.repository.renewAdmissionLease.bind(this.repository) : this.repository.renewLease.bind(this.repository))(
           taskId,
           this.ownerId,
           state.leaseRevision,
@@ -2222,7 +2221,8 @@ export class TaskController {
 
   private releaseExecutionLease(taskId: string): void {
     const lease = this.leases.get(taskId)
-    if (lease) this.repository.releaseLease(taskId, this.ownerId, lease.leaseRevision)
+    if (lease?.admission) this.repository.releaseAdmissionLease(taskId, this.ownerId, lease.leaseRevision)
+    else if (lease) this.repository.releaseLease(taskId, this.ownerId, lease.leaseRevision)
     this.leases.delete(taskId)
     for (const [turnId, token] of this.attemptTokens) if (token.taskId === taskId) {
       this.repository.execution.finishAttempt(token.executionId, 'completed', this.nowIso())

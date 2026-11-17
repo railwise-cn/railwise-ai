@@ -119,6 +119,42 @@ describe('TaskRunRepository', () => {
     store.close()
   })
 
+  it('keeps concrete Turn admission separate from execution and transfers ownership atomically', async () => {
+    const store = await repository()
+    const created = store.create(task({ originThreadId: 'origin_1' }))
+    const now = '2026-07-18T00:00:00.000Z', later = '2026-07-18T00:00:30.000Z'
+    const admitted = store.acquireAdmissionLease(created.id, 'turn_1', 'owner-a', now, '2026-07-18T00:01:00.000Z')!
+    expect(admitted).toMatchObject({ turnId: 'turn_1', ownerId: 'owner-a' })
+    expect(store.getLease(created.id)).toBeNull()
+    expect(store.reconcileExpired(later)).toEqual([])
+    expect(store.acquireAdmissionLease(created.id, 'turn_other', 'owner-b', later, '2026-07-18T00:02:00.000Z')).toBeNull()
+    expect(store.acquireLease(created.id, 'owner-b', later, '2026-07-18T00:02:00.000Z', 'turn_1')).toBeNull()
+    expect(store.acquireLease(created.id, 'owner-a', later, '2026-07-18T00:02:00.000Z', 'wrong_turn')).toBeNull()
+    const execution = store.acquireLease(created.id, 'owner-a', later, '2026-07-18T00:02:00.000Z', 'turn_1')!
+    expect(execution).toMatchObject({ ownerId: 'owner-a' })
+    expect(store.getAdmissionLease(created.id)?.expiresAt).toBe('1970-01-01T00:00:00.000Z')
+    expect(store.renewAdmissionLease(created.id, admitted.ownerId, admitted.revision, later, '2026-07-18T00:03:00.000Z')).toBeNull()
+    expect(store.acquireAdmissionLease(created.id, 'turn_2', 'owner-a', later, '2026-07-18T00:03:00.000Z')).toBeNull()
+    expect(store.reconcileExpired('2026-07-18T00:01:30.000Z')).toEqual([])
+    store.close()
+  })
+
+  it('fences expired admission owners while keeping abandoned queued work recoverable', async () => {
+    const store = await repository()
+    const created = store.create(task({ originThreadId: 'origin_1' }))
+    const first = store.acquireAdmissionLease(created.id, 'turn_1', 'owner-a', '2026-07-18T00:00:00.000Z', '2026-07-18T00:01:00.000Z')!
+    expect(store.renewAdmissionLease(created.id, 'owner-b', first.revision, '2026-07-18T00:00:30.000Z', '2026-07-18T00:02:00.000Z')).toBeNull()
+    expect(store.reconcileExpired('2026-07-18T00:02:00.000Z').map(run => run.id)).toEqual([created.id])
+    const next = store.acquireAdmissionLease(created.id, 'turn_2', 'owner-b', '2026-07-18T00:02:00.000Z', '2026-07-18T00:03:00.000Z')!
+    expect(next.revision).toBe(first.revision + 1)
+    expect(store.releaseAdmissionLease(created.id, first.ownerId, first.revision)).toBe(false)
+    expect(store.renewAdmissionLease(created.id, first.ownerId, first.revision, '2026-07-18T00:02:10.000Z', '2026-07-18T00:04:00.000Z')).toBeNull()
+    expect(store.acquireLease(created.id, first.ownerId, '2026-07-18T00:02:10.000Z', '2026-07-18T00:04:00.000Z', first.turnId)).toBeNull()
+    expect(store.reconcileExpired('2026-07-18T00:02:10.000Z')).toEqual([])
+    expect(store.renewAdmissionLease(created.id, next.ownerId, next.revision, '2026-07-18T00:02:10.000Z', '2026-07-18T00:04:00.000Z')).toMatchObject({ revision: next.revision })
+    store.close()
+  })
+
   it('renews a lease only for its current owner and fences stale revisions', async () => {
     const store = await repository()
     const created = store.create(task({ status: 'running' }))
