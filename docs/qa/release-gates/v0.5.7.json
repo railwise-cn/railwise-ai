@@ -388,5 +388,23 @@
     "publicReleaseStatus": "HOLD_pending",
     "h5ChatPreviewFailureRetained": true,
     "noCodexPaidSourceCollectionOrReportEditing": true
+  },
+  "h9InitialCI": {
+    "sourceHead": "98150ea0b7087b7c771b0e84c6a450defa35fe62",
+    "sourceTree": "e2e267af58339280967c7f220e85788e34c576a2",
+    "status": "failed_retained",
+    "pushRunId": 44143167639,
+    "pullRequestRunId": 44143181966,
+    "runAttempt": 1,
+    "passedJobs": 4,
+    "failedJobs": 2,
+    "cause": "Offline full-chain closed-status fixture omitted identityMatches:false; strict production protocol rejected correctly. Fixture completed and resumed-read-before-open path covered; original CI was not rerun.",
+    "productionValidatorRelaxed": false,
+    "nativeOrBusinessAcceptance": false,
+    "privateEvidence": {
+      "fileName": "quality-98150ea0-final-handoff.json",
+      "sha256": "93f36449ab749a7ad193cbdd7ddb21bf00a62ff0e13cc82c56b82ea9c0ac01a2",
+      "privateSourceOnly": true
+    }
   }
 }

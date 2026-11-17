@@ -1034,3 +1034,5 @@ Root正常退出H7一次，核对受保护状态，完成含浏览器SQLite的�
 H9源码补上恢复前的固定元数据查询：同Task/Turn/Grant/配置/旧绑定的查询单独封存，当前已核验来源可复用，确认旧ID与名称均缺失才返回可恢复的原地址open提示。空间新建仍只能走原有显式Continue授权和fresh open检查；用户接管、身份不符、过期、配置变化及结果未知均停止。缓存依赖真实Host的批准结果与输出hash，不是网页读取证明。失败诊断仅保留白名单SDK边界、异常类别和匹配绑定的身份；Page handle标签不代表原生Page存在，不保存原生消息、stack、正文或URL token。离线原生形状替身与Factory/Host集成回归167项通过，不是实际SDK或A3通过。
 
 同时修正明确命名任务被后文“采集计划独立”覆盖的标题，并将未知Ego范围及Task审查入口改为准确的呈现文字；完整目标、权限和执行处理不改，121项聚焦UI测试通过。Root合并检查、新精确包、同任务A3、新来源/报告、自然到期和chat后台预览隔离仍待完成，公开发行持续HOLD。付费页面、标题、正文和HTML均未提交。
+
+H9首份提交 `98150ea0` 的原始 [push44143167639](https://github.com/railwise-cn/railwise-ai/actions/runs/44143167639) 与 [PR44143181966](https://github.com/railwise-cn/railwise-ai/actions/runs/44143181966) 均未通过完整Runtime测试，四份Electron/Windows作业通过。两个相同恢复集成变体的离线SDK状态替身漏传官方状态脚本必返的 `identityMatches:false`，被新的严格合同正确拒绝。只补齐替身字段，不放宽生产校验；并让该Factory/Coordinator/Host全链回归先真实调用旧空间读取，核对可恢复的open提示，再走fresh open建立后继空间、读取、报告核验、计划读回与收尾。旧Grant、预算、失败记录及无关UNKNOWN保留断言不改。修正后该文件9项通过；两份原CI失败及原始日志保留，不重跑原提交、不据此发布。后继完整CI、精确包与真实A3仍待完成。
