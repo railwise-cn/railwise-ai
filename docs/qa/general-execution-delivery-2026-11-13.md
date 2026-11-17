@@ -945,3 +945,16 @@ Root 独立核验后正常退出旧实例一次、确认 Main／Runtime 全停�
 临时计划已通过一次正常 UI 点击暂停，revision 正常增加为二；正式大单网与原暂停政府采购的全部定义行逐字不变。实际付费内容、页面和原生图只保存在私有证据目录。后续修正限定在活动状态的进展投影、周期任务对原计划的安全读回、以及模型的精确到期回合上下文；不放宽创建计划或浏览器权限，不清除旧回执或改变任务次数。修正后的完整检查、新精确包及对应真实到期结果仍须验收，d9fb 不作为最终业务通过包。
 
 三项修正的回归均先复现原缺陷。活动进展投影先三项失败，后桌面两文件十五项通过，等待／暂停／失败的真实原因及审批提示保留，输入 Task 不变。周期读回新增二十三项覆盖：真实派发准备链、Ego 只读范围、错误任务／Turn／Grant／版本／站点／身份／撤销、合法原计划重试及周期任务重试；既有一百二十四项保留。AgentLoop 回归实际捕获跨工具调用前后的模型请求，验证只从可信 Task 注入精确计划 ID、到期时间、当前任务与 due_execution 阶段，普通请求伪造这些文本不产生注入；原工具目录和 Task 对象不变。最终 Node 22 标准 KUN runner 合跑两个文件 169 项通过，KUN 类型、六文件 lint 通过；未再变动的桌面增量沿用对应 Node／Web 类型检查。包含全部增量的一次实际生产构建、1,381 输入 freshness 和 2,443 个 authored production 文件对比通过。后继完整 CI、新精确包和实际到期阶段／计划读回仍待验收。
+
+
+### 2026-11-17 Windows manual-preview acceptance correction
+
+The exact 0.5.7 package from Release run `44024949316` remains bound to production source `3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa`. Original full Windows run `44029208287` remains **failed**: the browser initial task and real-clock scheduled occurrence completed, but the subsequent manual artifact-entry click was behind a legitimate inspector overlay. These receipts do not make that full run pass.
+
+At 1024 pixels, switching routes can asynchronously restore the selected task preview and make the main surface inert. The corrected QA driver waits for that projection, uses the visible “收起右侧栏” control, then requires an interactive main surface and two stable uncovered target frames before real pointer input. Permanent coverage still fails. Existing HTML body, isolated partition, manual-entry and layout assertions remain. No production code, source gate or authorization was changed.
+
+The regression uses the actual production layout hook: the original driver fails with `UI target is covered`, the correction passes, and the two focused QA files plus existing package-source tests pass 136/136. The same exact Mac package independently reproduced the overlay/inert state and became clickable after its real collapse control. The required new-head CI and corrected exact-package Windows full run remain pending. Windows coverage uses controlled BrowserSkill, model protocol and loopback content; it is not Ego Windows or paid-site acceptance.
+
+Private evidence digests: QA patch `643f3c5f9740b7e92f0229416248b1c6e5527483c4abf5b071e2ba4f17a6cc83`; original failure manifest `5f60fda594dde2bf9b8d88b21e226c633bd5ccd6bf64c7fb5ac20307f7ff6156`; focused validation manifest `193e1aae699c43adc8933e7c71a7cf04b58f39d0e0e79b536e48e57f6e1e3546`.
+
+This note supersedes the separately added QA JSON in commit `d3745f5b`; its original bytes remain in that commit and the private evidence set. Consolidating into this existing allowed acceptance document preserves the package/driver source contract without expanding its allowlist.
