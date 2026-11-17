@@ -1,106 +1,99 @@
 {
   "status": "passed",
-  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
-  "scope": "Exact committed-byte-bound local production build, focused tests, types and lint only; no official CI, distributed package or new actual business acceptance is claimed",
-  "recordedAt": "2026-11-16T22:15:22.153768+00:00",
-  "runtimeFocused": {
-    "files": 2,
-    "passed": 169,
-    "failed": 0,
-    "serviceAndLoopTogether": true,
-    "maxWorkers": 2
+  "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+  "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
+  "releaseRunId": 44024949316,
+  "scope": "Passed exact H4 local focused tests/type/lint/production build/freshness and official production CI; separate8538 QA correction CI passed",
+  "localObservation": {
+    "status": "passed",
+    "actualProductionBuilds": 1,
+    "focusedRuntimePassed": 37,
+    "testNarrowingFocusedPassed": 19,
+    "focusedSidebarDomPassed": 55,
+    "checks": [
+      {
+        "name": "desktop-types",
+        "exitCode": 0,
+        "logFileName": "browser-context-combined-desktop-types.log",
+        "logSha256": "d5bea42244232afa2bab045a6ef6953e40b0e5c244d9b82cbafa463474f58ab1"
+      },
+      {
+        "name": "lint",
+        "exitCode": 0,
+        "logFileName": "browser-context-combined-lint.log",
+        "logSha256": "b2e943eb4fb3b6f0761e06333585e7e25424a85bce1bfddfd784b956a24d4538"
+      },
+      {
+        "name": "runtime-types",
+        "exitCode": 0,
+        "logFileName": "browser-document-hygiene-typecheck-narrowing-green.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "affected-test-lint",
+        "exitCode": 0,
+        "logFileName": "browser-context-v2-affected-test-lint.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "production-build",
+        "exitCode": 0,
+        "logFileName": "browser-context-v2-production-build.log",
+        "logSha256": "200d1514fa723fde71412bd7fe99e24a93a4b64556e90fe17141fe6306b85d9b"
+      },
+      {
+        "name": "freshness",
+        "exitCode": 0,
+        "logFileName": "browser-context-v2-freshness.log",
+        "logSha256": "8deb5d70674856640360101a0a65426c5637ffeb96810a3abb80f52b3d474501"
+      }
+    ]
   },
-  "desktopFocused": {
-    "files": 2,
-    "passed": 15,
-    "rerunInCombinedValidation": false,
-    "basis": "Root earlier active-banner focused RED/GREEN on byte-identical two source/test files, then bound to this committed source"
-  },
-  "checks": [
-    {
-      "name": "runtimeTests",
-      "exitCode": 0,
-      "logFileName": "active-banner-local-combined-runtime-tests.log",
-      "logSha256": "91f7ad32933f4b0cd5b1e0197d81146b8a0bfd0de364915ded0421c95aa8f5f9"
-    },
-    {
-      "name": "kunTypes",
-      "exitCode": 0,
-      "logFileName": "active-banner-local-combined-kun-types.log",
-      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "name": "eslint",
-      "exitCode": 0,
-      "logFileName": "active-banner-local-combined-eslint.log",
-      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "name": "productionBuild",
-      "exitCode": 0,
-      "logFileName": "active-banner-local-combined-production-build-final.log",
-      "logSha256": "00a8e58a1ebcf2c14e350a5b0991416df306fd59d4f667d59448f2b90105d420"
-    },
-    {
-      "name": "freshness",
-      "exitCode": 0,
-      "logFileName": "active-banner-local-combined-freshness.log",
-      "logSha256": "8deb5d70674856640360101a0a65426c5637ffeb96810a3abb80f52b3d474501"
+  "productionQuality": {
+    "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+    "push": 44022606217,
+    "pullRequest": 44022613409,
+    "sixOfficialJobsObserved": "success",
+    "evidence": {
+      "fileName": "quality-3f1ba1d3-six-official-identities.json",
+      "bytes": 18931,
+      "sha256": "d8795dbd1287f2a6e83d8bc4250b63139c95eb1c4dfee2e7ac06895beffd3665",
+      "privateSourceOnly": false
     }
-  ],
-  "nodeWebTypeReuse": [
-    {
-      "name": "node-types",
-      "exitCode": 0,
-      "executedAgain": false,
-      "basis": "Only later changes were KUN-only; both previously checked active-banner source files remain exact, and combined KUN types passed",
-      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "name": "web-types",
-      "exitCode": 0,
-      "executedAgain": false,
-      "basis": "Only later changes were KUN-only; both previously checked active-banner source files remain exact, and combined KUN types passed",
-      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    }
-  ],
-  "productionBuild": {
-    "actualNpmInvocations": 1,
-    "exitCode": 0,
-    "freshnessExitCode": 0,
-    "freshnessProductionInputs": 1381,
-    "launcherAttempts": 2,
-    "firstLauncherFailureBeforeNpmStartup": true,
-    "firstLauncherFailureStartedCompilation": false
   },
-  "sourceBinding": {
-    "preCommitDirtyValidationPreservedAsRecorded": true,
-    "committedBytesBound": true,
-    "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-    "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
-    "sixSyncedCodeFilesExact": true,
-    "authoredProductionFilesChecked": 2443,
-    "mismatches": [],
-    "physicalGitHead": "6219fbca413b7d7e777737a8a91fcb342acf10c5",
-    "physicalGitHeadIsReviewedSource": false,
-    "basis": "Separate physical dependency/build tree has an older Git HEAD, but authored production bytes match the canonical final commit; official distribution must be built from the new source by the new Release run."
+  "qaOnlyDriver": {
+    "sourceHead": "8538d2624ad496cc2964cdfddc16bfaca274d2a6",
+    "status": "passed",
+    "push": 44042111126,
+    "pullRequest": 44042117029,
+    "scope": "Undistributed Windows manual-preview harness correction; not package/production source",
+    "qualityProof": {
+      "fileName": "quality-8538d262-six-official-identities.json",
+      "bytes": 19409,
+      "sha256": "a5d2126765595ae43e5545c18e62da7aef1919a749883f7a7c673153545c6cd2",
+      "privateSourceOnly": false
+    },
+    "rootIndependentProof": {
+      "fileName": "quality-8538d262-root-independent-check.json",
+      "bytes": 2645,
+      "sha256": "91707b30bcc8765460408acd1e1a90f4208861aeeee69272fe12278ab69b661e",
+      "privateSourceOnly": false
+    },
+    "doesNotChangePackageBytes": true
   },
   "originalEvidence": [
     {
-      "fileName": "active-banner-local-final-combined-validation.json",
-      "bytes": 10383,
-      "sha256": "6b90f69727dab7906be38937d16b3b8d395540f2a855a7860b0031cc0db266e0"
+      "fileName": "browser-context-combined-v2-local-validation.json",
+      "bytes": 5625,
+      "sha256": "71563b9bb8a0f7157c37ad3993a85e1625b04b77d2cb3ca823d15d60bd58b394",
+      "privateSourceOnly": false
     },
     {
-      "fileName": "7d19a3fb-local-validation-committed-source-binding.json",
-      "bytes": 1049,
-      "sha256": "73e13cbddfd84ad2f3451ba6435f3a834061d14b4119e8930769722a125ea29e"
+      "fileName": "browser-context-committed-source-binding.json",
+      "bytes": 664,
+      "sha256": "d1fa04fe43fbeb4afd406bed095f512b79a736569efe99f400d568f3dc5efa30",
+      "privateSourceOnly": false
     }
   ],
-  "uiFocusedOriginalProof": {
-    "fileName": "summary.json",
-    "sha256": "644ce9eeec59e93e88054c25c9c8aa6fffce6ac979a6eda1b99d29c1706fff30"
-  },
-  "sourceExceptionOrProvenanceOverride": false
+  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00"
 }

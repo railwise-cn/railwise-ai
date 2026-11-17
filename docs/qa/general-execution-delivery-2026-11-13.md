@@ -961,3 +961,14 @@ This note supersedes the separately added QA JSON in commit `d3745f5b`; its orig
 
 
 The subsequent exact-package full run `44039630770` also remains **failed**. Its driver had dismissed the route-restored preview, then incorrectly required the same selected task/artifact hash to emit another automatic preview. Keeping a dismissed key closed is the intended product behavior. The next QA correction waits for loading only when a modal inspector actually exists; otherwise it checks stable uncovered geometry and tests the independent manual entry directly. A late modal is dismissed through its visible panel control with a bounded recheck. The actual layout-hook regression now includes reselecting the same task/hash without inventing a new projection. All earlier late-overlay and permanent-coverage cases remain; focused tests pass 137/137. Original HTML, partition, manual-entry and layout assertions remain. Production code, source gates and allowlists remain unchanged; a corrected new-head full result is still pending. Private correction patch digest: `c502c60d897c834499a27b2ce3c79054082ecb0e3b5f1e6f557e71cb1758989c`. Original second failure manifest digest: `c7d8f72318385b9cf3a4d1020e5cbb8929bb199969350e125e9b72a3a70839fb`.
+
+
+### 2026-11-17 最终 H4 精确包与业务验收
+
+最终生产包为 `3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa`、Release `44024949316`、正常版本 0.5.7。实际安装并打开了该 Mac 包，核对 bundle、Team、签名、应用公证、DMG 与 ASAR。相同 run 的原始 0.5.6→0.5.7 native updater 已通过。Windows 同一原包在修正后的 QA driver `8538d2624ad496cc2964cdfddc16bfaca274d2a6` 上完成 full `44044175670`：官方 success，原始证据 artifact `14310842516`、整档 SHA 与 CRC、全部 13 个解压文件原 bytes、严格 checker 和 Root 独立核对通过。初始与自然到期均生成新 HTML，自动预览与关闭后的手动重开通过；原两次 full 的失败结论保留，不回写为通过。该后继仅改未分发 QA/证据，未重建应用或 updater。
+
+真实浏览与报告由 RailWise AI 的实际模型和 Ego Provider 完成，Codex 没有采集付费网页或改写报告。初始 A1 的严格来源核验失败保留；一次澄清原业务筛选与逐字引用要求后，在同一任务正常继续 A2，交付首屏筛选的 10 条。15:10 的临时计划由真实时钟自然触发，独立 Task/Grant 在 A1 内自行恢复一次旧 observation 和一次引用核验错误，重新读取更新列表，交付 11 条并核验文件。执行中实际观察到第二个 Ego Space，结束操作 awaited finish 后恢复原 Space；未把结束后截图冒充正在运行的 Space。后台成果没有抢走当前任务预览；选择新任务后正确自动打开其独立成果。首屏范围、未读取官方正文与独立条目链接、缺失字段待核验均明确记录，不宣称全日全站覆盖。相关性判断属于 AI 内容核对，不代表专业人工签字。
+
+临时计划仅该新增项在一次自然到期后正常暂停；正式计划仍启用，Asia/Shanghai 08:30、16:30 启动，09:00、17:00 交付目标。此前五份计划定义、22 个任务和 16 条 UNKNOWN 原记录保持原样。旧版本真实 08:30 失败及错过目标时间仍保留，不追认按时成功。
+
+原生 Mac 窗口在 1024×760、实际最小 960×700、1280×840 检查 General 菜单重定位、焦点返回和无横向溢出；760 的请求被实际窗口最小宽度约束为 960，不声称测试了更窄尺寸。Windows 另覆盖大小字体、菜单定位和窄窗导航。Windows Authenticode 仍为 NotSigned/not-configured；Windows BSK/模型协议/loopback 受控验证不代表 Ego Windows 或付费大单网。Mac 本地 Intel UI 未测，本机 Gatekeeper override 与同 run CI 启用策略 accepted 证据分列。完整外层 Mac archive 未在本机全 hash 的界限保留。付费内容和原生付费页面图仅留私有证据。当前验收资料见 `docs/qa/release-gates/v0.5.7.json` 及其 sidecars。

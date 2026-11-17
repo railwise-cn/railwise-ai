@@ -1,103 +1,245 @@
 {
   "status": "passed",
-  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
-  "scope": "Official new exact-source Quality only; not distributed-package identity/UI/updater or real Ego/Dadan acceptance",
+  "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+  "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
+  "scope": "Official CI only. H4 packaged production source and8538 QA-only descendant are distinct; no package/UI/updater/business or publication approval inferred.",
   "repository": "railwise-cn/railwise-ai",
   "workflowPath": ".github/workflows/quality.yml",
   "runs": [
     {
-      "runId": 43965382885,
+      "runId": 44022606217,
       "runAttempt": 1,
       "event": "push",
-      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/43965382885",
+      "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022606217",
       "status": "passed",
       "conclusion": "success",
       "jobs": [
         {
-          "id": 133643338329,
-          "name": "Electron production smoke",
-          "status": "completed",
-          "conclusion": "success",
-          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/43965382885/job/133643338329"
-        },
-        {
-          "id": 133643338657,
+          "id": 133835320181,
           "name": "OpenSpec, brand, lint, type, test, build",
           "status": "completed",
           "conclusion": "success",
-          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/43965382885/job/133643338657"
+          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022606217/job/133835320181"
         },
         {
-          "id": 133643338701,
+          "id": 133835320466,
           "name": "Windows path, spawn, persistence",
           "status": "completed",
           "conclusion": "success",
-          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/43965382885/job/133643338701"
+          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022606217/job/133835320466"
+        },
+        {
+          "id": 133835320531,
+          "name": "Electron production smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022606217/job/133835320531"
         }
       ]
     },
     {
-      "runId": 43965391889,
+      "runId": 44022613409,
       "runAttempt": 1,
       "event": "pull_request",
-      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/43965391889",
+      "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022613409",
       "status": "passed",
       "conclusion": "success",
       "jobs": [
         {
-          "id": 133643370800,
-          "name": "Electron production smoke",
-          "status": "completed",
-          "conclusion": "success",
-          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/43965391889/job/133643370800"
-        },
-        {
-          "id": 133643371319,
-          "name": "OpenSpec, brand, lint, type, test, build",
-          "status": "completed",
-          "conclusion": "success",
-          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/43965391889/job/133643371319"
-        },
-        {
-          "id": 133643371408,
+          "id": 133835343037,
           "name": "Windows path, spawn, persistence",
           "status": "completed",
           "conclusion": "success",
-          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/43965391889/job/133643371408"
+          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022613409/job/133835343037"
+        },
+        {
+          "id": 133835343211,
+          "name": "Electron production smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022613409/job/133835343211"
+        },
+        {
+          "id": 133835343416,
+          "name": "OpenSpec, brand, lint, type, test, build",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022613409/job/133835343416"
         }
       ]
     }
   ],
   "allSixJobsPassed": true,
-  "officialTestCounts": {
-    "eachRunDesktop": {
-      "passed": 4827,
-      "skipped": 17
-    },
-    "eachRunKUN": {
-      "passed": 5254,
-      "skipped": 24
+  "packagedProductionSource": {
+    "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+    "status": "passed",
+    "allSixJobsPassed": true,
+    "runs": [
+      {
+        "runId": 44022606217,
+        "runAttempt": 1,
+        "event": "push",
+        "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+        "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022606217",
+        "status": "passed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 133835320181,
+            "name": "OpenSpec, brand, lint, type, test, build",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022606217/job/133835320181"
+          },
+          {
+            "id": 133835320466,
+            "name": "Windows path, spawn, persistence",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022606217/job/133835320466"
+          },
+          {
+            "id": 133835320531,
+            "name": "Electron production smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022606217/job/133835320531"
+          }
+        ]
+      },
+      {
+        "runId": 44022613409,
+        "runAttempt": 1,
+        "event": "pull_request",
+        "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+        "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022613409",
+        "status": "passed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 133835343037,
+            "name": "Windows path, spawn, persistence",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022613409/job/133835343037"
+          },
+          {
+            "id": 133835343211,
+            "name": "Electron production smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022613409/job/133835343211"
+          },
+          {
+            "id": 133835343416,
+            "name": "OpenSpec, brand, lint, type, test, build",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44022613409/job/133835343416"
+          }
+        ]
+      }
+    ],
+    "originalEvidence": [
+      {
+        "fileName": "quality-3f1ba1d3-six-official-identities.json",
+        "bytes": 18931,
+        "sha256": "d8795dbd1287f2a6e83d8bc4250b63139c95eb1c4dfee2e7ac06895beffd3665"
+      }
+    ],
+    "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
+    "scope": "Official six-job Quality for the source actually packaged in Release44024949316"
+  },
+  "qaOnlySuccessor": {
+    "sourceHead": "8538d2624ad496cc2964cdfddc16bfaca274d2a6",
+    "status": "passed",
+    "allSixJobsPassed": true,
+    "runs": [
+      {
+        "runId": 44042111126,
+        "runAttempt": 1,
+        "event": "push",
+        "sourceHead": "8538d2624ad496cc2964cdfddc16bfaca274d2a6",
+        "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44042111126",
+        "status": "passed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 133898908206,
+            "name": "Electron production smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44042111126/job/133898908206"
+          },
+          {
+            "id": 133898908550,
+            "name": "OpenSpec, brand, lint, type, test, build",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44042111126/job/133898908550"
+          },
+          {
+            "id": 133898908563,
+            "name": "Windows path, spawn, persistence",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44042111126/job/133898908563"
+          }
+        ]
+      },
+      {
+        "runId": 44042117029,
+        "runAttempt": 1,
+        "event": "pull_request",
+        "sourceHead": "8538d2624ad496cc2964cdfddc16bfaca274d2a6",
+        "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44042117029",
+        "status": "passed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 133898925614,
+            "name": "Windows path, spawn, persistence",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44042117029/job/133898925614"
+          },
+          {
+            "id": 133898926068,
+            "name": "OpenSpec, brand, lint, type, test, build",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44042117029/job/133898926068"
+          },
+          {
+            "id": 133898926289,
+            "name": "Electron production smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/44042117029/job/133898926289"
+          }
+        ]
+      }
+    ],
+    "originalEvidence": [
+      {
+        "fileName": "quality-8538d262-six-official-identities.json",
+        "bytes": 19409,
+        "sha256": "a5d2126765595ae43e5545c18e62da7aef1919a749883f7a7c673153545c6cd2"
+      }
+    ],
+    "sourceTree": "cf9be9a3eefcdacd8bac4287a21195518577adaa",
+    "scope": "Only the nonshipped Windows manual-preview QA correction; not a new package build or source identity",
+    "rootIndependentEvidence": {
+      "fileName": "quality-8538d262-root-independent-check.json",
+      "bytes": 2645,
+      "sha256": "91707b30bcc8765460408acd1e1a90f4208861aeeee69272fe12278ab69b661e"
     }
   },
-  "originalEvidence": [
-    {
-      "fileName": "quality-7d19a3fb-six-official-identities.json",
-      "bytes": 19058,
-      "sha256": "bf3b41f289c09909e6a0d9ecc4b7264da28849403de098deffa75054cc037441"
-    },
-    {
-      "fileName": "quality-7d19a3fb-official-test-counts.json",
-      "bytes": 1453,
-      "sha256": "1fda47e54fe0225f4c0b4f9bceecf192acfcef869a03f0f03c906d51a2e48f4d"
-    },
-    {
-      "fileName": "quality-7d19a3fb-root-independent-check.json",
-      "bytes": 1414,
-      "sha256": "025fb6deb6a488c776ee4bb903f9a508aeb751f3cd4590d46f073ba78322c2bb"
-    }
-  ],
-  "newApiCallsByThisPreparation": 0
+  "newApiCallsByThisPreparation": 0,
+  "globalReleaseStatus": "pending",
+  "officialTestCountsIncluded": false,
+  "testCountScopeNote": "No old7d19 test counts carried forward; this supplement records exact H4 and8538 official job identities and conclusions.",
+  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00"
 }
