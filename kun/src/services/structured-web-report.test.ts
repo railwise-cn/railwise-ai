@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { renderStructuredWebReport, type StructuredWebReport } from './structured-web-report.js'
+import { renderStructuredWebReport, StructuredWebReportSchema, type StructuredWebReport } from './structured-web-report.js'
 
 const report = () => ({ title: '工程监测招标资料', collectedAt: '2026-11-16T04:00:00+08:00', evidence: {
   coverage: [{ url: 'https://public.example.test/list?a=1&b=2', resultHash: 'a'.repeat(64) }],
@@ -89,4 +89,143 @@ it('requires an actual longer source quote for a short feed title instead of man
   expect(() => renderStructuredWebReport('feed.html', value, 'observed_feed')).toThrow(/标题.*原文/)
   value.evidence.items[0]!.fields[0]!.quote = '本次测绘服务项目预算为808870元（含税）。'
   expect(renderStructuredWebReport('feed.html', value, 'observed_feed').verificationInput.items[0]!.fields.find(field => field.field === 'title')?.quote).toBe(value.evidence.items[0]!.fields[0]!.quote)
+})
+
+function screenedReport(count = 19): StructuredWebReport {
+  const value: StructuredWebReport = report(), source = value.evidence.coverage[0]!
+  value.evidence.items = Array.from({ length: count }, (_, index) => {
+    const title = `合成工程服务列表记录第${index + 1}项`
+    return { sectionId: `record-${index + 1}`, title, source, discovery: source, classification: 'source',
+      fields: [{ field: 'title', value: title, quote: title },
+        { field: 'publication_date', value: '2026年11月18日', quote: '列表标注日期：2026年11月18日' }],
+      unverifiedFields: ['budget', 'deadline', 'status', 'qualification'] }
+  })
+  value.presentation = { summary: '本次按工程服务范围整理列表，保留筛选判断与来源字段的区别。',
+    coverageNote: '本报告仅代表所列记录，不声称平台全部记录已覆盖。',
+    screening: value.evidence.items.map((item, index) => ({ sectionId: item.sectionId,
+      decision: index < 6 ? 'excluded' : 'relevant', reason: index < 6 ? 'AI判断与本次工程服务范围不符。' : 'AI判断与本次工程服务范围相关。',
+      businessTypes: ['工程服务'], region: '区域待人工确认' })) }
+  return value
+}
+
+function formalRegion(content: string): string {
+  return content.split('<main data-evidence-report>')[1]!.split('</main>')[0]!
+}
+
+it('groups mixed AI screening outside the formal region and retains every source item exactly once', () => {
+  const value = screenedReport(), original = structuredClone(value)
+  const rendered = renderStructuredWebReport('screened.html', value, 'observed_feed'), main = formalRegion(rendered.content)
+  const sourceIds = [...main.matchAll(/data-evidence-item="([^"]+)"/g)].map(match => match[1])
+  const screeningIds = [...rendered.content.matchAll(/data-report-screening-item="([^"]+)"/g)].map(match => match[1])
+  const expectedOrder = [...value.evidence.items.slice(6), ...value.evidence.items.slice(0, 6)].map(item => item.sectionId)
+  expect(sourceIds).toEqual(expectedOrder)
+  expect(screeningIds).toEqual(expectedOrder)
+  expect(new Set(sourceIds).size).toBe(19)
+  expect(new Set(screeningIds).size).toBe(19)
+  expect(rendered.content).toContain('data-screening-count="relevant">相关记录：13</span>')
+  expect(rendered.content).toContain('data-screening-count="pending">待判断：0</span>')
+  expect(rendered.content).toContain('data-screening-count="excluded">排除附录：6</span>')
+  expect(rendered.content.indexOf('data-screening-group="relevant"')).toBeLessThan(rendered.content.indexOf('data-screening-group="excluded"'))
+  expect(rendered.content).toContain('AI筛选判断，不代表已核验事实、资质认定或投标资格')
+  expect(rendered.content).toContain('AI筛选理由：')
+  expect(rendered.content).toContain('AI业务类型判断：')
+  expect(rendered.content).toContain('AI区域判断：')
+  expect(rendered.content).toContain('来源字段附录')
+  for (const id of sourceIds) expect(rendered.content).toContain(`href="#${id}"`)
+  expect(main).not.toMatch(/data-report-screening|AI筛选|AI业务|AI区域|本次工程服务范围/)
+  expect([...main.matchAll(/data-evidence-classification="source"/g)]).toHaveLength(19)
+  expect(rendered.verificationInput).toEqual({ path: 'screened.html', ...value.evidence })
+  expect(rendered.verificationInput).not.toHaveProperty('presentation')
+  expect(value).toEqual(original)
+})
+
+it('places missing screening decisions in pending without manufacturing reasons or source facts', () => {
+  const value = screenedReport(3)
+  value.presentation!.screening = [{ sectionId: 'record-2', decision: 'relevant', reason: 'AI判断需要进一步核对服务范围。' }]
+  const rendered = renderStructuredWebReport('partial.html', value, 'observed_feed'), main = formalRegion(rendered.content)
+  expect(rendered.content).toContain('data-screening-count="relevant">相关记录：1</span>')
+  expect(rendered.content).toContain('data-screening-count="pending">待判断：2</span>')
+  expect(rendered.content).toContain('待判断（2）')
+  expect(rendered.content).toContain('本条尚未提供AI筛选判断。')
+  expect(rendered.content).toContain('AI业务类型判断：</strong>未判断')
+  expect(rendered.content).toContain('AI区域判断：</strong>未判断')
+  expect([...main.matchAll(/data-evidence-unverified>待核验/g)]).toHaveLength(12)
+  expect(main).not.toContain('data-evidence-field="region"')
+  expect(main).not.toContain('data-evidence-field="businessTypes"')
+  expect(rendered.verificationInput.items).toEqual(value.evidence.items)
+})
+
+it('treats an explicitly empty screening list as pending for every declared record', () => {
+  const value = screenedReport(2); value.presentation!.screening = []
+  const rendered = renderStructuredWebReport('pending.html', value, 'observed_feed')
+  expect(rendered.content).toContain('data-screening-count="pending">待判断：2</span>')
+  expect([...rendered.content.matchAll(/data-report-screening-item="[^"]+" data-screening-decision="pending"/g)]).toHaveLength(2)
+  expect([...formalRegion(rendered.content).matchAll(/data-evidence-item=/g)]).toHaveLength(2)
+})
+
+it('rejects duplicate or unknown screening section IDs rather than detaching analysis from source rows', () => {
+  const value = screenedReport(2)
+  value.presentation!.screening!.push({ ...value.presentation!.screening![0]! })
+  expect(StructuredWebReportSchema.safeParse(value).success).toBe(false)
+  value.presentation!.screening = [{ sectionId: 'not-in-the-report', decision: 'pending', reason: '合成判断说明' }]
+  expect(StructuredWebReportSchema.safeParse(value).success).toBe(false)
+  value.presentation!.screening = [{ sectionId: 'record-1', decision: 'pending', reason: '合成判断说明' }]
+  expect(StructuredWebReportSchema.safeParse(value).success).toBe(true)
+})
+
+it('bounds presentation strings, classifications and collection sizes without extending literal evidence fields', () => {
+  const value = screenedReport(1)
+  const invalid = [
+    { ...value, presentation: { summary: '字'.repeat(1201) } },
+    { ...value, presentation: { coverageNote: '字'.repeat(1201) } },
+    { ...value, presentation: { screening: Array.from({ length: 101 }, () => value.presentation!.screening![0]!) } },
+    { ...value, presentation: { screening: [{ sectionId: 'record-1', decision: 'opportunity', reason: '合成判断' }] } },
+    { ...value, presentation: { screening: [{ sectionId: 'record-1', decision: 'pending', reason: ' ' }] } },
+    { ...value, presentation: { screening: [{ sectionId: 'record-1', decision: 'pending', reason: '字'.repeat(1201) }] } },
+    { ...value, presentation: { screening: [{ sectionId: 'record-1', decision: 'pending', reason: '合成判断', businessTypes: ['字'.repeat(81)] }] } },
+    { ...value, presentation: { screening: [{ sectionId: 'record-1', decision: 'pending', reason: '合成判断', businessTypes: Array(9).fill('工程服务') }] } },
+    { ...value, presentation: { screening: [{ sectionId: 'record-1', decision: 'pending', reason: '合成判断', region: '字'.repeat(121) }] } },
+    { ...value, presentation: { screening: [{ sectionId: 'record-1', decision: 'pending', reason: '合成判断', budget: '推测金额' }] } }
+  ]
+  for (const candidate of invalid) expect(StructuredWebReportSchema.safeParse(candidate).success).toBe(false)
+})
+
+it('escapes AI presentation text and keeps summary, coverage and report time separate from the heading', () => {
+  const value = screenedReport(1); value.title = '合成筛选日报'
+  value.presentation!.summary = '合成摘要<script>alert(1)</script>'
+  value.presentation!.coverageNote = '合成覆盖范围 <今日记录>'
+  value.presentation!.screening = [{ sectionId: 'record-1', decision: 'pending', reason: '<img src=x onerror=alert(1)>', businessTypes: ['R&D服务'], region: '<未知区域>' }]
+  const rendered = renderStructuredWebReport('escaped.html', value, 'observed_feed')
+  expect(rendered.content).toContain('<h1>合成筛选日报</h1>')
+  expect(rendered.content).toContain('data-report-presentation="summary">合成摘要&lt;script&gt;')
+  expect(rendered.content).toContain('覆盖说明（AI整理）：')
+  expect(rendered.content).toContain('报告标注时间：')
+  expect(rendered.content).toContain('&lt;img src=x onerror=alert(1)&gt;')
+  expect(rendered.content).toContain('R&amp;D服务')
+  expect(rendered.content).toContain('&lt;未知区域&gt;')
+  expect(rendered.content).not.toMatch(/<script\b|<img\b|<link\b|@import|url\(/i)
+  expect(formalRegion(rendered.content)).not.toContain('合成摘要')
+})
+
+it('preserves legacy report structure while offering single-column mobile and readable print styles', () => {
+  const value = report(); value.title = '字'.repeat(160)
+  const rendered = renderStructuredWebReport('legacy.html', value)
+  expect(rendered.content).toContain(`<h1>${value.title}</h1>`)
+  expect(rendered.content).not.toContain('data-report-presentation=')
+  expect(rendered.content).not.toContain('data-report-screening-item=')
+  expect([...rendered.content.matchAll(/<main data-evidence-report>/g)]).toHaveLength(1)
+  expect(formalRegion(rendered.content)).toContain('data-evidence-classification="opportunity"')
+  expect(rendered.verificationInput).toEqual({ path: 'legacy.html', ...value.evidence })
+  expect(rendered.content).toContain('@media(max-width:560px)')
+  expect(rendered.content).toContain('.screening-cards{grid-template-columns:1fr}')
+  expect(rendered.content).toContain('@media print')
+  expect(rendered.content).toContain('break-inside:avoid')
+})
+
+it('keeps a maximum-sized screening report below the existing evidence parser node bound', () => {
+  const value = screenedReport(100)
+  value.presentation!.screening!.forEach(entry => { entry.businessTypes = Array(8).fill('合成业务类别') })
+  const rendered = renderStructuredWebReport('bounded.html', value, 'observed_feed')
+  expect([...rendered.content.matchAll(/<[a-z][a-z0-9:-]*\b/gi)].length).toBeLessThan(5000)
+  expect([...formalRegion(rendered.content).matchAll(/data-evidence-item=/g)]).toHaveLength(100)
 })

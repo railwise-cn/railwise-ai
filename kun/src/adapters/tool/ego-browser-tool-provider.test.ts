@@ -232,8 +232,8 @@ it.each(['ego_browser_read','ego_browser_observe','ego_browser_next_page'] as co
 })
 it('checks a resumed agent Space once per sealed Turn and reuses the exact id and label',async()=>{
  const h=await reopenFixture(true);h.setState('agent')
- expect(await h.execute('ego_browser_read')).toMatchObject({status:'succeeded',taskSpaceId:7})
- expect(await h.execute('ego_browser_read')).toMatchObject({status:'succeeded',taskSpaceId:7})
+ expect(await h.execute('ego_browser_read')).toMatchObject({status:'succeeded',taskSpaceId:7,pagination:{navigationActionsUsed:1,currentSpaceNavigationCount:1,documentPageNumber:null}})
+ expect(await h.execute('ego_browser_read')).toMatchObject({status:'succeeded',taskSpaceId:7,pagination:{navigationActionsUsed:1,currentSpaceNavigationCount:1,documentPageNumber:null}})
  expect(h.calls.map(c=>c.action)).toEqual(['space_status','read','read'])
  expect(h.f.repo.operations(h.f.task.id,'ego_task_space')).toHaveLength(1)
  expect(h.f.repo.operations(h.f.task.id,'ego_task_space_status')).toHaveLength(1)
@@ -332,6 +332,25 @@ it('appends one closed-Space incarnation only under an actual user-resume author
  const again=await h.execute();expect(again).toMatchObject({code:'ego_browser_task_space_missing'})
  expect(h.f.repo.operations(h.f.task.id,'ego_task_space')).toHaveLength(2)
  expect(h.calls.filter(c=>c.action==='open')).toHaveLength(1)
+})
+it('distinguishes current-Space navigation from the task-wide limit after a closed-Space replacement',async()=>{
+ const h=await reopenFixture(true)
+ const priorNavigation=h.f.repo.operations(h.f.task.id,'ego_page_navigation')[0]!,priorRead=h.f.repo.operations(h.f.task.id,'ego_document_read')[0]!
+ let out=await h.execute()
+ expect(out).toMatchObject({status:'succeeded',taskSpaceId:8,pagination:{pageNumber:2,pageNumberMeaning:'task_navigation_actions_used',navigationActionsUsed:2,currentSpaceNavigationCount:1,documentPageNumber:null,pageLimit:10,limitReached:false}})
+ const read=await h.execute('ego_browser_read')
+ expect(read).toMatchObject({pagination:{navigationActionsUsed:2,currentSpaceNavigationCount:1,documentPageNumber:null}})
+ expect(h.f.repo.operations(h.f.task.id,'ego_page_navigation')).toHaveLength(2)
+ out=read
+ for(let used=2;used<10;used++)out=await h.execute('ego_browser_next_page',{observationId:out.observationId,targetId:(out.nextPages as Array<{targetId:string}>)[0]!.targetId})
+ expect(out).toMatchObject({status:'succeeded',pagination:{pageNumber:10,navigationActionsUsed:10,currentSpaceNavigationCount:9,documentPageNumber:null,pageLimit:10,limitReached:true}})
+ const before=h.calls.length
+ expect(await h.execute('ego_browser_next_page',{observationId:out.observationId,targetId:(out.nextPages as Array<{targetId:string}>)[0]!.targetId})).toMatchObject({code:'ego_browser_page_limit'})
+ expect(h.calls).toHaveLength(before)
+ expect(h.f.repo.operations(h.f.task.id,'ego_page_navigation')).toHaveLength(10)
+ expect(h.f.repo.operationById(h.f.task.id,priorNavigation.id,'ego_page_navigation')).toEqual(priorNavigation)
+ expect(h.f.repo.operationById(h.f.task.id,priorRead.id,'ego_document_read')).toEqual(priorRead)
+ expect(validEgoDocumentEvidence(h.f.repo,h.f.task,h.opened,h.oldGrant)).toBe(true)
 })
 it.each(['no-auth','wrong-turn','wrong-binding','user','inactive','unassigned','agentDelegatedToUser','name-conflict','query-timeout','host-unknown'] as const)('never replaces an existing, uncontrolled or unconfirmed Space: %s',async boundary=>{
  const h=await reopenFixture()

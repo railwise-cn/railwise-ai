@@ -99,10 +99,10 @@ describe('publish_artifact structured report branch', () => {
 })
 
 
-async function collectionFixture(ready: boolean, basis: 'observed_feed' | 'primary_document' = 'observed_feed') {
+async function collectionFixture(ready: boolean, basis: 'observed_feed' | 'primary_document' = 'observed_feed', goal = '汇总已授权订阅列表') {
   const f = await fixture(), workspace = f.root
   const task: TaskRun = { id: 'task-test', threadId: 'thread-test', activeTurnId: 'turn-test', workspaceRoot: workspace,
-    goal: '汇总已授权订阅列表', status: 'running', agentId: 'general', childTaskIds: [],
+    goal, status: 'running', agentId: 'general', childTaskIds: [],
     acceptance: { kind: 'files', requiredNodeKinds: ['execute', 'verify', 'deliver'], requireFinalResponse: true, requireActionableArtifactCard: true, requiresWebEvidence: true, webEvidenceBasis: basis }, budget: { maxAttempts: 8, maxDurationMs: 900000 },
     attempts: 1, replans: 0, noProgressCount: 0, nodes: [], artifacts: [], revision: 0,
     createdAt: '2026-11-16T23:59:00.000Z', updatedAt: '2026-11-16T23:59:00.000Z' }
@@ -125,6 +125,37 @@ async function collectionFixture(ready: boolean, basis: 'observed_feed' | 'prima
     unverifiedFields: ['budget', 'deadline', 'status', 'qualification'] }], noMatches: [] } }
   return { ...f, tools, context, policy, data, observedFeedCollectionContext, verifyWebArtifact }
 }
+
+it('returns business presentation feedback without writing a misleading source-verified draft', async () => {
+  const f = await collectionFixture(true, 'observed_feed', '按工程测量与监测服务筛选订阅信息')
+  const publish = f.tools.find(tool => tool.name === 'publish_artifact')!
+  const result = await publish.execute({ path: 'screened.html', report: f.data }, f.context)
+  expect(result).toMatchObject({ isError: true, output: {
+    code: 'artifact_business_presentation_required', ready: false, collectionFreshness: f.policy,
+    issues: [{ kind: 'screening_required', sectionId: 'one' }]
+  } })
+  expect((result.output as Record<string, unknown>).nextStep).toMatch(/presentation.screening/)
+  await expect(stat(join(f.root, 'screened.html'))).rejects.toMatchObject({ code: 'ENOENT' })
+  expect(f.verifyWebArtifact).not.toHaveBeenCalled()
+  const data = { ...f.data, presentation: { summary: '当前已读列表资料，未确认后续分页。', screening: [
+    { sectionId: 'one', decision: 'pending', reason: '仅凭列表记录还无法判断业务范围' }
+  ] } }
+  const published = await publish.execute({ path: 'screened.html', report: data }, f.context)
+  expect(published.isError).not.toBe(true)
+  expect(published.output).toHaveProperty('verificationInput')
+  const html = await readFile(join(f.root, 'screened.html'), 'utf8')
+  expect(html).toContain('data-evidence-classification="source"')
+  expect(html).toContain('data-evidence-unverified')
+})
+
+it('retains actual source-read blockers before business presentation feedback', async () => {
+  const f = await collectionFixture(false, 'observed_feed', '按公司测绘业务筛选订阅信息')
+  const publish = f.tools.find(tool => tool.name === 'publish_artifact')!
+  expect(await publish.execute({ path: 'screened.html', report: f.data }, f.context)).toMatchObject({
+    isError: true, output: { code: 'web_artifact_repair_stalled', collectionFreshness: f.policy }
+  })
+  await expect(stat(join(f.root, 'screened.html'))).rejects.toMatchObject({ code: 'ENOENT' })
+})
 
 it('guides a blocked current collection to native reads while retaining old stalled facts and writing no draft', async () => {
   const f = await collectionFixture(false), publish = f.tools.find(tool => tool.name === 'publish_artifact')!

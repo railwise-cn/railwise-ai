@@ -56,6 +56,27 @@ function feedInput() {
   const proof = input(), reference = { url: origins[0] + '/notice/1', resultHash: sha(document) }
   return WebArtifactEvidenceInputSchema.parse({ ...proof, coverage: [reference], noMatches: [], items: [{ ...proof.items[0], source: reference, discovery: reference, classification: 'source' }] })
 }
+
+it('keeps AI business presentation outside literal evidence verification without exempting changed facts', async () => {
+  const f = await fixture({}, 'observed_feed')
+  try {
+    await f.source(origins[0] + '/notice/1', document)
+    const proof = feedInput(), original = JSON.stringify(proof)
+    const rendered = renderStructuredWebReport(proof.path, {
+      title: '工程服务筛选日报',
+      presentation: { summary: '仅汇总本次已列示记录。', screening: [{
+        sectionId: 'notice-1', decision: 'relevant', reason: '原记录标题包含工程测量服务', businessTypes: ['工程测量'], region: '未判断'
+      }] },
+      evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches }
+    }, 'observed_feed')
+    expect(rendered.verificationInput).toEqual(proof)
+    expect((await f.assessment(rendered.content, proof)).complete).toBe(true)
+    expect(JSON.stringify(proof)).toBe(original)
+    const changed = rendered.content.replace('100000元', '999999元')
+    expect(await f.assessment(changed, proof)).toMatchObject({ complete: false,
+      reasons: expect.arrayContaining([expect.stringContaining('budget')]) })
+  } finally { f.repository.close() }
+})
 async function fixture(primaryOutput: Record<string, unknown> = {}, basis?: 'observed_feed') {
   const temporary = await mkdtemp(join(tmpdir(), 'railwise-web-artifact-evidence-')); roots.push(temporary)
   const root = await realpath(temporary), workspace = join(root, '只读 工作区'); await mkdir(workspace)

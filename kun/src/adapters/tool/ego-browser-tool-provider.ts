@@ -168,12 +168,13 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
     if (context.abortSignal.aborted || !grant.expiresAt || Date.parse(grant.expiresAt) <= now()) throw fail('ego_browser_grant_expired')
     return { grant, task }
   }
+  const paginationMeaning = '分页结果中的navigationActionsUsed是本任务累计成功导航动作数（含旧TaskSpace历史），currentSpaceNavigationCount只统计当前TaskSpace；documentPageNumber未从站点核验时为null。pageNumber是累计动作数的旧兼容字段，不是网页页码；不得据此声称已读第几页或完整分页。'
   const descriptions = {
     ego_browser_finish: '成功交付后调用一次：先完成报告/显式核验及已要求的计划读回，再用本工具await原Ego任务空间finish({keep:[]})；成功后直接最终回复，不再调用页面工具。错误/用户接管时不要finish。重复调用只读原真实回执，未知结果不重放。',
-    ego_browser_open: '首次在当前任务专属 Ego TaskSpace 打开已授权 URL，只读复用用户现有登录。后续读取或等待异步内容使用ego_browser_read({})，不要反复open刷新同一URL。无需传 TaskSpace 或页面ID；不要用此工具执行表单/登录/业务操作。',
+    ego_browser_open: '首次在当前任务专属 Ego TaskSpace 打开已授权 URL，只读复用用户现有登录。后续读取或等待异步内容使用ego_browser_read({})，不要反复open刷新同一URL。无需传 TaskSpace 或页面ID；不要用此工具执行表单/登录/业务操作。' + paginationMeaning,
     ego_browser_observe: '只读观察本任务 Ego 页面完整语义快照。用户接管或失去控制时停止，不创建替代 TaskSpace。',
-    ego_browser_read: '默认使用ego_browser_read({})直接重新读取本任务当前整页的实际文本与链接HTML，不传selector或旧observationId，无需先observe或重新open。异步页面仅有导航壳、空DOM或加载提示时继续原页实际读取，不能宣称采集完成；只有实际零结果标记才能声明零匹配。仅确需局部内容时使用标准CSS selector，恰好匹配一个当前可见元素，并携带最近一次观察的observationId；不要使用文本/XPath。旧观察或页面变化时优先ego_browser_read({})，不要重放旧选择或重开TaskSpace。来源仅代表实际订阅列表，不代表核验官方原文。',
-    ego_browser_next_page: '仅打开最近一次完整读取中实际出现的同源“下一页”链接。使用返回的 observationId/targetId，最多10页；无链接式分页时停止说明，不提交按钮或业务表单。'
+    ego_browser_read: '默认使用ego_browser_read({})直接重新读取本任务当前整页的实际文本与链接HTML，不传selector或旧observationId，无需先observe或重新open。异步页面仅有导航壳、空DOM或加载提示时继续原页实际读取，不能宣称采集完成；只有实际零结果标记才能声明零匹配。仅确需局部内容时使用标准CSS selector，恰好匹配一个当前可见元素，并携带最近一次观察的observationId；不要使用文本/XPath。旧观察或页面变化时优先ego_browser_read({})，不要重放旧选择或重开TaskSpace。来源仅代表实际订阅列表，不代表核验官方原文。' + paginationMeaning,
+    ego_browser_next_page: '仅打开最近一次完整读取中实际出现的同源“下一页”链接。使用返回的 observationId/targetId，本任务累计最多10次打开/翻页导航（含旧TaskSpace历史）；无链接式分页时停止说明，不提交按钮或业务表单。' + paginationMeaning
   }
   return { id: 'ego-browser', kind: 'skill', enabled: true, available: config.state === 'installed', tools: EGO_TOOLS.map(name => LocalToolHost.defineTool({
     name, description: descriptions[name], policy: 'auto', inputSchema: z.toJSONSchema(inputs[name]),
@@ -398,8 +399,11 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
         if(!usingSelector&&result.selection!==undefined)throw fail('ego_browser_protocol_invalid')
         const selection=usingSelector?{selector:args.selector,matchedCount:1,contextReceiptId:params.contextReceiptId,documentHash:hash(String(result.documentHtml))}:undefined
         if(selection&&(object(result.selection).selector!==selection.selector||object(result.selection).matchedCount!==1))throw fail('ego_browser_element_ambiguous')
-        const pageNumber=repository.operations(task.id,'ego_page_navigation').filter(r=>r.status==='succeeded').length
-        const pagination={pageNumber,hasMore:nextPages.length?true:null,nextTargetsCount:nextPages.length,pageLimit:10,limitReached:pageNumber>=10}
+        const navigations=repository.operations(task.id,'ego_page_navigation').filter(r=>r.status==='succeeded')
+        const navigationActionsUsed=navigations.length
+        const currentSpaceNavigationCount=navigations.filter(r=>object(r.result).taskSpaceId===result.taskSpaceId).length
+        // Keep the historical alias readable; neither count attests a site's page number.
+        const pagination={pageNumber:navigationActionsUsed,pageNumberMeaning:'task_navigation_actions_used',navigationActionsUsed,currentSpaceNavigationCount,documentPageNumber:null,hasMore:nextPages.length?true:null,nextTargetsCount:nextPages.length,pageLimit:10,limitReached:navigationActionsUsed>=10}
         const saved={pagination,loadingObserved:result.loadingObserved===true,emptyObserved:result.visibleText===false,sourceUrl,html:result.html,resultHash,truncated:result.truncated,taskSpaceId:result.taskSpaceId,nextPages,documentHtml:result.documentHtml,...(selection?{selection}:{}),...(recoveredFrom?{recoveredFrom}:{})}
         const read=repository.beginOperation({ownerId:task.id,idempotencyKey:readKey,kind:'ego_document_read',request:{...request,taskSpaceId:result.taskSpaceId,...(usingSelector?{selector:args.selector,contextReceiptId:params.contextReceiptId}:{})},nowIso:new Date(now()).toISOString()}).receipt
         repository.finishOperation(task.id,readKey,{status:'succeeded',result:saved},new Date(now()).toISOString())
