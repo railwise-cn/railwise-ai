@@ -27,6 +27,8 @@ const rootIdentity = installIdentity(baseVersion, baseSource)
 const targetIdentity = installIdentity(targetVersion, reviewedBuild.sourceHead)
 const pathEquals = (one, other) => resolve(one).toLowerCase() === resolve(other).toLowerCase()
 const hourMs = 60 * 60 * 1000
+export const sidebarUpgradeControlSelector =
+  `button[title^="升级到 ${targetVersion}，"], button[title^="Update to ${targetVersion},"]`
 
 export function repairedScheduleSeed(nowMs) {
   return { appVersion: baseVersion, lastCheckedAt: new Date(nowMs - hourMs).toISOString() }
@@ -271,7 +273,7 @@ async function main(args) {
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
     report.baseline.pid = child.pid
     report.phase = 'automatic-offer'
-    const control = 'button[title^="升级到 0.5.7"], button[title^="Upgrade to 0.5.7"]'
+    const control = sidebarUpgradeControlSelector
     const button = await cdp.wait(`(() => {
       const element = document.querySelector(${JSON.stringify(control)})
       if (!element || element.disabled || !element.getClientRects().length) return null

@@ -6,7 +6,8 @@ import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   marketplaceCommandEnvironment,
-  resolveMarketplaceCommand
+  resolveMarketplaceCommand,
+  resolveMarketplaceNpmCommand
 } from './marketplace-command'
 
 const roots: string[] = []
@@ -100,5 +101,32 @@ describe('resolveMarketplaceCommand', () => {
 
     expect(resolveMarketplaceCommand('workwise-missing-tool', { PATH: root }, root))
       .toBe('workwise-missing-tool')
+  })
+})
+
+describe('resolveMarketplaceNpmCommand', () => {
+  it('resolves npm.cmd into a native Windows launch and a separate script argument', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'workwise npm 中文 '))
+    roots.push(root)
+    const cliDirectory = join(root, 'node_modules', 'npm', 'bin')
+    await mkdir(cliDirectory, { recursive: true })
+    await writeFile(join(root, 'npm.CMD'), '@exit /b 81\r\n')
+    await writeFile(join(root, 'node.exe'), '')
+    const cli = join(cliDirectory, 'npm-cli.js')
+    await writeFile(cli, '')
+
+    expect(resolveMarketplaceNpmCommand({ Path: root, PATHEXT: '.EXE;.CMD' }, root, 'win32')).toEqual({
+      executable: join(root, 'node.exe'),
+      args: [cli]
+    })
+  })
+
+  it('reports the missing Windows npm toolchain instead of executing a batch file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'workwise-npm-wrapper-'))
+    roots.push(root)
+    await writeFile(join(root, 'npm.CMD'), '@exit /b 81\r\n')
+
+    expect(() => resolveMarketplaceNpmCommand({ Path: root, PATHEXT: '.EXE;.CMD' }, root, 'win32'))
+      .toThrow('Windows Node.js with npm was not found.')
   })
 })

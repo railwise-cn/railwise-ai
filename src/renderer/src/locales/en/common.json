@@ -4428,6 +4428,8 @@
   "taskTimingHumanWait": "Waiting for you",
   "taskTimingComplete": "Recorded since task creation; execution includes child work.",
   "taskTimingPartial": "Recorded intervals only; missing historical time is not estimated.",
+  "pluginErrorMissingWindowsNpm": "Install Node.js with npm on Windows, restart the app and try this package again.",
+  "pluginErrorWindowsLauncher": "Windows could not start a required installer command (EINVAL). Check the package requirements and try again.",
   "pluginErrorPackageNetwork": "This plugin is listed in the catalog, but its package download source is unavailable. Use a mirror or import a local package.",
   "pluginUnifiedPartialOffline": "Featured catalog remains available offline while some online sources are unavailable.",
   "pluginUnifiedCatalogUnavailable": "The plugin catalog is temporarily unavailable. Try again later.",

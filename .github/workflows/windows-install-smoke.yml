@@ -168,6 +168,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - name: Reject mixed acceptance modes
         if: ${{ inputs.package_run_id != '' || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}

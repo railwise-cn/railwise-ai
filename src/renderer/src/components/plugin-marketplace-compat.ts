@@ -253,6 +253,12 @@ export function friendlyMarketplaceError(message: string, t: (key: string) => st
   if (/OAuth client ID is missing and dynamic registration is unavailable/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorOAuthClient', MARKETPLACE_TEXT_FALLBACKS.pluginErrorOAuthClient)
   }
+  if (/Windows Node\.js with npm was not found/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorMissingWindowsNpm', 'Install Node.js with npm on Windows, restart the app and try this package again.')
+  }
+  if (/spawn EINVAL/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorWindowsLauncher', 'Windows could not start a required installer command (EINVAL). Check the package requirements and try again.')
+  }
   if (/GitHub archive|codeload\.github|raw\.githubusercontent|api\.github|npm (?:view|install)|pypi\.org|files\.pythonhosted/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorPackageNetwork', MARKETPLACE_TEXT_FALLBACKS.pluginErrorPackageNetwork)
   }

@@ -2,11 +2,21 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { parse } from 'yaml'
-import { assertPublishedWindowsUpgrade, repairedScheduleSeed, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
+import { assertPublishedWindowsUpgrade, repairedScheduleSeed, sidebarUpgradeControlSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const installer = { url: 'RailWise-AI-0.5.7-win-x64.exe', size: 317686658, sha512: manifestDigest }
 const manifest = { version: '0.5.7', path: installer.url, sha512: manifestDigest, files: [installer] }
+
+test('the sidebar locator matches the actual English and Chinese updater button titles', async () => {
+  for (const locale of ['en', 'zh']) {
+    const strings = JSON.parse(await readFile(new URL(`../src/renderer/src/locales/${locale}/settings.json`, import.meta.url), 'utf8'))
+    const title = strings.guiUpdateUpgradeTitle.replace('{{version}}', '0.5.7')
+    const prefixes = [...sidebarUpgradeControlSelector.matchAll(/\[title\^="([^"]+)"\]/g)].map(match => match[1])
+    assert.ok(prefixes.some(prefix => title.startsWith(prefix)), `No selector matched the ${locale} title ${title}`)
+    assert.ok(prefixes.every(prefix => !title.replace('0.5.7', '0.5.70').startsWith(prefix)))
+  }
+})
 
 test('live feed preflight binds the complete reviewed Windows installer', () => {
   assert.equal(verifyPublishedWindowsManifest(manifest).reviewedSha256, '113a88a8601b04a49233267dc8321c17063a949fecce9fa5ad3e6ff37ed66dd7')
@@ -68,6 +78,7 @@ test('published Windows smoke is a separate opt-in job with read-only GitHub per
   assert.match(job.steps.find(step => step.name === 'Reject mixed acceptance modes').if, /run_repaired_gui_update/)
   const repaired = workflow.jobs['windows-repaired-gui-update']
   assert.match(repaired.if, /run_repaired_gui_update == true && inputs.run_published_gui_update != true/)
+  assert.equal(repaired.steps.find(step => step.uses === 'actions/checkout@v7').with['fetch-depth'], 0)
   const build = repaired.steps.find(step => step.run === 'npm run dist:win')
   assert.equal(build.env.WORKWISE_APP_VERSION, '0.5.6')
   assert.equal(build.env.WORKWISE_UPDATE_CHANNEL, 'stable')

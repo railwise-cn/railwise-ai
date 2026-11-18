@@ -39,7 +39,8 @@ import { describeNetworkFailure, systemFetch } from './system-network'
 import { parseCatalogPackageArtifact } from './marketplace-catalog-service'
 import {
   marketplaceCommandEnvironment,
-  resolveMarketplaceCommand
+  resolveMarketplaceCommand,
+  resolveMarketplaceNpmCommand
 } from './marketplace-command'
 
 const PREPARED_IMPORT_TTL_MS = 30 * 60_000
@@ -617,9 +618,9 @@ async function materializeNpmPackage(
   if (source.kind !== 'npm' || source.digest.algorithm !== 'sha512-sri') {
     throw new Error('Catalog npm package metadata is incomplete.')
   }
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  const npm = resolveMarketplaceNpmCommand()
   const spec = `${source.packageName}@${source.version}`
-  const integrityOutput = await command(npm, ['view', spec, 'dist.integrity', '--json'])
+  const integrityOutput = await command(npm.executable, [...npm.args, 'view', spec, 'dist.integrity', '--json'])
   let integrity = integrityOutput.trim()
   try {
     const parsed = JSON.parse(integrity) as unknown
@@ -637,7 +638,8 @@ async function materializeNpmPackage(
     version: '1.0.0',
     private: true
   }, null, 2)}\n`, { mode: 0o600 })
-  await command(npm, [
+  await command(npm.executable, [
+    ...npm.args,
     'install',
     '--ignore-scripts',
     '--no-audit',

@@ -1,6 +1,6 @@
-import { accessSync, constants } from 'node:fs'
+import { accessSync, constants, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { delimiter, join } from 'node:path'
+import { delimiter, dirname, extname, isAbsolute, join } from 'node:path'
 
 /**
  * GUI-launched Electron processes do not inherit the user's interactive shell
@@ -33,6 +33,37 @@ export function resolveMarketplaceCommand(
   }) ?? trimmed
 }
 
+function isRegularFile(path: string): boolean {
+  try {
+    return isAbsolute(path) && statSync(path).isFile()
+  } catch {
+    return false
+  }
+}
+
+export function resolveMarketplaceNpmCommand(
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+  platform: NodeJS.Platform = process.platform
+): { executable: string; args: string[] } {
+  const npm = resolveMarketplaceCommand('npm', env, home, platform)
+  if (platform !== 'win32' || (extname(npm).toLowerCase() === '.exe' && isRegularFile(npm))) {
+    return { executable: npm, args: [] }
+  }
+
+  // Node cannot execFile a Windows batch wrapper. Use the real npm entry
+  // point and keep the registry arguments out of any command interpreter.
+  const detectedNode = resolveMarketplaceCommand('node.exe', env, home, platform)
+  const directories = [npm, detectedNode].filter(isAbsolute).map(dirname)
+  for (const directory of new Set(directories)) {
+    const cli = join(directory, 'node_modules', 'npm', 'bin', 'npm-cli.js')
+    const executable = [join(directory, 'node.exe'), detectedNode]
+      .find((candidate) => extname(candidate).toLowerCase() === '.exe' && isRegularFile(candidate))
+    if (executable && isRegularFile(cli)) return { executable, args: [cli] }
+  }
+  throw new Error('Windows Node.js with npm was not found.')
+}
+
 export function marketplaceCommandEnvironment(
   env: NodeJS.ProcessEnv = process.env,
   home = homedir(),
@@ -55,6 +86,13 @@ function marketplacePathEntries(
   const pathDelimiter = platform === 'win32' ? ';' : delimiter
   return [
     env.PATH ?? env.Path ?? '',
+    ...(platform === 'win32' ? [
+      env.NVM_SYMLINK ?? '',
+      env.FNM_MULTISHELL_PATH ?? '',
+      env.ProgramFiles ? join(env.ProgramFiles, 'nodejs') : '',
+      env.APPDATA ? join(env.APPDATA, 'npm') : '',
+      env.LOCALAPPDATA ? join(env.LOCALAPPDATA, 'Volta', 'bin') : ''
+    ] : []),
     '/opt/homebrew/bin',
     '/opt/homebrew/sbin',
     '/usr/local/bin',

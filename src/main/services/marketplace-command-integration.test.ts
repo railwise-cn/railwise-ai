@@ -1,6 +1,6 @@
 import { access, chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { CatalogSourceV1, MarketplacePackageV1 } from '../../shared/marketplace'
 import { MarketplaceCatalogService } from './marketplace-catalog-service'
@@ -192,5 +192,87 @@ process.exit(0)`)
     expect(result.snapshot?.revision).toBe(commit)
     expect((await service.getSnapshot(sourceId))?.packages.map((item) => item.id))
       .toEqual(['fixture-package'])
+  })
+})
+
+const describeWindows = process.platform === 'win32' ? describe : describe.skip
+
+describeWindows('Windows marketplace npm installation', () => {
+  async function windowsNpmFixture(matchesIntegrity = true) {
+    const root = await tempRoot()
+    const tools = join(root, '工具路径 with spaces')
+    const npmBin = join(tools, 'node_modules', 'npm', 'bin')
+    const target = join(root, '安装目录 with spaces')
+    const cmdMarker = join(root, 'npm-cmd-started.txt')
+    const invocationLog = join(root, 'npm-invocations.jsonl')
+    const item = officialPackage('context7-mcp')
+    if (item.source.kind !== 'npm') throw new Error('Expected an npm fixture.')
+    const packageName = item.source.packageName
+    const spec = `${packageName}@${item.source.version}`
+    process.env.PATH = [tools, dirname(process.execPath)].join(delimiter)
+    process.env.WORKWISE_TEST_PACKAGE_NAME = packageName
+    process.env.WORKWISE_TEST_INTEGRITY = matchesIntegrity
+      ? item.source.digest.value
+      : `sha512-${Buffer.alloc(64).toString('base64')}`
+    process.env.WORKWISE_TEST_NPM_CMD_MARKER = cmdMarker
+    process.env.WORKWISE_TEST_NPM_INVOCATIONS = invocationLog
+
+    await mkdir(npmBin, { recursive: true })
+    await writeFile(join(tools, 'npm.cmd'), '@echo off\r\necho unexpected>"%WORKWISE_TEST_NPM_CMD_MARKER%"\r\nexit /b 27\r\n')
+    await writeFile(join(npmBin, 'npm-cli.js'), String.raw`
+const fs = require('node:fs')
+const path = require('node:path')
+const args = process.argv.slice(2)
+const packageName = process.env.WORKWISE_TEST_PACKAGE_NAME
+fs.appendFileSync(process.env.WORKWISE_TEST_NPM_INVOCATIONS, JSON.stringify({ args, cwd: process.cwd() }) + '\n')
+if (args[0] === 'view') {
+  process.stdout.write(JSON.stringify(process.env.WORKWISE_TEST_INTEGRITY))
+} else if (args[0] === 'install') {
+  const packageRoot = path.join(process.cwd(), 'node_modules', ...packageName.split('/'))
+  fs.mkdirSync(packageRoot, { recursive: true })
+  fs.writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({ name: packageName }))
+  fs.writeFileSync(path.join(packageRoot, 'LICENSE'), 'MIT fixture')
+} else {
+  throw new Error('Unexpected npm command: ' + args[0])
+}
+`)
+
+    return {
+      item, target, packageName, spec, cmdMarker,
+      async readInvocations(): Promise<Array<{ args: string[]; cwd: string }>> {
+        return (await readFile(invocationLog, 'utf8')).trim().split('\n').map((line) => JSON.parse(line))
+      }
+    }
+  }
+
+  it('checks the pinned npm integrity and installs without launching the .cmd wrapper', async () => {
+    const fixture = await windowsNpmFixture()
+
+    await materializeCatalogPackage(fixture.item, fixture.target)
+
+    expect(await fixture.readInvocations()).toEqual([
+      { args: ['view', fixture.spec, 'dist.integrity', '--json'], cwd: expect.any(String) },
+      {
+        args: ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--save-exact', '--package-lock=true', fixture.spec],
+        cwd: fixture.target
+      }
+    ])
+    expect(await readFile(join(fixture.target, 'LICENSE'), 'utf8')).toBe('MIT fixture')
+    expect(JSON.parse(await readFile(join(fixture.target, 'node_modules', ...fixture.packageName.split('/'), 'package.json'), 'utf8')))
+      .toEqual({ name: fixture.packageName })
+    await expect(access(fixture.cmdMarker)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('stops before installation when the Windows npm integrity mismatches', async () => {
+    const fixture = await windowsNpmFixture(false)
+
+    await expect(materializeCatalogPackage(fixture.item, fixture.target))
+      .rejects.toThrow('npm registry integrity does not match the trusted catalog snapshot.')
+
+    expect(await fixture.readInvocations()).toEqual([
+      { args: ['view', fixture.spec, 'dist.integrity', '--json'], cwd: expect.any(String) }
+    ])
+    await expect(access(fixture.target)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(access(fixture.cmdMarker)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })
