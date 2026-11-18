@@ -572,7 +572,7 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   assert.ok(ui.indexOf("text: '版本更新'") < ui.indexOf("'1.4 现有界面截图'"))
   const offlineHelp = ui.indexOf("report.checks.push('offline-help-images')")
   const taskRuntime = ui.indexOf("'the installed KUN runtime'", offlineHelp)
-  assert.match(ui, /if \(!taskSmoke\) \{[\s\S]*?'offline-help-images'\)\n    \} else \{/)
+  assert.match(ui, /if \(!taskSmoke\) \{[\s\S]*?'offline-help-images'\)\r?\n    \} else \{/)
   assert.ok(taskRuntime > offlineHelp)
   assert.ok(taskRuntime < ui.indexOf("cdp.click('.ds-sidebar-shell button.w-full', '新建会话')", taskRuntime))
   assert.doesNotMatch(ui, /cdp\.hover\('button\[aria-label="新建会话"\]'/)

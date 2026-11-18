@@ -64,12 +64,25 @@ function modelAction(body, selection, render, parseFixtureToolOutput) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
   const results = new Map(body.messages?.filter(message => message.role === 'tool')
     .map(message => [message.tool_call_id, parseFixtureToolOutput(message.content)]))
-  const resource = results.get('eval-read-pipeline')
-  if (!results.has('eval-read-pipeline')) return tools.has('read_skill_resource') ?
-    ['eval-read-pipeline', 'read_skill_resource', { skill_id: selection.skillId, path: 'references/pipeline.md' }] : null
-  assert.ok(resource?.skill_id === selection.skillId && resource?.path === 'references/pipeline.md' && /remotion render/i.test(resource.content),
-    'The installed Skill workflow must actually be read before requesting rendering')
-  selection.read = true
+  const pipeline = 'references/pipeline.md'
+  let offset = 0
+  for (let page = 0; page < 8; page++) {
+    const id = `eval-read-pipeline-${page}`
+    if (!results.has(id)) {
+      assert.ok(tools.has('read_skill_resource'), 'The installed Skill must offer its scoped document reader')
+      return [id, 'read_skill_resource', { skill_id: selection.skillId, path: pipeline, offset_bytes: offset }]
+    }
+    const resource = results.get(id)
+    const typed = { idMatches: resource?.skill_id === selection.skillId, pathMatches: resource?.path === pipeline,
+      code: /^[a-z0-9_-]{1,80}$/i.test(resource?.code ?? '') ? resource.code : undefined,
+      offset: resource?.offset_bytes, bytes: resource?.bytes_returned, next: resource?.next_offset_bytes }
+    assert.ok(typed.idMatches && typed.pathMatches && typed.offset === offset && typeof resource.content === 'string',
+      `The installed Skill workflow could not be read: ${literal(typed)}`)
+    if (/remotion render/i.test(resource.content)) { selection.read = true; break }
+    assert.ok(Number.isSafeInteger(typed.next) && typed.next > offset, `The real workflow did not show its rendering step: ${literal(typed)}`)
+    offset = typed.next
+  }
+  assert.equal(selection.read, true, 'The installed Skill workflow must actually be read before requesting rendering')
   if (!results.has('eval-render')) return tools.has('request_host_shell') ? ['eval-render', 'request_host_shell', render] : null
   let output = results.get('eval-render')
   for (let index = 1; output?.status === 'running' && index < 45; index++) {
