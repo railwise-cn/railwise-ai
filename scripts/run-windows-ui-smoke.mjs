@@ -2471,7 +2471,7 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
   }
 }
 
-export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true' }) {
+export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true' }) {
   taskSmoke ||= browserSmoke
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
@@ -2487,7 +2487,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const workspace = join(root, windowsSmokeWorkspaceName)
   const environment = windowsUiEnvironment(process.env, root)
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
-  const taskModel = taskSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke }) : undefined
+  const taskModel = taskSmoke || mirrorSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke }) : undefined
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
   await writeFile(settingsPath, JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
@@ -3079,6 +3079,14 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       validateWindowsTaskEvidence(report.taskExecution)
       report.checks.push('runtime-task-html-and-daily-schedule')
     }
+    if (mirrorSmoke) {
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
+      await cdp.click('.ds-settings-sidebar button', '返回')
+      await cdp.wait(`!document.querySelector('.ds-settings-sidebar')`, 'the workspace after leaving offline help')
+      const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
+      report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root })
+      report.checks.push('cold-mirror-installs-playwright-docling-and-skill-selection')
+    }
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error))
     if (error.browserBootstrap) report.browserBootstrap = error.browserBootstrap
@@ -3435,7 +3443,8 @@ export async function dispatchWindowsSmokeEntry(args, environment = process.env,
   const [executable, version, sourceHead, evidenceDir, flag] = args
   const diagnostic = args.includes('--browser-startup-diagnostic') || environment.RAILWISE_WINDOWS_BROWSER_STARTUP_DIAGNOSTIC === 'true'
   if (diagnostic) {
-    assert.ok(environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' && !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup diagnostic is exclusive with task/browser execution')
+    assert.ok(environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&
+      environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup diagnostic is exclusive with task/browser execution')
     return runDiagnostic({ executable, version, sourceHead, evidenceDir })
   }
   return runUi({ executable, version, sourceHead, evidenceDir, ...(flag === '--task-smoke' ? { taskSmoke: true } : {}), ...(flag === '--browser-smoke' ? { browserSmoke: true } : {}) })

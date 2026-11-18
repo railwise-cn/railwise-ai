@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_mirror_acceptance:
+        description: 'Check cold official marketplace installs, local Playwright navigation, Docling startup and Video Shotcraft selection on the exact Windows installer.'
+        type: boolean
+        required: false
+        default: false
       run_browser_startup_diagnostic:
         description: 'Collect isolated pinned daemon startup diagnostics only; no application, model or task execution'
         type: boolean
@@ -58,6 +63,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_mirror_acceptance:
+        description: 'Check cold official marketplace installs, local Playwright navigation, Docling startup and Video Shotcraft selection on the exact Windows installer.'
+        type: boolean
+        required: false
+        default: false
       run_browser_startup_diagnostic:
         description: 'Collect isolated pinned daemon startup diagnostics only; no application, model or task execution'
         type: boolean
@@ -78,7 +88,7 @@ jobs:
     if: ${{ inputs.run_frozen_gui_update != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
-    timeout-minutes: ${{ inputs.run_browser_execution && 25 || 15 }}
+    timeout-minutes: ${{ inputs.run_mirror_acceptance && 65 || inputs.run_browser_execution && 25 || 15 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -88,6 +98,9 @@ jobs:
       - name: Reject mixed diagnostic and business acceptance modes
         if: inputs.run_browser_startup_diagnostic && (inputs.run_task_execution || inputs.run_browser_execution)
         run: throw 'Browser startup diagnostic is exclusive with task and browser execution'
+      - name: Preserve the isolated cold marketplace profile
+        if: inputs.run_mirror_acceptance && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution)
+        run: throw 'Cold marketplace acceptance must use its own clean profile'
       - name: Require the original package build ID
         if: ${{ inputs.package_run_id == '' }}
         run: throw 'package_run_id is required to inspect an existing package'
@@ -121,6 +134,7 @@ jobs:
           RAILWISE_WINDOWS_BROWSER_STARTUP_DIAGNOSTIC: ${{ inputs.run_browser_startup_diagnostic }}
           RAILWISE_WINDOWS_TASK_SMOKE: ${{ inputs.run_task_execution }}
           RAILWISE_WINDOWS_BROWSER_SMOKE: ${{ inputs.run_browser_execution }}
+          RAILWISE_WINDOWS_MIRROR_SMOKE: ${{ inputs.run_mirror_acceptance }}
         run: |
           $packages = Join-Path $env:RUNNER_TEMP 'exact-windows-packages'
           $installers = @(Get-ChildItem -LiteralPath $packages -Filter '*.exe' -File)
@@ -154,7 +168,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Validate exclusive acceptance scope
-        if: ${{ inputs.package_run_id == '' || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
+        if: ${{ inputs.package_run_id == '' || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance }}
         run: throw 'Select one original frozen package run and optional private next package run'
       - uses: actions/setup-node@v7
         with:
