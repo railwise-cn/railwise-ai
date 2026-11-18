@@ -12,6 +12,7 @@ import type {
 } from '../agent/types'
 import type { LiveUsageProjection } from './live-usage-projection'
 import type { CoreRuntimeCapabilityManifestJson } from '../agent/runtime-contract'
+import type { ThreadRunActivity } from '../agent/ag-ui-activity'
 import type {
   ClawImAgentProfileV1,
   ClawImChannelV1,
@@ -161,6 +162,7 @@ export type ChatState = {
   liveAssistant: string
   lastSeq: number
   usageRefreshKey: number
+  runActivity?: ThreadRunActivity | null
   liveUsageByThreadId: Record<string, LiveUsageProjection>
   busy: boolean
   error: string | null

@@ -11,6 +11,7 @@ import {
   Globe2,
   ListTodo,
   MessageCircleMore,
+  Sheet,
   Terminal
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -27,6 +28,7 @@ type Props = {
   sideChatOpen?: boolean
   sideChatEnabled?: boolean
   onOpenSideChat?: () => void
+  onNewWorkbook?: () => void
 }
 
 export function WorkbenchTopBar({
@@ -37,7 +39,8 @@ export function WorkbenchTopBar({
   sideChatRunningCount = 0,
   sideChatOpen = false,
   sideChatEnabled = true,
-  onOpenSideChat
+  onOpenSideChat,
+  onNewWorkbook
 }: Props): ReactElement {
   const { t } = useTranslation(['common', 'settings'])
   const [editors, setEditors] = useState<EditorInfo[]>([])
@@ -127,6 +130,13 @@ export function WorkbenchTopBar({
 
   return (
     <div className="chat-workbench-topbar ds-no-drag flex min-w-0 shrink-0 flex-nowrap items-center justify-end gap-1">
+      {onNewWorkbook ? <button
+        type="button"
+        className="inline-flex shrink-0 items-center rounded-full border border-transparent px-2.5 py-1.5 text-ds-muted hover:bg-ds-subtle"
+        onClick={onNewWorkbook}
+        aria-label={t('newWorkbook')}
+        title={t('newWorkbook')}
+      ><Sheet className="h-4 w-4" strokeWidth={1.8} /></button> : null}
       <div ref={editorMenuRef} className="relative">
         <button
           type="button"

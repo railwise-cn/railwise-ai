@@ -789,7 +789,9 @@ export async function syncManagedSkillCapability(
   settings: AppSettingsV1,
   options: { enable?: true } = {}
 ): Promise<void> {
-  const managedRoots = (await guiSkillRootsForRuntime(settings)).map(root => root.path)
+  const discoveredRoots = await guiSkillRootsForRuntime(settings)
+  const managedRoots = discoveredRoots.map(root => root.path)
+  const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
   await updateManagedConnectorConfig(dataDir, existing => {
     const capabilities = objectValue(existing.capabilities)
     const current = objectValue(capabilities.skills)
@@ -797,6 +799,7 @@ export async function syncManagedSkillCapability(
     const customRoots = stringArrayValue(current.roots).filter(root => !previousManaged.has(root) && !isManagedPluginSkillRoot(root))
     const roots = uniqueStrings([...customRoots, ...managedRoots])
     const skills = SkillsCapabilityConfig.parse({ ...current, roots, managedRoots,
+      projectRoots: projectRoots.length ? projectRoots : undefined,
       revision: Number(current.revision ?? 0) + 1,
       enabled: options.enable === true || current.enabled !== false })
     return { ...existing, capabilities: { ...capabilities, skills } }
@@ -1009,7 +1012,9 @@ async function skillCapabilityConfigForRuntime(
   settings?: AppSettingsV1,
   explicitRoots?: string[]
 ): Promise<Record<string, unknown>> {
-  const managedRoots = explicitRoots ? [] : (await guiSkillRootsForRuntime(settings)).map((root) => root.path)
+  const discoveredRoots = explicitRoots ? [] : await guiSkillRootsForRuntime(settings)
+  const managedRoots = discoveredRoots.map(root => root.path)
+  const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
   const roots = explicitRoots
     ? uniqueStrings(explicitRoots.map(normalizeSkillRootPath))
     : uniqueStrings([
@@ -1021,6 +1026,7 @@ async function skillCapabilityConfigForRuntime(
     enabled: existing.enabled !== false,
     roots,
     managedRoots,
+    projectRoots: projectRoots.length ? projectRoots : undefined,
     legacySkillMd: existing.legacySkillMd === false ? false : true
   }
 }

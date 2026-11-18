@@ -134,6 +134,7 @@ export type SkillRuntimeDiagnostics = {
     description?: string
     version: string
     root: string
+    scope?: 'project' | 'global'
     legacy: boolean
     triggers: LoadedSkill['triggers']
     allowedTools: string[]
@@ -264,7 +265,11 @@ export class SkillRuntime {
     const refreshedConfig = dynamicRoots.size > 0
       ? { ...this.config, roots: [...dynamicRoots.keys(), ...this.config.roots] }
       : this.config
-    const loaded = await discoverSkills(refreshedConfig, previousSkills, dynamicRoots, (progress) => {
+    const scopedRoots = new Map([
+      ...(this.config.projectRoots ?? []).map(({ root, workspace }) => [resolve(root), resolve(workspace)] as const),
+      ...dynamicRoots
+    ])
+    const loaded = await discoverSkills(refreshedConfig, previousSkills, scopedRoots, (progress) => {
       if (generation !== this.configurationGeneration) return
       // Publish successful reads while retaining the old catalog until this scan ends.
       this.skills = uniqueSkills([...progress.skills, ...previousSkills])
@@ -275,17 +280,47 @@ export class SkillRuntime {
     this.validationErrors = loaded.validationErrors
   }
 
+  async validateSlashSelection(prompt: string, workspace: string): Promise<void> {
+    const id = requestedSlashSkill(prompt)
+    if (!id) return
+    await this.refreshForWorkspace(workspace)
+    const skill = this.skillsForWorkspace(workspace).find(candidate => candidate.id === id)
+    if (!this.config.enabled || !skill || this.options.activeLimit < 1 ||
+        !buildSkillInstruction({ skill, skillId: id, reason: 'explicit:id', score: 1_000 }, this.options.instructionBudgetBytes)) {
+      throw unavailableSlashSkill(id)
+    }
+  }
+
+  async refreshForWorkspace(workspace: string): Promise<void> {
+    const current = this.discovery
+    await this.refresh(workspace)
+    // A scan of another workspace can complete and start the requested scan
+    // while its caller is waiting. Reuse that scan's existing time budget.
+    const next = this.discovery
+    if (next && current && next !== current && next.workspace === (workspace.trim() ? resolve(workspace) : undefined)) {
+      await next.wait
+    }
+  }
+
   resolveTurn(input: {
     prompt: string
     workspace: string
+    requestedSkillId?: string
     filePaths?: readonly string[]
     preferredSkillIds?: readonly string[]
     contextPrompt?: string
   }): SkillTurnResolution {
-    if (!this.config.enabled) return emptyResolution()
-    const matches = this.matchSkills(input)
+    const requestedSkillId = input.requestedSkillId ?? requestedSlashSkill(input.prompt)
+    if (!this.config.enabled) {
+      if (requestedSkillId) throw unavailableSlashSkill(requestedSkillId)
+      return emptyResolution()
+    }
+    const matches = this.matchSkills({ ...input, requestedSkillId })
     const active = matches.slice(0, this.options.activeLimit)
     const injection = buildInjection(active, this.options.instructionBudgetBytes)
+    if (requestedSkillId && !injection.activeSkillIds.includes(requestedSkillId)) {
+      throw unavailableSlashSkill(requestedSkillId)
+    }
     const activeSkillResources = active.flatMap(({ skill }) =>
       skill.resourceScope && injection.activeSkillIds.includes(skill.id) ? [skill.resourceScope] : [])
     const blockedToolNames = blockedToolsFor(this.skillsForWorkspace(input.workspace), injection.allowedToolNames)
@@ -310,16 +345,18 @@ export class SkillRuntime {
     }
   }
 
-  diagnostics(): SkillRuntimeDiagnostics {
+  diagnostics(workspace?: string): SkillRuntimeDiagnostics {
+    const skills = workspace === undefined ? this.skills : this.skillsForWorkspace(workspace)
     return {
       enabled: this.config.enabled,
       roots: [...this.config.roots],
-      skills: this.skills.map((skill) => ({
+      skills: skills.map((skill) => ({
         id: skill.id,
         name: skill.name,
         ...(skill.description ? { description: skill.description } : {}),
         version: skill.version,
         root: skill.root,
+        ...(workspace !== undefined ? { scope: skill.workspace ? 'project' as const : 'global' as const } : {}),
         legacy: skill.legacy,
         triggers: skill.triggers,
         allowedTools: skill.allowedTools
@@ -344,17 +381,29 @@ export class SkillRuntime {
   private matchSkills(input: {
     prompt: string
     workspace: string
+    requestedSkillId?: string
     filePaths?: readonly string[]
     preferredSkillIds?: readonly string[]
     contextPrompt?: string
   }): Array<SkillActivation & { skill: LoadedSkill }> {
-    const prompt = input.prompt
-    const positivePrompt = positiveSkillContext(prompt)
+    // An ID token carries intent only for that exact Skill. Exclude it from
+    // description and natural-name matching so a shorter ID cannot also run.
+    const positiveSource = positiveSkillContext(input.prompt)
+    const slashIds = new Set(Array.from(positiveSource.matchAll(SLASH_SKILL_TOKEN), match => match[2].toLowerCase()))
+    const prompt = input.prompt.replace(SLASH_SKILL_TOKEN, '$1')
+    const positivePrompt = positiveSource.replace(SLASH_SKILL_TOKEN, '$1')
     const lowerPrompt = positivePrompt.toLowerCase()
     const fileTypes = fileTypesFrom(input.filePaths ?? [], prompt)
     const preferredSkillIds = new Set(input.preferredSkillIds ?? [])
     const matches: Array<SkillActivation & { skill: LoadedSkill }> = []
     for (const skill of this.skillsForWorkspace(input.workspace)) {
+      if (skill.id === input.requestedSkillId || slashIds.has(skill.id)) {
+        // The picker selects one exact ID. Keep it ahead of inferred skills,
+        // independent of package priority and the size of the turn budget.
+        matches.push({ skill, skillId: skill.id, reason: 'explicit:id',
+          score: skill.id === input.requestedSkillId ? Number.MAX_SAFE_INTEGER : 1_000 + skill.priority })
+        continue
+      }
       const explicit = explicitSkillMention(skill, positivePrompt)
       if (explicit) {
         matches.push({ skill, skillId: skill.id, reason: explicit, score: 1_000 + skill.priority })
@@ -407,14 +456,14 @@ export class SkillRuntime {
 async function discoverSkills(
   config: SkillsCapabilityConfig,
   previousSkills: LoadedSkill[],
-  dynamicRoots: ReadonlyMap<string, string>,
+  scopedRoots: ReadonlyMap<string, string>,
   onProgress: (loaded: DiscoveredSkills) => void
 ): Promise<DiscoveredSkills> {
   const skills: LoadedSkill[] = []
   const validationErrors: Array<{ root: string; message: string }> = []
   for (const rawRoot of config.roots) {
     const root = resolve(rawRoot)
-    const workspace = dynamicRoots.get(root)
+    const workspace = scopedRoots.get(root)
     const previousInScope = previousSkills.filter(skill => skill.workspace === workspace)
     const startedAt = Date.now()
     const pendingRootTimer = setTimeout(() => {
@@ -696,6 +745,18 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
+const SLASH_SKILL_TOKEN = /(^|[\s([{，。；：、])\/skill:([\p{L}\p{N}_-]+)(?=\s|$)/giu
+
+export function requestedSlashSkill(prompt: string): string | undefined {
+  return /^\/skill:([\p{L}\p{N}_-]+)(?=\s|$)/u.exec(prompt.trimStart().normalize('NFKC').toLowerCase())?.[1]
+}
+
+function unavailableSlashSkill(id: string): Error {
+  return Object.assign(new Error(`Skill "${id}" is unavailable. Check Skills & Connectors or select it again from the / menu.`), {
+    code: 'skill_unavailable'
+  })
+}
+
 function explicitSkillMention(skill: LoadedSkill, prompt: string): string | undefined {
   // Keep the known BrowserSkill spellings from the reported task aligned with
   // capability preflight; do not fuzzy-match other installed skill names.
@@ -703,7 +764,7 @@ function explicitSkillMention(skill: LoadedSkill, prompt: string): string | unde
   const lower = prompt.toLowerCase()
   const id = skill.id.toLowerCase()
   const name = skill.name.toLowerCase()
-  if (lower.includes(`$${id}`) || lower.includes(`@${id}`) || lower.includes(`/skill:${id}`)) return 'explicit:id'
+  if (lower.includes(`$${id}`) || lower.includes(`@${id}`)) return 'explicit:id'
   if (name && (lower.includes(`$${name}`) || lower.includes(`@${name}`))) return 'explicit:name'
   const naturalPrompt = normalizeNaturalSkillMention(prompt)
   for (const [candidate, reason] of [

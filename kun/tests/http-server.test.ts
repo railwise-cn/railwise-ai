@@ -11,6 +11,7 @@ import { WORKWISE_RUNTIME_PROTOCOL_VERSION } from '../src/contracts/runtime-prot
 import type { TurnItem } from '../src/contracts/items.js'
 import { fingerprintDshUiBlock } from '../src/contracts/dsh-ui.js'
 import { RUNTIME_RESOURCE_LIMITS_V1 } from '../src/contracts/resource-limits.js'
+import { SkillRuntime } from '../src/skills/skill-runtime.js'
 
 describe('HTTP server', () => {
   let dataDir = ''
@@ -311,6 +312,34 @@ describe('HTTP server', () => {
       id: 'review',
       description: 'Review the current change'
     })
+  })
+
+  it('uses the actual thread workspace for the picker and rejects a removed skill before admitting a turn', async () => {
+    const skillPath = join(dataDir, '.agents', 'skills', 'file-review')
+    await mkdir(skillPath, { recursive: true })
+    await writeFile(join(skillPath, 'SKILL.md'), '---\nname: 审阅文件\n---\nReview a document.\n')
+    const skillRuntime = await SkillRuntime.create({ enabled: true, roots: [], legacySkillMd: true })
+    const h = buildHarness({ skillRuntime })
+    const threadId = 'thr_slash_skill'
+    await h.threadService.create({ workspace: dataDir, model: 'fake', mode: 'agent' }, { id: threadId })
+    const headers = { authorization: 'Bearer tok-1' }
+    const catalog = await dispatchRequest(h.router, new Request(
+      `http://localhost/v1/skills?scope=available&threadId=${threadId}&workspace=/tmp/unrelated`,
+      { headers }
+    ))
+    expect(await readJson(catalog)).toMatchObject({
+      scope: 'available',
+      skills: [expect.objectContaining({ id: 'file-review', name: '审阅文件', scope: 'project' })]
+    })
+    await rm(skillPath, { recursive: true })
+    const rejected = await dispatchRequest(h.router, new Request(`http://localhost/v1/threads/${threadId}/turns`, {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'Managed instructions\n/skill:file-review 审阅', displayText: '/skill:file-review 审阅' })
+    }))
+    expect(rejected.status).toBe(409)
+    expect(await readJson(rejected)).toMatchObject({ code: 'skill_unavailable' })
+    expect((await h.threadService.get(threadId))?.turns).toEqual([])
   })
 
   it('returns the real user message item id when starting a turn', async () => {

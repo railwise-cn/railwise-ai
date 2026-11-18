@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -148,6 +149,7 @@ type Props = {
   executionSettingsApplying?: boolean
   changedFiles?: ComposerChangedFile[]
   changedFileStats?: { added: number; removed: number } | null
+  skillsLoading?: boolean
   skillCommands?: Array<{
     id: string
     name: string
@@ -582,6 +584,7 @@ export function FloatingComposer({
   changedFiles = EMPTY_CHANGED_FILES,
   changedFileStats = null,
   skillCommands = EMPTY_SKILL_COMMANDS,
+  skillsLoading = false,
   onPickAttachments,
   onPasteClipboardImage,
   onRemoveAttachment,
@@ -696,7 +699,8 @@ export function FloatingComposer({
     minHeight: composerMinHeight,
     maxHeight: composerMaxHeight
   })
-  const slashQuery = getSlashQuery(input)
+  const [dismissedSlashInput, setDismissedSlashInput] = useState<string | null>(null)
+  const slashQuery = dismissedSlashInput === input ? null : getSlashQuery(input)
   const [composerCursor, setComposerCursor] = useState(() => input.length)
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0)
   const [selectedSkillMentionIndex, setSelectedSkillMentionIndex] = useState(0)
@@ -712,6 +716,7 @@ export function FloatingComposer({
   const [reviewRepositoryRoot, setReviewRepositoryRoot] = useState('')
   const composerRootRef = useRef<HTMLDivElement | null>(null)
   const suggestionAnchorRef = useRef<HTMLDivElement | null>(null)
+  const slashListId = useId()
   const slashListRef = useRef<HTMLDivElement | null>(null)
   const skillListRef = useRef<HTMLDivElement | null>(null)
   const fileListRef = useRef<HTMLDivElement | null>(null)
@@ -772,7 +777,6 @@ export function FloatingComposer({
           if (leftProject !== rightProject) return leftProject ? -1 : 1
           return left.name.localeCompare(right.name)
         })
-        .slice(0, 40)
         .map<SlashCommand>((skill) => {
           const prompt = `/skill:${skill.id} `
           const scopeLabel = isProjectSkill(skill, effectiveWorkspaceRoot)
@@ -788,7 +792,7 @@ export function FloatingComposer({
             kind: 'skill',
             title: skill.name,
             description: skill.description?.trim() || t('slashSkillDescriptionFallback'),
-            keywords: [skill.id, skill.name, skill.root ?? '', scopeLabel, 'skill', '技能', ...triggers],
+            keywords: [skill.id, skill.name, scopeLabel, 'skill', '技能', ...triggers],
             icon: <Sparkles className="h-4 w-4" strokeWidth={1.9} />,
             badge: prompt.trim(),
             scopeLabel,
@@ -796,7 +800,7 @@ export function FloatingComposer({
             disabled: !runtimeReady
           }
         })
-      commands.push(...dynamicSkillCommands)
+      commands.unshift(...dynamicSkillCommands)
 
       commands.push({
         id: 'goal',
@@ -894,7 +898,7 @@ export function FloatingComposer({
     if (!slashQuery) return slashCommands
     return slashCommands.filter((command) => {
       const haystack = [command.id, command.title, command.description, ...command.keywords]
-      return haystack.some((part) => part.toLowerCase().includes(slashQuery))
+      return haystack.some((part) => part.normalize('NFKC').toLowerCase().includes(slashQuery))
     })
   }, [slashCommands, slashQuery])
 
@@ -1106,7 +1110,7 @@ export function FloatingComposer({
   const applySlashCommand = (commandId: SlashCommandId): void => {
     if (commandId.startsWith('skill:')) {
       const command = slashCommands.find((item) => item.id === commandId)
-      if (command?.skillPrompt) {
+      if (command?.skillPrompt && !command.disabled) {
         setInput(command.skillPrompt)
         draft.focusComposer()
       }
@@ -1297,6 +1301,7 @@ export function FloatingComposer({
       applySlashCommand(highlightedSlashCommand.id)
       return
     }
+    if (slashQuery === '') return
     if (setGoalFromComposerInput()) {
       return
     }
@@ -1410,7 +1415,7 @@ export function FloatingComposer({
       }
       if (event.key === 'Escape') {
         event.preventDefault()
-        setInput('')
+        setDismissedSlashInput(input)
         return
       }
     }
@@ -1686,13 +1691,21 @@ export function FloatingComposer({
             <div className="flex h-7 shrink-0 items-center px-2.5 text-[11.5px] font-semibold text-ds-muted">
               {t('slashCommandMenuTitle')}
             </div>
+            {skillsLoading && route !== 'claw' ? (
+              <div role="status" className="px-2.5 py-1 text-[12px] text-ds-muted">
+                {t('slashSkillsLoading')}
+              </div>
+            ) : null}
             {filteredSlashCommands.length > 0 ? (
-              <div ref={slashListRef} className="flex min-h-0 max-h-[300px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
-                {filteredSlashCommands.map((command) => {
+              <div id={slashListId} role="listbox" aria-label={t('slashCommandMenuTitle')} ref={slashListRef} className="flex min-h-0 max-h-[300px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+                {filteredSlashCommands.map((command, index) => {
                   const active = highlightedSlashCommand?.id === command.id
                   return (
                     <button
                       key={command.id}
+                      id={`${slashListId}-${index}`}
+                      role="option"
+                      aria-selected={active}
                       data-composer-active={active ? 'true' : undefined}
                       type="button"
                       onMouseDown={(event) => event.preventDefault()}
@@ -1994,8 +2007,11 @@ export function FloatingComposer({
             placeholder={placeholder}
             value={input}
             disabled={!canEditComposer}
+            aria-controls={filteredSlashCommands.length ? slashListId : undefined}
+            aria-activedescendant={highlightedSlashCommand ? `${slashListId}-${filteredSlashCommands.indexOf(highlightedSlashCommand)}` : undefined}
             onChange={(e) => {
               setInput(e.target.value)
+              setDismissedSlashInput(null)
               setComposerCursor(e.target.selectionStart ?? e.target.value.length)
               setDismissedFileMentionKey(null)
             }}

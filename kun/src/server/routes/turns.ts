@@ -32,6 +32,9 @@ export async function startTurn(
     onStarted?.(response)
     return jsonResponse(response, 202)
   } catch (error) {
+    if ((error as { code?: unknown })?.code === 'skill_unavailable') {
+      return jsonResponse({ code: 'skill_unavailable', message: (error as Error).message }, 409)
+    }
     if ((error as { code?: unknown })?.code === 'model_provider_unavailable') {
       return jsonResponse({ code: 'model_provider_unavailable', message: (error as Error).message }, 400)
     }

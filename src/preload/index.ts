@@ -282,6 +282,8 @@ const api = {
   openChatAttachmentOriginal: (managedPath) => ipcRenderer.invoke('attachment:open-original', managedPath),
   cancelDocumentParse: (parseId) => ipcRenderer.invoke('document-engine:cancel', parseId),
   previewWorkspaceFile: (request) => ipcRenderer.invoke('file:preview-workspace', request),
+  openSpreadsheet: (request) => ipcRenderer.invoke('spreadsheet:open', request),
+  saveWorkbook: (request) => ipcRenderer.invoke('spreadsheet:save', request),
   openSkillRoot: (rootPath) =>
     ipcRenderer.invoke('skill:open-root', rootPath),
   getRuntimeConfigFile: () =>

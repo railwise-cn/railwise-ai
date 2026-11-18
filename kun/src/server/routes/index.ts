@@ -286,7 +286,7 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('GET', '/v1/engineering/deformations/:id', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.getDeformation(runtime.surveyService, ctx.params.id) : ERRORS.unauthorized())
   router.add('GET', '/v1/skills', async (request) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
-    return listSkills(runtime)
+    return listSkills(runtime, request)
   })
   router.add('POST', '/v1/attachments', async (request) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
@@ -526,7 +526,11 @@ export function buildRouter(runtime: ServerRuntime): Router {
           intent: statusQuery ? 'status' : parsed.data.taskIntent === 'new' || parsed.data.taskIntent === 'supplement' ? parsed.data.taskIntent : 'auto',
           idempotencyKey: parsed.data.idempotencyKey ?? randomUUID(),
           request: parsed.data
+        }).catch((error: unknown) => {
+          if ((error as { code?: unknown })?.code === 'skill_unavailable') return null
+          throw error
         })
+        if (!result) return jsonResponse({ code: 'skill_unavailable', message: 'Check Skills & Connectors or select the Skill again from the / menu.' }, 409)
         if (result.kind === 'task_started' || result.kind === 'chat_started') return jsonResponse(result.turn, 202)
         if (result.kind === 'capability_required') return jsonResponse({
           code: 'capability_required', message: result.message, taskId: result.task?.id,

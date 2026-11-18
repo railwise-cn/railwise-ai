@@ -1,6 +1,7 @@
 import i18n from '../../i18n'
 import type { ConversationViewMode } from '@shared/app-settings'
 import type { ChatBlock } from '../../agent/types'
+import { operationPhase } from '../../agent/operation-phase'
 
 const SECRET_KEY_PATTERN = /(?:api[-_]?key|authorization|cookie|password|secret|token)/i
 
@@ -112,14 +113,7 @@ export function deriveSemanticProgress(blocks: ChatBlock[], processing: boolean)
   const active = [...tools].reverse().find((block) => block.status === 'running')
   const latest = active ?? tools.at(-1)
   if (!latest) return { phase: 'working', operationCount: 0, active: processing }
-  const toolName = typeof latest.meta?.toolName === 'string' ? latest.meta.toolName.toLowerCase() : ''
-  const text = `${toolName} ${latest.summary}`.toLowerCase()
-  let phase: SemanticProgress['phase'] = 'working'
-  if (/test|verify|validate|diagnos|lint|typecheck|build/.test(text)) phase = 'validating'
-  else if (/ppt|slide|image|generate|render|export/.test(text)) phase = 'generating'
-  else if (latest.toolKind === 'file_change' || /write|edit|patch|save/.test(text)) phase = 'editing'
-  else if (/browser|fetch|web|search_query|mcp/.test(text)) phase = 'researching'
-  else if (/read|grep|find|list|\bls\b/.test(text)) phase = 'reading'
-  else if (latest.toolKind === 'command_execution') phase = 'executing'
+  const toolName = typeof latest.meta?.toolName === 'string' ? latest.meta.toolName : ''
+  const phase = operationPhase(`${toolName} ${latest.summary}`, latest.toolKind)
   return { phase, operationCount: tools.length, active: processing || latest.status === 'running' }
 }

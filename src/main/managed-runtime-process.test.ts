@@ -1004,6 +1004,13 @@ describe('syncManagedRuntimeConfig', () => {
       join(codexHome, 'skills'),
       extraRoot
     ]))
+    expect(parsed.capabilities.skills.projectRoots).toContainEqual({
+      root: join(workspaceRoot, '.codex', 'skills'),
+      workspace: workspaceRoot
+    })
+    expect(parsed.capabilities.skills.projectRoots).not.toContainEqual(expect.objectContaining({
+      root: join(codexHome, 'skills')
+    }))
   })
 
   it('writes GUI-managed MCP search settings without removing existing servers', async () => {

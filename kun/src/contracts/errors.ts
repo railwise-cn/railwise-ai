@@ -19,6 +19,7 @@ export const KunErrorCode = z.enum([
   'turn_not_running',
   'approval_not_pending',
   'capability_unavailable',
+  'skill_unavailable',
   'provider_unavailable',
   'policy_blocked',
   'model_modality_unsupported',

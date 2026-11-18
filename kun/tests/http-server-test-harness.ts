@@ -27,6 +27,7 @@ import { modelCapabilitiesForModel } from '../src/loop/model-context-profile.js'
 import { RUNTIME_RESOURCE_LIMITS_V1 } from '../src/contracts/resource-limits.js'
 import { WorkspaceReferenceService } from '../src/services/workspace-reference-service.js'
 import { UiActionService } from '../src/services/ui-action-service.js'
+import type { SkillRuntime } from '../src/skills/skill-runtime.js'
 
 function makeModel(chunks: ModelStreamChunk[]): ModelClient {
   return {
@@ -84,7 +85,7 @@ type Harness = {
   nowIso: () => string
 }
 
-export function buildHarness(options: { onThreadDeleted?: (threadId: string) => Promise<void> } = {}): Harness {
+export function buildHarness(options: { onThreadDeleted?: (threadId: string) => Promise<void>; skillRuntime?: SkillRuntime } = {}): Harness {
   const bus = new InMemoryEventBus()
   const approvalGate = new InMemoryApprovalGate()
   const userInputGate = new InMemoryUserInputGate()
@@ -110,10 +111,11 @@ export function buildHarness(options: { onThreadDeleted?: (threadId: string) => 
     compactor,
     ids,
     nowIso,
-    workspaceReferences: workspaceReferenceService
+    workspaceReferences: workspaceReferenceService,
+    validateSkillSelection: (prompt, workspace) => options.skillRuntime?.validateSlashSelection(prompt, workspace) ?? Promise.resolve()
   })
   const uiActionService = new UiActionService({ sessionStore, turns: turnService })
-  const threadService = new ThreadService({ threadStore, sessionStore, events, ids, nowIso, ...options })
+  const threadService = new ThreadService({ threadStore, sessionStore, events, ids, nowIso, onThreadDeleted: options.onThreadDeleted })
   const model = makeModel([{ kind: 'completed', stopReason: 'stop' }])
   const loop = new AgentLoop({
     threadStore,
@@ -131,6 +133,7 @@ export function buildHarness(options: { onThreadDeleted?: (threadId: string) => 
     prefix,
     ids,
     nowIso,
+    skillRuntime: options.skillRuntime,
     workspaceReferences: workspaceReferenceService
   })
   const startedAt = nowIso()
@@ -148,6 +151,10 @@ export function buildHarness(options: { onThreadDeleted?: (threadId: string) => 
     events,
     approvalGate,
     userInputGate,
+    ...(options.skillRuntime ? { skills: async (workspace?: string) => {
+      await options.skillRuntime!.refresh(workspace)
+      return options.skillRuntime!.diagnostics(workspace)
+    } } : {}),
     workspaceInspector: new LocalWorkspaceInspector(),
     workspaceReferenceService,
     runTurn: (threadId, turnId) => {

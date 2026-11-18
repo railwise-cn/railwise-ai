@@ -2,6 +2,7 @@ import type { ReactElement, RefObject } from 'react'
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ChatBlock, RuntimeConnectionStatus } from '../../agent/types'
+import type { ThreadRunActivity } from '../../agent/ag-ui-activity'
 import type { ConversationViewMode } from '@shared/app-settings'
 import { useChatStore } from '../../store/chat-store'
 import { resolveTimelineWorkspaceRoot, useTimelineStores } from './use-timeline-stores'
@@ -106,6 +107,10 @@ export function MessageTimeline({
     turnReasoningLastAtByUserId,
     activeThread
   } = useTimelineStores(activeThreadId)
+  const runActivity = useChatStore(state => {
+    const activity = state.runActivity
+    return activity?.threadId === activeThreadId && activity.runId === state.currentTurnId ? activity : undefined
+  })
 
   const heroRoute: 'chat' | 'claw' = route === 'claw' ? 'claw' : 'chat'
   const hasContent = blocks.length > 0 || live || liveReasoning
@@ -226,6 +231,7 @@ export function MessageTimeline({
                 turn={turn}
                 professionalSurface={professionalSurface}
                 isProcessing={(busy && isLatestTurn) || turnPending || hasLiveStream}
+                runActivity={isLatestTurn ? runActivity : undefined}
                 liveReasoning={isLatestTurn ? liveReasoning : ''}
                 live={isLatestTurn ? live : ''}
                 durationMs={durationMs}
@@ -268,6 +274,7 @@ export function MessageTimeline({
             turn={{ blocks: [] }}
             professionalSurface={professionalSurface}
             isProcessing={busy}
+            runActivity={runActivity}
             liveReasoning={liveReasoning}
             live={live}
             devPreviewCard={devPreviewCard}
@@ -298,6 +305,7 @@ export function MessageTimeline({
 function MessageTurn({
   turn,
   isProcessing,
+  runActivity,
   liveReasoning,
   live,
   durationMs,
@@ -314,6 +322,7 @@ function MessageTurn({
 }: {
   turn: Turn
   isProcessing: boolean
+  runActivity?: ThreadRunActivity
   liveReasoning: string
   live: string
   durationMs?: number
@@ -367,6 +376,8 @@ function MessageTurn({
     [processBlocks, viewMode]
   )
   const pendingControls = visibleProcessBlocks.filter(isPendingProcessControl)
+  const restoredWaiting = pendingControls.some(block => block.kind === 'approval') ? 'waiting_approval'
+    : pendingControls.some(block => block.kind === 'user_input') ? 'waiting_user' : undefined
   const semanticProgress = useMemo(
     () => deriveSemanticProgress(processBlocks, isProcessing),
     [processBlocks, isProcessing]
@@ -432,7 +443,7 @@ function MessageTurn({
         <ReviewSummaryCard key={review.id} review={review} />
       )) : null}
 
-      {isProcessing && !professionalSurface ? <LiveTurnProgressRow progress={semanticProgress} /> : null}
+      {isProcessing && !professionalSurface ? <LiveTurnProgressRow progress={semanticProgress} activity={runActivity} restoredWaiting={restoredWaiting} /> : null}
 
       {!isProcessing && !professionalSurface && devPreviewCard ? devPreviewCard : null}
 
@@ -453,16 +464,22 @@ function MessageTurn({
   )
 }
 
-function LiveTurnProgressRow({ progress }: { progress: ReturnType<typeof deriveSemanticProgress> }): ReactElement {
+function LiveTurnProgressRow({ progress, activity, restoredWaiting }: {
+  progress: ReturnType<typeof deriveSemanticProgress>
+  activity?: ThreadRunActivity
+  restoredWaiting?: 'waiting_approval' | 'waiting_user'
+}): ReactElement {
   const { t } = useTranslation('common')
+  const waiting = activity?.status === 'waiting_approval' || activity?.status === 'waiting_user' ? activity.status : restoredWaiting
+  const phase = activity?.status === 'running' && activity.phase !== 'working' ? activity.phase : progress.phase
 
   return (
-    <div className="flex w-fit max-w-full items-center gap-2 py-0.5 text-[14px] font-medium text-ds-muted">
-      <span className="ds-work-logo-slot ds-work-logo-slot-sm mr-0.5">
+    <div role="status" className="flex w-fit max-w-full items-center gap-2 py-0.5 text-[14px] font-medium text-ds-muted">
+      {!waiting ? <span className="ds-work-logo-slot ds-work-logo-slot-sm mr-0.5">
         <AnimatedWorkLogo active phase="trail" size="sm" />
-      </span>
-      <span className="ds-shiny-text">
-        {t(`semanticProgress_${progress.phase}`, { count: progress.operationCount })}
+      </span> : null}
+      <span className={waiting ? undefined : 'ds-shiny-text'}>
+        {waiting ? t(`taskRunStatus_${waiting}`) : t(`semanticProgress_${phase}`, { count: progress.operationCount })}
       </span>
     </div>
   )
@@ -471,6 +488,7 @@ function LiveTurnProgressRow({ progress }: { progress: ReturnType<typeof deriveS
 const MemoMessageTurn = memo(MessageTurn, (prev, next) => (
   sameTurnContent(prev.turn, next.turn) &&
   prev.isProcessing === next.isProcessing &&
+  prev.runActivity === next.runActivity &&
   prev.liveReasoning === next.liveReasoning &&
   prev.live === next.live &&
   prev.durationMs === next.durationMs &&

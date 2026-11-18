@@ -33,7 +33,7 @@ describe('conversation execution details', () => {
   beforeEach(async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     await i18n.changeLanguage('en')
-    useChatStore.setState({ activeThreadId: 'thread-test', route: 'chat', busy: false })
+    useChatStore.setState({ activeThreadId: 'thread-test', route: 'chat', busy: false, currentTurnId: null, runActivity: null })
     container = document.createElement('div')
     document.body.append(container)
     root = createRoot(container)
@@ -43,6 +43,22 @@ describe('conversation execution details', () => {
     await act(async () => root.unmount())
     container.remove()
     vi.unstubAllGlobals()
+  })
+
+  it('shows current protocol activity without using progress from a previous turn', async () => {
+    const activity = { threadId: 'thread-test', runId: 'current', status: 'waiting_approval', phase: 'working' } as const
+    useChatStore.setState({ currentTurnId: activity.runId, busy: true, runActivity: activity })
+    await act(async () => root.render(createElement(MessageTimeline, {
+      blocks: [{ kind: 'user', id: 'user', text: 'Read the announcement' }],
+      activeThreadId: 'thread-test', runtimeConnection: 'ready', liveReasoning: '', live: '',
+      onRetryConnection: () => undefined, onOpenSettings: () => undefined
+    })))
+
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('Waiting for approval')
+    await act(async () => useChatStore.setState({ runActivity: { ...activity, status: 'running', phase: 'researching' } }))
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('Researching…')
+    await act(async () => useChatStore.setState({ currentTurnId: 'newer' }))
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('Continuing the task…')
   })
 
   it.each(['concise', 'standard', 'developer'] as const)('keeps recoverable errors behind neutral disclosures in %s mode', async viewMode => {

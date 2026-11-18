@@ -36,6 +36,7 @@ export type TurnServiceDeps = {
   approvalGate?: ApprovalGate
   userInputGate?: UserInputGate
   workspaceReferences?: Pick<WorkspaceReferenceService, 'validateReferences'>
+  validateSkillSelection?: (prompt: string, workspace: string) => Promise<void>
 }
 
 export const MAX_TERMINAL_TURN_IDS = 1_000
@@ -117,6 +118,10 @@ export class TurnService {
       this.terminalTurns.delete(oldest)
     }
     return true
+  }
+
+  async validateSkillSelection(prompt: string, workspace: string): Promise<void> {
+    await this.deps.validateSkillSelection?.(prompt, workspace)
   }
 
   async startTurn(input: {
@@ -490,6 +495,7 @@ export class TurnService {
         code: 'turn_in_progress'
       })
     }
+    await this.validateSkillSelection(input.request.displayText ?? input.request.prompt, thread.workspace)
     const selection = this.deps.tasks?.continuationSelection(thread, input.request, input.engineeringExecution, input.continuationTaskId)
     const engineeringPlanId = input.engineeringPlanId ?? selection?.engineeringPlanId
     input = { ...input, engineeringPlanId, engineeringExecution: input.engineeringExecution || Boolean(engineeringPlanId) }

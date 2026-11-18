@@ -165,6 +165,7 @@ export function clearedThreadSelection(): Pick<
   | 'activeThreadTodos'
   | 'blocks'
   | 'lastSeq'
+  | 'runActivity'
   | 'liveReasoning'
   | 'liveAssistant'
   | 'busy'
@@ -183,6 +184,7 @@ export function clearedThreadSelection(): Pick<
     activeThreadTodos: null,
     blocks: [],
     lastSeq: 0,
+    runActivity: null,
     liveReasoning: '',
     liveAssistant: '',
     busy: false,

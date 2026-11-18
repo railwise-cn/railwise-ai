@@ -237,6 +237,11 @@ const builderConfig = {
       filter: ['**/*']
     },
     {
+      from: 'src/asset/builtin-integrations',
+      to: 'third-party/builtin-integrations',
+      filter: ['**/*']
+    },
+    {
       // Keep third-party editor notices and the MPL-2.0 component's source
       // offer available beside the packaged application. These legal files
       // must not be filtered by the app.asar source exclusions below.

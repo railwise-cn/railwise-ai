@@ -526,6 +526,11 @@ describe('WorkWiseRuntimeProvider', () => {
       if (path === '/v1/runtime/tools') {
         return { ok: true, status: 200, body: JSON.stringify({ providers: [{ id: 'web' }] }) }
       }
+      if (path === '/v1/skills?scope=available&threadId=thr_1') {
+        return { ok: true, status: 200, body: JSON.stringify({
+          scope: 'available', enabled: true, skills: [{ id: 'scoped-review', name: 'Project Review', scope: 'project' }]
+        }) }
+      }
       if (path === '/v1/skills') {
         return {
           ok: true,
@@ -592,6 +597,8 @@ describe('WorkWiseRuntimeProvider', () => {
         description: 'Review changes'
       })
     ])
+    await expect(provider.listSkills({ threadId: 'thr_1', workspace: '/ignored-when-thread-exists' }))
+      .resolves.toEqual([{ id: 'scoped-review', name: 'Project Review', scope: 'project' }])
     await expect(provider.uploadAttachment({
       name: 'shot.png',
       mimeType: 'image/png',
@@ -812,6 +819,46 @@ describe('WorkWiseRuntimeProvider', () => {
     await provider.subscribeThreadEvents('thr_1', 2, sink, ac.signal)
     expect(sink.onSeq).toHaveBeenCalledWith(3)
     expect(sink.onDeltas).toHaveBeenCalledWith([{ text: 'he', kind: 'agent_message', seq: 3 }])
+  })
+
+  it('projects the real subscription approval and resumed progress without dispatching a second approval', async () => {
+    let onData: ((payload: { streamId: string; events: unknown[] }) => void) | undefined
+    let onEnd: ((payload: { streamId: string }) => void) | undefined
+    const runtimeRequest = vi.fn(async () => ({ ok: true, status: 200, body: '{}' }))
+    const sink: ThreadEventSink = {
+      onSeq: vi.fn(), onDeltas: vi.fn(), onUserMessage: vi.fn(), onTool: vi.fn(), onCompaction: vi.fn(),
+      onApproval: vi.fn(), onUserInput: vi.fn(), onUserInputStatus: vi.fn(), onGoal: vi.fn(),
+      onTurnComplete: vi.fn(), onError: vi.fn(), onRunActivity: vi.fn()
+    }
+    installDsGui({
+      runtimeRequest,
+      onSseEvent: vi.fn(handler => { onData = handler; return () => undefined }),
+      onSseEnd: vi.fn(handler => { onEnd = handler; return () => undefined }),
+      startSse: vi.fn(async (_threadId, _sinceSeq, streamId = 'fixture') => {
+        const identity = { threadId: 'thr_activity', turnId: 'turn_activity' }
+        queueMicrotask(() => {
+          onData?.({ streamId, events: [
+            { ...identity, seq: 1, kind: 'turn_started' },
+            { ...identity, seq: 2, kind: 'approval_requested', approvalId: 'approval', approvalPolicy: 'on-request' }
+          ] })
+          onData?.({ streamId, events: [
+            { ...identity, seq: 3, kind: 'approval_resolved', approvalId: 'approval', status: 'allowed' },
+            { ...identity, seq: 4, kind: 'tool_call_ready', toolName: 'search_web' }
+          ] })
+          onData?.({ streamId, events: [{ ...identity, seq: 5, kind: 'turn_completed' }] })
+          onEnd?.({ streamId })
+        })
+        return { streamId }
+      })
+    })
+
+    await new WorkWiseRuntimeProvider().subscribeThreadEvents('thr_activity', 0, sink, new AbortController().signal)
+    expect(sink.onApproval).toHaveBeenCalledTimes(1)
+    expect(runtimeRequest).not.toHaveBeenCalled()
+    expect(sink.onRunActivity).toHaveBeenNthCalledWith(1, expect.objectContaining({ status: 'waiting_approval' }))
+    expect(sink.onRunActivity).toHaveBeenNthCalledWith(2, expect.objectContaining({ status: 'running', phase: 'researching' }))
+    expect(sink.onRunActivity).toHaveBeenNthCalledWith(3, expect.objectContaining({ status: 'completed' }))
+    expect(sink.onTurnComplete).toHaveBeenCalledTimes(1)
   })
 
   it('dispatches SSE batches in sequence order when an earlier batch awaits', async () => {

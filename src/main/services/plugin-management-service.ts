@@ -37,6 +37,7 @@ import { downloadManagedDependency, findManagedDependency } from './managed-depe
 import { materializePypiPackage } from './pypi-package-materializer'
 import { describeNetworkFailure, systemFetch } from './system-network'
 import { parseCatalogPackageArtifact } from './marketplace-catalog-service'
+import { materializeMarketplaceMirror, mirrorRecordFor } from './marketplace-mirror'
 import {
   marketplaceCommandEnvironment,
   resolveMarketplaceCommand,
@@ -837,6 +838,21 @@ export async function materializeGithubArchive(
 }
 
 export async function materializeCatalogPackage(
+  item: MarketplacePackageV1,
+  targetDirectory: string
+): Promise<void> {
+  if (await exists(targetDirectory)) throw new Error('Catalog package staging directory already exists.')
+  if (item.installation?.mode === 'direct-mirror' && item.source.catalogSourceId === 'workwise-official') {
+    const record = mirrorRecordFor(item)
+    if (!record) throw new Error('当前版本没有此插件的睿威官方镜像，请检查应用更新。')
+    await materializeMarketplaceMirror(item, record, targetDirectory)
+    return
+  }
+  await materializeCatalogUpstreamForMirror(item, targetDirectory)
+}
+
+/** Resolve upstream dependencies on a release build runner or for an explicitly upstream-only package. */
+export async function materializeCatalogUpstreamForMirror(
   item: MarketplacePackageV1,
   targetDirectory: string
 ): Promise<void> {

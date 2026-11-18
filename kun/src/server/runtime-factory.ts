@@ -349,7 +349,8 @@ export async function createKunServeRuntime(
     },
     approvalGate,
     userInputGate,
-    workspaceReferences: workspaceReferenceService
+    workspaceReferences: workspaceReferenceService,
+    validateSkillSelection: (prompt, workspace) => skillRuntime.validateSlashSelection(prompt, workspace)
   })
   const uiActionService = new UiActionService({ sessionStore, turns: turnService })
   await traceRuntimeStartupPhase('usage-carryover', () =>
@@ -1102,9 +1103,10 @@ export async function createKunServeRuntime(
         ...(visionEvidenceRuntime.reason ? { reason: visionEvidenceRuntime.reason } : {})
       }
     }),
-    skills: async () => {
-      await skillRuntime.refresh()
-      return skillRuntime.diagnostics()
+    skills: async (workspace?: string) => {
+      if (workspace === undefined) await skillRuntime.refresh()
+      else await skillRuntime.refreshForWorkspace(workspace)
+      return skillRuntime.diagnostics(workspace)
     },
     shutdown: async () => {
       // SIGTERM also reaches this path directly, without update preparation.

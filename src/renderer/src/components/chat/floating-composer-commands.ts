@@ -53,10 +53,13 @@ export const REVIEW_COMMAND_ALIASES = [
 ]
 
 export function getSlashQuery(input: string): string | null {
-  const trimmed = input.trimStart()
-  if (!trimmed.startsWith('/')) return null
-  if (/\s/.test(trimmed)) return null
-  return trimmed.slice(1).toLowerCase()
+  const normalized = input.trimStart().normalize('NFKC').toLowerCase()
+  if (!normalized.startsWith('/') || /[\r\n/\\]/.test(normalized.slice(1))) return null
+  if (/\s/u.test(normalized) && (
+    normalized.startsWith('/skill:') || normalized.startsWith('/plan ') || parseGoalCommand(normalized) || parseCompactCommand(normalized) ||
+    parseReviewCommand(normalized) !== false || parseBtwCommand(normalized) !== false
+  )) return null
+  return normalized.slice(1).trim()
 }
 
 /** Returns the active @skill token when the cursor is still inside it. */
@@ -160,11 +163,8 @@ function isSlashAliasMatch(body: string, alias: string): boolean {
 }
 
 /**
- * Returns the seed text for a `/btw <question>` command, or `null`
- * if the input is not a `/btw` command. The renderer's slash menu
- * only matches single-word commands; this mirrors the existing
- * `parseGuiPlanCommand` interception that runs at send time so the
- * user can pass a question inline.
+ * Returns the seed for a side conversation. False means the input is not
+ * a /btw command, and null opens a side draft with an empty seed.
  */
 export function parseBtwCommand(input: string): string | null | false {
   const trimmed = input.trim()

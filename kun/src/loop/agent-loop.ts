@@ -54,7 +54,7 @@ import { repairModelHistoryItems } from '../domain/model-history-repair.js'
 import type { TurnItem } from '../contracts/items.js'
 import type { ThreadGoal, ThreadTodoList } from '../contracts/threads.js'
 import { modelCapabilitiesForModel, type ContextCompactionConfig } from './model-context-profile.js'
-import type { SkillRuntime, SkillTurnResolution } from '../skills/skill-runtime.js'
+import { requestedSlashSkill, type SkillRuntime, type SkillTurnResolution } from '../skills/skill-runtime.js'
 import type { TaskController } from '../services/task-controller.js'
 import type { RuntimeSpanService } from '../services/runtime-span-service.js'
 import type { TaskAttemptOutcome } from '../contracts/tasks.js'
@@ -691,6 +691,10 @@ export class AgentLoop {
         return status
       }
       const raw = error instanceof Error ? error.message : String(error)
+      if ((error as { code?: unknown })?.code === 'skill_unavailable') {
+        await this.failTurn(threadId, turnId, `[skill_unavailable] ${raw}`)
+        return 'failed'
+      }
       // Best-effort enrichment so the renderer can show "what failed where"
       // instead of the bare "RailWise AI turn failed" string. See issue #26.
       const modelInfo = this.opts.model && 'config' in this.opts.model
@@ -1019,9 +1023,12 @@ export class AgentLoop {
     )
     const preferredSkillIds = continuationTurn?.activeSkillIds
       ?? thread?.agentProfile?.preferredSkillIds
+    const userMessage = turn?.items.find(item => item.kind === 'user_message')
+    const requestedSkillId = requestedSlashSkill(userMessage?.displayText ?? turn?.prompt ?? '')
     const skillResolution = executionSkills.resolution ??= this.opts.skillRuntime?.resolveTurn({
       prompt: turn?.prompt ?? '',
       workspace: thread?.workspace ?? '',
+      requestedSkillId,
       preferredSkillIds,
       contextPrompt: continuationTurn?.prompt
     }) ?? {

@@ -70,6 +70,7 @@ import {
   threadFromCore
 } from './runtime-mapper'
 import { rendererRuntimeClient } from './runtime-client'
+import { createThreadRunActivity } from './ag-ui-activity'
 
 function createSseStreamId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `sse-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -600,15 +601,23 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
     )
   }
 
-  async listSkills(): Promise<CoreRuntimeSkillJson[]> {
-    const response = await rendererRuntimeClient.runtimeRequest(RUNTIME_SKILLS_PATH, 'GET')
+  async listSkills(scope?: { threadId?: string; workspace?: string }): Promise<CoreRuntimeSkillJson[]> {
+    const query = scope ? new URLSearchParams({ scope: 'available' }) : null
+    if (scope?.threadId) query?.set('threadId', scope.threadId)
+    else if (scope?.workspace) query?.set('workspace', scope.workspace)
+    const response = await rendererRuntimeClient.runtimeRequest(
+      query ? `${RUNTIME_SKILLS_PATH}?${query}` : RUNTIME_SKILLS_PATH,
+      'GET'
+    )
     if (!response.ok) {
       throw runtimeErrorToError(readRuntimeError(response.body, 'failed to list skills'))
     }
-    return readRuntimeJson<CoreRuntimeSkillsResponseJson>(
+    const catalog = readRuntimeJson<CoreRuntimeSkillsResponseJson>(
       response.body,
       'runtime returned an invalid skills response'
-    ).skills ?? []
+    )
+    if (scope && catalog.scope !== 'available') return []
+    return catalog.enabled === false ? [] : catalog.skills ?? []
   }
 
   async uploadAttachment(input: {
@@ -780,6 +789,7 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
     signal: AbortSignal
   ): Promise<void> {
     const streamId = createSseStreamId()
+    const runActivity = createThreadRunActivity(threadId, sinceSeq)
     await new Promise<void>(async (resolve) => {
       let settled = false
       const pendingDispatches = new Set<Promise<void>>()
@@ -827,11 +837,17 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
           : batch
         const task = dispatchChain.then(async () => {
           if (replayReset && typeof replayReset.seq === 'number') {
+            runActivity.reset(replayReset.seq)
+            sink.onRunActivity?.(null)
             await sink.onReplayReset?.(replayReset.seq)
           }
           await dispatchRuntimeEvents(eventsToDispatch, sink, (runtimeEvent, eventSink) =>
             this.handleApprovalRequest(runtimeEvent, eventSink)
           )
+          if (!signal.aborted && sink.onRunActivity) {
+            const activity = runActivity.apply(eventsToDispatch)
+            if (activity) sink.onRunActivity(activity)
+          }
         }).finally(() => {
           pendingDispatches.delete(task)
         })

@@ -246,6 +246,8 @@ import { McpConfigService } from '../services/mcp-config-service'
 import { CatalogCredentialService } from '../services/catalog-credential-service'
 import { activatePluginPackage } from '../services/plugin-activation-service'
 import { openVerifiedTaskArtifact } from '../services/task-artifact-open'
+import { openSpreadsheet, saveWorkbook } from '../services/workspace-sheet-service'
+import { MAX_WORKBOOK_BYTES } from '../../shared/workspace-sheet'
 import { TaskArtifactPreviewService } from '../services/task-artifact-preview-service'
 import { MarketplaceCatalogService } from '../services/marketplace-catalog-service'
 import { PluginManagementService } from '../services/plugin-management-service'
@@ -726,9 +728,12 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   let skillCatalogGeneration = 1
 
   const notifySkillsChanged = async (skillOptions?: { enable: true }): Promise<RuntimeRequestResult | void> => {
-    skillCatalogGeneration += 1
-    getMainWindow()?.webContents.send('skills:changed', skillCatalogGeneration)
-    return options.onSkillsChanged?.(skillOptions)
+    try {
+      return await options.onSkillsChanged?.(skillOptions)
+    } finally {
+      skillCatalogGeneration += 1
+      getMainWindow()?.webContents.send('skills:changed', skillCatalogGeneration)
+    }
   }
 
   const notifyPluginCapabilitiesChanged = async (mcpChanged: boolean, installed?: InstalledPackageV1, skillNames?: string[]) => {
@@ -981,6 +986,19 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('task-artifact:open', async (_, payload: unknown) => {
     const request = parseIpcPayload('task-artifact:open', z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict(), payload)
     return openVerifiedTaskArtifact(request, { runtimeRequest, openPath: path => shell.openPath(path) })
+  })
+  const spreadsheetPath = z.object({ workspaceRoot: z.string().trim().min(1).max(4096), path: z.string().trim().min(1).max(4096) })
+  const spreadsheetArtifact = z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict()
+  ipcMain.handle('spreadsheet:open', async (_, payload: unknown) => {
+    const request = parseIpcPayload('spreadsheet:open', z.union([spreadsheetPath.strict(), spreadsheetArtifact]), payload)
+    return openSpreadsheet(request, runtimeRequest)
+  })
+  ipcMain.handle('spreadsheet:save', async (_, payload: unknown) => {
+    const request = parseIpcPayload('spreadsheet:save', spreadsheetPath.extend({
+      content: z.string().max(MAX_WORKBOOK_BYTES),
+      expectedSha256: z.string().regex(/^[a-f0-9]{64}$/).nullable()
+    }).strict(), payload)
+    return saveWorkbook(request)
   })
   ipcMain.handle('task-artifact:preview', async (_, payload: unknown) => {
     const request = parseIpcPayload('task-artifact:preview', z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict(), payload)

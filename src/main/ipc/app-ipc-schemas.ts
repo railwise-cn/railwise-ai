@@ -231,7 +231,7 @@ function hasAllowedQuery(url: URL, endpoint: EndpointTemplate): boolean {
   for (const [key, value] of url.searchParams.entries()) {
     if (!endpoint.allowedQueryParams.has(key) || seen.has(key)) return false
     if (key === 'download' && value !== '1') return false
-    if (!value.trim() || value.length > MAX_ID_LENGTH) return false
+    if (!value.trim() || value.length > (key === 'workspace' ? MAX_URL_LENGTH : MAX_ID_LENGTH)) return false
     seen.add(key)
   }
   return true
@@ -306,7 +306,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_HEALTH_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_INFO_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TOOLS_TEMPLATE, ['GET']),
-  compileEndpoint(RUNTIME_SKILLS_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_SKILLS_TEMPLATE, ['GET'], ['scope', 'threadId', 'workspace']),
   compileEndpoint(RUNTIME_TASKS_TEMPLATE, ['GET'], ['threadId', 'workspaceRoot', 'status', 'limit', 'offset', 'search', 'pagination', 'filter', 'cursor']),
   compileEndpoint('/v1/task-commands', ['POST'], []),
   compileEndpoint(RUNTIME_TASK_TEMPLATE, ['GET']),

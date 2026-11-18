@@ -75,6 +75,7 @@ export class TaskCoordinator {
       await this.recordResult(command, result, intent)
       return result
     }
+    await this.deps.turns.validateSkillSelection(userText, origin.workspace)
     if (resolving?.status !== undefined && resolving.status !== 'pending') throw Object.assign(new Error('这条待处理选择已经完成，请刷新当前任务。'), { code: 'stale_request' })
     if (resolving?.payload?.kind === 'task_input_intent' && operationFingerprint(StartTurnRequest.parse(resolving.payload.request)) !== operationFingerprint(command.request)) {
       throw Object.assign(new Error('任务选择必须使用原始请求及附件，请重新打开该待办。'), { code: 'scope_conflict' })
