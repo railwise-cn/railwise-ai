@@ -8,7 +8,7 @@ const replayedText = '验收断线期间 0042。'
 const followingText = '同一会话已恢复。'
 const callId = 'call-activity-fixture-read'
 const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
-const ready = `Boolean(document.querySelector('${composer}'))`
+const homeReady = `Boolean(document.querySelector('main textarea'))`
 const quote = JSON.stringify
 const cutBudgetMs = 12_000
 
@@ -115,7 +115,8 @@ export async function verifyWindowsActivityLifecycle(cdp, inspector, { version, 
   assert.ok(inspector, 'The acceptance runner must own the packaged main-process inspector')
   const release = 'main section[aria-label="本版更新"]'
   await cdp.wait(`document.querySelector(${quote(release)})?.innerText.includes(${quote(`本版更新 · ${version}`)})`, 'the exact-version notice on the initial home surface')
-  await cdp.wait(ready, 'the ordinary Chinese composer below the first-run notice', 60_000)
+  audit.homepage = { source: 'installed-home-before-first-conversation', version, shownOnFirstOpen: true, dismissedAndReloaded: false }
+  await cdp.wait(homeReady, 'the startup composer below the first-run notice', 60_000)
   await cdp.click('button[aria-label="关闭本版更新"]')
   await cdp.wait(`!document.querySelector(${quote(release)})`, 'dismissal from the home surface')
   const firstPage = await cdp.evaluate('performance.timeOrigin')
@@ -123,14 +124,14 @@ export async function verifyWindowsActivityLifecycle(cdp, inspector, { version, 
   let reloaded = false
   for (let attempt = 0; attempt < 60 && !reloaded; attempt += 1) {
     try {
-      reloaded = await cdp.evaluate(`performance.timeOrigin!==${firstPage} && (${ready}) && window.workwise?.getAppVersion().then(value=>value===${quote(version)})`, 1500)
+      reloaded = await cdp.evaluate(`performance.timeOrigin!==${firstPage} && (${homeReady}) && window.workwise?.getAppVersion().then(value=>value===${quote(version)})`, 1500)
     } catch { /* A real reload can destroy the old CDP execution context. */ }
     if (!reloaded) await new Promise(resolve => setTimeout(resolve, 250))
   }
   assert.equal(reloaded, true, 'The same installed home must reopen in a fresh renderer context')
   assert.equal(await cdp.evaluate(`localStorage.getItem(${quote(`railwise.release-highlights.${version}`)})`), '1')
   assert.equal(await cdp.evaluate(`Boolean(document.querySelector(${quote(release)}))`), false)
-  audit.homepage = { source: 'installed-home-before-first-conversation', version, shownOnFirstOpen: true, dismissedAndReloaded: true }
+  audit.homepage.dismissedAndReloaded = true
 
   const runtimeJson = (path) => `window.workwise.runtimeRequest(${quote(path)},'GET').then(result=>result.ok?JSON.parse(result.body):null)`
   const threads = '/v1/threads'
