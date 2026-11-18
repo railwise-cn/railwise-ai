@@ -17,6 +17,7 @@ import { buildScopedHostShellToolProviders } from './scoped-host-shell-tool-prov
 import { HostShellVerificationService } from '../../services/host-shell-verification.js'
 import { getTaskOperationReceipts } from '../../server/routes/tasks.js'
 import { buildRouter } from '../../server/routes/index.js'
+import { sanitizeToolResultOutput } from '../../security/tool-persistence-security.js'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => { await stopAllBashSessions('test_cleanup'); for (const close of cleanup.splice(0)) await close() })
@@ -152,11 +153,17 @@ describe('one-shot, explicitly reviewed host shell', () => {
     const started = await f.run('session', { ...f.args, command })
     expect(started.item).toMatchObject({ output: { status: 'running', session_id: expect.any(String), authorizationId: expect.any(String) } })
     const output = (started.item as { output: Record<string, unknown> }).output
-    const sessionArgs = { authorization_id: output.authorizationId, action: 'poll', yield_seconds: 1 }
+    const visible = sanitizeToolResultOutput('request_host_shell', output) as Record<string, unknown>
+    expect(visible.authorizationId).toBe('<redacted>')
+    const sessionArgs = { session_id: visible.session_id, action: 'poll', yield_seconds: 1 }
     const polled = await f.host.execute({ callId: 'poll', toolName: 'host_shell_session', arguments: sessionArgs }, f.context)
-    expect(polled.item).toMatchObject({ output: { output: 'started', status: 'running' } })
+    expect(polled.item).toMatchObject({ output: { output: 'started', status: 'running', session_id: visible.session_id } })
+    const denied = await f.host.execute({ callId: 'foreign-session', toolName: 'host_shell_session', arguments: { ...sessionArgs, session_id: 'bash_unrelated' } }, f.context)
+    expect(denied.item).toMatchObject({ isError: true, output: { code: 'host_shell_scope_blocked' } })
+    const ambiguous = await f.host.execute({ callId: 'ambiguous-session', toolName: 'host_shell_session', arguments: { ...sessionArgs, authorization_id: output.authorizationId } }, f.context)
+    expect(ambiguous.item).toMatchObject({ isError: true })
     const laterGrant = { ...f.context, executionGrant: { ...f.context.executionGrant!, id: 'later-readback-grant' } }
-    const laterPoll = await f.host.execute({ callId: 'later-poll', toolName: 'host_shell_session', arguments: sessionArgs }, laterGrant)
+    const laterPoll = await f.host.execute({ callId: 'later-poll', toolName: 'host_shell_session', arguments: { authorization_id: output.authorizationId, action: 'poll' } }, laterGrant)
     expect(laterPoll.item).toMatchObject({ output: { output: 'started', status: 'running' } })
     const laterStop = await f.host.execute({ callId: 'later-stop', toolName: 'host_shell_session', arguments: { ...sessionArgs, action: 'stop' } }, laterGrant)
     expect(laterStop.item).toMatchObject({ isError: true, output: { code: 'host_shell_scope_blocked' } })
