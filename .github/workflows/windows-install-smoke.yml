@@ -33,6 +33,16 @@ on:
         type: boolean
         required: false
         default: false
+      run_frozen_gui_update:
+        description: 'Install official 0.5.7 then test the exact frozen 0.5.8 installer with a runner-only HTTPS update feed and installed profile continuity.'
+        type: boolean
+        required: false
+        default: false
+      build_private_next:
+        description: 'In the frozen update test only, build a temporary 0.5.9 NSIS fixture from this exact source, exercise the next native upgrade and discard the fixture.'
+        type: boolean
+        required: false
+        default: true
       run_repaired_gui_update:
         description: 'Build a private 0.5.6 updater fixture from this ref and exercise its warm-check upgrade to released Stable 0.5.7'
         type: boolean
@@ -65,7 +75,7 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
+    if: ${{ inputs.run_frozen_gui_update != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_browser_execution && 25 || 15 }}
@@ -133,8 +143,89 @@ jobs:
             ${{ runner.temp }}/exact-windows-evidence/
             ${{ runner.temp }}/windows-package-source.json
 
+  windows-frozen-gui-update:
+    if: ${{ inputs.run_frozen_gui_update == true }}
+    name: Official 0.5.7 to exact frozen 0.5.8 and optional private 0.5.9
+    runs-on: windows-2022
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate exclusive acceptance scope
+        if: ${{ inputs.package_run_id == '' || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
+        run: throw 'Select one original frozen package run and optional private next package run'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - run: npm ci
+      - run: node --test scripts/windows-published-gui-update-smoke.test.mjs scripts/prepare-windows-install-smoke.test.mjs
+      - name: Resolve the frozen Windows installer artifact
+        id: frozen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+        run: node scripts/prepare-windows-install-smoke.mjs "$env:PACKAGE_RUN_ID" "$env:RUNNER_TEMP/frozen-windows-source.json"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.frozen.outputs.artifact_id }}
+          run-id: ${{ inputs.package_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/frozen-windows
+      - name: Prepare checksummed Electron runtime for the private fixture
+        if: ${{ inputs.build_private_next }}
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+        run: npm run prepare:electron
+      - name: Reuse the original build's Windows document sidecar
+        if: ${{ inputs.build_private_next }}
+        uses: actions/download-artifact@v4
+        with:
+          name: markitdown-win32-x64
+          run-id: ${{ inputs.package_run_id }}
+          github-token: ${{ github.token }}
+          path: build/sidecars/markitdown-win32-x64
+      - name: Verify the reused Windows document sidecar
+        if: ${{ inputs.build_private_next }}
+        env:
+          WORKWISE_SIDECAR_ARCH: x64
+        run: node scripts/build-markitdown-sidecar.mjs --verify-only
+      - name: Build the runner-local higher-version NSIS fixture
+        if: ${{ inputs.build_private_next }}
+        env:
+          WORKWISE_APP_VERSION: '0.5.9'
+          WORKWISE_CANDIDATE_SOURCE_HEAD: ${{ github.sha }}
+          WORKWISE_REQUIRE_DOCUMENT_SIDECAR: '1'
+          WORKWISE_UPDATE_CHANNEL: stable
+          WORKWISE_DIST_DIR: ${{ runner.temp }}/private-next-windows
+          RELEASE_CHANNEL: stable
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: npm run dist:win
+      - name: Exercise native update or the exact overlay fallback and reopen the existing conversation
+        env:
+          INCLUDE_PRIVATE_NEXT: ${{ inputs.build_private_next }}
+        run: |
+          $arguments = @("$env:RUNNER_TEMP/frozen-windows", "$env:RUNNER_TEMP/frozen-windows-source.json", "$env:RUNNER_TEMP/frozen-windows-evidence")
+          if ($env:INCLUDE_PRIVATE_NEXT -eq 'true') {
+            @{ packageSourceHead=$env:GITHUB_SHA; runId=$env:GITHUB_RUN_ID; runAttempt=$env:GITHUB_RUN_ATTEMPT; purpose='private-next-updater-fixture' } | ConvertTo-Json | Set-Content -LiteralPath "$env:RUNNER_TEMP/private-next-windows-source.json"
+            $arguments += @("$env:RUNNER_TEMP/private-next-windows", "$env:RUNNER_TEMP/private-next-windows-source.json", '0.5.9')
+          }
+          node scripts/run-windows-frozen-gui-upgrade.mjs @arguments
+      - name: Retain exact-package Windows updater evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frozen-windows-gui-upgrade-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/frozen-windows-evidence/
+
   windows-published-gui-update:
-    if: ${{ inputs.run_published_gui_update == true }}
+    if: ${{ inputs.run_published_gui_update == true && inputs.run_frozen_gui_update != true }}
     name: Released Windows 0.5.6 to 0.5.7 via the real sidebar upgrade
     runs-on: windows-2022
     timeout-minutes: 30
@@ -165,7 +256,7 @@ jobs:
           path: ${{ runner.temp }}/published-windows-gui-upgrade-evidence/
 
   windows-repaired-gui-update:
-    if: ${{ (inputs.run_repaired_gui_update == true || inputs.run_repaired_marketplace_install == true) && inputs.run_published_gui_update != true }}
+    if: ${{ (inputs.run_repaired_gui_update == true || inputs.run_repaired_marketplace_install == true) && inputs.run_published_gui_update != true && inputs.run_frozen_gui_update != true }}
     name: ${{ inputs.run_repaired_marketplace_install && 'Private Windows npm marketplace install' || 'Private repaired Windows baseline to released Stable 0.5.7' }}
     runs-on: windows-2022
     timeout-minutes: 60

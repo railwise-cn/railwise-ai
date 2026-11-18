@@ -41,7 +41,7 @@ import type {
 } from '../../shared/gui-update'
 import { isCandidateImProviderConnectionAllowed } from '../candidate-runtime'
 import type { DesignAsset } from '../../shared/design-document'
-import { canonicalizeContainmentRoot, isCanonicalPathContained } from '../services/canonical-containment'
+import { canonicalizeContainmentRoot, isCanonicalPathContained, resolveContainedPath } from '../services/canonical-containment'
 import {
   agentProfileListPayloadSchema,
   agentProfileSavePayloadSchema,
@@ -989,6 +989,22 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   const spreadsheetPath = z.object({ workspaceRoot: z.string().trim().min(1).max(4096), path: z.string().trim().min(1).max(4096) })
   const spreadsheetArtifact = z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict()
+  ipcMain.handle('spreadsheet:pick', async (_, payload: unknown): Promise<WorkspacePickResult> => {
+    const request = parseIpcPayload('spreadsheet:pick', spreadsheetPath.pick({ workspaceRoot: true }).strict(), payload)
+    const root = await canonicalizeContainmentRoot(request.workspaceRoot)
+    const options: Electron.OpenDialogOptions = {
+      defaultPath: root,
+      properties: ['openFile'],
+      filters: [{ name: 'RailWise / Excel', extensions: ['rwsheet', 'xlsx'] }]
+    }
+    const mainWindow = getMainWindow()
+    const selection = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options)
+    if (selection.canceled || !selection.filePaths[0]) return { canceled: true, path: null }
+    const path = await resolveContainedPath({
+      root, target: selection.filePaths[0], expect: 'file', mustExist: true, rejectFinalLink: true
+    })
+    return { canceled: false, path }
+  })
   ipcMain.handle('spreadsheet:open', async (_, payload: unknown) => {
     const request = parseIpcPayload('spreadsheet:open', z.union([spreadsheetPath.strict(), spreadsheetArtifact]), payload)
     return openSpreadsheet(request, runtimeRequest)

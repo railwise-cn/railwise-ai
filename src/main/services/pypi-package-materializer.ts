@@ -23,13 +23,12 @@ import {
   type ManagedUvRuntimeV1
 } from './managed-uv-runtime-service'
 import { systemFetch } from './system-network'
+import { isPackageLicenseName, MAX_PACKAGE_LICENSE_BYTES, readCatalogLicenseEvidence } from './package-license-evidence'
 
 const execFileAsync = promisify(execFile)
 const MAX_PYPI_METADATA_BYTES = 2 * 1024 * 1024
 const MAX_WHEEL_BYTES = 64 * 1024 * 1024
 const MAX_LOCK_BYTES = 8 * 1024 * 1024
-const MAX_LICENSE_BYTES = 2 * 1024 * 1024
-const MAX_LICENSE_METADATA_BYTES = 3 * 1024 * 1024
 const SHA256 = /^[0-9a-f]{64}$/i
 const PACKAGE_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,198}[A-Za-z0-9])?$/
 const VERSION = /^[A-Za-z0-9](?:[A-Za-z0-9._+!-]{0,126}[A-Za-z0-9])?$/
@@ -228,10 +227,6 @@ async function writeVerifiedWheel(targetDirectory: string, artifact: PypiArtifac
   }
 }
 
-function licenseName(path: string): boolean {
-  return /^(?:licen[cs]e|notice|copying)(?:\.|$)/i.test(basename(path))
-}
-
 export async function preservePypiLicense(
   item: MarketplacePackageV1,
   targetDirectory: string,
@@ -244,67 +239,21 @@ export async function preservePypiLicense(
   const licenses = entries.filter((entry) => {
     const path = entry.name.replaceAll('\\', '/')
     return !entry.dir && !path.includes(':') && !path.includes('\0') && path.split('/').every((segment) => segment && segment !== '.' && segment !== '..') &&
-      licenseName(path) && (path.includes('.dist-info/licenses/') || path.includes('.dist-info/'))
+      isPackageLicenseName(path) && (path.includes('.dist-info/licenses/') || path.includes('.dist-info/'))
   })
   let preservedBytes = 0
   for (const entry of licenses) {
     const content = await entry.async('nodebuffer')
     preservedBytes += content.byteLength
-    if (content.byteLength === 0 || preservedBytes > MAX_LICENSE_BYTES) throw new Error('PyPI wheel license files exceed their safety limit.')
+    if (content.byteLength === 0 || preservedBytes > MAX_PACKAGE_LICENSE_BYTES) throw new Error('PyPI wheel license files exceed their safety limit.')
     const destination = join(targetDirectory, 'licenses', ...entry.name.replaceAll('\\', '/').split('/'))
     await mkdir(dirname(destination), { recursive: true, mode: 0o700 })
     await writeFile(destination, content, { mode: 0o600, flag: 'wx' })
   }
-  const license = licenses[0]
-  let bytes: Buffer
-  if (license) {
-    bytes = await license.async('nodebuffer')
-  } else {
-    const evidence = item.licenseEvidence.find((candidate) =>
-      candidate.required && candidate.includeInInstall && candidate.license === item.license &&
-      licenseName(candidate.path)
-    )
-    const source = item.sources.find((candidate) => candidate.id === evidence?.sourceId)
-    if (!evidence || source?.kind !== 'github' || !/^[0-9a-f]{40}$/i.test(source.resolvedRef)) {
-      throw new Error('PyPI wheel does not preserve a LICENSE, NOTICE, or COPYING file.')
-    }
-    const segments = evidence.path.replaceAll('\\', '/').split('/')
-    if (segments.some((segment) => !segment || segment === '.' || segment === '..')) {
-      throw new Error('PyPI license evidence path is unsafe.')
-    }
-    const url = new URL(`https://api.github.com/repos/${encodeURIComponent(source.owner)}/${encodeURIComponent(source.repository)}/contents/${segments.map(encodeURIComponent).join('/')}`)
-    url.searchParams.set('ref', source.resolvedRef)
-    const response = await fetchImpl(url.toString(), {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'RailWise AI' },
-      redirect: 'error',
-      signal: AbortSignal.timeout(30_000)
-    })
-    if (!response.ok) throw new Error(`PyPI license evidence request failed (${response.status}).`)
-    assertHttpsHost(response.url || url.toString(), 'api.github.com', 'PyPI license evidence URL')
-    const metadata = JSON.parse((await readBoundedResponseBuffer(
-      response,
-      MAX_LICENSE_METADATA_BYTES,
-      'PyPI license evidence metadata'
-    )).toString('utf8')) as {
-      type?: unknown
-      path?: unknown
-      size?: unknown
-      encoding?: unknown
-      content?: unknown
-    }
-    const encoded = typeof metadata.content === 'string'
-      ? metadata.content.replace(/\s/g, '')
-      : ''
-    if (metadata.type !== 'file' || metadata.path !== segments.join('/') ||
-        metadata.encoding !== 'base64' || typeof metadata.size !== 'number' ||
-        !Number.isSafeInteger(metadata.size) || metadata.size < 1 || metadata.size > MAX_LICENSE_BYTES ||
-        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) {
-      throw new Error('PyPI license evidence metadata is invalid.')
-    }
-    bytes = Buffer.from(encoded, 'base64')
-    if (bytes.byteLength !== metadata.size) throw new Error('PyPI license evidence size is invalid.')
-  }
-  if (bytes.byteLength === 0 || bytes.byteLength > MAX_LICENSE_BYTES) {
+  const embedded = licenses[0]
+  const bytes = embedded ? await embedded.async('nodebuffer') : await readCatalogLicenseEvidence(item, fetchImpl)
+  if (!bytes) throw new Error('PyPI wheel does not preserve a LICENSE, NOTICE, or COPYING file.')
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_PACKAGE_LICENSE_BYTES) {
     throw new Error('PyPI wheel license file exceeds its safety limit.')
   }
   await writeFile(join(targetDirectory, 'LICENSE'), bytes, { mode: 0o600 })

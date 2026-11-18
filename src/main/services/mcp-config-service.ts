@@ -22,8 +22,18 @@ import { atomicWriteFile, readRecoveredFile, runSerialized } from './durable-fil
 import { canonicalizeContainmentRoot, resolveContainedPath } from './canonical-containment'
 import { isCandidateCredentialAccessAllowed } from '../candidate-runtime'
 import { decryptStringWithCredentialHelper, encryptStringWithCredentialHelper } from './im-credential-helper'
+import { verifiedMirroredNpmMcp } from './plugin-activation-service'
+import { resolveMarketplaceCommand } from './marketplace-command'
 
 const execFileAsync = promisify(execFile)
+const ELECTRON_NODE_MODE = 'ELECTRON_RUN_AS_NODE'
+
+async function packagedNodeFallback(server: McpServerConfigV2): Promise<string | undefined> {
+  if (!process.versions.electron || process.defaultApp || process.env[ELECTRON_NODE_MODE] ||
+      !server.command || resolveMarketplaceCommand(server.command) !== server.command) return undefined
+  return await verifiedMirroredNpmMcp(server) ? process.execPath : undefined
+}
+
 const MAX_OAUTH_RESPONSE_BYTES = 1024 * 1024
 const OAUTH_REQUEST_TIMEOUT_MS = 15_000
 const OAUTH_STATE_TTL_MS = 10 * 60_000
@@ -366,15 +376,18 @@ export class McpConfigService {
             OPENAI_API_KEY: '', GOOGLE_API_KEY: '', GEMINI_API_KEY: '', HF_TOKEN: ''
           })
         }
+        const packagedNode = enabled ? await packagedNodeFallback(server) : undefined
         for (const key of server.credentialEnvironmentVariables ?? []) {
+          if (key.toUpperCase() === ELECTRON_NODE_MODE) continue
           const variable = runtimeCredentialVariable(server.id, key)
           env[key] = `\${${variable}}`
           if (credential) environment[variable] = credential.accessToken
         }
+        if (packagedNode) env[ELECTRON_NODE_MODE] = '1'
         servers[server.id] = {
           enabled,
           transport: 'stdio',
-          command: server.command,
+          command: packagedNode ?? server.command,
           args: server.args ?? [],
           cwd,
           env,
@@ -526,6 +539,8 @@ export class McpConfigService {
           const cwd = await canonicalizeContainmentRoot(server.cwd)
           await resolveContainedPath({ root: server.workspaceRoot, target: cwd, allowRoot: true, mustExist: true, expect: 'directory' })
         }
+        const packagedNode = await packagedNodeFallback(server)
+        if (packagedNode) return await this.testPackagedNpmConnector(server, packagedNode, startedAt)
         const lookup = process.platform === 'win32' ? ['where', [server.command!]] as const : ['which', [server.command!]] as const
         await execFileAsync(lookup[0], lookup[1], { timeout: Math.min(server.timeoutMs, 10_000), windowsHide: true })
         return { id: server.id, state: 'connected', authorized: true, latencyMs: Date.now() - startedAt }
@@ -555,6 +570,31 @@ export class McpConfigService {
         latencyMs: Date.now() - startedAt,
         message: error instanceof Error ? error.message : String(error)
       }
+    }
+  }
+
+  private async testPackagedNpmConnector(server: McpServerConfigV2, command: string, startedAt: number): Promise<McpServerStatusV1> {
+    const credential = await this.readCredential(server.credentialRef, true)
+    if (server.credentialEnvironmentVariables?.length && !credential) {
+      return { id: server.id, state: 'needs_authorization', authorized: false, errorCode: 'missing_credentials' }
+    }
+    const env: Record<string, string> = { [ELECTRON_NODE_MODE]: '1' }
+    for (const key of server.credentialEnvironmentVariables ?? []) {
+      if (credential && key.toUpperCase() !== ELECTRON_NODE_MODE) env[key] = credential.accessToken
+    }
+    const client = new Client({ name: 'railwise-mirror-connection-check', version: '1.0.0' })
+    try {
+      await client.connect(new StdioClientTransport({
+        command, args: server.args ?? [], env, stderr: 'ignore'
+      }), { timeout: server.timeoutMs })
+      const { tools } = await client.listTools({}, { timeout: server.timeoutMs })
+      return { id: server.id, state: 'connected', authorized: true, verification: 'tool_discovery',
+        toolCount: tools.length, latencyMs: Date.now() - startedAt }
+    } catch {
+      return { id: server.id, state: 'error', authorized: false, errorCode: 'connection_failed',
+        latencyMs: Date.now() - startedAt, message: '内置运行时未能启动该连接器，请在市场重新核验安装后重试。' }
+    } finally {
+      await client.close().catch(() => undefined)
     }
   }
 

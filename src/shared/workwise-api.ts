@@ -613,6 +613,7 @@ export type WorkWiseApi = {
   cancelChatAttachmentImport: (importId: string) => Promise<boolean>
   openChatAttachmentOriginal: (managedPath: string) => Promise<void>
   openSpreadsheet: (request: import('./workspace-sheet').SheetFileTarget) => Promise<import('./workspace-sheet').OpenSpreadsheetResult>
+  pickWorkbook: (request: { workspaceRoot: string }) => Promise<WorkspacePickResult>
   saveWorkbook: (request: import('./workspace-sheet').SaveWorkbookRequest) => Promise<import('./workspace-sheet').SaveWorkbookResult>
   previewWorkspaceFile: (request: {
     workspaceRoot: string

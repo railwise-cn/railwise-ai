@@ -283,6 +283,7 @@ const api = {
   cancelDocumentParse: (parseId) => ipcRenderer.invoke('document-engine:cancel', parseId),
   previewWorkspaceFile: (request) => ipcRenderer.invoke('file:preview-workspace', request),
   openSpreadsheet: (request) => ipcRenderer.invoke('spreadsheet:open', request),
+  pickWorkbook: (request) => ipcRenderer.invoke('spreadsheet:pick', request),
   saveWorkbook: (request) => ipcRenderer.invoke('spreadsheet:save', request),
   openSkillRoot: (rootPath) =>
     ipcRenderer.invoke('skill:open-root', rootPath),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { McpServerConfigV2 } from '@shared/agent-workbench'
 import type { InstalledPackageV1, MarketplacePackageV1, PluginUpdateDiagnosticV1 } from '@shared/marketplace'
-import { marketplaceNeedsConfiguration, marketplacePackageStatus } from './plugin-marketplace-status'
+import { marketplaceNeedsConfiguration, marketplacePackageDelivery, marketplacePackageStatus } from './plugin-marketplace-status'
 
 const item = {
   availability: { status: 'available' },
@@ -12,6 +12,15 @@ const installed = { health: { status: 'healthy' } } as InstalledPackageV1
 const server = { enabled: true, credentialRef: { id: 'local-ref', storage: 'keychain' } } as McpServerConfigV2
 
 describe('marketplace package readiness', () => {
+  it('keeps first-party mirrors distinct from upstream and external delivery', () => {
+    const official = { ...item, source: { catalogSourceId: 'workwise-official' } } as MarketplacePackageV1
+    expect(marketplacePackageDelivery(official)).toBe('railwise')
+    expect(marketplacePackageDelivery({ ...official, source: { ...official.source, catalogSourceId: 'local' } })).toBeUndefined()
+    expect(marketplacePackageDelivery({ ...official, installation: { mode: 'upstream-only', installedByDefault: false, reinstallable: true } })).toBe('upstream')
+    expect(marketplacePackageDelivery({ ...official, installation: { mode: 'system-managed', installedByDefault: true, reinstallable: false } })).toBe('builtin')
+    expect(marketplacePackageDelivery({ ...official, installation: { mode: 'external', installedByDefault: false, reinstallable: false } })).toBe('external')
+  })
+
   it('shows an actionable install state instead of a version for a package not yet installed', () => {
     expect(marketplacePackageStatus(item)).toEqual({ state: 'available', tone: 'neutral' })
     expect(marketplaceNeedsConfiguration(item)).toBe(false)

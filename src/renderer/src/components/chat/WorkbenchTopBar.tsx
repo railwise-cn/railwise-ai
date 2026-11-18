@@ -29,6 +29,7 @@ type Props = {
   sideChatEnabled?: boolean
   onOpenSideChat?: () => void
   onNewWorkbook?: () => void
+  onOpenWorkbook?: () => void
 }
 
 export function WorkbenchTopBar({
@@ -40,7 +41,8 @@ export function WorkbenchTopBar({
   sideChatOpen = false,
   sideChatEnabled = true,
   onOpenSideChat,
-  onNewWorkbook
+  onNewWorkbook,
+  onOpenWorkbook
 }: Props): ReactElement {
   const { t } = useTranslation(['common', 'settings'])
   const [editors, setEditors] = useState<EditorInfo[]>([])
@@ -137,6 +139,13 @@ export function WorkbenchTopBar({
         aria-label={t('newWorkbook')}
         title={t('newWorkbook')}
       ><Sheet className="h-4 w-4" strokeWidth={1.8} /></button> : null}
+      {onOpenWorkbook ? <button
+        type="button"
+        className="inline-flex shrink-0 items-center rounded-full border border-transparent px-2.5 py-1.5 text-ds-muted hover:bg-ds-subtle"
+        onClick={onOpenWorkbook}
+        aria-label={t('openWorkbook')}
+        title={t('openWorkbook')}
+      ><FolderOpen className="h-4 w-4" strokeWidth={1.8} /></button> : null}
       <div ref={editorMenuRef} className="relative">
         <button
           type="button"

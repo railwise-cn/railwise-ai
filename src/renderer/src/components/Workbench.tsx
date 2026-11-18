@@ -2010,6 +2010,20 @@ export function Workbench(): ReactElement {
     }
   }
 
+  const openLocalWorkbook = async (): Promise<void> => {
+    const root = normalizeWorkspaceRoot(workspaceRoot)
+    if (!root) return
+    try {
+      const result = await window.workwise.pickWorkbook({ workspaceRoot: root })
+      if (result.canceled || !result.path) return
+      setFilePreviewTarget({ workspaceRoot: root, path: result.path })
+      setRightSidebarWidth(width => Math.max(width, 680))
+      setRightPanelMode('file')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   const startNewWriteAssistantConversation = (): void => {
     const writeState = useWriteWorkspaceStore.getState()
     const writeWorkspaceRoot = writeState.workspaceRoot || workspaceRoot
@@ -2468,6 +2482,7 @@ export function Workbench(): ReactElement {
                     sideChatEnabled={runtimeConnection === 'ready' && Boolean(activeThreadId)}
                     onOpenSideChat={openSideChat}
                     onNewWorkbook={workspaceRoot ? () => void createLocalWorkbook() : undefined}
+                    onOpenWorkbook={workspaceRoot ? () => void openLocalWorkbook() : undefined}
                   />
                 </div>
               </div>

@@ -235,8 +235,21 @@ export function marketplaceText(t: (key: string) => string, key: string, fallbac
   return value && value !== key ? value : MARKETPLACE_TEXT_FALLBACKS[key] ?? fallback
 }
 
-export function friendlyMarketplaceError(message: string, t: (key: string) => string): string {
+export function friendlyMarketplaceError(
+  message: string,
+  t: (key: string) => string,
+  delivery?: 'builtin' | 'railwise' | 'external' | 'upstream'
+): string {
   const normalized = message.trim()
+  if (/没有此插件的睿威官方镜像|mirror is not available for this platform/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorMirrorMissing', 'This version has no RailWise package for this system. Check for an app update.')
+  }
+  if (/RailWise marketplace archive failed.*verification/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorMirrorIntegrity', 'The RailWise download did not pass verification. Retry from the marketplace. Existing installations remain available.')
+  }
+  if (delivery === 'railwise' && /marketplace download failed|fetch failed|network|ENOTFOUND|ECONNRESET|ETIMEDOUT|TimeoutError/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorMirrorNetwork', 'The RailWise download is currently unreachable. Check access to www.railwise.cn and retry from the marketplace. Existing installations remain available.')
+  }
   if (/Unsafe Skill package:.*file exceeds/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorUnsafeSkillTooLarge', 'Skill package contains an oversized file.')
   }

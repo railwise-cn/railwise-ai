@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { assertPublishedWindowsUpgrade, repairedScheduleSeed, sidebarUpgradeControlSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
+import { verifyFrozenWindowsReadback } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const installer = { url: 'RailWise-AI-0.5.7-win-x64.exe', size: 317686658, sha512: manifestDigest }
@@ -94,4 +95,26 @@ test('published Windows smoke is a separate opt-in job with read-only GitHub per
   const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
   assert.match(packageJson.scripts['dist:win'], /^npm run dist -- --win nsis --x64$/)
   assert.match(packageJson.scripts.dist, /--publish never/)
+})
+
+test('frozen Windows acceptance preserves native package identity and the local KUN conversation', () => {
+  const sourceHead = '1'.repeat(40)
+  const sha256 = 'a'.repeat(64)
+  const target = { identity: { version: '0.5.8', sourceHead }, installer: { sha256 } }
+  const result = { expectedVersion: '0.5.8', expectedSource: sourceHead, installerSha256: sha256,
+    registry: { displayVersion: '0.5.8' }, packageMetadata: { version: '0.5.8', sourceHead, asarSha256: 'b'.repeat(64) },
+    profilePreserved: true, threadPreserved: true }
+  assert.doesNotThrow(() => verifyFrozenWindowsReadback(result, target))
+  assert.throws(() => verifyFrozenWindowsReadback({ ...result, threadPreserved: false }, target))
+  assert.throws(() => verifyFrozenWindowsReadback({ ...result, registry: { displayVersion: '0.5.7' } }, target))
+  assert.throws(() => verifyFrozenWindowsReadback({ ...result, installerSha256: '0'.repeat(64) }, target))
+})
+
+test('frozen Windows acceptance pins the original artifact and builds the next installer inside its runner', async () => {
+  const workflow = parse(await readFile(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
+  const job = workflow.jobs['windows-frozen-gui-update']
+  assert.match(job.if, /inputs.run_frozen_gui_update == true/)
+  assert.ok(job.steps.some(step => step.with?.['artifact-ids'] === '${{ steps.frozen.outputs.artifact_id }}'))
+  assert.ok(job.steps.some(step => step.run === 'npm run dist:win' && step.env?.WORKWISE_APP_VERSION === '0.5.9'))
+  assert.ok(job.steps.filter(step => step.uses?.startsWith('actions/upload-artifact@')).every(step => step.with.path.includes('frozen-windows-evidence/')))
 })

@@ -519,14 +519,23 @@ function pypiSource(
   }
 }
 
-function mcpServersLicenseSource(
-  commit: string
+const MCP_SERVERS_TRANSITIONAL_LICENSE = 'MIT AND Apache-2.0 AND CC-BY-4.0'
+const MCP_SERVERS_TRANSITIONAL_LICENSE_SHA = '0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a'
+const REDIS_LICENSE_SOURCE = {
+  owner: 'redis', repository: 'mcp-redis', commit: '11e67e44358cd6410d5a7e615a29539ccd71a045',
+  sha256: '8fc61d1149298a3a21da6c56157008ce8a6212a4d75b1fddc29949a00537bef5'
+}
+
+function githubLicenseSource(
+  commit: string,
+  owner = 'modelcontextprotocol',
+  repository = 'servers'
 ): SourceDefinition<GithubPackageSourceV1> {
   return {
     kind: 'github',
-    location: 'https://github.com/modelcontextprotocol/servers',
-    owner: 'modelcontextprotocol',
-    repository: 'servers',
+    location: `https://github.com/${owner}/${repository}`,
+    owner,
+    repository,
     defaultBranch: 'main',
     requestedRef: commit,
     resolvedRef: commit
@@ -774,7 +783,7 @@ const officialPackages: MarketplacePackageV1[] = [
       'https://github.com/modelcontextprotocol',
       true
     ),
-    license: 'MIT',
+    license: MCP_SERVERS_TRANSITIONAL_LICENSE,
     categories: ['system'],
     permissions: [FILESYSTEM_READ_PERMISSION, FILESYSTEM_WRITE_PERMISSION],
     args: ['${workspaceRoot}'],
@@ -791,7 +800,7 @@ const officialPackages: MarketplacePackageV1[] = [
       'https://github.com/modelcontextprotocol',
       true
     ),
-    license: 'MIT',
+    license: MCP_SERVERS_TRANSITIONAL_LICENSE,
     categories: ['knowledge'],
     tier: 'advanced',
     permissions: [FILESYSTEM_READ_PERMISSION, FILESYSTEM_WRITE_PERMISSION],
@@ -808,7 +817,7 @@ const officialPackages: MarketplacePackageV1[] = [
       'https://github.com/modelcontextprotocol',
       true
     ),
-    license: 'MIT',
+    license: MCP_SERVERS_TRANSITIONAL_LICENSE,
     categories: ['agent-workflows'],
     tier: 'advanced',
     licenseEvidenceCommit: '6dd0a683e198783e30feabf7abaf42f925bd18b1'
@@ -1092,7 +1101,8 @@ const officialPackages: MarketplacePackageV1[] = [
     license: 'MIT',
     categories: ['data'],
     permissions: [DATABASE_READ_PERMISSION, DATABASE_WRITE_PERMISSION],
-    auth: { type: 'tool-managed', provider: 'redis-mcp' }
+    auth: { type: 'tool-managed', provider: 'redis-mcp' },
+    licenseEvidenceSource: REDIS_LICENSE_SOURCE
   }),
   npmMcpPackage({
     id: 'mongodb-mcp',
@@ -1285,7 +1295,7 @@ function npmMcpPackage(options: {
     license: options.license,
     source: npmSource(options.artifact),
     additionalSources: options.licenseEvidenceCommit
-      ? [mcpServersLicenseSource(options.licenseEvidenceCommit)]
+      ? [githubLicenseSource(options.licenseEvidenceCommit)]
       : [],
     components: [{
       id: `${options.id}-server`,
@@ -1300,6 +1310,7 @@ function npmMcpPackage(options: {
           license: options.license,
           sourceId: licenseSourceId,
           path: 'LICENSE',
+          sha256: MCP_SERVERS_TRANSITIONAL_LICENSE_SHA,
           includeInInstall: true,
           required: true
         }]
@@ -1323,8 +1334,12 @@ function wheelMcpPackage(options: {
   auth?: MarketplacePackageV1['auth']
   dependencies?: PackageDependencyV1[]
   licenseEvidenceCommit?: string
+  licenseEvidenceSource?: { owner: string; repository: string; commit: string; sha256: string }
 }): MarketplacePackageV1 {
   const licenseSourceId = `${options.id}-source-2`
+  const evidence = options.licenseEvidenceSource
+  const licenseSource = evidence ? githubLicenseSource(evidence.commit, evidence.owner, evidence.repository)
+    : options.licenseEvidenceCommit ? githubLicenseSource(options.licenseEvidenceCommit) : undefined
   return definePackage({
     id: options.id,
     name: options.name,
@@ -1335,9 +1350,7 @@ function wheelMcpPackage(options: {
     publisher: options.publisher,
     license: options.license,
     source: pypiSource(options.artifact),
-    additionalSources: options.licenseEvidenceCommit
-      ? [mcpServersLicenseSource(options.licenseEvidenceCommit)]
-      : [],
+    additionalSources: licenseSource ? [licenseSource] : [],
     components: [{
       id: `${options.id}-server`,
       name: `${options.name} Server`,
@@ -1346,11 +1359,12 @@ function wheelMcpPackage(options: {
     }],
     permissions: options.permissions,
     auth: options.auth ?? { type: 'none' },
-    licenseEvidence: options.licenseEvidenceCommit
+    licenseEvidence: licenseSource
       ? [{
           license: options.license,
           sourceId: licenseSourceId,
           path: 'LICENSE',
+          ...(evidence ? { sha256: evidence.sha256 } : {}),
           includeInInstall: true,
           required: true
         }]

@@ -200,6 +200,15 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
+      - uses: actions/upload-artifact@v6
+        if: ${{ !cancelled() }}
+        with:
+          name: marketplace-lock-${{ matrix.target }}
+          path: |
+            ${{ runner.temp }}/marketplace-parts/marketplace-lock.json
+            ${{ runner.temp }}/marketplace-parts/build-errors.json
+          if-no-files-found: error
+          retention-days: 14
 
   stage-managed-dependencies:
     name: Stage verified immutable managed dependencies

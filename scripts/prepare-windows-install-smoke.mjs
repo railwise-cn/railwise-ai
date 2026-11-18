@@ -10,6 +10,8 @@ const driverFiles = new Set([
   '.github/workflows/windows-install-smoke.yml',
   'scripts/prepare-windows-install-smoke.mjs',
   'scripts/run-windows-install-smoke.ps1',
+  'scripts/run-windows-frozen-gui-upgrade.mjs',
+  'scripts/run-windows-published-gui-update-smoke.mjs',
   'scripts/run-windows-ui-smoke.mjs',
   'scripts/prepare-browser-skill-smoke.mjs',
   'scripts/verify-windows-install-smoke.mjs',

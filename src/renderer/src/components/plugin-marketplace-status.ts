@@ -9,6 +9,17 @@ export type MarketplacePackageStatus = {
   tone: 'success' | 'attention' | 'neutral'
 }
 
+export function marketplacePackageDelivery(
+  item: MarketplacePackageV1
+): 'builtin' | 'railwise' | 'external' | 'upstream' | undefined {
+  if (item.installation.mode === 'direct-mirror' && item.source?.catalogSourceId === 'workwise-official') return 'railwise'
+  if (item.installation.mode === 'upstream-only') return 'upstream'
+  if (item.installation.mode === 'external' || (item.source?.catalogSourceId === 'workwise-official' && item.id === 'ego-browser')) return 'external'
+  if (item.installation.mode === 'system-managed' && item.installation.installedByDefault) return 'builtin'
+  if (item.source?.catalogSourceId === 'workwise-official' && (item.id === 'officecli' || item.id === 'lark-cli')) return 'railwise'
+  return undefined
+}
+
 export function marketplaceNeedsConfiguration(
   item: MarketplacePackageV1,
   record?: InstalledPackageV1,

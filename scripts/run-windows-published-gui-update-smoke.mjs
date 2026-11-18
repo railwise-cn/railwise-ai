@@ -78,14 +78,14 @@ export function assertPublishedWindowsUpgrade(report) {
   assert.equal(report.profile?.sentinelPreserved, true)
 }
 
-const psQuote = value => "'" + value.replaceAll("'", "''") + "'"
-function powershell(script, timeout = 12_000) {
+export const psQuote = value => "'" + value.replaceAll("'", "''") + "'"
+export function powershell(script, timeout = 12_000) {
   return execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', script], {
     encoding: 'utf8', maxBuffer: 128 * 1024, timeout, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']
   }).trim()
 }
 
-function registryState() {
+export function registryState() {
   const base = psQuote(rootIdentity.installRegistryKey)
   const uninstall = psQuote(rootIdentity.uninstallRegistryKey)
   return JSON.parse(powershell(`
@@ -111,7 +111,7 @@ function registryState() {
   `))
 }
 
-function ownedInstallState(directory, version) {
+export function ownedInstallState(directory, version) {
   const entries = registryState().filter(entry => entry.hive === 'CurrentUser' && entry.view === 'Registry64')
   assert.equal(entries.length, 1, 'The public NSIS identity must be installed for this user')
   const registry = entries[0]
@@ -120,7 +120,7 @@ function ownedInstallState(directory, version) {
   return registry
 }
 
-function windowsForExecutable(executable) {
+export function windowsForExecutable(executable) {
   return JSON.parse(powershell(`
     $ErrorActionPreference = 'Stop'
     $windows = @(Get-Process -Name ${psQuote(basename(executable, '.exe'))} -ErrorAction SilentlyContinue |
@@ -130,7 +130,7 @@ function windowsForExecutable(executable) {
   `))
 }
 
-async function waitUntil(read, label, timeout, interval = 250) {
+export async function waitUntil(read, label, timeout, interval = 250) {
   const deadline = Date.now() + timeout
   while (Date.now() < deadline) {
     const value = await read()
@@ -140,7 +140,7 @@ async function waitUntil(read, label, timeout, interval = 250) {
   throw new Error(`Timed out waiting for ${label}`)
 }
 
-async function sha256(path) {
+export async function sha256(path) {
   const digest = createHash('sha256')
   for await (const bytes of createReadStream(path)) digest.update(bytes)
   return digest.digest('hex')
@@ -159,7 +159,7 @@ async function downloadBaseline(directory) {
   return { path, name: baseline.name, url, size: info.size, sha256: digest }
 }
 
-async function attachPackagedRenderer(child, executable, devtoolsPort) {
+export async function attachPackagedRenderer(child, executable, devtoolsPort) {
   return waitUntil(async () => {
     if (child.exitCode !== null) throw new Error(`Baseline exited before renderer inspection (${child.exitCode})`)
     const port = await devtoolsPort()
@@ -172,6 +172,24 @@ async function attachPackagedRenderer(child, executable, devtoolsPort) {
       entry.webSocketDebuggerUrl?.startsWith(`ws://127.0.0.1:${port}/`))
     return tab ? connectCdp(tab.webSocketDebuggerUrl) : null
   }, 'the owned packaged renderer', 90_000)
+}
+
+export function installExactNsis(installerPath, directory) {
+  // /D must be last. A raw NSIS argument string preserves paths with spaces.
+  const exitCode = powershell(`
+    $ErrorActionPreference = 'Stop'
+    $start = [Diagnostics.ProcessStartInfo]::new()
+    $start.FileName = ${psQuote(installerPath)}
+    $start.Arguments = ${psQuote(`/S /currentuser /D=${directory}`)}
+    $start.UseShellExecute = $false
+    $installer = [Diagnostics.Process]::Start($start)
+    if (-not $installer.WaitForExit(300000)) {
+      $installer.Kill($true)
+      throw 'Windows installer timed out'
+    }
+    $installer.ExitCode
+  `, 310_000)
+  assert.equal(Number(exitCode), 0, 'Windows installer exit code')
 }
 
 async function main(args) {
@@ -223,21 +241,7 @@ async function main(args) {
       ? inspectInstaller(join(process.env.RUNNER_TEMP, 'repaired-updater-baseline', baselineIdentity.installerName), baselineIdentity)
       : await downloadBaseline(root)
     await save()
-    // /D must be last. A raw NSIS argument string preserves paths with spaces.
-    const exitCode = powershell(`
-      $ErrorActionPreference = 'Stop'
-      $start = [Diagnostics.ProcessStartInfo]::new()
-      $start.FileName = ${psQuote(report.baseline.installer.path)}
-      $start.Arguments = ${psQuote(`/S /currentuser /D=${directory}`)}
-      $start.UseShellExecute = $false
-      $installer = [Diagnostics.Process]::Start($start)
-      if (-not $installer.WaitForExit(300000)) {
-        $installer.Kill($true)
-        throw 'Released baseline installer timed out'
-      }
-      $installer.ExitCode
-    `, 310_000)
-    assert.equal(Number(exitCode), 0, 'Released baseline installer exit code')
+    installExactNsis(report.baseline.installer.path, directory)
     report.baseline.executable = executable
     report.baseline.package = inspectInstalledPackage(directory, baselineIdentity)
     report.baseline.registry = ownedInstallState(directory, baseVersion)

@@ -54,7 +54,7 @@ import brand from '@shared/product-brand.json'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useChatStore } from '../store/chat-store'
 import { friendlyMarketplaceError, skillValidationWarning } from './plugin-marketplace-compat'
-import { marketplaceNeedsConfiguration, marketplacePackageStatus } from './plugin-marketplace-status'
+import { marketplaceNeedsConfiguration, marketplacePackageDelivery, marketplacePackageStatus } from './plugin-marketplace-status'
 import { ConnectorCatalog } from './connectors/ConnectorCatalog'
 
 export * from './plugin-marketplace-compat'
@@ -104,6 +104,15 @@ function packageDisplaySummary(item: MarketplacePackageV1, text: Text): string {
 function sourceLabel(source: CatalogSourceV1 | undefined, fallback: string, text: Text): string {
   const id = source?.id || fallback
   return text(`pluginCatalogSource_${id}`, source?.name || fallback)
+}
+
+function packageDeliveryLabel(item: MarketplacePackageV1, text: Text): string | undefined {
+  const delivery = marketplacePackageDelivery(item)
+  if (delivery === 'builtin') return text('pluginDeliveryBuiltin', 'Built in')
+  if (delivery === 'railwise') return text('pluginDeliveryRailWise', 'Download from RailWise')
+  if (delivery === 'external') return text('pluginDeliveryExternal', 'External setup required')
+  if (delivery === 'upstream') return text('pluginDeliveryUpstream', 'Upstream download')
+  return undefined
 }
 
 function permissionKindLabel(kind: PackagePermissionV1['kind'], text: Text): string {
@@ -771,7 +780,9 @@ export function PluginMarketplaceView(): ReactElement {
         packageId: entry.package.id
       }))
     } catch (error) {
-      setNotice({ tone: 'error', message: friendlyMarketplaceError(error instanceof Error ? error.message : String(error), t) })
+      setNotice({ tone: 'error', message: friendlyMarketplaceError(
+        error instanceof Error ? error.message : String(error), t, marketplacePackageDelivery(entry.package)
+      ) })
     } finally {
       setBusy('')
     }
@@ -834,13 +845,19 @@ export function PluginMarketplaceView(): ReactElement {
       }
       await window.workwise.cancelPluginImport(prepared.id).catch(() => false)
       setPrepared(null)
+      const name = packageDisplayName(prepared.package, text)
+      const permissionUpdate = current?.version === prepared.package.version && prepared.format === 'catalog'
+      const fromMirror = prepared.format === 'catalog' && marketplacePackageDelivery(prepared.package) === 'railwise'
+      const confirmation = permissionUpdate
+        ? text('pluginUnifiedPermissionsUpdated', '{{name}} permissions updated.', { name })
+        : fromMirror
+          ? text('pluginDeliveryRailWiseInstalled', '{{name}} was downloaded from RailWise, verified, and installed.', { name })
+          : text('pluginUnifiedInstalled', '{{name}} installed.', { name })
       setNotice({
         tone: skillRuntime && skillRuntime !== 'loaded' ? 'info' : 'success',
-        message: skillRuntime ? `${prepared.package.name} · ${skillRuntimeLabel(skillRuntime, text)}` : text(
-          current?.version === prepared.package.version ? 'pluginUnifiedPermissionsUpdated' : 'pluginUnifiedInstalled',
-          current?.version === prepared.package.version ? '{{name}} permissions updated.' : '{{name}} installed.',
-          { name: prepared.package.name }
-        )
+        message: skillRuntime && skillRuntime !== 'loaded'
+          ? `${confirmation} ${skillRuntimeLabel(skillRuntime, text)}`
+          : confirmation
       })
       await refresh()
     } catch (error) {
@@ -1823,7 +1840,8 @@ function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy
   const installLabel = item.installation.mode === 'upstream-only'
     ? text('pluginUnifiedInstallUpstream', 'Install from upstream') : text('pluginUnifiedInstall', 'Install')
   const label = sourceOnly ? text('pluginOpenSource', 'Open source') : blocked ? diagnosticLabel(diagnostic!, text) : update
-    ? permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedReviewUpdate', 'Review update') : text('pluginUnifiedUpdate', 'Update')
+    ? permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedReviewUpdate', 'Review update')
+      : item.installation.mode === 'upstream-only' ? text('pluginDeliveryUpdateUpstream', 'Update from upstream') : text('pluginUnifiedUpdate', 'Update')
     : isCatalogInstallable(item) && !added ? installLabel
     : remote && !added ? text('pluginUnifiedConnect', 'Connect')
     : managesPermissions ? text('pluginUnifiedPermissions', 'Permissions')
@@ -1849,6 +1867,7 @@ function PluginRow({ entry, installed, skillRuntime, server, reviewSha256, diagn
   onAction: () => void
 }): ReactElement {
   const item = entry.package
+  const delivery = marketplacePackageDelivery(item) !== 'upstream' ? packageDeliveryLabel(item, text) : undefined
   return (
     <div role="button" tabIndex={0} onClick={onSelect} onKeyDown={(event) => { if (event.key === 'Enter') onSelect() }} className="grid min-h-[96px] cursor-pointer grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 border-b border-ds-border px-1 py-3 hover:bg-ds-hover/60">
       <PluginIcon item={item} text={text} />
@@ -1861,6 +1880,7 @@ function PluginRow({ entry, installed, skillRuntime, server, reviewSha256, diagn
         <p className="mt-1 line-clamp-1 text-[12px] text-ds-muted">{packageDisplaySummary(item, text)}</p>
         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-ds-faint">
           <span>{item.publisher.name}</span>
+          {delivery ? <span>{delivery}</span> : null}
           {skillRuntime && item.id !== 'browser-skill' && !hasUpdate(item, installed, reviewSha256, diagnostic)
             ? <span>{skillRuntimeLabel(skillRuntime, text)}</span>
             : <PackageStatus item={item} installed={installed} server={server} diagnostic={diagnostic} reviewSha256={reviewSha256} text={text} />}
@@ -1909,6 +1929,7 @@ function DetailsDrawer({ entry, source, installed, skillRuntime, checkingRuntime
   onOpenSource: () => void
 }): ReactElement {
   const item = entry.package
+  const delivery = packageDeliveryLabel(item, text)
   return (
     <Drawer title={packageDisplayName(item, text)} closeLabel={text('pluginUnifiedClose', 'Close')} onClose={onClose}>
       <div className="px-5 py-5">
@@ -1943,6 +1964,7 @@ function DetailsDrawer({ entry, source, installed, skillRuntime, checkingRuntime
           [text('pluginUnifiedPublisher', 'Publisher'), `${item.publisher.name}${item.publisher.verified ? ` · ${text('pluginUnifiedVerified', 'Verified')}` : ''}`],
           [text('pluginUnifiedLicense', 'License'), item.license ?? text('pluginUnifiedUnknownLicense', 'Unknown')],
           [text('pluginUnifiedSource', 'Source'), sourceLabel(source, entry.sourceId, text)],
+          ...(delivery ? [[text('pluginDeliveryMethod', 'Distribution'), delivery] as [string, string]] : []),
           [text('pluginUnifiedUpdatePolicy', 'Update policy'), updatePolicyLabel(item, text)]
         ]} />
         {item.installation.mode === 'upstream-only' && !item.license ? <p className="mt-3 text-[12px] leading-5 text-amber-700 dark:text-amber-300">{text('pluginUnifiedUndeclaredLicenseNotice', 'The upstream repository has no declared license. Installation uses its pinned source version.')}</p> : null}
@@ -1968,6 +1990,9 @@ function DetailsDrawer({ entry, source, installed, skillRuntime, checkingRuntime
           [text('pluginUnifiedAuthentication', 'Authentication'), item.auth.type === 'none' ? text('pluginUnifiedNone', 'None') : `${item.auth.type} · ${item.auth.provider}`],
           [text('pluginUnifiedDependencies', 'Dependencies'), item.dependencies.length ? item.dependencies.map((dependency) => dependency.requirement).join(', ') : text('pluginUnifiedNone', 'None')]
         ]} />
+        {marketplacePackageDelivery(item) === 'railwise' && item.dependencies.some(dependency => dependency.managedBy === 'user' && !dependency.optional)
+          ? <p className="mt-2 text-[11px] text-ds-muted">{text('pluginDeliveryExternalDependency', 'Set up the listed external requirements before using this package.')}</p>
+          : null}
       </DetailSection>
       <DetailSection title={text('pluginUnifiedHealth', 'Health')}>
         <DefinitionList values={[
@@ -2103,7 +2128,7 @@ function ReviewModal({ prepared, selections, scope, permissionUpdate, workspaceA
     ? text('pluginUnifiedInstallUpstream', 'Install from upstream') : text('pluginUnifiedInstall', 'Install')
   return (
     <Modal title={text('pluginUnifiedReviewTitle', 'Review {{name}}', { name: item.name })} onClose={onClose}>
-      <div className="flex items-start gap-3 rounded-md border border-ds-border bg-ds-subtle p-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><div className="text-[12px] font-semibold">{text('pluginUnifiedVerifiedReview', 'Content and metadata review')}</div><p className="mt-1 break-all text-[10px] leading-4 text-ds-muted">SHA-256 {prepared.contentSha256}</p></div></div>
+      <div className="flex items-start gap-3 rounded-md border border-ds-border bg-ds-subtle p-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><div className="text-[12px] font-semibold">{text('pluginUnifiedVerifiedReview', 'Content and metadata review')}</div>{!permissionUpdate && prepared.format === 'catalog' && marketplacePackageDelivery(item) === 'railwise' ? <p className="mt-1 text-[11px] text-ds-muted">{text('pluginDeliveryRailWiseVerified', 'Download from RailWise verified.')}</p> : null}<p className="mt-1 break-all text-[10px] leading-4 text-ds-muted">SHA-256 {prepared.contentSha256}</p></div></div>
       {item.installation.mode === 'upstream-only' && !item.license ? <p className="mt-3 text-[12px] leading-5 text-amber-700 dark:text-amber-300">{text('pluginUnifiedUndeclaredLicenseNotice', 'The upstream repository has no declared license. Installation uses its pinned source version.')}</p> : null}
       {!prepared.compatibility.workwiseCompatible ? <div className="mt-3 flex gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-[12px] text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"><CircleAlert className="h-4 w-4 shrink-0" /><span>{prepared.compatibility.reasons.join(' ')}</span></div> : null}
       <div className="mt-4"><h3 className="text-[11px] font-semibold uppercase text-ds-faint">{text('pluginUnifiedPermissions', 'Permissions')}</h3><div className="mt-2 max-h-[230px] space-y-2 overflow-y-auto">{item.permissions.length ? item.permissions.map((permission) => <label key={permission.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-ds-border p-3"><input type="checkbox" checked={Boolean(selections[permission.id])} onChange={(event) => onSelection(permission.id, event.target.checked)} className="mt-0.5 h-4 w-4" /><div><div className="text-[12px] font-medium">{permissionKindLabel(permission.kind, text)} · {permissionAccessLabel(permission.access, text)}</div><p className="mt-0.5 text-[11px] leading-4 text-ds-muted">{permissionDescription(permission, text)}</p></div></label>) : <p className="text-[12px] text-ds-faint">{text('pluginUnifiedNoPermissions', 'No additional permissions declared.')}</p>}</div></div>

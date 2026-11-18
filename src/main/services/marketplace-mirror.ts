@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { lstat, readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { MarketplacePackageV1 } from '../../shared/marketplace'
 import lock from '../../shared/marketplace-mirror-lock.json'
 import { readBoundedResponseBuffer } from './bounded-response'
@@ -8,6 +10,7 @@ import { systemFetch } from './system-network'
 
 export const MARKETPLACE_MIRROR_BASE = 'https://www.railwise.cn/downloads/railwise-ai/dependencies'
 const hexDigest = /^[0-9a-f]{64}$/
+export const MARKETPLACE_MIRROR_RECEIPT = 'workwise.mirror.json'
 
 export type MirrorPart = { sha256: string; size: number }
 export type MirroredPackage = {
@@ -49,6 +52,29 @@ export function mirrorRecordFor(
   return record
 }
 
+function mirrorReceipt(record: MirroredPackage): string {
+  return JSON.stringify({
+    schemaVersion: 1,
+    packageId: record.packageId,
+    reviewSha256: record.reviewSha256,
+    platform: record.platform,
+    arch: record.arch,
+    parts: record.parts.map(({ sha256, size }) => ({ sha256, size }))
+  }) + '\n'
+}
+
+export async function hasMarketplaceMirrorReceipt(directory: string, record: MirroredPackage): Promise<boolean> {
+  const expected = mirrorReceipt(record)
+  const path = join(directory, MARKETPLACE_MIRROR_RECEIPT)
+  try {
+    const info = await lstat(path)
+    return info.isFile() && !info.isSymbolicLink() && info.size === Buffer.byteLength(expected)
+      && await readFile(path, 'utf8') === expected
+  } catch {
+    return false
+  }
+}
+
 export async function materializeMarketplaceMirror(
   item: MarketplacePackageV1,
   record: MirroredPackage,
@@ -79,7 +105,7 @@ export async function materializeMarketplaceMirror(
     for (const entry of index.entries) {
       if (entry.directory) continue
       const key = entry.path.normalize('NFC').toLowerCase()
-      if (paths.has(key) || key === 'workwise.catalog.json' || entry.uncompressedBytes > limits.maxFileBytes) {
+      if (paths.has(key) || key === 'workwise.catalog.json' || key === MARKETPLACE_MIRROR_RECEIPT || entry.uncompressedBytes > limits.maxFileBytes) {
         throw new Error('Marketplace mirror contains an invalid or duplicate file.')
       }
       paths.add(key)
@@ -88,4 +114,5 @@ export async function materializeMarketplaceMirror(
     await extractPluginArchive(buffer, directory, options)
   }
   await inspectPackageDirectory(directory, limits)
+  await writeFile(join(directory, MARKETPLACE_MIRROR_RECEIPT), mirrorReceipt(record), { flag: 'wx', mode: 0o600 })
 }
