@@ -959,15 +959,19 @@ test('curated 0.5.6 publication notes can follow an accepted package', t => {
   assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
 })
 
-function addExactUpdaterEvidence(f, baseVersion) {
-  f.manifest.release.updaterPathChanged = true
-  const build = f.manifest.package.reviewedBuild
+function setUpdaterBaseline(f, baseVersion) {
   f.machineReport.baseVersion = baseVersion
   f.machineReport.baselineIdentity.version = baseVersion
   f.machineReport.baselineAsset = { tag: `v${baseVersion}`, ...resolveUpdaterBaseline(baseVersion).pins.arm64 }
   f.machineReport.dataSeed.serviceIdentity.packageVersion = baseVersion
   f.nativeReport.baseVersion = baseVersion
   f.nativeReport.stages.at(-1).detail = baseVersion
+}
+
+function addExactUpdaterEvidence(f, baseVersion) {
+  f.manifest.release.updaterPathChanged = true
+  const build = f.manifest.package.reviewedBuild
+  setUpdaterBaseline(f, baseVersion)
   delete f.machineReport.reviewedBuild
   f.machineReport.privatePackage = { sourceHead: build.sourceHead, artifactRunId: build.runId, artifactName: 'release-mac', files: structuredClone(build.files.filter(file => file.artifact === 'release-mac')) }
   f.machineReport.provenance = { repository: build.repository, workflowPath: build.workflowPath, workflowRef: build.workflowRef,
@@ -1007,6 +1011,27 @@ test('0.5.7 exact smoke binds the independently declared 0.5.6 baseline through 
     const releaseHead = f.tagRelease()
     if (name === 'passed') assert.match(f.verify(releaseHead), /verified v0\.5\.7/)
     else assert.throws(() => f.verify(releaseHead))
+  })
+})
+
+test('a protected-main frozen smoke binds the declared baseline and its exact older installer', async t => {
+  const cases = [
+    ['0.5.6', () => {}, undefined],
+    [undefined, () => {}, /official baseline version mismatch/],
+    ['0.5.9', () => {}, /no valid arm64 installer pin/],
+    ['0.5.6', f => { f.machineReport.baselineAsset.sha256 = '0'.repeat(64) }, /pinned official installer mismatch/],
+    ['0.5.6', f => { f.machineReport.dataSeed.serviceIdentity.packageVersion = '0.5.3' }, /dataSeed package version mismatch/],
+    ['0.5.6', f => { f.nativeReport.baseVersion = '0.5.3' }, /native official baseline mismatch/],
+  ]
+  for (const [baseVersion, change, expectedError] of cases) await t.test(expectedError?.source ?? 'explicit pinned baseline', t => {
+    const f = releaseFixture(t, '0.5.8', '0.5.8')
+    setUpdaterBaseline(f, '0.5.6')
+    f.manifest.acceptance.updaterRoundTrip.baseVersion = baseVersion
+    change(f)
+    f.recordEvidence()
+    const releaseHead = f.tagRelease()
+    if (expectedError) f.verify(releaseHead, expectedError)
+    else assert.match(f.verify(releaseHead), /verified v0\.5\.8/)
   })
 })
 
