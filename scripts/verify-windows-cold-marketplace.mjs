@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import { lstat, readFile, realpath, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { isAbsolute, join, relative, sep } from 'node:path'
+import { isAbsolute, join, relative, sep, win32 } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
@@ -74,27 +74,55 @@ async function inspectDoclingLaunch(cdp, workspace, ownedRoot) {
   const server = await cdp.evaluate(`window.workwise.listMcpServers(${literal(workspace)}).then(all=>all.find(row=>row.id==='docling-mcp-server'))`)
   assert.equal(server?.source, 'managed-tool')
   assert.equal(server?.transport, 'stdio')
-  assert.ok(containment(await realpath(ownedRoot), await realpath(server.command)))
+  const canonicalRoot = await realpath(ownedRoot)
+  assert.ok(containment(canonicalRoot, await realpath(server.command)))
   assert.deepEqual(server.env ?? {}, {})
-  const transport = new StdioClientTransport({ command: server.command, args: server.args, cwd: server.cwd, env: {}, stderr: 'pipe' })
-  const client = new Client({ name: 'railwise-installed-docling-startup-diagnostic', version: '1.0.0' })
-  const begin = Date.now()
-  let stderr = ''
-  transport.stderr?.on('data', data => { stderr = (stderr + data.toString()).slice(-4096) })
-  const evidence = { launchedFromOwnedProfile: true, stdioArgPresent: server.args.some((arg, i) => arg === '--transport' && server.args[i + 1] === 'stdio'),
-    configuredStartupTimeoutMs: server.startupTimeoutMs }
-  try {
-    await client.connect(transport, { timeout: 60_000 })
-    const discovered = await client.listTools(undefined, { timeout: 15_000 })
-    evidence.tools = discovered.tools.length
-  } catch (error) {
-    evidence.error = error instanceof Error ? error.message.slice(0, 300) : 'unknown child error'
-  } finally {
-    await client.close().catch(() => undefined)
+  const probe = async args => {
+    const transport = new StdioClientTransport({ command: server.command, args, cwd: server.cwd, env: {}, stderr: 'pipe' })
+    const client = new Client({ name: 'railwise-installed-docling-startup-diagnostic', version: '1.0.0' })
+    const begin = Date.now()
+    let stderr = ''
+    transport.stderr?.on('data', data => { stderr = (stderr + data.toString()).slice(-4096) })
+    const result = {}
+    try {
+      await client.connect(transport, { timeout: 60_000 })
+      const discovered = await client.listTools(undefined, { timeout: 15_000 })
+      result.tools = discovered.tools.length
+    } catch (error) {
+      result.error = error instanceof Error ? error.message.slice(0, 300) : 'unknown child error'
+    } finally {
+      await client.close().catch(() => undefined)
+    }
+    return { ...result, elapsedMs: Date.now() - begin, stderr: stderr.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
+      .replaceAll(ownedRoot, '<owned-runner-profile>').replaceAll(workspace, '<workspace>')
+      .replace(/\b(token|password|authorization|api[_-]?key)[\s=:]+[^\s,]+/gi, '$1=<redacted>').slice(-2200) }
   }
-  return { ...evidence, elapsedMs: Date.now() - begin, stderr: stderr.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
-    .replaceAll(ownedRoot, '<owned-runner-profile>').replaceAll(workspace, '<workspace>')
-    .replace(/\b(token|password|authorization|api[_-]?key)[\s=:]+[^\s,]+/gi, '$1=<redacted>').slice(-2200) }
+  const native = await probe(server.args)
+  const evidence = { ...native, launchedFromOwnedProfile: true,
+    stdioArgPresent: server.args.some((arg, i) => arg === '--transport' && server.args[i + 1] === 'stdio'),
+    configuredStartupTimeoutMs: server.startupTimeoutMs }
+  if (native.tools || !/filename or extension is too long/i.test(native.stderr)) return evidence
+  const [isolated, launcher, sitePackages, ...remaining] = server.args
+  assert.equal(isolated, '-I')
+  assert.ok(launcher.endsWith('workwise-python-launcher.py') && sitePackages.endsWith('site-packages'))
+  for (const path of [launcher, sitePackages]) assert.ok(containment(canonicalRoot, await realpath(path)))
+  const extendedLauncher = win32.toNamespacedPath(launcher)
+  const extendedPackages = win32.toNamespacedPath(sitePackages)
+  assert.notEqual(extendedLauncher, launcher)
+  assert.notEqual(extendedPackages, sitePackages)
+  evidence.extendedPaths = await probe([isolated, extendedLauncher, extendedPackages, ...remaining])
+  if (!evidence.extendedPaths.tools && /(?:pywintypes|pythoncom|win32api|win32con|win32job)/i.test(evidence.extendedPaths.stderr)) {
+    const pythonPaths = ['win32', 'win32/lib', 'pythonwin']
+    const module = 'win32/lib/pywin32_bootstrap.py'
+    for (const path of [...pythonPaths, 'pywin32_system32', module]) {
+      assert.ok(containment(await realpath(sitePackages), await realpath(join(sitePackages, path))))
+    }
+    const bootstrap = ['import runpy, sys', 'from pathlib import Path', 'sys.argv = sys.argv[1:]', 'site_packages = Path(sys.argv[1])',
+      `sys.path[0:0] = [str(site_packages), *(str(site_packages / path) for path in ${literal(pythonPaths)})]`,
+      `runpy.run_path(str(site_packages / ${literal(module)}))`, 'runpy.run_path(sys.argv[0], run_name="__main__")'].join('\n')
+    evidence.extendedPathsWithPinnedBootstrap = await probe([isolated, '-c', bootstrap, extendedLauncher, extendedPackages, ...remaining])
+  }
+  return evidence
 }
 
 export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot, mode = 'marketplace', observe }) {
