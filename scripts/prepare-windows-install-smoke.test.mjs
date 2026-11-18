@@ -81,12 +81,14 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   const { run_published_gui_update: publishedUpdate, run_repaired_gui_update: repairedUpdate,
     run_frozen_gui_update: frozenUpdate, build_private_next: buildPrivateNext,
     run_repaired_marketplace_install: marketplaceInstall, run_private_video_evaluation: privateVideoEvaluation,
-    package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
+    run_activity_lifecycle: activityLifecycle, package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
   assert.equal(publishedUpdate.default, false)
   assert.equal(repairedUpdate.default, false)
   assert.equal(marketplaceInstall.default, false)
   assert.equal(frozenUpdate.default, false)
   assert.equal(privateVideoEvaluation.default, false)
+  assert.deepEqual({ type: activityLifecycle.type, required: activityLifecycle.required, default: activityLifecycle.default },
+    { type: 'boolean', required: false, default: false })
   assert.equal(buildPrivateNext.default, true)
   assert.equal(packageRun.required, false)
   assert.deepEqual(workflow.on.workflow_call.inputs, { package_run_id: { ...packageRun, required: true }, ...inspectionInputs })
@@ -95,6 +97,8 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   const download = steps.find(step => step.uses === 'actions/download-artifact@v4')
   assert.equal(download.with['artifact-ids'], '${{ steps.source.outputs.artifact_id }}')
   assert.equal(download.with['run-id'], '${{ inputs.package_run_id }}')
+  const install = steps.find(step => step.name === 'Install, inspect the Chinese UI and uninstall the temporary instance')
+  assert.equal(install.env.RAILWISE_WINDOWS_ACTIVITY_SMOKE, '${{ inputs.run_activity_lifecycle }}')
   const commands = steps.map(step => step.run ?? '').join('\n')
   assert.match(commands, /prepare-windows-install-smoke/)
   assert.match(commands, /run-windows-install-smoke\.ps1/)
