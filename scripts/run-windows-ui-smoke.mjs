@@ -589,8 +589,7 @@ export function validateWindowsTaskEvidence(evidence) {
   assert.ok(Date.parse(evidence.dueOccurrence.createdAt) >= Date.parse(evidence.dueOccurrence.dueAt))
 }
 
-/** Re-select the persisted task after resume removes it from the attention filter. */
-export async function openWindowsTaskConversation(cdp, task) {
+async function selectWindowsTaskDetails(cdp, task) {
   assert.ok(task?.id && typeof task.goal === 'string' && task.goal.trim(), 'The original persisted task identity is required')
   const sidebar = 'section.ds-task-sidebar[aria-label="任务列表"]'
   const all = `${sidebar} nav[aria-label="任务筛选"] button:last-child`
@@ -601,6 +600,11 @@ export async function openWindowsTaskConversation(cdp, task) {
   await cdp.wait(`(() => {const all=document.querySelector(${JSON.stringify(all)});const matches=Array.from(document.querySelectorAll(${JSON.stringify(list)})).filter(node=>node.getAttribute('title')===${JSON.stringify(task.goal)});return all?.getAttribute('aria-pressed')==='true' && matches.length===1;})()`, 'the same task goal uniquely visible in All tasks')
   await cdp.click(target)
   await cdp.wait(`(() => {const detail=document.querySelector('article[aria-label="任务详情"]');const selected=Array.from(document.querySelectorAll(${JSON.stringify(list)})).filter(node=>node.getAttribute('aria-pressed')==='true' && node.getAttribute('title')===${JSON.stringify(task.goal)});return selected.length===1 && Array.from(detail?.querySelectorAll('details p')??[]).some(node=>node.textContent.trim()===${JSON.stringify(task.goal)});})()`, 'the exact original task details after UI selection')
+}
+
+/** Re-select the persisted task after resume removes it from the attention filter. */
+export async function openWindowsTaskConversation(cdp, task) {
+  await selectWindowsTaskDetails(cdp, task)
   await cdp.click('article[aria-label="任务详情"] button', '打开原会话')
   return { taskId: task.id, goal: task.goal, filter: 'all', exactTaskSelected: true, input: 'real-cdp-mouse' }
 }
@@ -2794,8 +2798,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         const initialAttention = (await runtimeRequest('/v1/inbox')).find(item => item.taskId === taskId && item.kind === 'blocked')
         assert.equal(initialAttention?.payload?.capability?.provider, 'browser-skill')
         assert.equal(initialAttention.payload.capability.errorCode, 'browser_disabled')
-        await cdp.click('button', '打开任务工作台')
-        await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes(${JSON.stringify(prompt)}))`, 'the original blocked browser task')
+        await cdp.click('nav[aria-label="工作区工具"] button', '任务')
+        await selectWindowsTaskDetails(cdp, task)
         await cdp.click('article[aria-label="任务详情"] button', '暂停')
         await cdp.wait(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/tasks/${encodeURIComponent(taskId)}`)},'GET').then(result=>JSON.parse(result.body).status==='paused')`, 'the original task paused before its first Turn')
         const pausedBeforeConfiguration = await readRecovery('paused')
