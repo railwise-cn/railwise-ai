@@ -70,16 +70,19 @@ async function invokeInstalledPlaywright(server, workspace, environment) {
   }
 }
 
-export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot, videoOnly = false, observe }) {
+export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot, mode = 'marketplace', observe }) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' &&
     process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_OS === 'Windows', 'Use only an ephemeral hosted Windows acceptance runner')
   assert.ok(containment(await realpath(process.env.RUNNER_TEMP), await realpath(ownedRoot)))
   const lock = JSON.parse(await readFile(new URL('../src/shared/marketplace-mirror-lock.json', import.meta.url), 'utf8'))
+  assert.ok(['marketplace', 'connectors', 'video'].includes(mode))
+  const selected = mode === 'video' ? ['video-shotcraft'] : mode === 'connectors' ? ['docling-mcp', 'playwright-mcp'] : undefined
   const expected = new Map(lock.packages.filter(row => row.platform === 'win32' && row.arch === 'x64' &&
-    (!videoOnly || row.packageId === 'video-shotcraft')).map(row => [row.packageId, row]))
+    (!selected || selected.includes(row.packageId))).map(row => [row.packageId, row]))
   assert.ok(expected.size, 'The exact release requires a complete Windows marketplace lock')
+  if (selected) assert.deepEqual([...expected.keys()].sort(), selected)
 
-  const proof = { status: 'running', releaseComplete: false, blockedHosts, installed: [], expectedPackages: expected.size }
+  const proof = { status: 'running', mode, releaseComplete: false, blockedHosts, installed: [], expectedPackages: expected.size }
   observe(proof)
   return withPublicUpstreamsBlocked(async () => {
     const catalog = (await cdp.evaluate('window.workwise.listCatalogPackages()')).packages
@@ -104,24 +107,26 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     }
     delete proof.currentPackage
 
-    const scope = `/v1/skills?${new URLSearchParams({ scope: 'available', workspace })}`
-    const current = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result=>result.ok&&JSON.parse(result.body).skills.find(row=>row.name==='video-shotcraft'))`, 'Video Shotcraft loaded in the active workspace', 90_000)
-    const skill = await readFile(join(current.root, 'SKILL.md'))
-    const videoArtifact = await cdp.evaluate(`window.workwise.listInstalledPlugins().then(all=>all.find(row=>row.packageId==='video-shotcraft'))`)
-    assert.ok(containment(await realpath(videoArtifact.artifact.location), await realpath(join(current.root, 'SKILL.md'))),
-      'The runtime Skill entry must be inside the reviewed installed mirror payload')
-    assert.match(skill.toString('utf8'), /^name:\s*video-shotcraft\s*$/m)
-    await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
-    const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
-    await cdp.fill(composer, '/video-shotcraft')
-    await cdp.click('[role="option"] .truncate', current.name)
-    await cdp.wait(`document.querySelector(${literal(composer)})?.value === ${literal(`/skill:${current.id} `)}`, 'the exact installed Skill token after choosing /')
-    await cdp.fill(composer, '')
+    if (mode !== 'connectors') {
+      const scope = `/v1/skills?${new URLSearchParams({ scope: 'available', workspace })}`
+      const current = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result=>result.ok&&JSON.parse(result.body).skills.find(row=>row.name==='video-shotcraft'))`, 'Video Shotcraft loaded in the active workspace', 90_000)
+      const skill = await readFile(join(current.root, 'SKILL.md'))
+      const videoArtifact = await cdp.evaluate(`window.workwise.listInstalledPlugins().then(all=>all.find(row=>row.packageId==='video-shotcraft'))`)
+      assert.ok(containment(await realpath(videoArtifact.artifact.location), await realpath(join(current.root, 'SKILL.md'))),
+        'The runtime Skill entry must be inside the reviewed installed mirror payload')
+      assert.match(skill.toString('utf8'), /^name:\s*video-shotcraft\s*$/m)
+      await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
+      const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
+      await cdp.fill(composer, '/video-shotcraft')
+      await cdp.click('[role="option"] .truncate', current.name)
+      await cdp.wait(`document.querySelector(${literal(composer)})?.value === ${literal(`/skill:${current.id} `)}`, 'the exact installed Skill token after choosing /')
+      await cdp.fill(composer, '')
 
-    proof.videoShotcraft = { runtimeSkillId: current.id, slashSelectionVerified: true,
-      entrySha256: createHash('sha256').update(skill).digest('hex'), render: 'pending-licensed-remotion-and-video-runtime' }
+      proof.videoShotcraft = { runtimeSkillId: current.id, slashSelectionVerified: true,
+        entrySha256: createHash('sha256').update(skill).digest('hex'), render: 'pending-licensed-remotion-and-video-runtime' }
+    }
 
-    if (!videoOnly) {
+    if (mode !== 'video') {
       const runtimeServer = id => `window.workwise.runtimeRequest('/v1/runtime/tools','GET').then(result=>
         result.ok?JSON.parse(result.body).mcpServers.find(item=>item.id===${literal(id)}):null)`
       const outcomes = await Promise.allSettled(['docling-mcp-server', 'playwright-mcp-server'].map(async id => {

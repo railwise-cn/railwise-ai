@@ -407,12 +407,15 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.ok(report.checks.includes('installed-runtime-ready'))
     assert.equal(report.marketplace.status, 'passed')
     assert.ok(report.marketplace.installed.length > 0)
-    assert.equal(report.marketplace.videoShotcraft.slashSelectionVerified, true)
+    assert.equal(report.marketplace.installed.length, report.marketplace.expectedPackages)
+    if (!report.connectorSmokeRequested) assert.equal(report.marketplace.videoShotcraft.slashSelectionVerified, true)
     if (report.videoEvaluationRequested) {
       assert.ok(report.checks.includes('installed-video-skill-protocol-render-registered-and-decoded'))
       assert.equal(report.marketplace.videoShotcraft.render.decoded, true)
     } else {
-      assert.ok(report.checks.includes('cold-mirror-installs-playwright-docling-and-skill-selection'))
+      const check = report.connectorSmokeRequested ? 'cold-mirror-playwright-and-docling' : 'cold-mirror-installs-playwright-docling-and-skill-selection'
+      assert.ok(report.checks.includes(check))
+      if (report.connectorSmokeRequested) assert.deepEqual(report.marketplace.installed.map(row => row.id).sort(), ['docling-mcp', 'playwright-mcp'])
       assert.equal(report.marketplace.playwright.navigated, true)
       assert.ok(report.marketplace.docling.toolsDiscovered > 0)
     }
@@ -2493,10 +2496,16 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
   }
 }
 
-export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true' }) {
+export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir,
+  taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true',
+  browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true',
+  mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true',
+  connectorSmoke = process.env.RAILWISE_WINDOWS_CONNECTOR_SMOKE === 'true',
+  videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true' }) {
   taskSmoke ||= browserSmoke
-  mirrorSmoke ||= videoEvaluation
-  assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
+  assert.ok(!(connectorSmoke && (mirrorSmoke || videoEvaluation)) && !(taskSmoke && (mirrorSmoke || connectorSmoke || videoEvaluation)),
+    'Use a separate clean profile for marketplace, connector, browser and private video evaluation')
+  mirrorSmoke ||= videoEvaluation || connectorSmoke
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
   }
@@ -2513,7 +2522,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
   const video = videoEvaluation ? await import('./verify-windows-video-evaluation.mjs')
     .then(module => module.startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput)) : undefined
-  const taskModel = video ?? (taskSmoke || mirrorSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke }) : undefined)
+  const taskModel = video ?? (taskSmoke || mirrorSmoke && !connectorSmoke
+    ? await startWindowsTaskModelFixture({ browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke })
+    : undefined)
   const model = video?.model ?? 'windows-task-fixture'
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
@@ -2525,7 +2536,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       ...(taskModel ? { providerId: model, model, approvalPolicy: video ? 'on-request' : 'auto', sandboxMode: 'read-only' } : {}) } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
     sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', workspaceRoot: workspace, productionTouched: false, checks: [], errors: [],
-    marketplaceSmokeRequested: mirrorSmoke, videoEvaluationRequested: videoEvaluation, focusedTaskSmoke: taskSmoke,
+    marketplaceSmokeRequested: mirrorSmoke, videoEvaluationRequested: videoEvaluation,
+    connectorSmokeRequested: connectorSmoke, focusedTaskSmoke: taskSmoke,
     installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
   // Electron's supported --user-data-dir overrides chrome::DIR_USER_DATA
   // before application startup. The installed EXE/ASAR and public identity
@@ -2588,13 +2600,14 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(response=>response.ok)`, 'the installed KUN runtime', 90_000)
       report.checks.push('installed-runtime-ready')
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
-      await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: videoEvaluation,
+      await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root,
+        mode: videoEvaluation ? 'video' : connectorSmoke ? 'connectors' : 'marketplace',
         observe: proof => { report.marketplace = proof } })
       if (video) {
         report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
         report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
       } else {
-        report.checks.push('cold-mirror-installs-playwright-docling-and-skill-selection')
+        report.checks.push(connectorSmoke ? 'cold-mirror-playwright-and-docling' : 'cold-mirror-installs-playwright-docling-and-skill-selection')
       }
       return report
     }
@@ -3484,7 +3497,7 @@ export async function dispatchWindowsSmokeEntry(args, environment = process.env,
   const diagnostic = args.includes('--browser-startup-diagnostic') || environment.RAILWISE_WINDOWS_BROWSER_STARTUP_DIAGNOSTIC === 'true'
   if (diagnostic) {
     assert.ok(environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&
-      environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_VIDEO_EVALUATION !== 'true' &&
+      environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_CONNECTOR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_VIDEO_EVALUATION !== 'true' &&
       !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup diagnostic is exclusive with task/browser execution')
     return runDiagnostic({ executable, version, sourceHead, evidenceDir })
   }
