@@ -79,17 +79,19 @@ function modelAction(body, selection, render, parseFixtureToolOutput) {
   assert.ok(typed.idMatches && typed.pathMatches && typeof resource.content === 'string' && resource.content.includes(`Remotion ${version}`),
     `The installed Skill setup guidance could not be read: ${literal(typed)}`)
   selection.read = true
-  assert.ok(tools.has('bash'), 'The ordinary approved workspace command must be offered in the isolated evaluation profile')
-  if (!messages.has('eval-render')) return ['eval-render', 'bash', render]
+  assert.ok(tools.has('request_host_shell'), 'KUN must offer a scoped command with explicit approval in the isolated evaluation profile')
+  if (!messages.has('eval-render')) return ['eval-render', 'request_host_shell', render]
   let output = parseFixtureToolOutput(messages.get('eval-render'))
-  const originalSessionId = output?.session_id
   for (let index = 1; output?.status === 'running' && index < 45; index++) {
     const id = `eval-poll-${index}`
     if (messages.has(id)) { output = parseFixtureToolOutput(messages.get(id)); continue }
-    assert.ok(typeof originalSessionId === 'string' && output.session_id === originalSessionId)
-    return [id, 'bash', { action: 'poll', session_id: originalSessionId, yield_seconds: 30 }]
+    assert.ok(tools.has('host_shell_session'), 'The running approved command must expose scoped read-only polling')
+    assert.ok(typeof output.authorizationId === 'string' && /^host_shell_[a-f0-9-]+$/i.test(output.authorizationId),
+      `The model cannot poll the running approved command: ${literal({ status: output.status,
+        authorizationRedacted: output.authorizationId === '<redacted>', sessionReturned: typeof output.session_id === 'string' })}`)
+    return [id, 'host_shell_session', { action: 'poll', authorization_id: output.authorizationId, yield_seconds: 4 }]
   }
-  assert.ok(output?.exit_code === 0 && output.session_id === originalSessionId,
+  assert.ok(output?.exit_code === 0 && output.commandHash === digest(render.command),
     'The exact user-approved rendering command must complete with exit code zero')
   selection.rendered = true
   return null
@@ -98,10 +100,10 @@ function modelAction(body, selection, render, parseFixtureToolOutput) {
 export async function startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput) {
   const toolchain = await provision(workspace, environment)
   const quote = value => `'${value.replace(/'/g, "''")}'`
-  const render = { action: 'run', command: `& ${quote(process.execPath)} ${quote(join(workspace, script))}`,
-    timeout: 180, yield_seconds: 60 }
+  const render = { command: `& ${quote(process.execPath)} ${quote(join(workspace, script))}`,
+    timeout_seconds: 180, ttl_seconds: 240, idempotency_key: 'private-synthetic-render-once' }
   const marker = '独立的 Video Shotcraft 非商用合成评估'
-  const selection = { read: false, rendered: false, requests: [], expectedApprovals: new Map() }
+  const selection = { read: false, rendered: false, requests: [] }
   const server = createServer(async (request, response) => {
     if (request.method === 'GET') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -115,7 +117,6 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       assert.ok(selection.skillId && body.messages?.some(message => message.role === 'user' && literal(message.content).includes(marker)))
       const action = modelAction(body, selection, render, parseFixtureToolOutput)
       selection.requests.push(action?.[1] ?? 'final-response')
-      if (action?.[1] === 'bash') selection.expectedApprovals.set(digest(literal(action[2])), action[2].action)
       const delta = action ? { tool_calls: [{ index: 0, id: action[0], type: 'function',
         function: { name: action[1], arguments: literal(action[2]) } }] } :
         { content: selection.rendered ? `已渲染并保存 ${filename} 。` : '合成验收所需工具未就绪。' }
@@ -147,11 +148,10 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       const approved = new Set()
       const approve = async item => {
         const request = item.payload?.approval
-        assert.equal(request?.toolName, 'bash')
+        assert.equal(request?.toolName, 'request_host_shell')
         assert.equal(item.taskId, firstApproval.taskId)
         assert.equal(request.turnId, firstApproval.payload.approval.turnId)
-        const operation = selection.expectedApprovals.get(request.requestHash)
-        assert.ok(operation === 'run' || operation === 'poll', 'Unexpected command or arguments in the approval request')
+        assert.equal(request.requestHash, digest(literal(render)), 'Unexpected command or arguments in the approval request')
         assert.ok(!approved.has(item.requestId), 'One request must not be approved twice')
         const button = await cdp.wait(`(() => {
           const article=document.querySelector(${literal(detail)});
@@ -197,6 +197,6 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
         { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
       return { kind: 'private-noncommercial-synthetic-evaluation', remotionVersion: version, codec: probe.codec_name,
         width: probe.width, height: probe.height, frames: Number(probe.nb_frames), artifact: { id: artifact.id, sha256: artifact.sha256, bytes: video.length },
-        installedSkillResourceRead: true, execution: 'approved-workspace-command', runtimeApprovalIds: [...approved], decoded: true }
+        installedSkillResourceRead: true, execution: 'explicit-host-shell-approval', runtimeApprovalIds: [...approved], decoded: true }
     } }
 }

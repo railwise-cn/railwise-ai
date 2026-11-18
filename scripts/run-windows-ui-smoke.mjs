@@ -2522,7 +2522,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
     ...(taskModel ? { provider: { providers: [{ id: model, name: '本机验收协议模型', apiKey: 'synthetic-local-only', baseUrl: taskModel.baseUrl, endpointFormat: 'chat_completions', models: [model] }] } } : {}),
     agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'),
-      ...(taskModel ? { providerId: model, model, approvalPolicy: video ? 'on-request' : 'auto', sandboxMode: video ? 'danger-full-access' : 'read-only' } : {}) } } }))
+      ...(taskModel ? { providerId: model, model, approvalPolicy: video ? 'on-request' : 'auto', sandboxMode: 'read-only' } : {}) } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
     sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', workspaceRoot: workspace, productionTouched: false, checks: [], errors: [],
     marketplaceSmokeRequested: mirrorSmoke, videoEvaluationRequested: videoEvaluation, focusedTaskSmoke: taskSmoke,
