@@ -73,6 +73,16 @@ on:
         type: boolean
         required: false
         default: false
+      run_activity_lifecycle:
+        description: 'Verify first-open release highlights, collapsed diagnostics, real KUN stream recovery and cancellation in the exact installed application.'
+        type: boolean
+        required: false
+        default: false
+      activity_cancellation_only:
+        description: 'For the activity run, exercise normal cancellation without severing the event stream.'
+        type: boolean
+        required: false
+        default: false
       run_browser_startup_diagnostic:
         description: 'Collect isolated pinned daemon startup diagnostics only; no application, model or task execution'
         type: boolean
@@ -106,6 +116,9 @@ jobs:
       - name: Preserve the isolated cold marketplace profile
         if: (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation) && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution)
         run: throw 'Cold marketplace acceptance must use its own clean profile'
+      - name: Preserve the isolated activity lifecycle profile
+        if: inputs.run_activity_lifecycle && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation)
+        run: throw 'Activity acceptance must use its own clean profile'
       - name: Require the original package build ID
         if: ${{ inputs.package_run_id == '' }}
         run: throw 'package_run_id is required to inspect an existing package'
@@ -116,7 +129,7 @@ jobs:
       - name: Install verification tools
         run: npm ci --ignore-scripts
       - name: Verify Windows acceptance contracts and PowerShell syntax
-        run: node --test scripts/windows-install-smoke.test.mjs scripts/windows-ui-smoke.test.mjs scripts/prepare-windows-install-smoke.test.mjs scripts/prepare-browser-skill-smoke.test.mjs
+        run: node --test scripts/windows-install-smoke.test.mjs scripts/windows-ui-smoke.test.mjs scripts/prepare-windows-install-smoke.test.mjs scripts/prepare-browser-skill-smoke.test.mjs scripts/verify-windows-ag-ui-lifecycle.test.mjs
       - name: Verify the original build and unchanged application source
         id: source
         env:
@@ -141,6 +154,8 @@ jobs:
           RAILWISE_WINDOWS_BROWSER_SMOKE: ${{ inputs.run_browser_execution }}
           RAILWISE_WINDOWS_MIRROR_SMOKE: ${{ inputs.run_mirror_acceptance }}
           RAILWISE_WINDOWS_VIDEO_EVALUATION: ${{ inputs.run_private_video_evaluation }}
+          RAILWISE_WINDOWS_ACTIVITY_SMOKE: ${{ inputs.run_activity_lifecycle }}
+          RAILWISE_WINDOWS_ACTIVITY_CANCELLATION_ONLY: ${{ inputs.activity_cancellation_only }}
         run: |
           $packages = Join-Path $env:RUNNER_TEMP 'exact-windows-packages'
           $installers = @(Get-ChildItem -LiteralPath $packages -Filter '*.exe' -File)
