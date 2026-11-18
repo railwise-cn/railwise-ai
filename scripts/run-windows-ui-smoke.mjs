@@ -418,11 +418,6 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     }
     return report
   }
-  assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
-  assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
-  assert.equal(report.update.ok, true)
-  assert.equal(report.update.hasUpdate, false)
-  assert.equal(report.helpOffline, true)
   if (requireTaskExecution || report.taskSmokeRequested) {
     assert.equal(report.taskSmokeRequested, true)
     validateWindowsPermissionRuntimeEvidence(report.permissionRuntime)
@@ -442,6 +437,17 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.notEqual(report.taskExecution.dueOccurrence.browserSessionId, report.taskExecution.browserSkill.sessionId)
     assert.ok(report.checks.includes('real-browser-skill-html-and-schedule'), 'Missing actual UI observation: real-browser-skill-html-and-schedule')
   }
+  if (report.focusedTaskSmoke) {
+    assert.equal(report.taskSmokeRequested, true)
+    assert.ok(report.checks.includes('installed-chinese-renderer'))
+    assert.ok(report.checks.includes('installed-runtime-ready'))
+    return true
+  }
+  assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
+  assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
+  assert.equal(report.update.ok, true)
+  assert.equal(report.update.hasUpdate, false)
+  assert.equal(report.helpOffline, true)
   for (const check of requiredChecks) assert.ok(report.checks.includes(check), `Missing actual UI observation: ${check}`)
   assert.deepEqual(validateDefaultSkillSources(report.resources.defaultSkills).map(skill => skill.id), defaultSkillIds)
   for (const skill of report.resources.defaultSkills) {
@@ -2518,7 +2524,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'), ...(taskModel ? { providerId: model, model, approvalPolicy: 'auto', sandboxMode: 'read-only' } : {}) } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
     sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', workspaceRoot: workspace, productionTouched: false, checks: [], errors: [],
-    marketplaceSmokeRequested: mirrorSmoke, videoEvaluationRequested: videoEvaluation,
+    marketplaceSmokeRequested: mirrorSmoke, videoEvaluationRequested: videoEvaluation, focusedTaskSmoke: taskSmoke,
     installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
   // Electron's supported --user-data-dir overrides chrome::DIR_USER_DATA
   // before application startup. The installed EXE/ASAR and public identity
@@ -2591,163 +2597,163 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       return report
     }
 
-    await cdp.click('button', '技能与连接器')
-    report.tabs = await cdp.wait(`(() => { const tabs=Array.from(document.querySelectorAll('[role="tablist"][aria-label="技能与连接器分类"] [role="tab"]')); return tabs.length===3 && tabs.map(tab=>tab.textContent.trim()); })()`, 'marketplace tabs')
-    assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
-    assert.equal(await cdp.evaluate(`document.querySelector('[role="tablist"][aria-label="技能与连接器分类"] [aria-selected="true"]')?.textContent.trim()`), '技能')
-    report.checks.push('skills-default-and-tab-order')
-    // Read the installed application's built-in catalog and wait for its actual
-    // rendered entries. Remote connector checks are not a readiness signal.
-    const localCatalog = await cdp.evaluate(`Promise.all([window.workwise.listCatalogSources(),window.workwise.listCatalogPackages()]).then(([sources,catalog]) =>
-      catalog.packages.filter(entry=>['amap-maps','zotero-mcp','autocad-dwg-redraw','autocad-image-redraw'].includes(entry.package.id)).map(entry=>({
-        id:entry.package.id,name:entry.package.name,catalogSourceType:sources.find(source=>source.id===entry.sourceId)?.type,
-        commit:entry.package.source.resolvedRef,sourceUrl:entry.package.source.location,archiveSha256:entry.package.source.digest?.value
-      })))`)
-    assert.equal(localCatalog.length, 4)
-    assert.ok(localCatalog.every(entry => entry.catalogSourceType === 'built-in'))
-    await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'both locally cataloged CAD skills', 60_000)
-    report.resources = { defaultSkills: [], engineeringSkills: [], connectors: [], cad: [], connectionsUnchanged: false }
-    report.resources.engineeringSkills = await cdp.evaluate(`Array.from(document.querySelectorAll('section[aria-label="工程技能"] article')).map(article=>({
-      name:article.querySelector('h3')?.textContent.trim(),installEnabled:Array.from(article.querySelectorAll('button')).some(button=>button.textContent.trim()==='安装'&&!button.disabled)
-    }))`)
-    assert.deepEqual(report.resources.engineeringSkills.map(skill => skill.name), engineeringSkillNames)
-    assert.ok(report.resources.engineeringSkills.every(skill => skill.installEnabled))
-    const skills = await cdp.evaluate(`window.workwise.listSkills().then(result=>result.ok?result.skills.map(skill=>({id:skill.id,name:skill.name,root:skill.root,entryPath:skill.entryPath,
-      source:skill.source&&{type:skill.source.type,id:skill.source.id,owner:skill.source.owner,repo:skill.source.repo,path:skill.source.path,ref:skill.source.ref,
-        installedSha:skill.source.installedSha,overlaySkillId:skill.source.overlaySkillId,autoUpdate:skill.source.autoUpdate}})):[])`)
-    report.resources.defaultSkills = skills.filter(skill => defaultSkillIds.includes(skill.id))
-    for (const skill of report.resources.defaultSkills) {
-      if (skill.id === monitoringAgentPack.component && !skill.source) {
-        await verifyInstalledAgentPackSkill(skill, { applicationRoot: dirname(executable), isolatedRoot: root })
+    if (!taskSmoke) {
+      await cdp.click('button', '技能与连接器')
+      report.tabs = await cdp.wait(`(() => { const tabs=Array.from(document.querySelectorAll('[role="tablist"][aria-label="技能与连接器分类"] [role="tab"]')); return tabs.length===3 && tabs.map(tab=>tab.textContent.trim()); })()`, 'marketplace tabs')
+      assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
+      assert.equal(await cdp.evaluate(`document.querySelector('[role="tablist"][aria-label="技能与连接器分类"] [aria-selected="true"]')?.textContent.trim()`), '技能')
+      report.checks.push('skills-default-and-tab-order')
+      // Read the installed application's built-in catalog and wait for its actual
+      // rendered entries. Remote connector checks are not a readiness signal.
+      const localCatalog = await cdp.evaluate(`Promise.all([window.workwise.listCatalogSources(),window.workwise.listCatalogPackages()]).then(([sources,catalog]) =>
+        catalog.packages.filter(entry=>['amap-maps','zotero-mcp','autocad-dwg-redraw','autocad-image-redraw'].includes(entry.package.id)).map(entry=>({
+          id:entry.package.id,name:entry.package.name,catalogSourceType:sources.find(source=>source.id===entry.sourceId)?.type,
+          commit:entry.package.source.resolvedRef,sourceUrl:entry.package.source.location,archiveSha256:entry.package.source.digest?.value
+        })))`)
+      assert.equal(localCatalog.length, 4)
+      assert.ok(localCatalog.every(entry => entry.catalogSourceType === 'built-in'))
+      await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'both locally cataloged CAD skills', 60_000)
+      report.resources = { defaultSkills: [], engineeringSkills: [], connectors: [], cad: [], connectionsUnchanged: false }
+      report.resources.engineeringSkills = await cdp.evaluate(`Array.from(document.querySelectorAll('section[aria-label="工程技能"] article')).map(article=>({
+        name:article.querySelector('h3')?.textContent.trim(),installEnabled:Array.from(article.querySelectorAll('button')).some(button=>button.textContent.trim()==='安装'&&!button.disabled)
+      }))`)
+      assert.deepEqual(report.resources.engineeringSkills.map(skill => skill.name), engineeringSkillNames)
+      assert.ok(report.resources.engineeringSkills.every(skill => skill.installEnabled))
+      const skills = await cdp.evaluate(`window.workwise.listSkills().then(result=>result.ok?result.skills.map(skill=>({id:skill.id,name:skill.name,root:skill.root,entryPath:skill.entryPath,
+        source:skill.source&&{type:skill.source.type,id:skill.source.id,owner:skill.source.owner,repo:skill.source.repo,path:skill.source.path,ref:skill.source.ref,
+          installedSha:skill.source.installedSha,overlaySkillId:skill.source.overlaySkillId,autoUpdate:skill.source.autoUpdate}})):[])`)
+      report.resources.defaultSkills = skills.filter(skill => defaultSkillIds.includes(skill.id))
+      for (const skill of report.resources.defaultSkills) {
+        if (skill.id === monitoringAgentPack.component && !skill.source) {
+          await verifyInstalledAgentPackSkill(skill, { applicationRoot: dirname(executable), isolatedRoot: root })
+        }
+        if (skill.id === 'tender-master' && resolve(skill.root) === resolve(join(root, 'home', '.workwise', 'skills', 'tender-master'))) {
+          await verifyInstalledBundledSkillCopy(skill, { applicationRoot: dirname(executable), isolatedRoot: root })
+        }
       }
-      if (skill.id === 'tender-master' && resolve(skill.root) === resolve(join(root, 'home', '.workwise', 'skills', 'tender-master'))) {
-        await verifyInstalledBundledSkillCopy(skill, { applicationRoot: dirname(executable), isolatedRoot: root })
+      const defaultSkills = validateDefaultSkillSources(skills)
+      for (const skill of defaultSkills) {
+        if (!verifiedAgentPackSource(skill) && !verifiedBundledSkillCopy(skill)) {
+          const entry = join('src', 'asset', 'skills', skill.id, 'SKILL.md')
+          const expectedRoot = join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', skill.id)
+          assert.equal(resolve(skill.root).toLowerCase(), expectedRoot.toLowerCase())
+          assert.equal(resolve(skill.entryPath).toLowerCase(), join(expectedRoot, 'SKILL.md').toLowerCase())
+          const entryBytes = await readFile(skill.entryPath)
+          assert.ok(entryBytes.equals(asar.extractFile(join(dirname(executable), 'resources', 'app.asar'), entry)))
+          skill.entryRelativePath = relative(dirname(executable), skill.entryPath).replaceAll('\\', '/')
+          skill.entrySha256 = createHash('sha256').update(entryBytes).digest('hex')
+          skill.entryRegisteredInAsar = true
+        }
+        await cdp.fill('input[placeholder*="已索引"]', skill.name || skill.id)
+        // For a bundled copy, the library shows the verified shipped source.
+        // Its runtime copy and source bytes were checked separately above.
+        const displayedRoot = verifiedBundledSkillCopy(skill)
+          ? dirname(join(dirname(executable), ...skill.bundledCopySource.entryRelativePath.split('/')))
+          : skill.root
+        await cdp.wait(`document.body.innerText.includes(${JSON.stringify(displayedRoot)}) && Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===${JSON.stringify(skill.name || skill.id)})`, `${skill.id} in its verified library directory`)
       }
-    }
-    const defaultSkills = validateDefaultSkillSources(skills)
-    for (const skill of defaultSkills) {
-      if (!verifiedAgentPackSource(skill) && !verifiedBundledSkillCopy(skill)) {
-        const entry = join('src', 'asset', 'skills', skill.id, 'SKILL.md')
-        const expectedRoot = join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', skill.id)
-        assert.equal(resolve(skill.root).toLowerCase(), expectedRoot.toLowerCase())
-        assert.equal(resolve(skill.entryPath).toLowerCase(), join(expectedRoot, 'SKILL.md').toLowerCase())
-        const entryBytes = await readFile(skill.entryPath)
-        assert.ok(entryBytes.equals(asar.extractFile(join(dirname(executable), 'resources', 'app.asar'), entry)))
-        skill.entryRelativePath = relative(dirname(executable), skill.entryPath).replaceAll('\\', '/')
-        skill.entrySha256 = createHash('sha256').update(entryBytes).digest('hex')
-        skill.entryRegisteredInAsar = true
+      await cdp.fill('input[placeholder*="已索引"]', '')
+      await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'the catalog after clearing the local Skill search')
+      report.resources.defaultSkills = defaultSkills
+      report.checks.push('packaged-skills-and-engineering-entries')
+      for (const expected of cadEntries) {
+        await cdp.click('section[aria-label="发现技能"] [role="button"] .truncate', expected.name)
+        const observation = await cdp.wait(`(() => {
+          const drawer=Array.from(document.querySelectorAll('aside')).find(node=>node.querySelector('header h2')?.textContent.trim()===${JSON.stringify(expected.name)});
+          if(!drawer)return null;
+          const text=drawer.innerText;
+          return {installEnabled:Array.from(drawer.querySelectorAll('button')).some(button=>button.textContent.trim()==='从上游安装'&&!button.disabled),
+            dependenciesVisible:${JSON.stringify(expected.dependencies)}.every(value=>text.includes(value)),
+            licenseNoticeVisible:text.includes('上游未声明许可证'),versionVisible:text.includes(${JSON.stringify(cadCommit)}),publisherVisible:text.includes('pengxiaoan')};
+        })()`, `${expected.name} source, install entry and dependencies`)
+        assert.ok(observation.installEnabled && observation.dependenciesVisible && observation.licenseNoticeVisible && observation.versionVisible && observation.publisherVisible)
+        report.resources.cad.push({ ...localCatalog.find(item => item.id === expected.id), ...observation })
+        if (expected.id === 'autocad-dwg-redraw') {
+          const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+          await writeFile(join(evidenceDir, 'windows-cad-details-zh-dark.png'), Buffer.from(screenshot.data, 'base64'))
+        }
+        // The generic package drawer supports dismissal through its backdrop.
+        await cdp.click('div.fixed.inset-0.z-40:has(> aside > header > h2)')
+        await cdp.wait(`!Array.from(document.querySelectorAll('aside')).some(node=>node.querySelector('header h2')?.textContent.trim()===${JSON.stringify(expected.name)})`, 'package drawer dismissed')
       }
-      await cdp.fill('input[placeholder*="已索引"]', skill.name || skill.id)
-      // For a bundled copy, the library shows the verified shipped source.
-      // Its runtime copy and source bytes were checked separately above.
-      const displayedRoot = verifiedBundledSkillCopy(skill)
-        ? dirname(join(dirname(executable), ...skill.bundledCopySource.entryRelativePath.split('/')))
-        : skill.root
-      await cdp.wait(`document.body.innerText.includes(${JSON.stringify(displayedRoot)}) && Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===${JSON.stringify(skill.name || skill.id)})`, `${skill.id} in its verified library directory`)
-    }
-    await cdp.fill('input[placeholder*="已索引"]', '')
-    await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'the catalog after clearing the local Skill search')
-    report.resources.defaultSkills = defaultSkills
-    report.checks.push('packaged-skills-and-engineering-entries')
-    for (const expected of cadEntries) {
-      await cdp.click('section[aria-label="发现技能"] [role="button"] .truncate', expected.name)
-      const observation = await cdp.wait(`(() => {
-        const drawer=Array.from(document.querySelectorAll('aside')).find(node=>node.querySelector('header h2')?.textContent.trim()===${JSON.stringify(expected.name)});
-        if(!drawer)return null;
-        const text=drawer.innerText;
-        return {installEnabled:Array.from(drawer.querySelectorAll('button')).some(button=>button.textContent.trim()==='从上游安装'&&!button.disabled),
-          dependenciesVisible:${JSON.stringify(expected.dependencies)}.every(value=>text.includes(value)),
-          licenseNoticeVisible:text.includes('上游未声明许可证'),versionVisible:text.includes(${JSON.stringify(cadCommit)}),publisherVisible:text.includes('pengxiaoan')};
-      })()`, `${expected.name} source, install entry and dependencies`)
-      assert.ok(observation.installEnabled && observation.dependenciesVisible && observation.licenseNoticeVisible && observation.versionVisible && observation.publisherVisible)
-      report.resources.cad.push({ ...localCatalog.find(item => item.id === expected.id), ...observation })
-      if (expected.id === 'autocad-dwg-redraw') {
+      report.checks.push('autocad-fixed-upstream-entries')
+      await cdp.click('[role="tab"]', '插件')
+      await cdp.wait(`document.querySelector('[role="tablist"][aria-label="技能与连接器分类"] [aria-selected="true"]')?.textContent.trim()==='插件'`, 'Plugins selected')
+      report.checks.push('plugins-tab')
+      await cdp.click('[role="tab"]', '连接器')
+      await cdp.wait(`document.querySelector('[role="tablist"][aria-label="技能与连接器分类"] [aria-selected="true"]')?.textContent.trim()==='连接器' && document.body.innerText.includes('钉钉') && document.body.innerText.includes('飞书')`, 'native connector catalog')
+      await cdp.wait(`['查看 高德地图 连接详情','查看 Zotero 本机文献 连接详情'].every(label=>Array.from(document.querySelectorAll('button')).some(button=>button.getAttribute('aria-label')===label&&!button.disabled))`, 'the loaded local Amap and Zotero catalog entries', 60_000)
+      report.checks.push('connectors-tab')
+      const connectorsScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+      await writeFile(join(evidenceDir, 'windows-connectors-zh-dark.png'), Buffer.from(connectorsScreenshot.data, 'base64'))
+      const connectionsBefore = await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))')
+      for (const connector of [{ id: 'amap-maps', name: '高德地图' }, { id: 'zotero-mcp', name: 'Zotero 本机文献' }]) {
+        await cdp.click(`button[aria-label="查看 ${connector.name} 连接详情"]`)
+        const detailsReady = await cdp.wait(readonlyConnectorSetupExpression(connector), `${connector.name} actionable local setup details`)
+        report.resources.connectors.push({ ...localCatalog.find(item => item.id === connector.id), detailsReady })
         const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
-        await writeFile(join(evidenceDir, 'windows-cad-details-zh-dark.png'), Buffer.from(screenshot.data, 'base64'))
+        await writeFile(join(evidenceDir, `windows-${connector.id}-details-zh-dark.png`), Buffer.from(screenshot.data, 'base64'))
+        await cdp.click('button[aria-label="关闭连接详情"]')
       }
-      // The generic package drawer supports dismissal through its backdrop.
-      await cdp.click('div.fixed.inset-0.z-40:has(> aside > header > h2)')
-      await cdp.wait(`!Array.from(document.querySelectorAll('aside')).some(node=>node.querySelector('header h2')?.textContent.trim()===${JSON.stringify(expected.name)})`, 'package drawer dismissed')
-    }
-    report.checks.push('autocad-fixed-upstream-entries')
-    await cdp.click('[role="tab"]', '插件')
-    await cdp.wait(`document.querySelector('[role="tablist"][aria-label="技能与连接器分类"] [aria-selected="true"]')?.textContent.trim()==='插件'`, 'Plugins selected')
-    report.checks.push('plugins-tab')
-    await cdp.click('[role="tab"]', '连接器')
-    await cdp.wait(`document.querySelector('[role="tablist"][aria-label="技能与连接器分类"] [aria-selected="true"]')?.textContent.trim()==='连接器' && document.body.innerText.includes('钉钉') && document.body.innerText.includes('飞书')`, 'native connector catalog')
-    await cdp.wait(`['查看 高德地图 连接详情','查看 Zotero 本机文献 连接详情'].every(label=>Array.from(document.querySelectorAll('button')).some(button=>button.getAttribute('aria-label')===label&&!button.disabled))`, 'the loaded local Amap and Zotero catalog entries', 60_000)
-    report.checks.push('connectors-tab')
-    const connectorsScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
-    await writeFile(join(evidenceDir, 'windows-connectors-zh-dark.png'), Buffer.from(connectorsScreenshot.data, 'base64'))
-    const connectionsBefore = await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))')
-    for (const connector of [{ id: 'amap-maps', name: '高德地图' }, { id: 'zotero-mcp', name: 'Zotero 本机文献' }]) {
-      await cdp.click(`button[aria-label="查看 ${connector.name} 连接详情"]`)
-      const detailsReady = await cdp.wait(readonlyConnectorSetupExpression(connector), `${connector.name} actionable local setup details`)
-      report.resources.connectors.push({ ...localCatalog.find(item => item.id === connector.id), detailsReady })
-      const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
-      await writeFile(join(evidenceDir, `windows-${connector.id}-details-zh-dark.png`), Buffer.from(screenshot.data, 'base64'))
-      await cdp.click('button[aria-label="关闭连接详情"]')
-    }
-    report.resources.connectionsUnchanged = await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))') === connectionsBefore
-    assert.equal(report.resources.connectionsUnchanged, true)
-    report.checks.push('amap-zotero-actionable-setup')
-    await cdp.click('button[aria-label="查看 GitHub MCP 连接详情"]')
-    await cdp.wait(`document.querySelector('[role="dialog"][aria-label="GitHub 连接"] input[type="password"]') && document.body.innerText.includes('在 GitHub 创建令牌')`, 'actionable GitHub connection setup')
-    assert.equal(await cdp.evaluate(`document.body.innerText.includes('这个 MCP 服务需要先配置 OAuth Client ID')`), false)
-    assert.equal(await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))'), connectionsBefore)
-    report.checks.push('github-actionable-setup')
-    await cdp.click('button[aria-label="关闭 GitHub 连接详情"]')
+      report.resources.connectionsUnchanged = await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))') === connectionsBefore
+      assert.equal(report.resources.connectionsUnchanged, true)
+      report.checks.push('amap-zotero-actionable-setup')
+      await cdp.click('button[aria-label="查看 GitHub MCP 连接详情"]')
+      await cdp.wait(`document.querySelector('[role="dialog"][aria-label="GitHub 连接"] input[type="password"]') && document.body.innerText.includes('在 GitHub 创建令牌')`, 'actionable GitHub connection setup')
+      assert.equal(await cdp.evaluate(`document.body.innerText.includes('这个 MCP 服务需要先配置 OAuth Client ID')`), false)
+      assert.equal(await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))'), connectionsBefore)
+      report.checks.push('github-actionable-setup')
+      await cdp.click('button[aria-label="关闭 GitHub 连接详情"]')
 
-    report.updateChecks = { mode: 'read-only-metadata', maxAttempts: 2, recheckDelayMs: 2_000, attempts: [] }
-    const update = await checkWindowsUpdateMetadata(() => cdp.evaluate('window.workwise.checkGuiUpdate()', 30_000),
-      { attempts: report.updateChecks.attempts })
-    report.update = update
-    assert.equal(update.ok, true, 'The real updater metadata check must succeed')
-    assert.equal(update.hasUpdate, false, 'This exact private target must have no newer published update')
-    await cdp.wait(`window.workwise.getGuiUpdateState().then(state=>state.status==='not_available')`, 'no-update state')
-    assert.equal(await cdp.evaluate(`document.querySelectorAll('button[title^="升级到"]').length`), 0)
-    report.checks.push('no-update-control-hidden')
+      report.updateChecks = { mode: 'read-only-metadata', maxAttempts: 2, recheckDelayMs: 2_000, attempts: [] }
+      const update = await checkWindowsUpdateMetadata(() => cdp.evaluate('window.workwise.checkGuiUpdate()', 30_000),
+        { attempts: report.updateChecks.attempts })
+      report.update = update
+      assert.equal(update.ok, true, 'The real updater metadata check must succeed')
+      assert.equal(update.hasUpdate, false, 'This exact private target must have no newer published update')
+      await cdp.wait(`window.workwise.getGuiUpdateState().then(state=>state.status==='not_available')`, 'no-update state')
+      assert.equal(await cdp.evaluate(`document.querySelectorAll('button[title^="升级到"]').length`), 0)
+      report.checks.push('no-update-control-hidden')
 
-    // Help must continue to work without network. Only this renderer is put
-    // offline; no API responses, application globals or DOM are substituted.
-    await cdp.send('Network.enable')
-    await cdp.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 })
-    report.helpOffline = true
-    await cdp.click('button', '设置')
-    await cdp.click('.ds-settings-sidebar nav button', '帮助')
-    report.chapters = await cdp.wait(`(() => { const headings=Array.from(document.querySelectorAll('[aria-label="用户使用手册"] .write-markdown-preview h2')); const numbers=headings.map(heading=>Number(/^(\\d+)\\./.exec(heading.textContent.trim())?.[1])).filter(Number.isInteger); return numbers.length===13 && numbers; })()`, 'the complete thirteen-chapter manual')
-    assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
-    await cdp.wait(`document.querySelector('[aria-label="手册目录"]')?.innerText.includes('12. 版本更新')`, 'manual table of contents')
-    report.checks.push('offline-help-thirteen-chapters')
-    assert.equal(await cdp.evaluate(`Array.from(document.querySelectorAll('a,button')).some(node=>/个人主页|personal homepage/i.test(node.textContent))`), false)
-    report.checks.push('personal-homepage-absent')
-    // Search before anchor navigation, which can finish an asynchronous
-    // diagram hydration scroll after a previously calculated click point.
-    let searchFocused = false
-    for (let attempt = 0; attempt < 3 && !searchFocused; attempt++) {
-      await cdp.click('input[aria-label="搜索帮助"]')
-      searchFocused = await cdp.evaluate(`document.activeElement?.matches('input[aria-label="搜索帮助"]')`)
-      if (!searchFocused) await sleep(100)
-    }
-    assert.ok(searchFocused, 'The real help search input must receive keyboard focus')
-    await cdp.send('Input.insertText', { text: '版本更新' })
-    await cdp.wait(`document.querySelector('input[aria-label="搜索帮助"]')?.value === '版本更新'`, 'the typed search query')
-    await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="帮助搜索结果"] button > span:first-child')).some(heading=>heading.textContent==='12. 版本更新')`, 'manual search results')
-    await cdp.click('[aria-label="帮助搜索结果"] button', '12. 版本更新')
-    await cdp.wait(`!document.querySelector('[aria-label="帮助搜索结果"]') && document.querySelector('[aria-label="用户使用手册"] .write-markdown-preview h2[id="12-版本更新"]')`, 'search result navigation')
-    const updateHeading = await cdp.evaluate(`(() => { const heading=document.getElementById('12-版本更新'); const rect=heading.getBoundingClientRect(); return {top:rect.top,bottom:rect.bottom}; })()`)
-    assert.ok(updateHeading.bottom > 0 && updateHeading.top < report.viewport.height, 'Search must scroll to the actual result heading')
-    report.checks.push('offline-help-search-and-navigation')
-    const helpScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
-    await writeFile(join(evidenceDir, 'windows-help-zh-dark.png'), Buffer.from(helpScreenshot.data, 'base64'))
-    if (await cdp.evaluate(`document.querySelector('.ds-help-outline')?.open===false`)) await cdp.click('.ds-help-outline > summary', '章节目录')
-    await cdp.click('[aria-label="手册目录"] button', '1.4 现有界面截图')
-    await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="用户使用手册"] img')).some(image=>image.complete && image.naturalWidth>0)`, 'a packaged manual image offline')
-    report.checks.push('offline-help-images')
-    if (taskSmoke) {
-      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
-      await cdp.click('.ds-settings-sidebar button', '返回')
-      await cdp.wait(`!document.querySelector('.ds-settings-sidebar')`, 'the main workspace after leaving help')
+      // Help must continue to work without network. Only this renderer is put
+      // offline; no API responses, application globals or DOM are substituted.
+      await cdp.send('Network.enable')
+      await cdp.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 })
+      report.helpOffline = true
+      await cdp.click('button', '设置')
+      await cdp.click('.ds-settings-sidebar nav button', '帮助')
+      report.chapters = await cdp.wait(`(() => { const headings=Array.from(document.querySelectorAll('[aria-label="用户使用手册"] .write-markdown-preview h2')); const numbers=headings.map(heading=>Number(/^(\\d+)\\./.exec(heading.textContent.trim())?.[1])).filter(Number.isInteger); return numbers.length===13 && numbers; })()`, 'the complete thirteen-chapter manual')
+      assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
+      await cdp.wait(`document.querySelector('[aria-label="手册目录"]')?.innerText.includes('12. 版本更新')`, 'manual table of contents')
+      report.checks.push('offline-help-thirteen-chapters')
+      assert.equal(await cdp.evaluate(`Array.from(document.querySelectorAll('a,button')).some(node=>/个人主页|personal homepage/i.test(node.textContent))`), false)
+      report.checks.push('personal-homepage-absent')
+      // Search before anchor navigation, which can finish an asynchronous
+      // diagram hydration scroll after a previously calculated click point.
+      let searchFocused = false
+      for (let attempt = 0; attempt < 3 && !searchFocused; attempt++) {
+        await cdp.click('input[aria-label="搜索帮助"]')
+        searchFocused = await cdp.evaluate(`document.activeElement?.matches('input[aria-label="搜索帮助"]')`)
+        if (!searchFocused) await sleep(100)
+      }
+      assert.ok(searchFocused, 'The real help search input must receive keyboard focus')
+      await cdp.send('Input.insertText', { text: '版本更新' })
+      await cdp.wait(`document.querySelector('input[aria-label="搜索帮助"]')?.value === '版本更新'`, 'the typed search query')
+      await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="帮助搜索结果"] button > span:first-child')).some(heading=>heading.textContent==='12. 版本更新')`, 'manual search results')
+      await cdp.click('[aria-label="帮助搜索结果"] button', '12. 版本更新')
+      await cdp.wait(`!document.querySelector('[aria-label="帮助搜索结果"]') && document.querySelector('[aria-label="用户使用手册"] .write-markdown-preview h2[id="12-版本更新"]')`, 'search result navigation')
+      const updateHeading = await cdp.evaluate(`(() => { const heading=document.getElementById('12-版本更新'); const rect=heading.getBoundingClientRect(); return {top:rect.top,bottom:rect.bottom}; })()`)
+      assert.ok(updateHeading.bottom > 0 && updateHeading.top < report.viewport.height, 'Search must scroll to the actual result heading')
+      report.checks.push('offline-help-search-and-navigation')
+      const helpScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+      await writeFile(join(evidenceDir, 'windows-help-zh-dark.png'), Buffer.from(helpScreenshot.data, 'base64'))
+      if (await cdp.evaluate(`document.querySelector('.ds-help-outline')?.open===false`)) await cdp.click('.ds-help-outline > summary', '章节目录')
+      await cdp.click('[aria-label="手册目录"] button', '1.4 现有界面截图')
+      await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="用户使用手册"] img')).some(image=>image.complete && image.naturalWidth>0)`, 'a packaged manual image offline')
+      report.checks.push('offline-help-images')
+    } else {
+      await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(response=>response.ok)`, 'the installed KUN runtime', 90_000)
+      report.checks.push('installed-runtime-ready')
       const runtimeRequest = (path, method = 'GET', body) => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},${JSON.stringify(method)},${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'}).then(result=>{if(!result.ok)throw new Error(result.body);return JSON.parse(result.body)})`)
       const previousThreads = new Set((await runtimeRequest('/v1/threads')).threads.map(thread => thread.id))
       const prompt = windowsTaskPrompt(taskModel, browserSmoke)
