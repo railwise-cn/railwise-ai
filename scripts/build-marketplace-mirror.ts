@@ -68,11 +68,22 @@ async function build() {
   await mkdir(output, { recursive: true })
   const scratch = await mkdtemp(join(tmpdir(), 'railwise-mirror-'))
   const records: MirroredPackage[] = []
+  const errors: Array<{ packageId: string; message: string }> = []
   try {
     for (const target of targets) {
       console.log(`Preparing ${target.id} ${target.version} on ${process.platform}-${process.arch}`)
-      records.push(await preparePackage(target, output, scratch))
-      await writeFile(join(output, 'marketplace-lock.json'), `${JSON.stringify({ version: 1, packages: records }, null, 2)}\n`)
+      try {
+        records.push(await preparePackage(target, output, scratch))
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        console.error(`Marketplace preparation failed for ${target.id}: ${message}`)
+        errors.push({ packageId: target.id, message })
+      }
+    }
+    await writeFile(join(output, 'marketplace-lock.json'), `${JSON.stringify({ version: 1, packages: records }, null, 2)}\n`)
+    if (errors.length) {
+      await writeFile(join(output, 'build-errors.json'), `${JSON.stringify(errors, null, 2)}\n`)
+      throw new Error(`${errors.length} of ${targets.length} marketplace packages failed on ${process.platform}-${process.arch}.`)
     }
   } finally {
     await rm(scratch, { recursive: true, force: true })

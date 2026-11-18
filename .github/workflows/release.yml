@@ -193,6 +193,7 @@ jobs:
           node -e 'if (process.platform + "-" + process.arch !== process.env.MARKETPLACE_TARGET) process.exit(1)'
           node node_modules/.cache/build-marketplace-mirror.cjs "${RUNNER_TEMP}/marketplace-parts"
       - uses: actions/upload-artifact@v6
+        if: ${{ !cancelled() }}
         with:
           name: marketplace-mirror-${{ matrix.target }}
           path: ${{ runner.temp }}/marketplace-parts/
