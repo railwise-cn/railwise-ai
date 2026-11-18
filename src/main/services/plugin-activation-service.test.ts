@@ -6,9 +6,11 @@ import JSZip from 'jszip'
 import type { McpServerConfigV2 } from '../../shared/agent-workbench'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { InstalledPackageV1, MarketplacePackageV1 } from '../../shared/marketplace'
-import { activatePluginPackage, verifiedMirroredNpmMcp } from './plugin-activation-service'
+import { activatePluginPackage, legacyOfficialDoclingStdioArgs, verifiedMirroredNpmMcp } from './plugin-activation-service'
 import { MARKETPLACE_MIRROR_RECEIPT, materializeMarketplaceMirror, type MirroredPackage } from './marketplace-mirror'
 import { inspectPackageDirectory, marketplacePackageReviewSha256 } from './package-installation-service'
+import { MANAGED_PYTHON_VERSION, MANAGED_UV_VERSION } from './managed-uv-runtime-service'
+import { getOfficialMarketplaceCatalog } from './official-marketplace-catalog'
 
 const roots: string[] = []
 
@@ -97,6 +99,51 @@ async function fixture(): Promise<{ item: MarketplacePackageV1; installed: Insta
     health: { status: 'healthy' }
   }
   return { item, installed }
+}
+
+async function doclingFixture() {
+  const { installed } = await fixture()
+  const item = getOfficialMarketplaceCatalog().find(entry => entry.id === 'docling-mcp')!
+  const [component] = item.components
+  if (component.type !== 'mcp' || component.runtime.kind !== 'uv') throw new Error('Invalid Docling fixture')
+  const { runtime } = component
+  Object.assign(installed, {
+    packageId: item.id,
+    version: item.version,
+    license: item.license,
+    reviewSha256: marketplacePackageReviewSha256(item),
+    source: item.source,
+    sources: item.sources,
+    components: [{ componentId: component.id, sourceId: item.source.id }],
+    scope: 'user',
+    workspaceRoot: undefined,
+    permissions: item.permissions.map(permission => ({ permissionId: permission.id, decision: 'granted' }))
+  })
+  const pythonRoot = join(installed.artifact.location, 'python')
+  const pythonPath = join(pythonRoot, process.platform === 'win32' ? 'python.exe' : 'python')
+  const launcher = join(installed.artifact.location, 'workwise-python-launcher.py')
+  const sitePackages = join(installed.artifact.location, 'site-packages')
+  const lock = `${runtime.packageName}==${runtime.version} --hash=sha256:${runtime.install.digest.value}\n`
+  await mkdir(pythonRoot, { recursive: true })
+  await mkdir(sitePackages, { recursive: true })
+  await writeFile(pythonPath, 'python')
+  await writeFile(launcher, 'print("launcher")\n')
+  await writeFile(join(installed.artifact.location, 'requirements.lock'), lock)
+  await writeFile(join(installed.artifact.location, 'workwise-python-runtime.json'), JSON.stringify({
+    schema: 'workwise.python-runtime',
+    version: 1,
+    packageName: runtime.packageName,
+    packageVersion: runtime.version,
+    entrypoints: [runtime.executable],
+    sitePackages: 'site-packages',
+    lockSha256: createHash('sha256').update(lock).digest('hex'),
+    uvVersion: MANAGED_UV_VERSION,
+    pythonVersion: MANAGED_PYTHON_VERSION,
+    wheel: { sha256: runtime.install.digest.value }
+  }))
+  const command = await realpath(pythonPath)
+  const args = ['-I', await realpath(launcher), await realpath(sitePackages), runtime.packageName, runtime.executable]
+  return { item, installed, component, command, args, pythonRoot }
 }
 
 describe('activatePluginPackage', () => {
@@ -397,6 +444,55 @@ describe('activatePluginPackage', () => {
         ]
       })
     }))
+  })
+
+  it('activates the official Docling 3.0.0 package on stdio', async () => {
+    const { item, installed, component, command, args, pythonRoot } = await doclingFixture()
+    const save = vi.fn(async ({ config }) => ({ ...config, revision: 1 }))
+
+    await activatePluginPackage({
+      item,
+      installed,
+      mcpConfigService: { list: vi.fn(async () => []), save } as never,
+      managedUvRuntime: { ensure: async () => ({
+        uvPath: command,
+        uvVersion: MANAGED_UV_VERSION,
+        pythonPath: command,
+        pythonVersion: MANAGED_PYTHON_VERSION,
+        cacheDirectory: installed.artifact.location,
+        pythonInstallDirectory: pythonRoot
+      }) },
+      idempotencyKey: 'activate-official-docling'
+    })
+
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      config: expect.objectContaining({
+        id: component.id,
+        transport: 'stdio',
+        command,
+        args: [...args, '--transport', 'stdio'],
+        enabled: true
+      })
+    }))
+  })
+
+  it('projects stdio only for the unchanged legacy official Docling launch', async () => {
+    const { installed, component, command, args, pythonRoot } = await doclingFixture()
+    // Review digest in the shipped 0.5.7 and the first 0.5.8 candidate.
+    installed.reviewSha256 = '18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99'
+    const server: McpServerConfigV2 = {
+      id: component.id, name: component.name, scope: 'global', transport: 'stdio',
+      command, args, source: 'managed-tool', timeoutMs: 30_000, toolPolicy: {}, enabled: true, revision: 1
+    }
+    const options = { installed: { get: vi.fn().mockResolvedValue(installed) }, pythonRoot }
+
+    await expect(legacyOfficialDoclingStdioArgs(server, options)).resolves.toEqual([...args, '--transport', 'stdio'])
+    expect(server.args).toEqual(args)
+    await expect(legacyOfficialDoclingStdioArgs({ ...server, source: 'user' }, options)).resolves.toBeUndefined()
+    await expect(legacyOfficialDoclingStdioArgs({ ...server, args: [...args, '--transport', 'http'] }, options)).resolves.toBeUndefined()
+    await expect(legacyOfficialDoclingStdioArgs({ ...server, args: [args[0], 'other-launcher.py', ...args.slice(2)] }, options)).resolves.toBeUndefined()
+    installed.permissions = []
+    await expect(legacyOfficialDoclingStdioArgs(server, options)).resolves.toBeUndefined()
   })
 
   it('activates MCPB uv packages only through the pinned managed runtime', async () => {

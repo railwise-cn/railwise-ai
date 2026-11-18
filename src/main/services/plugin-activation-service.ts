@@ -1,7 +1,7 @@
 import { ZOTERO_READ_TOOLS, isApprovedUpstreamPackage } from '../../shared/engineering-marketplace'
 import { createHash } from 'node:crypto'
 import { lstat, readFile, realpath } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import type {
   BundledPackageRuntimeV1,
   InstalledPackageV1,
@@ -13,6 +13,7 @@ import { isCanonicalPathContained } from './canonical-containment'
 import {
   MANAGED_PYTHON_VERSION,
   MANAGED_UV_VERSION,
+  defaultManagedUvRoot,
   ManagedUvRuntimeService,
   type ManagedUvRuntimeV1
 } from './managed-uv-runtime-service'
@@ -24,6 +25,8 @@ import { inspectPackageDirectory, PackageInstallationService, packageInstallLimi
 const MAX_PACKAGE_JSON_BYTES = 1024 * 1024
 const MAX_RUNTIME_METADATA_BYTES = 1024 * 1024
 const SHA256 = /^[0-9a-f]{64}$/i
+// Official Docling 3.0.0 review before the transport argument was explicit.
+const LEGACY_DOCLING_REVIEW_SHA256 = '18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99'
 
 export type ActivatePluginPackageOptions = {
   item: MarketplacePackageV1
@@ -242,7 +245,7 @@ async function pythonLaunch(
   executable: string,
   args: string[],
   workspaceRoot: string | undefined,
-  provider: { ensure(): Promise<ManagedUvRuntimeV1> }
+  provider: { ensure(): Promise<Pick<ManagedUvRuntimeV1, 'pythonPath' | 'pythonVersion' | 'uvVersion'>> }
 ): Promise<{ command: string; args: string[] }> {
   const metadataPath = await verifiedArtifactPath(root, 'workwise-python-runtime.json')
   const metadataInfo = await lstat(metadataPath)
@@ -297,6 +300,47 @@ async function pythonLaunch(
       executable,
       ...args.map((arg) => replaceWorkspace(arg, workspaceRoot))
     ]
+  }
+}
+
+/** Correct the launch projection for unchanged, previously reviewed Docling 3.0.0 installs. */
+export async function legacyOfficialDoclingStdioArgs(
+  server: McpServerConfigV2,
+  options: {
+    installed?: Pick<PackageInstallationService, 'get'>
+    pythonRoot?: string
+  } = {}
+): Promise<string[] | undefined> {
+  if (server.id !== 'docling-mcp-server' || server.source !== 'managed-tool' ||
+      server.transport !== 'stdio' || server.cwd || !server.command || !isAbsolute(server.command) ||
+      server.args?.length !== 5 || server.args[0] !== '-I') return undefined
+
+  const item = getOfficialMarketplaceCatalog().find(entry => entry.id === 'docling-mcp' && entry.version === '3.0.0')
+  const component = item?.components.find(entry => entry.id === server.id)
+  if (!item || component?.type !== 'mcp' || component.runtime.kind !== 'uv') return undefined
+  const runtime = component.runtime
+  try {
+    const installed = await (options.installed ?? new PackageInstallationService()).get(item.id)
+    const workspace = server.scope === 'workspace' ? server.workspaceRoot : undefined
+    if (!installed || installed.version !== item.version ||
+        installed.source.catalogSourceId !== 'workwise-official' || installed.source.id !== item.source.id ||
+        installed.reviewSha256 !== LEGACY_DOCLING_REVIEW_SHA256 ||
+        (installed.scope === 'workspace') !== (server.scope === 'workspace') ||
+        installed.workspaceRoot !== workspace || !permissionGranted(item, installed)) return undefined
+
+    const command = await realpath(server.command)
+    const pythonRoot = await realpath(options.pythonRoot ?? join(defaultManagedUvRoot(), 'python'))
+    if (command !== server.command || !isCanonicalPathContained(pythonRoot, command)) return undefined
+    const launch = await pythonLaunch(
+      installed.artifact.location, runtime.packageName, runtime.version, runtime.install.digest.value,
+      runtime.executable, [], workspace, {
+        ensure: async () => ({ pythonPath: command, uvVersion: MANAGED_UV_VERSION, pythonVersion: MANAGED_PYTHON_VERSION })
+      }
+    )
+    if (!launch.args.every((arg, index) => arg === server.args?.[index])) return undefined
+    return [...launch.args, '--transport', 'stdio']
+  } catch {
+    return undefined
   }
 }
 
