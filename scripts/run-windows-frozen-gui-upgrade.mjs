@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
@@ -87,29 +87,36 @@ async function officialBaseline(root) {
 
 async function createPrivateTrust(root) {
   const certificate = join(root, 'private-updater.pfx')
+  const publicRoot = join(root, 'private-updater-root.cer')
   const password = randomUUID()
-  const friendlyName = `RailWise ephemeral update smoke ${randomUUID()}`
+  const name = `RailWise ephemeral update smoke ${randomUUID()}`
+  const issuerSubject = `CN=${name} root`
+  const leafSubject = `CN=${name} loopback`
   const remove = () => powershell(`
     $ErrorActionPreference = 'Stop'
-    foreach ($store in @('My','Root')) {
-      Get-ChildItem "Cert:\\CurrentUser\\$store" | Where-Object FriendlyName -eq ${psQuote(friendlyName)} | Remove-Item
-    }
+    Get-ChildItem 'Cert:\\LocalMachine\\Root' | Where-Object Subject -eq ${psQuote(issuerSubject)} | Remove-Item
+    Get-ChildItem 'Cert:\\CurrentUser\\My' | Where-Object Subject -in @(${psQuote(issuerSubject)},${psQuote(leafSubject)}) | Remove-Item -DeleteKey
   `)
   try {
-    powershell(`
+    const command = `
       $ErrorActionPreference = 'Stop'
-      $cert = New-SelfSignedCertificate -Type Custom -Subject 'CN=RailWise ephemeral updater' -FriendlyName ${psQuote(friendlyName)} \`
-        -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddHours(1) -KeyExportPolicy Exportable \`
-        -HashAlgorithm SHA256 -KeyUsage DigitalSignature,KeyEncipherment -TextExtension @('2.5.29.17={text}ipaddress=127.0.0.1','2.5.29.37={text}1.3.6.1.5.5.7.3.1')
-      $secure = ConvertTo-SecureString ${psQuote(password)} -AsPlainText -Force
+      $admin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+      if (!$admin.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'The ephemeral runner is required to be an administrator' }
+      $issuer = New-SelfSignedCertificate -Type Custom -Subject ${psQuote(issuerSubject)} -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddHours(1) -HashAlgorithm SHA256 -KeyUsage CertSign,CRLSign -TextExtension '2.5.29.19={critical}{text}ca=1&pathlength=0'
+      $cert = New-SelfSignedCertificate -Type Custom -Subject ${psQuote(leafSubject)} -Signer $issuer -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddMinutes(50) -KeyExportPolicy Exportable -HashAlgorithm SHA256 -KeyUsage DigitalSignature,KeyEncipherment -TextExtension @('2.5.29.17={text}ipaddress=127.0.0.1','2.5.29.37={text}1.3.6.1.5.5.7.3.1')
+      $secure = ConvertTo-SecureString $env:RAILWISE_TEST_PFX_PASSWORD -AsPlainText -Force
       Export-PfxCertificate -Cert $cert -FilePath ${psQuote(certificate)} -Password $secure -CryptoAlgorithmOption AES256_SHA256 | Out-Null
-      $root = [System.Security.Cryptography.X509Certificates.X509Store]::new('Root','CurrentUser')
-      try { $root.Open('ReadWrite'); $root.Add($cert) } finally { $root.Close() }
-    `, 30_000)
+      Export-Certificate -Cert $issuer -FilePath ${psQuote(publicRoot)} | Out-Null
+      $trusted = Import-Certificate -FilePath ${psQuote(publicRoot)} -CertStoreLocation 'Cert:\\LocalMachine\\Root' -Confirm:$false
+      if ($trusted.Thumbprint -ne $issuer.Thumbprint) { throw 'The disposable trust root did not match the generated certificate' }
+    `
+    execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      env: { ...process.env, RAILWISE_TEST_PFX_PASSWORD: password }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 45_000
+    })
     return { pfx: await readFile(certificate), passphrase: password, remove }
   } catch (error) {
     remove()
-    throw error
+    throw new Error(`Could not establish the ephemeral Windows updater HTTPS trust (${error.code ?? error.status ?? 'setup-failed'})`)
   }
 }
 
