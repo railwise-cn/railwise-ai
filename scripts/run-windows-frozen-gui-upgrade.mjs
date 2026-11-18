@@ -89,13 +89,15 @@ async function createPrivateTrust(root) {
   const certificate = join(root, 'private-updater.pfx')
   const publicRoot = join(root, 'private-updater-root.cer')
   const password = randomUUID()
-  const name = `RailWise ephemeral update smoke ${randomUUID()}`
+  const name = `RailWise QA ${randomUUID()}`
   const issuerSubject = `CN=${name} root`
   const leafSubject = `CN=${name} loopback`
   const remove = () => powershell(`
     $ErrorActionPreference = 'Stop'
     Get-ChildItem 'Cert:\\LocalMachine\\Root' | Where-Object Subject -eq ${psQuote(issuerSubject)} | Remove-Item
-    Get-ChildItem 'Cert:\\CurrentUser\\My' | Where-Object Subject -in @(${psQuote(issuerSubject)},${psQuote(leafSubject)}) | Remove-Item -DeleteKey
+    Get-ChildItem 'Cert:\\CurrentUser\\My' | Where-Object Subject -in @(${psQuote(issuerSubject)},${psQuote(leafSubject)}) | ForEach-Object {
+      Remove-Item -LiteralPath "Cert:\\CurrentUser\\My\\$($_.Thumbprint)" -DeleteKey
+    }
   `)
   try {
     const command = `
@@ -115,7 +117,7 @@ async function createPrivateTrust(root) {
     })
     return { pfx: await readFile(certificate), passphrase: password, remove }
   } catch (error) {
-    remove()
+    try { remove() } catch { /* The ephemeral machine will discard an incomplete trust setup. */ }
     throw new Error(`Could not establish the ephemeral Windows updater HTTPS trust (${error.code ?? error.status ?? 'setup-failed'})`)
   }
 }
@@ -193,7 +195,10 @@ async function exerciseSidebar({ running, target, feed, executable, allowLegacyF
   const { cdp, child } = running
   const version = target.identity.version
   const control = `button[title^="升级到 ${version}，"], button[title^="Update to ${version},"]`
-  await cdp.wait(`Boolean([...document.querySelectorAll(${JSON.stringify(control)})].find(el => !el.disabled && el.getClientRects().length))`, 'the automatic sidebar update offer', 90_000)
+  await cdp.wait(`Boolean([...document.querySelectorAll(${JSON.stringify(control)})].find(el => !el.disabled && el.getClientRects().length))`, 'the automatic sidebar update offer', 90_000).catch(async error => {
+    const state = await cdp.evaluate('window.workwise.getGuiUpdateState()').catch(() => ({}))
+    throw new Error(`${error.message}: ${JSON.stringify({ status: state.status, code: state.code, latestVersion: state.info?.latestVersion, privateManifestReads: feed.requests.manifest })}`)
+  })
   const available = await cdp.evaluate('window.workwise.getGuiUpdateState()')
   assert.equal(available.status, 'available')
   assert.equal(available.info?.latestVersion, version)
@@ -253,6 +258,7 @@ async function main(args) {
     installExactNsis(baseline.installer.path, installDirectory)
     report.baseline.package = inspectInstalledPackage(installDirectory, baseline.identity)
     report.baseline.registry = ownedInstallState(installDirectory, '0.5.7')
+    await save()
     await seedSchedule('0.5.7')
     trust = await createPrivateTrust(root)
     feed = await openPrivateFeed(trust, target)
@@ -292,8 +298,15 @@ async function main(args) {
     running?.cdp.close()
     await closeOwnedWindows(executable).catch(() => undefined)
     await feed?.close()
-    trust?.remove()
-    await save()
+    try {
+      trust?.remove()
+    } catch {
+      report.cleanupError = 'Could not remove the owned QA certificates before the temporary runner shut down'
+      report.status = 'failed'
+    } finally {
+      await save()
+    }
+    if (report.cleanupError && !report.failure) throw new Error(report.cleanupError)
   }
 }
 
