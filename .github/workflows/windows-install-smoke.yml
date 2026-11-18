@@ -33,6 +33,11 @@ on:
         description: 'Same-repository release run containing the exact release-win artifact to inspect'
         type: string
         required: false
+      run_spreadsheet_acceptance:
+        description: 'Open the exact frozen installer privately on Windows x64, macOS Apple Silicon, and macOS Intel. Inspect Chinese spreadsheet UI with the renderer offline.'
+        type: boolean
+        required: false
+        default: false
       run_published_gui_update:
         description: 'Install released 0.5.6 and click the real sidebar upgrade to released Stable 0.5.7 on an ephemeral Windows runner'
         type: boolean
@@ -90,7 +95,7 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ inputs.run_frozen_gui_update != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
+    if: ${{ inputs.run_spreadsheet_acceptance != true && inputs.run_frozen_gui_update != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || inputs.run_browser_execution && 25 || 15 }}
@@ -162,6 +167,67 @@ jobs:
           path: |
             ${{ runner.temp }}/exact-windows-evidence/
             ${{ runner.temp }}/windows-package-source.json
+
+  exact-packaged-spreadsheet:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_spreadsheet_acceptance == true }}
+    name: Offline spreadsheets in frozen ${{ matrix.label }} package
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows x64
+            runner: windows-2022
+            arch: x64
+          - label: macOS Apple Silicon
+            runner: macos-15
+            arch: arm64
+          - label: macOS Intel
+            runner: macos-15-intel
+            arch: x64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - name: Install verification tools
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Resolve the immutable original artifact
+        id: exact-source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+        shell: bash
+        run: node scripts/run-packaged-spreadsheet-smoke.mjs --prepare "$PACKAGE_RUN_ID" "$RUNNER_TEMP/exact-spreadsheet-source.json" "${{ matrix.arch }}"
+      - name: Download the original installer
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.exact-source.outputs.artifact_id }}
+          run-id: ${{ inputs.package_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/exact-spreadsheet-package
+      - name: Install and inspect the real Chinese spreadsheet surface
+        shell: bash
+        run: >-
+          node scripts/run-packaged-spreadsheet-smoke.mjs --run
+          "$RUNNER_TEMP/exact-spreadsheet-package" "$RUNNER_TEMP/exact-spreadsheet-source.json"
+          "$RUNNER_TEMP/exact-spreadsheet-evidence" "${{ matrix.arch }}"
+      - name: Retain compact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spreadsheet-smoke-${{ matrix.runner }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/exact-spreadsheet-source.json
+            ${{ runner.temp }}/exact-spreadsheet-evidence/spreadsheet-smoke.json
 
   windows-frozen-gui-update:
     if: ${{ inputs.run_frozen_gui_update == true }}
