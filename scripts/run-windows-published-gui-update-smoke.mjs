@@ -10,7 +10,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { inspectInstalledPackage, inspectInstaller, installIdentity } from './verify-windows-install-smoke.mjs'
-import { connectCdp, summarizeWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
+import { connectCdp, summarizeWindowsUpdateMetadata, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 
 const baseVersion = '0.5.6'
 const targetVersion = '0.5.7'
@@ -162,7 +162,7 @@ async function downloadBaseline(directory) {
 async function attachPackagedRenderer(child, executable, devtoolsPort) {
   return waitUntil(async () => {
     if (child.exitCode !== null) throw new Error(`Baseline exited before renderer inspection (${child.exitCode})`)
-    const port = devtoolsPort()
+    const port = await devtoolsPort()
     if (!port) return null
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(3_000) })
       .then(response => response.json()).catch(() => [])
@@ -178,15 +178,17 @@ async function main(args) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.GITHUB_ACTIONS === 'true' &&
     process.env.RUNNER_ENVIRONMENT === 'github-hosted' && process.env.RUNNER_OS === 'Windows',
     'Published GUI upgrade requires an ephemeral GitHub-hosted Windows x64 runner')
-  const repaired = args.length === 1 && args[0] === '--repaired-baseline'
-  assert.ok(!args.length || repaired, 'Unsupported Windows GUI updater smoke arguments')
+  const marketplace = args.length === 1 && args[0] === '--repaired-marketplace'
+  const repaired = marketplace || (args.length === 1 && args[0] === '--repaired-baseline')
+  assert.ok(!args.length || repaired, 'Unsupported Windows package smoke arguments')
   const evidenceDir = join(process.env.RUNNER_TEMP, 'published-windows-gui-upgrade-evidence')
   await mkdir(evidenceDir)
-  const report = { schemaVersion: 1, scope: repaired ? 'private-repaired-windows-gui-upgrade' : 'published-windows-gui-upgrade', status: 'running',
+  const scope = marketplace ? 'private-windows-npm-marketplace' : repaired ? 'private-repaired-windows-gui-upgrade' : 'published-windows-gui-upgrade'
+  const report = { schemaVersion: 1, scope, status: 'running',
     provenance: { driverSourceHead: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT },
     baseVersion, targetVersion, phase: 'preflight', baseline: {},
     officialFeed, directTargetInstallerLaunches: 0, applicationUpdaterOverrides: 0 }
-  const save = () => writeFile(join(evidenceDir, 'windows-published-gui-upgrade.json'), JSON.stringify(report, null, 2) + '\n')
+  const save = () => writeFile(join(evidenceDir, marketplace ? 'windows-npm-marketplace.json' : 'windows-published-gui-upgrade.json'), JSON.stringify(report, null, 2) + '\n')
   const capture = async (cdp, filename) => {
     const image = await cdp.send('Page.captureScreenshot', { format: 'png' })
     await writeFile(join(evidenceDir, filename), Buffer.from(image.data, 'base64'))
@@ -205,11 +207,13 @@ async function main(args) {
       })
       assert.equal(present, false, 'An existing RailWise profile was found')
     }
-    const response = await fetch(new URL('latest.yml', officialFeed), {
-      cache: 'no-store', signal: AbortSignal.timeout(30_000)
-    })
-    assert.ok(response.ok, `Current Stable feed returned HTTP ${response.status}`)
-    report.manifest = verifyPublishedWindowsManifest(parse(await response.text()))
+    if (!marketplace) {
+      const response = await fetch(new URL('latest.yml', officialFeed), {
+        cache: 'no-store', signal: AbortSignal.timeout(30_000)
+      })
+      assert.ok(response.ok, `Current Stable feed returned HTTP ${response.status}`)
+      report.manifest = verifyPublishedWindowsManifest(parse(await response.text()))
+    }
     const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'railwise-published-gui-upgrade-'))
     const directory = join(root, 'install')
     const executable = join(directory, rootIdentity.executableName)
@@ -242,11 +246,11 @@ async function main(args) {
     assert.match(appUpdate.url, /^https:\/\/www\.railwise\.cn\/downloads\/(?:railwise-ai|workwise)\/channels\/stable\/latest\/?$/)
     report.baseline.packagedFeed = appUpdate.url
     report.phase = 'baseline-renderer'
-    const cleanEnvironment = { ...process.env }
+    let cleanEnvironment = { ...process.env }
     for (const name of Object.keys(cleanEnvironment)) {
       if (/SECRET|TOKEN|PASSWORD|PRIVATE_KEY|API_KEY|^(?:APPLE_|CSC_|R2_|S3_|WORKWISE_|ELECTRON_RUN_AS_NODE|NODE_OPTIONS|RELEASE_CHANNEL|PUBLIC_DOWNLOAD_BASE_URL)/i.test(name)) delete cleanEnvironment[name]
     }
-    if (repaired) {
+    if (repaired && !marketplace) {
       await mkdir(profile)
       const seededAt = Date.now()
       const seededRecord = repairedScheduleSeed(seededAt)
@@ -255,8 +259,21 @@ async function main(args) {
       report.schedule = { seededAt: new Date(seededAt).toISOString(), seededRecord }
       await save()
     }
-    child = spawn(executable, ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN'],
-      { env: cleanEnvironment, cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
+    const chromeArgs = ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN']
+    const workspace = join(root, '工程 插件验收')
+    const marketplaceProfile = join(root, 'marketplace-profile')
+    if (marketplace) {
+      cleanEnvironment = windowsUiEnvironment(cleanEnvironment, root)
+      await Promise.all([workspace, marketplaceProfile, cleanEnvironment.USERPROFILE, cleanEnvironment.APPDATA,
+        cleanEnvironment.LOCALAPPDATA].map(path => mkdir(path, { recursive: true })))
+      await writeFile(join(marketplaceProfile, 'workwise-settings.json'), JSON.stringify({
+        schema: 'workwise.settings', version: 2, revision: 0, locale: 'zh', theme: 'light', workspaceRoot: workspace,
+        appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
+        agents: { kun: { autoStart: true, dataDir: join(root, 'runtime') } }
+      }) + '\n', { flag: 'wx' })
+      chromeArgs.unshift(`--user-data-dir=${marketplaceProfile}`)
+    }
+    child = spawn(executable, chromeArgs, { env: cleanEnvironment, cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
     let devtoolsPort
     let output = ''
     let launchError
@@ -265,13 +282,28 @@ async function main(args) {
       output = (output + chunk).slice(-8_000)
       devtoolsPort ??= output.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1]
     })
-    cdp = await attachPackagedRenderer(child, executable, () => {
+    cdp = await attachPackagedRenderer(child, executable, async () => {
       if (launchError) throw launchError
+      if (!devtoolsPort && marketplace) {
+        const portFile = await readFile(join(marketplaceProfile, 'DevToolsActivePort'), 'utf8').catch(() => '')
+        const port = portFile.split(/\r?\n/)[0]
+        if (/^\d+$/.test(port)) devtoolsPort = port
+      }
       return devtoolsPort
     })
     await cdp.wait('Boolean(window.workwise?.getAppVersion && document.querySelector("button"))', 'baseline workbench')
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
     report.baseline.pid = child.pid
+    if (marketplace) {
+      report.phase = 'marketplace-install'
+      await save()
+      const { verifyInstalledWindowsNpmMarketplace } = await import('./verify-installed-windows-npm-marketplace.mjs')
+      report.marketplace = await verifyInstalledWindowsNpmMarketplace(cdp, { workspace })
+      await capture(cdp, 'windows-marketplace-installed.png')
+      report.status = 'passed'
+      report.phase = 'complete'
+      return
+    }
     report.phase = 'automatic-offer'
     const control = sidebarUpgradeControlSelector
     const button = await cdp.wait(`(() => {
@@ -343,7 +375,7 @@ async function main(args) {
     if (cdp && child?.exitCode === null) {
       const state = await cdp.evaluate('window.workwise.getGuiUpdateState()', 3_000).catch(() => null)
       if (state && !report.lastUpdateState) report.lastUpdateState = { status: state.status, ...summarizeWindowsUpdateMetadata(state.info ?? state) }
-      await capture(cdp, 'windows-published-upgrade-failure.png').catch(() => undefined)
+      await capture(cdp, marketplace ? 'windows-marketplace-failure.png' : 'windows-published-upgrade-failure.png').catch(() => undefined)
     }
     throw error
   } finally {

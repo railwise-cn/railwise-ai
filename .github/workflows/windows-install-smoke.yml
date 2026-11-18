@@ -38,6 +38,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_repaired_marketplace_install:
+        description: 'Build a private Windows fixture from this ref and verify the real Playwright MCP catalog installation'
+        type: boolean
+        required: false
+        default: false
       run_task_execution:
         description: 'Run real installed task tools, HTML file verification and daily schedule readback with a local model protocol fixture'
         type: boolean
@@ -60,7 +65,7 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true }}
+    if: ${{ inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_browser_execution && 25 || 15 }}
@@ -138,7 +143,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Reject mixed acceptance modes
-        if: ${{ inputs.run_repaired_gui_update || inputs.package_run_id != '' || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
+        if: ${{ inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.package_run_id != '' || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
         run: throw 'The published GUI upgrade accepts no package build or other smoke mode'
       - uses: actions/setup-node@v7
         with:
@@ -160,8 +165,8 @@ jobs:
           path: ${{ runner.temp }}/published-windows-gui-upgrade-evidence/
 
   windows-repaired-gui-update:
-    if: ${{ inputs.run_repaired_gui_update == true && inputs.run_published_gui_update != true }}
-    name: Private repaired Windows baseline to released Stable 0.5.7
+    if: ${{ (inputs.run_repaired_gui_update == true || inputs.run_repaired_marketplace_install == true) && inputs.run_published_gui_update != true }}
+    name: ${{ inputs.run_repaired_marketplace_install && 'Private Windows npm marketplace install' || 'Private repaired Windows baseline to released Stable 0.5.7' }}
     runs-on: windows-2022
     timeout-minutes: 60
     steps:
@@ -171,8 +176,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Reject mixed acceptance modes
-        if: ${{ inputs.package_run_id != '' || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
-        run: throw 'The private repaired baseline accepts no package build or other smoke mode'
+        if: ${{ (inputs.run_repaired_gui_update && inputs.run_repaired_marketplace_install) || inputs.package_run_id != '' || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
+        run: throw 'Select one private repaired fixture mode without other smoke options'
       - uses: actions/setup-node@v7
         with:
           node-version: '22.22.0'
@@ -216,7 +221,11 @@ jobs:
           node scripts/verify-packaged-runtime-native.cjs "$env:RUNNER_TEMP/repaired-updater-baseline" win
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upgrade the repaired baseline through the real packaged sidebar
+        if: inputs.run_repaired_gui_update
         run: node scripts/run-windows-published-gui-update-smoke.mjs --repaired-baseline
+      - name: Install the reviewed Playwright MCP package with native npm
+        if: inputs.run_repaired_marketplace_install
+        run: node scripts/run-windows-published-gui-update-smoke.mjs --repaired-marketplace
       - name: Retain diagnostics for the private repaired baseline
         if: always()
         uses: actions/upload-artifact@v4

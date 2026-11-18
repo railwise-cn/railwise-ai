@@ -77,7 +77,11 @@ test('published Windows smoke is a separate opt-in job with read-only GitHub per
   assert.equal(workflow.on.workflow_dispatch.inputs.run_repaired_gui_update.default, false)
   assert.match(job.steps.find(step => step.name === 'Reject mixed acceptance modes').if, /run_repaired_gui_update/)
   const repaired = workflow.jobs['windows-repaired-gui-update']
-  assert.match(repaired.if, /run_repaired_gui_update == true && inputs.run_published_gui_update != true/)
+  assert.match(repaired.if, /run_repaired_gui_update == true \|\| inputs.run_repaired_marketplace_install == true/)
+  assert.match(repaired.if, /inputs.run_published_gui_update != true/)
+  assert.equal(workflow.on.workflow_dispatch.inputs.run_repaired_marketplace_install.default, false)
+  assert.ok(repaired.steps.some(step => step.if === 'inputs.run_repaired_marketplace_install' &&
+    step.run === 'node scripts/run-windows-published-gui-update-smoke.mjs --repaired-marketplace'))
   assert.equal(repaired.steps.find(step => step.uses === 'actions/checkout@v7').with['fetch-depth'], 0)
   const build = repaired.steps.find(step => step.run === 'npm run dist:win')
   assert.equal(build.env.WORKWISE_APP_VERSION, '0.5.6')
