@@ -2588,7 +2588,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(response=>response.ok)`, 'the installed KUN runtime', 90_000)
       report.checks.push('installed-runtime-ready')
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
-      report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: videoEvaluation })
+      await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: videoEvaluation,
+        observe: proof => { report.marketplace = proof } })
       if (video) {
         report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
         report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')

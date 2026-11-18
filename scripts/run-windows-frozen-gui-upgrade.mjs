@@ -17,7 +17,7 @@ import {
 
 const releaseNotes = new URL('../docs/qa/release-gates/v0.5.7.json', import.meta.url)
 const samePath = (left, right) => resolve(left).toLowerCase() === resolve(right).toLowerCase()
-const oneHour = 60 * 60_000
+const dueForLegacyCheck = 25 * 60 * 60_000
 
 export function verifyFrozenWindowsReadback({ expectedVersion, expectedSource, installerSha256, registry, packageMetadata, profilePreserved, threadPreserved }, target) {
   assert.equal(expectedVersion, target.identity.version)
@@ -247,7 +247,9 @@ async function main(args) {
   const sentinelFile = join(profile, 'railwise-updater-fixture.txt')
   await writeFile(sentinelFile, sentinel, { flag: 'wx' })
   await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify(settings), { flag: 'wx' })
-  const seedSchedule = version => writeFile(join(profile, 'gui-update-schedule.json'), JSON.stringify({ appVersion: version, lastCheckedAt: new Date(Date.now() - oneHour).toISOString() }))
+  // Released 0.5.7 schedules checks daily. The stored record must be due for
+  // both that legacy interval and the current 0.5.8 interval.
+  const seedSchedule = version => writeFile(join(profile, 'gui-update-schedule.json'), JSON.stringify({ appVersion: version, lastCheckedAt: new Date(Date.now() - dueForLegacyCheck).toISOString() }))
 
   const report = { status: 'running', scope: 'private-frozen-windows-gui-upgrade', productionTouched: false,
     driverSource: process.env.GITHUB_SHA, baseline: { installer: baseline.installer }, targetBuild: target.source, steps: [] }
