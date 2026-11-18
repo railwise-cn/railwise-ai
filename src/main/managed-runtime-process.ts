@@ -5,6 +5,7 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { homedir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { z } from 'zod'
 import {
   defaultManagedRuntimeTokenEconomySettings,
   isManagedRuntimeInsecure,
@@ -783,7 +784,11 @@ export async function syncManagedBrowserSkillCapability(dataDir: string, status:
     capabilities: { ...objectValue(existing.capabilities), browserSkill: BrowserCapabilityConfig.parse(status) } }))
 }
 
-export async function syncManagedSkillCapability(dataDir: string, settings: AppSettingsV1): Promise<void> {
+export async function syncManagedSkillCapability(
+  dataDir: string,
+  settings: AppSettingsV1,
+  options: { enable?: true } = {}
+): Promise<void> {
   const managedRoots = (await guiSkillRootsForRuntime(settings)).map(root => root.path)
   await updateManagedConnectorConfig(dataDir, existing => {
     const capabilities = objectValue(existing.capabilities)
@@ -793,7 +798,7 @@ export async function syncManagedSkillCapability(dataDir: string, settings: AppS
     const roots = uniqueStrings([...customRoots, ...managedRoots])
     const skills = SkillsCapabilityConfig.parse({ ...current, roots, managedRoots,
       revision: Number(current.revision ?? 0) + 1,
-      enabled: current.enabled === false ? false : roots.length > 0 })
+      enabled: options.enable === true || current.enabled !== false })
     return { ...existing, capabilities: { ...capabilities, skills } }
   })
 }
@@ -1013,7 +1018,7 @@ async function skillCapabilityConfigForRuntime(
       ])
   return {
     ...existing,
-    enabled: existing.enabled === false ? false : roots.length > 0 || existing.enabled === true,
+    enabled: existing.enabled !== false,
     roots,
     managedRoots,
     legacySkillMd: existing.legacySkillMd === false ? false : true
@@ -1406,7 +1411,11 @@ function sanitizeRuntimeCapabilitiesConfig(value: unknown): Record<string, unkno
   const next: Record<string, unknown> = {}
   if ('mcp' in raw) next.mcp = parseRuntimeConfigSection(McpCapabilityConfig, raw.mcp)
   if ('web' in raw) next.web = parseRuntimeConfigSection(WebCapabilityConfig, raw.web)
-  if ('skills' in raw) next.skills = parseRuntimeConfigSection(SkillsCapabilityConfig, raw.skills)
+  if ('skills' in raw) {
+    // Desktop discovery may start with zero global roots. An absent toggle
+    // leaves it enabled so the selected workspace and later installs can load.
+    next.skills = parseRuntimeConfigSection(SkillsCapabilityConfig.extend({ enabled: z.boolean().optional() }), raw.skills)
+  }
   if ('subagents' in raw) {
     next.subagents = parseRuntimeConfigSection(SubagentsCapabilityConfig, raw.subagents)
   }

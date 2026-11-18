@@ -36,6 +36,16 @@ describe('turn completion guard', () => {
     expect(requiredFileExtensionsForPrompt('制作一份 PPT 演示文稿，引用已有视频。')).toEqual(['ppt', 'pptx'])
   })
 
+  it('recognizes a video output only after an explicitly authorized host command exits successfully', () => {
+    const output = (exitCode?: number) => makeToolResultItem({
+      id: 'render-result', callId: 'render-call', toolName: 'request_host_shell',
+      threadId: 'thread', turnId: 'turn', output: { stdout: '/workspace/clip.mp4', exit_code: exitCode }
+    })
+    expect(hasSuccessfulFileDeliverable([output(0)], 'turn', '渲染 MP4 视频')).toBe(true)
+    expect(hasSuccessfulFileDeliverable([output()], 'turn', '渲染 MP4 视频')).toBe(false)
+    expect(hasSuccessfulFileDeliverable([output(1)], 'turn', '渲染 MP4 视频')).toBe(false)
+  })
+
   it('detects external side-effect requests separately from prose answers', () => {
     expect(promptRequiresExternalEffect('连接钉钉并自动审批我的待办事项。')).toBe(true)
     expect(promptRequiresExternalEffect('请在飞书发送一条项目通知。')).toBe(true)

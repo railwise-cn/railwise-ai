@@ -96,6 +96,13 @@ function relativeDeliverablePathsFromText(value: string): string[] {
   return paths
 }
 
+function isShellDeliveryResult(item: TurnItem): boolean {
+  if (item.kind !== 'tool_result') return false
+  if (item.toolKind === 'command_execution') return true
+  return (item.toolName === 'request_host_shell' || item.toolName === 'host_shell_session') &&
+    (item.output as { exit_code?: unknown } | undefined)?.exit_code === 0
+}
+
 export function verifiedShellDeliverablePaths(items: readonly TurnItem[], turnId: string): string[] {
   const claimedPaths = items.flatMap((item) =>
     item.turnId === turnId && item.kind === 'assistant_text' && item.status === 'completed'
@@ -109,7 +116,7 @@ export function verifiedShellDeliverablePaths(items: readonly TurnItem[], turnId
     if (
       item.turnId !== turnId ||
       item.kind !== 'tool_result' ||
-      item.toolKind !== 'command_execution' ||
+      !isShellDeliveryResult(item) ||
       item.status !== 'completed' ||
       item.isError === true ||
       !item.output ||
@@ -182,7 +189,7 @@ export function declaredFileOutputPaths(item:TurnItem):string[] {
   if(/^(?:read(?:_.*)?|ls|find|grep|search(?:_.*)?|list(?:_.*)?|memory_.*|get_.*)$/.test(item.toolName))return []
   const output=item.output&&typeof item.output==='object'?item.output as Record<string,unknown>:undefined
   if(Array.isArray(output?.generatedFiles))return fileOutputPaths({generatedFiles:output.generatedFiles})
-  const mutating=item.toolKind==='file_change'||item.toolKind==='command_execution'||['write','edit','propose_document','export_document','analyze_delivery_monitoring'].includes(item.toolName)
+  const mutating=item.toolKind==='file_change'||isShellDeliveryResult(item)||['write','edit','propose_document','export_document','analyze_delivery_monitoring'].includes(item.toolName)
   if(mutating)return fileOutputPaths(item.output)
   // Unknown adapters must explicitly declare generated files; a generic `path`
   // or `files` field can equally describe their inputs and is not sufficient.

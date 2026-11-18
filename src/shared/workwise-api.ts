@@ -515,7 +515,7 @@ export type WorkWiseApi = {
     idempotencyKey: string
   }) => Promise<InstalledPackageV1>
   listSkills: (workspaceRoot?: string) => Promise<SkillListResult>
-  refreshSkills: (workspaceRoot?: string) => Promise<SkillListResult>
+  refreshSkills: (workspaceRoot?: string, options?: { enable: true }) => Promise<SkillListResult>
   onSkillsChanged: (listener: (generation: number) => void) => () => void
   saveSkillFile: (rootPath: string, skillName: string, content: string) => Promise<SkillSaveResult>
   installGithubSkill: (rootPath: string, source: GithubSkillSource) => Promise<GithubSkillInstallResult>

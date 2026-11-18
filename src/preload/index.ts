@@ -197,8 +197,8 @@ const api = {
   updatePluginPermissions: (request) => ipcRenderer.invoke('plugin:update-permissions', request),
   listSkills: (workspaceRoot) =>
     ipcRenderer.invoke('skill:list', { workspaceRoot }),
-  refreshSkills: (workspaceRoot) =>
-    ipcRenderer.invoke('skill:refresh', { workspaceRoot }),
+  refreshSkills: (workspaceRoot, options) =>
+    ipcRenderer.invoke('skill:refresh', { workspaceRoot, enable: options?.enable }),
   onSkillsChanged: (listener) => {
     const wrapped = (_event: Electron.IpcRendererEvent, generation: number): void => listener(generation)
     ipcRenderer.on('skills:changed', wrapped)

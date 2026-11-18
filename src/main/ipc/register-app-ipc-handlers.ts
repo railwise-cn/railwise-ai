@@ -93,6 +93,7 @@ import {
   scheduleTaskFromTextPayloadSchema,
   shellOpenExternalUrlSchema,
   skillListPayloadSchema,
+  skillRefreshPayloadSchema,
   skillSaveFilePayloadSchema,
   settingsSetPayloadSchema,
   streamIdSchema,
@@ -326,7 +327,7 @@ type RegisterAppIpcHandlersOptions = {
   refreshManagedDingTalkCapabilities?: (status: import('../../shared/managed-dws').ManagedDwsStatus) => Promise<void | { enabled: boolean }>
   setManagedDingTalkEnabled?: (enabled: boolean) => Promise<import('../../shared/managed-dws').ManagedDwsResult>
   onMcpServersChanged?: (snapshot: import('../services/mcp-config-service').McpRuntimeSnapshotV1) => Promise<void>
-  onSkillsChanged?: () => Promise<RuntimeRequestResult | void>
+  onSkillsChanged?: (options?: { enable: true }) => Promise<RuntimeRequestResult | void>
   refreshBrowserSkill?: (status: import('../../../kun/src/contracts/browser-skill.js').BrowserCapabilityConfig) => Promise<void>
   onRuntimeMcpConfigWritten?: (path: string, content: string) => Promise<void> | void
   showTurnCompleteNotification: (
@@ -724,10 +725,10 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ;(app as typeof app & { once?: typeof app.once }).once?.('before-quit', () => mcpConfigService.dispose())
   let skillCatalogGeneration = 1
 
-  const notifySkillsChanged = async (): Promise<RuntimeRequestResult | void> => {
+  const notifySkillsChanged = async (skillOptions?: { enable: true }): Promise<RuntimeRequestResult | void> => {
     skillCatalogGeneration += 1
     getMainWindow()?.webContents.send('skills:changed', skillCatalogGeneration)
-    return options.onSkillsChanged?.()
+    return options.onSkillsChanged?.(skillOptions)
   }
 
   const notifyPluginCapabilitiesChanged = async (mcpChanged: boolean, installed?: InstalledPackageV1, skillNames?: string[]) => {
@@ -1719,8 +1720,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
 
   ipcMain.handle('skill:refresh', async (_, payload: unknown) => {
-    const request = parseIpcPayload('skill:refresh', skillListPayloadSchema, payload)
-    await notifySkillsChanged()
+    const request = parseIpcPayload('skill:refresh', skillRefreshPayloadSchema, payload)
+    await notifySkillsChanged(request.enable ? { enable: true } : undefined)
     return loadSkillCatalog(request.workspaceRoot)
   })
 

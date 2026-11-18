@@ -557,10 +557,10 @@ export function PluginMarketplaceView(): ReactElement {
     setLoading(false)
   }, [text, workspaceRoot])
 
-  const recheckSkillRuntime = async (): Promise<void> => {
+  const recheckSkillRuntime = async (enable: boolean): Promise<void> => {
     setCheckingRuntimeSkills(true)
     try {
-      await window.workwise.refreshSkills(workspaceRoot || undefined)
+      await window.workwise.refreshSkills(workspaceRoot || undefined, enable ? { enable: true } : undefined)
       setNotice(null)
     } catch {
       setNotice({ tone: 'info', message: skillRuntimeLabel('unavailable', text) })
@@ -1261,7 +1261,7 @@ export function PluginMarketplaceView(): ReactElement {
           onClose={() => setDetailsOpen(false)}
           onAction={() => void invokePrimaryAction(selected)}
           onRollback={(record) => void rollback(record)}
-          onRefreshSkillRuntime={() => void recheckSkillRuntime()}
+          onRefreshSkillRuntime={(enable) => void recheckSkillRuntime(enable)}
           onOpenSource={() => {
             if (isHttpUrl(selected.package.source.location)) void window.workwise.openExternal(selected.package.source.location)
           }}
@@ -1905,7 +1905,7 @@ function DetailsDrawer({ entry, source, installed, skillRuntime, checkingRuntime
   onClose: () => void
   onAction: () => void
   onRollback: (record: InstalledPackageV1) => void
-  onRefreshSkillRuntime: () => void
+  onRefreshSkillRuntime: (enable: boolean) => void
   onOpenSource: () => void
 }): ReactElement {
   const item = entry.package
@@ -1930,8 +1930,8 @@ function DetailsDrawer({ entry, source, installed, skillRuntime, checkingRuntime
       </div>
       {skillRuntime ? <DetailSection title={text('pluginSkillRuntimeTitle', 'Runtime Skill')}>
         <p className="text-[13px]">{skillRuntimeLabel(skillRuntime, text)}</p>
-        {skillRuntime !== 'loaded' ? <button type="button" disabled={checkingRuntimeSkills} onClick={onRefreshSkillRuntime} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 text-[12px] hover:bg-ds-hover disabled:opacity-50">
-          {text('pluginSkillRuntimeCheck', 'Recheck Skill load')}
+        {skillRuntime !== 'loaded' ? <button type="button" disabled={checkingRuntimeSkills} onClick={() => onRefreshSkillRuntime(skillRuntime === 'disabled')} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 text-[12px] hover:bg-ds-hover disabled:opacity-50">
+          {skillRuntime === 'disabled' ? text('pluginSkillRuntimeEnable', 'Enable and load Skills') : text('pluginSkillRuntimeCheck', 'Recheck Skill load')}
         </button> : null}
       </DetailSection> : null}
       {item.id === 'officecli' || item.id === 'markitdown' ? <div className="px-5"><ManagedDocumentTool id={item.id} /></div> : null}

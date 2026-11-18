@@ -1251,6 +1251,10 @@ export const skillListPayloadSchema = z
   })
   .strict()
 
+export const skillRefreshPayloadSchema = skillListPayloadSchema.extend({
+  enable: z.literal(true).optional()
+})
+
 export const rootPathSchema = trimmedString(MAX_PATH_LENGTH)
 export const runtimeConfigContentSchema = z.string().max(MAX_CONFIG_FILE_BYTES)
 

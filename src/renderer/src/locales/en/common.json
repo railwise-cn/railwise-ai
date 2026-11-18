@@ -1875,6 +1875,7 @@
   "pluginSkillRuntimeDisabled": "Installed · Runtime Skills disabled",
   "pluginSkillRuntimeUnavailable": "Installed · Runtime status unavailable",
   "pluginSkillRuntimeCheck": "Recheck Skill load",
+  "pluginSkillRuntimeEnable": "Enable and load Skills",
   "pluginUnifiedPermissionsUpdated": "{{name}} permissions updated.",
   "pluginUnifiedApplyPermissions": "Apply",
   "pluginUnifiedRollback": "Rollback",

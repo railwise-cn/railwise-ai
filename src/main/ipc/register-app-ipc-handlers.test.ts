@@ -584,8 +584,21 @@ describe('registerAppIpcHandlers', () => {
     await expect(handlers.get('plugin:install')?.({}, { preparedId: 'prepared-skill', reviewSha256: 'a'.repeat(64),
       expectedCurrentVersion: null, scope: 'user', permissions: [], idempotencyKey: 'install-skill' })).resolves.toEqual({ ...installed, skillRuntime: state })
     expect(onSkillsChanged).toHaveBeenCalledOnce()
+    expect(onSkillsChanged).toHaveBeenCalledWith(undefined)
     expect(runtimeSnapshot).not.toHaveBeenCalled()
     expect(onMcpServersChanged).not.toHaveBeenCalled()
+  })
+
+  it('passes explicit skill enablement only from the strict refresh action', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const onSkillsChanged = vi.fn(async () => undefined)
+    registerAppIpcHandlers(registerOptions({ onSkillsChanged }))
+    const refresh = handlers.get('skill:refresh')!
+    await expect(refresh({}, {})).resolves.toMatchObject({ ok: true })
+    await expect(refresh({}, { enable: true })).resolves.toMatchObject({ ok: true })
+    await expect(refresh({}, { enable: false })).rejects.toThrow(/Invalid payload for skill:refresh/)
+    await expect(handlers.get('skill:list')?.({}, { enable: true })).rejects.toThrow(/Invalid payload for skill:list/)
+    expect(onSkillsChanged.mock.calls).toEqual([[undefined], [{ enable: true }]])
   })
 
   it('forwards real MCP check evidence and rejects renderer-injected verification fields', async () => {
