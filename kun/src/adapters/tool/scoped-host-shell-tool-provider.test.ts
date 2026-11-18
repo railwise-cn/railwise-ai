@@ -1,4 +1,4 @@
-import { mkdtemp, realpath, rm } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -229,11 +229,18 @@ describe('read-only host command outcome verification', () => {
 
   it('polls a known running command without dispatching another tool call', async () => {
     const f = await fixture()
-    const command = `"${process.execPath.replaceAll('"', '\\"')}" -e "setTimeout(()=>process.stdout.write('finished'),1600)"`
+    // Hold the real subprocess open until the first result has been observed.
+    const marker = 'allow-fixture-exit'
+    const script = "const fs=require('node:fs');const timer=setInterval(()=>{if(!fs.existsSync(process.argv[1]))return;clearInterval(timer);process.stdout.write('finished')},10)"
+    const command = `"${process.execPath.replaceAll('"', '\\"')}" -e "${script}" ${marker}`
     await f.run('long-command', { ...f.args, command })
+    expect(f.repository.operations(f.task.id, 'host_shell')[0]?.status).toBe('running')
+    await writeFile(join(f.root, marker), '')
     const service = new HostShellVerificationService(f.repository, join(f.root, 'shell-output'), () => new Date().toISOString())
-    await service.reconcile(f.task.id)
-    expect(f.repository.operations(f.task.id, 'host_shell')[0]).toMatchObject({ status: 'succeeded', result: { verification: { exitCode: 0 } } })
+    await vi.waitFor(async () => {
+      await service.reconcile(f.task.id)
+      expect(f.repository.operations(f.task.id, 'host_shell')[0]).toMatchObject({ status: 'succeeded', result: { verification: { exitCode: 0 } } })
+    }, { timeout: 4000 })
     expect(f.execute).toHaveBeenCalledOnce()
   })
 })
