@@ -92,12 +92,12 @@ function modelAction(body, selection, render, parseFixtureToolOutput) {
     if (supportsSession) {
       assert.ok(typeof visibleSession === 'string' && /^bash_[a-f0-9-]+$/i.test(visibleSession) && output.session_id === visibleSession,
         'Always poll only the exact original session returned to the model after approval')
-      return [id, 'host_shell_session', { action: 'poll', session_id: visibleSession, yield_seconds: 4 }]
+      return [id, 'host_shell_session', { action: 'poll', session_id: visibleSession, yield_seconds: 10 }]
     }
     assert.ok(typeof output.authorizationId === 'string' && /^host_shell_[a-f0-9-]+$/i.test(output.authorizationId),
       `The model cannot poll the running approved command: ${literal({ status: output.status,
         authorizationRedacted: output.authorizationId === '<redacted>', sessionReturned: typeof output.session_id === 'string' })}`)
-    return [id, 'host_shell_session', { action: 'poll', authorization_id: output.authorizationId, yield_seconds: 4 }]
+    return [id, 'host_shell_session', { action: 'poll', authorization_id: output.authorizationId, yield_seconds: 10 }]
   }
   const completed = {
     status: output?.status,
