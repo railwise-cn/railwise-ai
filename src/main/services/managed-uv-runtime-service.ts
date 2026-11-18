@@ -71,6 +71,7 @@ export type ManagedUvRuntimeServiceOptions = {
   uvVersion?: string
   pythonVersion?: string
   pythonAsset?: ManagedDependency
+  mirrorOnly?: boolean
 }
 
 type RuntimeManifestV1 = {
@@ -177,6 +178,7 @@ export class ManagedUvRuntimeService {
   private readonly platform: NodeJS.Platform
   private readonly target: string
   private readonly pythonAsset: ManagedDependency
+  private readonly mirrorOnly: boolean
 
   constructor(options: ManagedUvRuntimeServiceOptions = {}) {
     this.rootDirectory = resolve(options.rootDirectory ?? join(homedir(), '.workwise', 'runtimes', 'uv'))
@@ -188,6 +190,7 @@ export class ManagedUvRuntimeService {
     this.run = options.run ?? defaultRun
     this.uvVersion = options.uvVersion ?? MANAGED_UV_VERSION
     this.pythonVersion = options.pythonVersion ?? MANAGED_PYTHON_VERSION
+    this.mirrorOnly = options.mirrorOnly ?? false
   }
 
   async ensure(): Promise<ManagedUvRuntimeV1> {
@@ -252,8 +255,9 @@ export class ManagedUvRuntimeService {
       if (sha256(bytes) === this.asset.sha256) return archivePath
       await rm(archivePath, { force: true })
     }
+    if (this.mirrorOnly && !this.asset.dependencyId) throw new Error('Managed uv version has no RailWise mirror.')
     const bytes = this.asset.dependencyId
-      ? await downloadManagedDependency(managedDependency(this.asset.dependencyId), this.fetchImpl)
+      ? await downloadManagedDependency(managedDependency(this.asset.dependencyId), this.fetchImpl, { mirrorOnly: this.mirrorOnly })
       : await this.downloadLegacyUvArchive()
     if (sha256(bytes) !== this.asset.sha256) throw new Error('Managed uv archive SHA-256 verification failed.')
     const temporary = `${archivePath}.next-${randomUUID()}`
@@ -390,7 +394,7 @@ export class ManagedUvRuntimeService {
     await mkdir(archiveDirectory, { recursive: true, mode: 0o700 })
     const cached = await pathExists(archivePath) ? await readBoundedFile(archivePath, this.pythonAsset.size + 1, 'Managed Python archive') : undefined
     if (!cached || cached.length !== this.pythonAsset.size || sha256(cached) !== this.pythonAsset.sha256) {
-      const bytes = await downloadManagedDependency(this.pythonAsset, this.fetchImpl)
+      const bytes = await downloadManagedDependency(this.pythonAsset, this.fetchImpl, { mirrorOnly: this.mirrorOnly })
       await atomicWriteFile(archivePath, bytes)
     }
     const locked = managedPythonDownload(this.target)

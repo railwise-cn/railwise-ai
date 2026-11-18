@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -19,7 +19,7 @@ import {
   installGithubSkill,
   listGuiSkills
 } from './skill-service'
-import { inspectPackageDirectory } from './package-installation-service'
+import { inspectPackageDirectory, MANAGED_PYPI_INSTALL_LIMITS, PACKAGE_INSTALL_LIMITS } from './package-installation-service'
 
 const originalFetch = globalThis.fetch
 const originalCodexHome = process.env.CODEX_HOME
@@ -88,6 +88,7 @@ describe('skill-service', () => {
     }))
     const inspection = await inspectPackageDirectory(pluginRoot)
     const record = {
+      source: { kind: 'github' },
       artifact: { location: pluginRoot, sha256: inspection.sha256 }
     } as InstalledPackageV1
 
@@ -97,6 +98,22 @@ describe('skill-service', () => {
 
     await writeFile(join(skillRoot, 'SKILL.md'), '# Tampered Marketplace Skill\n')
     await expect(discoverInstalledPluginSkillRoots([record])).resolves.toEqual([])
+  })
+
+  it('verifies already-installed Skills with the package source limits used at installation', async () => {
+    const pluginRoot = join(tempRoot, 'installed-managed-wheel')
+    await mkdir(pluginRoot, { recursive: true })
+    await writeFile(join(pluginRoot, 'SKILL.md'), '# Managed Skill\n')
+    await writeFile(join(pluginRoot, 'workwise.catalog.json'), JSON.stringify({ components: [{ type: 'skill' }] }))
+    const dependency = join(pluginRoot, 'managed-wheel.bin')
+    await writeFile(dependency, '')
+    await truncate(dependency, PACKAGE_INSTALL_LIMITS.maxFileBytes + 1)
+    const inspection = await inspectPackageDirectory(pluginRoot, MANAGED_PYPI_INSTALL_LIMITS)
+    const installed = {
+      source: { kind: 'pypi', catalogSourceId: 'workwise-official' },
+      artifact: { location: pluginRoot, sha256: inspection.sha256 }
+    } as InstalledPackageV1
+    await expect(discoverInstalledPluginSkillRoots([installed])).resolves.toEqual([pluginRoot])
   })
 
   it('discovers trusted Codex template plugins with bounded reference presentations', async () => {

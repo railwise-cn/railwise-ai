@@ -13,9 +13,10 @@ import type {
   GuiUpdateInstallResult,
   GuiUpdateState
 } from '../shared/gui-update'
-import { nextGuiUpdateCheckDelay } from '../shared/gui-update-schedule'
+import { GUI_UPDATE_CHECK_INTERVAL_MS, nextGuiUpdateCheckDelay } from '../shared/gui-update-schedule'
 import { DEFAULT_GUI_UPDATE_CHANNEL, normalizeGuiUpdateChannel } from '../shared/gui-update'
 import { configurePrivateUpdaterTls } from './private-updater-tls'
+import { WindowsGuiUpdater } from './windows-gui-update'
 import {
   legacyDownloadUrl,
   legacyGithubRepo,
@@ -40,7 +41,8 @@ const WITHDRAWN_STABLE_VERSIONS = new Set(
     .map((value) => value.trim())
     .filter(Boolean)
 )
-const { autoUpdater } = electronUpdater
+const windowsUpdater = process.platform === 'win32' ? new WindowsGuiUpdater() : null
+const autoUpdater = windowsUpdater ?? electronUpdater.autoUpdater
 
 let initialized = false
 let getMainWindow: (() => BrowserWindow | null) | null = null
@@ -57,6 +59,7 @@ let beforeInstallUpdate: (() => void | Promise<void>) | null = null
 let beforeInstallUpdatePromise: Promise<void> | null = null
 let backgroundCheckTimer: NodeJS.Timeout | null = null
 let backgroundCheckPromise: Promise<void> | null = null
+let lastBackgroundNotification: string | undefined
 let guiUpdateCheckPromise: Promise<GuiUpdateInfo> | null = null
 let guiUpdateCheckChannel: GuiUpdateChannel | null = null
 let onBackgroundUpdateAvailable: ((info: Extract<GuiUpdateInfo, { ok: true }>) => void) | null = null
@@ -488,6 +491,7 @@ function clearBackgroundCheckTimer(): void {
 
 function shouldSkipScheduledCheck(): boolean {
   return (
+    downloaded ||
     lastState.status === 'checking' ||
     lastState.status === 'downloading' ||
     lastState.status === 'downloaded' ||
@@ -495,10 +499,10 @@ function shouldSkipScheduledCheck(): boolean {
   )
 }
 
-async function scheduleNextBackgroundCheck(): Promise<void> {
+async function scheduleNextBackgroundCheck(minimumDelayMs = 0): Promise<void> {
   clearBackgroundCheckTimer()
   const lastCheckedAtMs = await readLastScheduledCheckAt()
-  const delay = nextGuiUpdateCheckDelay(lastCheckedAtMs)
+  const delay = Math.max(minimumDelayMs, nextGuiUpdateCheckDelay(lastCheckedAtMs))
   backgroundCheckTimer = setTimeout(() => {
     void runScheduledGuiUpdateCheck()
   }, delay)
@@ -512,12 +516,19 @@ async function runScheduledGuiUpdateCheck(): Promise<void> {
       const nowMs = Date.now()
       await writeLastScheduledCheckAt(nowMs)
       const info = await checkGuiUpdate()
-      if (info.ok && info.hasUpdate) onBackgroundUpdateAvailable?.(info)
+      if (info.ok && info.hasUpdate && !info.withdrawn && onBackgroundUpdateAvailable) {
+        const notification = `${info.channel}:${info.latestVersion}`
+        if (lastBackgroundNotification !== notification) {
+          lastBackgroundNotification = notification
+          onBackgroundUpdateAvailable(info)
+        }
+      }
     } catch (error) {
       console.warn('[workwise updater] scheduled GUI update check failed:', error)
     } finally {
       backgroundCheckPromise = null
-      void scheduleNextBackgroundCheck()
+      // A blocked check or unwritable timestamp must not schedule an immediate loop.
+      void scheduleNextBackgroundCheck(GUI_UPDATE_CHECK_INTERVAL_MS)
     }
   })()
   return backgroundCheckPromise
@@ -984,10 +995,6 @@ export async function downloadGuiUpdate(channel?: GuiUpdateChannel): Promise<Gui
   }
 }
 
-function shouldInstallSilently(platform: NodeJS.Platform): boolean {
-  return platform === 'win32'
-}
-
 let installationPromise: Promise<GuiUpdateInstallResult> | undefined
 
 export function installGuiUpdate(): Promise<GuiUpdateInstallResult> {
@@ -1010,12 +1017,15 @@ async function performGuiUpdateInstall(): Promise<GuiUpdateInstallResult> {
         message: 'The update has not finished downloading yet.'
       }
     }
-    emitGuiUpdateState({ status: 'installing', info: lastInfo ?? undefined })
+    const installingInfo = lastInfo
+    emitGuiUpdateState({ status: 'installing', info: installingInfo ?? undefined })
     await runBeforeInstallUpdate()
-    // Assisted NSIS installers are interactive unless isSilent is true. An
-    // in-app update must finish after WorkWise exits without leaving a hidden
-    // installer waiting for input. macOS ignores this parameter.
-    autoUpdater.quitAndInstall(shouldInstallSilently(process.platform), true)
+    if (windowsUpdater) {
+      await windowsUpdater.startVerifiedInstaller(() => downloaded && lastInfo === installingInfo)
+      setImmediate(() => app.quit())
+    } else {
+      autoUpdater.quitAndInstall(false, true)
+    }
     return { ok: true }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
@@ -1038,6 +1048,5 @@ export const _internals = {
   parseScheduledCheckAt,
   resolveWithdrawnVersion,
   validateCandidateVersion,
-  shouldInstallSilently,
   configureUpdaterRequestHeaders
 }

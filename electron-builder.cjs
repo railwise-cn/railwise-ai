@@ -213,6 +213,9 @@ const builderConfig = {
     // Only the core ESM-derived offline bundle in out/ is executed. Exclude
     // upstream browser bundles with their separately embedded dependency copies.
     '!**/node_modules/mermaid/dist/**/*',
+    // Univer is compiled into the lazy renderer assets. Its npm packages also
+    // contains alternate module formats, locales, and standalone SDK builds.
+    '!**/node_modules/@univerjs/**/*',
     // Dependency packages can contain upstream browser-debug logs/reports.
     // Keep these out of both the main bundle and managed runtime below.
     ...dependencyArtifactFilters('**/node_modules/**'),
@@ -234,6 +237,11 @@ const builderConfig = {
     {
       from: 'src/asset/markdown-rendering',
       to: 'third-party/markdown-rendering',
+      filter: ['**/*']
+    },
+    {
+      from: 'src/asset/builtin-integrations',
+      to: 'third-party/builtin-integrations',
       filter: ['**/*']
     },
     {

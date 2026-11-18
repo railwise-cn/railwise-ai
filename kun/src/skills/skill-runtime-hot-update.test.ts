@@ -43,6 +43,42 @@ describe('Skill installation runtime acknowledgement', () => {
     await runtime.updateConfiguration({ enabled: true, roots: [before], legacySkillMd: true, revision: 2 })
     expect(runtime.diagnostics().skills.map(skill => skill.name)).toEqual(['browser-skill'])
   })
+  it('uses the current workspace overlay and rejects a stale exact slash selection', async () => {
+    const global = await skillRoot('report-skill')
+    const workspace = await mkdtemp(join(tmpdir(), 'skill-workspace-'))
+    const otherWorkspace = await mkdtemp(join(tmpdir(), 'skill-workspace-'))
+    roots.push(workspace, otherWorkspace)
+    const scoped = join(workspace, '.agents', 'skills', 'report-skill')
+    const separate = join(workspace, '.agents', 'skills', 'report-skill-long')
+    for (const [path, name] of [[scoped, 'report-skill'], [separate, 'report-skill-long']]) {
+      await mkdir(path, { recursive: true })
+      await writeFile(join(path, 'SKILL.md'), `---\nname: ${name}\n---\nProject instruction.\n`)
+    }
+    const projectRoot = join(workspace, '.agents', 'skills')
+    const runtime = await SkillRuntime.create({
+      enabled: true, roots: [projectRoot, global], legacySkillMd: true,
+      projectRoots: [{ root: projectRoot, workspace }]
+    })
+    await runtime.refreshForWorkspace(workspace)
+    expect(runtime.diagnostics(otherWorkspace).skills).toEqual([
+      expect.objectContaining({ id: 'report-skill', scope: 'global' })
+    ])
+    expect(runtime.diagnostics(workspace).skills).toEqual([
+      expect.objectContaining({ id: 'report-skill', scope: 'project' }),
+      expect.objectContaining({ id: 'report-skill-long', scope: 'project' })
+    ])
+    await expect(runtime.validateSlashSelection('/skill:report-skill-long 写表格', otherWorkspace))
+      .rejects.toMatchObject({ code: 'skill_unavailable' })
+    await expect(runtime.validateSlashSelection('/skill:report-skill-long 写表格', workspace)).resolves.toBeUndefined()
+    expect(runtime.resolveTurn({ workspace, prompt: '/skill:report-skill-long 执行' }).activeSkillIds)
+      .toEqual(['report-skill-long'])
+    await rm(separate, { recursive: true })
+    await expect(runtime.validateSlashSelection('/skill:report-skill-long 执行', workspace))
+      .rejects.toMatchObject({ code: 'skill_unavailable' })
+    expect(() => runtime.resolveTurn({ workspace, prompt: '/skill:report-skill-long 执行' }))
+      .toThrow('Skill "report-skill-long" is unavailable')
+  })
+
   it('clears advertised instructions on explicit disable', async () => {
     const root = await skillRoot('browser-skill')
     const runtime = await SkillRuntime.create({ enabled: true, roots: [root], legacySkillMd: true })

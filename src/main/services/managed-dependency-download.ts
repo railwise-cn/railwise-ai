@@ -29,14 +29,20 @@ function assertSource(value: string): void {
 }
 
 /** Both delivery paths must produce the exact upstream bytes recorded in the application. */
-export async function downloadManagedDependency(asset: ManagedDependency, fetchImpl: typeof fetch = systemFetch): Promise<Buffer> {
+export async function downloadManagedDependency(
+  asset: ManagedDependency,
+  fetchImpl: typeof fetch = systemFetch,
+  { mirrorOnly = false }: { mirrorOnly?: boolean } = {}
+): Promise<Buffer> {
   let lastError: unknown
-  for (const [index, url] of dependencyDownloadUrls(asset).entries()) {
+  const urls = dependencyDownloadUrls(asset)
+  for (const [index, url] of (mirrorOnly ? urls.slice(0, 1) : urls).entries()) {
     try {
       assertSource(url)
-      const response = await fetchImpl(url, { headers: { 'User-Agent': 'RailWise AI' }, redirect: 'follow',
+      const response = await fetchImpl(url, { headers: { 'User-Agent': 'RailWise AI' }, redirect: mirrorOnly ? 'error' : 'follow',
         signal: AbortSignal.timeout(index === 0 ? 90_000 : 120_000) })
       if (!response.ok) throw new Error(`Managed dependency download failed (${response.status}).`)
+      if (mirrorOnly && response.url && response.url !== url) throw new Error('Managed dependency did not come from the RailWise mirror.')
       assertSource(response.url || url)
       const bytes = await readBoundedResponseBuffer(response, asset.size + 1, 'Managed dependency')
       if (bytes.length !== asset.size || createHash('sha256').update(bytes).digest('hex') !== asset.sha256) {

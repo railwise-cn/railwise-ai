@@ -510,6 +510,7 @@ const stopManagedRuntimesForUpdate = createGuiUpdateShutdown(async () => {
     updateRuntimePrepared = true
   }
   await stopManagedRuntimes(true)
+  if (process.platform === 'win32') await disposeManagedBrowserForExit()
 })
 
 async function stopManagedRuntimesForQuit(): Promise<void> {
@@ -1574,12 +1575,13 @@ app.whenReady().then(async () => {
     store,
     mcpConfigService,
     onMcpServersChanged: applyMcpServers,
-    onSkillsChanged: async () => {
+    onSkillsChanged: async (options) => {
       const settings = await store.load()
       const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime') : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
-      await syncManagedSkillCapability(dataDir, settings)
+      await syncManagedSkillCapability(dataDir, settings, options)
       const response = await runtimeRequest(settings, '/v1/runtime/skills/refresh', { method: 'POST' })
       if (!response.ok) throw new Error('技能资料已保存，Runtime 尚未确认加载。请点击刷新技能重试。')
+      return response
     },
     refreshBrowserSkill: async status => {
       const settings = await store.load()

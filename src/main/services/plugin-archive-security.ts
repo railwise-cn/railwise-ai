@@ -95,14 +95,19 @@ export type ExtractPluginArchiveOptionsV1 = {
    * directories. They are never created in the extraction directory.
    */
   allowInternalLinks?: boolean
+  verifiedMirrorPart?: boolean
 }
+
+export const MARKETPLACE_MIRROR_PART_BYTES = 128 * 1024 * 1024
 
 export function inspectPluginArchive(
   buffer: Buffer,
   options: ExtractPluginArchiveOptionsV1 = {}
 ): PluginArchiveInspectionV1 {
-  if (buffer.byteLength > PLUGIN_ARCHIVE_LIMITS.maxArchiveBytes) {
-    resourceLimit('Plugin archive exceeds the 64 MiB download limit.')
+  const maxArchiveBytes = options.verifiedMirrorPart ? MARKETPLACE_MIRROR_PART_BYTES : PLUGIN_ARCHIVE_LIMITS.maxArchiveBytes
+  const maxEntryBytes = options.verifiedMirrorPart ? MARKETPLACE_MIRROR_PART_BYTES : PLUGIN_ARCHIVE_LIMITS.maxEntryBytes
+  if (buffer.byteLength > maxArchiveBytes) {
+    resourceLimit(`Plugin archive exceeds the ${maxArchiveBytes / (1024 * 1024)} MiB download limit.`)
   }
   const eocd = findEndOfCentralDirectory(buffer)
   if (buffer.readUInt16LE(eocd + 4) !== 0 || buffer.readUInt16LE(eocd + 6) !== 0) {
@@ -158,8 +163,8 @@ export function inspectPluginArchive(
     const unixMode = (externalAttributes >>> 16) & 0xffff
     const symbolicLink = (unixMode & 0o170000) === 0o120000
     if (symbolicLink && !options.allowInternalLinks) unsafe(`links are not allowed: ${name}`)
-    if (entryUncompressed > PLUGIN_ARCHIVE_LIMITS.maxEntryBytes) {
-      resourceLimit(`Plugin archive entry exceeds 32 MiB: ${name}`)
+    if (entryUncompressed > maxEntryBytes) {
+      resourceLimit(`Plugin archive entry exceeds ${maxEntryBytes / (1024 * 1024)} MiB: ${name}`)
     }
     if (!normalized.directory && entryUncompressed > 0 && entryCompressed === 0) {
       resourceLimit(`Plugin archive entry has an unsafe compression ratio: ${name}`)
@@ -204,7 +209,7 @@ export async function extractPluginArchive(
 ): Promise<PluginArchiveInspectionV1> {
   const inspection = inspectPluginArchive(buffer, options)
   await mkdir(targetDirectory, { recursive: true, mode: 0o700 })
-  if ((await readdir(targetDirectory)).length > 0) unsafe('extraction target must be empty.')
+  if (!options.verifiedMirrorPart && (await readdir(targetDirectory)).length > 0) unsafe('extraction target must be empty.')
   const archive = await JSZip.loadAsync(buffer, { checkCRC32: true, createFolders: false })
   const entriesByPath = new Map(inspection.entries.map((item) => [item.path, item]))
   const written = new Set<string>()

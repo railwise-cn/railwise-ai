@@ -42,6 +42,7 @@ import { buildMcpToolProviders } from '../adapters/tool/mcp-tool-provider.js'
 import { ManagedMcpRuntime } from '../services/managed-mcp-runtime.js'
 import { buildMemoryToolProviders } from '../adapters/tool/memory-tool-provider.js'
 import { buildAttachmentToolProviders } from '../adapters/tool/attachment-tool-provider.js'
+import { buildSkillResourceToolProvider } from '../adapters/tool/skill-resource-tool-provider.js'
 import { buildFlowToolProviders } from '../adapters/tool/flow-tool-provider.js'
 import { buildDelegationToolProviders } from '../adapters/tool/delegation-tool-provider.js'
 import { buildWebToolProviders } from '../adapters/tool/web-tool-provider.js'
@@ -348,7 +349,8 @@ export async function createKunServeRuntime(
     },
     approvalGate,
     userInputGate,
-    workspaceReferences: workspaceReferenceService
+    workspaceReferences: workspaceReferenceService,
+    validateSkillSelection: (prompt, workspace) => skillRuntime.validateSlashSelection(prompt, workspace)
   })
   const uiActionService = new UiActionService({ sessionStore, turns: turnService })
   await traceRuntimeStartupPhase('usage-carryover', () =>
@@ -608,6 +610,7 @@ export async function createKunServeRuntime(
     ...webProviders.providers,
     ...buildMemoryToolProviders(memoryStore),
     ...buildAttachmentToolProviders(attachmentStore),
+    buildSkillResourceToolProvider(),
     ...buildDocumentDeliveryToolProviders(taskRepository, { contextRuntime: taskContextRuntime, engineeringService,
       observedFeedCollectionContext: (taskId, turnId) => taskController.observedFeedCollectionContext(taskId, turnId) }),
     ...buildManagedArtifactToolProviders(taskController),
@@ -1100,9 +1103,10 @@ export async function createKunServeRuntime(
         ...(visionEvidenceRuntime.reason ? { reason: visionEvidenceRuntime.reason } : {})
       }
     }),
-    skills: async () => {
-      await skillRuntime.refresh()
-      return skillRuntime.diagnostics()
+    skills: async (workspace?: string) => {
+      if (workspace === undefined) await skillRuntime.refresh()
+      else await skillRuntime.refreshForWorkspace(workspace)
+      return skillRuntime.diagnostics(workspace)
     },
     shutdown: async () => {
       // SIGTERM also reaches this path directly, without update preparation.

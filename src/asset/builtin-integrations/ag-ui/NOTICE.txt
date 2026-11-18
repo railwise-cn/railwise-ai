@@ -1,0 +1,3 @@
+RailWise AI bundles @ag-ui/core 1.0.5 for its local task activity displays.
+Upstream source: https://github.com/ag-ui-protocol/ag-ui/releases/tag/release/2026-11-17
+The upstream MIT license is included in LICENSE.

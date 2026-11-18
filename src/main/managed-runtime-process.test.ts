@@ -168,6 +168,38 @@ describe('startManagedRuntimeChild', () => {
     expect(readFileSync(credentialPath)).toEqual(ciphertext)
   })
 
+  it.runIf(process.platform === 'win32')('waits for owned Windows Runtime IPC to close cleanly', async () => {
+    const marker = join(tempRoot!, 'windows-runtime-saved.txt')
+    const script = writeScript('windows-update-stop.js', [
+      "process.on('message', message => {",
+      "  if (message.type !== 'railwise:runtime-shutdown' || message.version !== 1) return",
+      `  require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'saved')`,
+      "  process.exit(0)",
+      "})",
+      "process.send({ type: 'railwise:runtime-shutdown-ready', version: 1 }, error => {",
+      "  if (error) throw error",
+      "  console.log('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }))",
+      "})",
+      "setInterval(() => {}, 1000)"
+    ].join('\n'))
+    const module = await import('./managed-runtime-process')
+    await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
+    await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true, timeoutMs: 3000 })).resolves.toBeUndefined()
+    expect(module.isManagedRuntimeChildRunning()).toBe(false)
+    expect(readFileSync(marker, 'utf8')).toBe('saved')
+  })
+
+  it.runIf(process.platform === 'win32')('retains an owned Windows Runtime when update shutdown support is absent', async () => {
+    const script = writeScript('windows-legacy-runtime.js', [
+      "console.log('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }))",
+      "setInterval(() => {}, 1000)"
+    ].join('\n'))
+    const module = await import('./managed-runtime-process')
+    await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
+    await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true })).rejects.toThrow('Windows 安全退出通道')
+    expect(module.isManagedRuntimeChildRunning()).toBe(true)
+  })
+
   it('keeps a slow clean shutdown alive after update timeout and verifies it on retry', async () => {
     const script = writeScript('slow-update-stop.js', [
       "process.on('SIGTERM', () => setTimeout(() => process.exit(0), 200))",
@@ -907,6 +939,32 @@ describe('syncManagedRuntimeConfig', () => {
     })
   })
 
+  it('keeps empty desktop Skill discovery enabled and honors an explicit disable until requested', async () => {
+    const directory = tempRoot!
+    const configPath = join(directory, 'config.json')
+    const runtime = defaultManagedRuntimeSettings()
+    const settings = createSettings(join(directory, 'kun.js'))
+    const module = await import('./managed-runtime-process')
+    const readConfig = () => JSON.parse(readFileSync(configPath, 'utf8'))
+    const options = { skillRoots: [], mcpConfigPath: join(directory, 'mcp.json') }
+
+    await module.syncManagedRuntimeConfig(directory, runtime, options)
+    const config = readConfig()
+    expect(config.capabilities.skills).toMatchObject({ enabled: true, roots: [] })
+    config.capabilities.skills = { roots: [] }
+    writeFileSync(configPath, JSON.stringify(config))
+    await module.syncManagedRuntimeConfig(directory, runtime, options)
+    expect(readConfig().capabilities.skills.enabled).toBe(true)
+
+    config.capabilities.skills.enabled = false
+    writeFileSync(configPath, JSON.stringify(config))
+    await module.syncManagedRuntimeConfig(directory, runtime, options)
+    await module.syncManagedSkillCapability(directory, settings)
+    expect(readConfig().capabilities.skills.enabled).toBe(false)
+    await module.syncManagedSkillCapability(directory, settings, { enable: true })
+    expect(readConfig().capabilities.skills.enabled).toBe(true)
+  })
+
   it('adds GUI project and configured global skill roots to WorkWise Runtime runtime capabilities', async () => {
     if (!tempRoot) throw new Error('temp root not initialized')
     const configPath = join(tempRoot, 'config.json')
@@ -946,6 +1004,13 @@ describe('syncManagedRuntimeConfig', () => {
       join(codexHome, 'skills'),
       extraRoot
     ]))
+    expect(parsed.capabilities.skills.projectRoots).toContainEqual({
+      root: join(workspaceRoot, '.codex', 'skills'),
+      workspace: workspaceRoot
+    })
+    expect(parsed.capabilities.skills.projectRoots).not.toContainEqual(expect.objectContaining({
+      root: join(codexHome, 'skills')
+    }))
   })
 
   it('writes GUI-managed MCP search settings without removing existing servers', async () => {

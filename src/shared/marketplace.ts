@@ -339,6 +339,7 @@ export type PackageLicenseEvidenceV1 = {
   license: string
   sourceId: string
   path: string
+  sha256?: string
   includeInInstall: true
   required: true
 }
@@ -591,6 +592,10 @@ export type InstalledPackageV1 = PackageProvenanceSnapshotV1 & {
   health: PackageHealthV1
 }
 
+export type PluginActivationReceiptV1 = InstalledPackageV1 & {
+  skillRuntime?: import('./marketplace-skill-readiness').MarketplaceSkillReadiness
+}
+
 export type PackageUpdateResultV1 =
   | {
       status: 'updated'
@@ -609,7 +614,8 @@ export const DIRECT_MIRROR_LICENSE_ALLOWLIST = [
   'Apache-2.0',
   'BSD-2-Clause',
   'BSD-3-Clause',
-  'ISC'
+  'ISC',
+  'MIT AND Apache-2.0 AND CC-BY-4.0'
 ] as const
 
 export type DirectMirrorLicenseV1 = (typeof DIRECT_MIRROR_LICENSE_ALLOWLIST)[number]

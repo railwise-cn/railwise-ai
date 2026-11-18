@@ -1,5 +1,6 @@
 import { requestTaskDetail } from '../store/task-live-store'
 import { useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
+import { openGeneratedWorkspaceFile } from '../lib/generated-file-actions'
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -16,7 +17,7 @@ import {
   resolveKeyboardShortcutBindings,
   type KeyboardShortcutCommandId
 } from '@shared/keyboard-shortcuts'
-import type { DesktopCommand, SkillListItem, WriteKnowledgeSearchResult } from '@shared/workwise-api'
+import type { DesktopCommand, WriteKnowledgeSearchResult } from '@shared/workwise-api'
 import type { AgentProfileV1 } from '@shared/agent-workbench'
 import type { ClipboardImageReadResult } from '@shared/workspace-file'
 import type { AttachmentReference, ChatBlock } from '../agent/types'
@@ -31,6 +32,7 @@ import {
   extractLatestTurnDevPreviewUrls
 } from '../lib/dev-preview-detection'
 import { Sidebar } from './chat/Sidebar'
+import { ReleaseHighlights } from './ReleaseHighlights'
 import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { MessageTimeline } from './chat/MessageTimeline'
 import { TaskRunStatusBar } from './chat/TaskRunStatusBar'
@@ -50,6 +52,7 @@ import { WriteWorkspaceView } from './write/WriteWorkspaceView'
 import { WriteSidebar } from './write/WriteSidebar'
 import { SddDraftEditorView } from './sdd/SddDraftEditorView'
 import { SidebarTitlebarToggleButton } from './sidebar/SidebarPrimitives'
+import { SidebarUpdateControl } from './sidebar/SidebarUpdateControl'
 import { composeWritePrompt } from '../write/quoted-selection'
 import { useWriteWorkspaceStore } from '../write/write-workspace-store'
 import { isWriteThreadId } from '../write/write-thread-registry'
@@ -88,6 +91,7 @@ import { readFocusModePreference, writeFocusModePreference } from '../lib/focus-
 import { WorkbenchRegistry } from './workbench-registry'
 import { WorkbenchPanelLoader } from './workbench-panel-loader'
 import { isWorkbenchCapabilityAvailable, WorkbenchCapabilityBoundary } from './WorkbenchCapabilityBoundary'
+import { newWorkbookContent, WORKBOOK_SUFFIX } from '@shared/workspace-sheet'
 import { builtinRightPanelLoaders } from './workbench-panel-loaders'
 import {
   createWorkbenchComposerDrafts,
@@ -242,33 +246,6 @@ function sddPlanMatchesPendingTarget(
   if (!plan || !target) return false
   if (plan.id === target.planId) return true
   return buildGuiPlanId(plan.workspaceRoot, plan.relativePath) === target.planId
-}
-
-function mergeSkillCommands(
-  runtimeSkills: CoreRuntimeSkillJson[],
-  localSkills: SkillListItem[]
-): CoreRuntimeSkillJson[] {
-  const merged = new Map<string, CoreRuntimeSkillJson>()
-  for (const skill of localSkills) {
-    merged.set(skill.id, {
-      id: skill.id,
-      name: skill.name,
-      description: skill.description,
-      root: skill.root,
-      legacy: skill.legacy,
-      scope: skill.scope
-    })
-  }
-  for (const skill of runtimeSkills) {
-    const existing = merged.get(skill.id)
-    merged.set(skill.id, existing ? {
-      ...skill,
-      ...existing,
-      triggers: skill.triggers ?? existing.triggers,
-      allowedTools: skill.allowedTools ?? existing.allowedTools
-    } : skill)
-  }
-  return [...merged.values()]
 }
 
 function sddAssistantContextFromBlocks(blocks: ChatBlock[], maxMessages = 10): string {
@@ -438,7 +415,7 @@ export function Workbench(): ReactElement {
   const [composerReasoningEffort, setComposerReasoningEffort] =
     useState<ComposerReasoningEffort>('max')
   const [runtimeInfo, setRuntimeInfo] = useState<CoreRuntimeInfoJson | null>(null)
-  const [runtimeSkills, setRuntimeSkills] = useState<CoreRuntimeSkillJson[]>([])
+  const [skillCatalog, setSkillCatalog] = useState<{ context: string; skills: CoreRuntimeSkillJson[] } | null>(null)
   const [agentProfiles, setAgentProfiles] = useState<AgentProfileV1[]>([])
   const [agentSelectionApplying, setAgentSelectionApplying] = useState(false)
   const [composerAttachments, setComposerAttachments] = useState<AttachmentReference[]>([])
@@ -519,6 +496,16 @@ export function Workbench(): ReactElement {
     workspaceRoot
   ])
   const timelineBlocks = blocks
+  const inlineCapabilityCards = useMemo(() => {
+    // The newest turn remains mounted even when earlier history is folded.
+    const cards = []
+    for (let index = timelineBlocks.length - 1; index >= 0; index -= 1) {
+      const block = timelineBlocks[index]
+      if (block.kind === 'user') break
+      if (block.kind === 'assistant' && block.capabilityCard) cards.push(block.capabilityCard)
+    }
+    return cards
+  }, [timelineBlocks])
   const timelineLiveReasoning = liveReasoning
   const timelineLiveAssistant = liveAssistant
   const devPreviewBlocks = useMemo<ChatBlock[]>(() => {
@@ -553,6 +540,8 @@ export function Workbench(): ReactElement {
     () => threads.find((thread) => thread.id === activeThreadId) ?? null,
     [activeThreadId, threads]
   )
+  const skillCatalogContext = JSON.stringify([activeThreadId, activeSkillWorkspace, runtimeConnection, skillCatalogGeneration])
+  const runtimeSkills = skillCatalog?.context === skillCatalogContext ? skillCatalog.skills : undefined
   const composerChangeSummary = useMemo(
     () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
     [activeSkillWorkspace, timelineBlocks]
@@ -956,34 +945,25 @@ export function Workbench(): ReactElement {
     const runtimeReady = runtimeConnection === 'ready'
     if (!runtimeReady) setRuntimeInfo(null)
     const provider = getProvider()
-    const localSkillsTask = typeof window !== 'undefined' && typeof window.workwise?.listSkills === 'function'
-      ? window.workwise.listSkills(activeSkillWorkspace || undefined)
-      : Promise.resolve({ ok: true as const, generation: 0, skills: [], validationErrors: [] })
-    void Promise.allSettled([
-      runtimeReady && provider.getRuntimeInfo ? provider.getRuntimeInfo() : Promise.resolve(null),
-      runtimeReady && provider.listSkills ? provider.listSkills() : Promise.resolve([]),
-      localSkillsTask
-    ])
-      .then(([runtimeResult, skillsResult, localSkillsResult]) => {
-        if (cancelled) return
-        setRuntimeInfo(runtimeResult.status === 'fulfilled' ? runtimeResult.value : null)
-        const runtimeSkillList = skillsResult.status === 'fulfilled' ? skillsResult.value : []
-        const localSkillList =
-          localSkillsResult.status === 'fulfilled' && localSkillsResult.value.ok
-            ? localSkillsResult.value.skills
-            : []
-        setRuntimeSkills(mergeSkillCommands(runtimeSkillList, localSkillList))
+    if (runtimeReady) {
+      void provider.getRuntimeInfo?.().then(info => {
+        if (!cancelled) setRuntimeInfo(info)
+      }).catch(() => {
+        if (!cancelled) setRuntimeInfo(null)
       })
-      .catch(() => {
-        if (!cancelled) {
-          if (!runtimeReady) setRuntimeInfo(null)
-          setRuntimeSkills([])
-        }
-      })
+    }
+    const loadSkills = runtimeReady && provider.listSkills
+      ? provider.listSkills({ threadId: activeThreadId ?? undefined, workspace: activeSkillWorkspace })
+      : Promise.resolve([])
+    void loadSkills.then(skills => {
+      if (!cancelled) setSkillCatalog({ context: skillCatalogContext, skills })
+    }).catch(() => {
+      if (!cancelled) setSkillCatalog({ context: skillCatalogContext, skills: [] })
+    })
     return () => {
       cancelled = true
     }
-  }, [activeSkillWorkspace, runtimeConnection, skillCatalogGeneration])
+  }, [activeSkillWorkspace, activeThreadId, runtimeConnection, skillCatalogContext])
 
   const attachmentUploadEnabled = isChatAttachmentUploadEnabled({
     runtimeConnection,
@@ -2009,6 +1989,41 @@ export function Workbench(): ReactElement {
     }
   }
 
+  const createLocalWorkbook = async (): Promise<void> => {
+    const root = normalizeWorkspaceRoot(workspaceRoot)
+    if (!root) return
+    const name = t('untitledWorkbook')
+    const path = `${name}-${crypto.randomUUID().slice(0, 8)}${WORKBOOK_SUFFIX}`
+    try {
+      const result = await window.workwise.saveWorkbook({
+        workspaceRoot: root,
+        path,
+        expectedSha256: null,
+        content: newWorkbookContent(name)
+      })
+      if (!result.ok) throw new Error(result.message)
+      setFilePreviewTarget({ workspaceRoot: root, path: result.path })
+      setRightSidebarWidth(width => Math.max(width, 680))
+      setRightPanelMode('file')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  const openLocalWorkbook = async (): Promise<void> => {
+    const root = normalizeWorkspaceRoot(workspaceRoot)
+    if (!root) return
+    try {
+      const result = await window.workwise.pickWorkbook({ workspaceRoot: root })
+      if (result.canceled || !result.path) return
+      setFilePreviewTarget({ workspaceRoot: root, path: result.path })
+      setRightSidebarWidth(width => Math.max(width, 680))
+      setRightPanelMode('file')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   const startNewWriteAssistantConversation = (): void => {
     const writeState = useWriteWorkspaceStore.getState()
     const writeWorkspaceRoot = writeState.workspaceRoot || workspaceRoot
@@ -2230,6 +2245,9 @@ export function Workbench(): ReactElement {
         <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {
         if (/\.html?$/i.test(path) && artifactId) {
           await openWorkspaceArtifact({ taskId: task.id, artifactId })
+        } else if (/\.(?:mp4|m4v|mov)$/i.test(path)) {
+          const result = await openGeneratedWorkspaceFile({ workspaceRoot: task.workspaceRoot, path })
+          if (!result.ok) throw new Error(result.message)
         } else if (/\.(?:md|mdx|markdown)$/i.test(path)) {
           await useWriteWorkspaceStore.getState().openFile(task.workspaceRoot, path)
           setRoute('write')
@@ -2370,6 +2388,7 @@ export function Workbench(): ReactElement {
           route === 'plugins' ? 'px-0' : ''
         }`}
       >
+        <ReleaseHighlights />
         {resolvedWorkbenchViewId ? (
           <WorkbenchCapabilityBoundary
             route={route}
@@ -2462,6 +2481,8 @@ export function Workbench(): ReactElement {
                     sideChatOpen={sidePanel.open}
                     sideChatEnabled={runtimeConnection === 'ready' && Boolean(activeThreadId)}
                     onOpenSideChat={openSideChat}
+                    onNewWorkbook={workspaceRoot ? () => void createLocalWorkbook() : undefined}
+                    onOpenWorkbook={workspaceRoot ? () => void openLocalWorkbook() : undefined}
                   />
                 </div>
               </div>
@@ -2470,6 +2491,7 @@ export function Workbench(): ReactElement {
               threadId={activeThreadId}
               runtimeReady={runtimeConnection === 'ready'}
               onOpenTasks={openTasksView}
+              inlineCapabilityCards={inlineCapabilityCards}
             />
             <MessageTimeline
               viewMode={conversationViewMode}
@@ -2547,6 +2569,7 @@ export function Workbench(): ReactElement {
                 changedFiles={composerChangeSummary?.files}
                 changedFileStats={composerChangeSummary}
                 skillCommands={runtimeSkills}
+                skillsLoading={runtimeConnection === 'ready' && runtimeSkills === undefined}
                 onPickAttachments={(files) => void handlePickAttachments(files)}
                 onPasteClipboardImage={(options) => void handlePasteClipboardImage(options)}
                 onRemoveAttachment={removeComposerAttachment}
@@ -2583,6 +2606,7 @@ export function Workbench(): ReactElement {
 
           </>
         )}
+        {leftSidebarCollapsed ? <SidebarUpdateControl docked /> : null}
       </main>
       {renderRightPanel()}
     </div>

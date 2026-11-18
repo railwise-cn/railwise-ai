@@ -1,4 +1,5 @@
 import { access, mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
@@ -138,6 +139,49 @@ describe('PluginManagementService', () => {
     await expect(readFile(join(target, 'SKILL.md'), 'utf8')).resolves.toBe('# BrowserSkill\n')
     await expect(readFile(join(target, 'LICENSE'), 'utf8')).resolves.toBe('MIT License\n')
     await expect(access(join(target, '.git'))).rejects.toThrow()
+  })
+
+  it('materializes the portable Git archive of a versioned directory link', async () => {
+    const root = await tempRoot('github-git-zip')
+    const repository = join(root, 'repo')
+    await mkdir(join(repository, 'demos'), { recursive: true })
+    await mkdir(join(repository, 'workbench'), { recursive: true })
+    await writeFile(join(repository, 'SKILL.md'), '# Video fixture\n')
+    await writeFile(join(repository, 'LICENSE'), 'Apache-2.0\n')
+    await writeFile(join(repository, 'demos/example.md'), 'Mirror fixture.\n')
+    // A direct index entry works even on Windows where the runner may not
+    // have permission to create a native link in a working copy.
+    await writeFile(join(repository, 'workbench/demosrc'), '../demos')
+    const git = (args: string[]): string => execFileSync('git', args, { cwd: repository, encoding: 'utf8', windowsHide: true }).trim()
+    git(['init', '--quiet'])
+    git(['config', 'core.autocrlf', 'false'])
+    git(['add', 'SKILL.md', 'LICENSE', 'demos'])
+    const object = git(['hash-object', '-w', 'workbench/demosrc'])
+    git(['update-index', '--add', '--cacheinfo', `120000,${object},workbench/demosrc`])
+    git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'Fixture'])
+    const commit = git(['rev-parse', 'HEAD'])
+    const archive = join(root, 'source.zip')
+    git(['archive', '--format=zip', '--prefix=repository/', `--output=${archive}`, commit])
+    const bytes = await readFile(archive)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(bytes))))
+
+    const target = join(root, 'prepared')
+    await materializeGithubArchive('Owner', 'Repo', commit, target)
+    await expect(readFile(join(target, 'workbench/demosrc/example.md'), 'utf8')).resolves.toBe('Mirror fixture.\n')
+    await expect(access(join(target, '.git'))).rejects.toThrow()
+  })
+
+  it('rejects archive links that could read content outside the pinned repository root', async () => {
+    const root = await tempRoot('github-repository-root')
+    const archive = new JSZip()
+    archive.file('repository/LICENSE', 'MIT License\n')
+    archive.file('repository/SKILL.md', '../outside.md', { unixPermissions: 0o120777 })
+    archive.file('outside.md', 'An unrelated file')
+    const bytes = await archive.generateAsync({ type: 'nodebuffer', platform: 'UNIX' })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(bytes))))
+    await expect(materializeGithubArchive('Owner', 'Repo', 'a'.repeat(40), join(root, 'prepared')))
+      .rejects.toThrow('exactly one repository root')
+    await expect(access(join(root, 'prepared'))).rejects.toThrow()
   })
 
   it('prepares catalog packages through the same private review transaction', async () => {

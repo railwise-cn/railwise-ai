@@ -35,6 +35,13 @@ describe('plugin marketplace localization fallbacks', () => {
     )).toContain('OAuth client ID')
   })
 
+  it('gives a distinct recovery for a missing, unreachable or damaged first-party package', () => {
+    expect(friendlyMarketplaceError('TypeError: fetch failed', missing, 'railwise')).toContain('www.railwise.cn')
+    expect(friendlyMarketplaceError('当前版本没有此插件的睿威官方镜像，请检查应用更新。', missing)).toContain('Check for an app update')
+    expect(friendlyMarketplaceError('RailWise marketplace archive failed size or SHA-256 verification.', missing))
+      .toContain('Existing installations remain available')
+  })
+
   it('keeps installed CLIs visible when login or a health check needs attention', () => {
     expect(managedToolStatusIsInstalled({ id: 'lark-cli', state: 'needs_login' })).toBe(true)
     expect(managedToolStatusIsInstalled({

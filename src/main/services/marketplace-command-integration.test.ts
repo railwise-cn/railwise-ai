@@ -1,11 +1,12 @@
 import { access, chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
+import JSZip from 'jszip'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { CatalogSourceV1, MarketplacePackageV1 } from '../../shared/marketplace'
 import { MarketplaceCatalogService } from './marketplace-catalog-service'
 import { getOfficialMarketplaceCatalog } from './official-marketplace-catalog'
-import { materializeCatalogPackage } from './plugin-management-service'
+import { materializeCatalogUpstreamForMirror as materializeCatalogPackage } from './plugin-management-service'
 
 const roots: string[] = []
 const originalEnvironment = { ...process.env }
@@ -110,7 +111,7 @@ throw new Error('Unexpected npm arguments: ' + args.join(' '))`)
       .resolves.toBeUndefined()
   })
 
-  it('materializes a pinned GitHub Skill through git on a minimal PATH', async () => {
+  it.runIf(!process.versions.electron)('materializes a pinned GitHub Skill through git on a minimal PATH', async () => {
     const root = await tempRoot()
     const tools = join(root, 'tools')
     const target = join(root, 'github-package')
@@ -120,21 +121,19 @@ throw new Error('Unexpected npm arguments: ' + args.join(' '))`)
     }
     process.env.PATH = tools
     process.env.WORKWISE_TEST_COMMIT = item.source.resolvedRef
-    process.env.WORKWISE_TEST_SUBPATH = item.source.subpath
+    const archive = new JSZip().file('repository/LICENSE', 'MIT fixture').file(`repository/${item.source.subpath}/SKILL.md`, '# Chart visualization fixture\n')
+    process.env.WORKWISE_TEST_ARCHIVE = join(root, 'source.zip')
+    await writeFile(process.env.WORKWISE_TEST_ARCHIVE, await archive.generateAsync({ type: 'nodebuffer' }))
     await fakeTool(tools, 'git', String.raw`
 const fs = require('node:fs')
-const path = require('node:path')
 const args = process.argv.slice(2)
-if (args[0] === 'clone') {
-  const target = args[args.length - 1]
-  const payload = path.join(target, ...process.env.WORKWISE_TEST_SUBPATH.split('/'))
-  fs.mkdirSync(path.join(target, '.git'), { recursive: true })
-  fs.mkdirSync(payload, { recursive: true })
-  fs.writeFileSync(path.join(target, 'LICENSE'), 'MIT fixture')
-  fs.writeFileSync(path.join(payload, 'SKILL.md'), '# Chart visualization fixture\n')
-  process.exit(0)
+switch (args[0]) {
+  case 'init': fs.mkdirSync(args.at(-1), { recursive: true }); break
+  case 'fetch': if (args.at(-1) !== process.env.WORKWISE_TEST_COMMIT) process.exit(1); break
+  case 'rev-parse': process.stdout.write(process.env.WORKWISE_TEST_COMMIT + '\n'); break
+  case 'archive': fs.copyFileSync(process.env.WORKWISE_TEST_ARCHIVE, args.find(arg => arg.startsWith('--output=')).slice(9)); break
+  default: process.exit(1)
 }
-if (args[0] === 'rev-parse') process.stdout.write(process.env.WORKWISE_TEST_COMMIT + '\n')
 process.exit(0)`)
 
     await materializeCatalogPackage(item, target)
@@ -192,5 +191,87 @@ process.exit(0)`)
     expect(result.snapshot?.revision).toBe(commit)
     expect((await service.getSnapshot(sourceId))?.packages.map((item) => item.id))
       .toEqual(['fixture-package'])
+  })
+})
+
+const describeWindows = process.platform === 'win32' ? describe : describe.skip
+
+describeWindows('Windows marketplace npm installation', () => {
+  async function windowsNpmFixture(matchesIntegrity = true) {
+    const root = await tempRoot()
+    const tools = join(root, '工具路径 with spaces')
+    const npmBin = join(tools, 'node_modules', 'npm', 'bin')
+    const target = join(root, '安装目录 with spaces')
+    const cmdMarker = join(root, 'npm-cmd-started.txt')
+    const invocationLog = join(root, 'npm-invocations.jsonl')
+    const item = officialPackage('context7-mcp')
+    if (item.source.kind !== 'npm') throw new Error('Expected an npm fixture.')
+    const packageName = item.source.packageName
+    const spec = `${packageName}@${item.source.version}`
+    process.env.PATH = [tools, dirname(process.execPath)].join(delimiter)
+    process.env.WORKWISE_TEST_PACKAGE_NAME = packageName
+    process.env.WORKWISE_TEST_INTEGRITY = matchesIntegrity
+      ? item.source.digest.value
+      : `sha512-${Buffer.alloc(64).toString('base64')}`
+    process.env.WORKWISE_TEST_NPM_CMD_MARKER = cmdMarker
+    process.env.WORKWISE_TEST_NPM_INVOCATIONS = invocationLog
+
+    await mkdir(npmBin, { recursive: true })
+    await writeFile(join(tools, 'npm.cmd'), '@echo off\r\necho unexpected>"%WORKWISE_TEST_NPM_CMD_MARKER%"\r\nexit /b 27\r\n')
+    await writeFile(join(npmBin, 'npm-cli.js'), String.raw`
+const fs = require('node:fs')
+const path = require('node:path')
+const args = process.argv.slice(2)
+const packageName = process.env.WORKWISE_TEST_PACKAGE_NAME
+fs.appendFileSync(process.env.WORKWISE_TEST_NPM_INVOCATIONS, JSON.stringify({ args, cwd: process.cwd() }) + '\n')
+if (args[0] === 'view') {
+  process.stdout.write(JSON.stringify(process.env.WORKWISE_TEST_INTEGRITY))
+} else if (args[0] === 'install') {
+  const packageRoot = path.join(process.cwd(), 'node_modules', ...packageName.split('/'))
+  fs.mkdirSync(packageRoot, { recursive: true })
+  fs.writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({ name: packageName }))
+  fs.writeFileSync(path.join(packageRoot, 'LICENSE'), 'MIT fixture')
+} else {
+  throw new Error('Unexpected npm command: ' + args[0])
+}
+`)
+
+    return {
+      item, target, packageName, spec, cmdMarker,
+      async readInvocations(): Promise<Array<{ args: string[]; cwd: string }>> {
+        return (await readFile(invocationLog, 'utf8')).trim().split('\n').map((line) => JSON.parse(line))
+      }
+    }
+  }
+
+  it('checks the pinned npm integrity and installs without launching the .cmd wrapper', async () => {
+    const fixture = await windowsNpmFixture()
+
+    await materializeCatalogPackage(fixture.item, fixture.target)
+
+    expect(await fixture.readInvocations()).toEqual([
+      { args: ['view', fixture.spec, 'dist.integrity', '--json'], cwd: expect.any(String) },
+      {
+        args: ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--save-exact', '--package-lock=true', fixture.spec],
+        cwd: fixture.target
+      }
+    ])
+    expect(await readFile(join(fixture.target, 'LICENSE'), 'utf8')).toBe('MIT fixture')
+    expect(JSON.parse(await readFile(join(fixture.target, 'node_modules', ...fixture.packageName.split('/'), 'package.json'), 'utf8')))
+      .toEqual({ name: fixture.packageName })
+    await expect(access(fixture.cmdMarker)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('stops before installation when the Windows npm integrity mismatches', async () => {
+    const fixture = await windowsNpmFixture(false)
+
+    await expect(materializeCatalogPackage(fixture.item, fixture.target))
+      .rejects.toThrow('npm registry integrity does not match the trusted catalog snapshot.')
+
+    expect(await fixture.readInvocations()).toEqual([
+      { args: ['view', fixture.spec, 'dist.integrity', '--json'], cwd: expect.any(String) }
+    ])
+    await expect(access(fixture.target)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(access(fixture.cmdMarker)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

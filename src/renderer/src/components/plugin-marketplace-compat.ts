@@ -235,8 +235,21 @@ export function marketplaceText(t: (key: string) => string, key: string, fallbac
   return value && value !== key ? value : MARKETPLACE_TEXT_FALLBACKS[key] ?? fallback
 }
 
-export function friendlyMarketplaceError(message: string, t: (key: string) => string): string {
+export function friendlyMarketplaceError(
+  message: string,
+  t: (key: string) => string,
+  delivery?: 'builtin' | 'railwise' | 'external' | 'upstream'
+): string {
   const normalized = message.trim()
+  if (/没有此插件的睿威官方镜像|mirror is not available for this platform/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorMirrorMissing', 'This version has no RailWise package for this system. Check for an app update.')
+  }
+  if (/RailWise marketplace archive failed.*verification/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorMirrorIntegrity', 'The RailWise download did not pass verification. Retry from the marketplace. Existing installations remain available.')
+  }
+  if (delivery === 'railwise' && /marketplace download failed|fetch failed|network|ENOTFOUND|ECONNRESET|ETIMEDOUT|TimeoutError/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorMirrorNetwork', 'The RailWise download is currently unreachable. Check access to www.railwise.cn and retry from the marketplace. Existing installations remain available.')
+  }
   if (/Unsafe Skill package:.*file exceeds/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorUnsafeSkillTooLarge', 'Skill package contains an oversized file.')
   }
@@ -252,6 +265,12 @@ export function friendlyMarketplaceError(message: string, t: (key: string) => st
   }
   if (/OAuth client ID is missing and dynamic registration is unavailable/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorOAuthClient', MARKETPLACE_TEXT_FALLBACKS.pluginErrorOAuthClient)
+  }
+  if (/Windows Node\.js with npm was not found/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorMissingWindowsNpm', 'Install Node.js with npm on Windows, restart the app and try this package again.')
+  }
+  if (/spawn EINVAL/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorWindowsLauncher', 'Windows could not start a required installer command (EINVAL). Check the package requirements and try again.')
   }
   if (/GitHub archive|codeload\.github|raw\.githubusercontent|api\.github|npm (?:view|install)|pypi\.org|files\.pythonhosted/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorPackageNetwork', MARKETPLACE_TEXT_FALLBACKS.pluginErrorPackageNetwork)

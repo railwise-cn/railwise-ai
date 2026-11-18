@@ -12,10 +12,13 @@ type MockUpdater = EventEmitter & {
   checkForUpdates: ReturnType<typeof vi.fn>
   downloadUpdate: ReturnType<typeof vi.fn>
   quitAndInstall: ReturnType<typeof vi.fn>
+  startVerifiedInstaller: ReturnType<typeof vi.fn>
 }
 
+const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
 let updater: MockUpdater
 let nativeUpdater: EventEmitter
+const quitApp = vi.fn()
 
 function createUpdater(): MockUpdater {
   return Object.assign(new EventEmitter(), {
@@ -28,21 +31,25 @@ function createUpdater(): MockUpdater {
     setFeedURL: vi.fn(),
     checkForUpdates: vi.fn(),
     downloadUpdate: vi.fn(),
-    quitAndInstall: vi.fn()
+    quitAndInstall: vi.fn(),
+    startVerifiedInstaller: vi.fn()
   })
 }
 
 beforeEach(() => {
+  Object.defineProperty(process, 'platform', { value: 'darwin' })
   vi.useFakeTimers()
   vi.resetModules()
   updater = createUpdater()
   nativeUpdater = new EventEmitter()
+  quitApp.mockReset()
   vi.doMock('electron', () => ({
     app: {
       isPackaged: true,
       getAppPath: () => '/tmp/workwise-updater-test-app',
       getPath: () => '/tmp/workwise-updater-test-user-data',
-      getVersion: () => '0.1.0'
+      getVersion: () => '0.1.0',
+      quit: quitApp
     },
     autoUpdater: nativeUpdater,
     BrowserWindow: class {}
@@ -51,15 +58,20 @@ beforeEach(() => {
     default: { autoUpdater: updater },
     autoUpdater: updater
   }))
+  vi.doMock('./windows-gui-update', () => ({ WindowsGuiUpdater: class {
+    constructor() { return updater }
+  } }))
 })
 
 afterEach(() => {
+  Object.defineProperty(process, 'platform', platform)
   delete process.env.WORKWISE_WITHDRAWN_STABLE_VERSIONS
   vi.clearAllTimers()
   vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.doUnmock('electron')
   vi.doUnmock('electron-updater')
+  vi.doUnmock('./windows-gui-update')
   vi.resetModules()
 })
 
@@ -137,10 +149,30 @@ describe('installGuiUpdate', () => {
     } finally { if (previous === undefined) delete process.env.WORKWISE_ALLOW_UNSIGNED_UPDATES; else process.env.WORKWISE_ALLOW_UNSIGNED_UPDATES = previous }
   })
 
-  it('uses silent replacement only for the assisted Windows installer', async () => {
+  it('keeps a failed Windows handoff visible and quits only after an acknowledged retry', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' })
     const module = await import('./gui-updater')
-    expect(module._internals.shouldInstallSilently('win32')).toBe(true)
-    expect(module._internals.shouldInstallSilently('darwin')).toBe(false)
+    let acceptHandoff: () => void = () => { throw new Error('installer not prepared') }
+    updater.startVerifiedInstaller
+      .mockRejectedValueOnce(new Error('installer could not start'))
+      .mockImplementationOnce(() => new Promise<void>(resolve => { acceptHandoff = resolve }))
+    module.initializeGuiUpdater(() => null, () => 'stable', async () => undefined)
+    updater.emit('update-downloaded', { version: '0.2.0' })
+
+    await expect(module.installGuiUpdate()).resolves.toMatchObject({ ok: false, message: 'installer could not start' })
+    expect(module.getGuiUpdateState()).toMatchObject({ status: 'error', info: { downloaded: true } })
+    expect(quitApp).not.toHaveBeenCalled()
+
+    const installation = module.installGuiUpdate()
+    expect(module.installGuiUpdate()).toBe(installation)
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+    expect(updater.startVerifiedInstaller).toHaveBeenCalledTimes(2)
+    expect(quitApp).not.toHaveBeenCalled()
+    acceptHandoff()
+    await expect(installation).resolves.toEqual({ ok: true })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(quitApp).toHaveBeenCalledOnce()
+    expect(updater.quitAndInstall).not.toHaveBeenCalled()
   })
 })
 

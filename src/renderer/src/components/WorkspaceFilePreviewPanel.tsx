@@ -15,6 +15,8 @@ import {
   PanelRightClose
 } from 'lucide-react'
 import {
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -22,6 +24,7 @@ import {
   type ReactElement
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { WORKBOOK_SUFFIX } from '@shared/workspace-sheet'
 import { formatFilePathForDisplay } from '../lib/diff-stats'
 import { openWorkspacePathInEditor } from '../lib/open-workspace-path'
 import { languageFromFilePath } from '../lib/code-highlighting'
@@ -39,6 +42,7 @@ type Props = {
 }
 
 const COPY_RESET_MS = 1400
+const Spreadsheet = lazy(() => import('./WorkspaceSpreadsheet').then(module => ({ default: module.WorkspaceSpreadsheet })))
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -77,6 +81,7 @@ export function WorkspaceFilePreviewPanel({
   onClose
 }: Props): ReactElement {
   const { t } = useTranslation('common')
+  const isSpreadsheet = target?.path.toLowerCase().endsWith(WORKBOOK_SUFFIX) || /\.xlsx$/i.test(target?.path ?? '')
   const [result, setResult] = useState<WorkspaceFileReadResult | null>(null)
   const [richResult, setRichResult] = useState<WorkspacePreviewResultV1 | null>(null)
   const [loading, setLoading] = useState(false)
@@ -99,7 +104,7 @@ export function WorkspaceFilePreviewPanel({
   }
 
   useEffect(() => {
-    if (!target) {
+    if (!target || isSpreadsheet) {
       setResult(null)
       setRichResult(null)
       setLoading(false)
@@ -149,7 +154,7 @@ export function WorkspaceFilePreviewPanel({
       cancelled = true
       cancelActiveParse()
     }
-  }, [target, workspaceRoot])
+  }, [target, workspaceRoot, isSpreadsheet])
 
   useEffect(
     () => () => {
@@ -351,6 +356,17 @@ export function WorkspaceFilePreviewPanel({
               {t('filePreviewEmpty')}
             </div>
           </div>
+        ) : isSpreadsheet ? (
+          <Suspense fallback={<p className="px-3 py-2 text-xs text-ds-muted">{t('filePreviewLoading')}</p>}>
+            <Spreadsheet
+              key={`${target.workspaceRoot ?? workspaceRoot}:${target.path}`}
+              target={{ workspaceRoot: target.workspaceRoot ?? workspaceRoot, path: target.path }}
+              displayName={currentFileName}
+              onOpenSystem={/\.xlsx$/i.test(target.path) ? () => {
+                void window.workwise.openWorkspaceFile({ path: target.path, workspaceRoot: target.workspaceRoot ?? workspaceRoot })
+              } : undefined}
+            />
+          </Suspense>
         ) : loading ? (
           <div className="flex flex-1 items-center justify-center gap-2 text-[12px] text-ds-muted">
             <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.8} />

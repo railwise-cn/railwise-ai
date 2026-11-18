@@ -2,9 +2,13 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import JSZip from 'jszip'
+import type { McpServerConfigV2 } from '../../shared/agent-workbench'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { InstalledPackageV1, MarketplacePackageV1 } from '../../shared/marketplace'
-import { activatePluginPackage } from './plugin-activation-service'
+import { activatePluginPackage, verifiedMirroredNpmMcp } from './plugin-activation-service'
+import { MARKETPLACE_MIRROR_RECEIPT, materializeMarketplaceMirror, type MirroredPackage } from './marketplace-mirror'
+import { inspectPackageDirectory, marketplacePackageReviewSha256 } from './package-installation-service'
 
 const roots: string[] = []
 
@@ -137,6 +141,46 @@ describe('activatePluginPackage', () => {
         enabled: true
       })
     }))
+  })
+
+  it('permits the packaged Node runtime only for the exact sealed mirror, scope and launch', async () => {
+    const { item, installed } = await fixture()
+    item.source.catalogSourceId = 'workwise-official'
+    installed.reviewSha256 = marketplacePackageReviewSha256(item)
+    const directory = await mkdtemp(join(tmpdir(), 'railwise-verified-mcp-'))
+    roots.push(directory)
+    const zip = new JSZip()
+    zip.file('node_modules/@example/server/package.json', JSON.stringify({ bin: { 'example-mcp': 'dist/server.js' } }))
+    zip.file('node_modules/@example/server/dist/server.js', 'console.log("verified")\n')
+    const bytes = await zip.generateAsync({ type: 'nodebuffer' })
+    const record: MirroredPackage = {
+      packageId: item.id,
+      reviewSha256: installed.reviewSha256,
+      platform: process.platform,
+      arch: process.arch,
+      parts: [{ sha256: createHash('sha256').update(bytes).digest('hex'), size: bytes.length }]
+    }
+    await materializeMarketplaceMirror(item, record, directory, async () => new Response(new Uint8Array(bytes)))
+    const sealed = await inspectPackageDirectory(directory)
+    installed.artifact = { location: directory, sha256: sealed.sha256, fileCount: sealed.fileCount, totalBytes: sealed.totalBytes }
+    const entry = await realpath(join(directory, 'node_modules/@example/server/dist/server.js'))
+    const server: McpServerConfigV2 = {
+      id: 'example-mcp', name: 'Example MCP', source: 'managed-tool', transport: 'stdio',
+      scope: 'workspace', workspaceRoot: '/tmp/workspace', command: process.platform === 'win32' ? 'node.exe' : 'node',
+      args: [entry, '--root', '/tmp/workspace'], enabled: true, revision: 1, timeoutMs: 30_000, toolPolicy: {},
+      credentialEnvironmentVariables: ['EXAMPLE_TOKEN']
+    }
+    const options = { catalog: [item], installed: { get: async () => installed }, mirrorFor: () => record }
+    await expect(verifiedMirroredNpmMcp(server, options)).resolves.toBe(true)
+    await expect(verifiedMirroredNpmMcp({ ...server, source: 'user' }, options)).resolves.toBe(false)
+    await expect(verifiedMirroredNpmMcp({ ...server, workspaceRoot: '/another-project' }, options)).resolves.toBe(false)
+    await expect(verifiedMirroredNpmMcp({ ...server, args: [entry, '--override-configuration'] }, options)).resolves.toBe(false)
+    await expect(verifiedMirroredNpmMcp({ ...server, credentialEnvironmentVariables: ['NODE_OPTIONS'] }, options)).resolves.toBe(false)
+    await writeFile(entry, 'console.log("changed package")\n')
+    await expect(verifiedMirroredNpmMcp(server, options)).resolves.toBe(false)
+    await writeFile(entry, 'console.log("verified")\n')
+    await rm(join(directory, MARKETPLACE_MIRROR_RECEIPT))
+    await expect(verifiedMirroredNpmMcp(server, options)).resolves.toBe(false)
   })
 
   it('keeps the MCP server disabled when a declared permission is denied', async () => {

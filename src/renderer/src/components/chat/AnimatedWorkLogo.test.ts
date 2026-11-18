@@ -75,7 +75,6 @@ describe('AnimatedWorkLogo', () => {
     const html = renderToStaticMarkup(
       createElement(WorkMetaRow, {
         processing: true,
-        stepCount: 3,
         expanded: true,
         onToggle: () => undefined
       })

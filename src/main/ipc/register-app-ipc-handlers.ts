@@ -41,7 +41,7 @@ import type {
 } from '../../shared/gui-update'
 import { isCandidateImProviderConnectionAllowed } from '../candidate-runtime'
 import type { DesignAsset } from '../../shared/design-document'
-import { canonicalizeContainmentRoot, isCanonicalPathContained } from '../services/canonical-containment'
+import { canonicalizeContainmentRoot, isCanonicalPathContained, resolveContainedPath } from '../services/canonical-containment'
 import {
   agentProfileListPayloadSchema,
   agentProfileSavePayloadSchema,
@@ -93,6 +93,7 @@ import {
   scheduleTaskFromTextPayloadSchema,
   shellOpenExternalUrlSchema,
   skillListPayloadSchema,
+  skillRefreshPayloadSchema,
   skillSaveFilePayloadSchema,
   settingsSetPayloadSchema,
   streamIdSchema,
@@ -245,10 +246,17 @@ import { McpConfigService } from '../services/mcp-config-service'
 import { CatalogCredentialService } from '../services/catalog-credential-service'
 import { activatePluginPackage } from '../services/plugin-activation-service'
 import { openVerifiedTaskArtifact } from '../services/task-artifact-open'
+import { openSpreadsheet, saveWorkbook } from '../services/workspace-sheet-service'
+import { MAX_WORKBOOK_BYTES } from '../../shared/workspace-sheet'
 import { TaskArtifactPreviewService } from '../services/task-artifact-preview-service'
 import { MarketplaceCatalogService } from '../services/marketplace-catalog-service'
 import { PluginManagementService } from '../services/plugin-management-service'
-import type { CatalogSourceV1 } from '../../shared/marketplace'
+import type { CatalogSourceV1, InstalledPackageV1 } from '../../shared/marketplace'
+import {
+  declaredMarketplaceSkills,
+  marketplaceSkillReadiness,
+  readMarketplaceSkillSnapshot
+} from '../../shared/marketplace-skill-readiness'
 import type { DocumentEngineId } from '../../shared/agent-workbench'
 import {
   hasLegacyImChannelCredential,
@@ -321,7 +329,7 @@ type RegisterAppIpcHandlersOptions = {
   refreshManagedDingTalkCapabilities?: (status: import('../../shared/managed-dws').ManagedDwsStatus) => Promise<void | { enabled: boolean }>
   setManagedDingTalkEnabled?: (enabled: boolean) => Promise<import('../../shared/managed-dws').ManagedDwsResult>
   onMcpServersChanged?: (snapshot: import('../services/mcp-config-service').McpRuntimeSnapshotV1) => Promise<void>
-  onSkillsChanged?: () => Promise<void>
+  onSkillsChanged?: (options?: { enable: true }) => Promise<RuntimeRequestResult | void>
   refreshBrowserSkill?: (status: import('../../../kun/src/contracts/browser-skill.js').BrowserCapabilityConfig) => Promise<void>
   onRuntimeMcpConfigWritten?: (path: string, content: string) => Promise<void> | void
   showTurnCompleteNotification: (
@@ -719,18 +727,27 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ;(app as typeof app & { once?: typeof app.once }).once?.('before-quit', () => mcpConfigService.dispose())
   let skillCatalogGeneration = 1
 
-  const notifySkillsChanged = async (): Promise<number> => {
-    skillCatalogGeneration += 1
-    getMainWindow()?.webContents.send('skills:changed', skillCatalogGeneration)
-    await options.onSkillsChanged?.()
-    return skillCatalogGeneration
+  const notifySkillsChanged = async (skillOptions?: { enable: true }): Promise<RuntimeRequestResult | void> => {
+    try {
+      return await options.onSkillsChanged?.(skillOptions)
+    } finally {
+      skillCatalogGeneration += 1
+      getMainWindow()?.webContents.send('skills:changed', skillCatalogGeneration)
+    }
   }
 
-  const notifyPluginCapabilitiesChanged = async (mcpChanged: boolean): Promise<void> => {
-    const results = await Promise.allSettled([notifySkillsChanged(), mcpChanged ? notifyMcpServersChanged() : undefined])
-    const errors = results.filter(result => result.status === 'rejected').map(result => result.reason)
+  const notifyPluginCapabilitiesChanged = async (mcpChanged: boolean, installed?: InstalledPackageV1, skillNames?: string[]) => {
+    const [skills, mcp] = await Promise.allSettled([notifySkillsChanged(), mcpChanged ? notifyMcpServersChanged() : undefined])
+    const errors = [
+      ...(skills.status === 'rejected' && skillNames === undefined ? [skills.reason] : []),
+      ...(mcp.status === 'rejected' ? [mcp.reason] : [])
+    ]
     if (errors.length === 1) throw errors[0]
     if (errors.length > 1) throw new AggregateError(errors, '插件已保存，但技能与连接器均未能完成 Runtime 更新。请重试刷新。')
+    if (installed && skillNames !== undefined) {
+      const snapshot = skills.status === 'fulfilled' ? readMarketplaceSkillSnapshot(skills.value, 'state') : undefined
+      return marketplaceSkillReadiness(snapshot, installed.artifact.location, skillNames)
+    }
   }
 
   const loadSkillCatalog = async (workspaceRoot?: string) => {
@@ -970,6 +987,35 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const request = parseIpcPayload('task-artifact:open', z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict(), payload)
     return openVerifiedTaskArtifact(request, { runtimeRequest, openPath: path => shell.openPath(path) })
   })
+  const spreadsheetPath = z.object({ workspaceRoot: z.string().trim().min(1).max(4096), path: z.string().trim().min(1).max(4096) })
+  const spreadsheetArtifact = z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict()
+  ipcMain.handle('spreadsheet:pick', async (_, payload: unknown): Promise<WorkspacePickResult> => {
+    const request = parseIpcPayload('spreadsheet:pick', spreadsheetPath.pick({ workspaceRoot: true }).strict(), payload)
+    const root = await canonicalizeContainmentRoot(request.workspaceRoot)
+    const options: Electron.OpenDialogOptions = {
+      defaultPath: root,
+      properties: ['openFile'],
+      filters: [{ name: 'RailWise / Excel', extensions: ['rwsheet', 'xlsx'] }]
+    }
+    const mainWindow = getMainWindow()
+    const selection = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options)
+    if (selection.canceled || !selection.filePaths[0]) return { canceled: true, path: null }
+    const path = await resolveContainedPath({
+      root, target: selection.filePaths[0], expect: 'file', mustExist: true, rejectFinalLink: true
+    })
+    return { canceled: false, path }
+  })
+  ipcMain.handle('spreadsheet:open', async (_, payload: unknown) => {
+    const request = parseIpcPayload('spreadsheet:open', z.union([spreadsheetPath.strict(), spreadsheetArtifact]), payload)
+    return openSpreadsheet(request, runtimeRequest)
+  })
+  ipcMain.handle('spreadsheet:save', async (_, payload: unknown) => {
+    const request = parseIpcPayload('spreadsheet:save', spreadsheetPath.extend({
+      content: z.string().max(MAX_WORKBOOK_BYTES),
+      expectedSha256: z.string().regex(/^[a-f0-9]{64}$/).nullable()
+    }).strict(), payload)
+    return saveWorkbook(request)
+  })
   ipcMain.handle('task-artifact:preview', async (_, payload: unknown) => {
     const request = parseIpcPayload('task-artifact:preview', z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict(), payload)
     try { return { ok: true, ...await taskArtifactPreview.open(request) } }
@@ -1131,9 +1177,11 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('plugin:install', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:install', pluginInstallPayloadSchema, payload)
     let mcpChanged = false
+    let skillNames: string[] | undefined
     const installed = await pluginManagementService.installPrepared(
       request,
       async (record, item) => {
+        skillNames = declaredMarketplaceSkills(item.components)
         const applied = await activatePluginPackage({
           item,
           installed: record,
@@ -1144,15 +1192,17 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         mcpChanged = applied.mcpChanged
       }
     )
-    await notifyPluginCapabilitiesChanged(mcpChanged)
-    return installed
+    const skillRuntime = await notifyPluginCapabilitiesChanged(mcpChanged, installed, skillNames)
+    return skillRuntime ? { ...installed, skillRuntime } : installed
   })
   ipcMain.handle('plugin:rollback', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:rollback', pluginRollbackPayloadSchema, payload)
     let mcpChanged = false
+    let skillNames: string[] | undefined
     const installed = await pluginManagementService.rollback(
       request,
       async (record, item) => {
+        skillNames = declaredMarketplaceSkills(item.components)
         const applied = await activatePluginPackage({
           item,
           installed: record,
@@ -1163,8 +1213,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         mcpChanged = applied.mcpChanged
       }
     )
-    await notifyPluginCapabilitiesChanged(mcpChanged)
-    return installed
+    const skillRuntime = await notifyPluginCapabilitiesChanged(mcpChanged, installed, skillNames)
+    return skillRuntime ? { ...installed, skillRuntime } : installed
   })
   ipcMain.handle('plugin:update-permissions', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:update-permissions', pluginPermissionsUpdatePayloadSchema, payload)
@@ -1704,8 +1754,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
 
   ipcMain.handle('skill:refresh', async (_, payload: unknown) => {
-    const request = parseIpcPayload('skill:refresh', skillListPayloadSchema, payload)
-    await notifySkillsChanged()
+    const request = parseIpcPayload('skill:refresh', skillRefreshPayloadSchema, payload)
+    await notifySkillsChanged(request.enable ? { enable: true } : undefined)
     return loadSkillCatalog(request.workspaceRoot)
   })
 

@@ -81,6 +81,16 @@ test('installed ASAR inspection reads real archive metadata and rejects the wron
   assert.match(metadata.asarSha256, /^[a-f0-9]{64}$/)
   assert.throws(() => inspectInstalledPackage(directory, { ...identity, sourceHead: 'e'.repeat(40) }), /installed package sourceHead/)
   assert.throws(() => inspectInstalledPackage(directory, { ...identity, productName: 'WorkWise' }), /installed package productName/)
+
+  const upgraded = installIdentity('0.5.6', 'b'.repeat(40))
+  writeFileSync(join(input, 'extra.js'), 'This file shifts package.json within the replacement ASAR.')
+  writeFileSync(join(input, 'package.json'), JSON.stringify({ name: upgraded.packageName, productName: upgraded.productName,
+    version: upgraded.version, buildProvenance: { sourceHead: upgraded.sourceHead } }))
+  await require('@electron/asar').createPackage(input, join(directory, 'resources', 'app.asar'))
+  const afterUpgrade = inspectInstalledPackage(directory, upgraded)
+  assert.equal(afterUpgrade.version, upgraded.version)
+  assert.equal(afterUpgrade.sourceHead, upgraded.sourceHead)
+  assert.notEqual(afterUpgrade.asarSha256, metadata.asarSha256)
 })
 
 test('Windows smoke reports unsigned status honestly and requires full observed installation and cleanup', () => {

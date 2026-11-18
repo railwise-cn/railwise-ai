@@ -197,8 +197,8 @@ const api = {
   updatePluginPermissions: (request) => ipcRenderer.invoke('plugin:update-permissions', request),
   listSkills: (workspaceRoot) =>
     ipcRenderer.invoke('skill:list', { workspaceRoot }),
-  refreshSkills: (workspaceRoot) =>
-    ipcRenderer.invoke('skill:refresh', { workspaceRoot }),
+  refreshSkills: (workspaceRoot, options) =>
+    ipcRenderer.invoke('skill:refresh', { workspaceRoot, enable: options?.enable }),
   onSkillsChanged: (listener) => {
     const wrapped = (_event: Electron.IpcRendererEvent, generation: number): void => listener(generation)
     ipcRenderer.on('skills:changed', wrapped)
@@ -282,6 +282,9 @@ const api = {
   openChatAttachmentOriginal: (managedPath) => ipcRenderer.invoke('attachment:open-original', managedPath),
   cancelDocumentParse: (parseId) => ipcRenderer.invoke('document-engine:cancel', parseId),
   previewWorkspaceFile: (request) => ipcRenderer.invoke('file:preview-workspace', request),
+  openSpreadsheet: (request) => ipcRenderer.invoke('spreadsheet:open', request),
+  pickWorkbook: (request) => ipcRenderer.invoke('spreadsheet:pick', request),
+  saveWorkbook: (request) => ipcRenderer.invoke('spreadsheet:save', request),
   openSkillRoot: (rootPath) =>
     ipcRenderer.invoke('skill:open-root', rootPath),
   getRuntimeConfigFile: () =>

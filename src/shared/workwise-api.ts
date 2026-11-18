@@ -500,12 +500,12 @@ export type WorkWiseApi = {
     workspaceRoot?: string
     permissions: InstalledPackagePermissionV1[]
     idempotencyKey: string
-  }) => Promise<InstalledPackageV1>
+  }) => Promise<import('./marketplace').PluginActivationReceiptV1>
   rollbackPlugin: (request: {
     packageId: string
     expectedCurrentVersion: string
     idempotencyKey: string
-  }) => Promise<InstalledPackageV1>
+  }) => Promise<import('./marketplace').PluginActivationReceiptV1>
   updatePluginPermissions: (request: {
     packageId: string
     expectedCurrentVersion: string
@@ -515,7 +515,7 @@ export type WorkWiseApi = {
     idempotencyKey: string
   }) => Promise<InstalledPackageV1>
   listSkills: (workspaceRoot?: string) => Promise<SkillListResult>
-  refreshSkills: (workspaceRoot?: string) => Promise<SkillListResult>
+  refreshSkills: (workspaceRoot?: string, options?: { enable: true }) => Promise<SkillListResult>
   onSkillsChanged: (listener: (generation: number) => void) => () => void
   saveSkillFile: (rootPath: string, skillName: string, content: string) => Promise<SkillSaveResult>
   installGithubSkill: (rootPath: string, source: GithubSkillSource) => Promise<GithubSkillInstallResult>
@@ -612,6 +612,9 @@ export type WorkWiseApi = {
   }; managedPath: string }>
   cancelChatAttachmentImport: (importId: string) => Promise<boolean>
   openChatAttachmentOriginal: (managedPath: string) => Promise<void>
+  openSpreadsheet: (request: import('./workspace-sheet').SheetFileTarget) => Promise<import('./workspace-sheet').OpenSpreadsheetResult>
+  pickWorkbook: (request: { workspaceRoot: string }) => Promise<WorkspacePickResult>
+  saveWorkbook: (request: import('./workspace-sheet').SaveWorkbookRequest) => Promise<import('./workspace-sheet').SaveWorkbookResult>
   previewWorkspaceFile: (request: {
     workspaceRoot: string
     relativePath: string

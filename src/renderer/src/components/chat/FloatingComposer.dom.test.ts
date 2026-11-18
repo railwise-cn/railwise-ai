@@ -13,14 +13,16 @@ let pageScroll: ReturnType<typeof vi.spyOn>, globalReveal: ReturnType<typeof vi.
 const onAddFileReference = vi.fn()
 const rect = (top: number, height: number): DOMRect => ({ top, bottom: top + height, left: 0, right: 500, width: 500, height, x: 0, y: top, toJSON: () => ({}) })
 const skillCommands = Array.from({ length: 6 }, (_, index) => ({ id: `engineering-${index}`, name: `工程技能 ${index}`, description: '工程资料检查' }))
-function Harness({ menu }: { menu: Menu }) {
-  const [input, setInput] = useState(menu === 'slash' ? '/' : '@工程')
+function Harness({ menu, seed, available, onSend = vi.fn() }: {
+  menu: Menu; seed?: string; available?: typeof skillCommands; onSend?: () => void
+}) {
+  const [input, setInput] = useState(seed ?? (menu === 'slash' ? '/' : '@工程'))
   return createElement(FloatingComposer, {
     input, setInput, mode: 'agent', setMode: vi.fn(), busy: false, runtimeReady: true, hasActiveThread: true,
     composerModel: 'auto', composerPickList: ['auto'], onComposerModelChange: vi.fn(),
-    queuedMessages: [], onRemoveQueuedMessage: vi.fn(), onSend: vi.fn(), onInterrupt: vi.fn(),
+    queuedMessages: [], onRemoveQueuedMessage: vi.fn(), onSend, onInterrupt: vi.fn(),
     fileReferenceEnabled: menu === 'file', onAddFileReference,
-    skillCommands: menu === 'skill' ? skillCommands : []
+    skillCommands: available ?? (menu === 'skill' ? skillCommands : [])
   })
 }
 
@@ -103,6 +105,22 @@ describe('composer keyboard suggestion visibility', () => {
     expect(document.activeElement).toBe(textarea)
     expect(onAddFileReference).not.toHaveBeenCalled()
     expect(rows).toHaveLength(6)
+  })
+
+  it('finds a multi-word skill past the previous 40-item cut and inserts its exact ID without sending', async () => {
+    const onSend = vi.fn()
+    const available = Array.from({ length: 45 }, (_, index) => ({
+      id: `sample-${index}`, name: `Analysis ${index}`, description: 'Analysis'
+    }))
+    available.push({ id: 'vendor-video-shotcraft', name: 'Video Shotcraft', description: '制作和渲染视频' })
+    await act(async () => root.render(createElement(Harness, { menu: 'slash', seed: '/Video Shot', available, onSend })))
+    const textarea = host.querySelector('textarea')!
+    expect(host.querySelector('[role=option]')?.textContent).toContain('Video Shotcraft')
+    expect(textarea.getAttribute('aria-activedescendant')).toEqual(host.querySelector('[role=option]')?.id)
+    await key(textarea, 'Enter')
+    expect(textarea.value).toEqual('/skill:vendor-video-shotcraft ')
+    expect(host.querySelector('[role=listbox]')).toBeNull()
+    expect(onSend).not.toHaveBeenCalled()
   })
 
   it('keeps the existing mouse choice and prevents it from taking textarea focus', async () => {

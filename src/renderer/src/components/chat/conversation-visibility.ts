@@ -1,6 +1,7 @@
 import i18n from '../../i18n'
 import type { ConversationViewMode } from '@shared/app-settings'
 import type { ChatBlock } from '../../agent/types'
+import { operationPhase } from '../../agent/operation-phase'
 
 const SECRET_KEY_PATTERN = /(?:api[-_]?key|authorization|cookie|password|secret|token)/i
 
@@ -30,10 +31,11 @@ function redactUnknown(value: unknown, key = ''): unknown {
 
 function redactBlock(block: ChatBlock, includeDetail: boolean): ChatBlock {
   if (block.kind === 'tool') {
+    const includeOutput = includeDetail || (block.status === 'error' && !block.meta?.outcomeUnknown)
     return {
       ...block,
       summary: includeDetail ? redactRuntimeText(block.summary) : semanticToolSummary(block),
-      ...(includeDetail && block.detail ? { detail: redactRuntimeText(block.detail) } : { detail: undefined }),
+      detail: includeOutput && block.detail ? redactRuntimeText(block.detail) : undefined,
       ...(block.filePath ? { filePath: redactRuntimeText(block.filePath) } : {}),
       meta: { ...(redactUnknown(block.meta) as Record<string, unknown> ?? {}), ...(!includeDetail ? { presentationSummary: semanticToolSummary(block) } : {}) }
     }
@@ -42,7 +44,7 @@ function redactBlock(block: ChatBlock, includeDetail: boolean): ChatBlock {
     return {
       ...block,
       summary: redactRuntimeText(block.summary),
-      ...(includeDetail && block.detail ? { detail: redactRuntimeText(block.detail) } : { detail: undefined })
+      detail: (includeDetail || block.status === 'error') && block.detail ? redactRuntimeText(block.detail) : undefined
     }
   }
   if (block.kind === 'approval') {
@@ -57,7 +59,7 @@ function redactBlock(block: ChatBlock, includeDetail: boolean): ChatBlock {
     return {
       ...block,
       text: redactRuntimeText(block.text),
-      ...(includeDetail && block.detail ? { detail: redactRuntimeText(block.detail) } : { detail: undefined })
+      detail: (includeDetail || block.severity === 'error') && block.detail ? redactRuntimeText(block.detail) : undefined
     }
   }
   return block
@@ -71,7 +73,11 @@ function semanticToolSummary(block: Extract<ChatBlock, { kind: 'tool' }>): strin
   return i18n.t(`common:semanticProgress_${phase}`)
 }
 
-export function isCriticalProcessBlock(block: ChatBlock): boolean {
+export function isPendingProcessControl(block: ChatBlock): boolean {
+  return (block.kind === 'approval' || block.kind === 'user_input') && block.status === 'pending'
+}
+
+function isConciseProcessBlock(block: ChatBlock): boolean {
   if (block.kind === 'approval') return block.status === 'pending' || block.status === 'error'
   if (block.kind === 'user_input') return block.status === 'pending' || block.status === 'error'
   if (block.kind === 'tool' || block.kind === 'compaction') return block.status === 'error'
@@ -81,8 +87,8 @@ export function isCriticalProcessBlock(block: ChatBlock): boolean {
 
 /**
  * Removes private model reasoning in every view. Concise mode keeps only
- * actionable interruptions; standard mode keeps semantic operation summaries;
- * developer mode may include redacted detail.
+ * required controls and interruptions; standard mode adds semantic operation
+ * summaries. Developer mode also includes redacted outputs from normal operations.
  */
 export function visibleProcessBlocksForMode(
   blocks: ChatBlock[],
@@ -91,7 +97,7 @@ export function visibleProcessBlocksForMode(
   const nonPrivate = blocks.filter(
     (block) => block.kind !== 'reasoning' && block.kind !== 'assistant'
   )
-  const selected = mode === 'concise' ? nonPrivate.filter(isCriticalProcessBlock) : nonPrivate
+  const selected = mode === 'concise' ? nonPrivate.filter(isConciseProcessBlock) : nonPrivate
   return selected.map((block) => redactBlock(block, mode === 'developer'))
 }
 
@@ -107,14 +113,7 @@ export function deriveSemanticProgress(blocks: ChatBlock[], processing: boolean)
   const active = [...tools].reverse().find((block) => block.status === 'running')
   const latest = active ?? tools.at(-1)
   if (!latest) return { phase: 'working', operationCount: 0, active: processing }
-  const toolName = typeof latest.meta?.toolName === 'string' ? latest.meta.toolName.toLowerCase() : ''
-  const text = `${toolName} ${latest.summary}`.toLowerCase()
-  let phase: SemanticProgress['phase'] = 'working'
-  if (/test|verify|validate|diagnos|lint|typecheck|build/.test(text)) phase = 'validating'
-  else if (/ppt|slide|image|generate|render|export/.test(text)) phase = 'generating'
-  else if (latest.toolKind === 'file_change' || /write|edit|patch|save/.test(text)) phase = 'editing'
-  else if (/browser|fetch|web|search_query|mcp/.test(text)) phase = 'researching'
-  else if (/read|grep|find|list|\bls\b/.test(text)) phase = 'reading'
-  else if (latest.toolKind === 'command_execution') phase = 'executing'
+  const toolName = typeof latest.meta?.toolName === 'string' ? latest.meta.toolName : ''
+  const phase = operationPhase(`${toolName} ${latest.summary}`, latest.toolKind)
   return { phase, operationCount: tools.length, active: processing || latest.status === 'running' }
 }

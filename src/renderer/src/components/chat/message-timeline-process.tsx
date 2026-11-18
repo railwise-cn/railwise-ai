@@ -118,15 +118,7 @@ export function ProcessSectionRow({
       : []
   const hasDetails = sectionHasDetails(section, t)
   const active = isProcessSectionActive(section, processing)
-  const hasError = section.blocks.some(
-    (block) =>
-      (block.kind === 'tool' && block.status === 'error' && !block.meta?.outcomeUnknown) ||
-      (block.kind === 'approval' && block.status === 'error') ||
-      (block.kind === 'user_input' && block.status === 'error') ||
-      (block.kind === 'system' && block.severity === 'error')
-  )
   const defaultExpanded =
-    hasError ||
     sectionHasPendingApproval(section) ||
     (processing && section.kind === 'execution' && sectionHasRequestUserInput(section))
   const forceExpanded = sectionHasPendingApproval(section)
@@ -137,7 +129,6 @@ export function ProcessSectionRow({
     singleReasoningSection
   })
   const canToggleSection = hasDetails && !forceExpanded
-  const showActiveError = active && hasError
   const { ref: deferredDetailRef, shouldRender: shouldRenderDetail } = useDeferredRender<HTMLDivElement>({
     enabled: expanded,
     immediate: active || section.kind === 'execution',
@@ -176,16 +167,10 @@ export function ProcessSectionRow({
         <button
           type="button"
           onClick={() => setUserExpanded(!(userExpanded ?? defaultExpanded))}
-          className={`group flex w-fit max-w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[14px] font-medium transition hover:opacity-85 ${
-            hasError ? 'text-red-600 dark:text-red-300' : 'text-ds-muted'
-          }`}
+          aria-expanded={expanded}
+          className="group flex w-fit max-w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[14px] font-medium text-ds-muted transition hover:opacity-85"
         >
-          {showActiveError ? (
-            <span className="ds-work-logo-slot ds-work-logo-slot-sm mr-0.5">
-              <span className="h-2 w-2 rounded-full bg-red-500 dark:bg-red-300" />
-            </span>
-          ) : null}
-          <span className={active && !hasError ? 'ds-shiny-text' : ''}>{title}</span>
+          <span className={active ? 'ds-shiny-text' : ''}>{title}</span>
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-45" strokeWidth={1.8} />
           ) : (
@@ -193,17 +178,8 @@ export function ProcessSectionRow({
           )}
         </button>
       ) : (
-        <div
-          className={`flex w-fit max-w-full items-center gap-1.5 py-0.5 text-[14px] font-medium ${
-            hasError ? 'text-red-600 dark:text-red-300' : 'text-ds-muted'
-          }`}
-        >
-          {showActiveError ? (
-            <span className="ds-work-logo-slot ds-work-logo-slot-sm mr-0.5">
-              <span className="h-2 w-2 rounded-full bg-red-500 dark:bg-red-300" />
-            </span>
-          ) : null}
-          <span className={active && !hasError ? 'ds-shiny-text' : ''}>{title}</span>
+        <div className="flex w-fit max-w-full items-center gap-1.5 py-0.5 text-[14px] font-medium text-ds-muted">
+          <span className={active ? 'ds-shiny-text' : ''}>{title}</span>
         </div>
       )}
 
@@ -275,7 +251,7 @@ function ProcessStackRows({
         const autoOpenRequestInput = processing && isRequestUserInputTool(block)
         const autoOpenPending = processBlockIsAutoOpenPending(block, processing) || isPendingApproval(block)
         const forceOpen = autoOpenPending || autoOpenRequestInput
-        const open = canExpand && (processBlockHasError(block) || forceOpen || openBlockId === block.id)
+        const open = canExpand && (forceOpen || openBlockId === block.id)
         const rowActive = processBlockIsActive(block, processing)
         const isError = processBlockHasError(block)
         const canToggle = canExpand && !forceOpen
@@ -294,11 +270,12 @@ function ProcessStackRows({
           <div key={block.id} className="min-w-0">
             <div
               role={canToggle ? 'button' : undefined}
+              aria-expanded={canToggle ? open : undefined}
               tabIndex={canToggle ? 0 : undefined}
               onClick={handleToggle}
               onKeyDown={handleKeyDown}
               className={`group flex w-full min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-[13.5px] leading-6 transition ${
-                isError
+                isError && open
                   ? 'text-red-600 dark:text-red-300'
                   : 'text-ds-faint hover:text-ds-muted'
               } ${canToggle ? 'cursor-pointer hover:bg-ds-hover/45' : 'cursor-default'}`}
@@ -373,11 +350,12 @@ function ProcessEntryRow({
     <div className="flex flex-col">
       <div
         role={canToggle ? 'button' : undefined}
+        aria-expanded={canToggle ? open : undefined}
         tabIndex={canToggle ? 0 : undefined}
         onClick={handleToggle}
         onKeyDown={handleKeyDown}
         className={`group flex w-full items-start gap-2 rounded-md px-2 py-1 text-left text-[13.5px] leading-[1.55] transition ${
-          isError
+          isError && open
             ? 'text-red-600 dark:text-red-300'
             : 'text-ds-faint hover:text-ds-ink'
         } ${

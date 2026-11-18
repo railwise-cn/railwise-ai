@@ -12,6 +12,7 @@ export async function taskCommand(runtime:ServerRuntime,request:Request) {
   try { const result=await runtime.taskCoordinator.command(parsed.data); return jsonResponse(result,result.kind==='snapshot'?200:202) }
   catch(error) {
     const code=(error as {code?:string}).code
+    if(code==='skill_unavailable') return jsonResponse({code,message:(error as Error).message},409)
     if(code==='not_found') return ERRORS.notFound((error as Error).message)
     if(['idempotency_conflict','stale_request','scope_conflict','turn_in_progress','task_intent_required','invalid_state','outcome_unknown'].includes(code??'')) return ERRORS.conflict((error as Error).message)
     throw error

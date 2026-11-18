@@ -2584,7 +2584,7 @@ function acceptanceForPrompt(prompt: string): TaskAcceptance {
     sourceInferenceVersion: TASK_SOURCE_INFERENCE_VERSION,
     ...(requiredFormats ? { requiredFormats: [...requiredFormats] } : {}),
     ...(files ? { minimumArtifacts: 1 } : {}),
-    ...(web ? {requiresWebEvidence:true,requiredSourceOrigins:browserTaskOrigins(prompt), ...(asksForObservedFeedSummary(prompt) ? { webEvidenceBasis: 'observed_feed' as const } : {})} : {}),
+    ...(web ? {requiresWebEvidence:true,requiredSourceOrigins:browserTaskOrigins(prompt, { includeBareWww: true }), ...(asksForObservedFeedSummary(prompt) ? { webEvidenceBasis: 'observed_feed' as const } : {})} : {}),
     requireFinalResponse: true,
     requireActionableArtifactCard: files,
     ...(effect ? { requiresExternalEffects: true } : {}),

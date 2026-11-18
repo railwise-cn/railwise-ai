@@ -662,6 +662,10 @@ export function buildThreadEventSink(
   }
 
   return {
+    onRunActivity: (activity) => {
+      if (!isCurrentStream() || (activity && activity.threadId !== get().activeThreadId)) return
+      set({ runActivity: activity })
+    },
     onConversationItem: (block) => {
       if (!isCurrentStream()) return
       set(state => {

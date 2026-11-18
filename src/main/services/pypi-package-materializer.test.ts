@@ -109,15 +109,16 @@ describe('materializePypiPackage', () => {
       resolvedRef: 'b'.repeat(40)
     }
     packageItem.sources.push(source)
+    const license = Buffer.from('MIT License from immutable source\n')
     packageItem.licenseEvidence = [{
       license: 'MIT',
       sourceId: source.id,
       path: 'LICENSE',
+      sha256: createHash('sha256').update(license).digest('hex'),
       includeInInstall: true,
       required: true
     }]
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const license = Buffer.from('MIT License from immutable source\n')
       const response = new Response(JSON.stringify({
         type: 'file',
         path: 'LICENSE',
@@ -141,6 +142,10 @@ describe('materializePypiPackage', () => {
       expect.objectContaining({ redirect: 'error' })
     )
     expect(await readFile(join(root, 'LICENSE'), 'utf8')).toContain('immutable source')
+    const mismatched = structuredClone(packageItem)
+    mismatched.licenseEvidence[0].sha256 = '0'.repeat(64)
+    await expect(preservePypiLicense(mismatched, root, await wheelWithoutLicense(), fetchMock as typeof fetch))
+      .rejects.toThrow('do not match the reviewed size or SHA-256')
   })
 
   it('verifies the primary wheel, locks every dependency hash, and creates an isolated runtime', async () => {

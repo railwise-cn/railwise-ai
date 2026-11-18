@@ -5,6 +5,7 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { homedir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { z } from 'zod'
 import {
   defaultManagedRuntimeTokenEconomySettings,
   isManagedRuntimeInsecure,
@@ -44,6 +45,10 @@ import { DwsCapabilityConfig } from '../../kun/src/contracts/dws.js'
 import { DingTalkCapabilityConfig } from '../../kun/src/contracts/dingtalk.js'
 import { BrowserCapabilityConfig } from '../../kun/src/contracts/browser-skill.js'
 import { EgoBrowserCapabilityConfig } from '../../kun/src/contracts/ego-browser.js'
+import {
+  isManagedRuntimeShutdownReady,
+  MANAGED_RUNTIME_SHUTDOWN_REQUEST
+} from '../../kun/src/contracts/managed-runtime-ipc.js'
 import { diagnoseEgoBrowser } from './services/managed-ego-browser-service'
 import { getManagedBrowserSkillService } from './services/managed-browser-skill-service'
 import { resolveLarkCliEnvironment } from '../../kun/src/services/lark-cli-environment.js'
@@ -78,6 +83,7 @@ import type { TaskDocumentExportBridge } from './services/task-document-export-s
 
 let child: ChildProcess | null = null
 let lastManagedRuntimeExit: { code: number | null; signal: NodeJS.Signals | null } | undefined
+let ipcShutdownChild: ChildProcess | null = null
 let childLogCapture: RuntimeLogCapture | null = null
 let lastResolvedBinary: string | null = null
 let actualManagedRuntimePort: number | null = null
@@ -577,7 +583,9 @@ export async function startManagedRuntimeChild(
         model: provider.id === runtime.providerId ? runtime.model : provider.models[0] || runtime.model
       })))
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: process.platform === 'win32' && resolution.kind === 'node-script'
+      ? ['ignore', 'pipe', 'pipe', 'ipc']
+      : ['ignore', 'pipe', 'pipe'],
     detached: false,
     workspaceRoot: homeDir
   })
@@ -593,8 +601,18 @@ export async function startManagedRuntimeChild(
   startedLogCapture.logLifecycle(`spawned on port ${runtime.port} using data dir ${dataDir}`)
   startedChild.stdout?.on('data', startedLogCapture.captureStdout)
   startedChild.stderr?.on('data', startedLogCapture.captureStderr)
-  child.on('exit', (code, signal) => {
+  if (startedChild.connected) {
+    const onShutdownReady = (message: unknown): void => {
+      if (child !== startedChild || !isManagedRuntimeShutdownReady(message)) return
+      ipcShutdownChild = startedChild
+      startedChild.removeListener('message', onShutdownReady)
+      startedLogCapture.logLifecycle('Windows Runtime shutdown IPC ready')
+    }
+    startedChild.on('message', onShutdownReady)
+  }
+  startedChild.on('exit', (code, signal) => {
     if (child === startedChild) lastManagedRuntimeExit = { code, signal }
+    if (ipcShutdownChild === startedChild) ipcShutdownChild = null
     void startedExportBridge.close()
     if (documentExportBridge === startedExportBridge) documentExportBridge = null
     startedLogCapture.logLifecycle(
@@ -766,8 +784,14 @@ export async function syncManagedBrowserSkillCapability(dataDir: string, status:
     capabilities: { ...objectValue(existing.capabilities), browserSkill: BrowserCapabilityConfig.parse(status) } }))
 }
 
-export async function syncManagedSkillCapability(dataDir: string, settings: AppSettingsV1): Promise<void> {
-  const managedRoots = (await guiSkillRootsForRuntime(settings)).map(root => root.path)
+export async function syncManagedSkillCapability(
+  dataDir: string,
+  settings: AppSettingsV1,
+  options: { enable?: true } = {}
+): Promise<void> {
+  const discoveredRoots = await guiSkillRootsForRuntime(settings)
+  const managedRoots = discoveredRoots.map(root => root.path)
+  const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
   await updateManagedConnectorConfig(dataDir, existing => {
     const capabilities = objectValue(existing.capabilities)
     const current = objectValue(capabilities.skills)
@@ -775,8 +799,9 @@ export async function syncManagedSkillCapability(dataDir: string, settings: AppS
     const customRoots = stringArrayValue(current.roots).filter(root => !previousManaged.has(root) && !isManagedPluginSkillRoot(root))
     const roots = uniqueStrings([...customRoots, ...managedRoots])
     const skills = SkillsCapabilityConfig.parse({ ...current, roots, managedRoots,
+      projectRoots: projectRoots.length ? projectRoots : undefined,
       revision: Number(current.revision ?? 0) + 1,
-      enabled: current.enabled === false ? false : roots.length > 0 })
+      enabled: options.enable === true || current.enabled !== false })
     return { ...existing, capabilities: { ...capabilities, skills } }
   })
 }
@@ -987,17 +1012,21 @@ async function skillCapabilityConfigForRuntime(
   settings?: AppSettingsV1,
   explicitRoots?: string[]
 ): Promise<Record<string, unknown>> {
+  const discoveredRoots = explicitRoots ? [] : await guiSkillRootsForRuntime(settings)
+  const managedRoots = discoveredRoots.map(root => root.path)
+  const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
   const roots = explicitRoots
     ? uniqueStrings(explicitRoots.map(normalizeSkillRootPath))
     : uniqueStrings([
         ...stringArrayValue(existing.roots).filter(root => !stringArrayValue(existing.managedRoots).includes(root) && !isManagedPluginSkillRoot(root)).map(normalizeSkillRootPath),
-        ...(await guiSkillRootsForRuntime(settings)).map((root) => root.path)
+        ...managedRoots
       ])
   return {
     ...existing,
-    enabled: existing.enabled === false ? false : roots.length > 0 || existing.enabled === true,
+    enabled: existing.enabled !== false,
     roots,
-    managedRoots: explicitRoots ? [] : (await guiSkillRootsForRuntime(settings)).map(root => root.path),
+    managedRoots,
+    projectRoots: projectRoots.length ? projectRoots : undefined,
     legacySkillMd: existing.legacySkillMd === false ? false : true
   }
 }
@@ -1388,7 +1417,11 @@ function sanitizeRuntimeCapabilitiesConfig(value: unknown): Record<string, unkno
   const next: Record<string, unknown> = {}
   if ('mcp' in raw) next.mcp = parseRuntimeConfigSection(McpCapabilityConfig, raw.mcp)
   if ('web' in raw) next.web = parseRuntimeConfigSection(WebCapabilityConfig, raw.web)
-  if ('skills' in raw) next.skills = parseRuntimeConfigSection(SkillsCapabilityConfig, raw.skills)
+  if ('skills' in raw) {
+    // Desktop discovery may start with zero global roots. An absent toggle
+    // leaves it enabled so the selected workspace and later installs can load.
+    next.skills = parseRuntimeConfigSection(SkillsCapabilityConfig.extend({ enabled: z.boolean().optional() }), raw.skills)
+  }
   if ('subagents' in raw) {
     next.subagents = parseRuntimeConfigSection(SubagentsCapabilityConfig, raw.subagents)
   }
@@ -1447,10 +1480,20 @@ export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit
   const pid = child.pid
   const capture = childLogCapture
   if (stoppingChild.exitCode === null && stoppingChild.signalCode === null) {
-    try {
-      stoppingChild.kill('SIGTERM')
-    } catch {
-      /* already gone */
+    if (process.platform === 'win32' && stoppingChild === ipcShutdownChild && stoppingChild.connected) {
+      stoppingChild.send(MANAGED_RUNTIME_SHUTDOWN_REQUEST, (error) => {
+        if (error) capture?.logLifecycle(`shutdown IPC failed: ${error.message}`)
+      })
+    } else {
+      // Windows kill terminates the Runtime without running its save/close handler.
+      if (options.requireCleanExit && process.platform === 'win32') {
+        throw new Error('当前 Runtime 未提供 Windows 安全退出通道，更新包已保留。')
+      }
+      try {
+        stoppingChild.kill('SIGTERM')
+      } catch {
+        /* already gone */
+      }
     }
   }
   const exited = await waitForChildExit(stoppingChild, options.timeoutMs ?? RUNTIME_STOP_GRACE_MS)
@@ -1466,7 +1509,7 @@ export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit
     const forcedExit = await waitForChildExit(stoppingChild, RUNTIME_STOP_FORCE_MS)
     if (!forcedExit) throw new Error('Runtime process exit could not be confirmed.')
   }
-  if (options.requireCleanExit && stoppingChild.exitCode !== 0) {
+  if (options.requireCleanExit && (stoppingChild.exitCode !== 0 || stoppingChild.signalCode !== null)) {
     throw new Error('Runtime 未正常退出，更新已停止。请检查日志后重试。')
   }
   if (child === stoppingChild) child = null

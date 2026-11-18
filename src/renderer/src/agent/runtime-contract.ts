@@ -333,6 +333,7 @@ export type CoreRuntimeSkillJson = {
 }
 
 export type CoreRuntimeSkillsResponseJson = {
+  scope?: 'available'
   enabled?: boolean
   roots?: string[]
   skills?: CoreRuntimeSkillJson[]

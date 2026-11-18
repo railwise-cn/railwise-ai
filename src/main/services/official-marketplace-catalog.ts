@@ -22,6 +22,7 @@ import type {
   UvPackageRuntimeV1
 } from '../../shared/marketplace'
 import { evaluateMarketplaceLicense } from '../../shared/marketplace'
+import { VIDEO_SHOTCRAFT_COMMIT, VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION } from './video-shotcraft-distribution'
 
 const OFFICIAL_CATALOG_SOURCE_ID = 'workwise-official'
 const SHA1_COMMIT = /^[0-9a-f]{40}$/
@@ -519,14 +520,23 @@ function pypiSource(
   }
 }
 
-function mcpServersLicenseSource(
-  commit: string
+const MCP_SERVERS_TRANSITIONAL_LICENSE = 'MIT AND Apache-2.0 AND CC-BY-4.0'
+const MCP_SERVERS_TRANSITIONAL_LICENSE_SHA = '0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a'
+const REDIS_LICENSE_SOURCE = {
+  owner: 'redis', repository: 'mcp-redis', commit: '11e67e44358cd6410d5a7e615a29539ccd71a045',
+  sha256: '8fc61d1149298a3a21da6c56157008ce8a6212a4d75b1fddc29949a00537bef5'
+}
+
+function githubLicenseSource(
+  commit: string,
+  owner = 'modelcontextprotocol',
+  repository = 'servers'
 ): SourceDefinition<GithubPackageSourceV1> {
   return {
     kind: 'github',
-    location: 'https://github.com/modelcontextprotocol/servers',
-    owner: 'modelcontextprotocol',
-    repository: 'servers',
+    location: `https://github.com/${owner}/${repository}`,
+    owner,
+    repository,
     defaultBranch: 'main',
     requestedRef: commit,
     resolvedRef: commit
@@ -774,7 +784,7 @@ const officialPackages: MarketplacePackageV1[] = [
       'https://github.com/modelcontextprotocol',
       true
     ),
-    license: 'MIT',
+    license: MCP_SERVERS_TRANSITIONAL_LICENSE,
     categories: ['system'],
     permissions: [FILESYSTEM_READ_PERMISSION, FILESYSTEM_WRITE_PERMISSION],
     args: ['${workspaceRoot}'],
@@ -791,7 +801,7 @@ const officialPackages: MarketplacePackageV1[] = [
       'https://github.com/modelcontextprotocol',
       true
     ),
-    license: 'MIT',
+    license: MCP_SERVERS_TRANSITIONAL_LICENSE,
     categories: ['knowledge'],
     tier: 'advanced',
     permissions: [FILESYSTEM_READ_PERMISSION, FILESYSTEM_WRITE_PERMISSION],
@@ -808,7 +818,7 @@ const officialPackages: MarketplacePackageV1[] = [
       'https://github.com/modelcontextprotocol',
       true
     ),
-    license: 'MIT',
+    license: MCP_SERVERS_TRANSITIONAL_LICENSE,
     categories: ['agent-workflows'],
     tier: 'advanced',
     licenseEvidenceCommit: '6dd0a683e198783e30feabf7abaf42f925bd18b1'
@@ -1092,7 +1102,8 @@ const officialPackages: MarketplacePackageV1[] = [
     license: 'MIT',
     categories: ['data'],
     permissions: [DATABASE_READ_PERMISSION, DATABASE_WRITE_PERMISSION],
-    auth: { type: 'tool-managed', provider: 'redis-mcp' }
+    auth: { type: 'tool-managed', provider: 'redis-mcp' },
+    licenseEvidenceSource: REDIS_LICENSE_SOURCE
   }),
   npmMcpPackage({
     id: 'mongodb-mcp',
@@ -1213,12 +1224,22 @@ const officialPackages: MarketplacePackageV1[] = [
     publisher: publisher('vincentwei1021', 'Vincent Wei', 'https://github.com/Vincentwei1021/video-shotcraft'),
     owner: 'Vincentwei1021',
     repository: 'video-shotcraft',
-    commit: '1266a3ec4831289c4d893d42dd5102723658039a',
+    commit: VIDEO_SHOTCRAFT_COMMIT,
+    version: VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION,
     skillNames: ['video-shotcraft'],
     license: 'Apache-2.0',
     categories: ['visualization'],
-    usage: { howToUse: '准备好 Node.js 后安装 Skill，给出视频 brief、时长、画幅和镜头要求；它会生成可继续修改的 Remotion 工程和分镜方案。', requirements: ['Node.js'], examples: ['把这份产品 brief 做成 30 秒、节奏同步的镜头表。'] },
-    dependencies: [{ id: 'node', kind: 'runtime', requirement: 'Node.js', optional: false, managedBy: 'user' }]
+    usage: {
+      howToUse: '睿威镜像提供 Apache-2.0 的技能代码与文档，保留上游署名，演示音频、品牌图片和示例媒体需用自有或已授权素材替换。准备好渲染环境后，可在聊天输入 / 选择技能，再说明成片时长、画幅和镜头。',
+      requirements: ['Node.js 和 npm', '具备适用许可的 Remotion 4.0.484', '受支持的 Chromium 浏览器', 'FFmpeg 和 FFprobe'],
+      examples: ['用当前工作区的原创素材制作一段短片，实际渲染成 MP4 并核验。']
+    },
+    dependencies: [
+      { id: 'node', kind: 'runtime', requirement: 'Node.js and npm', optional: false, managedBy: 'user' },
+      { id: 'remotion', kind: 'runtime', requirement: 'remotion and @remotion/cli 4.0.484 under an applicable Remotion license', optional: false, managedBy: 'user' },
+      { id: 'browser', kind: 'system', requirement: 'Supported Chromium executable for Remotion', optional: false, managedBy: 'user' },
+      { id: 'ffmpeg', kind: 'system', requirement: 'FFmpeg and FFprobe', optional: false, managedBy: 'user' }
+    ]
   }),
   githubSkillPackage({
     id: 'diagram-design',
@@ -1285,7 +1306,7 @@ function npmMcpPackage(options: {
     license: options.license,
     source: npmSource(options.artifact),
     additionalSources: options.licenseEvidenceCommit
-      ? [mcpServersLicenseSource(options.licenseEvidenceCommit)]
+      ? [githubLicenseSource(options.licenseEvidenceCommit)]
       : [],
     components: [{
       id: `${options.id}-server`,
@@ -1300,6 +1321,7 @@ function npmMcpPackage(options: {
           license: options.license,
           sourceId: licenseSourceId,
           path: 'LICENSE',
+          sha256: MCP_SERVERS_TRANSITIONAL_LICENSE_SHA,
           includeInInstall: true,
           required: true
         }]
@@ -1323,8 +1345,12 @@ function wheelMcpPackage(options: {
   auth?: MarketplacePackageV1['auth']
   dependencies?: PackageDependencyV1[]
   licenseEvidenceCommit?: string
+  licenseEvidenceSource?: { owner: string; repository: string; commit: string; sha256: string }
 }): MarketplacePackageV1 {
   const licenseSourceId = `${options.id}-source-2`
+  const evidence = options.licenseEvidenceSource
+  const licenseSource = evidence ? githubLicenseSource(evidence.commit, evidence.owner, evidence.repository)
+    : options.licenseEvidenceCommit ? githubLicenseSource(options.licenseEvidenceCommit) : undefined
   return definePackage({
     id: options.id,
     name: options.name,
@@ -1335,9 +1361,7 @@ function wheelMcpPackage(options: {
     publisher: options.publisher,
     license: options.license,
     source: pypiSource(options.artifact),
-    additionalSources: options.licenseEvidenceCommit
-      ? [mcpServersLicenseSource(options.licenseEvidenceCommit)]
-      : [],
+    additionalSources: licenseSource ? [licenseSource] : [],
     components: [{
       id: `${options.id}-server`,
       name: `${options.name} Server`,
@@ -1346,11 +1370,12 @@ function wheelMcpPackage(options: {
     }],
     permissions: options.permissions,
     auth: options.auth ?? { type: 'none' },
-    licenseEvidence: options.licenseEvidenceCommit
+    licenseEvidence: licenseSource
       ? [{
           license: options.license,
           sourceId: licenseSourceId,
           path: 'LICENSE',
+          ...(evidence ? { sha256: evidence.sha256 } : {}),
           includeInInstall: true,
           required: true
         }]
@@ -1483,6 +1508,7 @@ function githubSkillPackage(options: {
   owner: string
   repository: string
   commit: string
+  version?: string
   subpath?: string
   skillNames: string[]
   license: string
@@ -1497,7 +1523,7 @@ function githubSkillPackage(options: {
     tier: 'advanced',
     productType: 'workflow',
     categories: options.categories,
-    version: options.commit,
+    version: options.version ?? options.commit,
     publisher: options.publisher,
     license: options.license,
     source: {
@@ -1609,9 +1635,12 @@ function assertCatalogInvariants(): void {
         }
       }
       if (component.runtime.kind === 'github') {
+        const curatedVideo = item.id === 'video-shotcraft'
+        const expectedVersion = curatedVideo ? VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION : component.runtime.resolvedCommit
         if (source.kind !== 'github' ||
             source.resolvedRef !== component.runtime.resolvedCommit ||
-            item.version !== component.runtime.resolvedCommit) {
+            (curatedVideo && source.resolvedRef !== VIDEO_SHOTCRAFT_COMMIT) ||
+            item.version !== expectedVersion) {
           throw new Error(`${item.id}/${component.id} Git provenance is incoherent.`)
         }
       }

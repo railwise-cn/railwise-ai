@@ -51,6 +51,7 @@ function runtimeErrorCode(payload: RuntimeErrorPayload | null, raw: string): str
   if (/^engineering_plan_execution_failed(?::|$)/.test(lowered)) return 'engineering_plan_execution_failed'
   if (/^engineering_plan_steps_incomplete(?::|$)/.test(lowered)) return 'engineering_plan_steps_incomplete'
   if (/^engineering_plan_binding_missing(?::|$)/.test(lowered)) return 'engineering_plan_binding_missing'
+  if (lowered.startsWith('[skill_unavailable]')) return 'skill_unavailable'
   if (lowered.includes('model_provider_unavailable')) return 'model_provider_unavailable'
   if (lowered.includes('fetch failed')) return 'fetch_failed'
   if (lowered.includes('runtime unhealthy')) return 'runtime_unhealthy'
@@ -127,6 +128,10 @@ function localizedRuntimeSummary(code: string | null, text: string): string | nu
 
   if (code === 'turn_in_progress' || lowered.includes('active turn')) {
     return i18n.t('common:runtimeActiveTurn')
+  }
+
+  if (code === 'skill_unavailable') {
+    return i18n.t('common:slashSkillUnavailable')
   }
 
   if (code === 'runtime_binary_not_installed') {

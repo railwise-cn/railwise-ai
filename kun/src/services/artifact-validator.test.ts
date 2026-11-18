@@ -72,6 +72,35 @@ describe('artifact validator', () => {
     })
   })
 
+  it('requires video metadata, a video track and media data in an MP4 deliverable', async () => {
+    const root = await tempRoot()
+    const path = join(root, 'clip.mp4')
+    const box = (type: string, ...parts: Buffer[]) => {
+      const header = Buffer.alloc(8)
+      header.writeUInt32BE(8 + parts.reduce((total, part) => total + part.length, 0))
+      header.write(type, 4, 'ascii')
+      return Buffer.concat([header, ...parts])
+    }
+    const sampleSizes = Buffer.alloc(12)
+    sampleSizes.writeUInt32BE(1, 8)
+    const container = (handler: string) => Buffer.concat([
+      box('ftyp', Buffer.from('isom0000')),
+      box('mdat', Buffer.from([1, 2, 3, 4])),
+      box('moov', box('trak', box('mdia', box('hdlr', Buffer.from(`00000000${handler}`)),
+        box('minf', box('stbl', box('stsz', sampleSizes))))))
+    ])
+    await writeFile(path, 'storyboard text with an mp4 extension')
+    await expect(validateArtifactFile(path, 'mp4')).resolves.toMatchObject({ valid: false })
+    await writeFile(path, container('soun'))
+    await expect(validateArtifactFile(path, 'mp4')).resolves.toMatchObject({ valid: false })
+    await writeFile(path, container('vide').subarray(0, -1))
+    await expect(validateArtifactFile(path, 'mp4')).resolves.toMatchObject({ valid: false })
+    await writeFile(path, container('vide'))
+    await expect(validateArtifactFile(path, 'mp4')).resolves.toMatchObject({
+      valid: true, format: 'mp4', sha256: expect.stringMatching(/^[a-f0-9]{64}$/)
+    })
+  })
+
   it('checks PDF structure instead of trusting the extension', async () => {
     const root = await tempRoot()
     const validPath = join(root, 'valid.pdf')

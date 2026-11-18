@@ -75,6 +75,16 @@ export type CurrentToolOperation = {
   executionGrantFingerprint: string
 }
 
+/** Snapshot of an activated Skill's admitted directory, supplied by SkillRuntime. */
+export type SkillResourceScope = Readonly<{
+  skillId: string
+  root: string
+  canonicalRoot: string
+  device: number
+  inode: number
+  birthtimeMs: number
+}>
+
 export type ToolHostContext = {
   threadId: string
   turnId: string
@@ -95,6 +105,8 @@ export type ToolHostContext = {
   flowInvocationStack?: string[]
   /** Skill ids activated for this turn, if the Skill runtime is enabled. */
   activeSkillIds?: readonly string[]
+  /** Runtime-owned file scopes resolved with the same Skill instructions as this tool call. */
+  activeSkillResources?: readonly SkillResourceScope[]
   /** Optional memory recall/mutation policy for this turn. */
   memoryPolicy?: {
     enabled: boolean

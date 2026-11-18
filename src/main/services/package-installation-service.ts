@@ -61,6 +61,14 @@ export const MANAGED_PYPI_INSTALL_LIMITS: PackageInstallLimitsV1 = Object.freeze
   maxDepth: 64
 })
 
+const MANAGED_NPM_INSTALL_LIMITS: PackageInstallLimitsV1 = Object.freeze({
+  maxFiles: 30_000,
+  maxEntries: 45_000,
+  maxTotalBytes: 512 * 1024 * 1024,
+  maxFileBytes: 128 * 1024 * 1024,
+  maxDepth: 24
+})
+
 export type PackageTreeInspectionV1 = {
   sha256: string
   fileCount: number
@@ -494,9 +502,11 @@ export function inspectPackageDirectory(
 }
 
 export function packageInstallLimitsForSource(source: PackageSourceV1): PackageInstallLimitsV1 {
-  return source.kind === 'pypi' && source.catalogSourceId === 'workwise-official'
-    ? MANAGED_PYPI_INSTALL_LIMITS
-    : PACKAGE_INSTALL_LIMITS
+  if (source.catalogSourceId === 'workwise-official') {
+    if (source.kind === 'pypi') return MANAGED_PYPI_INSTALL_LIMITS
+    if (source.kind === 'npm') return MANAGED_NPM_INSTALL_LIMITS
+  }
+  return PACKAGE_INSTALL_LIMITS
 }
 
 export function packageInstallLimitsFor(item: MarketplacePackageV1): PackageInstallLimitsV1 {

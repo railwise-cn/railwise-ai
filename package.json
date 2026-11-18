@@ -1,7 +1,7 @@
 {
   "name": "workwise",
   "productName": "RailWise AI",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "AI workbench for engineering, infrastructure, and operations workflows",
   "license": "MIT",
   "engines": {
@@ -63,6 +63,7 @@
     "generate:icons": "node ./scripts/generate-icons.mjs"
   },
   "dependencies": {
+    "@ag-ui/core": "1.0.5",
     "@aws-sdk/client-s3": "^3.1049.0",
     "@aws-sdk/s3-request-presigner": "^3.1101.0",
     "@codemirror/commands": "^6.10.3",
@@ -75,6 +76,8 @@
     "@modelcontextprotocol/sdk": "^1.32.0",
     "@smithy/node-http-handler": "4.7.6",
     "@tencent-weixin/openclaw-weixin": "2.4.3",
+    "@univerjs/preset-sheets-core": "1.5.2",
+    "@univerjs/presets": "1.5.2",
     "@xmldom/xmldom": "^0.9.12",
     "@xyflow/react": "^12.11.2",
     "axios": "^1.20.0",
@@ -103,6 +106,7 @@
     "react-markdown": "^10.1.0",
     "rehype-harden": "^1.1.8",
     "remark-gfm": "^4.0.1",
+    "rxjs": "7.8.2",
     "shiki": "^3.23.0",
     "streamdown": "^2.5.0",
     "typescript": "^5.9.3",

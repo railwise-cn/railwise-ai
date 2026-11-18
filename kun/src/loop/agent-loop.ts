@@ -54,7 +54,7 @@ import { repairModelHistoryItems } from '../domain/model-history-repair.js'
 import type { TurnItem } from '../contracts/items.js'
 import type { ThreadGoal, ThreadTodoList } from '../contracts/threads.js'
 import { modelCapabilitiesForModel, type ContextCompactionConfig } from './model-context-profile.js'
-import type { SkillRuntime } from '../skills/skill-runtime.js'
+import { requestedSlashSkill, type SkillRuntime, type SkillTurnResolution } from '../skills/skill-runtime.js'
 import type { TaskController } from '../services/task-controller.js'
 import type { RuntimeSpanService } from '../services/runtime-span-service.js'
 import type { TaskAttemptOutcome } from '../contracts/tasks.js'
@@ -691,6 +691,10 @@ export class AgentLoop {
         return status
       }
       const raw = error instanceof Error ? error.message : String(error)
+      if ((error as { code?: unknown })?.code === 'skill_unavailable') {
+        await this.failTurn(threadId, turnId, `[skill_unavailable] ${raw}`)
+        return 'failed'
+      }
       // Best-effort enrichment so the renderer can show "what failed where"
       // instead of the bare "RailWise AI turn failed" string. See issue #26.
       const modelInfo = this.opts.model && 'config' in this.opts.model
@@ -835,6 +839,7 @@ export class AgentLoop {
     turnId: string,
     signal: AbortSignal
   ): Promise<TaskAttemptOutcome | { kind: 'checkpoint_waiting' }> {
+    const executionSkills: { resolution?: SkillTurnResolution } = {}
     for (let step = 0; ; step += 1) {
       if (signal.aborted) return { kind: 'cancelled', reason: 'operation_cancelled' }
       if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) {
@@ -870,7 +875,7 @@ export class AgentLoop {
         }
       }
       await this.drainSteering(threadId, turnId, signal)
-      const stepResult = await this.modelStep(threadId, turnId, signal, step)
+      const stepResult = await this.modelStep(threadId, turnId, signal, step, executionSkills)
       if (stepResult === 'checkpoint_waiting') return { kind: 'checkpoint_waiting' }
       if (stepResult === 'outcome_unknown') return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
       if (stepResult === 'stop') return { kind: 'candidate' }
@@ -916,7 +921,8 @@ export class AgentLoop {
     threadId: string,
     turnId: string,
     signal: AbortSignal,
-    stepIndex = 0
+    stepIndex: number,
+    executionSkills: { resolution?: SkillTurnResolution }
   ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown' | 'checkpoint_waiting' | 'suppression_exhausted'> {
     if (shouldVerifyImmutablePrefix()) {
       verifyImmutablePrefix(this.opts.prefix)
@@ -1017,9 +1023,12 @@ export class AgentLoop {
     )
     const preferredSkillIds = continuationTurn?.activeSkillIds
       ?? thread?.agentProfile?.preferredSkillIds
-    const skillResolution = this.opts.skillRuntime?.resolveTurn({
+    const userMessage = turn?.items.find(item => item.kind === 'user_message')
+    const requestedSkillId = requestedSlashSkill(userMessage?.displayText ?? turn?.prompt ?? '')
+    const skillResolution = executionSkills.resolution ??= this.opts.skillRuntime?.resolveTurn({
       prompt: turn?.prompt ?? '',
       workspace: thread?.workspace ?? '',
+      requestedSkillId,
       preferredSkillIds,
       contextPrompt: continuationTurn?.prompt
     }) ?? {
@@ -1090,6 +1099,7 @@ export class AgentLoop {
       ...(activeDesignContext ? { guiDesign: activeDesignContext } : {}),
       model: modelCapabilities,
       activeSkillIds: skillResolution.activeSkillIds,
+      activeSkillResources: skillResolution.activeSkillResources,
       memoryPolicy: { enabled: Boolean(this.opts.memoryStore) },
       delegationPolicy: this.opts.delegationPolicy ?? { enabled: false },
       ...(allowedToolNames ? { allowedToolNames } : {}),
@@ -1200,6 +1210,9 @@ export class AgentLoop {
       ...(workspaceReferences.length ? [workspaceReferenceInstruction(workspaceReferences)] : []),
       ...formatWorkspaceInstructions(workspaceInstructions),
       ...skillResolution.instructions,
+      ...(effectiveToolSpecs.some(tool => tool.name === 'read_skill_resource')
+        ? ['Read relative Skill references with read_skill_resource and the ID in the matching Active Skill heading. Use next_offset_bytes to continue a partial read.']
+        : []),
       ...(occurrenceTask?.scheduledBy ? [
         `Scheduled task occurrence (server-owned): ${JSON.stringify({ taskId: occurrenceTask.id,
           scheduleId: occurrenceTask.scheduledBy.scheduleId, dueAt: occurrenceTask.scheduledBy.dueAt, phase: 'due_execution' })}`,
@@ -1601,6 +1614,7 @@ export class AgentLoop {
             activePlanContext,
             modelCapabilities,
             activeSkillIds: skillResolution.activeSkillIds,
+            activeSkillResources: skillResolution.activeSkillResources,
             allowedToolNames,
             allowedMcpProviderIds,
             executionGrant,
@@ -1745,6 +1759,7 @@ export class AgentLoop {
       activeDesignContext: engineeringTurn ? undefined : activeDesignContext,
       modelCapabilities,
       activeSkillIds: skillResolution.activeSkillIds,
+      activeSkillResources: skillResolution.activeSkillResources,
       allowedToolNames,
       allowedMcpProviderIds,
       executionGrant,
@@ -1812,6 +1827,7 @@ export class AgentLoop {
     activeDesignContext?: GuiDesignContext
     modelCapabilities: ModelCapabilityMetadata
     activeSkillIds: readonly string[]
+    activeSkillResources?: ToolHostContext['activeSkillResources']
     allowedToolNames?: readonly string[]
     allowedMcpProviderIds?: readonly string[]
     executionGrant?: ExecutionGrant
@@ -2015,6 +2031,7 @@ export class AgentLoop {
     activeDesignContext?: GuiDesignContext
     modelCapabilities: ModelCapabilityMetadata
     activeSkillIds: readonly string[]
+    activeSkillResources?: ToolHostContext['activeSkillResources']
     allowedToolNames?: readonly string[]
     allowedMcpProviderIds?: readonly string[]
     executionGrant?: ExecutionGrant
@@ -2032,6 +2049,7 @@ export class AgentLoop {
       ...(input.activeDesignContext ? { guiDesign: input.activeDesignContext } : {}),
       model: input.modelCapabilities,
       activeSkillIds: input.activeSkillIds,
+      activeSkillResources: input.activeSkillResources,
       memoryPolicy: { enabled: Boolean(this.opts.memoryStore) },
       delegationPolicy: this.opts.delegationPolicy ?? { enabled: false },
       ...(input.allowedToolNames ? { allowedToolNames: input.allowedToolNames } : {}),

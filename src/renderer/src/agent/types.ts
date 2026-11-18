@@ -8,6 +8,7 @@ import type {
   CoreRuntimeSkillJson,
   CoreRuntimeToolDiagnosticsJson
 } from './runtime-contract'
+import type { ThreadRunActivity } from './ag-ui-activity'
 import type { ApprovalPolicy, SandboxMode } from '@shared/app-settings'
 import type { ExternalTaskCapabilityCard, TaskIntentCard } from '@shared/task-command'
 
@@ -421,6 +422,7 @@ export type ThreadUsageSnapshot = {
 export type ThreadEventSink = {
   /** Durable local messages; these must not toggle execution state. */
   onConversationItem?(block: ChatBlock): void
+  onRunActivity?(activity: ThreadRunActivity | null): void
   onSeq(seq: number): void
   onReplayReset?(seq: number): void | Promise<void>
   onDeltas(deltas: ThreadDeltaEvent[]): void
@@ -504,7 +506,7 @@ export interface AgentProvider {
   ): Promise<{ turnId: string; threadId: string; userMessageItemId?: string; reviewItemId?: string }>
   getRuntimeInfo?(): Promise<CoreRuntimeInfoJson>
   getToolDiagnostics?(): Promise<CoreRuntimeToolDiagnosticsJson>
-  listSkills?(): Promise<CoreRuntimeSkillJson[]>
+  listSkills?(scope?: { threadId?: string; workspace?: string }): Promise<CoreRuntimeSkillJson[]>
   uploadAttachment?(input: {
     name: string
     mimeType?: string

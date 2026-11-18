@@ -17,7 +17,11 @@ import { systemFetch } from './system-network'
 import { expandHomePath, normalizeSkillFolderName } from './workspace-service'
 import { LEGACY_SKILL_SOURCE_METADATA_FILE } from '../compat/legacy-metadata'
 import { resolveContainedPath } from './canonical-containment'
-import { inspectPackageDirectory, PackageInstallationService } from './package-installation-service'
+import {
+  inspectPackageDirectory,
+  PackageInstallationService,
+  packageInstallLimitsForSource
+} from './package-installation-service'
 import {
   BUNDLED_SKILL_LIMITS,
   SKILL_PACKAGE_LIMITS,
@@ -48,6 +52,7 @@ export type GuiSkillListResult =
 export type GuiSkillRoot = {
   path: string
   scope: GuiSkillScope
+  workspace?: string
   validation: 'strict' | 'trusted-plugin'
 }
 
@@ -91,11 +96,13 @@ export async function guiSkillRootsForRuntime(
     ...(settings?.claw.tasks.map((task) => task.workspaceRoot) ?? []),
     ...(settings?.schedule.tasks.map((task) => task.workspaceRoot) ?? [])
   ].map(normalizeSkillRootPath).filter(Boolean))
-  const projectRoots = workspaceRoots.flatMap((workspaceRoot) => [
-    join(workspaceRoot, '.codex', 'skills'),
-    join(workspaceRoot, '.agents', 'skills'),
-    join(workspaceRoot, 'skills')
-  ])
+  const projectRoots = workspaceRoots.flatMap((workspace) => [
+    join(workspace, '.codex', 'skills'),
+    join(workspace, '.agents', 'skills'),
+    join(workspace, 'skills')
+  ].filter(path => existsSync(path)).map(path => ({
+    path, workspace, scope: 'project' as const, validation: 'strict' as const
+  })))
   const globalRoots = [
     join(
       process.env.WORKWISE_TOOLS_ROOT?.trim() || join(homedir(), '.workwise', 'tools'),
@@ -123,9 +130,7 @@ export async function guiSkillRootsForRuntime(
   ].map(normalizeSkillRootPath)
 
   return uniqueSkillRoots([
-    ...projectRoots
-      .filter((root) => existsSync(root))
-      .map((path) => ({ path, scope: 'project' as const, validation: 'strict' as const })),
+    ...projectRoots,
     ...globalRoots
       .filter((root) => existsSync(root))
       .map((path) => ({
@@ -143,11 +148,10 @@ export async function guiSkillRootsForRuntime(
       .map((path) => ({ path, scope: 'global' as const, validation: 'trusted-plugin' as const })),
     ...configuredExtraRoots
       .filter(Boolean)
-      .map((path) => ({
-        path,
-        scope: scopeForConfiguredRoot(path, workspaceRoots),
-        validation: 'strict' as const
-      }))
+      .map((path) => {
+        const workspace = workspaceForConfiguredRoot(path, workspaceRoots)
+        return { path, scope: workspace ? 'project' as const : 'global' as const, workspace, validation: 'strict' as const }
+      })
   ])
 }
 
@@ -397,7 +401,10 @@ export async function discoverInstalledPluginSkillRoots(
   const roots: string[] = []
   for (const record of installed) {
     if (!await installedPackageContainsSkills(record.artifact.location)) continue
-    const inspection = await inspectPackageDirectory(record.artifact.location).catch(() => null)
+    const inspection = await inspectPackageDirectory(
+      record.artifact.location,
+      packageInstallLimitsForSource(record.source)
+    ).catch(() => null)
     if (!inspection || inspection.sha256 !== record.artifact.sha256) continue
     await collectInstalledSkillRoots(record.artifact.location, roots, 0, 6)
   }
@@ -1074,12 +1081,12 @@ function compareSkillSummary(a: GuiSkillSummary, b: GuiSkillSummary): number {
   return a.name.localeCompare(b.name)
 }
 
-function scopeForConfiguredRoot(path: string, workspaceRoots: string[]): GuiSkillScope {
+function workspaceForConfiguredRoot(path: string, workspaceRoots: string[]): string | undefined {
   const comparable = comparablePath(path)
-  return workspaceRoots.some((workspaceRoot) => {
+  return workspaceRoots.filter((workspaceRoot) => {
     const workspace = comparablePath(workspaceRoot)
     return comparable === workspace || comparable.startsWith(`${workspace}/`)
-  }) ? 'project' : 'global'
+  }).sort((first, second) => second.length - first.length)[0]
 }
 
 function uniqueSkillRoots(roots: GuiSkillRoot[]): GuiSkillRoot[] {

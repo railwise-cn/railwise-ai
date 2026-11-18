@@ -304,7 +304,8 @@ describe('marketplace license policy', () => {
       'Apache-2.0',
       'BSD-2-Clause',
       'BSD-3-Clause',
-      'ISC'
+      'ISC',
+      'MIT AND Apache-2.0 AND CC-BY-4.0'
     ])
 
     for (const license of DIRECT_MIRROR_LICENSE_ALLOWLIST) {

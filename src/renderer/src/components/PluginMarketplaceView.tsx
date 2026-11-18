@@ -3,6 +3,7 @@ import { GitHubConnectorSetup } from './connectors/GitHubConnectorSetup'
 import { isGitHubMcpServer } from '@shared/github-connector'
 import { currentMcpConnectionCheck } from '@shared/mcp-connection-check'
 import { ENGINEERING_FEATURED_PACKAGE_IDS, OPTIONAL_ENGINEERING_SKILLS, isCatalogInstallable } from '@shared/engineering-marketplace'
+import { declaredMarketplaceSkills, marketplaceSkillReadiness, readMarketplaceSkillSnapshot, type MarketplaceSkillReadiness } from '@shared/marketplace-skill-readiness'
 import { ProductIcon } from './ProductIcon'
 import type { ReactElement, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -53,7 +54,7 @@ import brand from '@shared/product-brand.json'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useChatStore } from '../store/chat-store'
 import { friendlyMarketplaceError, skillValidationWarning } from './plugin-marketplace-compat'
-import { marketplaceNeedsConfiguration, marketplacePackageStatus } from './plugin-marketplace-status'
+import { marketplaceNeedsConfiguration, marketplacePackageDelivery, marketplacePackageStatus } from './plugin-marketplace-status'
 import { ConnectorCatalog } from './connectors/ConnectorCatalog'
 
 export * from './plugin-marketplace-compat'
@@ -103,6 +104,15 @@ function packageDisplaySummary(item: MarketplacePackageV1, text: Text): string {
 function sourceLabel(source: CatalogSourceV1 | undefined, fallback: string, text: Text): string {
   const id = source?.id || fallback
   return text(`pluginCatalogSource_${id}`, source?.name || fallback)
+}
+
+function packageDeliveryLabel(item: MarketplacePackageV1, text: Text): string | undefined {
+  const delivery = marketplacePackageDelivery(item)
+  if (delivery === 'builtin') return text('pluginDeliveryBuiltin', 'Built in')
+  if (delivery === 'railwise') return text('pluginDeliveryRailWise', 'Download from RailWise')
+  if (delivery === 'external') return text('pluginDeliveryExternal', 'External setup required')
+  if (delivery === 'upstream') return text('pluginDeliveryUpstream', 'Upstream download')
+  return undefined
 }
 
 function permissionKindLabel(kind: PackagePermissionV1['kind'], text: Text): string {
@@ -260,6 +270,15 @@ function statusTone(tone: Notice['tone']): string {
   if (tone === 'error') return 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200'
   if (tone === 'success') return 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
   return 'border-ds-border bg-ds-subtle text-ds-muted'
+}
+
+function skillRuntimeLabel(state: MarketplaceSkillReadiness, text: Text): string {
+  switch (state) {
+    case 'loaded': return text('pluginSkillRuntimeLoaded', 'Installed · loaded by Runtime')
+    case 'pending': return text('pluginSkillRuntimePending', 'Installed · Runtime load pending')
+    case 'disabled': return text('pluginSkillRuntimeDisabled', 'Installed · Runtime Skills disabled')
+    case 'unavailable': return text('pluginSkillRuntimeUnavailable', 'Installed · Runtime status unavailable')
+  }
 }
 
 function skillSourceUrl(skill: SkillListItem): string | null {
@@ -431,6 +450,8 @@ export function PluginMarketplaceView(): ReactElement {
   const [updateDiagnostics, setUpdateDiagnostics] = useState<PluginUpdateDiagnosticV1[]>([])
   const diagnosticMap = useMemo(() => new Map(updateDiagnostics.map((item) => [item.packageId, item])), [updateDiagnostics])
   const [mcpServers, setMcpServers] = useState<McpServerConfigV2[]>([])
+  const [runtimeSkills, setRuntimeSkills] = useState<ReturnType<typeof readMarketplaceSkillSnapshot>>()
+  const [checkingRuntimeSkills, setCheckingRuntimeSkills] = useState(false)
   const [skills, setSkills] = useState<SkillListItem[]>([])
   const [skillValidationErrors, setSkillValidationErrors] = useState<Array<{ root: string; message: string }>>([])
   const [skillCount, setSkillCount] = useState(0)
@@ -471,6 +492,12 @@ export function PluginMarketplaceView(): ReactElement {
     [installedPackages]
   )
   const sourceMap = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources])
+  const runtimeStateForSkill = (item: MarketplacePackageV1): MarketplaceSkillReadiness | undefined => {
+    const record = installed.get(item.id)
+    const names = declaredMarketplaceSkills(item.components)
+    return record?.artifact.location && names !== undefined
+      ? marketplaceSkillReadiness(runtimeSkills, record.artifact.location, names) : undefined
+  }
 
   const refresh = useCallback(async (showSpinner = false): Promise<void> => {
     if (showSpinner) setLoading(true)
@@ -491,9 +518,10 @@ export function PluginMarketplaceView(): ReactElement {
       window.workwise.listInstalledPlugins(),
       window.workwise.listPluginUpdateDiagnostics?.() ?? Promise.resolve([]),
       window.workwise.listMcpServers(workspaceRoot || undefined),
-      window.workwise.listSkills(workspaceRoot || undefined)
+      window.workwise.listSkills(workspaceRoot || undefined),
+      window.workwise.runtimeRequest?.('/v1/runtime/tools', 'GET')
     ])
-    const [sourcesResult, catalogResult, packagesResult, diagnosticsResult, serversResult, skillsResult] = results
+    const [sourcesResult, catalogResult, packagesResult, diagnosticsResult, serversResult, skillsResult, runtimeSkillsResult] = results
     const failures: string[] = []
     if (sourcesResult.status === 'fulfilled') setSources(sourcesResult.value)
     else failures.push('sources')
@@ -505,6 +533,7 @@ export function PluginMarketplaceView(): ReactElement {
     else failures.push('diagnostics')
     if (serversResult.status === 'fulfilled') setMcpServers(serversResult.value)
     else failures.push('mcp')
+    setRuntimeSkills(runtimeSkillsResult.status === 'fulfilled' ? readMarketplaceSkillSnapshot(runtimeSkillsResult.value, 'skills') : undefined)
     if (skillsResult.status === 'fulfilled' && skillsResult.value?.ok) {
       setSkills(skillsResult.value.skills)
       setSkillCount(skillsResult.value.skills.length)
@@ -536,6 +565,19 @@ export function PluginMarketplaceView(): ReactElement {
     }
     setLoading(false)
   }, [text, workspaceRoot])
+
+  const recheckSkillRuntime = async (enable: boolean): Promise<void> => {
+    setCheckingRuntimeSkills(true)
+    try {
+      await window.workwise.refreshSkills(workspaceRoot || undefined, enable ? { enable: true } : undefined)
+      setNotice(null)
+    } catch {
+      setNotice({ tone: 'info', message: skillRuntimeLabel('unavailable', text) })
+    } finally {
+      await refresh()
+      setCheckingRuntimeSkills(false)
+    }
+  }
 
   useEffect(() => {
     void refresh(true)
@@ -738,7 +780,9 @@ export function PluginMarketplaceView(): ReactElement {
         packageId: entry.package.id
       }))
     } catch (error) {
-      setNotice({ tone: 'error', message: friendlyMarketplaceError(error instanceof Error ? error.message : String(error), t) })
+      setNotice({ tone: 'error', message: friendlyMarketplaceError(
+        error instanceof Error ? error.message : String(error), t, marketplacePackageDelivery(entry.package)
+      ) })
     } finally {
       setBusy('')
     }
@@ -771,6 +815,7 @@ export function PluginMarketplaceView(): ReactElement {
     setBusy(`prepared:${prepared.id}`)
     try {
       const current = installed.get(prepared.package.id)
+      let skillRuntime: MarketplaceSkillReadiness | undefined
       if (current?.version === prepared.package.version && prepared.format === 'catalog') {
         await window.workwise.updatePluginPermissions({
           packageId: prepared.package.id,
@@ -784,7 +829,7 @@ export function PluginMarketplaceView(): ReactElement {
           idempotencyKey: uuid()
         })
       } else {
-        await window.workwise.installPreparedPlugin({
+        const receipt = await window.workwise.installPreparedPlugin({
           preparedId: prepared.id,
           reviewSha256: prepared.reviewSha256,
           expectedCurrentVersion: current?.version ?? null,
@@ -796,16 +841,23 @@ export function PluginMarketplaceView(): ReactElement {
           })),
           idempotencyKey: uuid()
         })
+        skillRuntime = receipt.skillRuntime
       }
       await window.workwise.cancelPluginImport(prepared.id).catch(() => false)
       setPrepared(null)
+      const name = packageDisplayName(prepared.package, text)
+      const permissionUpdate = current?.version === prepared.package.version && prepared.format === 'catalog'
+      const fromMirror = prepared.format === 'catalog' && marketplacePackageDelivery(prepared.package) === 'railwise'
+      const confirmation = permissionUpdate
+        ? text('pluginUnifiedPermissionsUpdated', '{{name}} permissions updated.', { name })
+        : fromMirror
+          ? text('pluginDeliveryRailWiseInstalled', '{{name}} was downloaded from RailWise, verified, and installed.', { name })
+          : text('pluginUnifiedInstalled', '{{name}} installed.', { name })
       setNotice({
-        tone: 'success',
-        message: text(
-          current?.version === prepared.package.version ? 'pluginUnifiedPermissionsUpdated' : 'pluginUnifiedInstalled',
-          current?.version === prepared.package.version ? '{{name}} permissions updated.' : '{{name}} installed.',
-          { name: prepared.package.name }
-        )
+        tone: skillRuntime && skillRuntime !== 'loaded' ? 'info' : 'success',
+        message: skillRuntime && skillRuntime !== 'loaded'
+          ? `${confirmation} ${skillRuntimeLabel(skillRuntime, text)}`
+          : confirmation
       })
       await refresh()
     } catch (error) {
@@ -819,12 +871,14 @@ export function PluginMarketplaceView(): ReactElement {
   const rollback = async (record: InstalledPackageV1): Promise<void> => {
     setBusy(`rollback:${record.packageId}`)
     try {
-      await window.workwise.rollbackPlugin({
+      const receipt = await window.workwise.rollbackPlugin({
         packageId: record.packageId,
         expectedCurrentVersion: record.version,
         idempotencyKey: uuid()
       })
-      setNotice({ tone: 'success', message: text('pluginUnifiedRolledBack', '{{name}} rolled back.', { name: record.packageId }) })
+      setNotice(receipt.skillRuntime && receipt.skillRuntime !== 'loaded'
+        ? { tone: 'info', message: `${record.packageId} · ${skillRuntimeLabel(receipt.skillRuntime, text)}` }
+        : { tone: 'success', message: text('pluginUnifiedRolledBack', '{{name}} rolled back.', { name: record.packageId }) })
       await refresh()
     } catch (error) {
       setNotice({ tone: 'error', message: friendlyMarketplaceError(error instanceof Error ? error.message : String(error), t) })
@@ -1143,7 +1197,7 @@ export function PluginMarketplaceView(): ReactElement {
           </section>
           {skillCatalogEntries.length ? <section className="mx-auto w-full max-w-[1040px] px-5 pt-5 md:px-7" aria-label={text('connectorHubSkillCatalog', 'Discover skills')}>
             <h2 className="mb-2 text-[14px] font-semibold">{text('connectorHubSkillCatalog', 'Discover skills')}</h2>
-            <div className="grid gap-x-9 md:grid-cols-2">{skillCatalogEntries.filter(entry => !OPTIONAL_ENGINEERING_SKILLS.some(skill => skill.id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div>
+            <div className="grid gap-x-9 md:grid-cols-2">{skillCatalogEntries.filter(entry => !OPTIONAL_ENGINEERING_SKILLS.some(skill => skill.id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} skillRuntime={runtimeStateForSkill(entry.package)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div>
           </section> : null}
           <LocalSkillsList
             skills={visibleSkills}
@@ -1175,7 +1229,7 @@ export function PluginMarketplaceView(): ReactElement {
           </div>
         ) : (
           <div className="mx-auto w-full max-w-[1040px] px-5 pb-8 md:px-7">
-            {!query && statusFilter === 'recommended' && categoryFilter === 'all' && audienceFilter === 'official' && sourceFilter === 'all' ? <section className="pt-5" aria-label={text('engineeringPluginSelection', 'Engineering essentials')}><h2 className="border-b border-ds-border pb-2 text-[13px] font-semibold">{text('engineeringPluginSelection', 'Engineering essentials')}</h2><div className="grid gap-x-9 md:grid-cols-2">{entries.filter(entry => ENGINEERING_FEATURED_PACKAGE_IDS.some(id => id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div></section> : null}
+            {!query && statusFilter === 'recommended' && categoryFilter === 'all' && audienceFilter === 'official' && sourceFilter === 'all' ? <section className="pt-5" aria-label={text('engineeringPluginSelection', 'Engineering essentials')}><h2 className="border-b border-ds-border pb-2 text-[13px] font-semibold">{text('engineeringPluginSelection', 'Engineering essentials')}</h2><div className="grid gap-x-9 md:grid-cols-2">{entries.filter(entry => ENGINEERING_FEATURED_PACKAGE_IDS.some(id => id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} skillRuntime={runtimeStateForSkill(entry.package)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div></section> : null}
             {visibleEntryGroups.map((group) => (
               <section key={group.category} className="pt-5">
                 <div className="flex h-8 items-center justify-between border-b border-ds-border">
@@ -1190,6 +1244,7 @@ export function PluginMarketplaceView(): ReactElement {
                       key={packageKey(entry)}
                       entry={entry}
                       installed={installed.get(entry.package.id)}
+                      skillRuntime={runtimeStateForSkill(entry.package)}
                       diagnostic={diagnosticMap.get(entry.package.id)}
                       reviewSha256={entry.reviewSha256}
                       server={installedServerForPackage(entry.package, mcpServers)}
@@ -1215,12 +1270,15 @@ export function PluginMarketplaceView(): ReactElement {
           diagnostic={diagnosticMap.get(selected.package.id)}
           source={sourceMap.get(selected.sourceId)}
           installed={installed.get(selected.package.id)}
+          skillRuntime={runtimeStateForSkill(selected.package)}
+          checkingRuntimeSkills={checkingRuntimeSkills}
           server={installedServerForPackage(selected.package, mcpServers)}
           busy={busy}
           text={text}
           onClose={() => setDetailsOpen(false)}
           onAction={() => void invokePrimaryAction(selected)}
           onRollback={(record) => void rollback(record)}
+          onRefreshSkillRuntime={(enable) => void recheckSkillRuntime(enable)}
           onOpenSource={() => {
             if (isHttpUrl(selected.package.source.location)) void window.workwise.openExternal(selected.package.source.location)
           }}
@@ -1782,7 +1840,8 @@ function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy
   const installLabel = item.installation.mode === 'upstream-only'
     ? text('pluginUnifiedInstallUpstream', 'Install from upstream') : text('pluginUnifiedInstall', 'Install')
   const label = sourceOnly ? text('pluginOpenSource', 'Open source') : blocked ? diagnosticLabel(diagnostic!, text) : update
-    ? permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedReviewUpdate', 'Review update') : text('pluginUnifiedUpdate', 'Update')
+    ? permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedReviewUpdate', 'Review update')
+      : item.installation.mode === 'upstream-only' ? text('pluginDeliveryUpdateUpstream', 'Update from upstream') : text('pluginUnifiedUpdate', 'Update')
     : isCatalogInstallable(item) && !added ? installLabel
     : remote && !added ? text('pluginUnifiedConnect', 'Connect')
     : managesPermissions ? text('pluginUnifiedPermissions', 'Permissions')
@@ -1795,9 +1854,10 @@ function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy
   )
 }
 
-function PluginRow({ entry, installed, server, reviewSha256, diagnostic, busy, text, onSelect, onAction }: {
+function PluginRow({ entry, installed, skillRuntime, server, reviewSha256, diagnostic, busy, text, onSelect, onAction }: {
   entry: MarketplaceCatalogPackageEntryV1
   installed?: InstalledPackageV1
+  skillRuntime?: MarketplaceSkillReadiness
   server?: McpServerConfigV2
   reviewSha256?: string
   diagnostic?: PluginUpdateDiagnosticV1
@@ -1807,6 +1867,7 @@ function PluginRow({ entry, installed, server, reviewSha256, diagnostic, busy, t
   onAction: () => void
 }): ReactElement {
   const item = entry.package
+  const delivery = marketplacePackageDelivery(item) !== 'upstream' ? packageDeliveryLabel(item, text) : undefined
   return (
     <div role="button" tabIndex={0} onClick={onSelect} onKeyDown={(event) => { if (event.key === 'Enter') onSelect() }} className="grid min-h-[96px] cursor-pointer grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 border-b border-ds-border px-1 py-3 hover:bg-ds-hover/60">
       <PluginIcon item={item} text={text} />
@@ -1819,7 +1880,10 @@ function PluginRow({ entry, installed, server, reviewSha256, diagnostic, busy, t
         <p className="mt-1 line-clamp-1 text-[12px] text-ds-muted">{packageDisplaySummary(item, text)}</p>
         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-ds-faint">
           <span>{item.publisher.name}</span>
-          <PackageStatus item={item} installed={installed} server={server} diagnostic={diagnostic} reviewSha256={reviewSha256} text={text} />
+          {delivery ? <span>{delivery}</span> : null}
+          {skillRuntime && item.id !== 'browser-skill' && !hasUpdate(item, installed, reviewSha256, diagnostic)
+            ? <span>{skillRuntimeLabel(skillRuntime, text)}</span>
+            : <PackageStatus item={item} installed={installed} server={server} diagnostic={diagnostic} reviewSha256={reviewSha256} text={text} />}
         </div>
       </div>
       <div className="flex items-center gap-1.5">
@@ -1848,10 +1912,12 @@ function DetailSection({ title, children }: { title: string; children: ReactNode
   return <section className="border-b border-ds-border px-5 py-4"><h3 className="mb-2 text-[11px] font-semibold uppercase text-ds-faint">{title}</h3>{children}</section>
 }
 
-function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, text, onClose, onAction, onRollback, onOpenSource }: {
+function DetailsDrawer({ entry, source, installed, skillRuntime, checkingRuntimeSkills, server, diagnostic, busy, text, onClose, onAction, onRollback, onRefreshSkillRuntime, onOpenSource }: {
   entry: MarketplaceCatalogPackageEntryV1
   source?: CatalogSourceV1
   installed?: InstalledPackageV1
+  skillRuntime?: MarketplaceSkillReadiness
+  checkingRuntimeSkills: boolean
   server?: McpServerConfigV2
   diagnostic?: PluginUpdateDiagnosticV1
   busy: string
@@ -1859,9 +1925,11 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
   onClose: () => void
   onAction: () => void
   onRollback: (record: InstalledPackageV1) => void
+  onRefreshSkillRuntime: (enable: boolean) => void
   onOpenSource: () => void
 }): ReactElement {
   const item = entry.package
+  const delivery = packageDeliveryLabel(item, text)
   return (
     <Drawer title={packageDisplayName(item, text)} closeLabel={text('pluginUnifiedClose', 'Close')} onClose={onClose}>
       <div className="px-5 py-5">
@@ -1881,6 +1949,12 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
           ) : null}
         </div>
       </div>
+      {skillRuntime ? <DetailSection title={text('pluginSkillRuntimeTitle', 'Runtime Skill')}>
+        <p className="text-[13px]">{skillRuntimeLabel(skillRuntime, text)}</p>
+        {skillRuntime !== 'loaded' ? <button type="button" disabled={checkingRuntimeSkills} onClick={() => onRefreshSkillRuntime(skillRuntime === 'disabled')} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 text-[12px] hover:bg-ds-hover disabled:opacity-50">
+          {skillRuntime === 'disabled' ? text('pluginSkillRuntimeEnable', 'Enable and load Skills') : text('pluginSkillRuntimeCheck', 'Recheck Skill load')}
+        </button> : null}
+      </DetailSection> : null}
       {item.id === 'officecli' || item.id === 'markitdown' ? <div className="px-5"><ManagedDocumentTool id={item.id} /></div> : null}
       {diagnostic ? <DetailSection title={text('pluginUpdateDiagnosis', 'Update diagnosis')}><p className="text-[13px] font-medium">{diagnosticLabel(diagnostic, text)}</p>{diagnostic.state === 'runtime-drift' ? <p className="mt-2 text-[12px] text-ds-muted">{text('pluginUpdateFullReason', 'Runtime or source verification changed. Install a verified new package version; metadata review cannot replace runtime validation.')}</p> : null}</DetailSection> : null}
       <DetailSection title={text('pluginUnifiedPackageInfo', 'Package')}>
@@ -1890,6 +1964,7 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
           [text('pluginUnifiedPublisher', 'Publisher'), `${item.publisher.name}${item.publisher.verified ? ` · ${text('pluginUnifiedVerified', 'Verified')}` : ''}`],
           [text('pluginUnifiedLicense', 'License'), item.license ?? text('pluginUnifiedUnknownLicense', 'Unknown')],
           [text('pluginUnifiedSource', 'Source'), sourceLabel(source, entry.sourceId, text)],
+          ...(delivery ? [[text('pluginDeliveryMethod', 'Distribution'), delivery] as [string, string]] : []),
           [text('pluginUnifiedUpdatePolicy', 'Update policy'), updatePolicyLabel(item, text)]
         ]} />
         {item.installation.mode === 'upstream-only' && !item.license ? <p className="mt-3 text-[12px] leading-5 text-amber-700 dark:text-amber-300">{text('pluginUnifiedUndeclaredLicenseNotice', 'The upstream repository has no declared license. Installation uses its pinned source version.')}</p> : null}
@@ -1915,6 +1990,9 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
           [text('pluginUnifiedAuthentication', 'Authentication'), item.auth.type === 'none' ? text('pluginUnifiedNone', 'None') : `${item.auth.type} · ${item.auth.provider}`],
           [text('pluginUnifiedDependencies', 'Dependencies'), item.dependencies.length ? item.dependencies.map((dependency) => dependency.requirement).join(', ') : text('pluginUnifiedNone', 'None')]
         ]} />
+        {marketplacePackageDelivery(item) === 'railwise' && item.dependencies.some(dependency => dependency.managedBy === 'user' && !dependency.optional)
+          ? <p className="mt-2 text-[11px] text-ds-muted">{text('pluginDeliveryExternalDependency', 'Set up the listed external requirements before using this package.')}</p>
+          : null}
       </DetailSection>
       <DetailSection title={text('pluginUnifiedHealth', 'Health')}>
         <DefinitionList values={[
@@ -2050,7 +2128,7 @@ function ReviewModal({ prepared, selections, scope, permissionUpdate, workspaceA
     ? text('pluginUnifiedInstallUpstream', 'Install from upstream') : text('pluginUnifiedInstall', 'Install')
   return (
     <Modal title={text('pluginUnifiedReviewTitle', 'Review {{name}}', { name: item.name })} onClose={onClose}>
-      <div className="flex items-start gap-3 rounded-md border border-ds-border bg-ds-subtle p-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><div className="text-[12px] font-semibold">{text('pluginUnifiedVerifiedReview', 'Content and metadata review')}</div><p className="mt-1 break-all text-[10px] leading-4 text-ds-muted">SHA-256 {prepared.contentSha256}</p></div></div>
+      <div className="flex items-start gap-3 rounded-md border border-ds-border bg-ds-subtle p-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><div className="text-[12px] font-semibold">{text('pluginUnifiedVerifiedReview', 'Content and metadata review')}</div>{!permissionUpdate && prepared.format === 'catalog' && marketplacePackageDelivery(item) === 'railwise' ? <p className="mt-1 text-[11px] text-ds-muted">{text('pluginDeliveryRailWiseVerified', 'Download from RailWise verified.')}</p> : null}<p className="mt-1 break-all text-[10px] leading-4 text-ds-muted">SHA-256 {prepared.contentSha256}</p></div></div>
       {item.installation.mode === 'upstream-only' && !item.license ? <p className="mt-3 text-[12px] leading-5 text-amber-700 dark:text-amber-300">{text('pluginUnifiedUndeclaredLicenseNotice', 'The upstream repository has no declared license. Installation uses its pinned source version.')}</p> : null}
       {!prepared.compatibility.workwiseCompatible ? <div className="mt-3 flex gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-[12px] text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"><CircleAlert className="h-4 w-4 shrink-0" /><span>{prepared.compatibility.reasons.join(' ')}</span></div> : null}
       <div className="mt-4"><h3 className="text-[11px] font-semibold uppercase text-ds-faint">{text('pluginUnifiedPermissions', 'Permissions')}</h3><div className="mt-2 max-h-[230px] space-y-2 overflow-y-auto">{item.permissions.length ? item.permissions.map((permission) => <label key={permission.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-ds-border p-3"><input type="checkbox" checked={Boolean(selections[permission.id])} onChange={(event) => onSelection(permission.id, event.target.checked)} className="mt-0.5 h-4 w-4" /><div><div className="text-[12px] font-medium">{permissionKindLabel(permission.kind, text)} · {permissionAccessLabel(permission.access, text)}</div><p className="mt-0.5 text-[11px] leading-4 text-ds-muted">{permissionDescription(permission, text)}</p></div></label>) : <p className="text-[12px] text-ds-faint">{text('pluginUnifiedNoPermissions', 'No additional permissions declared.')}</p>}</div></div>

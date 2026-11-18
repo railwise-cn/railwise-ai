@@ -1,5 +1,5 @@
 import { useTaskState, refreshTaskState, takeRequestedTask, updateTaskNavigation } from '../../store/task-live-store'
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import { CheckCircle2, ChevronRight, FileText, Loader2, MessageSquare, Pause, Play, Plus, RefreshCw, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TaskAttentionV1, TaskEventV1, TaskInputV1, TaskOperationReceiptV1, TaskPublicQueryRecoverySnapshotV1, TaskRunV1, TaskTemplateId, TaskTemplateStartV1, TaskTemplateV1 } from '@shared/agent-workbench'
@@ -21,6 +21,7 @@ import { TaskPublicQueryRecoveryCard } from './TaskPublicQueryRecoveryCard'
 import { TaskPermissionPanel } from '../chat/TaskPermissionPanel'
 import { useChatStore } from '../../store/chat-store'
 import { foregroundTaskArtifactPreview } from '../../lib/use-task-artifact-preview'
+import { projectTaskRunActivity } from '../../agent/ag-ui-activity'
 
 type Props = {
   workspaceRoot: string
@@ -35,6 +36,7 @@ type Props = {
 }
 
 const TERMINAL = new Set(['completed', 'failed', 'cancelled'])
+const Spreadsheet = lazy(() => import('../WorkspaceSpreadsheet').then(module => ({ default: module.WorkspaceSpreadsheet })))
 
 // An explicit owner must never be replaced by another task sharing its thread.
 function attentionMatchesTask(item: TaskAttentionV1, task: TaskRunV1): boolean {
@@ -204,10 +206,13 @@ function AttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, o
 
 export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarCollapsed, onToggleLeftSidebar, onOpenThread, onOpenArtifact, onOpenFlow, onConfigureProvider, onConfigureReplyDelivery }: Props): ReactElement {
   const [artifactOpenError, setArtifactOpenError] = useState('')
+  const [spreadsheet, setSpreadsheet] = useState<{ taskId: string; artifactId: string } | null>(null)
   const openArtifact = async (task: TaskRunV1, artifact: TaskRunV1['artifacts'][number]): Promise<void> => {
     setArtifactOpenError('')
     try {
-      if (/\.html?$/i.test(artifact.relativePath)) {
+      if (/\.xlsx$/i.test(artifact.relativePath) && artifact.absolutePath) {
+        setSpreadsheet({ taskId: task.id, artifactId: artifact.id })
+      } else if (/\.html?$/i.test(artifact.relativePath)) {
         await onOpenArtifact(task, artifact.relativePath, artifact.id)
       } else if (artifact.absolutePath) {
         const result = await window.workwise.openTaskArtifact({ taskId: task.id, artifactId: artifact.id })
@@ -274,7 +279,12 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const currentProgress = currentExecution && progressSample?.taskRevision === currentExecution.revision && progressSample.turnId === currentExecution.activeTurnId &&
     ['running','retrying'].includes(currentExecution.status) ? progressSample : undefined
   const currentTiming = currentProgress?.timing ?? currentExecution?.timing
-  const currentActivity = currentProgress?.active && Date.parse(currentProgress.leaseExpiresAt) > Date.now() ? currentProgress.activity : undefined
+  const artifactEntries = useMemo(() => selectedGroup ? taskGroupArtifacts(selectedGroup) : [], [selectedGroup])
+  const selectedSpreadsheet = spreadsheet && artifactEntries.find(entry =>
+    entry.task.id === spreadsheet.taskId && entry.artifact.id === spreadsheet.artifactId
+  )
+  const detailTask = currentExecution ?? selected
+  const runActivity = detailTask ? projectTaskRunActivity(detailTask, currentProgress, artifactEntries.length) : undefined
   const hasPublicQueryRecovery = publicQueryRecovery?.taskId === (currentExecution ?? selected)?.id
     && (publicQueryRecovery?.state !== 'unavailable' || publicQueryRecovery?.reason === 'browser_public_query_schedule_scope_required')
   useEffect(() => {
@@ -423,9 +433,9 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
         {selectedAttentionId ? standaloneAttention.filter(item => item.id === selectedAttentionId).map(item => <AttentionCard key={item.id} item={item} conversationThreadId={conversationForAttention(item)} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />) : null}
         {selected ? <article aria-label={t('taskWorkspaceDetails')} className="min-w-0 rounded-xl border border-ds-border bg-ds-card p-4">
           <h2 className="break-words text-base font-semibold">{taskDisplayTitle(selected)}</h2>
-          <p className="mt-2 text-xs text-ds-muted">{t(`taskRunStatus_${(currentExecution ?? selected).status}`)} · {t('taskWorkspaceStepProgress', taskGroupProgress(selectedGroup!))}</p>
+          <p className="mt-2 text-xs text-ds-muted">{t(`taskRunStatus_${runActivity?.status ?? (currentExecution ?? selected).status}`)} · {t('taskWorkspaceStepProgress', taskGroupProgress(selectedGroup!))}{runActivity?.artifactCount ? ` · ${t('taskWorkspaceArtifactCount', { count: runActivity.artifactCount })}` : ''}</p>
           <details className="mt-3 text-xs text-ds-muted"><summary className="cursor-pointer">{t('taskWorkspaceOriginalRequest')}</summary><p className="mt-2 whitespace-pre-wrap break-words leading-relaxed">{taskDisplayGoal(selected)}</p><p className="mt-2 break-all">{t('taskWorkspaceLocation')}: {selected.workspaceRoot}</p></details>
-          {currentActivity ? <p role="status" className="mt-2 text-xs text-ds-muted">{t(`taskActivity_${currentActivity.phase}`)}</p> : null}
+          {runActivity?.phase ? <p role="status" className="mt-2 text-xs text-ds-muted">{t(`taskActivity_${runActivity.phase}`)}</p> : null}
           {currentTiming ? <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ds-muted" title={t(currentTiming.coverage === 'complete' ? 'taskTimingComplete' : 'taskTimingPartial')}>
             <span>{t('taskTimingExecution')}: {Math.round(currentTiming.executionMs / 1000)}s</span>
             <span>{t('taskTimingQueued')}: {Math.round(currentTiming.queuedMs / 1000)}s</span>
@@ -465,7 +475,21 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
           }} />
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunArtifacts')}</h3>
           {artifactOpenError ? <p role="alert" className="mb-3 text-xs text-red-600">{artifactOpenError}</p> : null}
-          {selectedGroup && taskGroupArtifacts(selectedGroup).length ? <ul className="mb-4 space-y-2">{taskGroupArtifacts(selectedGroup).map(({ task: artifactTask, artifact }) => <li key={`${artifactTask.id}:${artifact.id}`} className="rounded-lg border border-ds-border px-3 py-2"><button type="button" onClick={() => void openArtifact(artifactTask, artifact)} className="flex w-full items-start gap-2 text-left text-xs text-accent"><FileText className="h-4 w-4 shrink-0" /><span className="break-all">{artifact.absolutePath ? artifact.relativePath.split(/[\\/]/).at(-1) : artifact.relativePath}</span></button><p className="mt-1 text-[11px] text-ds-muted">{artifact.storage === 'task' ? `${t('taskArtifactManagedStorage')} · ` : ''}{t(taskArtifactValidationLabelKey(artifactTask, artifact))} · {dateLabel(artifact.createdAt)}</p>{artifact.validationMessage ? <p className="mt-1 text-xs text-ds-muted">{artifact.validationMessage}</p> : null}<TaskArtifactReview task={artifactTask} artifact={artifact} onOpen={() => openArtifact(artifactTask, artifact)} /></li>)}</ul> : <p className="mb-4 text-xs text-ds-faint">{t('taskRunNoArtifacts')}</p>}
+          {artifactEntries.length ? <ul className="mb-4 space-y-2">{artifactEntries.map(({ task: artifactTask, artifact }) => <li key={`${artifactTask.id}:${artifact.id}`} className="rounded-lg border border-ds-border px-3 py-2"><button type="button" onClick={() => void openArtifact(artifactTask, artifact)} className="flex w-full items-start gap-2 text-left text-xs text-accent"><FileText className="h-4 w-4 shrink-0" /><span className="break-all">{artifact.absolutePath ? artifact.relativePath.split(/[\\/]/).at(-1) : artifact.relativePath}</span></button><p className="mt-1 text-[11px] text-ds-muted">{artifact.storage === 'task' ? `${t('taskArtifactManagedStorage')} · ` : ''}{t(taskArtifactValidationLabelKey(artifactTask, artifact))} · {dateLabel(artifact.createdAt)}</p>{artifact.validationMessage ? <p className="mt-1 text-xs text-ds-muted">{artifact.validationMessage}</p> : null}<TaskArtifactReview task={artifactTask} artifact={artifact} onOpen={() => openArtifact(artifactTask, artifact)} /></li>)}</ul> : <p className="mb-4 text-xs text-ds-faint">{t('taskRunNoArtifacts')}</p>}
+          {spreadsheet && selectedSpreadsheet ? <div className="mb-4 flex h-[420px] min-w-0 flex-col rounded-lg border border-ds-border">
+            <div className="flex items-center justify-between gap-2 border-b border-ds-border px-3 py-2 text-xs">
+              <span className="truncate">{selectedSpreadsheet.artifact.relativePath.split(/[\\/]/).at(-1)}</span>
+              <button type="button" aria-label={t('rightPanelCollapse')} onClick={() => setSpreadsheet(null)}><X className="h-4 w-4" /></button>
+            </div>
+            <Suspense fallback={<p className="px-3 py-2 text-xs text-ds-muted">{t('filePreviewLoading')}</p>}>
+              <Spreadsheet key={`${spreadsheet.taskId}:${spreadsheet.artifactId}:${selectedSpreadsheet.artifact.sha256}`}
+                target={spreadsheet} displayName={selectedSpreadsheet.artifact.relativePath}
+                onOpenSystem={() => void window.workwise.openTaskArtifact(spreadsheet).then(result => {
+                  if (!result.ok) setArtifactOpenError(result.message)
+                }).catch(error => setArtifactOpenError(errorMessage(error)))} />
+            </Suspense>
+          </div> : null}
+
           {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <form onSubmit={event => { event.preventDefault(); void mutate('input') }} className="mb-4 rounded-xl border border-ds-border bg-ds-main p-3"><label htmlFor="task-supplement" className="text-xs font-semibold">{t('taskWorkspaceSupplement')}</label><textarea id="task-supplement" value={drafts[selected.id] ?? ''} onChange={event => setDrafts(current => ({ ...current, [selected.id]: event.target.value }))} rows={2} placeholder={t('taskWorkspaceSupplementHint')} className="mt-2 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-sm" /><button type="submit" disabled={actionBusy || !drafts[selected.id]?.trim()} className="mt-2 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceSendSupplement')}</button></form> : null}
           {inputs.length ? <details className="mb-4"><summary className="cursor-pointer text-xs font-semibold">{t('taskWorkspaceInputs')} ({inputs.length})</summary><ul className="mt-2 space-y-2">{inputs.map(input => <li key={input.id} className="rounded-lg bg-ds-main p-2 text-xs"><p className="whitespace-pre-wrap">{input.text}</p><p className="mt-1 text-ds-faint">{dateLabel(input.createdAt)} · {input.consumedAt ? t('taskWorkspaceInputConsumed') : input.deliveredAt ? t('taskWorkspaceInputDelivered') : t('taskWorkspaceInputSaved')}</p></li>)}</ul></details> : null}
           {selectedGroup && selectedGroup.children.length ? <div className="mb-4"><h3 className="text-xs font-semibold">{t('taskWorkspaceSubtasks')}</h3><ul className="mt-2 space-y-1.5">{selectedGroup.children.map(child => <li key={child.id} className="flex items-center gap-2 rounded-lg bg-ds-main px-3 py-2 text-xs"><span className="min-w-0 flex-1 truncate">{taskDisplayGoal(child)}</span><span className="shrink-0 text-ds-muted">{t(`taskRunStatus_${child.status}`)}</span></li>)}</ul></div> : null}

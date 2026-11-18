@@ -7,6 +7,7 @@ import {
   splitKunCliCommand
 } from './agent-cli.js'
 import { startKunServe } from '../server/runtime-factory.js'
+import { isManagedRuntimeShutdownRequest, MANAGED_RUNTIME_SHUTDOWN_READY } from '../contracts/managed-runtime-ipc.js'
 
 export const KUN_READY_PREFIX = 'KUN_READY '
 
@@ -28,6 +29,33 @@ async function serveMain(argv: readonly string[]): Promise<number> {
     return parsed.exitCode
   }
   const handle = await startKunServe(parsed.options)
+  const ipcShutdown = process.connected === true && typeof process.send === 'function'
+  const stopped = new Promise<void>((resolve, reject) => {
+    let stopping = false
+    const cleanup = () => {
+      process.off('SIGTERM', stop)
+      process.off('SIGINT', stop)
+      process.off('message', onParentMessage)
+    }
+    const stop = () => {
+      if (stopping) return
+      stopping = true
+      void handle.close().finally(cleanup).then(resolve, reject)
+    }
+    const onParentMessage = (message: unknown) => {
+      if (isManagedRuntimeShutdownRequest(message)) stop()
+    }
+    process.on('SIGTERM', stop)
+    process.on('SIGINT', stop)
+    if (ipcShutdown) process.on('message', onParentMessage)
+  })
+  if (ipcShutdown) {
+    const reportFailure = (error: unknown) => {
+      if (error) process.stderr.write(`kun serve: could not announce managed shutdown readiness: ${String(error)}\n`)
+    }
+    try { process.send?.(MANAGED_RUNTIME_SHUTDOWN_READY, reportFailure) }
+    catch (error) { reportFailure(error) }
+  }
   const info = handle.runtime.info()
   const startupInfo = {
     service: 'kun',
@@ -42,20 +70,12 @@ async function serveMain(argv: readonly string[]): Promise<number> {
     insecure: info.insecure,
     startedAt: info.startedAt,
     pid: info.pid,
+    ipcShutdown,
     message: `kun runtime listening on http://${handle.host}:${handle.port}`
   }
   process.stdout.write(`${KUN_READY_PREFIX}${JSON.stringify(startupInfo)}\n`)
   process.stdout.write(JSON.stringify(startupInfo, null, 2) + '\n')
-  await new Promise<void>((resolve, reject) => {
-    let stopping = false
-    const stop = () => {
-      if (stopping) return
-      stopping = true
-      void handle.close().then(resolve, reject)
-    }
-    process.once('SIGTERM', stop)
-    process.once('SIGINT', stop)
-  })
+  await stopped
   return ServeExitCode.ok
 }
 

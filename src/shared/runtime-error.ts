@@ -24,6 +24,7 @@ export type KunErrorCode =
   | 'turn_not_running'
   | 'approval_not_pending'
   | 'capability_unavailable'
+  | 'skill_unavailable'
   | 'provider_unavailable'
   | 'policy_blocked'
   | 'model_modality_unsupported'
@@ -68,6 +69,7 @@ const KNOWN_KUN_CODES: ReadonlySet<KunErrorCode> = new Set<KunErrorCode>([
   'turn_not_running',
   'approval_not_pending',
   'capability_unavailable',
+  'skill_unavailable',
   'provider_unavailable',
   'policy_blocked',
   'model_modality_unsupported',

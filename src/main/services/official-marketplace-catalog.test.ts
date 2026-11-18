@@ -568,7 +568,7 @@ describe('official marketplace catalog', () => {
     for (const [id, [commit, license, subpath]] of expected) {
       const item = packageById(id)
       expect(item.installation.mode).toBe('direct-mirror')
-      expect(item.version).toBe(commit)
+      expect(item.version).toBe(id === 'video-shotcraft' ? `${commit}-railwise.1` : commit)
       expect(item.source).toMatchObject({
         kind: 'github', resolvedRef: commit,
         ...(subpath ? { subpath } : {})
@@ -594,7 +594,7 @@ describe('official marketplace catalog', () => {
       .toBe('https://github.com/cathrynlavery/diagram-design')
   })
 
-  it('retains immutable root MIT license evidence for official MCP server artifacts', () => {
+  it('retains immutable root license evidence for official MCP server artifacts', () => {
     const expectedCommits = new Map([
       ['filesystem-mcp', '9a96ea6e5913736f92b88345bf51caeaaa8e719f'],
       ['memory-mcp', '6dd0a683e198783e30feabf7abaf42f925bd18b1'],
@@ -606,13 +606,16 @@ describe('official marketplace catalog', () => {
 
     for (const [id, commit] of expectedCommits) {
       const item = packageById(id)
-      expect(item.license).toBe('MIT')
+      const npmPackage = item.source.kind === 'npm'
+      const license = npmPackage ? 'MIT AND Apache-2.0 AND CC-BY-4.0' : 'MIT'
+      expect(item.license).toBe(license)
       expect(item.licenseEvidence).toHaveLength(1)
       expect(item.licenseEvidence[0]).toMatchObject({
-        license: 'MIT',
+        license,
         path: 'LICENSE',
         includeInInstall: true,
-        required: true
+        required: true,
+        ...(npmPackage ? { sha256: '0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a' } : {})
       })
       const evidenceSource = item.sources.find(
         (source) => source.id === item.licenseEvidence[0]?.sourceId
@@ -625,6 +628,12 @@ describe('official marketplace catalog', () => {
         resolvedRef: commit
       })
     }
+    const redis = packageById('redis-mcp')
+    expect(redis.licenseEvidence[0]).toMatchObject({ license: 'MIT', path: 'LICENSE',
+      sha256: '8fc61d1149298a3a21da6c56157008ce8a6212a4d75b1fddc29949a00537bef5' })
+    expect(redis.sources.find(source => source.id === redis.licenseEvidence[0]?.sourceId)).toMatchObject({
+      owner: 'redis', repository: 'mcp-redis', resolvedRef: '11e67e44358cd6410d5a7e615a29539ccd71a045'
+    })
   })
 
   it('declares required Git, Fetch, and Docling permissions', () => {

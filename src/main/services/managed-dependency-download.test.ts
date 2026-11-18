@@ -20,6 +20,12 @@ describe('managed dependency download', () => {
     expect(fetcher.mock.calls[1]?.[0]).toBe(asset.sourceUrl)
   })
 
+  it('keeps the mirrored plugin runtime on the RailWise host when the mirror is unavailable', async () => {
+    const fetcher = vi.fn(async () => new Response('', { status: 503 }))
+    await expect(downloadManagedDependency(asset, fetcher, { mirrorOnly: true })).rejects.toThrow('503')
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(dependencyDownloadUrls(asset)[0], expect.objectContaining({ redirect: 'error' }))
+  })
+
   it('refuses modified bytes from either source', async () => {
     await expect(downloadManagedDependency(asset, vi.fn(async () => response(Buffer.alloc(bytes.length))))).rejects.toThrow(/SHA-256/)
     await expect(downloadManagedDependency(asset, vi.fn(async () => response(Buffer.alloc(bytes.length + 20))))).rejects.toThrow(/limit|large|size/i)

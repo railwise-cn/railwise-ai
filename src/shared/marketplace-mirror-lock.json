@@ -1,0 +1,1093 @@
+{
+  "version": 1,
+  "packages": [
+    {
+      "packageId": "antv-chart-mcp",
+      "reviewSha256": "b28052824a8114e93d92e57cbaf37f0b6f5be5413195df0a346d6032c0fe0e48",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "234f6df863045e98fc8b3d8322ffaaf7656601e42c9c473b513fd547a12cec9f",
+          "size": 3140245
+        },
+        {
+          "sha256": "c4eb8735fad6d6c1fd2b736f9063a7bd89067e3eea220eb0766e035b10d36c0d",
+          "size": 2938511
+        }
+      ]
+    },
+    {
+      "packageId": "antv-chart-skill",
+      "reviewSha256": "7c2bd6af032af5a0a4d1a03812f2918d5a5ed0b034930190b973590ca3b60c99",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "dfdd48064e433618dccddc739e426350634f5f175cd3d66d42be3c1a78b21e9e",
+          "size": 3093
+        }
+      ]
+    },
+    {
+      "packageId": "arch-diagram-skill",
+      "reviewSha256": "fb4a311f1e0a4366fa3d5bb255e40deb7417a9c4262397c11780a5298ba7d58d",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "4c40f413126a7818b4c71661b8a299ffddda01e11b70b6223118a3f51a3b4ca4",
+          "size": 42887
+        }
+      ]
+    },
+    {
+      "packageId": "blender-skills",
+      "reviewSha256": "0442e462af8af3fc99207874dbd8e65f5fe1f8e6b4727cf7f72c99d9ed38b956",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "71c3202272ecbe9e6496608d2eeeb4cea48a6efacd73ed00cbf0fc26396ada36",
+          "size": 195463
+        }
+      ]
+    },
+    {
+      "packageId": "browser-skill",
+      "reviewSha256": "00bd03b5f36fdd2e111c4a323dc6a5269d4a9b16a1a670eaf853361734c229b2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "96a7ab91832f5ac8b3c03aa1244204b9457f5933ce2d60c5f2b16e5df0022a7a",
+          "size": 41696
+        }
+      ]
+    },
+    {
+      "packageId": "context7-mcp",
+      "reviewSha256": "cd9e1f2c90234753d4dd699d9a6e1aa40bf5be18134f92b53a1e5aacbae620e2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "b10c12b570bf43e86ec58b91e7d9beab5656d0eaed014043ebf2fb18569d3e5d",
+          "size": 4937014
+        },
+        {
+          "sha256": "2e28aa508e7d5842a2d50075e228460e838b5461792b65690e5a27b2db479440",
+          "size": 1110738
+        }
+      ]
+    },
+    {
+      "packageId": "dbhub",
+      "reviewSha256": "8cb385dce30dd57149417e0276dcc642d6c3ff1b950a7c9bcc36f4c5567c53c3",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "125e50169940f716020f9298af57bd7d58518d74a68428780e2d6d8c7ee32ff4",
+          "size": 1963867
+        },
+        {
+          "sha256": "5398372da2e7a5ddf17416937a9623c6c95f38b819368f907122cac7076e47a7",
+          "size": 2361007
+        },
+        {
+          "sha256": "d261e8adf02b255c1dbd81672c5973ae764bbdc8b6402906dbc3ba4fe00144c8",
+          "size": 4400811
+        },
+        {
+          "sha256": "2fc7283687abf92ed488ef1c08392e19c7d16f173f55e5d994664961f2a589ee",
+          "size": 5688108
+        },
+        {
+          "sha256": "5aca85ec8537f3fd6b266062aed6e91e178d736631c650cf77123068306278af",
+          "size": 2820704
+        },
+        {
+          "sha256": "61c2cc41511d7f241d4a6d2790bf970a3627c6a8fc7bf324918be4664b212e10",
+          "size": 4286223
+        },
+        {
+          "sha256": "bbc27212f873b752b7b7d779a5a5ee14897cbc0128ddadf8024e7ee7d0ce01bb",
+          "size": 3295809
+        }
+      ]
+    },
+    {
+      "packageId": "diagram-design",
+      "reviewSha256": "fc6220b3245b723d21ac701eea25bbdc0fa2dadb1a7ef7311bcdfab1431e1186",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "f4eb283a8c78656a43ef82b3910fa13fa4f12c4db4e77400fba261592907a3ca",
+          "size": 21997504
+        }
+      ]
+    },
+    {
+      "packageId": "docling-mcp",
+      "reviewSha256": "18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "a8b9a98f1114314e8bc1381a1a0f82194a46736918469fcab52e5a231184e01c",
+          "size": 17310168
+        },
+        {
+          "sha256": "5d1dfacd73b4080cb387e65f3801c4fd15139be6627972b66cdf5089ce9263f8",
+          "size": 15100001
+        },
+        {
+          "sha256": "037b532f8e5d5dbb87a33771f5f13d6b4a5a862f7cf0889e992f2263b8df3c52",
+          "size": 8527836
+        },
+        {
+          "sha256": "1f02e1cc53183973bc221b020902c6800742ea9f403fc028aef1cdd8ca87b4a2",
+          "size": 1022213
+        }
+      ]
+    },
+    {
+      "packageId": "fetch-mcp",
+      "reviewSha256": "ced65391d97c5da31b528372a2f2a14840cf44be7cc426ae0215fea210450fcb",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "d812c78cc8759090e9ad3d8b39736512508403d11516fd0928bda293be2262d3",
+          "size": 18171080
+        }
+      ]
+    },
+    {
+      "packageId": "filesystem-mcp",
+      "reviewSha256": "91163cdc69eb8924dbfa069fd31ad788734417bbceae50bc7ad1eaeb20504fb5",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "a1922d968480ffe317b0354722bd82d67a72e9707cd01305453fea87a25eeb45",
+          "size": 2801680
+        },
+        {
+          "sha256": "83470c03b73dd04c648b347149775a9c030dc86998723f3560912584328c820d",
+          "size": 3573664
+        },
+        {
+          "sha256": "0d758f7c4a8b56a830ba38a8d3b9e8131dad20c3c70290aeb94b18d87b7f2783",
+          "size": 230132
+        }
+      ]
+    },
+    {
+      "packageId": "git-mcp",
+      "reviewSha256": "1649daaf6e5d3a9f4558b37b8fd35fa325fc0be5133efae244cda7376cf404a8",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "02a22e351829d135233132f201a78c07330314247ceb0ddf37569311819ae6f9",
+          "size": 8721959
+        }
+      ]
+    },
+    {
+      "packageId": "memory-mcp",
+      "reviewSha256": "5a29aa65bb104395ddb5330f58d7740062a7a7b9f771eab88a89d95e574fcd47",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "2606f2c2bc7d9d9fe1d650de7c9ae2d224b20f184ef97b834aa02eec574bf5aa",
+          "size": 2529483
+        },
+        {
+          "sha256": "18b4fcb9451f59c5e07e9cda12cbfb6866005b964a134b13dd311708cf8b8861",
+          "size": 2669195
+        }
+      ]
+    },
+    {
+      "packageId": "mongodb-mcp",
+      "reviewSha256": "99d2945dff1d07e5d30d2504d5374aab155c13a86b8e5557e13aa47a2f057f4e",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "87bd5c3f0d10ae3b9ac2220eed7845fea1c5ee0f0fe86e16c4686495b6c4632f",
+          "size": 3219768
+        },
+        {
+          "sha256": "59f654486fbcbe5a4469fa36dc6623950d6d3734e4c8bfbeffbaee9aec2f35b8",
+          "size": 2306473
+        },
+        {
+          "sha256": "ebd39459a0ce22c22345b03b04a3326a98811c5d82b9d58dfe92e3c2cf43a7bd",
+          "size": 40323533
+        },
+        {
+          "sha256": "f5e20d4f42aa86219df973a5b0882639f9d80fbe01013db0c9d01601627e464e",
+          "size": 3663928
+        },
+        {
+          "sha256": "b6cb2aba8b03bbfb73889ec76c7a23afb440463007a8ad3f3b9b8c11a8d6d39c",
+          "size": 3376956
+        },
+        {
+          "sha256": "1ca5b0e0d066461d9312413910023c9c44a4b7a4ccc83919adbb1e26ff25ea08",
+          "size": 1727151
+        },
+        {
+          "sha256": "52f4b0b5ca9e3b9a366e972b504829dbb748d8e59a50863d4cc68f91ab4c638b",
+          "size": 2356171
+        },
+        {
+          "sha256": "107814350c9f8d316f59a0b0ca9e898c83011a5b39a867f0c74271d7a6a4f257",
+          "size": 4168138
+        },
+        {
+          "sha256": "63ddb0abdbb0d24f3ae923511daf3429ac38f2817900fd7fcfabdca7c02c499b",
+          "size": 4154576
+        },
+        {
+          "sha256": "ff7b578e4b8be811dce9332f00f089df5426bf0e845e5fc872e08db5b255147b",
+          "size": 3091821
+        }
+      ]
+    },
+    {
+      "packageId": "playwright-cli-skills",
+      "reviewSha256": "87913bdffceed564bca36cce02d7b0730a7f00b5b7f6eb9dfaa0c5fd5517f618",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "a2341e738347b766716fafb78b50dbe84c2a01f3e0738d8283c868513e0c90bf",
+          "size": 4274439
+        }
+      ]
+    },
+    {
+      "packageId": "playwright-mcp",
+      "reviewSha256": "557f89a99f416b8742d1d2255d14525b3f6e60a9de00abeb3c274793f9697644",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "c4d3461e875fe3b26e2a7a75851a913195d9f9e7118823a1ce58a04829a2677c",
+          "size": 4238838
+        }
+      ]
+    },
+    {
+      "packageId": "redis-mcp",
+      "reviewSha256": "ea47419cfaedcaa2db102aaf0b7fd52be8198d21a18066504863e7a3f437a005",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "4ff43d40cc226cf93059f0bf0794d969c16360166ef024bf32db6a608cbb1daf",
+          "size": 12322801
+        },
+        {
+          "sha256": "54cd5f877d0e87d011fbefc4637e5c639e345e9caddfe92272244e1214a4a03f",
+          "size": 5830637
+        }
+      ]
+    },
+    {
+      "packageId": "sequential-thinking-mcp",
+      "reviewSha256": "fec7e7b9321420f0d3854d68f5b057fa86747fb21ed20e985b44c8f4360297d9",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "ee27a858c66fc78974307d7dc37376b04bb5bab0c98cef557b1249ea10207202",
+          "size": 2557243
+        },
+        {
+          "sha256": "f6adacb2684efac195a586b822b7f4fce5580cf322e81eedf8126406c8b09592",
+          "size": 2874680
+        }
+      ]
+    },
+    {
+      "packageId": "superpowers",
+      "reviewSha256": "757298cdb87136ab60f7213fccc2f5b74f4c42756664aa2b514be2bfd40a7e1a",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "06fd394b354b1010e88d36a16c7f232954a109574061bc7fda6f01c4943f6b25",
+          "size": 147252
+        }
+      ]
+    },
+    {
+      "packageId": "time-mcp",
+      "reviewSha256": "2e14c205e2dfc0ff11cd43b84b786f844e55a20c5b2eed1cf360984e2e362d88",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "4450ad979e6ea4c0020c8100de72a1e57a6f1a7a88cc9d07862f527e50cc0f79",
+          "size": 8822046
+        }
+      ]
+    },
+    {
+      "packageId": "video-shotcraft",
+      "reviewSha256": "e52072beda606da50549af2a2e5311ef480f79e1a6bd6708fda0fe10d82b9dd0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "parts": [
+        {
+          "sha256": "23d79ab2871094262721fb2aa2ea8647aaa3b45e5d757b1ea69465a5ce80dfcc",
+          "size": 3040181
+        }
+      ]
+    },
+    {
+      "packageId": "antv-chart-mcp",
+      "reviewSha256": "b28052824a8114e93d92e57cbaf37f0b6f5be5413195df0a346d6032c0fe0e48",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "234f6df863045e98fc8b3d8322ffaaf7656601e42c9c473b513fd547a12cec9f",
+          "size": 3140245
+        },
+        {
+          "sha256": "c4eb8735fad6d6c1fd2b736f9063a7bd89067e3eea220eb0766e035b10d36c0d",
+          "size": 2938511
+        }
+      ]
+    },
+    {
+      "packageId": "antv-chart-skill",
+      "reviewSha256": "7c2bd6af032af5a0a4d1a03812f2918d5a5ed0b034930190b973590ca3b60c99",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "dfdd48064e433618dccddc739e426350634f5f175cd3d66d42be3c1a78b21e9e",
+          "size": 3093
+        }
+      ]
+    },
+    {
+      "packageId": "arch-diagram-skill",
+      "reviewSha256": "fb4a311f1e0a4366fa3d5bb255e40deb7417a9c4262397c11780a5298ba7d58d",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "4c40f413126a7818b4c71661b8a299ffddda01e11b70b6223118a3f51a3b4ca4",
+          "size": 42887
+        }
+      ]
+    },
+    {
+      "packageId": "blender-skills",
+      "reviewSha256": "0442e462af8af3fc99207874dbd8e65f5fe1f8e6b4727cf7f72c99d9ed38b956",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "71c3202272ecbe9e6496608d2eeeb4cea48a6efacd73ed00cbf0fc26396ada36",
+          "size": 195463
+        }
+      ]
+    },
+    {
+      "packageId": "browser-skill",
+      "reviewSha256": "00bd03b5f36fdd2e111c4a323dc6a5269d4a9b16a1a670eaf853361734c229b2",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "96a7ab91832f5ac8b3c03aa1244204b9457f5933ce2d60c5f2b16e5df0022a7a",
+          "size": 41696
+        }
+      ]
+    },
+    {
+      "packageId": "context7-mcp",
+      "reviewSha256": "cd9e1f2c90234753d4dd699d9a6e1aa40bf5be18134f92b53a1e5aacbae620e2",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "b10c12b570bf43e86ec58b91e7d9beab5656d0eaed014043ebf2fb18569d3e5d",
+          "size": 4937014
+        },
+        {
+          "sha256": "2e28aa508e7d5842a2d50075e228460e838b5461792b65690e5a27b2db479440",
+          "size": 1110738
+        }
+      ]
+    },
+    {
+      "packageId": "dbhub",
+      "reviewSha256": "8cb385dce30dd57149417e0276dcc642d6c3ff1b950a7c9bcc36f4c5567c53c3",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "125e50169940f716020f9298af57bd7d58518d74a68428780e2d6d8c7ee32ff4",
+          "size": 1963867
+        },
+        {
+          "sha256": "5398372da2e7a5ddf17416937a9623c6c95f38b819368f907122cac7076e47a7",
+          "size": 2361007
+        },
+        {
+          "sha256": "d261e8adf02b255c1dbd81672c5973ae764bbdc8b6402906dbc3ba4fe00144c8",
+          "size": 4400811
+        },
+        {
+          "sha256": "2fc7283687abf92ed488ef1c08392e19c7d16f173f55e5d994664961f2a589ee",
+          "size": 5688108
+        },
+        {
+          "sha256": "5aca85ec8537f3fd6b266062aed6e91e178d736631c650cf77123068306278af",
+          "size": 2820704
+        },
+        {
+          "sha256": "61c2cc41511d7f241d4a6d2790bf970a3627c6a8fc7bf324918be4664b212e10",
+          "size": 4286223
+        },
+        {
+          "sha256": "bbc27212f873b752b7b7d779a5a5ee14897cbc0128ddadf8024e7ee7d0ce01bb",
+          "size": 3295809
+        }
+      ]
+    },
+    {
+      "packageId": "diagram-design",
+      "reviewSha256": "fc6220b3245b723d21ac701eea25bbdc0fa2dadb1a7ef7311bcdfab1431e1186",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "f4eb283a8c78656a43ef82b3910fa13fa4f12c4db4e77400fba261592907a3ca",
+          "size": 21997504
+        }
+      ]
+    },
+    {
+      "packageId": "docling-mcp",
+      "reviewSha256": "18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "5cc8d2b25c94a3221a11c3a7e61db7730b56a4c1d81f33c1479e7bb4e24be1a5",
+          "size": 16383079
+        },
+        {
+          "sha256": "d895816955e24478bda63221b6f8b8209864ecaf5e0eab85668029e3b953ded1",
+          "size": 15887270
+        },
+        {
+          "sha256": "eefef882b16843c38119758a915dd1cc5273562632d73dac3a7fcd80ae283fc2",
+          "size": 10437269
+        },
+        {
+          "sha256": "b70f093218bc9cef3125bec1eb0aa2ff3a6918b9845601fa1a8255ccbf2fe10e",
+          "size": 1774029
+        }
+      ]
+    },
+    {
+      "packageId": "fetch-mcp",
+      "reviewSha256": "ced65391d97c5da31b528372a2f2a14840cf44be7cc426ae0215fea210450fcb",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "5195a88d278a378e5ecf5f85e9cb4e55f1b47bdc9f8ead6009528214f030cad4",
+          "size": 17377513
+        },
+        {
+          "sha256": "bf0c707da8107ef20d3e64f9de21abcf89868e640015753e6f55652bf5cdbd5c",
+          "size": 956045
+        }
+      ]
+    },
+    {
+      "packageId": "filesystem-mcp",
+      "reviewSha256": "91163cdc69eb8924dbfa069fd31ad788734417bbceae50bc7ad1eaeb20504fb5",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "a1922d968480ffe317b0354722bd82d67a72e9707cd01305453fea87a25eeb45",
+          "size": 2801680
+        },
+        {
+          "sha256": "83470c03b73dd04c648b347149775a9c030dc86998723f3560912584328c820d",
+          "size": 3573664
+        },
+        {
+          "sha256": "0d758f7c4a8b56a830ba38a8d3b9e8131dad20c3c70290aeb94b18d87b7f2783",
+          "size": 230132
+        }
+      ]
+    },
+    {
+      "packageId": "git-mcp",
+      "reviewSha256": "1649daaf6e5d3a9f4558b37b8fd35fa325fc0be5133efae244cda7376cf404a8",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "1de088ca361fbb438a477e43b96550bd998130000b825d010d7d78484b29241e",
+          "size": 12828505
+        }
+      ]
+    },
+    {
+      "packageId": "memory-mcp",
+      "reviewSha256": "5a29aa65bb104395ddb5330f58d7740062a7a7b9f771eab88a89d95e574fcd47",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "2606f2c2bc7d9d9fe1d650de7c9ae2d224b20f184ef97b834aa02eec574bf5aa",
+          "size": 2529483
+        },
+        {
+          "sha256": "18b4fcb9451f59c5e07e9cda12cbfb6866005b964a134b13dd311708cf8b8861",
+          "size": 2669195
+        }
+      ]
+    },
+    {
+      "packageId": "mongodb-mcp",
+      "reviewSha256": "99d2945dff1d07e5d30d2504d5374aab155c13a86b8e5557e13aa47a2f057f4e",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "5d72b3f924f7c18a70bc29a0c27e1b8701cda8de30943cc01e06b12e2d13e8db",
+          "size": 3219852
+        },
+        {
+          "sha256": "2ba9dadd920aa93a296eca05cc4395735741e00f692069ca9c97d91373cd641f",
+          "size": 2358598
+        },
+        {
+          "sha256": "494b2bb5c53b8e1dfbf6d2d57044f18a541a2b5116adf09fe7f8b52cf0aeae65",
+          "size": 43442457
+        },
+        {
+          "sha256": "846a924fa24ca6e75ff2ad04874273384c65e2d9e9eb8fa2c8d25f02189b547e",
+          "size": 711
+        },
+        {
+          "sha256": "a15f102c4e88877aaaa72d451d1a152816b5087e6345ce6076f0aba3b49ba8ff",
+          "size": 43442439
+        },
+        {
+          "sha256": "3a74a3cecc652dc688c7b1beb12dc6de484b7c9b2a836782a8e52ea1841de4e8",
+          "size": 3731619
+        },
+        {
+          "sha256": "b6cb2aba8b03bbfb73889ec76c7a23afb440463007a8ad3f3b9b8c11a8d6d39c",
+          "size": 3376956
+        },
+        {
+          "sha256": "1ca5b0e0d066461d9312413910023c9c44a4b7a4ccc83919adbb1e26ff25ea08",
+          "size": 1727151
+        },
+        {
+          "sha256": "52f4b0b5ca9e3b9a366e972b504829dbb748d8e59a50863d4cc68f91ab4c638b",
+          "size": 2356171
+        },
+        {
+          "sha256": "107814350c9f8d316f59a0b0ca9e898c83011a5b39a867f0c74271d7a6a4f257",
+          "size": 4168138
+        },
+        {
+          "sha256": "63ddb0abdbb0d24f3ae923511daf3429ac38f2817900fd7fcfabdca7c02c499b",
+          "size": 4154576
+        },
+        {
+          "sha256": "ff7b578e4b8be811dce9332f00f089df5426bf0e845e5fc872e08db5b255147b",
+          "size": 3091821
+        }
+      ]
+    },
+    {
+      "packageId": "playwright-cli-skills",
+      "reviewSha256": "87913bdffceed564bca36cce02d7b0730a7f00b5b7f6eb9dfaa0c5fd5517f618",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "a2341e738347b766716fafb78b50dbe84c2a01f3e0738d8283c868513e0c90bf",
+          "size": 4274439
+        }
+      ]
+    },
+    {
+      "packageId": "playwright-mcp",
+      "reviewSha256": "557f89a99f416b8742d1d2255d14525b3f6e60a9de00abeb3c274793f9697644",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "c4d3461e875fe3b26e2a7a75851a913195d9f9e7118823a1ce58a04829a2677c",
+          "size": 4238838
+        }
+      ]
+    },
+    {
+      "packageId": "redis-mcp",
+      "reviewSha256": "ea47419cfaedcaa2db102aaf0b7fd52be8198d21a18066504863e7a3f437a005",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "ac29cb78643b20f69b6199c6b6e0fdaaf36dd9af15fbf8dbd7e8eff4e9d03f07",
+          "size": 15331958
+        },
+        {
+          "sha256": "9259e3416f60fa3224f1a665185694e9a78cd45f643b5bb549d4b76a0b89e8f9",
+          "size": 8298006
+        }
+      ]
+    },
+    {
+      "packageId": "sequential-thinking-mcp",
+      "reviewSha256": "fec7e7b9321420f0d3854d68f5b057fa86747fb21ed20e985b44c8f4360297d9",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "ee27a858c66fc78974307d7dc37376b04bb5bab0c98cef557b1249ea10207202",
+          "size": 2557243
+        },
+        {
+          "sha256": "f6adacb2684efac195a586b822b7f4fce5580cf322e81eedf8126406c8b09592",
+          "size": 2874680
+        }
+      ]
+    },
+    {
+      "packageId": "superpowers",
+      "reviewSha256": "757298cdb87136ab60f7213fccc2f5b74f4c42756664aa2b514be2bfd40a7e1a",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "06fd394b354b1010e88d36a16c7f232954a109574061bc7fda6f01c4943f6b25",
+          "size": 147252
+        }
+      ]
+    },
+    {
+      "packageId": "time-mcp",
+      "reviewSha256": "2e14c205e2dfc0ff11cd43b84b786f844e55a20c5b2eed1cf360984e2e362d88",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "0bcf250a999bbd719ad6800bc6af36900e23b3083929022ec118e06746343966",
+          "size": 12928576
+        }
+      ]
+    },
+    {
+      "packageId": "video-shotcraft",
+      "reviewSha256": "e52072beda606da50549af2a2e5311ef480f79e1a6bd6708fda0fe10d82b9dd0",
+      "platform": "darwin",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "23d79ab2871094262721fb2aa2ea8647aaa3b45e5d757b1ea69465a5ce80dfcc",
+          "size": 3040181
+        }
+      ]
+    },
+    {
+      "packageId": "antv-chart-mcp",
+      "reviewSha256": "b28052824a8114e93d92e57cbaf37f0b6f5be5413195df0a346d6032c0fe0e48",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "33b848afd321a358e04233d45c11ac19fac511d6b16b34000fe441dc005d9569",
+          "size": 3140245
+        },
+        {
+          "sha256": "f69e52f4f0d534e6bb052fdaefeef98dd85c7f710133c4ab9c9cd30e78d41083",
+          "size": 2938511
+        }
+      ]
+    },
+    {
+      "packageId": "antv-chart-skill",
+      "reviewSha256": "7c2bd6af032af5a0a4d1a03812f2918d5a5ed0b034930190b973590ca3b60c99",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "e588929c704214da619907112e713e04cfe61cb66e60edd1adf5086bc36d4be4",
+          "size": 3124
+        }
+      ]
+    },
+    {
+      "packageId": "arch-diagram-skill",
+      "reviewSha256": "fb4a311f1e0a4366fa3d5bb255e40deb7417a9c4262397c11780a5298ba7d58d",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "81325c0e6f22e5b8cdc92a8e31ff9f8014f4c96034ad195b466213aca8ad7525",
+          "size": 43093
+        }
+      ]
+    },
+    {
+      "packageId": "blender-skills",
+      "reviewSha256": "0442e462af8af3fc99207874dbd8e65f5fe1f8e6b4727cf7f72c99d9ed38b956",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "cd566fc3413fd8ae00fe8b0d3ec8ab2e148dfffb5c018b24e95c154eb0ea7316",
+          "size": 198053
+        }
+      ]
+    },
+    {
+      "packageId": "browser-skill",
+      "reviewSha256": "00bd03b5f36fdd2e111c4a323dc6a5269d4a9b16a1a670eaf853361734c229b2",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "b315933a3ba9fd26478071e78178166fcf4e3ee31f1ae7c72caf0590003a3708",
+          "size": 41696
+        }
+      ]
+    },
+    {
+      "packageId": "context7-mcp",
+      "reviewSha256": "cd9e1f2c90234753d4dd699d9a6e1aa40bf5be18134f92b53a1e5aacbae620e2",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "daa55c02645f433b9b15c2ba94fdd9a848e50b400c226823bfb86d6229252ed7",
+          "size": 4937014
+        },
+        {
+          "sha256": "845aec0b35982143c2e51bcf665967f72b0e6730c4abc02a0f66a712822a41b7",
+          "size": 1110738
+        }
+      ]
+    },
+    {
+      "packageId": "dbhub",
+      "reviewSha256": "8cb385dce30dd57149417e0276dcc642d6c3ff1b950a7c9bcc36f4c5567c53c3",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "894813328915f9427c26c0a9f73b93f32b6a87180aef13a8d0de3d33e32129e8",
+          "size": 1963867
+        },
+        {
+          "sha256": "710a7c190477a55a3663760964fb0287b7539cca777889ce6f2b35fac066b3d8",
+          "size": 2361007
+        },
+        {
+          "sha256": "5f69f4850831c5f117ae30ed5ab5f8fc27b78390566d819687d8f6db3cf88235",
+          "size": 4400811
+        },
+        {
+          "sha256": "b7abd59f42412447b143fcf100d20a68d891a12b85e476fe75b73342dbbdfd49",
+          "size": 5688108
+        },
+        {
+          "sha256": "f5b5647b68fd90c010f6a858b0f9afd81e17f2aa383f6581d3c228de673df8b9",
+          "size": 2820704
+        },
+        {
+          "sha256": "31039daa035560469427d5d4883157e711c9ac5a19a0f70b6a93863d89ca23dc",
+          "size": 4286223
+        },
+        {
+          "sha256": "b8315d7c42a7a03a7468c6c97ce416f9d2783f2964664929cc3a1ba11905be3f",
+          "size": 3295809
+        }
+      ]
+    },
+    {
+      "packageId": "diagram-design",
+      "reviewSha256": "fc6220b3245b723d21ac701eea25bbdc0fa2dadb1a7ef7311bcdfab1431e1186",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "553279a410461b812ffee41bd13b90bd39ae04e04515ee24764f4401aec5af6a",
+          "size": 22005406
+        }
+      ]
+    },
+    {
+      "packageId": "docling-mcp",
+      "reviewSha256": "18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "81bf7c19d90b1eecd5694a07ee8e8415e57444e6271164f7ef62d721034bb27d",
+          "size": 20804091
+        },
+        {
+          "sha256": "5c35d9aeb941e36eafe493dbc5bf1f34770ee1854c6f3f1f3a2ff023c3234e65",
+          "size": 15090414
+        },
+        {
+          "sha256": "e2b662456a8a2a57601b051ab7bf56bfb472540a9c6520c2961498cf099ccefc",
+          "size": 11096668
+        },
+        {
+          "sha256": "21c4eb1ae6177e0457add53dad647a4af3479cdd82edc1e724badeedf8bf5ef9",
+          "size": 6497681
+        }
+      ]
+    },
+    {
+      "packageId": "fetch-mcp",
+      "reviewSha256": "ced65391d97c5da31b528372a2f2a14840cf44be7cc426ae0215fea210450fcb",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "ae59bfd25a78221d7316f12a1f49372c87da44cff9508bb17b596781ff5e4b59",
+          "size": 19343475
+        },
+        {
+          "sha256": "4d9d75d314ebf508c9eeb2455b26fa515c6968456a51babfb7407e2b01e148ce",
+          "size": 784147
+        }
+      ]
+    },
+    {
+      "packageId": "filesystem-mcp",
+      "reviewSha256": "91163cdc69eb8924dbfa069fd31ad788734417bbceae50bc7ad1eaeb20504fb5",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "deeb22d00cfa663164397337835e66f9a6a3b3401a91f4ad88e67bd810bd1d3d",
+          "size": 2801680
+        },
+        {
+          "sha256": "3798cc90a08bb8e82d3a4646ddb38d8cb4f6e67cae68876101598cc3b0c8d8a4",
+          "size": 3573664
+        },
+        {
+          "sha256": "0a6a4c286219e4b76188e844277a1a95a2c1c969928da8a6af8bec4b4d69df8f",
+          "size": 230132
+        }
+      ]
+    },
+    {
+      "packageId": "git-mcp",
+      "reviewSha256": "1649daaf6e5d3a9f4558b37b8fd35fa325fc0be5133efae244cda7376cf404a8",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "b38efee699a732c27f31d2d7b7788d1cec91bb6e92d96549fef93718a4efc42f",
+          "size": 15424987
+        }
+      ]
+    },
+    {
+      "packageId": "memory-mcp",
+      "reviewSha256": "5a29aa65bb104395ddb5330f58d7740062a7a7b9f771eab88a89d95e574fcd47",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "eacf6b0f102c48218baa0a24c43cc7938605ae26033bb470a7e0d8d54f929ef5",
+          "size": 2529483
+        },
+        {
+          "sha256": "576bc8bee9920631916af07179316f1487aa6eb5f344818d9b4e37c488d4d886",
+          "size": 2669195
+        }
+      ]
+    },
+    {
+      "packageId": "mongodb-mcp",
+      "reviewSha256": "99d2945dff1d07e5d30d2504d5374aab155c13a86b8e5557e13aa47a2f057f4e",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "fb5c83ef9381f6ad6fb4c4330df28e67ec9b4c7e820edf3485c90f6bdc240045",
+          "size": 3219849
+        },
+        {
+          "sha256": "a4f9d7b11f21b80db01740386bb250e84490e0e8c3a74757507d1424e9a44cf3",
+          "size": 2456737
+        },
+        {
+          "sha256": "5ee22ee4e5b352c5d81b7700da0fce17b2e551ca70b33d7dcb6d16e74b2ed366",
+          "size": 54731534
+        },
+        {
+          "sha256": "a68bf0533ec698eecf0a5bd3272e9951c013cec8113e871bfae002dee16d54d2",
+          "size": 719
+        },
+        {
+          "sha256": "563883c2e4baeb4addc122340fdf73145f0206b5e7ca6ea39e1b09eea83f5fb3",
+          "size": 54731516
+        },
+        {
+          "sha256": "e2622f3e1114ef900ce86eacb49ce2a6de1722a948ee4bcf072d2286e0a805a5",
+          "size": 3798003
+        },
+        {
+          "sha256": "3f9a6c1d23dc8194dcaf54c4aa20b12479e8b3e1e90fe635965eac5ed3c65e8f",
+          "size": 3376956
+        },
+        {
+          "sha256": "bef4c605fc5c89df8b9216a1fad34602005e321aed3b5c10f6b653b99b48999e",
+          "size": 1727151
+        },
+        {
+          "sha256": "ad64898b5a12b61c1a4766612468fb826bb2fe80eedc5f323291e4697d5a9295",
+          "size": 2356171
+        },
+        {
+          "sha256": "852e3580ab11831c9a747176fc6e3b5fea6c496875ae1d4683656f76df6fbf71",
+          "size": 4168138
+        },
+        {
+          "sha256": "ef6f6baec790b2df3ef9e8c443c01d3010e9a7e53b8ee0fff4e603d93513287b",
+          "size": 4154576
+        },
+        {
+          "sha256": "9f83c7c8580f2ab3dd461f3a51e813e3ea8d99ebdca9c3d1d4bc43ed556416d5",
+          "size": 3104405
+        }
+      ]
+    },
+    {
+      "packageId": "playwright-cli-skills",
+      "reviewSha256": "87913bdffceed564bca36cce02d7b0730a7f00b5b7f6eb9dfaa0c5fd5517f618",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "898fe3aaaf0a182733f6ab1032dd8d059f0b317abb06494dc6f01cb198cbae81",
+          "size": 4251667
+        }
+      ]
+    },
+    {
+      "packageId": "playwright-mcp",
+      "reviewSha256": "557f89a99f416b8742d1d2255d14525b3f6e60a9de00abeb3c274793f9697644",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "34ec7d50edb87cbb068a4ee167f9ddb92882ca1fed758c4ebbc8943bbabab71e",
+          "size": 4216070
+        }
+      ]
+    },
+    {
+      "packageId": "redis-mcp",
+      "reviewSha256": "ea47419cfaedcaa2db102aaf0b7fd52be8198d21a18066504863e7a3f437a005",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "52c04d80b0cad76e14b097c8dc19ca7d1a746f4da65f3b33f8dbfdbf87e773b8",
+          "size": 17714367
+        },
+        {
+          "sha256": "a1ef4651b6a3e23a88271b35ca02127481f4e3770d0d2f8c3d50babdf530679b",
+          "size": 11209580
+        },
+        {
+          "sha256": "500d493aafceeb574c596547fcb3c0413bb5d7887f2dcb77bc0fc155d8623271",
+          "size": 2849722
+        }
+      ]
+    },
+    {
+      "packageId": "sequential-thinking-mcp",
+      "reviewSha256": "fec7e7b9321420f0d3854d68f5b057fa86747fb21ed20e985b44c8f4360297d9",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "de2b1a4c4c230a9793c9b63e4297dd68343e8a6c4f637c05060fb646b559eea0",
+          "size": 2557243
+        },
+        {
+          "sha256": "278b904614e17503a6b5240c3395d78247700588d30434f86f688967b1eb9d36",
+          "size": 2874680
+        }
+      ]
+    },
+    {
+      "packageId": "superpowers",
+      "reviewSha256": "757298cdb87136ab60f7213fccc2f5b74f4c42756664aa2b514be2bfd40a7e1a",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "87c4c56e1cd9d4472517fe8e2d0628b8421951e2a5c929ddf8ff4e5aeb2bfeaa",
+          "size": 147368
+        }
+      ]
+    },
+    {
+      "packageId": "time-mcp",
+      "reviewSha256": "2e14c205e2dfc0ff11cd43b84b786f844e55a20c5b2eed1cf360984e2e362d88",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "c98a08bfa96616d396c3d8286f48b5dc9814f05cb6e3e24c2b8eea6564ebdf71",
+          "size": 14256141
+        },
+        {
+          "sha256": "b6082cfe6364d1898767b5a969315f3d643005a8bec0c4e309894eb7de42433d",
+          "size": 1256874
+        }
+      ]
+    },
+    {
+      "packageId": "video-shotcraft",
+      "reviewSha256": "e52072beda606da50549af2a2e5311ef480f79e1a6bd6708fda0fe10d82b9dd0",
+      "platform": "win32",
+      "arch": "x64",
+      "parts": [
+        {
+          "sha256": "23afe1ac1aa8eac204f368539fb327ba4420fc5135fa0dbf042d9dc20551e9f5",
+          "size": 3053191
+        }
+      ]
+    }
+  ]
+}

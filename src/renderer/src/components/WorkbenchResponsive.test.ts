@@ -19,6 +19,7 @@ describe('Workbench responsive panel contract', () => {
     expect(workbench.match(/\{renderRightPanel\(\)\}/g)).toHaveLength(1)
     expect(workbench.indexOf('{renderRightPanel()}')).toBeGreaterThan(workbench.indexOf('</main>'))
     expect(workbench).toContain('inert={activeOverlay ? true : undefined}')
+    expect(workbench).toContain('{leftSidebarCollapsed ? <SidebarUpdateControl docked /> : null}')
     expect(baseShell).toMatch(/\.ds-workbench-divider\s*\{[\s\S]*width: 1px;[\s\S]*flex: 0 0 1px;[\s\S]*background: transparent;/)
     expect(baseShell).toMatch(/\.ds-workbench-divider::before\s*\{\s*content: none;/)
     expect(baseShell).toMatch(/\.ds-workbench-divider::after\s*\{\s*content: none;/)

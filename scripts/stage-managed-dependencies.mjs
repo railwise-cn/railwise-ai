@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,6 +11,10 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { websiteStaticTransport } from './deploy-website-release.mjs'
 
 const manifestPath = fileURLToPath(new URL('../src/shared/managed-dependencies.json', import.meta.url))
+const marketplaceLockPath = fileURLToPath(new URL('../src/shared/marketplace-mirror-lock.json', import.meta.url))
+const marketplaceTargets = new Set(['darwin-arm64', 'darwin-x64', 'win32-x64'])
+const maxMirrorPartSize = 128 * 1024 * 1024
+const contentDigest = /^[0-9a-f]{64}$/
 const sourceHosts = new Set(['github.com', 'api.github.com', 'codeload.github.com', 'raw.githubusercontent.com', 'files.pythonhosted.org', 'www.python.org'])
 const responseHosts = new Set([...sourceHosts, 'codeload.github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com', 'www.railwise.cn'])
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -30,6 +35,91 @@ export function validateManifest(manifest) {
     if (!file.licenseIds?.length || !file.sourceIds?.length || [...file.licenseIds, ...file.sourceIds].some(id => !ids.has(id))) throw new Error(`Missing source/license records for ${file.id}.`)
   }
   return manifest
+}
+
+function parseMarketplaceRecords(lock, expectedTarget) {
+  if (lock?.version !== 1 || !Array.isArray(lock.packages) || lock.packages.length < 1 || lock.packages.length > 1000) {
+    throw new Error('Invalid or empty marketplace mirror lock.')
+  }
+  const result = new Map()
+  for (const record of lock.packages) {
+    const target = `${record?.platform}-${record?.arch}`
+    const key = `${target}/${record?.packageId}`
+    if (!marketplaceTargets.has(target) || (expectedTarget && target !== expectedTarget) ||
+        typeof record.packageId !== 'string' || !/^[a-z0-9][-a-z0-9.]{0,127}$/.test(record.packageId) ||
+        !contentDigest.test(record.reviewSha256) || !Array.isArray(record.parts) ||
+        record.parts.length === 0 || record.parts.length > 128 || result.has(key)) {
+      throw new Error(`Invalid or duplicate marketplace mirror record: ${key}`)
+    }
+    const used = new Set()
+    const parts = record.parts.map(part => {
+      if (!part || !contentDigest.test(part.sha256) || used.has(part.sha256) ||
+          !Number.isSafeInteger(part.size) || part.size < 1 || part.size > maxMirrorPartSize) {
+        throw new Error(`Invalid or duplicate marketplace mirror part: ${key}`)
+      }
+      used.add(part.sha256)
+      return { sha256: part.sha256, size: part.size }
+    })
+    result.set(key, { target, reviewSha256: record.reviewSha256, parts })
+  }
+  return result
+}
+
+async function requireRegularFile(path, maxBytes) {
+  const info = await lstat(path)
+  if (!info.isFile() || info.size < 1 || info.size > maxBytes) throw new Error('Invalid marketplace artifact file.')
+  return info
+}
+
+async function verifyMarketplacePart(path, file) {
+  const info = await requireRegularFile(path, file.size)
+  if (info.size !== file.size) throw new Error(`Marketplace artifact integrity mismatch: ${file.id}`)
+  const hash = createHash('sha256')
+  let size = 0
+  for await (const chunk of createReadStream(path)) {
+    size += chunk.byteLength
+    if (size > file.size) throw new Error(`Marketplace artifact exceeds locked size: ${file.id}`)
+    hash.update(chunk)
+  }
+  if (size !== file.size || hash.digest('hex') !== file.sha256) throw new Error(`Marketplace artifact integrity mismatch: ${file.id}`)
+}
+
+/** Bind downloaded build artifacts to committed review digests and exact content hashes. */
+export async function loadMarketplaceArtifacts(lock, directory) {
+  const locked = parseMarketplaceRecords(lock)
+  const targets = new Set([...locked.values()].map(record => record.target))
+  const files = new Map()
+  const sourcePaths = new Map()
+  for (const target of targets) {
+    const verified = new Set()
+    const sourceDirectory = join(directory, `marketplace-mirror-${target}`)
+    if (!(await lstat(sourceDirectory)).isDirectory()) throw new Error(`Invalid marketplace artifact directory: ${target}`)
+    const sourceLock = join(sourceDirectory, 'marketplace-lock.json')
+    await requireRegularFile(sourceLock, 2 * 1024 * 1024)
+    const records = parseMarketplaceRecords(JSON.parse(await readFile(sourceLock, 'utf8')), target)
+    const expected = [...locked.keys()].filter(key => key.startsWith(`${target}/`))
+    if (records.size !== expected.length) throw new Error(`Marketplace artifact record count differs for ${target}.`)
+    for (const key of expected) {
+      const committed = locked.get(key)
+      const generated = records.get(key)
+      if (!generated || JSON.stringify(generated) !== JSON.stringify(committed)) {
+        throw new Error(`Marketplace artifact does not match the committed lock: ${key}`)
+      }
+      for (const part of committed.parts) {
+        const file = { id: `marketplace-${part.sha256}`, ...part, mirrorPath: `marketplace/1/${part.sha256}/payload.zip` }
+        const source = join(sourceDirectory, `${part.sha256}.zip`)
+        const existing = files.get(file.id)
+        if (existing && existing.size !== file.size) throw new Error(`Marketplace artifact size differs for ${file.id}.`)
+        if (!verified.has(file.id)) {
+          await verifyMarketplacePart(source, file)
+          verified.add(file.id)
+          sourcePaths.set(file.id, source)
+        }
+        if (!existing) files.set(file.id, file)
+      }
+    }
+  }
+  return { files: [...files.values()], sources: sourcePaths }
 }
 
 export async function checkedBytes(response, file) {
@@ -137,7 +227,10 @@ PY_REMOTE`
 async function verifyPublicDependencies(manifest, receipt) {
   for (const file of manifest.files) {
     const url = `${manifest.publicBase}/${file.mirrorPath.split('/').map(encodeURIComponent).join('/')}`
-    await checkedBytes(await fetch(url, { signal: AbortSignal.timeout(120_000) }), file)
+    await checkedBytes(await fetch(url, {
+      signal: AbortSignal.timeout(120_000),
+      ...(file.mirrorPath.startsWith('marketplace/') ? { redirect: 'error' } : {})
+    }), file)
     receipt.files.push({ id: file.id, url, sha256: file.sha256, size: file.size, verified: true })
   }
 }
@@ -147,6 +240,7 @@ async function resumeWebsiteStage(manifestBytes, manifest, stagingId, inspectOnl
   const ssh = websiteStaticTransport.readSshConfig()
   const remote = `${ssh.root}/dependencies/.deploy-${stagingId}/payload`
   const receipt = { schema: 'railwise.dependency-mirror-evidence.v1', sourceHead: process.env.GITHUB_SHA ?? '', manifestSha256: sha(manifestBytes), stagingId, status: 'resuming', files: [] }
+  if (manifest.marketplace) receipt.marketplace = manifest.marketplace
   try {
     const progress = JSON.parse(websiteStaticTransport.runRemote(ssh, inspectWebsiteStage, [remote, receipt.manifestSha256]))
     receipt.progress = progress
@@ -166,8 +260,20 @@ async function resumeWebsiteStage(manifestBytes, manifest, stagingId, inspectOnl
 }
 
 export async function stageManagedDependencies() {
-  const manifestBytes = await readFile(manifestPath)
+  let manifestBytes = await readFile(manifestPath)
   const manifest = validateManifest(JSON.parse(manifestBytes))
+  let marketplaceSources = new Map()
+  if (process.env.MARKETPLACE_BUILD_RUN_ID) {
+    if (!/^[1-9][0-9]*$/.test(process.env.MARKETPLACE_BUILD_RUN_ID) || !process.env.MARKETPLACE_MIRROR_ARTIFACTS) {
+      throw new Error('Marketplace staging requires artifacts from an exact same-repository build run.')
+    }
+    const lockBytes = await readFile(marketplaceLockPath)
+    const batch = await loadMarketplaceArtifacts(JSON.parse(lockBytes), process.env.MARKETPLACE_MIRROR_ARTIFACTS)
+    marketplaceSources = batch.sources
+    manifest.files.push(...batch.files)
+    manifest.marketplace = { buildRunId: process.env.MARKETPLACE_BUILD_RUN_ID, lockSha256: sha(lockBytes) }
+    manifestBytes = Buffer.from(JSON.stringify(manifest))
+  }
   if (process.env.DEPENDENCY_STAGE_ID) return resumeWebsiteStage(manifestBytes, manifest, process.env.DEPENDENCY_STAGE_ID, process.env.DEPENDENCY_STAGE_INSPECT_ONLY === 'true')
   if (process.env.DEPENDENCY_STAGE_INSPECT_ONLY === 'true') throw new Error('Dependency inspection requires the saved staging UUID.')
   for (const name of ['R2_ACCOUNT_ID', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']) if (!process.env[name]) throw new Error(`Missing ${name}.`)
@@ -177,6 +283,7 @@ export async function stageManagedDependencies() {
     requestHandler: new NodeHttpHandler({ connectionTimeout: 15_000, requestTimeout: 120_000 }) })
   const directory = await mkdtemp(join(tmpdir(), 'railwise-dependencies-'))
   const receipt = { schema: 'railwise.dependency-mirror-evidence.v1', sourceHead: process.env.GITHUB_SHA ?? '', manifestSha256: sha(manifestBytes), stagingId: randomUUID(), status: 'staging', files: [] }
+  if (manifest.marketplace) receipt.marketplace = manifest.marketplace
   try {
     await writeFile('dependency-mirror-evidence.json', `${JSON.stringify(receipt, null, 2)}\n`)
     await writeFile(join(directory, 'manifest.json'), manifestBytes)
@@ -189,10 +296,14 @@ export async function stageManagedDependencies() {
     for (const file of manifest.files) {
       const key = `railwise-ai/dependencies/${file.mirrorPath}`
       if (!await r2Matches(client, process.env.R2_BUCKET, key, file)) {
-        const bytes = await checkedBytes(await fetch(file.sourceUrl, { signal: AbortSignal.timeout(120_000) }), file)
+        const artifactSource = marketplaceSources.get(file.id)
+        const bytes = artifactSource
+          ? await readFile(artifactSource)
+          : await checkedBytes(await fetch(file.sourceUrl, { signal: AbortSignal.timeout(120_000) }), file)
+        if (bytes.length !== file.size || sha(bytes) !== file.sha256) throw new Error(`Staged source integrity mismatch: ${file.id}`)
         try { await client.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key, Body: bytes, IfNoneMatch: '*', CacheControl: 'public,max-age=31536000,immutable', Metadata: { sha256: file.sha256 } })) }
         catch (error) { if (error?.$metadata?.httpStatusCode !== 412) throw error }
-        await r2Matches(client, process.env.R2_BUCKET, key, file)
+        if (!await r2Matches(client, process.env.R2_BUCKET, key, file)) throw new Error(`Uploaded object is missing: ${file.id}`)
       }
       if (pendingIds.has(file.id)) downloads.push({ name: file.id, size: file.size,
         url: await getSignedUrl(client, new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }), { expiresIn: 3600 }) })

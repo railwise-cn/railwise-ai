@@ -2,7 +2,7 @@ import { AUTOCAD_UPSTREAM, isApprovedAutocadUpstreamSkill, isApprovedUpstreamPac
 import { createHash, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { constants } from 'node:fs'
-import { copyFile, lstat, mkdir, open, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, mkdtemp, open, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -24,7 +24,7 @@ import {
   stagePackageDirectory,
   type UpdatePackagePermissionsRequestV1
 } from './package-installation-service'
-import { extractPluginArchive, PLUGIN_ARCHIVE_LIMITS } from './plugin-archive-security'
+import { extractPluginArchive, inspectPluginArchive, PLUGIN_ARCHIVE_LIMITS } from './plugin-archive-security'
 import {
   installPreparedPluginPackage,
   parsePreparedPluginDirectory,
@@ -35,11 +35,15 @@ import {
 } from './plugin-package-formats'
 import { downloadManagedDependency, findManagedDependency } from './managed-dependency-download'
 import { materializePypiPackage } from './pypi-package-materializer'
+import { readCatalogLicenseEvidence } from './package-license-evidence'
 import { describeNetworkFailure, systemFetch } from './system-network'
 import { parseCatalogPackageArtifact } from './marketplace-catalog-service'
+import { materializeMarketplaceMirror, mirrorRecordFor } from './marketplace-mirror'
+import { curateVideoShotcraftMirror } from './video-shotcraft-distribution'
 import {
   marketplaceCommandEnvironment,
-  resolveMarketplaceCommand
+  resolveMarketplaceCommand,
+  resolveMarketplaceNpmCommand
 } from './marketplace-command'
 
 const PREPARED_IMPORT_TTL_MS = 30 * 60_000
@@ -474,7 +478,7 @@ export class PluginManagementService {
         await handle.close()
       }
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      if ((error as NodeJS.ErrnoException | undefined)?.code !== 'ENOENT') throw error
       const sourceKind = installed.source.kind
       if (sourceKind !== 'local' && sourceKind !== 'project' && sourceKind !== 'https') {
         throw new Error('Installed plugin does not contain recoverable reviewed metadata.')
@@ -590,18 +594,19 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-async function copyLicense(sourceDirectory: string, targetDirectory: string, required = true): Promise<void> {
+async function copyLicense(sourceDirectory: string, targetDirectory: string, required = true): Promise<boolean> {
   const names = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'NOTICE', 'NOTICE.md', 'COPYING']
   if (await Promise.all(names.map((name) => exists(join(targetDirectory, name)))).then((values) => values.some(Boolean))) {
-    return
+    return true
   }
   for (const name of names) {
     const source = join(sourceDirectory, name)
     if (!await exists(source)) continue
     await copyFile(source, join(targetDirectory, name))
-    return
+    return true
   }
   if (required) throw new Error('Catalog package does not preserve a LICENSE, NOTICE, or COPYING file.')
+  return false
 }
 
 function packageDirectory(root: string, packageName: string): string {
@@ -617,9 +622,9 @@ async function materializeNpmPackage(
   if (source.kind !== 'npm' || source.digest.algorithm !== 'sha512-sri') {
     throw new Error('Catalog npm package metadata is incomplete.')
   }
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  const npm = resolveMarketplaceNpmCommand()
   const spec = `${source.packageName}@${source.version}`
-  const integrityOutput = await command(npm, ['view', spec, 'dist.integrity', '--json'])
+  const integrityOutput = await command(npm.executable, [...npm.args, 'view', spec, 'dist.integrity', '--json'])
   let integrity = integrityOutput.trim()
   try {
     const parsed = JSON.parse(integrity) as unknown
@@ -637,7 +642,8 @@ async function materializeNpmPackage(
     version: '1.0.0',
     private: true
   }, null, 2)}\n`, { mode: 0o600 })
-  await command(npm, [
+  await command(npm.executable, [
+    ...npm.args,
     'install',
     '--ignore-scripts',
     '--no-audit',
@@ -655,7 +661,11 @@ async function materializeNpmPackage(
     }
     await stagePackageDirectory(skillSource, join(targetDirectory, 'skills'))
   }
-  await copyLicense(installedPackageRoot, targetDirectory)
+  if (!await copyLicense(installedPackageRoot, targetDirectory, false)) {
+    const license = await readCatalogLicenseEvidence(item, systemFetch, true)
+    if (!license) throw new Error('Catalog package does not preserve a LICENSE, NOTICE, or COPYING file.')
+    await writeFile(join(targetDirectory, 'LICENSE'), license, { mode: 0o600, flag: 'wx' })
+  }
 }
 
 async function materializeGithubPackage(
@@ -671,71 +681,74 @@ async function materializeGithubPackage(
     await materializeGithubArchive(source.owner, source.repository, source.resolvedRef, targetDirectory, source.subpath, isApprovedAutocadUpstreamSkill(item) ? item : undefined)
     return
   }
-  const repository = `https://github.com/${source.owner}/${source.repository}.git`
-  // GUI Electron processes do not inherit the interactive shell's proxy. Prefer
-  // Chromium's network stack in the packaged app, while keeping the git path for
-  // CLI/tests and as a fallback when codeload is unavailable.
-  if (process.versions.electron) {
+  const packageArchive = () => materializeGithubArchive(
+    source.owner, source.repository, source.resolvedRef, targetDirectory, source.subpath
+  )
+  // The installed application can use Chromium's network stack. On a release
+  // runner Git is another way to obtain the same immutable commit.
+  const preferDownload = Boolean(process.versions.electron)
+  if (preferDownload) {
     try {
-      await materializeGithubArchive(
-        source.owner,
-        source.repository,
-        source.resolvedRef,
-        targetDirectory,
-        source.subpath
-      )
+      await packageArchive()
       return
     } catch (error) {
       if (!isGithubNetworkFailure(error)) throw error
     }
   }
+  let archive: Buffer
   try {
-    await command('git', ['clone', '--filter=blob:none', '--no-checkout', repository, targetDirectory])
+    archive = await archivePinnedGithubCommit(source.owner, source.repository, source.resolvedRef, targetDirectory)
   } catch (error) {
-    if (!isGithubNetworkFailure(error)) throw error
-    await rm(targetDirectory, { recursive: true, force: true })
-    await materializeGithubArchive(
-      source.owner,
-      source.repository,
-      source.resolvedRef,
-      targetDirectory,
-      source.subpath
-    )
+    if (preferDownload || (!isGithubNetworkFailure(error) && (error as NodeJS.ErrnoException).code !== 'ENOENT')) throw error
+    await packageArchive()
     return
   }
+  await stageGithubArchive(archive, targetDirectory, source.subpath)
+}
+
+async function archivePinnedGithubCommit(
+  owner: string,
+  repository: string,
+  commit: string,
+  targetDirectory: string
+): Promise<Buffer> {
+  const work = await mkdtemp(join(dirname(targetDirectory), '.github-package-'))
+  const checkout = join(work, 'checkout')
+  const archive = join(work, 'source.zip')
   try {
-    await command('git', ['fetch', '--depth=1', 'origin', source.resolvedRef], { cwd: targetDirectory })
-    await command('git', ['checkout', '--detach', source.resolvedRef], { cwd: targetDirectory })
-    const head = (await command('git', ['rev-parse', 'HEAD'], { cwd: targetDirectory })).trim()
-    if (head.toLowerCase() !== source.resolvedRef.toLowerCase()) {
-      throw new Error('GitHub checkout does not match the trusted catalog commit.')
+    await command('git', ['init', '--quiet', checkout])
+    const remote = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}.git`
+    await command('git', ['fetch', '--depth=1', '--no-tags', remote, commit], { cwd: checkout })
+    const fetched = (await command('git', ['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], { cwd: checkout })).trim()
+    if (fetched.toLowerCase() !== commit.toLowerCase()) {
+      throw new Error('GitHub fetch does not match the trusted catalog commit.')
     }
-    await rm(join(targetDirectory, '.git'), { recursive: true, force: true })
-    if (source.subpath) {
-      const payload = `${targetDirectory}.payload`
-      const selected = resolve(targetDirectory, source.subpath)
-      if (!isCanonicalPathContained(targetDirectory, selected)) {
-        throw new Error('Catalog package subpath escapes its repository.')
+    // A checkout can materialize real links on Unix and plain link text on
+    // Windows. Use Git's portable archive mode and the same vetted extraction
+    // as codeload, including internal link expansion, on all release runners.
+    await command('git', ['archive', '--format=zip', '--prefix=repository/', `--output=${archive}`, fetched], { cwd: checkout })
+    const handle = await open(archive, 'r')
+    try {
+      const info = await handle.stat()
+      if (!info.isFile() || info.size > MAX_GITHUB_ARCHIVE_BYTES) {
+        throw new Error(`GitHub archive exceeds the ${Math.floor(MAX_GITHUB_ARCHIVE_BYTES / (1024 * 1024))} MiB limit.`)
       }
-      await stagePackageDirectory(selected, payload)
-      await copyLicense(targetDirectory, payload)
-      await rm(targetDirectory, { recursive: true, force: true })
-      await rename(payload, targetDirectory)
-    } else {
-      await copyLicense(targetDirectory, targetDirectory)
+      return await handle.readFile()
+    } finally {
+      await handle.close()
     }
-  } catch (error) {
-    await rm(`${targetDirectory}.payload`, { recursive: true, force: true }).catch(() => undefined)
-    throw error
+  } finally {
+    await rm(work, { recursive: true, force: true }).catch(() => undefined)
   }
 }
 
 function isGithubNetworkFailure(error: unknown): boolean {
-  const value = error as { message?: unknown; stderr?: unknown; cause?: { message?: unknown } }
-  const detail = [value?.message, value?.stderr, value?.cause?.message]
+  const value = error as { name?: unknown; message?: unknown; stderr?: unknown; cause?: { code?: unknown; message?: unknown } }
+  if (value?.name === 'TimeoutError') return true
+  const detail = [value?.message, value?.stderr, value?.cause?.code, value?.cause?.message]
     .filter((item): item is string => typeof item === 'string')
     .join(' ')
-  return /unable to access|could not resolve host|failed to connect|connection timed out|connection reset|network is unreachable|connection refused|operation timed out|fetch failed|archive download failed \((?:408|429|5\d\d)\)/i.test(detail)
+  return /unable to access|could not resolve host|failed to connect|connection timed out|connection reset|network is unreachable|connection refused|operation timed out|aborted due to timeout|fetch failed|RPC failed|early EOF|remote end hung up|ETIMEDOUT|ECONNRESET|ENOTFOUND|archive download failed \((?:408|429|5\d\d)\)/i.test(detail)
 }
 
 async function downloadGithubArchive(owner: string, repository: string, commit: string): Promise<Buffer> {
@@ -795,39 +808,46 @@ export async function materializeGithubArchive(
   subpath?: string,
   upstreamSkill?: MarketplacePackageV1
 ): Promise<void> {
+  const approvedUpstreamSkill = upstreamSkill !== undefined && isApprovedAutocadUpstreamSkill(upstreamSkill)
+  if (upstreamSkill && (!approvedUpstreamSkill || upstreamSkill.source.kind !== 'github'
+    || upstreamSkill.source.owner !== owner || upstreamSkill.source.repository !== repository
+    || upstreamSkill.source.resolvedRef !== commit || upstreamSkill.source.subpath !== subpath)) {
+    throw new Error('Upstream Skill source does not match the reviewed catalog artifact.')
+  }
+  const archive = await downloadGithubArchive(owner, repository, commit)
+  if (approvedUpstreamSkill && createHash('sha256').update(archive).digest('hex') !== AUTOCAD_UPSTREAM.sha256) {
+    throw new Error('Upstream Skill archive SHA-256 does not match the reviewed catalog artifact.')
+  }
+  await stageGithubArchive(archive, targetDirectory, subpath, !approvedUpstreamSkill)
+}
+
+async function stageGithubArchive(
+  archive: Buffer,
+  targetDirectory: string,
+  subpath?: string,
+  requireLicense = true
+): Promise<void> {
+  const options = { allowInternalLinks: true }
+  const { entries } = inspectPluginArchive(archive, options)
+  const rootName = entries[0]?.path.split('/')[0]
+  if (!rootName || entries.some(entry => !(entry.path === rootName && entry.directory) && !entry.path.startsWith(`${rootName}/`))) {
+    throw new Error('GitHub archive must contain exactly one repository root directory.')
+  }
+
   const archiveDirectory = `${targetDirectory}.archive`
   try {
-    const approvedUpstreamSkill = upstreamSkill !== undefined && isApprovedAutocadUpstreamSkill(upstreamSkill)
-    if (upstreamSkill && (!approvedUpstreamSkill || upstreamSkill.source.kind !== 'github'
-      || upstreamSkill.source.owner !== owner || upstreamSkill.source.repository !== repository
-      || upstreamSkill.source.resolvedRef !== commit || upstreamSkill.source.subpath !== subpath)) {
-      throw new Error('Upstream Skill source does not match the reviewed catalog artifact.')
-    }
-    const archive = await downloadGithubArchive(owner, repository, commit)
-    if (approvedUpstreamSkill && createHash('sha256').update(archive).digest('hex') !== AUTOCAD_UPSTREAM.sha256) {
-      throw new Error('Upstream Skill archive SHA-256 does not match the reviewed catalog artifact.')
-    }
-    // GitHub repositories may commit internal symlinks (for example a
-    // workbench demo directory). The archive extractor resolves those links
-    // into regular files/directories while continuing to reject links that
-    // escape the repository or create cycles.
-    await extractPluginArchive(archive, archiveDirectory, { allowInternalLinks: true })
-    const roots = (await readdir(archiveDirectory, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink())
-    if (roots.length !== 1) {
-      throw new Error('GitHub archive must contain exactly one repository root directory.')
-    }
-    const repositoryRoot = join(archiveDirectory, roots[0]!.name)
+    await extractPluginArchive(archive, archiveDirectory, options)
+    const repositoryRoot = join(archiveDirectory, rootName)
     if (subpath) {
       const selected = resolve(repositoryRoot, subpath)
       if (!isCanonicalPathContained(repositoryRoot, selected)) {
         throw new Error('Catalog package subpath escapes its repository.')
       }
       await stagePackageDirectory(selected, targetDirectory)
-      await copyLicense(repositoryRoot, targetDirectory, !approvedUpstreamSkill)
+      await copyLicense(repositoryRoot, targetDirectory, requireLicense)
     } else {
       await rename(repositoryRoot, targetDirectory)
-      await copyLicense(targetDirectory, targetDirectory, !approvedUpstreamSkill)
+      await copyLicense(targetDirectory, targetDirectory, requireLicense)
     }
   } finally {
     await rm(archiveDirectory, { recursive: true, force: true }).catch(() => undefined)
@@ -839,12 +859,30 @@ export async function materializeCatalogPackage(
   targetDirectory: string
 ): Promise<void> {
   if (await exists(targetDirectory)) throw new Error('Catalog package staging directory already exists.')
+  if (item.installation?.mode === 'direct-mirror' && item.source.catalogSourceId === 'workwise-official') {
+    const record = mirrorRecordFor(item)
+    if (!record) throw new Error('当前版本没有此插件的睿威官方镜像，请检查应用更新。')
+    await materializeMarketplaceMirror(item, record, targetDirectory)
+    return
+  }
+  await materializeCatalogUpstreamForMirror(item, targetDirectory)
+}
+
+/** Resolve upstream dependencies on a release build runner or for an explicitly upstream-only package. */
+export async function materializeCatalogUpstreamForMirror(
+  item: MarketplacePackageV1,
+  targetDirectory: string
+): Promise<void> {
+  if (await exists(targetDirectory)) throw new Error('Catalog package staging directory already exists.')
   if (item.source.kind === 'npm') {
     await materializeNpmPackage(item, targetDirectory)
     return
   }
   if (item.source.kind === 'github') {
     await materializeGithubPackage(item, targetDirectory)
+    if (item.id === 'video-shotcraft' && item.source.catalogSourceId === 'workwise-official') {
+      await curateVideoShotcraftMirror(item, targetDirectory)
+    }
     return
   }
   if (item.source.kind === 'pypi') {

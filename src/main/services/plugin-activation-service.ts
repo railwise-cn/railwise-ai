@@ -17,6 +17,9 @@ import {
   type ManagedUvRuntimeV1
 } from './managed-uv-runtime-service'
 import type { McpConfigService } from './mcp-config-service'
+import { getOfficialMarketplaceCatalog } from './official-marketplace-catalog'
+import { hasMarketplaceMirrorReceipt, mirrorRecordFor, type MirroredPackage } from './marketplace-mirror'
+import { inspectPackageDirectory, PackageInstallationService, packageInstallLimitsFor } from './package-installation-service'
 
 const MAX_PACKAGE_JSON_BYTES = 1024 * 1024
 const MAX_RUNTIME_METADATA_BYTES = 1024 * 1024
@@ -81,6 +84,67 @@ async function npmEntrypoint(
     : manifest.bin?.[executable] ?? Object.values(manifest.bin ?? {})[0]
   if (!bin) throw new Error(`Plugin npm executable was not found: ${executable}.`)
   return verifiedArtifactPath(packageRoot, bin)
+}
+
+async function verifiedMarketplaceInstallation(
+  item: MarketplacePackageV1,
+  installed: InstalledPackageV1,
+  record = mirrorRecordFor(item)
+): Promise<boolean> {
+  if (!record || item.installation?.mode !== 'direct-mirror' || item.source.catalogSourceId !== 'workwise-official' ||
+      installed.packageId !== item.id || record.packageId !== item.id || installed.reviewSha256 !== record.reviewSha256 ||
+      installed.version !== item.version || installed.source.id !== item.source.id ||
+      installed.source.catalogSourceId !== 'workwise-official' ||
+      !await hasMarketplaceMirrorReceipt(installed.artifact.location, record)) return false
+  try {
+    const inspected = await inspectPackageDirectory(installed.artifact.location, packageInstallLimitsFor(item))
+    return inspected.sha256 === installed.artifact.sha256
+  } catch {
+    return false
+  }
+}
+
+export async function verifiedMirroredNpmMcp(
+  server: McpServerConfigV2,
+  options: {
+    installed?: Pick<PackageInstallationService, 'get'>
+    catalog?: readonly MarketplacePackageV1[]
+    mirrorFor?: (item: MarketplacePackageV1) => MirroredPackage | undefined
+  } = {}
+): Promise<boolean> {
+  // The renderer's generic MCP editor can save a command. Node mode for
+  // Electron is derived exclusively from a reviewed catalog component and
+  // its sealed, mirrored installed artifact.
+  if (server.transport !== 'stdio' || server.source !== 'managed-tool' || server.cwd ||
+      server.command !== (process.platform === 'win32' ? 'node.exe' : 'node') || !server.args?.[0]) return false
+  const item = (options.catalog ?? getOfficialMarketplaceCatalog()).find(candidate =>
+    candidate.installation?.mode === 'direct-mirror' && candidate.source.catalogSourceId === 'workwise-official' &&
+    candidate.source.kind === 'npm' &&
+    candidate.components.some(component => component.id === server.id && component.type === 'mcp' && component.runtime.kind === 'npm')
+  )
+  if (!item) return false
+  const record = (options.mirrorFor ?? mirrorRecordFor)(item)
+  if (!record) return false
+  try {
+    const service = options.installed ?? new PackageInstallationService()
+    const installed = await service.get(item.id)
+    const workspace = server.scope === 'workspace' ? server.workspaceRoot : undefined
+    if (!installed || (installed.scope === 'workspace') !== (server.scope === 'workspace') ||
+        installed.workspaceRoot !== workspace || !permissionGranted(item, installed) ||
+        !isCanonicalPathContained(await realpath(installed.artifact.location), server.args[0])) return false
+    const component = item.components.find(candidate => candidate.id === server.id && candidate.type === 'mcp')
+    if (component?.type !== 'mcp' || component.runtime.kind !== 'npm') return false
+    const credentialKeys = item.auth.type === 'token' ? item.auth.environmentVariables : []
+    const savedKeys = server.credentialEnvironmentVariables ?? []
+    if (credentialKeys.length !== savedKeys.length || !credentialKeys.every(key =>
+      savedKeys.includes(key) && !/^(?:ELECTRON_|NODE_|PATH$)/i.test(key))) return false
+    const expected = [await npmEntrypoint(installed.artifact.location, component.runtime.packageName, component.runtime.executable),
+      ...component.runtime.args.map(arg => replaceWorkspace(arg, workspace))]
+    if (expected.length !== server.args.length || !expected.every((arg, index) => arg === server.args![index])) return false
+    return verifiedMarketplaceInstallation(item, installed, record)
+  } catch {
+    return false
+  }
 }
 
 async function bundledArgument(
@@ -284,7 +348,10 @@ async function stdioLaunch(
 
 export async function activatePluginPackage(options: ActivatePluginPackageOptions): Promise<{ mcpChanged: boolean }> {
   const enabledByPermissions = permissionGranted(options.item, options.installed)
-  const managedUvRuntime = options.managedUvRuntime ?? new ManagedUvRuntimeService()
+  const usesManagedPython = options.item.components.some(component => component.type === 'mcp' && component.runtime.kind === 'uv')
+  const mirrorOnly = !options.managedUvRuntime && usesManagedPython &&
+    await verifiedMarketplaceInstallation(options.item, options.installed)
+  const managedUvRuntime = options.managedUvRuntime ?? new ManagedUvRuntimeService(mirrorOnly ? { mirrorOnly: true } : undefined)
   const workspaceRoot = options.installed.scope === 'workspace'
     ? options.installed.workspaceRoot
     : options.workspaceRoot
