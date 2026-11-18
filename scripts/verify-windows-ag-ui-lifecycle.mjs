@@ -111,8 +111,8 @@ function observeOwnedThreadSocket(origin, threadId) {
   return true
 }
 
-export async function verifyWindowsActivityLifecycle(cdp, inspector, { version, fixture, audit }) {
-  assert.ok(inspector, 'The acceptance runner must own the packaged main-process inspector')
+export async function verifyWindowsActivityLifecycle(cdp, inspector, { version, fixture, audit, cancellationOnly }) {
+  assert.ok(inspector || cancellationOnly, 'The acceptance runner must own the packaged main-process inspector')
   const release = 'main section[aria-label="本版更新"]'
   await cdp.wait(`document.querySelector(${quote(release)})?.innerText.includes(${quote(`本版更新 · ${version}`)})`, 'the exact-version notice on the initial home surface')
   audit.homepage = { source: 'installed-home-before-first-conversation', version, shownOnFirstOpen: true, dismissedAndReloaded: false }
@@ -142,7 +142,7 @@ export async function verifyWindowsActivityLifecycle(cdp, inspector, { version, 
   const port = await cdp.evaluate('window.workwise.getSettings().then(settings=>settings.agents.kun.port)')
   const observer = 'globalThis[Symbol.for("railwise.windows.activity-acceptance")]'
   const origin = `http://127.0.0.1:${port}`
-  assert.equal(await inspector.evaluate(`(${observeOwnedThreadSocket})(${quote(origin)}, ${quote(threadId)})`), true)
+  if (!cancellationOnly) assert.equal(await inspector.evaluate(`(${observeOwnedThreadSocket})(${quote(origin)}, ${quote(threadId)})`), true)
   try {
     await cdp.fill(composer, '普通会话活动验收，请用本地文件工具做一次只读检查。')
     await cdp.click('button[aria-label="发送"]')
@@ -164,16 +164,18 @@ export async function verifyWindowsActivityLifecycle(cdp, inspector, { version, 
     await cdp.wait(`!document.body.innerText.includes(${quote(missingFile)})`, 'the diagnostic to close again')
     audit.diagnostics = { renderedCollapsedByDefault: true, outputVisibleOnDemand: true, source: 'packaged-read-tool-error', runningStatus }
 
-    const initial = await inspector.wait(`(() => {const state=${observer}.read();return state.live && state;})()`, 'owned loopback thread event transport', cutBudgetMs)
-    assert.equal(await inspector.evaluate(`${observer}.disconnect()`), true, 'Drop only the exact intercepted loopback SSE socket')
-    fixture.continueDuringDisconnect()
-    const restored = await inspector.wait(`(() => {const state=${observer}.read();return state.live && state.cursors.length>${initial.cursors.length} && state;})()`, 'a new loopback event connection', cutBudgetMs)
-    const resumedCursor = restored.cursors.at(-1)
-    assert.ok(Number.isSafeInteger(resumedCursor) && resumedCursor > 0, 'The packaged client must reconnect from a durable cursor')
-    const occurrences = (text) => `(document.body.innerText.split(${quote(text)}).length-1)`
-    await cdp.wait(`${occurrences(replayedText)}===1 && ${occurrences(firstText)}===1`, 'single replay of the content generated across disconnect', cutBudgetMs)
-    audit.reconnect = { transport: 'owned-loopback-thread-sse', fixtureResentModelRequest: false,
-      startingCursor: initial.cursors.at(-1), resumedCursor, firstTextCount: 1, interruptedTextCount: 1 }
+    if (!cancellationOnly) {
+      const initial = await inspector.wait(`(() => {const state=${observer}.read();return state.live && state;})()`, 'owned loopback thread event transport', cutBudgetMs)
+      assert.equal(await inspector.evaluate(`${observer}.disconnect()`), true, 'Drop only the exact intercepted loopback SSE socket')
+      fixture.continueDuringDisconnect()
+      const restored = await inspector.wait(`(() => {const state=${observer}.read();return state.live && state.cursors.length>${initial.cursors.length} && state;})()`, 'a new loopback event connection', cutBudgetMs)
+      const resumedCursor = restored.cursors.at(-1)
+      assert.ok(Number.isSafeInteger(resumedCursor) && resumedCursor > 0, 'The packaged client must reconnect from a durable cursor')
+      audit.reconnect = { transport: 'owned-loopback-thread-sse', startingCursor: initial.cursors.at(-1), resumedCursor }
+      const occurrences = (text) => `(document.body.innerText.split(${quote(text)}).length-1)`
+      await cdp.wait(`${occurrences(replayedText)}===1 && ${occurrences(firstText)}===1`, 'single replay of the content generated across disconnect', cutBudgetMs)
+      Object.assign(audit.reconnect, { firstTextCount: 1, interruptedTextCount: 1 })
+    }
 
     await cdp.click('button[aria-label="停止"]')
     const endedTurn = await cdp.wait(`${readThread}.then(thread=>thread?.turns.find(turn=>turn.id===${quote(activeTurn)} && turn.status==='aborted'))`, 'the original persisted turn to be aborted by the real Stop button')
@@ -187,11 +189,12 @@ export async function verifyWindowsActivityLifecycle(cdp, inspector, { version, 
     assert.equal(final.turns[0].id, activeTurn)
     assert.equal(fixture.observed.failure, undefined)
     assert.deepEqual(fixture.observed.requests, ['read-failing-file', 'hold-stream-after-real-tool-error', 'follow-up'])
+    if (audit.reconnect) audit.reconnect.fixtureResentModelRequest = false
     assert.equal(fixture.observed.streamedResponseClosed, true, 'Stopping must close the original model connection')
     audit.cancel = { source: 'composer-stop-button', originalTurnAborted: true, originalToolResultCount: 1,
       followUpCompleted: true, fixtureStreamClosed: fixture.observed.streamedResponseClosed }
     return audit
   } finally {
-    await inspector.evaluate(`${observer}?.stop()`).catch(() => undefined)
+    await inspector?.evaluate(`${observer}?.stop()`).catch(() => undefined)
   }
 }

@@ -78,6 +78,11 @@ on:
         type: boolean
         required: false
         default: false
+      activity_cancellation_only:
+        description: 'For the activity run, exercise normal cancellation without severing the event stream.'
+        type: boolean
+        required: false
+        default: false
       run_browser_startup_diagnostic:
         description: 'Collect isolated pinned daemon startup diagnostics only; no application, model or task execution'
         type: boolean
@@ -150,6 +155,7 @@ jobs:
           RAILWISE_WINDOWS_MIRROR_SMOKE: ${{ inputs.run_mirror_acceptance }}
           RAILWISE_WINDOWS_VIDEO_EVALUATION: ${{ inputs.run_private_video_evaluation }}
           RAILWISE_WINDOWS_ACTIVITY_SMOKE: ${{ inputs.run_activity_lifecycle }}
+          RAILWISE_WINDOWS_ACTIVITY_CANCELLATION_ONLY: ${{ inputs.activity_cancellation_only }}
         run: |
           $packages = Join-Path $env:RUNNER_TEMP 'exact-windows-packages'
           $installers = @(Get-ChildItem -LiteralPath $packages -Filter '*.exe' -File)

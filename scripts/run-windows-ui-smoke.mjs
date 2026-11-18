@@ -2474,6 +2474,9 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
 export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', activitySmoke = process.env.RAILWISE_WINDOWS_ACTIVITY_SMOKE === 'true' }) {
   taskSmoke ||= browserSmoke
   mirrorSmoke ||= videoEvaluation
+  const activityCancellationOnly = activitySmoke && process.env.RAILWISE_WINDOWS_ACTIVITY_CANCELLATION_ONLY === 'true'
+  const activityChecks = ['installed-chinese-renderer', 'homepage-release-notice', 'collapsed-tool-diagnostic',
+    ...(activityCancellationOnly ? [] : ['thread-sse-reconnect']), 'normal-turn-cancel']
   assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
   assert.ok(!(activitySmoke && (taskSmoke || mirrorSmoke)), 'Use a clean profile for the activity lifecycle fixture')
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
@@ -2496,7 +2499,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const taskModel = video ?? (activity ? await activity.startWindowsActivityModelFixture()
     : taskSmoke || mirrorSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke }) : undefined)
   const model = taskModel?.model ?? 'windows-task-fixture'
-  const mainInspectorPort = browserSmoke || activitySmoke ? await availablePort() : undefined
+  const mainInspectorPort = browserSmoke || (activitySmoke && !activityCancellationOnly) ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
   await writeFile(settingsPath, JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: 'zh', theme: 'dark', workspaceRoot: workspace, uiFontScale: 'small',
@@ -2564,9 +2567,10 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
     if (activity) {
-      report.activityLifecycle = {}
-      await activity.verifyWindowsActivityLifecycle(cdp, mainCdp, { version, fixture: taskModel, audit: report.activityLifecycle })
-      report.checks.push('homepage-release-notice', 'collapsed-tool-diagnostic', 'thread-sse-reconnect', 'normal-turn-cancel')
+      report.activityLifecycle = { scenario: activityCancellationOnly ? 'cancellation-only' : 'full' }
+      await activity.verifyWindowsActivityLifecycle(cdp, mainCdp, { version, fixture: taskModel,
+        audit: report.activityLifecycle, cancellationOnly: activityCancellationOnly })
+      report.checks.push(...activityChecks.slice(1))
       return report
     }
 
@@ -3176,7 +3180,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         assert.deepEqual(report.errors, [])
         assert.equal(report.packageUnchanged, true)
         assert.equal(report.cleanExit, true)
-        assert.deepEqual(report.checks, ['installed-chinese-renderer', 'homepage-release-notice', 'collapsed-tool-diagnostic', 'thread-sse-reconnect', 'normal-turn-cancel'])
+        assert.deepEqual(report.checks, activityChecks)
       } else {
         validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke })
       }
