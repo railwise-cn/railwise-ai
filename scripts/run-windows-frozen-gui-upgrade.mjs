@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
@@ -17,7 +17,7 @@ import {
 
 const releaseNotes = new URL('../docs/qa/release-gates/v0.5.7.json', import.meta.url)
 const samePath = (left, right) => resolve(left).toLowerCase() === resolve(right).toLowerCase()
-const oneHour = 60 * 60_000
+const dueForLegacyCheck = 25 * 60 * 60_000
 
 export function verifyFrozenWindowsReadback({ expectedVersion, expectedSource, installerSha256, registry, packageMetadata, profilePreserved, threadPreserved }, target) {
   assert.equal(expectedVersion, target.identity.version)
@@ -87,29 +87,38 @@ async function officialBaseline(root) {
 
 async function createPrivateTrust(root) {
   const certificate = join(root, 'private-updater.pfx')
+  const publicRoot = join(root, 'private-updater-root.cer')
   const password = randomUUID()
-  const friendlyName = `RailWise ephemeral update smoke ${randomUUID()}`
+  const name = `RailWise QA ${randomUUID()}`
+  const issuerSubject = `CN=${name} root`
+  const leafSubject = `CN=${name} loopback`
   const remove = () => powershell(`
     $ErrorActionPreference = 'Stop'
-    foreach ($store in @('My','Root')) {
-      Get-ChildItem "Cert:\\CurrentUser\\$store" | Where-Object FriendlyName -eq ${psQuote(friendlyName)} | Remove-Item
+    Get-ChildItem 'Cert:\\LocalMachine\\Root' | Where-Object Subject -eq ${psQuote(issuerSubject)} | Remove-Item
+    Get-ChildItem 'Cert:\\CurrentUser\\My' | Where-Object Subject -in @(${psQuote(issuerSubject)},${psQuote(leafSubject)}) | ForEach-Object {
+      Remove-Item -LiteralPath "Cert:\\CurrentUser\\My\\$($_.Thumbprint)" -DeleteKey
     }
   `)
   try {
-    powershell(`
+    const command = `
       $ErrorActionPreference = 'Stop'
-      $cert = New-SelfSignedCertificate -Type Custom -Subject 'CN=RailWise ephemeral updater' -FriendlyName ${psQuote(friendlyName)} \`
-        -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddHours(1) -KeyExportPolicy Exportable \`
-        -HashAlgorithm SHA256 -KeyUsage DigitalSignature,KeyEncipherment -TextExtension @('2.5.29.17={text}ipaddress=127.0.0.1','2.5.29.37={text}1.3.6.1.5.5.7.3.1')
-      $secure = ConvertTo-SecureString ${psQuote(password)} -AsPlainText -Force
+      $admin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+      if (!$admin.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'The ephemeral runner is required to be an administrator' }
+      $issuer = New-SelfSignedCertificate -Type Custom -Subject ${psQuote(issuerSubject)} -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddHours(1) -HashAlgorithm SHA256 -KeyUsage CertSign,CRLSign -TextExtension '2.5.29.19={critical}{text}ca=1&pathlength=0'
+      $cert = New-SelfSignedCertificate -Type Custom -Subject ${psQuote(leafSubject)} -Signer $issuer -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddMinutes(50) -KeyExportPolicy Exportable -HashAlgorithm SHA256 -KeyUsage DigitalSignature,KeyEncipherment -TextExtension @('2.5.29.17={text}ipaddress=127.0.0.1','2.5.29.37={text}1.3.6.1.5.5.7.3.1')
+      $secure = ConvertTo-SecureString $env:RAILWISE_TEST_PFX_PASSWORD -AsPlainText -Force
       Export-PfxCertificate -Cert $cert -FilePath ${psQuote(certificate)} -Password $secure -CryptoAlgorithmOption AES256_SHA256 | Out-Null
-      $root = [System.Security.Cryptography.X509Certificates.X509Store]::new('Root','CurrentUser')
-      try { $root.Open('ReadWrite'); $root.Add($cert) } finally { $root.Close() }
-    `, 30_000)
+      Export-Certificate -Cert $issuer -FilePath ${psQuote(publicRoot)} | Out-Null
+      $trusted = Import-Certificate -FilePath ${psQuote(publicRoot)} -CertStoreLocation 'Cert:\\LocalMachine\\Root' -Confirm:$false
+      if ($trusted.Thumbprint -ne $issuer.Thumbprint) { throw 'The disposable trust root did not match the generated certificate' }
+    `
+    execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      env: { ...process.env, RAILWISE_TEST_PFX_PASSWORD: password }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 45_000
+    })
     return { pfx: await readFile(certificate), passphrase: password, remove }
   } catch (error) {
-    remove()
-    throw error
+    try { remove() } catch { /* The ephemeral machine will discard an incomplete trust setup. */ }
+    throw new Error(`Could not establish the ephemeral Windows updater HTTPS trust (${error.code ?? error.status ?? 'setup-failed'})`)
   }
 }
 
@@ -186,7 +195,10 @@ async function exerciseSidebar({ running, target, feed, executable, allowLegacyF
   const { cdp, child } = running
   const version = target.identity.version
   const control = `button[title^="升级到 ${version}，"], button[title^="Update to ${version},"]`
-  await cdp.wait(`Boolean([...document.querySelectorAll(${JSON.stringify(control)})].find(el => !el.disabled && el.getClientRects().length))`, 'the automatic sidebar update offer', 90_000)
+  await cdp.wait(`Boolean([...document.querySelectorAll(${JSON.stringify(control)})].find(el => !el.disabled && el.getClientRects().length))`, 'the automatic sidebar update offer', 90_000).catch(async error => {
+    const state = await cdp.evaluate('window.workwise.getGuiUpdateState()').catch(() => ({}))
+    throw new Error(`${error.message}: ${JSON.stringify({ status: state.status, code: state.code, latestVersion: state.info?.latestVersion, privateManifestReads: feed.requests.manifest })}`)
+  })
   const available = await cdp.evaluate('window.workwise.getGuiUpdateState()')
   assert.equal(available.status, 'available')
   assert.equal(available.info?.latestVersion, version)
@@ -235,7 +247,9 @@ async function main(args) {
   const sentinelFile = join(profile, 'railwise-updater-fixture.txt')
   await writeFile(sentinelFile, sentinel, { flag: 'wx' })
   await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify(settings), { flag: 'wx' })
-  const seedSchedule = version => writeFile(join(profile, 'gui-update-schedule.json'), JSON.stringify({ appVersion: version, lastCheckedAt: new Date(Date.now() - oneHour).toISOString() }))
+  // Released 0.5.7 schedules checks daily. The stored record must be due for
+  // both that legacy interval and the current 0.5.8 interval.
+  const seedSchedule = version => writeFile(join(profile, 'gui-update-schedule.json'), JSON.stringify({ appVersion: version, lastCheckedAt: new Date(Date.now() - dueForLegacyCheck).toISOString() }))
 
   const report = { status: 'running', scope: 'private-frozen-windows-gui-upgrade', productionTouched: false,
     driverSource: process.env.GITHUB_SHA, baseline: { installer: baseline.installer }, targetBuild: target.source, steps: [] }
@@ -246,6 +260,7 @@ async function main(args) {
     installExactNsis(baseline.installer.path, installDirectory)
     report.baseline.package = inspectInstalledPackage(installDirectory, baseline.identity)
     report.baseline.registry = ownedInstallState(installDirectory, '0.5.7')
+    await save()
     await seedSchedule('0.5.7')
     trust = await createPrivateTrust(root)
     feed = await openPrivateFeed(trust, target)
@@ -285,8 +300,15 @@ async function main(args) {
     running?.cdp.close()
     await closeOwnedWindows(executable).catch(() => undefined)
     await feed?.close()
-    trust?.remove()
-    await save()
+    try {
+      trust?.remove()
+    } catch {
+      report.cleanupError = 'Could not remove the owned QA certificates before the temporary runner shut down'
+      report.status = 'failed'
+    } finally {
+      await save()
+    }
+    if (report.cleanupError && !report.failure) throw new Error(report.cleanupError)
   }
 }
 
