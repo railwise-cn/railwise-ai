@@ -33,7 +33,10 @@ it('uses the public site as a source for the reported ordinary Video Shotcraft r
 })
 
 it('keeps explicit URL behavior and excludes host lookalikes from bare source targets', () => {
-  const prompt = '查阅 https://example.test/docs、 user@www.mail.test https://user:secret@www.private.test/ ftp://www.ftp.test https://www.full.test/?redirect="www.other.test" （WWW.RAILWISE.CN）。'
+  const privateSource = new URL('https://www.private.test/')
+  privateSource.username = 'fixture-user'
+  privateSource.password = 'fixture-password'
+  const prompt = `查阅 https://example.test/docs、 user@www.mail.test ${privateSource} ftp://www.ftp.test https://www.full.test/?redirect="www.other.test" （WWW.RAILWISE.CN）。`
   expect(browserTaskOrigins(prompt)).toEqual(['https://example.test', 'https://www.full.test'])
   expect(browserTaskOrigins(prompt, { includeBareWww: true })).toEqual(['https://example.test', 'https://www.full.test', 'https://www.railwise.cn'])
   expect(requiresWebSourceEvidence('查找 www.railwise.cn 的公开信息。')).toBe(true)
