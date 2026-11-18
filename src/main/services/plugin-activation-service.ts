@@ -20,7 +20,7 @@ import {
 import type { McpConfigService } from './mcp-config-service'
 import { getOfficialMarketplaceCatalog } from './official-marketplace-catalog'
 import { hasMarketplaceMirrorReceipt, mirrorRecordFor, type MirroredPackage } from './marketplace-mirror'
-import { inspectPackageDirectory, PackageInstallationService, packageInstallLimitsFor } from './package-installation-service'
+import { inspectPackageDirectory, marketplacePackageReviewSha256, PackageInstallationService, packageInstallLimitsFor } from './package-installation-service'
 
 const MAX_PACKAGE_JSON_BYTES = 1024 * 1024
 const MAX_RUNTIME_METADATA_BYTES = 1024 * 1024
@@ -303,17 +303,18 @@ async function pythonLaunch(
   }
 }
 
-/** Correct the launch projection for unchanged, previously reviewed Docling 3.0.0 installs. */
-export async function legacyOfficialDoclingStdioArgs(
+/** Give the verified stock Docling launch time to import its Python dependencies. */
+export async function verifiedOfficialDoclingStdioLaunch(
   server: McpServerConfigV2,
   options: {
     installed?: Pick<PackageInstallationService, 'get'>
     pythonRoot?: string
   } = {}
-): Promise<string[] | undefined> {
+): Promise<{ args: string[]; startupTimeoutMs: number } | undefined> {
+  const args = server.args
   if (server.id !== 'docling-mcp-server' || server.source !== 'managed-tool' ||
       server.transport !== 'stdio' || server.cwd || !server.command || !isAbsolute(server.command) ||
-      server.args?.length !== 5 || server.args[0] !== '-I') return undefined
+      args?.[0] !== '-I' || (args.length !== 5 && args.length !== 7)) return undefined
 
   const item = getOfficialMarketplaceCatalog().find(entry => entry.id === 'docling-mcp' && entry.version === '3.0.0')
   const component = item?.components.find(entry => entry.id === server.id)
@@ -322,9 +323,10 @@ export async function legacyOfficialDoclingStdioArgs(
   try {
     const installed = await (options.installed ?? new PackageInstallationService()).get(item.id)
     const workspace = server.scope === 'workspace' ? server.workspaceRoot : undefined
+    const legacy = installed?.reviewSha256 === LEGACY_DOCLING_REVIEW_SHA256
     if (!installed || installed.version !== item.version ||
         installed.source.catalogSourceId !== 'workwise-official' || installed.source.id !== item.source.id ||
-        installed.reviewSha256 !== LEGACY_DOCLING_REVIEW_SHA256 ||
+        (!legacy && installed.reviewSha256 !== marketplacePackageReviewSha256(item)) ||
         (installed.scope === 'workspace') !== (server.scope === 'workspace') ||
         installed.workspaceRoot !== workspace || !permissionGranted(item, installed)) return undefined
 
@@ -333,12 +335,16 @@ export async function legacyOfficialDoclingStdioArgs(
     if (command !== server.command || !isCanonicalPathContained(pythonRoot, command)) return undefined
     const launch = await pythonLaunch(
       installed.artifact.location, runtime.packageName, runtime.version, runtime.install.digest.value,
-      runtime.executable, [], workspace, {
+      runtime.executable, legacy ? [] : runtime.args, workspace, {
         ensure: async () => ({ pythonPath: command, uvVersion: MANAGED_UV_VERSION, pythonVersion: MANAGED_PYTHON_VERSION })
       }
     )
-    if (!launch.args.every((arg, index) => arg === server.args?.[index])) return undefined
-    return [...launch.args, '--transport', 'stdio']
+    if (launch.args.length !== args.length || !launch.args.every((arg, index) => arg === args[index])) return undefined
+    return {
+      args: legacy ? [...launch.args, '--transport', 'stdio'] : launch.args,
+      // Keep some margin for the managed Runtime's 45-second process startup watchdog.
+      startupTimeoutMs: 40_000
+    }
   } catch {
     return undefined
   }

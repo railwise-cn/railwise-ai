@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { CapabilityRegistry } from '../src/adapters/tool/capability-registry.js'
 import { LocalToolHost } from '../src/adapters/tool/local-tool-host.js'
 import {
@@ -412,6 +412,46 @@ describe('MCP tool provider', () => {
     })
   })
 
+  it('keeps the standard startup deadline while allowing a bounded per-server bootstrap', async () => {
+    vi.useFakeTimers()
+    try {
+      const server = { transport: 'stdio', command: 'node', trustScope: 'user' }
+      const config = KunCapabilitiesConfig.parse({
+        mcp: {
+          enabled: true,
+          servers: {
+            standard: server,
+            extended: { ...server, startupTimeoutMs: 40_000 },
+            hung: { ...server, startupTimeoutMs: 40_000 }
+          }
+        }
+      })
+      const client = fakeClient()
+      const pending = buildMcpToolProviders(config.mcp, {
+        clientFactory: async (id) => {
+          await new Promise(resolve => setTimeout(resolve, 10_500))
+          return { ...client, listTools: async () => {
+            await new Promise(resolve => setTimeout(resolve, id === 'hung' ? 31_000 : 500))
+            return client.listTools()
+          } }
+        }
+      })
+      await vi.advanceTimersByTimeAsync(42_000)
+      const built = await pending
+      expect(built.diagnostics).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'standard', status: 'error', lastError: expect.stringContaining('10000ms') }),
+        expect.objectContaining({ id: 'extended', status: 'connected' }),
+        expect.objectContaining({ id: 'hung', status: 'error', lastError: expect.stringContaining('40000ms') })
+      ]))
+      expect(KunCapabilitiesConfig.safeParse({
+        mcp: { servers: { excessive: { ...server, startupTimeoutMs: 45_001 } } }
+      }).success).toBe(false)
+      await built.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('passes MCP timeouts and abort signals to discovery and execution', async () => {
     const listOptions: Array<{ signal?: AbortSignal; timeout?: number } | undefined> = []
     const callOptions: Array<{ signal?: AbortSignal; timeout?: number } | undefined> = []
@@ -424,6 +464,7 @@ describe('MCP tool provider', () => {
             command: 'node',
             trustScope: 'workspace',
             trustedWorkspaceRoots: ['/tmp/project'],
+            startupTimeoutMs: 40_000,
             timeoutMs: 1234
           }
         }
