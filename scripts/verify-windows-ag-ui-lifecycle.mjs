@@ -146,7 +146,12 @@ export async function verifyWindowsActivityLifecycle(cdp, inspector, { version, 
     await cdp.fill(composer, '普通会话活动验收，请用本地文件工具做一次只读检查。')
     await cdp.click('button[aria-label="发送"]')
     await cdp.wait(`document.body.innerText.includes(${quote(firstText)}) && Boolean(document.querySelector('button[aria-label="停止"]'))`, 'a running normal KUN response after a real tool failure')
+    const runningStatus = await cdp.wait(`Array.from(document.querySelectorAll('[role="status"]')).find(node=>/^正在(整理资料|推进任务|执行任务)/.test(node.innerText.trim()))?.innerText.trim()`, 'visible plain-language live task progress')
     const activeTurn = await cdp.wait(`${readThread}.then(thread=>thread?.turns.length===1 && thread.turns[0]?.id)`, 'one persisted input turn')
+    const details = 'button[aria-expanded]'
+    await cdp.wait(`Array.from(document.querySelectorAll(${quote(details)})).some(node=>node.querySelector('span')?.textContent==='执行详情' && node.getAttribute('aria-expanded')==='false')`, 'collapsed conversation execution details')
+    assert.equal(await cdp.evaluate(`document.body.innerText.includes(${quote(missingFile)})`), false)
+    await cdp.click(details, '执行详情')
     const tool = '[role="button"][aria-expanded]'
     const failureLabel = '执行失败'
     await cdp.wait(`Array.from(document.querySelectorAll(${quote(tool)})).some(node=>node.innerText.trim()===${quote(failureLabel)} && node.getAttribute('aria-expanded')==='false')`, 'the quiet, collapsed failed tool details')
@@ -154,8 +159,9 @@ export async function verifyWindowsActivityLifecycle(cdp, inspector, { version, 
     await cdp.click(tool, failureLabel)
     await cdp.wait(`document.body.innerText.includes(${quote(missingFile)})`, 'the actual file-read diagnostic after explicit expansion')
     await cdp.click(tool, failureLabel)
-    assert.equal(await cdp.evaluate(`document.body.innerText.includes(${quote(missingFile)})`), false)
-    audit.diagnostics = { renderedCollapsedByDefault: true, outputVisibleOnDemand: true, source: 'packaged-read-tool-error' }
+    await cdp.click(details, '执行详情')
+    await cdp.wait(`!document.body.innerText.includes(${quote(missingFile)})`, 'the diagnostic to close again')
+    audit.diagnostics = { renderedCollapsedByDefault: true, outputVisibleOnDemand: true, source: 'packaged-read-tool-error', runningStatus }
 
     const initial = await inspector.wait(`(() => {const state=${observer}.read();return state.live && state;})()`, 'owned loopback thread event transport', cutBudgetMs)
     assert.equal(await inspector.evaluate(`${observer}.disconnect()`), true, 'Drop only the exact intercepted loopback SSE socket')
