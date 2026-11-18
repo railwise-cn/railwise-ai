@@ -38,6 +38,12 @@ on:
         type: boolean
         required: false
         default: false
+      spreadsheet_platforms:
+        description: 'Native spreadsheet validation targets available in the frozen build'
+        type: choice
+        options: [all, windows, mac]
+        required: false
+        default: all
       run_published_gui_update:
         description: 'Install released 0.5.6 and click the real sidebar upgrade to released Stable 0.5.7 on an ephemeral Windows runner'
         type: boolean
@@ -170,22 +176,15 @@ jobs:
 
   exact-packaged-spreadsheet:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_spreadsheet_acceptance == true }}
-    name: Offline spreadsheets in frozen ${{ matrix.label }} package
+    name: Offline spreadsheets in frozen ${{ matrix.runner }} package
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
+    env:
+      EXACT_SHEET_ARCH: ${{ matrix.runner == 'macos-15' && 'arm64' || 'x64' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - label: Windows x64
-            runner: windows-2022
-            arch: x64
-          - label: macOS Apple Silicon
-            runner: macos-15
-            arch: arm64
-          - label: macOS Intel
-            runner: macos-15-intel
-            arch: x64
+        runner: ${{ fromJSON(inputs.spreadsheet_platforms == 'windows' && '["windows-2022"]' || inputs.spreadsheet_platforms == 'mac' && '["macos-15","macos-15-intel"]' || '["windows-2022","macos-15","macos-15-intel"]') }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -203,7 +202,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
         shell: bash
-        run: node scripts/run-packaged-spreadsheet-smoke.mjs --prepare "$PACKAGE_RUN_ID" "$RUNNER_TEMP/exact-spreadsheet-source.json" "${{ matrix.arch }}"
+        run: node scripts/run-packaged-spreadsheet-smoke.mjs --prepare "$PACKAGE_RUN_ID" "$RUNNER_TEMP/exact-spreadsheet-source.json" "$EXACT_SHEET_ARCH"
       - name: Download the original installer
         uses: actions/download-artifact@v4
         with:
@@ -217,7 +216,7 @@ jobs:
         run: >-
           node scripts/run-packaged-spreadsheet-smoke.mjs --run
           "$RUNNER_TEMP/exact-spreadsheet-package" "$RUNNER_TEMP/exact-spreadsheet-source.json"
-          "$RUNNER_TEMP/exact-spreadsheet-evidence" "${{ matrix.arch }}"
+          "$RUNNER_TEMP/exact-spreadsheet-evidence" "$EXACT_SHEET_ARCH"
       - name: Retain compact evidence
         if: always()
         uses: actions/upload-artifact@v4
