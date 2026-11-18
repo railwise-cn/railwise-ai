@@ -152,7 +152,7 @@ jobs:
       - name: Install verification tools
         run: npm ci --ignore-scripts
       - name: Verify the published GUI upgrade contract
-        run: node --test scripts/windows-published-gui-update-smoke.test.mjs
+        run: node --test scripts/windows-published-gui-update-smoke.test.mjs scripts/windows-install-smoke.test.mjs
       - name: Install the released baseline and upgrade through the packaged UI
         run: node scripts/run-windows-published-gui-update-smoke.mjs
       - name: Retain actual updater evidence and diagnostics
@@ -185,7 +185,7 @@ jobs:
       - name: Install fixture build tools
         run: npm ci
       - name: Verify the GUI upgrade contract
-        run: node --test scripts/windows-published-gui-update-smoke.test.mjs
+        run: node --test scripts/windows-published-gui-update-smoke.test.mjs scripts/windows-install-smoke.test.mjs
       - name: Prepare checksummed Electron runtime
         env:
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/

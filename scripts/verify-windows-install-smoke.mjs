@@ -72,7 +72,10 @@ export function inspectInstalledPackage(directory, identity) {
   const path = join(directory, 'resources', 'app.asar')
   const stat = lstatSync(path)
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 1) fail('installed ASAR must be a nonempty regular file')
-  const metadata = JSON.parse(require('@electron/asar').extractFile(path, 'package.json').toString('utf8'))
+  const asar = require('@electron/asar')
+  // An in-place upgrade replaces this archive without changing its path.
+  asar.uncache(path)
+  const metadata = JSON.parse(asar.extractFile(path, 'package.json').toString('utf8'))
   const result = { name: metadata.name, productName: metadata.productName, version: metadata.version,
     sourceHead: metadata.buildProvenance?.sourceHead, asarSha256: digest(readFileSync(path)), asarSize: stat.size }
   for (const key of ['version', 'sourceHead', 'productName']) equal(result[key], identity[key], `installed package ${key}`)
