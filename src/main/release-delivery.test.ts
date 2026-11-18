@@ -16,7 +16,7 @@ import { _internals as websiteDelivery } from '../../scripts/deploy-website-rele
 import { isTransientMacSigningFailure, runMacArtifactBuildWithRetry } from '../../scripts/run-mac-artifact-build-with-retry.mjs'
 
 describe('R2 release delivery gates', () => {
-  it('retries only transient Apple timestamp outages during signed macOS packaging', async () => {
+  it('retries timestamp signing failures during signed macOS packaging', async () => {
     expect(isTransientMacSigningFailure('The timestamp service is not available.')).toBe(true)
     expect(isTransientMacSigningFailure('A timestamp was expected but was not found.')).toBe(true)
     expect(isTransientMacSigningFailure('bundle format is ambiguous')).toBe(false)
@@ -55,6 +55,30 @@ describe('R2 release delivery gates', () => {
       execute: async () => ({ code: 1, signal: null, output: 'invalid signature' }),
       wait: async () => undefined
     })).rejects.toThrow(/artifact build failed/)
+  })
+
+  it('limits missing-timestamp retries to three attempts without claiming an Apple outage', async () => {
+    const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const attempts: number[] = []
+    const waits: number[] = []
+    try {
+      await expect(runMacArtifactBuildWithRetry('x64', {
+        execute: async (attempt: number) => {
+          attempts.push(attempt)
+          return { code: 1, signal: null, output: 'A timestamp was expected but was not found.' }
+        },
+        wait: async (ms: number) => { waits.push(ms) }
+      })).rejects.toThrow(/artifact build failed/)
+      expect(attempts).toEqual([1, 2, 3])
+      expect(waits).toEqual([20_000, 40_000])
+      expect(warnings).toHaveBeenCalledTimes(2)
+      for (const [message] of warnings.mock.calls) {
+        expect(message).toContain('Timestamp signing failed')
+        expect(message).not.toMatch(/Apple|unavailable|outage/i)
+      }
+    } finally {
+      warnings.mockRestore()
+    }
   })
 
   it('keeps releases in semantic newest-first order for three-version retention', () => {

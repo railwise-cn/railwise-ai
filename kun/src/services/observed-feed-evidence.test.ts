@@ -81,13 +81,16 @@ it('seals observed-feed only from the explicit user subscription-list summary in
   } finally { /* repository already closed above */ }
 })
 
-it('publishes a neutral list draft from actual same-record fields, explicitly verifies it, and does not auto-complete', async () => {
-  const f = await fixture()
+it.each([false, true])('publishes a neutral source list draft, explicitly verifies it, and does not auto-complete (business screening=%s)', async businessScreening => {
+  const f = await fixture(businessScreening ? goal : `读取我已订阅的平台招标列表 ${url}，按日期汇总为 HTML；只核对列表数据，不需要打开公告正文。`)
   try {
     await f.source()
     const proof = WebArtifactEvidenceInputSchema.parse(rawProof())
     expect((await f.assess(proof)).complete).toBe(true)
-    const publication = await f.call('publish_artifact', { path: proof.path, report: { title: '睿威订阅列表汇总', evidence: { coverage: proof.coverage, items: proof.items, noMatches: [] } } })
+    const publication = await f.call('publish_artifact', { path: proof.path, report: { title: '睿威订阅列表汇总',
+      ...(businessScreening ? { presentation: { screening: [{ sectionId: 'record-one', decision: 'relevant',
+        reason: '列表标题包含工程测量与变形监测服务', businessTypes: ['工程测量', '变形监测'] }] } } : {}),
+      evidence: { coverage: proof.coverage, items: proof.items, noMatches: [] } } })
     expect(publication.isError).not.toBe(true)
     const output = publication.output as Record<string, unknown>
     expect(output.nextStep).toContain('草稿')
@@ -280,7 +283,7 @@ it('renders bounded coverage and literal matching excerpts without claiming all 
   const rendered = renderStructuredWebReport(proof.path, { title: '订阅列表', evidence: { coverage: proof.coverage, items: proof.items, noMatches: [] } }, 'observed_feed')
   expect(rendered.content).toContain('本报告列出 1 条列表记录，关联 1 个来源页面')
   expect(rendered.content).toContain('后续分页覆盖尚未确认，不代表今日全量')
-  expect(rendered.content).toContain('匹配依据（列表原文）')
+  expect(rendered.content).toContain('列表原文摘录')
   expect(rendered.content).toContain('列表标注日期')
   expect(rendered.content).not.toContain('当前机会</p>')
 })

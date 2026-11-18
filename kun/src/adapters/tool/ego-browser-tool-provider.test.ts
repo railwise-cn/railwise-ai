@@ -54,9 +54,9 @@ describe('Ego controlled read protocol; no external CLI/browser',()=>{
  it('rejects model JS/spaceId and exposes no click/form tools',async()=>{const f=await fixture();expect(f.provider.tools.map(t=>t.name)).toEqual(EGO_TOOLS);expect(await f.execute('ego_browser_open',{url:'https://feed.test/list',spaceId:999,code:'fetch("evil")'})).toMatchObject({status:'blocked'});expect(f.calls).toHaveLength(0)})
  it.each(['expired','scope','identity'] as const)('blocks %s before CLI',async boundary=>{const f=await fixture(),g=f.grant();f.setGrant(boundary==='expired'?{...g,expiresAt:date}:boundary==='identity'?{...g,connectorIdentityFingerprints:{'ego-browser':'b'.repeat(64)}}:{...g,browserScope:{...g.browserScope!,provider:undefined}});expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({status:'blocked'});expect(f.calls).toHaveLength(0)})
  it('records takeover without changing Task and resumes same Space only in a new user Turn',async()=>{
-  const f=await fixture();await f.execute('ego_browser_open',{url:'https://feed.test/list'});f.setOwnership('user');expect(await f.execute('ego_browser_read')).toMatchObject({code:'ego_browser_user_control'})
+  const h=await reopenFixture(true),f=h.f,resumedGrant=f.grant();f.setGrant(h.oldGrant);f.repo.update(f.task.id,f.repo.get(f.task.id)!.revision,t=>({...t,activeTurnId:h.oldGrant.turnId}));f.setOwnership('user');expect(await f.execute('ego_browser_read')).toMatchObject({code:'ego_browser_user_control'})
   const count=f.calls.length;expect(await f.execute('ego_browser_observe')).toMatchObject({code:'ego_browser_waiting_user'});expect(f.calls).toHaveLength(count);expect(f.repo.get(f.task.id)?.status).toBe('running')
-  f.setGrant({...f.grant(),id:'new-grant',turnId:'new-user-turn'});f.repo.update(f.task.id,0,t=>({...t,activeTurnId:'new-user-turn'}));f.setOwnership('agent');expect(await f.execute('ego_browser_read')).toMatchObject({status:'succeeded'});expect(f.calls.at(-1)?.spaceId).toBe(7);expect(f.repo.operations(f.task.id,'ego_task_space')).toHaveLength(1)
+  f.setGrant(resumedGrant);f.repo.update(f.task.id,f.repo.get(f.task.id)!.revision,t=>({...t,activeTurnId:resumedGrant.turnId}));h.setState('agent');expect(await h.execute('ego_browser_read')).toMatchObject({status:'succeeded'});expect(h.calls.map(c=>c.action)).toEqual(['space_status','read']);expect(f.repo.operations(f.task.id,'ego_task_space')).toHaveLength(1)
  })
  it('records a real in-flight expiry with its saved Host proof without reacquiring an expired closure',async()=>{const f=await fixture();f.setExpireDuringRun();expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({code:'ego_browser_grant_expired'});expect(f.calls).toHaveLength(1);expect(f.repo.operations(f.task.id,'ego_browser_wait')).toEqual([expect.objectContaining({status:'succeeded',request:expect.objectContaining({hostOperationId:expect.any(String),callId:'call-1',code:'ego_browser_grant_expired'})})])})
  it('never silently retries an uncertain first open',async()=>{const f=await fixture();f.setThrown();expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({code:'ego_browser_command_timeout'});expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({code:'ego_browser_waiting_user'});expect(f.calls).toHaveLength(1);f.setGrant({...f.grant(),id:'new-grant',turnId:'resumed'});f.setThrown(false);f.repo.update(f.task.id,0,t=>({...t,activeTurnId:'resumed'}));expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({status:'succeeded'});expect(f.calls).toHaveLength(2);expect(f.calls.at(-1)?.recoverExistingOnly).toBe(true)})
@@ -159,7 +159,7 @@ it('keeps unknown read failures hard and never persists a non-enum diagnostic as
 
 
 // Isolated SDK result protocol; no external CLI, browser, profile or network.
-async function reopenFixture() {
+async function reopenFixture(native = false) {
  const f=await fixture(),opened=await f.execute('ego_browser_open',{url:'https://feed.test/list'})
  const prior=f.repo.operation(f.task.id,'ego-task-space')!,raw=JSON.stringify(prior)
  const oldGrant=f.grant(),turnId='user-resume-turn'
@@ -168,31 +168,158 @@ async function reopenFixture() {
  const resume=f.repo.beginOperation({ownerId:f.task.id,idempotencyKey:'user-resume',kind:'resume',request:{expectedRevision:0,idempotencyKey:'user-resume'},nowIso:date}).receipt
  f.repo.finishOperation(f.task.id,resume.idempotencyKey,{status:'succeeded',result:{task:f.repo.get(f.task.id),turn:{threadId:f.task.threadId,turnId,userMessageItemId:'explicit-user-resume'}}},date)
  const authorization={controlOwnerId:f.task.id,resumeReceiptId:resume.id,turnId,priorBindingReceiptId:prior.id}
- let auth:typeof authorization|null=authorization,state='closed',throwMetadata=false,throwCreate=false,errorResult:Record<string,unknown>|undefined,count=0
+ let auth:typeof authorization|null=authorization,state='closed',throwMetadata=false,throwCreate=false,thrownMessage:string|undefined,errorResult:Record<string,unknown>|undefined,count=0
+ let metadataRows:unknown[]|undefined,afterMetadata:(()=>void)|undefined,clock=Date.parse(date)+1000,controller:AbortController|undefined
+ const nativeCalls:string[]=[],window=native?new Window({url:'https://feed.test/list'}):undefined
+ if(window){window.document.body.innerHTML=html;clean.push(()=>window.happyDOM.close())}
+ let nativeId=7,nativeName=String(prior.request!.spaceName),nativeUrl='https://feed.test/list'
  const calls:Array<Record<string,unknown>>=[]
  const config={state:'installed' as const,executablePath:'/controlled/ego-browser',executableHash:'a'.repeat(64),version:'0.6.3.14',revision:0}
- const provider=buildEgoBrowserToolProvider({config,repository:f.repo,now:()=>Date.parse(date)+1000,
+ const provider=buildEgoBrowserToolProvider({config,repository:f.repo,now:()=>clock,
   canReopenClosedSpace:async()=>auth,
   run:async(_config,script)=>{
    const first=script.split('\n')[0]!,p=JSON.parse(first.slice(first.startsWith('const p = ')?'const p = '.length:'const p='.length,-1)) as Record<string,unknown>;calls.push(p)
+   if(native) {
+    const rows:Record<string,unknown>[]=[],globals=globalThis as unknown as Record<string,unknown>,previous={document:globals.document,location:globals.location}
+    globals.document=window!.document;globals.location=new URL(nativeUrl)
+    const AsyncFunction=Object.getPrototypeOf(async()=>undefined).constructor as new(...args:string[])=>(...args:unknown[])=>Promise<void>
+    try {
+     await new AsyncFunction('taskSpace','listTaskSpaces','console','setTimeout','Date',script)(async(id:unknown)=>{
+      nativeCalls.push('attach')
+      if(typeof id==='number'&&state==='closed')throw new Error('private native missing Space detail ?token=secret')
+      if(typeof id==='string'){nativeId=8;nativeName=id;state='agent'}
+      return {spaceId:nativeId,name:nativeName,ownership:state,page:()=>{nativeCalls.push('page');return {label:'p1',url:async()=>{nativeCalls.push('url');return nativeUrl},snapshot:async()=>{nativeCalls.push('snapshot');return 'offline fixture snapshot'},goto:async(url:string)=>{nativeCalls.push('goto');nativeUrl=url;globals.location=new URL(url)},evaluate:async(fn:(arg:unknown)=>unknown,arg:unknown)=>{nativeCalls.push('evaluate');return JSON.parse(JSON.stringify(await fn(arg))) as unknown}}}}
+     },async()=>{nativeCalls.push('list');if(throwMetadata)throw new Error('private metadata transport error ?token=secret');return metadataRows??(state==='closed'?[]:[{id:nativeId,name:nativeName,ownership:state}])},{log:(line:string)=>rows.push(JSON.parse(line.slice('RAILWISE_EGO_RESULT:'.length)) as Record<string,unknown>)},(callback:()=>void)=>callback(),{now:()=>Date.parse(date)+1000})
+     if(p.action==='space_status')afterMetadata?.()
+     return rows[0]!
+    } finally {globals.document=previous.document;globals.location=previous.location}
+   }
    if(p.action==='space_status') {
     if(throwMetadata)throw new Error('ego_browser_command_timeout')
     return {ok:true,kind:'ego_space_status',version:1,taskSpaceId:p.spaceId,spaceName:p.spaceName,idMatch:state!=='closed',nameMatches:state==='name-conflict'?2:state==='closed'?0:1,spaceStatus:state==='closed'?'closed':'existing',identityMatches:state!=='closed'&&state!=='name-conflict',...(state==='closed'?{}:{ownership:state})}
    }
    if(errorResult)return errorResult
+   if(thrownMessage)throw new Error(thrownMessage)
    if(throwCreate)throw new Error('ego_browser_command_timeout')
    return {ok:true,taskSpaceId:p.spaceId??8,spaceName:p.spaceName,ownership:'agent',pageLabel:'p1',sourceUrl:'https://feed.test/list',html,documentHtml:html,truncated:false,candidates:[]}
   }})
  const execute=async(name:typeof EGO_TOOLS[number]='ego_browser_open',args:Record<string,unknown>=name==='ego_browser_open'?{url:'https://feed.test/list'}:{})=>{
   const grant=f.grant(),callId='reopen-'+(++count),key='tool:'+grant.turnId+':'+callId
+  controller=new AbortController()
   const host=f.repo.beginOperation({ownerId:f.task.id,idempotencyKey:key,kind:'tool',request:{dispatchTracking:'host-v1',executionId:'reopen-execution',providerId:'ego-browser',toolName:name,callId,turnId:grant.turnId,argumentsHash:operationFingerprint(args),executionGrant:grant},nowIso:date}).receipt
-  const context:ToolHostContext={threadId:f.task.threadId,turnId:grant.turnId,workspace:f.task.workspaceRoot,threadMode:'agent',sandboxMode:'read-only',approvalPolicy:'auto',executionGrant:grant,abortSignal:new AbortController().signal,awaitApproval:async()=>'allow',currentToolOperation:()=>({operationId:host.id,idempotencyKey:key,taskId:f.task.id,turnId:grant.turnId,executionId:'reopen-execution',callId,toolName:name,providerId:'ego-browser',argumentsHash:operationFingerprint(args),executionGrantFingerprint:operationFingerprint(grant)})}
+  const context:ToolHostContext={threadId:f.task.threadId,turnId:grant.turnId,workspace:f.task.workspaceRoot,threadMode:'agent',sandboxMode:'read-only',approvalPolicy:'auto',executionGrant:grant,abortSignal:controller.signal,awaitApproval:async()=>'allow',currentToolOperation:()=>({operationId:host.id,idempotencyKey:key,taskId:f.task.id,turnId:grant.turnId,executionId:'reopen-execution',callId,toolName:name,providerId:'ego-browser',argumentsHash:operationFingerprint(args),executionGrantFingerprint:operationFingerprint(grant)})}
   const result=await provider.tools.find(t=>t.name===name)!.execute(args,context)
   f.repo.finishOperation(f.task.id,key,{status:result.isError?'failed':'succeeded',result:{approved:true,item:{id:'result-'+callId,kind:'tool_result',status:'completed',createdAt:date,finishedAt:date,threadId:f.task.threadId,turnId:grant.turnId,callId,toolName:name,output:result.output,isError:Boolean(result.isError)}}},date)
   return result.output as Record<string,unknown>
  }
- return {f,prior,raw,opened,oldGrant,authorization,calls,execute,setAuth:(v:typeof auth)=>{auth=v},setState:(v:string)=>{state=v},setMetadataTimeout:()=>{throwMetadata=true},setCreateTimeout:(v=true)=>{throwCreate=v},setError:(v:typeof errorResult)=>{errorResult=v}}
+ return {f,prior,raw,opened,oldGrant,authorization,calls,nativeCalls,execute,setAuth:(v:typeof auth)=>{auth=v},setState:(v:string)=>{state=v},setMetadataTimeout:()=>{throwMetadata=true},setMetadataRows:(v:unknown[])=>{metadataRows=v},setAfterMetadata:(v:()=>void)=>{afterMetadata=v},expire:()=>{clock=Date.parse(f.grant().expiresAt!)},abort:()=>controller?.abort(),changeConfig:()=>{config.revision++},setCreateTimeout:(v=true)=>{throwCreate=v},setThrownMessage:(v:string)=>{thrownMessage=v},setError:(v:typeof errorResult)=>{errorResult=v}}
 }
+it.each(['ego_browser_read','ego_browser_observe','ego_browser_next_page'] as const)('preflights a resumed %s before attaching a closed old Space, then permits only authorized open recovery',async name=>{
+ const h=await reopenFixture(true),args=name==='ego_browser_next_page'?{observationId:h.opened.observationId,targetId:(h.opened.nextPages as Array<{targetId:string}>)[0]!.targetId}:{}
+ const out=await h.execute(name,args)
+ expect(out).toMatchObject({status:'blocked',code:'ego_browser_open_required'})
+ expect(String(out.message)).toContain('ego_browser_open');expect(String(out.message)).toContain('https://feed.test/list')
+ expect(h.calls.map(c=>c.action)).toEqual(['space_status']);expect(h.nativeCalls).toEqual(['list'])
+ expect(h.f.repo.operations(h.f.task.id,'ego_browser_wait')).toHaveLength(0)
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space')).toHaveLength(1)
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space_reopen')).toHaveLength(0)
+ expect(h.f.repo.operations(h.f.task.id,'ego_document_read')).toHaveLength(1)
+ expect(await h.execute(name,args)).toMatchObject({code:'ego_browser_open_required'});expect(h.nativeCalls).toEqual(['list'])
+ expect(await h.execute()).toMatchObject({status:'succeeded',taskSpaceId:8})
+ expect(h.calls.map(c=>c.action)).toEqual(['space_status','space_status','open'])
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space')).toHaveLength(2)
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space_reopen')).toHaveLength(1)
+})
+it('checks a resumed agent Space once per sealed Turn and reuses the exact id and label',async()=>{
+ const h=await reopenFixture(true);h.setState('agent')
+ expect(await h.execute('ego_browser_read')).toMatchObject({status:'succeeded',taskSpaceId:7,pagination:{navigationActionsUsed:1,currentSpaceNavigationCount:1,documentPageNumber:null}})
+ expect(await h.execute('ego_browser_read')).toMatchObject({status:'succeeded',taskSpaceId:7,pagination:{navigationActionsUsed:1,currentSpaceNavigationCount:1,documentPageNumber:null}})
+ expect(h.calls.map(c=>c.action)).toEqual(['space_status','read','read'])
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space')).toHaveLength(1)
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space_status')).toHaveLength(1)
+})
+it.each(['ego_browser_observe','ego_browser_next_page'] as const)('preflights resumed agent %s and keeps its existing binding',async name=>{
+ const h=await reopenFixture(true);h.setState('agent')
+ const args=name==='ego_browser_next_page'?{observationId:h.opened.observationId,targetId:(h.opened.nextPages as Array<{targetId:string}>)[0]!.targetId}:{}
+ expect(await h.execute(name,args)).toMatchObject({status:'succeeded'})
+ expect(h.calls.map(c=>c.action)).toEqual(['space_status',name==='ego_browser_observe'?'observe':'next'])
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space')).toHaveLength(1)
+ expect(await h.execute('ego_browser_read')).toMatchObject({status:'succeeded'})
+ expect(h.calls.filter(c=>c.action==='space_status')).toHaveLength(1)
+})
+it.each(['user','inactive','unassigned','agentDelegatedToUser','unknown'] as const)('denies resumed %s ownership before any Page operation',async ownership=>{
+ const h=await reopenFixture(true);h.setState(ownership)
+ expect(await h.execute('ego_browser_read')).toMatchObject({status:'blocked'})
+ expect(h.nativeCalls).toEqual(['list']);expect(h.f.repo.operations(h.f.task.id,'ego_browser_wait')).toHaveLength(1)
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space')).toHaveLength(1)
+})
+it.each(['mismatch','duplicate','protocol','transport'] as const)('fails closed on resumed metadata %s without attaching',async boundary=>{
+ const h=await reopenFixture(true);h.setState('agent')
+ if(boundary==='transport')h.setMetadataTimeout()
+ else h.setMetadataRows(boundary==='mismatch'?[{id:7,name:'other-name',ownership:'agent'}]:boundary==='duplicate'?[{id:7,name:h.prior.request!.spaceName,ownership:'agent'},{id:7,name:h.prior.request!.spaceName,ownership:'agent'}]:[{id:'7',name:h.prior.request!.spaceName,ownership:'agent'}])
+ expect(await h.execute('ego_browser_read')).toMatchObject({status:'blocked'})
+ expect(h.nativeCalls).toEqual(['list']);expect(h.f.repo.operations(h.f.task.id,'ego_browser_wait')).toHaveLength(1)
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space_reopen')).toHaveLength(0)
+})
+it('revalidates the active Grant after metadata returns and before any Page attachment',async()=>{
+ const h=await reopenFixture(true);h.setState('agent');h.setAfterMetadata(()=>h.f.repo.update(h.f.task.id,h.f.repo.get(h.f.task.id)!.revision,t=>({...t,activeTurnId:'different-turn'})))
+ expect(await h.execute('ego_browser_read')).toMatchObject({status:'blocked',code:'ego_browser_scope_required'})
+ expect(h.nativeCalls).toEqual(['list'])
+})
+it('rejects an expired resumed Grant before making a metadata query',async()=>{
+ const h=await reopenFixture(true);h.f.setGrant({...h.f.grant(),expiresAt:date})
+ expect(await h.execute('ego_browser_read')).toMatchObject({code:'ego_browser_grant_expired'})
+ expect(h.nativeCalls).toEqual([])
+})
+it.each(['expired','abort','configuration'] as const)('preserves %s fencing after a metadata await',async boundary=>{
+ const h=await reopenFixture(true);h.setState('agent');h.setAfterMetadata(boundary==='expired'?h.expire:boundary==='abort'?h.abort:h.changeConfig)
+ expect(await h.execute('ego_browser_read')).toMatchObject({status:'blocked',code:boundary==='configuration'?'ego_browser_scope_required':'ego_browser_grant_expired'})
+ expect(h.nativeCalls).toEqual(['list']);expect(h.f.repo.operations(h.f.task.id,'ego_task_space_status').at(-1)?.status).toBe('failed')
+})
+it('keeps the finished-Space fence ahead of any resumed metadata or Page call',async()=>{
+ const h=await reopenFixture(true);expect(await h.f.execute('ego_browser_finish')).toMatchObject({status:'succeeded'})
+ expect(await h.execute('ego_browser_read')).toMatchObject({code:'ego_browser_task_space_finished'})
+ expect(h.nativeCalls).toEqual([]);expect(h.calls).toEqual([])
+})
+it.each(['approval','result-hash','grant'] as const)('does not reuse a metadata verdict after its %s seal changes',async boundary=>{
+ const h=await reopenFixture(true);await h.execute('ego_browser_read')
+ const status=h.f.repo.operations(h.f.task.id,'ego_task_space_status')[0]!,host=h.f.repo.operationById(h.f.task.id,String(status.request!.hostOperationId),'tool')!,saved=host.result as {approved:boolean;item:{output:Record<string,unknown>}}
+ if(boundary==='grant')h.f.setGrant({...h.f.grant(),id:'new-current-grant'})
+ else h.f.repo.finishOperation(h.f.task.id,host.idempotencyKey,{status:'succeeded',result:boundary==='approval'?{...saved,approved:false}:{...saved,item:{...saved.item,output:{...saved.item.output,spaceStatusResultHash:'forged'}}}},date)
+ expect(await h.execute('ego_browser_read')).toMatchObject({code:'ego_browser_open_required'})
+ expect(h.calls.map(c=>c.action)).toEqual(['space_status','space_status'])
+})
+it('fails closed if the current binding changes while the metadata query is in flight',async()=>{
+ const h=await reopenFixture(true);h.setState('agent');h.setAfterMetadata(()=>h.f.repo.beginOperation({ownerId:h.f.task.id,idempotencyKey:'invalid-concurrent-binding',kind:'ego_task_space',request:{},nowIso:date}))
+ expect(await h.execute('ego_browser_read')).toMatchObject({code:'ego_browser_task_space_unconfirmed'})
+ expect(h.nativeCalls).toEqual(['list']);expect(h.f.repo.operations(h.f.task.id,'ego_browser_wait')).toHaveLength(1)
+})
+it.each(['space_attach','page_resolve','initial_url'] as const)('reports the exact failing SDK %s boundary without raw native errors or invented Page identity',async stage=>{
+ const rows:Record<string,unknown>[]=[],native=Object.assign(new Error('private page content https://feed.test/?token=secret'),{code:'ECONNRESET'})
+ const task={spaceId:7,name:'bound-space',ownership:'agent',page:()=>{if(stage==='page_resolve')throw native;return {label:'p1',url:async()=>{throw native}}}}
+ const AsyncFunction=Object.getPrototypeOf(async()=>undefined).constructor as new(...args:string[])=>(...args:unknown[])=>Promise<void>
+ await new AsyncFunction('taskSpace','console',egoReadScript({action:'read',spaceId:7,spaceName:'bound-space',origins:['https://feed.test'],maxBytes:4096,deadline:Date.now()+60000}))(async()=>{if(stage==='space_attach')throw native;return task},{log:(line:string)=>rows.push(JSON.parse(line.slice('RAILWISE_EGO_RESULT:'.length)) as Record<string,unknown>)})
+ expect(rows[0]).toMatchObject({ok:false,code:'ego_browser_read_failed',sdkStage:stage,nativeErrorName:'Error',nativeErrorCode:'ECONNRESET',nativeErrorCategory:'connection'})
+ if(stage==='space_attach')expect(rows[0]).not.toHaveProperty('taskSpaceId')
+ else {expect(rows[0]).toMatchObject({identityVerified:true,taskSpaceId:7,ownership:'agent'});if(stage==='page_resolve')expect(rows[0]).not.toHaveProperty('pageHandleLabel');else expect(rows[0]?.pageHandleLabel).toBe('p1')}
+ expect(rows[0]).not.toHaveProperty('pageLabel')
+ expect(JSON.stringify(rows)).not.toMatch(/private page content|token=secret|stack/)
+})
+it.each([true,false])('persists only allowlisted native diagnostics and verified failure identity (known=%s)',async known=>{
+ const h=await reopenFixture();h.setState('agent')
+ h.setError({ok:false,code:known?'ego_browser_read_failed':'ego_browser_private_token',failurePhase:'control',sdkStage:'initial_url',identityVerified:true,taskSpaceId:7,spaceName:h.prior.request!.spaceName,ownership:'agent',pageHandleLabel:'p1',nativeErrorName:known?'TimeoutError':'private native name',nativeErrorCode:known?'ETIMEDOUT':'private code ?token=secret',nativeErrorCategory:'invented cause',message:'private page content ?token=secret',stack:'private stack'})
+ const out=await h.execute('ego_browser_read'),failed=h.f.repo.operations(h.f.task.id,'ego_page_observation').at(-1)!
+ expect(out).toMatchObject({code:'ego_browser_read_failed',sdkStage:'initial_url',nativeErrorCategory:known?'timeout':'unknown',verifiedIdentity:{taskSpaceId:7,ownership:'agent',pageHandleLabel:'p1'}})
+ expect(failed).toMatchObject({status:'failed',result:{sdkStage:'initial_url',nativeErrorCategory:known?'timeout':'unknown',verifiedIdentity:{taskSpaceId:7}}})
+ if(!known){expect(out).not.toHaveProperty('nativeErrorName');expect(out).not.toHaveProperty('nativeErrorCode')}
+ expect(JSON.stringify([out,failed])).not.toMatch(/private native|private code|private page|token=secret|private stack|invented cause/)
+})
+it('never promotes an unknown native message to a persisted error code',async()=>{
+ const h=await reopenFixture();h.setState('agent');h.setThrownMessage('private_page_token_secret')
+ const out=await h.execute('ego_browser_read')
+ expect(out).toMatchObject({code:'ego_browser_read_failed'})
+ expect(JSON.stringify([out,h.f.repo.operations(h.f.task.id,'ego_browser_wait')])).not.toContain('private_page_token_secret')
+})
 it('appends one closed-Space incarnation only under an actual user-resume authorization, preserving prior source bytes',async()=>{
  const h=await reopenFixture(),out=await h.execute()
  expect(out).toMatchObject({status:'succeeded',taskSpaceId:8})
@@ -205,6 +332,25 @@ it('appends one closed-Space incarnation only under an actual user-resume author
  const again=await h.execute();expect(again).toMatchObject({code:'ego_browser_task_space_missing'})
  expect(h.f.repo.operations(h.f.task.id,'ego_task_space')).toHaveLength(2)
  expect(h.calls.filter(c=>c.action==='open')).toHaveLength(1)
+})
+it('distinguishes current-Space navigation from the task-wide limit after a closed-Space replacement',async()=>{
+ const h=await reopenFixture(true)
+ const priorNavigation=h.f.repo.operations(h.f.task.id,'ego_page_navigation')[0]!,priorRead=h.f.repo.operations(h.f.task.id,'ego_document_read')[0]!
+ let out=await h.execute()
+ expect(out).toMatchObject({status:'succeeded',taskSpaceId:8,pagination:{pageNumber:2,pageNumberMeaning:'task_navigation_actions_used',navigationActionsUsed:2,currentSpaceNavigationCount:1,documentPageNumber:null,pageLimit:10,limitReached:false}})
+ const read=await h.execute('ego_browser_read')
+ expect(read).toMatchObject({pagination:{navigationActionsUsed:2,currentSpaceNavigationCount:1,documentPageNumber:null}})
+ expect(h.f.repo.operations(h.f.task.id,'ego_page_navigation')).toHaveLength(2)
+ out=read
+ for(let used=2;used<10;used++)out=await h.execute('ego_browser_next_page',{observationId:out.observationId,targetId:(out.nextPages as Array<{targetId:string}>)[0]!.targetId})
+ expect(out).toMatchObject({status:'succeeded',pagination:{pageNumber:10,navigationActionsUsed:10,currentSpaceNavigationCount:9,documentPageNumber:null,pageLimit:10,limitReached:true}})
+ const before=h.calls.length
+ expect(await h.execute('ego_browser_next_page',{observationId:out.observationId,targetId:(out.nextPages as Array<{targetId:string}>)[0]!.targetId})).toMatchObject({code:'ego_browser_page_limit'})
+ expect(h.calls).toHaveLength(before)
+ expect(h.f.repo.operations(h.f.task.id,'ego_page_navigation')).toHaveLength(10)
+ expect(h.f.repo.operationById(h.f.task.id,priorNavigation.id,'ego_page_navigation')).toEqual(priorNavigation)
+ expect(h.f.repo.operationById(h.f.task.id,priorRead.id,'ego_document_read')).toEqual(priorRead)
+ expect(validEgoDocumentEvidence(h.f.repo,h.f.task,h.opened,h.oldGrant)).toBe(true)
 })
 it.each(['no-auth','wrong-turn','wrong-binding','user','inactive','unassigned','agentDelegatedToUser','name-conflict','query-timeout','host-unknown'] as const)('never replaces an existing, uncontrolled or unconfirmed Space: %s',async boundary=>{
  const h=await reopenFixture()
@@ -270,4 +416,137 @@ it('accepts the SDK default user Space id 0 without claiming it or confusing a c
  for(const id of [-1,1.5,Number.MAX_SAFE_INTEGER+1,'0'])expect(await run([{...defaultSpace,id}])).toMatchObject({ok:false,code:'ego_browser_protocol_invalid'})
  expect(await run([defaultSpace],0)).toMatchObject({ok:false,code:'ego_browser_protocol_invalid'})
  const h=await reopenFixture();h.setState('user');expect(await h.execute()).toMatchObject({code:'ego_browser_user_control'});expect(h.calls.filter(p=>p.action!=='space_status')).toHaveLength(0)
+})
+
+// The same fixed SDK program executes against a synthetic live DOM; no browser/CLI/network.
+async function liveSelectionFixture(options: { stopAfterFirst?: 'expired'|'revoked'|'abort'|'configuration'; routeAfterFirst?: boolean; routeBeforeEvaluation?:boolean; error?: {code:string;phase:string;spaceId?:number;ownership?:string}; fallbackError?: boolean; large?:boolean; throwFirst?:boolean; shell?:boolean } = {}) {
+ const f=await fixture(),opened=await f.execute('ego_browser_open',{url:'https://feed.test/list'})
+ const window=new Window({url:'https://feed.test/list'});window.document.body.innerHTML=html
+ window.document.body.insertAdjacentHTML('beforeend','<nav><time>new asynchronous navigation clock</time></nav>')
+ if(options.shell)window.document.body.innerHTML='<nav>Visible site navigation, records have not arrived</nav>'
+ if(options.large)window.document.body.insertAdjacentHTML('beforeend','<p>'+'x'.repeat(6000)+'</p>')
+ clean.push(()=>window.happyDOM.close())
+ const config={state:'installed' as const,executablePath:'/controlled/ego-browser',executableHash:'a'.repeat(64),version:'0.6.3.14',revision:0}
+ const calls:Array<Record<string,unknown>>=[],controller=new AbortController()
+ let clock=Date.parse(date)+1000,revoked=false,evaluations=0,racedDomReads=0
+ const AsyncFunction=Object.getPrototypeOf(async()=>undefined).constructor as new(...args:string[])=>(...args:unknown[])=>Promise<void>
+ const provider=buildEgoBrowserToolProvider({config,repository:f.repo,now:()=>clock,run:async(_config,script)=>{
+  const p=JSON.parse(script.split('\n')[0]!.slice('const p = '.length,-1)) as Record<string,unknown>;calls.push(p)
+  if(options.throwFirst)throw new Error('ego_browser_command_timeout')
+  let result:Record<string,unknown>
+  if(options.error || options.fallbackError&&calls.length>1) result={ok:false,code:options.error?.code??'ego_browser_observation_stale',failurePhase:options.error?.phase??'selection',taskSpaceId:options.error?.spaceId??7,spaceName:p.spaceName,ownership:options.error?.ownership??'agent',pageLabel:'p1'}
+  else {
+   const globals=globalThis as unknown as Record<string,unknown>,previous={document:globals.document,location:globals.location}
+   globals.document=window.document;globals.location=window.location
+   try {
+    const rows:Record<string,unknown>[]=[],task={spaceId:7,name:p.spaceName,ownership:'agent',page:()=>({label:'p1',url:async()=>window.location.href,evaluate:async(fn:(arg:unknown)=>unknown,arg:unknown)=>{
+     evaluations++
+     if(options.routeBeforeEvaluation&&calls.length>1) {
+      window.location.hash='changed-after-url-before-evaluate'
+      globals.document=new Proxy(window.document,{get(target,property){const value=Reflect.get(target,property,target);if(property==='querySelectorAll')return (...args:unknown[])=>{racedDomReads++;return Reflect.apply(value,target,args)};return typeof value==='function'?value.bind(target):value}})
+     }
+     return JSON.parse(JSON.stringify(await fn(arg))) as unknown
+    }})}
+    await new AsyncFunction('taskSpace','console','listTaskSpaces','setTimeout','Date',script)(async()=>task,{log:(line:string)=>rows.push(JSON.parse(line.slice('RAILWISE_EGO_RESULT:'.length)) as Record<string,unknown>)},async()=>[{id:7,name:p.spaceName,ownership:'agent'}],(callback:()=>void)=>callback(),{now:()=>clock})
+    result=rows[0]!
+   } finally {globals.document=previous.document;globals.location=previous.location}
+  }
+  if(calls.length===1) {
+   if(options.stopAfterFirst==='expired')clock=Date.parse(f.grant().expiresAt!)
+   if(options.stopAfterFirst==='revoked')revoked=true
+   if(options.stopAfterFirst==='abort')controller.abort()
+   if(options.stopAfterFirst==='configuration')config.revision++
+   if(options.routeAfterFirst)window.location.hash='changed-route'
+  }
+  return result
+ }})
+ let sequence=0
+ const execute=async(args:Record<string,unknown>)=>{
+  const grant=f.grant(),callId='live-recovery-'+(++sequence),key='tool:'+grant.turnId+':'+callId
+  const request={providerId:'ego-browser',toolName:'ego_browser_read',callId,turnId:grant.turnId,argumentsHash:operationFingerprint(args),executionGrant:grant}
+  const host=f.repo.beginOperation({ownerId:f.task.id,idempotencyKey:key,kind:'tool',request,nowIso:date}).receipt
+  const context:ToolHostContext={threadId:f.task.threadId,turnId:grant.turnId,workspace:f.task.workspaceRoot,threadMode:'agent',sandboxMode:'read-only',approvalPolicy:'auto',executionGrant:grant,abortSignal:controller.signal,awaitApproval:async()=>'allow',validateExecutionGrant:async()=>{if(revoked)throw Object.assign(new Error('revoked'),{code:'execution_grant_scope'})},currentToolOperation:()=>({operationId:host.id,idempotencyKey:key,taskId:f.task.id,turnId:grant.turnId,executionId:'live-recovery',callId,toolName:'ego_browser_read',providerId:'ego-browser',argumentsHash:operationFingerprint(args),executionGrantFingerprint:operationFingerprint(grant)})}
+  const result=await provider.tools.find(tool=>tool.name==='ego_browser_read')!.execute(args,context)
+  f.repo.finishOperation(f.task.id,key,{status:result.isError?'failed':'succeeded',result:{approved:true,item:{id:'result-'+callId,kind:'tool_result',status:'completed',threadId:f.task.threadId,turnId:grant.turnId,callId,toolName:'ego_browser_read',output:result.output,isError:Boolean(result.isError)}}},date)
+  return result.output as Record<string,unknown>
+ }
+ return {f,opened,calls,execute,evaluations:()=>evaluations,racedDomReads:()=>racedDomReads}
+}
+
+it('recovers one live selection DOM change by a separately sealed same-page current document read',async()=>{
+ const h=await liveSelectionFixture(),out=await h.execute({selector:'article',observationId:h.opened.observationId})
+ expect(out).toMatchObject({status:'succeeded',readScope:'document',truncated:false,recoveredFrom:{code:'ego_browser_observation_stale',failurePhase:'selection'}})
+ expect(String(out.html)).toContain('new asynchronous navigation clock');expect(String(out.html)).toContain('测绘监测项目')
+ expect((out.evidence as Record<string,unknown>).selection).toBeUndefined();expect(validEgoDocumentEvidence(h.f.repo,h.f.task,out,h.f.grant())).toBe(true)
+ expect(h.calls).toHaveLength(2);expect(h.calls[0]).toHaveProperty('selector','article');expect(h.calls[1]).toMatchObject({action:'read',spaceId:7,recoverExistingOnly:true,expectedReadSourceUrl:'https://feed.test/list'})
+ expect(h.calls[1]).not.toHaveProperty('selector');expect(h.calls[1]).not.toHaveProperty('expectedDocumentHtml')
+ const observations=h.f.repo.operations(h.f.task.id,'ego_page_observation')
+ expect(observations).toHaveLength(2);expect(observations[0]).toMatchObject({status:'failed',result:{code:'ego_browser_observation_stale',failurePhase:'selection'}});expect(observations[1]?.status).toBe('succeeded')
+ const read=h.f.repo.operations(h.f.task.id,'ego_document_read').at(-1)!
+ expect(read.request).not.toHaveProperty('selector');expect(read.request).toHaveProperty('recoveredFrom.failedDispatchReceiptId',observations[0]!.id)
+ expect(h.f.repo.operations(h.f.task.id,'ego_task_space')).toHaveLength(1)
+})
+
+it.each(['expired','revoked','abort','configuration'] as const)('retains the failed selector and blocks %s before its recovery read',async stopAfterFirst=>{
+ const h=await liveSelectionFixture({stopAfterFirst}),out=await h.execute({selector:'article',observationId:h.opened.observationId})
+ expect(out.status).toBe('blocked');expect(out).not.toHaveProperty('evidence');expect(h.calls).toHaveLength(1)
+  expect(h.f.repo.operations(h.f.task.id,'ego_page_observation')).toEqual([expect.objectContaining({status:'failed',result:expect.objectContaining({code:'ego_browser_observation_stale',failurePhase:'selection'})})])
+ expect(h.f.repo.operations(h.f.task.id,'ego_document_read')).toHaveLength(1)
+})
+
+it.each([
+ {code:'ego_browser_observation_stale',phase:'control'}, {code:'ego_browser_page_changed',phase:'selection'},
+ {code:'ego_browser_selector_invalid',phase:'selection'}, {code:'ego_browser_element_ambiguous',phase:'selection'},
+ {code:'ego_browser_origin_denied',phase:'selection'}, {code:'ego_browser_protocol_invalid',phase:'selection'},
+ {code:'ego_browser_observation_stale',phase:'selection',spaceId:8}, {code:'ego_browser_observation_stale',phase:'selection',ownership:'user'}
+])('does not recover an ineligible read result $code/$phase',async error=>{
+ const h=await liveSelectionFixture({error}),out=await h.execute({selector:'article',observationId:h.opened.observationId})
+ expect(out.status).toBe('blocked');expect(out).not.toHaveProperty('evidence');expect(h.calls).toHaveLength(1);expect(h.f.repo.operations(h.f.task.id,'ego_document_read')).toHaveLength(1)
+})
+
+it('never follows a changed same-origin route during selection recovery',async()=>{
+ const h=await liveSelectionFixture({routeAfterFirst:true}),out=await h.execute({selector:'article',observationId:h.opened.observationId})
+ expect(out).toMatchObject({status:'blocked',code:'ego_browser_page_changed'});expect(out).not.toHaveProperty('evidence');expect(h.calls).toHaveLength(2)
+ expect(h.evaluations()).toBe(2);expect(h.f.repo.operations(h.f.task.id,'ego_document_read')).toHaveLength(1)
+})
+
+it('checks the exact recovery URL inside evaluate before reading a raced route DOM',async()=>{
+ const h=await liveSelectionFixture({routeBeforeEvaluation:true}),out=await h.execute({selector:'article',observationId:h.opened.observationId})
+ expect(out).toMatchObject({status:'blocked',code:'ego_browser_page_changed',failurePhase:'control'});expect(out).not.toHaveProperty('evidence')
+ expect(h.calls).toHaveLength(2);expect(h.evaluations()).toBe(3);expect(h.racedDomReads()).toBe(0)
+ expect(h.f.repo.operations(h.f.task.id,'ego_document_read')).toHaveLength(1)
+ const attempts=h.f.repo.operations(h.f.task.id,'ego_page_observation')
+ expect(attempts).toHaveLength(2);expect(attempts[0]).toMatchObject({status:'failed',result:{code:'ego_browser_observation_stale',failurePhase:'selection'}})
+ expect(attempts[1]).toMatchObject({status:'failed',result:{code:'ego_browser_page_changed',failurePhase:'control'}})
+})
+
+it('never repeats a failed fallback or promotes a capped current document to full evidence',async()=>{
+ const failed=await liveSelectionFixture({fallbackError:true}),out=await failed.execute({selector:'article',observationId:failed.opened.observationId})
+ expect(out.status).toBe('blocked');expect(failed.calls).toHaveLength(2);expect(failed.f.repo.operations(failed.f.task.id,'ego_document_read')).toHaveLength(1)
+ const capped=await liveSelectionFixture({large:true}),limited=await capped.execute({selector:'article',observationId:capped.opened.observationId,maxBytes:4096})
+ expect(limited).toMatchObject({status:'succeeded',readScope:'document',truncated:true});expect(capped.calls).toHaveLength(2)
+ expect(validEgoDocumentEvidence(capped.f.repo,capped.f.task,limited,capped.f.grant())).toBe(false)
+})
+
+it('rejects a foreign receipt before dispatch and guides an old observation to a fresh default read',async()=>{
+ const h=await liveSelectionFixture(),foreign=h.f.repo.beginOperation({ownerId:h.f.task.id,kind:'ego_observation',idempotencyKey:'foreign-context',request:{taskId:'another-task',turnId:h.f.grant().turnId},nowIso:'2026-11-16T00:00:02.000Z'}).receipt
+ h.f.repo.finishOperation(h.f.task.id,foreign.idempotencyKey,{status:'succeeded',result:{sourceUrl:'https://feed.test/list',taskSpaceId:7,documentHtml:html}},'2026-11-16T00:00:02.000Z')
+ const forged=await h.execute({selector:'article',observationId:foreign.id});expect(forged).toMatchObject({code:'ego_browser_observation_stale',failurePhase:'control'});expect(h.calls).toHaveLength(0)
+ const stale=await h.execute({selector:'article',observationId:h.opened.observationId});expect(stale).toMatchObject({code:'ego_browser_observation_stale',failurePhase:'control'});expect(String(stale.message)).toContain('ego_browser_read({})');expect(h.calls).toHaveLength(0)
+ const fresh=await h.execute({});expect(fresh).toMatchObject({status:'succeeded',readScope:'document'});expect(h.calls).toHaveLength(1)
+})
+
+it('does not replay a selector whose dispatched command outcome is unknown',async()=>{
+ const h=await liveSelectionFixture({throwFirst:true}),out=await h.execute({selector:'article',observationId:h.opened.observationId})
+ expect(out).toMatchObject({status:'blocked',code:'ego_browser_command_timeout'});expect(out).not.toHaveProperty('evidence');expect(h.calls).toHaveLength(1)
+ expect(h.f.repo.operations(h.f.task.id,'ego_page_observation')).toHaveLength(1);expect(h.f.repo.operations(h.f.task.id,'ego_document_read')).toHaveLength(1)
+ expect(h.f.repo.operations(h.f.task.id,'ego_browser_wait')).toHaveLength(1)
+})
+
+it('returns an authentic current SPA shell without inventing records or collection completion',async()=>{
+ const h=await liveSelectionFixture({shell:true}),out=await h.execute({selector:'body',observationId:h.opened.observationId})
+ expect(out).toMatchObject({status:'succeeded',readScope:'document',truncated:false,loadingObserved:false,emptyObserved:false})
+ expect(String(out.html)).toContain('records have not arrived');expect(String(out.html)).not.toContain('测绘监测项目');expect(String(out.html)).not.toContain('2026-11-16')
+ expect(out).not.toHaveProperty('complete');expect(out).not.toHaveProperty('noMatches');expect(validEgoDocumentEvidence(h.f.repo,h.f.task,out,h.f.grant())).toBe(true)
+ expect(h.calls).toHaveLength(2)
 })

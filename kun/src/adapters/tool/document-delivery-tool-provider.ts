@@ -396,7 +396,10 @@ export function buildDocumentDeliveryToolProviders(repository: TaskRunRepository
       const bytes = options.contextRuntime.readObject(task.id, String(args.bundle_id ?? ''), String(args.object_id ?? ''))
       const offset = typeof args.offset === 'number' ? Math.max(0, Math.trunc(args.offset)) : 0
       const maxBytes = typeof args.max_bytes === 'number' ? Math.min(65536, Math.max(1, Math.trunc(args.max_bytes))) : 32768
-      const end = Math.min(bytes.length, offset + maxBytes)
+      if (offset > bytes.length || offset < bytes.length && (bytes[offset]! & 0xc0) === 0x80) return { isError: true, output: { untrusted: true, error: 'Context offset must be an exact UTF-8 byte boundary; use the returned nextOffset.' } }
+      let end = Math.min(bytes.length, offset + maxBytes)
+      while (end > offset && end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end--
+      if (end === offset && offset < bytes.length) return { isError: true, output: { untrusted: true, error: 'max_bytes cannot hold the next UTF-8 character; retry with at least 4 bytes.' } }
       const grant = context.executionGrant
       // Guidance is current server state, kept separate from immutable historical spill text.
       const collectionFreshness = grant?.taskId === task.id && grant.threadId === context.threadId && grant.turnId === context.turnId

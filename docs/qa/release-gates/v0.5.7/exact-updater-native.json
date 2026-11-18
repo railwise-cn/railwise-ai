@@ -7,39 +7,39 @@
   "targetVersion": "0.5.7",
   "channel": "frontier",
   "feedUrl": "[redacted][redacted]",
-  "startedAt": "2026-11-16T23:04:01.369Z",
+  "startedAt": "2026-11-17T06:27:59.638Z",
   "browserOpened": false,
   "userDataPreserved": true,
   "stages": [
     {
       "name": "base_started",
-      "at": "2026-11-16T23:04:01.369Z"
+      "at": "2026-11-17T06:27:59.638Z"
     },
     {
       "name": "update_available",
-      "at": "2026-11-16T23:04:02.680Z",
+      "at": "2026-11-17T06:28:00.742Z",
       "detail": "0.5.7"
     },
     {
       "name": "download_completed",
-      "at": "2026-11-16T23:04:35.915Z",
+      "at": "2026-11-17T06:28:36.004Z",
       "detail": "1 artifact(s)"
     },
     {
       "name": "install_requested",
-      "at": "2026-11-16T23:04:35.922Z"
+      "at": "2026-11-17T06:28:36.009Z"
     },
     {
       "name": "target_relaunched",
-      "at": "2026-11-16T23:05:10.736Z",
+      "at": "2026-11-17T06:29:09.841Z",
       "detail": "0.5.7"
     },
     {
       "name": "user_data_preserved",
-      "at": "2026-11-16T23:05:10.738Z",
+      "at": "2026-11-17T06:29:09.842Z",
       "detail": "0.5.6"
     }
   ],
-  "completedAt": "2026-11-16T23:05:10.738Z"
+  "completedAt": "2026-11-17T06:29:09.842Z"
 }
 

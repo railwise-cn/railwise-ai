@@ -10,6 +10,7 @@ import { requestFlowDetail } from '../../store/flow-navigation'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
 import { refreshTaskState, requestTaskDetail, useTaskState } from '../../store/task-live-store'
 import { isExecutionGrantExpiredCapability, taskHasExecutionEvidence } from '@shared/task-presentation'
+import { foregroundTaskArtifactPreview } from '../../lib/use-task-artifact-preview'
 
 /** A capability failure is a durable waiting task, never a completed answer. */
 export function CapabilityRequiredCard({ card, workspaceRoot }: { card: ExternalTaskCapabilityCard; workspaceRoot?: string }): ReactElement {
@@ -43,6 +44,9 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
   const isEgo = capability.provider === 'ego-browser'
   const connector = isBrowser ? 'browser-skill' : isLark ? 'lark' : isDingTalk ? 'dingtalk' : undefined
   const action = capability.resolution ?? capability.action
+  const egoTaskReview = isEgo && ['blocked', 'needs_authorization'].includes(capability.status) && action?.route === 'task/ego-browser-review'
+  const scopeFallbackKey = capability.provider === 'workspace' ? 'capabilityScopeReviewRequired'
+    : isEgo ? 'capabilityScopeRecheckOnResume' : 'capabilityScopeNotGranted'
   const attention = live.attention.find(item => item.id === (card.attentionId ?? `capability_${card.taskId}`) &&
     item.taskId === card.taskId && item.status === 'pending' && item.payload?.kind === 'capability_required')
   const currentCapability = attention?.payload?.capability as ExternalTaskCapabilityCard['capability'] | undefined
@@ -145,6 +149,9 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       threadId: card.threadId, taskId: card.taskId, resolveAttentionId: card.attentionId,
       intent: 'resume', idempotencyKey: crypto.randomUUID(), request: { prompt: card.prompt }
     })
+    if (result.kind === 'task_started' && result.task && result.turn?.turnId) {
+      foregroundTaskArtifactPreview(card.threadId, result.task.id)
+    }
     if (result.kind === 'capability_required' || result.kind === 'attention_required') {
       if (result.kind === 'capability_required') setRechecked({ source: card.capability, capability: result.capability })
       setMessage(result.kind === 'capability_required' && isExecutionGrantExpiredCapability(result.capability)
@@ -181,7 +188,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
         <dt className="text-ds-muted">{t(capability.provider === 'workspace' ? 'capabilityPermissionType' : 'capabilityProvider')}</dt><dd>{t(isLark ? 'capabilityLark' : isDingTalk ? 'capabilityDingTalk' : isBrowser ? 'connectorHubBrowserSkill' : isEgo ? 'pluginCliEgoTitle' : capability.provider === 'schedule' ? 'capabilitySchedule' : 'capabilityWorkspaceFiles')}</dd>
         <dt className="text-ds-muted">{t(interactive ? 'capabilityCurrentStatus' : 'capabilityRecordedStatus')}</dt><dd>{t(`capabilityStatus_${capability.status}`)}</dd>
         <dt className="text-ds-muted">{t(interactive ? 'capabilityWorkspace' : 'capabilityRecordedWorkspace')}</dt><dd className="break-all">{displayedWorkspaceRoot || t('capabilityWorkspaceUnknown')}</dd>
-        <dt className="text-ds-muted">{t(interactive ? 'capabilityRequestedScope' : 'capabilityRecordedScope')}</dt><dd>{capability.requiredScopes?.join(', ') || t(capability.provider === 'workspace' ? 'capabilityScopeReviewRequired' : 'capabilityScopeNotGranted')}</dd>
+        <dt className="text-ds-muted">{t(interactive ? 'capabilityRequestedScope' : 'capabilityRecordedScope')}</dt><dd>{capability.requiredScopes?.join(', ') || t(scopeFallbackKey)}</dd>
         {execution ? <>
           <dt className="text-ds-muted">{t('capabilityWorkspaceTrust')}</dt><dd>{t(`settings:agentCenterTrust_${execution.workspaceTrust}`)}</dd>
           <dt className="text-ds-muted">{t('capabilityAgentTrust')}</dt><dd>{t(`settings:agentCenterTrust_${execution.agentTrust}`)}</dd>
@@ -209,7 +216,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {interactive ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
         {executionGrantExpired ? <button type="button" onClick={openOriginalTask}>{t('taskRunOpenTaskWorkspace')}</button> : null}
-        <button type="button" disabled={pending} onClick={configure}>{isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isDingTalk ? 'capabilityConfigureDingTalk' : 'capabilityOpenMarketplace')}</button>
+        <button type="button" disabled={pending} onClick={configure}>{egoTaskReview ? t('capabilityViewTaskRecoveryOptions') : isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isDingTalk ? 'capabilityConfigureDingTalk' : 'capabilityOpenMarketplace')}</button>
         <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
         <button type="button" disabled={pending} onClick={() => void run(decline)}>{t('capabilityDecline')}</button>
       </div> : <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">

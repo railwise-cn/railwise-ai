@@ -9,7 +9,7 @@ import { taskDisplayTitle } from '@shared/task-presentation'
 import { TaskWorkspaceView, filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from './TaskWorkspaceView'
 import { useChatStore } from '../../store/chat-store'
 import { clearFileReferenceValidationCache } from '../../lib/file-reference-validation'
-import { resetTaskStateForTests, refreshTaskState, updateTaskNavigation } from '../../store/task-live-store'
+import { getTaskState, resetTaskStateForTests, refreshTaskState, updateTaskNavigation } from '../../store/task-live-store'
 
 const now = '2026-11-09T01:00:00.000Z'
 function task(id: string, status: TaskRunV1['status'], goal = id): TaskRunV1 {
@@ -27,6 +27,31 @@ const approval: TaskAttentionV1 = {
 }
 
 describe('task filtering', () => {
+  it('orders task groups by current-branch business updates for snapshot and live input order', () => {
+    const original = { ...task('original', 'failed'), updatedAt: '2026-11-09T06:00:00.000Z' }
+    const retry = { ...task('retry', 'completed'), rootTaskId: original.id, retryOfTaskId: original.id, createdAt: '2026-11-09T02:00:00.000Z', updatedAt: '2026-11-09T02:00:00.000Z' }
+    const child = { ...task('child', 'completed'), rootTaskId: original.id, parentTaskId: retry.id, updatedAt: '2026-11-09T03:00:00.000Z' }
+    const other = { ...task('other', 'completed'), updatedAt: '2026-11-09T04:00:00.000Z' }
+    const inputs = [[original, retry, child, other], [other, child, retry, original], [child, other, original, retry]]
+    for (const input of inputs) {
+      expect(filterWorkspaceTasks(input, [], 'all').map(item => item.id)).toEqual([other.id, original.id])
+      const live = [...input.filter(item => item.id !== child.id), { ...child, updatedAt: '2026-11-09T05:00:00.000Z' }]
+      expect(filterWorkspaceTasks(live, [], 'all').map(item => item.id)).toEqual([original.id, other.id])
+      expect(filterWorkspaceTasks(live, [], 'completed').map(item => item.id)).toEqual([original.id, other.id])
+      expect(filterWorkspaceTasks(live, [], 'attention')).toEqual([])
+    }
+  })
+
+  it('keeps equal-time task group order stable without changing the source tasks', () => {
+    const first = task('a', 'completed'), second = task('b', 'completed')
+    for (const input of [[first, second], [second, first]]) {
+      const before = JSON.stringify(input)
+      expect(groupWorkspaceTasks(input).map(group => group.root.id)).toEqual([first.id, second.id])
+      expect(JSON.stringify(input)).toBe(before)
+      expect(groupWorkspaceTasks(input).find(group => group.root.id === first.id)?.root).toBe(first)
+    }
+  })
+
   it('keeps paused tasks visible and derives counts from the exact same filter as the list', () => {
     const tasks = [task('t1', 'running', 'Monthly monitoring'), task('t2', 'running', 'Tender'), task('t3', 'paused', 'Research'), task('t4', 'completed', 'Completed')]
     expect(filterWorkspaceTasks(tasks, [approval], 'ongoing').map(item => item.id)).toEqual(['t1', 't3'])
@@ -130,6 +155,38 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it.each(['root', 'child'] as const)('promotes live current-branch updates without reviving old failed attempts or losing %s selection', async selection => {
+    const original = task('original', 'failed', 'Recovered report')
+    const oldRetry = { ...task('old-retry', 'failed'), rootTaskId: original.id, retryOfTaskId: original.id, createdAt: '2026-11-09T01:30:00.000Z' }
+    const current = { ...task('current', 'completed'), rootTaskId: original.id, retryOfTaskId: oldRetry.id, createdAt: '2026-11-09T02:00:00.000Z', updatedAt: '2026-11-09T02:05:00.000Z' }
+    const child = { ...task('current-child', 'completed'), rootTaskId: original.id, parentTaskId: current.id, updatedAt: current.updatedAt }
+    const other = { ...task('other', 'completed', 'Other report'), updatedAt: '2026-11-09T02:10:00.000Z' }
+    tasks = [other, original, oldRetry, current, child]; inbox = []
+    const selectedTaskId = selection === 'root' ? original.id : child.id
+    await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId, filter: 'all' }) }); await settle()
+    const rows = (): HTMLButtonElement[] => [...container.querySelectorAll<HTMLButtonElement>('.ds-task-sidebar button[title]')].filter(button => [original.goal, other.goal].includes(button.title))
+    expect(rows().map(button => button.title)).toEqual([other.goal, original.goal])
+    const streamId = vi.mocked(window.workwise.startTaskSse).mock.calls[0][1]!, receive = vi.mocked(window.workwise.onSseEvent).mock.calls[0][0]
+    const publish = async (seq: number, updated: TaskRunV1): Promise<void> => {
+      await act(async () => receive({ streamId, events: [{ seq, kind: 'task_changed', taskId: updated.id, payload: updated }] })); await settle()
+    }
+    await publish(1, { ...child, revision: 2, updatedAt: '2026-11-09T02:15:00.000Z' })
+    expect(getTaskState().tasks.at(-1)?.id).toBe(child.id)
+    expect(rows().map(button => button.title)).toEqual([original.goal, other.goal])
+    await publish(2, { ...other, revision: 2, updatedAt: '2026-11-09T02:20:00.000Z' })
+    expect(rows().map(button => button.title)).toEqual([other.goal, original.goal])
+    await publish(3, { ...original, revision: 2, updatedAt: '2026-11-09T03:00:00.000Z' })
+    await publish(4, { ...oldRetry, revision: 2, updatedAt: '2026-11-09T04:00:00.000Z' })
+    expect(rows().map(button => button.title)).toEqual([other.goal, original.goal])
+    const selected = rows().find(button => button.title === original.goal)!
+    expect(selected.getAttribute('aria-pressed')).toBe('true')
+    expect(selected.textContent).toContain(i18n.t('common:taskRunStatus_completed'))
+    expect(selected.textContent).not.toContain(i18n.t('common:taskRunStatus_failed'))
+    expect(getTaskState().navigation.selectedTaskId).toBe(selectedTaskId)
+    expect(filterWorkspaceTasks(getTaskState().tasks, [], 'attention')).toEqual([])
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled(); expect(window.workwise.retryTask).not.toHaveBeenCalled()
+  })
+
   it('shows current retry expiry attention and keeps superseded parent data unchanged', async () => {
     await i18n.changeLanguage('zh')
     const raw='Execution grant expired; start a newly authorized Turn.'
@@ -243,14 +300,18 @@ describe('TaskWorkspaceView', () => {
     expect(container.querySelector('article ol')?.textContent).toContain(i18n.t('common:taskNodeStatus_running'))
   })
 
-  it('renders the static delivery note as Markdown while preserving its completed disclosure', async () => {
+  it('keeps a completed delivery note collapsed until requested and preserves its Markdown and diagnostic text', async () => {
     await import('../chat/StreamdownAssistant')
-    tasks[0] = { ...tasks[0], status: 'completed', finalResponse: '## 交付清单\n\n**已经保存**\n\n- 已生成报告\n- 已核对单位 `毫米`' }
+    tasks[0] = { ...tasks[0], status: 'completed', finalResponse: '## 交付清单\n\n**已经保存**\n\n- 已生成报告\n- 已核对单位 `毫米`\n\nverify_web_artifact\n\nSHA256: ' + 'a'.repeat(64) }
     inbox = []
     await act(async () => { await refreshTaskState(); updateTaskNavigation({ selectedTaskId: tasks[0].id, filter: 'all' }) })
     await settle()
     const result = [...container.querySelectorAll('details')].find(element => element.querySelector('summary')?.textContent === i18n.t('common:taskWorkspaceResult'))!
+    expect(result.open).toBe(false)
+    await act(async () => result.querySelector('summary')!.click())
     expect(result.open).toBe(true)
+    expect(result.textContent).toContain('verify_web_artifact')
+    expect(result.textContent).toContain('SHA256: ' + 'a'.repeat(64))
     expect(result.querySelector('h2')?.textContent).toBe('交付清单')
     expect(result.querySelector('[data-streamdown="strong"]')?.textContent, result.innerHTML).toBe('已经保存')
     expect([...result.querySelectorAll('ul > li')].map(item => item.textContent)).toEqual(['已生成报告', '已核对单位 毫米'])
@@ -357,6 +418,23 @@ describe('TaskWorkspaceView', () => {
     expect(original.open).toBe(false)
     expect(original.textContent).toContain(goal)
     expect([...workspace.querySelectorAll('button')].some(button => button.textContent === '暂停')).toBe(true)
+  })
+
+  it('shows an explicit task name in navigation and details while preserving the full original request', async () => {
+    await i18n.changeLanguage('zh')
+    const goal = '新任务：大单网临时实钟验收（0.5.7，临时验证）。此任务与原来的正式采集计划独立。\n使用已核对的原任务范围。'
+    tasks[0] = { ...tasks[0], goal, status: 'stalled' }
+    const original = JSON.stringify(tasks[0])
+    await act(async () => refreshTaskState())
+    const details = container.querySelector('[aria-label="任务详情"]')!
+    expect(details.querySelector('h2')?.textContent).toBe('大单网临时实钟验收')
+    const item = [...container.querySelectorAll('.ds-task-sidebar button[title]')].find(item => item.getAttribute('title') === goal)!
+    expect(item.textContent).toContain('大单网临时实钟验收')
+    expect(item.textContent).not.toContain('采集计划独立')
+    const request = [...details.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent === '原始要求')!
+    expect(request.textContent).toContain(goal)
+    expect(JSON.stringify(tasks[0])).toBe(original)
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
   })
 
   it('explicitly rechecks an existing local HTML output without starting a model or discarding the task', async () => {
@@ -788,6 +866,24 @@ describe('TaskWorkspaceView', () => {
     expect(window.workwise.resumeTask).toHaveBeenCalledOnce()
     await act(async () => refreshTaskState())
     expect(container.textContent).toContain('继续原任务前需要处理')
+  })
+
+  it.each(['resume', 'retry', 'blocked'] as const)('marks an explicitly continued scheduled task as foreground only after a real new Turn (%s)', async action => {
+    tasks = [Object.assign({ ...tasks[0], status: action === 'retry' ? 'failed' as const : 'paused' as const,
+      originThreadId: 'original-chat' }, { scheduledBy: { scheduleId: 'daily', dueAt: now } })]
+    inbox = []
+    const result = action === 'blocked'
+      ? { task: tasks[0], capability: { provider: 'ego-browser', status: 'needs_authorization', message: '需要处理' } }
+      : { task: tasks[0], turn: { threadId: tasks[0].threadId, turnId: 'explicit-user-turn' } }
+    Object.assign(window.workwise, { resumeTask: vi.fn(async () => result), retryTask: vi.fn(async () => result) })
+    const dispatch = vi.spyOn(window, 'dispatchEvent')
+    try {
+      await act(async () => refreshTaskState())
+      await click(action === 'retry' ? i18n.t('common:taskRunRetry') : i18n.t('common:taskRunResume'))
+      const foreground = dispatch.mock.calls.map(([event]) => event as CustomEvent).filter(event => event.type === 'railwise:foreground-task-artifact-preview')
+      expect(foreground.map(event => event.detail)).toEqual(action === 'blocked'
+        ? [] : [{ threadId: 'original-chat', taskId: tasks[0].id }])
+    } finally { dispatch.mockRestore() }
   })
 
   it('shows pending decisions and resolves them through the original approval API', async () => {

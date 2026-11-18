@@ -7,6 +7,7 @@ import { explicitWorkspaceWrite, workspaceWritePreflight } from './workspace-wri
 
 const roots: string[] = []
 const browserReportRequest = '新任务：使用 broswer-skill，帮我到 https://zfcg.czt.zj.gov.cn/ 和 https://ygcg.nbcqjy.org/home 获取最近七天与工程测量、工程监测相关的公开招标公告。允许在这两个公开站点的搜索框输入“工程测量”“工程监测”并点击搜索、翻页，不提交报名或业务表单。读取公告正文，核对标题、日期、预算、截止时间、资格条款，缺失标为待核验，说明各来源覆盖情况。生成精美可打印中文 HTML 招标简报，保存到本任务成果并自动打开右侧预览。持久创建每日两次计划，九点前和五点前交付，提前30分钟启动。此前暂停的任务保持暂停。'
+const backgroundTaskOutput = '后台到期成果保存到对应的本轮任务，并保持当前预览。'
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 describe('explicit workspace write admission', () => {
   it('keeps ordinary HTML generation and questions on the managed/chat paths', () => {
@@ -23,6 +24,29 @@ describe('explicit workspace write admission', () => {
       expect(explicitWorkspaceWrite(text), text).toBeNull()
     }
   })
+  it('recognizes bare current-run task references only at a managed destination boundary', () => {
+    for (const text of [backgroundTaskOutput, '保存到本轮任务。', '保存至本次任务中。',
+      '保存到当前任务内。', '输出至对应的任务。', '保存到对应本轮任务的成果中。',
+      '保存到本任务。', '保存到该任务成果区中。', '保存到任务成果中。']) {
+      expect(explicitWorkspaceWrite(text), text).toBeNull()
+    }
+  })
+  it('keeps quoted names, path suffixes and task workspaces explicit beside managed references', () => {
+    for (const [text, target] of [
+      ['保存到“对应的本轮任务”。', '对应的本轮任务'],
+      ['保存到 "本轮任务"。', '本轮任务'],
+      ['保存到本轮任务/report.html。', '本轮任务/report.html'],
+      ['保存到对应的本轮任务\\report.html。', '对应的本轮任务\\report.html'],
+      ['保存到 ../本轮任务/report.html。', '../本轮任务/report.html'],
+      ['保存到本轮任务工作区。', '本轮任务工作区'],
+      ['保存到当前任务的工作区。', '当前任务的工作区'],
+      ['保存到本轮任务目录。', '本轮任务目录'],
+      ['保存到本轮任务的成果备份。', '本轮任务的成果备份']
+    ] as const) expect(explicitWorkspaceWrite(text), text).toEqual({ target, edit: false })
+    expect(explicitWorkspaceWrite(`${backgroundTaskOutput}另将副本保存到 reports/report.html。`)).toEqual({ target: 'reports/report.html', edit: false })
+    expect(explicitWorkspaceWrite('保存到本轮任务；输出至 ../shared/report.html。')).toEqual({ target: '../shared/report.html', edit: false })
+    expect(explicitWorkspaceWrite(`${backgroundTaskOutput}修改当前工作区的 README.md 文件。`)).toEqual({ target: 'README.md', edit: true })
+  })
   it('still checks actual destinations and edits in a mixed managed-output request', () => {
     expect(explicitWorkspaceWrite('保存到本任务成果并自动打开右侧预览，再保存到 "F:\\Projects\\报告.html"。')?.target).toBe('F:\\Projects\\报告.html')
     expect(explicitWorkspaceWrite('保存到本任务成果；输出至 ../shared/report.html。')?.target).toBe('../shared/report.html')
@@ -37,6 +61,9 @@ describe('explicit workspace write admission', () => {
     const thread = createThreadRecord({ id: 'readonly-report', title: 'synthetic', model: 'synthetic', workspace: root, approvalPolicy: 'on-request', sandboxMode: 'read-only' })
     const check = workspaceWritePreflight({ workspaceTrust: { get: async () => ({ canonicalRoot: root, level: 'read-only' as const, revision: 0 }) }, restriction: async () => ({}) })
     expect(await check(browserReportRequest, thread)).toBeNull()
+    expect(await check(backgroundTaskOutput, thread)).toBeNull()
+    expect(await check(`${backgroundTaskOutput}另将副本保存到 reports/report.html。`, thread)).toMatchObject({ errorCode: 'sandbox_read_only' })
+    expect(await check(`${backgroundTaskOutput}修改当前工作区的 README.md 文件。`, thread)).toMatchObject({ errorCode: 'sandbox_read_only' })
     expect(await check(`${browserReportRequest}另将副本保存到 reports/report.html。`, thread)).toMatchObject({ errorCode: 'sandbox_read_only' })
     expect(await check(`${browserReportRequest}修改当前工作区的 README.md 文件。`, thread)).toMatchObject({ errorCode: 'sandbox_read_only' })
   })

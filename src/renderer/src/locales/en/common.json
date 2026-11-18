@@ -4447,6 +4447,8 @@
   "capabilityDiagnosticDetails": "View original diagnostic",
   "capabilityPermissionType": "Permission type",
   "capabilityScopeReviewRequired": "Scope needs review; inspect the current task permissions",
+  "capabilityScopeRecheckOnResume": "Recheck the original task scope when resuming",
+  "capabilityViewTaskRecoveryOptions": "View task and recovery options",
   "capabilityProvider": "Provider",
   "capabilityCurrentStatus": "Current status",
   "capabilityWorkspace": "Current workspace",

@@ -56,6 +56,27 @@ function feedInput() {
   const proof = input(), reference = { url: origins[0] + '/notice/1', resultHash: sha(document) }
   return WebArtifactEvidenceInputSchema.parse({ ...proof, coverage: [reference], noMatches: [], items: [{ ...proof.items[0], source: reference, discovery: reference, classification: 'source' }] })
 }
+
+it('keeps AI business presentation outside literal evidence verification without exempting changed facts', async () => {
+  const f = await fixture({}, 'observed_feed')
+  try {
+    await f.source(origins[0] + '/notice/1', document)
+    const proof = feedInput(), original = JSON.stringify(proof)
+    const rendered = renderStructuredWebReport(proof.path, {
+      title: '工程服务筛选日报',
+      presentation: { summary: '仅汇总本次已列示记录。', screening: [{
+        sectionId: 'notice-1', decision: 'relevant', reason: '原记录标题包含工程测量服务', businessTypes: ['工程测量'], region: '未判断'
+      }] },
+      evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches }
+    }, 'observed_feed')
+    expect(rendered.verificationInput).toEqual(proof)
+    expect((await f.assessment(rendered.content, proof)).complete).toBe(true)
+    expect(JSON.stringify(proof)).toBe(original)
+    const changed = rendered.content.replace('100000元', '999999元')
+    expect(await f.assessment(changed, proof)).toMatchObject({ complete: false,
+      reasons: expect.arrayContaining([expect.stringContaining('budget')]) })
+  } finally { f.repository.close() }
+})
 async function fixture(primaryOutput: Record<string, unknown> = {}, basis?: 'observed_feed') {
   const temporary = await mkdtemp(join(tmpdir(), 'railwise-web-artifact-evidence-')); roots.push(temporary)
   const root = await realpath(temporary), workspace = join(root, '只读 工作区'); await mkdir(workspace)
@@ -484,6 +505,9 @@ it('keeps the actual missing-origin deficit when a later publication drops its t
     expect(f.repository.operations(f.task.id, 'web_artifact_source_gate').at(-1)?.result).toMatchObject({
       failureKinds: expect.arrayContaining(['source_manifest_required', `source_origin:${gov}`])
     })
+    const decision = await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')
+    expect(decision?.task.waitingReason).toContain('尚无已登记成果')
+    expect(decision?.task.waitingReason).not.toContain('草稿')
   } finally { f.repository.close() }
 })
 
@@ -812,6 +836,27 @@ it('round trips the structured manifest through the real unchanged source eviden
   } finally { f.repository.close() }
 })
 
+it.each(['列表原文摘录', '匹配依据（列表原文）'])('accepts neutral and legacy feed excerpt captions: %s, while requiring literal owner evidence', async caption => {
+  const f = await fixture({}, 'observed_feed')
+  try {
+    const owner = '业主单位：示例工程建设有限公司', body = document.replace('</article>', `<p>${owner}</p></article>`), proof = feedInput()
+    await f.source(origins[0] + '/notice/1', body)
+    const reference = { url: origins[0] + '/notice/1', resultHash: sha(body) }
+    proof.coverage = [reference]; proof.items[0]!.source = reference; proof.items[0]!.discovery = reference
+    proof.items[0]!.fields.push({ field: 'other', value: owner, quote: owner })
+    const original = structuredClone(proof), { path, ...evidence } = proof
+    const generated = renderStructuredWebReport(path, { title: '订阅列表摘录', evidence }, 'observed_feed')
+    const html = generated.content.replace(/<dt>(?:列表原文摘录|匹配依据（列表原文）)<\/dt>/, `<dt>${caption}</dt>`)
+    expect(generated.verificationInput).toEqual(original)
+    expect(await f.assessment(html, generated.verificationInput)).toMatchObject({ complete: true, reasons: [] })
+    const inferred = structuredClone(generated.verificationInput), reason = '符合工程测量监测主营业务'
+    inferred.items[0]!.fields.find(field => field.field === 'other')!.value = reason
+    expect(await f.assessment(html.replace(owner, reason), inferred)).toMatchObject({ complete: false,
+      reasons: expect.arrayContaining(['字段缺少正文与成果的精确依据：notice-1/other']) })
+    expect(proof).toEqual(original)
+  } finally { f.repository.close() }
+})
+
 it('renders unknown fields honestly while preserving title, full source, discovery and required origins', async () => {
   const f = await fixture()
   try {
@@ -1091,5 +1136,138 @@ it.each(['cross-path', 'changed-bytes'] as const)('rejects %s reuse of the newly
     expect(f.repository.operations(f.task.id, 'tool').filter(row => row.request?.toolName === 'browser_get_html').map(row => JSON.stringify(row))).toEqual(f.sourceRows)
     expect(await readFile(f.path, 'utf8')).toBe(f.oldBytes)
     expect(f.repository.get(f.task.id)!.status).not.toBe('completed')
+  } finally { f.repository.close() }
+})
+
+it('distinguishes a current captured feed document from report record evidence without treating navigation text as zero results', async () => {
+  const f = await observedCollectionFixture()
+  try {
+    const url = origins[0] + '/#/subscribe/bidding', shell = '<main><nav>工作台 资料 搜索</nav><h1>我的订阅列表</h1></main>'
+    await f.source(url, shell)
+    const proof = feedInput(), reference = { url, resultHash: sha(shell) }
+    proof.coverage = [reference]; proof.items[0]!.source = reference; proof.items[0]!.discovery = reference
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', proof.path, proof)).toMatchObject({ ready: false,
+      collectionFreshness: { currentCollectionReady: true, currentDocumentCaptured: true, reportEvidenceReady: false, readinessMeaning: 'current_capture_only' },
+      reportReadiness: { typedManifestProvided: true, reportEvidenceReady: false, declaredRecords: 1, boundRecords: 0, gaps: expect.arrayContaining(['record_binding_required']) } })
+    expect(await f.controller.recordWebArtifactPublicationBlock(f.task.id, 'new-turn', proof.path, proof)).toMatchObject({
+      code: 'web_source_reads_required', semanticRepair: { failureCount: 1, stalled: false } })
+    const second = await f.controller.recordWebArtifactPublicationBlock(f.task.id, 'new-turn', 'renamed.html')
+    expect(second).toMatchObject({ code: 'web_artifact_repair_stalled', semanticRepair: { failureCount: 2, stalled: true },
+      reportReadiness: { typedManifestProvided: false, gaps: expect.arrayContaining(['typed_manifest_required']) } })
+    expect(second!.missingOrigins).toContain(origins[0]); expect(second!.nextReads).toEqual([])
+    const before = f.repository.get(f.task.id)!, decision = await f.controller.suspendWebArtifactProgress(f.thread.id, 'new-turn')
+    expect(decision?.task.waitingReason).toContain('尚无已登记成果')
+    expect(decision?.task.waitingReason).not.toMatch(/草稿已保留|字段仍待核验/)
+    expect(decision?.task.budget).toEqual(before.budget); expect(decision?.task.attempts).toBe(before.attempts)
+  } finally { f.repository.close() }
+})
+
+it.each(['active', 'expired', 'finished', 'unknown'] as const)('offers the existing same-Space empty-args document read only for a live scoped Ego execution: %s', async boundary => {
+  const f = await observedCollectionFixture()
+  try {
+    const task = f.repository.get(f.task.id)!, url = origins[0] + '/#/subscribe/bidding', identity = 'e'.repeat(64), nonce = 'offline-recovery-space'
+    f.repository.update(task.id, task.revision, row => ({ ...row, goal: '汇总已授权订阅列表 ' + url }))
+    const thread = (await f.threadStore.get(f.thread.id))!
+    await f.threadStore.upsert({ ...thread, turns: thread.turns.map(turn => turn.id === 'new-turn' ? { ...turn, executionGrant: {
+      ...turn.executionGrant!, allowedProviderIds: ['ego-browser'], allowedToolNames: ['ego_browser_read', 'publish_artifact'], connectorIdentityFingerprints: { 'ego-browser': identity },
+      browserScope: { ...turn.executionGrant!.browserScope!, provider: 'ego-browser' as const }, expiresAt: boundary === 'expired' ? '2026-11-14T23:59:00.000Z' : '2026-11-15T00:30:00.000Z'
+    } } : turn) })
+    const binding = f.repository.beginOperation({ ownerId: task.id, kind: 'ego_task_space', idempotencyKey: 'ego-task-space', request: {
+      taskId: task.id, threadId: task.threadId, nonce, spaceName: `RailWise read-only ${task.id} ${nonce}`, createdTurnId: 'new-turn', configurationFingerprint: identity, origins
+    }, nowIso: fixtureTime }).receipt
+    f.repository.finishOperation(task.id, binding.idempotencyKey, { status: 'succeeded', result: { taskSpaceId: 12, pageLabel: 'p1', ownership: 'agent' } }, fixtureTime)
+    if (boundary === 'finished' || boundary === 'unknown') {
+      const key = boundary === 'finished' ? 'ego-finish:' + binding.id : 'unknown-read'
+      f.repository.beginOperation({ ownerId: task.id, kind: boundary === 'finished' ? 'ego_task_space_finish' : 'tool', idempotencyKey: key, request: { turnId: 'new-turn' }, nowIso: fixtureTime })
+      f.repository.finishOperation(task.id, key, { status: boundary === 'finished' ? 'succeeded' : 'outcome_unknown', result: {} }, fixtureTime)
+    }
+    const before = JSON.stringify(f.repository.operations(task.id)), state = f.repository.get(task.id)!
+    const gate = await f.controller.webArtifactPublicationGate(task.id, 'new-turn', 'current.html', feedInput())
+    if (boundary === 'active') {
+      expect(gate).toMatchObject({ readRecovery: { providerId: 'ego-browser', toolName: 'ego_browser_read', arguments: {}, taskId: task.id,
+        turnId: 'new-turn', taskSpaceId: 12, requestedUrls: [url], maxCalls: 1 } })
+      expect(gate!.collectionFreshness!.nextStep).toContain('ego_browser_read({})'); expect(gate!.readRecovery).not.toHaveProperty('url')
+    } else expect(gate!.readRecovery).toBeUndefined()
+    expect(JSON.stringify(f.repository.operations(task.id))).toBe(before); expect(f.repository.get(task.id)).toEqual(state)
+    if (boundary === 'active') {
+      const first = await f.controller.recordWebArtifactPublicationBlock(task.id, 'new-turn', 'current.html', feedInput())
+      expect(first).toMatchObject({ stalled: false, readRecovery: { maxCalls: 1 } })
+      const second = await f.controller.recordWebArtifactPublicationBlock(task.id, 'new-turn', 'other-name.html')
+      expect(second).toMatchObject({ code: 'web_artifact_repair_stalled', collectionReadFailures: 2, stalled: true })
+      expect(second!.readRecovery).toBeUndefined()
+      expect(f.repository.get(task.id)!.budget).toEqual(state.budget); expect(f.repository.get(task.id)!.attempts).toBe(state.attempts)
+      f.controller.pauseTask(task.id, f.repository.get(task.id)!.revision)
+      expect(await f.controller.observedFeedCollectionContext(task.id, 'new-turn')).toBeNull()
+    }
+  } finally { f.repository.close() }
+})
+
+
+it('isolates a feed record before checking a bad adjacent-owner quote instead of cascading into valid title and date', async () => {
+  const f = await fixture({}, 'observed_feed')
+  try {
+    const name = '匿名工程测量监测订阅记录[内容包含]', url = origins[0] + '/current-feed'
+    const body = `<main><div><div><div>${name}</div><div>发布日期：2026-11-15</div><div>预算金额：100000元</div></div><div><div>匿名工程测量服务另一条完整记录</div><div>发布日期：2026-11-15预算金额：100000元。业主单位：相邻记录单位</div></div></div></main>`
+    await f.source(url, body)
+    const reference = { url, resultHash: sha(body) }
+    const proof = WebArtifactEvidenceInputSchema.parse({ path: 'record-repair.html', coverage: [reference], items: [{ sectionId: 'x06', title: name,
+      source: reference, discovery: reference, classification: 'source', fields: [
+        { field: 'title', value: name, quote: name },
+        { field: 'publication_date', value: '2026-11-15', quote: '发布日期：2026-11-15' },
+        { field: 'budget', value: '100000元', quote: '预算金额：100000元。业主单位：相邻记录单位' }
+      ], unverifiedFields: ['deadline', 'status', 'qualification'] }] })
+    const other = structuredClone(proof.items[0]!)
+    other.sectionId = 'good-row'; other.title = '匿名工程测量服务另一条完整记录'
+    other.fields[0] = { field: 'title', value: other.title, quote: other.title }
+    other.fields[2]!.quote = '发布日期：2026-11-15预算金额：100000元'
+    proof.items.push(other)
+    const render = () => renderStructuredWebReport(proof.path, { title: '匿名订阅记录汇总', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } }, 'observed_feed')
+    const result = await f.assessment(render().content, proof)
+    expect(result.complete).toBe(false)
+    expect(result.reasons).toEqual(['字段缺少正文与成果的精确依据：x06/budget'])
+    expect(result).toMatchObject({ repairContext: { kind: 'observed_feed_fields', recordsTruncated: false, records: [{ sectionId: 'x06',
+      failedFields: ['budget'], sourceReceiptId: expect.any(String), sourceResultHash: sha(body), excerptTruncated: false }] } })
+    expect(result.repairContext!.records[0]!.excerpt).toContain('预算金额：100000元')
+    expect(result.repairContext!.records[0]!.excerpt).not.toContain('相邻记录单位')
+    expect(await f.controller.webArtifactPublicationGate(f.task.id, 'new-turn', proof.path, proof)).toMatchObject({ ready: true, reportReadiness: { boundRecords: 2, reportEvidenceReady: false, gaps: ['field_quote_unverified'], verificationRequired: true } })
+    const shortened = structuredClone(proof)
+    shortened.items[0]!.title = name.slice(0, -6)
+    shortened.items[0]!.fields[0]!.value = shortened.items[0]!.title
+    const unbound = await f.assessment(renderStructuredWebReport(proof.path, { title: '匿名订阅记录汇总', evidence: { coverage: shortened.coverage, items: shortened.items, noMatches: shortened.noMatches } }, 'observed_feed').content, shortened)
+    expect(unbound.reasons).toContain('订阅记录缺少同一真实记录内的标题、日期及实际链接依据：x06')
+    expect(unbound).not.toHaveProperty('repairContext')
+    const firstDraft = await f.call('publish_artifact', { path: proof.path, report: { title: '匿名订阅记录汇总', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } })
+    expect(firstDraft).toHaveProperty('bytes_written')
+    expect(await f.call('verify_web_artifact', firstDraft.verificationInput as Record<string, unknown>)).toMatchObject({ complete: false,
+      reasons: result.reasons, semanticRepair: { failureCount: 1, stalled: false } })
+    const failedReceipt = JSON.stringify(f.repository.operations(f.task.id, 'web_artifact_evidence').at(-1))
+    proof.items[0]!.fields[2]!.quote = '发布日期：2026-11-15预算金额：100000元'
+    const corrected = await f.call('publish_artifact', { path: proof.path, report: { title: '匿名订阅记录汇总', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } } })
+    expect(corrected).toHaveProperty('bytes_written')
+    expect(await f.call('verify_web_artifact', corrected.verificationInput as Record<string, unknown>)).toMatchObject({ complete: true, reasons: [] })
+    expect(JSON.stringify(f.repository.operations(f.task.id, 'web_artifact_evidence').filter(row => row.status === 'failed').at(-1))).toBe(failedReceipt)
+    expect(f.repository.get(f.task.id)?.status).toBe('running')
+  } finally { f.repository.close() }
+})
+
+it('returns every bounded feed defect beyond thirty while limiting excerpts to the actually bound records', async () => {
+  const f = await fixture({}, 'observed_feed')
+  try {
+    const names = Array.from({ length: 40 }, (_, n) => `匿名工程测量订阅项目第${n + 1}项完整标题`)
+    const body = `<main>${names.map(name => `<article><h2>${name}</h2><p>发布日期：2026-11-15。预算金额：100000元。</p><p>${'匿名说明'.repeat(400)}</p></article>`).join('')}</main>`
+    const url = origins[0] + '/many-current-records'; await f.source(url, body)
+    const reference = { url, resultHash: sha(body) }
+    const proof = WebArtifactEvidenceInputSchema.parse({ path: 'many-records.html', coverage: [reference], items: names.map((name, n) => ({
+      sectionId: `x${String(n + 1).padStart(2, '0')}`, title: name, source: reference, discovery: reference, classification: 'source',
+      fields: [{ field: 'title', value: name, quote: name }, { field: 'publication_date', value: '2026-11-15', quote: '发布日期：2026-11-15' },
+        { field: 'budget', value: '100000元', quote: '不存在的预算金额：100000元及无来源的附加单位' }], unverifiedFields: ['deadline', 'status', 'qualification'] })) })
+    const result = await f.assessment(renderStructuredWebReport(proof.path, { title: '匿名多条记录汇总', evidence: { coverage: proof.coverage, items: proof.items, noMatches: proof.noMatches } }, 'observed_feed').content, proof)
+    expect(result.complete).toBe(false)
+    expect(result.reasons).toHaveLength(40)
+    expect(result.reasons).toContain('字段缺少正文与成果的精确依据：x40/budget')
+    expect(result).toMatchObject({ repairContext: { recordsTruncated: true, records: expect.any(Array) } })
+    expect(result.repairContext!.records).toHaveLength(3)
+    expect(result.repairContext!.records.every(record => record.excerpt.length <= 1200 && record.excerptTruncated)).toBe(true)
+    expect(JSON.stringify(result.repairContext)).not.toContain('不存在的预算金额')
   } finally { f.repository.close() }
 })

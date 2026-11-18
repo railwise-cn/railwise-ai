@@ -1,60 +1,126 @@
 {
   "status": "passed",
-  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
-  "releaseRunId": 43968313921,
-  "scope": "Root actual new exact package Chinese/light primary 1280x840 native UI, preserved completed Task automatic preview and raw internal wait-reason hiding. No all-size matrix or fresh due success is claimed.",
-  "language": "zh-CN",
+  "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+  "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
+  "releaseRunId": 44024949316,
+  "scope": "Actual installed H4 Chinese/light Mac task and preview, native responsive General menu, plus corrected exact Windows manual-entry and responsive proof",
+  "language": "zh",
   "theme": "light",
-  "nativeWindowSize": [
+  "normalWindow": [
     1280,
     840
   ],
-  "currentTaskBannerProjection": {
-    "rawInternalRepairReasonWasPresent": true,
-    "rawRepairReasonHiddenFromActiveChatUi": true,
-    "basis": "Root active chat DOM plus persisted binding proof, distinct from the later completed-state screenshot"
-  },
-  "completedTaskAttentionResolution": {
-    "oldResolvedAttentionNotReopened": true,
-    "originalCompletedTaskStillAttempt7": true,
-    "allTaskRowsAndOperationsUnchanged": true
-  },
-  "taskWorkspaceAutoPreviewNoArtifactClick": true,
-  "rootVisuallyInspected": true,
-  "visualDefects": [],
-  "initialQaNativeScreenshotPhase": "completed; prior active DOM captured internal repair present and hidden in UI",
-  "completedScreenshotUsedAsRunningEvidence": false,
-  "privateEvidenceDigests": [
-    {
-      "fileName": "7d19-preserved-original-task-and-auto-preview-private.json",
-      "bytes": 860,
-      "sha256": "5c8cff0a1a06a656e400a060ef4be44b4724d16c2fb7cd2e84eef7ae3f36ff4f",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-qa-active-chat-ui-private.json",
-      "bytes": 13285,
-      "sha256": "44d142a12f211cdea11569fdd2507202cf9123e429dbb0ee4b6b894522b68b56",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-ego-temporary-qa-actual-binding-private.json",
-      "bytes": 867,
-      "sha256": "3b502583cdf01d2bccef7bc345107a07446f3b969b406bcf50b2a52a73db55a3",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-initial-qa-completion-private.json",
-      "bytes": 2093,
-      "sha256": "857208360361d9cbe8c3c909be2a4e4cd17b943cff1df1a60701d5163b2440c6",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "private-native-primary-image-not-published",
-      "sha256": "542af69b6c449a303318e46c790881835a2037d98a06e3fbd2b29e5bbb8914ba",
+  "macObservations": {
+    "initialTaskCompleted": true,
+    "naturalDueCompleted": true,
+    "initialSavedHtmlPreviewReported": true,
+    "backgroundDueDidNotStealInitialSelection": true,
+    "selectDueTaskOpenedSavedVerifiedHtmlWithoutArtifactClick": true,
+    "narrowInspectorOverlayMainInertIsExpectedModalBehavior": true,
+    "actualPanelCollapseRestoresMainHitTesting": true,
+    "originEvidence": {
+      "fileName": "3f1ba1d3-real-model-ego-initial-and-natural-due-root-audit-private.json",
+      "bytes": 15428,
+      "sha256": "6fbe7de96e10374e28b0623a145ae9d04f02e11d42d8246046aec35acbf53f82",
       "privateSourceOnly": true
     }
+  },
+  "windows": {
+    "status": "passed",
+    "packageSourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+    "driverSourceHead": "8538d2624ad496cc2964cdfddc16bfaca274d2a6",
+    "packageRunId": 44024949316,
+    "acceptanceRunId": 44044175670,
+    "acceptanceRunAttempt": 1,
+    "acceptanceJobId": 133905676505,
+    "officialConclusion": "success",
+    "strictCheckerStatus": "passed",
+    "originalRawEvidence": {
+      "id": 14310842516,
+      "bytes": 1200983,
+      "sha256": "e2460ccb8fece5f70deead223dc95b94b747665fa529b241872991d30f20c274",
+      "zipCRCVerified": true,
+      "allExtractedEntryBytesMatched": true,
+      "entries": 13
+    },
+    "strictSummary": {
+      "fileName": "windows-44044175670-summary.json",
+      "bytes": 215426,
+      "sha256": "346daeff31d8dcdb336310b3669475c2196e788515be6da4d5d1be65da79bbf3"
+    },
+    "rootIndependentProof": {
+      "fileName": "windows-8538d262-same-H4-root-full-proof-check.json",
+      "bytes": 3662,
+      "sha256": "40514a8899f81deeb53215396de417e82032b1dae2b3a121ea5be1432c86263d"
+    },
+    "scope": "Controlled Windows BSK/local model/loopback, actual saved HTML, automatic and manual preview, daily readback and real-clock due; not Ego Windows, external model or paid Dadan",
+    "signing": "NotSigned/not-configured",
+    "priorFailures": [
+      {
+        "runId": 44029208287,
+        "driverSourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+        "conclusion": "failure",
+        "stage": "manual artifact center hit test covered by expected inspector modal",
+        "evidence": {
+          "fileName": "windows-3f1ba1d3-full-failure-handoff.json",
+          "bytes": 10094,
+          "sha256": "5f60fda594dde2bf9b8d88b21e226c633bd5ccd6bf64c7fb5ac20307f7ff6156",
+          "privateSourceOnly": false
+        }
+      },
+      {
+        "runId": 44039630770,
+        "driverSourceHead": "17f74463ff7181777f39f6af5aba4dffd3d340a2",
+        "conclusion": "failure",
+        "stage": "QA wait for a new auto-preview despite already dismissed same task/key",
+        "evidence": {
+          "fileName": "full-failure-handoff.json",
+          "bytes": 27679,
+          "sha256": "c7d8f72318385b9cf3a4d1020e5cbb8929bb199969350e125e9b72a3a70839fb",
+          "privateSourceOnly": false
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "Mac local UI is Apple Silicon only; no local Intel UI matrix.",
+    "Native proof referenced privately; no paid titles, private DOM or report path is staged."
   ],
-  "privacy": "No paid page/report content, announcement entries, account data or original private screenshot bytes are copied into this report."
+  "macResponsive": {
+    "status": "passed",
+    "nativeSizes": [
+      [
+        1024,
+        760
+      ],
+      [
+        960,
+        700
+      ],
+      [
+        1280,
+        840
+      ]
+    ],
+    "minimumWidthActuallyClampedTo": 960,
+    "requested760ClaimedAsTested": false,
+    "generalMenuReanchoredDuringResize": true,
+    "escapeReturnedFocus": true,
+    "horizontalOverflow": false,
+    "evidence": {
+      "fileName": "3f1ba1d3-root-responsive-native-qa.json",
+      "bytes": 3228,
+      "sha256": "53d8b9f42624a5e9fcadd5d18e1772a3555345f1cb17b4f9aa23a088b14d6e43"
+    }
+  },
+  "windowsAdaptive": {
+    "status": "passed",
+    "nativeResize": "verified-pid-native-window",
+    "bodyZoomScenarios": [
+      0.9,
+      1.1
+    ],
+    "allAgentAndModelHitTestsPassed": true
+  },
+  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00"
 }

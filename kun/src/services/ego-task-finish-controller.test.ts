@@ -95,7 +95,7 @@ vi.mock('./ego-browser-cli.js', async original => ({
       expect(p.spaceId).toBe(27)
       expect(p.spaceName).toBe(closedSpaceSdk.names.get(27))
       return { ok: true, kind: 'ego_space_status', version: 1, taskSpaceId: 27, spaceName: p.spaceName,
-        idMatch: false, nameMatches: 0, spaceStatus: 'closed' }
+        idMatch: false, nameMatches: 0, spaceStatus: 'closed', identityMatches: false }
     }
     if (!p.action) {
       expect(p.spaceId).toBe(28)
@@ -137,12 +137,16 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
     const initialSteps = resumeWithOldDraft ? [...initialReads,
       ['publish-bad-1', 'publish_artifact'], ['read-bad-1', 'read_artifact'], ['verify-bad-1', 'verify_web_artifact'],
       ['publish-bad-2', 'publish_artifact'], ['read-bad-2', 'read_artifact'], ['verify-bad-2', 'verify_web_artifact']] : initialReads
-    const recoverySteps = [...(resumeWithOldDraft ? [['publish-cached', 'publish_artifact']] : []), ...initialReads,
+    const recoverySteps = [...(resumeWithOldDraft ? [['publish-cached', 'publish_artifact']] : []),
+      ['check-old-space', 'ego_browser_read'], ...initialReads,
       ['publish', 'publish_artifact'], ['read-file', 'read_artifact'], ['verify', 'verify_web_artifact'],
       ['schedule', 'schedule_task'], ['read-schedule', 'list_schedules'], ['finish', 'ego_browser_finish']]
     const reportFor = (ref: Record<string, unknown>, badBudget: boolean) => {
       const title = '离线恢复后的测绘监测项目', quote = title + ' 2026-11-16'
-      const input = { path: 'recovered-feed.html', report: { title: '订阅列表恢复汇总', evidence: { coverage: [ref],
+      const input = { path: 'recovered-feed.html', report: { title: '订阅列表恢复汇总', presentation: { screening: [
+        { sectionId: 'one-record', decision: 'relevant', reason: '列表标题包含测绘与监测服务范围', businessTypes: ['测绘', '监测'] },
+        ...(resumeWithOldDraft ? [{ sectionId: 'second-record', decision: 'pending', reason: '列表标题未提供足够业务范围信息' }] : [])
+      ] }, evidence: { coverage: [ref],
         items: [{ sectionId: 'one-record', title, source: ref, discovery: ref, classification: 'source',
           fields: [{ field: 'title', value: title, quote }, { field: 'publication_date', value: '2026-11-16', quote }],
           unverifiedFields: ['budget', 'deadline', 'status', 'qualification'] }, ...(resumeWithOldDraft ? [{
@@ -152,7 +156,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
             { field: 'budget', value: badBudget ? '人民币999元' : '人民币300元',
               quote: badBudget ? '预算报价人民币999元，来源原文。' : '另一条离线记录 2026-11-16 预算人民币300元' }],
           unverifiedFields: ['deadline', 'status', 'qualification'] }] : [])], noMatches: [] } } }
-      // Keep the old bad drafts unchanged. The successful model request supplies
+      // Keep the bad source fields unchanged. The successful model request supplies
       // each title once; short titles retain their real same-record date quote.
       if (!badBudget) for (const item of input.report.evidence.items) item.fields = item.fields.filter(field => field.field !== 'title')
       return input
@@ -169,7 +173,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
         if (!content) throw new Error('Missing real Host result: ' + id)
         return JSON.parse(content.slice(content.indexOf('{'))) as Record<string, unknown>
       }
-      if (resumeWithOldDraft && resumed && next?.[0] === 'open') {
+      if (resumeWithOldDraft && resumed && next?.[0] === 'check-old-space') {
         reachedReadBarrier = true
         await nativeReadAllowed
       }
@@ -252,7 +256,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
       releaseNativeRead()
     }
     await expect.poll(() => ({ status: repo.get(taskId)?.status, codes: repo.operations(taskId, 'tool').slice(priorTools.length).filter(receipt => receipt.status !== 'succeeded').map(receipt => (receipt.result as { item?: { output?: { code?: string } } }).item?.output?.code) }), { timeout: 10000 })
-      .toEqual({ status: 'completed', codes: resumeWithOldDraft ? ['web_source_reads_required'] : [] })
+      .toEqual({ status: 'completed', codes: resumeWithOldDraft ? ['web_source_reads_required', 'ego_browser_open_required'] : ['ego_browser_open_required'] })
     const task = repo.get(taskId)!, bindings = repo.operations(taskId, 'ego_task_space'), currentBinding = bindings.find(binding => binding.id !== oldBinding.id)!
     expect(bindings).toHaveLength(2); expect(currentBinding.status).toBe('succeeded')
     expect(currentBinding.request).toMatchObject({ priorBindingReceiptId: oldBinding.id, createdTurnId: continued.turn!.turnId, origins: oldBinding.request!.origins })
@@ -261,7 +265,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
     expect(repo.operations(taskId, 'ego_task_space_reopen')).toEqual([expect.objectContaining({ status: 'succeeded',
       request: expect.objectContaining({ priorBindingReceiptId: oldBinding.id, resumeReceiptId: repo.operation(taskId, 'explicit-same-task-resume')!.id }),
       result: expect.objectContaining({ closed: true, idMatch: false, nameMatches: 0 }) })])
-    expect(closedSpaceSdk.calls.filter(call => call.action === 'space_status')).toHaveLength(1)
+    expect(closedSpaceSdk.calls.filter(call => call.action === 'space_status')).toHaveLength(2)
     expect(closedSpaceSdk.calls.filter(call => call.action === 'open' && !call.spaceId)).toHaveLength(2)
     expect(closedSpaceSdk.finishes).toEqual([28])
     expect(repo.operations(taskId, 'ego_task_space_finish')).toEqual([expect.objectContaining({ status: 'succeeded', request: expect.objectContaining({ bindingReceiptId: currentBinding.id }) })])

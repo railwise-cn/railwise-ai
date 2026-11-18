@@ -23,14 +23,13 @@ import { defaultExternalTaskCapability } from './external-task-capability.js'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async()=>{ for(const close of cleanup.splice(0)) await close() })
-async function fixture(persistent = false) {
+async function fixture(persistent = false, nowIso = () => new Date().toISOString()) {
   const root=await mkdtemp(join(tmpdir(),'railwise-coordinator-'))
   const repository=new TaskRunRepository(join(root,'tasks.sqlite3'))
   cleanup.push(async()=>{repository.close();await rm(root,{recursive:true,force:true})})
   const threadStore=persistent ? new FileThreadStore({dataDir:root}) : new InMemoryThreadStore()
   const sessionStore=persistent ? new FileSessionStore({dataDir:root}) : new InMemorySessionStore()
   const bus=new InMemoryEventBus(),ids=new SequentialIdGenerator()
-  const nowIso=()=>new Date().toISOString()
   const events=new RuntimeEventRecorder({eventBus:bus,sessionStore,allocateSeq:id=>bus.allocateSeq(id),nowIso})
   const threads=new ThreadService({threadStore,sessionStore,events,ids,nowIso})
   const tasks=new TaskController({repository,threadStore,sessionStore,nowIso})
@@ -42,6 +41,81 @@ async function fixture(persistent = false) {
 }
 
 describe('task commands before Turn allocation',()=>{
+  it('keeps durable admission owned while a scheduled task is prepared before worker dispatch', async () => {
+    let now = '2026-11-17T00:30:00.000Z'
+    const f = await fixture(false, () => now)
+    let release!: () => void, entered!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    const ready = new Promise<void>(resolve => { entered = resolve })
+    const recovered: string[] = []
+    f.tasks.startWatchdog({ intervalMs: 60_000, leaseMs: 60_000, onRecoveryNeeded: async tasks => {
+      for (const task of tasks) {
+        recovered.push(task.id)
+        await f.turns.finishTurn({ threadId: task.threadId, turnId: task.activeTurnId!, status: 'aborted' })
+        const turn = await f.turns.startTurn({ threadId: task.threadId, continuationTaskId: task.id,
+          request: { prompt: 'Continue the persisted task automatically after an application restart.' } })
+        f.tasks.beginAttempt(turn.threadId, turn.turnId)
+      }
+    } })
+    const coordinator = new TaskCoordinator({ ...f, nowIso: () => now, runTurn: (threadId, turnId) => f.tasks.beginAttempt(threadId, turnId) })
+    const starting = coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'schedule:formal:0830', request: { prompt: '生成独立 HTML 招标汇总。' } }, {
+      prepareTask: async task => {
+        f.repository.update(task.id, task.revision, current => ({ ...current,
+          scheduledBy: { scheduleId: 'formal', dueAt: now } }))
+        entered()
+        await held
+      }
+    })
+    try {
+      await ready
+      now = '2026-11-17T00:30:30.000Z'
+      await (f.tasks as unknown as { runWatchdogTick(): Promise<void> }).runWatchdogTick()
+      expect(recovered).toEqual([])
+      expect(f.repository.list()[0]).toMatchObject({ status: 'queued', attempts: 0, scheduledBy: { scheduleId: 'formal' } })
+      expect(f.repository.reconcileExpired(now)).toEqual([])
+      expect(f.repository.getLease(f.repository.list()[0]!.id)).toBeNull()
+      expect(f.repository.getAdmissionLease(f.repository.list()[0]!.id)).toMatchObject({ turnId: f.repository.list()[0]!.activeTurnId })
+      release()
+      const started = await starting
+      expect(started.kind).toBe('task_started')
+      const task = f.repository.list()[0]!
+      expect(task).toMatchObject({ status: 'running', attempts: 1 })
+      expect((await f.threads.get(task.threadId))?.turns).toHaveLength(1)
+      expect(f.repository.events(task.id).filter(event => event.kind === 'attempt_started')).toHaveLength(1)
+      expect(f.repository.events(task.id).filter(event => event.kind === 'task_auto_recovery')).toHaveLength(0)
+    } finally {
+      release()
+      await starting
+      f.tasks.stopWatchdog()
+    }
+  })
+
+  it('releases only the pending admission when coordinator preparation fails', async () => {
+    const f = await fixture()
+    await expect(f.coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'failed-preparation',
+      request: { prompt: '生成 HTML 报告。' } }, { prepareTask: () => { throw new Error('preparation interrupted') } })).rejects.toThrow('preparation interrupted')
+    const task = f.repository.list()[0]!
+    expect(task).toMatchObject({ status: 'queued', attempts: 0 })
+    expect(f.runTurn).not.toHaveBeenCalled()
+    expect(f.repository.getLease(task.id)).toBeNull()
+    expect(f.repository.getAdmissionLease(task.id)?.expiresAt).toBe('1970-01-01T00:00:00.000Z')
+    expect(f.tasks.reconcileStartup()).toMatchObject([{ id: task.id, status: 'retrying', attempts: 0 }])
+  })
+
+  it('keeps dispatched admission owned when only the conversation receipt fails', async () => {
+    const f = await fixture()
+    const receipt = vi.spyOn(f.coordinator, 'flushCommandMessages').mockRejectedValueOnce(new Error('receipt unavailable'))
+    await expect(f.coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'dispatched-receipt',
+      request: { prompt: '生成 HTML 报告。' } })).rejects.toThrow('receipt unavailable')
+    const task = f.repository.list()[0]!
+    expect(f.runTurn).toHaveBeenCalledTimes(1)
+    expect(task).toMatchObject({ status: 'queued', attempts: 0 })
+    expect(f.repository.getLease(task.id)).toBeNull()
+    expect(Date.parse(f.repository.getAdmissionLease(task.id)!.expiresAt)).toBeGreaterThan(Date.now())
+    expect(f.repository.reconcileExpired(new Date().toISOString())).toEqual([])
+    receipt.mockRestore()
+  })
+
   it.each(['explicit', 'rule'] as const)('projects a %s resume as a short control without repeating the persisted original request', async origin => {
     const f = await fixture(true)
     let ready = false

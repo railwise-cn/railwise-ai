@@ -42,8 +42,11 @@ export function taskDisplayGoal(task: Pick<TaskRunV1, 'goal' | 'templateId'>): s
 
 /** Compact business title; the full request remains available in details. */
 export function taskDisplayTitle(task: Pick<TaskRunV1, 'goal' | 'templateId'>): string {
-  const goal = taskDisplayGoal(task).replace(/\s+/g, ' ').trim()
+  const displayGoal = taskDisplayGoal(task)
+  const goal = displayGoal.replace(/\s+/g, ' ').trim()
+  const namedTitle = /^(?:新任务|任务名称|任务标题)[ \t]*[：:][ \t]*([^\r\n。；;！!？?]{1,256})/.exec(displayGoal.trim())?.[1]
+    ?.replace(/\s*[（(]v?\d+\.\d+(?:\.\d+)?[^()（）]*[）)]\s*$/, '').replace(/\s+/g, ' ').trim()
   const action = /(?:绘制|制作|设计|编写|生成|整理|分析|获取|收集|采集)([^，。；;！!\n]{2,64})/.exec(goal)
-  const title = action ? action[0].replace(/(绘制|制作|设计|编写|生成|整理|分析|获取|收集|采集)(?:一只|一个|一份|一张|一段|一些)/, '$1').replace('正在', '') : goal.split(/[。\n]/)[0]
+  const title = namedTitle || (action ? action[0].replace(/(绘制|制作|设计|编写|生成|整理|分析|获取|收集|采集)(?:一只|一个|一份|一张|一段|一些)/, '$1').replace('正在', '') : goal.split(/[。\n]/)[0])
   return title.length > 42 ? title.slice(0, 41) + '…' : title
 }

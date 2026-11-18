@@ -218,17 +218,26 @@ export class TaskCoordinator {
       const oldTurn=(await this.deps.threads.get(executionThreadId))?.turns.find(turn=>turn.idempotencyKey===turnKey)
       const externalProvider = capability?.provider === 'dingtalk' || capability?.provider === 'lark' ? capability.provider : undefined
       const turn=await this.deps.turns.startTurn({threadId:executionThreadId,...(capability?.status==='available' && externalProvider ? {externalTaskProvider:externalProvider}:{}),request:{...command.request,idempotencyKey:turnKey,taskIntent:isTask?'new':undefined,taskVisibility:isTask?'task':'chat',...(isTask?{taskOriginThreadId:origin.id}:{})}})
-      const linked=this.deps.repository.findByTurn(turn.turnId)
-      if (linked && isTask) {
-        await options.prepareTask?.(linked)
-        this.deps.context?.subscribeTask(linked, origin.id)
+      let dispatched = Boolean(oldTurn)
+      try {
+        const linked=this.deps.repository.findByTurn(turn.turnId)
+        if (linked && isTask) {
+          await options.prepareTask?.(linked)
+          this.deps.context?.subscribeTask(linked, origin.id)
+        }
+        result={kind:isTask?'task_started':'chat_started',...(linked&&isTask?{task:this.deps.repository.get(linked.id) ?? linked}:{}),turn}
+        if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:this.deps.nowIso()})
+        this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
+        if(!oldTurn) {
+          void this.deps.runTurn(turn.threadId,turn.turnId)
+          dispatched = true
+        }
+        await this.recordResult(command,result,intent)
+        return result
+      } catch (error) {
+        if (!dispatched) this.deps.tasks.releasePendingAdmission(turn.threadId, turn.turnId)
+        throw error
       }
-      result={kind:isTask?'task_started':'chat_started',...(linked&&isTask?{task:this.deps.repository.get(linked.id) ?? linked}:{}),turn}
-      if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:this.deps.nowIso()})
-      this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
-      if(!oldTurn)void this.deps.runTurn(turn.threadId,turn.turnId)
-      await this.recordResult(command,result,intent)
-      return result
     }
     if (resolving && result.kind !== 'attention_required' && result.kind !== 'capability_required') {
       const latest=this.deps.repository.attention(resolving.id) ?? resolving

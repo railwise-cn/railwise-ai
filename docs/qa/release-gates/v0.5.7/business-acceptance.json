@@ -1,345 +1,807 @@
 {
-  "status": "passed",
-  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
-  "scope": "Root-accepted new exact RailWise real-clock Ego occurrence and normal temporary-plan pause, confirmed by the source receipt audit and Root independent aggregate acceptance; paid source/report content is not copied.",
-  "releaseRunId": 43968313921,
-  "actualQaInitialTaskId": "task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
-  "actualDueTaskId": "task_0d9dffaf-096c-41bc-8264-a358bd2b850a",
-  "scheduledBy": {
-    "scheduleId": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
-    "dueAt": "2026-11-16T23:21:00.000Z"
-  },
-  "naturalSchedulerNotManual": true,
-  "newIndependentRunAndHtml": true,
-  "actualDueCurrentBrowserSource": {
-    "status": "passed",
-    "count": 3,
-    "receipts": [
-      {
-        "id": "operation_5437af25-5707-430d-8a17-d00e28e010f1",
-        "createdAt": "2026-11-16T23:21:32.305Z",
-        "resultHash": "a8881ecf94e35048b5b1fc83bac6ea3271a7b9e3698c6dffbbec047da3452a6f",
-        "truncated": false,
-        "taskId": "task_0d9dffaf-096c-41bc-8264-a358bd2b850a",
-        "turnId": "turn_miyqit4c",
-        "hostOperationId": "operation_dce8b320-087e-4a86-b5fd-24bf60e34bf4"
+  "status": "partial",
+  "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+  "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
+  "releaseRunId": 44024949316,
+  "scope": "Historical scoped passes and every H4/H5/H6/H7 failure remain retained. Current H8 exact package is installed/opened and updater/corrected-driver Windows checks pass; actual same-task A2 is waiting_user after one plain Ego control failure, with no current source/artifact. H9 preflight/diagnostic source is prepared, not packaged or accepted.",
+  "rootAuditObservedStatus": "current-candidate-incomplete-H8-A2-control-failure",
+  "actor": "RailWise AI real model and Ego provider",
+  "sourceBasis": "observed_feed",
+  "sourceOrigin": "https://dadan.vip",
+  "initialAutonomousFirstPass": false,
+  "initialFailurePreserved": true,
+  "explicitOriginalTaskClarifications": 1,
+  "sameTaskNormalContinuations": 1,
+  "clarification": "Original business filter and literal-quote requirement clarified; Runtime, validator and counters unchanged.",
+  "runs": [
+    {
+      "mode": "initial",
+      "taskId": "task_1b331d8b-e69d-40d3-abe8-ac75c8a795bd",
+      "turnId": "turn_wqeah3wa",
+      "statusObservedByRoot": "completed",
+      "attempts": 2,
+      "replans": 0,
+      "createdAt": "2026-11-17T06:35:36.795Z",
+      "completedAt": "2026-11-17T07:05:33.754Z",
+      "scheduledBy": null,
+      "selectedRecords": 10,
+      "observedPublicationDatesAllToday": true,
+      "artifact": {
+        "sha256": "ceaa9a48c9296e72d19a2bd5e647d9c50c5288dce668cbb159f30c10c4396e4a",
+        "sizeBytes": 16484,
+        "validation": "valid",
+        "sourceEvidenceStatus": "verified"
       },
-      {
-        "id": "operation_8e3cf9fa-8088-4947-9af3-dfc156548fbe",
-        "createdAt": "2026-11-16T23:21:44.147Z",
-        "resultHash": "45bcedaf5e9298a5de5dac00a0576b48dbea0e11554e40a7b27eab17ed3f88d3",
-        "truncated": false,
-        "taskId": "task_0d9dffaf-096c-41bc-8264-a358bd2b850a",
-        "turnId": "turn_miyqit4c",
-        "hostOperationId": "operation_21810c63-b772-408b-9a5f-d8239f5c59d4"
-      },
-      {
-        "id": "operation_eb3e0f0e-f5ea-4b4e-9b26-2239500308d5",
-        "createdAt": "2026-11-16T23:21:54.810Z",
-        "resultHash": "45bcedaf5e9298a5de5dac00a0576b48dbea0e11554e40a7b27eab17ed3f88d3",
-        "truncated": false,
-        "taskId": "task_0d9dffaf-096c-41bc-8264-a358bd2b850a",
-        "turnId": "turn_miyqit4c",
-        "hostOperationId": "operation_44faf6b3-2094-4831-9416-52475dcc4eba"
-      }
-    ],
-    "verifiedSources": [
-      {
-        "receiptId": "operation_21810c63-b772-408b-9a5f-d8239f5c59d4",
-        "receiptHash": "631e0b88d768418d1b91b4d86c608b86f11bf3129f4751d33c230af1e8b901b0",
-        "turnId": "turn_miyqit4c",
-        "resultHash": "45bcedaf5e9298a5de5dac00a0576b48dbea0e11554e40a7b27eab17ed3f88d3",
-        "fullCapturedDocument": true,
-        "readAt": "2026-11-16T23:21:44.150Z"
-      }
-    ],
-    "allReadsBoundToCurrentOccurrence": true,
-    "fullCapturedDocumentDoesNotMeanAllSourcePages": true,
-    "sourceHashNeedNotChangeWhenPageIsUnchanged": true,
-    "rawSourceHtmlCopied": false
-  },
-  "actualDueNewHtmlHash": "b77c8d8e0749e23d189d14e66242ef7cc7177e6316af770f7414078abb6bae9c",
-  "actualDueAutoPreview": true,
-  "parentPlanReadback": {
-    "receiptId": "operation_4230c8f9-ff8c-42a7-a521-c4202462119b",
-    "at": "2026-11-16T23:21:29.856Z",
-    "request": {
-      "scheduleId": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
-      "versionId": "flowver_1641b1a09b7c9107d3bf89b3",
-      "dueAt": "2026-11-16T23:21:00.000Z",
-      "sourceTaskId": "task_ced01703-3b9e-45b3-a660-9ddcc33ae205"
-    },
-    "resultId": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
-    "enabledAtOccurrenceReadback": true,
-    "nextRunAt": "2026-11-17T23:21:00.000Z",
-    "scopeHash": "89a202c2cf1425be6e9af4fa320985a1d23c3cd1d4f6b76f787cc9e5b31fd5e2",
-    "sameParentPlanPositiveResult": true,
-    "bindingAuditStatus": "passed"
-  },
-  "parentPlanPermissionsBoundToOccurrence": {
-    "status": "passed",
-    "requestKeysExact": [
-      "scheduleId",
-      "versionId",
-      "dueAt",
-      "sourceTaskId"
-    ],
-    "currentOccurrenceAndParentVersionBound": true,
-    "sameSourceTaskIdBound": true,
-    "readbackScopeHash": "89a202c2cf1425be6e9af4fa320985a1d23c3cd1d4f6b76f787cc9e5b31fd5e2",
-    "originalReadbackResultEnabled": true,
-    "basis": "Existing receipt-owner summary and Root independent assertions; not an additional review gate."
-  },
-  "finalResponseCorrectlyDescribesDueOccurrence": {
-    "passed": true,
-    "describesScheduledOccurrence": true,
-    "mislabelsAsPreparation": false,
-    "falseMissingPlanClaim": false,
-    "rawFinalResponseSha256": "bf4eea58c4cd38adfae2a19f52aa19b02db004387442a8c2d84d38097b38599b",
-    "textCopied": false,
-    "receiptOwnerAndRootAssertionsAdopted": true
-  },
-  "manualPlanRecreationGuidanceAbsent": true,
-  "temporaryQaPlanId": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
-  "onlyTemporaryQaPlanPaused": {
-    "id": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
-    "enabled": false,
-    "revision": 2,
-    "normalUiPauseAttestedByRoot": true,
-    "otherThreeDefinitionsByteUnchanged": true,
-    "afterOccurrenceReadback": true
-  },
-  "originalFormalDadanPlanUnchanged": {
-    "passed": true,
-    "originalDefinitionBytesUnchanged": true,
-    "formalPlanPreservedAlongWithOtherTwoOriginalDefinitions": true
-  },
-  "oldGovernmentPlanRemainedPaused": {
-    "passed": true,
-    "originalPausedDefinitionBytesUnchanged": true
-  },
-  "unknownOperationsAndBudgetPreserved": {
-    "newOccurrenceUnknownCount": 0,
-    "legacyUnknownCount": 16,
-    "legacyUnknown16Preserved": true,
-    "originalTaskRemainsCompletedAttempt7": true,
-    "originalTaskNotResumedOrRetried8": true,
-    "directProfileOrTaskMutation": false,
-    "manualClockOrFutureTrigger": false,
-    "basis": "Root accepted preserved Task row/operation/UNKNOWN/plan comparison and normal execution; no task budget or attempt reset."
-  },
-  "codexPaidSourceCollection": false,
-  "privateEvidenceDigests": [
-    {
-      "fileName": "7d19-initial-qa-completion-private.json",
-      "bytes": 2093,
-      "sha256": "857208360361d9cbe8c3c909be2a4e4cd17b943cff1df1a60701d5163b2440c6",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-initial-schedule-receipts-private.json",
-      "bytes": 13422,
-      "sha256": "5535c69ad769ec30d72b0aefec62501760bfa32d24f6d56fe8e36f09a4228458",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-ego-temporary-qa-actual-binding-private.json",
-      "bytes": 867,
-      "sha256": "3b502583cdf01d2bccef7bc345107a07446f3b969b406bcf50b2a52a73db55a3",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-due-running-task-private.json",
-      "bytes": 12277,
-      "sha256": "650fea01e8b725fda3e565cb4f2d424da5dd163be97a311537d9bf84570998f4",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-due-receipt-audit-private.json",
-      "bytes": 42676,
-      "sha256": "7645d667379be15463f9cb9b6db94b89c1406a0257aec09e800d98cbc39a6e50",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-due-completed-auto-preview-ui-private.json",
-      "bytes": 28113,
-      "sha256": "87e934fec2c2056db624744dd78919ab6e3e7f4a5c71dd42c210fa94cfdb789d",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-temporary-qa-pause-readback-private.json",
-      "bytes": 1296,
-      "sha256": "499a12746991322da8d52e2506d9661beea882760e1d7aada1fbf3c21d747c9d",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-due-completed-auto-preview-native-private.png",
-      "bytes": 1285574,
-      "sha256": "e6643b5485c3009d49955f0d20f8168cc703ff8c6710853073840567f5fab3c2",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-real-ego-actual-due-root-acceptance-private.json",
-      "bytes": 6425,
-      "sha256": "fbac1e4cd11decf552a3838c88d60d46dda4ce9e3ce7fa33eb0043720e33c58a",
-      "privateSourceOnly": true
-    },
-    {
-      "fileName": "7d19-due-receipt-audit-summary-private.json",
-      "bytes": 7509,
-      "sha256": "2b9ac21a35d6fa4e86abd9212ae9c9a22e666ed47c7cf9ca382894a07c5e33cd",
-      "privateSourceOnly": true
-    }
-  ],
-  "coverageLimits": "Actual collection covers only the visible first subscription-list page. It is a subscription-list summary with five selected rows, not complete site coverage; official announcement bodies were not independently verified and missing budget/deadline/qualification/detail-link fields remain pending. The true collection timestamp is November17 Beijing; the artifact filename contains November18 as a minor naming defect. All review of business relevance/content here is AI review, not professional or human sign-off.",
-  "finalBusinessAcceptance": true,
-  "initialPreparation": {
-    "status": "completed",
-    "attempts": 4,
-    "artifact": {
-      "bytes": 13868,
-      "sha256": "86be4be13eb301cc1a74a5b4b8fe264d75caee4ce3628550d5f5df98b394925f",
-      "actualHashMatched": true,
-      "validation": "valid",
-      "sourceEvidenceStatus": "verified"
-    },
-    "finalToolStatuses": [
-      {
-        "name": "ego_browser_read",
-        "status": "succeeded"
-      },
-      {
-        "name": "read_task_context",
-        "status": "succeeded"
-      },
-      {
-        "name": "publish_artifact",
-        "status": "succeeded"
-      },
-      {
-        "name": "read_artifact",
-        "status": "succeeded"
-      },
-      {
-        "name": "verify_web_artifact",
-        "status": "succeeded"
-      },
-      {
-        "name": "schedule_task",
-        "status": "succeeded"
-      },
-      {
-        "name": "list_schedules",
-        "status": "succeeded"
-      },
-      {
-        "name": "ego_browser_finish",
-        "status": "succeeded"
-      }
-    ],
-    "reportAutoPreview": true,
-    "scheduleReadBack": {
-      "id": "schedule_task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
-      "enabled": true,
-      "kind": "daily",
-      "times": [
-        "07:21"
+      "sourceReceipts": [
+        {
+          "receiptId": "operation_36ef3a50-0038-4e69-8d81-0d0f2caffe7f",
+          "receiptHash": "c9dbf0a826cb3c93f7067ef26174834f2fec9efb627a2114a831123833ad4634",
+          "turnId": "turn_wqeah3wa",
+          "resultHash": "2a737219719355f5cc97f53f0d103e88f6834832af86699519501ca0d922ce5c",
+          "full": false,
+          "readAt": "2026-11-17T07:03:14.273Z",
+          "origin": "https://dadan.vip",
+          "feedElement": true
+        }
       ],
-      "timezone": "Asia/Shanghai",
-      "leadMinutes": 0,
-      "nextRunAt": "2026-11-16T23:21:00.000Z",
-      "sourceTaskId": "task_ced01703-3b9e-45b3-a660-9ddcc33ae205",
-      "listReadbackMatched": true
+      "verificationReceiptId": "operation_39ed6354-a253-465c-9506-5d8d16224e37",
+      "verificationReasons": [],
+      "grant": {
+        "id": "grant:turn_wqeah3wa:0:0",
+        "turnId": "turn_wqeah3wa",
+        "taskId": "task_1b331d8b-e69d-40d3-abe8-ac75c8a795bd",
+        "issuedAt": "2026-11-17T07:02:21.106Z",
+        "expiresAt": "2026-11-17T07:32:21.106Z",
+        "provider": "ego-browser",
+        "origins": [
+          "https://dadan.vip"
+        ]
+      },
+      "taskSpaceId": 10,
+      "finishReceiptId": "operation_abe3958a-0adc-4969-9c83-44564acb2a4d",
+      "finishResolvedAt": "2026-11-17T07:05:21.941Z",
+      "planReadbackEnabled": true,
+      "planReadbackNextRunAt": "2026-11-17T07:10:00.000Z",
+      "actualPreviewEvidence": {
+        "fileName": "3f1ba1d3-initial-verified-actual-preview-private.json",
+        "bytes": 3197,
+        "sha256": "827d554b762fff195ff2b01576a2420bca2f8977bb456e8b87ea37a965c6d9bb",
+        "privateSourceOnly": true
+      },
+      "failedToolsPreserved": [
+        {
+          "tool": "ego_browser_read",
+          "at": "2026-11-17T06:35:48.957Z",
+          "turnId": "turn_x6mup11g",
+          "code": "ego_browser_observation_stale"
+        },
+        {
+          "tool": "verify_web_artifact",
+          "at": "2026-11-17T06:39:21.758Z",
+          "turnId": "turn_x6mup11g",
+          "code": "web_artifact_evidence_incomplete"
+        },
+        {
+          "tool": "verify_web_artifact",
+          "at": "2026-11-17T06:41:17.303Z",
+          "turnId": "turn_x6mup11g",
+          "code": "web_artifact_repair_stalled"
+        },
+        {
+          "tool": "verify_web_artifact",
+          "at": "2026-11-17T07:04:16.789Z",
+          "turnId": "turn_wqeah3wa",
+          "code": "web_artifact_evidence_incomplete"
+        }
+      ]
     },
-    "nativeScreenshotPhase": "completed; prior active DOM captured internal repair present and hidden in UI",
-    "countsAsActualDue": false
-  },
-  "handoffPreservation": {
-    "allOriginalTaskRowsAndOperationsUnchanged": true,
-    "legacyUnknown16Unchanged": true,
-    "allExistingPlansAndRunsUnchangedAtFirstOpen": true,
-    "allOriginalPlansUntouchedByInitialQa": true
-  },
-  "actualDueResult": {
-    "status": "completed",
-    "attempts": 4,
-    "nodesCompleted": 3,
-    "createdAt": "2026-11-16T23:21:28.303Z",
-    "finishedAt": "2026-11-16T23:24:24.002Z",
-    "artifactBytes": 9080,
-    "validation": "valid",
-    "sourceEvidenceStatus": "verified",
-    "newOccurrenceUnknownReceipts": 0,
-    "sourceReceiptMetadataCount": 3,
-    "runtimeSnapshotFileIsCompletedDespiteRunningInName": true
-  },
-  "minorDefects": [
     {
-      "kind": "artifact-filename-date-mismatch",
-      "severity": "minor",
-      "filenameDate": "2026-11-18",
-      "actualCollectedAtUtc": "2026-11-16T23:22:30Z",
-      "actualCollectedAtBeijing": "2026-11-17T07:22:30+08:00",
-      "actualCollectedLocalDate": "2026-11-17",
-      "reportCollectionTimestampCorrect": true,
-      "impact": "Filename contains the next-day schedule date; the report collection timestamp records the actual current run. No claim that the occurrence or collection happened on November 18.",
-      "notFixedInThisDraft": true
+      "mode": "due",
+      "taskId": "task_8777e520-f298-4699-b2dc-9d0d103243d9",
+      "turnId": "turn_fswomb0t",
+      "statusObservedByRoot": "completed",
+      "attempts": 1,
+      "replans": 0,
+      "createdAt": "2026-11-17T07:10:13.273Z",
+      "completedAt": "2026-11-17T07:12:49.001Z",
+      "scheduledBy": {
+        "scheduleId": "schedule_task_1b331d8b-e69d-40d3-abe8-ac75c8a795bd",
+        "dueAt": "2026-11-17T07:10:00.000Z"
+      },
+      "selectedRecords": 11,
+      "observedPublicationDatesAllToday": true,
+      "artifact": {
+        "sha256": "35f83d9feae043830ad5e57e6098909137cb2f6537d33243e143315c3a978737",
+        "sizeBytes": 15022,
+        "validation": "valid",
+        "sourceEvidenceStatus": "verified"
+      },
+      "sourceReceipts": [
+        {
+          "receiptId": "operation_629b4086-6514-4a29-8f4b-fee44c3c801e",
+          "receiptHash": "07582879cb7039806527e5e76014b9a1341cc31a12e6c17ba791c217cebae94d",
+          "turnId": "turn_fswomb0t",
+          "resultHash": "6b771413624144a986bf7ca78dbbe6ad13f51480e8c041cb0fbd590cdcc12d84",
+          "full": true,
+          "readAt": "2026-11-17T07:10:42.676Z",
+          "origin": "https://dadan.vip",
+          "feedElement": false
+        }
+      ],
+      "verificationReceiptId": "operation_33d749ad-88e5-4e7f-b956-c26bc6232f30",
+      "verificationReasons": [],
+      "grant": {
+        "id": "grant:turn_fswomb0t:0:0",
+        "turnId": "turn_fswomb0t",
+        "taskId": "task_8777e520-f298-4699-b2dc-9d0d103243d9",
+        "issuedAt": "2026-11-17T07:10:13.787Z",
+        "expiresAt": "2026-11-17T07:40:13.787Z",
+        "provider": "ego-browser",
+        "origins": [
+          "https://dadan.vip"
+        ]
+      },
+      "taskSpaceId": 11,
+      "finishReceiptId": "operation_4b73df43-446c-44df-ae4e-12d51d6c0fe4",
+      "finishResolvedAt": "2026-11-17T07:12:37.976Z",
+      "planReadbackEnabled": true,
+      "planReadbackNextRunAt": "2026-11-18T07:10:00.000Z",
+      "actualPreviewEvidence": {
+        "fileName": "3f1ba1d3-due-verified-actual-preview-private.json",
+        "bytes": 3098,
+        "sha256": "b43dd81efec6fb501dd16a84352cb2bd51440d8ea4ad470d81b27ca89dad52c2",
+        "privateSourceOnly": true
+      },
+      "failedToolsPreserved": [
+        {
+          "tool": "ego_browser_read",
+          "at": "2026-11-17T07:10:33.134Z",
+          "turnId": "turn_fswomb0t",
+          "code": "ego_browser_observation_stale"
+        },
+        {
+          "tool": "verify_web_artifact",
+          "at": "2026-11-17T07:11:55.577Z",
+          "turnId": "turn_fswomb0t",
+          "code": "web_artifact_evidence_incomplete"
+        }
+      ]
     }
   ],
-  "rootAcceptedAt": "2026-11-16T23:31:49.303829+00:00",
-  "rootAcceptanceScope": "Actual new exact-package RailWise Ego scheduled occurrence, report/source verification, automatic preview, current parent-plan readback/phase, and normal pause of only the independent QA plan.",
-  "semanticAIContentCheck": {
-    "label": "AI semantic content review; not human, vendor, regulatory or licensed professional sign-off",
-    "correctDuePhase": true,
-    "noFalseMissingScheduleClaim": true,
-    "noNeedUserRecreatePlan": true,
-    "coverageTruthfulPartial": true,
-    "officialBodyIndependentlyVerified": false,
-    "reportCollectionTimestamp": "2026-11-16T23:22:30Z",
-    "filenameHasTomorrowDate": true,
-    "reportClaimsTomorrowCollection": false,
-    "unknownFieldsRemainUnknown": [
-      "budget",
-      "deadline",
-      "qualification",
-      "status"
-    ]
+  "naturalDue": {
+    "manuallyTriggered": false,
+    "systemClockChanged": false,
+    "independentTaskAndGrant": true,
+    "freshSourceHashChanged": true,
+    "firstInitialGrantExpiredBeforeDue": true,
+    "latestInitialGrantExpiredBeforeDue": false,
+    "initialTaskTurnCompletedBeforeDue": true,
+    "boundedRecovery": {
+      "readStaleErrors": 1,
+      "citationErrors": 1,
+      "resolvedByAppWithinSameDueTurn": true,
+      "modelOrSourceHelpByCodex": false
+    }
   },
   "coverage": {
     "pagesRead": 1,
-    "selectedRows": 5,
-    "officialAnnouncementBodiesIndependentlyVerified": false,
-    "allSiteCoverageClaimed": false,
-    "observedPublicationDates": [
-      "2026-11-16"
+    "initialSelectedRows": 10,
+    "dueSelectedRows": 11,
+    "allDailyRecordsCovered": false,
+    "officialDetailBodiesIndependentlyRead": false,
+    "independentRecordHrefsVerified": false,
+    "missingFieldsStayUnverified": true
+  },
+  "scheduleReadback": {
+    "formalEnabled": true,
+    "formalTimes": [
+      "08:30",
+      "16:30"
     ],
-    "collectionTimestamp": "2026-11-16T23:22:30Z",
-    "filenameDateMismatchMinorRetained": true
+    "deliveryTargets": [
+      "09:00",
+      "17:00"
+    ],
+    "timezone": "Asia/Shanghai",
+    "onlyNewQaPausedAfterRealDue": true,
+    "priorFivePlansUnchanged": true
   },
-  "finish": {
-    "status": "succeeded",
-    "finishResolved": true,
-    "sameCurrentTaskAndTurnVerifiedByRoot": true
+  "preservation": {
+    "original22TasksAnd16UnknownRowsUnchanged": true,
+    "newTaskToEvadeInitialFailure": false,
+    "codexPaidSourceCollection": false,
+    "codexEgoCliOrBrowserInputs": 0,
+    "codexReportEdits": 0
   },
-  "boundedRecovery": {
-    "recoveredReadOrArgumentErrors": 4,
-    "finalArtifactAndSourceVerified": true,
-    "newUnknownOperations": 0,
-    "manualUserPlanRecreationRequired": false
+  "spaceObservation": {
+    "visibleTwoSpacesDuringInitial": true,
+    "visibleOneOriginalSpaceAfterDueFinish": true,
+    "activeDueSpaceNativeScreenshotClaimed": false
   },
-  "finalAcceptanceEvidence": [
-    {
-      "fileName": "7d19-real-ego-actual-due-root-acceptance-private.json",
-      "bytes": 6425,
-      "sha256": "fbac1e4cd11decf552a3838c88d60d46dda4ce9e3ce7fa33eb0043720e33c58a",
-      "privateSourceOnly": true
+  "contentReview": "AI relevance/content review, not human, licensed, vendor or regulatory sign-off",
+  "windows": {
+    "status": "passed",
+    "packageSourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+    "driverSourceHead": "8538d2624ad496cc2964cdfddc16bfaca274d2a6",
+    "packageRunId": 44024949316,
+    "acceptanceRunId": 44044175670,
+    "acceptanceRunAttempt": 1,
+    "acceptanceJobId": 133905676505,
+    "officialConclusion": "success",
+    "strictCheckerStatus": "passed",
+    "originalRawEvidence": {
+      "id": 14310842516,
+      "bytes": 1200983,
+      "sha256": "e2460ccb8fece5f70deead223dc95b94b747665fa529b241872991d30f20c274",
+      "zipCRCVerified": true,
+      "allExtractedEntryBytesMatched": true,
+      "entries": 13
     },
-    {
-      "fileName": "7d19-due-receipt-audit-summary-private.json",
-      "bytes": 7509,
-      "sha256": "2b9ac21a35d6fa4e86abd9212ae9c9a22e666ed47c7cf9ca382894a07c5e33cd",
+    "strictSummary": {
+      "fileName": "windows-44044175670-summary.json",
+      "bytes": 215426,
+      "sha256": "346daeff31d8dcdb336310b3669475c2196e788515be6da4d5d1be65da79bbf3"
+    },
+    "rootIndependentProof": {
+      "fileName": "windows-8538d262-same-H4-root-full-proof-check.json",
+      "bytes": 3662,
+      "sha256": "40514a8899f81deeb53215396de417e82032b1dae2b3a121ea5be1432c86263d"
+    },
+    "scope": "Controlled Windows BSK/local model/loopback, actual saved HTML, automatic and manual preview, daily readback and real-clock due; not Ego Windows, external model or paid Dadan",
+    "signing": "NotSigned/not-configured",
+    "priorFailures": [
+      {
+        "runId": 44029208287,
+        "driverSourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+        "conclusion": "failure",
+        "stage": "manual artifact center hit test covered by expected inspector modal",
+        "evidence": {
+          "fileName": "windows-3f1ba1d3-full-failure-handoff.json",
+          "bytes": 10094,
+          "sha256": "5f60fda594dde2bf9b8d88b21e226c633bd5ccd6bf64c7fb5ac20307f7ff6156",
+          "privateSourceOnly": false
+        }
+      },
+      {
+        "runId": 44039630770,
+        "driverSourceHead": "17f74463ff7181777f39f6af5aba4dffd3d340a2",
+        "conclusion": "failure",
+        "stage": "QA wait for a new auto-preview despite already dismissed same task/key",
+        "evidence": {
+          "fileName": "full-failure-handoff.json",
+          "bytes": 27679,
+          "sha256": "c7d8f72318385b9cf3a4d1020e5cbb8929bb199969350e125e9b72a3a70839fb",
+          "privateSourceOnly": false
+        }
+      }
+    ]
+  },
+  "originalRootAudit": {
+    "fileName": "3f1ba1d3-real-model-ego-initial-and-natural-due-root-audit-private.json",
+    "bytes": 15428,
+    "sha256": "6fbe7de96e10374e28b0623a145ae9d04f02e11d42d8246046aec35acbf53f82",
+    "privateSourceOnly": true
+  },
+  "limitations": [
+    "Initial A1 failed strict evidence checks; A2 succeeded after one explicit clarification. Not intervention-free initial first-pass success.",
+    "Only the first visible subscription-list page was covered; no all-day/site completeness claim.",
+    "Paid titles, DOM, source body, report files and their paths are excluded. Missing facts remain unverified.",
+    "Latest initial Grant was still wall-clock valid, but initial Task/Turn had completed; due used its own Task/Grant."
+  ],
+  "historicalFormal0830Failure": {
+    "status": "failed",
+    "retained": true,
+    "countsAsCurrentSuccess": false,
+    "evidence": {
+      "fileName": "formal-dadan-0830-actual-due-FAILED-audit-private.json",
+      "bytes": 22721,
+      "sha256": "579c7ec63064209c76959642b6c632b1e1b6689d65dfc3d404d5b7b317733a79"
+    },
+    "missedDeliveryNotReclassified": true
+  },
+  "rootAcceptedAt": "2026-11-17T08:21:44.983557+00:00",
+  "rootFinalizedAt": null,
+  "laterFormal1630Occurrence": {
+    "status": "failed",
+    "taskId": "task_8e88f809-3767-4772-99cd-f37d63276665",
+    "scheduleId": "schedule_task_capability_a308861eb3244f18abb86e32",
+    "dueAt": "2026-11-17T08:30:00.000Z",
+    "createdAt": "2026-11-17T08:30:13.525Z",
+    "waitingAt": "2026-11-17T08:32:51.209Z",
+    "actualTerminalStatus": "waiting_user",
+    "attempts": 1,
+    "artifactCount": 0,
+    "taskSpaceId": 12,
+    "newNativeSeparateSpaceObserved": true,
+    "readCapturesWereUntruncatedButOnlySpaShell": true,
+    "sourceReadinessDidNotEqualReportCompleteness": true,
+    "noManualTriggerOrContinuation": true,
+    "rawTaskAndFailurePreserved": true,
+    "privateEvidence": {
+      "fileName": "formal1630-terminal-FAILED-private.json",
+      "sha256": "daa72c078562bea56e7c5fc9d9ca3050455ca8362cba63dacdf62100141f58b5"
+    },
+    "publicReleaseHeld": true
+  },
+  "laterH5ActualEgo": {
+    "sourceHead": "c821177f3c11ddd379e6e1ff2efcf872b97757ff",
+    "sourceTree": "396ef5a8a24e42de31eccf30ef40d3f2b0546e0e",
+    "releaseRunId": 44055604252,
+    "formal1630Continuation": {
+      "attempts": 2,
+      "completed": true,
+      "priorH4A1FailureRetained": true,
+      "missed1700DeadlineNotReclassified": true,
+      "records": 13,
+      "authorizedReplacementSpace": 13,
+      "SDKListedOldSpace12Absent": true,
+      "SDKAbsenceCauseUnknown": true
+    },
+    "independentInitial": {
+      "attempts": 1,
+      "completed": true,
+      "records": 13,
+      "extraRootClarifications": 0
+    },
+    "realClockDue": {
+      "dueAt": "2026-11-17T11:00:00.000Z",
+      "createdAt": "2026-11-17T11:00:10.202Z",
+      "attempts": 1,
+      "completed": true,
+      "records": 13,
+      "boundedLiteralEvidenceRepair": true,
+      "manualTrigger": false,
+      "freshTaskAndGrant": true
+    },
+    "rootPaidBrowserActions": 0,
+    "rootReportEdits": 0,
+    "temporaryQaPausedAfterDue": true,
+    "oldSixPlansUnchanged": true,
+    "formalPlanStillEnabled": true,
+    "coverage": "First current subscription page only; no full-day, all-site, independent item href or official primary text claim.",
+    "previewIsolation": "FAILED_same_origin_chat_background_artifact_replaced_current_report",
+    "newProductionFixAndExactPackageRequired": true,
+    "rootPrivateLedger": {
+      "fileName": "H5-c821177f-browser-pass-preview-FAIL-ledger-private.json",
+      "sha256": "9fc3368f86f0ddf3adeaa5e39748c1b99a6276aced10c39090f83d53af87d743"
+    },
+    "localIntegratedFixChecks": {
+      "fileName": "H6-combined-local-v1-validation.json",
+      "sha256": "fcecbb94c32265d96472681ad3852265c3fbf7f90962675c6ac29739d6a84c8e",
+      "desktopTests": 160,
+      "runtimeTests": 137,
+      "typesAndLint": "passed",
+      "productionBuilds": 1,
+      "freshnessInputs": 1381,
+      "newInstalledPackageClaimed": false
+    }
+  },
+  "latestH6Candidate": {
+    "status": "partial_business_blocked_before_attempt1",
+    "sourceHead": "e5a0428dbce9778d4651a129044f0d84559f2286",
+    "sourceTree": "b6de0c2366e2ddf5cdde37bfd9de4b7c5ff81a54",
+    "releaseRunId": 44078752895,
+    "runAttempt": 1,
+    "actualMacAppOpened": true,
+    "macPackage": {
+      "version": "0.5.7",
+      "bundleId": "com.wangjiawei508.workgpt",
+      "architecture": "arm64",
+      "asarSha256": "617d5d570481b97d1673df032fbfaa1bed892ba107e03bb9941a6150ef592746",
+      "dmgSha256": "9064b434870cadce591b315e914ebed1e678405f132c1ad478bc05da17e0efd9",
+      "signature": "passed",
+      "notarization": "passed",
+      "localGatekeeper": "not_evaluated_local_security_override",
+      "localOuterMacArchiveFullHashClaimed": false,
+      "rootIdentityProof": {
+        "fileName": "e5a0428d-root-independent-package-check.json",
+        "sha256": "a3e6256d38a1d262ac1107051ef6edb12e5c60a68c298cae57d0dd02dc0a5be4",
+        "privateSourceOnly": true
+      }
+    },
+    "sameRunNativeUpdater": {
+      "status": "passed_official_and_unchanged_strict_validator",
+      "baseVersion": "0.5.6",
+      "targetVersion": "0.5.7",
+      "runId": 44078752895,
+      "jobId": 134050947033,
+      "artifactId": 14329777867,
+      "artifactDigest": "sha256:e6902319b28836f2fca296d02a6fa6a179b486b702ed408bffb1e8b2fe12e3e3",
+      "targetAndInstalledAsarMatchLocal": true,
+      "cleanCiGatekeeper": "accepted_with_assessments_enabled",
+      "rootIndependentAllRawArchiveVerificationClaimed": false,
+      "evidence": {
+        "fileName": "exact-updater-44078752895-summary.json",
+        "sha256": "8b975fa128d88bfc9171487628a6cf907b1007de0e68426a2d3090afa7f67f36",
+        "privateSourceOnly": true
+      }
+    },
+    "windowsFull": {
+      "status": "passed_official_strict_and_root_original_integrity",
+      "packageRunId": 44078752895,
+      "acceptanceRunId": 44083591136,
+      "runAttempt": 1,
+      "packageAndDriverSourceHead": "e5a0428dbce9778d4651a129044f0d84559f2286",
+      "windowsSignature": "NotSigned",
+      "scope": "controlled BrowserSkill, local protocol model and loopback; not Ego Windows, external real model or paid Dadan acceptance",
+      "rootEvidence": {
+        "fileName": "windows-e5a0428d-root-full-proof-check.json",
+        "sha256": "63e981f69b0be022fa8af72ee5a0ea37f4031d7c3acba0fb1d09c789464584f4",
+        "privateSourceOnly": true
+      }
+    },
+    "generalSelectorUi": {
+      "status": "passed_scoped_two_native_sizes",
+      "sizes": [
+        {
+          "width": 960,
+          "height": 760
+        },
+        {
+          "width": 1280,
+          "height": 840
+        }
+      ],
+      "menuWithinViewport": true,
+      "noHorizontalOverflow": true,
+      "doesNotEstablishBusinessOrBackgroundPreviewAcceptance": true,
+      "evidence": {
+        "fileName": "e5a0428d-General-native-two-size-geometry-private.json",
+        "sha256": "a66eaed4ffc42d8350fc366830c17fdd0e65c6b0de31205eb7c7305d78b29bf4",
+        "privateSourceOnly": true
+      }
+    },
+    "realNewTask": {
+      "taskId": "task_capability_c9985c7ac166d00865b4724a",
+      "status": "waiting_user",
+      "attempts": 0,
+      "activeTurnId": null,
+      "modelTurnStarted": false,
+      "sourceCollectionStarted": false,
+      "planCreated": false,
+      "artifactProduced": false,
+      "chatBackgroundPreviewIsolationExercised": false,
+      "rootCause": "explicitWorkspaceWrite misclassified a natural-language task destination as a local path; the inherited read-only sandbox then correctly rejected that incorrectly inferred write. Managed task HTML itself is supported under read-only.",
+      "actualCompiledPackageRedProof": {
+        "fileName": "H6-e5a0428d-actual-package-write-preflight-RED-private.json",
+        "sha256": "c5868d4e8bda5473e99d3b1f4cff577e21e38de7ba0ad9ac33e4a2d1032c5e5a",
+        "privateSourceOnly": true
+      },
+      "evidence": {
+        "fileName": "H6-e5a0428d-actual-preflight-blocker-private.json",
+        "sha256": "747ace40a6fee8ffe4349f7eaa1e265aac43b493f8af88fbcae99a5428dd7346",
+        "privateSourceOnly": true
+      }
+    },
+    "preservation": {
+      "allPriorTaskPlanAndUnknownRowsUnchangedOnLaunch": true,
+      "beforeNewQaEvidence": {
+        "fileName": "e5a0428d-before-new-QA-protected-history-private.json",
+        "sha256": "0c22350046f939ed3401b83e3024c262f95aa70f150f34eecbaa46675b213750",
+        "privateSourceOnly": true
+      },
+      "noDefaultPermissionOrExistingPlanChange": true,
+      "h5PreviewFailureRetained": true,
+      "noCodexPaidSourceCollectionOrReportEditing": true
+    },
+    "nextH7": {
+      "status": "minimal_path_recognition_fix_pending_new_source_and_exact_package",
+      "sourceHead": null,
+      "sourceTree": null,
+      "releaseRunId": null,
+      "targetAsarSha256": null,
+      "sandboxWideningAllowed": false,
+      "newTaskSandboxInterfaceRequired": false,
+      "actualBusinessAcceptance": "pending",
+      "naturalDueAndChatBackgroundPreviewAcceptance": "pending"
+    },
+    "publicReleaseStatus": "HOLD_pending",
+    "historicalReviewedBuildUnchanged": "Existing release/package/checks and sidecars above remain H4 historical evidence, not an H6 or H7 release approval."
+  },
+  "latestH7Candidate": {
+    "status": "partial_real_browser_and_file_pass_strict_report_verification_blocked",
+    "sourceHead": "41e00153dad3978357c28dce992cd9d09f2afba5",
+    "sourceTree": "a89a16e8fb09223f0a9af3ac48de5a8d72492b74",
+    "releaseRunId": 44098000303,
+    "runAttempt": 1,
+    "actualMacAppOpened": true,
+    "macPackage": {
+      "version": "0.5.7",
+      "bundleId": "com.wangjiawei508.workgpt",
+      "architecture": "arm64",
+      "asarSha256": "d2f0c667830a9884da509ba46b1abdf537b269f0e0e8cd2d78d3c3529605ef1b",
+      "dmgSha256": "69e29d5091477e12b73b718f13791b9345099a9635bccb17b7d91398f28d9c9f",
+      "signature": "passed",
+      "notarization": "passed",
+      "localGatekeeper": "not_evaluated_local_security_override",
+      "localOuterMacArchiveFullHashClaimed": false,
+      "rootIdentityProof": {
+        "fileName": "41e00153-root-independent-package-check.json",
+        "sha256": "e5a2e4f4669b983fa57e6f24c2fbf7bb82e0c75ad6576434a173be4d0f5592c0",
+        "privateSourceOnly": true
+      }
+    },
+    "sameRunNativeUpdater": {
+      "status": "passed_official_strict_and_root_original_integrity",
+      "baseVersion": "0.5.6",
+      "targetVersion": "0.5.7",
+      "jobId": 134126582437,
+      "artifactId": 14340271708,
+      "targetAndInstalledAsarMatchLocal": true,
+      "cleanCiGatekeeper": "accepted_with_assessments_enabled",
+      "rootEvidence": {
+        "fileName": "41e00153-root-updater-original-proof-check.json",
+        "sha256": "2a60404bdd117590d34294e78ffcfd639bcfc1f4d2214402ca2a1d5a737c7cb9",
+        "privateSourceOnly": true
+      }
+    },
+    "windowsFull": {
+      "status": "passed_official_strict_and_root_original_integrity",
+      "acceptanceRunId": 44103976580,
+      "packageAndDriverSourceHead": "41e00153dad3978357c28dce992cd9d09f2afba5",
+      "windowsSignature": "NotSigned",
+      "scope": "controlled BrowserSkill, local protocol model and loopback; not Ego Windows, external real model or paid Dadan acceptance",
+      "rootEvidence": {
+        "fileName": "windows-41e00153-root-full-proof-check.json",
+        "sha256": "5bf4a49c28ac058e7f2b5fe51a22a432d8a7a92fd5fd24ab3cf3647bb426d6db",
+        "privateSourceOnly": true
+      }
+    },
+    "realSameTask": {
+      "taskId": "task_capability_c9985c7ac166d00865b4724a",
+      "previousH6Attempt0FailureRetained": true,
+      "status": "waiting_user",
+      "attempts": 1,
+      "turnId": "turn_xvvlax38",
+      "egoTaskSpaceId": 17,
+      "nativeTwoSpacesObserved": true,
+      "sourceCollectedBy": "RailWise AI actual model through Ego Provider",
+      "currentFullSourceBytes": 33260,
+      "managedHtmlSavedAndAutoPreviewed": true,
+      "sourceVerificationPassed": false,
+      "threeNodesCompleted": false,
+      "temporaryDailyPlanCreatedAndReadBack": true,
+      "temporaryPlanTime": "21:18 Asia/Shanghai, next day because requested time had passed before recovery",
+      "naturalDueExecuted": false,
+      "chatBackgroundPreviewIsolationExercised": false,
+      "failureLedger": {
+        "fileName": "H7-41e00153-initial-A1-source-verification-HOLD-private.json",
+        "sha256": "e84215cb2dfd74bf8f249e89741c533ed6cd87b224950fe26e659fcabd8ac4be",
+        "privateSourceOnly": true
+      }
+    },
+    "rootCause": "An invalid field quote pulled neighboring-record text. Strict rejection was correct; feedRecord depends on all field quotes and therefore cascades a bad quote into title/date record-binding errors. The first reason list is truncated to30 and hides later row defects, impairing bounded repair. Existing failure counters remain unchanged.",
+    "preservation": {
+      "allOther27TaskRowsAndOld7PlanDefinitionsUnchanged": true,
+      "oldUnknown16AndPrepared1RawRowsUnchanged": true,
+      "configurationOpaqueHashesUnchanged": true,
+      "formalPlanStillEnabled": true,
+      "rootEvidence": {
+        "fileName": "41e00153-A1-blocked-continuity-private.json",
+        "sha256": "cc410411de53698de8d8870fcf3224e265572bc3b82ddb4bb0e1357d831856ad",
+        "privateSourceOnly": true
+      }
+    },
+    "nextH8": {
+      "status": "record_binding_and_actionable_verification_feedback_fix_in_progress",
+      "sourceHead": null,
+      "sourceTree": null,
+      "releaseRunId": null,
+      "targetAsarSha256": null,
+      "sandboxWideningAllowed": false,
+      "failureCounterResetAllowed": false,
+      "actualBusinessAcceptance": "pending",
+      "naturalDueAndChatBackgroundPreviewAcceptance": "pending"
+    },
+    "publicReleaseStatus": "HOLD_pending",
+    "h5ChatPreviewFailureRetained": true,
+    "historicalH6PreflightFailureRetained": true,
+    "noCodexPaidSourceCollectionOrReportEditing": true
+  },
+  "latestH8Candidate": {
+    "status": "partial_package_updater_windows_pass_real_A2_control_failure",
+    "sourceHead": "2ba978c63343da8c5aaf2324cf76111c8c7f3cd2",
+    "sourceTree": "5f183c1c5ff83fe5d3e26649c5843ea565279365",
+    "releaseRunId": 44120488456,
+    "runAttempt": 1,
+    "actualMacAppOpened": true,
+    "macPackage": {
+      "version": "0.5.7",
+      "bundleId": "com.wangjiawei508.workgpt",
+      "architecture": "arm64",
+      "asarSha256": "0c603ad8722f628c36fb3f2176038236822975832807e5d9f480c197ec4bd5bf",
+      "dmgSha256": "7c0b415d972a3598ae4475f38e34957bd481038467301de3d8a89395c1ff72de",
+      "signature": "passed",
+      "notarization": "passed",
+      "gatekeeper": "not_evaluated_local_security_override",
+      "localOuterMacArchiveFullHashClaimed": true,
+      "rootIdentityProof": {
+        "fileName": "2ba978c6-root-independent-package-check.json",
+        "sha256": "673a38ba9866e3fd593a95140c76d4cabf075371327e2d8c60bc35d11904f402",
+        "privateSourceOnly": true
+      }
+    },
+    "sameRunNativeUpdater": {
+      "status": "passed_original_strict_and_root_integrity",
+      "baseVersion": "0.5.6",
+      "targetVersion": "0.5.7",
+      "jobId": 134205274071,
+      "artifactId": 14350810887,
+      "targetAndInstalledAsarMatchLocal": true,
+      "cleanCiGatekeeper": "accepted_with_assessments_enabled",
+      "rootEvidence": {
+        "fileName": "2ba978c6-root-updater-original-proof-check.json",
+        "sha256": "1972d7b9b5a1d8f19c4dbcf107e0c64ff3203b46a2645635232a47437ad3f4b1",
+        "privateSourceOnly": true
+      }
+    },
+    "windowsFull": {
+      "status": "passed_corrected_QA_driver_original_strict_and_root_integrity",
+      "acceptanceRunId": 44136767946,
+      "packageSourceHead": "2ba978c63343da8c5aaf2324cf76111c8c7f3cd2",
+      "driverSourceHead": "1ba93dcacd1882563bbb8a5b4c6c0d7109aefa59",
+      "changedFiles": [
+        "scripts/run-windows-ui-smoke.mjs",
+        "scripts/windows-ui-smoke.test.mjs"
+      ],
+      "uiChecks": 17,
+      "permissionChecks": 6,
+      "localModelFixtureRequests": 42,
+      "realClockDuePassed": true,
+      "windowsSignature": "NotSigned",
+      "scope": "controlled BSK/local model/loopback; Windows Ego, external model and paid Dadan unexercised",
+      "rootEvidence": {
+        "fileName": "windows-1ba93dca-same-H8-root-full-proof-check.json",
+        "sha256": "8100fd1b68aafe2371a0e852915aca137c0192d3608e625f90aa1637020bb326",
+        "privateSourceOnly": true
+      },
+      "originalFullFailure": {
+        "runId": 44128824077,
+        "status": "failure",
+        "preserved": true,
+        "actualNullErrno": "unknown; QA publication-read gap reproduced deterministically and bounded exact-Turn/Grant wait corrected"
+      }
+    },
+    "realSameTask": {
+      "taskId": "task_capability_c9985c7ac166d00865b4724a",
+      "previousH6A0AndH7A1FailuresRetained": true,
+      "status": "waiting_user",
+      "attempts": 2,
+      "turnId": "turn_zmgjouro",
+      "listSchedulesSucceeded": true,
+      "plainReadAttempts": 1,
+      "plainReadFailedCode": "ego_browser_read_failed",
+      "failurePhase": "control",
+      "nativeCause": "unknown_not_preserved_by_old_diagnostics",
+      "newSourceCollected": false,
+      "newManagedHtmlSaved": false,
+      "previousA1DraftRetained": true,
+      "sourceVerificationPassed": false,
+      "threeNodesCompleted": false,
+      "existingTemporaryPlanReadBack": true,
+      "newPlanCreated": false,
+      "temporaryPlanTime": "21:18 Asia/Shanghai",
+      "naturalDueExecuted": false,
+      "chatBackgroundPreviewIsolationExercised": false,
+      "failureLedger": {
+        "fileName": "H8-2ba978c6-actual-A2-FAIL-ledger-private.json",
+        "sha256": "d133d46061bfb4611daaa6c2961aeb7e115e3996787ea299ab8ee222023718dd",
+        "privateSourceOnly": true
+      }
+    },
+    "preservation": {
+      "allOther27TaskRowsAndAll8PlanDefinitionsAndEnabledStatesUnchanged": true,
+      "oldUnknown16AndPrepared1RawRowsUnchanged": true,
+      "configurationOpaqueHashesUnchanged": true,
+      "oldOperationPayloadStatusAndSealsUnchanged": true,
+      "oneSuccessfulCurrentTaskScheduleReadbackUpdatedAtRefreshed": true,
+      "originalRawReadbackRetainedInBackup": true,
+      "formalPlanStillEnabled": true,
+      "rootEvidence": {
+        "fileName": "2ba978c6-A2-blocked-full-raw-preservation-private.json",
+        "sha256": "7c2e5aa9f5b1de40f1654feb14e1438d805db5e75f2a28a9f8911b8e9c2d39d2",
+        "privateSourceOnly": true
+      }
+    },
+    "nextH9": {
+      "status": "metadata_only_resumed_space_preflight_and_safe_native_diagnostics_source_prepared",
+      "sourceHead": null,
+      "sourceTree": null,
+      "releaseRunId": null,
+      "targetAsarSha256": null,
+      "expectedSameTaskAttempt": 3,
+      "currentAppRemainsH8": true,
+      "noTaskInputOrA3Yet": true,
+      "sandboxWideningAllowed": false,
+      "failureCounterResetAllowed": false,
+      "actualBusinessAcceptance": "pending",
+      "naturalDueAndChatBackgroundPreviewAcceptance": "pending"
+    },
+    "publicReleaseStatus": "HOLD_pending",
+    "h5ChatPreviewFailureRetained": true,
+    "noCodexPaidSourceCollectionOrReportEditing": true
+  },
+  "h9InitialCI": {
+    "sourceHead": "98150ea0b7087b7c771b0e84c6a450defa35fe62",
+    "sourceTree": "e2e267af58339280967c7f220e85788e34c576a2",
+    "status": "failed_retained",
+    "pushRunId": 44143167639,
+    "pullRequestRunId": 44143181966,
+    "runAttempt": 1,
+    "passedJobs": 4,
+    "failedJobs": 2,
+    "cause": "Offline full-chain closed-status fixture omitted identityMatches:false; strict production protocol rejected correctly. Fixture completed and resumed-read-before-open path covered; original CI was not rerun.",
+    "productionValidatorRelaxed": false,
+    "nativeOrBusinessAcceptance": false,
+    "privateEvidence": {
+      "fileName": "quality-98150ea0-final-handoff.json",
+      "sha256": "93f36449ab749a7ad193cbdd7ddb21bf00a62ff0e13cc82c56b82ea9c0ac01a2",
       "privateSourceOnly": true
     }
-  ]
+  },
+  "latestH9Candidate": {
+    "sourceHead": "cc32fe571502ddc763b86da3ceb690ff6cc7fa99",
+    "sourceTree": "d2eebba1c9fdd8751d58a7fcf208da8daf3ae9e4",
+    "sixOfficialQualityJobs": "passed",
+    "pushQualityRunId": 44147940457,
+    "pullRequestQualityRunId": 44147956668,
+    "privateReleaseRunId": 44151140572,
+    "privateReleaseRunAttempt": 1,
+    "actualProducerVersion": "0.5.7",
+    "Mac": {
+      "status": "failed_before_artifact",
+      "jobId": 134283007896,
+      "stage": "Build signed macOS packages",
+      "arch": "x64",
+      "timestampError": "A timestamp was expected but was not found.",
+      "internalArchitectureAttempts": 3,
+      "notarySubmissionReached": false,
+      "underlyingEndpointOrServiceCause": "unknown",
+      "artifactCreated": false,
+      "installed": false,
+      "opened": false
+    },
+    "Windows": {
+      "status": "original_basic_full_and_root_independent_checks_passed",
+      "artifactId": 14360406634,
+      "artifactSize": 317560437,
+      "artifactSha256": "e5719d8de8f36d19b837a9b27e425ac6d133c1a8826900d25e84441d823ad4ed",
+      "installerSha256": "09df0038b44af1f812ed42fe989d345b89e11b3f76f1dfcb2b9e56b6296f5de6",
+      "installedAsarSha256": "af01034c5699be7fe463c83de63a41184fa0843c30101b8bb9debb26aea3de6f",
+      "signature": "NotSigned",
+      "fullRunId": 44156852440,
+      "fullResult": "passed",
+      "scope": "controlled BSK/local protocol model/loopback; no Windows Ego/paid Dadan/external model claim",
+      "fullArtifactId": 14360644691,
+      "fullArtifactSize": 1197782,
+      "fullArtifactSha256": "4fb106a6de6730f12bc4d0f58de14d76ac57b288c124835bd6f5f64dc8b80861",
+      "rootEvidence": {
+        "fileName": "windows-cc32fe57-H9-root-full-proof-check.json",
+        "sha256": "b9efa21cee168d93813c7248dbb59bb1796e4579a3e2930a08dfbb86275769fa",
+        "privateSourceOnly": true
+      }
+    },
+    "failureEvidence": {
+      "fileName": "H9-cc32fe57-Mac-attempt1-FAIL-ledger-private.json",
+      "sha256": "d8928dd39fe67b6b43ca82639b3108bde60bcc59dae9a5a534e45e3c7aa01057",
+      "privateSourceOnly": true
+    },
+    "actualMacRemainsH8": true,
+    "actualSameTaskStillA2Waiting": true,
+    "noTaskInputOrA3": true,
+    "publicReleaseStatus": "HOLD_pending",
+    "nextPackagingCorrection": {
+      "status": "source_applied_validated_PNG_exact_path_rules_standard_signer",
+      "sourceHead": null,
+      "sourceTree": null,
+      "releaseRunId": null,
+      "MacAsarSha256": null,
+      "actualBusinessAcceptance": "pending",
+      "isolatedSourceCommit": "2e6d2dc0d12b261f86512f052c0cb2bafb56151a",
+      "focusedTestsPassed": 61,
+      "requiredTimestampPreserved": true,
+      "underlyingTSAResolutionClaimed": false,
+      "newExactMacPackageRequired": true
+    }
+  }
 }

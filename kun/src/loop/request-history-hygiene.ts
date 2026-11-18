@@ -1,4 +1,6 @@
 import type { TurnItem } from '../contracts/items.js'
+import { createHash } from 'node:crypto'
+import sax from 'sax'
 
 export type RequestHistoryHygieneOptions = {
   maxToolResultLines?: number
@@ -31,6 +33,14 @@ type JsonRecord = Record<string, unknown>
 type CompactResult<T> = {
   value: T
   changed: boolean
+  unabridged?: T
+}
+
+// Send-time bridge only. TaskContextRuntime persists these complete sources in
+// its existing task-scoped context store before advertising a recall reference.
+const documentSources = new WeakMap<TurnItem, unknown>()
+export function unabridgedHistoryToolOutput(item: TurnItem): unknown {
+  return documentSources.get(item)
 }
 
 /**
@@ -51,10 +61,14 @@ export function applyRequestHistoryHygiene(
   let changed = false
   const next = items.map((item) => {
     if (item.kind === 'tool_result') {
-      const output = compactToolResultOutput(item.output, limits)
+      const output = item.toolName === 'read_task_context'
+        ? compactContextSlice(item.output, limits) ?? compactToolResultOutput(item.output, limits, item.toolName)
+        : compactToolResultOutput(item.output, limits, item.toolName)
       if (!output.changed) return item
       changed = true
-      return { ...item, output: output.value }
+      const projected = { ...item, output: output.value }
+      if (output.unabridged !== undefined) documentSources.set(projected, output.unabridged)
+      return projected
     }
     if (item.kind === 'tool_call' && pairedToolCallIds.has(item.callId)) {
       const args = compactCompletedToolArguments(item.arguments, {
@@ -96,8 +110,15 @@ function normalizeOptions(options: RequestHistoryHygieneOptions): Required<Reque
 
 function compactToolResultOutput(
   output: unknown,
-  limits: Required<RequestHistoryHygieneOptions>
+  limits: Required<RequestHistoryHygieneOptions>,
+  toolName: string
 ): CompactResult<unknown> {
+  // Only the actual top-level browser document contract is projected. Arbitrary
+  // nested tool objects/arrays retain their existing bounded JSON treatment.
+  if (/^(?:ego_browser_(?:open|read|next_page)|browser_get_html)$/.test(toolName) && isRecord(output)) {
+    const document = compactBrowserDocument(output, limits)
+    if (document) return document
+  }
   return compactToolResultValue(output, '', limits)
 }
 
@@ -128,6 +149,82 @@ function compactToolResultValue(
     changed ||= child.changed
   }
   return changed ? { value: out, changed: true } : { value, changed: false }
+}
+
+/** Source documents are ordered data, not command logs. Never sample their
+ * middle or shorten individual content lines. No page code is evaluated. */
+function compactBrowserDocument(value: JsonRecord, limits: Required<RequestHistoryHygieneOptions>): CompactResult<unknown> | null {
+  if (typeof value.html !== 'string' || typeof value.sourceUrl !== 'string' || !/^https?:\/\//i.test(value.sourceUrl) ||
+    !/<[a-z][^>]*>/i.test(value.html) || withinTextLimits(value.html, limits)) return null
+  const html = value.html, semantic = documentTextAndLinks(html, value.sourceUrl)
+  const text = semantic ?? html, shown = sourcePrefix(text, limits)
+  const otherFields = compactToolResultValue({ ...value, html: '' }, '', limits).value as JsonRecord
+  const projection = { untrusted: true, sourceField: 'html', representation: semantic === null ? 'source-html' : 'text-and-links',
+    sourceHtmlSha256: createHash('sha256').update(html).digest('hex'), sourceHtmlBytes: Buffer.byteLength(html),
+    sourceTruncated: value.truncated === true, sourceReadScope: value.readScope ?? 'source-html', textUtf8Bytes: Buffer.byteLength(text), offsetUnit: 'utf8-bytes' }
+  const metadata = (part: string) => ({ ...projection, shownUtf8Bytes: Buffer.byteLength(part),
+    complete: part === text && semantic !== null && value.truncated !== true,
+    ...(part !== text || semantic === null ? { instruction: 'Incomplete model document projection. Do not infer omitted records or full source coverage. Read the task-scoped contextSpill reference when provided; otherwise obtain an authorized narrower document read before reporting.' } : {}) })
+  return { changed: true, value: { ...otherFields, html: shown, modelDocumentProjection: metadata(shown) },
+    ...(shown !== text || semantic === null ? { unabridged: { ...otherFields, html: text, modelDocumentProjection: metadata(text) } } : {}) }
+}
+
+function documentTextAndLinks(html: string, sourceUrl: string): string | null {
+  const parser = sax.parser(false, { lowercase: true }), parts: string[] = []
+  const excluded = new Set(['script', 'style', 'template', 'noscript', 'textarea', 'select'])
+  const block = /^(?:address|article|aside|blockquote|br|dd|div|dl|dt|figcaption|figure|footer|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|table|tbody|td|th|thead|tr|ul)$/
+  let skipped = 0, invalid = false
+  parser.onopentag = node => {
+    if (skipped || excluded.has(node.name)) { skipped++; return }
+    if (block.test(node.name)) parts.push('\n')
+    for (const key of ['alt', 'title', 'aria-label', 'datetime']) {
+      const attribute = node.attributes[key]
+      if (typeof attribute === 'string' && attribute.trim()) parts.push(` [${key}=${JSON.stringify(attribute)}] `)
+    }
+    if (node.name === 'a' && typeof node.attributes.href === 'string') {
+      try { const url = new URL(node.attributes.href, sourceUrl)
+        if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password) parts.push(` [link=${JSON.stringify(url.href)}] `)
+      } catch { /* Keep the source label without inventing a usable link. */ }
+    }
+  }
+  parser.onclosetag = name => { if (skipped) { skipped--; return }; if (block.test(name)) parts.push('\n') }
+  parser.ontext = text => { if (!skipped) parts.push(text) }
+  parser.oncdata = text => { if (!skipped) parts.push(text) }
+  parser.onerror = () => { invalid = true; parser.resume() }
+  try { parser.write(html).close() } catch { return null }
+  if (invalid) return null
+  return parts.join('').split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n')
+}
+
+function withinTextLimits(text: string, limits: Required<RequestHistoryHygieneOptions>): boolean {
+  return Buffer.byteLength(text) <= limits.maxToolResultBytes && countLines(text) <= limits.maxToolResultLines && estimateTokens(text) <= limits.maxToolResultTokens
+}
+
+/** A contiguous prefix at Unicode boundaries; offsets refer to these exact
+ * UTF-8 source bytes, never to normalized or re-encoded HTML positions. */
+function sourcePrefix(text: string, limits: Required<RequestHistoryHygieneOptions>): string {
+  if (withinTextLimits(text, limits)) return text
+  let end = 0, bytes = 0, tokens = 0, asciiRun = 0, newlines = 0
+  for (const char of text) {
+    const charBytes = Buffer.byteLength(char), ascii = char.charCodeAt(0) <= 0x7f
+    const charTokens = ascii ? (asciiRun % 4 === 0 ? 1 : 0) : isCombiningMark(char) ? 0 : 1
+    const nextNewlines = newlines + (char === '\n' ? 1 : 0)
+    if (bytes + charBytes > limits.maxToolResultBytes || tokens + charTokens > limits.maxToolResultTokens || nextNewlines + (char === '\n' ? 0 : 1) > limits.maxToolResultLines) break
+    bytes += charBytes; tokens += charTokens; asciiRun = ascii ? asciiRun + 1 : 0; newlines = nextNewlines
+    end += char.length
+  }
+  return text.slice(0, end)
+}
+
+function compactContextSlice(value: unknown, limits: Required<RequestHistoryHygieneOptions>): CompactResult<unknown> | null {
+  if (!isRecord(value) || typeof value.text !== 'string' || !Number.isSafeInteger(value.offset) || Number(value.offset) < 0 ||
+    !Number.isSafeInteger(value.totalBytes) || typeof value.sha256 !== 'string') return null
+  const text = sourcePrefix(value.text, limits)
+  if (text === value.text) return { value, changed: false }
+  const nextOffset = Number(value.offset) + Buffer.byteLength(text)
+  return { changed: true, value: { ...value, text, nextOffset, modelContextSlice: {
+    complete: false, offsetUnit: 'utf8-bytes', shownUtf8Bytes: Buffer.byteLength(text),
+    instruction: 'Continue read_task_context on the same bundle_id/object_id at nextOffset before relying on unseen source bytes.' } } }
 }
 
 function compactArray(

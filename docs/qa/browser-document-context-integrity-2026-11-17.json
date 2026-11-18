@@ -1,0 +1,183 @@
+{
+  "status": "source-validation-passed-new-exact-package-and-business-pending",
+  "observedAt": "2026-11-17T04:39:00Z",
+  "sourceHead": "0e9281ebe27dc9dee40e2a8b1f9e1618dfd35b04",
+  "exactPackage": {
+    "version": "0.5.7",
+    "releaseRunId": 44010342698,
+    "runAttempt": 1,
+    "macPackageAndSameRunNativeUpdater": "passed",
+    "windowsControlledFullAcceptance": "passed",
+    "realBusinessAcceptance": "failed"
+  },
+  "observedFailure": {
+    "initialTaskCompletedNodes": 3,
+    "initialTaskAttempts": 1,
+    "browserCreatedOwnTaskSpace": true,
+    "browserSdkFinishAwaited": true,
+    "wholeSpaceDisappearanceIndependentlyObserved": false,
+    "loadedSourceHtmlCharacters": 26440,
+    "modelVisibleHtmlCharactersAfterHistoryHygiene": 7813,
+    "originalReceiptUnchanged": true,
+    "threeRelevantCurrentDaySourceMarkersMissingAfterHygiene": true,
+    "reportOmittedThoseRecords": true,
+    "rootCause": "Command-log history hygiene sampled head/tail lines and shortened long lines in browser HTML, silently dropping business records between them.",
+    "mechanicalCompletionIsNotBusinessAcceptance": true
+  },
+  "requiredCorrection": [
+    "Preserve browser document semantics in source order within the existing model-context limits.",
+    "Expose truncation and an authorized continuation path when semantic content really exceeds the limits.",
+    "Retain immutable raw source receipts and hashes, the existing browser authority and execution budgets.",
+    "Cover front, middle and final records with synthetic fixtures; do not commit authenticated page content.",
+    "Build, install and exercise the corrected exact package with real model/browser initial and naturally due tasks before accepting the business workflow."
+  ],
+  "sourceFixValidation": {
+    "focusedRuntimeTestsPassed": 37,
+    "focusedSidebarDomTestsPassed": 55,
+    "offlinePrivateSourceTextNodesRetained": [
+      [
+        342,
+        342
+      ],
+      [
+        342,
+        342
+      ],
+      [
+        20,
+        20
+      ]
+    ],
+    "allPreviouslyMissingMarkersRetained": true,
+    "rawSourceHashesAndReceiptsUnchanged": true,
+    "newExactPackageBusinessAcceptance": "pending",
+    "desktopTypes": "passed",
+    "runtimeTypes": "passed",
+    "lint": "passed",
+    "productionBuilds": 1,
+    "buildFreshness": "passed",
+    "sourceChangedDuringValidation": false,
+    "testOnlyUnionNarrowingAfterInitialTypeFailure": true,
+    "sourceBoundLocalProof": {
+      "fileName": "browser-context-combined-v2-local-validation.json",
+      "sha256": "71563b9bb8a0f7157c37ad3993a85e1625b04b77d2cb3ca823d15d60bd58b394"
+    },
+    "requiredCi": "pending on new committed source"
+  },
+  "subsequentH3NaturalDueObservation": {
+    "scheduledStart": "2026-11-17T04:57:00.000Z",
+    "actualTaskCreatedAt": "2026-11-17T04:57:23.994Z",
+    "completedAt": "2026-11-17T05:00:10.937Z",
+    "attempts": 1,
+    "completedNodes": 3,
+    "freshGrantAfterOriginalGrantExpiry": true,
+    "nativeTwoSpacesWithRailWiseRunningObserved": true,
+    "nativeOneOriginalSpaceAfterFinishObserved": true,
+    "freshCurrentPageAndDistinctReport": true,
+    "automaticPreviewObserved": true,
+    "temporaryPlanPausedThroughNormalUi": true,
+    "originalPlanDefinitionsUnchanged": true,
+    "doesNotEraseInitialH3BusinessFailure": true
+  },
+  "privateProofs": [
+    {
+      "fileName": "0e9281eb-initial-qa-completion-business-FAILED-private.json",
+      "sha256": "16fe40dae6c6a3867c2ba0916c7ed07901ad1d63bac5155e3ccd8bfea781f43b"
+    },
+    {
+      "fileName": "0e9281eb-natural-due-real-ego-root-audit-private.json",
+      "sha256": "eb0933cc64da3b7bc553b7fcac7e880eb8627c1b3e13c1f0a58cee75eec77758"
+    },
+    {
+      "fileName": "browser-document-hygiene-private-fixture-green-v2.json",
+      "sha256": "50c45651440bef3bdd255b28945113b00ea02b7dba6091f54535ca2d12f318c1"
+    },
+    {
+      "fileName": "browser-document-hygiene-fix-summary-v2-private.json",
+      "sha256": "e41e1e5528416f98184a6813a89e3ffe7fe07ce2696b6c93aeef654e4926ddf4"
+    },
+    {
+      "fileName": "task-workspace-order-manifest.json",
+      "sha256": "08a0d4cb4e6082b18f7ec5c5e30fcf40dcfcec54ec3e5adadd20448d9546c304"
+    }
+  ],
+  "preservation": {
+    "originalCompletedTaskAndFailedScheduledTaskUnchanged": true,
+    "existingFourPlanDefinitionsUnchanged": true,
+    "legacyUnknownCount": 16,
+    "newUnknownCount": 0,
+    "directCodexPaidSourceCollection": false,
+    "publicReleaseGate": "pending-denied"
+  },
+  "subsequentH10ActualComponentsAndH11Corrections": {
+    "sourceHead": "77d81d3f1662677e26d80f65903633729bbf9bdc",
+    "releaseRunId": 44166307752,
+    "actualMacInstalledAndOpened": true,
+    "MacAsarSha256": "dc33d529fa6974eab1cb4727b442531e0d608fb4535abc0e4a04b7c0c5411d95",
+    "MacSignatureAndNotarization": "passed",
+    "localGatekeeper": "not_evaluated_local_security_override",
+    "sameRunNativeUpdater": "passed_mac_updater_component_only",
+    "wholeReleaseAccepted": false,
+    "originalStrictFullReleaseVerifier": "failed_truthful_sibling_Windows_basic_failure",
+    "WindowsOriginalBasic": {
+      "job": 134343317383,
+      "status": "failed",
+      "cause": "unknown"
+    },
+    "WindowsNewBasic": {
+      "run": 44178773300,
+      "status": "passed",
+      "sameOriginalPackage": true,
+      "driver": "d00c401ea73a2ab6dcb02aa6f3afc37a12470d94"
+    },
+    "WindowsFull": {
+      "run": 44181573847,
+      "status": "passed",
+      "signature": "NotSigned",
+      "scope": "controlled BrowserSkill/local model protocol/loopback; no Windows Ego or paid-site real-model claim"
+    },
+    "realMacBusinessComponents": {
+      "initialAttempt": 3,
+      "initialEgoSpace": 18,
+      "initialNodesCompleted": "3/3",
+      "naturalDue": "2026-11-18 05:31 Asia/Shanghai",
+      "dueAttempt": 1,
+      "dueEgoSpace": 19,
+      "dueNodesCompleted": "3/3",
+      "newVerifiedHtmlPerRun": true,
+      "awaitedFinishBothRuns": true,
+      "backgroundPreviewStayedOnInitial": true,
+      "explicitDueArtifactSelectionOpenedDue": true,
+      "TaskSelectionAloneSwitchedPreview": false,
+      "QAOnlyPlanPausedAfterDue": true,
+      "formal0830and1630PlanUntouched": true
+    },
+    "preservation": {
+      "allOther27TasksUnchanged": true,
+      "oneIndependentDueAdded": true,
+      "other7PlanDefinitionsUnchanged": true,
+      "oldOperationRowsByteIdentical": 1414,
+      "unknownRows": 16,
+      "preparedRows": 1,
+      "opaqueConfigHashesUnchanged": true
+    },
+    "remainingDefects": [
+      "Initial report heading too long and business screening semantics absent from schema/rendering",
+      "Flow Save then Publish can restore stale revision and publish after a swallowed save conflict"
+    ],
+    "businessOverallAccepted": false,
+    "publicHold": true,
+    "privateEvidence": {
+      "componentLedgerFile": "H10-actual-initial-natural-due-preview-component-ledger-private.json",
+      "componentLedgerSha256": "29e8306eef958343ddad18dc7f508a9031ef5c825b76d1dc5a80cb440dfbecd9",
+      "rawContinuityFile": "H10-old-operation-rows-continuity-private.json",
+      "rawContinuitySha256": "30af71d5f6efb3844274816e959ce5f5eefd845e672b7ebf1bb4527160764a17"
+    },
+    "nextSourceChanges": {
+      "reportAndPagination": "36b310f630efab28251c92da375788430f0523f2",
+      "FlowRevision": "22b98308f01adffe6563c83532d8de7f205833e5",
+      "requiresFreshExactPackageAndNewOrdinaryUiBusinessTask": true,
+      "completedC998MustNotResumeA4": true
+    }
+  }
+}

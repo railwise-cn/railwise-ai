@@ -1,0 +1,112 @@
+{
+  "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+  "sourceTree": "123dc6f7965170e6752c52381612fc8ef59bef62",
+  "status": "passed",
+  "acceptedBy": "AI review of actual package and artifacts",
+  "macOS": {
+    "source": "Authenticated Dadan subscription list via the RailWise AI Ego connector",
+    "manualSourceCollection": false,
+    "explicitPurpose": "Existing subscription filters for engineering surveying, mapping and monitoring services",
+    "initial": {
+      "taskCreatedAt": "2026-11-17T23:41:14.131Z",
+      "taskCompletedAt": "2026-11-17T23:46:06.907Z",
+      "attempts": 1,
+      "independentEgoTaskSpaceId": 20,
+      "egoFinishConfirmed": true,
+      "sourceCoverage": {
+        "subscriptionPagesRead": 1,
+        "visibleRecords": 20,
+        "directOfficialNoticeBodiesVerified": 0
+      },
+      "artifactBytes": 42974,
+      "artifactSha256": "35403dfb5660298edcbc88f14138234437ba59cc6324451e725598c81d253b8c",
+      "artifactVerification": "verified",
+      "previewHttpStatus": 200,
+      "previewAutomaticallyOpened": true,
+      "matchedAllSavedItemIds": true,
+      "observationSha256": "7d7cd479e108d09d4827f053fd97a4fc716110bee04447b9ebb226d80a4bf63a",
+      "nativePreviewProofSha256": "64abf9eb2b24c6b2b94bbae1b66fa267359c596040e15ba5746469348772a1df",
+      "normalComposerSubmission": true,
+      "related": 12,
+      "pending": 2,
+      "excluded": 6
+    },
+    "naturalDue": {
+      "taskCreatedAt": "2026-11-17T23:58:05.844Z",
+      "taskCompletedAt": "2026-11-18T00:02:35.277Z",
+      "attempts": 1,
+      "independentEgoTaskSpaceId": 21,
+      "egoFinishConfirmed": true,
+      "sourceCoverage": {
+        "subscriptionPagesRead": 1,
+        "visibleRecords": 20,
+        "directOfficialNoticeBodiesVerified": 0
+      },
+      "artifactBytes": 44100,
+      "artifactSha256": "096e46cee71ebf73876f939c793d0d362741383dac8a901d5d7a0734bca41ae3",
+      "artifactVerification": "verified",
+      "previewHttpStatus": 200,
+      "previewAutomaticallyOpened": false,
+      "matchedAllSavedItemIds": true,
+      "observationSha256": "9eb90bc2230df255dbd9b290bb5b4e3aca03bd0ccd64f5e62bdedf339ed8d532",
+      "nativePreviewProofSha256": "14b581ca02558e305517d973fdc73a21622caf8f15dceb3f932d69c634d80e19",
+      "actualSystemClock": true,
+      "manualTrigger": false,
+      "dueAt": "2026-11-17T23:58:00.000Z",
+      "related": 13,
+      "pending": 3,
+      "excluded": 4
+    },
+    "reportQuality": "Responsive, printable Chinese HTML with scoped coverage, reasons per classification, a literal source appendix and unverified fields. No November 18 entry was observed on the first page at capture time. Additional pages and notice bodies were outside the accepted scope.",
+    "recovery": "Initial source-evidence verification required one automatic correction. Scheduled execution automatically recovered from an invalid write argument and an incomplete source-evidence payload."
+  },
+  "schedules": {
+    "timezone": "Asia/Shanghai",
+    "temporaryInitialStart": "10:40",
+    "editedStart": "07:58",
+    "saveRevision": 2,
+    "publishRevision": 3,
+    "temporaryPausedReadback": true,
+    "formalEnabled": true,
+    "formalStart": [
+      "08:30",
+      "16:30"
+    ],
+    "formalDeliveryBy": [
+      "09:00",
+      "17:00"
+    ]
+  },
+  "preservation": {
+    "existingTaskRowsUnchanged": 29,
+    "existingPlanDefinitionsUnchanged": 8,
+    "unknownRowsUnchanged": 16,
+    "preparedRowsUnchanged": 1,
+    "completedInitialUnchangedAcrossDue": true
+  },
+  "windows": {
+    "status": "passed",
+    "packageRunId": 44192481166,
+    "fullRunId": 44196389961,
+    "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "packageSourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "driverSourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "installerSha256": "113a88a8601b04a49233267dc8321c17063a949fecce9fa5ad3e6ff37ed66dd7",
+    "installedAsarSha256": "d0b02f0cf4ff19c7891a1722706932d10c33ee77f3b03c53f3fdd3ab3998ce3a",
+    "signatureStatuses": {
+      "installer": "NotSigned",
+      "installedExecutable": "NotSigned"
+    },
+    "scope": "controlled Windows full task/browser protocol fixture",
+    "actualRealModel": false,
+    "controlledInitialAndNaturalDuePassed": true,
+    "limitations": [
+      "Controlled model protocol/page; this does not replace real Mac model/site acceptance",
+      "Windows signing is recorded from raw Authenticode; no professional engineering sign-off"
+    ]
+  },
+  "limitations": [
+    "The exact Windows full runner uses controlled BrowserSkill and a local protocol model. The authenticated Ego and Dadan verification ran on Apple Silicon macOS.",
+    "Paid source contents, native screenshots, local account paths, preview lease URLs and user reports are retained privately."
+  ]
+}

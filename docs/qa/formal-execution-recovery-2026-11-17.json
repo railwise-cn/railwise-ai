@@ -1,0 +1,249 @@
+{
+  "status": "local-validation-passed-exact-package-and-business-pending",
+  "at": "2026-11-17T02:25:50.310881+00:00",
+  "scope": "Formal periodic browser task admission and bounded observation recovery",
+  "observedFailure": {
+    "taskId": "task_eb5e06cd-2f57-4037-b8a5-92c3a2255cc7",
+    "dueAt": "2026-11-17T00:30:00.000Z",
+    "status": "stalled",
+    "attempts": 8,
+    "artifactCount": 0,
+    "originalRecordsUnchanged": true,
+    "authorizationAndFreshBrowserRead": "passed",
+    "completion": "failed"
+  },
+  "changes": [
+    "Queued task and a separate internal admission lease commit atomically for concrete Turns; dispatch transfers admission to execution in the same transaction. Pre-Turn Retry preparation remains authorizable under the existing execution-lease guard.",
+    "A queued/retrying next Turn can receive the same Controller execution lease only with explicit current owner and revision proof. The transaction fences the old token immediately; delayed old cleanup cannot remove the new admission or execution.",
+    "Pre-dispatch preparation failure releases only its pending admission; a post-dispatch receipt error retains the running owner.",
+    "Stale Turn cleanup settles its own execution token and cannot clear a newer Turn lease, fence or actual model-work clock.",
+    "Only trusted read-only browser observation suppression receives at most two same-Turn model feedback opportunities; persisted rejected tool results reach the model before candidate assessment.",
+    "Persistent repetition produces one durable tool_storm_recovery_exhausted failure. No guard reset, mutation replay, scope expansion or hard-budget increase."
+  ],
+  "tests": {
+    "suppressionRedFailures": 4,
+    "admissionRedFailures": 3,
+    "compositeFiles": 11,
+    "compositePassed": 219,
+    "failed": 0,
+    "kunTypes": "passed",
+    "lint": "passed",
+    "oneProductionBuild": "passed",
+    "freshnessProductionInputs": 1381,
+    "authoredProductionInputsMatched": 2443,
+    "sourceChangedDuringValidation": false,
+    "admissionLifecycleRedFailures": 13,
+    "allCheckedFiles": 2449,
+    "fullRuntimeFilesPassed": 364,
+    "fullRuntimeFilesSkipped": 4,
+    "fullRuntimeTestsPassed": 5269,
+    "fullRuntimeTestsSkipped": 24,
+    "fullRuntimeExitCode": 0,
+    "newHandoffRegressions": 2,
+    "finalSourceOneProductionBuild": "passed",
+    "finalSourceFreshness": "passed"
+  },
+  "testedFiles": [
+    {
+      "path": "kun/src/loop/agent-loop.ts",
+      "sha256": "903c61edd0247bc2db4188249a57ff863dfcd1d59bc2e4caaf14cc031a90838b",
+      "bytes": 146330
+    },
+    {
+      "path": "kun/src/loop/agent-loop.test.ts",
+      "sha256": "3e93ef33077580ea125f8ef0b9a78b36cd8ff555e35aed6158dec80da0eb91e5",
+      "bytes": 44933
+    },
+    {
+      "path": "kun/src/services/task-controller.ts",
+      "sha256": "dec4c27e3e4f5741c29809cfcea457e6ebb50a23bc03677a2dcffd6639bba828",
+      "bytes": 194871
+    },
+    {
+      "path": "kun/src/services/task-controller.test.ts",
+      "sha256": "3e4409f53392922e094274480d18f5d65fcc888044bb549a2046810c0fc081a9",
+      "bytes": 71505
+    },
+    {
+      "path": "kun/src/services/task-coordinator.ts",
+      "sha256": "2f0eb116e2061fc4c2de948c23baf0dbeb631397e9047854aea83e20d84c4d10",
+      "bytes": 29163
+    },
+    {
+      "path": "kun/src/services/task-coordinator.test.ts",
+      "sha256": "975ff330769271a8dabe70ea4c9d3aec88aed50d704440e8f522108fa668dc30",
+      "bytes": 34875
+    },
+    {
+      "path": "kun/src/services/task-run-repository.ts",
+      "sha256": "e9109048d215f9e01117e6205249e62a215e4e1efa339079d47298b8fd3dc2d2",
+      "bytes": 63290
+    },
+    {
+      "path": "kun/src/services/task-run-repository.test.ts",
+      "sha256": "6ce55ef8d859370d46d31de3c68a6fccc6e85a00534cdf534a60262f8e71c652",
+      "bytes": 11541
+    }
+  ],
+  "preservation": {
+    "actualTaskBudgetsCountersGrantsAndOperationReceiptsUnchanged": true,
+    "formalPlanRevision1StillEnabled": true,
+    "oldPausedPlansUnchanged": true,
+    "newUnknown": 0,
+    "legacyUnknown": 16,
+    "directCodexPaidSourceCollection": false
+  },
+  "privateProofs": [
+    {
+      "fileName": "formal-dadan-0830-actual-due-FAILED-audit-private.json",
+      "sha256": "579c7ec63064209c76959642b6c632b1e1b6689d65dfc3d404d5b7b317733a79",
+      "bytes": 22721
+    },
+    {
+      "fileName": "formal-suppression-fix-summary-private.json",
+      "sha256": "505d00c449d3038357ff0c002ba03612a72ecb9c1a36e222b8599e3e77f5d1ae",
+      "bytes": 4126
+    },
+    {
+      "fileName": "admission-race-summary-private.json",
+      "sha256": "416bc4b12e7ca3b19274fe823c201f937341f19c4fbb02e0871804043b89c796",
+      "bytes": 4360
+    },
+    {
+      "fileName": "formal-composite-local-validation.json",
+      "sha256": "3abb3d0bc4a1833be6c60b1122d24aba2b936b29fd2c93873ceebd1672706276",
+      "bytes": 335534
+    },
+    {
+      "fileName": "admission-lifecycle-summary-private.json",
+      "sha256": "5d79fd6594ddef7d0af2bb6068518ebe649b08b347af326da9e5f84b0e81df40",
+      "bytes": 3790
+    },
+    {
+      "fileName": "formal-composite-v2-local-validation.json",
+      "sha256": "dec6b6b0864ed2e791a84b1f051449699cf0ca34dd27dd172581ca7b3775efcf",
+      "bytes": 334812
+    },
+    {
+      "fileName": "quality-4b5634dd-official-terminal-identities.json",
+      "sha256": "b1a0754a90ae87e38ed6282b3a4f31ecfa7628f5233247c36a117a7b2da9690c",
+      "bytes": 25191
+    },
+    {
+      "fileName": "admission-host-shell-summary-private.json",
+      "sha256": "997e3e648f649e9d292a54cc30e1410596fe6b435a5f1f5e76b39e7c03da3aac",
+      "bytes": 4685
+    },
+    {
+      "fileName": "formal-composite-v3-local-validation.json",
+      "sha256": "cfe1e0ee126cc3efb7540a03cbb791ff0ec6236bcc7b8b9df10f16b68891d8de",
+      "bytes": 330992
+    },
+    {
+      "fileName": "quality-dbca360e-official-terminal-identities.json",
+      "sha256": "7b572c8ad7c3c7835db81dd0567076fbec792cecef97326b52547d842ea506d9",
+      "bytes": 25191
+    }
+  ],
+  "acceptanceBoundary": "Runtime changes require a new exact candidate and real-model browser/report/periodic acceptance. Previous7d19 short temporary occurrence success is preserved as historical scoped evidence. Current public release gate remains pending; Stable0.5.6 and the failed publication record are preserved.",
+  "migration": {
+    "newTable": "task_admission_leases",
+    "mode": "CREATE TABLE IF NOT EXISTS",
+    "existingExecutionRowsOrUserConfigurationsDeleted": 0,
+    "permissionExecutionGuardChanged": false
+  },
+  "ciRegression": {
+    "sourceHead": "4b5634dd36c23e5b00f1e5b400e6bda8835cafab",
+    "pushRun": 43994397733,
+    "prRun": 43994657305,
+    "failedTests": 13,
+    "affectedFiles": 5,
+    "cause": "An admission was incorrectly stored as an execution lease, blocking pre-Turn Retry permission and consent settlement.",
+    "originalFailingAssertionsModified": 0,
+    "originalCasesNowPassed": 13,
+    "newRequiredCI": "pending after corrected source commit",
+    "packageBuiltForFailedCI": false
+  },
+  "additionalCIRegression": {
+    "sourceHead": "dbca360eb37df1fefb364e528075d97ecf1fb70c",
+    "pushRun": 43999589644,
+    "prRun": 43999600351,
+    "failedTests": 1,
+    "originalHostShellAssertionsModified": 0,
+    "cause": "A known background host session returns continue/retrying while retaining the current execution lease for polling. A subsequent Turn can be attached by the same Controller before old-worker final cleanup. Admission wrongly treated this proven same-owner execution lease as a different runtime.",
+    "nowPassed": true,
+    "newRequiredCI": "pending for final source",
+    "packageBuiltForFailedCI": false
+  },
+  "subsequentH10ActualComponentsAndH11Corrections": {
+    "sourceHead": "77d81d3f1662677e26d80f65903633729bbf9bdc",
+    "releaseRunId": 44166307752,
+    "actualMacInstalledAndOpened": true,
+    "MacAsarSha256": "dc33d529fa6974eab1cb4727b442531e0d608fb4535abc0e4a04b7c0c5411d95",
+    "MacSignatureAndNotarization": "passed",
+    "localGatekeeper": "not_evaluated_local_security_override",
+    "sameRunNativeUpdater": "passed_mac_updater_component_only",
+    "wholeReleaseAccepted": false,
+    "originalStrictFullReleaseVerifier": "failed_truthful_sibling_Windows_basic_failure",
+    "WindowsOriginalBasic": {
+      "job": 134343317383,
+      "status": "failed",
+      "cause": "unknown"
+    },
+    "WindowsNewBasic": {
+      "run": 44178773300,
+      "status": "passed",
+      "sameOriginalPackage": true,
+      "driver": "d00c401ea73a2ab6dcb02aa6f3afc37a12470d94"
+    },
+    "WindowsFull": {
+      "run": 44181573847,
+      "status": "passed",
+      "signature": "NotSigned",
+      "scope": "controlled BrowserSkill/local model protocol/loopback; no Windows Ego or paid-site real-model claim"
+    },
+    "realMacBusinessComponents": {
+      "initialAttempt": 3,
+      "initialEgoSpace": 18,
+      "initialNodesCompleted": "3/3",
+      "naturalDue": "2026-11-18 05:31 Asia/Shanghai",
+      "dueAttempt": 1,
+      "dueEgoSpace": 19,
+      "dueNodesCompleted": "3/3",
+      "newVerifiedHtmlPerRun": true,
+      "awaitedFinishBothRuns": true,
+      "backgroundPreviewStayedOnInitial": true,
+      "explicitDueArtifactSelectionOpenedDue": true,
+      "TaskSelectionAloneSwitchedPreview": false,
+      "QAOnlyPlanPausedAfterDue": true,
+      "formal0830and1630PlanUntouched": true
+    },
+    "preservation": {
+      "allOther27TasksUnchanged": true,
+      "oneIndependentDueAdded": true,
+      "other7PlanDefinitionsUnchanged": true,
+      "oldOperationRowsByteIdentical": 1414,
+      "unknownRows": 16,
+      "preparedRows": 1,
+      "opaqueConfigHashesUnchanged": true
+    },
+    "remainingDefects": [
+      "Initial report heading too long and business screening semantics absent from schema/rendering",
+      "Flow Save then Publish can restore stale revision and publish after a swallowed save conflict"
+    ],
+    "businessOverallAccepted": false,
+    "publicHold": true,
+    "privateEvidence": {
+      "componentLedgerFile": "H10-actual-initial-natural-due-preview-component-ledger-private.json",
+      "componentLedgerSha256": "29e8306eef958343ddad18dc7f508a9031ef5c825b76d1dc5a80cb440dfbecd9",
+      "rawContinuityFile": "H10-old-operation-rows-continuity-private.json",
+      "rawContinuitySha256": "30af71d5f6efb3844274816e959ce5f5eefd845e672b7ebf1bb4527160764a17"
+    },
+    "nextSourceChanges": {
+      "reportAndPagination": "36b310f630efab28251c92da375788430f0523f2",
+      "FlowRevision": "22b98308f01adffe6563c83532d8de7f205833e5",
+      "requiresFreshExactPackageAndNewOrdinaryUiBusinessTask": true,
+      "completedC998MustNotResumeA4": true
+    }
+  }
+}

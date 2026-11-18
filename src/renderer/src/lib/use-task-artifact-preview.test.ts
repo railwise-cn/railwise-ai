@@ -3,7 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TaskRunV1 } from '@shared/agent-workbench'
-import { latestHtmlArtifact, useTaskArtifactPreview } from './use-task-artifact-preview'
+import { foregroundTaskArtifactPreview, latestHtmlArtifact, useTaskArtifactPreview } from './use-task-artifact-preview'
 
 let tasks: TaskRunV1[] = []
 vi.mock('../store/task-live-store', () => ({ useTaskState: () => ({ tasks }) }))
@@ -163,5 +163,26 @@ describe('task-owned HTML auto preview', () => {
     await hook.render('other')
     await act(async () => finish({ ok: true, url: 'http://127.0.0.1:1/old', title: 'old' }))
     expect(hook.current().url).toBeNull()
+  })
+
+  it('keeps the visible report when a new user task has no HTML yet and the previous task preview resolves late', async () => {
+    const previous = task('previous')
+    const next = { ...task('next'), artifacts: [] }
+    tasks = [previous, next]
+    let finishPrevious!: (value: unknown) => void
+    const preview = vi.fn().mockResolvedValueOnce({ ok: true, url: 'http://127.0.0.1:1/visible', sha256: 'hash' })
+      .mockImplementationOnce(() => new Promise(resolve => { finishPrevious = resolve }))
+      .mockResolvedValue({ ok: true, url: 'http://127.0.0.1:1/next', sha256: 'hash' })
+    Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact: preview } })
+    const hook = await mountPreview('chat')
+    tasks = [{ ...previous, artifacts: [{ ...previous.artifacts[0]!, sha256: 'late-old-version' }] }, next]
+    await hook.render()
+    await act(async () => foregroundTaskArtifactPreview('chat', next.id))
+    await act(async () => finishPrevious({ ok: true, url: 'http://127.0.0.1:1/late-old-version', sha256: 'late-old-version' }))
+    expect(hook.current().url).toBe('http://127.0.0.1:1/visible')
+    tasks = [tasks[0]!, { ...next, artifacts: task('next').artifacts }]
+    await hook.render()
+    expect(hook.current().url).toBe('http://127.0.0.1:1/next')
+    expect(preview.mock.calls.map(([request]) => request.taskId)).toEqual(['previous', 'previous', 'next'])
   })
 })

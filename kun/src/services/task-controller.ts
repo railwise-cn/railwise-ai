@@ -121,7 +121,7 @@ export class TaskController {
   private readonly spans?: RuntimeSpanService
   private readonly reconcileHostShell?: TaskControllerDeps['reconcileHostShell']
   private readonly completionGuard?: TaskControllerDeps['completionGuard']
-  private readonly leases = new Map<string, { leaseRevision: number; turnId?: string }>()
+  private readonly leases = new Map<string, { leaseRevision: number; turnId?: string; admission?: boolean }>()
   private readonly attemptTokens = new Map<string, ExecutionToken>()
   private readonly identity: ProcessIdentity = processIdentity() ?? { pid: process.pid, fingerprint: `unverified:${executionUUID()}` }
   private readonly fencedTasks = new Set<string>()
@@ -204,19 +204,23 @@ export class TaskController {
     const intent = input.request.taskIntent ?? 'auto'
     if (active && intent === 'status') return active
     if (active && (input.continuationTaskId || intent === 'supplement' || (!consultation && intent !== 'new' && shouldContinueActiveTask(input.request.prompt)))) {
-      return this.repository.update(active.id, active.revision, (current) => ({
-        ...current,
-        activeTurnId: input.turnId,
-        model: input.request.model ?? current.model,
-        providerId: input.request.providerId ?? current.providerId,
-        reasoningEffort: input.request.reasoningEffort ?? current.reasoningEffort,
-        engineeringPlanId: input.engineeringPlanId ?? current.engineeringPlanId,
-        updatedAt: now
-      }), {
-        key: `turn-attached:${input.turnId}`,
-        kind: 'turn_attached',
-        payload: { turnId: input.turnId },
-        createdAt: now
+      return this.repository.transact(() => {
+        const attached = this.repository.update(active.id, active.revision, (current) => ({
+          ...current,
+          activeTurnId: input.turnId,
+          model: input.request.model ?? current.model,
+          providerId: input.request.providerId ?? current.providerId,
+          reasoningEffort: input.request.reasoningEffort ?? current.reasoningEffort,
+          engineeringPlanId: input.engineeringPlanId ?? current.engineeringPlanId,
+          updatedAt: now
+        }), {
+          key: `turn-attached:${input.turnId}`,
+          kind: 'turn_attached',
+          payload: { turnId: input.turnId },
+          createdAt: now
+        })
+        if (['queued', 'retrying'].includes(attached.status)) this.holdAdmission(attached, input.turnId)
+        return attached
       })
     }
     // A new message never implicitly revokes or cancels another task.
@@ -279,7 +283,7 @@ export class TaskController {
     const profile = input.thread.agentProfile
     const selectedModel = input.request.model ?? profile?.model ?? input.thread.model
     const maxCostUsd = minimumDefinedPositive(profile?.budget.maxCostUsd, input.thread.costBudgetUsd)
-    const created = this.repository.create({
+    const queued: TaskRun = {
       id,
       threadId: input.thread.id,
       originThreadId: source?.originThreadId ?? input.request.taskOriginThreadId,
@@ -325,6 +329,13 @@ export class TaskController {
       createdAt: now,
       updatedAt: now,
       revision: 0
+    }
+    const created = this.repository.transact(() => {
+      const task = this.repository.create(queued)
+      // Persist ownership in the same transaction as the queued Task. The
+      // coordinator still has to prepare its schedule/receipts before dispatch.
+      if (input.turnId) this.holdAdmission(task, input.turnId)
+      return task
     })
     this.repository.execution.ensureSession(created, now)
     this.spans?.start({
@@ -340,6 +351,26 @@ export class TaskController {
       }
     })
     return created
+  }
+
+  private holdAdmission(task: TaskRun, turnId: string): void {
+    const now = this.nowIso()
+    const leaseMs = Math.max(1_000, Math.trunc(this.watchdogOptions.leaseMs ?? 60_000))
+    const previous = this.leases.get(task.id)
+    const lease = this.repository.acquireAdmissionLease(task.id, turnId, this.ownerId, now, new Date(Date.parse(now) + leaseMs).toISOString(), previous?.admission ? undefined : previous?.leaseRevision)
+    if (!lease) throw Object.assign(new Error('task admission is owned by another runtime'), { code: 'task_lease_conflict' })
+    this.leases.set(task.id, { leaseRevision: lease.revision, turnId, admission: true })
+    this.fencedTasks.delete(task.id)
+  }
+
+  /** Failed preparation may release only its own not-yet-started admission. */
+  releasePendingAdmission(threadId: string, turnId: string): void {
+    for (const [taskId, lease] of this.leases) {
+      if (!lease.admission || lease.turnId !== turnId || this.repository.get(taskId)?.threadId !== threadId) continue
+      this.repository.releaseAdmissionLease(taskId, this.ownerId, lease.leaseRevision)
+      this.leases.delete(taskId)
+      this.fencedTasks.delete(taskId)
+    }
   }
 
   continuationSelection(thread: ThreadRecord, request: StartTurnRequest, engineeringExecution?: boolean, continuationTaskId?: string): Pick<StartTurnRequest, 'model' | 'providerId' | 'reasoningEffort'> & { engineeringPlanId?: string } {
@@ -458,7 +489,7 @@ export class TaskController {
     const now = this.nowIso()
     const leaseMs = Math.max(1_000, Math.trunc(this.watchdogOptions.leaseMs ?? 60_000))
     const expiresAt = new Date(Date.parse(now) + leaseMs).toISOString()
-    const lease = this.repository.acquireLease(task.id, this.ownerId, now, expiresAt)
+    const lease = this.repository.acquireLease(task.id, this.ownerId, now, expiresAt, turnId)
     if (!lease) {
       throw Object.assign(new Error('task is already running in another runtime'), {
         code: 'task_lease_conflict'
@@ -618,7 +649,7 @@ export class TaskController {
       const key = `web-source-gate:${turnId}:collection:${operationFingerprint(request)}:${count}`
       this.repository.beginOperation({ ownerId: taskId, kind: 'web_artifact_source_gate', idempotencyKey: key, request, nowIso: this.nowIso() })
       this.repository.finishOperation(taskId, key, { status: 'failed', result: { complete: false, failureKinds: ['source_read_required'], reasons: gate.reasons } }, this.nowIso())
-      return { ...gate, stalled: count + 1 >= 2, code: count + 1 >= 2 ? 'web_artifact_repair_stalled' : 'web_source_reads_required', collectionReadFailures: count + 1 }
+      return { ...gate, stalled: count + 1 >= 2, code: count + 1 >= 2 ? 'web_artifact_repair_stalled' : 'web_source_reads_required', collectionReadFailures: count + 1, ...(count + 1 >= 2 ? { readRecovery: undefined } : {}) }
     }
     const attempts = this.webArtifactRepairAttempts(task)
     if (gate.stalled && attempts.some(attempt => attempt.turnId === turnId)) return gate
@@ -635,7 +666,7 @@ export class TaskController {
     const semanticRepair = deriveWebArtifactRepairState(attempts, { id: receipt.id, requirementHash: gate.requirementHash,
       evidenceFingerprint: gate.evidenceFingerprint, failureEvidenceFingerprints: gate.failureEvidenceFingerprints, failureKinds, reasons: gate.reasons })
     this.repository.finishOperation(taskId, key, { status: 'failed', result: { complete: false, failureKinds, reasons: gate.reasons, semanticRepair } }, this.nowIso())
-    return { ...gate, stalled: semanticRepair.stalled, code: semanticRepair.stalled ? 'web_artifact_repair_stalled' : gate.code, semanticRepair }
+    return { ...gate, stalled: semanticRepair.stalled, code: semanticRepair.stalled ? 'web_artifact_repair_stalled' : gate.code, semanticRepair, ...(semanticRepair.stalled ? { readRecovery: undefined } : {}) }
   }
 
   /** Source-first publication gate; only task-owned receipts can establish progress. */
@@ -666,11 +697,31 @@ export class TaskController {
       else if (candidate === undefined && await this.currentWebArtifactFieldRepair(task, turnId, path, effectiveEvidence)) stalled = false
       this.assertToken(token)
     }
-    return { ...sourceGate, ready: sourceGate.ready && !stalled, stalled, requirementHash,
+    const readRecovery = !stalled && !sourceGate.ready ? this.observedFeedReadRecovery(task, turnId, grant, sourceGate.collectionFreshness?.requestedUrls ?? []) : undefined
+    return { ...sourceGate, ready: sourceGate.ready && !stalled, stalled, requirementHash, ...(readRecovery ? { readRecovery } : {}),
       code: stalled ? 'web_artifact_repair_stalled' : sourceGate.ready ? undefined : 'web_source_reads_required',
       reasons: collectionPending ? ['本轮订阅列表尚未实际重新读取；旧来源和草稿保留为历史素材。'] : stalled ? semanticRepair!.reasons : sourceGate.ready ? [] : sourceGate.missingOrigins.length
         ? sourceGate.missingOrigins.map(origin => `${task.acceptance.webEvidenceBasis === 'observed_feed' ? '订阅列表记录尚未核验' : '正式公告正文尚未核验'}：${origin}`) : [task.acceptance.webEvidenceBasis === 'observed_feed' ? '尚缺可信的完整列表或单记录读取；加载/空DOM/截断不代表零条。' : '尚缺可信的完整正文来源读取或实际零匹配页面。'],
       ...(semanticRepair ? { semanticRepair } : {}) }
+  }
+
+  /** A suggested existing read, never an authorization, dispatch or repair reset. */
+  private observedFeedReadRecovery(task: TaskRun, turnId: string, grant: ExecutionGrant | undefined, requestedUrls: string[]) {
+    const now = Date.parse(this.nowIso()), issued = Date.parse(grant?.issuedAt ?? ''), expires = Date.parse(grant?.expiresAt ?? '')
+    if (task.acceptance.webEvidenceBasis !== 'observed_feed' || task.status !== 'running' || task.activeTurnId !== turnId ||
+      grant?.taskId !== task.id || grant.threadId !== task.threadId || grant.turnId !== turnId || grant.workspaceRoot !== task.workspaceRoot ||
+      grant.browserScope?.provider !== 'ego-browser' || !grant.allowedToolNames?.includes('ego_browser_read') || !grant.allowedProviderIds?.includes('ego-browser') ||
+      !Number.isFinite(now) || !Number.isFinite(issued) || !Number.isFinite(expires) || expires <= now || issued > now ||
+      this.repository.operations(task.id).some(row => row.status === 'outcome_unknown' || row.kind === 'ego_browser_wait' && row.request?.turnId === turnId)) return undefined
+    try {
+      const binding = currentEgoTaskSpaceBinding(this.repository, task.id)
+      const space: Record<string, unknown> = binding?.result && typeof binding.result === 'object' && !Array.isArray(binding.result) ? binding.result as Record<string, unknown> : {}
+      if (!binding || binding.status !== 'succeeded' || binding.request?.configurationFingerprint !== grant.connectorIdentityFingerprints?.['ego-browser'] ||
+        operationFingerprint(binding.request?.origins) !== operationFingerprint(grant.browserScope.origins) ||
+        !Number.isSafeInteger(space.taskSpaceId) || this.repository.operation(task.id, 'ego-finish:' + binding.id)) return undefined
+      return { providerId: 'ego-browser' as const, toolName: 'ego_browser_read' as const, arguments: {}, taskId: task.id,
+        turnId, taskSpaceId: Number(space.taskSpaceId), bindingReceiptId: binding.id, requestedUrls, maxCalls: 1 as const, guidanceOnly: true as const }
+    } catch { return undefined }
   }
 
   /** Shared read-only projection for tool guidance; it cannot authorize a read or reset an epoch. */
@@ -718,10 +769,13 @@ export class TaskController {
     const repairFingerprint = block.collectionFreshness?.currentCollectionReady === false
       ? operationFingerprint({ taskId: task.id, turnId, requirementHash: block.requirementHash, collectionReadRequired: true }) : block.semanticRepair!.fingerprint
     const fingerprint = `web-artifact-repair:${repairFingerprint}`
+    const retained = task.artifacts.length ? '已有成果及原始核验记录已保留。' : '尚无已登记成果，原始读取和核验记录已保留。'
     const reason = task.acceptance.webEvidenceBasis === 'observed_feed'
-      ? block.collectionFreshness?.currentCollectionReady === false ? '本轮订阅列表尚未重新读取，旧来源和草稿已保留。请在原任务中实际打开并读取当前列表后继续。'
-        : '部分订阅记录的字段仍待核验，草稿已保留。请核对原始列表后继续。'
-      : `相同来源或字段问题在一次修复后仍未解决，已停止重复发布；已有草稿和原始核验记录已保留。${block.reasons.join('；')}`
+      ? block.collectionFreshness?.currentCollectionReady === false ? `本轮订阅列表尚未重新读取。${retained}`
+        : block.reportManifestRequired ? `本轮报告缺少结构化列表证据。${retained}`
+        : block.missingOrigins.length ? `本轮订阅记录尚未建立完整原文依据。${retained}`
+        : `部分订阅记录的字段仍待核验。${retained}`
+      : `相同来源或字段问题在一次修复后仍未解决，已停止重复发布。${retained}${block.reasons.join('；')}`
     return this.repository.transact(() => {
       const result = this.waitForUser(task, reason, task.finalResponse ?? '', fingerprint, turnId)
       const id = `web_evidence_${task.id}`, prior = this.repository.attention(id), now = this.nowIso()
@@ -729,7 +783,7 @@ export class TaskController {
         workspaceRoot: task.workspaceRoot, kind: 'blocked', title: '网页来源核验需要处理', message: reason, status: 'pending',
         revision: (prior?.revision ?? -1) + 1, createdAt: prior?.createdAt ?? now, updatedAt: now,
         payload: { kind: 'web_artifact_repair_stalled', code: block.code, reasons: block.reasons, missingOrigins: block.missingOrigins,
-          nextReads: block.nextReads, fingerprint: repairFingerprint } })
+          nextReads: block.nextReads, reportReadiness: block.reportReadiness, reportManifestRequired: block.reportManifestRequired, fingerprint: repairFingerprint } })
       return result
     })
   }
@@ -1352,7 +1406,7 @@ export class TaskController {
     if (code === 'operation_cancelled' || code === 'turn_total_timeout') {
       return this.finish(task, code === 'operation_cancelled' ? 'cancelled' : 'failed', message)
     }
-    if (code === 'web_access_exhausted' || code === 'max_tokens') {
+    if (code === 'web_access_exhausted' || code === 'max_tokens' || code === 'tool_storm_recovery_exhausted') {
       return this.finish(task, 'failed', message)
     }
     if (hostShell.lastFailed) return this.waitForUser(task,'最后一次已授权命令没有执行成功。请先处理失败原因，再明确授权新的检查命令。', '', `host-shell-failed:${hostShell.lastFailed.id}`,turnId)
@@ -1432,14 +1486,23 @@ export class TaskController {
 
   endRun(turnId: string): void {
     const token = this.attemptTokens.get(turnId)
-    if (!token) return
+    if (!token) {
+      for (const [taskId, lease] of this.leases) if (lease.admission && lease.turnId === turnId) {
+        const task = this.repository.get(taskId)
+        if (task) this.releasePendingAdmission(task.threadId, turnId)
+      }
+      return
+    }
     // The in-process worker has actually returned; this is stronger evidence
     // than a lease timeout or a stale lock file.
     this.repository.execution.finishAttempt(token.executionId, 'cancelled', this.nowIso())
     this.repository.releaseLease(token.taskId, token.ownerId, token.leaseRevision)
     this.attemptTokens.delete(turnId)
-    this.leases.delete(token.taskId)
-    this.fencedTasks.delete(token.taskId)
+    const current = this.leases.get(token.taskId)
+    if (!current?.admission && current?.leaseRevision === token.leaseRevision && current.turnId === turnId) {
+      this.leases.delete(token.taskId)
+      this.fencedTasks.delete(token.taskId)
+    }
   }
 
   assertToken(token: ExecutionToken): void {
@@ -2125,11 +2188,11 @@ export class TaskController {
       }
       for (const [taskId, state] of this.leases) {
         const task = this.repository.get(taskId)
-        if (!task || TERMINAL.has(task.status) || task.status === 'paused') {
+        if (!task || TERMINAL.has(task.status) || task.status === 'paused' || state.admission && !['queued', 'retrying'].includes(task.status)) {
           this.releaseExecutionLease(taskId)
           continue
         }
-        const renewed = this.repository.renewLease(
+        const renewed = (state.admission ? this.repository.renewAdmissionLease.bind(this.repository) : this.repository.renewLease.bind(this.repository))(
           taskId,
           this.ownerId,
           state.leaseRevision,
@@ -2183,7 +2246,8 @@ export class TaskController {
 
   private releaseExecutionLease(taskId: string): void {
     const lease = this.leases.get(taskId)
-    if (lease) this.repository.releaseLease(taskId, this.ownerId, lease.leaseRevision)
+    if (lease?.admission) this.repository.releaseAdmissionLease(taskId, this.ownerId, lease.leaseRevision)
+    else if (lease) this.repository.releaseLease(taskId, this.ownerId, lease.leaseRevision)
     this.leases.delete(taskId)
     for (const [turnId, token] of this.attemptTokens) if (token.taskId === taskId) {
       this.repository.execution.finishAttempt(token.executionId, 'completed', this.nowIso())

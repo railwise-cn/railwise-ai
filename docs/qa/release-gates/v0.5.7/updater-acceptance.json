@@ -1,39 +1,23 @@
 {
   "status": "passed",
-  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
-  "scope": "Original same-Release official 0.5.6 to new exact 0.5.7 native updater; original retained bytes and same actual UI-reviewed ASAR",
+  "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+  "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
+  "releaseRunId": 44024949316,
+  "scope": "Original same-H4-run 0.5.6 -> exact 0.5.7 native updater; unchanged raw bytes",
+  "originalObservation": {
+    "status": "passed",
+    "jobId": 133860695222,
+    "artifactId": 14304908011,
+    "artifactDigest": "sha256:df6971a55bce5f1064e2c04c926152cdbfd9f40d0f9b2e285ece8db621bb9d4c",
+    "archiveDigestAndCrcVerified": true
+  },
   "baseVersion": "0.5.6",
   "targetVersion": "0.5.7",
-  "releaseRunId": 43968313921,
-  "officialUpdaterJobId": 133674823598,
-  "officialUpdaterJobConclusion": "success",
-  "updaterArtifactId": 14280698320,
-  "updaterArtifactDigest": "sha256:ade0950b397a5204bb63fd3e79a8b19e19db1e93d0d31f1133e00ef991b840b9",
-  "originalArchiveDigestAndCrcVerified": true,
-  "releaseMacArtifactId": 14280501870,
-  "releaseMacArtifactDigest": "sha256:5a219280ce123145d44c597ea4d1ba4098c57430f620c7dab9dfce808593f235",
-  "machineReportSha256": "d198f90297b8dc02ae32ab2b3766cee5f02407bd05c66321f8d7fce1424fd660",
-  "nativeReportSha256": "8811be94de534efa08df09577036eb4ac4d50e36f38940793ab86a1b7903a109",
+  "machineReportSha256": "f503412cec1bb3243563c0f05fe4084e656f1c66dfb016a6f56e0e02e2f44213",
+  "nativeReportSha256": "32d7d395f9e01440813bffd0b11f976d4a35b4b511cf5b6a3e1630ad531a3355",
+  "targetAsarSha256": "d5f3a99755bcdc7b86fb443bf5e909f472908f47f0de0bd861ab2abca72550ee",
+  "installedAsarSha256": "d5f3a99755bcdc7b86fb443bf5e909f472908f47f0de0bd861ab2abca72550ee",
   "machineTargetAsarEqualsUiReviewedAsar": true,
-  "targetAsarSha256": "4279a7c49691e1c1c1665665445b6eab58d980c56f28cd80e9adec1aa9c9d0a7",
-  "installedAsarSha256": "4279a7c49691e1c1c1665665445b6eab58d980c56f28cd80e9adec1aa9c9d0a7",
-  "enabledNativeGatekeeper": {
-    "baseline": "accepted",
-    "target": "accepted",
-    "installed": "accepted",
-    "assessments": "enabled",
-    "source": "Notarized Developer ID"
-  },
-  "localGatekeeperObservation": "Local security-disabled override is recorded separately; no local clean-policy or trust change is claimed.",
-  "dataContinuity": {
-    "seedSource": "source-bound-compatibility-service",
-    "taskContinuity": "passed",
-    "targetReadback": "passed",
-    "targetRestartReadback": "passed",
-    "configReferences": "byte-preserved",
-    "separateSentinelPreserved": true
-  },
   "nativeStages": [
     "base_started",
     "update_available",
@@ -42,16 +26,6 @@
     "target_relaunched",
     "user_data_preserved"
   ],
-  "feedRequests": {
-    "manifest": 2,
-    "zip": 1,
-    "rejected": 0,
-    "bytesServed": 404529001
-  },
-  "ownedCleanup": {
-    "lastOperation": "owned-resource-cleanup",
-    "lastStatus": "completed"
-  },
   "productionTouched": false,
   "systemTrustModified": false,
   "officialFeedsModified": false,
@@ -59,27 +33,17 @@
   "additionalUpdaterRunsByThisPreparation": 0,
   "originalEvidence": [
     {
-      "fileName": "final-7d19a3fb-ready-receipt.json",
-      "bytes": 6399,
-      "sha256": "5e70c5bcdcbe08222238552bb738d50874213bfbce6b0d62e8f7248201446ec6",
-      "privateSourceOnly": false
-    },
-    {
-      "fileName": "exact-updater-43968313921-summary.json",
+      "fileName": "exact-updater-44024949316-summary.json",
       "bytes": 13497,
-      "sha256": "6ba1b8245b9fd5ce93d9187b9191317303fbd940b84ea516eda582aaca2508e5",
+      "sha256": "d776f987f4b367f832f6c96f4d5345268c6c4ef37583da02bd760ccc31467328",
       "privateSourceOnly": false
     },
     {
-      "fileName": "7d19-root-final-package-updater-check.json",
-      "bytes": 593,
-      "sha256": "9feebc932abace0f7f3f49c39818c161cddbb1c423e633276ca2f21083bc185e",
+      "fileName": "final-3f1ba1d3-ready-receipt.json",
+      "bytes": 3410,
+      "sha256": "d9987db5a05d312b4e97348e8703f97ed69ac6a5e149dec8b6bffbf0c8388d3b",
       "privateSourceOnly": false
     }
   ],
-  "limitations": [
-    "Selected local Mac DMG/ASAR is cross-checked; full outer Mac release artifact ZIP was not locally hashed",
-    "Local Gatekeeper override limitation is separate from clean CI updater Gatekeeper assessment",
-    "Native updater and Windows protocol fixture do not substitute real website/model business acceptance"
-  ]
+  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00"
 }

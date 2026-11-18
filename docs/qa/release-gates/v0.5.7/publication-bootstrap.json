@@ -83,5 +83,9 @@
       "bytes": 200
     }
   ],
-  "recoveryBoundary": "Correct only the unpublished version tag after normal required CI and source verification, while preserving the failed run and previous tag identity; publish the same already accepted eight files. Product-page source and deployment stay unchanged."
+  "recoveryBoundary": "Correct only the unpublished version tag after normal required CI and source verification, while preserving the failed run and previous tag identity; publish the same already accepted eight files. Product-page source and deployment stay unchanged.",
+  "historicalRecord": true,
+  "currentPackageSourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+  "currentPackageRunId": 44024949316,
+  "historicalPackageIdentifiersNotCurrentAcceptance": true
 }

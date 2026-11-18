@@ -80,6 +80,8 @@ export type TaskLeaseGuard = {
   nowIso: string
 }
 
+export type TaskAdmissionLease = TaskLease & { turnId: string }
+
 export class TaskRunRepository {
   private readonly db: BetterSqliteDatabase
   readonly execution: ExecutionStore
@@ -398,8 +400,10 @@ export class TaskRunRepository {
     }))
   }
 
-  acquireLease(taskId: string, ownerId: string, nowIso: string, expiresAt: string): TaskLease | null {
+  acquireLease(taskId: string, ownerId: string, nowIso: string, expiresAt: string, admissionTurnId?: string): TaskLease | null {
     return this.transaction(() => {
+      const admission = this.getAdmissionLease(taskId)
+      if (admission && admission.expiresAt > nowIso && (admission.ownerId !== ownerId || admission.turnId !== admissionTurnId)) return null
       const existing = this.db.prepare('SELECT * FROM task_leases WHERE task_id = ?').get(taskId) as {
         task_id: string
         owner_id: string
@@ -418,8 +422,63 @@ export class TaskRunRepository {
           expires_at = excluded.expires_at,
           revision = excluded.revision
       `).run(taskId, ownerId, nowIso, expiresAt, nextRevision)
+      // Dispatch hands admission to execution without an unowned recovery gap.
+      if (admission) this.releaseAdmissionLease(taskId, admission.ownerId, admission.revision)
       return { taskId, ownerId, acquiredAt: nowIso, expiresAt, revision: nextRevision }
     })
+  }
+
+  acquireAdmissionLease(taskId: string, turnId: string, ownerId: string, nowIso: string, expiresAt: string, executionRevision?: number): TaskAdmissionLease | null {
+    return this.transaction(() => {
+      const execution = this.getLease(taskId)
+      const current = this.getAdmissionLease(taskId)
+      if (current && current.ownerId !== ownerId && current.expiresAt > nowIso) return null
+      if (execution && execution.expiresAt > nowIso) {
+        const task = this.get(taskId)
+        if (execution.ownerId !== ownerId || execution.revision !== executionRevision || task?.activeTurnId !== turnId || !['queued', 'retrying'].includes(task.status)) return null
+        // The same controller may prepare its next Turn before the old worker's
+        // finally runs. Fence that exact revision within the admission handoff.
+        if (!this.releaseLease(taskId, ownerId, executionRevision)) return null
+      }
+      const revision = (current?.revision ?? -1) + 1
+      this.db.prepare(`
+        INSERT INTO task_admission_leases(task_id, turn_id, owner_id, acquired_at, expires_at, revision)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(task_id) DO UPDATE SET
+          turn_id = excluded.turn_id,
+          owner_id = excluded.owner_id,
+          acquired_at = excluded.acquired_at,
+          expires_at = excluded.expires_at,
+          revision = excluded.revision
+      `).run(taskId, turnId, ownerId, nowIso, expiresAt, revision)
+      return { taskId, turnId, ownerId, acquiredAt: nowIso, expiresAt, revision }
+    })
+  }
+
+  renewAdmissionLease(taskId: string, ownerId: string, revision: number, nowIso: string, expiresAt: string): TaskAdmissionLease | null {
+    return this.transaction(() => {
+      const current = this.getAdmissionLease(taskId)
+      if (!current || current.ownerId !== ownerId || current.revision !== revision || current.expiresAt <= nowIso) return null
+      const result = this.db.prepare(`
+        UPDATE task_admission_leases SET expires_at = ?
+        WHERE task_id = ? AND owner_id = ? AND revision = ? AND expires_at > ?
+      `).run(expiresAt, taskId, ownerId, revision, nowIso)
+      return result.changes === 1 ? { ...current, expiresAt } : null
+    })
+  }
+
+  releaseAdmissionLease(taskId: string, ownerId: string, revision: number): boolean {
+    return this.db.prepare(`
+      UPDATE task_admission_leases SET expires_at='1970-01-01T00:00:00.000Z'
+      WHERE task_id = ? AND owner_id = ? AND revision = ?
+    `).run(taskId, ownerId, revision).changes === 1
+  }
+
+  getAdmissionLease(taskId: string): TaskAdmissionLease | null {
+    const row = this.db.prepare('SELECT * FROM task_admission_leases WHERE task_id = ?').get(taskId) as {
+      task_id: string; turn_id: string; owner_id: string; acquired_at: string; expires_at: string; revision: number
+    } | undefined
+    return row ? { taskId: row.task_id, turnId: row.turn_id, ownerId: row.owner_id, acquiredAt: row.acquired_at, expiresAt: row.expires_at, revision: row.revision } : null
   }
 
   renewLease(taskId: string, ownerId: string, leaseRevision: number, nowIso: string, expiresAt: string): TaskLease | null {
@@ -471,8 +530,10 @@ export class TaskRunRepository {
     const rows = this.db.prepare(`
       SELECT r.* FROM task_runs r
       LEFT JOIN task_leases l ON l.task_id = r.id
+      LEFT JOIN task_admission_leases a ON a.task_id = r.id
       WHERE (r.status IN ('running', 'retrying') OR (r.status='queued' AND json_extract(r.data_json,'$.originThreadId') IS NOT NULL)) AND (l.task_id IS NULL OR l.expires_at <= ?)
-    `).all(nowIso) as TaskRunRow[]
+        AND (a.task_id IS NULL OR a.expires_at <= ?)
+    `).all(nowIso, nowIso) as TaskRunRow[]
     return rows.map((row) => this.parseRun(row))
   }
 
@@ -976,6 +1037,14 @@ export class TaskRunRepository {
       );
       CREATE TABLE IF NOT EXISTS task_leases (
         task_id TEXT PRIMARY KEY REFERENCES task_runs(id) ON DELETE CASCADE,
+        owner_id TEXT NOT NULL,
+        acquired_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        revision INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS task_admission_leases (
+        task_id TEXT PRIMARY KEY REFERENCES task_runs(id) ON DELETE CASCADE,
+        turn_id TEXT NOT NULL,
         owner_id TEXT NOT NULL,
         acquired_at TEXT NOT NULL,
         expires_at TEXT NOT NULL,

@@ -7,14 +7,18 @@ import type { ModelClient, ModelRequest } from '../ports/model-client.js'
 import type { FlowSourceEvent, FlowAttentionEvent } from '../flow/repository.js'
 import { TaskContextRepository, contextBundleHash } from './task-context-repository.js'
 import type { TaskRunRepository } from './task-run-repository.js'
+import { unabridgedHistoryToolOutput } from '../loop/request-history-hygiene.js'
 
 const HISTORY_SPILL_BYTES = 12 * 1024
 const EXCERPT_CHARACTERS = 320
-function spillContent(item: ModelRequest['history'][number], turnId: string): { data: string; mediaType: string } | null {
+function spillContent(item: ModelRequest['history'][number], turnId: string): { data: string; mediaType: string; forceSpill?: boolean } | null {
   // The active user's request and protocol-bearing tool calls stay intact.
   // A recall result must remain available for the next decision, otherwise
   // recalling a large object would only produce another reference to itself.
-  if (item.kind === 'tool_result' && item.toolName !== 'read_task_context') return { data: JSON.stringify(item.output) ?? 'null', mediaType: 'application/json' }
+  if (item.kind === 'tool_result' && item.toolName !== 'read_task_context') {
+    const document = unabridgedHistoryToolOutput(item)
+    return { data: JSON.stringify(document ?? item.output) ?? 'null', mediaType: 'application/json', ...(document !== undefined ? { forceSpill: true } : {}) }
+  }
   if (item.turnId !== turnId && ['user_message', 'assistant_text', 'assistant_reasoning'].includes(item.kind) && 'text' in item) return { data: item.text, mediaType: 'text/plain' }
   return null
 }
@@ -48,7 +52,7 @@ export class TaskContextRuntime {
       ...(client.resolveDefaultModelId ? { resolveDefaultModelId: client.resolveDefaultModelId.bind(client) } : {}),
       async *stream(request) {
         const bundle = runtime.prepareModelRequest(request)
-        const spilled = bundle?.objects.filter(item => item.storage === 'spill' && item.kind !== 'model-request-projection') ?? []
+        const spilled = bundle?.objects.filter(item => item.kind !== 'model-request-projection' && (item.storage === 'spill' || item.kind.startsWith('history-item:'))) ?? []
         const canRecall = request.tools.some(tool => tool.name === 'read_task_context')
         const history = bundle && canRecall ? runtime.projectHistory(request, bundle) : request.history
         const outgoing = bundle && spilled.length && canRecall ? { ...request, history, contextInstructions: [
@@ -75,7 +79,7 @@ export class TaskContextRuntime {
     if (request.tools.some(tool => tool.name === 'read_task_context')) {
       for (const item of request.history) {
         const content = spillContent(item, request.turnId)
-        if (content && Buffer.byteLength(content.data, 'utf8') > HISTORY_SPILL_BYTES) historyObjects.push(this.repository.putContextObject({ kind: `history-item:${item.id}`, ...content }))
+        if (content && (content.forceSpill || Buffer.byteLength(content.data, 'utf8') > HISTORY_SPILL_BYTES)) historyObjects.push(this.repository.putContextObject({ kind: `history-item:${item.id}`, mediaType: content.mediaType, data: content.data }))
       }
     }
     const timestamp = this.nowIso()

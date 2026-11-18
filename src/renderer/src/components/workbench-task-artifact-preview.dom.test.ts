@@ -5,7 +5,7 @@ import { act, createElement, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { TaskRunV1 } from '@shared/agent-workbench'
-import { useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
+import { foregroundTaskArtifactPreview, useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
 import { useWorkbenchLayout } from './workbench-layout'
 import { DevBrowserPanel } from './DevBrowserPanel'
 import i18n from '../i18n'
@@ -178,6 +178,77 @@ it('automatically previews the selected task new hash, ignores parallel tasks an
   await view.render('tasks')
   expect(view.browser()?.getAttribute('src')).toContain('/selected-verified-v3.html')
   expect(previewTaskArtifact).toHaveBeenCalledTimes(3)
+})
+
+it('keeps the current chat report when a same-origin scheduled child publishes in the background', async () => {
+  const initial = { ...task('initial', 'chat-a'), status: 'completed' } as TaskRunV1
+  tasks = [initial]
+  const previewTaskArtifact = vi.fn(async ({ taskId }: { taskId: string }) => ({ ok: true, title: '报告',
+    sha256: 'html-v1', url: `http://127.0.0.1:1234/task-preview/${'a'.repeat(48)}/${taskId}.html` }))
+  Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact, openExternal: vi.fn() } })
+  const view = await mount('chat-a')
+  await view.render('chat')
+  expect(view.browser()?.getAttribute('src')).toContain('/initial.html')
+  const due = Object.assign(task('due', 'chat-a'), { parentTaskId: initial.id, status: 'running',
+    updatedAt: '2026-11-13T19:00:00Z', scheduledBy: { scheduleId: 'daily', dueAt: '2026-11-13T19:00:00Z' } })
+  tasks = [initial, due]
+  await view.render('chat')
+  expect(view.browser()?.getAttribute('src')).toContain('/initial.html')
+  expect(previewTaskArtifact.mock.calls.map(([request]) => request.taskId)).toEqual(['initial'])
+  tasks = [initial, { ...due, status: 'completed', updatedAt: '2026-11-13T19:05:00Z' } as TaskRunV1]
+  await view.render('chat')
+  expect(view.browser()?.getAttribute('src')).toContain('/initial.html')
+  expect(previewTaskArtifact).toHaveBeenCalledOnce()
+})
+
+it.each(['new task', 'continued scheduled task'])('follows a user-started %s while preserving the visible page until its first HTML and ignoring late parallel files', async kind => {
+  const initial = task('initial', 'chat-a')
+  const foreground = { ...task('foreground', 'chat-a'), artifacts: [] } as TaskRunV1
+  if (kind === 'continued scheduled task') Object.assign(foreground, { scheduledBy: { scheduleId: 'daily', dueAt: '2026-11-13T19:00:00Z' } })
+  tasks = [initial, foreground]
+  const previewTaskArtifact = vi.fn(async ({ taskId, artifactId }: { taskId: string; artifactId: string }) => {
+    const artifact = tasks.find(item => item.id === taskId)!.artifacts.find(item => item.id === artifactId)!
+    return { ok: true, title: '报告', sha256: artifact.sha256,
+      url: `http://127.0.0.1:1234/task-preview/${'a'.repeat(48)}/${taskId}-${artifact.sha256}.html` }
+  })
+  Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact, openExternal: vi.fn() } })
+  const view = await mount('chat-a')
+  await view.render('chat')
+  expect(view.browser()?.getAttribute('src')).toContain('/initial-html-v1.html')
+  await act(async () => foregroundTaskArtifactPreview('chat-a', foreground.id))
+  tasks = [{ ...initial, updatedAt: '2029-01-01T00:00:00Z', artifacts: [{ ...initial.artifacts[0]!, sha256: 'late-parallel' }] }, foreground]
+  await view.render('chat')
+  expect(view.browser()?.getAttribute('src')).toContain('/initial-html-v1.html')
+  expect(previewTaskArtifact).toHaveBeenCalledOnce()
+  tasks = [tasks[0]!, { ...foreground, artifacts: task('foreground').artifacts }]
+  await view.render('chat')
+  expect(view.browser()?.getAttribute('src')).toContain('/foreground-html-v1.html')
+  expect(previewTaskArtifact.mock.calls.map(([request]) => request.taskId)).toEqual(['initial', 'foreground'])
+  await view.close()
+  await view.render('chat')
+  expect(view.browser()).toBeNull()
+  tasks = tasks.map(item => item.id === foreground.id ? { ...item, artifacts: [{ ...item.artifacts[0]!, sha256: 'html-v2' }] } : item)
+  await view.render('chat')
+  expect(view.browser()?.getAttribute('src')).toContain('/foreground-html-v2.html')
+  expect(previewTaskArtifact).toHaveBeenCalledTimes(3)
+})
+
+it('automatically opens a scheduled task explicitly selected in the task workspace and lets the user open its artifact again', async () => {
+  const due = Object.assign(task('due', 'chat-a'), { scheduledBy: { scheduleId: 'daily', dueAt: '2026-11-13T19:00:00Z' } })
+  tasks = [task('initial', 'chat-a'), due]
+  selectedTaskId = due.id
+  const previewTaskArtifact = vi.fn(async ({ taskId }: { taskId: string }) => ({ ok: true, title: '报告',
+    url: `http://127.0.0.1:1234/task-preview/${'a'.repeat(48)}/${taskId}.html` }))
+  Object.defineProperty(window, 'workwise', { configurable: true, value: { previewTaskArtifact, openExternal: vi.fn() } })
+  const view = await mount('chat-a')
+  await view.render('tasks')
+  expect(view.browser()?.getAttribute('src')).toContain('/due.html')
+  await view.close()
+  await view.render('tasks')
+  expect(view.browser()).toBeNull()
+  await view.click('打开due')
+  expect(view.browser()?.getAttribute('src')).toContain('/due.html')
+  expect(previewTaskArtifact).toHaveBeenCalledTimes(2)
 })
 
 it('discards the selected task late preview when the user selects another task', async () => {

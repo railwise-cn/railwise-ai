@@ -1,0 +1,78 @@
+{
+  "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+  "sourceTree": "123dc6f7965170e6752c52381612fc8ef59bef62",
+  "status": "passed",
+  "release": {
+    "id": 44192481166,
+    "run_attempt": 1,
+    "head_sha": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "head_branch": "codex/formal-execution-recovery-057",
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "success",
+    "workflow_id": 295317901
+  },
+  "requiredReleaseJobs": [
+    {
+      "id": 134428364111,
+      "name": "Build Windows",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 134428364214,
+      "name": "Build macOS",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 134434771120,
+      "name": "Private exact-package Windows install smoke",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 134449980946,
+      "name": "Private exact-package updater smoke",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "macOS": {
+    "version": "0.5.7",
+    "bundleId": "com.wangjiawei508.workgpt",
+    "dmgSha256": "8b235bb9601e8b89eed1ad0f35b6acf0012cde16d6d607726ba95c302a90ef9f",
+    "asarSha256": "b0d09f0f3e1b311ee5404c46f3fd49bb66bf21b8446d92079111c63531130e94",
+    "signature": "passed",
+    "notarization": "passed",
+    "gatekeeper": "not_evaluated_local_security_override",
+    "architecture": "arm64",
+    "developerIdTeam": "R35G7F4A9U",
+    "nativeAppOpened": true,
+    "outerArtifactIntegrityAndCRCPassed": true,
+    "localPackageReceiptSha256": "85bb0415a4525ff346d1d8a4d4d9ff459b2c8ed339f20e5d0a9d3350da18e6f8",
+    "nativeLaunchReceiptSha256": "49245763f528f8d74c4e7ea27c89a4ffd79fc28a67ccab4ec95d49a66a4cd1dd",
+    "enabledGatekeeperAcceptance": "Original clean hosted updater runner"
+  },
+  "windows": {
+    "status": "passed",
+    "packageRunId": 44192481166,
+    "fullRunId": 44196389961,
+    "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "packageSourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "driverSourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "installerSha256": "113a88a8601b04a49233267dc8321c17063a949fecce9fa5ad3e6ff37ed66dd7",
+    "installedAsarSha256": "d0b02f0cf4ff19c7891a1722706932d10c33ee77f3b03c53f3fdd3ab3998ce3a",
+    "signatureStatuses": {
+      "installer": "NotSigned",
+      "installedExecutable": "NotSigned"
+    },
+    "scope": "controlled Windows full task/browser protocol fixture",
+    "actualRealModel": false,
+    "controlledInitialAndNaturalDuePassed": true,
+    "limitations": [
+      "Controlled model protocol/page; this does not replace real Mac model/site acceptance",
+      "Windows signing is recorded from raw Authenticode; no professional engineering sign-off"
+    ]
+  }
+}

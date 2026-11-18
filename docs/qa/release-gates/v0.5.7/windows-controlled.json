@@ -1,128 +1,143 @@
 {
   "status": "passed",
-  "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-  "sourceTree": "9517220a55fba17aec586304b15036d0e5dd66f9",
+  "sourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+  "sourceTree": "eb80945d565d53b09e1beb00789e9af90fae50d3",
+  "packageSourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+  "driverSourceHead": "8538d2624ad496cc2964cdfddc16bfaca274d2a6",
+  "driverSourceTree": "cf9be9a3eefcdacd8bac4287a21195518577adaa",
   "version": "0.5.7",
-  "scope": "New exact Windows package controlled BSK/local model/loopback pages, saved and previewed HTML, daily schedule readback and real-clock due fixture; not Ego Windows, paid Dadan or real external model",
-  "releaseRunId": 43968313921,
-  "acceptanceRunId": 43972418431,
+  "releaseRunId": 44024949316,
+  "acceptanceRunId": 44044175670,
   "acceptanceRunAttempt": 1,
-  "acceptanceJobId": 133667727779,
-  "acceptanceUrl": "https://github.com/railwise-cn/railwise-ai/actions/runs/43972418431",
+  "acceptanceJobId": 133905676505,
+  "acceptanceUrl": "https://github.com/railwise-cn/railwise-ai/actions/runs/44044175670",
   "officialConclusion": "success",
   "strictValidation": "passed",
+  "scope": "Controlled Windows BSK/local model/loopback, actual saved HTML, automatic and manual preview, daily readback and real-clock due; not Ego Windows, external model or paid Dadan",
+  "actualChangedFiles": [
+    "docs/qa/general-execution-delivery-2026-11-13.md",
+    "scripts/run-windows-ui-smoke.mjs",
+    "scripts/windows-ui-smoke.test.mjs"
+  ],
+  "sourceGateAlgorithmChanged": false,
   "originalPackageArtifact": {
-    "id": 14279345015,
-    "bytes": 317540779,
-    "digest": "sha256:81b27455fda5ac7dcd60f8a8b5b360906d93bedc8bd2784c2ed1eec768144af7",
-    "officialDigestMatched": true,
-    "zipCRCVerified": true
+    "id": 14303231955,
+    "bytes": 317523319,
+    "digest": "sha256:dec272e801f7f019e10af67f690ee294a39ccbabd8f35afbecc90eb444ce86ca",
+    "originalRootPrerequisiteEvidence": {
+      "fileName": "windows-3f1ba1d3-root-prerequisite-check.json",
+      "bytes": 4657,
+      "sha256": "e923eb28c93bf499e95f56f43690680d0f3e65271017564aca83f380f82977b6"
+    }
   },
   "originalAcceptanceArtifact": {
-    "id": 14280580394,
-    "bytes": 1200657,
-    "digest": "sha256:227c2ef95a01eb3ced381f79b38396a4bbaccb2b0634adf1d0729be404cd85cf",
-    "officialDigestMatched": true,
-    "zipCRCVerified": true
+    "id": 14310842516,
+    "bytes": 1200983,
+    "sha256": "e2460ccb8fece5f70deead223dc95b94b747665fa529b241872991d30f20c274",
+    "zipCRCVerified": true,
+    "allExtractedEntryBytesMatched": true,
+    "entries": 13
   },
-  "installerSha256": "bb183e8fb9ce567be8fdf3bdc016d18b492994d2918f953a00b9ce58abe719cd",
-  "installedAsarSha256": "1e6545139775ba607329ea34af4106bbaae93f2a4c107b8e2fdd37452d3b05c4",
+  "installerSha256": "df9d592eac5d06204003a0a18e09a992b36efd309c773ab3be0748ab57b8fa0e",
+  "installedAsarSha256": "d6e0868dbd3320a9886992d5887da98bf49b0b91e7d136f99bb565ab1bf67254",
   "windowsSigning": {
     "installer": "NotSigned",
     "installedExecutable": "NotSigned"
   },
   "initial": {
     "status": "completed",
-    "artifact": {
-      "format": "html",
-      "validation": "valid",
-      "sizeBytes": 3608,
-      "sha256": "fdc58deddb8f71a3417798ac922533440fe8ea7ca5ddafaebea0e4780837a814",
-      "byteHashMatches": true
-    },
-    "schedule": {
-      "kind": "daily",
-      "times": [
-        "08:30",
-        "16:30"
-      ],
-      "timezone": "Asia/Shanghai",
-      "id": "schedule_task_capability_091c9652144ad5ab1675934b",
-      "enabled": true,
-      "nextRunAt": "2026-11-17T00:30:00.000Z",
-      "readBackFromTool": true
-    },
-    "sourceReceiptCount": 2,
-    "sourceComplete": true,
-    "sourceReasons": [],
-    "persistedReceiptVerified": true,
-    "unknownOutcomes": 0,
-    "autoPreview": true,
-    "previewContentVerified": true,
-    "manualPreview": true,
-    "sessionStopped": true
+    "taskId": "task_capability_6e6f177313f2ac1b88db45c8",
+    "artifactSha256": "13105e70e10122db71fcd7e73a5e195627424cf291493ccc4376a974b30917b7"
   },
   "due": {
-    "status": "completed",
     "clock": "real",
-    "dueAt": "2026-11-16T22:47:33.944Z",
-    "createdAt": "2026-11-16T22:48:01.080Z",
+    "trigger": {
+      "kind": "at",
+      "atTime": "2026-11-17T08:14:10.887Z"
+    },
+    "taskId": "task_44cf7351-5c00-4844-976a-4a53e25db323",
+    "status": "completed",
+    "dueAt": "2026-11-17T08:14:10.887Z",
+    "createdAt": "2026-11-17T08:14:33.402Z",
     "independentTask": true,
     "independentArtifact": true,
-    "artifactSha256": "b66e199786eb805895e2c99838bd10b4b4413faaa9000d77815bc37daa3f1075",
+    "artifactSha256": "fa4ea67e4a1636c56a8195bafdf87a134406383a8dae6c20d85ca3cc0c97cffa",
     "byteHashMatches": true,
     "originalDailyScheduleRestored": true
   },
   "sourceEvidence": {
-    "sourceReceiptCount": 2,
-    "complete": true,
-    "reasons": [],
-    "persistedReceiptVerified": true,
+    "initial": true,
+    "due": true,
     "unknownOutcomes": 0
   },
   "autoPreview": true,
   "manualPreview": true,
-  "parentPlanReadback": null,
-  "finalPhaseCorrect": null,
-  "notClaimedByThisLane": [
-    "actual Ego scheduled occurrence parent-plan permissions/readback and external-model phase guidance",
-    "actual paid Dadan source/report run",
-    "actual Mac package/UI/native updater"
-  ],
   "controlledModel": {
-    "protocol": "local-model-fixture",
+    "externalRealModel": false,
     "requests": 42,
-    "allResponses200": true,
-    "actualRealModel": false
+    "allStatus200": true
   },
-  "rootCachedProofReadback": {
-    "allReferencedEvidenceHashesAndBytesMatched": true,
-    "count": 26,
-    "officialCachedIdentityAndConclusionMatched": true,
-    "newOfficialCallsByRoot": 0
-  },
-  "originalEvidence": [
+  "priorFailedFullRuns": [
     {
-      "fileName": "windows-7d19a3fb-final-handoff.json",
-      "bytes": 11368,
-      "sha256": "1610560fec7c17584cd9822d5df459bee938d4000b545d21e264835a1a1eec42"
+      "runId": 44029208287,
+      "driverSourceHead": "3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa",
+      "conclusion": "failure",
+      "overallStatus": "failed",
+      "stage": "manual target covered by expected modal inspector",
+      "originalFailureEvidence": {
+        "fileName": "windows-3f1ba1d3-full-failure-handoff.json",
+        "bytes": 10094,
+        "sha256": "5f60fda594dde2bf9b8d88b21e226c633bd5ccd6bf64c7fb5ac20307f7ff6156"
+      },
+      "notAdoptedAsCurrentFullPass": true
     },
     {
-      "fileName": "windows-7d19a3fb-root-independent-proof-check.json",
-      "bytes": 2431,
-      "sha256": "27858d87bf90561c8d2e7fe6b01d4f920b8214933082e41b269968123bae0f56"
-    },
-    {
-      "fileName": "package-artifact-integrity.json",
-      "bytes": 1329,
-      "sha256": "62ff20bf9895482155253b3de2ccca2fc375210a6f14a33278e47ac6eae01c7d"
+      "runId": 44039630770,
+      "driverSourceHead": "17f74463ff7181777f39f6af5aba4dffd3d340a2",
+      "conclusion": "failure",
+      "overallStatus": "failed",
+      "stage": "QA wait for a new automatic projection after same task/key had been dismissed",
+      "originalFailureEvidence": {
+        "fileName": "full-failure-handoff.json",
+        "bytes": 27679,
+        "sha256": "c7d8f72318385b9cf3a4d1020e5cbb8929bb199969350e125e9b72a3a70839fb"
+      },
+      "notAdoptedAsCurrentFullPass": true
     }
   ],
-  "limitations": [
-    "Windows BSK controlled protocol/model and loopback pages only",
-    "Ego Windows, real external model and actual paid Dadan not exercised",
-    "Windows installer and installed executable NotSigned/not-configured",
-    "Mac active banner/scheduled context, actual Ego and real-clock due acceptance remain independent; no claim of their packaged pass here",
-    "Mac package/sign/notarization/updater independent; no cross-platform ASAR equality claim"
-  ]
+  "notClaimedByThisLane": [
+    "Ego Windows",
+    "actual paid Dadan source/report",
+    "external real model",
+    "actual Mac package/UI/native updater",
+    "publication approval"
+  ],
+  "newApiCallsByThisPreparation": 0,
+  "additionalDownloads": 0,
+  "additionalPosts": 0,
+  "globalReleaseStatus": "acceptance-passed-publication-pending",
+  "rootIndependentProof": {
+    "fileName": "windows-8538d262-same-H4-root-full-proof-check.json",
+    "bytes": 3662,
+    "sha256": "40514a8899f81deeb53215396de417e82032b1dae2b3a121ea5be1432c86263d"
+  },
+  "strictSummary": {
+    "fileName": "windows-44044175670-summary.json",
+    "bytes": 215426,
+    "sha256": "346daeff31d8dcdb336310b3669475c2196e788515be6da4d5d1be65da79bbf3"
+  },
+  "permissions": {
+    "status": "passed",
+    "actualSystemClock": true,
+    "actualOsJunction": true,
+    "checks": [
+      "read-only-chinese-space-workspace-managed-artifact",
+      "explicit-task-grant-exports-to-chinese-space-directory",
+      "changed-os-junction-cannot-reuse-original-task-path-grant",
+      "real-expiry-blocks-captured-old-execution-grant",
+      "replacement-does-not-revive-the-old-immutable-grant",
+      "http-revocation-invalidates-captured-live-grant"
+    ]
+  },
+  "rootFinalizedAt": "2026-11-17T08:21:44.983557+00:00"
 }

@@ -1,6 +1,7 @@
+import * as permissionSmokeModule from './run-windows-ui-smoke.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { createHash } from 'node:crypto'
@@ -9,11 +10,141 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
+import { windowsUiClickExpression, windowsManualArtifactTargetExpression, clickWindowsManualTaskArtifact, readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact, windowsTaskArtifactPreviewExpression } from './run-windows-ui-smoke.mjs'
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
+import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
+
+test('updater metadata diagnostics retain only safe fields and known categories, leaving unexplained failures unclassified', () => {
+  const secret = 'private-query-token-do-not-export'
+  for (const [message, category] of [
+    ['The stable update feed is rate limited right now. Please try again later.', 'http_429'],
+    ['HttpError: 429 Too Many Requests', 'http_429'],
+    ['The stable update feed is temporarily unavailable. Please try again later.', 'http_5xx'],
+    ['HTTP 503 Service Unavailable', 'http_5xx'],
+    ['Cannot parse update info from latest.yml', 'manifest'],
+    ['connect ECONNRESET', 'network'],
+    ['unexplained failure', 'unclassified'],
+    ['unexplained 429', 'unclassified'],
+    ['unexplained failure https://example.invalid/?token=network&status=HTTP503', 'unclassified'],
+    ['unexplained failure\nnetwork error in response body', 'unclassified']
+  ]) {
+    const summary = summarizeWindowsUpdateMetadata({ ok: false, code: 'unknown', currentVersion: '0.5.7',
+      latestVersion: secret, message: `${message}\nHeaders: ${secret}\nData: ${secret}`,
+      releaseUrl: `https://example.invalid/?token=${secret}`, headers: { authorization: secret }, body: secret })
+    assert.equal(summary.category, category)
+    assert.equal(summary.phase, 'metadata-check')
+    assert.equal(summary.code, 'unknown', 'A diagnostic hint must not replace the actual updater failure code')
+    assert.equal(summary.currentVersion, '0.5.7')
+    assert.equal(summary.latestVersion, undefined)
+    assert.doesNotMatch(JSON.stringify(summary), new RegExp(`${secret}|message|releaseUrl|headers|body`))
+  }
+  assert.equal(summarizeWindowsUpdateMetadata({ ok: false, code: secret }).code, 'unknown')
+})
+
+test('successful first metadata response requires one real read and retains no raw updater payload', async () => {
+  const attempts = []
+  let calls = 0
+  const result = await checkWindowsUpdateMetadata(async () => {
+    calls++
+    return { ok: true, hasUpdate: false, currentVersion: '0.5.7', latestVersion: '0.5.7', releaseUrl: 'private-url' }
+  }, { attempts, wait: async () => assert.fail('A successful first check must not wait or reread') })
+  assert.equal(calls, 1)
+  assert.equal(result.ok, true)
+  assert.equal(result.hasUpdate, false)
+  assert.equal(attempts.length, 1)
+  assert.deepEqual(attempts[0], { attempt: 1, ...result })
+  assert.doesNotMatch(JSON.stringify({ attempts, result }), /private-url|releaseUrl/)
+})
+
+test('one bounded metadata reread preserves the first unknown or network failure before a real second success', async () => {
+  for (const code of ['unknown', 'network']) {
+    const attempts = [], order = []
+    let calls = 0
+    const result = await checkWindowsUpdateMetadata(async () => {
+      order.push('read')
+      return ++calls === 1 ? { ok: false, code, currentVersion: '0.5.7', message: code === 'unknown' ? 'unexplained' : 'connect ECONNRESET' }
+        : { ok: true, hasUpdate: false, currentVersion: '0.5.7', latestVersion: '0.5.7' }
+    }, { attempts, wait: async milliseconds => { order.push(milliseconds) } })
+    assert.deepEqual(order, ['read', 2_000, 'read'])
+    assert.equal(calls, 2)
+    assert.equal(result.ok, true)
+    assert.deepEqual(attempts.map(item => item.ok), [false, true])
+    assert.equal(attempts[0].code, code)
+    assert.equal(attempts[0].category, code === 'unknown' ? 'unclassified' : 'network')
+    assert.doesNotMatch(JSON.stringify(attempts), /transient|message|unexplained|ECONNRESET/)
+  }
+})
+
+test('persistent metadata failures stop after two reads and retain a failed final result', async () => {
+  const attempts = []
+  let calls = 0, waits = 0
+  const result = await checkWindowsUpdateMetadata(async () => {
+    calls++
+    return { ok: false, code: 'unknown', currentVersion: '0.5.7', message: 'still unexplained' }
+  }, { attempts, wait: async milliseconds => { assert.equal(milliseconds, 2_000); waits++ } })
+  assert.equal(calls, 2)
+  assert.equal(waits, 1)
+  assert.equal(result.ok, false)
+  assert.equal(result.code, 'unknown')
+  assert.equal(result.category, 'unclassified')
+  assert.deepEqual(attempts.map(item => item.ok), [false, false])
+  assert.throws(() => validateWindowsUiReport({ ...report(), update: result }, identity), 'Persistent failure must still fail acceptance')
+})
+
+test('integrity, configuration, available updates and malformed responses do not get an extra metadata read', async () => {
+  for (const response of [
+    { ok: false, code: 'signature_invalid' }, { ok: false, code: 'not_configured' },
+    { ok: false, code: 'unsupported' }, { ok: false, code: 'unsigned_build' },
+    { ok: false, code: 'github_forbidden' }, { ok: false, code: 'github_repo_not_found' },
+    { ok: false, code: 'unknown', message: 'SHA512 checksum mismatch' },
+    { ok: false, code: 'unknown', message: 'No online update source is configured.' },
+    { ok: true, hasUpdate: true }, { ok: false, hasUpdate: true, code: 'network' },
+    { ok: false, code: 'unexpected-private-code' }, undefined
+  ]) {
+    let calls = 0
+    const attempts = []
+    const result = await checkWindowsUpdateMetadata(async () => { calls++; return response },
+      { attempts, wait: async () => assert.fail('This result must not be retried') })
+    assert.equal(calls, 1)
+    assert.equal(attempts.length, 1)
+    assert.equal(result.ok, response?.ok)
+    assert.equal(result.hasUpdate, response?.hasUpdate)
+  }
+})
+
+test('thrown metadata IPC is terminal and its raw exception is never exported, including after the one reread', async () => {
+  for (const failAt of [1, 2]) {
+    let calls = 0, waits = 0
+    const attempts = []
+    await assert.rejects(checkWindowsUpdateMetadata(async () => {
+      if (++calls === failAt) throw new Error('private-message https://example.invalid/?token=secret Headers: private-header Data: private-body')
+      return { ok: false, code: 'unknown' }
+    }, { attempts, wait: async () => { waits++ } }), { message: 'The real updater metadata IPC did not return a result' })
+    assert.equal(calls, failAt)
+    assert.equal(waits, failAt - 1)
+    assert.equal(attempts.length, failAt)
+    assert.deepEqual(attempts.at(-1), { attempt: failAt, ok: false, category: 'ipc_exception', phase: 'ipc' })
+    assert.doesNotMatch(JSON.stringify(attempts), /private|secret|Headers|Data|message/)
+  }
+})
+
+test('default metadata reread waits exactly two seconds and never schedules a third read', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let calls = 0
+  const result = checkWindowsUpdateMetadata(async () => { calls++; return { ok: false, code: 'network' } })
+  await Promise.resolve()
+  t.mock.timers.tick(1_999)
+  await Promise.resolve()
+  assert.equal(calls, 1)
+  t.mock.timers.tick(1)
+  assert.equal((await result).ok, false)
+  assert.equal(calls, 2)
+  t.mock.timers.tick(60_000)
+  assert.equal(calls, 2)
+})
 
 test('composer menu geometry uses actual viewport rectangles at both supported font scales', () => {
   const actual = { coordinateUnit: 'viewport-css-px', side: 'top', menuCount: 1, itemCount: 3, hitTest: true,
@@ -262,6 +393,8 @@ test('installed permission wrapper uses the exact EXE and packaged Runtime with 
   assert.match(wrapper, /'app\.asar\.unpacked', 'kun', 'dist'/)
   assert.match(wrapper, /fs\.mkdtemp\(path\.join\(temporaryRoot,/)
   assert.match(wrapper, /installedPermissionWorker\.toString\(\)/)
+  assert.match(wrapper, /readWindowsPermissionExecutionTurn\.toString\(\)/)
+  assert.equal((installedPermissionWorker.toString().match(/await poll\(\(\) => readWindowsPermissionExecutionTurn/g) ?? []).length, 2)
   assert.match(wrapper, /150_000/)
   assert.match(wrapper, /if \(childExited\) await fs\.rm\(ownedRoot/)
   assert.doesNotMatch(wrapper, /Date\.now\s*=|setSystemTime|--ignore-certificate-errors/)
@@ -1970,4 +2103,241 @@ test('diagnostic quick identity retry receives only the remaining startup budget
   assert.deepEqual(attempts.slice(0, 2), [['identity', 77, 10000], ['identity', 77, 9000]])
   assert.equal(value.result.identity.verified, true)
   assert.equal(value.result.cleanup.verifiedBirth, true)
+})
+
+// Offline renderer protocol fixture: the production layout hook, not a mocked
+// activeOverlay response, reacts to a deferred preview after the real route click.
+async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false, selectedTaskKeyUnchanged = false } = {}) {
+  const { Window } = await import('happy-dom')
+  const window = new Window({ url: 'http://localhost/' }), temporary = await mkdtemp(join(tmpdir(), 'railwise-manual-route-'))
+  const prior = new Map()
+  for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'getComputedStyle', 'IS_REACT_ACT_ENVIRONMENT', 'MessageChannel']) {
+    prior.set(key, Object.getOwnPropertyDescriptor(globalThis, key))
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: key === 'MessageChannel' ? class { constructor() { this.port1 = {}; this.port2 = { postMessage: () => setImmediate(() => this.port1.onmessage?.()) } } } : key === 'IS_REACT_ACT_ENVIRONMENT' ? true : key === 'getComputedStyle' ? window.getComputedStyle.bind(window) : key === 'window' ? window : window[key] })
+  }
+  let root, fixture
+  try {
+    Object.defineProperty(window, 'innerWidth', { value: 1024 }); Object.defineProperty(window, 'innerHeight', { value: 728 })
+    const output = join(temporary, 'layout.cjs')
+    await build({ stdin: { contents: `
+      import {act,createElement as h,useState} from 'react'; import {createRoot} from 'react-dom/client';
+      import {useWorkbenchLayout} from './src/renderer/src/components/workbench-layout.ts';
+      export {act,createRoot,h};
+      export const events=[];
+      export function Harness(){
+        const [route,setRoute]=useState('chat'),[ready,setReady]=useState(0);
+        const layout=useWorkbenchLayout({route,workspaceRoot:'/synthetic-ui-only',activeThreadId:route==='tasks'?'task-workspace-preview:synthetic':'chat',latestAutoOpenDevPreviewKey:ready?'synthetic-current-hash-'+ready:null,latestAutoOpenDevPreviewUrl:ready?'http://localhost/report':null,latestDevPreviewUrl:ready?'http://localhost/report':null,writeAssistantOpen:false});
+        const artifact=()=>{events.push('artifact-click');layout.openDevPreview()};
+        const select=()=>{events.push('select-task');if(${JSON.stringify(selectedTaskKeyUnchanged)})return;Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
+        return h('div',{className:'ds-workbench-shell',ref:layout.shellRef,'data-active-overlay':layout.activeOverlay??''},
+          h('nav',{'aria-label':'工作区工具'},h('button',{id:'task-route',onClick:()=>{events.push('route-tasks');setRoute('tasks');if(${JSON.stringify(latePreviewOnRoute)})Promise.resolve().then(()=>{events.push('route-preview-projection');setReady(value=>value+1)})}},'任务')),
+          layout.activeOverlay?h('button',{'aria-label':'返回当前任务',id:'backdrop',onClick:layout.closeDevPreview}):null,
+          h('main',{inert:layout.activeOverlay?true:undefined},route==='tasks'?h('section',{className:'ds-task-sidebar','aria-label':'任务列表'},h('div',{'aria-label':'任务筛选'},h('button',{id:'completed'},'已完成 1')),h('button',{id:'task-row',title:'合成 UI 任务',onClick:select},'合成 UI 任务')):null,
+            route==='tasks'?h('article',{'aria-label':'任务详情'},h('button',{id:'artifact',onClick:artifact},'每日网页报告.html')):null),
+          layout.rightPanelVisible?h('aside',{id:'workbench-inspector'},h('button',{'aria-label':'收起右侧栏',id:'collapse',onClick:()=>{events.push('collapse-panel');layout.closeDevPreview()}}),h('webview'),ready?h('div',{id:'workspace-preview-ready'}):null):null);
+      }`, resolveDir: fileURLToPath(new URL('..', import.meta.url)), loader: 'tsx' }, outfile: output, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', define: { 'process.env.NODE_ENV': '"development"' } })
+    fixture = createRequire(import.meta.url)(output)
+    const box = node => {
+      const x = node.id === 'artifact' ? 297 : node.id === 'collapse' ? 940 : node.id === 'backdrop' ? 0 : node.id === 'task-route' ? 20 : node.id === 'completed' ? 20 : 20
+      const y = node.id === 'artifact' ? 500 : node.id === 'collapse' ? 20 : node.id === 'backdrop' ? 0 : node.id === 'task-route' ? 20 : node.id === 'completed' ? 100 : 160
+      const width = node.id === 'artifact' ? 674 : node.id === 'backdrop' ? 1024 : 60, height = node.id === 'backdrop' ? 728 : 36
+      return { x, y, left: x, top: y, width, height, right: x + width, bottom: y + height }
+    }
+    window.HTMLElement.prototype.getBoundingClientRect = function () { return box(this) }
+    window.HTMLElement.prototype.getClientRects = function () { return this.isConnected ? [box(this)] : [] }
+    window.HTMLElement.prototype.scrollIntoView = function () {}
+    window.requestAnimationFrame = callback => { queueMicrotask(() => callback(Date.now())); return 1 }
+    window.document.elementFromPoint = (x, y) => {
+      const candidates = Array.from(window.document.querySelectorAll('button')).filter(node => { const b = box(node); return x >= b.x && x < b.right && y >= b.y && y < b.bottom })
+      if (window.document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay === 'inspector') return candidates.find(node => node.id === 'collapse') ?? window.document.querySelector('webview')
+      return candidates.find(node => node.id !== 'backdrop') ?? window.document.body
+    }
+    root = fixture.createRoot(window.document.body.appendChild(window.document.createElement('div')))
+    await fixture.act(async () => root.render(fixture.h(fixture.Harness)))
+    const input = []
+    const cdp = {
+      async evaluate(expression) { let value; await fixture.act(async () => { value = await window.eval(expression) }); return value },
+      async wait(expression, label) { for (let attempt = 0; attempt < 10; attempt++) { const value = await this.evaluate(expression); if (value) return value } throw new Error('Fixture UI did not show ' + label) },
+      async send(method, params) {
+        assert.equal(method, 'Input.dispatchMouseEvent'); input.push(params)
+        if (params.type === 'mouseReleased') await fixture.act(async () => { const hit = window.document.elementFromPoint(params.x, params.y); assert.equal(Boolean(hit.closest('main[inert]')), false, 'Real input cannot bypass the modal main surface'); hit.dispatchEvent(new window.MouseEvent('click', { bubbles: true, clientX: params.x, clientY: params.y })) })
+      },
+      async click(selector, label) { const point = await this.wait(windowsUiClickExpression(selector, label), label ?? selector); for (const type of ['mousePressed', 'mouseReleased']) await this.send('Input.dispatchMouseEvent', { type, button: 'left', clickCount: 1, ...point }) }
+    }
+    await run({ window, cdp, events: fixture.events, input })
+  } finally {
+    if (root) await fixture.act(async () => root.unmount())
+    for (const [key, descriptor] of prior) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key] }
+    await window.happyDOM.close(); await rm(temporary, { recursive: true, force: true })
+  }
+}
+
+test('manual artifact entry waits for the actual route late-preview overlay and dismisses its panel control before pointer input', async () => {
+  await manualPreviewRouteFixture(async ({ cdp, events, input }) => {
+    const audit = {}
+    await clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `document.querySelector('#workspace-preview-ready') && {partition:'railwise-artifact-synthetic'}`, audit })
+    assert.ok(events.indexOf('route-tasks') < events.indexOf('late-preview-projection'))
+    assert.ok(events.indexOf('late-preview-projection') < events.indexOf('collapse-panel'))
+    assert.equal(events.filter(event => event === 'artifact-click').length, 1)
+    assert.equal(events.filter(event => event === 'collapse-panel').length, 1)
+    assert.equal(audit.afterProjection.activeOverlay, 'inspector')
+    assert.equal(audit.afterProjection.mainInert, true)
+    assert.equal(audit.afterProjection.hit.target, false)
+    assert.ok(audit.target.stableFrames >= 2)
+    assert.equal(audit.target.mainInert, false)
+    assert.equal(input.at(-1).type, 'mouseReleased')
+  })
+})
+
+test('manual artifact permanent coverage stays failed with first geometry and no input behind the blocker', async () => {
+  await manualPreviewRouteFixture(async ({ window, cdp, events }) => {
+    const originalHit = window.document.elementFromPoint.bind(window.document)
+    window.document.elementFromPoint = (x, y) => { const hit = originalHit(x, y); return hit?.id === 'artifact' ? window.document.body : hit }
+    const audit = {}, evidence = report()
+    assert.equal(await inspectWindowsManualPreview(evidence, () => clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })), false)
+    assert.equal(audit.target.ready, false)
+    assert.equal(audit.target.observedFrames, 60)
+    assert.equal(audit.target.initial.hit.tag, 'BODY')
+    assert.equal(audit.target.initial.hit.target, false)
+    assert.equal(audit.target.initial.mainInert, false)
+    assert.ok(audit.target.initial.rect.width > 0)
+    assert.equal(events.includes('artifact-click'), false)
+    assert.match(evidence.errors[0], /UI target is covered or unstable/)
+    assert.throws(() => validateWindowsTaskEvidence(evidence.taskExecution))
+    assert.throws(() => validateWindowsUiReport(evidence, identity))
+  })
+})
+
+test('manual artifact pointer probe waits through a covered frame, moving geometry and DOM replacement', async () => {
+  const { Window } = await import('happy-dom'), window = new Window()
+  try {
+    window.document.body.innerHTML = '<div class="ds-workbench-shell"><main><article aria-label="任务详情"><button>每日网页报告.html</button></article></main></div>'
+    let frame = 0, scrollOptions
+    const configure = node => {
+      node.scrollIntoView = options => { scrollOptions = options }
+      node.getClientRects = () => [node.getBoundingClientRect()]
+      node.getBoundingClientRect = () => ({ x: 10, y: frame < 3 ? frame * 10 : 40, width: 100, height: 30 })
+    }
+    configure(window.document.querySelector('button'))
+    window.requestAnimationFrame = callback => { frame++; if (frame === 3) { const node = window.document.createElement('button'); node.textContent = '每日网页报告.html'; configure(node); window.document.querySelector('button').replaceWith(node) } queueMicrotask(() => callback(frame)); return frame }
+    window.document.elementFromPoint = () => frame === 2 ? window.document.body : window.document.querySelector('button')
+    const result = JSON.parse(JSON.stringify(await window.eval(windowsManualArtifactTargetExpression({ stable: true }))))
+    assert.equal(result.ready, true)
+    assert.equal(result.observedFrames, 5)
+    assert.equal(result.stableFrames, 2)
+    assert.equal(result.rect.y, 40)
+    assert.equal(scrollOptions.behavior, 'instant')
+    assert.doesNotMatch(windowsManualArtifactTargetExpression({ stable: true }), /\.click\(|dispatchEvent|\.remove\(|removeAttribute|setAttribute/)
+  } finally { await window.happyDOM.close() }
+})
+
+test('manual task navigation dismisses a late route overlay as well as the selected-task preview without bypassing either', async () => {
+  await manualPreviewRouteFixture(async ({ cdp, events }) => {
+    const audit = {}
+    await clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })
+    assert.ok(events.indexOf('route-tasks') < events.indexOf('route-preview-projection'))
+    assert.ok(events.indexOf('route-preview-projection') < events.indexOf('select-task'))
+    assert.equal(events.filter(event => event === 'collapse-panel').length, 2)
+    assert.equal(events.filter(event => event === 'artifact-click').length, 1)
+    assert.equal(audit.navigation[0].initial.activeOverlay, 'inspector')
+    assert.equal(audit.navigation[0].initial.mainInert, true)
+    assert.equal(audit.navigation[0].afterDismiss.ready, true)
+    assert.equal(audit.target.ready, true)
+  }, { latePreviewOnRoute: true })
+})
+
+
+test('manual artifact entry respects an already dismissed workspace preview when selecting the same task and hash again', async () => {
+  await manualPreviewRouteFixture(async ({ cdp, events }) => {
+    const audit = {}
+    await clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })
+    assert.equal(events.filter(event => event === 'route-preview-projection').length, 1)
+    assert.equal(events.filter(event => event === 'late-preview-projection').length, 0, 'Selecting the current task must not invent a new IPC projection or artifact hash')
+    assert.equal(events.filter(event => event === 'collapse-panel').length, 1)
+    assert.equal(events.filter(event => event === 'artifact-click').length, 1)
+    assert.ok(events.indexOf('collapse-panel') < events.indexOf('select-task'))
+    assert.ok(events.indexOf('select-task') < events.indexOf('artifact-click'))
+    assert.equal(audit.beforeManual.activeOverlay, null)
+    assert.equal(audit.beforeManual.mainInert, false)
+    assert.equal(audit.targetBeforeDismiss, undefined)
+    assert.equal(audit.target.ready, true)
+    assert.equal(audit.target.mainInert, false)
+    assert.equal(audit.target.stableFrames, 2)
+  }, { latePreviewOnRoute: true, selectedTaskKeyUnchanged: true })
+})
+
+
+// Execute the worker's real capture statement and existing bounded poll, rather
+// than a duplicate mock of its readiness algorithm. The file-store is real.
+function permissionCaptureFromWorker(runtime, taskId, turnId, timeout = 1000) {
+  const code = installedPermissionWorker.toString()
+  const start = code.indexOf('    const turn =', code.indexOf("'actual exported file'"))
+  const end = code.indexOf('\n    const grant =', start)
+  assert.ok(start > 0 && end > start)
+  const pollStart = code.indexOf('  const poll = async')
+  const pollEnd = code.indexOf('  const exists =', pollStart)
+  const originalPoll = new Function(code.slice(pollStart, pollEnd) + '; return poll')()
+  const capture = new Function('runtime', 'taskId', 'getTask', 'resume', 'poll', 'readWindowsPermissionExecutionTurn',
+    `return (async () => { ${code.slice(start, end)}; return turn })()`)
+  return capture(runtime, taskId, () => runtime.taskRepository.get(taskId), { turn: { turnId } },
+    (read, label) => originalPoll(read, label, timeout), permissionSmokeModule.readWindowsPermissionExecutionTurn)
+}
+
+let permissionFileStoreModule
+async function permissionFileStore(root) {
+  permissionFileStoreModule ??= build({ entryPoints: [fileURLToPath(new URL('../kun/src/adapters/file/file-thread-store.ts', import.meta.url))],
+    bundle: true, platform: 'node', format: 'esm', write: false }).then(result => import('data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].text).toString('base64')))
+  const { FileThreadStore } = await permissionFileStoreModule
+  return new FileThreadStore({ dataDir: root })
+}
+
+test('permission execution capture waits through the real file-store publication gap for the exact Turn and Grant', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-permission-thread-publication-'))
+  try {
+    const store = await permissionFileStore(root), taskId = 'permission-task', threadId = 'permission-thread', turnId = 'permission-turn'
+    const grant = { id: 'owned-grant', taskId, threadId, turnId }
+    const thread = { id: threadId, updatedAt: new Date().toISOString(), turns: [{ id: turnId, status: 'running', executionGrant: grant }] }
+    await store.upsert(thread)
+    const file = join(root, 'threads', threadId, 'thread.json'), backup = file + '.workwise-backup'
+    // This is the Windows replace() target->backup->temp publication boundary.
+    // A barrier restores it only after the actual FileThreadStore.get saw null.
+    await rename(file, backup)
+    let observedMissing
+    const missing = new Promise(resolve => { observedMissing = resolve })
+    const runtime = { taskRepository: { get: () => ({ id: taskId, threadId, activeTurnId: turnId }) },
+      threadService: { get: async id => { const value = await store.get(id); if (value === null) observedMissing(); return value } } }
+    const captured = permissionCaptureFromWorker(runtime, taskId, turnId).then(value => ({ value }), error => ({ error }))
+    await missing
+    await rename(backup, file)
+    const result = await captured
+    assert.equal(result.error, undefined, result.error?.stack)
+    assert.equal(result.value.id, turnId)
+    assert.equal(result.value.status, 'running', 'The fixture deliberately holds the current Turn for expiry/revocation checks')
+    assert.deepEqual(result.value.executionGrant, grant)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('permission execution capture permanently missing Thread remains a bounded failure', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-permission-thread-missing-'))
+  try {
+    const store = await permissionFileStore(root), taskId = 'permission-task', threadId = 'permission-thread', turnId = 'permission-turn'
+    const runtime = { taskRepository: { get: () => ({ id: taskId, threadId, activeTurnId: turnId }) }, threadService: { get: id => store.get(id) } }
+    await assert.rejects(permissionCaptureFromWorker(runtime, taskId, turnId, 30), /Permission acceptance timed out: .*execution Grant/)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test('permission execution readiness rejects foreign and stale Task Turn or Grant snapshots', async () => {
+  const taskId = 'current-task', threadId = 'current-thread', turnId = 'current-turn'
+  const task = { id: taskId, threadId, activeTurnId: turnId }
+  const turn = { id: turnId, executionGrant: { id: 'current-grant', taskId, threadId, turnId } }
+  const read = async (taskSnapshot, threadSnapshot) => permissionSmokeModule.readWindowsPermissionExecutionTurn({ taskRepository: { get: () => taskSnapshot }, threadService: { get: async () => threadSnapshot } }, taskId, turnId)
+  assert.equal(await read(task, { id: threadId, turns: [turn] }), turn)
+  for (const [badTask, badThread] of [
+    [{ ...task, activeTurnId: 'old-turn' }, { id: threadId, turns: [turn] }],
+    [task, { id: 'foreign-thread', turns: [turn] }],
+    [task, { id: threadId, turns: [{ ...turn, executionGrant: { ...turn.executionGrant, taskId: 'foreign-task' } }] }],
+    [task, { id: threadId, turns: [{ ...turn, executionGrant: { ...turn.executionGrant, turnId: 'old-turn' } }] }],
+    [task, { id: threadId, turns: [{ id: turnId }] }]
+  ]) assert.equal(await read(badTask, badThread), null)
 })

@@ -4447,6 +4447,8 @@
   "capabilityDiagnosticDetails": "查看原始诊断",
   "capabilityPermissionType": "权限类型",
   "capabilityScopeReviewRequired": "范围待核对，请查看当前任务权限",
+  "capabilityScopeRecheckOnResume": "恢复时重新核对原任务范围",
+  "capabilityViewTaskRecoveryOptions": "查看任务与恢复选项",
   "capabilityProvider": "外部平台",
   "capabilityCurrentStatus": "当前状态",
   "capabilityWorkspace": "当前工作区",

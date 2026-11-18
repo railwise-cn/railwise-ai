@@ -6,9 +6,10 @@
     "tag": "v0.5.7",
     "version": "0.5.7",
     "previousTag": "v0.5.6",
-    "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-    "updaterPathChanged": false,
-    "visualChange": true
+    "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "visualChange": true,
+    "updaterPathChanged": true,
+    "sourceTree": "123dc6f7965170e6752c52381612fc8ef59bef62"
   },
   "package": {
     "version": "0.5.7",
@@ -16,27 +17,38 @@
     "buildVersion": "0.5.7",
     "identity": {
       "bundleId": "com.wangjiawei508.workgpt",
-      "artifactSha256": "60417970a05fa091b588a7c7915f62d59830af8470c88aec94ecabf0eef9b950",
-      "asarSha256": "4279a7c49691e1c1c1665665445b6eab58d980c56f28cd80e9adec1aa9c9d0a7"
+      "artifactSha256": "8b235bb9601e8b89eed1ad0f35b6acf0012cde16d6d607726ba95c302a90ef9f",
+      "asarSha256": "b0d09f0f3e1b311ee5404c46f3fd49bb66bf21b8446d92079111c63531130e94"
     },
     "installedMetadata": {
       "version": "0.5.7",
-      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
+      "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
       "packageName": "workwise",
       "productName": "RailWise AI",
-      "asarSha256": "4279a7c49691e1c1c1665665445b6eab58d980c56f28cd80e9adec1aa9c9d0a7"
+      "asarSha256": "b0d09f0f3e1b311ee5404c46f3fd49bb66bf21b8446d92079111c63531130e94"
+    },
+    "signature": {
+      "status": "passed",
+      "scope": "macOS Developer ID",
+      "teamIdentifier": "R35G7F4A9U",
+      "windowsAuthenticode": "NotSigned",
+      "windowsSigning": "not-configured"
+    },
+    "notarization": {
+      "status": "passed",
+      "scope": "Original macOS release artifacts and exact Apple Silicon package"
     },
     "reviewedBuild": {
-      "schemaVersion": 1,
-      "mode": "exact-build",
       "repository": "railwise-cn/railwise-ai",
       "workflowPath": ".github/workflows/release.yml",
-      "headRef": "refs/heads/codex/general-execution-delivery",
-      "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/general-execution-delivery",
-      "workflowSha": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-      "runId": 43968313921,
+      "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+      "headRef": "refs/heads/codex/formal-execution-recovery-057",
+      "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/formal-execution-recovery-057",
+      "workflowSha": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+      "runId": 44192481166,
       "runAttempt": 1,
+      "schemaVersion": 1,
+      "mode": "exact-build",
       "publicIdentity": {
         "bundleId": "com.wangjiawei508.workgpt",
         "packageName": "workwise",
@@ -44,14 +56,14 @@
       },
       "artifacts": [
         {
-          "id": 14280501870,
+          "id": 14380433001,
           "name": "release-mac",
-          "digest": "sha256:5a219280ce123145d44c597ea4d1ba4098c57430f620c7dab9dfce808593f235"
+          "digest": "sha256:93b15bdfa5a9f4111567b925cf7729a64a9aa73986f4b590af2ec6c495928e33"
         },
         {
-          "id": 14279345015,
+          "id": 14378462849,
           "name": "release-win",
-          "digest": "sha256:81b27455fda5ac7dcd60f8a8b5b360906d93bedc8bd2784c2ed1eec768144af7"
+          "digest": "sha256:d89fcc79c877f322c9f4768e8925ca261a5ea24405d8a5e6ef5f1695b1844780"
         }
       ],
       "files": [
@@ -59,98 +71,82 @@
           "name": "RailWise-AI-0.5.7-mac-arm64.dmg",
           "platform": "darwin-arm64",
           "artifact": "release-mac",
-          "size": 397692299,
-          "sha256": "60417970a05fa091b588a7c7915f62d59830af8470c88aec94ecabf0eef9b950"
+          "size": 397543513,
+          "sha256": "8b235bb9601e8b89eed1ad0f35b6acf0012cde16d6d607726ba95c302a90ef9f"
         },
         {
           "name": "RailWise-AI-0.5.7-mac-arm64.zip",
           "platform": "darwin-arm64",
           "artifact": "release-mac",
-          "size": 404529001,
-          "sha256": "956536e6b07e0af155410b6c9c516cf5a41172d6730b975f5ef5a417a1a0f299"
+          "size": 404316550,
+          "sha256": "536818caf7a7e4cf698260e85cbc6be63cd2a911a9a39bbf8ff1d6c75d6203fb"
         },
         {
           "name": "RailWise-AI-0.5.7-mac-x64.dmg",
           "platform": "darwin-x64",
           "artifact": "release-mac",
-          "size": 406572634,
-          "sha256": "ef6d60714e6af38781e9014abd5d95a237b130db87a31e343fc7d8f8bb660e52"
+          "size": 406488491,
+          "sha256": "da99ebfb4a21594e0ce161736f8e13eaa66bc68c25c6000bbb9471d5653660bf"
         },
         {
           "name": "RailWise-AI-0.5.7-mac-x64.zip",
           "platform": "darwin-x64",
           "artifact": "release-mac",
-          "size": 413693596,
-          "sha256": "5b8a20122c355ef315dc445da2ae2b87d90e4524cce584fb4abbd10364e2cb39"
+          "size": 413480321,
+          "sha256": "688ee990813c103987101d14d0db5fff9e38dab56a543eabc50c06f355dd8bb1"
         },
         {
           "name": "latest-mac.yml",
           "platform": "darwin",
           "artifact": "release-mac",
           "size": 839,
-          "sha256": "539b226b24666cdead3e97771c49f41b89d839c1c58cf47b52c4d1b11e21e55c"
+          "sha256": "2a8404ac7918b2fc9705860e0fca360b5f6c2b2210747ab8f59f611429c8b849"
         },
         {
           "name": "RailWise-AI-0.5.7-win-x64.exe",
           "platform": "win32-x64",
           "artifact": "release-win",
-          "size": 317655301,
-          "sha256": "bb183e8fb9ce567be8fdf3bdc016d18b492994d2918f953a00b9ce58abe719cd"
+          "size": 317686658,
+          "sha256": "113a88a8601b04a49233267dc8321c17063a949fecce9fa5ad3e6ff37ed66dd7"
         },
         {
           "name": "RailWise-AI-0.5.7-win-x64.exe.blockmap",
           "platform": "win32-x64",
           "artifact": "release-win",
-          "size": 324095,
-          "sha256": "4fa8134187b51bca55273966c84e1ee93ec056576d2bcbfd4e1d565418cc4e0a"
+          "size": 324966,
+          "sha256": "69274392577da8eff1d1f6636ee9d6ed1b2b281f5e404082b53a65d83eb420a9"
         },
         {
           "name": "latest.yml",
           "platform": "win32-x64",
           "artifact": "release-win",
           "size": 355,
-          "sha256": "3104b78cb2bcb8f9202f4f87ae63318267d881bc164c82df25c8c5931bfca9ff"
+          "sha256": "732cf3b93944be3d4c115c80d9934cc3d0cc0d958c2b2782eff71af1eeba50e1"
         }
-      ]
+      ],
+      "sourceTree": "123dc6f7965170e6752c52381612fc8ef59bef62"
     },
-    "signature": {
-      "status": "passed",
-      "scope": "Selected exact arm64 macOS application; Windows actual Authenticode NotSigned retained",
-      "teamIdentifier": "R35G7F4A9U",
-      "windowsAuthenticode": "NotSigned",
-      "windowsSigning": "not-configured"
-    },
-    "notarization": {
-      "status": "passed",
-      "scope": "new exact macOS app staple and same-run native Gatekeeper verification",
-      "dmgStapleClaimed": false
-    },
-    "limitations": [
-      "Windows installer and installed executable are NotSigned/not-configured. Its BSK/local model/loopback fixture does not exercise Ego Windows, an external real model or paid Dadan.",
-      "Local Mac acceptance used Apple Silicon; Intel UI was not run on the local host.",
-      "Selected DMG entry CRC/SHA512/DMG SHA256 and installed ASAR were verified. The full outer release-mac archive was not locally hashed; its digest is immutable official artifact provenance.",
-      "Local Gatekeeper assessment reports a security-disabled override; no local clean-policy acceptance or system trust change is claimed. Enabled-policy accepted Gatekeeper proof comes from original same-run native updater reports.",
-      "Real Ego acceptance covers the first visible subscription-list page and five selected rows; official announcement bodies were not independently verified and missing fields stay unverified. Minor naming defect retained: artifact filename uses2026-11-18 while the report collection timestamp is correct for2026-11-17 Beijing. Semantic business relevance/content checks are AI review, not professional/human sign-off."
-    ]
+    "localGatekeeper": "not_evaluated_local_security_override",
+    "cleanLocalGatekeeperAcceptanceClaimed": false
   },
   "checks": {
     "productionBuild": {
       "status": "passed",
-      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-      "path": "docs/qa/release-gates/v0.5.7/build-and-focused.json"
+      "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+      "path": "docs/qa/release-gates/v0.5.7/h11/build-and-focused.json"
     },
     "focusedTests": {
       "status": "passed",
-      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-      "path": "docs/qa/release-gates/v0.5.7/build-and-focused.json"
+      "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+      "path": "docs/qa/release-gates/v0.5.7/h11/build-and-focused.json"
     },
     "requiredCI": {
       "status": "passed",
       "workflowRun": {
         "repository": "railwise-cn/railwise-ai",
         "workflowPath": ".github/workflows/quality.yml",
-        "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-        "runId": 43965382885,
+        "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+        "runId": 44189863018,
         "runAttempt": 1
       }
     }
@@ -158,39 +154,309 @@
   "acceptance": {
     "installedPackage": {
       "status": "passed",
-      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-      "path": "docs/qa/release-gates/v0.5.7/installed-package.json"
+      "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+      "path": "docs/qa/release-gates/v0.5.7/h11/installed-package.json",
+      "scope": "Exact macOS arm64 install/signature/stapled-notary/source/ASAR; local Gatekeeper assessments disabled, no clean local Gatekeeper acceptance claimed."
     },
     "packagedUI": {
       "status": "passed",
-      "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-      "path": "docs/qa/release-gates/v0.5.7/packaged-ui.json"
+      "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+      "path": "docs/qa/release-gates/v0.5.7/h11/packaged-ui.json"
     },
     "functionalChecklist": {
       "status": "passed",
-      "path": "docs/qa/release-gates/v0.5.7/business-acceptance.json"
+      "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+      "path": "docs/qa/release-gates/v0.5.7/h11/business-acceptance.json"
     },
     "updaterRoundTrip": {
       "status": "passed",
       "mode": "exact-build",
       "baseVersion": "0.5.6",
-      "path": "docs/qa/release-gates/v0.5.7/updater-acceptance.json",
-      "machineReportPath": "docs/qa/release-gates/v0.5.7/exact-updater-machine.json",
-      "nativeReportPath": "docs/qa/release-gates/v0.5.7/exact-updater-native.json",
+      "path": "docs/qa/release-gates/v0.5.7/h11/updater-acceptance.json",
+      "machineReportPath": "docs/qa/release-gates/v0.5.7/h11/frozen-updater.json",
+      "nativeReportPath": "docs/qa/release-gates/v0.5.7/h11/native-updater.json",
       "workflowRun": {
         "repository": "railwise-cn/railwise-ai",
         "workflowPath": ".github/workflows/release.yml",
-        "headRef": "refs/heads/codex/general-execution-delivery",
-        "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/general-execution-delivery",
-        "workflowSha": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-        "sourceHead": "7d19a3fba21ad0c46f3c8d36fffda62ac163760a",
-        "runId": 43968313921,
+        "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+        "headRef": "refs/heads/codex/formal-execution-recovery-057",
+        "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/formal-execution-recovery-057",
+        "workflowSha": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+        "runId": 44192481166,
         "runAttempt": 1,
         "artifact": {
-          "id": 14280698320,
-          "name": "exact-package-updater-43968313921",
-          "digest": "sha256:ade0950b397a5204bb63fd3e79a8b19e19db1e93d0d31f1133e00ef991b840b9"
+          "id": 14381811349,
+          "name": "exact-package-updater-44192481166",
+          "digest": "sha256:9642d71e9d58af6821eb25d8edc5164517e0753ab57b97dc4e908469c2559b9a"
         }
+      }
+    }
+  },
+  "supersededEvidence": {
+    "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "path": "docs/qa/release-gates/v0.5.7.json",
+    "scope": "Earlier pending manifest and candidate findings remain available at the reviewed source commit.",
+    "historicalPublicationHolds": [
+      {
+        "at": "2026-11-17T11:38:26.642811+00:00",
+        "sourceHead": "c821177f3c11ddd379e6e1ff2efcf872b97757ff",
+        "runId": 44055604252,
+        "browserInitialAndNaturalDue": "passed_scoped_actual_Ego_Dadan_first_page",
+        "chatPreviewIsolation": "failed",
+        "nextProductionCandidateRequired": true,
+        "newCandidatePackageAndAcceptance": "pending",
+        "privateLedgerFileName": "H5-c821177f-browser-pass-preview-FAIL-ledger-private.json",
+        "privateLedgerSha256": "9fc3368f86f0ddf3adeaa5e39748c1b99a6276aced10c39090f83d53af87d743"
+      },
+      {
+        "at": "2026-11-17T13:19:02.635030+00:00",
+        "sourceHead": "e5a0428dbce9778d4651a129044f0d84559f2286",
+        "runId": 44078752895,
+        "reason": "H6 real new Task is waiting_user at attempt0 because a task destination was misclassified as a local path. No model, source collection, HTML or new plan started.",
+        "priorH5ChatPreviewFailureRetained": true,
+        "newCandidateSourceHead": null,
+        "newCandidatePackageAndAcceptance": "pending",
+        "privateBlockerEvidence": {
+          "fileName": "H6-e5a0428d-actual-preflight-blocker-private.json",
+          "sha256": "747ace40a6fee8ffe4349f7eaa1e265aac43b493f8af88fbcae99a5428dd7346",
+          "privateSourceOnly": true
+        }
+      },
+      {
+        "at": "2026-11-17T15:29:23.169812+00:00",
+        "sourceHead": "41e00153dad3978357c28dce992cd9d09f2afba5",
+        "runId": 44098000303,
+        "reason": "Actual same-task H7 A1 opened its own Ego Space, read current source, saved HTML and created/read the QA plan, but strict verification rejected a cross-record quote. Report remains draft; natural due and chat background-preview isolation are not exercised.",
+        "priorH5ChatPreviewFailureRetained": true,
+        "priorH6PreflightFailureRetained": true,
+        "newCandidateSourceHead": null,
+        "newCandidatePackageAndAcceptance": "pending",
+        "privateBlockerEvidence": {
+          "fileName": "H7-41e00153-initial-A1-source-verification-HOLD-private.json",
+          "sha256": "e84215cb2dfd74bf8f249e89741c533ed6cd87b224950fe26e659fcabd8ac4be",
+          "privateSourceOnly": true
+        }
+      }
+    ],
+    "previousPublicationHold": {
+      "at": "2026-11-17T17:57:03.745376+00:00",
+      "sourceHead": "2ba978c63343da8c5aaf2324cf76111c8c7f3cd2",
+      "runId": 44120488456,
+      "reason": "H8 exact package is installed/opened and updater/Windows checks pass, but same-task A2 plain Ego read failed at control with no new source/artifact. Native cause is unknown. New H9 source fixes metadata-only resumed-Space preflight and safe diagnostics; actual package and A3 acceptance remain pending.",
+      "priorH5ChatPreviewFailureRetained": true,
+      "priorH6A0AndH7A1FailuresRetained": true,
+      "privateBlockerEvidence": {
+        "fileName": "H8-2ba978c6-actual-A2-FAIL-ledger-private.json",
+        "sha256": "d133d46061bfb4611daaa6c2961aeb7e115e3996787ea299ab8ee222023718dd",
+        "privateSourceOnly": true
+      },
+      "newCandidateSourceHead": null,
+      "newCandidatePackageAndAcceptance": "pending"
+    },
+    "previousCandidateAcceptance": {
+      "status": "partial_package_updater_windows_pass_real_A2_control_failure",
+      "sourceHead": "2ba978c63343da8c5aaf2324cf76111c8c7f3cd2",
+      "sourceTree": "5f183c1c5ff83fe5d3e26649c5843ea565279365",
+      "releaseRunId": 44120488456,
+      "runAttempt": 1,
+      "actualMacAppOpened": true,
+      "macPackage": {
+        "version": "0.5.7",
+        "bundleId": "com.wangjiawei508.workgpt",
+        "architecture": "arm64",
+        "asarSha256": "0c603ad8722f628c36fb3f2176038236822975832807e5d9f480c197ec4bd5bf",
+        "dmgSha256": "7c0b415d972a3598ae4475f38e34957bd481038467301de3d8a89395c1ff72de",
+        "signature": "passed",
+        "notarization": "passed",
+        "gatekeeper": "not_evaluated_local_security_override",
+        "localOuterMacArchiveFullHashClaimed": true,
+        "rootIdentityProof": {
+          "fileName": "2ba978c6-root-independent-package-check.json",
+          "sha256": "673a38ba9866e3fd593a95140c76d4cabf075371327e2d8c60bc35d11904f402",
+          "privateSourceOnly": true
+        }
+      },
+      "sameRunNativeUpdater": {
+        "status": "passed_original_strict_and_root_integrity",
+        "baseVersion": "0.5.6",
+        "targetVersion": "0.5.7",
+        "jobId": 134205274071,
+        "artifactId": 14350810887,
+        "targetAndInstalledAsarMatchLocal": true,
+        "cleanCiGatekeeper": "accepted_with_assessments_enabled",
+        "rootEvidence": {
+          "fileName": "2ba978c6-root-updater-original-proof-check.json",
+          "sha256": "1972d7b9b5a1d8f19c4dbcf107e0c64ff3203b46a2645635232a47437ad3f4b1",
+          "privateSourceOnly": true
+        }
+      },
+      "windowsFull": {
+        "status": "passed_corrected_QA_driver_original_strict_and_root_integrity",
+        "acceptanceRunId": 44136767946,
+        "packageSourceHead": "2ba978c63343da8c5aaf2324cf76111c8c7f3cd2",
+        "driverSourceHead": "1ba93dcacd1882563bbb8a5b4c6c0d7109aefa59",
+        "changedFiles": [
+          "scripts/run-windows-ui-smoke.mjs",
+          "scripts/windows-ui-smoke.test.mjs"
+        ],
+        "uiChecks": 17,
+        "permissionChecks": 6,
+        "localModelFixtureRequests": 42,
+        "realClockDuePassed": true,
+        "windowsSignature": "NotSigned",
+        "scope": "controlled BSK/local model/loopback; Windows Ego, external model and paid Dadan unexercised",
+        "rootEvidence": {
+          "fileName": "windows-1ba93dca-same-H8-root-full-proof-check.json",
+          "sha256": "8100fd1b68aafe2371a0e852915aca137c0192d3608e625f90aa1637020bb326",
+          "privateSourceOnly": true
+        },
+        "originalFullFailure": {
+          "runId": 44128824077,
+          "status": "failure",
+          "preserved": true,
+          "actualNullErrno": "unknown; QA publication-read gap reproduced deterministically and bounded exact-Turn/Grant wait corrected"
+        }
+      },
+      "realSameTask": {
+        "taskId": "task_capability_c9985c7ac166d00865b4724a",
+        "previousH6A0AndH7A1FailuresRetained": true,
+        "status": "waiting_user",
+        "attempts": 2,
+        "turnId": "turn_zmgjouro",
+        "listSchedulesSucceeded": true,
+        "plainReadAttempts": 1,
+        "plainReadFailedCode": "ego_browser_read_failed",
+        "failurePhase": "control",
+        "nativeCause": "unknown_not_preserved_by_old_diagnostics",
+        "newSourceCollected": false,
+        "newManagedHtmlSaved": false,
+        "previousA1DraftRetained": true,
+        "sourceVerificationPassed": false,
+        "threeNodesCompleted": false,
+        "existingTemporaryPlanReadBack": true,
+        "newPlanCreated": false,
+        "temporaryPlanTime": "21:18 Asia/Shanghai",
+        "naturalDueExecuted": false,
+        "chatBackgroundPreviewIsolationExercised": false,
+        "failureLedger": {
+          "fileName": "H8-2ba978c6-actual-A2-FAIL-ledger-private.json",
+          "sha256": "d133d46061bfb4611daaa6c2961aeb7e115e3996787ea299ab8ee222023718dd",
+          "privateSourceOnly": true
+        }
+      },
+      "preservation": {
+        "allOther27TaskRowsAndAll8PlanDefinitionsAndEnabledStatesUnchanged": true,
+        "oldUnknown16AndPrepared1RawRowsUnchanged": true,
+        "configurationOpaqueHashesUnchanged": true,
+        "oldOperationPayloadStatusAndSealsUnchanged": true,
+        "oneSuccessfulCurrentTaskScheduleReadbackUpdatedAtRefreshed": true,
+        "originalRawReadbackRetainedInBackup": true,
+        "formalPlanStillEnabled": true,
+        "rootEvidence": {
+          "fileName": "2ba978c6-A2-blocked-full-raw-preservation-private.json",
+          "sha256": "7c2e5aa9f5b1de40f1654feb14e1438d805db5e75f2a28a9f8911b8e9c2d39d2",
+          "privateSourceOnly": true
+        }
+      },
+      "nextH9": {
+        "status": "metadata_only_resumed_space_preflight_and_safe_native_diagnostics_source_prepared",
+        "sourceHead": null,
+        "sourceTree": null,
+        "releaseRunId": null,
+        "targetAsarSha256": null,
+        "expectedSameTaskAttempt": 3,
+        "currentAppRemainsH8": true,
+        "noTaskInputOrA3Yet": true,
+        "sandboxWideningAllowed": false,
+        "failureCounterResetAllowed": false,
+        "actualBusinessAcceptance": "pending",
+        "naturalDueAndChatBackgroundPreviewAcceptance": "pending"
+      },
+      "publicReleaseStatus": "HOLD_pending",
+      "h5ChatPreviewFailureRetained": true,
+      "noCodexPaidSourceCollectionOrReportEditing": true
+    },
+    "h9InitialCI": {
+      "sourceHead": "98150ea0b7087b7c771b0e84c6a450defa35fe62",
+      "sourceTree": "e2e267af58339280967c7f220e85788e34c576a2",
+      "status": "failed_retained",
+      "pushRunId": 44143167639,
+      "pullRequestRunId": 44143181966,
+      "runAttempt": 1,
+      "passedJobs": 4,
+      "failedJobs": 2,
+      "cause": "Offline full-chain closed-status fixture omitted identityMatches:false; strict production protocol rejected correctly. Fixture completed and resumed-read-before-open path covered; original CI was not rerun.",
+      "productionValidatorRelaxed": false,
+      "nativeOrBusinessAcceptance": false,
+      "privateEvidence": {
+        "fileName": "quality-98150ea0-final-handoff.json",
+        "sha256": "93f36449ab749a7ad193cbdd7ddb21bf00a62ff0e13cc82c56b82ea9c0ac01a2",
+        "privateSourceOnly": true
+      }
+    },
+    "latestH9Candidate": {
+      "sourceHead": "cc32fe571502ddc763b86da3ceb690ff6cc7fa99",
+      "sourceTree": "d2eebba1c9fdd8751d58a7fcf208da8daf3ae9e4",
+      "sixOfficialQualityJobs": "passed",
+      "pushQualityRunId": 44147940457,
+      "pullRequestQualityRunId": 44147956668,
+      "privateReleaseRunId": 44151140572,
+      "privateReleaseRunAttempt": 1,
+      "actualProducerVersion": "0.5.7",
+      "Mac": {
+        "status": "failed_before_artifact",
+        "jobId": 134283007896,
+        "stage": "Build signed macOS packages",
+        "arch": "x64",
+        "timestampError": "A timestamp was expected but was not found.",
+        "internalArchitectureAttempts": 3,
+        "notarySubmissionReached": false,
+        "underlyingEndpointOrServiceCause": "unknown",
+        "artifactCreated": false,
+        "installed": false,
+        "opened": false
+      },
+      "Windows": {
+        "status": "original_basic_full_and_root_independent_checks_passed",
+        "artifactId": 14360406634,
+        "artifactSize": 317560437,
+        "artifactSha256": "e5719d8de8f36d19b837a9b27e425ac6d133c1a8826900d25e84441d823ad4ed",
+        "installerSha256": "09df0038b44af1f812ed42fe989d345b89e11b3f76f1dfcb2b9e56b6296f5de6",
+        "installedAsarSha256": "af01034c5699be7fe463c83de63a41184fa0843c30101b8bb9debb26aea3de6f",
+        "signature": "NotSigned",
+        "fullRunId": 44156852440,
+        "fullResult": "passed",
+        "scope": "controlled BSK/local protocol model/loopback; no Windows Ego/paid Dadan/external model claim",
+        "fullArtifactId": 14360644691,
+        "fullArtifactSize": 1197782,
+        "fullArtifactSha256": "4fb106a6de6730f12bc4d0f58de14d76ac57b288c124835bd6f5f64dc8b80861",
+        "rootEvidence": {
+          "fileName": "windows-cc32fe57-H9-root-full-proof-check.json",
+          "sha256": "b9efa21cee168d93813c7248dbb59bb1796e4579a3e2930a08dfbb86275769fa",
+          "privateSourceOnly": true
+        }
+      },
+      "failureEvidence": {
+        "fileName": "H9-cc32fe57-Mac-attempt1-FAIL-ledger-private.json",
+        "sha256": "d8928dd39fe67b6b43ca82639b3108bde60bcc59dae9a5a534e45e3c7aa01057",
+        "privateSourceOnly": true
+      },
+      "actualMacRemainsH8": true,
+      "actualSameTaskStillA2Waiting": true,
+      "noTaskInputOrA3": true,
+      "publicReleaseStatus": "HOLD_pending",
+      "nextPackagingCorrection": {
+        "status": "source_applied_validated_PNG_exact_path_rules_standard_signer",
+        "sourceHead": null,
+        "sourceTree": null,
+        "releaseRunId": null,
+        "MacAsarSha256": null,
+        "actualBusinessAcceptance": "pending",
+        "isolatedSourceCommit": "2e6d2dc0d12b261f86512f052c0cb2bafb56151a",
+        "focusedTestsPassed": 61,
+        "requiredTimestampPreserved": true,
+        "underlyingTSAResolutionClaimed": false,
+        "newExactMacPackageRequired": true
       }
     }
   }

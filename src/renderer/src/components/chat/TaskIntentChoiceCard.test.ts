@@ -29,3 +29,17 @@ it('submits the original request with a stable decision key, suppresses double c
   expect(container.querySelectorAll('button')).toHaveLength(0)
   expect(store.selectThread).toHaveBeenCalledWith('origin')
 })
+
+it('makes a user-selected new task foreground only after the coordinator actually starts its Turn', async () => {
+  const coordinate = vi.fn(async () => ({ kind: 'task_started', task: { id: 'new-task' }, turn: { threadId: 'worker', turnId: 'new-turn' } }))
+  vi.stubGlobal('window', Object.assign(window, { workwise: { coordinateTaskCommand: coordinate } }))
+  const dispatch = vi.spyOn(window, 'dispatchEvent')
+  try {
+    container = document.createElement('div'); document.body.append(container); root = createRoot(container)
+    await act(async () => root!.render(createElement(TaskIntentChoiceCard, { card, message: '请选择归属' })))
+    await act(async () => container!.querySelectorAll('button')[1]!.click())
+    expect(coordinate).toHaveBeenCalledWith(expect.objectContaining({ intent: 'new' }))
+    const foreground = dispatch.mock.calls.map(([event]) => event as CustomEvent).filter(event => event.type === 'railwise:foreground-task-artifact-preview')
+    expect(foreground.map(event => event.detail)).toEqual([{ threadId: card.threadId, taskId: 'new-task' }])
+  } finally { dispatch.mockRestore() }
+})

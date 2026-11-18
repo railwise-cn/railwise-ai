@@ -945,3 +945,115 @@ Root 独立核验后正常退出旧实例一次、确认 Main／Runtime 全停�
 临时计划已通过一次正常 UI 点击暂停，revision 正常增加为二；正式大单网与原暂停政府采购的全部定义行逐字不变。实际付费内容、页面和原生图只保存在私有证据目录。后续修正限定在活动状态的进展投影、周期任务对原计划的安全读回、以及模型的精确到期回合上下文；不放宽创建计划或浏览器权限，不清除旧回执或改变任务次数。修正后的完整检查、新精确包及对应真实到期结果仍须验收，d9fb 不作为最终业务通过包。
 
 三项修正的回归均先复现原缺陷。活动进展投影先三项失败，后桌面两文件十五项通过，等待／暂停／失败的真实原因及审批提示保留，输入 Task 不变。周期读回新增二十三项覆盖：真实派发准备链、Ego 只读范围、错误任务／Turn／Grant／版本／站点／身份／撤销、合法原计划重试及周期任务重试；既有一百二十四项保留。AgentLoop 回归实际捕获跨工具调用前后的模型请求，验证只从可信 Task 注入精确计划 ID、到期时间、当前任务与 due_execution 阶段，普通请求伪造这些文本不产生注入；原工具目录和 Task 对象不变。最终 Node 22 标准 KUN runner 合跑两个文件 169 项通过，KUN 类型、六文件 lint 通过；未再变动的桌面增量沿用对应 Node／Web 类型检查。包含全部增量的一次实际生产构建、1,381 输入 freshness 和 2,443 个 authored production 文件对比通过。后继完整 CI、新精确包和实际到期阶段／计划读回仍待验收。
+
+
+### 2026-11-17 Windows manual-preview acceptance correction
+
+The exact 0.5.7 package from Release run `44024949316` remains bound to production source `3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa`. Original full Windows run `44029208287` remains **failed**: the browser initial task and real-clock scheduled occurrence completed, but the subsequent manual artifact-entry click was behind a legitimate inspector overlay. These receipts do not make that full run pass.
+
+At 1024 pixels, switching routes can asynchronously restore the selected task preview and make the main surface inert. The corrected QA driver waits for that projection, uses the visible “收起右侧栏” control, then requires an interactive main surface and two stable uncovered target frames before real pointer input. Permanent coverage still fails. Existing HTML body, isolated partition, manual-entry and layout assertions remain. No production code, source gate or authorization was changed.
+
+The regression uses the actual production layout hook: the original driver fails with `UI target is covered`, the correction passes, and the two focused QA files plus existing package-source tests pass 136/136. The same exact Mac package independently reproduced the overlay/inert state and became clickable after its real collapse control. The required new-head CI and corrected exact-package Windows full run remain pending. Windows coverage uses controlled BrowserSkill, model protocol and loopback content; it is not Ego Windows or paid-site acceptance.
+
+Private evidence digests: QA patch `643f3c5f9740b7e92f0229416248b1c6e5527483c4abf5b071e2ba4f17a6cc83`; original failure manifest `5f60fda594dde2bf9b8d88b21e226c633bd5ccd6bf64c7fb5ac20307f7ff6156`; focused validation manifest `193e1aae699c43adc8933e7c71a7cf04b58f39d0e0e79b536e48e57f6e1e3546`.
+
+This note supersedes the separately added QA JSON in commit `d3745f5b`; its original bytes remain in that commit and the private evidence set. Consolidating into this existing allowed acceptance document preserves the package/driver source contract without expanding its allowlist.
+
+
+The subsequent exact-package full run `44039630770` also remains **failed**. Its driver had dismissed the route-restored preview, then incorrectly required the same selected task/artifact hash to emit another automatic preview. Keeping a dismissed key closed is the intended product behavior. The next QA correction waits for loading only when a modal inspector actually exists; otherwise it checks stable uncovered geometry and tests the independent manual entry directly. A late modal is dismissed through its visible panel control with a bounded recheck. The actual layout-hook regression now includes reselecting the same task/hash without inventing a new projection. All earlier late-overlay and permanent-coverage cases remain; focused tests pass 137/137. Original HTML, partition, manual-entry and layout assertions remain. Production code, source gates and allowlists remain unchanged; a corrected new-head full result is still pending. Private correction patch digest: `c502c60d897c834499a27b2ce3c79054082ecb0e3b5f1e6f557e71cb1758989c`. Original second failure manifest digest: `c7d8f72318385b9cf3a4d1020e5cbb8929bb199969350e125e9b72a3a70839fb`.
+
+
+### 2026-11-17 最终 H4 精确包与业务验收
+
+最终生产包为 `3f1ba1d345ac5f3ae33d2cd98a2b5a1ebced30aa`、Release `44024949316`、正常版本 0.5.7。实际安装并打开了该 Mac 包，核对 bundle、Team、签名、应用公证、DMG 与 ASAR。相同 run 的原始 0.5.6→0.5.7 native updater 已通过。Windows 同一原包在修正后的 QA driver `8538d2624ad496cc2964cdfddc16bfaca274d2a6` 上完成 full `44044175670`：官方 success，原始证据 artifact `14310842516`、整档 SHA 与 CRC、全部 13 个解压文件原 bytes、严格 checker 和 Root 独立核对通过。初始与自然到期均生成新 HTML，自动预览与关闭后的手动重开通过；原两次 full 的失败结论保留，不回写为通过。该后继仅改未分发 QA/证据，未重建应用或 updater。
+
+真实浏览与报告由 RailWise AI 的实际模型和 Ego Provider 完成，Codex 没有采集付费网页或改写报告。初始 A1 的严格来源核验失败保留；一次澄清原业务筛选与逐字引用要求后，在同一任务正常继续 A2，交付首屏筛选的 10 条。15:10 的临时计划由真实时钟自然触发，独立 Task/Grant 在 A1 内自行恢复一次旧 observation 和一次引用核验错误，重新读取更新列表，交付 11 条并核验文件。执行中实际观察到第二个 Ego Space，结束操作 awaited finish 后恢复原 Space；未把结束后截图冒充正在运行的 Space。后台成果没有抢走当前任务预览；选择新任务后正确自动打开其独立成果。首屏范围、未读取官方正文与独立条目链接、缺失字段待核验均明确记录，不宣称全日全站覆盖。相关性判断属于 AI 内容核对，不代表专业人工签字。
+
+临时计划仅该新增项在一次自然到期后正常暂停；正式计划仍启用，Asia/Shanghai 08:30、16:30 启动，09:00、17:00 交付目标。此前五份计划定义、22 个任务和 16 条 UNKNOWN 原记录保持原样。旧版本真实 08:30 失败及错过目标时间仍保留，不追认按时成功。
+
+原生 Mac 窗口在 1024×760、实际最小 960×700、1280×840 检查 General 菜单重定位、焦点返回和无横向溢出；760 的请求被实际窗口最小宽度约束为 960，不声称测试了更窄尺寸。Windows 另覆盖大小字体、菜单定位和窄窗导航。Windows Authenticode 仍为 NotSigned/not-configured；Windows BSK/模型协议/loopback 受控验证不代表 Ego Windows 或付费大单网。Mac 本地 Intel UI 未测，本机 Gatekeeper override 与同 run CI 启用策略 accepted 证据分列。完整外层 Mac archive 未在本机全 hash 的界限保留。付费内容和原生付费页面图仅留私有证据。当前验收资料见 `docs/qa/release-gates/v0.5.7.json` 及其 sidecars。
+
+
+**后续正式 16:30 失败与暂停发行：** 原正式计划在 16:30:13 自然建立独立任务，实际打开 Space 12，原生画面显示 2 Spaces。SPA 的两次未截断读取只有导航／订阅壳，正文尚未到达；随后 selector 因观察与动态 DOM 变化两次拒绝。模型未回到当前完整只读读取，重复 publish 被严格来源核验拒绝，16:32:51 转 waiting_user，无成果。该真实失败与次数保留，不宣称交付或按时完成。H4 上述初次／临时到期及 Windows 通过仍是限定范围的历史证据；总业务状态改 partial，public gate 恢复 pending，尚未移动发行标签或公开发布。后续修正须保持同任务来源、授权和严格校验，完成新源码精确包验证后再评估发行。
+
+
+**16:30 故障的代码修正（尚待新精确包）：** Ego 工具默认引导在原 Space 直接 `ego_browser_read({})` 读取当前文档，避免重复导航及旧 selector。仅真实当前同 Task／Turn／Grant／配置／Space 的 selection-phase stale 允许一次独立的整页只读恢复；初始失败回执保留，新读取单独封存，不能冒充原局部选择成功。过期、撤销、接管、未知结果、伪造或旧观察、变更完整 URL（含 hash）均不自动恢复。URL 还在 evaluate 内任何 DOM 查询前原子核对；竞态回归由旧代码两次错误查询变为零次。截断、空 DOM 和导航壳仍是实际捕获，不被升级为完整业务或零结果。
+
+来源反馈区分当前文档捕获与报告同记录证据，明确 typed manifest／来源／记录缺口；已有合法 Ego Scope 时仅建议同一任务空间的现有只读工具，不增加授权，不派发工具，不扩大站点。订阅列表恢复不从导航链接推断新目标，保留原 hash 路由。同缺口两次即停的计数与全部严格引用核验保留；零登记成果时准确显示尚无成果。provider 回归 65 项通过（此前相关回归 138 项保留），source/controller 169 项通过；Root 最终四文件集成 261 项、桌面／Runtime 类型、五文件 lint、一次生产构建与 1,381 输入 freshness 通过。初轮类型失败保留；仅补运行时 object 类型收窄后复验通过。实际模型与新精确包尚未验收，public gate 保持 pending，正式失败次数／Space 12／原 Grant 记录不改。
+
+
+### 2026-11-17 H5 真实浏览通过、后台预览缺口与下一候选包
+
+H5 生产源 `c821177f3c11ddd379e6e1ff2efcf872b97757ff`、精确 Release `44055604252` 的正常 0.5.7 Mac 已安装并实际打开。同轮原始 0.5.6→0.5.7 updater、Windows 精确包 full `44059638946`、签名与适用公证检查均保留原证。Windows 仍为 NotSigned；Windows 是受控 BSK/本地协议模型/loopback 范围，不代替 Mac 的真实 Ego/DeepSeek/付费大单网。Mac 本机 Gatekeeper override 与 CI 启用策略 accepted 分列，不把本机覆盖策略误称独立 Gatekeeper 通过。
+
+RailWise 自己完成了原16:30失败任务在 H5 中的正常 A2 补交：实际当前列表、13 条相关记录、已保存并核验的 HTML、隔离预览与 awaited finish。原 H4 A1 失败和错过17:00仍是失败；旧 Space12 的真实 SDK 列表探测返回旧 ID/旧名均缺失，本次显式 Continue 被一次消费后建立替代 Space13，不能声称复用了12，也不能推断 SDK 为什么不再列出它。随后新独立验收任务 A1 自行完成初轮，并保存19:00计划。真实时钟在19:00:10建立独立到期 Task/Grant，重新读取列表、生成13条报告、修复一次逐字引用核验缺口、核验文件并 awaited finish；Codex 没有代采集网页、代改报告或手动触发到期。只读首屏和未读官方正文的限制始终明确。临时计划仅该新增项在自然到期后正常暂停；旧六份计划定义原样，正式08:30/16:30计划仍启用。
+
+此次验收在 chat 场景复现了预览隔离失败：同 origin 的后台定时 Task 发布草稿后，自动替换了正在看的初轮报告。H4 的实际“不抢占”检查仅覆盖固定 TaskWorkspace，相关 UI 源 H4→H5 没变，不能将旧通过结果外推到 chat；原 URL 不变的断言保留 FAIL，H5 整体仍 partial，禁止公开晋级。下一生产修复按真实用户成功启动/继续 Task/Turn 或显式打开成果记录前台预览意图，后台调度事件不自提为前台；等待新成果时保留当前页面并拒绝旧请求的迟到响应。同任务版本更新、用户关闭后的去重、明确选择定时 Task 的打开行为与旧资料保留均继续覆盖。完成后的长篇交付说明默认折叠，原 Markdown、哈希和诊断文字仍可主动展开。
+
+另修正报告通用 `other` 的语义标签：任意原文摘录可能是业主名称，不应一律标为“匹配依据”。新报告显示“列表原文摘录”；旧标签仍可核验，原值、逐字引用、必需字段、严格校验和旧报告不变。本修改不会凭空新增匹配理由。
+
+本地合并检查已通过：桌面和 Runtime 类型检查、所有修改文件 lint、7份 UI 用例160项、3份来源/报告用例137项、一次生产构建与1381输入 freshness。新的精确包、正式 CI 和实际预览隔离复验仍待完成；这些源码检查不代表新包已安装或整体验收通过。私有 H5 原证汇总 `H5-c821177f-browser-pass-preview-FAIL-ledger-private.json`（SHA256 `9fc3368f86f0ddf3adeaa5e39748c1b99a6276aced10c39090f83d53af87d743`）不含公开的付费正文。
+
+
+### 2026-11-17 H6 精确包已打开，真实新任务在预检 A0 阻断
+
+H6 源码 `e5a0428dbce9778d4651a129044f0d84559f2286`、[精确 Release 44078752895](https://github.com/railwise-cn/railwise-ai/actions/runs/44078752895)、正常版本 0.5.7 已安装并实际打开。Mac arm64 的正式 bundle 为 `com.wangjiawei508.workgpt`，DMG SHA256 为 `9064b434870cadce591b315e914ebed1e678405f132c1ad478bc05da17e0efd9`，实际 ASAR 为 `617d5d570481b97d1673df032fbfaa1bed892ba107e03bb9941a6150ef592746`，签名与适用公证通过。本机 Gatekeeper 因原有 security-disabled override 明确记为未评估；未改系统信任。选定 DMG 的 CRC、SHA512、SHA256 已核对，不声称本机完整下载并核验外层 Mac ZIP。
+
+同 run 的原始 0.5.6→精确 0.5.7 native updater 官方与原 strict validator 通过，target／installed ASAR 与本机包一致；干净 CI 的启用 Gatekeeper 评估通过。此处不声称 Root 已独立补查所有 updater 原始 archive。Windows [full 44083591136](https://github.com/railwise-cn/railwise-ai/actions/runs/44083591136) 的官方、原 strict checker 和 Root 原始证据完整性核对通过；安装器仍为 NotSigned，范围为受控 BrowserSkill、协议模型与 loopback，不代表 Ego Windows、外部真实模型或付费站点验收。H6 Mac 的 General 菜单在实际 960×760 和 1280×840 两个原生尺寸下位于窗口内，未发现横向溢出；这两项几何检查不代替真实业务与后台预览隔离验收。
+
+新的真实任务 `task_capability_c9985c7ac166d00865b4724a` 在 attempt0 即进入 waiting_user；模型 Turn、来源采集、HTML 成果和新计划均未启动。Root 对准确 H6 安装包中 compiled preflight 函数的只读导入／合成依赖 RED 证明：`explicitWorkspaceWrite` 将“后台到期成果保存到对应的本轮任务，并保持……”中的任务归属短语误判为本地路径，随后只读沙箱按现有规则正确拒绝该误判目标。报告保存到应用管理的任务成果本来允许只读工作区；修复目标是路径识别，不是放宽沙箱、修改默认权限或增加新的 TaskSandbox 接口。RED 回放只证明此误分类，不是业务通过。
+
+启动后、提交新 QA 前，原27个 Task、7份计划和旧 UNKNOWN 原始记录核对保持；这些数量是当时事实，不是后续交接的固定条件。H5 的同 origin 后台任务抢占 chat 预览 FAIL、H4 的真实正式到期失败及错过目标时间仍保留，不能用 H6 的包、升级、Windows 或 General 检查覆盖。H6 尚未执行新初轮、自然到期及 chat 后台不抢占的真实浏览验收。H7 当前仅准备最小识别修复与未激活交接输入，源码、Release run 和新 ASAR 尚未绑定；必须使用后继新精确包继续验收，**总状态仍为 HOLD／pending，未公开发布**。
+
+私有证据只公开文件名和摘要：预检阻断 `H6-e5a0428d-actual-preflight-blocker-private.json`（SHA256 `747ace40a6fee8ffe4349f7eaa1e265aac43b493f8af88fbcae99a5428dd7346`）；准确已安装模块 RED `H6-e5a0428d-actual-package-write-preflight-RED-private.json`（`c5868d4e8bda5473e99d3b1f4cff577e21e38de7ba0ad9ac33e4a2d1032c5e5a`）；旧记录保留 `e5a0428d-before-new-QA-protected-history-private.json`（`0c22350046f939ed3401b83e3024c262f95aa70f150f34eecbaa46675b213750`）。付费页面、条目标题和私有报告仍未提交。
+
+
+### 2026-11-17 H7 原任务进入真实 Ego 空间，报告仍被严格核验拦截
+
+H7 源码 `41e00153dad3978357c28dce992cd9d09f2afba5`、[精确 Release 44098000303](https://github.com/railwise-cn/railwise-ai/actions/runs/44098000303) 的正常 0.5.7 Mac 已安装并实际打开。DMG SHA256 `69e29d5091477e12b73b718f13791b9345099a9635bccb17b7d91398f28d9c9f`、本机 ASAR `d2f0c667830a9884da509ba46b1abdf537b269f0e0e8cd2d78d3c3529605ef1b`，bundle、Team、签名和适用公证通过。同 run 真实 0.5.6→精确包 updater、原 strict 校验及 Root 原始 archive/全部九个文件核对通过，target/installed ASAR 与本机相同。Windows [full 44103976580](https://github.com/railwise-cn/railwise-ai/actions/runs/44103976580) 的官方、原 strict 与 Root 原始证据核对通过；仍是 NotSigned 和受控 BSK/本地模型/loopback 范围。Mac 本机 Gatekeeper override、外层 Mac ZIP 未全量本机 hash 的限制保留。
+
+Root 正常退出 H6 一次，确认 Main/Runtime 全停、所有受保护状态一致并完成 SQLite 一致性备份后，于北京时间23:05打开新精确包。23:10通过真实界面只重新检查并继续原 attempt0 任务一次，没有新建任务或修改 Agent/沙箱/默认权限。原任务正常进入 A1；RailWise 自己建立 Ego Space17、打开已授权订阅地址、读取本轮33,260字节完整列表。实际原生画面显示两个 Space：用户原空间保留，蓝色运行空间属于 RailWise。Codex 没有操作网页、采集付费来源或改写报告。
+
+RailWise 自己保存并自动预览 HTML，创建并读回同任务独立临时21:18计划；该时刻早于恢复，nextRunAt 为次日，尚未编辑时间或执行自然到期。首轮字段核验失败后，模型自行重新读取并修复大部分缺陷；第二次核验仍拒绝一个跨记录拼接的字段 quote，任务进入 waiting_user、1/3节点完成，成果保持来源待核验。真实源中的标题/日期和金额值不能为该错误 quote 背书，拦截是正确的。
+
+代码定位发现 `feedRecord` 将所有字段 quote 的成功与否纳入记录定位，一个字段错误会连带正确标题、日期报错；首轮核验原因列表又截断为30条，隐藏后段记录问题，削弱一次有界修复的反馈。后续最小修复仅分离严格记录边界与逐字段校验，并提供有界、完整、可定位的已读记录反馈；不放宽跨记录引用、不修改失败计数、权限或历史回执。H7 自身仍是 partial/HOLD，后继精确包及同任务继续必须重新验证，不把已有草稿或包检查升级为业务通过。
+
+原27个其它任务、旧七份计划定义、16条 UNKNOWN及一条 prepared 原始记录和配置 opaque hash 保持；仅原 attempt0任务正常增至A1，并新增其临时计划。正式每日08:30/16:30计划仍启用。H5 chat 后台抢预览 FAIL、H6 A0失败和 H4正式时限失败均保留。私有 H7失败账本 `H7-41e00153-initial-A1-source-verification-HOLD-private.json`（SHA256 `e84215cb2dfd74bf8f249e89741c533ed6cd87b224950fe26e659fcabd8ac4be`）；连续性 `41e00153-A1-blocked-continuity-private.json`（`cc410411de53698de8d8870fcf3224e265572bc3b82ddb4bb0e1357d831856ad`）。付费页面、条目名、原文和 HTML 只留私有证据。
+
+该最小修复的匿名功能回归先在旧代码形成两个 RED（单字段级联、30条截断），修复后来源/订阅/计数/结构化四文件155项通过。Root 合并树再完成桌面/Runtime类型、两文件lint、包含真实Factory/Host Ego替身链的五文件133项、一次生产构建与1381输入freshness；原有跨行、唯一标题、伪href及计数防线均保留。对已保存真实来源/草稿做纯解析离线重放仍只拒绝原错误字段，没有更改现场文件、来源回执或任务状态；它不是新的Host/Grant或业务通过证明。反馈最多附三条、每条1200字符的已授权同记录原文，不猜测不完整/歧义记录。publication/source-progress 仍用原逐字quote准入，记录定位成功本身不升级为字段或报告核验通过。后继完整CI、精确包和原任务A2仍待完成。
+
+
+### 2026-11-18 H8 已安装打开，原任务 A2 在 Ego 控制阶段失败
+
+H8 源 `2ba978c63343da8c5aaf2324cf76111c8c7f3cd2`、[精确 Release 44120488456](https://github.com/railwise-cn/railwise-ai/actions/runs/44120488456) 的0.5.7 Mac已安装并实际打开，ASAR `0c603ad8722f628c36fb3f2176038236822975832807e5d9f480c197ec4bd5bf`。完整外层 Mac ZIP 已在本机独立核对官方 SHA256、大小及全部 CRC，选定 DMG/更新元数据和签名、公证通过；本机 Gatekeeper override 如实记为未评估，未改系统信任。同 run 真实0.5.6→精确包 updater、原 strict 与 Root 原始九份文件完整性核对通过，CI启用 Gatekeeper 的三套身份均 accepted。
+
+Windows原 full44128824077在权限测试驱动一次读取持久化会话得到null后失败；实际底层errno未记录。真实FileThreadStore的Windows发布空窗被确定性复现，驱动改为等待同一Task/Turn/Grant就绪，保留原20秒界限和全部六项权限断言。仅两份QA脚本的1ba后继驱动使用同一H8安装包，[full44136767946](https://github.com/railwise-cn/railwise-ai/actions/runs/44136767946) 通过17项UI、6项权限、42次本地协议模型请求和一次真实到期。原始失败保留；Windows仍NotSigned，范围不包括Windows Ego、外部模型或付费站点。
+
+Root正常退出H7一次，核对受保护状态，完成含浏览器SQLite的一致性备份并另存临时目录之外；H8打开后仅在原任务正常继续一次至A2。RailWise读回已有临时计划，随后一次无selector的Ego读取返回 `ego_browser_read_failed/control`，没有本轮新来源或新成果，保留A1草稿。旧代码抹去了具体SDK边界和原生异常类别，不能断言Space17关闭、用户接管或网络阶段。被动原生画面仅证明可见界面当时只有个人Space，不冒充SDK清单证明。其它27个Task、8份计划定义及启用状态、16条UNKNOWN、一条prepared和配置opaque hash保持；旧操作payload/status/seal保持，仅本任务真实计划读回刷新一条成功回执的updatedAt，原文仍保存在一致性备份。
+
+H9源码补上恢复前的固定元数据查询：同Task/Turn/Grant/配置/旧绑定的查询单独封存，当前已核验来源可复用，确认旧ID与名称均缺失才返回可恢复的原地址open提示。空间新建仍只能走原有显式Continue授权和fresh open检查；用户接管、身份不符、过期、配置变化及结果未知均停止。缓存依赖真实Host的批准结果与输出hash，不是网页读取证明。失败诊断仅保留白名单SDK边界、异常类别和匹配绑定的身份；Page handle标签不代表原生Page存在，不保存原生消息、stack、正文或URL token。离线原生形状替身与Factory/Host集成回归167项通过，不是实际SDK或A3通过。
+
+同时修正明确命名任务被后文“采集计划独立”覆盖的标题，并将未知Ego范围及Task审查入口改为准确的呈现文字；完整目标、权限和执行处理不改，121项聚焦UI测试通过。Root合并检查、新精确包、同任务A3、新来源/报告、自然到期和chat后台预览隔离仍待完成，公开发行持续HOLD。付费页面、标题、正文和HTML均未提交。
+
+H9首份提交 `98150ea0` 的原始 [push44143167639](https://github.com/railwise-cn/railwise-ai/actions/runs/44143167639) 与 [PR44143181966](https://github.com/railwise-cn/railwise-ai/actions/runs/44143181966) 均未通过完整Runtime测试，四份Electron/Windows作业通过。两个相同恢复集成变体的离线SDK状态替身漏传官方状态脚本必返的 `identityMatches:false`，被新的严格合同正确拒绝。只补齐替身字段，不放宽生产校验；并让该Factory/Coordinator/Host全链回归先真实调用旧空间读取，核对可恢复的open提示，再走fresh open建立后继空间、读取、报告核验、计划读回与收尾。旧Grant、预算、失败记录及无关UNKNOWN保留断言不改。修正后该文件9项通过；两份原CI失败及原始日志保留，不重跑原提交、不据此发布。后继完整CI、精确包与真实A3仍待完成。
+
+### 2026-11-18 H9 全量CI通过，Mac精确包在签名阶段失败
+
+后继 `cc32fe571502ddc763b86da3ceb690ff6cc7fa99` 的 [push44147940457](https://github.com/railwise-cn/railwise-ai/actions/runs/44147940457) 与 [PR44147956668](https://github.com/railwise-cn/railwise-ai/actions/runs/44147956668) 六项官方检查全部通过，Root另核对官方原始结果。本地176项执行链、121项UI、类型、lint、一次生产构建及freshness通过；此前981两份Runtime失败保留。
+
+[私有精确构建44151140572](https://github.com/railwise-cn/railwise-ai/actions/runs/44151140572)实际生产版本为0.5.7，Windows包和原生安装检查通过。完整Windows ZIP大小、官方SHA、全部CRC、feed SHA512、安装程序及原生安装ASAR来源已再次独立核对；仍NotSigned。该包的受控完整任务/浏览器检查44156852440及Root原始ZIP/全部13份原文和引用hash复核通过，包含6项权限、42次本地协议模型请求、HTML自动/手动预览、daily读回与真实时钟独立到期任务；该范围不包括Windows Ego、付费大单网或外部模型。
+
+同run的Mac x64在签名打包阶段三次内部尝试均遇到 `A timestamp was expected but was not found.`，目标为PPT Master的普通PNG资源；生产bundle已构建、公证凭据预检已通过，但尚未公证提交、未生成Mac成果、未安装或打开新Mac包。原日志没有TSA响应或网络阶段证据，不能断言Apple服务故障。精确依赖26.8.1/1.3.3的只读源码及真实PNG探针确认，默认签名walker以通用二进制分类选中了该0644资源。后续整改通过打包后真实格式核对，只向标准签名器添加确切PNG数据路径，并准确呈现时间戳失败；程序、动态库、脚本及未知文件继续签名，新的精确构建仍须验证实际结果。
+
+本机仍为H8，原任务仍停在A2，未添加Task输入、未继续A3，原个人Ego空间、27个其它Task、既有计划及UNKNOWN保持。公开发行继续HOLD。原始H9失败账本 `H9-cc32fe57-Mac-attempt1-FAIL-ledger-private.json`（SHA256 `d8928dd39fe67b6b43ca82639b3108bde60bcc59dae9a5a534e45e3c7aa01057`）保留。
+
+
+### 2026-11-18 H10 实际空间、初轮和自然到期完成；报告呈现仍待整改
+
+源 `77d81d3f1662677e26d80f65903633729bbf9bdc`、[精确构建44166307752](https://github.com/railwise-cn/railwise-ai/actions/runs/44166307752) 的正常0.5.7 Mac已安装并实际打开，ASAR为 `dc33d529fa6974eab1cb4727b442531e0d608fb4535abc0e4a04b7c0c5411d95`。完整外层ZIP、全部CRC、DMG和元数据、签名及公证均经独立核对。本机Gatekeeper仍因原有override记未评估，未修改系统信任。
+
+同run的Mac及真实0.5.6→精确包native updater成功；原Windows basic因更新元数据返回unknown失败，底层原因未确定。该run整体因此仍是failure，原strict全Release verifier按真实结论拒绝。单独Mac/updater组件校验保留全部原生、来源、哈希、签名、公证、启用Gatekeeper和数据连续性断言，只给组件通过，不冒充原strict或整个Release通过。两文件QA驱动 `d00c401e` 为相同Windows原包保留每次元数据结果、最多一次只读复查和全部硬断言；新[basic44178773300](https://github.com/railwise-cn/railwise-ai/actions/runs/44178773300) 首次实际读取即成功，[full44181573847](https://github.com/railwise-cn/railwise-ai/actions/runs/44181573847) 及原始ZIP/全部文件/严格checker通过。原失败不改为通过，Windows仍NotSigned，范围仅受控BSK、本地协议模型及loopback，不代替Windows Ego或付费网站真实模型。
+
+原任务仅正常继续一次至A3。RailWise自己创建Space18、读取当前订阅、生成并核验新HTML、自动打开并await finish；被动原生画面实际显示个人空间与蓝色RailWise运行空间。临时QA计划通过正常界面改到05:31，经真实时钟自然建立独立Task/Turn/Grant及Space19，重新采集、生成核验新HTML并finish。初轮和到期均3/3。后台运行前、发布期间、完成后保持初轮URL/partition/hash；明确点击到期成果后才打开对应新报告。只选Task未切换预览的现象保留，不冒充该路径通过。该临时计划随后正常暂停，正式08:30/16:30计划仍启用；未RunNow、改时钟或重评完成的父任务。其它27个Task、7份计划定义、1414条旧操作原bytes、16条UNKNOWN、一条prepared及配置opaque hash保持。付费网页、标题、报告和Key均不提交。
+
+本轮仍不能认定完整业务质量通过：报告将长覆盖说明塞入标题，并把相关与排除条目都显示为同一来源卡片；严格逐字来源核验成功不等于业务筛选呈现合格。Flow还实际显示保存后旧revision冲突，但错误被吞后仍发布当前服务器版本，真实到期没有失效。后续源码分别补独立AI业务筛选层、简短标题/覆盖说明、相关/待判断/排除分组及打印布局；来源classification和逐字字段校验保持。导航累计动作数与网页页码明确区分，总10次动作预算不重置。Flow以函数式几何更新保持新revision，保存失败停止发布并回读规范版本，保留乐观锁。旧报告、任务和失败记录不回写。修正仍须新精确包及新的普通界面真实模型任务验收；已完成c998 A3不继续为A4。公开发行继续HOLD。
