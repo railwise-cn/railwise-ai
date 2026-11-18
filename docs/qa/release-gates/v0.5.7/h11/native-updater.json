@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "platform": "darwin",
+  "arch": "arm64",
+  "baseVersion": "0.5.6",
+  "targetVersion": "0.5.7",
+  "channel": "frontier",
+  "feedUrl": "[redacted][redacted]",
+  "startedAt": "2026-11-17T23:37:47.241Z",
+  "browserOpened": false,
+  "userDataPreserved": true,
+  "stages": [
+    {
+      "name": "base_started",
+      "at": "2026-11-17T23:37:47.241Z"
+    },
+    {
+      "name": "update_available",
+      "at": "2026-11-17T23:37:48.391Z",
+      "detail": "0.5.7"
+    },
+    {
+      "name": "download_completed",
+      "at": "2026-11-17T23:38:18.740Z",
+      "detail": "1 artifact(s)"
+    },
+    {
+      "name": "install_requested",
+      "at": "2026-11-17T23:38:18.744Z"
+    },
+    {
+      "name": "target_relaunched",
+      "at": "2026-11-17T23:38:53.036Z",
+      "detail": "0.5.7"
+    },
+    {
+      "name": "user_data_preserved",
+      "at": "2026-11-17T23:38:53.043Z",
+      "detail": "0.5.6"
+    }
+  ],
+  "completedAt": "2026-11-17T23:38:53.043Z"
+}
+

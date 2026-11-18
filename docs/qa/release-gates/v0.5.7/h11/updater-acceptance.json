@@ -1,0 +1,51 @@
+{
+  "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+  "sourceTree": "123dc6f7965170e6752c52381612fc8ef59bef62",
+  "status": "passed",
+  "workflowRun": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/release.yml",
+    "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "headRef": "refs/heads/codex/formal-execution-recovery-057",
+    "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/formal-execution-recovery-057",
+    "workflowSha": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "runId": 44192481166,
+    "runAttempt": 1,
+    "artifact": {
+      "id": 14381811349,
+      "name": "exact-package-updater-44192481166",
+      "digest": "sha256:9642d71e9d58af6821eb25d8edc5164517e0753ab57b97dc4e908469c2559b9a"
+    }
+  },
+  "baseVersion": "0.5.6",
+  "targetVersion": "0.5.7",
+  "archive": {
+    "sha256": "9642d71e9d58af6821eb25d8edc5164517e0753ab57b97dc4e908469c2559b9a",
+    "bytes": 37605
+  },
+  "archiveMatchesOriginalOfficialDigest": true,
+  "archiveCRCVerifiedReadOnly": true,
+  "originalMachineReport": {
+    "archiveEntry": "frozen-updater.json",
+    "sha256": "a2d6a19d7647d5239f1ede7124c28b8d5b2759b225779a9f5b99a412a639ffe6",
+    "bytes": 154943
+  },
+  "originalNativeReport": {
+    "archiveEntry": "native-updater.json",
+    "sha256": "f9d507899b3604fdbed4de5ddae2fd6a0089afbab34047ff00f9a70dd46fdeaa",
+    "bytes": 995
+  },
+  "nativeReportDigestMatchesOriginalMachine": true,
+  "targetAsarSha256": "b0d09f0f3e1b311ee5404c46f3fd49bb66bf21b8446d92079111c63531130e94",
+  "installedAsarSha256": "b0d09f0f3e1b311ee5404c46f3fd49bb66bf21b8446d92079111c63531130e94",
+  "matchesLocalUiReviewedAsar": true,
+  "originalProvenanceAndPrivatePackageUnmodified": true,
+  "nativeStages": [
+    "base_started",
+    "update_available",
+    "download_completed",
+    "install_requested",
+    "target_relaunched",
+    "user_data_preserved"
+  ]
+}

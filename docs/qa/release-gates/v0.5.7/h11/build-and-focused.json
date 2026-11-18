@@ -1,0 +1,69 @@
+{
+  "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+  "sourceTree": "123dc6f7965170e6752c52381612fc8ef59bef62",
+  "status": "passed",
+  "productionBuild": "Official exact-source Quality production build and exact release production package builds passed. The local production build was additionally checked for unchanged production inputs across the fixture-only follow-up.",
+  "localValidationSha256": "50c66bfb14c48a2adad892b0c12c163f1a69c3f63e440bf9d7ce996ad33e2059",
+  "focused": {
+    "runtimeTests": 274,
+    "runtimeFiles": 8,
+    "flowDomTests": 8,
+    "windowsDriverTests": 127,
+    "desktopAndRuntimeTypecheck": "passed",
+    "changedFileLint": "passed"
+  },
+  "qualityRuns": [
+    {
+      "runId": 44189876228,
+      "event": "pull_request",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 134416104758,
+          "name": "OpenSpec, brand, lint, type, test, build",
+          "conclusion": "success"
+        },
+        {
+          "id": 134416105002,
+          "name": "Electron production smoke",
+          "conclusion": "success"
+        },
+        {
+          "id": 134416105190,
+          "name": "Windows path, spawn, persistence",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "runId": 44189863018,
+      "event": "push",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 134416057148,
+          "name": "Electron production smoke",
+          "conclusion": "success"
+        },
+        {
+          "id": 134416057538,
+          "name": "Windows path, spawn, persistence",
+          "conclusion": "success"
+        },
+        {
+          "id": 134416057607,
+          "name": "OpenSpec, brand, lint, type, test, build",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "earlierFailedFixtureRuns": [
+    44186009078,
+    44186016722
+  ]
+}

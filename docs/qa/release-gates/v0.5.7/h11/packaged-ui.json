@@ -1,0 +1,80 @@
+{
+  "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+  "sourceTree": "123dc6f7965170e6752c52381612fc8ef59bef62",
+  "status": "passed",
+  "asarSha256": "b0d09f0f3e1b311ee5404c46f3fd49bb66bf21b8446d92079111c63531130e94",
+  "localNativeInspection": true,
+  "language": "zh-CN",
+  "theme": "light",
+  "generalAndSidebar": {
+    "1280x840": {
+      "agentMenuWithinViewport": true,
+      "agentTriggerAligned": true,
+      "escapeRestoredTriggerFocus": true,
+      "workspaceNavigationNoDocumentOverflow": true,
+      "openEvidenceSha256": "bc61a4762a02078a401f3e26be031b71ba73b5b62c9b22dd7ccf32af9f7c8929",
+      "escapeEvidenceSha256": "86a298771cae7075371dea53d1e6f6d9a1bb5c20f1010b3017f73e32e4f08924"
+    },
+    "960x760": {
+      "agentMenuWithinViewport": true,
+      "agentTriggerAligned": true,
+      "escapeRestoredTriggerFocus": true,
+      "workspaceNavigationNoDocumentOverflow": true,
+      "openEvidenceSha256": "5ff05b84d5bef26a48a326587d630e7ba9ca6261e617feec25353414e3eb6b7e",
+      "escapeEvidenceSha256": "c0e0d4f4bd3c6ee2b633c13bf1798c07f7ca517a2457f505a938b1ab8cd64727"
+    }
+  },
+  "preview": {
+    "firstArtifactAutoOpened": true,
+    "backgroundTaskDidNotReplaceOpenPreview": true,
+    "explicitDueArtifactSelectionLoadedItsOwnPreview": true,
+    "phases": {
+      "beforeDue": {
+        "receiptSha256": "ed025da87e147a9f625adec8cb33f7c100036bfad2cac8ae59c06ba54c952f4d",
+        "artifactSha256": "35403dfb5660298edcbc88f14138234437ba59cc6324451e725598c81d253b8c",
+        "httpStatus": 200,
+        "actualPageLoaded": true
+      },
+      "duringDue": {
+        "receiptSha256": "899976bd9ac5f8f60958fffa5639a6ca8badbe8bb6d86380f071eb7711ebe568",
+        "artifactSha256": "35403dfb5660298edcbc88f14138234437ba59cc6324451e725598c81d253b8c",
+        "httpStatus": 200,
+        "actualPageLoaded": true
+      },
+      "afterDueBeforeSelect": {
+        "receiptSha256": "2ff79814c19ecbd4825a346b6d80e18192ae50561d3c37f3da4e1789f5afbe4f",
+        "artifactSha256": "35403dfb5660298edcbc88f14138234437ba59cc6324451e725598c81d253b8c",
+        "httpStatus": 200,
+        "actualPageLoaded": true
+      },
+      "afterExplicitDueSelect": {
+        "receiptSha256": "ff963a4fa56879d98343c49b8282d6dcf52d6254edd9e9f4e767c9114b4ff5a1",
+        "artifactSha256": "096e46cee71ebf73876f939c793d0d362741383dac8a901d5d7a0734bca41ae3",
+        "httpStatus": 200,
+        "actualPageLoaded": true
+      }
+    }
+  },
+  "windows": {
+    "status": "passed",
+    "packageRunId": 44192481166,
+    "fullRunId": 44196389961,
+    "sourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "packageSourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "driverSourceHead": "52779c7b0cf46452a05ccf80a413f0b5d046a7b3",
+    "installerSha256": "113a88a8601b04a49233267dc8321c17063a949fecce9fa5ad3e6ff37ed66dd7",
+    "installedAsarSha256": "d0b02f0cf4ff19c7891a1722706932d10c33ee77f3b03c53f3fdd3ab3998ce3a",
+    "signatureStatuses": {
+      "installer": "NotSigned",
+      "installedExecutable": "NotSigned"
+    },
+    "scope": "controlled Windows full task/browser protocol fixture",
+    "actualRealModel": false,
+    "controlledInitialAndNaturalDuePassed": true,
+    "limitations": [
+      "Controlled model protocol/page; this does not replace real Mac model/site acceptance",
+      "Windows signing is recorded from raw Authenticode; no professional engineering sign-off"
+    ]
+  },
+  "scope": "Apple Silicon Mac native UI and controlled exact Windows UI. No exhaustive language, theme or size matrix is claimed."
+}
