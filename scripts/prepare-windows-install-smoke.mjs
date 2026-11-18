@@ -14,6 +14,7 @@ const driverFiles = new Set([
   'scripts/run-windows-published-gui-update-smoke.mjs',
   'scripts/run-windows-ui-smoke.mjs',
   'scripts/verify-windows-cold-marketplace.mjs',
+  'scripts/verify-windows-video-evaluation.mjs',
   'scripts/prepare-browser-skill-smoke.mjs',
   'scripts/verify-windows-install-smoke.mjs',
   'scripts/verify-release-approval.mjs',
