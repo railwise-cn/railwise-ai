@@ -159,7 +159,6 @@ export async function buildMcpToolProviders(
   // Connect all servers in parallel — startup previously paid the sum of
   // every server's connect + list latency, and a single hung server (e.g.
   // npx resolving a package) blocked the runtime ready signal forever.
-  const startupTimeoutMs = options.startupConnectTimeoutMs ?? DEFAULT_MCP_STARTUP_CONNECT_TIMEOUT_MS
   type ConnectOutcome =
     | { serverId: string; server: McpServerConfig; status: 'disabled' }
     | { serverId: string; server: McpServerConfig; status: 'error'; error: unknown }
@@ -175,6 +174,7 @@ export async function buildMcpToolProviders(
       if (!server.enabled) {
         return { serverId, server, status: 'disabled' }
       }
+      const startupTimeoutMs = options.startupConnectTimeoutMs ?? server.startupTimeoutMs ?? DEFAULT_MCP_STARTUP_CONNECT_TIMEOUT_MS
       const attempt = (async () => {
         const environment = mcpCredentialEnvironment(server, options.environment)
         const clientFactory = options.clientFactory ?? ((id: string, configuration: McpServerConfig) => createSdkMcpClient(id, configuration, environment))
@@ -359,7 +359,7 @@ function taskScheduleBridgeBlock(serverId: string, context: ToolHostContext): { 
 async function createSdkMcpClient(serverId: string, server: McpServerConfig, environment?: Readonly<Record<string, string>>): Promise<McpClientLike> {
   const client = new Client({ name: `railwise-ai-${serverId}`, version: '0.1.0' })
   const transport = createTransport(server, environment)
-  await client.connect(transport, { timeout: server.timeoutMs })
+  await client.connect(transport, { timeout: Math.max(server.timeoutMs, server.startupTimeoutMs ?? 0) })
   return {
     listTools: (options) => {
       const params = options?.cursor ? { cursor: options.cursor } : undefined

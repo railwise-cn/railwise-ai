@@ -19,7 +19,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW, githubApi, validateReviewedBuild, verifyReviewedBuildSource } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, validateUpdaterEvidenceRun, verifyRemoteUpdaterEvidence } from './verify-frozen-updater-evidence.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
-import { FROZEN_BASE_VERSION, resolveUpdaterBaseline } from './frozen-release-version.mjs'
+import { FROZEN_BASE_VERSION, resolveUpdaterBaseline, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 import { EXACT_UPDATER_BASE_VERSION, validateExactUpdaterEvidenceRun, verifyRemoteExactUpdaterEvidence } from './verify-exact-updater-evidence.mjs'
 
 const ROOT = process.cwd()
@@ -58,6 +58,8 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/verify-reviewed-release-artifacts.test.mjs',
   'scripts/verify-exact-updater-evidence.mjs',
   'scripts/verify-exact-updater-evidence.test.mjs',
+  'scripts/verify-frozen-updater-evidence.mjs',
+  'scripts/verify-frozen-updater-evidence.test.mjs',
   'scripts/run-task-delivery-live.mjs',
   'scripts/run-windows-ui-smoke.mjs',
   'scripts/windows-ui-smoke.test.mjs',
@@ -246,8 +248,12 @@ function readCommittedJson(relativePath, releaseHead, label) {
 
 function requireUpdaterEvidence(evidence, reviewedBuild, packageIdentity, version, releaseHead) {
   const exactBuild = evidence.mode === 'exact-build'
-  const baseVersion = exactBuild ? evidence.baseVersion ?? EXACT_UPDATER_BASE_VERSION : FROZEN_BASE_VERSION
+  const explicitBaseVersion = evidence.baseVersion
+  const baseVersion = explicitBaseVersion === undefined
+    ? (exactBuild ? EXACT_UPDATER_BASE_VERSION : FROZEN_BASE_VERSION)
+    : explicitBaseVersion
   const baseline = resolveUpdaterBaseline(baseVersion)
+  validateFrozenTargetVersion(version, baseline.version)
   // A prose summary or a green declaration cannot substitute for the native
   // runner's two reports, bound to the exact frozen public package bytes.
   const machinePath = requireTrackedArtifact(evidence?.machineReportPath, 'acceptance.updaterRoundTrip.machineReportPath', releaseHead)
@@ -327,8 +333,8 @@ function requireUpdaterEvidence(evidence, reviewedBuild, packageIdentity, versio
   equal(reportSha256(nativeBytes), machine.nativeReportSha256, 'retained native report digest')
   const run = exactBuild
     ? validateExactUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild, version, baseVersion)
-    : validateUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild.sourceHead, version)
-  return { run, machineBytes, nativeBytes, mode: exactBuild ? 'exact-build' : 'frozen-public-release' }
+    : validateUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild.sourceHead, version, explicitBaseVersion)
+  return { run, machineBytes, nativeBytes, baseVersion: explicitBaseVersion, mode: exactBuild ? 'exact-build' : 'frozen-public-release' }
 }
 
 const QUALITY_WORKFLOW = '.github/workflows/quality.yml'

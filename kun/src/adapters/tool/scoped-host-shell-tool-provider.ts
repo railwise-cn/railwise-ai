@@ -16,7 +16,14 @@ const requestSchema = z.object({
   ttl_seconds: z.number().int().min(1).max(300).default(60),
   idempotency_key: z.string().trim().min(1).max(200)
 }).strict().refine(value => value.timeout_seconds <= value.ttl_seconds, { message: 'Command timeout must fit within the reviewed authorization lifetime.' })
-const sessionSchema = z.object({ authorization_id: z.string().min(1), action: z.enum(['poll', 'stop']), yield_seconds: z.number().int().min(1).max(10).default(1) }).strict()
+const sessionSchema = z.object({
+  session_id: z.string().min(1).max(128).describe('The session_id returned by request_host_shell.').optional(),
+  authorization_id: z.string().min(1).describe('Legacy authorization reference. Use session_id for new calls.').optional(),
+  action: z.enum(['poll', 'stop']),
+  yield_seconds: z.number().int().min(1).max(10).default(1)
+}).strict().refine(value => (value.session_id === undefined) !== (value.authorization_id === undefined), {
+  message: 'Provide exactly one session_id or legacy authorization_id.'
+})
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 const fail = (code: string, message: string): never => { throw Object.assign(new Error(message), { code }) }
 const connectorProxy = /(?:\bdws\b|\bdingtalk\b|\blark(?:-cli)?\b|\bfeishu\b|\blarksuite\b|钉钉|飞书)/i
@@ -52,7 +59,7 @@ export function buildScopedHostShellToolProviders(options: {
   return [{ id: 'scoped-host-shell', kind: 'built-in', enabled: true, available: true, tools: [
     defineLocalTool({
       name: 'request_host_shell',
-      description: 'Propose ONE exact host shell command for explicit user approval. The approval shows the full redacted command, workspace, hashes and lifetime; it grants full host access only for this command, never changes workspace trust, and cannot be used for connector/platform operations. No command executes before approval. Returns real output or a server-owned session. Use host_shell_session only to poll or stop that session; stdin writes are not authorized. Unknown outcomes are never replayed.',
+      description: 'Propose ONE exact host shell command for explicit user approval. The approval shows the full redacted command, workspace, hashes and lifetime; it grants full host access only for this command, never changes workspace trust, and cannot be used for connector/platform operations. No command executes before approval. Returns real output or a server-owned session_id. Pass that session_id to host_shell_session to poll or stop; stdin writes are not authorized. Unknown outcomes are never replayed.',
       inputSchema: z.toJSONSchema(requestSchema) as Record<string, unknown>, policy: 'on-request', requireExplicitApproval: true,
       shouldAdvertise: context => Boolean(current(context)) && context.approvalPolicy !== 'never',
       execute: async (raw, context, onUpdate) => {
@@ -115,19 +122,25 @@ export function buildScopedHostShellToolProviders(options: {
     }),
     defineLocalTool({
       name: 'host_shell_session',
-      description: 'Read output or stop the exact session created by request_host_shell. Read-only poll can verify an earlier attempt in the same task and unchanged workspace/Agent scope. Stop requires the original Turn, grant and immutable lease. Cannot start another command, change scope or write stdin. A recovered process can be polled read-only; uncertain process identity is never terminated.',
+      description: 'Poll output or stop the exact process using the session_id returned by request_host_shell. Read-only poll can verify an earlier attempt in the same task and unchanged workspace/Agent scope. Stop requires the original Turn, grant and immutable lease. Cannot start another command, change scope or write stdin. A recovered process can be polled read-only; uncertain process identity is never terminated.',
       inputSchema: z.toJSONSchema(sessionSchema) as Record<string, unknown>, policy: 'auto',
       shouldAdvertise: context => Boolean(current(context)),
       execute: async (raw, context, onUpdate) => {
         const request = sessionSchema.parse(raw), checked = await assertContext(context)
-        const receipt = repository.operations(checked.task.id, 'host_shell').find(item => (item.result as SavedResult | undefined)?.authorization?.id === request.authorization_id)
+        const receipt = repository.operations(checked.task.id, 'host_shell').find(item => {
+          const result = item.result as SavedResult | undefined
+          if (!result?.authorization) return false
+          return request.session_id !== undefined
+            ? savedSessionId(result) === request.session_id
+            : result.authorization.id === request.authorization_id
+        })
         const saved = receipt?.result as SavedResult | undefined
         if (!receipt || !saved) return fail('host_shell_scope_blocked', 'No approved command belongs to this task.')
         const authorization = HostShellAuthorizationSchema.parse(saved.authorization)
         if (authorization.taskId !== checked.task.id || authorization.threadId !== context.threadId || authorization.workspaceRoot !== checked.workspace || authorization.workspaceRevision !== checked.grant.workspaceRevision || authorization.agentRevision !== checked.grant.agentRevision) return fail('host_shell_scope_blocked', 'This command authorization belongs to a different task or revoked workspace/Agent scope.')
         if (request.action === 'stop' && (authorization.turnId !== context.turnId || authorization.executionId !== checked.token.executionId || authorization.ownerId !== checked.token.ownerId || authorization.leaseRevision !== checked.token.leaseRevision || authorization.executionGrantId !== checked.grant.id)) return fail('host_shell_scope_blocked', 'Stopping requires the original command execution and its immutable lease; read-only poll can verify an earlier attempt.')
         if (receipt.status === 'succeeded' || receipt.status === 'failed') return resultFor(saved)
-        const sessionId = saved.sessionId ?? objectOutput(saved.shell?.output).session_id
+        const sessionId = savedSessionId(saved)
         if (typeof sessionId !== 'string') return resultFor(saved)
         const session = repository.getShellSession(sessionId)
         if (!session || session.taskId !== checked.task.id || session.executionId !== authorization.executionId || session.ownerId !== authorization.ownerId) return fail('host_shell_scope_blocked', 'Shell process ownership could not be verified; no signal was sent.')
@@ -147,4 +160,8 @@ export function buildScopedHostShellToolProviders(options: {
 
 function objectOutput(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : { output: value }
+}
+
+function savedSessionId(result: SavedResult): unknown {
+  return result.sessionId ?? objectOutput(result.shell?.output).session_id
 }

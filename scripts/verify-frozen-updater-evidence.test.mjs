@@ -88,6 +88,21 @@ test('updater report provenance binds the exact freeze, run and retained native 
   verifyUpdaterEvidenceArchive({ ...f, archive: f.archive() })
 })
 
+test('an explicit protected-main updater baseline selects the exact trusted workflow job title', t => {
+  const f = fixture(t, '0.5.8')
+  f.machine.baseVersion = '0.5.6'
+  f.machine.dataSeed.serviceIdentity.packageVersion = '0.5.6'
+  f.job.name = 'Official 0.5.6 to exact public package native updater'
+  assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.8', '0.5.6'), f.run)
+  assert.equal(verifyUpdaterEvidenceSource(f.run, f.api, '0.5.6'), f.run)
+  assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api), /trusted native updater job/)
+  assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api, '0.5.4'), /trusted native updater job/)
+  assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api, '0.5.9'), /no valid arm64 installer pin/)
+  assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.6', '0.5.6'), /must be newer/)
+  f.job.name = UPDATER_JOB
+  assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api, '0.5.6'), /trusted native updater job/)
+})
+
 test('updater evidence pins the published 0.5.3 baseline assets for each native architecture', () => {
   assert.equal(FROZEN_BASE_VERSION, '0.5.3')
   assert.deepEqual(FROZEN_BASELINE_PINS.arm64, {

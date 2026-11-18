@@ -395,7 +395,12 @@ export function registerRuntimeSseIpc(options: {
           } catch (e) {
             if (state.stoppedByClient || ac.signal.aborted) return
             const msg = e instanceof Error ? e.message : String(e)
-            if (/sse start timeout/i.test(msg) || /fetch failed/i.test(msg) || /network/i.test(msg)) {
+            // Fetch's body reader reports a mid-stream socket close as
+            // TypeError("terminated", { cause: { code: "UND_ERR_SOCKET" } }).
+            // Reuse this subscription and cursor so the renderer keeps its
+            // partial reply while KUN replays persisted deltas.
+            const cause = e instanceof Error ? e.cause as { code?: unknown } | undefined : undefined
+            if (cause?.code === 'UND_ERR_SOCKET' || /sse start timeout|fetch failed|network/i.test(msg)) {
               await sleepWithAbort(reconnectDelayMs, ac.signal)
               reconnectDelayMs = Math.min(reconnectDelayMs * 2, SSE_RECONNECT_MAX_MS)
               continue
