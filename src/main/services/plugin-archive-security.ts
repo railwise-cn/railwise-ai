@@ -107,7 +107,7 @@ export function inspectPluginArchive(
   const maxArchiveBytes = options.verifiedMirrorPart ? MARKETPLACE_MIRROR_PART_BYTES : PLUGIN_ARCHIVE_LIMITS.maxArchiveBytes
   const maxEntryBytes = options.verifiedMirrorPart ? MARKETPLACE_MIRROR_PART_BYTES : PLUGIN_ARCHIVE_LIMITS.maxEntryBytes
   if (buffer.byteLength > maxArchiveBytes) {
-    resourceLimit('Plugin archive exceeds its download limit.')
+    resourceLimit(`Plugin archive exceeds the ${maxArchiveBytes / (1024 * 1024)} MiB download limit.`)
   }
   const eocd = findEndOfCentralDirectory(buffer)
   if (buffer.readUInt16LE(eocd + 4) !== 0 || buffer.readUInt16LE(eocd + 6) !== 0) {
@@ -164,7 +164,7 @@ export function inspectPluginArchive(
     const symbolicLink = (unixMode & 0o170000) === 0o120000
     if (symbolicLink && !options.allowInternalLinks) unsafe(`links are not allowed: ${name}`)
     if (entryUncompressed > maxEntryBytes) {
-      resourceLimit(`Plugin archive entry exceeds its size limit: ${name}`)
+      resourceLimit(`Plugin archive entry exceeds ${maxEntryBytes / (1024 * 1024)} MiB: ${name}`)
     }
     if (!normalized.directory && entryUncompressed > 0 && entryCompressed === 0) {
       resourceLimit(`Plugin archive entry has an unsafe compression ratio: ${name}`)

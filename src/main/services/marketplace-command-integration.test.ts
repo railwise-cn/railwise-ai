@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { CatalogSourceV1, MarketplacePackageV1 } from '../../shared/marketplace'
 import { MarketplaceCatalogService } from './marketplace-catalog-service'
 import { getOfficialMarketplaceCatalog } from './official-marketplace-catalog'
-import { materializeCatalogPackage } from './plugin-management-service'
+import { materializeCatalogUpstreamForMirror as materializeCatalogPackage } from './plugin-management-service'
 
 const roots: string[] = []
 const originalEnvironment = { ...process.env }
