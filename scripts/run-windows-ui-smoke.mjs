@@ -402,6 +402,22 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
   assert.equal(report.errors.length, 0)
+  if (report.marketplaceSmokeRequested) {
+    assert.ok(report.checks.includes('installed-chinese-renderer'))
+    assert.ok(report.checks.includes('installed-runtime-ready'))
+    assert.equal(report.marketplace.status, 'passed')
+    assert.ok(report.marketplace.installed.length > 0)
+    assert.equal(report.marketplace.videoShotcraft.slashSelectionVerified, true)
+    if (report.videoEvaluationRequested) {
+      assert.ok(report.checks.includes('installed-video-skill-protocol-render-registered-and-decoded'))
+      assert.equal(report.marketplace.videoShotcraft.render.decoded, true)
+    } else {
+      assert.ok(report.checks.includes('cold-mirror-installs-playwright-docling-and-skill-selection'))
+      assert.equal(report.marketplace.playwright.navigated, true)
+      assert.ok(report.marketplace.docling.toolsDiscovered > 0)
+    }
+    return report
+  }
   assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
   assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
   assert.equal(report.update.ok, true)
@@ -2502,6 +2518,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'), ...(taskModel ? { providerId: model, model, approvalPolicy: 'auto', sandboxMode: 'read-only' } : {}) } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
     sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', workspaceRoot: workspace, productionTouched: false, checks: [], errors: [],
+    marketplaceSmokeRequested: mirrorSmoke, videoEvaluationRequested: videoEvaluation,
     installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
   // Electron's supported --user-data-dir overrides chrome::DIR_USER_DATA
   // before application startup. The installed EXE/ASAR and public identity
@@ -2560,6 +2577,19 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     }
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
+    if (mirrorSmoke) {
+      await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(response=>response.ok)`, 'the installed KUN runtime', 90_000)
+      report.checks.push('installed-runtime-ready')
+      const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
+      report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: videoEvaluation })
+      if (video) {
+        report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
+        report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
+      } else {
+        report.checks.push('cold-mirror-installs-playwright-docling-and-skill-selection')
+      }
+      return report
+    }
 
     await cdp.click('button', '技能与连接器')
     report.tabs = await cdp.wait(`(() => { const tabs=Array.from(document.querySelectorAll('[role="tablist"][aria-label="技能与连接器分类"] [role="tab"]')); return tabs.length===3 && tabs.map(tab=>tab.textContent.trim()); })()`, 'marketplace tabs')
@@ -3089,18 +3119,6 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       validateWindowsTaskEvidence(report.taskExecution)
       report.checks.push('runtime-task-html-and-daily-schedule')
     }
-    if (mirrorSmoke) {
-      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
-      await cdp.click('.ds-settings-sidebar button', '返回')
-      await cdp.wait(`!document.querySelector('.ds-settings-sidebar')`, 'the workspace after leaving offline help')
-      const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
-      report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root })
-      report.checks.push('cold-mirror-installs-playwright-docling-and-skill-selection')
-      if (video) {
-        report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
-        report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
-      }
-    }
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error))
     if (error.browserBootstrap) report.browserBootstrap = error.browserBootstrap
@@ -3165,15 +3183,15 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       }
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
-    if (taskModel) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
+    if (taskModel?.observed) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
     try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
     await writeFile(join(evidenceDir, 'windows-ui-smoke.json'), `${JSON.stringify(report, null, 2)}\n`)
+    if (report.status !== 'passed') throw new Error(`Exact Windows Chinese UI smoke failed: ${report.errors.join('; ')}`)
   }
-  if (report.status !== 'passed') throw new Error(`Exact Windows Chinese UI smoke failed: ${report.errors.join('; ')}`)
   return report
 }
 

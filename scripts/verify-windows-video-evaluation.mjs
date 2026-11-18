@@ -90,7 +90,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
   const render = { command: `& ${quote(process.execPath)} ${quote(join(workspace, script))}`,
     timeout_seconds: 180, ttl_seconds: 240, idempotency_key: 'private-synthetic-render-once' }
   const marker = '独立的 Video Shotcraft 非商用合成评估'
-  const selection = { read: false, rendered: false }
+  const selection = { read: false, rendered: false, requests: [] }
   const server = createServer(async (request, response) => {
     if (request.method === 'GET') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -103,6 +103,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       const body = JSON.parse(Buffer.concat(chunks).toString())
       assert.ok(selection.skillId && body.messages?.some(message => message.role === 'user' && literal(message.content).includes(marker)))
       const action = modelAction(body, selection, render, parseFixtureToolOutput)
+      selection.requests.push(action?.[1] ?? 'final-response')
       const delta = action ? { tool_calls: [{ index: 0, id: action[0], type: 'function',
         function: { name: action[1], arguments: literal(action[2]) } }] } :
         { content: selection.rendered ? `已渲染并保存 ${filename} 。` : '合成验收所需工具未就绪。' }
@@ -115,7 +116,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
     }
   })
   await new Promise((ready, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', ready) })
-  return { model, baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
+  return { model, baseUrl: `http://127.0.0.1:${server.address().port}/v1`, observed: selection,
     close: () => new Promise(done => { server.close(done); server.closeAllConnections() }),
     async verify(cdp, skillId) {
       selection.skillId = skillId
