@@ -1,0 +1,141 @@
+{
+  "status": "passed",
+  "sourceHead": "bd0e81af6bae82454b5f3c79423532f8cfe0f21f",
+  "version": "0.5.8",
+  "windowsX64": {
+    "locale": "zh",
+    "theme": "dark",
+    "installedAsarSha256": "8bd5edff705c42a7ae2e1c0c09a545b92e43999dd55ee6adc365e83a0b67b52b",
+    "adaptiveWorkbench": {
+      "input": "renderer-cdp-real-input",
+      "resizeMethod": "verified-pid-native-window",
+      "menus": [
+        {
+          "control": "切换智能体",
+          "viewport": {
+            "left": 0,
+            "top": 0,
+            "width": 1024,
+            "height": 728
+          },
+          "result": "passed"
+        },
+        {
+          "control": "模型与推理设置",
+          "viewport": {
+            "left": 0,
+            "top": 0,
+            "width": 1024,
+            "height": 728
+          },
+          "result": "passed"
+        },
+        {
+          "control": "切换智能体",
+          "viewport": {
+            "left": 0,
+            "top": 0,
+            "width": 960,
+            "height": 672
+          },
+          "result": "passed"
+        },
+        {
+          "control": "模型与推理设置",
+          "viewport": {
+            "left": 0,
+            "top": 0,
+            "width": 960,
+            "height": 672
+          },
+          "result": "passed"
+        }
+      ],
+      "narrowNavigation": {
+        "modal": true,
+        "mainInert": true,
+        "width": 290.390625,
+        "viewportWidth": 960
+      }
+    },
+    "taskResults": {
+      "sidebarPlacement": "sidebar",
+      "overflow": {
+        "workspace": 0,
+        "columns": 0,
+        "details": 0
+      },
+      "preview": {
+        "automatic": true,
+        "manualEntryVerified": true,
+        "contentVerified": true
+      }
+    },
+    "nativeActivity": {
+      "scenario": "full",
+      "homepage": {
+        "source": "installed-home-before-first-conversation",
+        "version": "0.5.8",
+        "shownOnFirstOpen": true,
+        "dismissedAndReloaded": true
+      },
+      "diagnostics": {
+        "renderedCollapsedByDefault": true,
+        "outputVisibleOnDemand": true,
+        "source": "packaged-read-tool-error",
+        "runningStatus": "正在整理资料…"
+      },
+      "reconnect": {
+        "transport": "owned-loopback-thread-sse",
+        "startingCursor": 2,
+        "resumedCursor": 29,
+        "firstTextCount": 1,
+        "interruptedTextCount": 1,
+        "fixtureResentModelRequest": false
+      },
+      "cancel": {
+        "source": "composer-stop-button",
+        "originalTurnAborted": true,
+        "originalToolResultCount": 1,
+        "followUpCompleted": true,
+        "fixtureStreamClosed": true
+      }
+    },
+    "evidence": [
+      {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "runId": 44318639996,
+        "runAttempt": 1,
+        "driverSourceHead": "a8392139ec3945a907a3b75def1796370f8a9f5e",
+        "artifact": {
+          "id": 14434102312,
+          "name": "exact-package-windows-install-44318639996",
+          "digest": "sha256:541a061b62467ecf468873290d49b34b462dcb4b77e7c03017fffae320e70f24"
+        },
+        "report": {
+          "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+          "sha256": "e89bbaa9c35fe5422b9752cc7a6964f0737b54d51316364b9468644c422c3b61",
+          "bytes": 215458
+        }
+      },
+      {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "runId": 44318714127,
+        "runAttempt": 1,
+        "driverSourceHead": "92cb259d8e8e7e7da56b529d116cf81e494107a4",
+        "artifact": {
+          "id": 14432889115,
+          "name": "exact-package-windows-install-44318714127",
+          "digest": "sha256:163ceefc17d0f5fd98a94b4cf00fe624279627cad45a75f876a3d20ce37531d5"
+        },
+        "report": {
+          "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+          "sha256": "9d3fc3f308ba4378665155a4125b1aa47533435e58b46b4ca080733cebdc4296",
+          "bytes": 3183
+        }
+      }
+    ]
+  }
+}

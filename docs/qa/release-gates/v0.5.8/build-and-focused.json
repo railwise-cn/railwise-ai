@@ -1,0 +1,88 @@
+{
+  "status": "passed",
+  "sourceHead": "bd0e81af6bae82454b5f3c79423532f8cfe0f21f",
+  "qualityWorkflow": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/quality.yml",
+    "sourceHead": "bd0e81af6bae82454b5f3c79423532f8cfe0f21f",
+    "runId": 44315252981,
+    "runAttempt": 1
+  },
+  "jobs": {
+    "Electron production smoke": {
+      "id": 134839518717,
+      "name": "Electron production smoke",
+      "conclusion": "success",
+      "passedSteps": [
+        "Set up job",
+        "Run actions/checkout@v7",
+        "Run actions/setup-node@v7",
+        "Run npm ci",
+        "Prepare checksummed Electron runtime",
+        "Run npm run build",
+        "Launch packaged production preview",
+        "Post Run actions/setup-node@v7",
+        "Post Run actions/checkout@v7",
+        "Complete job"
+      ]
+    },
+    "OpenSpec, brand, lint, type, test, build": {
+      "id": 134839519145,
+      "name": "OpenSpec, brand, lint, type, test, build",
+      "conclusion": "success",
+      "passedSteps": [
+        "Set up job",
+        "Run actions/checkout@v7",
+        "Run actions/setup-node@v7",
+        "Run npm ci",
+        "Run npm run openspec:validate",
+        "Run npm run verify:brand-boundary",
+        "Run npm run verify:document-licenses",
+        "Run npm run lint",
+        "Run npm run typecheck",
+        "Prepare checksummed Electron runtime",
+        "Run npm test",
+        "Verify Stable release workflow gates",
+        "Website audit regression checks (offline fixtures)",
+        "Website canonical route inspection checks (offline fixtures)",
+        "Run npm --prefix kun run typecheck",
+        "Run npm --prefix kun test",
+        "Run npm run build",
+        "Post Run actions/setup-node@v7",
+        "Post Run actions/checkout@v7",
+        "Complete job"
+      ]
+    },
+    "Windows path, spawn, persistence": {
+      "id": 134839519320,
+      "name": "Windows path, spawn, persistence",
+      "conclusion": "success",
+      "passedSteps": [
+        "Set up job",
+        "Run actions/checkout@v7",
+        "Run actions/setup-node@v7",
+        "Run npm ci",
+        "Run npm run typecheck",
+        "Verify native Windows ASAR paths and offline runtime packaging",
+        "Run core Windows security tests",
+        "Verify Windows Runtime shutdown through owned IPC",
+        "Run plugin Windows security tests",
+        "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/process-identity-async.test.ts tests/process-identity-async.windows.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+        "Post Run actions/setup-node@v7",
+        "Post Run actions/checkout@v7",
+        "Complete job"
+      ]
+    }
+  },
+  "productionPackages": {
+    "workflowPath": ".github/workflows/release.yml",
+    "runId": 44315356926,
+    "runAttempt": 1,
+    "sourceHead": "bd0e81af6bae82454b5f3c79423532f8cfe0f21f",
+    "privateBuild": true,
+    "artifactNames": [
+      "release-mac",
+      "release-win"
+    ]
+  }
+}

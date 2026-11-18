@@ -1,0 +1,506 @@
+{
+  "status": "passed",
+  "sourceHead": "bd0e81af6bae82454b5f3c79423532f8cfe0f21f",
+  "version": "0.5.8",
+  "scope": "controlled exact-package functional verification",
+  "spreadsheet": [
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "locale": "zh",
+      "theme": "light",
+      "network": "Chromium HTTP proxy refused and renderer HTTP blocked with CDP",
+      "firstOpenMs": 1171,
+      "checks": [
+        "native-create-and-render",
+        "chinese-csv-two-sheets-save",
+        "xlsx-read-only-unchanged",
+        "existing-workbook-reopened"
+      ],
+      "excelOriginalSha256": "5315e8e38109f89c56f5be8b92c407d9115437249e2a5d75b3d1450c9f6a668a",
+      "installer": {
+        "name": "RailWise-AI-0.5.8-win-x64.exe",
+        "sha256": "7c07bbb350b1199793c4c4a6273bcab1c57b93518086a54b4cd5b5beb0e3d1ef",
+        "bytes": 320835129
+      },
+      "installedAsarSha256": "8bd5edff705c42a7ae2e1c0c09a545b92e43999dd55ee6adc365e83a0b67b52b",
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "runId": 44318992550,
+        "runAttempt": 1,
+        "driverSourceHead": "743ee3c844c02b6a898b770bd8ddf8249521a7f1",
+        "artifact": {
+          "id": 14433987496,
+          "name": "spreadsheet-smoke-windows-2022",
+          "digest": "sha256:38e34b90f21b99b4c85f29d6c927ea27eb48cce210596ae9c619b8ba4125617b"
+        },
+        "report": {
+          "archivePath": "exact-spreadsheet-evidence/spreadsheet-smoke.json",
+          "sha256": "10b41280393fe42386578ba445731b569806cc2a3e1ce27c9438d438af977943",
+          "bytes": 1603
+        }
+      }
+    },
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "locale": "zh",
+      "theme": "light",
+      "network": "Chromium HTTP proxy refused and renderer HTTP blocked with CDP",
+      "firstOpenMs": 3083,
+      "checks": [
+        "native-create-and-render",
+        "chinese-csv-two-sheets-save",
+        "xlsx-read-only-unchanged",
+        "existing-workbook-reopened"
+      ],
+      "excelOriginalSha256": "df482f9a21f198cdd1d6dc682d324e64f95661cc3d84bfac1e825114e16e0aa1",
+      "installer": {
+        "name": "RailWise-AI-0.5.8-mac-arm64.dmg",
+        "sha256": "5df86bc3163e02340305d0c0f8a80f160aad44cc83abdb144b64279e4780a465",
+        "bytes": 402354432
+      },
+      "installedAsarSha256": "52cdb61aa3d90e6b4d62b80df819d305c3a82a19cf50512e9b45947d372b8cb9",
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "runId": 44324683396,
+        "runAttempt": 1,
+        "driverSourceHead": "743ee3c844c02b6a898b770bd8ddf8249521a7f1",
+        "artifact": {
+          "id": 14437596350,
+          "name": "spreadsheet-smoke-macos-15",
+          "digest": "sha256:cd51eef95f4a8ddb248bcef132240368af9476ba3497f9f095d01b959a65cad6"
+        },
+        "report": {
+          "archivePath": "exact-spreadsheet-evidence/spreadsheet-smoke.json",
+          "sha256": "66c3eb3bdbd5bb1a815ac2ca0ddbc333b7192cf17ecd2eda7bb4a0bb94966485",
+          "bytes": 1570
+        }
+      }
+    },
+    {
+      "platform": "darwin",
+      "arch": "x64",
+      "locale": "zh",
+      "theme": "light",
+      "network": "Chromium HTTP proxy refused and renderer HTTP blocked with CDP",
+      "firstOpenMs": 2544,
+      "checks": [
+        "native-create-and-render",
+        "chinese-csv-two-sheets-save",
+        "xlsx-read-only-unchanged",
+        "existing-workbook-reopened"
+      ],
+      "excelOriginalSha256": "3fa77dba53906bae74d4d1b0c91fdf9b0a8d4703e4de8f0a382ed816e1dabf0b",
+      "installer": {
+        "name": "RailWise-AI-0.5.8-mac-x64.dmg",
+        "sha256": "877f2a0a1b067a3ddb193ed4ba64c39213419ce518a88e0f83b6ec17a1617b78",
+        "bytes": 411164396
+      },
+      "installedAsarSha256": "c22684263668ae41fe215fadac0f623910064ad6c7c655cc32f43a6930cdd7d0",
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "runId": 44324683396,
+        "runAttempt": 1,
+        "driverSourceHead": "743ee3c844c02b6a898b770bd8ddf8249521a7f1",
+        "artifact": {
+          "id": 14437745171,
+          "name": "spreadsheet-smoke-macos-15-intel",
+          "digest": "sha256:9196256ad78991b60ba6b0ceb54560574bdb097e36055385ca79baf3f5222706"
+        },
+        "report": {
+          "archivePath": "exact-spreadsheet-evidence/spreadsheet-smoke.json",
+          "sha256": "6800c2263f9343607db9fca10cbd7184d3d13ef356b6a721840ad673238a16ec",
+          "bytes": 1566
+        }
+      }
+    }
+  ],
+  "marketplace": {
+    "mirror": {
+      "lockSha256": "42368cacb068cd9e9a5af5ee952fe9c1e9c6fb2b3ecb25b59d3cd00807248a23",
+      "catalogTargets": {
+        "win32-x64": 21,
+        "darwin-arm64": 21,
+        "darwin-x64": 21
+      },
+      "verifiedSiteFiles": 149,
+      "stagedSourceHead": "4fddeceeab14a293b863dc0f75bb279da8b3b9ca",
+      "stagedLockSha256": "edc796d8a0536169cfddf07b42b013b5c501acacdd9b1f4b3e7f66e8665dc9fd",
+      "allLatestLockedPartDigestsMatchStagedBytes": true,
+      "stagingRunId": "44274431133",
+      "stageManifestSha256": "b71ea7f3ac34c5af38b2f89c1e72ebbb53e29c03860366d0cb4cfd9ef7443f2c"
+    },
+    "coldWindows": {
+      "network": "GitHub-hosted Windows x64 with GitHub, npm, PyPI and listed distribution hosts blocked via DNS.",
+      "blockedHosts": [
+        "github.com",
+        "api.github.com",
+        "codeload.github.com",
+        "raw.githubusercontent.com",
+        "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com",
+        "npmjs.com",
+        "registry.npmjs.com",
+        "registry.npmjs.org",
+        "pypi.org",
+        "files.pythonhosted.org",
+        "pypi.python.org",
+        "registry.npmmirror.com",
+        "cdn.playwright.dev",
+        "playwright.azureedge.net"
+      ],
+      "packageCount": 21,
+      "lockedPartCount": 51,
+      "lockedPackages": [
+        {
+          "id": "antv-chart-mcp",
+          "version": "0.9.10",
+          "reviewSha256": "b28052824a8114e93d92e57cbaf37f0b6f5be5413195df0a346d6032c0fe0e48",
+          "artifactSha256": "6d2683921a465bdc1f93f53da93697ffac16f75cbb6753e3fa70e8a8cdef7c7e",
+          "lockedParts": 2
+        },
+        {
+          "id": "antv-chart-skill",
+          "version": "b47f2feae59b1e792462d0edd8d1a7ea87c9bdfc",
+          "reviewSha256": "7c2bd6af032af5a0a4d1a03812f2918d5a5ed0b034930190b973590ca3b60c99",
+          "artifactSha256": "589885229ce6ef1120bfaca157e0677e5e77fb5f0dda54a67c1112c2c1b69c81",
+          "lockedParts": 1
+        },
+        {
+          "id": "arch-diagram-skill",
+          "version": "879ca7fa503a64ab46b5bc77d2062ded32fadc84",
+          "reviewSha256": "fb4a311f1e0a4366fa3d5bb255e40deb7417a9c4262397c11780a5298ba7d58d",
+          "artifactSha256": "851f2645a07ba43dcdf1ef40710009ba936aa94cc5e8fe089c13b69ef08763de",
+          "lockedParts": 1
+        },
+        {
+          "id": "blender-skills",
+          "version": "8f778d2405a214b508d4c7d80742be8e43acdd52",
+          "reviewSha256": "0442e462af8af3fc99207874dbd8e65f5fe1f8e6b4727cf7f72c99d9ed38b956",
+          "artifactSha256": "ba8d72fcf8c0ca7803e771f5c15572d3807f2aabd23c904ee68c960a6307e41e",
+          "lockedParts": 1
+        },
+        {
+          "id": "browser-skill",
+          "version": "361da1d75798b99b358dfb434b8ce1921fb90d9e",
+          "reviewSha256": "00bd03b5f36fdd2e111c4a323dc6a5269d4a9b16a1a670eaf853361734c229b2",
+          "artifactSha256": "3fec7cb6e4481a706b8d0c5604d1d7e91d4df9ed083796ba29bdc8b2d1e8552f",
+          "lockedParts": 1
+        },
+        {
+          "id": "context7-mcp",
+          "version": "4.0.0",
+          "reviewSha256": "cd9e1f2c90234753d4dd699d9a6e1aa40bf5be18134f92b53a1e5aacbae620e2",
+          "artifactSha256": "b51580de57ce34946dc3aef1a9f8be7b7bc039a823c5a750e1b95d08a7fb26b4",
+          "lockedParts": 2
+        },
+        {
+          "id": "dbhub",
+          "version": "1.2.0",
+          "reviewSha256": "8cb385dce30dd57149417e0276dcc642d6c3ff1b950a7c9bcc36f4c5567c53c3",
+          "artifactSha256": "ee10e2e8fa863379a9800c38978213ebc29af7a5cd3cff1ea0e48ffbedd2dd63",
+          "lockedParts": 7
+        },
+        {
+          "id": "diagram-design",
+          "version": "0cf73c3fcc56667ad91a9a04c439ac6ccfabc9d1",
+          "reviewSha256": "fc6220b3245b723d21ac701eea25bbdc0fa2dadb1a7ef7311bcdfab1431e1186",
+          "artifactSha256": "98e25a1e488a8625f4151eee87dc329c9fdbb15ac61926f30c411adc129e86f0",
+          "lockedParts": 1
+        },
+        {
+          "id": "docling-mcp",
+          "version": "3.0.0",
+          "reviewSha256": "ffa9c850d1c8abc39cca84f724ab5833592995b24ed2bd4baf9afa38c2026c70",
+          "artifactSha256": "da25add13c4cc25a863c156b0e582c6301ec197505cb780622e8dfb47481196e",
+          "lockedParts": 4
+        },
+        {
+          "id": "fetch-mcp",
+          "version": "2026.7.10",
+          "reviewSha256": "ced65391d97c5da31b528372a2f2a14840cf44be7cc426ae0215fea210450fcb",
+          "artifactSha256": "5c763a5be78cf19378005dfb0b0a5b03099b5b3063ed080b5123636e742a4178",
+          "lockedParts": 2
+        },
+        {
+          "id": "filesystem-mcp",
+          "version": "2026.7.10",
+          "reviewSha256": "91163cdc69eb8924dbfa069fd31ad788734417bbceae50bc7ad1eaeb20504fb5",
+          "artifactSha256": "f97ebd295b24327208e4648042eec8fc943efe89543ae48763cd5e3699b9a00a",
+          "lockedParts": 3
+        },
+        {
+          "id": "git-mcp",
+          "version": "2026.7.10",
+          "reviewSha256": "1649daaf6e5d3a9f4558b37b8fd35fa325fc0be5133efae244cda7376cf404a8",
+          "artifactSha256": "95ab85ce54685bd6bfa643f0c4c0e0928b80f4dd02b7e1f1f89ca033506f04c0",
+          "lockedParts": 1
+        },
+        {
+          "id": "memory-mcp",
+          "version": "2026.7.4",
+          "reviewSha256": "5a29aa65bb104395ddb5330f58d7740062a7a7b9f771eab88a89d95e574fcd47",
+          "artifactSha256": "b6f363b51f3fcccbe06b1e0f87af7b02044debdb744704bb149c53f19e7a08ac",
+          "lockedParts": 2
+        },
+        {
+          "id": "mongodb-mcp",
+          "version": "2.0.0",
+          "reviewSha256": "99d2945dff1d07e5d30d2504d5374aab155c13a86b8e5557e13aa47a2f057f4e",
+          "artifactSha256": "9b516730568adfddba2d24123a1b19632c501352c06e98e5b9f9bfed13157ad1",
+          "lockedParts": 12
+        },
+        {
+          "id": "playwright-cli-skills",
+          "version": "0.1.18",
+          "reviewSha256": "87913bdffceed564bca36cce02d7b0730a7f00b5b7f6eb9dfaa0c5fd5517f618",
+          "artifactSha256": "bd6d6df207ddc58f4de865831f881c0f4c583ea0d38bdeb60102ef8c2feda409",
+          "lockedParts": 1
+        },
+        {
+          "id": "playwright-mcp",
+          "version": "0.0.79",
+          "reviewSha256": "557f89a99f416b8742d1d2255d14525b3f6e60a9de00abeb3c274793f9697644",
+          "artifactSha256": "bde76c9500377725c4f75977813803169b4f22055ec493fdcf13c94360d2a1c2",
+          "lockedParts": 1
+        },
+        {
+          "id": "redis-mcp",
+          "version": "0.5.1",
+          "reviewSha256": "ea47419cfaedcaa2db102aaf0b7fd52be8198d21a18066504863e7a3f437a005",
+          "artifactSha256": "7175a709f404b4ff553e745d5424247c926af0bf6238dad0fc53f29138de7f86",
+          "lockedParts": 3
+        },
+        {
+          "id": "sequential-thinking-mcp",
+          "version": "2026.7.4",
+          "reviewSha256": "fec7e7b9321420f0d3854d68f5b057fa86747fb21ed20e985b44c8f4360297d9",
+          "artifactSha256": "51210f7c3d9a2ba2fe2261fcb7046bd1ea21fd8ee14fc70c69cec0cfcd8d15e2",
+          "lockedParts": 2
+        },
+        {
+          "id": "superpowers",
+          "version": "44c9b2d6e889982ac18c27d05a19fefe335194e1",
+          "reviewSha256": "757298cdb87136ab60f7213fccc2f5b74f4c42756664aa2b514be2bfd40a7e1a",
+          "artifactSha256": "464000be362b3e45d037cfda8b79af489f71d51ad5d6c308569a0733d170df00",
+          "lockedParts": 1
+        },
+        {
+          "id": "time-mcp",
+          "version": "2026.7.10",
+          "reviewSha256": "2e14c205e2dfc0ff11cd43b84b786f844e55a20c5b2eed1cf360984e2e362d88",
+          "artifactSha256": "10459ba6e0db7ae36e2c1d99e1b54158209a1e15dc7a5d2e28e6c507968a4fa7",
+          "lockedParts": 2
+        },
+        {
+          "id": "video-shotcraft",
+          "version": "1266a3ec4831289c4d893d42dd5102723658039a-railwise.1",
+          "reviewSha256": "e52072beda606da50549af2a2e5311ef480f79e1a6bd6708fda0fe10d82b9dd0",
+          "artifactSha256": "c962b0fe9eab507c78171a435f651b48dd7e617525aed79c648ec381c5e3c560",
+          "lockedParts": 1
+        }
+      ],
+      "videoRenderVerifiedInSeparateExactPackageRun": true,
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "runId": 44318842386,
+        "runAttempt": 1,
+        "driverSourceHead": "a8392139ec3945a907a3b75def1796370f8a9f5e",
+        "artifact": {
+          "id": 14436490965,
+          "name": "exact-package-windows-install-44318842386",
+          "digest": "sha256:fdd114ea21626aa229be58c3fa54a0edb28523f6e31f5fb33d71c72155be649f"
+        },
+        "report": {
+          "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+          "sha256": "f0faff36c434bb398fa71c4bc44b2598fd1991cf4a0070f7aa78864b536522f4",
+          "bytes": 9766
+        }
+      }
+    },
+    "directMainlandMirrorDownload": {
+      "scope": "Official Windows x64 marketplace mirror bytes fetched from the current Mac using direct HTTPS",
+      "officialHost": "www.railwise.cn",
+      "explicitProxyDisabled": true,
+      "observedIpCountry": "CN",
+      "locationService": "Cloudflare trace country only",
+      "uniqueParts": 51,
+      "verifiedBytes": 362292684,
+      "elapsedSeconds": 87.5,
+      "packages": 21,
+      "report": {
+        "path": "docs/qa/release-gates/v0.5.8/windows-mirror-direct.json",
+        "sha256": "03926e13f12ee28e3db5601c83e2543f49fbb27111a3d53baeffaefe652c53e8"
+      },
+      "mainlandWindowsInstalledLocation": "not independently verified"
+    },
+    "connectors": {
+      "docling": {
+        "toolsDiscovered": 19
+      },
+      "playwright": {
+        "navigated": true,
+        "observed": 2,
+        "toolsDiscovered": 24,
+        "method": "installed-mcp-stdio"
+      },
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "runId": 44318844145,
+        "runAttempt": 1,
+        "driverSourceHead": "a8392139ec3945a907a3b75def1796370f8a9f5e",
+        "artifact": {
+          "id": 14434296769,
+          "name": "exact-package-windows-install-44318844145",
+          "digest": "sha256:cc0e4366f5548dfbdf6e4faa7211ed3d6cf02b8eadbb1e6227d1f58537f5aa62"
+        },
+        "report": {
+          "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+          "sha256": "cf65f52116255b5be2278ee8f5e2a926037abeee0eec2b8953ed3de2e2ab1547",
+          "bytes": 3612
+        }
+      }
+    },
+    "videoShotcraft": {
+      "kind": "private-noncommercial-synthetic-evaluation",
+      "remotionVersion": "4.0.484",
+      "codec": "h264",
+      "width": 320,
+      "height": 180,
+      "frames": 24,
+      "artifact": {
+        "id": "artifact_a0231589f7c73092",
+        "sha256": "1f4c25b56c06b265b9eb2273cd608b285d51510bdbeda76525441913944914dd",
+        "bytes": 50721
+      },
+      "execution": "explicit-host-shell-approval",
+      "decoded": true,
+      "slashSelectionVerified": true,
+      "installedSkillResourceRead": true,
+      "explicitApprovalCount": 1,
+      "fullDecoder": {
+        "source": "@ffmpeg-installer/win32-x64@4.1.0",
+        "exitCode": 0
+      },
+      "primaryDecoderStatus": {
+        "exitCode": 3165764104,
+        "reason": "wrapped_avframe encoder unavailable in the inspected compositor"
+      },
+      "scope": "Separately provisioned synthetic evaluation runtime, local model protocol fixture and locally authored media.",
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "runId": 44318848495,
+        "runAttempt": 1,
+        "driverSourceHead": "a8392139ec3945a907a3b75def1796370f8a9f5e",
+        "artifact": {
+          "id": 14432449661,
+          "name": "exact-package-windows-install-44318848495",
+          "digest": "sha256:04830fda501e253397baec1b14322698167aa0d57cf06d123fa73878a3cdbf38"
+        },
+        "report": {
+          "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+          "sha256": "e79c5c7784e60338232bba570d99a34eea2a5ce4fbdfd42cc2dc9e5d92ecb540",
+          "bytes": 5059
+        }
+      }
+    }
+  },
+  "browserTask": {
+    "source": "Controlled public-query fixture with installed BrowserSkill and a local model protocol fixture.",
+    "actualPrimaryDocumentReadbackVerified": true,
+    "verifiedFields": [
+      "title",
+      "publication_date",
+      "budget",
+      "deadline",
+      "status",
+      "qualification"
+    ],
+    "authorizedActions": 5,
+    "unknownOutcomes": 0,
+    "taskConsentVerified": true,
+    "sourceVerification": {
+      "complete": true,
+      "persistedReceiptVerified": true,
+      "artifactHash": "3dd09a7c3e353c1a74942ae2c8d58e6b8b514a50c1e904a4a081dffbe47b3f62"
+    },
+    "dailySchedule": {
+      "times": [
+        "08:30",
+        "16:30"
+      ],
+      "timezone": "Asia/Shanghai",
+      "enabled": true,
+      "readBackFromTool": true
+    },
+    "dueOccurrence": {
+      "status": "completed",
+      "independentTask": true,
+      "independentArtifact": true,
+      "originalDailyScheduleRestored": true
+    },
+    "evidence": {
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/windows-install-smoke.yml",
+      "runId": 44318639996,
+      "runAttempt": 1,
+      "driverSourceHead": "a8392139ec3945a907a3b75def1796370f8a9f5e",
+      "artifact": {
+        "id": 14434102312,
+        "name": "exact-package-windows-install-44318639996",
+        "digest": "sha256:541a061b62467ecf468873290d49b34b462dcb4b77e7c03017fffae320e70f24"
+      },
+      "report": {
+        "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+        "sha256": "e89bbaa9c35fe5422b9752cc7a6964f0737b54d51316364b9468644c422c3b61",
+        "bytes": 215458
+      }
+    }
+  },
+  "ordinaryTask": {
+    "dailySchedule": {
+      "times": [
+        "08:30",
+        "16:30"
+      ],
+      "timezone": "Asia/Shanghai",
+      "enabled": true,
+      "readBackFromTool": true
+    },
+    "dueOccurrence": {
+      "status": "completed",
+      "independentTask": true,
+      "independentArtifact": true,
+      "originalDailyScheduleRestored": true
+    },
+    "preview": {
+      "automatic": true,
+      "manualEntryVerified": true,
+      "contentVerified": true
+    },
+    "evidence": {
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/windows-install-smoke.yml",
+      "runId": 44318651410,
+      "runAttempt": 1,
+      "driverSourceHead": "a8392139ec3945a907a3b75def1796370f8a9f5e",
+      "artifact": {
+        "id": 14434645249,
+        "name": "exact-package-windows-install-44318651410",
+        "digest": "sha256:983d6383825e53157016b42f825cc9c0c198588ad7483e98564e8ab9ce4c3739"
+      },
+      "report": {
+        "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+        "sha256": "6296d6dbfbb3935c01c5c089b53b9a70c616d06f81a51fb53e492455a47bca6d",
+        "bytes": 21811
+      }
+    }
+  }
+}

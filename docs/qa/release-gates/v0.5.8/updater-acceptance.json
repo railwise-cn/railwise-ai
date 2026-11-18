@@ -1,0 +1,122 @@
+{
+  "status": "passed",
+  "sourceHead": "bd0e81af6bae82454b5f3c79423532f8cfe0f21f",
+  "version": "0.5.8",
+  "macNative": {
+    "arch": "arm64",
+    "baseVersion": "0.5.6",
+    "targetVersion": "0.5.8",
+    "targetAsarSha256": "52cdb61aa3d90e6b4d62b80df819d305c3a82a19cf50512e9b45947d372b8cb9",
+    "installedAsarSha256": "52cdb61aa3d90e6b4d62b80df819d305c3a82a19cf50512e9b45947d372b8cb9",
+    "targetZipSha256": "aabbeb819644a2116882d1084595740bb65f42901ecea1cf052dd283f40e58d2",
+    "frozenManifestSha256": "9d206d18795718e273eeba40592a4b2d8b51de039e75945f0d65489511d0a4ce",
+    "strictNonceProbe": {
+      "nonceSha256": "add0a7278e5ec7339a165c462f757fa9007c8f4dc6b1532126a00ef40badf05a",
+      "strictProbeRequired": true
+    },
+    "updatedToExactPackage": true,
+    "signature": "verified",
+    "notarization": "verified",
+    "gatekeeper": "accepted",
+    "historyAndConfigurationPreserved": true,
+    "nativeStages": [
+      "base_started",
+      "update_available",
+      "download_completed",
+      "install_requested",
+      "target_relaunched",
+      "user_data_preserved"
+    ],
+    "evidence": [
+      {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/frozen-release-updater-acceptance.yml",
+        "runId": 44328989342,
+        "runAttempt": 1,
+        "driverSourceHead": "bd0e81af6bae82454b5f3c79423532f8cfe0f21f",
+        "artifact": {
+          "id": 14438434214,
+          "name": "frozen-updater-arm64-44328989342",
+          "digest": "sha256:c902149dda003e4f647c52489bcd88e1ee17d5dfbc14b15288303f3a0283cab6"
+        },
+        "report": {
+          "archivePath": "frozen-updater.json",
+          "sha256": "48c967a6892f47dd245eb9ec9afdfd41a8a12b54237c72a4ec5346595e0ef919",
+          "bytes": 157659
+        }
+      },
+      {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/frozen-release-updater-acceptance.yml",
+        "runId": 44328989342,
+        "runAttempt": 1,
+        "driverSourceHead": "bd0e81af6bae82454b5f3c79423532f8cfe0f21f",
+        "artifact": {
+          "id": 14438434214,
+          "name": "frozen-updater-arm64-44328989342",
+          "digest": "sha256:c902149dda003e4f647c52489bcd88e1ee17d5dfbc14b15288303f3a0283cab6"
+        },
+        "report": {
+          "archivePath": "native-updater.json",
+          "sha256": "1f762516d807d1c2da00a1737580eac5cd3899dc8a8ba4fe9a766fcd6464ce4a",
+          "bytes": 995
+        }
+      }
+    ]
+  },
+  "windows": {
+    "baselineVersion": "0.5.7",
+    "officialInstallerSha256": "113a88a8601b04a49233267dc8321c17063a949fecce9fa5ad3e6ff37ed66dd7",
+    "baselineToTarget": {
+      "expectedVersion": "0.5.8",
+      "installerSha256": "7c07bbb350b1199793c4c4a6273bcab1c57b93518086a54b4cd5b5beb0e3d1ef",
+      "packageMetadata": {
+        "name": "workwise",
+        "productName": "RailWise AI",
+        "version": "0.5.8",
+        "sourceHead": "bd0e81af6bae82454b5f3c79423532f8cfe0f21f",
+        "asarSha256": "8bd5edff705c42a7ae2e1c0c09a545b92e43999dd55ee6adc365e83a0b67b52b",
+        "asarSize": 506620654
+      },
+      "profilePreserved": true,
+      "threadPreserved": true,
+      "action": {
+        "method": "exact-installer-overlay",
+        "oldUpdaterError": "install_failed"
+      }
+    },
+    "privateNext": {
+      "privateFixture": true,
+      "expectedVersion": "0.5.9",
+      "installerSha256": "76bf396765bfc81c0f5f65d834d82a18a55ba9efe4c1fa6bfbb94e696c24cec7",
+      "packageMetadata": {
+        "name": "workwise",
+        "productName": "RailWise AI",
+        "version": "0.5.9",
+        "sourceHead": "a8392139ec3945a907a3b75def1796370f8a9f5e",
+        "asarSha256": "60ead9e919628b04ed0b62b03fa0893eecd3b74565f2b2a5e3d56bdb837bf792",
+        "asarSize": 506620654
+      },
+      "profilePreserved": true,
+      "threadPreserved": true,
+      "action": "trusted-pointer-on-sidebar"
+    },
+    "evidence": {
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/windows-install-smoke.yml",
+      "runId": 44318842982,
+      "runAttempt": 1,
+      "driverSourceHead": "a8392139ec3945a907a3b75def1796370f8a9f5e",
+      "artifact": {
+        "id": 14435785298,
+        "name": "frozen-windows-gui-upgrade-44318842982",
+        "digest": "sha256:ffc7881a57d890ed441a2274af4bb57d4a784e3a5b0355f78a616dcb1cae7f54"
+      },
+      "report": {
+        "archivePath": "frozen-windows-update.json",
+        "sha256": "440f72d28a281b895083569197d7ccc67e0623efeebf1a93204f381fb14c8fd4",
+        "bytes": 3799
+      }
+    }
+  }
+}
