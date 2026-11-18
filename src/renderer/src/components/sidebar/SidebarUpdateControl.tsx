@@ -3,7 +3,7 @@ import { ArrowUpCircle, ExternalLink, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { applyGuiUpdate, useGuiUpdate } from '../../store/gui-update-store'
 
-export function SidebarUpdateControl(): ReactElement | null {
+export function SidebarUpdateControl({ docked = false }: { docked?: boolean } = {}): ReactElement | null {
   const { t } = useTranslation(['settings', 'common'])
   const { state, pending, error } = useGuiUpdate()
   const info = state.info
@@ -15,7 +15,7 @@ export function SidebarUpdateControl(): ReactElement | null {
     : state.status === 'installing' ? t('guiUpdateCompactInstalling')
       : info.manualOnly ? t('guiUpdateManualDownload') : error ? t('guiUpdateRetry') : t('guiUpdateUpgrade')
   return (
-    <div>
+    <div className={docked ? 'ds-no-drag mx-2 mb-2 max-w-[calc(100%_-_1rem)] shrink-0 self-start rounded-lg border border-ds-border bg-ds-card' : undefined}>
       <button
         type="button"
         disabled={busy}
@@ -27,7 +27,7 @@ export function SidebarUpdateControl(): ReactElement | null {
         <Icon className={`h-4 w-4 shrink-0 ${busy ? 'animate-spin' : ''}`} strokeWidth={1.75} />
         <span aria-live="polite">{label}</span>
       </button>
-      {error ? <p role="alert" className="px-3 pb-2 text-xs text-red-600 dark:text-red-400">{error}</p> : null}
+      {error ? <p role="alert" className="break-words px-3 pb-2 text-xs text-red-600 dark:text-red-400">{error}</p> : null}
     </div>
   )
 }

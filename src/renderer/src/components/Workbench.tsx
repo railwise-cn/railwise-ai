@@ -50,6 +50,7 @@ import { WriteWorkspaceView } from './write/WriteWorkspaceView'
 import { WriteSidebar } from './write/WriteSidebar'
 import { SddDraftEditorView } from './sdd/SddDraftEditorView'
 import { SidebarTitlebarToggleButton } from './sidebar/SidebarPrimitives'
+import { SidebarUpdateControl } from './sidebar/SidebarUpdateControl'
 import { composeWritePrompt } from '../write/quoted-selection'
 import { useWriteWorkspaceStore } from '../write/write-workspace-store'
 import { isWriteThreadId } from '../write/write-thread-registry'
@@ -2583,6 +2584,7 @@ export function Workbench(): ReactElement {
 
           </>
         )}
+        {leftSidebarCollapsed ? <SidebarUpdateControl docked /> : null}
       </main>
       {renderRightPanel()}
     </div>

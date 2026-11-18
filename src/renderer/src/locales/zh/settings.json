@@ -733,6 +733,7 @@
   "guiUpdateNotConfiguredTitle": "当前无法检查更新",
   "guiUpdateDesc": "从 {{productName}} 官方 GitHub Releases 检查新版本；支持时可直接下载并安装。",
   "guiUpdateChecking": "正在检查更新…",
+  "guiUpdateInstallFailedTitle": "安装更新失败",
   "guiUpdateCheckFailed": "无法检查更新",
   "guiUpdateErrNotConfigured": "暂时无法连接更新来源，请打开版本与下载页面手动安装。",
   "guiUpdateErrUnsupported": "当前构建不支持应用内自动更新。",

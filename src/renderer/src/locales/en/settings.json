@@ -733,6 +733,7 @@
   "guiUpdateNotConfiguredTitle": "Can't check for updates",
   "guiUpdateDesc": "Check official {{productName}} GitHub Releases for a new version, then download and install in the app when supported.",
   "guiUpdateChecking": "Checking for updates…",
+  "guiUpdateInstallFailedTitle": "Could not install the update",
   "guiUpdateCheckFailed": "Could not check for updates",
   "guiUpdateErrNotConfigured": "The update source is temporarily unavailable. Open Releases & Downloads to install manually.",
   "guiUpdateErrUnsupported": "This build does not support in-app automatic updates.",

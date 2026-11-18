@@ -33,7 +33,7 @@ test('test browser uses an isolated profile and explicit test extension-loading 
 test('connected-browser acceptance remains opt-in and only its exact helper is source-equivalent', () => {
   const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   assert.equal(workflow.on.workflow_dispatch.inputs.run_browser_execution.default, false)
-  assert.deepEqual(workflow.on.workflow_call.inputs, workflow.on.workflow_dispatch.inputs)
+  assert.deepEqual(workflow.on.workflow_call.inputs.run_browser_execution, workflow.on.workflow_dispatch.inputs.run_browser_execution)
   assert.equal(workflow.jobs['windows-install'].steps.find(step => step.env?.RAILWISE_WINDOWS_BROWSER_SMOKE).env.RAILWISE_WINDOWS_BROWSER_SMOKE, '${{ inputs.run_browser_execution }}')
   const source = { repository: 'railwise-cn/railwise-ai', packageSourceHead: 'a'.repeat(40), driverSourceHead: 'b'.repeat(40), workflow: '.github/workflows/release.yml',
     windowsBuildConclusion: 'success', runId: '123', runAttempt: '1', artifactId: '234', artifactName: 'release-win', artifactDigest: 'sha256:' + 'c'.repeat(64), artifactExpired: false,
@@ -45,7 +45,7 @@ test('connected-browser acceptance remains opt-in and only its exact helper is s
 test('startup diagnostic is opt-in and exclusive before package/dependency work', () => {
   const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   assert.equal(workflow.on.workflow_dispatch.inputs.run_browser_startup_diagnostic.default, false)
-  assert.deepEqual(workflow.on.workflow_call.inputs, workflow.on.workflow_dispatch.inputs)
+  assert.deepEqual(workflow.on.workflow_call.inputs.run_browser_startup_diagnostic, workflow.on.workflow_dispatch.inputs.run_browser_startup_diagnostic)
   const steps = workflow.jobs['windows-install'].steps
   const gate = steps.findIndex(step => step.name === 'Reject mixed diagnostic and business acceptance modes')
   assert.ok(gate >= 0 && gate < steps.findIndex(step => step.uses === 'actions/setup-node@v7'))

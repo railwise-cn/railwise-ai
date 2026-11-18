@@ -59,16 +59,16 @@ export function GuiUpdateControl({
   } else if (installing) {
     title = t('guiUpdateInstalling')
     tone = 'warn'
+  } else if (error) {
+    title = t(downloaded ? 'guiUpdateInstallFailedTitle' : 'guiUpdateCheckFailed')
+    detail = error
+    tone = 'error'
   } else if (downloaded && info?.ok) {
     title = t('guiUpdateDownloaded', { version: info.latestVersion })
     detail = t('guiUpdateDownloadedDesc')
     tone = 'warn'
   } else if (checking && !info) {
     title = t('guiUpdateChecking')
-  } else if (error) {
-    title = t('guiUpdateCheckFailed')
-    detail = error
-    tone = 'error'
   } else if (info?.ok && info.withdrawn && !info.hasUpdate) {
     title = t('guiUpdateWithdrawnTitle', { version: info.withdrawnVersion ?? info.currentVersion })
     detail = t('guiUpdateWithdrawnDesc')
@@ -103,7 +103,7 @@ export function GuiUpdateControl({
 
   return (
     <div className="w-full min-w-0 md:max-w-md">
-      <div className={`rounded-xl border px-3 py-2.5 shadow-sm ${panelClass}`}>
+      <div role={tone === 'error' ? 'alert' : undefined} className={`rounded-xl border px-3 py-2.5 shadow-sm ${panelClass}`}>
         <div className="flex items-start gap-2">
           {busy ? (
             <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" strokeWidth={2} />

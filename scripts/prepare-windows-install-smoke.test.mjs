@@ -78,8 +78,10 @@ test('Windows provenance keeps the actual workflow SHA and requires source evide
 
 test('Windows acceptance workflow downloads the original artifact and performs no packaging or publication', () => {
   const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
-  assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), ['package_run_id', 'run_task_execution', 'run_browser_startup_diagnostic', 'run_browser_execution'])
-  assert.deepEqual(workflow.on.workflow_call.inputs, workflow.on.workflow_dispatch.inputs)
+  const { run_published_gui_update: publishedUpdate, package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
+  assert.equal(publishedUpdate.default, false)
+  assert.equal(packageRun.required, false)
+  assert.deepEqual(workflow.on.workflow_call.inputs, { package_run_id: { ...packageRun, required: true }, ...inspectionInputs })
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   const steps = workflow.jobs['windows-install'].steps
   const download = steps.find(step => step.uses === 'actions/download-artifact@v4')

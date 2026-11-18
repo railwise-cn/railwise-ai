@@ -510,6 +510,7 @@ const stopManagedRuntimesForUpdate = createGuiUpdateShutdown(async () => {
     updateRuntimePrepared = true
   }
   await stopManagedRuntimes(true)
+  if (process.platform === 'win32') await disposeManagedBrowserForExit()
 })
 
 async function stopManagedRuntimesForQuit(): Promise<void> {

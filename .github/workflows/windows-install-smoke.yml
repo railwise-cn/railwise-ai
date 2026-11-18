@@ -27,7 +27,12 @@ on:
       package_run_id:
         description: 'Same-repository release run containing the exact release-win artifact to inspect'
         type: string
-        required: true
+        required: false
+      run_published_gui_update:
+        description: 'Install released 0.5.6 and click the real sidebar upgrade to released Stable 0.5.7 on an ephemeral Windows runner'
+        type: boolean
+        required: false
+        default: false
       run_task_execution:
         description: 'Run real installed task tools, HTML file verification and daily schedule readback with a local model protocol fixture'
         type: boolean
@@ -50,6 +55,7 @@ permissions:
 
 jobs:
   windows-install:
+    if: ${{ inputs.run_published_gui_update != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_browser_execution && 25 || 15 }}
@@ -62,6 +68,9 @@ jobs:
       - name: Reject mixed diagnostic and business acceptance modes
         if: inputs.run_browser_startup_diagnostic && (inputs.run_task_execution || inputs.run_browser_execution)
         run: throw 'Browser startup diagnostic is exclusive with task and browser execution'
+      - name: Require the original package build ID
+        if: ${{ inputs.package_run_id == '' }}
+        run: throw 'package_run_id is required to inspect an existing package'
       - uses: actions/setup-node@v7
         with:
           node-version: '22.22.0'
@@ -113,3 +122,34 @@ jobs:
           path: |
             ${{ runner.temp }}/exact-windows-evidence/
             ${{ runner.temp }}/windows-package-source.json
+
+  windows-published-gui-update:
+    if: ${{ inputs.run_published_gui_update == true }}
+    name: Released Windows 0.5.6 to 0.5.7 via the real sidebar upgrade
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Reject mixed acceptance modes
+        if: ${{ inputs.package_run_id != '' || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
+        run: throw 'The published GUI upgrade accepts no package build or other smoke mode'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - name: Install verification tools
+        run: npm ci --ignore-scripts
+      - name: Verify the published GUI upgrade contract
+        run: node --test scripts/windows-published-gui-update-smoke.test.mjs
+      - name: Install the released baseline and upgrade through the packaged UI
+        run: node scripts/run-windows-published-gui-update-smoke.mjs
+      - name: Retain actual updater evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-windows-gui-upgrade-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/published-windows-gui-upgrade-evidence/

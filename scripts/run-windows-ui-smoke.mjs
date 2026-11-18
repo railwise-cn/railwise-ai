@@ -1922,7 +1922,7 @@ async function availablePort() {
   return port
 }
 
-async function connectCdp(url) {
+export async function connectCdp(url) {
   const socket = new WebSocket(url)
   await new Promise((done, reject) => {
     const timer = setTimeout(() => reject(new Error('Installed renderer connection timed out')), 10_000)
