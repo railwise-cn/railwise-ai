@@ -99,8 +99,18 @@ function modelAction(body, selection, render, parseFixtureToolOutput) {
         authorizationRedacted: output.authorizationId === '<redacted>', sessionReturned: typeof output.session_id === 'string' })}`)
     return [id, 'host_shell_session', { action: 'poll', authorization_id: output.authorizationId, yield_seconds: 4 }]
   }
-  assert.ok(output?.exit_code === 0 && output.commandHash === digest(render.command),
-    'The exact user-approved rendering command must complete with exit code zero')
+  const completed = {
+    status: output?.status,
+    exitCode: output?.exit_code,
+    code: output?.code,
+    commandHashMatches: output?.commandHash === digest(render.command),
+    tail: typeof output?.output === 'string'
+      ? output.output.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/(?:[A-Za-z]:[\\/])[^\r\n"']+/g, '<runner-path>')
+        .split(/\r?\n/).filter(Boolean).slice(-7).join(' ').slice(-650)
+      : undefined
+  }
+  assert.ok(completed.exitCode === 0 && completed.commandHashMatches,
+    `The exact user-approved render did not report success: ${literal(completed)}`)
   selection.rendered = true
   return null
 }
@@ -182,7 +192,10 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       const deadline = Date.now() + 240_000
       let artifact
       while (!artifact && Date.now() < deadline) {
-        if (selection.failure) throw new Error(selection.failure)
+        if (selection.failure) {
+          const file = await lstat(toolchain.target).catch(() => null)
+          throw new Error(`${selection.failure} Synthetic output bytes on disk: ${file?.isFile() ? file.size : 0}.`)
+        }
         const waiting = await cdp.evaluate(pending(firstApproval.taskId))
         for (const approval of waiting) if (!approved.has(approval.requestId)) await approve(approval)
         artifact = await cdp.evaluate(`window.workwise.runtimeRequest(${literal(taskPath)},'GET').then(result=>{
