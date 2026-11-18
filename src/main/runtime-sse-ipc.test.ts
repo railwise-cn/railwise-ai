@@ -1,4 +1,5 @@
 import type { IpcMain, IpcMainInvokeEvent } from 'electron'
+import { createServer, type ServerResponse } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppSettingsV1 } from '../shared/app-settings'
 import { defaultKunRuntimeSettings } from '../shared/app-settings'
@@ -6,6 +7,7 @@ import { appCancellationRegistry } from './cancellation-registry'
 import { registerRuntimeSseIpc, stopAllRuntimeSse } from './runtime-sse-ipc'
 
 type InvokeHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
+const nativeFetch = globalThis.fetch
 
 function createHarness(options: { ensureRuntime?: () => Promise<void> } = {}) {
   const handlers = new Map<string, InvokeHandler>()
@@ -96,6 +98,45 @@ describe('runtime SSE IPC lifecycle', () => {
     expect(options.signal.aborted).toBe(true)
     await vi.advanceTimersByTimeAsync(10_000)
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('reconnects a severed real SSE socket with the same subscription and delivers each reply fragment once', async () => {
+    vi.stubGlobal('fetch', nativeFetch)
+    const harness = createHarness()
+    let firstResponse: ServerResponse | undefined
+    const cursors: { since: string | null; lastId: string | undefined }[] = []
+    const part = (seq: number, text: string) => `id: ${seq}\nevent: assistant_text_delta\ndata: ${JSON.stringify({ item: { text } })}\n\n`
+    const server = createServer((request, response) => {
+      const url = new URL(request.url!, 'http://127.0.0.1')
+      cursors.push({ since: url.searchParams.get('since_seq'), lastId: request.headers['last-event-id'] as string | undefined })
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      if (cursors.length === 1) {
+        firstResponse = response
+        response.write(part(7, 'before disconnect'))
+      } else {
+        response.write(part(8, 'during disconnect'))
+      }
+    })
+    await new Promise<void>((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('Expected an owned loopback SSE server')
+    harness.settings.agents.kun.port = address.port
+    const batches = () => harness.sender.send.mock.calls.filter(([channel]) => channel === 'runtime:sse-event').map(([, batch]) => batch)
+    try {
+      await harness.start('actual-stream', 'thread-fixture')
+      await vi.waitFor(() => expect(batches()).toHaveLength(1))
+      firstResponse!.destroy()
+      await vi.waitFor(() => expect(batches()).toHaveLength(2), { timeout: 4_000 })
+      expect(cursors).toEqual([{ since: '0', lastId: undefined }, { since: '7', lastId: '7' }])
+      expect(batches().map(batch => batch.streamId)).toEqual(['actual-stream', 'actual-stream'])
+      expect(batches().flatMap(batch => batch.events.map((event: { seq: number; item: { text: string } }) => [event.seq, event.item.text])))
+        .toEqual([[7, 'before disconnect'], [8, 'during disconnect']])
+      expect(harness.sender.send).not.toHaveBeenCalledWith('runtime:sse-error', expect.anything())
+      expect(harness.sender.send).not.toHaveBeenCalledWith('runtime:sse-end', expect.anything())
+    } finally {
+      await harness.stop('actual-stream')
+      await new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections() })
+    }
   })
 
   it('carries task progress without allocating a durable cursor and reconnects from the original task change', async () => {
