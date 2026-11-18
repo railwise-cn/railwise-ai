@@ -69,8 +69,10 @@ async function findInstallation(directory, root, source, report) {
   const receipt = await json(join(directory, 'reviewed-build.json'))
   for (const name of ['runId', 'runAttempt', 'sourceHead']) assert.equal(receipt[name], source[name])
   assert.equal(receipt.version, version)
+  // The immutable build leaves architecture suffixes intact. The publication
+  // workflow only applies friendly names when preparing website downloads.
   const fileName = isWindows ? 'RailWise-AI-0.5.8-win-x64.exe'
-    : process.arch === 'x64' ? 'RailWise-AI-0.5.8-mac-Intel.dmg' : 'RailWise-AI-0.5.8-mac-Apple-Silicon.dmg'
+    : 'RailWise-AI-0.5.8-mac-' + process.arch + '.dmg'
   const path = join(directory, fileName)
   const digest = await sha256(path)
   const record = receipt.files.find(file => file.name === fileName)
