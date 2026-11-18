@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { websiteStaticTransport } from './deploy-website-release.mjs'
-import { checkedBytes, finalizeWebsite, inspectPublishedDependencies, inspectWebsiteStage, r2Matches, validateManifest } from './stage-managed-dependencies.mjs'
+import { checkedBytes, finalizeWebsite, inspectPublishedDependencies, inspectWebsiteStage, loadMarketplaceArtifacts, r2Matches, validateManifest } from './stage-managed-dependencies.mjs'
 
 const manifest = JSON.parse(await readFile(new URL('../src/shared/managed-dependencies.json', import.meta.url), 'utf8'))
 const bytes = Buffer.from('exact upstream dependency')
@@ -156,8 +156,31 @@ test('dependency workflow excludes every application job', async () => {
   const jobs = workflow.slice(workflow.indexOf('\njobs:\n')).split(/\n {2}(?=[a-z][a-z0-9-]+:)/).slice(1)
   assert.ok(jobs.length > 10)
   for (const job of jobs) {
-    if (job.startsWith('stage-managed-dependencies:')) assert.match(job, /inputs.stage_dependency_mirror == true/)
+    if (job.startsWith('stage-managed-dependencies:') || job.startsWith('build-marketplace-mirror:')) assert.match(job, /inputs.stage_dependency_mirror == true/)
     else if (job.startsWith('existing-windows-package-acceptance:')) assert.match(job, /inputs.existing_windows_package_run_id != ''/)
     else assert.match(job, /\n {4}if: \$\{\{ inputs.stage_dependency_mirror != true &&/)
   }
+})
+
+test('marketplace staging accepts only verified native bundle bytes matching the committed lock', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'marketplace-stage-test-'))
+  try {
+    const platform = 'win32', arch = 'x64'
+    const build = join(directory, `marketplace-mirror-${platform}-${arch}`)
+    await mkdir(build)
+    const record = { packageId: 'playwright', reviewSha256: 'f'.repeat(64), platform, arch, parts: [{ sha256: file.sha256, size: file.size }] }
+    const lock = { version: 1, packages: [record] }
+    const sourceLock = join(build, 'marketplace-lock.json')
+    const sourceBytes = join(build, `${file.sha256}.zip`)
+    await writeFile(sourceLock, JSON.stringify(lock))
+    await writeFile(sourceBytes, bytes)
+    const result = await loadMarketplaceArtifacts(lock, directory)
+    assert.deepEqual(result.files, [{ id: `marketplace-${file.sha256}`, sha256: file.sha256, size: file.size, mirrorPath: `marketplace/1/${file.sha256}/payload.zip` }])
+    assert.equal(result.sources.get(result.files[0].id), sourceBytes)
+    await writeFile(sourceBytes, Buffer.alloc(bytes.length))
+    await assert.rejects(loadMarketplaceArtifacts(lock, directory), /integrity mismatch/)
+    await writeFile(sourceLock, JSON.stringify({ ...lock, packages: [{ ...record, reviewSha256: 'a'.repeat(64) }] }))
+    await assert.rejects(loadMarketplaceArtifacts(lock, directory), /does not match the committed lock/)
+    await assert.rejects(loadMarketplaceArtifacts({ ...lock, packages: [] }, directory), /Invalid or empty/)
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })
