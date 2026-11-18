@@ -33,6 +33,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_repaired_gui_update:
+        description: 'Build a private 0.5.6 updater fixture from this ref and exercise its warm-check upgrade to released Stable 0.5.7'
+        type: boolean
+        required: false
+        default: false
       run_task_execution:
         description: 'Run real installed task tools, HTML file verification and daily schedule readback with a local model protocol fixture'
         type: boolean
@@ -55,7 +60,7 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ inputs.run_published_gui_update != true }}
+    if: ${{ inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_browser_execution && 25 || 15 }}
@@ -133,7 +138,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Reject mixed acceptance modes
-        if: ${{ inputs.package_run_id != '' || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
+        if: ${{ inputs.run_repaired_gui_update || inputs.package_run_id != '' || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
         run: throw 'The published GUI upgrade accepts no package build or other smoke mode'
       - uses: actions/setup-node@v7
         with:
@@ -150,6 +155,72 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: published-windows-gui-upgrade-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/published-windows-gui-upgrade-evidence/
+
+  windows-repaired-gui-update:
+    if: ${{ inputs.run_repaired_gui_update == true && inputs.run_published_gui_update != true }}
+    name: Private repaired Windows baseline to released Stable 0.5.7
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Reject mixed acceptance modes
+        if: ${{ inputs.package_run_id != '' || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution }}
+        run: throw 'The private repaired baseline accepts no package build or other smoke mode'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - name: Install fixture build tools
+        run: npm ci
+      - name: Verify the GUI upgrade contract
+        run: node --test scripts/windows-published-gui-update-smoke.test.mjs
+      - name: Prepare checksummed Electron runtime
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+        run: npm run prepare:electron
+      - name: Restore pinned Windows document sidecar from the reviewed release build
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '14376543672'
+          run-id: '44192481166'
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: build/sidecars/markitdown-win32-x64
+      - name: Verify Windows sidecar
+        env:
+          WORKWISE_SIDECAR_ARCH: x64
+        run: node scripts/build-markitdown-sidecar.mjs --verify-only
+      - name: Build the local-only repaired baseline NSIS installer
+        env:
+          WORKWISE_APP_VERSION: '0.5.6'
+          WORKWISE_CANDIDATE_SOURCE_HEAD: ${{ github.sha }}
+          WORKWISE_REQUIRE_DOCUMENT_SIDECAR: '1'
+          WORKWISE_UPDATE_CHANNEL: stable
+          WORKWISE_DIST_DIR: ${{ runner.temp }}/repaired-updater-baseline
+          RELEASE_CHANNEL: stable
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          NODE_OPTIONS: --max-old-space-size=6144
+        # dist:win uses electron-builder --publish never.
+        run: npm run dist:win
+      - name: Verify packaged Windows Runtime and document sidecar
+        run: |
+          node scripts/verify-packaged-markitdown.cjs "$env:RUNNER_TEMP/repaired-updater-baseline" win
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-packaged-runtime-native.cjs "$env:RUNNER_TEMP/repaired-updater-baseline" win
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upgrade the repaired baseline through the real packaged sidebar
+        run: node scripts/run-windows-published-gui-update-smoke.mjs --repaired-baseline
+      - name: Retain diagnostics for the private repaired baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repaired-windows-gui-upgrade-${{ github.run_id }}
           retention-days: 7
           if-no-files-found: warn
           path: ${{ runner.temp }}/published-windows-gui-upgrade-evidence/

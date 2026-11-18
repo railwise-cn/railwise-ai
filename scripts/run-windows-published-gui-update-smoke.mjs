@@ -9,7 +9,7 @@ import { pipeline } from 'node:stream/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
-import { inspectInstalledPackage, installIdentity } from './verify-windows-install-smoke.mjs'
+import { inspectInstalledPackage, inspectInstaller, installIdentity } from './verify-windows-install-smoke.mjs'
 import { connectCdp, summarizeWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 
 const baseVersion = '0.5.6'
@@ -26,6 +26,11 @@ const target = reviewedBuild.files.find(file => file.name === `RailWise-AI-${tar
 const rootIdentity = installIdentity(baseVersion, baseSource)
 const targetIdentity = installIdentity(targetVersion, reviewedBuild.sourceHead)
 const pathEquals = (one, other) => resolve(one).toLowerCase() === resolve(other).toLowerCase()
+const hourMs = 60 * 60 * 1000
+
+export function repairedScheduleSeed(nowMs) {
+  return { appVersion: baseVersion, lastCheckedAt: new Date(nowMs - hourMs).toISOString() }
+}
 
 export function verifyPublishedWindowsManifest(manifest) {
   assert.equal(manifest.version, targetVersion, 'The current Stable feed must match the pinned target')
@@ -40,7 +45,20 @@ export function verifyPublishedWindowsManifest(manifest) {
 
 export function assertPublishedWindowsUpgrade(report) {
   assert.equal(report.baseline?.package?.version, baseVersion)
-  assert.equal(report.baseline?.installer?.sha256, baseline.sha256)
+  if (report.scope === 'private-repaired-windows-gui-upgrade') {
+    assert.ok(/^[a-f0-9]{40}$/.test(report.provenance?.driverSourceHead ?? ''))
+    assert.equal(report.baseline.package.sourceHead, report.provenance.driverSourceHead)
+    assert.match(report.baseline?.installer?.sha256 ?? '', /^[a-f0-9]{64}$/)
+    assert.notEqual(report.baseline.installer.sha256, baseline.sha256)
+    assert.equal(report.schedule?.seededRecord?.appVersion, baseVersion)
+    assert.equal(report.schedule?.automaticRecord?.appVersion, baseVersion)
+    assert.equal(Date.parse(report.schedule.seededAt) - Date.parse(report.schedule.seededRecord.lastCheckedAt), hourMs)
+    assert.ok(Date.parse(report.schedule.automaticRecord.lastCheckedAt) >= Date.parse(report.schedule.seededAt),
+      'The normal baseline updater must recheck after the one-hour seed')
+  } else {
+    assert.equal(report.scope, 'published-windows-gui-upgrade')
+    assert.equal(report.baseline?.installer?.sha256, baseline.sha256)
+  }
   assert.equal(report.offer?.status, 'available')
   assert.equal(report.offer?.hasUpdate, true)
   assert.equal(report.action?.method, 'trusted-pointer-on-sidebar')
@@ -154,13 +172,15 @@ async function attachPackagedRenderer(child, executable, devtoolsPort) {
   }, 'the owned packaged renderer', 90_000)
 }
 
-async function main() {
+async function main(args) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.GITHUB_ACTIONS === 'true' &&
     process.env.RUNNER_ENVIRONMENT === 'github-hosted' && process.env.RUNNER_OS === 'Windows',
     'Published GUI upgrade requires an ephemeral GitHub-hosted Windows x64 runner')
+  const repaired = args.length === 1 && args[0] === '--repaired-baseline'
+  assert.ok(!args.length || repaired, 'Unsupported Windows GUI updater smoke arguments')
   const evidenceDir = join(process.env.RUNNER_TEMP, 'published-windows-gui-upgrade-evidence')
   await mkdir(evidenceDir)
-  const report = { schemaVersion: 1, scope: 'published-windows-gui-upgrade', status: 'running',
+  const report = { schemaVersion: 1, scope: repaired ? 'private-repaired-windows-gui-upgrade' : 'published-windows-gui-upgrade', status: 'running',
     provenance: { driverSourceHead: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT },
     baseVersion, targetVersion, phase: 'preflight', baseline: {},
     officialFeed, directTargetInstallerLaunches: 0, applicationUpdaterOverrides: 0 }
@@ -192,7 +212,10 @@ async function main() {
     const directory = join(root, 'install')
     const executable = join(directory, rootIdentity.executableName)
     report.phase = 'baseline-install'
-    report.baseline.installer = await downloadBaseline(root)
+    const baselineIdentity = repaired ? installIdentity(baseVersion, process.env.GITHUB_SHA) : rootIdentity
+    report.baseline.installer = repaired
+      ? inspectInstaller(join(process.env.RUNNER_TEMP, 'repaired-updater-baseline', baselineIdentity.installerName), baselineIdentity)
+      : await downloadBaseline(root)
     await save()
     // /D must be last. A raw NSIS argument string preserves paths with spaces.
     const exitCode = powershell(`
@@ -210,7 +233,7 @@ async function main() {
     `, 310_000)
     assert.equal(Number(exitCode), 0, 'Released baseline installer exit code')
     report.baseline.executable = executable
-    report.baseline.package = inspectInstalledPackage(directory, rootIdentity)
+    report.baseline.package = inspectInstalledPackage(directory, baselineIdentity)
     report.baseline.registry = ownedInstallState(directory, baseVersion)
     const appUpdate = parse(await readFile(join(directory, 'resources', 'app-update.yml'), 'utf8'))
     assert.equal(appUpdate.provider, 'generic')
@@ -220,6 +243,15 @@ async function main() {
     const cleanEnvironment = { ...process.env }
     for (const name of Object.keys(cleanEnvironment)) {
       if (/SECRET|TOKEN|PASSWORD|PRIVATE_KEY|API_KEY|^(?:APPLE_|CSC_|R2_|S3_|WORKWISE_|ELECTRON_RUN_AS_NODE|NODE_OPTIONS|RELEASE_CHANNEL|PUBLIC_DOWNLOAD_BASE_URL)/i.test(name)) delete cleanEnvironment[name]
+    }
+    if (repaired) {
+      await mkdir(profile)
+      const seededAt = Date.now()
+      const seededRecord = repairedScheduleSeed(seededAt)
+      const file = join(profile, 'gui-update-schedule.json')
+      await writeFile(file, JSON.stringify(seededRecord) + '\n', { flag: 'wx' })
+      report.schedule = { seededAt: new Date(seededAt).toISOString(), seededRecord }
+      await save()
     }
     child = spawn(executable, ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN'],
       { env: cleanEnvironment, cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -267,6 +299,11 @@ async function main() {
       if (schedule?.isFile()) activeProfiles.push(path)
     }
     assert.equal(activeProfiles.length, 1, 'Expected the automatic updater schedule in the owned profile')
+    if (repaired) {
+      assert.ok(pathEquals(activeProfiles[0], profile), 'The fixture must reuse the profile seeded before launch')
+      report.schedule.automaticRecord = JSON.parse(await readFile(join(profile, 'gui-update-schedule.json'), 'utf8'))
+      await save()
+    }
     const sentinel = join(activeProfiles[0], 'railwise-published-updater-smoke.txt')
     const sentinelValue = `Synthetic updater continuity marker ${randomUUID()}\n`
     await writeFile(sentinel, sentinelValue, { flag: 'wx' })
@@ -317,5 +354,5 @@ async function main() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await main()
+  await main(process.argv.slice(2))
 }
