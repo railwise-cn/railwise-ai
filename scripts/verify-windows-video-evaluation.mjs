@@ -5,7 +5,6 @@ import { access, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
-import { parseFixtureToolOutput } from './run-windows-ui-smoke.mjs'
 
 const execFile = promisify(execFileCallback)
 const digest = value => createHash('sha256').update(value).digest('hex')
@@ -61,7 +60,7 @@ console.log(${literal(target)});
   return { target, ffmpeg, ffprobe }
 }
 
-function modelAction(body, selection, render) {
+function modelAction(body, selection, render, parseFixtureToolOutput) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
   const results = new Map(body.messages?.filter(message => message.role === 'tool')
     .map(message => [message.tool_call_id, parseFixtureToolOutput(message.content)]))
@@ -85,7 +84,7 @@ function modelAction(body, selection, render) {
   return null
 }
 
-export async function startWindowsVideoEvaluation(workspace, environment) {
+export async function startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput) {
   const toolchain = await provision(workspace, environment)
   const quote = value => `'${value.replace(/'/g, "''")}'`
   const render = { command: `& ${quote(process.execPath)} ${quote(join(workspace, script))}`,
@@ -103,7 +102,7 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
       for await (const chunk of request) chunks.push(chunk)
       const body = JSON.parse(Buffer.concat(chunks).toString())
       assert.ok(selection.skillId && body.messages?.some(message => message.role === 'user' && literal(message.content).includes(marker)))
-      const action = modelAction(body, selection, render)
+      const action = modelAction(body, selection, render, parseFixtureToolOutput)
       const delta = action ? { tool_calls: [{ index: 0, id: action[0], type: 'function',
         function: { name: action[1], arguments: literal(action[2]) } }] } :
         { content: selection.rendered ? `已渲染并保存 ${filename} 。` : '合成验收所需工具未就绪。' }
