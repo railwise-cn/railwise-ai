@@ -2608,7 +2608,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         mode: videoEvaluation ? 'video' : connectorSmoke ? 'connectors' : 'marketplace',
         observe: proof => { report.marketplace = proof } })
       if (video) {
-        report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
+        await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId, evidence => { report.marketplace.videoShotcraft.render = evidence })
         report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
       } else {
         report.checks.push(connectorSmoke ? 'cold-mirror-playwright-and-docling' : 'cold-mirror-installs-playwright-docling-and-skill-selection')

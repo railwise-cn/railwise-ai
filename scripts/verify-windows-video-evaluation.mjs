@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { execFile as execFileCallback, execFileSync } from 'node:child_process'
+import { execFile as execFileCallback, execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -15,6 +15,9 @@ const model = 'windows-video-evaluation-fixture'
 const filename = 'railwise-synthetic-evaluation.mp4'
 const script = 'render-evaluation.mjs'
 const composition = 'RailWiseSyntheticEvaluation'
+const fullDecoderPackage = '@ffmpeg-installer/win32-x64'
+const fullDecoderVersion = '4.1.0'
+const fullDecoderIntegrity = 'sha512-Drt5u2vzDnIONf4ZEkKtFlbvwj6rI3kxw1Ck9fpudmtgaZIHD4ucsWB2lCZBXRxJgXR+2IMSti+4rtM4C4rXgg=='
 
 // Original geometry only. This evaluation does not rely on the media omitted from the Skill.
 const scene = `import React from 'react';
@@ -37,7 +40,7 @@ async function provision(workspace, environment) {
   const root = join(workspace, 'synthetic-evaluation')
   await mkdir(root)
   await writeFile(join(root, 'package.json'), literal({ name: model, private: true, dependencies: {
-    '@remotion/cli': version, remotion: version, react: '19.2.7', 'react-dom': '19.2.7'
+    '@remotion/cli': version, remotion: version, react: '19.2.7', 'react-dom': '19.2.7', [fullDecoderPackage]: fullDecoderVersion
   } }))
   await writeFile(join(root, 'index.jsx'), scene)
   const npm = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js')
@@ -50,7 +53,10 @@ async function provision(workspace, environment) {
   const binaries = join(root, 'node_modules', '@remotion', 'compositor-win32-x64-msvc')
   const ffprobe = join(binaries, 'ffprobe.exe')
   const ffmpeg = join(binaries, 'ffmpeg.exe')
-  for (const path of [cli, ffmpeg, ffprobe]) await access(path)
+  const fullDecoder = join(root, 'node_modules', fullDecoderPackage, 'ffmpeg.exe')
+  for (const path of [cli, ffmpeg, ffprobe, fullDecoder]) await access(path)
+  const lock = JSON.parse(await readFile(join(root, 'package-lock.json'), 'utf8'))
+  assert.equal(lock.packages[`node_modules/${fullDecoderPackage}`]?.integrity, fullDecoderIntegrity)
   assert.equal(JSON.parse(await readFile(join(dirname(cli), 'package.json'), 'utf8')).version, version)
   const target = join(workspace, filename)
   await writeFile(join(workspace, script), `import {execFileSync} from 'node:child_process';
@@ -58,7 +64,7 @@ execFileSync(${literal(process.execPath)}, ${literal([cli, 'render', 'index.jsx'
     '--concurrency=1', '--chrome-mode=chrome-for-testing', '--browser-executable', browser])}, {cwd:${literal(root)},stdio:'inherit',windowsHide:true,timeout:140000});
 console.log(${literal(target)});
 `)
-  return { target, ffmpeg, ffprobe }
+  return { target, ffmpeg, ffprobe, fullDecoder }
 }
 
 function modelAction(body, selection, render, parseFixtureToolOutput) {
@@ -149,7 +155,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
   await new Promise((ready, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', ready) })
   return { model, baseUrl: `http://127.0.0.1:${server.address().port}/v1`, observed: selection,
     close: () => new Promise(done => { server.close(done); server.closeAllConnections() }),
-    async verify(cdp, skillId) {
+    async verify(cdp, skillId, observe) {
       selection.skillId = skillId
       const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
       await cdp.fill(composer, `/skill:${skillId} ${marker}，请读取已安装技能的流水线说明，用本工作区准备的原创一秒合成场景实际制作成片，输出 ${filename} 。请通过明确审批运行本工作区的 ${script} 。`)
@@ -214,10 +220,24 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       const probe = JSON.parse(execFileSync(toolchain.ffprobe, ['-v', 'error', '-select_streams', 'v:0', '-show_streams', '-of', 'json', toolchain.target],
         { encoding: 'utf8', windowsHide: true, timeout: 15_000 })).streams[0]
       assert.deepEqual([probe.codec_name, probe.width, probe.height, Number(probe.nb_frames)], ['h264', 320, 180, 24])
-      execFileSync(toolchain.ffmpeg, ['-v', 'error', '-xerror', '-i', toolchain.target, '-f', 'null', '-'],
-        { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
-      return { kind: 'private-noncommercial-synthetic-evaluation', remotionVersion: version, codec: probe.codec_name,
+      const evidence = { kind: 'private-noncommercial-synthetic-evaluation', remotionVersion: version, codec: probe.codec_name,
         width: probe.width, height: probe.height, frames: Number(probe.nb_frames), artifact: { id: artifact.id, sha256: artifact.sha256, bytes: video.length },
-        installedSkillResourceRead: true, execution: 'explicit-host-shell-approval', runtimeApprovalIds: [...approved], decoded: true }
+        installedSkillResourceRead: true, execution: 'explicit-host-shell-approval', runtimeApprovalIds: [...approved], decoded: false }
+      observe(evidence)
+      const decode = executable => spawnSync(executable, ['-v', 'error', '-xerror', '-i', toolchain.target, '-f', 'null', '-'],
+        { windowsHide: true, timeout: 30_000, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] })
+      const capturedStderr = result => (result.stderr ?? '').replaceAll(workspace, '<workspace>').slice(-1200)
+      const primary = decode(toolchain.ffmpeg)
+      evidence.decoder = { source: 'pinned-remotion-compositor', exitCode: primary.status, stderr: capturedStderr(primary) }
+      if (primary.status !== 0 && /(?:requested output format ['"]?null|could not find suitable output format|unknown encoder|encoder[^\r\n]*(?:not found|unavailable|disabled)|automatic encoder selection failed)/i.test(evidence.decoder.stderr)) {
+        const fallback = decode(toolchain.fullDecoder)
+        evidence.fallbackDecoder = { source: `${fullDecoderPackage}@${fullDecoderVersion}`, integrity: fullDecoderIntegrity,
+          exitCode: fallback.status, stderr: capturedStderr(fallback) }
+        assert.equal(fallback.status, 0, `Pinned independent decoder failed: ${evidence.fallbackDecoder.stderr}`)
+      } else {
+        assert.equal(primary.status, 0, `Pinned Remotion decoder failed: ${evidence.decoder.stderr}`)
+      }
+      evidence.decoded = true
+      return evidence
     } }
 }
