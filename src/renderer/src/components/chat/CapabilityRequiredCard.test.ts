@@ -104,6 +104,27 @@ describe('capability waiting card', () => {
   })
   afterEach(async () => { await act(async () => root.unmount()); resetTaskStateForTests(); container.remove() })
 
+  it('does not repeat a current inline blocker in the status bar and preserves the fallback for old cards', async () => {
+    const current = { ...card, capability: { ...card.capability, checkedAt: '2026-11-13T00:01:00Z' } }
+    const previous = { ...card, capability: { ...card.capability, checkedAt: '2026-11-13T00:00:00Z' } }
+    tasks[0].waitingReason = current.capability.message
+    inbox = [attentionFor(current)]
+    const renderStatus = async (inline: ExternalTaskCapabilityCard): Promise<void> => {
+      await act(async () => {
+        await refreshTaskState()
+        root.render(createElement('div', null,
+          createElement(TaskRunStatusBar, { threadId: card.threadId, runtimeReady: true, inlineCapabilityCards: [inline] }),
+          createElement(CapabilityRequiredCard, { card: inline })))
+      })
+    }
+    await renderStatus(current)
+    expect(visibleText().split(current.capability.message)).toHaveLength(2)
+    expect(button('重新检查并继续原任务')).toBeTruthy()
+    await renderStatus(previous)
+    expect(visibleText()).toContain(current.capability.message)
+    expect(visibleText()).toContain('能力处理记录')
+  })
+
   it('presents an expired execution after partial HTML work without changing its durable wait or authorizing it', async () => {
     const raw = 'Execution grant expired; start a newly authorized Turn.'
     const expired: ExternalTaskCapabilityCard = { ...card, capability: {

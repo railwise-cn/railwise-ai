@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TaskAttentionV1 } from '@shared/agent-workbench'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { ManagedLarkConnection } from '../connectors/ManagedLarkConnection'
 import { ManagedDingTalkConnection } from '../connectors/ManagedDingTalkConnection'
@@ -11,6 +12,21 @@ import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
 import { refreshTaskState, requestTaskDetail, useTaskState } from '../../store/task-live-store'
 import { isExecutionGrantExpiredCapability, taskHasExecutionEvidence } from '@shared/task-presentation'
 import { foregroundTaskArtifactPreview } from '../../lib/use-task-artifact-preview'
+
+export function capabilityCardMatchesAttention(card: ExternalTaskCapabilityCard, item: TaskAttentionV1): boolean {
+  if (item.id !== (card.attentionId ?? `capability_${card.taskId}`) ||
+    item.taskId !== card.taskId || item.status !== 'pending' || item.payload?.kind !== 'capability_required') return false
+  const current = item.payload.capability as ExternalTaskCapabilityCard['capability'] | undefined
+  const capability = card.capability
+  if (!current || current.provider !== capability.provider || current.status !== capability.status || current.errorCode !== capability.errorCode) return false
+  // The coordinator reuses attention IDs. checkedAt distinguishes subsequent requests.
+  if (capability.checkedAt || current.checkedAt) return Boolean(capability.checkedAt && capability.checkedAt === current.checkedAt)
+  const legacyRequestKey = (value: ExternalTaskCapabilityCard['capability']) => JSON.stringify([
+    value.message, value.workspaceRoot, value.requiredScopes, value.action?.kind, value.action?.route,
+    value.resolution?.kind, value.resolution?.route
+  ])
+  return legacyRequestKey(capability) === legacyRequestKey(current)
+}
 
 /** A capability failure is a durable waiting task, never a completed answer. */
 export function CapabilityRequiredCard({ card, workspaceRoot }: { card: ExternalTaskCapabilityCard; workspaceRoot?: string }): ReactElement {
@@ -47,20 +63,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
   const egoTaskReview = isEgo && ['blocked', 'needs_authorization'].includes(capability.status) && action?.route === 'task/ego-browser-review'
   const scopeFallbackKey = capability.provider === 'workspace' ? 'capabilityScopeReviewRequired'
     : isEgo ? 'capabilityScopeRecheckOnResume' : 'capabilityScopeNotGranted'
-  const attention = live.attention.find(item => item.id === (card.attentionId ?? `capability_${card.taskId}`) &&
-    item.taskId === card.taskId && item.status === 'pending' && item.payload?.kind === 'capability_required')
-  const currentCapability = attention?.payload?.capability as ExternalTaskCapabilityCard['capability'] | undefined
-  // The coordinator reuses a task's attention ID. A new checkedAt identifies a
-  // later capability request while the old chat card remains in history.
-  const legacyRequestKey = (value: ExternalTaskCapabilityCard['capability']) => JSON.stringify([
-    value.message, value.workspaceRoot, value.requiredScopes, value.action?.kind, value.action?.route,
-    value.resolution?.kind, value.resolution?.route
-  ])
-  const currentRequest = Boolean(currentCapability && currentCapability.provider === capability.provider &&
-    currentCapability.status === capability.status && currentCapability.errorCode === capability.errorCode &&
-    (capability.checkedAt || currentCapability.checkedAt
-      ? capability.checkedAt && capability.checkedAt === currentCapability.checkedAt
-      : legacyRequestKey(capability) === legacyRequestKey(currentCapability)))
+  const currentRequest = live.attention.some(item => capabilityCardMatchesAttention({ ...card, capability }, item))
   const stateKnown = checkedRequest === requestKey && live.ready && !live.error
   const ownerTask = live.tasks.find(task => task.id === card.taskId)
   const settled = settledCapability === card.capability || Boolean(stateKnown && (

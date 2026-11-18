@@ -23,7 +23,7 @@ import {
 import { extractPlanMetadataFromBlock } from '../../plan/plan-tool'
 import { planDisplayNameFromRelativePath } from '../../plan/plan-path'
 import {
-  isCriticalProcessBlock,
+  isPendingProcessControl,
   deriveSemanticProgress,
   visibleProcessBlocksForMode
 } from './conversation-visibility'
@@ -344,7 +344,7 @@ function MessageTurn({
   }, [turn.blocks, isProcessing])
   const { think: liveThink, content: liveContent } = splitThink(live)
   const liveProcessText = [liveReasoning, liveThink].filter(Boolean).join('\n\n')
-  const [workExpandedOverride, setWorkExpandedOverride] = useState<boolean | null>(null)
+  const [workExpanded, setWorkExpanded] = useState(false)
 
   const { processBlocks, assistantContentBlocks, generatedFileBlocks, turnFileChanges } = useMemo(
     () =>
@@ -366,22 +366,20 @@ function MessageTurn({
     () => visibleProcessBlocksForMode(processBlocks, viewMode),
     [processBlocks, viewMode]
   )
+  const pendingControls = visibleProcessBlocks.filter(isPendingProcessControl)
   const semanticProgress = useMemo(
     () => deriveSemanticProgress(processBlocks, isProcessing),
     [processBlocks, isProcessing]
   )
-  const criticalProcessVisible = visibleProcessBlocks.some(isCriticalProcessBlock)
-  const workExpanded = criticalProcessVisible || (workExpandedOverride ?? false)
-
   const processSections = useMemo(
-    () => (workExpanded ? groupProcessSections(visibleProcessBlocks) : []),
+    () => (workExpanded ? groupProcessSections(visibleProcessBlocks.filter(block => !isPendingProcessControl(block))) : []),
     [visibleProcessBlocks, workExpanded]
   )
   const reasoningSectionCount = useMemo(
     () => processSections.filter((section) => section.kind === 'reasoning').length,
     [processSections]
   )
-  const hasProcess = isProcessing || visibleProcessBlocks.length > 0
+  const hasProcess = isProcessing || visibleProcessBlocks.length > pendingControls.length
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -393,11 +391,10 @@ function MessageTurn({
             ? <p role="status" className="py-0.5 text-[13px] font-medium text-ds-muted">{t('engineeringRuntimeProcessing')}</p>
             : <WorkMetaRow
               processing={isProcessing}
-              stepCount={visibleProcessBlocks.length}
               durationMs={durationMs}
               reasoningDurationMs={reasoningDurationMs}
               expanded={workExpanded}
-              onToggle={() => setWorkExpandedOverride((value) => !(value ?? false))}
+              onToggle={() => setWorkExpanded(value => !value)}
             />}
           {!professionalSurface && workExpanded && processSections.length > 0 ? (
             <div className="flex flex-col gap-1">
@@ -415,6 +412,10 @@ function MessageTurn({
           ) : null}
         </div>
       ) : null}
+
+      {!professionalSurface ? pendingControls.map(block => (
+        <MessageBubble key={block.id} block={block} nested />
+      )) : null}
 
       {assistantContentBlocks.map((block) => (
         <MessageBubble key={block.id} block={block} professionalSurface={professionalSurface} />

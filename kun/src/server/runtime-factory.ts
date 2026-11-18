@@ -42,6 +42,7 @@ import { buildMcpToolProviders } from '../adapters/tool/mcp-tool-provider.js'
 import { ManagedMcpRuntime } from '../services/managed-mcp-runtime.js'
 import { buildMemoryToolProviders } from '../adapters/tool/memory-tool-provider.js'
 import { buildAttachmentToolProviders } from '../adapters/tool/attachment-tool-provider.js'
+import { buildSkillResourceToolProvider } from '../adapters/tool/skill-resource-tool-provider.js'
 import { buildFlowToolProviders } from '../adapters/tool/flow-tool-provider.js'
 import { buildDelegationToolProviders } from '../adapters/tool/delegation-tool-provider.js'
 import { buildWebToolProviders } from '../adapters/tool/web-tool-provider.js'
@@ -608,6 +609,7 @@ export async function createKunServeRuntime(
     ...webProviders.providers,
     ...buildMemoryToolProviders(memoryStore),
     ...buildAttachmentToolProviders(attachmentStore),
+    buildSkillResourceToolProvider(),
     ...buildDocumentDeliveryToolProviders(taskRepository, { contextRuntime: taskContextRuntime, engineeringService,
       observedFeedCollectionContext: (taskId, turnId) => taskController.observedFeedCollectionContext(taskId, turnId) }),
     ...buildManagedArtifactToolProviders(taskController),

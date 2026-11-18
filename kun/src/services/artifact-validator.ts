@@ -113,6 +113,59 @@ async function validateOoxml(
   return { valid: true, format, sizeBytes, sha256, evidence }
 }
 
+type MediaBox = { type: string; payload: number; end: number }
+
+function mediaBoxes(bytes: Buffer, start: number, end: number): MediaBox[] {
+  const boxes: MediaBox[] = []
+  let offset = start
+  while (offset < end) {
+    if (end - offset < 8 || boxes.length >= 8192) throw new Error('Invalid video box header.')
+    const size32 = bytes.readUInt32BE(offset)
+    const type = bytes.toString('ascii', offset + 4, offset + 8)
+    const headerSize = size32 === 1 ? 16 : 8
+    if (end - offset < headerSize) throw new Error('Truncated video box header.')
+    const size = size32 === 1 ? Number(bytes.readBigUInt64BE(offset + 8)) : size32 || end - offset
+    if (!Number.isSafeInteger(size) || size < headerSize || size > end - offset) {
+      throw new Error('Truncated or invalid video box.')
+    }
+    boxes.push({ type, payload: offset + headerSize, end: offset + size })
+    offset += size
+  }
+  return boxes
+}
+
+function validateMpeg4Video(bytes: Buffer, format: string, sizeBytes: number, sha256: string): ArtifactValidationResult {
+  try {
+    const children = (box: MediaBox) => mediaBoxes(bytes, box.payload, box.end)
+    const boxes = mediaBoxes(bytes, 0, bytes.byteLength)
+    const movie = boxes.find(box => box.type === 'moov')
+    const hasMedia = boxes.some(box => box.type === 'mdat' && box.end > box.payload)
+    const hasBrand = boxes.some(box => box.type === 'ftyp' && box.end - box.payload >= 8)
+    if (!movie || !hasMedia || (format !== 'mov' && !hasBrand)) {
+      return invalid(format, sizeBytes, sha256, 'Video container is missing its movie metadata or media payload.')
+    }
+    const fragmented = boxes.some(box => box.type === 'moof' && box.end > box.payload)
+    const videoTrack = children(movie).filter(box => box.type === 'trak').some(track => {
+      const media = children(track).find(box => box.type === 'mdia')
+      if (!media) return false
+      const mediaChildren = children(media)
+      const handler = mediaChildren.find(box => box.type === 'hdlr')
+      if (!handler || handler.end - handler.payload < 12 ||
+          bytes.toString('ascii', handler.payload + 8, handler.payload + 12) !== 'vide') return false
+      const mediaInfo = mediaChildren.find(box => box.type === 'minf')
+      const table = mediaInfo && children(mediaInfo).find(box => box.type === 'stbl')
+      if (!table) return false
+      const sizes = children(table).find(box => box.type === 'stsz' || box.type === 'stz2')
+      return Boolean(sizes && sizes.end - sizes.payload >= 12 &&
+        (bytes.readUInt32BE(sizes.payload + 8) > 0 || fragmented))
+    })
+    if (!videoTrack) return invalid(format, sizeBytes, sha256, 'Video container does not contain a rendered video track.')
+    return { valid: true, format, sizeBytes, sha256, evidence: ['Video container, track and media payload verified'] }
+  } catch (error) {
+    return invalid(format, sizeBytes, sha256, error instanceof Error ? error.message : 'Invalid video container.')
+  }
+}
+
 export async function validateArtifactFile(
   path: string,
   requestedFormat?: string
@@ -127,6 +180,9 @@ export async function validateArtifactFile(
   const sha256 = createHash('sha256').update(bytes).digest('hex')
   if (format === 'pptx' || format === 'docx' || format === 'xlsx') {
     return validateOoxml(bytes, format, info.size, sha256)
+  }
+  if (format === 'mp4' || format === 'm4v' || format === 'mov') {
+    return validateMpeg4Video(bytes, format, info.size, sha256)
   }
   if (format === 'pdf') {
     const header = bytes.subarray(0, 8).toString('latin1')

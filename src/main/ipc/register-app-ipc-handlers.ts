@@ -248,7 +248,12 @@ import { openVerifiedTaskArtifact } from '../services/task-artifact-open'
 import { TaskArtifactPreviewService } from '../services/task-artifact-preview-service'
 import { MarketplaceCatalogService } from '../services/marketplace-catalog-service'
 import { PluginManagementService } from '../services/plugin-management-service'
-import type { CatalogSourceV1 } from '../../shared/marketplace'
+import type { CatalogSourceV1, InstalledPackageV1 } from '../../shared/marketplace'
+import {
+  declaredMarketplaceSkills,
+  marketplaceSkillReadiness,
+  readMarketplaceSkillSnapshot
+} from '../../shared/marketplace-skill-readiness'
 import type { DocumentEngineId } from '../../shared/agent-workbench'
 import {
   hasLegacyImChannelCredential,
@@ -321,7 +326,7 @@ type RegisterAppIpcHandlersOptions = {
   refreshManagedDingTalkCapabilities?: (status: import('../../shared/managed-dws').ManagedDwsStatus) => Promise<void | { enabled: boolean }>
   setManagedDingTalkEnabled?: (enabled: boolean) => Promise<import('../../shared/managed-dws').ManagedDwsResult>
   onMcpServersChanged?: (snapshot: import('../services/mcp-config-service').McpRuntimeSnapshotV1) => Promise<void>
-  onSkillsChanged?: () => Promise<void>
+  onSkillsChanged?: () => Promise<RuntimeRequestResult | void>
   refreshBrowserSkill?: (status: import('../../../kun/src/contracts/browser-skill.js').BrowserCapabilityConfig) => Promise<void>
   onRuntimeMcpConfigWritten?: (path: string, content: string) => Promise<void> | void
   showTurnCompleteNotification: (
@@ -719,18 +724,24 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ;(app as typeof app & { once?: typeof app.once }).once?.('before-quit', () => mcpConfigService.dispose())
   let skillCatalogGeneration = 1
 
-  const notifySkillsChanged = async (): Promise<number> => {
+  const notifySkillsChanged = async (): Promise<RuntimeRequestResult | void> => {
     skillCatalogGeneration += 1
     getMainWindow()?.webContents.send('skills:changed', skillCatalogGeneration)
-    await options.onSkillsChanged?.()
-    return skillCatalogGeneration
+    return options.onSkillsChanged?.()
   }
 
-  const notifyPluginCapabilitiesChanged = async (mcpChanged: boolean): Promise<void> => {
-    const results = await Promise.allSettled([notifySkillsChanged(), mcpChanged ? notifyMcpServersChanged() : undefined])
-    const errors = results.filter(result => result.status === 'rejected').map(result => result.reason)
+  const notifyPluginCapabilitiesChanged = async (mcpChanged: boolean, installed?: InstalledPackageV1, skillNames?: string[]) => {
+    const [skills, mcp] = await Promise.allSettled([notifySkillsChanged(), mcpChanged ? notifyMcpServersChanged() : undefined])
+    const errors = [
+      ...(skills.status === 'rejected' && skillNames === undefined ? [skills.reason] : []),
+      ...(mcp.status === 'rejected' ? [mcp.reason] : [])
+    ]
     if (errors.length === 1) throw errors[0]
     if (errors.length > 1) throw new AggregateError(errors, '插件已保存，但技能与连接器均未能完成 Runtime 更新。请重试刷新。')
+    if (installed && skillNames !== undefined) {
+      const snapshot = skills.status === 'fulfilled' ? readMarketplaceSkillSnapshot(skills.value, 'state') : undefined
+      return marketplaceSkillReadiness(snapshot, installed.artifact.location, skillNames)
+    }
   }
 
   const loadSkillCatalog = async (workspaceRoot?: string) => {
@@ -1131,9 +1142,11 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('plugin:install', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:install', pluginInstallPayloadSchema, payload)
     let mcpChanged = false
+    let skillNames: string[] | undefined
     const installed = await pluginManagementService.installPrepared(
       request,
       async (record, item) => {
+        skillNames = declaredMarketplaceSkills(item.components)
         const applied = await activatePluginPackage({
           item,
           installed: record,
@@ -1144,15 +1157,17 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         mcpChanged = applied.mcpChanged
       }
     )
-    await notifyPluginCapabilitiesChanged(mcpChanged)
-    return installed
+    const skillRuntime = await notifyPluginCapabilitiesChanged(mcpChanged, installed, skillNames)
+    return skillRuntime ? { ...installed, skillRuntime } : installed
   })
   ipcMain.handle('plugin:rollback', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:rollback', pluginRollbackPayloadSchema, payload)
     let mcpChanged = false
+    let skillNames: string[] | undefined
     const installed = await pluginManagementService.rollback(
       request,
       async (record, item) => {
+        skillNames = declaredMarketplaceSkills(item.components)
         const applied = await activatePluginPackage({
           item,
           installed: record,
@@ -1163,8 +1178,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         mcpChanged = applied.mcpChanged
       }
     )
-    await notifyPluginCapabilitiesChanged(mcpChanged)
-    return installed
+    const skillRuntime = await notifyPluginCapabilitiesChanged(mcpChanged, installed, skillNames)
+    return skillRuntime ? { ...installed, skillRuntime } : installed
   })
   ipcMain.handle('plugin:update-permissions', async (_, payload: unknown) => {
     const request = parseIpcPayload('plugin:update-permissions', pluginPermissionsUpdatePayloadSchema, payload)

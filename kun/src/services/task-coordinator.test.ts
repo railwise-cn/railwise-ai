@@ -157,6 +157,26 @@ describe('task commands before Turn allocation',()=>{
     expect(f.repository.inputs(waiting.task.id).at(-1)).toMatchObject({ kind: 'supplement', text: supplement })
   })
 
+  it('admits the original ordinary-chat video request as a durable file and source task', async () => {
+    const f = await fixture()
+    const prompt = '使用Video ShotCraft技能，帮我做一个视频，介绍一下宁波睿威工程技术有限公司，相关信息你可去官网上查找。 www.railwise.cn'
+    const result = await f.coordinator.command({
+      threadId: f.origin.id,
+      idempotencyKey: 'video-delivery',
+      request: { prompt }
+    })
+    expect(result).toMatchObject({
+      kind: 'task_started',
+      task: { originThreadId: f.origin.id, acceptance: {
+        kind: 'files',
+        requiredFormats: ['mp4'],
+        requiresWebEvidence: true,
+        requiredSourceOrigins: ['https://www.railwise.cn']
+      } }
+    })
+    expect(f.runTurn).toHaveBeenCalledOnce()
+  })
+
   it('routes pause, continue and cancel deterministically without a classification request',async()=>{
     expect(classifyTaskInput('先暂停',true)).toBe('pause')
     expect(classifyTaskInput('继续',true)).toBe('resume')

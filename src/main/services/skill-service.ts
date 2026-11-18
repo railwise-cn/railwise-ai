@@ -17,7 +17,11 @@ import { systemFetch } from './system-network'
 import { expandHomePath, normalizeSkillFolderName } from './workspace-service'
 import { LEGACY_SKILL_SOURCE_METADATA_FILE } from '../compat/legacy-metadata'
 import { resolveContainedPath } from './canonical-containment'
-import { inspectPackageDirectory, PackageInstallationService } from './package-installation-service'
+import {
+  inspectPackageDirectory,
+  PackageInstallationService,
+  packageInstallLimitsForSource
+} from './package-installation-service'
 import {
   BUNDLED_SKILL_LIMITS,
   SKILL_PACKAGE_LIMITS,
@@ -397,7 +401,10 @@ export async function discoverInstalledPluginSkillRoots(
   const roots: string[] = []
   for (const record of installed) {
     if (!await installedPackageContainsSkills(record.artifact.location)) continue
-    const inspection = await inspectPackageDirectory(record.artifact.location).catch(() => null)
+    const inspection = await inspectPackageDirectory(
+      record.artifact.location,
+      packageInstallLimitsForSource(record.source)
+    ).catch(() => null)
     if (!inspection || inspection.sha256 !== record.artifact.sha256) continue
     await collectInstalledSkillRoots(record.artifact.location, roots, 0, 6)
   }

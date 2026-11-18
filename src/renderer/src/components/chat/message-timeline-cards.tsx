@@ -299,28 +299,18 @@ export function TurnChangeSummary({
 /** Turn-level work-process summary. Details stay collapsed until the user opens them. */
 export function WorkMetaRow({
   processing,
-  stepCount,
   durationMs,
   reasoningDurationMs,
   expanded,
   onToggle
 }: {
   processing: boolean
-  stepCount: number
   durationMs?: number
   reasoningDurationMs?: number
   expanded: boolean
   onToggle: () => void
 }): ReactElement {
   const { t } = useTranslation('common')
-
-  const mainLabel = processing
-    ? typeof durationMs === 'number'
-      ? `${t('processing')} ${formatDuration(durationMs)}`
-      : t('processing')
-    : typeof durationMs === 'number'
-      ? `${t('processed')} ${formatDuration(durationMs)}`
-      : t('processSteps', { count: stepCount })
 
   const showThoughtSuffix =
     !processing &&
@@ -334,7 +324,10 @@ export function WorkMetaRow({
       aria-expanded={expanded}
       className="group flex w-fit max-w-full items-center gap-1.5 rounded-md py-1 text-left text-[15px] font-medium text-ds-muted transition hover:opacity-85"
     >
-      <span className={`tabular-nums ${processing ? 'ds-shiny-text' : ''}`}>{mainLabel}</span>
+      <span className={processing ? 'ds-shiny-text' : ''}>{t('taskEvidenceExecutionDetails')}</span>
+      {typeof durationMs === 'number' ? (
+        <span className="tabular-nums text-ds-faint">· {formatDuration(durationMs)}</span>
+      ) : null}
       {showThoughtSuffix ? (
         <span className="text-ds-faint">
           · {t('thoughtFor', { duration: formatDuration(reasoningDurationMs!) })}

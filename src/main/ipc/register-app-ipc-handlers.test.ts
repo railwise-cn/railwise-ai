@@ -562,11 +562,16 @@ describe('registerAppIpcHandlers', () => {
     }
   }, 15_000)
 
-  it('refreshes only Skills after a pure Skill installation even when unrelated MCP refresh would fail', async () => {
+  it.each(['loaded', 'pending', 'unavailable'] as const)('reports Skills Runtime state %s after a pure Skill installation', async (state) => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
-    const installed = { packageId: 'browser-skill', scope: 'user', permissions: [], rollback: { available: false } }
-    const item = { permissions: [], components: [{ id: 'browser-skill', type: 'skill' }] }
-    const onSkillsChanged = vi.fn(async () => undefined)
+    const artifactRoot = join(tmpdir(), 'pinned-marketplace-skill')
+    const installed = { packageId: 'browser-skill', scope: 'user', permissions: [], artifact: { location: artifactRoot }, rollback: { available: false } }
+    const item = { permissions: [], components: [{ id: 'browser-skill', type: 'skill', skillNames: ['browser-skill'] }] }
+    const onSkillsChanged = vi.fn(async () => {
+      if (state === 'unavailable') throw new Error('Runtime request unavailable')
+      const root = state === 'loaded' ? artifactRoot : join(tmpdir(), 'older-same-name-skill')
+      return { ok: true, status: 200, body: JSON.stringify({ state: { enabled: true, skills: [{ id: 'browser-skill', name: 'Browser Skill', root }] } }) }
+    })
     const onMcpServersChanged = vi.fn(async () => { throw new Error('Unrelated MCP is offline') })
     const runtimeSnapshot = vi.fn()
     registerAppIpcHandlers(registerOptions({ onSkillsChanged, onMcpServersChanged,
@@ -577,7 +582,7 @@ describe('registerAppIpcHandlers', () => {
       } } as never
     }))
     await expect(handlers.get('plugin:install')?.({}, { preparedId: 'prepared-skill', reviewSha256: 'a'.repeat(64),
-      expectedCurrentVersion: null, scope: 'user', permissions: [], idempotencyKey: 'install-skill' })).resolves.toEqual(installed)
+      expectedCurrentVersion: null, scope: 'user', permissions: [], idempotencyKey: 'install-skill' })).resolves.toEqual({ ...installed, skillRuntime: state })
     expect(onSkillsChanged).toHaveBeenCalledOnce()
     expect(runtimeSnapshot).not.toHaveBeenCalled()
     expect(onMcpServersChanged).not.toHaveBeenCalled()

@@ -1004,17 +1004,18 @@ async function skillCapabilityConfigForRuntime(
   settings?: AppSettingsV1,
   explicitRoots?: string[]
 ): Promise<Record<string, unknown>> {
+  const managedRoots = explicitRoots ? [] : (await guiSkillRootsForRuntime(settings)).map((root) => root.path)
   const roots = explicitRoots
     ? uniqueStrings(explicitRoots.map(normalizeSkillRootPath))
     : uniqueStrings([
         ...stringArrayValue(existing.roots).filter(root => !stringArrayValue(existing.managedRoots).includes(root) && !isManagedPluginSkillRoot(root)).map(normalizeSkillRootPath),
-        ...(await guiSkillRootsForRuntime(settings)).map((root) => root.path)
+        ...managedRoots
       ])
   return {
     ...existing,
     enabled: existing.enabled === false ? false : roots.length > 0 || existing.enabled === true,
     roots,
-    managedRoots: explicitRoots ? [] : (await guiSkillRootsForRuntime(settings)).map(root => root.path),
+    managedRoots,
     legacySkillMd: existing.legacySkillMd === false ? false : true
   }
 }

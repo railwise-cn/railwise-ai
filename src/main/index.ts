@@ -1581,6 +1581,7 @@ app.whenReady().then(async () => {
       await syncManagedSkillCapability(dataDir, settings)
       const response = await runtimeRequest(settings, '/v1/runtime/skills/refresh', { method: 'POST' })
       if (!response.ok) throw new Error('技能资料已保存，Runtime 尚未确认加载。请点击刷新技能重试。')
+      return response
     },
     refreshBrowserSkill: async status => {
       const settings = await store.load()

@@ -5,11 +5,18 @@ import { externalTaskIntent } from '../services/external-task-capability.js'
 
 const DELIVERABLE_EXTENSIONS = new Set([
   'csv', 'doc', 'docx', 'htm', 'html', 'md', 'markdown', 'odt', 'pdf',
-  'ppt', 'pptx', 'rtf', 'txt', 'xls', 'xlsx'
+  'ppt', 'pptx', 'rtf', 'txt', 'xls', 'xlsx', 'mp4', 'm4v', 'mov'
 ])
 
 const DELIVERY_ACTION_PATTERN =
   /(?:形成|生成|创建|制作|编写|撰写|导出|保存|交付|转换).{0,40}(?:文档|文件|报告|方案|表格|演示|幻灯片|PPT|PDF|Word|Excel|Markdown)|(?:文档|文件|报告|方案|表格|演示|幻灯片|PPT|PDF|Word|Excel|Markdown).{0,40}(?:形成|生成|创建|制作|编写|撰写|导出|保存|交付|转换)|(?:create|write|draft|generate|export|save|deliver|convert).{0,60}(?:document|report|spreadsheet|presentation|markdown|pdf|docx|xlsx|pptx|csv)/i
+
+const VIDEO_DELIVERY_PATTERN =
+  /(?:制作|生成|渲染|剪辑|导出|交付|做(?:出)?)[^，,。！？；;\n]{0,36}?(?:视频|短片|成片|宣传片)(?![\s的]*(?:脚本|文案|策划|大纲|教程|方案|分镜|镜头表))|\b(?:create|make|produce|generate|render|export|deliver)\b[^,.;!?\n]{0,60}?\b(?:video|film|mp4|m4v|mov)\b(?![\s-]+(?:script|outline|tutorial|storyboard|plan|guide))/i
+const VIDEO_FORMAT_REQUEST =
+  /(?:渲染|导出|输出|保存|交付|转换成|制作|生成|创建|剪辑|\b(?:render|export|output|save|deliver|convert\s+to|create|make|produce|generate)\b).{0,30}?\b(mp4|m4v|mov)\b|\b(mp4|m4v|mov)\b[\s-]*(?:格式|成片|文件|视频|video|file)/i
+const VIDEO_ADVICE_ONLY =
+  /^(?:请\s*)?(?:如何|怎么|怎样|教我|为什么|为何|\b(?:how\s+(?:to|do|can)|explain|why)\b)|(?:只|仅)(?:需|要|做|写|给|提供|生成)?.{0,10}(?:脚本|文案|分镜|镜头表)|\b(?:only|just)\b.{0,16}\b(?:script|storyboard|outline)\b/i
 
 const WEB_DELIVERY_PATTERN = /(?:生成|制作|创建|保存|导出|交付|汇报|输出).{0,60}(?:网页|html\b)|(?:网页|html\b).{0,60}(?:生成|制作|创建|保存|导出|交付|汇报|报告)|(?:generate|create|save|export|deliver).{0,60}(?:html|web\s*page)/i
 const CODE_ONLY_PATTERN = /(?:只|仅).{0,8}(?:要|给|提供|输出|展示).{0,8}(?:示例|源码|代码)|(?:解释|讲解|如何|怎么|怎样).{0,30}(?:html|网页)|(?:show|explain).{0,20}(?:code|example)/i
@@ -17,7 +24,7 @@ const CODE_ONLY_PATTERN = /(?:只|仅).{0,8}(?:要|给|提供|输出|展示).{0,
 const WRITE_USER_REQUEST_HEADING = '[用户请求]'
 
 const EXPLICIT_FILE_ACTION_PATTERN =
-  /(?:形成|生成|创建|制作|编写|撰写|导出|保存|输出|交付|转换|create|write|draft|generate|export|save|deliver|convert).{0,80}(?:^|[\s"'`/\\])[^\s"'`/\\]+\.(?:md|markdown|txt|docx?|odt|rtf|pdf|xlsx?|csv|pptx?|html?)(?:$|[\s"'`,，。；;:：)）])|(?:^|[\s"'`/\\])[^\s"'`/\\]+\.(?:md|markdown|txt|docx?|odt|rtf|pdf|xlsx?|csv|pptx?|html?)(?:$|[\s"'`,，。；;:：)）]).{0,80}(?:形成|生成|创建|制作|编写|撰写|导出|保存|输出|交付|转换|create|write|draft|generate|export|save|deliver|convert)/i
+  /(?:形成|生成|创建|制作|编写|撰写|导出|保存|输出|交付|转换|create|write|draft|generate|export|save|deliver|convert).{0,80}(?:^|[\s"'`/\\])[^\s"'`/\\]+\.(?:md|markdown|txt|docx?|odt|rtf|pdf|xlsx?|csv|pptx?|html?|mp4|m4v|mov)(?:$|[\s"'`,，。；;:：)）])|(?:^|[\s"'`/\\])[^\s"'`/\\]+\.(?:md|markdown|txt|docx?|odt|rtf|pdf|xlsx?|csv|pptx?|html?|mp4|m4v|mov)(?:$|[\s"'`,，。；;:：)）]).{0,80}(?:形成|生成|创建|制作|编写|撰写|导出|保存|输出|交付|转换|create|write|draft|generate|export|save|deliver|convert)/i
 
 const NEGATED_FILE_DELIVERY_PATTERN =
   /(?:不要|无需|不用|请勿|禁止|不需要|不必)[^，,；;。！？\n]{0,12}(?:形成|生成|创建|制作|编写|撰写|导出|保存|输出|交付|转换)[^，,；;。！？\n]{0,48}(?:文档|文件|报告|方案|表格|演示|幻灯片|PPT|PDF|Word|Excel|Markdown|CSV|DOCX?|XLSX?|PPTX?)|(?:do\s+not|don't|without|no\s+need\s+to)[^,;.!?\n]{0,12}(?:create|write|draft|generate|export|save|deliver|convert)[^,;.!?\n]{0,48}(?:document|file|report|spreadsheet|presentation|markdown|pdf|docx|xlsx|pptx|csv)/gi
@@ -26,7 +33,7 @@ const PROGRESS_ONLY_PATTERN =
   /(?:我(?:先|会|将|来|再|现在|马上|继续|帮你)|让我|接下来|现在开始|继续)(?:.{0,80})(?:抓取|收集|查找|查询|查一下|检索|搜索|搜一下|查看|整理|梳理|汇报|撰写|生成|创建|处理|检查|执行|继续|补充|验证)|(?:i(?:'ll| will)|let me|next[, ]|i am going to|continuing to)(?:.{0,120})(?:fetch|collect|search|look up|review|write|draft|generate|create|process|check|continue|verify)/is
 
 const DELIVERED_RESULT_PATTERN =
-  /(?:文档|文件|报告|方案|表格|PPT|PDF|Word|Excel|Markdown).{0,24}(?:已完成|已生成|已创建|已保存|已写入|已导出)|(?:已完成|已生成|已创建|已保存|已写入|已导出).{0,24}(?:文档|文件|报告|方案|表格|PPT|PDF|Word|Excel|Markdown)|(?:document|file|report|spreadsheet|presentation).{0,40}(?:completed|created|generated|saved|written|exported)/i
+  /(?:文档|文件|报告|方案|表格|PPT|PDF|Word|Excel|Markdown|视频|短片|成片).{0,24}(?:已完成|已生成|已创建|已保存|已写入|已导出)|(?:已完成|已生成|已创建|已保存|已写入|已导出).{0,24}(?:文档|文件|报告|方案|表格|PPT|PDF|Word|Excel|Markdown|视频|短片|成片)|(?:document|file|report|spreadsheet|presentation|video|film).{0,40}(?:completed|created|generated|saved|written|exported)/i
 
 const EXTERNAL_CAPABILITY_PATTERN =
   /(?:图片生成|图像生成|生图|图片生成提供商|图片生成工具|image generation|image generator|image provider|image tool)/i
@@ -69,7 +76,7 @@ function pathExtension(value: string): string {
 
 function absoluteDeliverablePathsFromText(value: string): string[] {
   const paths: string[] = []
-  const pattern = /((?:\/|[A-Za-z]:[\\/])[^"'\r\n]*?\.(?:md|markdown|txt|docx?|odt|rtf|pdf|xlsx?|csv|pptx?|html?))(?=$|[\s"'`])/gi
+  const pattern = /((?:\/|[A-Za-z]:[\\/])[^"'\r\n]*?\.(?:md|markdown|txt|docx?|odt|rtf|pdf|xlsx?|csv|pptx?|html?|mp4|m4v|mov))(?=$|[\s"'`])/gi
   for (const line of value.split(/\r?\n/)) {
     for (const match of line.matchAll(pattern)) {
       const path = match[1]?.trim()
@@ -81,7 +88,7 @@ function absoluteDeliverablePathsFromText(value: string): string[] {
 
 function relativeDeliverablePathsFromText(value: string): string[] {
   const paths: string[] = []
-  const pattern = /(?:^|[\s"'`(（])((?:[^\s"'`/\\]+[\\/])*[^\s"'`/\\]+\.(?:md|markdown|txt|docx?|odt|rtf|pdf|xlsx?|csv|pptx?|html?))(?=$|[\s"'`,，。；;:：)）])/gi
+  const pattern = /(?:^|[\s"'`(（])((?:[^\s"'`/\\]+[\\/])*[^\s"'`/\\]+\.(?:md|markdown|txt|docx?|odt|rtf|pdf|xlsx?|csv|pptx?|html?|mp4|m4v|mov))(?=$|[\s"'`,，。；;:：)）])/gi
   for (const match of value.matchAll(pattern)) {
     const path = match[1]?.trim()
     if (path && !isAbsolute(path) && !/^[A-Za-z]:[\\/]/.test(path)) paths.push(path)
@@ -182,13 +189,22 @@ export function declaredFileOutputPaths(item:TurnItem):string[] {
   return []
 }
 
+function requestedVideoFormats(prompt: string): readonly string[] | undefined {
+  if (VIDEO_ADVICE_ONLY.test(prompt)) return undefined
+  const positive = prompt.replace(/(?:不要|无需|不用|请勿|禁止|不需要|不必|\b(?:do not|don't|no need to)\b)[^，,；;。！？\n]{0,48}(?:视频|短片|成片|宣传片|\b(?:video|film|mp4|m4v|mov)\b)/gi, ' ')
+  const format = VIDEO_FORMAT_REQUEST.exec(positive)
+  const explicit = format?.[1] ?? format?.[2]
+  if (explicit) return [explicit.toLowerCase()]
+  return VIDEO_DELIVERY_PATTERN.test(positive) ? ['mp4'] : undefined
+}
+
 export function promptRequiresFileDeliverable(prompt: string): boolean {
   const normalized = completionIntentText(prompt)
     .replace(NEGATED_FILE_DELIVERY_PATTERN, ' ')
     .trim()
   if (!normalized) return false
   if (CODE_ONLY_PATTERN.test(normalized)) return false
-  return DELIVERY_ACTION_PATTERN.test(normalized) || EXPLICIT_FILE_ACTION_PATTERN.test(normalized) || WEB_DELIVERY_PATTERN.test(normalized)
+  return Boolean(requestedVideoFormats(normalized)) || DELIVERY_ACTION_PATTERN.test(normalized) || EXPLICIT_FILE_ACTION_PATTERN.test(normalized) || WEB_DELIVERY_PATTERN.test(normalized)
 }
 
 export function promptRequiresExternalEffect(prompt: string): boolean {
@@ -206,6 +222,8 @@ export function requiredFileExtensionsForPrompt(prompt: string): readonly string
   const normalized = completionIntentText(prompt)
     .replace(NEGATED_FILE_DELIVERY_PATTERN, ' ')
     .trim()
+  const videoFormats = requestedVideoFormats(normalized)
+  if (videoFormats) return videoFormats
   if (HTML_DELIVERABLE_PATTERN.test(normalized) && !PPT_SPECIFIC_DELIVERABLE_PATTERN.test(normalized)) {
     return ['html', 'htm']
   }
@@ -301,7 +319,9 @@ export function incompleteTurnContinuationInstruction(input: {
     return [
       'The user explicitly requested a file deliverable, but this turn has not produced one yet.',
       requiredTypeInstruction,
-      'Continue the task now. Use an available file-writing tool to save the completed deliverable inside the workspace.',
+      input.requiredFileExtensions?.some(extension => ['mp4', 'm4v', 'mov'].includes(extension))
+        ? 'Continue using the active Skill and an authorized renderer. Inspect dependencies and the render exit status, then verify the actual video file saved in the workspace.'
+        : 'Continue the task now. Use an available file-writing tool to save the completed deliverable inside the workspace.',
       'Do not stop after announcing what you will do. After writing the file, verify it and give its exact path.'
     ].filter(Boolean).join(' ')
   }

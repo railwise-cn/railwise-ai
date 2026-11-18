@@ -26,6 +26,16 @@ describe('turn completion guard', () => {
     expect(promptRequiresFileDeliverable('Please output the relative paths as Markdown links.')).toBe(false)
   })
 
+  it('requires rendered video for video creation and preserves briefs, advice, and source-only requests', () => {
+    expect(requiredFileExtensionsForPrompt('使用Video ShotCraft技能，帮我做一个视频，介绍一下宁波睿威工程技术有限公司，相关信息你可去官网上查找。 www.railwise.cn')).toEqual(['mp4'])
+    expect(requiredFileExtensionsForPrompt('请使用安装的技能制作宣传片，再导出 MOV。')).toEqual(['mov'])
+    expect(requiredFileExtensionsForPrompt('Render a short product video.')).toEqual(['mp4'])
+    expect(requiredFileExtensionsForPrompt('请只做视频脚本，无需生成成片。')).toBeUndefined()
+    expect(requiredFileExtensionsForPrompt('Please create a video storyboard, no need to render a film.')).toBeUndefined()
+    expect(requiredFileExtensionsForPrompt('怎么用这个技能制作视频？')).toBeUndefined()
+    expect(requiredFileExtensionsForPrompt('制作一份 PPT 演示文稿，引用已有视频。')).toEqual(['ppt', 'pptx'])
+  })
+
   it('detects external side-effect requests separately from prose answers', () => {
     expect(promptRequiresExternalEffect('连接钉钉并自动审批我的待办事项。')).toBe(true)
     expect(promptRequiresExternalEffect('请在飞书发送一条项目通知。')).toBe(true)

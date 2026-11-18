@@ -591,6 +591,10 @@ export type InstalledPackageV1 = PackageProvenanceSnapshotV1 & {
   health: PackageHealthV1
 }
 
+export type PluginActivationReceiptV1 = InstalledPackageV1 & {
+  skillRuntime?: import('./marketplace-skill-readiness').MarketplaceSkillReadiness
+}
+
 export type PackageUpdateResultV1 =
   | {
       status: 'updated'

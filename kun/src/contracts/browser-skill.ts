@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { isLocalHtmlCreativeRequest } from './task-source-intent.js'
+import { bareWwwHosts, isLocalHtmlCreativeRequest } from './task-source-intent.js'
 
 export const BrowserOrigin = z.string().refine(value => {
   try {
@@ -74,10 +74,14 @@ export function isBrowserTask(text: string): boolean {
   return /(?:browser|broswer|browse)[-_ ]?skill|浏览器|网页.*(?:点击|填写|填表|操作|截图|提取|打开)|(?:点击|填写|填表|操作|截图|提取).*网页|\b(?:chrome|edge)\b/i.test(text)
 }
 
-export function browserTaskOrigins(text: string): string[] {
+/** Bare hosts are evidence targets only. Browser scope callers retain URL-only behavior. */
+export function browserTaskOrigins(text: string, options?: { includeBareWww?: boolean }): string[] {
   const origins = new Set<string>()
   for (const match of text.matchAll(/https?:\/\/[^\s<>"'）)，。]+/gi)) {
     try { const url = new URL(match[0]); if (!url.username && !url.password) origins.add(url.origin) } catch { /* A malformed URL is not a grant. */ }
+  }
+  if (options?.includeBareWww) {
+    for (const host of bareWwwHosts(text)) origins.add(`https://${host}`)
   }
   return [...origins]
 }

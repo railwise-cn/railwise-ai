@@ -596,6 +596,32 @@ describe('PluginMarketplaceView unified catalog', () => {
     }
   })
 
+  it('keeps a saved Skill visible and rechecks Runtime without reinstalling', async () => {
+    const skill = pinnedSkillPackage('video-shotcraft')
+    const location = 'C:\\RailWise\\plugins\\versions\\current'
+    vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([{ ...INSTALLED, packageId: skill.id, artifact: { ...INSTALLED.artifact, location } }])
+    const diagnostics = (root: string) => ({
+      ok: true, status: 200, body: JSON.stringify({ skills: {
+        enabled: true, skills: [{ id: 'hashed-id', name: 'video-shotcraft', root }]
+      } })
+    })
+    const runtimeRequest = vi.fn(async () => diagnostics('C:\\RailWise\\plugins\\versions\\older'))
+    const refreshSkills = vi.fn(async () => {
+      runtimeRequest.mockResolvedValue(diagnostics('c:/railwise/plugins/versions/current'))
+      return { ok: true as const, skills: [], validationErrors: [] }
+    })
+    Object.assign(window.workwise, { runtimeRequest, refreshSkills })
+    await act(async () => iconButton('Refresh').click())
+    const selected = [...container.querySelectorAll('[role="button"]')]
+      .find(row => row.querySelector('.truncate')?.textContent === skill.name)
+    expect(selected?.textContent).toContain('Runtime load pending')
+    await act(async () => (selected as HTMLElement).click())
+    await act(async () => exactButton('Recheck Skill load').click())
+    expect(refreshSkills).toHaveBeenCalledOnce()
+    expect(window.workwise.installPreparedPlugin).not.toHaveBeenCalled()
+    expect(container.querySelector('aside')?.textContent).toContain('loaded by Runtime')
+  })
+
   it('shows featured recommendations on the default Skills overview', async () => {
     vi.mocked(window.workwise.listSkills).mockResolvedValue({
       ok: true,

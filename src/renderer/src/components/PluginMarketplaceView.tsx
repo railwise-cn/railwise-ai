@@ -3,6 +3,7 @@ import { GitHubConnectorSetup } from './connectors/GitHubConnectorSetup'
 import { isGitHubMcpServer } from '@shared/github-connector'
 import { currentMcpConnectionCheck } from '@shared/mcp-connection-check'
 import { ENGINEERING_FEATURED_PACKAGE_IDS, OPTIONAL_ENGINEERING_SKILLS, isCatalogInstallable } from '@shared/engineering-marketplace'
+import { declaredMarketplaceSkills, marketplaceSkillReadiness, readMarketplaceSkillSnapshot, type MarketplaceSkillReadiness } from '@shared/marketplace-skill-readiness'
 import { ProductIcon } from './ProductIcon'
 import type { ReactElement, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -262,6 +263,15 @@ function statusTone(tone: Notice['tone']): string {
   return 'border-ds-border bg-ds-subtle text-ds-muted'
 }
 
+function skillRuntimeLabel(state: MarketplaceSkillReadiness, text: Text): string {
+  switch (state) {
+    case 'loaded': return text('pluginSkillRuntimeLoaded', 'Installed · loaded by Runtime')
+    case 'pending': return text('pluginSkillRuntimePending', 'Installed · Runtime load pending')
+    case 'disabled': return text('pluginSkillRuntimeDisabled', 'Installed · Runtime Skills disabled')
+    case 'unavailable': return text('pluginSkillRuntimeUnavailable', 'Installed · Runtime status unavailable')
+  }
+}
+
 function skillSourceUrl(skill: SkillListItem): string | null {
   if (skill.source?.type !== 'github') return null
   const path = skill.source.path ? `/${skill.source.path.replace(/^\/+/, '')}` : ''
@@ -431,6 +441,8 @@ export function PluginMarketplaceView(): ReactElement {
   const [updateDiagnostics, setUpdateDiagnostics] = useState<PluginUpdateDiagnosticV1[]>([])
   const diagnosticMap = useMemo(() => new Map(updateDiagnostics.map((item) => [item.packageId, item])), [updateDiagnostics])
   const [mcpServers, setMcpServers] = useState<McpServerConfigV2[]>([])
+  const [runtimeSkills, setRuntimeSkills] = useState<ReturnType<typeof readMarketplaceSkillSnapshot>>()
+  const [checkingRuntimeSkills, setCheckingRuntimeSkills] = useState(false)
   const [skills, setSkills] = useState<SkillListItem[]>([])
   const [skillValidationErrors, setSkillValidationErrors] = useState<Array<{ root: string; message: string }>>([])
   const [skillCount, setSkillCount] = useState(0)
@@ -471,6 +483,12 @@ export function PluginMarketplaceView(): ReactElement {
     [installedPackages]
   )
   const sourceMap = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources])
+  const runtimeStateForSkill = (item: MarketplacePackageV1): MarketplaceSkillReadiness | undefined => {
+    const record = installed.get(item.id)
+    const names = declaredMarketplaceSkills(item.components)
+    return record?.artifact.location && names !== undefined
+      ? marketplaceSkillReadiness(runtimeSkills, record.artifact.location, names) : undefined
+  }
 
   const refresh = useCallback(async (showSpinner = false): Promise<void> => {
     if (showSpinner) setLoading(true)
@@ -491,9 +509,10 @@ export function PluginMarketplaceView(): ReactElement {
       window.workwise.listInstalledPlugins(),
       window.workwise.listPluginUpdateDiagnostics?.() ?? Promise.resolve([]),
       window.workwise.listMcpServers(workspaceRoot || undefined),
-      window.workwise.listSkills(workspaceRoot || undefined)
+      window.workwise.listSkills(workspaceRoot || undefined),
+      window.workwise.runtimeRequest?.('/v1/runtime/tools', 'GET')
     ])
-    const [sourcesResult, catalogResult, packagesResult, diagnosticsResult, serversResult, skillsResult] = results
+    const [sourcesResult, catalogResult, packagesResult, diagnosticsResult, serversResult, skillsResult, runtimeSkillsResult] = results
     const failures: string[] = []
     if (sourcesResult.status === 'fulfilled') setSources(sourcesResult.value)
     else failures.push('sources')
@@ -505,6 +524,7 @@ export function PluginMarketplaceView(): ReactElement {
     else failures.push('diagnostics')
     if (serversResult.status === 'fulfilled') setMcpServers(serversResult.value)
     else failures.push('mcp')
+    setRuntimeSkills(runtimeSkillsResult.status === 'fulfilled' ? readMarketplaceSkillSnapshot(runtimeSkillsResult.value, 'skills') : undefined)
     if (skillsResult.status === 'fulfilled' && skillsResult.value?.ok) {
       setSkills(skillsResult.value.skills)
       setSkillCount(skillsResult.value.skills.length)
@@ -536,6 +556,19 @@ export function PluginMarketplaceView(): ReactElement {
     }
     setLoading(false)
   }, [text, workspaceRoot])
+
+  const recheckSkillRuntime = async (): Promise<void> => {
+    setCheckingRuntimeSkills(true)
+    try {
+      await window.workwise.refreshSkills(workspaceRoot || undefined)
+      setNotice(null)
+    } catch {
+      setNotice({ tone: 'info', message: skillRuntimeLabel('unavailable', text) })
+    } finally {
+      await refresh()
+      setCheckingRuntimeSkills(false)
+    }
+  }
 
   useEffect(() => {
     void refresh(true)
@@ -771,6 +804,7 @@ export function PluginMarketplaceView(): ReactElement {
     setBusy(`prepared:${prepared.id}`)
     try {
       const current = installed.get(prepared.package.id)
+      let skillRuntime: MarketplaceSkillReadiness | undefined
       if (current?.version === prepared.package.version && prepared.format === 'catalog') {
         await window.workwise.updatePluginPermissions({
           packageId: prepared.package.id,
@@ -784,7 +818,7 @@ export function PluginMarketplaceView(): ReactElement {
           idempotencyKey: uuid()
         })
       } else {
-        await window.workwise.installPreparedPlugin({
+        const receipt = await window.workwise.installPreparedPlugin({
           preparedId: prepared.id,
           reviewSha256: prepared.reviewSha256,
           expectedCurrentVersion: current?.version ?? null,
@@ -796,12 +830,13 @@ export function PluginMarketplaceView(): ReactElement {
           })),
           idempotencyKey: uuid()
         })
+        skillRuntime = receipt.skillRuntime
       }
       await window.workwise.cancelPluginImport(prepared.id).catch(() => false)
       setPrepared(null)
       setNotice({
-        tone: 'success',
-        message: text(
+        tone: skillRuntime && skillRuntime !== 'loaded' ? 'info' : 'success',
+        message: skillRuntime ? `${prepared.package.name} · ${skillRuntimeLabel(skillRuntime, text)}` : text(
           current?.version === prepared.package.version ? 'pluginUnifiedPermissionsUpdated' : 'pluginUnifiedInstalled',
           current?.version === prepared.package.version ? '{{name}} permissions updated.' : '{{name}} installed.',
           { name: prepared.package.name }
@@ -819,12 +854,14 @@ export function PluginMarketplaceView(): ReactElement {
   const rollback = async (record: InstalledPackageV1): Promise<void> => {
     setBusy(`rollback:${record.packageId}`)
     try {
-      await window.workwise.rollbackPlugin({
+      const receipt = await window.workwise.rollbackPlugin({
         packageId: record.packageId,
         expectedCurrentVersion: record.version,
         idempotencyKey: uuid()
       })
-      setNotice({ tone: 'success', message: text('pluginUnifiedRolledBack', '{{name}} rolled back.', { name: record.packageId }) })
+      setNotice(receipt.skillRuntime && receipt.skillRuntime !== 'loaded'
+        ? { tone: 'info', message: `${record.packageId} · ${skillRuntimeLabel(receipt.skillRuntime, text)}` }
+        : { tone: 'success', message: text('pluginUnifiedRolledBack', '{{name}} rolled back.', { name: record.packageId }) })
       await refresh()
     } catch (error) {
       setNotice({ tone: 'error', message: friendlyMarketplaceError(error instanceof Error ? error.message : String(error), t) })
@@ -1143,7 +1180,7 @@ export function PluginMarketplaceView(): ReactElement {
           </section>
           {skillCatalogEntries.length ? <section className="mx-auto w-full max-w-[1040px] px-5 pt-5 md:px-7" aria-label={text('connectorHubSkillCatalog', 'Discover skills')}>
             <h2 className="mb-2 text-[14px] font-semibold">{text('connectorHubSkillCatalog', 'Discover skills')}</h2>
-            <div className="grid gap-x-9 md:grid-cols-2">{skillCatalogEntries.filter(entry => !OPTIONAL_ENGINEERING_SKILLS.some(skill => skill.id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div>
+            <div className="grid gap-x-9 md:grid-cols-2">{skillCatalogEntries.filter(entry => !OPTIONAL_ENGINEERING_SKILLS.some(skill => skill.id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} skillRuntime={runtimeStateForSkill(entry.package)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div>
           </section> : null}
           <LocalSkillsList
             skills={visibleSkills}
@@ -1175,7 +1212,7 @@ export function PluginMarketplaceView(): ReactElement {
           </div>
         ) : (
           <div className="mx-auto w-full max-w-[1040px] px-5 pb-8 md:px-7">
-            {!query && statusFilter === 'recommended' && categoryFilter === 'all' && audienceFilter === 'official' && sourceFilter === 'all' ? <section className="pt-5" aria-label={text('engineeringPluginSelection', 'Engineering essentials')}><h2 className="border-b border-ds-border pb-2 text-[13px] font-semibold">{text('engineeringPluginSelection', 'Engineering essentials')}</h2><div className="grid gap-x-9 md:grid-cols-2">{entries.filter(entry => ENGINEERING_FEATURED_PACKAGE_IDS.some(id => id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div></section> : null}
+            {!query && statusFilter === 'recommended' && categoryFilter === 'all' && audienceFilter === 'official' && sourceFilter === 'all' ? <section className="pt-5" aria-label={text('engineeringPluginSelection', 'Engineering essentials')}><h2 className="border-b border-ds-border pb-2 text-[13px] font-semibold">{text('engineeringPluginSelection', 'Engineering essentials')}</h2><div className="grid gap-x-9 md:grid-cols-2">{entries.filter(entry => ENGINEERING_FEATURED_PACKAGE_IDS.some(id => id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} skillRuntime={runtimeStateForSkill(entry.package)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div></section> : null}
             {visibleEntryGroups.map((group) => (
               <section key={group.category} className="pt-5">
                 <div className="flex h-8 items-center justify-between border-b border-ds-border">
@@ -1190,6 +1227,7 @@ export function PluginMarketplaceView(): ReactElement {
                       key={packageKey(entry)}
                       entry={entry}
                       installed={installed.get(entry.package.id)}
+                      skillRuntime={runtimeStateForSkill(entry.package)}
                       diagnostic={diagnosticMap.get(entry.package.id)}
                       reviewSha256={entry.reviewSha256}
                       server={installedServerForPackage(entry.package, mcpServers)}
@@ -1215,12 +1253,15 @@ export function PluginMarketplaceView(): ReactElement {
           diagnostic={diagnosticMap.get(selected.package.id)}
           source={sourceMap.get(selected.sourceId)}
           installed={installed.get(selected.package.id)}
+          skillRuntime={runtimeStateForSkill(selected.package)}
+          checkingRuntimeSkills={checkingRuntimeSkills}
           server={installedServerForPackage(selected.package, mcpServers)}
           busy={busy}
           text={text}
           onClose={() => setDetailsOpen(false)}
           onAction={() => void invokePrimaryAction(selected)}
           onRollback={(record) => void rollback(record)}
+          onRefreshSkillRuntime={() => void recheckSkillRuntime()}
           onOpenSource={() => {
             if (isHttpUrl(selected.package.source.location)) void window.workwise.openExternal(selected.package.source.location)
           }}
@@ -1795,9 +1836,10 @@ function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy
   )
 }
 
-function PluginRow({ entry, installed, server, reviewSha256, diagnostic, busy, text, onSelect, onAction }: {
+function PluginRow({ entry, installed, skillRuntime, server, reviewSha256, diagnostic, busy, text, onSelect, onAction }: {
   entry: MarketplaceCatalogPackageEntryV1
   installed?: InstalledPackageV1
+  skillRuntime?: MarketplaceSkillReadiness
   server?: McpServerConfigV2
   reviewSha256?: string
   diagnostic?: PluginUpdateDiagnosticV1
@@ -1819,7 +1861,9 @@ function PluginRow({ entry, installed, server, reviewSha256, diagnostic, busy, t
         <p className="mt-1 line-clamp-1 text-[12px] text-ds-muted">{packageDisplaySummary(item, text)}</p>
         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-ds-faint">
           <span>{item.publisher.name}</span>
-          <PackageStatus item={item} installed={installed} server={server} diagnostic={diagnostic} reviewSha256={reviewSha256} text={text} />
+          {skillRuntime && item.id !== 'browser-skill' && !hasUpdate(item, installed, reviewSha256, diagnostic)
+            ? <span>{skillRuntimeLabel(skillRuntime, text)}</span>
+            : <PackageStatus item={item} installed={installed} server={server} diagnostic={diagnostic} reviewSha256={reviewSha256} text={text} />}
         </div>
       </div>
       <div className="flex items-center gap-1.5">
@@ -1848,10 +1892,12 @@ function DetailSection({ title, children }: { title: string; children: ReactNode
   return <section className="border-b border-ds-border px-5 py-4"><h3 className="mb-2 text-[11px] font-semibold uppercase text-ds-faint">{title}</h3>{children}</section>
 }
 
-function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, text, onClose, onAction, onRollback, onOpenSource }: {
+function DetailsDrawer({ entry, source, installed, skillRuntime, checkingRuntimeSkills, server, diagnostic, busy, text, onClose, onAction, onRollback, onRefreshSkillRuntime, onOpenSource }: {
   entry: MarketplaceCatalogPackageEntryV1
   source?: CatalogSourceV1
   installed?: InstalledPackageV1
+  skillRuntime?: MarketplaceSkillReadiness
+  checkingRuntimeSkills: boolean
   server?: McpServerConfigV2
   diagnostic?: PluginUpdateDiagnosticV1
   busy: string
@@ -1859,6 +1905,7 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
   onClose: () => void
   onAction: () => void
   onRollback: (record: InstalledPackageV1) => void
+  onRefreshSkillRuntime: () => void
   onOpenSource: () => void
 }): ReactElement {
   const item = entry.package
@@ -1881,6 +1928,12 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
           ) : null}
         </div>
       </div>
+      {skillRuntime ? <DetailSection title={text('pluginSkillRuntimeTitle', 'Runtime Skill')}>
+        <p className="text-[13px]">{skillRuntimeLabel(skillRuntime, text)}</p>
+        {skillRuntime !== 'loaded' ? <button type="button" disabled={checkingRuntimeSkills} onClick={onRefreshSkillRuntime} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 text-[12px] hover:bg-ds-hover disabled:opacity-50">
+          {text('pluginSkillRuntimeCheck', 'Recheck Skill load')}
+        </button> : null}
+      </DetailSection> : null}
       {item.id === 'officecli' || item.id === 'markitdown' ? <div className="px-5"><ManagedDocumentTool id={item.id} /></div> : null}
       {diagnostic ? <DetailSection title={text('pluginUpdateDiagnosis', 'Update diagnosis')}><p className="text-[13px] font-medium">{diagnosticLabel(diagnostic, text)}</p>{diagnostic.state === 'runtime-drift' ? <p className="mt-2 text-[12px] text-ds-muted">{text('pluginUpdateFullReason', 'Runtime or source verification changed. Install a verified new package version; metadata review cannot replace runtime validation.')}</p> : null}</DetailSection> : null}
       <DetailSection title={text('pluginUnifiedPackageInfo', 'Package')}>

@@ -1,5 +1,6 @@
 import { requestTaskDetail } from '../store/task-live-store'
 import { useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
+import { openGeneratedWorkspaceFile } from '../lib/generated-file-actions'
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -520,6 +521,16 @@ export function Workbench(): ReactElement {
     workspaceRoot
   ])
   const timelineBlocks = blocks
+  const inlineCapabilityCards = useMemo(() => {
+    // The newest turn remains mounted even when earlier history is folded.
+    const cards = []
+    for (let index = timelineBlocks.length - 1; index >= 0; index -= 1) {
+      const block = timelineBlocks[index]
+      if (block.kind === 'user') break
+      if (block.kind === 'assistant' && block.capabilityCard) cards.push(block.capabilityCard)
+    }
+    return cards
+  }, [timelineBlocks])
   const timelineLiveReasoning = liveReasoning
   const timelineLiveAssistant = liveAssistant
   const devPreviewBlocks = useMemo<ChatBlock[]>(() => {
@@ -2231,6 +2242,9 @@ export function Workbench(): ReactElement {
         <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {
         if (/\.html?$/i.test(path) && artifactId) {
           await openWorkspaceArtifact({ taskId: task.id, artifactId })
+        } else if (/\.(?:mp4|m4v|mov)$/i.test(path)) {
+          const result = await openGeneratedWorkspaceFile({ workspaceRoot: task.workspaceRoot, path })
+          if (!result.ok) throw new Error(result.message)
         } else if (/\.(?:md|mdx|markdown)$/i.test(path)) {
           await useWriteWorkspaceStore.getState().openFile(task.workspaceRoot, path)
           setRoute('write')
@@ -2471,6 +2485,7 @@ export function Workbench(): ReactElement {
               threadId={activeThreadId}
               runtimeReady={runtimeConnection === 'ready'}
               onOpenTasks={openTasksView}
+              inlineCapabilityCards={inlineCapabilityCards}
             />
             <MessageTimeline
               viewMode={conversationViewMode}

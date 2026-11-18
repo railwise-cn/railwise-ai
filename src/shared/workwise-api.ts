@@ -500,12 +500,12 @@ export type WorkWiseApi = {
     workspaceRoot?: string
     permissions: InstalledPackagePermissionV1[]
     idempotencyKey: string
-  }) => Promise<InstalledPackageV1>
+  }) => Promise<import('./marketplace').PluginActivationReceiptV1>
   rollbackPlugin: (request: {
     packageId: string
     expectedCurrentVersion: string
     idempotencyKey: string
-  }) => Promise<InstalledPackageV1>
+  }) => Promise<import('./marketplace').PluginActivationReceiptV1>
   updatePluginPermissions: (request: {
     packageId: string
     expectedCurrentVersion: string

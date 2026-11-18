@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { isBrowserTask } from './browser-skill.js'
+import { browserTaskOrigins, isBrowserTask } from './browser-skill.js'
 import { isLocalHtmlCreativeRequest, requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames } from './task-source-intent.js'
 
 it.each([
@@ -22,6 +22,22 @@ it.each([
 ])('retains source evidence for mixed creation and external reading: %s', prompt => {
   expect(isLocalHtmlCreativeRequest(prompt)).toBe(false)
   expect(requiresWebSourceEvidence(prompt)).toBe(true)
+})
+
+it('uses the public site as a source for the reported ordinary Video Shotcraft request', () => {
+  const prompt = '使用Video ShotCraft技能，帮我做一个视频，介绍一下宁波睿威工程技术有限公司，相关信息你可去官网上查找。 www.railwise.cn'
+  expect(requiresWebSourceEvidence(prompt)).toBe(true)
+  expect(isBrowserTask(prompt)).toBe(false)
+  expect(browserTaskOrigins(prompt)).toEqual([])
+  expect(browserTaskOrigins(prompt, { includeBareWww: true })).toEqual(['https://www.railwise.cn'])
+})
+
+it('keeps explicit URL behavior and excludes host lookalikes from bare source targets', () => {
+  const prompt = '查阅 https://example.test/docs、 user@www.mail.test https://user:secret@www.private.test/ ftp://www.ftp.test https://www.full.test/?redirect="www.other.test" （WWW.RAILWISE.CN）。'
+  expect(browserTaskOrigins(prompt)).toEqual(['https://example.test', 'https://www.full.test'])
+  expect(browserTaskOrigins(prompt, { includeBareWww: true })).toEqual(['https://example.test', 'https://www.full.test', 'https://www.railwise.cn'])
+  expect(requiresWebSourceEvidence('查找 www.railwise.cn 的公开信息。')).toBe(true)
+  expect(requiresWebSourceEvidence('制作本地 HTML 动画，不要去官网上查找资料。 www.railwise.cn')).toBe(false)
 })
 
 it('keeps an explicit BrowserSkill connection request while not turning local rendering into source research', () => {
