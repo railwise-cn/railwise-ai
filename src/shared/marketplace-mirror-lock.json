@@ -131,7 +131,7 @@
     },
     {
       "packageId": "docling-mcp",
-      "reviewSha256": "18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99",
+      "reviewSha256": "ffa9c850d1c8abc39cca84f724ab5833592995b24ed2bd4baf9afa38c2026c70",
       "platform": "darwin",
       "arch": "arm64",
       "parts": [
@@ -483,7 +483,7 @@
     },
     {
       "packageId": "docling-mcp",
-      "reviewSha256": "18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99",
+      "reviewSha256": "ffa9c850d1c8abc39cca84f724ab5833592995b24ed2bd4baf9afa38c2026c70",
       "platform": "darwin",
       "arch": "x64",
       "parts": [
@@ -847,7 +847,7 @@
     },
     {
       "packageId": "docling-mcp",
-      "reviewSha256": "18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99",
+      "reviewSha256": "ffa9c850d1c8abc39cca84f724ab5833592995b24ed2bd4baf9afa38c2026c70",
       "platform": "win32",
       "arch": "x64",
       "parts": [

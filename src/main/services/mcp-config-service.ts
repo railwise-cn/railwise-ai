@@ -22,7 +22,7 @@ import { atomicWriteFile, readRecoveredFile, runSerialized } from './durable-fil
 import { canonicalizeContainmentRoot, resolveContainedPath } from './canonical-containment'
 import { isCandidateCredentialAccessAllowed } from '../candidate-runtime'
 import { decryptStringWithCredentialHelper, encryptStringWithCredentialHelper } from './im-credential-helper'
-import { verifiedMirroredNpmMcp } from './plugin-activation-service'
+import { verifiedMirroredNpmMcp, verifiedOfficialDoclingStdioLaunch } from './plugin-activation-service'
 import { resolveMarketplaceCommand } from './marketplace-command'
 
 const execFileAsync = promisify(execFile)
@@ -377,6 +377,7 @@ export class McpConfigService {
           })
         }
         const packagedNode = enabled ? await packagedNodeFallback(server) : undefined
+        const docling = enabled ? await verifiedOfficialDoclingStdioLaunch(server) : undefined
         for (const key of server.credentialEnvironmentVariables ?? []) {
           if (key.toUpperCase() === ELECTRON_NODE_MODE) continue
           const variable = runtimeCredentialVariable(server.id, key)
@@ -389,6 +390,7 @@ export class McpConfigService {
           transport: 'stdio',
           command: packagedNode ?? server.command,
           args: server.args ?? [],
+          ...docling,
           cwd,
           env,
           ...(toolPolicy ? { toolPolicy } : {}),

@@ -99,7 +99,8 @@ export const McpServerConfig = z
       allowedTools: z.array(z.string().min(1)),
       readOnlyTools: z.array(z.string().min(1)).default([])
     }).optional(),
-    timeoutMs: z.number().int().positive().default(30_000)
+    timeoutMs: z.number().int().positive().default(30_000),
+    startupTimeoutMs: z.number().int().positive().max(45_000).optional()
   })
   .strict()
   .superRefine((server, ctx) => {

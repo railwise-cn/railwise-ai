@@ -379,7 +379,9 @@ const WHEEL_ARTIFACTS = {
     packageName: 'docling-mcp',
     version: '3.0.0',
     sha256: '595da70b9de2265f1f14e575fad65ff4213c5c7e2dbb255184d606505fa49f23',
-    executable: 'docling-mcp-server'
+    executable: 'docling-mcp-server',
+    // The 3.0.0 CLI defaults to Streamable HTTP. The managed runtime expects stdio.
+    args: ['--transport', 'stdio']
   },
   fetch: {
     packageName: 'mcp-server-fetch',

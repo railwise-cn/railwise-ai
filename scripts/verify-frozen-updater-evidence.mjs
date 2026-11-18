@@ -7,12 +7,11 @@ import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { githubApi, RELEASE_REPOSITORY } from './verify-reviewed-release-artifacts.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
-import { FROZEN_BASE_VERSION } from './frozen-release-version.mjs'
+import { FROZEN_BASE_VERSION, resolveUpdaterBaseline } from './frozen-release-version.mjs'
 
 export const UPDATER_WORKFLOW = '.github/workflows/frozen-release-updater-acceptance.yml'
 export const UPDATER_WORKFLOW_REF = `${RELEASE_REPOSITORY}/${UPDATER_WORKFLOW}@refs/heads/main`
 export const UPDATER_JOB = `Official ${FROZEN_BASE_VERSION} to exact frozen public package native updater`
-const JOB = UPDATER_JOB
 const RUN_STEP = 'Run default-trust HTTPS download, Squirrel install and historical data readback'
 const RETAIN_STEP = 'Retain durable updater evidence including failures'
 const MAX_ARCHIVE = 20 * 1024 * 1024
@@ -22,7 +21,7 @@ function equal(actual, expected, label) { if (actual !== expected) fail(`${label
 function positive(value, label) { if (!Number.isSafeInteger(value) || value < 1) fail(`${label} must be a positive safe integer`) }
 export function reportSha256(bytes) { return createHash('sha256').update(bytes).digest('hex') }
 
-export function validateUpdaterEvidenceRun(run, machine, sourceHead, version) {
+export function validateUpdaterEvidenceRun(run, machine, sourceHead, version, baseVersion = FROZEN_BASE_VERSION) {
   if (!run || typeof run !== 'object') fail('updaterRoundTrip.workflowRun is required')
   if (!['arm64', 'x64'].includes(machine?.arch)) fail('machine report must identify a supported native macOS architecture')
   equal(run.repository, RELEASE_REPOSITORY, 'repository')
@@ -37,11 +36,15 @@ export function validateUpdaterEvidenceRun(run, machine, sourceHead, version) {
     runId: run.runId, runAttempt: run.runAttempt }
   if (!isDeepStrictEqual(machine.provenance, provenance)) fail('machine report workflow provenance mismatch')
   if (!/^[a-f0-9]{64}$/.test(machine.nativeReportSha256 ?? '')) fail('native report SHA256 is required')
-  validateUpdaterServiceEvidence(machine, { sourceHead, version })
+  validateUpdaterServiceEvidence(machine, { sourceHead, version, baseVersion: resolveUpdaterBaseline(baseVersion).version })
   return run
 }
 
-export function verifyUpdaterEvidenceSource(run, api = githubApi) {
+export function verifyUpdaterEvidenceSource(run, api = githubApi, baseVersion) {
+  // Receipts recorded before the workflow exposed the baseline input retain their original title.
+  const jobName = baseVersion === undefined
+    ? UPDATER_JOB
+    : `Official ${resolveUpdaterBaseline(baseVersion).version} to exact public package native updater`
   const root = `repos/${RELEASE_REPOSITORY}`
   const repository = api(root)
   const workflow = api(`${root}/actions/workflows/frozen-release-updater-acceptance.yml`)
@@ -77,7 +80,7 @@ export function verifyUpdaterEvidenceSource(run, api = githubApi) {
     if (jobs.length >= result.total_count) break
     if (result.jobs.length === 0) fail('incomplete updater jobs response')
   }
-  const matches = jobs.filter(job => job.name === JOB)
+  const matches = jobs.filter(job => job.name === jobName)
   if (matches.length !== 1 || matches[0].conclusion !== 'success') fail('trusted native updater job must succeed exactly once')
   for (const name of [RUN_STEP, RETAIN_STEP]) {
     const steps = matches[0].steps?.filter(step => step.name === name) ?? []
@@ -110,8 +113,8 @@ export function verifyUpdaterEvidenceArchive({ archive, run, machineBytes, nativ
   } finally { rmSync(root, { recursive: true, force: true }) }
 }
 
-export function verifyRemoteUpdaterEvidence({ run, machineBytes, nativeBytes }, api = githubApi) {
-  verifyUpdaterEvidenceSource(run, api)
+export function verifyRemoteUpdaterEvidence({ run, machineBytes, nativeBytes, baseVersion }, api = githubApi) {
+  verifyUpdaterEvidenceSource(run, api, baseVersion)
   const archive = execFileSync('gh', ['api', '--hostname', 'github.com', `repos/${RELEASE_REPOSITORY}/actions/artifacts/${run.artifact.id}/zip`],
     { maxBuffer: MAX_ARCHIVE, timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
   verifyUpdaterEvidenceArchive({ archive, run, machineBytes, nativeBytes })

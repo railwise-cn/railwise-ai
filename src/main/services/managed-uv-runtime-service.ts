@@ -26,6 +26,9 @@ import { downloadManagedDependency, managedDependency, managedPythonDownload, ty
 
 export const MANAGED_UV_VERSION = '0.12.3'
 export const MANAGED_PYTHON_VERSION = '3.12.12'
+export function defaultManagedUvRoot(): string {
+  return join(homedir(), '.workwise', 'runtimes', 'uv')
+}
 const MAX_UV_ARCHIVE_BYTES = 64 * 1024 * 1024
 const MAX_UV_BINARY_BYTES = 64 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 90_000
@@ -181,7 +184,7 @@ export class ManagedUvRuntimeService {
   private readonly mirrorOnly: boolean
 
   constructor(options: ManagedUvRuntimeServiceOptions = {}) {
-    this.rootDirectory = resolve(options.rootDirectory ?? join(homedir(), '.workwise', 'runtimes', 'uv'))
+    this.rootDirectory = resolve(options.rootDirectory ?? defaultManagedUvRoot())
     this.platform = options.platform ?? process.platform
     this.target = `${this.platform}-${options.arch ?? process.arch}`
     this.pythonAsset = options.pythonAsset ?? managedDependency(`python-${this.target}`)
