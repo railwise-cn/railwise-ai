@@ -82,10 +82,18 @@ function modelAction(body, selection, render, parseFixtureToolOutput) {
   assert.ok(tools.has('request_host_shell'), 'KUN must offer a scoped command with explicit approval in the isolated evaluation profile')
   if (!messages.has('eval-render')) return ['eval-render', 'request_host_shell', render]
   let output = parseFixtureToolOutput(messages.get('eval-render'))
+  const visibleSession = output?.session_id
+  const supportsSession = body.tools?.some(tool => tool.function?.name === 'host_shell_session' &&
+    Object.hasOwn(tool.function.parameters?.properties ?? {}, 'session_id'))
   for (let index = 1; output?.status === 'running' && index < 45; index++) {
     const id = `eval-poll-${index}`
     if (messages.has(id)) { output = parseFixtureToolOutput(messages.get(id)); continue }
     assert.ok(tools.has('host_shell_session'), 'The running approved command must expose scoped read-only polling')
+    if (supportsSession) {
+      assert.ok(typeof visibleSession === 'string' && /^bash_[a-f0-9-]+$/i.test(visibleSession) && output.session_id === visibleSession,
+        'Always poll only the exact original session returned to the model after approval')
+      return [id, 'host_shell_session', { action: 'poll', session_id: visibleSession, yield_seconds: 4 }]
+    }
     assert.ok(typeof output.authorizationId === 'string' && /^host_shell_[a-f0-9-]+$/i.test(output.authorizationId),
       `The model cannot poll the running approved command: ${literal({ status: output.status,
         authorizationRedacted: output.authorizationId === '<redacted>', sessionReturned: typeof output.session_id === 'string' })}`)
