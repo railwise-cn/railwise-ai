@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import JSZip from 'jszip'
 import type { McpServerConfigV2 } from '../../shared/agent-workbench'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -122,7 +122,8 @@ async function doclingFixture() {
   const pythonRoot = join(installed.artifact.location, 'python')
   const pythonPath = join(pythonRoot, process.platform === 'win32' ? 'python.exe' : 'python')
   const launcher = join(installed.artifact.location, 'workwise-python-launcher.py')
-  const sitePackages = join(installed.artifact.location, 'site-packages')
+  const siteDirectory = 'site-packages 中文'
+  const sitePackages = join(installed.artifact.location, siteDirectory)
   const lock = `${runtime.packageName}==${runtime.version} --hash=sha256:${runtime.install.digest.value}\n`
   await mkdir(pythonRoot, { recursive: true })
   await mkdir(sitePackages, { recursive: true })
@@ -135,7 +136,7 @@ async function doclingFixture() {
     packageName: runtime.packageName,
     packageVersion: runtime.version,
     entrypoints: [runtime.executable],
-    sitePackages: 'site-packages',
+    sitePackages: siteDirectory,
     lockSha256: createHash('sha256').update(lock).digest('hex'),
     uvVersion: MANAGED_UV_VERSION,
     pythonVersion: MANAGED_PYTHON_VERSION,
@@ -482,7 +483,7 @@ describe('activatePluginPackage', () => {
       id: component.id, name: component.name, scope: 'global', transport: 'stdio',
       command, args, source: 'managed-tool', timeoutMs: 30_000, toolPolicy: {}, enabled: true, revision: 1
     }
-    const options = { installed: { get: vi.fn().mockResolvedValue(installed) }, pythonRoot }
+    const options = { installed: { get: vi.fn().mockResolvedValue(installed) }, pythonRoot, platform: 'darwin' as const }
     const projected = { args: [...args, '--transport', 'stdio'], startupTimeoutMs: 40_000 }
 
     await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args: projected.args }, options)).resolves.toEqual(projected)
@@ -496,6 +497,37 @@ describe('activatePluginPackage', () => {
     await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args: [args[0], 'other-launcher.py', ...args.slice(2)] }, options)).resolves.toBeUndefined()
     installed.permissions = []
     await expect(verifiedOfficialDoclingStdioLaunch(server, options)).resolves.toBeUndefined()
+  })
+
+  it('initializes only the verified Windows Docling pywin32 paths and preserves the saved launch', async () => {
+    const { installed, component, command, args, pythonRoot } = await doclingFixture()
+    const savedArgs = [...args, '--transport', 'stdio']
+    const server: McpServerConfigV2 = {
+      id: component.id, name: component.name, scope: 'global', transport: 'stdio',
+      command, args: savedArgs, source: 'managed-tool', timeoutMs: 30_000, toolPolicy: {}, enabled: true, revision: 1
+    }
+    const options = { installed: { get: vi.fn().mockResolvedValue(installed) }, pythonRoot, platform: 'win32' as const }
+    const sitePackages = args[2]
+    await expect(verifiedOfficialDoclingStdioLaunch(server, options)).resolves.toBeUndefined()
+    for (const directory of ['win32/lib', 'pythonwin', 'pywin32_system32']) {
+      await mkdir(join(sitePackages, directory), { recursive: true })
+    }
+    await writeFile(join(sitePackages, 'win32', 'lib', 'pywin32_bootstrap.py'), '# pywin32 fixture\n')
+
+    const launch = await verifiedOfficialDoclingStdioLaunch(server, options)
+    expect(launch?.startupTimeoutMs).toBe(40_000)
+    expect(launch?.args.slice(0, 2)).toEqual(['-I', '-c'])
+    expect(launch?.args[2]).toContain('["win32","win32/lib","pythonwin"]')
+    expect(launch?.args[2]).toContain('runpy.run_path(str(site_packages / "win32/lib/pywin32_bootstrap.py"))')
+    expect(launch?.args[2]).not.toContain('addsitedir')
+    expect(launch?.args.slice(3, 5)).toEqual(savedArgs.slice(1, 3).map(path => win32.toNamespacedPath(path)))
+    expect(launch?.args.slice(5)).toEqual(savedArgs.slice(3))
+    expect(server.args).toEqual([...args, '--transport', 'stdio'])
+
+    await expect(verifiedOfficialDoclingStdioLaunch({ ...server, source: 'user' }, options)).resolves.toBeUndefined()
+    await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args: [...args, '--transport', 'streamable-http'] }, options)).resolves.toBeUndefined()
+    installed.reviewSha256 = '18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99'
+    await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args }, options)).resolves.toEqual(launch)
   })
 
   it('activates MCPB uv packages only through the pinned managed runtime', async () => {
