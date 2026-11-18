@@ -568,7 +568,7 @@ describe('official marketplace catalog', () => {
     for (const [id, [commit, license, subpath]] of expected) {
       const item = packageById(id)
       expect(item.installation.mode).toBe('direct-mirror')
-      expect(item.version).toBe(commit)
+      expect(item.version).toBe(id === 'video-shotcraft' ? `${commit}-railwise.1` : commit)
       expect(item.source).toMatchObject({
         kind: 'github', resolvedRef: commit,
         ...(subpath ? { subpath } : {})

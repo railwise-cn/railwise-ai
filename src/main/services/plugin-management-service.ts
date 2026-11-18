@@ -39,6 +39,7 @@ import { readCatalogLicenseEvidence } from './package-license-evidence'
 import { describeNetworkFailure, systemFetch } from './system-network'
 import { parseCatalogPackageArtifact } from './marketplace-catalog-service'
 import { materializeMarketplaceMirror, mirrorRecordFor } from './marketplace-mirror'
+import { curateVideoShotcraftMirror } from './video-shotcraft-distribution'
 import {
   marketplaceCommandEnvironment,
   resolveMarketplaceCommand,
@@ -879,6 +880,9 @@ export async function materializeCatalogUpstreamForMirror(
   }
   if (item.source.kind === 'github') {
     await materializeGithubPackage(item, targetDirectory)
+    if (item.id === 'video-shotcraft' && item.source.catalogSourceId === 'workwise-official') {
+      await curateVideoShotcraftMirror(item, targetDirectory)
+    }
     return
   }
   if (item.source.kind === 'pypi') {

@@ -1,6 +1,7 @@
 import { access, chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
+import JSZip from 'jszip'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { CatalogSourceV1, MarketplacePackageV1 } from '../../shared/marketplace'
 import { MarketplaceCatalogService } from './marketplace-catalog-service'
@@ -110,7 +111,7 @@ throw new Error('Unexpected npm arguments: ' + args.join(' '))`)
       .resolves.toBeUndefined()
   })
 
-  it('materializes a pinned GitHub Skill through git on a minimal PATH', async () => {
+  it.runIf(!process.versions.electron)('materializes a pinned GitHub Skill through git on a minimal PATH', async () => {
     const root = await tempRoot()
     const tools = join(root, 'tools')
     const target = join(root, 'github-package')
@@ -120,21 +121,19 @@ throw new Error('Unexpected npm arguments: ' + args.join(' '))`)
     }
     process.env.PATH = tools
     process.env.WORKWISE_TEST_COMMIT = item.source.resolvedRef
-    process.env.WORKWISE_TEST_SUBPATH = item.source.subpath
+    const archive = new JSZip().file('repository/LICENSE', 'MIT fixture').file(`repository/${item.source.subpath}/SKILL.md`, '# Chart visualization fixture\n')
+    process.env.WORKWISE_TEST_ARCHIVE = join(root, 'source.zip')
+    await writeFile(process.env.WORKWISE_TEST_ARCHIVE, await archive.generateAsync({ type: 'nodebuffer' }))
     await fakeTool(tools, 'git', String.raw`
 const fs = require('node:fs')
-const path = require('node:path')
 const args = process.argv.slice(2)
-if (args[0] === 'clone') {
-  const target = args[args.length - 1]
-  const payload = path.join(target, ...process.env.WORKWISE_TEST_SUBPATH.split('/'))
-  fs.mkdirSync(path.join(target, '.git'), { recursive: true })
-  fs.mkdirSync(payload, { recursive: true })
-  fs.writeFileSync(path.join(target, 'LICENSE'), 'MIT fixture')
-  fs.writeFileSync(path.join(payload, 'SKILL.md'), '# Chart visualization fixture\n')
-  process.exit(0)
+switch (args[0]) {
+  case 'init': fs.mkdirSync(args.at(-1), { recursive: true }); break
+  case 'fetch': if (args.at(-1) !== process.env.WORKWISE_TEST_COMMIT) process.exit(1); break
+  case 'rev-parse': process.stdout.write(process.env.WORKWISE_TEST_COMMIT + '\n'); break
+  case 'archive': fs.copyFileSync(process.env.WORKWISE_TEST_ARCHIVE, args.find(arg => arg.startsWith('--output=')).slice(9)); break
+  default: process.exit(1)
 }
-if (args[0] === 'rev-parse') process.stdout.write(process.env.WORKWISE_TEST_COMMIT + '\n')
 process.exit(0)`)
 
     await materializeCatalogPackage(item, target)

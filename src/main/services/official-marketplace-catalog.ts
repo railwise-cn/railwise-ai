@@ -22,6 +22,7 @@ import type {
   UvPackageRuntimeV1
 } from '../../shared/marketplace'
 import { evaluateMarketplaceLicense } from '../../shared/marketplace'
+import { VIDEO_SHOTCRAFT_COMMIT, VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION } from './video-shotcraft-distribution'
 
 const OFFICIAL_CATALOG_SOURCE_ID = 'workwise-official'
 const SHA1_COMMIT = /^[0-9a-f]{40}$/
@@ -1223,12 +1224,22 @@ const officialPackages: MarketplacePackageV1[] = [
     publisher: publisher('vincentwei1021', 'Vincent Wei', 'https://github.com/Vincentwei1021/video-shotcraft'),
     owner: 'Vincentwei1021',
     repository: 'video-shotcraft',
-    commit: '1266a3ec4831289c4d893d42dd5102723658039a',
+    commit: VIDEO_SHOTCRAFT_COMMIT,
+    version: VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION,
     skillNames: ['video-shotcraft'],
     license: 'Apache-2.0',
     categories: ['visualization'],
-    usage: { howToUse: '准备好 Node.js 后安装 Skill，给出视频 brief、时长、画幅和镜头要求；它会生成可继续修改的 Remotion 工程和分镜方案。', requirements: ['Node.js'], examples: ['把这份产品 brief 做成 30 秒、节奏同步的镜头表。'] },
-    dependencies: [{ id: 'node', kind: 'runtime', requirement: 'Node.js', optional: false, managedBy: 'user' }]
+    usage: {
+      howToUse: '睿威镜像提供 Apache-2.0 的技能代码与文档，保留上游署名，演示音频、品牌图片和示例媒体需用自有或已授权素材替换。准备好渲染环境后，可在聊天输入 / 选择技能，再说明成片时长、画幅和镜头。',
+      requirements: ['Node.js 和 npm', '具备适用许可的 Remotion 4.0.484', '受支持的 Chromium 浏览器', 'FFmpeg 和 FFprobe'],
+      examples: ['用当前工作区的原创素材制作一段短片，实际渲染成 MP4 并核验。']
+    },
+    dependencies: [
+      { id: 'node', kind: 'runtime', requirement: 'Node.js and npm', optional: false, managedBy: 'user' },
+      { id: 'remotion', kind: 'runtime', requirement: 'remotion and @remotion/cli 4.0.484 under an applicable Remotion license', optional: false, managedBy: 'user' },
+      { id: 'browser', kind: 'system', requirement: 'Supported Chromium executable for Remotion', optional: false, managedBy: 'user' },
+      { id: 'ffmpeg', kind: 'system', requirement: 'FFmpeg and FFprobe', optional: false, managedBy: 'user' }
+    ]
   }),
   githubSkillPackage({
     id: 'diagram-design',
@@ -1497,6 +1508,7 @@ function githubSkillPackage(options: {
   owner: string
   repository: string
   commit: string
+  version?: string
   subpath?: string
   skillNames: string[]
   license: string
@@ -1511,7 +1523,7 @@ function githubSkillPackage(options: {
     tier: 'advanced',
     productType: 'workflow',
     categories: options.categories,
-    version: options.commit,
+    version: options.version ?? options.commit,
     publisher: options.publisher,
     license: options.license,
     source: {
@@ -1623,9 +1635,12 @@ function assertCatalogInvariants(): void {
         }
       }
       if (component.runtime.kind === 'github') {
+        const curatedVideo = item.id === 'video-shotcraft'
+        const expectedVersion = curatedVideo ? VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION : component.runtime.resolvedCommit
         if (source.kind !== 'github' ||
             source.resolvedRef !== component.runtime.resolvedCommit ||
-            item.version !== component.runtime.resolvedCommit) {
+            (curatedVideo && source.resolvedRef !== VIDEO_SHOTCRAFT_COMMIT) ||
+            item.version !== expectedVersion) {
           throw new Error(`${item.id}/${component.id} Git provenance is incoherent.`)
         }
       }

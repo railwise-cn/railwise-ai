@@ -154,6 +154,7 @@ describe('PluginManagementService', () => {
     await writeFile(join(repository, 'workbench/demosrc'), '../demos')
     const git = (args: string[]): string => execFileSync('git', args, { cwd: repository, encoding: 'utf8', windowsHide: true }).trim()
     git(['init', '--quiet'])
+    git(['config', 'core.autocrlf', 'false'])
     git(['add', 'SKILL.md', 'LICENSE', 'demos'])
     const object = git(['hash-object', '-w', 'workbench/demosrc'])
     git(['update-index', '--add', '--cacheinfo', `120000,${object},workbench/demosrc`])
