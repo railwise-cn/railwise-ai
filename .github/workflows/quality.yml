@@ -81,6 +81,8 @@ jobs:
           src/main/services/bounded-response.test.ts
           src/main/services/write-export-link.test.ts
           src/main/services/managed-browser-skill-service.test.ts
+      - name: Verify Windows Runtime shutdown through owned IPC
+        run: npm test -- --run src/main/managed-runtime-process.test.ts -t "owned Windows Runtime"
       - name: Run plugin Windows security tests
         run: >-
           npm test -- --run

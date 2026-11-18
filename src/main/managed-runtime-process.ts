@@ -44,6 +44,10 @@ import { DwsCapabilityConfig } from '../../kun/src/contracts/dws.js'
 import { DingTalkCapabilityConfig } from '../../kun/src/contracts/dingtalk.js'
 import { BrowserCapabilityConfig } from '../../kun/src/contracts/browser-skill.js'
 import { EgoBrowserCapabilityConfig } from '../../kun/src/contracts/ego-browser.js'
+import {
+  isManagedRuntimeShutdownReady,
+  MANAGED_RUNTIME_SHUTDOWN_REQUEST
+} from '../../kun/src/contracts/managed-runtime-ipc.js'
 import { diagnoseEgoBrowser } from './services/managed-ego-browser-service'
 import { getManagedBrowserSkillService } from './services/managed-browser-skill-service'
 import { resolveLarkCliEnvironment } from '../../kun/src/services/lark-cli-environment.js'
@@ -78,6 +82,7 @@ import type { TaskDocumentExportBridge } from './services/task-document-export-s
 
 let child: ChildProcess | null = null
 let lastManagedRuntimeExit: { code: number | null; signal: NodeJS.Signals | null } | undefined
+let ipcShutdownChild: ChildProcess | null = null
 let childLogCapture: RuntimeLogCapture | null = null
 let lastResolvedBinary: string | null = null
 let actualManagedRuntimePort: number | null = null
@@ -577,7 +582,9 @@ export async function startManagedRuntimeChild(
         model: provider.id === runtime.providerId ? runtime.model : provider.models[0] || runtime.model
       })))
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: process.platform === 'win32' && resolution.kind === 'node-script'
+      ? ['ignore', 'pipe', 'pipe', 'ipc']
+      : ['ignore', 'pipe', 'pipe'],
     detached: false,
     workspaceRoot: homeDir
   })
@@ -593,8 +600,18 @@ export async function startManagedRuntimeChild(
   startedLogCapture.logLifecycle(`spawned on port ${runtime.port} using data dir ${dataDir}`)
   startedChild.stdout?.on('data', startedLogCapture.captureStdout)
   startedChild.stderr?.on('data', startedLogCapture.captureStderr)
-  child.on('exit', (code, signal) => {
+  if (startedChild.connected) {
+    const onShutdownReady = (message: unknown): void => {
+      if (child !== startedChild || !isManagedRuntimeShutdownReady(message)) return
+      ipcShutdownChild = startedChild
+      startedChild.removeListener('message', onShutdownReady)
+      startedLogCapture.logLifecycle('Windows Runtime shutdown IPC ready')
+    }
+    startedChild.on('message', onShutdownReady)
+  }
+  startedChild.on('exit', (code, signal) => {
     if (child === startedChild) lastManagedRuntimeExit = { code, signal }
+    if (ipcShutdownChild === startedChild) ipcShutdownChild = null
     void startedExportBridge.close()
     if (documentExportBridge === startedExportBridge) documentExportBridge = null
     startedLogCapture.logLifecycle(
@@ -1447,10 +1464,20 @@ export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit
   const pid = child.pid
   const capture = childLogCapture
   if (stoppingChild.exitCode === null && stoppingChild.signalCode === null) {
-    try {
-      stoppingChild.kill('SIGTERM')
-    } catch {
-      /* already gone */
+    if (process.platform === 'win32' && stoppingChild === ipcShutdownChild && stoppingChild.connected) {
+      stoppingChild.send(MANAGED_RUNTIME_SHUTDOWN_REQUEST, (error) => {
+        if (error) capture?.logLifecycle(`shutdown IPC failed: ${error.message}`)
+      })
+    } else {
+      // Windows kill terminates the Runtime without running its save/close handler.
+      if (options.requireCleanExit && process.platform === 'win32') {
+        throw new Error('当前 Runtime 未提供 Windows 安全退出通道，更新包已保留。')
+      }
+      try {
+        stoppingChild.kill('SIGTERM')
+      } catch {
+        /* already gone */
+      }
     }
   }
   const exited = await waitForChildExit(stoppingChild, options.timeoutMs ?? RUNTIME_STOP_GRACE_MS)
@@ -1466,7 +1493,7 @@ export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit
     const forcedExit = await waitForChildExit(stoppingChild, RUNTIME_STOP_FORCE_MS)
     if (!forcedExit) throw new Error('Runtime process exit could not be confirmed.')
   }
-  if (options.requireCleanExit && stoppingChild.exitCode !== 0) {
+  if (options.requireCleanExit && (stoppingChild.exitCode !== 0 || stoppingChild.signalCode !== null)) {
     throw new Error('Runtime 未正常退出，更新已停止。请检查日志后重试。')
   }
   if (child === stoppingChild) child = null

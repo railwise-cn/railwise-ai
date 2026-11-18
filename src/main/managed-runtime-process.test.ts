@@ -168,6 +168,38 @@ describe('startManagedRuntimeChild', () => {
     expect(readFileSync(credentialPath)).toEqual(ciphertext)
   })
 
+  it.runIf(process.platform === 'win32')('waits for owned Windows Runtime IPC to close cleanly', async () => {
+    const marker = join(tempRoot!, 'windows-runtime-saved.txt')
+    const script = writeScript('windows-update-stop.js', [
+      "process.on('message', message => {",
+      "  if (message.type !== 'railwise:runtime-shutdown' || message.version !== 1) return",
+      `  require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'saved')`,
+      "  process.exit(0)",
+      "})",
+      "process.send({ type: 'railwise:runtime-shutdown-ready', version: 1 }, error => {",
+      "  if (error) throw error",
+      "  console.log('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }))",
+      "})",
+      "setInterval(() => {}, 1000)"
+    ].join('\n'))
+    const module = await import('./managed-runtime-process')
+    await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
+    await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true, timeoutMs: 3000 })).resolves.toBeUndefined()
+    expect(module.isManagedRuntimeChildRunning()).toBe(false)
+    expect(readFileSync(marker, 'utf8')).toBe('saved')
+  })
+
+  it.runIf(process.platform === 'win32')('retains an owned Windows Runtime when update shutdown support is absent', async () => {
+    const script = writeScript('windows-legacy-runtime.js', [
+      "console.log('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }))",
+      "setInterval(() => {}, 1000)"
+    ].join('\n'))
+    const module = await import('./managed-runtime-process')
+    await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
+    await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true })).rejects.toThrow('Windows 安全退出通道')
+    expect(module.isManagedRuntimeChildRunning()).toBe(true)
+  })
+
   it('keeps a slow clean shutdown alive after update timeout and verifies it on retry', async () => {
     const script = writeScript('slow-update-stop.js', [
       "process.on('SIGTERM', () => setTimeout(() => process.exit(0), 200))",
