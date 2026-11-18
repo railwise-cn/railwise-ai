@@ -1,7 +1,7 @@
 import { ZOTERO_READ_TOOLS, isApprovedUpstreamPackage } from '../../shared/engineering-marketplace'
 import { createHash } from 'node:crypto'
 import { lstat, readFile, realpath } from 'node:fs/promises'
-import { isAbsolute, join, resolve } from 'node:path'
+import { isAbsolute, join, resolve, win32 } from 'node:path'
 import type {
   BundledPackageRuntimeV1,
   InstalledPackageV1,
@@ -27,6 +27,19 @@ const MAX_RUNTIME_METADATA_BYTES = 1024 * 1024
 const SHA256 = /^[0-9a-f]{64}$/i
 // Official Docling 3.0.0 review before the transport argument was explicit.
 const LEGACY_DOCLING_REVIEW_SHA256 = '18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99'
+// The Docling Windows wheel set pins pywin32 312. Its required .pth
+// initialization is skipped when the isolated launcher adds site-packages.
+const DOCLING_PYWIN32_PATHS = ['win32', 'win32/lib', 'pythonwin']
+const DOCLING_PYWIN32_MODULE = 'win32/lib/pywin32_bootstrap.py'
+const DOCLING_PYWIN32_BOOTSTRAP = [
+  'import runpy, sys',
+  'from pathlib import Path',
+  'sys.argv = sys.argv[1:]',
+  'site_packages = Path(sys.argv[1])',
+  `sys.path[0:0] = [str(site_packages), *(str(site_packages / path) for path in ${JSON.stringify(DOCLING_PYWIN32_PATHS)})]`,
+  `runpy.run_path(str(site_packages / ${JSON.stringify(DOCLING_PYWIN32_MODULE)}))`,
+  'runpy.run_path(sys.argv[0], run_name="__main__")'
+].join('\n')
 
 export type ActivatePluginPackageOptions = {
   item: MarketplacePackageV1
@@ -309,6 +322,7 @@ export async function verifiedOfficialDoclingStdioLaunch(
   options: {
     installed?: Pick<PackageInstallationService, 'get'>
     pythonRoot?: string
+    platform?: NodeJS.Platform
   } = {}
 ): Promise<{ args: string[]; startupTimeoutMs: number } | undefined> {
   const args = server.args
@@ -340,8 +354,25 @@ export async function verifiedOfficialDoclingStdioLaunch(
       }
     )
     if (launch.args.length !== args.length || !launch.args.every((arg, index) => arg === args[index])) return undefined
+    const stdioArgs = legacy ? [...launch.args, '--transport', 'stdio'] : launch.args
+    let runtimeArgs = stdioArgs
+    if ((options.platform ?? process.platform) === 'win32') {
+      const sitePackages = launch.args[2]
+      await Promise.all([
+        ...DOCLING_PYWIN32_PATHS.map(path => verifiedArtifactDirectory(sitePackages, path)),
+        verifiedArtifactDirectory(sitePackages, 'pywin32_system32'),
+        verifiedArtifactPath(sitePackages, DOCLING_PYWIN32_MODULE)
+      ])
+      // The loader needs extended paths when a pinned .pyd exceeds MAX_PATH.
+      // Use these only for already verified paths in the child arguments.
+      runtimeArgs = [
+        '-I', '-c', DOCLING_PYWIN32_BOOTSTRAP,
+        win32.toNamespacedPath(launch.args[1]), win32.toNamespacedPath(sitePackages),
+        ...stdioArgs.slice(3)
+      ]
+    }
     return {
-      args: legacy ? [...launch.args, '--transport', 'stdio'] : launch.args,
+      args: runtimeArgs,
       // Keep some margin for the managed Runtime's 45-second process startup watchdog.
       startupTimeoutMs: 40_000
     }
