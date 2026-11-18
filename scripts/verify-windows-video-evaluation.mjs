@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { access, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { promisify } from 'node:util'
 
 const execFile = promisify(execFileCallback)
@@ -62,36 +63,33 @@ console.log(${literal(target)});
 
 function modelAction(body, selection, render, parseFixtureToolOutput) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
-  const results = new Map(body.messages?.filter(message => message.role === 'tool')
-    .map(message => [message.tool_call_id, parseFixtureToolOutput(message.content)]))
-  const pipeline = 'references/pipeline.md'
-  let offset = 0
-  for (let page = 0; page < 8; page++) {
-    const id = `eval-read-pipeline-${page}`
-    if (!results.has(id)) {
-      assert.ok(tools.has('read_skill_resource'), 'The installed Skill must offer its scoped document reader')
-      return [id, 'read_skill_resource', { skill_id: selection.skillId, path: pipeline, offset_bytes: offset }]
-    }
-    const resource = results.get(id)
-    const typed = { idMatches: resource?.skill_id === selection.skillId, pathMatches: resource?.path === pipeline,
-      code: /^[a-z0-9_-]{1,80}$/i.test(resource?.code ?? '') ? resource.code : undefined,
-      offset: resource?.offset_bytes, bytes: resource?.bytes_returned, next: resource?.next_offset_bytes }
-    assert.ok(typed.idMatches && typed.pathMatches && typed.offset === offset && typeof resource.content === 'string',
-      `The installed Skill workflow could not be read: ${literal(typed)}`)
-    if (/remotion render/i.test(resource.content)) { selection.read = true; break }
-    assert.ok(Number.isSafeInteger(typed.next) && typed.next > offset, `The real workflow did not show its rendering step: ${literal(typed)}`)
-    offset = typed.next
+  const messages = new Map(body.messages?.filter(message => message.role === 'tool').map(message => [message.tool_call_id, message.content]))
+  const setup = 'RAILWISE-DISTRIBUTION.md'
+  if (!messages.has('eval-read-setup')) {
+    assert.ok(tools.has('read_skill_resource'), 'The installed Skill must offer its scoped document reader')
+    return ['eval-read-setup', 'read_skill_resource', { skill_id: selection.skillId, path: setup, offset_bytes: 0 }]
   }
-  assert.equal(selection.read, true, 'The installed Skill workflow must actually be read before requesting rendering')
-  if (!results.has('eval-render')) return tools.has('request_host_shell') ? ['eval-render', 'request_host_shell', render] : null
-  let output = results.get('eval-render')
+  const raw = messages.get('eval-read-setup')
+  const resource = parseFixtureToolOutput(raw)
+  const typed = { idMatches: resource?.skill_id === selection.skillId, pathMatches: resource?.path === setup,
+    code: /^[a-z0-9_-]{1,80}$/i.test(resource?.code ?? '') ? resource.code : undefined,
+    bytes: resource?.bytes_returned, contentType: typeof raw, wireCharacters: raw?.length,
+    recordedResult: typeof raw === 'string' && raw.includes('Recorded result:'),
+    firstToken: typeof raw === 'string' ? /^[A-Za-z_][A-Za-z0-9_]{0,48}/.exec(raw)?.[0] : undefined }
+  assert.ok(typed.idMatches && typed.pathMatches && typeof resource.content === 'string' && resource.content.includes(`Remotion ${version}`),
+    `The installed Skill setup guidance could not be read: ${literal(typed)}`)
+  selection.read = true
+  assert.ok(tools.has('bash'), 'The ordinary approved workspace command must be offered in the isolated evaluation profile')
+  if (!messages.has('eval-render')) return ['eval-render', 'bash', render]
+  let output = parseFixtureToolOutput(messages.get('eval-render'))
+  const originalSessionId = output?.session_id
   for (let index = 1; output?.status === 'running' && index < 45; index++) {
     const id = `eval-poll-${index}`
-    if (results.has(id)) { output = results.get(id); continue }
-    assert.ok(tools.has('host_shell_session') && typeof output.authorizationId === 'string')
-    return [id, 'host_shell_session', { action: 'poll', authorization_id: output.authorizationId, yield_seconds: 4 }]
+    if (messages.has(id)) { output = parseFixtureToolOutput(messages.get(id)); continue }
+    assert.ok(typeof originalSessionId === 'string' && output.session_id === originalSessionId)
+    return [id, 'bash', { action: 'poll', session_id: originalSessionId, yield_seconds: 30 }]
   }
-  assert.ok(output?.exit_code === 0 && output.commandHash === digest(render.command),
+  assert.ok(output?.exit_code === 0 && output.session_id === originalSessionId,
     'The exact user-approved rendering command must complete with exit code zero')
   selection.rendered = true
   return null
@@ -100,10 +98,10 @@ function modelAction(body, selection, render, parseFixtureToolOutput) {
 export async function startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput) {
   const toolchain = await provision(workspace, environment)
   const quote = value => `'${value.replace(/'/g, "''")}'`
-  const render = { command: `& ${quote(process.execPath)} ${quote(join(workspace, script))}`,
-    timeout_seconds: 180, ttl_seconds: 240, idempotency_key: 'private-synthetic-render-once' }
+  const render = { action: 'run', command: `& ${quote(process.execPath)} ${quote(join(workspace, script))}`,
+    timeout: 180, yield_seconds: 60 }
   const marker = '独立的 Video Shotcraft 非商用合成评估'
-  const selection = { read: false, rendered: false, requests: [] }
+  const selection = { read: false, rendered: false, requests: [], expectedApprovals: new Map() }
   const server = createServer(async (request, response) => {
     if (request.method === 'GET') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -117,6 +115,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       assert.ok(selection.skillId && body.messages?.some(message => message.role === 'user' && literal(message.content).includes(marker)))
       const action = modelAction(body, selection, render, parseFixtureToolOutput)
       selection.requests.push(action?.[1] ?? 'final-response')
+      if (action?.[1] === 'bash') selection.expectedApprovals.set(digest(literal(action[2])), action[2].action)
       const delta = action ? { tool_calls: [{ index: 0, id: action[0], type: 'function',
         function: { name: action[1], arguments: literal(action[2]) } }] } :
         { content: selection.rendered ? `已渲染并保存 ${filename} 。` : '合成验收所需工具未就绪。' }
@@ -138,32 +137,54 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       const key = { code: 'Enter', key: 'Enter', windowsVirtualKeyCode: 13 }
       await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
       await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
-      const approval = await cdp.wait(`window.workwise.listTaskInbox(${literal(workspace)}).then(items=>items.find(item=>item.status==='pending'&&item.kind==='approval'&&item.message.includes(${literal(`Command SHA256: ${digest(render.command)}`)})))`, 'the exact reviewed isolated render approval', 90_000)
-      assert.equal(approval.payload?.approval?.toolName, 'request_host_shell')
-      assert.equal(approval.payload.approval.requestHash, digest(literal(render)))
+      const pending = (taskId = null) => `window.workwise.listTaskInbox(${literal(workspace)}).then(items=>items.filter(item=>
+        item.status==='pending'&&item.kind==='approval'&&(!${literal(taskId)}||item.taskId===${literal(taskId)})))`
+      const firstApproval = await cdp.wait(`${pending()}.then(items=>items.find(item=>item.payload?.approval?.requestHash===${literal(digest(literal(render)))}))`,
+        'the exact reviewed isolated render approval', 90_000).catch(error => { throw new Error(selection.failure ?? error.message) })
       assert.equal(selection.read, true)
       await cdp.click('button', '打开任务工作台')
       const detail = 'article[aria-label="任务详情"]'
-      const commandFingerprint = `Command SHA256: ${digest(render.command)}`
-      const button = await cdp.wait(`(() => {
-        const article=document.querySelector(${literal(detail)});
-        const options=[...(article?.querySelectorAll('button')??[])].filter(item=>
-          item.textContent.trim()==='允许此操作'&&!item.disabled&&item.getClientRects().length&&item.parentElement.parentElement.innerText.includes(${literal(commandFingerprint)}));
-        if(options.length!==1)return null;
-        const button=options[0];
-        button.scrollIntoView({block:'center'});
-        const box=button.getBoundingClientRect();
-        const point={x:box.x+box.width/2,y:box.y+box.height/2};
-        return button.contains(document.elementFromPoint(point.x,point.y))?point:null;
-      })()`, 'the visible approval for the exact command')
-      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...button })
-      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...button })
-      const taskPath = `/v1/tasks/${encodeURIComponent(approval.taskId)}`
-      const artifact = await cdp.wait(`window.workwise.runtimeRequest(${literal(taskPath)},'GET').then(result=>{
-        if(!result.ok)return null;
-        const payload=JSON.parse(result.body),task=payload.task??payload;
-        return task.status==='completed'&&task.artifacts.find(item=>item.format==='mp4'&&item.validation==='valid'&&item.relativePath===${literal(filename)});
-      })`, 'a completed real task and registered MP4', 240_000).catch(error => { throw new Error(selection.failure ?? error.message) })
+      const approved = new Set()
+      const approve = async item => {
+        const request = item.payload?.approval
+        assert.equal(request?.toolName, 'bash')
+        assert.equal(item.taskId, firstApproval.taskId)
+        assert.equal(request.turnId, firstApproval.payload.approval.turnId)
+        const operation = selection.expectedApprovals.get(request.requestHash)
+        assert.ok(operation === 'run' || operation === 'poll', 'Unexpected command or arguments in the approval request')
+        assert.ok(!approved.has(item.requestId), 'One request must not be approved twice')
+        const button = await cdp.wait(`(() => {
+          const article=document.querySelector(${literal(detail)});
+          const options=[...(article?.querySelectorAll('button')??[])].filter(button=>
+            button.textContent.trim()==='允许此操作'&&!button.disabled&&button.getClientRects().length&&
+            [...button.parentElement.parentElement.querySelectorAll('p')].some(text=>text.textContent===${literal(item.message)}));
+          if(options.length!==1)return null;
+          const button=options[0];
+          button.scrollIntoView({block:'center'});
+          const box=button.getBoundingClientRect();
+          const point={x:box.x+box.width/2,y:box.y+box.height/2};
+          return button.contains(document.elementFromPoint(point.x,point.y))?point:null;
+        })()`, 'the visible approval for the exact workspace command')
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...button })
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...button })
+        approved.add(item.requestId)
+      }
+      await approve(firstApproval)
+      const taskPath = `/v1/tasks/${encodeURIComponent(firstApproval.taskId)}`
+      const deadline = Date.now() + 240_000
+      let artifact
+      while (!artifact && Date.now() < deadline) {
+        if (selection.failure) throw new Error(selection.failure)
+        const waiting = await cdp.evaluate(pending(firstApproval.taskId))
+        for (const approval of waiting) if (!approved.has(approval.requestId)) await approve(approval)
+        artifact = await cdp.evaluate(`window.workwise.runtimeRequest(${literal(taskPath)},'GET').then(result=>{
+          if(!result.ok)return null;
+          const payload=JSON.parse(result.body),task=payload.task??payload;
+          return task.status==='completed'&&task.artifacts.find(item=>item.format==='mp4'&&item.validation==='valid'&&item.relativePath===${literal(filename)});
+        })`)
+        if (!artifact) await sleep(300)
+      }
+      assert.ok(artifact, 'The installed app did not complete and register the private MP4')
       assert.equal(selection.rendered, true)
       const video = await readFile(toolchain.target)
       assert.equal((await lstat(toolchain.target)).isSymbolicLink(), false)
@@ -176,6 +197,6 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
         { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
       return { kind: 'private-noncommercial-synthetic-evaluation', remotionVersion: version, codec: probe.codec_name,
         width: probe.width, height: probe.height, frames: Number(probe.nb_frames), artifact: { id: artifact.id, sha256: artifact.sha256, bytes: video.length },
-        installedSkillResourceRead: true, runtimeApprovalId: approval.requestId, decoded: true }
+        installedSkillResourceRead: true, execution: 'approved-workspace-command', runtimeApprovalIds: [...approved], decoded: true }
     } }
 }
