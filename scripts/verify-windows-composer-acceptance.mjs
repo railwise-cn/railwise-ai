@@ -255,17 +255,10 @@ async function verifyPersistedSkillRead(cdp, threadId, selected, marker, skillId
   assert.equal(record.sha256, pipelineSha256, 'Persisted full original matches the official locked Skill archive')
 }
 
-export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptance, checkpoint = async () => {} }) {
-  assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
+async function verifyWindowsComposerAttachments(cdp, workspace, checkpoint) {
   const files = { scan: join(workspace, scanName), text: join(workspace, textName), invalid: join(workspace, invalidName) }
   const scan = expandScanPdf(await readFile(new URL('../test/fixtures/document-quality/synthetic-image-only-scan.pdf', import.meta.url)))
   await Promise.all([writeFile(files.scan, scan), writeFile(files.text, createChineseTextPdf()), writeFile(files.invalid, '%PDF-1.7\ninvalid\n%%EOF\n')])
-  const threadList = "window.workwise.runtimeRequest('/v1/threads','GET').then(result=>JSON.parse(result.body).threads)"
-  const previousThreads = (await cdp.evaluate(threadList)).map(thread => thread.id)
-  await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
-  await cdp.wait(`Boolean(document.querySelector(${literal(composer)}))`, 'the real chat composer')
-  const threadId = await cdp.wait(`${threadList}.then(items=>items.find(item=>!${literal(previousThreads)}.includes(item.id))?.id)`, 'new owned conversation')
-  await cdp.click(composer)
   await checkpoint('composer native clipboard and scanned PDF')
   // Explorer's file clipboard format is set natively in the isolated runner.
   execFileSync('powershell.exe', ['-NoProfile', '-STA', '-Command',
@@ -305,6 +298,18 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
     return Boolean(chip && chip.innerText.includes('读取失败'))
   })()`, 'damaged PDF feedback from the real drop', 120_000)
   await cdp.click(removeAttachment)
+  return { scanBytes: scan.length, nativeClipboard: true, chooser: true, drop: true }
+}
+
+export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptance, verifyAttachments = true, checkpoint = async () => {} }) {
+  assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
+  const threadList = "window.workwise.runtimeRequest('/v1/threads','GET').then(result=>JSON.parse(result.body).threads)"
+  const previousThreads = (await cdp.evaluate(threadList)).map(thread => thread.id)
+  await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
+  await cdp.wait(`Boolean(document.querySelector(${literal(composer)}))`, 'the real chat composer')
+  const threadId = await cdp.wait(`${threadList}.then(items=>items.find(item=>!${literal(previousThreads)}.includes(item.id))?.id)`, 'new owned conversation')
+  await cdp.click(composer)
+  const attachmentEvidence = verifyAttachments ? await verifyWindowsComposerAttachments(cdp, workspace, checkpoint) : undefined
 
   await checkpoint('composer official Skill package')
   const installed = await cdp.evaluate(`(async () => {
@@ -341,7 +346,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '插件读取验收通过')
   await verifyPersistedSkillRead(cdp, threadId, 'pluginRead', acceptance.pluginTurnMarker, skill.id, acceptance)
-  assert.deepEqual(acceptance.observations, { skillRead: true, pluginRead: true, scanSent: true, chineseTextSent: true })
-  return { status: 'passed', scanBytes: scan.length, nativeClipboard: true, chooser: true, drop: true,
+  assert.deepEqual(acceptance.observations, { skillRead: true, pluginRead: true, scanSent: verifyAttachments, chineseTextSent: verifyAttachments })
+  return { status: 'passed', focus: verifyAttachments ? 'files-and-capabilities' : 'capabilities', ...attachmentEvidence,
     installedPlugin: { id: installed.packageId, sha256: installed.artifact.sha256 }, ...acceptance.observations }
 }

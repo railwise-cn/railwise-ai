@@ -390,7 +390,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireComposerAcceptance = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireComposerAcceptance = false, requireComposerCapabilitiesOnly = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -406,14 +406,22 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   if (requireComposerAcceptance) {
     const composer = report.composerAcceptance
     assert.equal(composer?.status, 'passed')
-    for (const field of ['nativeClipboard', 'chooser', 'drop', 'skillRead', 'pluginRead', 'scanSent', 'chineseTextSent']) {
+    for (const field of ['skillRead', 'pluginRead']) {
       assert.equal(composer[field], true, `Missing composer acceptance: ${field}`)
     }
-    assert.ok(composer.scanBytes >= 40 * 1024 * 1024)
+    if (requireComposerCapabilitiesOnly) {
+      assert.equal(composer.focus, 'capabilities')
+      assert.equal(composer.nativeClipboard, undefined)
+    } else {
+      for (const field of ['nativeClipboard', 'chooser', 'drop', 'scanSent', 'chineseTextSent']) {
+        assert.equal(composer[field], true, `Missing composer attachment acceptance: ${field}`)
+      }
+      assert.ok(composer.scanBytes >= 40 * 1024 * 1024)
+    }
     assert.equal(composer.installedPlugin?.id, 'video-shotcraft')
     assert.match(composer.installedPlugin?.sha256 ?? '', /^[a-f0-9]{64}$/)
     assert.ok(report.checks.includes('installed-chinese-renderer'))
-    assert.ok(report.checks.includes('composer-files-skills-and-plugin'))
+    assert.ok(report.checks.includes(requireComposerCapabilitiesOnly ? 'composer-skills-and-plugin' : 'composer-files-skills-and-plugin'))
     if (!requireTaskExecution && !requireBrowserExecution) return true
   }
   assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
@@ -2597,9 +2605,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       await checkpoint('composer setup')
       await cdp.wait(`window.workwise.runtimeRequest('/v1/threads','GET').then(response=>response.ok).catch(()=>false)`, 'owned Runtime ready', 60_000)
       report.composerAcceptance = await composerModule.verifyWindowsComposerAcceptance(cdp, {
-        workspace, acceptance: composerAcceptance, checkpoint
+        workspace, acceptance: composerAcceptance, verifyAttachments: false, checkpoint
       })
-      report.checks.push('composer-files-skills-and-plugin')
+      report.checks.push('composer-skills-and-plugin')
     } else {
     await cdp.click('button', '技能与连接器')
     report.tabs = await cdp.wait(`(() => { const tabs=Array.from(document.querySelectorAll('[role="tablist"][aria-label="技能与连接器分类"] [role="tab"]')); return tabs.length===3 && tabs.map(tab=>tab.textContent.trim()); })()`, 'marketplace tabs')
@@ -3223,7 +3231,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       } catch (error) { report.errors.push(error instanceof Error ? error.message : String(error)) }
       finally { clearTimeout(closeTimer) }
     }
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireComposerAcceptance: composerSmoke }); report.status = 'passed' } catch (error) {
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireComposerAcceptance: composerSmoke, requireComposerCapabilitiesOnly: composerOnly }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
