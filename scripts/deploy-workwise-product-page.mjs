@@ -2,6 +2,7 @@
 import publication from './release-publication.cjs'
 
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { runContentCommand } from './workwise-content-deploy.mjs'
@@ -70,7 +71,12 @@ function validateSource(sourceDirectory, version, includeCanonical = false) {
     }
   }
 
-  const manifest = JSON.parse(readFileSync(files[2].source, 'utf8'))
+  const manifest = validateManifest(files[2].source, version)
+  return { files, manifest }
+}
+
+function validateManifest(path, version) {
+  const manifest = JSON.parse(readFileSync(path, 'utf8'))
   if (manifest.version !== version) throw new Error(`Manifest version is ${manifest.version}, expected ${version}.`)
   if (manifest.releaseUrl !== `https://github.com/railwise-cn/railwise-ai/releases/tag/v${version}`) {
     throw new Error('Manifest Release URL does not match the requested version.')
@@ -89,7 +95,7 @@ function validateSource(sourceDirectory, version, includeCanonical = false) {
       throw new Error(`Invalid SHA-256 for website installer entry: ${name}`)
     }
   }
-  return { files, manifest }
+  return manifest
 }
 
 function normalizeReleaseRoot(value) {
@@ -166,6 +172,61 @@ stage="/tmp/workwise-product-deploy-$deploy_id/payload"
 case "$stage" in /tmp/workwise-product-deploy-*/payload) ;; *) exit 64 ;; esac
 install -d -m 700 "$stage/products/workwise" "$stage/products/railwise-ai" "$stage/products/screenshots/workwise" "$stage/includes" "$stage/data"
 printf '%s\n' "$stage"
+`
+
+const MANIFEST_TRANSACTION = String.raw`
+manifest_stage="$stage/data/workwise-product.json"
+backup="$(dirname "$site_root")/.workwise-product-backups/$deploy_id"
+case "$backup" in /www/audit-releases/audit-*/.workwise-product-backups/*|/www/releases/*/.workwise-product-backups/*) ;; *) exit 64 ;; esac
+container_run test -f "$json_path" && ! container_run test -L "$json_path" || fail 'expected a regular live product manifest'
+manifest_digest() { container_run sha256sum "$1" | cut -d ' ' -f 1; }
+php_manifest_version() { docker exec "$php_container" php -r 'require $argv[1]; echo rw_workwise_manifest()["version"];' -- "$include_path"; }
+current_digest="$(manifest_digest "$json_path")"
+next_path="$json_path.workwise-next-$deploy_id"
+
+restore_manifest() {
+  container_run test -s "$backup/workwise-product.json" || fail 'missing product manifest backup'
+  container_run cp -p "$backup/workwise-product.json" "$next_path"
+  container_run mv -f "$next_path" "$json_path"
+}
+
+if [ "$operation" = 'rollback-manifest' ]; then
+  [ "$current_digest" = "$next_digest" ] || fail 'live manifest changed since this deployment'
+  if ! container_run test -s "$backup/workwise-product.json"; then
+    printf 'This run did not replace the already active product manifest.\n'
+    exit 0
+  fi
+  restore_manifest
+  printf 'Restored the previous WorkWise product manifest.\n'
+  exit 0
+fi
+
+if [ "$current_digest" = "$next_digest" ]; then
+  [ "$(php_manifest_version)" = "$version" ] || fail 'PHP manifest does not match the deployed version'
+  printf 'The exact product manifest is already active.\n'
+  exit 0
+fi
+[ "$current_digest" = "$previous_digest" ] || fail 'live product manifest changed before deployment'
+test -s "$manifest_stage" || fail 'missing staged product manifest'
+[ "$(sha256sum "$manifest_stage" | cut -d ' ' -f 1)" = "$next_digest" ] || fail 'staged product manifest digest mismatch'
+old_version="$(container_run cat "$json_path" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+[ "$(php_manifest_version)" = "$old_version" ] || fail 'PHP does not read the current product manifest'
+docker exec -i "$php_container" php -r '$p=json_decode(stream_get_contents(STDIN), true); if (($p["version"] ?? "") !== $argv[1] || ($p["releaseChannel"] ?? "") !== "stable") { exit(65); }' -- "$version" < "$manifest_stage" || fail 'staged Stable manifest identity mismatch'
+
+container_run install -d -m 700 "$backup"
+! container_run test -e "$backup/workwise-product.json" || fail 'deployment identifier already has a manifest backup'
+container_run cp -p "$json_path" "$backup/workwise-product.json"
+container_run cp -p "$json_path" "$next_path"
+container_write "$next_path" < "$manifest_stage"
+[ "$(manifest_digest "$json_path")" = "$previous_digest" ] || fail 'live product manifest changed during staging'
+container_run mv -f "$next_path" "$json_path"
+
+if [ "$(manifest_digest "$json_path")" != "$next_digest" ] || [ "$(php_manifest_version)" != "$version" ]; then
+  restore_manifest
+  fail 'installed manifest did not match in the web and PHP runtimes'
+fi
+printf 'Deployed and verified the WorkWise product manifest for %s.\n' "$version"
+exit 0
 `
 
 const DEPLOY_SCRIPT = String.raw`
@@ -264,11 +325,21 @@ verify_live_targets() {
 release_root="$1"
 version="$2"
 deploy_id="$3"
+operation="$4"
+previous_digest="$5"
+next_digest="$6"
 case "$release_root" in /*/downloads/workwise) ;; *) exit 64 ;; esac
 stage="/tmp/workwise-product-deploy-$deploy_id/payload"
 case "$stage" in /tmp/workwise-product-deploy-*/payload) ;; *) exit 64 ;; esac
 
 discover_runtime
+case "$operation" in
+  deploy-manifest|rollback-manifest)
+    ${MANIFEST_TRANSACTION}
+    ;;
+  full) ;;
+  *) exit 64 ;;
+esac
 verify_live_targets
 python3 - "$web_container" <<'PY'
 import re, subprocess, sys
@@ -530,7 +601,66 @@ function deploy(sourceDirectory, version, deployId) {
       }
     }
   }
-  process.stdout.write(runRemote(config, DEPLOY_SCRIPT, [config.releaseRoot, version, deployId]))
+  process.stdout.write(runRemote(config, DEPLOY_SCRIPT, [config.releaseRoot, version, deployId, 'full', '', '']))
+}
+
+async function runManifestCommand(command, source, version, flags) {
+  const path = resolve(source, 'data/workwise-product.json')
+  const manifest = validateManifest(path, version)
+  if (manifest.schemaVersion !== 1 || manifest.releaseChannel !== 'stable' || !/^[a-f0-9]{40}$/.test(manifest.releaseCommit)) {
+    throw new Error('Product manifest requires a Stable release and its exact commit.')
+  }
+  for (const entry of manifest.platforms) {
+    const officialPath = `/downloads/railwise-ai/channels/stable/releases/v${version}/${entry.file}`
+    const githubUrl = `https://github.com/railwise-cn/railwise-ai/releases/download/v${version}/${entry.file}`
+    if (entry.url !== officialPath || entry.downloadUrl !== githubUrl || entry.mirrorSha256 !== entry.sha256 ||
+      !Number.isSafeInteger(entry.sizeBytes) || entry.sizeBytes < 1 || !Number.isFinite(Date.parse(entry.mirrorVerifiedAt))) {
+      throw new Error(`Invalid published installer identity: ${entry.file}.`)
+    }
+  }
+  if (command === 'validate') return
+  if (command === 'verify-public') {
+    await verifyProductPublication(manifest)
+    const audit = runRemote(readSshConfig(), String.raw`
+set -eu
+python3 /home/ubuntu/railwise-ops/website-audit/website-ops-check.py || [ "$?" -eq 1 ]
+`, [])
+    const result = JSON.parse(audit)
+    const relevant = /^(?:page-integrity:|redirect:|updater-)/
+    if (!Array.isArray(result.failures) || !Array.isArray(result.errors) || !result.checks || result.errors.length || result.failures.some(name => relevant.test(name))) {
+      throw new Error('Official website integrity, redirect or updater audit failed.')
+    }
+    console.log('Official website integrity, redirect and updater audit passed.')
+    return
+  }
+  const deployId = normalizeToken(requireFlag(flags, 'deploy-id'), 'deploy id')
+  const config = readSshConfig()
+  const digest = (bytes) => createHash('sha256').update(bytes).digest('hex')
+  const nextDigest = digest(readFileSync(path))
+  if (command === 'rollback') {
+    return process.stdout.write(runRemote(config, DEPLOY_SCRIPT, [config.releaseRoot, version, deployId, 'rollback-manifest', '', nextDigest]))
+  }
+  if (command !== 'deploy') throw new Error(`Unknown manifest deployment command: ${command}`)
+
+  const response = await fetch('https://www.railwise.cn/data/workwise-product.json', {
+    cache: 'no-store', signal: AbortSignal.timeout(15_000)
+  })
+  if (!response.ok) throw new Error(`Public product manifest returned HTTP ${response.status}.`)
+  const current = Buffer.from(await response.arrayBuffer())
+  const previous = JSON.parse(current.toString('utf8'))
+  if (previous.releaseChannel !== 'stable' || !/^\d+\.\d+\.\d+$/.test(previous.version)) {
+    throw new Error('Could not establish the current Stable product manifest.')
+  }
+  const currentParts = previous.version.split('.').map(Number)
+  const targetParts = version.split('.').map(Number)
+  const firstDifference = currentParts.findIndex((part, index) => part !== targetParts[index])
+  if (firstDifference >= 0 && currentParts[firstDifference] > targetParts[firstDifference]) {
+    throw new Error('Current product version is newer than the requested release.')
+  }
+  const stage = runRemote(config, PREPARE_SCRIPT, [config.releaseRoot, deployId]).trim()
+  if (stage !== `/tmp/workwise-product-deploy-${deployId}/payload`) throw new Error('Remote deployment stage was not recognized.')
+  copyToStage(config, path, `${stage}/data/workwise-product.json`)
+  process.stdout.write(runRemote(config, DEPLOY_SCRIPT, [config.releaseRoot, version, deployId, 'deploy-manifest', digest(current), nextDigest]))
 }
 
 function rollback(deployId) {
@@ -547,9 +677,11 @@ const { command, flags } = parseArgs(process.argv.slice(2))
 const source = requireFlag(flags, 'source')
 const version = normalizeVersion(requireFlag(flags, 'version'))
 const mode = flags.get('mode') || 'full'
-if (!['full', 'content-only'].includes(mode)) throw new Error(`Invalid mode: ${mode}`)
+if (!['full', 'content-only', 'manifest-only'].includes(mode)) throw new Error(`Invalid mode: ${mode}`)
 
-if (mode === 'content-only') {
+if (mode === 'manifest-only') {
+  await runManifestCommand(command, source, version, flags)
+} else if (mode === 'content-only') {
   validateSource(source, version, false)
   await runContentCommand({
     command, source, sourceSha: requireFlag(flags, 'source-sha'),

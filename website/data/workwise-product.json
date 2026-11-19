@@ -3,71 +3,77 @@
   "name": "RailWise AI",
   "shortName": "RailWise AI",
   "tagline": "桌面端 AI 工作台",
-  "version": "0.5.5",
-  "publishedAt": "2026-11-09",
-  "releaseCommit": "f809b3b27ece254b8cfee17d0308f5fbbbc94753",
+  "version": "0.5.8",
+  "publishedAt": "2026-11-19",
+  "releaseCommit": "5c25c473e4cdea8ce875fd6be0ceff6317caddf1",
   "releaseChannel": "stable",
-  "releaseUrl": "https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.5",
+  "releaseUrl": "https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.8",
   "repositoryUrl": "https://github.com/railwise-cn/railwise-ai",
-  "lastReviewedAt": "2026-11-08",
+  "lastReviewedAt": "2026-11-19",
   "platforms": [
     {
       "id": "macos-apple-silicon",
       "name": "macOS Apple Silicon",
-      "file": "RailWise-AI-0.5.5-mac-Apple-Silicon.dmg",
-      "size": "336.2 MB",
-      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.5/RailWise-AI-0.5.5-mac-Apple-Silicon.dmg",
-      "sha256": "77c80faa00c4c40d13c37aba6f350caf37e42f4be1cbcf9395de8345b64b4994",
+      "file": "RailWise-AI-0.5.8-mac-Apple-Silicon.dmg",
+      "size": "402.4 MB",
+      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.8/RailWise-AI-0.5.8-mac-Apple-Silicon.dmg",
+      "sha256": "5df86bc3163e02340305d0c0f8a80f160aad44cc83abdb144b64279e4780a465",
       "icon": "fab fa-apple",
-      "description": "适合 M 系列芯片的 macOS 设备。"
+      "description": "适合 M 系列芯片的 macOS 设备。",
+      "sizeBytes": 402354432,
+      "downloadUrl": "https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.8/RailWise-AI-0.5.8-mac-Apple-Silicon.dmg",
+      "mirrorSha256": "5df86bc3163e02340305d0c0f8a80f160aad44cc83abdb144b64279e4780a465",
+      "mirrorVerifiedAt": "2026-11-19T00:44:56.222Z"
     },
     {
       "id": "macos-intel",
       "name": "macOS Intel",
-      "file": "RailWise-AI-0.5.5-mac-Intel.dmg",
-      "size": "344.0 MB",
-      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.5/RailWise-AI-0.5.5-mac-Intel.dmg",
-      "sha256": "fcd90788e932afd2c39273dec7ba9fe47250e951a233783eff82f321a1863e09",
+      "file": "RailWise-AI-0.5.8-mac-Intel.dmg",
+      "size": "411.2 MB",
+      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.8/RailWise-AI-0.5.8-mac-Intel.dmg",
+      "sha256": "877f2a0a1b067a3ddb193ed4ba64c39213419ce518a88e0f83b6ec17a1617b78",
       "icon": "fab fa-apple",
-      "description": "适合 Intel 芯片 macOS 设备。"
+      "description": "适合 Intel 芯片 macOS 设备。",
+      "sizeBytes": 411164396,
+      "downloadUrl": "https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.8/RailWise-AI-0.5.8-mac-Intel.dmg",
+      "mirrorSha256": "877f2a0a1b067a3ddb193ed4ba64c39213419ce518a88e0f83b6ec17a1617b78",
+      "mirrorVerifiedAt": "2026-11-19T00:44:56.222Z"
     },
     {
       "id": "windows-x64",
       "name": "Windows x64",
-      "file": "RailWise-AI-0.5.5-win-x64.exe",
-      "size": "280.0 MB",
-      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.5/RailWise-AI-0.5.5-win-x64.exe",
-      "sha256": "3d9abb28849ecc8155d3b0331754af8057897ec5ec1a83efa24350e64c5bf2ed",
+      "file": "RailWise-AI-0.5.8-win-x64.exe",
+      "size": "320.8 MB",
+      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.8/RailWise-AI-0.5.8-win-x64.exe",
+      "sha256": "7c07bbb350b1199793c4c4a6273bcab1c57b93518086a54b4cd5b5beb0e3d1ef",
       "icon": "fab fa-windows",
-      "description": "适合 64 位 Windows 设备。"
+      "description": "适合 64 位 Windows 设备。",
+      "sizeBytes": 320835129,
+      "downloadUrl": "https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.8/RailWise-AI-0.5.8-win-x64.exe",
+      "mirrorSha256": "7c07bbb350b1199793c4c4a6273bcab1c57b93518086a54b4cd5b5beb0e3d1ef",
+      "mirrorVerifiedAt": "2026-11-19T00:44:56.222Z"
     }
   ],
   "capabilityStatus": {
     "stable": [
-      "DeepSeek V4.1-Flash 正式可用（API ID: deepseek-flash）",
-      "DeepSeek V4.1-Flash 1M 上下文 / 最高 384K 输出",
-      "Agent、Write、Survey 默认使用 deepseek-flash",
-      "DeepSeek Harness 结构化附件与视觉证据路径",
-      "精选分类插件市场与在线目录同步",
-      "34 个经过筛选的插件与 16 个精选插件",
-      "RailWise Survey 四阶段工作区：资料预检、建网平差、精度分析与待审查成果包",
+      "Code、Write 与 Design 工作台，围绕本地项目组织任务与成果",
+      "Survey 模块四阶段工作区：资料预检、建网平差、精度分析与待审查成果包",
       "精确成果追问、来源修订核对及重启后的只读证据恢复",
-      "工程监测、招投标、文档和数据分析特色 Skills",
-      "安装权限审查、完整性验证与单版本回滚",
-      "启动窗口、标题栏和临时浮层原生玻璃效果",
-      "侧边栏与工作区实色高对比界面",
-      "Code、Write 与 Design 工作台",
-      "可编辑 PPTX 原生导入与整页视觉参考",
-      "PPT Master 4.3.0 交付链与真实 PPTX 验证",
-      "Design 属性面板、元素定位与导入反馈",
-      "可靠持久任务",
-      "通用/探索/审查/研究 Agent",
-      "四级工作区信任",
-      "MCP V2 与安全凭据",
-      "Git 检查点与预览回滚",
-      "Word 模板与 Office / PDF 交付校验",
-      "通用文档与图片附件解析",
-      "已验证的跨平台应用内更新"
+      "DeepSeek 原生默认支持与结构化附件、视觉证据路径，具体额度和模型能力以服务商为准",
+      "持续任务管理：目标、进度、待办、成果、输入排队与暂停恢复",
+      "权限卡、外部写入确认、持久回执、结果核验及组合任务逐项验收",
+      "技能、插件、连接器三个页签，默认展示技能",
+      "飞书与钉钉官方连接及授权流程；待办、审批等操作按权限确认",
+      "GitHub MCP 受保护令牌存储与工具发现；高德地图和 Zotero 只读工具",
+      "工程资料盘点、监测质检与图表、文档差异审阅、会议纪要与待办技能",
+      "AutoCAD DWG 重绘及图片转 CAD 技能；完整 DWG 流程需要 Windows 和 AutoCAD",
+      "AI 辅助工程报告、投标文件和研究报告，附来源、验证结果和待确认项",
+      "可编辑 PPTX 导入、整页视觉参考和 PNG / SVG / PPTX 导出",
+      "PPT Master 演示文稿编排与交付校验",
+      "本地文档与图片附件解析、Word 模板及 Office / PDF 交付校验",
+      "工作区权限、Git 检查点与预览回滚",
+      "一次点击完成下载校验、内容保存、安全停止、安装与重启",
+      "内置 13 章中文帮助手册，支持离线阅读、全文搜索与章节跳转"
     ],
     "preview": [
       "Flow Preview 工作台与定时任务迁移",
@@ -94,5 +100,28 @@
     "security": "https://kb.railwise.cn/products/workwise/security-data/",
     "faq": "https://kb.railwise.cn/products/workwise/faq/",
     "changelog": "https://kb.railwise.cn/products/workwise/changelog/"
-  }
+  },
+  "releaseNotesUrl": "https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.8",
+  "releaseHighlights": [
+    {
+      "title": "离线表格与 Excel 预览",
+      "description": "新建本地工作簿，支持多工作表、公式、撤销与 CSV 导入导出。工作区和任务成果中的常见 Excel 文件可只读预览。"
+    },
+    {
+      "title": "技能选择与国内镜像",
+      "description": "输入 / 即可搜索当前工作区可调用的技能。21 项可分发市场包使用睿威官网镜像，Windows 冷缓存验收已覆盖全量安装。"
+    },
+    {
+      "title": "会话进度与任务布局",
+      "description": "执行详情默认折叠。会话断线可续传，任务列表位于侧栏，并验证了窄窗下的智能体与模型选择菜单。"
+    },
+    {
+      "title": "浏览器、HTML 成果与每日计划",
+      "description": "BrowserSkill 在测试网页完成读取和来源核验，登记 HTML 成果并支持预览。每日多时刻计划保留独立执行记录。"
+    },
+    {
+      "title": "首页更新提示与 Windows 升级",
+      "description": "首次进入首页可查看本版更新。遇到 Windows 0.5.7 重启安装失败，可用官网 0.5.8 安装器覆盖安装。"
+    }
+  ]
 }
