@@ -1,0 +1,175 @@
+{
+  "status": "passed",
+  "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+  "version": "0.5.9",
+  "windowsX64": {
+    "startup": [
+      {
+        "locale": "en",
+        "theme": "light",
+        "subtitle": "基于本地优先架构的智能协同工作台",
+        "viewport": {
+          "width": 360,
+          "height": 248,
+          "scale": 1
+        },
+        "versionVisible": false,
+        "progress": 18
+      },
+      {
+        "locale": "zh-CN",
+        "theme": "dark",
+        "subtitle": "基于本地优先架构的智能协同工作台",
+        "viewport": {
+          "width": 362,
+          "height": 250,
+          "scale": 1.25
+        },
+        "versionVisible": false,
+        "progress": 82
+      }
+    ],
+    "startupEvidence": {
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/windows-install-smoke.yml",
+      "sourceHead": "e64a412ff9bf3e00869995309a4058dc61cd5283",
+      "runId": 44499648407,
+      "runAttempt": 1,
+      "artifact": {
+        "id": 14517471035,
+        "name": "exact-package-windows-install-44499648407",
+        "digest": "sha256:63c2afb20391b20f73196efd536052bf85b99f207cbaa18b71a6601011c5f789"
+      },
+      "report": {
+        "archivePath": "exact-windows-evidence/windows-startup-appearance.json",
+        "sha256": "6af2c20538b917238b1e2b28180d8957f0305079412c938c5bd9e8584de067fa",
+        "bytes": 5069
+      }
+    },
+    "startupScope": "Focused appearance receipt passed. The combined workflow later reached a separate generic skill-directory assertion.",
+    "screenshot": {
+      "path": "docs/qa/release-gates/v0.5.9/windows-startup-zh-dark.png",
+      "sha256": "a1d251eb5fe61a71fec755f55abfbcd087747fb5e0b53ac02ca689422cb814dd",
+      "bytes": 18467
+    },
+    "composer": {
+      "viewport": {
+        "width": 1024,
+        "height": 728,
+        "scale": 1
+      },
+      "locale": "zh",
+      "theme": "dark"
+    }
+  },
+  "macOS": {
+    "arm64": {
+      "startup": [
+        {
+          "locale": "en",
+          "theme": "light",
+          "subtitle": "基于本地优先架构的智能协同工作台",
+          "viewport": {
+            "width": 360,
+            "height": 248,
+            "scale": 1
+          },
+          "versionVisible": false,
+          "progress": 18
+        },
+        {
+          "locale": "zh-CN",
+          "theme": "dark",
+          "subtitle": "基于本地优先架构的智能协同工作台",
+          "viewport": {
+            "width": 360,
+            "height": 248,
+            "scale": 1
+          },
+          "versionVisible": false,
+          "progress": 82
+        }
+      ],
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "sourceHead": "77af0b18d852ff00fd9f0d0e4f2772e9999ff88b",
+        "runId": 44506084478,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14519368653,
+          "name": "exact-mac-startup-appearance-arm64",
+          "digest": "sha256:62e08d3a0023884aa6586a860f1af153ee94cd2ea0866e801dc4e1e6bad19a75"
+        },
+        "report": {
+          "archivePath": "exact-mac-evidence/mac-startup-appearance.json",
+          "sha256": "316830b6fd4cae2ce4639635bea231ce382f59b73c0531fb340389df3bb1f470",
+          "bytes": 6027
+        }
+      }
+    },
+    "x64": {
+      "startup": [
+        {
+          "locale": "en",
+          "theme": "light",
+          "subtitle": "基于本地优先架构的智能协同工作台",
+          "viewport": {
+            "width": 360,
+            "height": 248,
+            "scale": 1
+          },
+          "versionVisible": false,
+          "progress": 18
+        },
+        {
+          "locale": "zh-CN",
+          "theme": "dark",
+          "subtitle": "基于本地优先架构的智能协同工作台",
+          "viewport": {
+            "width": 360,
+            "height": 248,
+            "scale": 1
+          },
+          "versionVisible": false,
+          "progress": 82
+        }
+      ],
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "sourceHead": "77af0b18d852ff00fd9f0d0e4f2772e9999ff88b",
+        "runId": 44506084478,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14520590515,
+          "name": "exact-mac-startup-appearance-x64",
+          "digest": "sha256:d9222a165e2d91e865d440de94aa30efb3c39be888106549839f3a191bf513d2"
+        },
+        "report": {
+          "archivePath": "exact-mac-evidence/mac-startup-appearance.json",
+          "sha256": "02160d7279262fe029df288ae68e7f370f61af20cf33e6929309a531319c3124",
+          "bytes": 6032
+        }
+      }
+    }
+  },
+  "layoutReview": {
+    "scope": "Isolated production renderer from the reviewed source, Chinese light theme at 110 percent.",
+    "cases": [
+      {
+        "viewport": "960 × 640",
+        "result": "Collapsed navigation and responsive side drawers"
+      },
+      {
+        "viewport": "1160 × 720",
+        "result": "Expanded left navigation and composer menus"
+      },
+      {
+        "viewport": "1460 × 840",
+        "result": "Expanded left navigation, loaded HTML preview and composer menus"
+      }
+    ],
+    "observedLimit": "An immediate click after one preview resize moved focus to the preview. Retest after layout settled passed."
+  }
+}

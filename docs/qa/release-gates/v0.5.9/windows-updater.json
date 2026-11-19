@@ -1,0 +1,62 @@
+{
+  "status": "passed",
+  "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+  "version": "0.5.9",
+  "scope": "Two isolated native Windows update rounds using a private HTTPS fixture and the exact public-identity package.",
+  "entrypoints": {
+    "sidebar": {
+      "baselineVersion": "0.5.8",
+      "baselineInstallerSha256": "7c07bbb350b1199793c4c4a6273bcab1c57b93518086a54b4cd5b5beb0e3d1ef",
+      "targetVersion": "0.5.9",
+      "targetInstallerSha256": "7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c",
+      "targetAsarSha256": "a90bca9b4fb10a43e1ae23b4a5a43d343656138e8ab9969256b9e2c08fca9d58",
+      "profilePreserved": true,
+      "threadPreserved": true,
+      "action": "trusted-pointer-on-sidebar",
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "sourceHead": "b37f9efd401853807c202fa6adf1bfc8a592a770",
+        "runId": 44500367698,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14517138088,
+          "name": "frozen-windows-gui-upgrade-44500367698-sidebar",
+          "digest": "sha256:1316c68fd185e435183883dc6e88c74c82d02d7f25881d8cac9647a1bf0985cf"
+        },
+        "report": {
+          "archivePath": "frozen-windows-update.json",
+          "sha256": "8e946746ef5dab9b0b811a699d2628a10a92b57d91432961c4a71a7b2ece8b60",
+          "bytes": 2800
+        }
+      }
+    },
+    "settings": {
+      "baselineVersion": "0.5.8",
+      "baselineInstallerSha256": "7c07bbb350b1199793c4c4a6273bcab1c57b93518086a54b4cd5b5beb0e3d1ef",
+      "targetVersion": "0.5.9",
+      "targetInstallerSha256": "7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c",
+      "targetAsarSha256": "a90bca9b4fb10a43e1ae23b4a5a43d343656138e8ab9969256b9e2c08fca9d58",
+      "profilePreserved": true,
+      "threadPreserved": true,
+      "action": "trusted-pointer-in-settings",
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "sourceHead": "b37f9efd401853807c202fa6adf1bfc8a592a770",
+        "runId": 44500367698,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14516584692,
+          "name": "frozen-windows-gui-upgrade-44500367698-settings",
+          "digest": "sha256:3606e605245131f9468755514c03fb9b1bffee494c90da31af1a0be356119ad8"
+        },
+        "report": {
+          "archivePath": "frozen-windows-update.json",
+          "sha256": "a247af49153705c5564c66b690272ab0bda8b80b6ffb3b944624be4fed132f5e",
+          "bytes": 2802
+        }
+      }
+    }
+  }
+}

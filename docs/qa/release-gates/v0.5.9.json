@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 2,
+  "scope": "public-release",
+  "status": "passed",
+  "release": {
+    "tag": "v0.5.9",
+    "version": "0.5.9",
+    "previousTag": "v0.5.8",
+    "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+    "visualChange": true,
+    "updaterPathChanged": true,
+    "sourceTree": "7b287ead88d7a1a6067731d4348dd41e1e62cfb3"
+  },
+  "package": {
+    "version": "0.5.9",
+    "sourceVersion": "0.5.9",
+    "buildVersion": "0.5.9",
+    "identity": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "artifactSha256": "0fb309df7c4f73fe74fa0e7b96d5bfc437a0f2c4e6f6023c2a15e4ac96324c66",
+      "asarSha256": "4ade24286040912c04c5a9963a9f7505ac410ee60b131b7d5438bfb0333e751e"
+    },
+    "reviewedBuild": {
+      "schemaVersion": 1,
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/release.yml",
+      "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+      "runId": 44493773337,
+      "runAttempt": 1,
+      "publicIdentity": {
+        "bundleId": "com.wangjiawei508.workgpt",
+        "packageName": "workwise",
+        "productName": "RailWise AI"
+      },
+      "artifacts": [
+        {
+          "name": "release-mac",
+          "id": 14518425925,
+          "digest": "sha256:a25748ad9016a69481fa164c701f71f50c986a8aa856c6e7844495351ded013e"
+        },
+        {
+          "name": "release-win",
+          "id": 14514753155,
+          "digest": "sha256:a023087fe421c17eb75c73bc0c818accaf966ea75c4205cdca51e7a332e3e29b"
+        }
+      ],
+      "files": [
+        {
+          "name": "RailWise-AI-0.5.9-mac-arm64.dmg",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 402395197,
+          "sha256": "0fb309df7c4f73fe74fa0e7b96d5bfc437a0f2c4e6f6023c2a15e4ac96324c66"
+        },
+        {
+          "name": "RailWise-AI-0.5.9-mac-arm64.zip",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 409169559,
+          "sha256": "356317c4c38aebbd2a86f4266dd45a14cfdd3492ee37f3fd6b7de0ea5f8c79bd"
+        },
+        {
+          "name": "RailWise-AI-0.5.9-mac-x64.dmg",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 411136357,
+          "sha256": "0f2d5c787d05596a3e7b5296a5ffa1a5276ad2ba7ed0c1bcf387b65738e03ce2"
+        },
+        {
+          "name": "RailWise-AI-0.5.9-mac-x64.zip",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 418326964,
+          "sha256": "ba91fada1cb820d67529652ff94021c1291e2c2a07d79978fd8a1803aeb7bdbe"
+        },
+        {
+          "name": "latest-mac.yml",
+          "platform": "darwin",
+          "artifact": "release-mac",
+          "size": 839,
+          "sha256": "16a2ccf31828b83534fea3b3396da2b5e5bac0fa0582f5c6582b6bdd19668a1d"
+        },
+        {
+          "name": "RailWise-AI-0.5.9-win-x64.exe",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 320871735,
+          "sha256": "7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c"
+        },
+        {
+          "name": "RailWise-AI-0.5.9-win-x64.exe.blockmap",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 329510,
+          "sha256": "f9eb146f4d8cf54ee56722bdcb9ac34212fdbe0b962b633371287797148fe79a"
+        },
+        {
+          "name": "latest.yml",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 355,
+          "sha256": "0518e176b5d02a7c52ec22e436251465ac97055140520b6d4cac61efa291872b"
+        }
+      ]
+    },
+    "installedMetadata": {
+      "version": "0.5.9",
+      "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+      "packageName": "workwise",
+      "productName": "RailWise AI",
+      "asarSha256": "4ade24286040912c04c5a9963a9f7505ac410ee60b131b7d5438bfb0333e751e"
+    },
+    "signature": {
+      "status": "passed",
+      "scope": "macOS Developer ID and recorded Windows Authenticode status",
+      "windowsInstallerAuthenticode": "NotSigned",
+      "windowsExecutableAuthenticode": "NotSigned"
+    },
+    "notarization": {
+      "status": "passed",
+      "scope": "Two notarized macOS installer architectures"
+    },
+    "screenshots": [
+      "docs/qa/release-gates/v0.5.9/windows-startup-zh-dark.png"
+    ]
+  },
+  "checks": {
+    "productionBuild": {
+      "status": "passed",
+      "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+      "path": "docs/qa/release-gates/v0.5.9/build-and-focused.json"
+    },
+    "focusedTests": {
+      "status": "passed",
+      "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+      "path": "docs/qa/release-gates/v0.5.9/build-and-focused.json"
+    },
+    "requiredCI": {
+      "status": "passed",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/quality.yml",
+        "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+        "runId": 44493700586,
+        "runAttempt": 1
+      }
+    }
+  },
+  "acceptance": {
+    "installedPackage": {
+      "status": "passed",
+      "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+      "path": "docs/qa/release-gates/v0.5.9/installed-package.json"
+    },
+    "packagedUI": {
+      "status": "passed",
+      "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+      "path": "docs/qa/release-gates/v0.5.9/packaged-ui.json"
+    },
+    "functionalChecklist": {
+      "status": "passed",
+      "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+      "path": "docs/qa/release-gates/v0.5.9/functional-checklist.json"
+    },
+    "updaterRoundTrip": {
+      "status": "passed",
+      "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+      "path": "docs/qa/release-gates/v0.5.9/updater-acceptance.json",
+      "mode": "frozen-public-release",
+      "baseVersion": "0.5.6",
+      "machineReportPath": "docs/qa/release-gates/v0.5.9/frozen-updater.json",
+      "nativeReportPath": "docs/qa/release-gates/v0.5.9/native-updater.json",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/frozen-release-updater-acceptance.yml",
+        "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+        "runId": 44516406751,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14525854540,
+          "name": "frozen-updater-arm64-44516406751",
+          "digest": "sha256:6efc07884bc5010b463fbc3efad6ca6704aebcb9d8c89ebc551d68a2a3238222"
+        }
+      }
+    }
+  }
+}

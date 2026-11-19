@@ -1,0 +1,214 @@
+{
+  "status": "passed",
+  "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+  "version": "0.5.9",
+  "identity": {
+    "bundleId": "com.wangjiawei508.workgpt",
+    "packageName": "workwise",
+    "productName": "RailWise AI"
+  },
+  "packageBuild": {
+    "schemaVersion": 1,
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/release.yml",
+    "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+    "runId": 44493773337,
+    "runAttempt": 1,
+    "publicIdentity": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "packageName": "workwise",
+      "productName": "RailWise AI"
+    },
+    "artifacts": [
+      {
+        "name": "release-mac",
+        "id": 14518425925,
+        "digest": "sha256:a25748ad9016a69481fa164c701f71f50c986a8aa856c6e7844495351ded013e"
+      },
+      {
+        "name": "release-win",
+        "id": 14514753155,
+        "digest": "sha256:a023087fe421c17eb75c73bc0c818accaf966ea75c4205cdca51e7a332e3e29b"
+      }
+    ],
+    "files": [
+      {
+        "name": "RailWise-AI-0.5.9-mac-arm64.dmg",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 402395197,
+        "sha256": "0fb309df7c4f73fe74fa0e7b96d5bfc437a0f2c4e6f6023c2a15e4ac96324c66"
+      },
+      {
+        "name": "RailWise-AI-0.5.9-mac-arm64.zip",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 409169559,
+        "sha256": "356317c4c38aebbd2a86f4266dd45a14cfdd3492ee37f3fd6b7de0ea5f8c79bd"
+      },
+      {
+        "name": "RailWise-AI-0.5.9-mac-x64.dmg",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 411136357,
+        "sha256": "0f2d5c787d05596a3e7b5296a5ffa1a5276ad2ba7ed0c1bcf387b65738e03ce2"
+      },
+      {
+        "name": "RailWise-AI-0.5.9-mac-x64.zip",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 418326964,
+        "sha256": "ba91fada1cb820d67529652ff94021c1291e2c2a07d79978fd8a1803aeb7bdbe"
+      },
+      {
+        "name": "latest-mac.yml",
+        "platform": "darwin",
+        "artifact": "release-mac",
+        "size": 839,
+        "sha256": "16a2ccf31828b83534fea3b3396da2b5e5bac0fa0582f5c6582b6bdd19668a1d"
+      },
+      {
+        "name": "RailWise-AI-0.5.9-win-x64.exe",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 320871735,
+        "sha256": "7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c"
+      },
+      {
+        "name": "RailWise-AI-0.5.9-win-x64.exe.blockmap",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 329510,
+        "sha256": "f9eb146f4d8cf54ee56722bdcb9ac34212fdbe0b962b633371287797148fe79a"
+      },
+      {
+        "name": "latest.yml",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 355,
+        "sha256": "0518e176b5d02a7c52ec22e436251465ac97055140520b6d4cac61efa291872b"
+      }
+    ]
+  },
+  "installations": [
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "installer": {
+        "name": "RailWise-AI-0.5.9-win-x64.exe",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 320871735,
+        "sha256": "7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c"
+      },
+      "installed": {
+        "name": "workwise",
+        "productName": "RailWise AI",
+        "version": "0.5.9",
+        "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+        "asarSha256": "a90bca9b4fb10a43e1ae23b4a5a43d343656138e8ab9969256b9e2c08fca9d58",
+        "asarSize": 506649535
+      },
+      "authenticode": {
+        "installer": "NotSigned",
+        "executable": "NotSigned"
+      },
+      "shortcuts": [
+        "desktop",
+        "start-menu"
+      ],
+      "cleanExit": true,
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "sourceHead": "1d70ca1aa8c0a3394cb876c5307de2b44e3de168",
+        "runId": 44509645877,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14521876428,
+          "name": "exact-package-windows-install-44509645877",
+          "digest": "sha256:6ba57eff2cf61e5122d4ef1edd3b9ae8e0efad957048720e5023b4121bcc9483"
+        },
+        "report": {
+          "archivePath": "exact-windows-evidence/windows-install-smoke.json",
+          "sha256": "e72039ce4cc996c8237b54cc27b80c85e405cd470c803409ac4889fcda59a578",
+          "bytes": 12560
+        }
+      }
+    },
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "installer": {
+        "name": "RailWise-AI-0.5.9-mac-arm64.dmg",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 402395197,
+        "sha256": "0fb309df7c4f73fe74fa0e7b96d5bfc437a0f2c4e6f6023c2a15e4ac96324c66"
+      },
+      "installed": {
+        "version": "0.5.9",
+        "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+        "bundleId": "com.wangjiawei508.workgpt",
+        "installedArch": "arm64",
+        "signature": "verified",
+        "notarization": "staple-verified",
+        "asarSha256": "4ade24286040912c04c5a9963a9f7505ac410ee60b131b7d5438bfb0333e751e"
+      },
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "sourceHead": "77af0b18d852ff00fd9f0d0e4f2772e9999ff88b",
+        "runId": 44506084478,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14519368653,
+          "name": "exact-mac-startup-appearance-arm64",
+          "digest": "sha256:62e08d3a0023884aa6586a860f1af153ee94cd2ea0866e801dc4e1e6bad19a75"
+        },
+        "report": {
+          "archivePath": "exact-mac-evidence/mac-startup-appearance.json",
+          "sha256": "316830b6fd4cae2ce4639635bea231ce382f59b73c0531fb340389df3bb1f470",
+          "bytes": 6027
+        }
+      }
+    },
+    {
+      "platform": "darwin",
+      "arch": "x64",
+      "installer": {
+        "name": "RailWise-AI-0.5.9-mac-x64.dmg",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 411136357,
+        "sha256": "0f2d5c787d05596a3e7b5296a5ffa1a5276ad2ba7ed0c1bcf387b65738e03ce2"
+      },
+      "installed": {
+        "version": "0.5.9",
+        "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+        "bundleId": "com.wangjiawei508.workgpt",
+        "installedArch": "x86_64",
+        "signature": "verified",
+        "notarization": "staple-verified",
+        "asarSha256": "6c10f2e035534ae6285d41bb4c4d679dc32b3f084f13bfd902df7477c4ddecf4"
+      },
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "sourceHead": "77af0b18d852ff00fd9f0d0e4f2772e9999ff88b",
+        "runId": 44506084478,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14520590515,
+          "name": "exact-mac-startup-appearance-x64",
+          "digest": "sha256:d9222a165e2d91e865d440de94aa30efb3c39be888106549839f3a191bf513d2"
+        },
+        "report": {
+          "archivePath": "exact-mac-evidence/mac-startup-appearance.json",
+          "sha256": "02160d7279262fe029df288ae68e7f370f61af20cf33e6929309a531319c3124",
+          "bytes": 6032
+        }
+      }
+    }
+  ]
+}

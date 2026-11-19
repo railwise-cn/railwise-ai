@@ -1,0 +1,89 @@
+{
+  "status": "passed",
+  "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+  "version": "0.5.9",
+  "requiredCI": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/quality.yml",
+    "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+    "runId": 44493700586,
+    "runAttempt": 1
+  },
+  "jobs": {
+    "Electron production smoke": {
+      "id": 135455447974,
+      "conclusion": "success",
+      "passedSteps": [
+        "Set up job",
+        "Run actions/checkout@v7",
+        "Run actions/setup-node@v7",
+        "Run npm ci",
+        "Prepare checksummed Electron runtime",
+        "Run npm run build",
+        "Launch packaged production preview",
+        "Post Run actions/setup-node@v7",
+        "Post Run actions/checkout@v7",
+        "Complete job"
+      ]
+    },
+    "Windows path, spawn, persistence": {
+      "id": 135455448436,
+      "conclusion": "success",
+      "passedSteps": [
+        "Set up job",
+        "Run actions/checkout@v7",
+        "Run actions/setup-node@v7",
+        "Run npm ci",
+        "Run npm run typecheck",
+        "Verify native Windows ASAR paths and offline runtime packaging",
+        "Run core Windows security tests",
+        "Verify Windows Runtime shutdown through owned IPC",
+        "Run plugin Windows security tests",
+        "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/process-identity-async.test.ts tests/process-identity-async.windows.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+        "Post Run actions/setup-node@v7",
+        "Post Run actions/checkout@v7",
+        "Complete job"
+      ]
+    },
+    "OpenSpec, brand, lint, type, test, build": {
+      "id": 135455448514,
+      "conclusion": "success",
+      "passedSteps": [
+        "Set up job",
+        "Run actions/checkout@v7",
+        "Run actions/setup-node@v7",
+        "Run npm ci",
+        "Run npm run openspec:validate",
+        "Run npm run verify:brand-boundary",
+        "Run npm run verify:document-licenses",
+        "Run npm run lint",
+        "Run npm run typecheck",
+        "Prepare checksummed Electron runtime",
+        "Run npm test",
+        "Verify Stable release workflow gates",
+        "Website audit regression checks (offline fixtures)",
+        "Website canonical route inspection checks (offline fixtures)",
+        "Run npm --prefix kun run typecheck",
+        "Run npm --prefix kun test",
+        "Run npm run build",
+        "Post Run actions/setup-node@v7",
+        "Post Run actions/checkout@v7",
+        "Complete job"
+      ]
+    }
+  },
+  "productionPackages": {
+    "workflowPath": ".github/workflows/release.yml",
+    "runId": 44493773337,
+    "runAttempt": 1,
+    "artifactNames": [
+      "release-mac",
+      "release-win"
+    ]
+  },
+  "focusedScope": [
+    "Composer files, PDF evidence, and exact skill and plugin binding",
+    "Task execution chronology and collapsible diagnostic summaries",
+    "Startup appearance and Windows automatic update behavior"
+  ]
+}

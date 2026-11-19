@@ -1,0 +1,263 @@
+{
+  "status": "passed",
+  "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+  "version": "0.5.9",
+  "attachmentWindows": {
+    "scope": "Mixed Windows run entered the real skill read phase after the native clipboard, file picker, drag-and-drop and attachment-only send checks. Its later assertion on persisted tool arguments failed because they are intentionally redacted.",
+    "checks": [
+      "Explorer file paste of a roughly 40 MiB synthetic scanned PDF",
+      "File picker and actual text extraction for a Chinese PDF",
+      "Damaged PDF drop and removal",
+      "Attachment-only sends with model requests checked by the local protocol fixture"
+    ],
+    "evidence": {
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/windows-install-smoke.yml",
+      "sourceHead": "bf0fd6f4dbba713775fc94731eaeb9c3ae9da08a",
+      "runId": 44507640970,
+      "runAttempt": 1,
+      "artifact": {
+        "id": 14520662141,
+        "name": "exact-package-windows-install-44507640970",
+        "digest": "sha256:1bff67fd130680090450faecc9d37aecb41062387c4a3f96f53623475259d01f"
+      },
+      "report": {
+        "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+        "sha256": "14f362199d1cb477127ed36ea23fdda9a92158131aad130b879ddda66903539d",
+        "bytes": 3770
+      }
+    }
+  },
+  "attachmentMacOS": {
+    "arm64": {
+      "nativeFilePaste": {
+        "status": "passed",
+        "fixture": {
+          "name": "Finder 中文粘贴样本.pdf",
+          "size": 1318,
+          "sha256": "5db9ef11279de43fee05435b64916fa8fe91f8a32c70246b714afab99356fe85"
+        },
+        "workbench": {
+          "visibility": "visible",
+          "locale": "zh",
+          "workspaceMatches": true,
+          "viewport": {
+            "width": 1024,
+            "height": 684
+          },
+          "overlay": null,
+          "sidebarVisible": true,
+          "newChat": {
+            "disabled": true,
+            "visible": true
+          },
+          "dialogs": []
+        },
+        "composerEntry": "installed-new-chat-shortcut",
+        "writtenFormat": "public.file-url",
+        "event": {
+          "trusted": true,
+          "types": [
+            "Files"
+          ],
+          "files": [
+            {
+              "name": "Finder 中文粘贴样本.pdf",
+              "size": 1318
+            }
+          ]
+        },
+        "attachment": {
+          "state": "文字提取受限",
+          "managedOriginal": true
+        },
+        "sourceUnchanged": true,
+        "loopbackModelGenerations": 0
+      },
+      "scope": "Native Finder PDF paste, limited text extraction state and managed original preservation.",
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "sourceHead": "77af0b18d852ff00fd9f0d0e4f2772e9999ff88b",
+        "runId": 44506084478,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14519368653,
+          "name": "exact-mac-startup-appearance-arm64",
+          "digest": "sha256:62e08d3a0023884aa6586a860f1af153ee94cd2ea0866e801dc4e1e6bad19a75"
+        },
+        "report": {
+          "archivePath": "exact-mac-evidence/mac-startup-appearance.json",
+          "sha256": "316830b6fd4cae2ce4639635bea231ce382f59b73c0531fb340389df3bb1f470",
+          "bytes": 6027
+        }
+      }
+    },
+    "x64": {
+      "nativeFilePaste": {
+        "status": "passed",
+        "fixture": {
+          "name": "Finder 中文粘贴样本.pdf",
+          "size": 1318,
+          "sha256": "5db9ef11279de43fee05435b64916fa8fe91f8a32c70246b714afab99356fe85"
+        },
+        "workbench": {
+          "visibility": "visible",
+          "locale": "zh",
+          "workspaceMatches": true,
+          "viewport": {
+            "width": 1280,
+            "height": 840
+          },
+          "overlay": null,
+          "sidebarVisible": true,
+          "newChat": {
+            "disabled": true,
+            "visible": true
+          },
+          "dialogs": []
+        },
+        "composerEntry": "installed-new-chat-shortcut",
+        "writtenFormat": "public.file-url",
+        "event": {
+          "trusted": true,
+          "types": [
+            "Files"
+          ],
+          "files": [
+            {
+              "name": "Finder 中文粘贴样本.pdf",
+              "size": 1318
+            }
+          ]
+        },
+        "attachment": {
+          "state": "文字提取受限",
+          "managedOriginal": true
+        },
+        "sourceUnchanged": true,
+        "loopbackModelGenerations": 0
+      },
+      "scope": "Native Finder PDF paste, limited text extraction state and managed original preservation.",
+      "evidence": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/windows-install-smoke.yml",
+        "sourceHead": "77af0b18d852ff00fd9f0d0e4f2772e9999ff88b",
+        "runId": 44506084478,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 14520590515,
+          "name": "exact-mac-startup-appearance-x64",
+          "digest": "sha256:d9222a165e2d91e865d440de94aa30efb3c39be888106549839f3a191bf513d2"
+        },
+        "report": {
+          "archivePath": "exact-mac-evidence/mac-startup-appearance.json",
+          "sha256": "02160d7279262fe029df288ae68e7f370f61af20cf33e6929309a531319c3124",
+          "bytes": 6032
+        }
+      }
+    }
+  },
+  "capabilityWindows": {
+    "scope": "Separate Plus-menu Skill and Plugin choices executed the real read_skill_resource tool with a local model protocol fixture.",
+    "installedPlugin": {
+      "id": "video-shotcraft",
+      "sha256": "c962b0fe9eab507c78171a435f651b48dd7e617525aed79c648ec381c5e3c560"
+    },
+    "skillRead": {
+      "callMatches": true,
+      "argumentsRedacted": true,
+      "resultMatches": true,
+      "declaredBytes": 24312,
+      "declaredTotalBytes": 24312,
+      "offset": 0,
+      "nextOffset": null,
+      "bytes": 24312,
+      "sha256": "7593dd38ca5255febfc2778b0ed78b158edee8519e9070328480dd4be15c871e"
+    },
+    "pluginRead": {
+      "callMatches": true,
+      "argumentsRedacted": true,
+      "resultMatches": true,
+      "declaredBytes": 24312,
+      "declaredTotalBytes": 24312,
+      "offset": 0,
+      "nextOffset": null,
+      "bytes": 24312,
+      "sha256": "7593dd38ca5255febfc2778b0ed78b158edee8519e9070328480dd4be15c871e"
+    },
+    "evidence": {
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/windows-install-smoke.yml",
+      "sourceHead": "1d70ca1aa8c0a3394cb876c5307de2b44e3de168",
+      "runId": 44509645877,
+      "runAttempt": 1,
+      "artifact": {
+        "id": 14521876428,
+        "name": "exact-package-windows-install-44509645877",
+        "digest": "sha256:6ba57eff2cf61e5122d4ef1edd3b9ae8e0efad957048720e5023b4121bcc9483"
+      },
+      "report": {
+        "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+        "sha256": "517856d678694989999ce849fb073032758dca77d4907c37be1e744d243835c0",
+        "bytes": 5204
+      }
+    }
+  },
+  "ordinaryTaskWindows": {
+    "preview": {
+      "automatic": true,
+      "manualEntryVerified": true,
+      "contentVerified": true
+    },
+    "schedule": {
+      "times": [
+        "08:30",
+        "16:30"
+      ],
+      "timezone": "Asia/Shanghai",
+      "enabled": true,
+      "readBackFromTool": true
+    },
+    "dueOccurrence": {
+      "clock": "real",
+      "status": "completed",
+      "independentTask": true,
+      "independentArtifact": true,
+      "originalDailyScheduleRestored": true
+    },
+    "evidence": {
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/windows-install-smoke.yml",
+      "sourceHead": "b5218598eeca3b516a3182a751f75efbc58e56e9",
+      "runId": 44502140362,
+      "runAttempt": 1,
+      "artifact": {
+        "id": 14518915177,
+        "name": "exact-package-windows-install-44502140362",
+        "digest": "sha256:84625afacdef15a1e113dc385e3a11c2254e2e2b01d1fca4e919403aa3850ae1"
+      },
+      "report": {
+        "archivePath": "exact-windows-evidence/windows-ui-smoke.json",
+        "sha256": "a83b80ccc3581825f3cf12055ec355e4238a4d85cec6ac438aa1e79b87150c86",
+        "bytes": 27528
+      }
+    }
+  },
+  "rendererChecks": {
+    "scope": "Focused automated renderer coverage in the required CI",
+    "checks": [
+      "Composer draft and ready attachments survive plan changes",
+      "Goal panel actions",
+      "Selection availability is rechecked when the conversation context changes",
+      "Diagnostics are collapsed, muted and recover after automatic retry"
+    ],
+    "evidence": {
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/quality.yml",
+      "sourceHead": "389ee737a62cf4b889d5cb1958402e84911c5725",
+      "runId": 44493700586,
+      "runAttempt": 1
+    }
+  }
+}
