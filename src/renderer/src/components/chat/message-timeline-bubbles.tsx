@@ -25,7 +25,8 @@ import { TaskIntentChoiceCard } from './TaskIntentChoiceCard'
 import { DiffView } from '../DiffView'
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { ModelMetaTag, WritePromptMetaDisclosure } from './message-timeline-cards'
-import { readNumber, formatDuration, formatToolTitle } from './message-timeline-tools'
+import { readNumber, formatDuration } from './message-timeline-tools'
+import { redactRuntimeText } from './conversation-visibility'
 import { engineeringProfessionalAnswerText, engineeringProfessionalUserSurfaceText } from '../engineering/engineering-professional-text'
 
 const COPY_FEEDBACK_RESET_MS = 1600
@@ -1497,7 +1498,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
     )
   }
   if (block.kind === 'tool') {
-    return <ToolEntry block={block} nested={nested} />
+    return <ToolEntry key={block.id} block={block} />
   }
   if (block.kind === 'user_input') {
     return <UserInputBubble block={block} nested={nested} />
@@ -1590,24 +1591,9 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
   return <></>
 }
 
-function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boolean }): ReactElement {
+function ToolEntry({ block }: { block: ToolBlock }): ReactElement {
   const { t } = useTranslation('common')
-  const [open, setOpen] = useState(() => block.status === 'error' || block.status === 'running')
-
-  useEffect(() => {
-    if (block.status === 'running') {
-      setOpen(true)
-    }
-  }, [block.status, block.id])
-
-  const effectiveOpen = block.status === 'running' ? true : open
-
-  const tone =
-    block.status === 'error'
-      ? 'border-red-300/80 bg-red-500/10 text-red-950 dark:border-red-800/60 dark:bg-red-950/35 dark:text-red-100'
-      : block.status === 'running'
-        ? 'border-amber-300/80 bg-amber-500/10 text-amber-950 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100'
-        : 'border-ds-border bg-ds-subtle text-ds-ink'
+  const [open, setOpen] = useState(false)
 
   const Icon = block.toolKind === 'file_change' ? FileEdit : block.toolKind === 'command_execution' ? Terminal : Wrench
   const kindLabel =
@@ -1619,76 +1605,42 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
 
   const exitCode = readNumber(block.meta, 'exit_code')
   const durationMs = readNumber(block.meta, 'duration_ms')
-  const hasDetail = !!(block.detail && block.detail.trim().length > 0)
-  const patchText = block.toolKind === 'file_change' ? extractUnifiedDiffText(block.detail) : undefined
-  const canExpand = hasDetail || block.status === 'running'
+  const detail = open && block.detail ? redactRuntimeText(block.detail) : undefined
+  const filePath = open && block.filePath ? redactRuntimeText(block.filePath) : undefined
+  const patchText = block.toolKind === 'file_change' ? extractUnifiedDiffText(detail) : undefined
+  const Chevron = open ? ChevronDown : ChevronRight
 
   return (
-    <div className={`rounded-[22px] border shadow-[0_12px_30px_rgba(86,103,136,0.04)] ${tone}`}>
+    <div className="min-w-0 text-ds-muted">
       <button
         type="button"
-        onClick={() => {
-          if (!canExpand || block.status === 'running') return
-          setOpen((v) => !v)
-        }}
-        className={`flex w-full items-start gap-2 px-4 py-3 text-left text-[13.5px] leading-6 ${
-          canExpand && block.status !== 'running' ? 'cursor-pointer' : 'cursor-default'
-        }`}
+        onClick={() => setOpen(value => !value)}
+        aria-expanded={open}
+        className="flex w-fit max-w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[13.5px] hover:bg-ds-hover/45"
       >
-        <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-80" strokeWidth={1.75} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold uppercase tracking-[0.12em] text-[11px] opacity-75">
-              {kindLabel}
-            </span>
-            {block.status === 'running' ? (
-              <span className="rounded-full bg-amber-200/40 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-700/30 dark:text-amber-100">
-                {t('inspectorStatusRunning')}
-              </span>
-            ) : null}
-            {typeof exitCode === 'number' ? (
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-mono ${
-                  exitCode === 0
-                    ? 'bg-ds-success-soft text-ds-success'
-                    : 'bg-ds-danger-soft text-ds-danger'
-                }`}
-              >
-                exit {exitCode}
-              </span>
-            ) : null}
-            {typeof durationMs === 'number' ? (
-              <span className="rounded-full bg-ds-card px-2 py-0.5 text-[11px] font-mono text-ds-muted">
-                {formatDuration(durationMs)}
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-0.5 break-words">
-            {block.filePath ? (
-              <span className="font-mono text-[12px] opacity-90">{block.filePath} — </span>
-            ) : null}
-            <span>{block.summary}</span>
-          </div>
-          <RuntimeMetaChips meta={block.meta} />
-        </div>
-        {canExpand ? (
-          effectiveOpen ? (
-            <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" strokeWidth={1.75} />
-          ) : (
-            <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" strokeWidth={1.75} />
-          )
-        ) : null}
+        <Icon className="h-3.5 w-3.5 shrink-0 opacity-75" strokeWidth={1.75} />
+        <span>{kindLabel}</span>
+        <Chevron className="h-3.5 w-3.5 shrink-0 opacity-45" strokeWidth={1.75} />
       </button>
+      <RuntimeMetaChips meta={block.meta} />
       <ToolAttachmentPreviews meta={block.meta} />
-      {effectiveOpen && hasDetail ? (
-        <div className="ds-panel-strip min-w-0 border-t border-ds-border-muted/60 px-4 py-3">
+      {open ? (
+        <div className="ds-work-timeline-detail min-w-0 text-[13.5px]">
+          <div className="mb-1 flex flex-wrap gap-x-2 text-[12px]">
+            {block.status === 'running' ? <span>{t('inspectorStatusRunning')}</span> : null}
+            {block.status === 'error' ? <span>{t('taskReceiptStatus_failed')}</span> : null}
+            {typeof exitCode === 'number' ? <span className="font-mono">exit {exitCode}</span> : null}
+            {typeof durationMs === 'number' ? <span>{formatDuration(durationMs)}</span> : null}
+          </div>
+          {filePath ? <p className="break-all font-mono text-[12px]">{filePath}</p> : null}
+          <p className="whitespace-pre-wrap break-words">{redactRuntimeText(block.summary)}</p>
           {patchText !== undefined ? (
-            <DiffView patch={patchText} filePath={block.filePath} />
-          ) : (
-            <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-ds-ink">
-              {block.detail}
+            <DiffView patch={patchText} filePath={filePath} />
+          ) : detail ? (
+            <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-6">
+              {detail}
             </pre>
-          )}
+          ) : null}
         </div>
       ) : null}
     </div>

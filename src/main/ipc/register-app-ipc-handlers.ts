@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os'
 import { startWorkspaceFileWatch, type WorkspaceFileWatch } from '../services/workspace-file-watch-service'
 import { z } from 'zod'
 import { BrowserOrigin } from '../../../kun/src/contracts/browser-skill.js'
+import { chunkAttachmentText } from '../../../kun/src/attachments/attachment-chunker.js'
 import { BROWSER_EXTENSION_URLS, getManagedBrowserSkillService } from '../services/managed-browser-skill-service'
 import {
   type AppSettingsPatch,
@@ -1297,6 +1298,11 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const staged = await chatAttachmentImportService.stage(request)
     try {
       if (!runtimeFileRequest) throw new Error('streamed Runtime attachment import is unavailable')
+      const settings = await store.load()
+      const parsed = await chatAttachmentImportService.parse(staged, {
+        mode: settings.documents.parsingMode,
+        unlimitedOcrServerUrl: settings.documents.unlimitedOcrServerUrl
+      })
       const imported = await runtimeFileRequest('/v1/attachments/documents', staged.absolutePath, {
         'Content-Type': staged.mimeType,
         'X-Workwise-File-Name': encodeURIComponent(staged.originalFileName),
@@ -1305,13 +1311,21 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         ...(request.workspace ? { 'X-Workwise-Workspace': encodeURIComponent(request.workspace) } : {})
       })
       if (!imported.ok) throw new Error(runtimeResponseMessage(imported))
-      const attachment = (JSON.parse(imported.body) as { attachment: { id: string } }).attachment
-      const settings = await store.load()
-      const parsed = await chatAttachmentImportService.parse(staged, {
-        mode: settings.documents.parsingMode,
-        unlimitedOcrServerUrl: settings.documents.unlimitedOcrServerUrl
-      })
-      const sections = buildAttachmentSections(attachment.id, parsed.document?.markdown ?? parsed.text ?? '', parsed.document)
+      const attachment = (JSON.parse(imported.body) as { attachment: { id: string; indexState?: string } }).attachment
+      const parsedText = parsed.document?.markdown ?? parsed.text ?? ''
+      const sections = parsed.pdfTextPages
+        ? chunkAttachmentText({ attachmentId: attachment.id, blocks: parsed.pdfTextPages.map(({ page, text }) => ({ text, provenance: { page } })) })
+        : buildAttachmentSections(attachment.id, parsedText, parsed.document)
+      if (sections.length === 0 && parsed.pdfTextPages && attachment.indexState === 'ready') {
+        return { attachment, managedPath: staged.absolutePath }
+      }
+      const parser = parsed.document ? buildAttachmentParserProvenance(parsed.document) : {
+        engine: parsed.pdfTextPages ? 'document-engine' : 'safe-text',
+        ...(parsed.pdfTextPages ? { version: 'PDF.js text layer' } : {}),
+        local: true,
+        parsedAt: new Date().toISOString()
+      }
+      const summary = parsed.pdfTextPages?.[0]?.text ?? parsedText
       for (let offset = 0; offset < sections.length || offset === 0; offset += 32) {
         const batch = sections.slice(offset, offset + 32)
         const final = offset + 32 >= sections.length
@@ -1319,10 +1333,10 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
           replace: offset === 0, sections: batch, final,
           ...(final ? { metadata: {
             state: parsed.state,
-            parser: parsed.document ? buildAttachmentParserProvenance(parsed.document) : { engine: 'safe-text', local: true, parsedAt: new Date().toISOString() },
+            parser,
             sourceStructure: parsed.sourceStructure ?? {},
             degradationReasons: parsed.degradationReasons, parserWarnings: parsed.warnings,
-            summary: (parsed.document?.markdown ?? parsed.text ?? '').replace(/\s+/g, ' ').slice(0, 1200)
+            summary: summary.replace(/\s+/g, ' ').slice(0, 1200)
           } } : {})
         }))
         if (!result.ok) throw new Error(runtimeResponseMessage(result))

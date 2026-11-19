@@ -16,7 +16,7 @@ import type {
 import { GUI_UPDATE_CHECK_INTERVAL_MS, nextGuiUpdateCheckDelay } from '../shared/gui-update-schedule'
 import { DEFAULT_GUI_UPDATE_CHANNEL, normalizeGuiUpdateChannel } from '../shared/gui-update'
 import { configurePrivateUpdaterTls } from './private-updater-tls'
-import { WindowsGuiUpdater } from './windows-gui-update'
+import { WindowsGuiUpdater, WindowsUpdateCacheError } from './windows-gui-update'
 import {
   legacyDownloadUrl,
   legacyGithubRepo,
@@ -49,6 +49,7 @@ let getMainWindow: (() => BrowserWindow | null) | null = null
 let lastInfo: Extract<GuiUpdateInfo, { ok: true }> | null = null
 let lastState: GuiUpdateState = { status: 'idle' }
 let downloaded = false
+let downloadedFileHash: string | undefined
 let downloadPromise: Promise<string[]> | null = null
 let configuredChannel: GuiUpdateChannel = normalizeGuiUpdateChannel(
   process.env.WORKWISE_UPDATE_CHANNEL?.trim() || legacyUpdateChannel() || undefined
@@ -499,7 +500,7 @@ function shouldSkipScheduledCheck(): boolean {
   )
 }
 
-async function scheduleNextBackgroundCheck(minimumDelayMs = 0): Promise<void> {
+async function scheduleNextBackgroundCheck(minimumDelayMs: number): Promise<void> {
   clearBackgroundCheckTimer()
   const lastCheckedAtMs = await readLastScheduledCheckAt()
   const delay = Math.max(minimumDelayMs, nextGuiUpdateCheckDelay(lastCheckedAtMs))
@@ -513,9 +514,13 @@ async function runScheduledGuiUpdateCheck(): Promise<void> {
   backgroundCheckPromise = (async () => {
     try {
       if (shouldSkipScheduledCheck()) return
-      const nowMs = Date.now()
-      await writeLastScheduledCheckAt(nowMs)
       const info = await checkGuiUpdate()
+      // A failed network check must not delay discovery when the app restarts.
+      if (info.ok) {
+        await writeLastScheduledCheckAt(Date.now()).catch(error => {
+          console.warn('[workwise updater] could not record the scheduled check:', error)
+        })
+      }
       if (info.ok && info.hasUpdate && !info.withdrawn && onBackgroundUpdateAvailable) {
         const notification = `${info.channel}:${info.latestVersion}`
         if (lastBackgroundNotification !== notification) {
@@ -570,6 +575,7 @@ function configureUpdaterChannel(channel: GuiUpdateChannel): void {
   }
   if (!changed) return
   downloaded = false
+  downloadedFileHash = undefined
   downloadPromise = null
   lastInfo = null
   emitGuiUpdateState({ status: 'idle' })
@@ -809,7 +815,10 @@ export function initializeGuiUpdater(
   })
 
   autoUpdater.on('update-available', (updateInfo: UpdateInfo) => {
-    downloaded = false
+    // Checking the same feed again (for example when opening Settings) must
+    // not invalidate a verified download whose version and bytes still match.
+    downloaded = downloaded && lastInfo?.latestVersion === updateInfo.version.trim() &&
+      downloadedFileHash !== undefined && downloadedFileHash === getUpdateFileHash(updateInfo)
     const invalid = validateCandidateVersion(updateInfo.version)
     if (invalid) {
       emitGuiUpdateState({ status: 'error', info: lastInfo ?? undefined, message: invalid, code: 'download_failed' })
@@ -817,7 +826,7 @@ export function initializeGuiUpdater(
     }
     const info = toGuiInfo(updateInfo, true)
     lastInfo = info
-    emitGuiUpdateState(info.hasUpdate ? { status: 'available', info } : { status: 'not_available', info })
+    emitGuiUpdateState(info.hasUpdate ? { status: downloaded ? 'downloaded' : 'available', info } : { status: 'not_available', info })
   })
 
   autoUpdater.on('update-not-available', (updateInfo: UpdateInfo) => {
@@ -839,6 +848,7 @@ export function initializeGuiUpdater(
       return
     }
     downloaded = true
+    downloadedFileHash = getUpdateFileHash(event)
     const info = toGuiInfo(event, true)
     if (!info.hasUpdate) {
       downloaded = false
@@ -866,7 +876,14 @@ export function initializeGuiUpdater(
     })
   })
 
-  void scheduleNextBackgroundCheck()
+  // The saved timestamp has no corresponding update state after a restart.
+  // Check this launch as well as on the running application's periodic timer.
+  backgroundCheckTimer = setTimeout(() => { void runScheduledGuiUpdateCheck() }, 0)
+}
+
+function getUpdateFileHash(info: UpdateInfo): string | undefined {
+  const hashes = info.files?.map(file => file.sha512).filter(Boolean)
+  return hashes?.length ? hashes.join(',') : info.sha512
 }
 
 export function getGuiUpdateState(): GuiUpdateState {
@@ -901,7 +918,7 @@ async function performGuiUpdateCheck(selectedChannel: GuiUpdateChannel): Promise
     }
     const info = toGuiInfo(result.updateInfo, result.isUpdateAvailable)
     lastInfo = info
-    emitGuiUpdateState(info.hasUpdate ? { status: 'available', info } : { status: 'not_available', info })
+    emitGuiUpdateState(info.hasUpdate ? { status: downloaded ? 'downloaded' : 'available', info } : { status: 'not_available', info })
     return info
   } catch (e) {
     const message = sanitizeUpdaterError(e instanceof Error ? e.message : String(e), selectedChannel)
@@ -921,6 +938,9 @@ async function performGuiUpdateCheck(selectedChannel: GuiUpdateChannel): Promise
 
 export async function checkGuiUpdate(channel?: GuiUpdateChannel): Promise<GuiUpdateInfo> {
   const selectedChannel = await resolveUpdateChannel(channel)
+  if (selectedChannel === lastInfo?.channel && (downloadPromise || lastState.status === 'installing')) {
+    return lastInfo
+  }
   if (guiUpdateCheckPromise) {
     if (guiUpdateCheckChannel === selectedChannel) return guiUpdateCheckPromise
     await guiUpdateCheckPromise.catch(() => undefined)
@@ -1029,6 +1049,11 @@ async function performGuiUpdateInstall(): Promise<GuiUpdateInstallResult> {
     return { ok: true }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
+    if (windowsUpdater && e instanceof WindowsUpdateCacheError && lastState.status === 'installing') {
+      downloaded = false
+      downloadedFileHash = undefined
+      if (lastInfo) lastInfo = { ...lastInfo, downloaded: false }
+    }
     emitGuiUpdateState({ status: 'error', info: lastInfo ?? undefined, message, code: 'install_failed' })
     return {
       ok: false,

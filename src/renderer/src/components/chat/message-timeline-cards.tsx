@@ -324,7 +324,7 @@ export function WorkMetaRow({
       aria-expanded={expanded}
       className="group flex w-fit max-w-full items-center gap-1.5 rounded-md py-1 text-left text-[15px] font-medium text-ds-muted transition hover:opacity-85"
     >
-      <span className={processing ? 'ds-shiny-text' : ''}>{t('taskEvidenceExecutionDetails')}</span>
+      <span>{t('taskEvidenceExecutionDetails')}</span>
       {typeof durationMs === 'number' ? (
         <span className="tabular-nums text-ds-faint">· {formatDuration(durationMs)}</span>
       ) : null}

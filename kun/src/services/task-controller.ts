@@ -243,7 +243,7 @@ export class TaskController {
       }), { key: 'capability-blocked', kind: 'capability_required', payload: { reason: input.reason } })
       return this.repository.appendInput({ taskId: waiting.id, expectedRevision: waiting.revision, idempotencyKey: `capability-original:${waiting.id}`,
         text: input.request.prompt, kind: 'supplement', sourceId: 'capability-original', attachmentIds: input.request.attachmentIds,
-        workspaceReferences: input.request.workspaceReferences, nowIso: this.nowIso() }).task
+        workspaceReferences: input.request.workspaceReferences, capabilityReferences: input.request.capabilityReferences, nowIso: this.nowIso() }).task
     })
   }
 
@@ -2060,7 +2060,7 @@ export class TaskController {
 
   markInputDelivered(inputId: string): void { this.repository.markInputDelivered(inputId, this.nowIso()) }
 
-  appendInput(taskId: string, expectedRevision: number, idempotencyKey: string, text: string, kind: TaskInput['kind'] = 'supplement', sourceId?: string, references?:Pick<TaskInput,'attachmentIds'|'workspaceReferences'>) {
+  appendInput(taskId: string, expectedRevision: number, idempotencyKey: string, text: string, kind: TaskInput['kind'] = 'supplement', sourceId?: string, references?:Pick<TaskInput,'attachmentIds'|'workspaceReferences'|'capabilityReferences'>) {
     return this.repository.appendInput({ taskId, expectedRevision, idempotencyKey, text, kind, sourceId, ...references, nowIso: this.nowIso() })
   }
 

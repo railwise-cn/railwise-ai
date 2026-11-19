@@ -86,4 +86,34 @@ describe('Skill installation runtime acknowledgement', () => {
     expect(runtime.diagnostics().skills).toEqual([])
     expect(runtime.resolveTurn({ workspace: '', prompt: 'browser-skill' }).activeSkillIds).toEqual([])
   })
+
+  it('validates inline picker tokens and ignores quoted and negated references', async () => {
+    const root = await skillRoot('selected-skill')
+    const runtime = await SkillRuntime.create({ enabled: true, roots: [root], legacySkillMd: true })
+    await expect(runtime.validateSlashSelection('请使用 /skill:missing-skill 处理', '')).rejects.toMatchObject({ code: 'skill_unavailable' })
+    await expect(runtime.validateSlashSelection('请说明 `/skill:missing-skill` 的含义，不要用 /skill:another-missing ', '')).resolves.toBeUndefined()
+    expect(runtime.resolveTurn({ workspace: '', prompt: '请使用 /skill:selected-skill 处理' }).activeSkillIds).toEqual(['selected-skill'])
+    expect(runtime.resolveTurn({ workspace: '', prompt: '示例是 `/skill:selected-skill`' }).activeSkillIds).not.toContain('selected-skill')
+  })
+
+  it('activates the exact verified Plugin Skill as context without changing the ordinary tool allowlist', async () => {
+    const existing = await skillRoot('standard-review-skill')
+    const installed = await skillRoot('installed-studio-skill')
+    const existingPath = join(existing, 'standard-review-skill')
+    const pluginPath = join(installed, 'installed-studio-skill')
+    await writeFile(join(existingPath, 'skill.json'), JSON.stringify({ name: 'standard-review-skill', allowedTools: ['read'] }))
+    await writeFile(join(pluginPath, 'skill.json'), JSON.stringify({ name: 'installed-studio-skill', allowedTools: ['write'] }))
+    const runtime = await SkillRuntime.create({
+      enabled: true, roots: [existing, installed], legacySkillMd: true,
+      pluginRoots: [{ root: installed, id: 'studio-package' }]
+    })
+    expect(runtime.callablePluginSkills('', new Set(['read']))).toEqual([])
+    expect(runtime.callablePluginSkills('', new Set(['write']))).toMatchObject([
+      { choice: { kind: 'plugin', id: 'studio-package' }, skillId: 'installed-studio-skill' }
+    ])
+    expect(runtime.resolveTurn({ workspace: '', prompt: '请用 standard-review-skill 执行', selectedPluginIds: ['studio-package'] }))
+      .toMatchObject({ activeSkillIds: ['installed-studio-skill', 'standard-review-skill'], allowedToolNames: ['read'],
+        activeSkillResources: [expect.objectContaining({ skillId: 'installed-studio-skill' }), expect.objectContaining({ skillId: 'standard-review-skill' })] })
+    expect(runtime.resolveTurn({ workspace: '', prompt: '开始', selectedPluginIds: ['installed-studio-skill'] }).activeSkillIds).toEqual([])
+  })
 })

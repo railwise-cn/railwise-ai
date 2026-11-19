@@ -9,7 +9,7 @@ import {
 vi.mock('electron', () => ({ BrowserWindow: class BrowserWindow {} }))
 
 describe('splash window document', () => {
-  it('shows the product, version, real progress, and accessibility fallbacks', () => {
+  it('shows the brand and full Chinese subtitle above quiet, accessible progress', () => {
     const html = buildSplashHtml(
       {
         appearance: {
@@ -20,21 +20,23 @@ describe('splash window document', () => {
           reason: 'supported'
         },
         dark: false,
-        version: '0.3.5',
-        locale: 'zh'
+        locale: 'zh',
+        logoDataUrl: 'data:image/png;base64,logo'
       },
       { progress: 0.42, label: '正在载入扩展' }
     )
 
-    expect(html).toContain('<div class="brand">RailWise AI</div>')
-    expect(html).toContain('<div class="version">0.3.5</div>')
+    expect(html).toMatch(/<img class="logo"[^>]*>\s*<h1 class="brand">RailWise AI<\/h1>\s*<p class="subtitle" lang="zh-CN">基于本地优先架构的智能协同工作台<\/p>/)
+    expect(html).not.toContain('class="version"')
+    expect(html).toContain('overflow-wrap: anywhere')
+    expect(html).toContain('role="progressbar" aria-labelledby="splash-status"')
     expect(html).toContain('aria-valuenow="42"')
     expect(html).toContain('正在载入扩展')
     expect(html).toContain('prefers-reduced-transparency: reduce')
     expect(html).toContain('forced-colors: active')
   })
 
-  it('clamps initial progress and localizes phase labels', () => {
+  it('keeps the Chinese subtitle in the English dark splash and escapes phase labels', () => {
     const html = buildSplashHtml(
       {
         appearance: {
@@ -45,14 +47,15 @@ describe('splash window document', () => {
           reason: 'gpu-disabled'
         },
         dark: true,
-        version: '<unsafe>',
         locale: 'en'
       },
       { progress: 3, label: '<ready>' }
     )
 
+    expect(html).toContain('<html lang="en" data-theme="dark" data-material="solid">')
+    expect(html).toContain('<p class="subtitle" lang="zh-CN">基于本地优先架构的智能协同工作台</p>')
+    expect(html).not.toContain('class="version"')
     expect(html).toContain('aria-valuenow="100"')
-    expect(html).toContain('&lt;unsafe&gt;')
     expect(html).toContain('&lt;ready&gt;')
     expect(splashProgressLabel('en', 'interface')).toBe('Opening workbench')
   })

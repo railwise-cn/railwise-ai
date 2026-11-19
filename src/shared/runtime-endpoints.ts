@@ -18,6 +18,7 @@ export const RUNTIME_TOOLS_PATH = '/v1/runtime/tools'
 export const RUNTIME_TOOLS_TEMPLATE = '/v1/runtime/tools'
 
 export const RUNTIME_SKILLS_PATH = '/v1/skills'
+export const RUNTIME_CALLABLE_CAPABILITIES_PATH = '/v1/capabilities/callable'
 export const RUNTIME_SKILLS_TEMPLATE = '/v1/skills'
 
 export const RUNTIME_ATTACHMENTS_PATH = '/v1/attachments'

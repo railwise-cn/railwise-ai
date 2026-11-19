@@ -76,6 +76,7 @@ export class TaskCoordinator {
       return result
     }
     await this.deps.turns.validateSkillSelection(userText, origin.workspace)
+    if (command.request.capabilityReferences?.length) await this.deps.turns.validateCapabilitySelection(command.request, origin)
     if (resolving?.status !== undefined && resolving.status !== 'pending') throw Object.assign(new Error('这条待处理选择已经完成，请刷新当前任务。'), { code: 'stale_request' })
     if (resolving?.payload?.kind === 'task_input_intent' && operationFingerprint(StartTurnRequest.parse(resolving.payload.request)) !== operationFingerprint(command.request)) {
       throw Object.assign(new Error('任务选择必须使用原始请求及附件，请重新打开该待办。'), { code: 'scope_conflict' })
@@ -128,7 +129,7 @@ export class TaskCoordinator {
         if (capability?.provider === 'workspace' && capability.status !== 'available') {
           await this.validateReferences(command, origin.workspace, task.threadId)
           const saved = this.deps.tasks.appendInput(task.id, command.expectedRevision ?? task.revision, command.idempotencyKey, userText, 'supplement', undefined,
-            { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences })
+            { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences })
           const attentionId = `capability_${task.id}`, now = this.deps.nowIso()
           const prior = this.deps.repository.attention(attentionId)
           this.deps.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: origin.id, workspaceRoot: origin.workspace,
@@ -150,7 +151,7 @@ export class TaskCoordinator {
                 successStatus: ['succeeded'], verification: 'provider_readback' } }, updatedAt: this.deps.nowIso()
             }))
             return this.deps.tasks.appendInput(bound.id, bound.revision, command.idempotencyKey, userText, 'supplement', 'provider-selection',
-              { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences })
+              { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences })
           })
           if (capability.status !== 'available') {
             const attentionId = `capability_${task.id}`
@@ -182,7 +183,7 @@ export class TaskCoordinator {
           result={kind:'attention_required',task,attentionId,message}
         } else {
           await this.validateReferences(command,origin.workspace,task.threadId)
-          const saved=this.deps.tasks.appendInput(task.id,command.expectedRevision ?? task.revision,command.idempotencyKey,userText,'supplement',undefined,{attachmentIds:command.request.attachmentIds,workspaceReferences:command.request.workspaceReferences})
+          const saved=this.deps.tasks.appendInput(task.id,command.expectedRevision ?? task.revision,command.idempotencyKey,userText,'supplement',undefined,{attachmentIds:command.request.attachmentIds,workspaceReferences:command.request.workspaceReferences,capabilityReferences:command.request.capabilityReferences})
           // The durable queue is authoritative; no in-memory steering acknowledgement.
           result={kind:'input_queued',task:saved.task,input:saved.input}
         }

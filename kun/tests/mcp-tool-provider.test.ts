@@ -13,6 +13,8 @@ import { REDACTED_SECRET } from '../src/config/secret-redaction.js'
 import { KunCapabilitiesConfig, type McpServerConfig } from '../src/contracts/capabilities.js'
 import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
 import type { ToolHostContext } from '../src/ports/tool-host.js'
+import { callableCapabilityCandidates } from '../src/services/callable-capabilities.js'
+import { SkillRuntime } from '../src/skills/skill-runtime.js'
 
 function buildContext(workspace: string): ToolHostContext {
   return {
@@ -78,6 +80,34 @@ describe('MCP secret references', () => {
 })
 
 describe('MCP tool provider', () => {
+  it.each(['direct', 'search'] as const)('lists only live scoped connections in %s mode', async mode => {
+    const skills = await SkillRuntime.create(undefined)
+    const config = KunCapabilitiesConfig.parse({ mcp: {
+      enabled: true, search: { enabled: true, mode }, servers: {
+        notes: { transport: 'stdio', command: 'fixture', trustScope: 'workspace', trustedWorkspaceRoots: ['/tmp/scope'] },
+        failed: { transport: 'stdio', command: 'fixture', trustScope: 'user' },
+        gui_schedule: { transport: 'stdio', command: 'fixture', trustScope: 'user' }
+      }
+    } })
+    const built = await buildMcpToolProviders(config.mcp, { clientFactory: async id => {
+      if (id === 'failed') throw new Error('not authorized')
+      return fakeClient()
+    } })
+    try {
+      const registry = new CapabilityRegistry(built.providers)
+      const list = (context: ToolHostContext) => callableCapabilityCandidates({ skills, mcp: built, context, tools: registry.listTools(context) })
+      const context = buildContext('/tmp/scope')
+      expect(list(context).map(({ choice }) => choice.id)).toEqual(['mcp:notes'])
+      expect(list(buildContext('/tmp/other'))).toEqual([])
+      expect(list({ ...context, threadMode: 'plan' })).toEqual([])
+      expect(list({ ...context, allowedMcpProviderIds: [] })).toEqual([])
+      built.retire()
+      expect(list(context)).toEqual([])
+    } finally {
+      await built.close()
+    }
+  })
+
   it.each(['gui_schedule', 'claw_schedule'])('blocks the internal %s bridge in task catalogs and direct replay without disabling other MCPs', async serverId => {
     const bridgeTools = ['claw', 'gui'].flatMap(prefix => ['list', 'create', 'update', 'delete'].map(action => `${prefix}_schedule_${action}`))
     const dispatched: string[] = []

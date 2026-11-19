@@ -139,5 +139,7 @@ export type ServerRuntime = {
   info(): RuntimeInfoResponse
   toolDiagnostics?(): RuntimeToolDiagnostics | Promise<RuntimeToolDiagnostics>
   skills?(workspace?: string): SkillRuntimeDiagnostics | Promise<SkillRuntimeDiagnostics>
+  callableCapabilities?(scope: import('../../contracts/callable-capabilities.js').CallableCapabilityScope):
+    Promise<import('../../contracts/callable-capabilities.js').CallableCapabilityChoice[]>
   shutdown?(): Promise<void>
 }

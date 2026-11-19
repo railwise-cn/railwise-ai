@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { getProvider } from '../../agent/registry'
 import type { CoreRuntimeInfoJson } from '../../agent/runtime-contract'
 import { prepareImageAttachmentUpload } from '../../lib/image-attachment-upload'
-import { selectFilesForAvailableAttachmentSlots } from '../../lib/attachment-selection'
+import { attachmentImportErrorKey, selectFilesForAvailableAttachmentSlots } from '../../lib/attachment-selection'
 import { useChatStore } from '../../store/chat-store'
 import { FloatingComposer } from '../chat/FloatingComposer'
 import { composerReasoningEffortRequestValue, type ComposerReasoningEffort } from '../chat/FloatingComposerModelPicker'
@@ -62,8 +62,7 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
       for (const file of selected) {
         if (file.size > 200 * 1024 * 1024) throw new Error(t('engineeringAttachmentSizeLimit', { name: file.name }))
         const id = `import_${crypto.randomUUID()}`
-        const sourcePath = window.workwise.getPathForFile(file)
-        update(scope, (value) => ({ ...value, attachments: [...value.attachments, { id, name: file.name, mimeType: file.type, byteSize: file.size, state: 'parsing', localSourcePath: sourcePath }] }))
+        update(scope, (value) => ({ ...value, attachments: [...value.attachments, { id, name: file.name, mimeType: file.type, byteSize: file.size, state: 'parsing' }] }))
         try {
           if (file.type.startsWith('image/')) {
             if (!provider.uploadAttachment) throw new Error(t('composerAttachmentUnavailable'))
@@ -71,12 +70,15 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
             const attachment = await provider.uploadAttachment({ name: file.name, ...prepared, threadId, workspace: workspaceRoot })
             update(scope, (value) => ({ ...value, attachments: value.attachments.map((item) => item.id === id ? { ...attachment, state: 'ready', previewUrl: `data:${prepared.mimeType};base64,${prepared.dataBase64}` } : item) }))
           } else {
-            const result = await window.workwise.importChatAttachment({ importId: id, sourcePath, declaredMimeType: file.type || undefined, threadId, workspace: workspaceRoot })
+            const sourcePath = window.workwise.getPathForFile(file)
+            if (!sourcePath) throw new Error('attachment original path unavailable')
+            update(scope, (value) => ({ ...value, attachments: value.attachments.map((item) => item.id === id ? { ...item, localSourcePath: sourcePath } : item) }))
+            const result = await window.workwise.importChatAttachment({ importId: id, sourcePath, threadId, workspace: workspaceRoot })
             update(scope, (value) => ({ ...value, attachments: value.attachments.map((item) => item.id === id ? { ...result.attachment, managedPath: result.managedPath, localSourcePath: sourcePath } : item) }))
           }
         } catch (error) {
-          const message = professionalAttachmentError(error, t('engineeringAttachmentUnavailable'))
-          update(scope, (value) => ({ ...value, error: message, attachments: value.attachments.map((item) => item.id === id ? { ...item, state: 'failed', degradationReasons: [message] } : item) }))
+          const message = t(attachmentImportErrorKey(error), { name: file.name })
+          update(scope, (value) => ({ ...value, attachments: value.attachments.map((item) => item.id === id ? { ...item, state: 'failed', degradationReasons: [message] } : item) }))
         }
       }
     } catch (error) {
@@ -89,11 +91,11 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
     if (!threadId || !isCurrentThread() || !attachment?.localSourcePath || attachment.state !== 'failed') return
     update(scope, (value) => ({ ...value, error: null, attachments: value.attachments.map((item) => item.id === id ? { ...item, state: 'parsing' } : item) }))
     try {
-      const result = await window.workwise.importChatAttachment({ importId: id, sourcePath: attachment.localSourcePath, declaredMimeType: attachment.mimeType || undefined, threadId, workspace: workspaceRoot })
+      const result = await window.workwise.importChatAttachment({ importId: id, sourcePath: attachment.localSourcePath, threadId, workspace: workspaceRoot })
       update(scope, (value) => ({ ...value, attachments: value.attachments.map((item) => item.id === id ? { ...result.attachment, managedPath: result.managedPath, localSourcePath: attachment.localSourcePath } : item) }))
     } catch (error) {
-      const message = professionalAttachmentError(error, t('engineeringAttachmentUnavailable'))
-      update(scope, (value) => ({ ...value, error: message, attachments: value.attachments.map((item) => item.id === id ? { ...item, state: 'failed', degradationReasons: [message] } : item) }))
+      const message = t(attachmentImportErrorKey(error), { name: attachment.name ?? id })
+      update(scope, (value) => ({ ...value, attachments: value.attachments.map((item) => item.id === id ? { ...item, state: 'failed', degradationReasons: [message] } : item) }))
     }
   }
 

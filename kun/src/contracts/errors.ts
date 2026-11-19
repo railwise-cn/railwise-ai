@@ -20,6 +20,7 @@ export const KunErrorCode = z.enum([
   'approval_not_pending',
   'capability_unavailable',
   'skill_unavailable',
+  'capability_reference_unavailable',
   'provider_unavailable',
   'policy_blocked',
   'model_modality_unsupported',

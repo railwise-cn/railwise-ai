@@ -402,7 +402,7 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     expect(html).toContain('Sources 1')
   })
 
-  it('keeps running tool calls collapsed by default while showing active status', () => {
+  it('keeps running tool calls collapsed and neutral', () => {
     const block: ChatBlock = toolBlock({
       summary: 'read: file',
       status: 'running',
@@ -423,7 +423,8 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     expect(html).toContain('Read')
     expect(html).toContain('/tmp/readme.md')
     expect(html).not.toContain('ds-work-logo')
-    expect(html).toContain('ds-shiny-text')
+    expect(html).toContain('text-ds-muted')
+    expect(html).not.toContain('ds-shiny-text')
     expect(html).not.toContain('partial tool output while running')
     expect(html).toContain('ds-process-file-reference')
   })

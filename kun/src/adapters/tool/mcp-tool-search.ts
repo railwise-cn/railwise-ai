@@ -322,10 +322,18 @@ function createMcpSearchTools(options: McpSearchProviderOptions): LocalTool[] {
 }
 
 function trustedRecords(options: McpSearchProviderOptions, context: ToolHostContext): McpSearchCatalogRecord[] {
-  return options.state.records.filter(record => {
+  return trustedMcpSearchRecords(options.state, options.isServerTrusted, context)
+}
+
+export function trustedMcpSearchRecords(
+  state: McpSearchCatalogState,
+  isServerTrusted: McpSearchProviderOptions['isServerTrusted'],
+  context: ToolHostContext
+): McpSearchCatalogRecord[] {
+  return state.records.filter(record => {
     if (record.contextBlock?.(context)) return false
     if (record.isAvailable && !record.isAvailable(context)) return false
-    if (!options.isServerTrusted(record.server, context.workspace)) return false
+    if (!isServerTrusted(record.server, context.workspace)) return false
     if (record.server.toolPolicy && !record.server.toolPolicy.allowedTools.includes(record.descriptor.name)) return false
     try {
       if (record.server.url) assertGrantAllowsNetwork(record.server.url, context)

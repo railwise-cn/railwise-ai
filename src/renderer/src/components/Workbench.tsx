@@ -19,6 +19,7 @@ import {
 } from '@shared/keyboard-shortcuts'
 import type { DesktopCommand, WriteKnowledgeSearchResult } from '@shared/workwise-api'
 import type { AgentProfileV1 } from '@shared/agent-workbench'
+import type { CallableCapabilityChoice, CallableCapabilityReference } from '@shared/callable-capabilities'
 import type { ClipboardImageReadResult } from '@shared/workspace-file'
 import type { AttachmentReference, ChatBlock } from '../agent/types'
 import type { CoreRuntimeInfoJson, CoreRuntimeSkillJson } from '../agent/runtime-contract'
@@ -85,8 +86,8 @@ import { isChatAttachmentUploadEnabled } from '../lib/attachment-upload-availabi
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useKeyboardShortcutSettings } from '../lib/keyboard-shortcut-settings'
 import { collectComposerChangeSummary } from '../lib/composer-change-summary'
-import { selectFilesForAvailableAttachmentSlots } from '../lib/attachment-selection'
-import { clearComposerDraftAfterSuccessfulSend } from '../lib/composer-send-result'
+import { attachmentImportErrorKey, isChatDocumentAttachment, selectFilesForAvailableAttachmentSlots } from '../lib/attachment-selection'
+import { clearComposerDraftAfterSuccessfulSend, emptyComposerMessage } from '../lib/composer-send-result'
 import { readFocusModePreference, writeFocusModePreference } from '../lib/focus-mode'
 import { WorkbenchRegistry } from './workbench-registry'
 import { WorkbenchPanelLoader } from './workbench-panel-loader'
@@ -416,6 +417,13 @@ export function Workbench(): ReactElement {
     useState<ComposerReasoningEffort>('max')
   const [runtimeInfo, setRuntimeInfo] = useState<CoreRuntimeInfoJson | null>(null)
   const [skillCatalog, setSkillCatalog] = useState<{ context: string; skills: CoreRuntimeSkillJson[] } | null>(null)
+  const [capabilityRefresh, setCapabilityRefresh] = useState(0)
+  const [capabilityCatalog, setCapabilityCatalog] = useState<{
+    context: string
+    choices: CallableCapabilityChoice[]
+    failed: boolean
+  } | null>(null)
+  const [draftCapabilities, setDraftCapabilities] = useState<Record<string, CallableCapabilityChoice[]>>({})
   const [agentProfiles, setAgentProfiles] = useState<AgentProfileV1[]>([])
   const [agentSelectionApplying, setAgentSelectionApplying] = useState(false)
   const [composerAttachments, setComposerAttachments] = useState<AttachmentReference[]>([])
@@ -431,6 +439,7 @@ export function Workbench(): ReactElement {
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
   const [writeAttachmentUploadBusy, setWriteAttachmentUploadBusy] = useState(false)
   const [writeAttachmentUploadError, setWriteAttachmentUploadError] = useState<string | null>(null)
+  const pendingAttachmentScopes = useRef(new Set<AttachmentScope>())
   const [connectPhoneSidebarOpen, setConnectPhoneSidebarOpen] = useState(false)
   const [focusModeEnabled, setFocusModeEnabled] = useState(readFocusModePreference)
   const [runtimeLogPath, setRuntimeLogPath] = useState('')
@@ -542,6 +551,13 @@ export function Workbench(): ReactElement {
   )
   const skillCatalogContext = JSON.stringify([activeThreadId, activeSkillWorkspace, runtimeConnection, skillCatalogGeneration])
   const runtimeSkills = skillCatalog?.context === skillCatalogContext ? skillCatalog.skills : undefined
+  const capabilityDraftKey = JSON.stringify([activeThreadId, activeSkillWorkspace])
+  const selectedCapabilities = draftCapabilities[capabilityDraftKey] ?? []
+  const explicitAgentProfile = agentProfiles.find(item => item.id === (activeThread?.agentId ?? 'general'))
+  const capabilityCatalogContext = JSON.stringify([
+    skillCatalogContext, activeThread?.agentId, explicitAgentProfile, mode, capabilityRefresh, route
+  ])
+  const currentCapabilities = capabilityCatalog?.context === capabilityCatalogContext ? capabilityCatalog : null
   const composerChangeSummary = useMemo(
     () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
     [activeSkillWorkspace, timelineBlocks]
@@ -965,6 +981,54 @@ export function Workbench(): ReactElement {
     }
   }, [activeSkillWorkspace, activeThreadId, runtimeConnection, skillCatalogContext])
 
+  useEffect(() => {
+    if (!capabilityRefresh || route !== 'chat' || runtimeConnection !== 'ready' || !activeSkillWorkspace) return
+    const provider = getProvider()
+    let cancelled = false
+    const load = provider.listCallableCapabilities?.({
+      threadId: activeThreadId ?? undefined,
+      workspace: activeSkillWorkspace,
+      mode,
+      ...(!activeThreadId && explicitAgentProfile ? {
+        agentProfile: {
+          toolAllowlist: explicitAgentProfile.toolAllowlist,
+          mcpAllowlist: explicitAgentProfile.mcpAllowlist,
+          trustLevel: explicitAgentProfile.trustLevel
+        }
+      } : {})
+    })
+    void load?.then(choices => {
+      if (!cancelled) setCapabilityCatalog({ context: capabilityCatalogContext, choices, failed: false })
+    }).catch(() => {
+      if (!cancelled) setCapabilityCatalog({ context: capabilityCatalogContext, choices: [], failed: true })
+    })
+    if (!load) setCapabilityCatalog({ context: capabilityCatalogContext, choices: [], failed: false })
+    return () => { cancelled = true }
+  }, [capabilityCatalogContext, capabilityRefresh, route, runtimeConnection, activeThreadId, activeSkillWorkspace, mode, explicitAgentProfile])
+
+  const selectComposerCapability = (choice: CallableCapabilityChoice): void => {
+    setDraftCapabilities(drafts => {
+      const current = drafts[capabilityDraftKey] ?? []
+      if (current.some(item => item.kind === choice.kind && item.id === choice.id)) return drafts
+      return { ...drafts, [capabilityDraftKey]: [...current, choice] }
+    })
+  }
+
+  const removeComposerCapability = (reference: CallableCapabilityReference): void => {
+    setDraftCapabilities(drafts => {
+      const current = drafts[capabilityDraftKey]
+      if (!current) return drafts
+      const remaining = current.filter(item => item.kind !== reference.kind || item.id !== reference.id)
+      if (remaining.length) return { ...drafts, [capabilityDraftKey]: remaining }
+      const { [capabilityDraftKey]: _removed, ...rest } = drafts
+      return rest
+    })
+  }
+
+  const clearComposerCapabilities = (): void => {
+    selectedCapabilities.forEach(removeComposerCapability)
+  }
+
   const attachmentUploadEnabled = isChatAttachmentUploadEnabled({
     runtimeConnection,
     route,
@@ -1033,12 +1097,9 @@ export function Workbench(): ReactElement {
     files: File[],
     scope: AttachmentScope = route === 'write' ? 'write' : 'chat'
   ): Promise<void> => {
-    if (!files.length || !attachmentUploadEnabled) return
+    if (!files.length || !attachmentUploadEnabled || pendingAttachmentScopes.current.has(scope)) return
     const provider = getProvider()
-    if (typeof provider.uploadAttachment !== 'function') {
-      setAttachmentErrorForScope(scope, t('composerAttachmentUnavailable'))
-      return
-    }
+    pendingAttachmentScopes.current.add(scope)
     setAttachmentBusyForScope(scope, true)
     setAttachmentErrorForScope(scope, null)
     try {
@@ -1050,62 +1111,60 @@ export function Workbench(): ReactElement {
         targetThreadId = await ensureWriteThreadForWorkspace(workspace, writeState.activeFilePath) ?? undefined
         if (!targetThreadId) throw new Error(t('runtimeActionNeedsConnection'))
       }
-      const attachmentCapabilities = runtimeInfo?.capabilities.attachments
-      if (!attachmentCapabilities) {
-        setAttachmentErrorForScope(scope, t('composerAttachmentUnavailable'))
-        return
-      }
+      const isImage = (file: File): boolean => file.type.startsWith('image/') || /\.(?:png|jpe?g|gif|webp)$/i.test(file.name)
       const selected = selectFilesForAvailableAttachmentSlots(
-        files,
+        files.filter((file) => isImage(file) || isChatDocumentAttachment(file)),
         attachmentsForScope(scope).length
       )
-      if (selected.reduce((total, file) => total + file.size, 0) > 500 * 1024 * 1024) throw new Error('附件批次不能超过 500 MiB')
-      const uploaded: AttachmentReference[] = []
+      if (selected.reduce((total, file) => total + file.size, 0) > 500 * 1024 * 1024) {
+        setAttachmentErrorForScope(scope, t('engineeringAttachmentBatchLimit'))
+        return
+      }
       for (const file of selected) {
-        if (file.size > 200 * 1024 * 1024) throw new Error(`${file.name} 超过 200 MiB`)
-        if (file.type.startsWith('image/') || /\.(?:png|jpe?g|gif|webp)$/i.test(file.name)) {
-          const prepared = await prepareImageAttachmentUpload(file, attachmentCapabilities)
-          const attachment = await provider.uploadAttachment({
-            name: file.name || 'image', mimeType: prepared.mimeType, dataBase64: prepared.dataBase64,
-            textFallback: prepared.textFallback, ...(targetThreadId ? { threadId: targetThreadId } : {}), ...(workspace ? { workspace } : {})
-          })
-          uploaded.push({ id: attachment.id, name: attachment.name, mimeType: attachment.mimeType, byteSize: attachment.byteSize, width: attachment.width, height: attachment.height, state: 'ready', previewUrl: `data:${prepared.mimeType};base64,${prepared.dataBase64}` })
+        const name = file.name || 'image'
+        if (file.size > 200 * 1024 * 1024) {
+          setAttachmentErrorForScope(scope, t('engineeringAttachmentSizeLimit', { name }))
           continue
         }
-        if (!/\.(?:pdf|docx|xlsx|pptx|txt|md|markdown|csv)$/i.test(file.name)) continue
-        if (typeof window.workwise.importChatAttachment !== 'function') throw new Error(t('composerAttachmentUnavailable'))
+        const image = isImage(file)
         const placeholderId = `import_${crypto.randomUUID()}`
-        const sourcePath = window.workwise.getPathForFile(file)
-        updateAttachmentsForScope(scope, (current) => [...current, { id: placeholderId, name: file.name, mimeType: file.type, byteSize: file.size, state: 'uploading', localSourcePath: sourcePath }])
-        updateAttachmentsForScope(scope, (current) => current.map((item) => item.id === placeholderId ? { ...item, state: 'parsing' } : item))
+        const placeholder: AttachmentReference = { id: placeholderId, name, mimeType: file.type, byteSize: file.size, state: image ? 'uploading' : 'parsing' }
+        updateAttachmentsForScope(scope, (current) => [...current, placeholder])
         try {
-          const result = await window.workwise.importChatAttachment({ importId: placeholderId, sourcePath, declaredMimeType: file.type || undefined, ...(targetThreadId ? { threadId: targetThreadId } : {}), ...(workspace ? { workspace } : {}) })
-          updateAttachmentsForScope(scope, (current) => current.filter((item) => item.id !== placeholderId))
-          uploaded.push({ ...result.attachment, managedPath: result.managedPath, localSourcePath: sourcePath })
+          const context = { ...(targetThreadId ? { threadId: targetThreadId } : {}), ...(workspace ? { workspace } : {}) }
+          let uploaded: AttachmentReference
+          if (image) {
+            const capabilities = runtimeInfo?.capabilities.attachments
+            if (!provider.uploadAttachment || !capabilities) throw new Error(t('composerAttachmentUnavailable'))
+            const prepared = await prepareImageAttachmentUpload(file, capabilities)
+            const attachment = await provider.uploadAttachment({ name, ...prepared, ...context })
+            uploaded = { ...attachment, state: 'ready', previewUrl: `data:${prepared.mimeType};base64,${prepared.dataBase64}` }
+          } else {
+            const sourcePath = window.workwise.getPathForFile(file)
+            if (!sourcePath) throw new Error('attachment original path unavailable')
+            updateAttachmentsForScope(scope, (current) => current.map((item) => item.id === placeholderId ? { ...item, localSourcePath: sourcePath } : item))
+            // Chromium may report a generic MIME type on native pasted files.
+            // The main process validates the on-disk type and contents.
+            const result = await window.workwise.importChatAttachment({ importId: placeholderId, sourcePath, ...context })
+            uploaded = { ...result.attachment, managedPath: result.managedPath, localSourcePath: sourcePath }
+          }
+          updateAttachmentsForScope(scope, (current) => current.map((item) => item.id === placeholderId ? uploaded : item))
         } catch (error) {
-          updateAttachmentsForScope(scope, (current) => current.map((item) => item.id === placeholderId ? { ...item, state: 'failed', degradationReasons: [error instanceof Error ? error.message : String(error)] } : item))
-          throw error
+          const message = t(attachmentImportErrorKey(error), { name })
+          updateAttachmentsForScope(scope, (current) => current.map((item) => item.id === placeholderId ? { ...item, state: 'failed', degradationReasons: [message] } : item))
         }
       }
-      if (uploaded.length > 0) {
-        updateAttachmentsForScope(scope, (current) => {
-          const byId = new Map(current.map((attachment) => [attachment.id, attachment]))
-          for (const attachment of uploaded) {
-            byId.set(attachment.id, attachment)
-          }
-          return [...byId.values()]
-        })
-      }
-    } catch (error) {
-      setAttachmentErrorForScope(scope, error instanceof Error ? error.message : String(error))
+    } catch {
+      setAttachmentErrorForScope(scope, t('composerAttachmentUnavailable'))
     } finally {
+      pendingAttachmentScopes.current.delete(scope)
       setAttachmentBusyForScope(scope, false)
     }
   }
 
   const removeComposerAttachment = (id: string, scope: AttachmentScope = 'chat'): void => {
     const attachment = attachmentsForScope(scope).find((item) => item.id === id)
-    if (attachment && ['uploading', 'parsing'].includes(attachment.state ?? '')) void window.workwise.cancelChatAttachmentImport(id)
+    if (attachment?.state === 'parsing') void window.workwise.cancelChatAttachmentImport(id).catch(() => undefined)
     updateAttachmentsForScope(scope, (current) => current.filter((attachment) => attachment.id !== id))
   }
 
@@ -1123,10 +1182,10 @@ export function Workbench(): ReactElement {
     setAttachmentErrorForScope(scope, null)
     updateAttachmentsForScope(scope, (current) => current.map((item) => item.id === id ? { ...item, state: 'parsing', degradationReasons: [] } : item))
     try {
-      const result = await window.workwise.importChatAttachment({ importId: id, sourcePath: attachment.localSourcePath, declaredMimeType: attachment.mimeType, ...(targetThreadId ? { threadId: targetThreadId } : {}), ...(workspace ? { workspace } : {}) })
+      const result = await window.workwise.importChatAttachment({ importId: id, sourcePath: attachment.localSourcePath, ...(targetThreadId ? { threadId: targetThreadId } : {}), ...(workspace ? { workspace } : {}) })
       updateAttachmentsForScope(scope, (current) => current.map((item) => item.id === id ? { ...result.attachment, managedPath: result.managedPath, localSourcePath: attachment.localSourcePath } : item))
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = t(attachmentImportErrorKey(error), { name: attachment.name ?? id })
       updateAttachmentsForScope(scope, (current) => current.map((item) => item.id === id ? { ...item, state: 'failed', degradationReasons: [message] } : item))
       setAttachmentErrorForScope(scope, message)
     }
@@ -1634,20 +1693,12 @@ export function Workbench(): ReactElement {
       fileReferences.length === 0 &&
       !(route === 'write' && writeAttachments.length > 0)
     ) return
-    const emptyPrompt =
-      fileReferences.length > 0 && attachmentIds.length > 0
-        ? t('composerFileAndImageOnlyPrompt')
-        : fileReferences.length > 0
-          ? t('composerFileOnlyPrompt')
-          : t('composerImageOnlyPrompt')
-    const emptyDisplayText = v
-      ? undefined
-      : fileReferences.length > 0 && attachmentIds.length > 0
-        ? t('composerFileAndImageOnlyDisplay', { count: fileReferences.length })
-        : fileReferences.length > 0
-          ? t('composerFileOnlyDisplay', { count: fileReferences.length })
-          : t('composerImageOnlyDisplay')
-    const messageText = v || emptyPrompt
+    const emptyMessage = emptyComposerMessage(attachments, fileReferences.length, t)
+    const emptyDisplayText = v ? undefined : emptyMessage.display
+    const messageText = v || emptyMessage.prompt
+    const capabilityReferences = route === 'chat' && !activeSddDraft
+      ? selectedCapabilities.map(({ kind, id }) => ({ kind, id }))
+      : []
     const prepareChatMessage = async (): Promise<{
       text: string
       displayText?: string
@@ -1709,12 +1760,14 @@ export function Workbench(): ReactElement {
         ...(prepared.workspaceReferences?.length
           ? { workspaceReferences: prepared.workspaceReferences }
           : {}),
-        ...(attachmentIds.length ? { attachmentIds, attachments } : {})
+        ...(attachmentIds.length ? { attachmentIds, attachments } : {}),
+        ...(capabilityReferences.length ? { capabilityReferences } : {})
       })
       clearComposerDraftAfterSuccessfulSend(sent, {
         clearInput: () => setInput(''),
         clearAttachments: clearComposerAttachments,
-        clearFileReferences: clearComposerFileReferences
+        clearFileReferences: clearComposerFileReferences,
+        clearCapabilities: clearComposerCapabilities
       })
       return
     }
@@ -1819,12 +1872,14 @@ export function Workbench(): ReactElement {
       ...(prepared.workspaceReferences?.length
         ? { workspaceReferences: prepared.workspaceReferences }
         : {}),
-      ...(attachmentIds.length ? { attachmentIds, attachments } : {})
+      ...(attachmentIds.length ? { attachmentIds, attachments } : {}),
+      ...(capabilityReferences.length ? { capabilityReferences } : {})
     })
     clearComposerDraftAfterSuccessfulSend(sent, {
       clearInput: () => setInput(''),
       clearAttachments: clearComposerAttachments,
-      clearFileReferences: clearComposerFileReferences
+      clearFileReferences: clearComposerFileReferences,
+      clearCapabilities: clearComposerCapabilities
     })
   }
 
@@ -2570,6 +2625,14 @@ export function Workbench(): ReactElement {
                 changedFileStats={composerChangeSummary}
                 skillCommands={runtimeSkills}
                 skillsLoading={runtimeConnection === 'ready' && runtimeSkills === undefined}
+                callableCapabilities={currentCapabilities?.choices}
+                callableCapabilitiesLoading={runtimeConnection === 'ready' && Boolean(activeSkillWorkspace) && !currentCapabilities}
+                callableCapabilitiesError={currentCapabilities?.failed ? t('composerCallableCapabilitiesUnavailable') : null}
+                selectedCapabilities={route === 'chat' && !activeSddDraft ? selectedCapabilities : undefined}
+                onOpenCapabilities={route === 'chat' && !activeSddDraft ? () => setCapabilityRefresh(value => value + 1) : undefined}
+                onSelectCapability={selectComposerCapability}
+                onRemoveCapability={removeComposerCapability}
+                onManagePlugins={route === 'chat' && !activeSddDraft ? openPluginsView : undefined}
                 onPickAttachments={(files) => void handlePickAttachments(files)}
                 onPasteClipboardImage={(options) => void handlePasteClipboardImage(options)}
                 onRemoveAttachment={removeComposerAttachment}

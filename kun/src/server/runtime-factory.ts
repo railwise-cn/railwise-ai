@@ -6,6 +6,10 @@ import { recoveryExecutionScope,verifiedPublicQueryRecovery } from '../services/
 import { HostShellVerificationService } from '../services/host-shell-verification.js'
 import { RuntimeUpdateLifecycle, type UpdateActiveWork } from '../services/runtime-update-lifecycle.js'
 import { FileWorkspaceTrustReader } from '../services/workspace-trust-reader.js'
+import { callableCapabilityCandidates, type CallableCapabilityCandidate } from '../services/callable-capabilities.js'
+import type { CallableCapabilityScope } from '../contracts/callable-capabilities.js'
+import type { ThreadRecord } from '../contracts/threads.js'
+import type { ToolHostContext } from '../ports/tool-host.js'
 import { ExternalOperationVerificationService } from '../services/external-operation-verification.js'
 import { TaskControlService } from '../services/task-control-service.js'
 import { TaskPermissionService } from '../services/task-permission-service.js'
@@ -76,7 +80,7 @@ import { EncryptedFileFlowSecretStore, FlowWebhookSecurity, UnavailableFlowSecre
 import type { ApprovalPolicy, SandboxMode } from '../contracts/policy.js'
 import type { ExecutionScope } from '../contracts/permissions.js'
 import { externalTargetGrantKey } from '../adapters/tool/sandbox-policy.js'
-import { AgentLoop } from '../loop/agent-loop.js'
+import { AgentLoop, effectiveAgentSandboxMode } from '../loop/agent-loop.js'
 import { ContextCompactor } from '../loop/context-compactor.js'
 import type { TokenEconomyConfig } from '../loop/token-economy.js'
 import {
@@ -350,7 +354,10 @@ export async function createKunServeRuntime(
     approvalGate,
     userInputGate,
     workspaceReferences: workspaceReferenceService,
-    validateSkillSelection: (prompt, workspace) => skillRuntime.validateSlashSelection(prompt, workspace)
+    validateSkillSelection: (prompt, workspace) => skillRuntime.validateSlashSelection(prompt, workspace),
+    callableCapabilities: (request, thread) => readCallableCapabilityCandidates({
+      mode: request.guiPlan ? 'plan' : request.mode
+    }, thread, request.sandboxMode)
   })
   const uiActionService = new UiActionService({ sessionStore, turns: turnService })
   await traceRuntimeStartupPhase('usage-carryover', () =>
@@ -756,6 +763,32 @@ export async function createKunServeRuntime(
   const mcpRuntime = new ManagedMcpRuntime(mcpProviders, options.capabilities?.mcp, [registry, childRegistry])
   let engineeringAi: EngineeringAiOrchestrator
   const toolHost = new LocalToolHost({ registry, readTracker: true })
+  async function readCallableCapabilityCandidates(
+    scope: CallableCapabilityScope, thread?: ThreadRecord, sandbox?: SandboxMode
+  ): Promise<CallableCapabilityCandidate[]> {
+    const workspace = thread?.workspace ?? scope.workspace ?? ''
+    const profile = thread ? thread.agentProfile : scope.agentProfile
+    const trust = await workspaceTrust.get(workspace)
+    await skillRuntime.refreshForWorkspace(workspace)
+    const requestedSandbox = sandbox ?? thread?.sandboxMode ?? options.sandboxMode
+    const context: ToolHostContext = {
+      threadId: thread?.id ?? '', turnId: '',
+      workspace: trust.canonicalRoot,
+      threadMode: scope.mode ?? thread?.mode ?? 'agent',
+      sandboxMode: effectiveAgentSandboxMode(effectiveAgentSandboxMode(requestedSandbox, trust.level), profile?.trustLevel),
+      approvalPolicy: thread?.approvalPolicy ?? options.approvalPolicy,
+      ...(profile && !profile.toolAllowlist.includes('*') ? { allowedToolNames: profile.toolAllowlist } : {}),
+      ...(profile && !profile.mcpAllowlist.includes('*') ? { allowedMcpProviderIds: profile.mcpAllowlist } : {}),
+      abortSignal: new AbortController().signal,
+      awaitApproval: async () => 'deny'
+    }
+    return callableCapabilityCandidates({
+      skills: skillRuntime,
+      mcp: mcpRuntime.state(),
+      context,
+      tools: registry.listTools(context)
+    })
+  }
   const browserVerification = new BrowserOperationVerificationService({ repository: taskRepository, controller: taskController,
     toolHost, threadStore, workspaceTrust, flows: flowService, nowIso, browserState: () => browserRuntime.state(), browserIdentity: () => browserRuntime.identityFingerprint(),
     validatePermission: (threadId, permissionId) => taskPermissionService.executionRestriction(threadId, permissionId) })
@@ -878,6 +911,7 @@ export async function createKunServeRuntime(
       : { enabled: false },
     modelCapabilities: (model) => modelCapabilitiesForModel(model, modelProfiles),
     skillRuntime,
+    callableCapabilities: (context, tools) => callableCapabilityCandidates({ skills: skillRuntime, mcp: mcpRuntime.state(), context, tools }),
     tokenEconomy,
     contextCompaction: options.contextCompaction,
     toolStorm: {...options.runtime?.toolStorm,validateEgoNavigationProgress:(call,result,grant)=>{
@@ -1107,6 +1141,17 @@ export async function createKunServeRuntime(
       if (workspace === undefined) await skillRuntime.refresh()
       else await skillRuntime.refreshForWorkspace(workspace)
       return skillRuntime.diagnostics(workspace)
+    },
+    callableCapabilities: async (scope) => {
+      const thread = scope.threadId ? await threadService.get(scope.threadId) : undefined
+      if (scope.threadId && (!thread || thread.status === 'deleted')) {
+        throw Object.assign(new Error('Thread not found.'), { code: 'not_found' })
+      }
+      const candidates = await readCallableCapabilityCandidates({
+        ...scope,
+        ...(thread?.mode === 'plan' ? { mode: 'plan' as const } : {})
+      }, thread ?? undefined)
+      return candidates.map(({ choice }) => choice)
     },
     shutdown: async () => {
       // SIGTERM also reaches this path directly, without update preparation.

@@ -168,6 +168,12 @@ try {
   # before uninstalling this same owned instance. The child creates a separate
   # synthetic profile and uses the ordinary packaged renderer and IPC services.
   $uiScript = Join-Path $PSScriptRoot 'run-windows-ui-smoke.mjs'
+  if ($env:RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE -eq 'true') {
+    & node $uiScript $executable $Version $SourceHead $EvidenceDir '--startup-appearance'
+    if ($LASTEXITCODE -ne 0) { throw "Installed startup appearance smoke failed ($LASTEXITCODE)" }
+    $report.startupAppearance = Get-Content -LiteralPath (Join-Path $EvidenceDir 'windows-startup-appearance.json') -Raw | ConvertFrom-Json
+    $env:RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE = ''
+  }
   if ($startupDiagnostic) {
     & node $uiScript $executable $Version $SourceHead $EvidenceDir '--browser-startup-diagnostic'
     if ($LASTEXITCODE -ne 0) { throw "Isolated browser startup diagnostic incomplete ($LASTEXITCODE)" }

@@ -10,6 +10,7 @@ import type { TurnItem } from '../contracts/items.js'
 import type { WorkspaceReference } from '../contracts/workspace-references.js'
 import type { UiActionAudit } from '../contracts/ui-actions.js'
 import type { ExternalTaskProvider } from '../contracts/harness.js'
+import type { CallableCapabilityReference } from '../contracts/callable-capabilities.js'
 
 export type TurnEntity = Turn
 
@@ -25,6 +26,7 @@ export function createTurnRecord(input: {
   reasoningEffort?: TurnReasoningEffort
   attachmentIds?: string[]
   workspaceReferences?: WorkspaceReference[]
+  capabilityReferences?: CallableCapabilityReference[]
   uiAction?: UiActionAudit
   guiPlan?: GuiPlanContextJson
   guiDesign?: GuiDesignContextJson
@@ -46,6 +48,9 @@ export function createTurnRecord(input: {
     items: [],
     attachmentIds: [...(input.attachmentIds ?? [])],
     workspaceReferences: [...(input.workspaceReferences ?? [])],
+    ...(input.capabilityReferences?.length ? {
+      capabilityReferences: input.capabilityReferences.map(reference => ({ ...reference }))
+    } : {}),
     ...(input.uiAction ? { uiAction: input.uiAction } : {}),
     activeSkillIds: [],
     injectedMemoryIds: [],

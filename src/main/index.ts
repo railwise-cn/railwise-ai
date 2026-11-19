@@ -1344,7 +1344,6 @@ app.whenReady().then(async () => {
     splashWindow = createSplashWindow({
       appearance: currentWindowAppearance,
       dark: currentWindowDark,
-      version: app.getVersion(),
       locale: initial.locale,
       logoDataUrl: splashIcon.isEmpty() ? undefined : splashIcon.toDataURL()
     })

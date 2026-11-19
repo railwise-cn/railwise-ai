@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
@@ -15,7 +15,6 @@ import {
   registryState, sha256, waitUntil, windowsForExecutable
 } from './run-windows-published-gui-update-smoke.mjs'
 
-const releaseNotes = new URL('../docs/qa/release-gates/v0.5.7.json', import.meta.url)
 const samePath = (left, right) => resolve(left).toLowerCase() === resolve(right).toLowerCase()
 const oneHour = 60 * 60_000
 
@@ -37,7 +36,7 @@ function requireHostedWindows(env) {
   'Only an ephemeral GitHub-hosted Windows x64 runner may use this acceptance driver')
 }
 
-async function verifiedTarget(directory, source, version) {
+async function verifiedTarget(directory, source, version, runnerFixture = false) {
   const identity = installIdentity(version, source.packageSourceHead)
   const installer = inspectInstaller(join(directory, identity.installerName), identity)
   const receiptPath = join(directory, 'reviewed-build.json')
@@ -45,8 +44,8 @@ async function verifiedTarget(directory, source, version) {
     if (error.code === 'ENOENT') return null
     throw error
   })
-  if (version === '0.5.8') assert.ok(receipt, 'Exact 0.5.8 must have its immutable reviewed build receipt')
-  if (version === '0.5.9') {
+  if (!runnerFixture) assert.ok(receipt, `Exact ${version} must have its immutable reviewed build receipt`)
+  if (runnerFixture) {
     assert.equal(source.purpose, 'private-next-updater-fixture')
     assert.equal(source.packageSourceHead, process.env.GITHUB_SHA)
     assert.equal(String(source.runId), process.env.GITHUB_RUN_ID)
@@ -70,15 +69,16 @@ async function verifiedTarget(directory, source, version) {
   return { identity, installer, directory, source }
 }
 
-async function officialBaseline(root) {
-  const gate = JSON.parse(await readFile(releaseNotes, 'utf8'))
+async function officialBaseline(root, version) {
+  assert.ok(['0.5.7', '0.5.8'].includes(version))
+  const gate = JSON.parse(execFileSync('git', ['show', `v${version}:docs/qa/release-gates/v${version}.json`], { encoding: 'utf8' }))
   const build = gate.package.reviewedBuild
-  const identity = installIdentity('0.5.7', build.sourceHead)
+  const identity = installIdentity(version, build.sourceHead)
   const release = build.files.find(file => file.name === identity.installerName)
   const path = join(root, identity.installerName)
-  const source = `https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.7/${identity.installerName}`
+  const source = `https://github.com/railwise-cn/railwise-ai/releases/download/v${version}/${identity.installerName}`
   const response = await fetch(source, { signal: AbortSignal.timeout(300_000) })
-  assert.ok(response.ok && response.body, '0.5.7 released installer download failed')
+  assert.ok(response.ok && response.body, `${version} released installer download failed`)
   await pipeline(Readable.fromWeb(response.body), createWriteStream(path, { flags: 'wx' }))
   assert.equal((await lstat(path)).size, release.size)
   assert.equal(await sha256(path), release.sha256)
@@ -182,7 +182,20 @@ async function closeOwnedWindows(executable) {
   `) === '0', 'the owned RailWise process to exit', 60_000)
 }
 
-async function exerciseSidebar({ running, target, feed, executable, allowLegacyFallback }) {
+async function clickLabeledButton(cdp, labels, action, timeout = 90_000) {
+  const selector = '[data-railwise-updater-probe="ready"]'
+  await cdp.wait(`(() => {
+    const button = [...document.querySelectorAll('button')].find(element => !element.disabled &&
+      element.getClientRects().length && ${JSON.stringify(labels)}.includes(element.textContent.trim()))
+    if (!button) return false
+    document.querySelector(${JSON.stringify(selector)})?.removeAttribute('data-railwise-updater-probe')
+    button.setAttribute('data-railwise-updater-probe','ready')
+    return true
+  })()`, action, timeout)
+  await cdp.click(selector)
+}
+
+async function exerciseGuiUpgrade({ running, target, feed, executable, allowLegacyFallback, entry }) {
   const { cdp, child } = running
   const version = target.identity.version
   const control = `button[title^="升级到 ${version}，"], button[title^="Update to ${version},"]`
@@ -191,7 +204,14 @@ async function exerciseSidebar({ running, target, feed, executable, allowLegacyF
   assert.equal(available.status, 'available')
   assert.equal(available.info?.latestVersion, version)
   assert.equal(available.info?.manualOnly, false)
-  await cdp.click(control)
+  if (entry === 'settings') {
+    await clickLabeledButton(cdp, ['设置', 'Settings'], 'the Settings entry')
+    await clickLabeledButton(cdp, ['下载更新', 'Download update'], 'the settings download button')
+    await clickLabeledButton(cdp, ['重启安装', 'Restart and install'], 'the settings restart and install button', 420_000)
+  } else {
+    await cdp.click(control)
+  }
+  const upgradeMethod = entry === 'settings' ? 'trusted-pointer-in-settings' : 'trusted-pointer-on-sidebar'
   const result = await waitUntil(async () => {
     if (child.exitCode === null && child.signalCode === null) {
       const state = await cdp.evaluate('window.workwise.getGuiUpdateState()', 3_000).catch(() => null)
@@ -199,7 +219,7 @@ async function exerciseSidebar({ running, target, feed, executable, allowLegacyF
       return null
     }
     const window = windowsForExecutable(executable).find(item => item.pid !== child.pid && item.title === target.identity.productName)
-    return window ? { method: 'trusted-pointer-on-sidebar', window } : null
+    return window ? { method: upgradeMethod, window } : null
   }, 'native NSIS handoff and relaunch', 600_000, 1_000)
   assert.ok(feed.requests.manifest > 0 && feed.requests.installerBytes > 0, 'The private feed must serve the requested installer')
   if (result.method === 'native-updater-error') {
@@ -213,14 +233,19 @@ async function exerciseSidebar({ running, target, feed, executable, allowLegacyF
 
 async function main(args) {
   requireHostedWindows(process.env)
+  const currentReleaseMode = args.length === 4
+  const entry = currentReleaseMode ? args[3] : 'sidebar'
+  const baseVersion = currentReleaseMode ? '0.5.8' : '0.5.7'
+  if (currentReleaseMode) assert.ok(['sidebar', 'settings'].includes(entry))
+  if (currentReleaseMode) args = args.slice(0, 3)
   assert.ok(args.length === 3 || args.length === 6, 'Pass exact package directory, provenance JSON, evidence directory, and optional private next package directory, provenance and version')
   const [directory, sourceFile, evidence, nextDirectory, nextSourceFile, nextVersion] = args.map(String)
   const readSource = async path => JSON.parse(await readFile(path, 'utf8'))
-  const target = await verifiedTarget(directory, await readSource(sourceFile), '0.5.8')
+  const target = await verifiedTarget(directory, await readSource(sourceFile), currentReleaseMode ? '0.5.9' : '0.5.8')
   if (nextDirectory) assert.equal(nextVersion, '0.5.9', 'Use the private 0.5.9 test installer for the next upgrade')
-  const next = nextDirectory ? await verifiedTarget(nextDirectory, await readSource(nextSourceFile), nextVersion) : undefined
+  const next = nextDirectory ? await verifiedTarget(nextDirectory, await readSource(nextSourceFile), nextVersion, true) : undefined
   const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'railwise-frozen-windows-update-'))
-  const baseline = await officialBaseline(root)
+  const baseline = await officialBaseline(root, baseVersion)
   const installDirectory = join(root, 'install')
   const executable = join(installDirectory, target.identity.executableName)
   const profile = join(process.env.APPDATA, target.identity.productName)
@@ -245,12 +270,12 @@ async function main(args) {
     await save()
     installExactNsis(baseline.installer.path, installDirectory)
     report.baseline.package = inspectInstalledPackage(installDirectory, baseline.identity)
-    report.baseline.registry = ownedInstallState(installDirectory, '0.5.7')
-    await seedSchedule('0.5.7')
+    report.baseline.registry = ownedInstallState(installDirectory, baseVersion)
+    await seedSchedule(baseVersion)
     trust = await createPrivateTrust(root)
     feed = await openPrivateFeed(trust, target)
     running = await launchOwned(executable, root, feed.url)
-    assert.equal(await running.cdp.evaluate('window.workwise.getAppVersion()'), '0.5.7')
+    assert.equal(await running.cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
     await running.cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(r=>r.ok)`, 'installed KUN service')
     thread = await running.cdp.evaluate(`(async()=>{
       const r=await window.workwise.runtimeRequest('/v1/threads','POST',JSON.stringify({workspace:${JSON.stringify(workspace)}, title:'升级验收会话', model:'deepseek-flash', mode:'agent'}));
@@ -259,7 +284,8 @@ async function main(args) {
     assert.ok(/^[A-Za-z0-9_-]+$/.test(thread), 'Real KUN conversation identity required')
     for (const [index, item] of [target, next].entries()) {
       if (!item) break
-      const action = await exerciseSidebar({ running, target: { ...item, installDirectory }, executable, feed, allowLegacyFallback: index === 0 })
+      const action = await exerciseGuiUpgrade({ running, target: { ...item, installDirectory }, executable, feed,
+        allowLegacyFallback: !currentReleaseMode && index === 0, entry })
       running.cdp.close()
       await closeOwnedWindows(executable)
       await feed.close()
@@ -276,7 +302,7 @@ async function main(args) {
       report.steps.push({ ...actual, action })
       await save()
     }
-    report.status = next ? 'passed' : 'overlay-verified-next-upgrade-pending'
+    report.status = currentReleaseMode || next ? 'passed' : 'overlay-verified-next-upgrade-pending'
   } catch (error) {
     report.status = 'failed'
     report.failure = error instanceof Error ? error.message.split(/\r?\n/, 1)[0] : 'Unexpected smoke failure'

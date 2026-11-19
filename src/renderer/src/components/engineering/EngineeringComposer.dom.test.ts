@@ -231,6 +231,20 @@ describe('Survey composer continuity', () => {
     expect(sendMessage).toHaveBeenCalledWith(expect.any(String), 'agent', expect.objectContaining({ attachmentIds: ['attachment-pdf'] }))
   })
 
+  it('allows sending a scanned PDF when the original is attached and text extraction is limited', async () => {
+    importChatAttachment.mockResolvedValueOnce({
+      attachment: { id: 'scanned-pdf', name: 'scan.pdf', state: 'degraded', degradationReasons: ['no_extractable_pdf_text'] },
+      managedPath: '/managed/scan.pdf'
+    })
+    await render()
+    await act(async () => composer.onPickAttachments?.([new File(['document'], 'scan.pdf', { type: 'application/octet-stream' })]))
+    expect(importChatAttachment).toHaveBeenCalledWith(expect.objectContaining({ sourcePath: '/source/scan.pdf' }))
+    expect(importChatAttachment.mock.calls[0][0]).not.toHaveProperty('declaredMimeType')
+    expect(composer.attachments).toEqual([expect.objectContaining({ id: 'scanned-pdf', state: 'degraded', managedPath: '/managed/scan.pdf' })])
+    await act(async () => composer.onSend())
+    expect(sendMessage).toHaveBeenCalledWith(expect.any(String), 'agent', expect.objectContaining({ attachmentIds: ['scanned-pdf'] }))
+  })
+
   it('guards send and stop against another active thread', async () => {
     await render()
     await act(async () => composer.setInput('Do not send to Code'))

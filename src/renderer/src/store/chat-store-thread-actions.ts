@@ -531,6 +531,7 @@ export function createThreadActions(
       }
     }
     let coordinatedTurn: {threadId:string;turnId:string;userMessageItemId?:string}|undefined
+    const capabilityReferences = queued?.capabilityReferences ?? overrides?.capabilityReferences ?? []
     const canCoordinate = !queued?.guiPlan && !overrides?.guiPlan && !overrides?.guiDesign && ['chat', 'write'].includes(get().route) && typeof window !== 'undefined' && typeof window.workwise?.coordinateTaskCommand === 'function'
     const commandAttachmentIds = queued?.attachmentIds ?? overrides?.attachmentIds?.filter(id => id.trim()) ?? messageAttachments.map(item => item.id)
     const commandReferences = queued?.workspaceReferences ?? overrides?.workspaceReferences
@@ -545,7 +546,8 @@ export function createThreadActions(
           ...(providerId ? { providerId } : {}),
           ...(commandReasoning ? { reasoningEffort: commandReasoning } : {}),
           ...(commandAttachmentIds.length ? { attachmentIds: commandAttachmentIds } : {}),
-          ...(commandReferences?.length ? { workspaceReferences: commandReferences } : {})
+          ...(commandReferences?.length ? { workspaceReferences: commandReferences } : {}),
+          ...(capabilityReferences.length ? { capabilityReferences } : {})
         }
       })
       if(result.kind==='chat_started'){coordinatedTurn=result.turn;return false}
@@ -617,7 +619,8 @@ export function createThreadActions(
             ...(overrides?.guiPlan ? { guiPlan: overrides.guiPlan } : {}),
             ...(attachmentIds?.length ? { attachmentIds } : {}),
             ...(attachments?.length ? { attachments } : {}),
-            ...(workspaceReferences?.length ? { workspaceReferences } : {})
+            ...(workspaceReferences?.length ? { workspaceReferences } : {}),
+            ...(capabilityReferences.length ? { capabilityReferences } : {})
           }
         ],
         error: null
@@ -822,7 +825,8 @@ export function createThreadActions(
         ...((queued?.guiPlan ?? overrides?.guiPlan) ? { guiPlan: queued?.guiPlan ?? overrides?.guiPlan } : {}),
         ...(overrides?.guiDesign ? { guiDesign: overrides.guiDesign } : {}),
         ...(attachmentIds.length ? { attachmentIds } : {}),
-        ...(workspaceReferences.length ? { workspaceReferences } : {})
+        ...(workspaceReferences.length ? { workspaceReferences } : {}),
+        ...(capabilityReferences.length ? { capabilityReferences } : {})
       })
       // Mirror the composer model selection against the runtime's stable
       // user_message item id so the badge survives page refresh / thread

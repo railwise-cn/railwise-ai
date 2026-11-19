@@ -35,6 +35,7 @@ type PlanTurnOverrides = Pick<
   SendMessageOverrides,
   | 'attachmentIds'
   | 'attachments'
+  | 'capabilityReferences'
   | 'displayText'
   | 'guiPlan'
   | 'model'

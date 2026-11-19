@@ -3,12 +3,14 @@ import type {
   ChatBlock,
   NormalizedThread,
   ReviewTarget,
+  SendTurnOptions,
   ThreadEventSink,
   ThreadListOptions,
   ThreadUsageSnapshot,
   UserInputAnswer
 } from './types'
 import { getManagedRuntimeSettings } from '@shared/app-settings'
+import type { CallableCapabilityChoice, CallableCapabilityScope } from '@shared/callable-capabilities'
 import {
   RUNTIME_ATTACHMENT_DIAGNOSTICS_PATH,
   RUNTIME_ATTACHMENTS_PATH,
@@ -17,6 +19,7 @@ import {
   RUNTIME_INFO_PATH,
   RUNTIME_TOOLS_PATH,
   RUNTIME_SKILLS_PATH,
+  RUNTIME_CALLABLE_CAPABILITIES_PATH,
   runtimeApprovalPath,
   runtimeThreadCompactPath,
   runtimeThreadEventsPath,
@@ -240,29 +243,7 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
   async sendUserMessage(
     threadId: string,
     text: string,
-    options?: {
-      mode?: RuntimeThreadMode
-      model?: string
-      providerId?: string
-      reasoningEffort?: string
-      displayText?: string
-      guiPlan?: {
-        operation: 'draft' | 'refine'
-        workspaceRoot: string
-        relativePath: string
-        planId: string
-        sourceRequest?: string
-        title?: string
-      }
-      guiDesign?: {
-        workspaceRoot: string
-        documentId: string
-        pageId: string
-        expectedRevision: number
-      }
-      attachmentIds?: string[]
-      workspaceReferences?: Array<{ path: string; kind: 'file' | 'directory' }>
-    }
+    options?: SendTurnOptions
   ): Promise<{ turnId: string; threadId: string; userMessageItemId?: string }> {
     const settings = await rendererRuntimeClient.getSettings()
     const runtime = getManagedRuntimeSettings(settings)
@@ -306,6 +287,9 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
     }
     if (options?.workspaceReferences?.length) {
       body.workspaceReferences = options.workspaceReferences
+    }
+    if (options?.capabilityReferences?.length) {
+      body.capabilityReferences = options.capabilityReferences
     }
     const response = await rendererRuntimeClient.runtimeRequest(
       runtimeThreadTurnsPath(threadId),
@@ -618,6 +602,19 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
     )
     if (scope && catalog.scope !== 'available') return []
     return catalog.enabled === false ? [] : catalog.skills ?? []
+  }
+
+  async listCallableCapabilities(scope: CallableCapabilityScope): Promise<CallableCapabilityChoice[]> {
+    const response = await rendererRuntimeClient.runtimeRequest(
+      RUNTIME_CALLABLE_CAPABILITIES_PATH, 'POST', JSON.stringify(scope)
+    )
+    if (!response.ok) {
+      throw runtimeErrorToError(readRuntimeError(response.body, 'failed to list callable capabilities'))
+    }
+    const result = readRuntimeJson<{ choices: CallableCapabilityChoice[] }>(
+      response.body, 'runtime returned an invalid callable capabilities response'
+    )
+    return result.choices
   }
 
   async uploadAttachment(input: {

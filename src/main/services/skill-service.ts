@@ -53,6 +53,7 @@ export type GuiSkillRoot = {
   path: string
   scope: GuiSkillScope
   workspace?: string
+  pluginId?: string
   validation: 'strict' | 'trusted-plugin'
 }
 
@@ -123,7 +124,7 @@ export async function guiSkillRootsForRuntime(
     normalizeSkillRootPath(join(homedir(), '.codex', 'skills'))
   ].filter(Boolean))
   const codexPluginRoots = await discoverCodexPluginSkillRoots()
-  const workwisePluginRoots = await discoverInstalledPluginSkillRoots()
+  const workwisePluginRoots = await discoverInstalledPluginSkillEntries()
   const configuredExtraRoots = [
     ...(settings?.claw.skills.extraDirs ?? []),
     ...(settings?.schedule.skills.extraDirs ?? [])
@@ -143,9 +144,7 @@ export async function guiSkillRootsForRuntime(
     ...codexPluginRoots
       .filter((root) => existsSync(root))
       .map((path) => ({ path, scope: 'global' as const, validation: 'trusted-plugin' as const })),
-    ...workwisePluginRoots
-      .filter((root) => existsSync(root))
-      .map((path) => ({ path, scope: 'global' as const, validation: 'trusted-plugin' as const })),
+    ...workwisePluginRoots.filter(({ path }) => existsSync(path)),
     ...configuredExtraRoots
       .filter(Boolean)
       .map((path) => {
@@ -397,8 +396,12 @@ async function installedPackageContainsSkills(root: string): Promise<boolean> {
 export async function discoverInstalledPluginSkillRoots(
   records?: InstalledPackageV1[]
 ): Promise<string[]> {
+  return uniqueStrings((await discoverInstalledPluginSkillEntries(records)).map(({ path }) => path))
+}
+
+async function discoverInstalledPluginSkillEntries(records?: InstalledPackageV1[]): Promise<GuiSkillRoot[]> {
   const installed = records ?? await new PackageInstallationService().list().catch(() => [])
-  const roots: string[] = []
+  const entries: GuiSkillRoot[] = []
   for (const record of installed) {
     if (!await installedPackageContainsSkills(record.artifact.location)) continue
     const inspection = await inspectPackageDirectory(
@@ -406,9 +409,16 @@ export async function discoverInstalledPluginSkillRoots(
       packageInstallLimitsForSource(record.source)
     ).catch(() => null)
     if (!inspection || inspection.sha256 !== record.artifact.sha256) continue
+    const roots: string[] = []
     await collectInstalledSkillRoots(record.artifact.location, roots, 0, 6)
+    const workspace = record.scope === 'workspace' ? record.workspaceRoot : undefined
+    if (record.scope === 'workspace' && !workspace) continue
+    entries.push(...roots.map(path => ({
+      path, pluginId: record.packageId, scope: workspace ? 'project' as const : 'global' as const,
+      ...(workspace ? { workspace } : {}), validation: 'trusted-plugin' as const
+    })))
   }
-  return uniqueStrings(roots)
+  return entries
 }
 
 /** Versioned package roots are selected by the installation manifest, including legacy Runtime configs. */

@@ -56,6 +56,12 @@ function redactBlock(block: ChatBlock, includeDetail: boolean): ChatBlock {
     }
   }
   if (block.kind === 'system') {
+    if (isRuntimeRetryRecord(block)) {
+      const detail = block.detail?.includes(block.text)
+        ? block.detail
+        : [block.text, block.detail].filter(Boolean).join('\n\n')
+      return { ...block, text: i18n.t('common:runtimeRetryRecord'), detail: redactRuntimeText(detail) }
+    }
     return {
       ...block,
       text: redactRuntimeText(block.text),
@@ -77,18 +83,26 @@ export function isPendingProcessControl(block: ChatBlock): boolean {
   return (block.kind === 'approval' || block.kind === 'user_input') && block.status === 'pending'
 }
 
+export function isInlineProcessControl(block: ChatBlock): boolean {
+  return isPendingProcessControl(block) ||
+    ((block.kind === 'approval' || block.kind === 'user_input') && block.status === 'error')
+}
+
+function isRuntimeRetryRecord(block: Extract<ChatBlock, { kind: 'system' }>): boolean {
+  return block.code === 'turn_attempt_exception' || block.code === 'task_acceptance_retry'
+}
+
 function isConciseProcessBlock(block: ChatBlock): boolean {
-  if (block.kind === 'approval') return block.status === 'pending' || block.status === 'error'
-  if (block.kind === 'user_input') return block.status === 'pending' || block.status === 'error'
+  if (isInlineProcessControl(block)) return true
   if (block.kind === 'tool' || block.kind === 'compaction') return block.status === 'error'
-  if (block.kind === 'system') return block.severity === 'warning' || block.severity === 'error'
+  if (block.kind === 'system') return isRuntimeRetryRecord(block) || block.severity === 'warning' || block.severity === 'error'
   return false
 }
 
 /**
- * Removes private model reasoning in every view. Concise mode keeps only
- * required controls and interruptions; standard mode adds semantic operation
- * summaries. Developer mode also includes redacted outputs from normal operations.
+ * Removes private model reasoning in every view. Concise mode keeps controls
+ * and exceptional diagnostics; standard mode adds semantic operation summaries.
+ * Developer mode also includes redacted outputs from normal operations.
  */
 export function visibleProcessBlocksForMode(
   blocks: ChatBlock[],
@@ -97,8 +111,8 @@ export function visibleProcessBlocksForMode(
   const nonPrivate = blocks.filter(
     (block) => block.kind !== 'reasoning' && block.kind !== 'assistant'
   )
-  const selected = mode === 'concise' ? nonPrivate.filter(isConciseProcessBlock) : nonPrivate
-  return selected.map((block) => redactBlock(block, mode === 'developer'))
+  return (mode === 'concise' ? nonPrivate.filter(isConciseProcessBlock) : nonPrivate)
+    .map((block) => redactBlock(block, mode === 'developer'))
 }
 
 export type SemanticProgress = {

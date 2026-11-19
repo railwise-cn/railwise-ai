@@ -316,6 +316,32 @@ describe('app-ipc-schemas', () => {
     expect(payload.path).toBe('/v1/skills')
   })
 
+  it('admits only the canonical callable capability POST with a bounded scoped body', () => {
+    const path = '/v1/capabilities/callable'
+    const request = { path, method: 'POST', body: JSON.stringify({ threadId: 'thr_1', mode: 'agent' }) }
+    expect(runtimeRequestPayloadSchema.parse(request)).toEqual(request)
+    const draft = {
+      ...request, body: JSON.stringify({ workspace: '/tmp/project', mode: 'plan',
+        agentProfile: { trustLevel: 'read-only', toolAllowlist: ['read'], mcpAllowlist: [] } })
+    }
+    expect(runtimeRequestPayloadSchema.parse(draft)).toEqual(draft)
+    for (const invalid of [
+      { ...request, method: 'GET' },
+      { ...request, method: 'PUT' },
+      { ...request, path: `${path}?scope=global` },
+      { ...request, path: `${path}?` },
+      { ...request, path: `${path}#fragment` },
+      { ...request, path: '/v1/other/../capabilities/callable' },
+      { ...request, path: '//localhost/v1/capabilities/callable' },
+      { ...request, body: undefined },
+      { ...request, body: '{' },
+      { ...request, body: '[{}]' },
+      { ...request, body: '{"threadId":"thr_1","grantAccess":true}' },
+      { ...request, body: '{"workspace":"/tmp/project","agentProfile":{"trustLevel":"read-only","toolAllowlist":[],"mcpAllowlist":[],"unknownScope":true}}' },
+      { ...request, body: '{}'.padEnd(96 * 1024 + 1) }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(invalid).success).toBe(false)
+  })
+
   it('allows Survey delivery decisions despite the overlapping flow-run detail path', () => {
     for (const decision of ['approve', 'reject']) {
       const payload = {

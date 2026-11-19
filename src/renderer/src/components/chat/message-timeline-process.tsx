@@ -13,6 +13,7 @@ import { AssistantMarkdown } from './AssistantMarkdown'
 import { MessageBubble } from './message-timeline-bubbles'
 import { blockHasPendingRuntimeWork, splitThink } from './message-timeline-turns'
 import { formatDuration, formatToolTitle } from './message-timeline-tools'
+import { isPendingProcessControl } from './conversation-visibility'
 
 export type ProcessSection = {
   id: string
@@ -75,26 +76,6 @@ function isProcessSectionActive(section: ProcessSection, processing: boolean): b
   )
 }
 
-function isRequestUserInputTool(block: ChatBlock): boolean {
-  if (block.kind === 'user_input' && block.status === 'pending') return true
-  if (block.kind !== 'tool' || block.status !== 'running') return false
-  const toolName = typeof block.meta?.toolName === 'string' ? block.meta.toolName.trim() : ''
-  if (toolName === 'request_user_input' || toolName === 'user_input') return true
-  return /^request_user_input\s*:/i.test(block.summary.trim())
-}
-
-function sectionHasRequestUserInput(section: ProcessSection): boolean {
-  return section.blocks.some(isRequestUserInputTool)
-}
-
-function isPendingApproval(block: ChatBlock): boolean {
-  return block.kind === 'approval' && block.status === 'pending'
-}
-
-function sectionHasPendingApproval(section: ProcessSection): boolean {
-  return section.blocks.some(isPendingApproval)
-}
-
 export function ProcessSectionRow({
   section,
   processing,
@@ -109,7 +90,7 @@ export function ProcessSectionRow({
   viewportRef: RefObject<HTMLDivElement | null>
 }): ReactElement {
   const { t } = useTranslation('common')
-  const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
+  const [userExpanded, setUserExpanded] = useState(false)
   const assistantBlocks =
     section.kind === 'output'
       ? section.blocks.filter(
@@ -118,17 +99,14 @@ export function ProcessSectionRow({
       : []
   const hasDetails = sectionHasDetails(section, t)
   const active = isProcessSectionActive(section, processing)
-  const defaultExpanded =
-    sectionHasPendingApproval(section) ||
-    (processing && section.kind === 'execution' && sectionHasRequestUserInput(section))
-  const forceExpanded = sectionHasPendingApproval(section)
-  const expanded = hasDetails && (forceExpanded || (userExpanded ?? defaultExpanded))
+  const hasPendingControls = section.blocks.some(isPendingProcessControl)
+  const expanded = hasDetails && (hasPendingControls || userExpanded)
   const title = describeProcessSection(section, t, {
     processing,
     reasoningDurationMs,
     singleReasoningSection
   })
-  const canToggleSection = hasDetails && !forceExpanded
+  const canToggleSection = hasDetails && !hasPendingControls
   const { ref: deferredDetailRef, shouldRender: shouldRenderDetail } = useDeferredRender<HTMLDivElement>({
     enabled: expanded,
     immediate: active || section.kind === 'execution',
@@ -166,11 +144,11 @@ export function ProcessSectionRow({
       {canToggleSection ? (
         <button
           type="button"
-          onClick={() => setUserExpanded(!(userExpanded ?? defaultExpanded))}
+          onClick={() => setUserExpanded(value => !value)}
           aria-expanded={expanded}
           className="group flex w-fit max-w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[14px] font-medium text-ds-muted transition hover:opacity-85"
         >
-          <span className={active ? 'ds-shiny-text' : ''}>{title}</span>
+          <span>{title}</span>
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-45" strokeWidth={1.8} />
           ) : (
@@ -179,7 +157,7 @@ export function ProcessSectionRow({
         </button>
       ) : (
         <div className="flex w-fit max-w-full items-center gap-1.5 py-0.5 text-[14px] font-medium text-ds-muted">
-          <span className={active ? 'ds-shiny-text' : ''}>{title}</span>
+          <span className={active && section.kind === 'reasoning' ? 'ds-shiny-text' : ''}>{title}</span>
         </div>
       )}
 
@@ -204,33 +182,6 @@ function processBlockIsRunningTool(block: ChatBlock, processing: boolean): boole
   return processing && block.kind === 'tool' && block.status === 'running'
 }
 
-function processBlockIsAutoOpenPending(block: ChatBlock, processing: boolean): boolean {
-  return (
-    processing &&
-    ((block.kind === 'compaction' && block.status === 'running') ||
-      (block.kind === 'approval' && block.status === 'pending') ||
-      (block.kind === 'user_input' && block.status === 'pending'))
-  )
-}
-
-function processBlockIsActive(block: ChatBlock, processing: boolean): boolean {
-  return (
-    processBlockIsRunningTool(block, processing) ||
-    processBlockIsAutoOpenPending(block, processing) ||
-    (processing && block.kind === 'assistant' && block.id === 'live-assistant')
-  )
-}
-
-function processBlockHasError(block: ChatBlock): boolean {
-  return (
-    (block.kind === 'tool' && block.status === 'error' && !block.meta?.outcomeUnknown) ||
-    (block.kind === 'compaction' && block.status === 'error') ||
-    (block.kind === 'approval' && block.status === 'error') ||
-    (block.kind === 'user_input' && block.status === 'error') ||
-    (block.kind === 'system' && block.severity === 'error')
-  )
-}
-
 function ProcessStackRows({
   blocks,
   processing
@@ -246,14 +197,9 @@ function ProcessStackRows({
       {blocks.map((block) => {
         const summary = describeProcessBlock(block, t)
         const detail = getProcessDetail(block, summary)
-        const isRunningTool = processBlockIsRunningTool(block, processing)
         const canExpand = detail.kind !== 'none'
-        const autoOpenRequestInput = processing && isRequestUserInputTool(block)
-        const autoOpenPending = processBlockIsAutoOpenPending(block, processing) || isPendingApproval(block)
-        const forceOpen = autoOpenPending || autoOpenRequestInput
+        const forceOpen = isPendingProcessControl(block)
         const open = canExpand && (forceOpen || openBlockId === block.id)
-        const rowActive = processBlockIsActive(block, processing)
-        const isError = processBlockHasError(block)
         const canToggle = canExpand && !forceOpen
         const handleToggle = (): void => {
           if (!canToggle) return
@@ -274,20 +220,16 @@ function ProcessStackRows({
               tabIndex={canToggle ? 0 : undefined}
               onClick={handleToggle}
               onKeyDown={handleKeyDown}
-              className={`group flex w-full min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-[13.5px] leading-6 transition ${
-                isError && open
-                  ? 'text-red-600 dark:text-red-300'
-                  : 'text-ds-faint hover:text-ds-muted'
-              } ${canToggle ? 'cursor-pointer hover:bg-ds-hover/45' : 'cursor-default'}`}
+              className={`group flex w-full min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-[13.5px] leading-6 text-ds-muted transition ${canToggle ? 'cursor-pointer hover:bg-ds-hover/45' : 'cursor-default'}`}
             >
-              <span className={`min-w-0 flex-1 truncate ${rowActive && !isError ? 'ds-shiny-text' : ''}`}>
+              <span className="min-w-0 flex-1 truncate">
                 <ProcessSummaryText block={block} summary={summary} />
               </span>
               {canExpand ? (
                 open ? (
                   <ChevronDown className="h-3 w-3 shrink-0 opacity-35" strokeWidth={2} />
                 ) : (
-                  <ChevronRight className="h-3 w-3 shrink-0 opacity-0 transition group-hover:opacity-35" strokeWidth={2} />
+                  <ChevronRight className="h-3 w-3 shrink-0 opacity-35" strokeWidth={2} />
                 )
               ) : null}
             </div>
@@ -324,9 +266,8 @@ function ProcessEntryRow({
   const canExpand = detail.kind !== 'none'
   const isAssistantProcessText = block.kind === 'assistant'
   const isRunningTool = processBlockIsRunningTool(block, processing)
-  const isAutoOpenPending = processBlockIsAutoOpenPending(block, processing) || isPendingApproval(block)
+  const isAutoOpenPending = isPendingProcessControl(block)
   const isStreamingAssistant = processing && block.kind === 'assistant' && block.id === 'live-assistant'
-  const isError = processBlockHasError(block)
   const open =
     canExpand &&
     (isAssistantProcessText || isAutoOpenPending || isStreamingAssistant || userOpen)
@@ -354,11 +295,7 @@ function ProcessEntryRow({
         tabIndex={canToggle ? 0 : undefined}
         onClick={handleToggle}
         onKeyDown={handleKeyDown}
-        className={`group flex w-full items-start gap-2 rounded-md px-2 py-1 text-left text-[13.5px] leading-[1.55] transition ${
-          isError && open
-            ? 'text-red-600 dark:text-red-300'
-            : 'text-ds-faint hover:text-ds-ink'
-        } ${
+        className={`group flex w-full items-start gap-2 rounded-md px-2 py-1 text-left text-[13.5px] leading-[1.55] text-ds-muted transition ${
           canToggle
             ? 'cursor-pointer hover:bg-ds-hover/70'
             : 'cursor-default'
@@ -367,16 +304,8 @@ function ProcessEntryRow({
         {!rowActive && block.kind === 'compaction' ? (
           <Minimize2 className="mt-1 h-3 w-3 shrink-0 opacity-70" strokeWidth={2} />
         ) : null}
-        <span
-          className={`min-w-0 flex-1 ${wrapSummary ? 'whitespace-pre-wrap break-words' : 'truncate'} ${
-            rowActive && !isError ? 'ds-shiny-text' : ''
-          }`}
-        >
-          <span
-            className={`font-medium ${isError ? '' : rowActive ? '' : 'text-ds-muted'}`}
-          >
-            {verb}
-          </span>
+        <span className={`min-w-0 flex-1 ${wrapSummary ? 'whitespace-pre-wrap break-words' : 'truncate'}`}>
+          <span className="font-medium">{verb}</span>
           {rest ? (
             <span className="ml-1.5 font-mono text-[13px]">
               <ProcessSummaryText block={block} summary={rest} />
@@ -387,7 +316,7 @@ function ProcessEntryRow({
           open ? (
             <ChevronDown className="mt-1 h-3 w-3 shrink-0 opacity-40" strokeWidth={2} />
           ) : (
-            <ChevronRight className="mt-1 h-3 w-3 shrink-0 opacity-0 transition group-hover:opacity-45" strokeWidth={2} />
+            <ChevronRight className="mt-1 h-3 w-3 shrink-0 opacity-40" strokeWidth={2} />
           )
         ) : null}
       </div>
@@ -585,7 +514,7 @@ type ProcessDetail =
   | { kind: 'none' }
   | { kind: 'reasoning'; text: string }
   | { kind: 'assistant'; text: string }
-  | { kind: 'tool'; text: string; isPatch: boolean; isError: boolean; filePath?: string }
+  | { kind: 'tool'; text: string; isPatch: boolean; filePath?: string }
   | { kind: 'approval' }
   | { kind: 'user_input' }
   | { kind: 'text'; text: string }
@@ -821,7 +750,6 @@ function getProcessDetail(block: ChatBlock, summaryText?: string): ProcessDetail
       kind: 'tool',
       text: patchText ?? block.detail!,
       isPatch: patchText !== undefined,
-      isError,
       filePath: block.filePath
     }
   }
@@ -871,22 +799,8 @@ function ProcessEntryDetail({
     if (detail.isPatch) {
       return <DiffView patch={detail.text} filePath={detail.filePath} />
     }
-    if (detail.isError) {
-      return (
-        <div className="overflow-hidden rounded-[10px] border border-red-200/80 bg-red-50/80 dark:border-red-800/40 dark:bg-red-500/10">
-          {detail.filePath ? (
-            <div className="border-b border-red-200/70 bg-red-100/50 px-3 py-1.5 font-mono text-[12px] text-red-700 dark:border-red-800/40 dark:bg-red-500/15 dark:text-red-300">
-              {detail.filePath}
-            </div>
-          ) : null}
-          <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[12px] leading-6 text-red-800 dark:text-red-200">
-            {detail.text}
-          </pre>
-        </div>
-      )
-    }
     return (
-      <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-ds-ink">
+      <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-ds-muted">
         {detail.text}
       </pre>
     )

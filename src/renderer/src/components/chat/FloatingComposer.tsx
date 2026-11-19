@@ -15,6 +15,9 @@ import {
 import {
   Archive,
   BarChart3,
+  Check,
+  ChevronLeft,
+  ChevronRight,
   FileEdit,
   FileText,
   GitFork,
@@ -27,6 +30,8 @@ import {
   Pencil,
   Plus,
   PlayCircle,
+  Plug,
+  Puzzle,
   RotateCcw,
   SearchCode,
   Send,
@@ -34,12 +39,15 @@ import {
   Square,
   Target,
   Trash2,
-  X
+  X,
+  type LucideIcon
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import type { CallableCapabilityChoice, CallableCapabilityReference } from '@shared/callable-capabilities'
 import type { ModelProviderModelGroup } from '@shared/workwise-api'
 import type { WorkspaceEntry } from '@shared/workspace-file'
 import type { AttachmentReference, ReviewTarget } from '../../agent/types'
+import { isChatDocumentAttachment } from '../../lib/attachment-selection'
 import { useChatStore } from '../../store/chat-store'
 import { normalizeWorkspaceRoot } from '../../lib/workspace-path'
 import {
@@ -58,6 +66,7 @@ import {
   getGoalPanelDraftObjective,
   getSkillMentionAtCursor,
   getSlashQuery,
+  insertSkillCommandAtCursor,
   parseBtwCommand,
   parseCompactCommand,
   parseGoalCommand,
@@ -163,6 +172,14 @@ type Props = {
       promptPatterns?: string[]
     }
   }>
+  callableCapabilities?: CallableCapabilityChoice[]
+  selectedCapabilities?: CallableCapabilityChoice[]
+  callableCapabilitiesLoading?: boolean
+  callableCapabilitiesError?: string | null
+  onOpenCapabilities?: () => void
+  onSelectCapability?: (choice: CallableCapabilityChoice) => void
+  onRemoveCapability?: (reference: CallableCapabilityReference) => void
+  onManagePlugins?: () => void
   onPickAttachments?: (files: File[]) => void
   onPasteClipboardImage?: (options?: { silentNoImage?: boolean }) => void | Promise<void>
   onRemoveAttachment?: (id: string) => void
@@ -189,12 +206,20 @@ type Props = {
 }
 
 type SkillCommand = NonNullable<Props['skillCommands']>[number]
+type ComposerMenu = 'actions' | 'skills' | 'plugins'
+type CapabilityCommand = Omit<SlashCommand, 'id' | 'kind'> & {
+  id: `capability:${string}`
+  kind: 'capability'
+  capability: CallableCapabilityChoice
+}
+type ComposerCommand = SlashCommand | CapabilityCommand
 
 const EMPTY_MODEL_GROUPS: ModelProviderModelGroup[] = []
 const EMPTY_ATTACHMENTS: AttachmentReference[] = []
 const EMPTY_FILE_REFERENCES: ComposerWorkspaceReference[] = []
 const EMPTY_CHANGED_FILES: ComposerChangedFile[] = []
 const EMPTY_SKILL_COMMANDS: SkillCommand[] = []
+const EMPTY_CAPABILITY_CHOICES: CallableCapabilityChoice[] = []
 
 type ComposerTransferItem = {
   kind?: string
@@ -207,12 +232,12 @@ type WorkspaceFileIndexRecord = {
   loadedAt: number
 }
 
-export type ComposerImageTransferSource = {
+type ComposerTransferSource = {
   files?: ArrayLike<File> | null
   items?: ArrayLike<ComposerTransferItem> | null
 }
 
-export type ComposerClipboardImageSource = ComposerImageTransferSource & {
+type ComposerClipboardSource = ComposerTransferSource & {
   getData?: (format: string) => string
 }
 
@@ -448,60 +473,53 @@ export async function loadComposerWorkspaceReferenceSuggestions(input: {
   throw new Error('Runtime workspace reference search is unavailable')
 }
 
-export function imageFilesFromTransfer(source: ComposerImageTransferSource | null | undefined): File[] {
-  if (!source) return []
-  const files: File[] = []
-  const seen = new Set<File>()
-  const addFile = (file: File | null | undefined, mimeTypeHint?: string): void => {
-    if (!file || seen.has(file)) return
-    seen.add(file)
-    const normalized = normalizedImageFile(file, mimeTypeHint)
-    if (normalized) files.push(normalized)
+export function filesFromComposerTransfer(source: ComposerTransferSource): File[] {
+  const files = arrayLikeValues(source.files)
+  const fileItems = arrayLikeValues(source.items).filter((item) => !item.kind || item.kind === 'file')
+  // Prefer the native FileList so the same item is never imported twice, and
+  // Electron can still resolve the original on-disk path for documents.
+  if (files.length > 0) {
+    return files.map((file, index) => normalizedImageFile(file, fileItems.length === files.length ? fileItems[index].type : undefined) ?? file)
   }
-
-  for (const item of arrayLikeValues(source.items)) {
-    if (item.kind && item.kind !== 'file') continue
-    if (!isImageMimeType(item.type)) continue
-    addFile(item.getAsFile?.(), item.type)
-  }
-  for (const file of arrayLikeValues(source.files)) {
-    addFile(file)
-  }
-  return files
+  return fileItems.flatMap((item) => {
+    const file = item.getAsFile?.()
+    return file ? [normalizedImageFile(file, item.type) ?? file] : []
+  })
 }
 
-export function imageTransferHasImages(source: ComposerImageTransferSource | null | undefined): boolean {
-  if (!source) return false
-  if (arrayLikeValues(source.files).some((file) => normalizedImageFile(file) !== null)) return true
-  return arrayLikeValues(source.items).some((item) =>
-    (!item.kind || item.kind === 'file') && isImageMimeType(item.type)
-  )
+function fileCanAttach(file: File, isAdditionalAttachment?: (file: File) => boolean): boolean {
+  return isImageMimeType(file.type) || isChatDocumentAttachment(file) || isAdditionalAttachment?.(file) === true
 }
 
-export function handleComposerImagePaste({
+export function handleComposerAttachmentPaste({
   canPickAttachment,
   clipboardData,
   preventDefault,
   onPickAttachments,
-  onPasteClipboardImage
+  onPasteClipboardImage,
+  isAdditionalAttachment
 }: {
   canPickAttachment: boolean
-  clipboardData: ComposerClipboardImageSource
+  clipboardData: ComposerClipboardSource
   preventDefault: () => void
   onPickAttachments?: (files: File[]) => void
   onPasteClipboardImage?: (options?: { silentNoImage?: boolean }) => void | Promise<void>
+  isAdditionalAttachment?: (file: File) => boolean
 }): boolean {
   if (!canPickAttachment || (!onPickAttachments && !onPasteClipboardImage)) return false
-  const files = imageFilesFromTransfer(clipboardData)
-  const hasPlainText = Boolean(clipboardData.getData?.('text/plain'))
-  const hasImageTransfer = imageTransferHasImages(clipboardData)
-  if (files.length > 0) {
+  const files = filesFromComposerTransfer(clipboardData)
+  const attachments = files.filter((file) => fileCanAttach(file, isAdditionalAttachment))
+  if (attachments.length > 0 && onPickAttachments) {
     preventDefault()
-    onPickAttachments?.(files)
+    onPickAttachments(attachments)
     return true
   }
-  if (!onPasteClipboardImage) return false
+  if (!onPasteClipboardImage || (files.length > 0 && !files.some((file) => isImageMimeType(file.type)))) return false
 
+  const hasPlainText = Boolean(clipboardData.getData?.('text/plain'))
+  const hasImageTransfer = arrayLikeValues(clipboardData.items).some((item) =>
+    (!item.kind || item.kind === 'file') && isImageMimeType(item.type)
+  )
   const shouldPreventDefault = !hasPlainText || hasImageTransfer
   if (shouldPreventDefault) preventDefault()
   void onPasteClipboardImage({ silentNoImage: !shouldPreventDefault })
@@ -526,9 +544,8 @@ export function formatGoalElapsedSeconds(seconds: number): string {
 }
 
 /** Reveal only within the mounted suggestion list; never scroll the input or page. */
-function revealActiveSuggestion(list: HTMLDivElement | null): void {
+function revealActiveSuggestion(list: HTMLDivElement | null, active = list?.querySelector<HTMLElement>('[data-composer-active="true"]')): void {
   if (!list || list.clientHeight <= 0 || list.offsetHeight <= 0) return
-  const active = list.querySelector<HTMLElement>('[data-composer-active="true"]')
   if (!active) return
   const bounds = list.getBoundingClientRect()
   // BCR includes actual CSS zoom; scrollTop/clientHeight use layout pixels.
@@ -540,6 +557,46 @@ function revealActiveSuggestion(list: HTMLDivElement | null): void {
   const delta = item.top < top ? (item.top - top) / scale
     : item.bottom > bottom ? (item.bottom - bottom) / scale : 0
   list.scrollTop = Math.max(0, Math.min(list.scrollHeight - list.clientHeight, list.scrollTop + delta))
+}
+
+function capabilityKey(reference: CallableCapabilityReference): string {
+  return `${reference.kind}:${reference.id}`
+}
+
+function ComposerActionItem({ label, icon: Icon, disabled, spinning, checked, opensPicker, onClick }: {
+  label: string
+  icon: LucideIcon
+  disabled?: boolean
+  spinning?: boolean
+  checked?: boolean
+  opensPicker?: boolean
+  onClick: () => void
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      role={checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+      aria-checked={checked}
+      tabIndex={-1}
+      disabled={disabled}
+      onClick={onClick}
+      className="ds-no-drag flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink focus:bg-ds-hover focus:text-ds-ink disabled:cursor-not-allowed disabled:opacity-45"
+    >
+      <Icon className={`h-4 w-4 shrink-0 ${spinning ? 'animate-spin' : ''}`} strokeWidth={1.8} />
+      <span className="min-w-0 flex-1 break-words">{label}</span>
+      {checked ? <Check className="h-4 w-4 shrink-0 text-accent" aria-hidden /> : null}
+      {opensPicker ? <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden /> : null}
+    </button>
+  )
+}
+
+function moveComposerOption(current: number, options: ComposerCommand[], step: 1 | -1): number {
+  const count = options.length
+  for (let offset = 1; offset <= count; offset++) {
+    const index = (current + count + step * offset) % count
+    if (!options[index].disabled) return index
+  }
+  return current
 }
 
 export function FloatingComposer({
@@ -585,6 +642,14 @@ export function FloatingComposer({
   changedFileStats = null,
   skillCommands = EMPTY_SKILL_COMMANDS,
   skillsLoading = false,
+  callableCapabilities = EMPTY_CAPABILITY_CHOICES,
+  selectedCapabilities = EMPTY_CAPABILITY_CHOICES,
+  callableCapabilitiesLoading = false,
+  callableCapabilitiesError = null,
+  onOpenCapabilities,
+  onSelectCapability,
+  onRemoveCapability,
+  onManagePlugins,
   onPickAttachments,
   onPasteClipboardImage,
   onRemoveAttachment,
@@ -669,6 +734,9 @@ export function FloatingComposer({
     (fileReferenceEnabled && fileReferences.length > 0)
   )
   const canPickAttachment = canCompose && attachmentUploadEnabled && !attachmentUploadBusy
+  const failedAttachment = attachments.find((item) => item.state === 'failed')
+  const hasImageOnlyPdf = attachments.some((item) => item.state === 'degraded' && item.degradationReasons?.includes('no_extractable_pdf_text'))
+  const attachmentProblem = attachmentUploadError || failedAttachment?.degradationReasons?.[0]
   const showIntentToolbar = !compact && route === 'chat'
   // Attachments must stay reachable outside the chat route (e.g. the Write
   // assistant panel), so any enabled attachment upload shows the "+" control
@@ -676,9 +744,10 @@ export function FloatingComposer({
   const showComposerMenuButton = showIntentToolbar || attachmentUploadEnabled
   const canTogglePlanMode = canCompose && Boolean(onPlanCommand)
   const canOpenGoalPanel = !compact && canCompose && route !== 'claw'
-  const canRunReview = !compact && canCompose && route !== 'claw' && Boolean(onReviewCommand)
+  const canOpenSkillPicker = showIntentToolbar && canCompose && !agentSelectionApplying
+  const showPluginPicker = showIntentToolbar && Boolean(onSelectCapability || onManagePlugins)
   const canOpenComposerMenu = showComposerMenuButton && (
-    (canPickAttachment && Boolean(onPickAttachments)) || canTogglePlanMode || canOpenGoalPanel || canRunReview
+    (canPickAttachment && Boolean(onPickAttachments)) || canTogglePlanMode || canOpenGoalPanel || canOpenSkillPicker || showPluginPicker
   )
   const showToolbarStartControls = showComposerMenuButton
   const showChangeSummary = !compact && route === 'chat' && changedFiles.length > 0
@@ -699,8 +768,14 @@ export function FloatingComposer({
     minHeight: composerMinHeight,
     maxHeight: composerMaxHeight
   })
+  const [composerMenu, setComposerMenu] = useState<ComposerMenu | null>(null)
+  const [menuSearch, setMenuSearch] = useState('')
+  const [goalPanelOpen, setGoalPanelOpen] = useState(false)
   const [dismissedSlashInput, setDismissedSlashInput] = useState<string | null>(null)
-  const slashQuery = dismissedSlashInput === input ? null : getSlashQuery(input)
+  const slashQuery = composerMenu || goalPanelOpen || dismissedSlashInput === input ? null : getSlashQuery(input)
+  const toolbarPicker = composerMenu === 'skills' || composerMenu === 'plugins' ? composerMenu : null
+  const composerMenuOpen = composerMenu !== null
+  const pickerQuery = toolbarPicker ? menuSearch.trim().normalize('NFKC').toLowerCase() : slashQuery
   const [composerCursor, setComposerCursor] = useState(() => input.length)
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0)
   const [selectedSkillMentionIndex, setSelectedSkillMentionIndex] = useState(0)
@@ -710,14 +785,15 @@ export function FloatingComposer({
   const [fileMentionError, setFileMentionError] = useState<string | null>(null)
   const [selectedFileMentionIndex, setSelectedFileMentionIndex] = useState(0)
   const [dismissedFileMentionKey, setDismissedFileMentionKey] = useState<string | null>(null)
-  const [composerMenuOpen, setComposerMenuOpen] = useState(false)
-  const [goalPanelOpen, setGoalPanelOpen] = useState(false)
   const [goalRuntimeNowMs, setGoalRuntimeNowMs] = useState(() => Date.now())
   const [reviewRepositoryRoot, setReviewRepositoryRoot] = useState('')
   const composerRootRef = useRef<HTMLDivElement | null>(null)
   const suggestionAnchorRef = useRef<HTMLDivElement | null>(null)
   const slashListId = useId()
+  const composerActionsId = useId()
+  const composerPickerId = useId()
   const slashListRef = useRef<HTMLDivElement | null>(null)
+  const pickerSearchRef = useRef<HTMLInputElement | null>(null)
   const skillListRef = useRef<HTMLDivElement | null>(null)
   const fileListRef = useRef<HTMLDivElement | null>(null)
   const composerMenuButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -726,6 +802,10 @@ export function FloatingComposer({
   useEffect(() => {
     setReviewRepositoryRoot('')
   }, [effectiveWorkspaceRoot])
+  useEffect(() => {
+    setComposerMenu(null)
+    setGoalPanelOpen(false)
+  }, [activeThreadId, effectiveWorkspaceRoot, route])
   const goalPanelRef = useRef<HTMLDivElement | null>(null)
   const goalRuntimeStartedAtRef = useRef<number | null>(null)
   const placeholder = !runtimeReady
@@ -893,19 +973,43 @@ export function FloatingComposer({
     t
   ])
 
-  const filteredSlashCommands = useMemo(() => {
-    if (slashQuery == null) return []
-    if (!slashQuery) return slashCommands
-    return slashCommands.filter((command) => {
+  const capabilityCommands = useMemo<CapabilityCommand[]>(() => {
+    if (callableCapabilitiesLoading || callableCapabilitiesError) return []
+    const selected = new Set(selectedCapabilities.map(capabilityKey))
+    return callableCapabilities.map((capability) => ({
+      id: `capability:${capabilityKey(capability)}`,
+      kind: 'capability',
+      capability,
+      title: capability.label,
+      description: capability.description ?? '',
+      keywords: [capability.id, t(capability.kind === 'connector' ? 'composerCapabilityConnector' : 'composerCapabilityPlugin')],
+      icon: capability.kind === 'connector' ? <Plug className="h-4 w-4" /> : <Puzzle className="h-4 w-4" />,
+      badge: selected.has(capabilityKey(capability)) ? t('composerCapabilitySelected') : t(capability.kind === 'connector' ? 'composerCapabilityConnector' : 'composerCapabilityPlugin'),
+      disabled: !canCompose || agentSelectionApplying || !onSelectCapability || selected.has(capabilityKey(capability))
+    }))
+  }, [agentSelectionApplying, canCompose, callableCapabilities, callableCapabilitiesError, callableCapabilitiesLoading, onSelectCapability, selectedCapabilities, t])
+  const filteredComposerCommands = useMemo<ComposerCommand[]>(() => {
+    if (pickerQuery == null) return []
+    const options = toolbarPicker === 'plugins'
+      ? capabilityCommands
+      : toolbarPicker === 'skills' ? slashCommands.filter(command => command.kind === 'skill') : slashCommands
+    if (!pickerQuery) return options
+    return options.filter((command) => {
       const haystack = [command.id, command.title, command.description, ...command.keywords]
-      return haystack.some((part) => part.normalize('NFKC').toLowerCase().includes(slashQuery))
+      return haystack.some((part) => part.normalize('NFKC').toLowerCase().includes(pickerQuery))
     })
-  }, [slashCommands, slashQuery])
+  }, [capabilityCommands, pickerQuery, slashCommands, toolbarPicker])
 
-  const highlightedSlashCommand =
-    filteredSlashCommands.length > 0
-      ? filteredSlashCommands[Math.min(selectedCommandIndex, filteredSlashCommands.length - 1)]
-      : null
+  const commandIndex = Math.min(selectedCommandIndex, filteredComposerCommands.length - 1)
+  const enabledCommandIndex = filteredComposerCommands[commandIndex]?.disabled
+    ? moveComposerOption(commandIndex, filteredComposerCommands, 1)
+    : commandIndex
+  const highlightedComposerCommand = filteredComposerCommands[enabledCommandIndex] ?? null
+  const highlightedSlashCommand = slashQuery != null ? highlightedComposerCommand : null
+  const pickerTitle = toolbarPicker === 'skills' ? t('composerMenuSkills')
+    : toolbarPicker === 'plugins' ? t('composerMenuPlugins') : t('slashCommandMenuTitle')
+  const pickerLoading = toolbarPicker === 'plugins' ? callableCapabilitiesLoading : skillsLoading && route !== 'claw'
+  const pickerSearchLabel = toolbarPicker === 'plugins' ? t('composerMenuSearchPlugins') : t('composerMenuSearchSkills')
   const activeSkillMention = useMemo<SkillMentionContext | null>(() => {
     if (slashQuery != null || route === 'claw') return null
     return getSkillMentionAtCursor(input, composerCursor)
@@ -949,16 +1053,17 @@ export function FloatingComposer({
     !composerMenuOpen &&
     !goalPanelOpen
   const suggestionMaxHeight = useComposerSuggestionBounds(
-    slashQuery != null || showSkillMentionMenu || showFileMentionMenu, suggestionAnchorRef
+    pickerQuery != null || composerMenuOpen || goalPanelOpen || showSkillMentionMenu || showFileMentionMenu,
+    suggestionAnchorRef
   )
   const highlightedFileMention =
     fileMentionSuggestions.length > 0
       ? fileMentionSuggestions[Math.min(selectedFileMentionIndex, fileMentionSuggestions.length - 1)]
       : null
   useLayoutEffect(() => {
-    revealActiveSuggestion(slashQuery != null ? slashListRef.current
+    revealActiveSuggestion(pickerQuery != null ? slashListRef.current
       : showSkillMentionMenu ? skillListRef.current : showFileMentionMenu ? fileListRef.current : null)
-  }, [slashQuery, showSkillMentionMenu, showFileMentionMenu, highlightedSlashCommand?.id,
+  }, [pickerQuery, showSkillMentionMenu, showFileMentionMenu, highlightedComposerCommand?.id,
     highlightedSkillMention?.id, highlightedFileMention?.relativePath, suggestionMaxHeight])
   const parsedGoalCommand = parseGoalCommand(input)
   const goalPanelDraftObjective = getGoalPanelDraftObjective(input, goalPanelOpen)
@@ -997,11 +1102,9 @@ export function FloatingComposer({
       ? t('goalActiveHeading')
       : t(`goalStatusShort.${activeThreadGoal.status}`)
     : ''
-  const goalMenuChecked = activeThreadGoal?.status === 'active'
-
   useEffect(() => {
     setSelectedCommandIndex(0)
-  }, [slashQuery])
+  }, [pickerQuery, toolbarPicker])
 
   useEffect(() => {
     setSelectedSkillMentionIndex(0)
@@ -1010,10 +1113,6 @@ export function FloatingComposer({
   useEffect(() => {
     setSelectedFileMentionIndex(0)
   }, [activeFileMentionKey])
-
-  useEffect(() => {
-    if (slashQuery != null || goalPanelOpen) setComposerMenuOpen(false)
-  }, [goalPanelOpen, slashQuery])
 
   useEffect(() => {
     if (!showFileMentionMenu || !activeFileMention || !effectiveWorkspaceRoot) {
@@ -1069,14 +1168,15 @@ export function FloatingComposer({
       if (composerMenuButtonRef.current?.contains(target)) return
       if (composerMenuPanelRef.current?.contains(target)) return
       if (goalPanelRef.current?.contains(target)) return
-      setComposerMenuOpen(false)
+      setComposerMenu(null)
       setGoalPanelOpen(false)
     }
 
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      setComposerMenuOpen(false)
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      setComposerMenu(null)
       setGoalPanelOpen(false)
+      if (composerMenuOpen) composerMenuButtonRef.current?.focus({ preventScroll: true })
     }
 
     window.addEventListener('pointerdown', onPointerDown)
@@ -1086,6 +1186,13 @@ export function FloatingComposer({
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [composerMenuOpen, goalPanelOpen])
+
+  useLayoutEffect(() => {
+    if (toolbarPicker) pickerSearchRef.current?.focus({ preventScroll: true })
+    if (composerMenu === 'actions') {
+      composerMenuPanelRef.current?.querySelector<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)')?.focus({ preventScroll: true })
+    }
+  }, [composerMenu, toolbarPicker])
 
   useEffect(() => {
     const shouldTimeGoal = busy && activeThreadGoal?.status === 'active'
@@ -1211,20 +1318,21 @@ export function FloatingComposer({
   const handleComposerMenuButtonClick = (): void => {
     if (!canOpenComposerMenu) return
     setGoalPanelOpen(false)
-    setComposerMenuOpen((open) => !open)
-    draft.focusComposer()
+    if (slashQuery != null) setDismissedSlashInput(input)
+    setComposerMenu(composerMenuOpen ? null : 'actions')
+    if (composerMenuOpen) draft.focusComposer()
   }
 
   const handleAttachmentMenuClick = (): void => {
     if (!canPickAttachment || !onPickAttachments) return
-    setComposerMenuOpen(false)
+    setComposerMenu(null)
     fileInputRef.current?.click()
     draft.focusComposer()
   }
 
   const handlePlanToolbarClick = (): void => {
     if (!canTogglePlanMode) return
-    setComposerMenuOpen(false)
+    setComposerMenu(null)
     if (mode === 'plan') {
       setMode('agent')
     } else {
@@ -1236,20 +1344,68 @@ export function FloatingComposer({
 
   const handleGoalMenuClick = (): void => {
     if (!canOpenGoalPanel) return
-    setComposerMenuOpen(false)
-    if (activeThreadGoal?.status === 'active') {
-      void setActiveThreadGoalStatus('paused')
-    } else if (activeThreadGoal) {
-      void setActiveThreadGoalStatus('active')
-    } else {
-      setGoalPanelOpen(true)
-    }
+    setComposerMenu(null)
+    setGoalPanelOpen(true)
     draft.focusComposer()
+  }
+
+  const openToolbarPicker = (picker: 'skills' | 'plugins'): void => {
+    setMenuSearch('')
+    setSelectedCommandIndex(0)
+    setComposerMenu(picker)
+    if (picker === 'plugins') onOpenCapabilities?.()
+  }
+
+  const closeToolbarMenu = (): void => {
+    setComposerMenu(null)
+    composerMenuButtonRef.current?.focus({ preventScroll: true })
+  }
+
+  const handleComposerMenuKeys = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'Escape' || event.key === 'Tab') {
+      if (event.key === 'Escape') event.preventDefault()
+      closeToolbarMenu()
+      return
+    }
+    const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)')]
+    const index = items.indexOf(document.activeElement as HTMLButtonElement)
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+      : event.key === 'ArrowDown' ? (index + 1) % items.length
+      : event.key === 'ArrowUp' ? (Math.max(index, 0) + items.length - 1) % items.length : -1
+    const item = items[next]
+    if (!item) return
+    event.preventDefault()
+    item.focus({ preventScroll: true })
+    revealActiveSuggestion(event.currentTarget, item)
   }
 
   const syncComposerCursor = (element = draft.textareaRef.current): void => {
     if (!element) return
     setComposerCursor(element.selectionStart ?? input.length)
+  }
+
+  const applyComposerCommand = (command: ComposerCommand): void => {
+    if (command.disabled) return
+    if (!toolbarPicker && command.kind !== 'capability') {
+      applySlashCommand(command.id)
+      return
+    }
+    if (command.kind === 'capability') {
+      onSelectCapability?.(command.capability)
+      draft.focusComposer()
+    } else if (command.kind === 'skill') {
+      const cursor = draft.textareaRef.current?.selectionStart ?? composerCursor
+      const next = insertSkillCommandAtCursor(input, cursor, command.id.slice('skill:'.length))
+      setInput(next.input)
+      window.requestAnimationFrame(() => {
+        const textarea = draft.textareaRef.current
+        if (!textarea) return
+        textarea.focus({ preventScroll: true })
+        textarea.setSelectionRange(next.cursor, next.cursor)
+        setComposerCursor(next.cursor)
+      })
+    }
+    setComposerMenu(null)
   }
 
   const applyFileMention = (reference: ComposerFileReference | null): void => {
@@ -1297,8 +1453,7 @@ export function FloatingComposer({
       return
     }
     if (highlightedSlashCommand) {
-      if (highlightedSlashCommand.disabled) return
-      applySlashCommand(highlightedSlashCommand.id)
+      applyComposerCommand(highlightedSlashCommand)
       return
     }
     if (slashQuery === '') return
@@ -1342,6 +1497,30 @@ export function FloatingComposer({
       }
     }
     onSend()
+  }
+
+  const handleCommandPickerKeys = (event: ReactKeyboardEvent<HTMLTextAreaElement | HTMLInputElement>): boolean => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      if (toolbarPicker) {
+        setComposerMenu(null)
+        draft.focusComposer()
+      } else {
+        setDismissedSlashInput(input)
+      }
+      return true
+    }
+    if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && filteredComposerCommands.length > 0) {
+      event.preventDefault()
+      setSelectedCommandIndex(moveComposerOption(enabledCommandIndex, filteredComposerCommands, event.key === 'ArrowDown' ? 1 : -1))
+      return true
+    }
+    if (toolbarPicker && event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
+      event.preventDefault()
+      if (highlightedComposerCommand) applyComposerCommand(highlightedComposerCommand)
+      return true
+    }
+    return false
   }
 
   const handleComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>): void => {
@@ -1400,25 +1579,7 @@ export function FloatingComposer({
       }
     }
 
-    if (!composing && slashQuery != null) {
-      if (event.key === 'ArrowDown' && filteredSlashCommands.length > 0) {
-        event.preventDefault()
-        setSelectedCommandIndex((current) => (current + 1) % filteredSlashCommands.length)
-        return
-      }
-      if (event.key === 'ArrowUp' && filteredSlashCommands.length > 0) {
-        event.preventDefault()
-        setSelectedCommandIndex((current) =>
-          current === 0 ? filteredSlashCommands.length - 1 : current - 1
-        )
-        return
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        setDismissedSlashInput(input)
-        return
-      }
-    }
+    if (!composing && pickerQuery != null && handleCommandPickerKeys(event)) return
 
     if (!sendByEnter || composing) return
 
@@ -1470,19 +1631,19 @@ export function FloatingComposer({
   }
 
   const handleComposerPaste = (event: ReactClipboardEvent<HTMLElement>): void => {
-    handleComposerImagePaste({
+    handleComposerAttachmentPaste({
       canPickAttachment,
       clipboardData: event.clipboardData,
       preventDefault: () => event.preventDefault(),
       onPickAttachments,
-      onPasteClipboardImage
+      onPasteClipboardImage,
+      isAdditionalAttachment
     })
   }
 
   const handleComposerDragOver = (event: ReactDragEvent<HTMLDivElement>): void => {
     const dataTransferTypes = Array.from(event.dataTransfer.types ?? [])
-    const canAcceptImages = canPickAttachment && imageTransferHasImages(event.dataTransfer)
-    if (!dataTransferTypes.includes('Files') && !canAcceptImages) return
+    if (!dataTransferTypes.includes('Files') && !event.dataTransfer.files?.length) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
   }
@@ -1511,18 +1672,12 @@ export function FloatingComposer({
   }
 
   const handleComposerDrop = (event: ReactDragEvent<HTMLDivElement>): void => {
-    const imageFiles = canPickAttachment ? imageFilesFromTransfer(event.dataTransfer) : []
-    const rawFiles = Array.from(event.dataTransfer.files ?? [])
-    const isImageLike = (file: File): boolean =>
-      isImageMimeType(file.type) || Boolean(imageMimeTypeFromFileName(file.name))
-    const documentFiles = rawFiles.filter((file) => !isImageLike(file) && (/\.(?:pdf|docx|xlsx|pptx|txt|md|markdown|csv)$/i.test(file.name) || isAdditionalAttachment?.(file)))
-    const pathFiles = rawFiles.filter((file) => !isImageLike(file) && !documentFiles.includes(file))
-    if (imageFiles.length === 0 && documentFiles.length === 0 && pathFiles.length === 0) return
+    const files = filesFromComposerTransfer(event.dataTransfer)
+    if (!files.length) return
     event.preventDefault()
-    if (imageFiles.length > 0 && onPickAttachments) {
-      onPickAttachments(imageFiles)
-    }
-    if (documentFiles.length > 0 && onPickAttachments) onPickAttachments(documentFiles)
+    const attachments = files.filter((file) => fileCanAttach(file, isAdditionalAttachment))
+    if (canPickAttachment && attachments.length > 0) onPickAttachments?.(attachments)
+    const pathFiles = files.filter((file) => !attachments.includes(file))
     if (pathFiles.length > 0) {
       const paths: string[] = []
       for (const file of pathFiles) {
@@ -1610,96 +1765,109 @@ export function FloatingComposer({
           </div>
         ) : null}
 
-        {composerMenuOpen && slashQuery == null ? (
+        {composerMenu === 'actions' ? (
           <div
             ref={composerMenuPanelRef}
-            className="absolute bottom-12 left-1 z-40 w-48 overflow-hidden rounded-[18px] border border-ds-border bg-white py-1.5 text-[13px] text-ds-muted shadow-[0_18px_48px_rgba(15,23,42,0.16)] dark:bg-ds-card"
+            id={composerActionsId}
+            role="menu"
+            aria-label={t('composerMenuTitle')}
+            onKeyDown={handleComposerMenuKeys}
+            style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }}
+            className="ds-card-strong absolute bottom-full left-1 z-40 mb-2 w-60 max-w-[calc(100%_-_0.5rem)] overflow-y-auto rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]"
           >
             {attachmentUploadEnabled ? (
+              <ComposerActionItem
+                label={t('composerAddFileOrImage')}
+                icon={attachmentUploadBusy ? Loader2 : ImagePlus}
+                spinning={attachmentUploadBusy}
+                disabled={!canPickAttachment || !onPickAttachments}
+                onClick={handleAttachmentMenuClick}
+              />
+            ) : null}
+            {showIntentToolbar ? (
+              <ComposerActionItem
+                label={t('composerMenuSkills')}
+                icon={Sparkles}
+                disabled={!canOpenSkillPicker}
+                opensPicker
+                onClick={() => openToolbarPicker('skills')}
+              />
+            ) : null}
+            {!compact ? (
               <>
-                <button
-                  type="button"
-                  disabled={!canPickAttachment || !onPickAttachments}
-                  onClick={handleAttachmentMenuClick}
-                  className="ds-no-drag flex h-8 w-full items-center gap-2 px-3 text-left transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-ds-muted"
-                >
-                  {attachmentUploadBusy ? (
-                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" strokeWidth={1.9} />
-                  ) : (
-                    <ImagePlus className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{t('composerAddFileOrImage')}</span>
-                </button>
-                {!compact ? <div className="my-1 h-px bg-ds-border-muted/70" /> : null}
+                <ComposerActionItem
+                  label={t('composerMenuPlanMode')}
+                  icon={ListTodo}
+                  checked={mode === 'plan'}
+                  disabled={!canTogglePlanMode}
+                  onClick={handlePlanToolbarClick}
+                />
+                <ComposerActionItem
+                  label={t('composerMenuPursueGoal')}
+                  icon={Target}
+                  disabled={!canOpenGoalPanel}
+                  onClick={handleGoalMenuClick}
+                />
               </>
             ) : null}
-            {!compact ? <>
-              <button
-              type="button"
-              disabled={!canTogglePlanMode}
-              onClick={handlePlanToolbarClick}
-              className="ds-no-drag flex h-8 w-full items-center gap-2 px-3 text-left transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-ds-muted"
-            >
-              <ListTodo className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-              <span className="min-w-0 flex-1 truncate">{t('composerMenuPlanMode')}</span>
-              <span
-                role="switch"
-                aria-checked={mode === 'plan'}
-                className={`relative h-5 w-9 shrink-0 rounded-full ring-1 transition ${
-                  mode === 'plan'
-                    ? 'bg-accent ring-accent/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]'
-                    : 'bg-ds-border-muted ring-ds-border-muted'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white ring-1 ring-black/5 transition ${
-                    mode === 'plan' ? 'translate-x-[17px]' : 'translate-x-0.5'
-                  } shadow-[0_1px_4px_rgba(15,23,42,0.28)]`}
-                />
-              </span>
-              </button>
-              <button
-              type="button"
-              disabled={!canOpenGoalPanel}
-              onClick={handleGoalMenuClick}
-              className="ds-no-drag flex h-8 w-full items-center gap-2 px-3 text-left transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-ds-muted"
-            >
-              <Target className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-              <span className="min-w-0 flex-1 truncate">{t('composerMenuPursueGoal')}</span>
-              <span
-                role="switch"
-                aria-checked={goalMenuChecked}
-                className={`relative h-5 w-9 shrink-0 rounded-full ring-1 transition ${
-                  goalMenuChecked
-                    ? 'bg-accent ring-accent/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]'
-                    : 'bg-ds-border-muted ring-ds-border-muted'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white ring-1 ring-black/5 transition ${
-                    goalMenuChecked ? 'translate-x-[17px]' : 'translate-x-0.5'
-                  } shadow-[0_1px_4px_rgba(15,23,42,0.28)]`}
-                />
-              </span>
-              </button>
-            </> : null}
+            {showPluginPicker ? (
+              <ComposerActionItem
+                label={t('composerMenuPlugins')}
+                icon={Plug}
+                opensPicker
+                onClick={() => openToolbarPicker('plugins')}
+              />
+            ) : null}
           </div>
         ) : null}
 
-        {slashQuery != null ? (
-          <div style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }} className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[760px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]">
-            <div className="flex h-7 shrink-0 items-center px-2.5 text-[11.5px] font-semibold text-ds-muted">
-              {t('slashCommandMenuTitle')}
+        {pickerQuery != null ? (
+          <div
+            ref={toolbarPicker ? composerMenuPanelRef : undefined}
+            id={toolbarPicker ? composerPickerId : undefined}
+            role={toolbarPicker ? 'dialog' : undefined}
+            aria-label={toolbarPicker ? pickerTitle : undefined}
+            style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }}
+            className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 flex w-[calc(100%_-_1rem)] max-w-[760px] -translate-x-1/2 flex-col overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(15,23,42,0.14)]"
+          >
+            <div className="flex h-7 shrink-0 items-center gap-1.5 px-2.5 text-[11.5px] font-semibold text-ds-muted">
+              {toolbarPicker ? (
+                <button type="button" aria-label={t('composerMenuBack')} onClick={() => setComposerMenu('actions')} className="-ml-1.5 flex h-6 w-6 items-center justify-center rounded-md hover:bg-ds-hover">
+                  <ChevronLeft className="h-4 w-4" aria-hidden />
+                </button>
+              ) : null}
+              {pickerTitle}
             </div>
-            {skillsLoading && route !== 'claw' ? (
+            {toolbarPicker ? (
+              <input
+                ref={pickerSearchRef}
+                role="combobox"
+                aria-label={pickerSearchLabel}
+                aria-autocomplete="list"
+                aria-expanded={filteredComposerCommands.length > 0}
+                aria-controls={filteredComposerCommands.length ? slashListId : undefined}
+                aria-activedescendant={highlightedComposerCommand ? `${slashListId}-${enabledCommandIndex}` : undefined}
+                placeholder={pickerSearchLabel}
+                value={menuSearch}
+                onChange={event => setMenuSearch(event.target.value)}
+                onKeyDown={event => {
+                  if (!event.nativeEvent.isComposing && event.keyCode !== 229) handleCommandPickerKeys(event)
+                }}
+                className="mx-1 mb-1 mt-0.5 min-h-8 min-w-0 shrink-0 rounded-lg border border-ds-border bg-ds-card px-2.5 text-[13px] text-ds-ink placeholder:text-ds-muted"
+              />
+            ) : null}
+            {pickerLoading ? (
               <div role="status" className="px-2.5 py-1 text-[12px] text-ds-muted">
-                {t('slashSkillsLoading')}
+                {t(toolbarPicker === 'plugins' ? 'composerCapabilityLoading' : 'slashSkillsLoading')}
               </div>
             ) : null}
-            {filteredSlashCommands.length > 0 ? (
-              <div id={slashListId} role="listbox" aria-label={t('slashCommandMenuTitle')} ref={slashListRef} className="flex min-h-0 max-h-[300px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
-                {filteredSlashCommands.map((command, index) => {
-                  const active = highlightedSlashCommand?.id === command.id
+            {toolbarPicker === 'plugins' && callableCapabilitiesError && !pickerLoading ? (
+              <div role="status" className="min-h-0 overflow-y-auto px-2.5 py-2 text-[12px] text-ds-muted">{callableCapabilitiesError}</div>
+            ) : null}
+            {filteredComposerCommands.length > 0 ? (
+              <div id={slashListId} role="listbox" aria-label={pickerTitle} ref={slashListRef} className="flex min-h-0 max-h-[300px] flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+                {filteredComposerCommands.map((command, index) => {
+                  const active = highlightedComposerCommand?.id === command.id
                   return (
                     <button
                       key={command.id}
@@ -1708,8 +1876,9 @@ export function FloatingComposer({
                       aria-selected={active}
                       data-composer-active={active ? 'true' : undefined}
                       type="button"
+                      tabIndex={toolbarPicker ? -1 : undefined}
                       onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => applySlashCommand(command.id)}
+                      onClick={() => applyComposerCommand(command)}
                       disabled={command.disabled}
                       className={`flex min-h-[52px] w-full items-center gap-2.5 rounded-[12px] px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
                         active && !command.disabled
@@ -1728,9 +1897,7 @@ export function FloatingComposer({
                         <span className="block truncate text-[13.5px] font-semibold leading-5 text-inherit">
                           {command.title}
                         </span>
-                        <span className="mt-0.5 block truncate text-[12px] leading-4 text-ds-faint">
-                          {command.description}
-                        </span>
+                        {command.description ? <span className="mt-0.5 block truncate text-[12px] leading-4 text-ds-faint">{command.description}</span> : null}
                       </span>
                       <span className="hidden min-w-[106px] shrink-0 flex-col items-end gap-1 sm:flex">
                         {command.scopeLabel ? (
@@ -1746,11 +1913,18 @@ export function FloatingComposer({
                   )
                 })}
               </div>
-            ) : (
-              <div className="rounded-[12px] border border-dashed border-ds-border-muted px-3 py-3 text-[12px] text-ds-faint">
-                {t('slashCommandEmpty')}
+            ) : !pickerLoading && !(toolbarPicker === 'plugins' && callableCapabilitiesError) ? (
+              <div className="min-h-0 overflow-y-auto rounded-[12px] border border-dashed border-ds-border-muted px-3 py-3 text-[12px] text-ds-muted">
+                {t(!toolbarPicker ? 'slashCommandEmpty'
+                  : pickerQuery ? 'composerMenuNoMatches'
+                  : toolbarPicker === 'plugins' ? 'composerCapabilityEmpty' : 'composerMenuNoSkills')}
               </div>
-            )}
+            ) : null}
+            {toolbarPicker === 'plugins' && onManagePlugins ? (
+              <button type="button" onClick={() => { setComposerMenu(null); onManagePlugins() }} className="mt-1 min-h-8 shrink-0 rounded-lg border-t border-ds-border px-2.5 py-1 text-left text-[12px] font-medium text-ds-muted hover:bg-ds-hover hover:text-ds-ink">
+                {t('composerManagePlugins')}
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -1852,7 +2026,8 @@ export function FloatingComposer({
         {goalPanelOpen && slashQuery == null ? (
           <div
             ref={goalPanelRef}
-            className="absolute inset-x-2 bottom-full z-30 mb-3 overflow-hidden rounded-[26px] border border-ds-border bg-ds-card/95 p-3 shadow-[0_18px_52px_rgba(15,23,42,0.14)] backdrop-blur-xl dark:bg-ds-card/90"
+            style={{ maxHeight: suggestionMaxHeight ?? undefined, backgroundColor: 'var(--ds-bg-canvas)' }}
+            className="absolute inset-x-2 bottom-full z-30 mb-3 overflow-y-auto rounded-[16px] border border-ds-border p-3 shadow-[0_18px_52px_rgba(15,23,42,0.14)]"
           >
             <div className="flex items-start gap-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ds-border-muted text-ds-muted">
@@ -2007,8 +2182,8 @@ export function FloatingComposer({
             placeholder={placeholder}
             value={input}
             disabled={!canEditComposer}
-            aria-controls={filteredSlashCommands.length ? slashListId : undefined}
-            aria-activedescendant={highlightedSlashCommand ? `${slashListId}-${filteredSlashCommands.indexOf(highlightedSlashCommand)}` : undefined}
+            aria-controls={slashQuery != null && filteredComposerCommands.length ? slashListId : undefined}
+            aria-activedescendant={highlightedSlashCommand ? `${slashListId}-${enabledCommandIndex}` : undefined}
             onChange={(e) => {
               setInput(e.target.value)
               setDismissedSlashInput(null)
@@ -2047,7 +2222,22 @@ export function FloatingComposer({
               ))}
             </div>
           ) : null}
-          {attachments.length > 0 || attachmentUploadError ? (
+          {selectedCapabilities.length > 0 ? (
+            <div role="group" aria-label={t('composerCapabilityDraft')} className="flex max-w-full flex-wrap items-center gap-2 px-1">
+              {selectedCapabilities.map(reference => (
+                <span key={capabilityKey(reference)} className="ds-no-drag inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-ds-border-muted bg-ds-card px-2 text-[12px] font-medium text-ds-muted" title={reference.label}>
+                  <Plug className="h-3.5 w-3.5 shrink-0 text-ds-faint" aria-hidden />
+                  <span className="min-w-0 max-w-48 truncate">{reference.label}</span>
+                  {onRemoveCapability ? (
+                    <button type="button" onClick={() => { onRemoveCapability(reference); draft.focusComposer() }} className="shrink-0 rounded-full p-0.5 text-ds-faint hover:bg-ds-hover hover:text-ds-ink" aria-label={t('composerCapabilityRemove', { name: reference.label })}>
+                      <X className="h-3 w-3" strokeWidth={2} />
+                    </button>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {attachments.length > 0 || attachmentProblem ? (
             <div className="flex flex-wrap items-center gap-2 px-1">
               {attachments.map((attachment) => (
                 attachment.previewUrl ? (
@@ -2077,13 +2267,13 @@ export function FloatingComposer({
                   <span
                     key={attachment.id}
                     className="ds-no-drag inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-ds-border-muted bg-ds-card/80 px-2 text-[12px] font-medium text-ds-muted"
-                    title={attachment.degradationReasons?.join('\n') || (attachment.managedPath ? '双击打开原文件位置' : attachment.id)}
+                    title={attachment.state === 'failed' ? attachment.degradationReasons?.[0] : attachment.managedPath ? t('composerAttachmentRevealOriginal') : undefined}
                     onDoubleClick={() => { if (attachment.managedPath) void window.workwise.openChatAttachmentOriginal(attachment.managedPath) }}
                   >
                     {attachment.state === 'uploading' || attachment.state === 'parsing' ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-600" /> : <FileText className="h-3.5 w-3.5 shrink-0 text-ds-faint" strokeWidth={1.8} />}
                     <span className="max-w-40 truncate">{attachment.name || attachment.id}</span>
                     {typeof attachment.byteSize === 'number' ? <span className="shrink-0 text-[10px] text-ds-faint">{formatAttachmentBytes(attachment.byteSize)}</span> : null}
-                    {attachment.state ? <span className={`rounded px-1 py-0.5 text-[10px] ${attachment.state === 'ready' ? 'bg-green-100 text-green-700' : attachment.state === 'degraded' ? 'bg-yellow-100 text-yellow-700' : attachment.state === 'failed' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{attachment.state}</span> : null}
+                    {attachment.state ? <span className={`rounded px-1 py-0.5 text-[10px] ${attachment.state === 'ready' ? 'bg-green-100 text-green-700' : ['degraded', 'failed'].includes(attachment.state) ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{t(`composerAttachmentState.${attachment.state}`)}</span> : null}
                     {typeof attachment.progress === 'number' && attachment.progress > 0 && attachment.progress < 1 ? <span className="shrink-0 text-[10px] tabular-nums text-blue-600">{Math.round(attachment.progress * 100)}%</span> : null}
                     {onRemoveAttachment ? (
                       <button
@@ -2096,20 +2286,20 @@ export function FloatingComposer({
                         <X className="h-3 w-3" strokeWidth={2} />
                       </button>
                     ) : null}
-                    {onRetryAttachment && (attachment.state === 'failed' || attachment.state === 'cancelled') ? (
-                      <button type="button" onClick={() => onRetryAttachment(attachment.id)} className="rounded-full p-0.5 text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink" aria-label="重试附件" title="重试附件">
+                    {onRetryAttachment && attachment.localSourcePath && (attachment.state === 'failed' || attachment.state === 'cancelled') ? (
+                      <button type="button" onClick={() => onRetryAttachment(attachment.id)} className="rounded-full p-0.5 text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink" aria-label={t('composerAttachmentRetry')} title={t('composerAttachmentRetry')}>
                         <RotateCcw className="h-3 w-3" strokeWidth={2} />
                       </button>
                     ) : null}
                     {attachment.managedPath ? (
-                      <button type="button" onClick={() => void window.workwise.openChatAttachmentOriginal(attachment.managedPath!)} className="rounded px-1 text-[10px] text-blue-600 hover:bg-blue-50" aria-label="打开原文件" title="打开原文件">打开</button>
+                      <button type="button" onClick={() => void window.workwise.openChatAttachmentOriginal(attachment.managedPath!)} className="rounded px-1 text-[10px] text-blue-600 hover:bg-blue-50" aria-label={t('composerAttachmentRevealOriginal')} title={t('composerAttachmentRevealOriginal')}>{t('composerAttachmentReveal')}</button>
                     ) : null}
                   </span>
                 )
               ))}
-              {attachmentUploadError ? (
-                <span className="min-w-0 break-words text-[12px] font-medium text-red-600 dark:text-red-300">
-                  {attachmentUploadError}
+              {attachmentProblem || hasImageOnlyPdf ? (
+                <span role="status" className="min-w-0 basis-full break-words text-[12px] text-ds-muted">
+                  {attachmentProblem || t('composerAttachmentImageOnlyPdf')}
                 </span>
               ) : null}
             </div>
@@ -2142,6 +2332,9 @@ export function FloatingComposer({
                         composerMenuOpen ? 'bg-ds-hover text-ds-ink' : ''
                       }`}
                       aria-label={t('composerMenuTitle')}
+                      aria-haspopup={toolbarPicker ? 'dialog' : 'menu'}
+                      aria-expanded={composerMenuOpen}
+                      aria-controls={composerMenuOpen ? toolbarPicker ? composerPickerId : composerActionsId : undefined}
                       title={t('composerMenuTitle')}
                     >
                       <Plus className="h-5 w-5" strokeWidth={1.8} />

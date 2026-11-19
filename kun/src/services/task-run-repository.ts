@@ -711,18 +711,19 @@ export class TaskRunRepository {
   /** All callbacks here are synchronous: external I/O must happen after commit. */
   transact<T>(fn: () => T): T { return this.transaction(fn) }
 
-  appendInput(input: { taskId: string; expectedRevision: number; idempotencyKey: string; text: string; kind?: TaskInput['kind']; sourceId?: string; nowIso: string;attachmentIds?:TaskInput['attachmentIds'];workspaceReferences?:TaskInput['workspaceReferences'] }): { input: TaskInput; task: TaskRun } {
+  appendInput(input: { taskId: string; expectedRevision: number; idempotencyKey: string; text: string; kind?: TaskInput['kind']; sourceId?: string; nowIso: string } & Pick<TaskInput, 'attachmentIds' | 'workspaceReferences' | 'capabilityReferences'>): { input: TaskInput; task: TaskRun } {
     return this.transaction(() => {
       const prior = this.db.prepare('SELECT data_json FROM task_inputs WHERE task_id = ? AND idempotency_key = ?').get(input.taskId, input.idempotencyKey) as { data_json: string } | undefined
       const task = this.get(input.taskId)
       if (!task) throw Object.assign(new Error('task not found'), { code: 'not_found' })
       if (prior) {
         const saved = TaskInputSchema.parse(JSON.parse(prior.data_json))
-        if (saved.text !== input.text.trim() || saved.kind !== (input.kind ?? 'supplement') || saved.sourceId !== input.sourceId || operationFingerprint(saved.attachmentIds ?? []) !== operationFingerprint(input.attachmentIds ?? []) || operationFingerprint(saved.workspaceReferences ?? []) !== operationFingerprint(input.workspaceReferences ?? [])) throw Object.assign(new Error('input key is bound to a different request'), { code: 'idempotency_conflict' })
+        if (saved.text !== input.text.trim() || saved.kind !== (input.kind ?? 'supplement') || saved.sourceId !== input.sourceId || operationFingerprint(saved.attachmentIds ?? []) !== operationFingerprint(input.attachmentIds ?? []) || operationFingerprint(saved.workspaceReferences ?? []) !== operationFingerprint(input.workspaceReferences ?? []) ||
+          operationFingerprint(saved.capabilityReferences ?? []) !== operationFingerprint(input.capabilityReferences ?? [])) throw Object.assign(new Error('input key is bound to a different request'), { code: 'idempotency_conflict' })
         return { input: saved, task }
       }
       if (TERMINAL_TASK_STATUSES.has(task.status)) throw Object.assign(new Error('cannot append input to a terminal task'), { code: 'invalid_state' })
-      const saved = TaskInputSchema.parse({ id: `input_${randomUUID()}`, taskId: task.id, kind: input.kind ?? 'supplement', text: input.text.trim(), idempotencyKey: input.idempotencyKey, sourceId: input.sourceId, createdAt: input.nowIso,attachmentIds:input.attachmentIds,workspaceReferences:input.workspaceReferences })
+      const saved = TaskInputSchema.parse({ id: `input_${randomUUID()}`, taskId: task.id, kind: input.kind ?? 'supplement', text: input.text.trim(), idempotencyKey: input.idempotencyKey, sourceId: input.sourceId, createdAt: input.nowIso,attachmentIds:input.attachmentIds,workspaceReferences:input.workspaceReferences,capabilityReferences:input.capabilityReferences })
       const next = this.update(task.id, input.expectedRevision, current => ({ ...current, updatedAt: input.nowIso }), { key: `input:${saved.id}`, kind: 'task_input_received', payload: { inputId: saved.id, kind: saved.kind }, createdAt: input.nowIso })
       this.db.prepare('INSERT INTO task_inputs(id, task_id, idempotency_key, consumed_at, data_json) VALUES (?, ?, ?, NULL, ?)').run(saved.id, task.id, saved.idempotencyKey, JSON.stringify(saved))
       const session = this.execution.ensureSession(next, input.nowIso)

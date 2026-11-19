@@ -19,6 +19,7 @@ const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
 let updater: MockUpdater
 let nativeUpdater: EventEmitter
 const quitApp = vi.fn()
+class WindowsUpdateCacheError extends Error {}
 
 function createUpdater(): MockUpdater {
   return Object.assign(new EventEmitter(), {
@@ -58,9 +59,10 @@ beforeEach(() => {
     default: { autoUpdater: updater },
     autoUpdater: updater
   }))
-  vi.doMock('./windows-gui-update', () => ({ WindowsGuiUpdater: class {
-    constructor() { return updater }
-  } }))
+  vi.doMock('./windows-gui-update', () => ({
+    WindowsUpdateCacheError,
+    WindowsGuiUpdater: class { constructor() { return updater } }
+  }))
 })
 
 afterEach(() => {
@@ -173,6 +175,20 @@ describe('installGuiUpdate', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(quitApp).toHaveBeenCalledOnce()
     expect(updater.quitAndInstall).not.toHaveBeenCalled()
+  })
+
+  it('offers a download again if Windows removes the checked installer from its cache', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    const module = await import('./gui-updater')
+    updater.startVerifiedInstaller.mockRejectedValueOnce(new WindowsUpdateCacheError('Installer cache lost'))
+    module.initializeGuiUpdater(() => null, () => 'stable')
+    updater.emit('update-downloaded', { version: '0.2.0' })
+
+    await expect(module.installGuiUpdate()).resolves.toMatchObject({ ok: false, code: 'install_failed' })
+    expect(module.getGuiUpdateState()).toMatchObject({
+      status: 'error', info: { hasUpdate: true, downloaded: false, latestVersion: '0.2.0' }
+    })
+    expect(quitApp).not.toHaveBeenCalled()
   })
 })
 
@@ -365,6 +381,49 @@ describe('gui updater source helpers', () => {
       lastCheckedAt: checkedAt,
       appVersion: '0.1.0'
     }), '0.2.0')).toBeNull()
+  })
+
+  it('automatically checks on startup even after a recent check in the same installed version', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    const now = new Date()
+    vi.setSystemTime(now)
+    const readFile = vi.fn(async () => JSON.stringify({ lastCheckedAt: now.toISOString(), appVersion: '0.1.0' }))
+    vi.doMock('node:fs/promises', async importOriginal => ({
+      ...await importOriginal<typeof import('node:fs/promises')>(),
+      readFile,
+      mkdir: vi.fn(async () => undefined),
+      writeFile: vi.fn(async () => undefined)
+    }))
+    try {
+      updater.checkForUpdates.mockResolvedValue({
+        isUpdateAvailable: true, updateInfo: { version: '0.2.0' }
+      })
+      const module = await import('./gui-updater')
+      module.initializeGuiUpdater(() => null, () => 'stable')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(updater.checkForUpdates).toHaveBeenCalledTimes(1)
+      expect(module.getGuiUpdateState()).toMatchObject({ status: 'available', info: { latestVersion: '0.2.0' } })
+    } finally {
+      vi.doUnmock('node:fs/promises')
+    }
+  })
+
+  it('keeps a downloaded installer actionable through a feed check only for matching bytes', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+    const update = { version: '0.2.0', files: [{ url: 'update.exe', sha512: 'checked-hash' }] }
+    updater.emit('update-downloaded', update)
+    updater.checkForUpdates.mockImplementation(async () => {
+      updater.emit('update-available', update)
+      return { isUpdateAvailable: true, updateInfo: update }
+    })
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({ downloaded: true })
+    expect(module.getGuiUpdateState().status).toBe('downloaded')
+
+    update.files = [{ url: 'update.exe', sha512: 'different-hash' }]
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({ downloaded: false })
+    expect(module.getGuiUpdateState().status).toBe('available')
   })
 
   it('rejects downgrades and manifest/download version mismatches', async () => {

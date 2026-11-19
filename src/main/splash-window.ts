@@ -22,7 +22,6 @@ export function splashRemainingVisibleMs(
 type SplashWindowOptions = {
   appearance: WindowAppearanceV1
   dark: boolean
-  version: string
   locale: 'zh' | 'en'
   logoDataUrl?: string
   logoDarkDataUrl?: string
@@ -80,7 +79,7 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
   <meta name="color-scheme" content="light dark" />
-  <title>${brand.platform}</title>
+  <title>${escapeHtml(brand.platform)}</title>
   <style>
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
@@ -97,8 +96,7 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 28px 34px 24px;
+      padding: clamp(12px, 8.5vh, 24px) clamp(16px, 8vw, 32px);
       border: 1px solid rgba(255, 255, 255, 0.54);
       border-radius: 14px;
       background: rgba(247, 249, 252, 0.78);
@@ -112,14 +110,14 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 72px rgba(0, 0, 0, 0.44);
     }
     html[data-theme="dark"][data-material="solid"] .splash { background: #151517; }
-    .logo { width: 112px; height: 64px; flex-shrink: 0; object-fit: contain; }
+    .logo, .logo-fallback { width: clamp(64px, 31vw, 112px); height: clamp(32px, 25vh, 64px); flex-shrink: 0; }
+    .logo { object-fit: contain; }
     .logo-dark { display: none; }
     html[data-theme="dark"] .logo-dark { display: block; }
     html[data-theme="dark"] .logo-light { display: none; }
     .logo-fallback {
       display: grid;
-      width: 96px;
-      height: 96px;
+      width: clamp(32px, 25vh, 64px);
       place-items: center;
       border-radius: 8px;
       background: #0088ff;
@@ -127,16 +125,25 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
       font-size: 24px;
       font-weight: 650;
     }
-    .brand { margin-top: 12px; font-size: 22px; font-weight: 650; letter-spacing: 0; }
-    .version { margin-top: 3px; color: rgba(67, 76, 91, 0.68); font-size: 11px; }
-    html[data-theme="dark"] .version { color: rgba(226, 232, 240, 0.52); }
-    .progress { width: 100%; margin-top: 24px; }
-    .track { height: 3px; overflow: hidden; border-radius: 2px; background: rgba(100, 116, 139, 0.18); }
+    .brand { margin: clamp(4px, 4vh, 10px) 0 0; font-size: clamp(18px, 6vw, 22px); font-weight: 650; line-height: 1.2; text-align: center; }
+    .subtitle {
+      max-width: 100%;
+      margin: 5px 0 0;
+      color: #475569;
+      font-family: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
+    html[data-theme="dark"] .subtitle { color: #bdc7d8; }
+    .progress { width: min(100%, 260px); margin-top: auto; padding-top: clamp(8px, 6vh, 16px); }
+    .track { height: 2px; overflow: hidden; border-radius: 2px; background: rgba(100, 116, 139, 0.18); }
     .bar { width: ${progress * 100}%; height: 100%; border-radius: inherit; background: #1683e8; transition: width 180ms ease; }
-    .status { min-height: 17px; margin-top: 9px; color: rgba(67, 76, 91, 0.72); font-size: 11px; text-align: center; }
+    .status { margin-top: 7px; color: #526072; font-size: 11px; line-height: 1.4; text-align: center; }
     html[data-theme="dark"] .track { background: rgba(255, 255, 255, 0.13); }
     html[data-theme="dark"] .bar { background: #4aa8ff; }
-    html[data-theme="dark"] .status { color: rgba(226, 232, 240, 0.6); }
+    html[data-theme="dark"] .status { color: #aab6c9; }
     @media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
     @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
       .splash { background: #f5f7fa; box-shadow: none; }
@@ -147,11 +154,11 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
 <body>
   <main class="splash">
     ${logo}
-    <div class="brand">${brand.platform}</div>
-    <div class="version">${escapeHtml(options.version)}</div>
-    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(progress * 100)}">
-      <div class="track"><div class="bar"></div></div>
-      <div class="status" aria-live="polite">${escapeHtml(initial.label)}</div>
+    <h1 class="brand">${escapeHtml(brand.platform)}</h1>
+    <p class="subtitle" lang="zh-CN">${escapeHtml(brand.platformSubtitleZh)}</p>
+    <div class="progress">
+      <div class="track" role="progressbar" aria-labelledby="splash-status" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(progress * 100)}"><div class="bar"></div></div>
+      <div id="splash-status" class="status" role="status">${escapeHtml(initial.label)}</div>
     </div>
   </main>
   <script>
@@ -159,7 +166,7 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
       var progress = Math.max(0, Math.min(1, Number(next.progress) || 0));
       document.querySelector('.bar').style.width = String(progress * 100) + '%';
       document.querySelector('.status').textContent = String(next.label || '');
-      document.querySelector('.progress').setAttribute('aria-valuenow', String(Math.round(progress * 100)));
+      document.querySelector('.track').setAttribute('aria-valuenow', String(Math.round(progress * 100)));
     };
   </script>
 </body>

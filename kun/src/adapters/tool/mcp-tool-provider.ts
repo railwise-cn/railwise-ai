@@ -18,6 +18,7 @@ import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import {
   createMcpSearchProvider,
   mcpSearchDiagnostic,
+  trustedMcpSearchRecords,
   type McpSearchCatalogRecord,
   type McpSearchCatalogState,
   type McpSearchRuntimeDiagnostic
@@ -78,6 +79,7 @@ export type McpToolProviderBuildResult = {
   toolCount: number
   close: () => Promise<void>
   retire: () => void
+  callableSearchServerIds?: (context: ToolHostContext) => string[]
 }
 
 export type McpToolProviderOptions = {
@@ -284,6 +286,11 @@ export async function buildMcpToolProviders(
     get connectedServers() { return diagnostics.filter(server => server.status === 'connected').length },
     get toolCount() { return diagnostics.filter(server => server.available).reduce((total, server) => total + server.toolCount, 0) },
     get authorityFingerprints() { return Object.fromEntries(connected.map(state => [`mcp:${state.serverId}`, state.authorityFingerprint])) },
+    ...(searchActive ? {
+      callableSearchServerIds: (context: ToolHostContext) => [...new Set(
+        trustedMcpSearchRecords(catalogState, isMcpServerTrusted, context).map(record => `mcp:${record.serverId}`)
+      )]
+    } : {}),
     retire: () => { for (const state of connected) state.retired = true },
     close: async () => {
       for (const state of connected) state.retired = true

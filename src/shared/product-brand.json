@@ -1,5 +1,6 @@
 {
   "platform": "RailWise AI",
+  "platformSubtitleZh": "基于本地优先架构的智能协同工作台",
   "survey": "RailWise Survey",
   "runtime": "RailWise AI Runtime",
   "surveySubtitle": { "zh": "工程测量内业", "en": "Engineering Survey Processing" },

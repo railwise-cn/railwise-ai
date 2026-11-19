@@ -12,6 +12,7 @@ import { SurveyQualityPlanCreateV1, SurveyQualityEvidenceCreateV1, SurveyQuality
 import { QUALITY_WORKFLOW_LIMITS, SurveyQualityWorkflowCreateV1, SurveyQualityWorkflowAppendV1, parseQualityWorkflowJson } from '../../shared/survey-quality-workflow'
 import { SurveyDraftCreateV1, SurveyDraftSealV1 } from '../../shared/survey-collaboration'
 import { TaskCommandSchema } from '../../../kun/src/contracts/execution'
+import { CallableCapabilityScopeSchema } from '../../../kun/src/contracts/callable-capabilities'
 import { TaskPermissionRevocationSchema, TaskPermissionConfirmationSchema } from '../../../kun/src/contracts/permissions'
 import { BrowserOperationConfirmation, BrowserTaskBindingConfirmation } from '../../../kun/src/contracts/browser-skill'
 import {
@@ -30,6 +31,7 @@ import {
   RUNTIME_TOOLS_TEMPLATE,
   RUNTIME_SESSION_RESUME_TEMPLATE,
   RUNTIME_SKILLS_TEMPLATE,
+  RUNTIME_CALLABLE_CAPABILITIES_PATH,
   RUNTIME_TASKS_TEMPLATE,
   RUNTIME_TASK_TEMPLATE,
   RUNTIME_TASK_REVALIDATE_ARTIFACTS_TEMPLATE,
@@ -307,6 +309,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_INFO_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TOOLS_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_SKILLS_TEMPLATE, ['GET'], ['scope', 'threadId', 'workspace']),
+  compileEndpoint(RUNTIME_CALLABLE_CAPABILITIES_PATH, ['POST'], []),
   compileEndpoint(RUNTIME_TASKS_TEMPLATE, ['GET'], ['threadId', 'workspaceRoot', 'status', 'limit', 'offset', 'search', 'pagination', 'filter', 'cursor']),
   compileEndpoint('/v1/task-commands', ['POST'], []),
   compileEndpoint(RUNTIME_TASK_TEMPLATE, ['GET']),
@@ -454,6 +457,15 @@ export const runtimeRequestPayloadSchema = z
     try { url = new URL(payload.path, 'http://localhost') } catch {
       context.addIssue({ code: 'custom', message: 'invalid runtime request URL' })
       return
+    }
+    if (url.pathname === RUNTIME_CALLABLE_CAPABILITIES_PATH) {
+      const body = payload.body
+      let valid = payload.path === RUNTIME_CALLABLE_CAPABILITIES_PATH && payload.method === 'POST'
+        && body !== undefined && Buffer.byteLength(body, 'utf8') <= 96 * 1024
+      if (valid) {
+        try { valid = CallableCapabilityScopeSchema.safeParse(JSON.parse(body!)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid callable capability scope' })
     }
     if (url.pathname === RUNTIME_TASKS_TEMPLATE) {
       const pagination = url.searchParams.get('pagination')
