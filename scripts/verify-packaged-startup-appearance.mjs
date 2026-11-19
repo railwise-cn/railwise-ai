@@ -105,6 +105,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
   child.once('error', error => { launch.error = error })
   for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => { launch.output = (launch.output + bytes).slice(-8000) })
   let observation, screenshot, main, port, startupCdpError
+  let splashCdp, splashTarget, screenshotAttempt
   let sawSplash = false
   let sawWorkbench = false
   let requestedMacTermination = false
@@ -119,38 +120,46 @@ export async function observeInstalledStartup(options, expected, dependencies) {
       sawSplash ||= Boolean(splash)
       sawWorkbench ||= Boolean(workbench)
       if (splash && (!observation || expected.screenshotName && !screenshot)) {
-        let splashCdp
         try {
-          splashCdp = await connectCdp(splash.webSocketDebuggerUrl)
-          const snapshot = await splashCdp.evaluate(`(${observeSplash.toString()})()`, 1000)
-          if (snapshot) {
-            observation = snapshot
-            if (expected.screenshotName) {
-              const capture = await splashCdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 2000)
-              screenshot = Buffer.from(capture.data, 'base64')
-            }
+          if (splashTarget !== splash.webSocketDebuggerUrl) {
+            splashCdp?.close()
+            splashCdp = await connectCdp(splash.webSocketDebuggerUrl)
+            splashTarget = splash.webSocketDebuggerUrl
+          }
+          if (!observation) {
+            const snapshot = await splashCdp.send('Runtime.evaluate', {
+              expression: `(${observeSplash.toString()})()`, returnByValue: true, awaitPromise: false
+            }, 300)
+            observation = snapshot.result?.value || undefined
+          }
+          if (observation && expected.screenshotName && !screenshotAttempt) {
+            screenshotAttempt = splashCdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 1300)
+              .then(capture => { screenshot = Buffer.from(capture.data, 'base64') })
+              .catch(error => { startupCdpError = error.message })
+              .finally(() => { screenshotAttempt = undefined })
           }
         } catch (error) { startupCdpError = error.message }
-        finally { splashCdp?.close() }
       }
-      if (workbench && observation && !splash) {
+      if (workbench && sawSplash && !splash) {
+        await screenshotAttempt
         main = await connectCdp(workbench.webSocketDebuggerUrl)
         break
       }
       await wait(45)
     }
     const startupTrace = `splash target: ${sawSplash}, workbench target: ${sawWorkbench}${startupCdpError ? `, CDP: ${startupCdpError}` : ''}`
-    assert.ok(observation, `The real transitional startup window was not captured (${startupTrace})`)
-    assert.ok(main, 'The installed startup window must close and reveal the workbench')
-    validateStartupAppearance(observation, expected)
+    if (!main) throw new Error(`The installed startup window did not transition to the workbench (${startupTrace})`)
     await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
     await onWorkbench?.(main, { root, workspace })
+    assert.ok(observation, `The real transitional startup window was not captured (${startupTrace})`)
+    validateStartupAppearance(observation, expected)
     if (expected.screenshotName) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), `Actual startup screenshot is missing (${startupTrace})`)
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
     }
   } finally {
+    splashCdp?.close()
     if (main) {
       await main.send('Page.close', {}, 2000).catch(() => undefined)
       main.close()

@@ -122,10 +122,34 @@ async function verifyMacFilePaste(cdp, { root, workspace }, report) {
   command('/usr/bin/swiftc', ['-module-cache-path', join(root, 'swift-cache'), swift, '-o', helper])
 
   const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
+  await cdp.send('Page.bringToFront')
+  await cdp.wait("document.visibilityState==='visible' && Boolean(document.querySelector('.ds-workbench-shell'))", 'the visible workbench after bootstrapping', 30_000)
+  report.workbench = await cdp.evaluate(`(async () => {
+    const settings = await window.workwise.getSettings();
+    const shell = document.querySelector('.ds-workbench-shell');
+    const sidebar = document.querySelector('.ds-sidebar-shell');
+    const newChat = [...(sidebar?.querySelectorAll('button') ?? [])].find(button=>button.textContent.trim()==='新建会话');
+    return { visibility: document.visibilityState, locale: settings.locale, workspaceMatches: settings.workspaceRoot===${JSON.stringify(workspace)},
+      viewport: { width: innerWidth, height: innerHeight }, overlay: shell.dataset.activeOverlay || null,
+      sidebarVisible: Boolean(sidebar?.getClientRects().length), newChat: newChat ? { disabled: newChat.disabled, visible: Boolean(newChat.getClientRects().length) } : null,
+      dialogs: [...document.querySelectorAll('[role="dialog"], dialog[open]')].map(node=>node.getAttribute('aria-label') || node.querySelector('h1,h2')?.textContent || 'dialog').slice(0, 3) };
+  })()`)
+  assert.equal(report.workbench.locale, 'zh')
+  assert.equal(report.workbench.workspaceMatches, true)
   await cdp.wait("window.workwise.runtimeRequest('/v1/threads','GET').then(result=>result.ok).catch(()=>false)", 'the isolated local Runtime', 60_000)
-  await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
-  await cdp.click(composer)
   const selector = JSON.stringify(composer)
+  if (await cdp.evaluate(`Boolean(document.querySelector(${selector})?.getClientRects().length)`)) {
+    report.composerEntry = 'visible-home-composer'
+  } else {
+    // The installed workbench's configured default new-chat binding is Ctrl+N.
+    // The command also works when its sidebar is collapsed on a small screen.
+    const key = { key: 'n', code: 'KeyN', windowsVirtualKeyCode: 78, nativeVirtualKeyCode: 45, modifiers: 2 }
+    await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+    report.composerEntry = 'installed-new-chat-shortcut'
+    await cdp.wait(`Boolean(document.querySelector(${selector})?.getClientRects().length)`, 'the composer after the real new-chat shortcut', 20_000)
+  }
+  await cdp.click(composer)
   assert.ok(await cdp.evaluate(`document.activeElement?.matches(${selector})`), 'The visible chat composer must have keyboard focus')
   await cdp.evaluate(`document.addEventListener('paste', (event) => {
     if (!event.target.matches(${selector})) return;
@@ -200,9 +224,11 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
   const report = { schemaVersion: 1, status: 'failed', startupStatus: 'failed', source, arch: process.arch, version,
     installer: { name, sha256: digest, size }, installed: { bundleId: info.CFBundleIdentifier, installedArch,
       signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256 },
-    observations: [], nativeFilePaste: { status: 'not-run' } }
+    observations: [], startupCases: [], nativeFilePaste: { status: 'not-run' } }
   try {
     for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
+      const startupCase = { locale: expected.locale, theme: expected.theme, status: 'failed' }
+      report.startupCases.push(startupCase)
       const onWorkbench = expected.locale === 'zh' ? async (cdp, paths) => {
         try {
           await verifyMacFilePaste(cdp, paths, report.nativeFilePaste)
@@ -210,12 +236,22 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
         } catch (error) {
           report.nativeFilePaste.status = 'failed'
           report.nativeFilePaste.error = error.message
+          try {
+            const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 1500)
+            await writeFile(join(evidenceDir, 'mac-workbench-before-native-file-paste.png'), Buffer.from(screenshot.data, 'base64'))
+          } catch { /* Preserve the more specific paste error. */ }
         }
       } : undefined
-      report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected,
-        { connectCdp, environmentForRoot: isolatedMacEnvironment, onWorkbench }))
+      try {
+        report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected,
+          { connectCdp, environmentForRoot: isolatedMacEnvironment, onWorkbench }))
+        startupCase.status = 'passed'
+      } catch (error) {
+        startupCase.error = error.message
+      }
     }
     assert.equal(await sha256(path), installedAsarSha256)
+    assert.equal(report.observations.length, report.startupCases.length, report.startupCases.filter(item=>item.error).map(item=>item.error).join(' | '))
     report.startupStatus = 'passed'
     assert.equal(report.nativeFilePaste.status, 'passed', report.nativeFilePaste.error ?? 'Native Mac PDF paste did not run')
     report.status = 'passed'
