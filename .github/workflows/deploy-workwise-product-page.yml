@@ -12,12 +12,13 @@ on:
         required: true
         type: string
       mode:
-        description: Full published-version page or introduction and candidate screenshots only
+        description: Full page, published version and download data only, or introduction and candidate screenshots only
         required: true
         default: content-only
         type: choice
         options:
           - full
+          - manifest-only
           - content-only
       operation:
         description: Render a private preview artifact or deploy the reviewed content
@@ -28,7 +29,7 @@ on:
           - preview
           - deploy
       source_sha:
-        description: Exact 40-hex source commit (required for content-only; empty uses main for full)
+        description: Exact 40-hex source commit (required for manifest-only and content-only)
         required: false
         type: string
 
@@ -56,11 +57,15 @@ jobs:
           OPERATION: ${{ inputs.operation || 'deploy' }}
         run: |
           set -euo pipefail
-          [[ "${DEPLOY_MODE}" == full || "${DEPLOY_MODE}" == content-only ]]
-          if [[ -n "${SOURCE_SHA}" ]]; then [[ "${SOURCE_SHA}" =~ ^[a-f0-9]{40}$ ]]; fi
-          if [[ "${DEPLOY_MODE}" == content-only ]]; then [[ "${SOURCE_SHA}" =~ ^[a-f0-9]{40}$ ]]; fi
+          [[ "${DEPLOY_MODE}" == full || "${DEPLOY_MODE}" == manifest-only || "${DEPLOY_MODE}" == content-only ]]
+          if [[ "${DEPLOY_MODE}" != full || -n "${SOURCE_SHA}" ]]; then
+            [[ "${SOURCE_SHA}" =~ ^[a-f0-9]{40}$ ]] || { echo "::error::An exact source SHA is required for this request"; exit 1; }
+          fi
           [[ "${OPERATION}" == preview || "${OPERATION}" == deploy ]]
-          if [[ "${OPERATION}" == preview ]]; then [[ "${DEPLOY_MODE}" == content-only ]]; fi
+          if [[ "${OPERATION}" == preview && "${DEPLOY_MODE}" != content-only ]]; then
+            echo "::error::Preview is available only for content-only mode"
+            exit 1
+          fi
 
       - name: Check out trusted deployment tools
         uses: actions/checkout@v4
@@ -82,7 +87,10 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git -C .content-source rev-parse HEAD)"
-          if [[ -n "${SOURCE_SHA}" ]]; then [[ "${actual}" == "${SOURCE_SHA}" ]]; fi
+          if [[ -n "${SOURCE_SHA}" && "${actual}" != "${SOURCE_SHA}" ]]; then
+            echo "::error::The product source checkout does not match the requested SHA"
+            exit 1
+          fi
           git merge-base --is-ancestor "${actual}" origin/main
           echo "Trusted deployment tools: $(git rev-parse HEAD); content source: ${actual}"
           echo "WORKWISE_PRODUCT_SOURCE_SHA=${actual}" >> "${GITHUB_ENV}"
@@ -106,9 +114,31 @@ jobs:
           [[ "$(git rev-list -n 1 "v${REQUESTED_VERSION}")" == "$(node -p "require('./.content-source/website/data/workwise-product.json').releaseCommit")" ]]
           release_state="$(gh release view "v${REQUESTED_VERSION}" --json isDraft,isPrerelease --jq '[.isDraft, .isPrerelease] | @tsv')"
           [[ "${release_state}" == $'false\tfalse' ]]
-          node scripts/deploy-workwise-product-page.mjs validate --source .content-source/website --version "${REQUESTED_VERSION}"
-          if [[ "${DEPLOY_MODE}" == content-only ]]; then
-            node scripts/deploy-workwise-product-page.mjs validate --source .content-source/website --version "${REQUESTED_VERSION}" --mode content-only --source-sha "${WORKWISE_PRODUCT_SOURCE_SHA}"
+          node scripts/deploy-workwise-product-page.mjs validate --source .content-source/website --version "${REQUESTED_VERSION}" --mode "${DEPLOY_MODE}" --source-sha "${WORKWISE_PRODUCT_SOURCE_SHA}"
+          if [[ "${DEPLOY_MODE}" == manifest-only ]]; then
+            node <<'NODE' || exit 1
+          const assert = require('node:assert/strict')
+          const { execFileSync } = require('node:child_process')
+          const { readFileSync } = require('node:fs')
+          const manifest = JSON.parse(readFileSync('.content-source/website/data/workwise-product.json', 'utf8'))
+          const tag = `v${process.env.REQUESTED_VERSION}`
+          const release = JSON.parse(execFileSync('gh', ['api', `repos/railwise-cn/railwise-ai/releases/tags/${tag}`], {
+            encoding: 'utf8', timeout: 60_000
+          }))
+          assert.equal(release.tag_name, tag)
+          assert.equal(release.draft, false)
+          assert.equal(release.prerelease, false)
+          assert.equal(manifest.platforms.length, 3)
+          const installers = new Map(manifest.platforms.map(platform => [platform.file, platform]))
+          assert.equal(installers.size, 3, 'Expected three distinct installers in the product manifest')
+          assert.deepEqual(release.assets.map(asset => asset.name).sort(), [...installers.keys()].sort(), 'Published installer names differ')
+          for (const asset of release.assets) {
+            const installer = installers.get(asset.name)
+            assert.equal(asset.size, installer.sizeBytes, `Published byte size differs for ${asset.name}`)
+            assert.equal(asset.digest, `sha256:${installer.sha256}`, `Published SHA-256 differs for ${asset.name}`)
+          }
+          console.log(`Verified size and SHA-256 of the three published ${tag} installers`)
+          NODE
           fi
       - name: Test content transaction and PHP guards
         if: ${{ inputs.mode == 'content-only' }}

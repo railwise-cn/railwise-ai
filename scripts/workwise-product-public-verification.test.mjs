@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,6 +16,85 @@ const goodResponse = (url) => {
   if (String(url).includes('/releases/')) return new Response('data', { status: 206, headers: { 'content-range': 'bytes 0-3/100' } })
   return new Response(html)
 }
+
+test('manifest-only validation accepts a data-only source and rejects changed download identities', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-data-only-source-'))
+  try {
+    mkdirSync(join(directory, 'data'))
+    const dataPath = join(directory, 'data/workwise-product.json')
+    const validate = () => execFileSync(process.execPath, [new URL('./deploy-workwise-product-page.mjs', import.meta.url).pathname,
+      'validate', '--source', directory, '--version', manifest.version, '--mode', 'manifest-only'], { stdio: 'pipe' })
+    writeFileSync(dataPath, JSON.stringify(manifest))
+    validate()
+    const changed = structuredClone(manifest)
+    changed.platforms[0].url = `https://other.example${changed.platforms[0].url}`
+    writeFileSync(dataPath, JSON.stringify(changed))
+    assert.throws(validate, /Invalid published installer identity/)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('manifest deployment journals and rolls back only the exact product data', () => {
+  const source = readFileSync(new URL('./deploy-workwise-product-page.mjs', import.meta.url), 'utf8')
+  const transaction = source.match(/const MANIFEST_TRANSACTION = String.raw`([\s\S]*?)\n`/)?.[1]
+  assert.ok(transaction)
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-manifest-transaction-'))
+  const live = join(directory, 'site/data/workwise-product.json')
+  const next = join(directory, 'stage/data/workwise-product.json')
+  const page = join(directory, 'site/index.php')
+  const previous = '{"version":"0.5.7"}\n'
+  const desired = '{"version":"0.5.8","releaseChannel":"stable"}\n'
+  const sha = (text) => createHash('sha256').update(text).digest('hex')
+  const run = (operation, previousDigest = sha(previous)) => execFileSync('bash', ['-s', '--', operation, previousDigest, sha(desired)], {
+    encoding: 'utf8', stdio: 'pipe', env: { ...process.env, FIXTURE_ROOT: directory }, input: `
+set -euo pipefail
+operation="$1"
+previous_digest="$2"
+next_digest="$3"
+deploy_id=fixture
+version=0.5.8
+site_root=/www/releases/fixture/site
+stage="$FIXTURE_ROOT/stage"
+json_path="$site_root/data/workwise-product.json"
+include_path="$site_root/includes/workwise_product.php"
+php_container=fixture
+map_path() { printf '%s' "$FIXTURE_ROOT/\${1#/www/releases/fixture/}"; }
+fail() { printf '%s\\n' "$1" >&2; exit 1; }
+container_run() {
+  local arg
+  local args=()
+  for arg in "$@"; do
+    case "$arg" in /www/releases/fixture/*) args+=("$(map_path "$arg")") ;; *) args+=("$arg") ;; esac
+  done
+  "\${args[@]}"
+}
+container_write() { cat > "$(map_path "$1")"; }
+docker() {
+  case "$*" in
+    *stream_get_contents*) cat >/dev/null ;;
+    *) container_run cat "$json_path" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"],end="")' ;;
+  esac
+}
+${transaction}
+` })
+  try {
+    mkdirSync(join(directory, 'site/data'), { recursive: true })
+    mkdirSync(join(directory, 'stage/data'), { recursive: true })
+    writeFileSync(live, previous)
+    writeFileSync(next, desired)
+    writeFileSync(page, 'site-owned PHP without old template marker')
+    assert.throws(() => run('deploy-manifest', '0'.repeat(64)), /changed before deployment/)
+    assert.equal(readFileSync(live, 'utf8'), previous)
+    run('deploy-manifest')
+    assert.equal(readFileSync(live, 'utf8'), desired)
+    run('rollback-manifest')
+    assert.equal(readFileSync(live, 'utf8'), previous)
+    assert.equal(readFileSync(page, 'utf8'), 'site-owned PHP without old template marker')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 test('product JSON-LD falls back to the canonical public download namespace', () => {
   assert.match(productPageSource, /'downloadUrl'\s*=>[^\n]*\?\?\s*'\/downloads\/railwise-ai\/'/)
