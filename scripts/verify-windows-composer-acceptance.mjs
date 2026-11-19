@@ -17,6 +17,7 @@ const invalidName = '损坏样本.pdf'
 const skillReadFailure = '受控验收停止：技能读取证据不匹配。'
 const pipelinePath = 'references/pipeline.md'
 // SHA-256 verified from the locked Windows Video Shotcraft mirror payload.
+const pipelineBytes = 24_312
 const pipelineSha256 = '7593dd38ca5255febfc2778b0ed78b158edee8519e9070328480dd4be15c871e'
 const sha256 = value => createHash('sha256').update(value).digest('hex')
 const toolCode = value => typeof value === 'string' && /^[a-z_]{1,80}$/.test(value) ? value : undefined
@@ -90,12 +91,13 @@ function expandScanPdf(bytes) {
 export function createComposerModelAcceptance(parseToolOutput = value => JSON.parse(value)) {
   const observations = { skillRead: false, pluginRead: false, scanSent: false, chineseTextSent: false }
   const skillReadEvidence = {}
+  const persistedSkillEvidence = {}
   const recallRequests = new Map()
   const skillTurnMarker = `railwise-skill-check-${randomUUID()}`
   const pluginTurnMarker = `railwise-plugin-check-${randomUUID()}`
   let skillId
   return {
-    observations, skillReadEvidence, skillTurnMarker, pluginTurnMarker,
+    observations, skillReadEvidence, persistedSkillEvidence, skillTurnMarker, pluginTurnMarker,
     setSkillId(value) { skillId = value },
     modelAction(body) {
       const messages = body.messages ?? []
@@ -105,13 +107,18 @@ export function createComposerModelAcceptance(parseToolOutput = value => JSON.pa
       const selected = text.includes(skillTurnMarker) ? 'skillRead' : text.includes(pluginTurnMarker) ? 'pluginRead' : null
       if (selected) {
         assert.ok(skillId)
-        if (selected === 'pluginRead') {
-          assert.ok(messages.some(item => typeof item.content === 'string' && item.content.includes('"kind":"plugin","id":"video-shotcraft"')))
+        if (selected === 'pluginRead' && !messages.some(item =>
+          typeof item.content === 'string' && item.content.includes('"kind":"plugin","id":"video-shotcraft"'))) {
+          skillReadEvidence[selected] = { issue: 'missing_selected_plugin_reference' }
+          return { content: skillReadFailure }
         }
         const id = `composer-${selected}`
         const readback = messages.find(item => item.role === 'tool' && item.tool_call_id === id)
         if (!readback) {
-          assert.ok(body.tools?.some(item => item.function?.name === 'read_skill_resource'))
+          if (!body.tools?.some(item => item.function?.name === 'read_skill_resource')) {
+            skillReadEvidence[selected] = { issue: 'missing_advertised_skill_resource_tool' }
+            return { content: skillReadFailure }
+          }
           return requestTool(id, 'read_skill_resource', { skill_id: skillId, path: pipelinePath })
         }
         let resource = parseToolOutput(readback.content)
@@ -159,12 +166,18 @@ export function createComposerModelAcceptance(parseToolOutput = value => JSON.pa
           skillMatches: resource?.skill_id === skillId,
           pathMatches: resource?.path === pipelinePath,
           bytes,
-          fullPage: bytes > 0 && bytes === resource?.bytes_returned && bytes === resource?.byte_size
-            && resource?.offset_bytes === 0 && resource?.next_offset_bytes === null,
+          declaredBytes: resource?.bytes_returned,
+          offset: resource?.offset_bytes,
+          sourceComplete: resource?.next_offset_bytes === null && resource?.bytes_returned === pipelineBytes
+            && resource?.byte_size === pipelineBytes,
+          modelView: bytes === pipelineBytes ? 'full' : contents.includes('[cache hygiene: omitted ') ? 'compacted' : 'unknown',
           ...(bytes > 0 && bytes <= 64 * 1024 ? { sha256: sha256(contents) } : {}),
           commandSnippet: /remotion\s+render/i.test(contents)
         })
-        if (!evidence.skillMatches || !evidence.pathMatches || !evidence.fullPage || !evidence.commandSnippet || evidence.sha256 !== pipelineSha256) {
+        const validModelContent = evidence.modelView === 'full' ? evidence.sha256 === pipelineSha256
+          : evidence.modelView === 'compacted' && bytes > 0 && bytes < pipelineBytes
+        if (!evidence.skillMatches || !evidence.pathMatches || !evidence.sourceComplete || evidence.offset !== 0
+          || !evidence.commandSnippet || !validModelContent) {
           return { content: skillReadFailure }
         }
         observations[selected] = true
@@ -201,6 +214,43 @@ async function continueAfterResponse(cdp, message) {
     if (text.includes(${literal(message)}) && document.querySelector(${literal(composer)})) return 'passed'
   })()`, message, 120_000)
   assert.equal(outcome, 'passed', 'Real Skill readback failed; see bounded modelFixture.skillReadEvidence')
+}
+
+async function verifyPersistedSkillRead(cdp, threadId, selected, marker, skillId, acceptance) {
+  const id = `composer-${selected}`
+  const expression = `(async () => {
+    const response = await window.workwise.runtimeRequest(${literal(`/v1/threads/${encodeURIComponent(threadId)}`)}, 'GET')
+    if (!response.ok) return
+    const thread = JSON.parse(response.body)
+    const turn = thread.turns.find(item => item.items.some(entry =>
+      entry.kind === 'user_message' && entry.text?.includes(${literal(marker)})))
+    const call = turn?.items.find(item => item.kind === 'tool_call' && item.callId === ${literal(id)})
+    const result = turn?.items.find(item => item.kind === 'tool_result' && item.callId === ${literal(id)})
+    if (!call || !result) return
+    const output = result.output
+    const bytes = new TextEncoder().encode(typeof output?.content === 'string' ? output.content : '')
+    const digest = await crypto.subtle.digest('SHA-256', bytes)
+    return {
+      callMatches: call.toolName === 'read_skill_resource' && call.arguments?.skill_id === ${literal(skillId)}
+        && call.arguments?.path === ${literal(pipelinePath)},
+      resultMatches: result.toolName === 'read_skill_resource' && result.isError !== true && output?.skill_id === ${literal(skillId)}
+        && output?.path === ${literal(pipelinePath)},
+      declaredBytes: output?.bytes_returned,
+      declaredTotalBytes: output?.byte_size,
+      offset: output?.offset_bytes, nextOffset: output?.next_offset_bytes,
+      bytes: bytes.length,
+      sha256: [...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2, '0')).join('')
+    }
+  })()`
+  const record = await cdp.wait(expression, `persisted tool result from ${selected}`, 35_000)
+  acceptance.persistedSkillEvidence[selected] = record
+  assert.ok(record.callMatches && record.resultMatches, 'Persisted tool receipt must match the same exact Skill and resource')
+  assert.equal(record.offset, 0)
+  assert.equal(record.nextOffset, null)
+  assert.equal(record.bytes, pipelineBytes)
+  assert.equal(record.declaredBytes, pipelineBytes)
+  assert.equal(record.declaredTotalBytes, pipelineBytes)
+  assert.equal(record.sha256, pipelineSha256, 'Persisted full original matches the official locked Skill archive')
 }
 
 export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptance, checkpoint = async () => {} }) {
@@ -279,6 +329,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.wait(`document.querySelector(${literal(composer)})?.value.includes(${literal(`/skill:${skill.id}`)})`, 'the exact inserted skill ID in the existing draft')
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '技能读取验收通过')
+  await verifyPersistedSkillRead(cdp, threadId, 'skillRead', acceptance.skillTurnMarker, skill.id, acceptance)
 
   await checkpoint('composer plugin selection and real readback')
   await cdp.fill(composer, `${acceptance.pluginTurnMarker} 请读取插件分镜说明。`)
@@ -287,6 +338,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.click('[role="option"] .truncate', plugin.label)
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '插件读取验收通过')
+  await verifyPersistedSkillRead(cdp, threadId, 'pluginRead', acceptance.pluginTurnMarker, skill.id, acceptance)
   assert.deepEqual(acceptance.observations, { skillRead: true, pluginRead: true, scanSent: true, chineseTextSent: true })
   return { status: 'passed', scanBytes: scan.length, nativeClipboard: true, chooser: true, drop: true,
     installedPlugin: { id: installed.packageId, sha256: installed.artifact.sha256 }, ...acceptance.observations }

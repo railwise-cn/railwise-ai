@@ -3212,7 +3212,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure,
-      ...(composerAcceptance ? { composer: composerAcceptance.observations, skillReadEvidence: composerAcceptance.skillReadEvidence } : {}) }
+      ...(composerAcceptance ? { composer: composerAcceptance.observations,
+        skillReadEvidence: composerAcceptance.skillReadEvidence, persistedSkillEvidence: composerAcceptance.persistedSkillEvidence } : {}) }
     if (taskModel) {
       let closeTimer
       try {
