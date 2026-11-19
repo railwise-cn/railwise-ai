@@ -901,7 +901,15 @@ export async function startWindowsTaskModelFixture({ browser = false, postPlanQu
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
   fixtureUrl = `http://127.0.0.1:${server.address().port}/fixture`
   return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, postPlanQuery, documentLinkClick, fixtureUrl, detailUrl: new URL('/fixture/detail', fixtureUrl).href, marker, query, inputHtml, buttonHtml, fullButtonHtml, observed,
-    close: () => new Promise(done => { server.close(done); server.closeAllConnections() }) }
+    close: () => new Promise((done, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Owned model fixture did not close within 5 seconds')), 5000)
+      server.close(error => {
+        clearTimeout(timeout)
+        if (error) reject(error)
+        else done()
+      })
+      server.closeAllConnections()
+    }) }
 }
 
 export function parseFixtureToolOutput(content) {
@@ -2497,6 +2505,14 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const workspace = join(root, windowsSmokeWorkspaceName)
   const environment = windowsUiEnvironment(process.env, root)
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
+  const phases = []
+  const recordTaskPhase = async phase => {
+    if (!taskSmoke) return
+    phases.push({ phase, at: new Date().toISOString() })
+    await writeFile(join(evidenceDir, 'windows-task-phases.json'),
+      `${JSON.stringify({ sourceHead, version, installedAsarSha256: before.asarSha256, phases }, null, 2)}\n`)
+  }
+  await recordTaskPhase('starting-owned-model-fixture')
   const video = videoEvaluation ? await import('./verify-windows-video-evaluation.mjs')
     .then(module => module.startWindowsVideoEvaluation(workspace, environment)) : undefined
   const composerModule = composerSmoke ? await import('./verify-windows-composer-acceptance.mjs') : undefined
@@ -2504,6 +2520,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const taskModel = video ?? (taskSmoke || mirrorSmoke || composerSmoke ? await startWindowsTaskModelFixture({
     browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke, composerAcceptance
   }) : undefined)
+  await recordTaskPhase('starting-installed-application')
   const model = video?.model ?? 'windows-task-fixture'
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
@@ -2566,10 +2583,12 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     assert.equal(actualSettings.theme, 'dark')
     assert.equal(actualSettings.workspaceRoot, workspace)
     if (taskSmoke) {
+      await recordTaskPhase('checking-installed-runtime-file-permissions')
       report.permissionRuntime = await runInstalledWindowsPermissionAcceptance({ executable, evidenceDir, temporaryRoot: tmpdir(), environment })
       validateWindowsPermissionRuntimeEvidence(report.permissionRuntime)
       report.checks.push('installed-runtime-file-permission')
     }
+    await recordTaskPhase('checking-installed-workbench')
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
@@ -2620,7 +2639,13 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         skill.entryRegisteredInAsar = true
       }
       await cdp.fill('input[placeholder*="已索引"]', skill.name || skill.id)
-      await cdp.wait(`document.body.innerText.includes(${JSON.stringify(skill.root)}) && Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===${JSON.stringify(skill.name || skill.id)})`, `${skill.id} in its actual local package directory`)
+      const localRoots = [skill.root]
+      // KUN can resolve the verified owned copy while the marketplace shows
+      // the byte-identical original bundled skill directory.
+      if (verifiedBundledSkillCopy(skill)) {
+        localRoots.push(join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', skill.id))
+      }
+      await cdp.wait(`${JSON.stringify(localRoots)}.some(root=>document.body.innerText.includes(root)) && Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===${JSON.stringify(skill.name || skill.id)})`, `${skill.id} in a verified local package directory`)
     }
     await cdp.fill('input[placeholder*="已索引"]', '')
     await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'the catalog after clearing the local Skill search')
@@ -2722,6 +2747,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="用户使用手册"] img')).some(image=>image.complete && image.naturalWidth>0)`, 'a packaged manual image offline')
     report.checks.push('offline-help-images')
     if (taskSmoke) {
+      await recordTaskPhase('creating-ordinary-task-through-the-installed-composer')
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
       await cdp.click('.ds-settings-sidebar button', '返回')
       await cdp.wait(`!document.querySelector('.ds-settings-sidebar')`, 'the main workspace after leaving help')
@@ -2933,6 +2959,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           byteHashMatches: createHash('sha256').update(bytes).digest('hex') === artifact.sha256 },
         schedule: { ...schedule.schedule, id: schedule.id, enabled: schedule.enabled, nextRunAt: schedule.nextRunAt, readBackFromTool: true },
         browserSkill: { status: 'not_exercised', reason: 'A real connected BrowserSkill extension requires a separate installed-browser session.' } }
+      await recordTaskPhase('verified-html-bytes-and-daily-schedule-readback')
       if (browserSmoke) {
         const outputs = execution.turns.flatMap(turn => turn.items).filter(item => item.kind === 'tool_result' && item.isError !== true)
         const output = name => outputs.find(item => item.toolName === name)?.output
@@ -2979,6 +3006,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const automaticPreview = await cdp.wait(previewExpression, 'automatic task HTML preview in the active conversation', 30_000)
       assert.ok(automaticPreview.partition?.startsWith('railwise-artifact-'), 'The automatic task preview must use its isolated partition')
       report.taskExecution.preview = { ...automaticPreview, automatic: true, originThreadId: task.originThreadId }
+      await recordTaskPhase('observed-automatic-html-preview')
       const automaticScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
       await writeFile(join(evidenceDir, 'windows-task-html-auto-preview-zh-dark.png'), Buffer.from(automaticScreenshot.data, 'base64'))
       const manualPreviewPassed = await inspectWindowsManualPreview(report, async () => {
@@ -3094,6 +3122,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       assert.deepEqual(restored.nodes.find(node => node.id === 'schedule').config, schedule.schedule)
       report.taskExecution.dueOccurrence.originalDailyScheduleRestored = true
       validateWindowsTaskEvidence(report.taskExecution)
+      await recordTaskPhase('verified-due-occurrence-and-restored-daily-schedule')
       report.checks.push('runtime-task-html-and-daily-schedule')
     }
     if (composerModule && composerAcceptance) {
@@ -3159,6 +3188,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       try { report.failureLogs = await readWindowsFailureLogs(profile, output) } catch { report.failureLogs = { readUnavailable: true } }
     }
   } finally {
+    await recordTaskPhase('closing-owned-application')
     await stopBindingPostAudit?.()
     mainCdp?.close()
     realBrowser?.cdp.close()
@@ -3182,12 +3212,14 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
-    await taskModel?.close()
+    await recordTaskPhase('closing-owned-model-fixture')
+    try { await taskModel?.close() } catch (error) { report.errors.push(error.message) }
     try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
     await writeFile(join(evidenceDir, 'windows-ui-smoke.json'), `${JSON.stringify(report, null, 2)}\n`)
+    await recordTaskPhase('wrote-acceptance-report')
   }
   if (report.status !== 'passed') throw new Error(`Exact Windows Chinese UI smoke failed: ${report.errors.join('; ')}`)
   return report
