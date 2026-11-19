@@ -61,13 +61,14 @@ function expandScanPdf(bytes) {
   return Buffer.concat([bytes.subarray(0, position), padding, Buffer.from(trailer)])
 }
 
-export function createComposerModelAcceptance() {
+export function createComposerModelAcceptance(parseToolOutput = value => JSON.parse(value)) {
   const observations = { skillRead: false, pluginRead: false, scanSent: false, chineseTextSent: false }
+  const skillReadEvidence = {}
   const skillTurnMarker = `railwise-skill-check-${randomUUID()}`
   const pluginTurnMarker = `railwise-plugin-check-${randomUUID()}`
   let skillId
   return {
-    observations, skillTurnMarker, pluginTurnMarker,
+    observations, skillReadEvidence, skillTurnMarker, pluginTurnMarker,
     setSkillId(value) { skillId = value },
     modelAction(body) {
       const messages = body.messages ?? []
@@ -83,7 +84,18 @@ export function createComposerModelAcceptance() {
         const id = `composer-${selected}`
         const readback = messages.find(item => item.role === 'tool' && item.tool_call_id === id)
         if (readback) {
-          assert.ok(literal(readback.content).includes('remotion render'), 'Real installed plugin documentation must be read')
+          const resource = parseToolOutput(readback.content)
+          const check = {
+            parsed: Boolean(resource),
+            code: typeof resource?.code === 'string' && /^[a-z_]{1,80}$/.test(resource.code) ? resource.code : undefined,
+            skillMatches: resource?.skill_id === skillId,
+            pathMatches: resource?.path === 'references/pipeline.md',
+            bytes: typeof resource?.content === 'string' ? Buffer.byteLength(resource.content) : 0,
+            commandSnippet: /remotion\s+render/i.test(resource?.content ?? '')
+          }
+          skillReadEvidence[selected] = check
+          assert.ok(check.skillMatches && check.pathMatches && check.commandSnippet,
+            `Expected actual Skill resource evidence: ${literal(check)}`)
           observations[selected] = true
           return { content: selected === 'pluginRead' ? '插件读取验收通过' : '技能读取验收通过' }
         }

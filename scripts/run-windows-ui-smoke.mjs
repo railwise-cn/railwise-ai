@@ -2514,7 +2514,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const video = videoEvaluation ? await import('./verify-windows-video-evaluation.mjs')
     .then(module => module.startWindowsVideoEvaluation(workspace, environment)) : undefined
   const composerModule = composerSmoke ? await import('./verify-windows-composer-acceptance.mjs') : undefined
-  const composerAcceptance = composerModule?.createComposerModelAcceptance()
+  const composerAcceptance = composerModule?.createComposerModelAcceptance(parseFixtureToolOutput)
   const taskModel = video ?? (taskSmoke || mirrorSmoke || composerSmoke ? await startWindowsTaskModelFixture({
     browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke, composerAcceptance
   }) : undefined)
@@ -3211,7 +3211,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       }
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
-    if (taskModel) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
+    if (taskModel) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure,
+      ...(composerAcceptance ? { composer: composerAcceptance.observations, skillReadEvidence: composerAcceptance.skillReadEvidence } : {}) }
     if (taskModel) {
       let closeTimer
       try {
