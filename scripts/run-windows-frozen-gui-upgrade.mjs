@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, createPrivateKey, randomUUID, X509Certificate } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:https'
 import { join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 import { parseByteRange } from './frozen-release-updater-feed.mjs'
+import { boundedCommand } from './updater-acceptance-process.mjs'
 import { inspectInstaller, inspectInstalledPackage, installIdentity } from './verify-windows-install-smoke.mjs'
 import {
   attachPackagedRenderer, installExactNsis, ownedInstallState, powershell, psQuote,
@@ -85,32 +86,46 @@ async function officialBaseline(root, version) {
   return { identity, installer: { path, sha256: release.sha256, size: release.size } }
 }
 
-async function createPrivateTrust(root) {
-  const certificate = join(root, 'private-updater.pfx')
-  const password = randomUUID()
-  const friendlyName = `RailWise ephemeral update smoke ${randomUUID()}`
-  const remove = () => powershell(`
-    $ErrorActionPreference = 'Stop'
-    foreach ($store in @('My','Root')) {
-      Get-ChildItem "Cert:\\CurrentUser\\$store" | Where-Object FriendlyName -eq ${psQuote(friendlyName)} | Remove-Item
-    }
-  `)
+export async function createPrivateTrust(root) {
+  const tlsDirectory = await mkdtemp(join(root, 'private-tls-'))
   try {
-    powershell(`
-      $ErrorActionPreference = 'Stop'
-      $cert = New-SelfSignedCertificate -Type Custom -Subject 'CN=RailWise ephemeral updater' -FriendlyName ${psQuote(friendlyName)} \`
-        -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddHours(1) -KeyExportPolicy Exportable \`
-        -HashAlgorithm SHA256 -KeyUsage DigitalSignature,KeyEncipherment -TextExtension @('2.5.29.17={text}ipaddress=127.0.0.1','2.5.29.37={text}1.3.6.1.5.5.7.3.1')
-      $secure = ConvertTo-SecureString ${psQuote(password)} -AsPlainText -Force
-      Export-PfxCertificate -Cert $cert -FilePath ${psQuote(certificate)} -Password $secure -CryptoAlgorithmOption AES256_SHA256 | Out-Null
-      $root = [System.Security.Cryptography.X509Certificates.X509Store]::new('Root','CurrentUser')
-      try { $root.Open('ReadWrite'); $root.Add($cert) } finally { $root.Close() }
-    `, 30_000)
-    return { pfx: await readFile(certificate), passphrase: password, remove }
-  } catch (error) {
-    remove()
-    throw error
+    const config = join(tlsDirectory, 'openssl.cnf')
+    const certFile = join(tlsDirectory, 'loopback.pem')
+    const keyFile = join(tlsDirectory, 'loopback.key')
+    await writeFile(config, [
+      '[req]', 'prompt=no', 'distinguished_name=dn', 'x509_extensions=ext',
+      '[dn]', 'CN=127.0.0.1',
+      '[ext]', 'subjectAltName=IP:127.0.0.1', 'basicConstraints=critical,CA:FALSE',
+      'keyUsage=critical,digitalSignature,keyEncipherment', 'extendedKeyUsage=serverAuth', ''
+    ].join('\n'), { mode: 0o600 })
+    boundedCommand('openssl', [
+      'req', '-new', '-newkey', 'rsa:2048', '-x509', '-sha256', '-nodes', '-days', '1',
+      '-keyout', keyFile, '-out', certFile, '-config', config
+    ], { timeoutMs: 15_000, windowsHide: true })
+    const [cert, key] = await Promise.all([readFile(certFile), readFile(keyFile)])
+    const leaf = new X509Certificate(cert)
+    const now = Date.now()
+    assert.ok(!leaf.ca && leaf.checkIP('127.0.0.1') === '127.0.0.1' &&
+      leaf.verify(leaf.publicKey) && leaf.checkPrivateKey(createPrivateKey(key)) &&
+      now >= Date.parse(leaf.validFrom) && now <= Date.parse(leaf.validTo),
+    'The disposable HTTPS certificate must be a valid runner-local leaf with a matching key')
+    const spkiSha256 = createHash('sha256').update(leaf.publicKey.export({ type: 'spki', format: 'der' })).digest('base64')
+    return { cert, key, spkiSha256 }
+  } finally {
+    await rm(tlsDirectory, { recursive: true, force: true })
   }
+}
+
+export function privateFeedArguments(feed, profile) {
+  if (!feed) return []
+  const url = new URL(feed.url)
+  assert.ok(url.protocol === 'https:' && url.hostname === '127.0.0.1' && url.port &&
+    !url.username && !url.password && !url.search && !url.hash &&
+    /^\/private-[a-f0-9-]{36}\/$/.test(url.pathname), 'The private updater feed must use the runner-local HTTPS origin')
+  assert.match(feed.spkiSha256, /^[A-Za-z0-9+/]{43}=$/)
+  // The pin trusts only this one throwaway leaf in the isolated GUI process.
+  // The updater's Electron net session handles both manifest and installer downloads.
+  return [`--user-data-dir=${profile}`, `--ignore-certificate-errors-spki-list=${feed.spkiSha256}`]
 }
 
 async function openPrivateFeed(trust, target) {
@@ -122,7 +137,7 @@ async function openPrivateFeed(trust, target) {
   const blockmapStat = await lstat(blockmap).catch(() => null)
   if (blockmapStat?.isFile()) files.set(`${name}.blockmap`, { path: blockmap, size: blockmapStat.size })
   const requests = { manifest: 0, installerBytes: 0 }
-  const server = createServer({ pfx: trust.pfx, passphrase: trust.passphrase }, (request, response) => {
+  const server = createServer({ cert: trust.cert, key: trust.key }, (request, response) => {
     const path = request.url?.split('?')[0]
     response.setHeader('Cache-Control', 'no-store')
     if (!['GET', 'HEAD'].includes(request.method) || !path?.startsWith(prefix)) { response.writeHead(404).end(); return }
@@ -150,14 +165,17 @@ async function openPrivateFeed(trust, target) {
   await new Promise((ready, reject) => { server.once('error', reject); server.listen({ host: '127.0.0.1', port: 0, exclusive: true }, ready) })
   const url = `https://127.0.0.1:${server.address().port}${prefix}`
   const close = () => new Promise(done => { server.close(done); server.closeAllConnections() })
-  return { url, requests, close }
+  return { url, spkiSha256: trust.spkiSha256, requests, close }
 }
 
-async function launchOwned(executable, cwd, feedUrl) {
+async function launchOwned(executable, cwd, profile, feed) {
   const env = { ...process.env }
-  for (const key of Object.keys(env)) if (/SECRET|TOKEN|PASSWORD|PRIVATE_KEY|API_KEY|^(WORKWISE_|CSC_|R2_|S3_|NODE_OPTIONS|NODE_TLS_REJECT_UNAUTHORIZED|ELECTRON_RUN_AS_NODE|RELEASE_CHANNEL)/i.test(key)) delete env[key]
-  if (feedUrl) Object.assign(env, { WORKWISE_UPDATE_URL_STABLE: feedUrl, WORKWISE_UPDATE_PROVIDER: 'generic' })
-  const child = spawn(executable, ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN'], { cwd, env })
+  for (const key of Object.keys(env)) if (/SECRET|TOKEN|PASSWORD|PRIVATE_KEY|API_KEY|^(WORKWISE_|CSC_|R2_|S3_|NODE_OPTIONS|NODE_EXTRA_CA_CERTS|NODE_TLS_REJECT_UNAUTHORIZED|ELECTRON_RUN_AS_NODE|RELEASE_CHANNEL)/i.test(key)) delete env[key]
+  if (feed) Object.assign(env, { WORKWISE_UPDATE_URL_STABLE: feed.url, WORKWISE_UPDATE_PROVIDER: 'generic' })
+  const child = spawn(executable, [
+    '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN',
+    ...privateFeedArguments(feed, profile)
+  ], { cwd, env })
   let port, failure, output = ''
   child.once('error', error => { failure = error })
   for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => {
@@ -263,6 +281,7 @@ async function main(args) {
   const seedSchedule = version => writeFile(join(profile, 'gui-update-schedule.json'), JSON.stringify({ appVersion: version, lastCheckedAt: new Date(Date.now() - oneHour).toISOString() }))
 
   const report = { status: 'running', scope: 'private-frozen-windows-gui-upgrade', productionTouched: false,
+    privateTransport: 'per-process leaf SPKI pin for loopback HTTPS', systemTrustModified: false,
     driverSource: process.env.GITHUB_SHA, baseline: { installer: baseline.installer }, targetBuild: target.source, steps: [] }
   const save = () => writeFile(join(evidence, 'frozen-windows-update.json'), `${JSON.stringify(report, null, 2)}\n`)
   let trust, feed, running, thread
@@ -274,7 +293,7 @@ async function main(args) {
     await seedSchedule(baseVersion)
     trust = await createPrivateTrust(root)
     feed = await openPrivateFeed(trust, target)
-    running = await launchOwned(executable, root, feed.url)
+    running = await launchOwned(executable, root, profile, feed)
     assert.equal(await running.cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
     await running.cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(r=>r.ok)`, 'installed KUN service')
     thread = await running.cdp.evaluate(`(async()=>{
@@ -291,7 +310,7 @@ async function main(args) {
       await feed.close()
       feed = index === 0 && next ? await openPrivateFeed(trust, next) : null
       await seedSchedule(item.identity.version)
-      running = await launchOwned(executable, root, feed?.url)
+      running = await launchOwned(executable, root, profile, feed)
       assert.equal(await running.cdp.evaluate('window.workwise.getAppVersion()'), item.identity.version)
       await running.cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(r=>r.ok)`, 'upgraded KUN service')
       const actual = { expectedVersion: item.identity.version, expectedSource: item.identity.sourceHead, installerSha256: item.installer.sha256,
@@ -311,7 +330,6 @@ async function main(args) {
     running?.cdp.close()
     await closeOwnedWindows(executable).catch(() => undefined)
     await feed?.close()
-    trust?.remove()
     await save()
   }
 }

@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { createHash, X509Certificate } from 'node:crypto'
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { assertPublishedWindowsUpgrade, repairedScheduleSeed, sidebarUpgradeControlSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
-import { verifyFrozenWindowsReadback } from './run-windows-frozen-gui-upgrade.mjs'
+import { createPrivateTrust, privateFeedArguments, verifyFrozenWindowsReadback } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const installer = { url: 'RailWise-AI-0.5.7-win-x64.exe', size: 317686658, sha512: manifestDigest }
@@ -108,6 +111,39 @@ test('frozen Windows acceptance preserves native package identity and the local 
   assert.throws(() => verifyFrozenWindowsReadback({ ...result, threadPreserved: false }, target))
   assert.throws(() => verifyFrozenWindowsReadback({ ...result, registry: { displayVersion: '0.5.7' } }, target))
   assert.throws(() => verifyFrozenWindowsReadback({ ...result, installerSha256: '0'.repeat(64) }, target))
+})
+
+test('the frozen Windows updater pin is bound to one disposable loopback leaf and an isolated GUI profile', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-windows-updater-test-'))
+  try {
+    const first = await createPrivateTrust(root)
+    const second = await createPrivateTrust(root)
+    const certificate = new X509Certificate(first.cert)
+    const profile = join(root, 'test profile')
+    assert.equal(certificate.ca, false)
+    assert.equal(certificate.checkIP('127.0.0.1'), '127.0.0.1')
+    assert.notEqual(first.spkiSha256, second.spkiSha256)
+    assert.equal(first.spkiSha256, createHash('sha256').update(certificate.publicKey.export({ type: 'spki', format: 'der' })).digest('base64'))
+    assert.deepEqual(await readdir(root), [], 'The fixture must leave no certificate or key files behind')
+    const origin = 'https://127.0.0.1:8080'
+    const path = '/private-9e4df742-d266-4765-b9a7-d27e9abcef94/'
+    const feed = { url: origin + path, spkiSha256: first.spkiSha256 }
+    assert.deepEqual(privateFeedArguments(feed, profile), [
+      `--user-data-dir=${profile}`,
+      `--ignore-certificate-errors-spki-list=${first.spkiSha256}`
+    ])
+    assert.deepEqual(privateFeedArguments(null, profile), [])
+    const urlWithCredentials = new URL(feed.url)
+    urlWithCredentials.username = 'fixture-user'
+    urlWithCredentials.password = 'fixture-password'
+    for (const url of [origin, `http://127.0.0.1:8080${path}`, `https://example.com:8080${path}`,
+      `https://127.0.0.1${path}`, urlWithCredentials.href, feed.url + '?query', feed.url + '#fragment']) {
+      assert.throws(() => privateFeedArguments({ ...feed, url }, profile))
+    }
+    assert.throws(() => privateFeedArguments({ ...feed, spkiSha256: first.spkiSha256 + ',' + second.spkiSha256 }, profile))
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test('frozen Windows acceptance pins the original artifact and builds the next installer inside its runner', async () => {
