@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
 import { validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
-import { validateStartupAppearance } from './verify-packaged-startup-appearance.mjs'
+import { findStartupTargets, validateStartupAppearance } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const dark = { htmlLang: 'zh-CN', theme: 'dark', scale: 1.25 }
@@ -28,6 +28,13 @@ test('rejects a version label, wrong scale and clipped Chinese text', () => {
   const snapshot = observed()
   snapshot.geometry.textLines[1] = box(90, 105, 160, 18)
   assert.throws(() => validateStartupAppearance(snapshot, dark), /fit inside/)
+})
+
+test('finds the loading splash before Chromium reports its title', () => {
+  const splash = { title: '', url: 'data:text/html;charset=UTF-8,%3C!doctype%20html%3E' }
+  const workbench = { title: '', url: 'file:///D:/RailWise%20AI/resources/app.asar/out/renderer/index.html' }
+  assert.deepEqual(findStartupTargets([workbench, splash]), { splash, workbench })
+  assert.deepEqual(findStartupTargets([workbench]), { splash: undefined, workbench })
 })
 
 test('selects the scoped startup runner without starting regular UI or task fixtures', async () => {
