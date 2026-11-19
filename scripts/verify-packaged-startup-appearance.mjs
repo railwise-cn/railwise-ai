@@ -75,6 +75,15 @@ async function collectTargets(launch, profile, port) {
   return { port, targets: (Array.isArray(targets) ? targets : []).filter(target => target.type === 'page' && target.webSocketDebuggerUrl?.startsWith(`ws://127.0.0.1:${port}/`)) }
 }
 
+export function findStartupTargets(targets) {
+  return {
+    // A new data document is discoverable before Chromium sets its title.
+    // observeSplash identifies the actual surface through the loaded DOM.
+    splash: targets.find(target => /^data:text\/html(?:;[^,]*)?,/i.test(target.url)),
+    workbench: targets.find(target => /^file:.*\/renderer\/index\.html(?:[?#]|$)/.test(target.url))
+  }
+}
+
 export async function observeInstalledStartup(options, expected, dependencies) {
   const { executable, version, evidenceDir, temporary } = options
   const { connectCdp, environmentForRoot, onWorkbench } = dependencies
@@ -95,7 +104,9 @@ export async function observeInstalledStartup(options, expected, dependencies) {
   const launch = { output: '', error: undefined }
   child.once('error', error => { launch.error = error })
   for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => { launch.output = (launch.output + bytes).slice(-8000) })
-  let observation, screenshot, main, port
+  let observation, screenshot, main, port, startupCdpError
+  let sawSplash = false
+  let sawWorkbench = false
   let requestedMacTermination = false
   try {
     const deadline = Date.now() + 35_000
@@ -104,37 +115,39 @@ export async function observeInstalledStartup(options, expected, dependencies) {
       assert.equal(child.exitCode, null, 'Installed application exited before startup observation')
       const observed = await collectTargets(launch, profile, port)
       port = observed.port
-      const splash = observed.targets.find(target => /^data:text\/html(?:;[^,]*)?,/i.test(target.url) && target.title === brand.platform)
-      if (!observation && splash) {
+      const { splash, workbench } = findStartupTargets(observed.targets)
+      sawSplash ||= Boolean(splash)
+      sawWorkbench ||= Boolean(workbench)
+      if (splash && (!observation || expected.screenshotName && !screenshot)) {
         let splashCdp
         try {
           splashCdp = await connectCdp(splash.webSocketDebuggerUrl)
           const snapshot = await splashCdp.evaluate(`(${observeSplash.toString()})()`, 1000)
           if (snapshot) {
+            observation = snapshot
             if (expected.screenshotName) {
               const capture = await splashCdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 2000)
               screenshot = Buffer.from(capture.data, 'base64')
             }
-            observation = snapshot
           }
-        } catch { /* The next poll can still capture the transient window. */ }
+        } catch (error) { startupCdpError = error.message }
         finally { splashCdp?.close() }
       }
-      const renderer = observed.targets.find(target => /^file:.*\/renderer\/index\.html(?:[?#]|$)/.test(target.url))
-      if (renderer && !splash) {
-        main = await connectCdp(renderer.webSocketDebuggerUrl)
+      if (workbench && observation && !splash) {
+        main = await connectCdp(workbench.webSocketDebuggerUrl)
         break
       }
       await wait(45)
     }
+    const startupTrace = `splash target: ${sawSplash}, workbench target: ${sawWorkbench}${startupCdpError ? `, CDP: ${startupCdpError}` : ''}`
+    assert.ok(observation, `The real transitional startup window was not captured (${startupTrace})`)
     assert.ok(main, 'The installed startup window must close and reveal the workbench')
-    assert.ok(observation, 'The real transitional startup window was not captured')
     validateStartupAppearance(observation, expected)
     await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
     await onWorkbench?.(main, { root, workspace })
     if (expected.screenshotName) {
-      assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
+      assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), `Actual startup screenshot is missing (${startupTrace})`)
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
     }
   } finally {
