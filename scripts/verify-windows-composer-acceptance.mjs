@@ -231,8 +231,10 @@ async function verifyPersistedSkillRead(cdp, threadId, selected, marker, skillId
     const bytes = new TextEncoder().encode(typeof output?.content === 'string' ? output.content : '')
     const digest = await crypto.subtle.digest('SHA-256', bytes)
     return {
-      callMatches: call.toolName === 'read_skill_resource' && call.arguments?.skill_id === ${literal(skillId)}
-        && call.arguments?.path === ${literal(pipelinePath)},
+      // KUN keeps raw tool arguments ephemeral. The exact call ID was matched
+      // above, and the linked result carries the executed Skill ID and path.
+      callMatches: call.toolName === 'read_skill_resource',
+      argumentsRedacted: Object.keys(call.arguments ?? {}).length === 0,
       resultMatches: result.toolName === 'read_skill_resource' && result.isError !== true && output?.skill_id === ${literal(skillId)}
         && output?.path === ${literal(pipelinePath)},
       declaredBytes: output?.bytes_returned,
@@ -244,7 +246,7 @@ async function verifyPersistedSkillRead(cdp, threadId, selected, marker, skillId
   })()`
   const record = await cdp.wait(expression, `persisted tool result from ${selected}`, 35_000)
   acceptance.persistedSkillEvidence[selected] = record
-  assert.ok(record.callMatches && record.resultMatches, 'Persisted tool receipt must match the same exact Skill and resource')
+  assert.ok(record.callMatches && record.argumentsRedacted && record.resultMatches, 'Persisted tool receipt must match the exact Skill and resource without retaining raw arguments')
   assert.equal(record.offset, 0)
   assert.equal(record.nextOffset, null)
   assert.equal(record.bytes, pipelineBytes)
