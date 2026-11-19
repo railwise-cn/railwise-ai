@@ -113,7 +113,7 @@ export function MessageTimeline({
   })
 
   const heroRoute: 'chat' | 'claw' = route === 'claw' ? 'claw' : 'chat'
-  const hasContent = blocks.length > 0 || live || liveReasoning
+  const hasContent = blocks.length > 0 || Boolean(live || liveReasoning)
   const endRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -142,6 +142,7 @@ export function MessageTimeline({
     busy,
     scrollDeps: {
       contentKey: scrollContentKey,
+      followEnd: hasContent,
       streaming: Boolean(live.trim() || liveReasoning.trim()),
       userTurnKey: currentTurnUserId ?? ''
     }

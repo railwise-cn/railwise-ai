@@ -2731,7 +2731,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
       await cdp.wait(`Boolean(document.querySelector('textarea[placeholder="向智能体提问…"]:not(:disabled)'))`, 'the active conversation composer')
       let previewEvidence
-      if (browserSmoke) {
+      if (browserSmoke || composerSmoke) {
         report.adaptiveWorkbench = { status: 'running', menus: [] }
         report.adaptiveWorkbench = await runWindowsAdaptiveComposerAcceptance(cdp, { pid: child.pid, environment, audit: report.adaptiveWorkbench })
         report.checks.push('native-window-composer-menus-and-narrow-navigation')

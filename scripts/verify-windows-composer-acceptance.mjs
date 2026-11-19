@@ -8,7 +8,7 @@ import { psQuote } from './run-windows-published-gui-update-smoke.mjs'
 const literal = JSON.stringify
 const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
 const addMenu = 'button[aria-label="更多操作"]'
-const sendButton = 'button[aria-label="发送"]'
+const sendButton = 'button[aria-label="发送"]:not(:disabled)'
 const removeAttachment = 'button[aria-label="移除附件"]'
 const fontMap = '铁路合成验收'
 const textName = '中文文字样本.pdf'
@@ -124,12 +124,15 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   const files = { scan: join(workspace, scanName), text: join(workspace, textName), invalid: join(workspace, invalidName) }
   const scan = expandScanPdf(await readFile(new URL('../test/fixtures/document-quality/synthetic-image-only-scan.pdf', import.meta.url)))
   await Promise.all([writeFile(files.scan, scan), writeFile(files.text, createChineseTextPdf()), writeFile(files.invalid, '%PDF-1.7\ninvalid\n%%EOF\n')])
+  const threadList = "window.workwise.runtimeRequest('/v1/threads','GET').then(result=>JSON.parse(result.body).threads)"
+  const previousThreads = (await cdp.evaluate(threadList)).map(thread => thread.id)
   await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
   await cdp.wait(`Boolean(document.querySelector(${literal(composer)}))`, 'the real chat composer')
+  const threadId = await cdp.wait(`${threadList}.then(items=>items.find(item=>!${literal(previousThreads)}.includes(item.id))?.id)`, 'new owned conversation')
   await cdp.click(composer)
   // Explorer's file clipboard format is set natively in the isolated runner.
   execFileSync('powershell.exe', ['-NoProfile', '-STA', '-Command',
-    `Add-Type -AssemblyName System.Windows.Forms; $files = New-Object System.Collections.Specialized.StringCollection; [void]$files.Add(${psQuote(files.scan)}); [Windows.Forms.Clipboard]::SetFileDropList($files)`],
+    `Add-Type -AssemblyName System.Windows.Forms; $files = New-Object System.Collections.Specialized.StringCollection; [void]$files.Add(${psQuote(files.scan)}); [System.Windows.Forms.Clipboard]::SetFileDropList($files)`],
   { windowsHide: true, timeout: 15_000 })
   await key(cdp, 'v', 'KeyV', 86, 2)
   await cdp.wait(`document.body.innerText.includes(${literal(scanName)}) && document.body.innerText.includes('未提取')`, 'native pasted scanned PDF marked as missing text', 120_000)
@@ -146,7 +149,10 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   assert.ok(nodeId)
   await cdp.send('DOM.setFileInputFiles', { nodeId, files: [files.text] })
   await cdp.send('Page.setInterceptFileChooserDialog', { enabled: false })
-  await cdp.wait(`document.body.innerText.includes(${literal(textName)}) && document.body.innerText.includes('已就绪')`, 'text PDF loaded through the chooser', 120_000)
+  await cdp.wait(`(() => {
+    const chip = [...document.querySelectorAll('.ds-floating-composer span')].find(item=>item.textContent.trim()===${literal(textName)})?.parentElement
+    return Boolean(chip && /已就绪|文字提取受限/.test(chip.innerText) && chip.querySelector('[aria-label="在文件夹中显示原件"]'))
+  })()`, 'text PDF loaded through the chooser', 120_000)
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '中文 PDF 文字已送达')
 
@@ -155,7 +161,10 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.send('Input.dispatchDragEvent', { type: 'dragEnter', ...drag })
   await cdp.send('Input.dispatchDragEvent', { type: 'dragOver', ...drag })
   await cdp.send('Input.dispatchDragEvent', { type: 'drop', ...drag })
-  await cdp.wait(`document.body.innerText.includes(${literal(invalidName)}) && document.body.innerText.includes('损坏')`, 'damaged PDF feedback from the real drop', 120_000)
+  await cdp.wait(`(() => {
+    const chip = [...document.querySelectorAll('.ds-floating-composer span')].find(item=>item.textContent.trim()===${literal(invalidName)})?.parentElement
+    return Boolean(chip && chip.innerText.includes('读取失败'))
+  })()`, 'damaged PDF feedback from the real drop', 120_000)
   await cdp.click(removeAttachment)
 
   const installed = await cdp.evaluate(`(async () => {
@@ -171,11 +180,13 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   assert.equal(installed.packageId, 'video-shotcraft')
   const skill = await cdp.wait(`window.workwise.runtimeRequest(${literal(`/v1/skills?${new URLSearchParams({ scope: 'available', workspace })}`)},'GET').then(result=>result.ok&&JSON.parse(result.body).skills.find(item=>item.name==='video-shotcraft'))`, 'installed Video Shotcraft loaded by KUN', 90_000)
   acceptance.setSkillId(skill.id)
+  const plugin = await cdp.wait(`window.workwise.runtimeRequest('/v1/capabilities/callable','POST',${literal(literal({ threadId, mode: 'agent' }))})
+    .then(result=>result.ok&&JSON.parse(result.body).choices.find(item=>item.kind==='plugin'&&item.id==='video-shotcraft'))`, 'plugin callable in the selected conversation')
 
   await cdp.fill(composer, `${acceptance.skillTurnMarker} 请读取分镜流程说明。`)
   await cdp.click(addMenu)
   await cdp.click('button', '技能')
-  await cdp.click('[role="option"] .truncate', 'Video Shotcraft')
+  await cdp.click('[role="option"] .truncate', skill.name)
   await cdp.wait(`document.querySelector(${literal(composer)})?.value.includes(${literal(`/skill:${skill.id}`)})`, 'the exact inserted skill ID in the existing draft')
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '技能读取验收通过')
@@ -183,7 +194,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.fill(composer, `${acceptance.pluginTurnMarker} 请读取插件分镜说明。`)
   await cdp.click(addMenu)
   await cdp.click('button', '插件与连接器')
-  await cdp.click('[role="option"] .truncate', 'Video Shotcraft')
+  await cdp.click('[role="option"] .truncate', plugin.label)
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '插件读取验收通过')
   assert.deepEqual(acceptance.observations, { skillRead: true, pluginRead: true, scanSent: true, chineseTextSent: true })

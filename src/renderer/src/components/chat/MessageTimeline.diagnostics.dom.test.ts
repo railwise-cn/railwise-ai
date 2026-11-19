@@ -201,3 +201,37 @@ describe('conversation execution details', () => {
     expect(container.querySelector('[class*="text-red-"], [class*="bg-red-"]')).toBeNull()
   })
 })
+
+describe('conversation empty state scrolling', () => {
+  it('leaves room for the empty hero and follows the first actual message', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    const host = document.createElement('div')
+    document.body.append(host)
+    const timeline = createRoot(host)
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => undefined)
+    const render = (activeThreadId: string, blocks: ChatBlock[]) => act(async () => timeline.render(createElement(MessageTimeline, {
+      blocks, activeThreadId, runtimeConnection: 'ready', liveReasoning: '', live: '',
+      onRetryConnection: () => undefined, onOpenSettings: () => undefined
+    })))
+    try {
+      await render('new-thread', [])
+      const scroller = host.querySelector<HTMLElement>('.ds-chat-timeline')!
+      expect(scroller.scrollTop).toBe(0)
+      expect(scrollIntoView).not.toHaveBeenCalled()
+
+      await render('new-thread', [{ kind: 'user', id: 'first-message', text: 'Check the file' }])
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'end' })
+      scrollIntoView.mockClear()
+
+      scroller.scrollTop = 300
+      await render('another-empty-thread', [])
+      expect(scroller.scrollTop).toBe(0)
+      expect(scrollIntoView).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => timeline.unmount())
+      host.remove()
+      scrollIntoView.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+})
