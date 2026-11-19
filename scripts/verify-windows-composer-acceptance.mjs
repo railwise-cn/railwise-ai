@@ -3,9 +3,9 @@ import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { psQuote } from './run-windows-published-gui-update-smoke.mjs'
 
 const literal = JSON.stringify
+const psQuote = value => "'" + value.replaceAll("'", "''") + "'"
 const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
 const addMenu = 'button[aria-label="更多操作"]'
 const sendButton = 'button[aria-label="发送"]:not(:disabled)'
