@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -14,6 +14,32 @@ const fontMap = '铁路合成验收'
 const textName = '中文文字样本.pdf'
 const scanName = '扫描宣传册.pdf'
 const invalidName = '损坏样本.pdf'
+const skillReadFailure = '受控验收停止：技能读取证据不匹配。'
+const pipelinePath = 'references/pipeline.md'
+// SHA-256 verified from the locked Windows Video Shotcraft mirror payload.
+const pipelineSha256 = '7593dd38ca5255febfc2778b0ed78b158edee8519e9070328480dd4be15c871e'
+const sha256 = value => createHash('sha256').update(value).digest('hex')
+const toolCode = value => typeof value === 'string' && /^[a-z_]{1,80}$/.test(value) ? value : undefined
+const safeDiagnostic = value => typeof value === 'string'
+  ? value.slice(0, 240).replace(/(?:[a-zA-Z]:[\\/]|\/)(?:[^\s,;]+[\\/])+[^\s,;]+/g, '[local path]')
+  : undefined
+
+function describeResult(resource) {
+  return {
+    parsed: Boolean(resource),
+    keys: Object.keys(resource ?? {}).filter(key => /^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(key)).slice(0, 16),
+    code: toolCode(resource?.code ?? resource?.error?.code),
+    status: toolCode(resource?.status),
+    error: safeDiagnostic(resource?.error?.message ?? resource?.error ?? resource?.message),
+    isError: typeof resource?.isError === 'boolean' ? resource.isError : undefined,
+    spilled: Boolean(resource?.contextSpill),
+    excerptBytes: typeof resource?.excerpt === 'string' ? Buffer.byteLength(resource.excerpt) : undefined
+  }
+}
+
+function requestTool(id, name, args) {
+  return { tool_calls: [{ index: 0, id, type: 'function', function: { name, arguments: literal(args) } }] }
+}
 
 export function createChineseTextPdf() {
   const glyphs = Array.from(fontMap)
@@ -64,6 +90,7 @@ function expandScanPdf(bytes) {
 export function createComposerModelAcceptance(parseToolOutput = value => JSON.parse(value)) {
   const observations = { skillRead: false, pluginRead: false, scanSent: false, chineseTextSent: false }
   const skillReadEvidence = {}
+  const recallRequests = new Map()
   const skillTurnMarker = `railwise-skill-check-${randomUUID()}`
   const pluginTurnMarker = `railwise-plugin-check-${randomUUID()}`
   let skillId
@@ -83,25 +110,65 @@ export function createComposerModelAcceptance(parseToolOutput = value => JSON.pa
         }
         const id = `composer-${selected}`
         const readback = messages.find(item => item.role === 'tool' && item.tool_call_id === id)
-        if (readback) {
-          const resource = parseToolOutput(readback.content)
-          const check = {
-            parsed: Boolean(resource),
-            code: typeof resource?.code === 'string' && /^[a-z_]{1,80}$/.test(resource.code) ? resource.code : undefined,
-            skillMatches: resource?.skill_id === skillId,
-            pathMatches: resource?.path === 'references/pipeline.md',
-            bytes: typeof resource?.content === 'string' ? Buffer.byteLength(resource.content) : 0,
-            commandSnippet: /remotion\s+render/i.test(resource?.content ?? '')
-          }
-          skillReadEvidence[selected] = check
-          assert.ok(check.skillMatches && check.pathMatches && check.commandSnippet,
-            `Expected actual Skill resource evidence: ${literal(check)}`)
-          observations[selected] = true
-          return { content: selected === 'pluginRead' ? '插件读取验收通过' : '技能读取验收通过' }
+        if (!readback) {
+          assert.ok(body.tools?.some(item => item.function?.name === 'read_skill_resource'))
+          return requestTool(id, 'read_skill_resource', { skill_id: skillId, path: pipelinePath })
         }
-        assert.ok(body.tools?.some(item => item.function?.name === 'read_skill_resource'))
-        return { tool_calls: [{ index: 0, id, type: 'function',
-          function: { name: 'read_skill_resource', arguments: literal({ skill_id: skillId, path: 'references/pipeline.md' }) } }] }
+        let resource = parseToolOutput(readback.content)
+        const evidence = describeResult(resource)
+        skillReadEvidence[selected] = evidence
+        const reference = resource?.contextSpill
+        if (reference) {
+          if (typeof reference.bundle_id !== 'string' || typeof reference.object_id !== 'string'
+            || !/^[a-f0-9]{64}$/.test(reference.sha256) || reference.mediaType !== 'application/json'
+            || !Number.isSafeInteger(reference.totalBytes) || reference.totalBytes < 1 || reference.totalBytes > 64 * 1024
+            || !body.tools?.some(item => item.function?.name === 'read_task_context')) {
+            return { content: skillReadFailure }
+          }
+          const slices = []
+          let offset = 0
+          while (offset < reference.totalBytes && slices.length < 16) {
+            const recallId = `${id}-recall-${offset}`
+            const recall = messages.find(item => item.role === 'tool' && item.tool_call_id === recallId)
+            if (!recall) {
+              const args = { bundle_id: reference.bundle_id, object_id: reference.object_id, offset, max_bytes: 4096 }
+              recallRequests.set(recallId, args)
+              return requestTool(recallId, 'read_task_context', args)
+            }
+            const requested = recallRequests.get(recallId)
+            const slice = parseToolOutput(recall.content)
+            const next = typeof slice?.text === 'string' ? offset + Buffer.byteLength(slice.text) : offset
+            if (slice?.sha256 !== reference.sha256 || slice.bundleId !== requested?.bundle_id || slice.objectId !== requested?.object_id
+              || slice.offset !== offset || slice.totalBytes !== reference.totalBytes || next <= offset || next > reference.totalBytes
+              || slice.nextOffset !== (next < reference.totalBytes ? next : null)) {
+              evidence.recall = describeResult(slice)
+              return { content: skillReadFailure }
+            }
+            slices.push(slice.text)
+            offset = next
+          }
+          const original = slices.join('')
+          if (offset !== reference.totalBytes || sha256(original) !== reference.sha256) return { content: skillReadFailure }
+          evidence.recall = { verified: true, bytes: offset, slices: slices.length, sha256: reference.sha256 }
+          resource = parseToolOutput(original)
+        }
+        const contents = typeof resource?.content === 'string' ? resource.content : ''
+        const bytes = Buffer.byteLength(contents)
+        Object.assign(evidence, {
+          status: toolCode(resource?.status) ?? (bytes > 0 ? 'read' : evidence.status),
+          skillMatches: resource?.skill_id === skillId,
+          pathMatches: resource?.path === pipelinePath,
+          bytes,
+          fullPage: bytes > 0 && bytes === resource?.bytes_returned && bytes === resource?.byte_size
+            && resource?.offset_bytes === 0 && resource?.next_offset_bytes === null,
+          ...(bytes > 0 && bytes <= 64 * 1024 ? { sha256: sha256(contents) } : {}),
+          commandSnippet: /remotion\s+render/i.test(contents)
+        })
+        if (!evidence.skillMatches || !evidence.pathMatches || !evidence.fullPage || !evidence.commandSnippet || evidence.sha256 !== pipelineSha256) {
+          return { content: skillReadFailure }
+        }
+        observations[selected] = true
+        return { content: selected === 'pluginRead' ? '插件读取验收通过' : '技能读取验收通过' }
       }
       if (text.includes('请根据附件中实际可读取的内容继续处理') || text.includes('Please use the content you can read')) {
         if (!observations.scanSent && history.includes(scanName)) {
@@ -128,7 +195,12 @@ async function key(cdp, name, code, windowsVirtualKeyCode, modifiers = 0) {
 }
 
 async function continueAfterResponse(cdp, message) {
-  await cdp.wait(`document.body.innerText.includes(${literal(message)}) && Boolean(document.querySelector(${literal(composer)}))`, message, 120_000)
+  const outcome = await cdp.wait(`(() => {
+    const text = document.body.innerText
+    if (text.includes(${literal(skillReadFailure)})) return 'failed'
+    if (text.includes(${literal(message)}) && document.querySelector(${literal(composer)})) return 'passed'
+  })()`, message, 120_000)
+  assert.equal(outcome, 'passed', 'Real Skill readback failed; see bounded modelFixture.skillReadEvidence')
 }
 
 export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptance, checkpoint = async () => {} }) {
