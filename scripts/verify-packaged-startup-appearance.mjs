@@ -77,7 +77,7 @@ async function collectTargets(launch, profile, port) {
 
 export async function observeInstalledStartup(options, expected, dependencies) {
   const { executable, version, evidenceDir, temporary } = options
-  const { connectCdp, environmentForRoot } = dependencies
+  const { connectCdp, environmentForRoot, onWorkbench } = dependencies
   const root = await mkdtemp(join(temporary, 'railwise-splash-'))
   const profile = join(root, 'profile')
   const workspace = join(root, 'workspace')
@@ -87,7 +87,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
   await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: expected.locale, theme: expected.theme, workspaceRoot: workspace,
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
-    agents: { kun: { autoStart: false, dataDir: join(root, 'runtime') } } }))
+    agents: { kun: { autoStart: Boolean(onWorkbench), dataDir: join(root, 'runtime') } } }))
   const child = spawn(executable, [`--user-data-dir=${profile}`, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1',
     `--lang=${expected.htmlLang}`, ...(expected.scale === undefined ? [] : [`--force-device-scale-factor=${expected.scale}`]),
     ...(expected.theme === 'dark' ? ['--force-dark-mode'] : [])],
@@ -132,6 +132,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     validateStartupAppearance(observation, expected)
     await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
+    await onWorkbench?.(main, { root, workspace })
     if (expected.screenshotName) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)

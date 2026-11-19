@@ -7,6 +7,7 @@ import { createRequire } from 'node:module'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { connectCdp } from './run-windows-ui-smoke.mjs'
+import { createChineseTextPdf } from './verify-windows-composer-acceptance.mjs'
 import { observeInstalledStartup } from './verify-packaged-startup-appearance.mjs'
 import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
 
@@ -15,7 +16,8 @@ const acceptedDriverFiles = new Set([
   '.github/workflows/windows-install-smoke.yml',
   'scripts/run-mac-startup-appearance-smoke.mjs',
   'scripts/run-windows-ui-smoke.mjs',
-  'scripts/verify-packaged-startup-appearance.mjs'
+  'scripts/verify-packaged-startup-appearance.mjs',
+  'scripts/verify-windows-startup-appearance.test.mjs'
 ])
 const command = (file, args) => execFileSync(file, args, { encoding: 'utf8', timeout: 90_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const git = (...args) => command('git', args)
@@ -72,6 +74,91 @@ function isolatedMacEnvironment(environment, root) {
     LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' }
 }
 
+export const nativeMacFilePasteboard = `
+import AppKit
+
+let pasteboard = NSPasteboard.general
+let args = CommandLine.arguments
+switch args[1] {
+case "write":
+    let file = URL(fileURLWithPath: args[2])
+    pasteboard.clearContents()
+    if !pasteboard.writeObjects([file as NSURL]) {
+        fatalError("NSPasteboard rejected the file URL")
+    }
+    guard let value = pasteboard.pasteboardItems?.first?.string(forType: .fileURL),
+          let roundTrip = URL(string: value),
+          roundTrip.isFileURL,
+          roundTrip.path == file.path else {
+        pasteboard.clearContents()
+        fatalError("NSPasteboard did not return the written public.file-url")
+    }
+    print(pasteboard.changeCount)
+case "clear":
+    if pasteboard.changeCount == Int(args[2]) {
+        pasteboard.clearContents()
+    }
+default:
+    fatalError("Unsupported file pasteboard operation")
+}
+`
+
+export async function dispatchMacFilePaste(cdp) {
+  const key = { key: 'v', code: 'KeyV', windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 9, modifiers: 8 }
+  await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key, commands: ['Paste'] })
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+}
+
+async function verifyMacFilePaste(cdp, { root, workspace }, report) {
+  assert.equal(process.platform, 'darwin')
+  assert.equal(process.env.GITHUB_ACTIONS, 'true')
+  assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
+  const name = 'Finder 中文粘贴样本.pdf'
+  const pdf = join(workspace, name)
+  const swift = join(root, 'native-file-pasteboard.swift')
+  const helper = join(root, 'native-file-pasteboard')
+  await Promise.all([writeFile(pdf, createChineseTextPdf()), writeFile(swift, nativeMacFilePasteboard)])
+  report.fixture = { name, size: (await stat(pdf)).size, sha256: await sha256(pdf) }
+  command('/usr/bin/swiftc', ['-module-cache-path', join(root, 'swift-cache'), swift, '-o', helper])
+
+  const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
+  await cdp.wait("window.workwise.runtimeRequest('/v1/threads','GET').then(result=>result.ok).catch(()=>false)", 'the isolated local Runtime', 60_000)
+  await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
+  await cdp.click(composer)
+  const selector = JSON.stringify(composer)
+  assert.ok(await cdp.evaluate(`document.activeElement?.matches(${selector})`), 'The visible chat composer must have keyboard focus')
+  await cdp.evaluate(`document.addEventListener('paste', (event) => {
+    if (!event.target.matches(${selector})) return;
+    window.nativeMacAttachmentPaste = {
+      trusted: event.isTrusted, types: Array.from(event.clipboardData?.types ?? []),
+      files: Array.from(event.clipboardData?.files ?? [], ({ name, size }) => ({ name, size }))
+    };
+  }, { capture: true, once: true })`)
+
+  const changeCount = command(helper, ['write', pdf])
+  assert.match(changeCount, /^\d+$/)
+  report.writtenFormat = 'public.file-url'
+  try {
+    await dispatchMacFilePaste(cdp)
+    report.event = await cdp.wait('window.nativeMacAttachmentPaste', 'a real Cmd+V paste event', 15_000)
+    assert.equal(report.event.trusted, true)
+    assert.deepEqual(report.event.files, [{ name, size: report.fixture.size }])
+    report.attachment = await cdp.wait(`(() => {
+      const label = [...document.querySelectorAll('.ds-floating-composer span')].find(item=>item.textContent.trim()===${JSON.stringify(name)});
+      const chip = label?.parentElement;
+      if (!chip) return null;
+      const state = [...chip.children].find(item=>/^(已就绪|文字提取受限|读取失败|已取消)$/.test(item.textContent))?.textContent;
+      return state ? { state, managedOriginal: Boolean(chip.querySelector('[aria-label="在文件夹中显示原件"]')) } : null;
+    })()`, 'the PDF attachment to finish loading', 120_000)
+    assert.match(report.attachment.state, /^(已就绪|文字提取受限)$/)
+    assert.equal(report.attachment.managedOriginal, true)
+    assert.equal(await sha256(pdf), report.fixture.sha256)
+    report.sourceUnchanged = true
+  } finally {
+    command(helper, ['clear', changeCount])
+  }
+}
+
 async function verify(directory, sourceFile, evidenceDir, temporary) {
   const source = validateMacStartupArtifact(await json(sourceFile))
   assert.equal(source.driverHead, process.env.GITHUB_SHA)
@@ -110,15 +197,27 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
   assert.equal(packaged.version, version)
   assert.equal(packaged.buildProvenance?.sourceHead, source.sourceHead)
   const installedAsarSha256 = await sha256(path)
-  const report = { schemaVersion: 1, status: 'failed', source, arch: process.arch, version,
+  const report = { schemaVersion: 1, status: 'failed', startupStatus: 'failed', source, arch: process.arch, version,
     installer: { name, sha256: digest, size }, installed: { bundleId: info.CFBundleIdentifier, installedArch,
-      signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256 }, observations: [] }
+      signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256 },
+    observations: [], nativeFilePaste: { status: 'not-run' } }
   try {
     for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
+      const onWorkbench = expected.locale === 'zh' ? async (cdp, paths) => {
+        try {
+          await verifyMacFilePaste(cdp, paths, report.nativeFilePaste)
+          report.nativeFilePaste.status = 'passed'
+        } catch (error) {
+          report.nativeFilePaste.status = 'failed'
+          report.nativeFilePaste.error = error.message
+        }
+      } : undefined
       report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected,
-        { connectCdp, environmentForRoot: isolatedMacEnvironment }))
+        { connectCdp, environmentForRoot: isolatedMacEnvironment, onWorkbench }))
     }
     assert.equal(await sha256(path), installedAsarSha256)
+    report.startupStatus = 'passed'
+    assert.equal(report.nativeFilePaste.status, 'passed', report.nativeFilePaste.error ?? 'Native Mac PDF paste did not run')
     report.status = 'passed'
   } catch (error) {
     report.error = error.message

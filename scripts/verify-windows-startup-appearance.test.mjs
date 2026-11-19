@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
-import { validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
+import { dispatchMacFilePaste, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { validateStartupAppearance } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
@@ -54,4 +54,14 @@ test('binds native Mac startup acceptance to a successful immutable release buil
   assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['src/main/splash-window.ts'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactExpired: true }))
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactName: 'release-win' }))
+})
+
+test('requests Mac Cmd+V through the trusted native editing route', async () => {
+  const calls = []
+  await dispatchMacFilePaste({ send: async (...args) => calls.push(args) })
+  const key = { key: 'v', code: 'KeyV', nativeVirtualKeyCode: 9, windowsVirtualKeyCode: 86, modifiers: 8 }
+  assert.deepEqual(calls, [
+    ['Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key, commands: ['Paste'] }],
+    ['Input.dispatchKeyEvent', { type: 'keyUp', ...key }]
+  ])
 })
