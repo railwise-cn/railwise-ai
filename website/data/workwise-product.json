@@ -3,55 +3,55 @@
   "name": "RailWise AI",
   "shortName": "RailWise AI",
   "tagline": "桌面端 AI 工作台",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "publishedAt": "2026-11-19",
-  "releaseCommit": "5c25c473e4cdea8ce875fd6be0ceff6317caddf1",
+  "releaseCommit": "4d9f61ba862b8c5e70d507c53cce963a4917e039",
   "releaseChannel": "stable",
-  "releaseUrl": "https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.8",
+  "releaseUrl": "https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.9",
   "repositoryUrl": "https://github.com/railwise-cn/railwise-ai",
   "lastReviewedAt": "2026-11-19",
   "platforms": [
     {
       "id": "macos-apple-silicon",
       "name": "macOS Apple Silicon",
-      "file": "RailWise-AI-0.5.8-mac-Apple-Silicon.dmg",
+      "file": "RailWise-AI-0.5.9-mac-Apple-Silicon.dmg",
       "size": "402.4 MB",
-      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.8/RailWise-AI-0.5.8-mac-Apple-Silicon.dmg",
-      "sha256": "5df86bc3163e02340305d0c0f8a80f160aad44cc83abdb144b64279e4780a465",
+      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.9/RailWise-AI-0.5.9-mac-Apple-Silicon.dmg",
+      "sha256": "0fb309df7c4f73fe74fa0e7b96d5bfc437a0f2c4e6f6023c2a15e4ac96324c66",
       "icon": "fab fa-apple",
       "description": "适合 M 系列芯片的 macOS 设备。",
-      "sizeBytes": 402354432,
-      "downloadUrl": "https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.8/RailWise-AI-0.5.8-mac-Apple-Silicon.dmg",
-      "mirrorSha256": "5df86bc3163e02340305d0c0f8a80f160aad44cc83abdb144b64279e4780a465",
-      "mirrorVerifiedAt": "2026-11-19T00:44:56.222Z"
+      "sizeBytes": 402395197,
+      "downloadUrl": "https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.9/RailWise-AI-0.5.9-mac-Apple-Silicon.dmg",
+      "mirrorSha256": "0fb309df7c4f73fe74fa0e7b96d5bfc437a0f2c4e6f6023c2a15e4ac96324c66",
+      "mirrorVerifiedAt": "2026-11-19T12:23:29Z"
     },
     {
       "id": "macos-intel",
       "name": "macOS Intel",
-      "file": "RailWise-AI-0.5.8-mac-Intel.dmg",
-      "size": "411.2 MB",
-      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.8/RailWise-AI-0.5.8-mac-Intel.dmg",
-      "sha256": "877f2a0a1b067a3ddb193ed4ba64c39213419ce518a88e0f83b6ec17a1617b78",
+      "file": "RailWise-AI-0.5.9-mac-Intel.dmg",
+      "size": "411.1 MB",
+      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.9/RailWise-AI-0.5.9-mac-Intel.dmg",
+      "sha256": "0f2d5c787d05596a3e7b5296a5ffa1a5276ad2ba7ed0c1bcf387b65738e03ce2",
       "icon": "fab fa-apple",
       "description": "适合 Intel 芯片 macOS 设备。",
-      "sizeBytes": 411164396,
-      "downloadUrl": "https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.8/RailWise-AI-0.5.8-mac-Intel.dmg",
-      "mirrorSha256": "877f2a0a1b067a3ddb193ed4ba64c39213419ce518a88e0f83b6ec17a1617b78",
-      "mirrorVerifiedAt": "2026-11-19T00:44:56.222Z"
+      "sizeBytes": 411136357,
+      "downloadUrl": "https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.9/RailWise-AI-0.5.9-mac-Intel.dmg",
+      "mirrorSha256": "0f2d5c787d05596a3e7b5296a5ffa1a5276ad2ba7ed0c1bcf387b65738e03ce2",
+      "mirrorVerifiedAt": "2026-11-19T12:23:29Z"
     },
     {
       "id": "windows-x64",
       "name": "Windows x64",
-      "file": "RailWise-AI-0.5.8-win-x64.exe",
-      "size": "320.8 MB",
-      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.8/RailWise-AI-0.5.8-win-x64.exe",
-      "sha256": "7c07bbb350b1199793c4c4a6273bcab1c57b93518086a54b4cd5b5beb0e3d1ef",
+      "file": "RailWise-AI-0.5.9-win-x64.exe",
+      "size": "320.9 MB",
+      "url": "/downloads/railwise-ai/channels/stable/releases/v0.5.9/RailWise-AI-0.5.9-win-x64.exe",
+      "sha256": "7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c",
       "icon": "fab fa-windows",
       "description": "适合 64 位 Windows 设备。",
-      "sizeBytes": 320835129,
-      "downloadUrl": "https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.8/RailWise-AI-0.5.8-win-x64.exe",
-      "mirrorSha256": "7c07bbb350b1199793c4c4a6273bcab1c57b93518086a54b4cd5b5beb0e3d1ef",
-      "mirrorVerifiedAt": "2026-11-19T00:44:56.222Z"
+      "sizeBytes": 320871735,
+      "downloadUrl": "https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.9/RailWise-AI-0.5.9-win-x64.exe",
+      "mirrorSha256": "7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c",
+      "mirrorVerifiedAt": "2026-11-19T12:23:29Z"
     }
   ],
   "capabilityStatus": {
@@ -73,7 +73,12 @@
       "本地文档与图片附件解析、Word 模板及 Office / PDF 交付校验",
       "工作区权限、Git 检查点与预览回滚",
       "一次点击完成下载校验、内容保存、安全停止、安装与重启",
-      "内置 13 章中文帮助手册，支持离线阅读、全文搜索与章节跳转"
+      "内置 13 章中文帮助手册，支持离线阅读、全文搜索与章节跳转",
+      "本地表格支持多工作表、公式、撤销、CSV 导入导出及 .rwsheet 保存和重开",
+      "工作区和任务成果可查看常见 Excel 工作簿；复杂工作簿可由系统应用打开并保留原文件",
+      "聊天框输入斜杠可搜索当前工作区技能；会话和任务详情显示进度、审批、成果及可展开的命令、错误和重试记录",
+      "官方市场镜像包按版本和平台校验，展示许可证或账号要求；升级保留已装插件、权限和连接配置",
+      "浏览器任务详情可查看网页证据、打开 HTML 成果，并核对每日计划和到期执行记录"
     ],
     "preview": [
       "Flow Preview 工作台与定时任务迁移",
@@ -101,27 +106,27 @@
     "faq": "https://kb.railwise.cn/products/workwise/faq/",
     "changelog": "https://kb.railwise.cn/products/workwise/changelog/"
   },
-  "releaseNotesUrl": "https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.8",
+  "releaseNotesUrl": "https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.9",
   "releaseHighlights": [
     {
-      "title": "离线表格与 Excel 预览",
-      "description": "新建本地工作簿，支持多工作表、公式、撤销与 CSV 导入导出。工作区和任务成果中的常见 Excel 文件可只读预览。"
+      "title": "启动画面与软件中文全称",
+      "description": "启动时显示 RailWise AI、软件中文全称「基于本地优先架构的智能协同工作台」及加载进度。"
     },
     {
-      "title": "技能选择与国内镜像",
-      "description": "输入 / 即可搜索当前工作区可调用的技能。21 项可分发市场包使用睿威官网镜像，Windows 冷缓存验收已覆盖全量安装。"
+      "title": "聊天附件与 PDF 读取",
+      "description": "聊天支持选择、拖放和复制粘贴文件。带文字层的 PDF 可读取，扫描件保留原件和可读页数。已配置本机 OCR 时可尝试识别扫描页。"
     },
     {
-      "title": "会话进度与任务布局",
-      "description": "执行详情默认折叠。会话断线可续传，任务列表位于侧栏，并验证了窄窗下的智能体与模型选择菜单。"
+      "title": "聊天快捷菜单",
+      "description": "「＋」菜单提供附件、技能、目标、计划模式与插件和连接器入口。输入 / 也可搜索当前工作区可用的技能。"
     },
     {
-      "title": "浏览器、HTML 成果与每日计划",
-      "description": "BrowserSkill 在测试网页完成读取和来源核验，登记 HTML 成果并支持预览。每日多时刻计划保留独立执行记录。"
+      "title": "执行详情与窗口布局",
+      "description": "命令、输出和自动重试默认收在灰色「执行详情」。任务需要确认或补充信息时，界面直接显示处理入口。"
     },
     {
-      "title": "首页更新提示与 Windows 升级",
-      "description": "首次进入首页可查看本版更新。遇到 Windows 0.5.7 重启安装失败，可用官网 0.5.8 安装器覆盖安装。"
+      "title": "Windows 升级",
+      "description": "工作台左下角和设置页共用升级状态。若旧版「重启安装」无响应，可下载对应安装包覆盖安装，工作区、会话和设置保留在原位置。"
     }
   ]
 }
