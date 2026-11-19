@@ -6,7 +6,7 @@ import { appendFile, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/p
 import { createRequire } from 'node:module'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { connectCdp } from './run-windows-ui-smoke.mjs'
+import { connectCdp, startWindowsTaskModelFixture } from './run-windows-ui-smoke.mjs'
 import { createChineseTextPdf } from './verify-windows-composer-acceptance.mjs'
 import { observeInstalledStartup } from './verify-packaged-startup-appearance.mjs'
 import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
@@ -225,10 +225,18 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
     installer: { name, sha256: digest, size }, installed: { bundleId: info.CFBundleIdentifier, installedArch,
       signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256 },
     observations: [], startupCases: [], nativeFilePaste: { status: 'not-run' } }
+  const englishLight = { locale: 'en', htmlLang: 'en', theme: 'light' }
+  const chineseDark = { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }
+  let loopbackModelFixture
   try {
-    for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
+    for (const expected of [englishLight, chineseDark]) {
       const startupCase = { locale: expected.locale, theme: expected.theme, status: 'failed' }
       report.startupCases.push(startupCase)
+      if (expected.locale === 'zh') {
+        loopbackModelFixture = await startWindowsTaskModelFixture({
+          composerAcceptance: { modelAction() { throw new Error('Attachment intake must not generate a model reply') } }
+        })
+      }
       const onWorkbench = expected.locale === 'zh' ? async (cdp, paths) => {
         try {
           await verifyMacFilePaste(cdp, paths, report.nativeFilePaste)
@@ -244,13 +252,28 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
       } : undefined
       try {
         report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected,
-          { connectCdp, environmentForRoot: isolatedMacEnvironment, onWorkbench }))
+          { connectCdp, environmentForRoot: isolatedMacEnvironment, onWorkbench, loopbackModelFixture }))
         startupCase.status = 'passed'
       } catch (error) {
         startupCase.error = error.message
       }
     }
+    const coldAttempt = report.startupCases[0]
+    if (coldAttempt.status === 'failed' && /transitional startup window was not captured.*Runtime\.evaluate timed out/.test(coldAttempt.error)) {
+      coldAttempt.coldError = coldAttempt.error
+      try {
+        const warm = await observeInstalledStartup({ executable, version, evidenceDir, temporary }, englishLight,
+          { connectCdp, environmentForRoot: isolatedMacEnvironment })
+        report.observations.unshift(warm)
+        coldAttempt.status = 'passed'
+        delete coldAttempt.error
+      } catch (error) {
+        coldAttempt.error = error.message
+      }
+    }
     assert.equal(await sha256(path), installedAsarSha256)
+    report.nativeFilePaste.loopbackModelGenerations = loopbackModelFixture?.observed.requests.length ?? 0
+    assert.equal(report.nativeFilePaste.loopbackModelGenerations, 0, 'This fixture must use only local readiness and attachment intake')
     assert.equal(report.observations.length, report.startupCases.length, report.startupCases.filter(item=>item.error).map(item=>item.error).join(' | '))
     report.startupStatus = 'passed'
     assert.equal(report.nativeFilePaste.status, 'passed', report.nativeFilePaste.error ?? 'Native Mac PDF paste did not run')
@@ -260,6 +283,7 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
     throw error
   } finally {
     await writeFile(join(evidenceDir, 'mac-startup-appearance.json'), `${JSON.stringify(report, null, 2)}\n`)
+    await loopbackModelFixture?.close()
   }
 }
 

@@ -86,17 +86,22 @@ export function findStartupTargets(targets) {
 
 export async function observeInstalledStartup(options, expected, dependencies) {
   const { executable, version, evidenceDir, temporary } = options
-  const { connectCdp, environmentForRoot, onWorkbench } = dependencies
+  const { connectCdp, environmentForRoot, onWorkbench, loopbackModelFixture } = dependencies
   const root = await mkdtemp(join(temporary, 'railwise-splash-'))
   const profile = join(root, 'profile')
   const workspace = join(root, 'workspace')
   const env = environmentForRoot(process.env, root)
+  const fixtureModel = 'windows-task-fixture'
+  if (loopbackModelFixture) assert.match(loopbackModelFixture.baseUrl, /^http:\/\/127\.0\.0\.1:\d+\/v1$/)
   await Promise.all([profile, workspace, env.USERPROFILE, env.APPDATA, env.LOCALAPPDATA, env.HOME]
     .filter(Boolean).map(path => mkdir(path, { recursive: true })))
   await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: expected.locale, theme: expected.theme, workspaceRoot: workspace,
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
-    agents: { kun: { autoStart: Boolean(onWorkbench), dataDir: join(root, 'runtime') } } }))
+    ...(loopbackModelFixture ? { provider: { providers: [{ id: fixtureModel, name: '本机验收协议模型', apiKey: 'synthetic-local-only',
+      baseUrl: loopbackModelFixture.baseUrl, endpointFormat: 'chat_completions', models: [fixtureModel] }] } } : {}),
+    agents: { kun: { autoStart: Boolean(onWorkbench), dataDir: join(root, 'runtime'),
+      ...(loopbackModelFixture ? { providerId: fixtureModel, model: fixtureModel } : {}) } } }))
   const child = spawn(executable, [`--user-data-dir=${profile}`, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1',
     `--lang=${expected.htmlLang}`, ...(expected.scale === undefined ? [] : [`--force-device-scale-factor=${expected.scale}`]),
     ...(expected.theme === 'dark' ? ['--force-dark-mode'] : [])],
