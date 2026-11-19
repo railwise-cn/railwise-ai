@@ -3,6 +3,7 @@ import { lstat, open, readdir, readFile, realpath, stat } from 'node:fs/promises
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { z } from 'zod'
 import type { SkillsCapabilityConfig } from '../contracts/capabilities.js'
+import type { CallableCapabilityChoice } from '../contracts/callable-capabilities.js'
 import { isLocalHtmlCreativeRequest, requiresWebSourceEvidence } from '../contracts/task-source-intent.js'
 import type { SkillResourceScope } from '../ports/tool-host.js'
 
@@ -281,14 +282,40 @@ export class SkillRuntime {
   }
 
   async validateSlashSelection(prompt: string, workspace: string): Promise<void> {
-    const id = requestedSlashSkill(prompt)
-    if (!id) return
+    const ids = requestedSlashSkills(prompt)
+    if (!ids.length) return
     await this.refreshForWorkspace(workspace)
-    const skill = this.skillsForWorkspace(workspace).find(candidate => candidate.id === id)
-    if (!this.config.enabled || !skill || this.options.activeLimit < 1 ||
-        !buildSkillInstruction({ skill, skillId: id, reason: 'explicit:id', score: 1_000 }, this.options.instructionBudgetBytes)) {
-      throw unavailableSlashSkill(id)
+    const available = new Map(this.skillsForWorkspace(workspace).map(skill => [skill.id, skill]))
+    const matches = ids.map((id, index) => {
+      const skill = available.get(id)
+      if (!this.config.enabled || !skill) throw unavailableSlashSkill(id)
+      return { skill, skillId: id, reason: 'explicit:id', score: Number.MAX_SAFE_INTEGER - index }
+    })
+    const active = buildInjection(matches.slice(0, this.options.activeLimit), this.options.instructionBudgetBytes).activeSkillIds
+    const unavailable = ids.find(id => !active.includes(id))
+    if (unavailable) throw unavailableSlashSkill(unavailable)
+  }
+
+  callablePluginSkills(workspace: string, toolNames?: ReadonlySet<string>): Array<{
+    choice: CallableCapabilityChoice; skillId: string
+  }> {
+    if (!this.config.enabled || this.options.activeLimit < 1) return []
+    const roots = this.config.pluginRoots ?? []
+    const choices = new Map<string, { choice: CallableCapabilityChoice; skillId: string }>()
+    for (const skill of this.skillsForWorkspace(workspace)) {
+      const owner = roots.find(({ root }) => {
+        const fromRoot = relative(resolve(root), skill.root)
+        return !isAbsolute(fromRoot) && fromRoot !== '..' && !fromRoot.startsWith('..' + sep)
+      })
+      if (!owner || choices.has(owner.id)) continue
+      if (toolNames && skill.allowedTools.length && !skill.allowedTools.includes('*') && !skill.allowedTools.some(tool => toolNames.has(tool))) continue
+      if (!buildSkillInstruction({ skill, skillId: skill.id, reason: 'explicit:id', score: 1_000 }, this.options.instructionBudgetBytes)) continue
+      choices.set(owner.id, {
+        choice: { kind: 'plugin', id: owner.id, label: skill.name, ...(skill.description ? { description: skill.description } : {}) },
+        skillId: skill.id
+      })
     }
+    return [...choices.values()]
   }
 
   async refreshForWorkspace(workspace: string): Promise<void> {
@@ -306,24 +333,41 @@ export class SkillRuntime {
     prompt: string
     workspace: string
     requestedSkillId?: string
+    selectionPrompt?: string
+    selectedPluginIds?: readonly string[]
     filePaths?: readonly string[]
     preferredSkillIds?: readonly string[]
     contextPrompt?: string
   }): SkillTurnResolution {
-    const requestedSkillId = input.requestedSkillId ?? requestedSlashSkill(input.prompt)
+    const explicitSkillIds = [...new Set([
+      ...(input.requestedSkillId ? [input.requestedSkillId] : []),
+      ...requestedSlashSkills(input.selectionPrompt ?? input.prompt)
+    ])]
     if (!this.config.enabled) {
-      if (requestedSkillId) throw unavailableSlashSkill(requestedSkillId)
+      if (explicitSkillIds[0]) throw unavailableSlashSkill(explicitSkillIds[0])
       return emptyResolution()
     }
-    const matches = this.matchSkills({ ...input, requestedSkillId })
-    const active = matches.slice(0, this.options.activeLimit)
-    const injection = buildInjection(active, this.options.instructionBudgetBytes)
-    if (requestedSkillId && !injection.activeSkillIds.includes(requestedSkillId)) {
-      throw unavailableSlashSkill(requestedSkillId)
-    }
+    const ordinaryMatches = this.matchSkills({ ...input, explicitSkillIds })
+    const ordinaryActive = ordinaryMatches.slice(0, this.options.activeLimit)
+    const ordinaryInjection = buildInjection(ordinaryActive, this.options.instructionBudgetBytes)
+    const pluginChoices = input.selectedPluginIds?.length ? this.callablePluginSkills(input.workspace) : []
+    const pluginSkillIds = input.selectedPluginIds?.flatMap(id => {
+      const plugin = pluginChoices.find(({ choice }) => choice.id === id)
+      return plugin ? [plugin.skillId] : []
+    }) ?? []
+    const active = pluginSkillIds.length
+      ? this.matchSkills({ ...input, explicitSkillIds: [...new Set([...explicitSkillIds, ...pluginSkillIds])] })
+          .slice(0, this.options.activeLimit)
+      : ordinaryActive
+    const injection = active === ordinaryActive ? ordinaryInjection : buildInjection(active, this.options.instructionBudgetBytes)
+    // A contextual Plugin can add its own instruction and resource scope, but
+    // may neither widen nor replace the ordinary per-Turn tool policy.
+    const allowedToolNames = ordinaryInjection.allowedToolNames
+    const unavailable = explicitSkillIds.find(id => !injection.activeSkillIds.includes(id))
+    if (unavailable) throw unavailableSlashSkill(unavailable)
     const activeSkillResources = active.flatMap(({ skill }) =>
       skill.resourceScope && injection.activeSkillIds.includes(skill.id) ? [skill.resourceScope] : [])
-    const blockedToolNames = blockedToolsFor(this.skillsForWorkspace(input.workspace), injection.allowedToolNames)
+    const blockedToolNames = blockedToolsFor(this.skillsForWorkspace(input.workspace), allowedToolNames)
     this.lastActivations = active.map(({ skill, reason, score }) => ({
       skillId: skill.id,
       reason,
@@ -340,7 +384,7 @@ export class SkillRuntime {
       ...(activeSkillResources.length ? { activeSkillResources: Object.freeze(activeSkillResources) } : {}),
       activations: this.lastActivations,
       instructions: injection.instructions,
-      ...(injection.allowedToolNames ? { allowedToolNames: injection.allowedToolNames } : {}),
+      ...(allowedToolNames ? { allowedToolNames } : {}),
       injectedBytes: injection.injectedBytes
     }
   }
@@ -381,7 +425,7 @@ export class SkillRuntime {
   private matchSkills(input: {
     prompt: string
     workspace: string
-    requestedSkillId?: string
+    explicitSkillIds: readonly string[]
     filePaths?: readonly string[]
     preferredSkillIds?: readonly string[]
     contextPrompt?: string
@@ -389,19 +433,19 @@ export class SkillRuntime {
     // An ID token carries intent only for that exact Skill. Exclude it from
     // description and natural-name matching so a shorter ID cannot also run.
     const positiveSource = positiveSkillContext(input.prompt)
-    const slashIds = new Set(Array.from(positiveSource.matchAll(SLASH_SKILL_TOKEN), match => match[2].toLowerCase()))
-    const prompt = input.prompt.replace(SLASH_SKILL_TOKEN, '$1')
-    const positivePrompt = positiveSource.replace(SLASH_SKILL_TOKEN, '$1')
+    const prompt = input.prompt.replace(ANY_SKILL_TOKEN, ' ')
+    const positivePrompt = positiveSource.replace(ANY_SKILL_TOKEN, ' ')
     const lowerPrompt = positivePrompt.toLowerCase()
     const fileTypes = fileTypesFrom(input.filePaths ?? [], prompt)
     const preferredSkillIds = new Set(input.preferredSkillIds ?? [])
     const matches: Array<SkillActivation & { skill: LoadedSkill }> = []
     for (const skill of this.skillsForWorkspace(input.workspace)) {
-      if (skill.id === input.requestedSkillId || slashIds.has(skill.id)) {
+      const explicitSkillIndex = input.explicitSkillIds.indexOf(skill.id)
+      if (explicitSkillIndex >= 0) {
         // The picker selects one exact ID. Keep it ahead of inferred skills,
         // independent of package priority and the size of the turn budget.
         matches.push({ skill, skillId: skill.id, reason: 'explicit:id',
-          score: skill.id === input.requestedSkillId ? Number.MAX_SAFE_INTEGER : 1_000 + skill.priority })
+          score: Number.MAX_SAFE_INTEGER - explicitSkillIndex })
         continue
       }
       const explicit = explicitSkillMention(skill, positivePrompt)
@@ -746,9 +790,16 @@ async function exists(path: string): Promise<boolean> {
 }
 
 const SLASH_SKILL_TOKEN = /(^|[\s([{，。；：、])\/skill:([\p{L}\p{N}_-]+)(?=\s|$)/giu
+const ANY_SKILL_TOKEN = /\/skill:[\p{L}\p{N}_-]+/giu
 
 export function requestedSlashSkill(prompt: string): string | undefined {
   return /^\/skill:([\p{L}\p{N}_-]+)(?=\s|$)/u.exec(prompt.trimStart().normalize('NFKC').toLowerCase())?.[1]
+}
+
+function requestedSlashSkills(prompt: string): string[] {
+  const unquoted = prompt.replace(/```[\s\S]*?```|`[^`\n]*`|["“][^"”\n]*["”]|[‘][^’\n]*[’]|^\s*>[^\n]*/gm, ' ')
+  const ids = Array.from(positiveSkillContext(unquoted).matchAll(SLASH_SKILL_TOKEN), match => match[2].toLowerCase())
+  return [...new Set([requestedSlashSkill(prompt), ...ids].filter((id): id is string => Boolean(id)))]
 }
 
 function unavailableSlashSkill(id: string): Error {

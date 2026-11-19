@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { WindowsGuiUpdater } from './windows-gui-update'
+import { WindowsGuiUpdater, WindowsUpdateCacheError } from './windows-gui-update'
 
 const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
 vi.mock('node:child_process', () => ({ spawn }))
@@ -62,7 +62,9 @@ describe('Windows verified installer handoff', () => {
 
   it('rejects a replaced installer and does not attempt launch', async () => {
     await writeFile(installer, 'different bytes')
-    await expect(updater().startVerifiedInstaller()).rejects.toThrow('安装包已变化')
+    const update = updater()
+    await expect(update.startVerifiedInstaller()).rejects.toThrow(WindowsUpdateCacheError)
+    expect(update).toHaveProperty('downloadedUpdateHelper', null)
     expect(spawn).not.toHaveBeenCalled()
   })
 

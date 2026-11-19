@@ -253,6 +253,7 @@ export type TaskInputV1 = {
   consumedAt?: string
   sourceId?: string
   idempotencyKey: string
+  capabilityReferences?: import('./callable-capabilities').CallableCapabilityReference[]
 }
 
 export type TaskEventV1 = {

@@ -4,9 +4,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import {
   FloatingComposer,
   formatGoalElapsedSeconds,
-  handleComposerImagePaste,
-  imageFilesFromTransfer,
-  imageTransferHasImages,
+  filesFromComposerTransfer,
+  handleComposerAttachmentPaste,
   loadComposerWorkspaceReferenceSuggestions,
   parseCompactCommand,
   parseGoalCommand,
@@ -273,15 +272,14 @@ describe('FloatingComposer model controls', () => {
   })
 })
 
-describe('FloatingComposer image transfer helpers', () => {
-  it('extracts image files from clipboard or drop payloads', () => {
+describe('FloatingComposer attachment transfer helpers', () => {
+  it('extracts image and document files from clipboard or drop payloads', () => {
     const screenshot = new File([new Uint8Array([1, 2, 3])], 'shot.png', { type: 'image/png' })
-    const pastedWebp = new File([new Uint8Array([4])], '', { type: 'image/webp' })
     const notes = new File(['hello'], 'notes.txt', { type: 'text/plain' })
     const source = {
       items: {
         length: 3,
-        0: { kind: 'file', type: 'image/webp', getAsFile: () => pastedWebp },
+        0: { kind: 'file', type: 'image/png', getAsFile: () => screenshot },
         1: { kind: 'file', type: 'text/plain', getAsFile: () => notes },
         2: { kind: 'string', type: 'text/plain', getAsFile: () => null }
       },
@@ -292,24 +290,25 @@ describe('FloatingComposer image transfer helpers', () => {
       }
     }
 
-    expect(imageFilesFromTransfer(source)).toEqual([pastedWebp, screenshot])
-    expect(imageTransferHasImages(source)).toBe(true)
+    expect(filesFromComposerTransfer(source)).toEqual([screenshot, notes])
   })
 
-  it('deduplicates files exposed through both transfer item and file lists', () => {
-    const screenshot = new File([new Uint8Array([1])], 'shot.png', { type: 'image/png' })
+  it('preserves OS-backed files when the item list also exposes a different File object', () => {
+    const nativePdf = new File(['%PDF'], '工程资料.pdf')
     const source = {
       items: {
         length: 1,
-        0: { kind: 'file', type: 'image/png', getAsFile: () => screenshot }
+        0: { kind: 'file', type: 'application/pdf', getAsFile: () => new File([nativePdf], nativePdf.name) }
       },
       files: {
         length: 1,
-        0: screenshot
+        0: nativePdf
       }
     }
 
-    expect(imageFilesFromTransfer(source)).toEqual([screenshot])
+    const files = filesFromComposerTransfer(source)
+    expect(files).toHaveLength(1)
+    expect(files[0]).toBe(nativePdf)
   })
 
   it('keeps clipboard item MIME hints when pasted image files omit their own type', () => {
@@ -324,12 +323,11 @@ describe('FloatingComposer image transfer helpers', () => {
       }
     }
 
-    const [file] = imageFilesFromTransfer(source)
+    const [file] = filesFromComposerTransfer(source)
 
     expect(file).toBeInstanceOf(File)
     expect(file?.type).toBe('image/png')
     expect(file?.name).toBe('shot')
-    expect(imageTransferHasImages(source)).toBe(true)
   })
 
   it('handles pasted image files through the attachment picker', () => {
@@ -337,7 +335,7 @@ describe('FloatingComposer image transfer helpers', () => {
     const preventDefault = vi.fn()
     const onPickAttachments = vi.fn()
     const onPasteClipboardImage = vi.fn()
-    const handled = handleComposerImagePaste({
+    const handled = handleComposerAttachmentPaste({
       canPickAttachment: true,
       clipboardData: {
         getData: () => '',
@@ -360,7 +358,7 @@ describe('FloatingComposer image transfer helpers', () => {
   it('does not intercept ordinary text paste', () => {
     const preventDefault = vi.fn()
     const onPasteClipboardImage = vi.fn()
-    const handled = handleComposerImagePaste({
+    const handled = handleComposerAttachmentPaste({
       canPickAttachment: true,
       clipboardData: {
         getData: (format) => format === 'text/plain' ? 'hello' : ''
@@ -377,7 +375,7 @@ describe('FloatingComposer image transfer helpers', () => {
   it('falls back to the Electron clipboard image bridge when files are unavailable', () => {
     const preventDefault = vi.fn()
     const onPasteClipboardImage = vi.fn()
-    const handled = handleComposerImagePaste({
+    const handled = handleComposerAttachmentPaste({
       canPickAttachment: true,
       clipboardData: {
         getData: () => ''
@@ -389,6 +387,19 @@ describe('FloatingComposer image transfer helpers', () => {
     expect(handled).toBe(true)
     expect(preventDefault).toHaveBeenCalledTimes(1)
     expect(onPasteClipboardImage).toHaveBeenCalledWith({ silentNoImage: false })
+  })
+
+  it('explains that an image-only PDF was attached without displaying parser diagnostics', () => {
+    const html = renderToStaticMarkup(createElement(FloatingComposer, {
+      input: '', setInput: vi.fn(), mode: 'agent', setMode: vi.fn(), busy: false, runtimeReady: true,
+      composerModel: 'auto', composerPickList: [], hasActiveThread: true, onComposerModelChange: vi.fn(),
+      queuedMessages: [], onRemoveQueuedMessage: vi.fn(), onSend: vi.fn(), onInterrupt: vi.fn(),
+      attachments: [{ id: 'scanned', name: '扫描资料.pdf', state: 'degraded', managedPath: '/managed/扫描资料.pdf', degradationReasons: ['no_extractable_pdf_text'] }]
+    }))
+
+    expect(html).toContain('The original PDF is attached.')
+    expect(html).toContain('Show original in folder')
+    expect(html).not.toContain('no_extractable_pdf_text')
   })
 })
 
@@ -1024,8 +1035,8 @@ describe('FloatingComposer capability controls', () => {
     expect(html).toContain('招标文件.pdf')
     expect(html).toContain('2.0 MiB')
     expect(html).toContain('42%')
-    expect(html).toContain('aria-label="重试附件"')
-    expect(html).toContain('aria-label="打开原文件"')
+    expect(html).toContain('aria-label="Retry attachment"')
+    expect(html).toContain('aria-label="Show original in folder"')
     expect(html).toContain('aria-label="Remove attachment"')
   })
 })

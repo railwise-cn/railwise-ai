@@ -5,13 +5,15 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import JSZip from 'jszip'
-import type { DocumentParseResultV1, DocumentParsingMode } from '../../shared/agent-workbench'
+import type { DocumentParseRequestV1, DocumentParseResultV1, DocumentParsingMode } from '../../shared/agent-workbench'
 import { canonicalizeContainmentRoot, isCanonicalPathContained, resolveContainedPath } from './canonical-containment'
 import { DocumentEngineService } from './document-engine-service'
 import { inspectOfficeArchive } from './office-archive-security'
+import { analyzePdfDocument, type PdfPageTextV1 } from './pdf-document-service'
 
 const MAX_FILE_BYTES = 200 * 1024 * 1024
 const MAX_TEXT_BYTES = 32 * 1024 * 1024
+const PDF_FALLBACK_TIMEOUT_MS = 60_000
 
 export type ChatAttachmentKind = 'image' | 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'text' | 'markdown' | 'csv'
 export type StagedChatAttachment = {
@@ -28,6 +30,7 @@ export type StagedChatAttachment = {
 export type ParsedChatAttachment = StagedChatAttachment & {
   text?: string
   document?: DocumentParseResultV1
+  pdfTextPages?: PdfPageTextV1[]
   state: 'ready' | 'degraded'
   warnings: string[]
   degradationReasons: string[]
@@ -126,29 +129,72 @@ export class ChatAttachmentImportService {
       if (!text.trim()) throw new Error('attachment contains no usable text')
       return { ...staged, text, state: 'ready', warnings: [], degradationReasons: [] }
     }
-    if (!this.options.documentEngine) throw new Error('local document engine is unavailable')
-    const root = await canonicalizeContainmentRoot(this.options.managedRoot)
-    const result = await this.options.documentEngine.parse({
-      parseId: staged.importId,
-      workspaceRoot: root,
-      relativePath: staged.relativePath,
-      mode: options.mode ?? 'auto',
-      unlimitedOcrServerUrl: options.unlimitedOcrServerUrl,
-      allowPrivateServerUpload: false,
-      idempotencyKey: `attachment:${staged.sha256}`
-    })
-    if (!result.markdown.trim()) throw new Error('attachment parser returned no usable text')
-    return {
-      ...staged,
-      document: result,
-      state: result.quality.status === 'degraded' ? 'degraded' : 'ready',
-      warnings: result.warnings,
-      degradationReasons: result.quality.reasons,
-      sourceStructure: {
-        ...result.sourceStructure,
-        headings: result.headings.length,
-        tables: result.tables.length
+    if (this.active.has(staged.importId)) throw new Error('attachment import is already active')
+    const controller = new AbortController()
+    this.active.set(staged.importId, controller)
+    try {
+      const request = {
+        parseId: staged.importId,
+        workspaceRoot: await canonicalizeContainmentRoot(this.options.managedRoot),
+        relativePath: staged.relativePath,
+        mode: options.mode ?? 'auto',
+        unlimitedOcrServerUrl: options.unlimitedOcrServerUrl,
+        allowPrivateServerUpload: false,
+        idempotencyKey: `attachment:${staged.sha256}`,
+        signal: controller.signal
       }
+      throwIfAttachmentParseCancelled(request.signal)
+      const engine = this.options.documentEngine
+      if (!engine && staged.kind !== 'pdf') throw new Error('local document engine is unavailable')
+      const result = await engine?.parse(request).catch((error) => {
+        if (staged.kind !== 'pdf' || request.signal.aborted || hasTerminalPdfError(error)) throw error
+        return undefined
+      })
+      throwIfAttachmentParseCancelled(request.signal)
+      if (result && hasParsedText(result.markdown)) return withDocument(staged, result)
+      if (staged.kind !== 'pdf') throw new Error('attachment parser returned no usable text')
+      return await this.parsePdfFallback(staged, request, result)
+    } finally {
+      this.active.delete(staged.importId)
+    }
+  }
+
+  private async parsePdfFallback(staged: StagedChatAttachment, request: DocumentParseRequestV1 & {
+    unlimitedOcrServerUrl?: string
+    signal: AbortSignal
+  }, result?: DocumentParseResultV1): Promise<ParsedChatAttachment> {
+    const analysisSignal = AbortSignal.any([request.signal, AbortSignal.timeout(PDF_FALLBACK_TIMEOUT_MS)])
+    const analysis = await analyzePdfDocument(staged.absolutePath, analysisSignal).catch((error) => {
+      if (analysisSignal.aborted && !request.signal.aborted) throw new Error('PDF text-layer analysis timed out')
+      throw error
+    })
+    const warnings = [...new Set([...(result?.warnings ?? []), ...analysis.warnings])]
+    if (!analysis.searchable && request.mode === 'auto' && request.unlimitedOcrServerUrl?.trim()) {
+      const ocr = await this.options.documentEngine?.parse({
+        ...request,
+        mode: 'accurate',
+        preferredEngine: 'unlimited-ocr-local',
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(PDF_FALLBACK_TIMEOUT_MS)])
+      }).catch((error) => {
+        if (request.signal.aborted) throw error
+        return undefined
+      })
+      throwIfAttachmentParseCancelled(request.signal)
+      if (ocr && hasParsedText(ocr.markdown)) return withDocument(staged, ocr)
+      warnings.push('Configured local OCR did not return text within this import attempt.')
+    }
+
+    const pdfTextPages = analysis.pages.filter((page) => page.text.length > 0)
+    const degradationReasons = analysis.searchable
+      ? ['pdf_text_layer_fallback']
+      : ['no_extractable_pdf_text', 'scanned_or_sparse_pages']
+    if (analysis.truncated) degradationReasons.push('pdf_text_layer_incomplete')
+    warnings.push(analysis.searchable
+      ? 'Text was recovered from the PDF text layer. Layout and table structure may be missing.'
+      : 'The original PDF was saved. No usable text was extracted. A scanned PDF may require OCR.')
+    return {
+      ...staged, pdfTextPages, state: 'degraded', warnings, degradationReasons,
+      sourceStructure: { pageCount: analysis.pageCount, headings: 0, tables: 0 }
     }
   }
 
@@ -165,6 +211,34 @@ export class ChatAttachmentImportService {
     if (!isCanonicalPathContained(root, target)) throw new Error('attachment path is outside managed storage')
     await rm(dirname(target), { recursive: true, force: true })
   }
+}
+
+function withDocument(staged: StagedChatAttachment, result: DocumentParseResultV1): ParsedChatAttachment {
+  return {
+    ...staged,
+    document: result,
+    state: result.quality.status === 'degraded' ? 'degraded' : 'ready',
+    warnings: result.warnings,
+    degradationReasons: result.quality.reasons,
+    sourceStructure: {
+      ...result.sourceStructure,
+      headings: result.headings.length,
+      tables: result.tables.length
+    }
+  }
+}
+
+function hasParsedText(markdown: string): boolean {
+  return Boolean(markdown.replace(/<!--\s*page\s*:\s*\d+\s*-->/gi, '').trim())
+}
+
+function hasTerminalPdfError(error: unknown): boolean {
+  return error instanceof Error && 'code' in error &&
+    ['password_required', 'invalid_document', 'document_parse_cancelled'].includes(String(error.code))
+}
+
+function throwIfAttachmentParseCancelled(signal: AbortSignal): void {
+  if (signal.aborted) throw Object.assign(new Error('Attachment parsing was cancelled'), { code: 'document_parse_cancelled' })
 }
 
 async function canonicalSourceFile(sourcePath: string): Promise<string> {

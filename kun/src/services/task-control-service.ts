@@ -131,7 +131,7 @@ export class TaskControlService {
       if (action === 'resume' && !current.retryOfTaskId && !current.activeTurnId && !repository.inputs(current.id).some(input => input.sourceId === 'capability-original')) {
         const original = StartTurnRequest.safeParse(repository.attention(`capability_${current.id}`)?.payload?.request)
         if (original.success) current = tasks.appendInput(current.id, current.revision, `capability-original:${current.id}`, original.data.prompt, 'supplement', 'capability-original',
-          { attachmentIds: original.data.attachmentIds, workspaceReferences: original.data.workspaceReferences }).task
+          { attachmentIds: original.data.attachmentIds, workspaceReferences: original.data.workspaceReferences, capabilityReferences: original.data.capabilityReferences }).task
       }
       const executionThread = await threads.get(current.threadId)
       if (!executionThread) throw Object.assign(new Error('task execution thread not found'), { code: 'not_found' })

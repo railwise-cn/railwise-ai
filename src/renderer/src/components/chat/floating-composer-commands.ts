@@ -89,6 +89,16 @@ export function replaceSkillMentionInInput(
   }
 }
 
+export function insertSkillCommandAtCursor(input: string, cursor: number, skillId: string): { input: string; cursor: number } {
+  const start = Math.max(0, Math.min(cursor, input.length))
+  const before = input.slice(0, start)
+  const after = input.slice(start)
+  const spaceBefore = before && !/\s$/u.test(before) ? ' ' : ''
+  const spaceAfter = /^\s/u.test(after) ? '' : ' '
+  const token = `${spaceBefore}/skill:${skillId}${spaceAfter}`
+  return { input: `${before}${token}${after}`, cursor: before.length + token.length }
+}
+
 export function getGoalPanelDraftObjective(input: string, goalPanelOpen: boolean): string {
   const objective = input.trim()
   if (!goalPanelOpen || objective.length === 0 || objective.startsWith('/')) return ''

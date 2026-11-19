@@ -792,6 +792,7 @@ export async function syncManagedSkillCapability(
   const discoveredRoots = await guiSkillRootsForRuntime(settings)
   const managedRoots = discoveredRoots.map(root => root.path)
   const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
+  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId }) => pluginId ? [{ root: path, id: pluginId }] : [])
   await updateManagedConnectorConfig(dataDir, existing => {
     const capabilities = objectValue(existing.capabilities)
     const current = objectValue(capabilities.skills)
@@ -800,6 +801,7 @@ export async function syncManagedSkillCapability(
     const roots = uniqueStrings([...customRoots, ...managedRoots])
     const skills = SkillsCapabilityConfig.parse({ ...current, roots, managedRoots,
       projectRoots: projectRoots.length ? projectRoots : undefined,
+      pluginRoots: pluginRoots.length ? pluginRoots : undefined,
       revision: Number(current.revision ?? 0) + 1,
       enabled: options.enable === true || current.enabled !== false })
     return { ...existing, capabilities: { ...capabilities, skills } }
@@ -1015,6 +1017,7 @@ async function skillCapabilityConfigForRuntime(
   const discoveredRoots = explicitRoots ? [] : await guiSkillRootsForRuntime(settings)
   const managedRoots = discoveredRoots.map(root => root.path)
   const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
+  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId }) => pluginId ? [{ root: path, id: pluginId }] : [])
   const roots = explicitRoots
     ? uniqueStrings(explicitRoots.map(normalizeSkillRootPath))
     : uniqueStrings([
@@ -1027,6 +1030,7 @@ async function skillCapabilityConfigForRuntime(
     roots,
     managedRoots,
     projectRoots: projectRoots.length ? projectRoots : undefined,
+    pluginRoots: pluginRoots.length ? pluginRoots : undefined,
     legacySkillMd: existing.legacySkillMd === false ? false : true
   }
 }

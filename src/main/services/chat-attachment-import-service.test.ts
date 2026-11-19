@@ -1,12 +1,21 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { DocumentParseResultV1 } from '../../shared/agent-workbench'
 import type { DocumentEngineService } from './document-engine-service'
 import { ChatAttachmentImportService } from './chat-attachment-import-service'
 
 const roots: string[] = []
+const fixtureRoot = new URL('../../../test/fixtures/document-quality/', import.meta.url)
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
+
+const emptyParse: DocumentParseResultV1 = {
+  id: 'parse', engine: 'markitdown', engineVersion: 'fixture', sourceSha256: 'fixture',
+  markdown: '', headings: [], tables: [], media: [], references: [], warnings: [],
+  quality: { status: 'degraded', reasons: ['scanned_document'] },
+  route: { requestedMode: 'auto', selectedEngine: 'markitdown' }, cacheHit: false, durationMs: 1
+}
 
 async function serviceWithFile(name: string, contents: string | Buffer, parse?: DocumentEngineService['parse']) {
   const root = await mkdtemp(join(tmpdir(), 'workwise-chat-attachment-'))
@@ -110,6 +119,64 @@ describe('ChatAttachmentImportService parse states', () => {
     expect(parse).toHaveBeenCalledWith(expect.objectContaining({
       mode: 'accurate',
       unlimitedOcrServerUrl: 'http://127.0.0.1:3000'
+    }))
+  })
+
+  it('retains the original of a real image-only PDF without inventing indexed text', async () => {
+    const scan = await readFile(new URL('synthetic-image-only-scan.pdf', fixtureRoot))
+    const parse = vi.fn(async () => emptyParse)
+    const fixture = await serviceWithFile('scan.pdf', scan, parse)
+    const staged = await fixture.service.stage({ sourcePath: fixture.sourcePath })
+    const result = await fixture.service.parse(staged)
+
+    expect(result).toMatchObject({
+      state: 'degraded', pdfTextPages: [], sourceStructure: { pageCount: 1 },
+      degradationReasons: ['no_extractable_pdf_text', 'scanned_or_sparse_pages']
+    })
+    expect(result.document).toBeUndefined()
+    expect(result.text).toBeUndefined()
+    expect(await readFile(result.absolutePath)).toEqual(scan)
+    expect(parse).toHaveBeenCalledTimes(1)
+  })
+
+  it('recovers real PDF text and its page when the document sidecar fails', async () => {
+    const source = await readFile(new URL('synthetic-complex-layout.pdf', fixtureRoot))
+    const fixture = await serviceWithFile('report.pdf', source, vi.fn(async () => {
+      throw new Error('document sidecar failed')
+    }))
+    const staged = await fixture.service.stage({ sourcePath: fixture.sourcePath })
+
+    await expect(fixture.service.parse(staged)).resolves.toMatchObject({
+      state: 'degraded', degradationReasons: ['pdf_text_layer_fallback'],
+      pdfTextPages: [{ page: 1, text: expect.stringContaining('Complex Layout Fixture') }],
+      sourceStructure: { pageCount: 1 }
+    })
+  })
+
+  it('rejects a structurally invalid PDF with a valid header instead of treating it as a scan', async () => {
+    const fixture = await serviceWithFile('damaged.pdf', '%PDF-1.7\n%%EOF', vi.fn(async () => emptyParse))
+    const staged = await fixture.service.stage({ sourcePath: fixture.sourcePath })
+
+    await expect(fixture.service.parse(staged)).rejects.toMatchObject({ code: 'invalid_document' })
+  })
+
+  it('tries configured local OCR once for a real scan and uses its actual extracted text', async () => {
+    const scan = await readFile(new URL('synthetic-image-only-scan.pdf', fixtureRoot))
+    const ocr: DocumentParseResultV1 = {
+      ...emptyParse, engine: 'unlimited-ocr-local', markdown: '<!-- page:1 -->\n\nOCR 文字',
+      quality: { status: 'enhanced', reasons: [] },
+      route: { requestedMode: 'accurate', selectedEngine: 'unlimited-ocr-local' }
+    }
+    const parse = vi.fn<DocumentEngineService['parse']>().mockResolvedValueOnce(emptyParse).mockResolvedValueOnce(ocr)
+    const fixture = await serviceWithFile('scan.pdf', scan, parse)
+    const staged = await fixture.service.stage({ sourcePath: fixture.sourcePath })
+
+    await expect(fixture.service.parse(staged, { unlimitedOcrServerUrl: 'http://127.0.0.1:3000' }))
+      .resolves.toMatchObject({ state: 'ready', document: ocr })
+    expect(parse).toHaveBeenCalledTimes(2)
+    expect(parse).toHaveBeenLastCalledWith(expect.objectContaining({
+      allowPrivateServerUpload: false, mode: 'accurate', preferredEngine: 'unlimited-ocr-local',
+      unlimitedOcrServerUrl: 'http://127.0.0.1:3000', signal: expect.any(AbortSignal)
     }))
   })
 })

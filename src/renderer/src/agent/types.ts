@@ -11,6 +11,7 @@ import type {
 import type { ThreadRunActivity } from './ag-ui-activity'
 import type { ApprovalPolicy, SandboxMode } from '@shared/app-settings'
 import type { ExternalTaskCapabilityCard, TaskIntentCard } from '@shared/task-command'
+import type { CallableCapabilityChoice, CallableCapabilityReference, CallableCapabilityScope } from '@shared/callable-capabilities'
 
 export type ToolItemKind = 'tool_call' | 'command_execution' | 'file_change'
 export type RuntimeErrorSeverity = 'info' | 'warning' | 'error'
@@ -446,6 +447,31 @@ export type ThreadEventSink = {
   onUsageDelta?(characters: number, seq?: number, turnId?: string): void
 }
 
+export type SendTurnOptions = {
+  mode?: string
+  model?: string
+  reasoningEffort?: string
+  providerId?: string
+  displayText?: string
+  guiPlan?: {
+    operation: 'draft' | 'refine'
+    workspaceRoot: string
+    relativePath: string
+    planId: string
+    sourceRequest?: string
+    title?: string
+  }
+  guiDesign?: {
+    workspaceRoot: string
+    documentId: string
+    pageId: string
+    expectedRevision: number
+  }
+  attachmentIds?: string[]
+  workspaceReferences?: Array<{ path: string; kind: 'file' | 'directory' }>
+  capabilityReferences?: CallableCapabilityReference[]
+}
+
 export interface AgentProvider {
   readonly id: 'kun'
   readonly displayName: string
@@ -475,29 +501,7 @@ export interface AgentProvider {
   sendUserMessage(
     threadId: string,
     text: string,
-    options?: {
-      mode?: string
-      model?: string
-      reasoningEffort?: string
-      providerId?: string
-      displayText?: string
-      guiPlan?: {
-        operation: 'draft' | 'refine'
-        workspaceRoot: string
-        relativePath: string
-        planId: string
-        sourceRequest?: string
-        title?: string
-      }
-      guiDesign?: {
-        workspaceRoot: string
-        documentId: string
-        pageId: string
-        expectedRevision: number
-      }
-      attachmentIds?: string[]
-      workspaceReferences?: Array<{ path: string; kind: 'file' | 'directory' }>
-    }
+    options?: SendTurnOptions
   ): Promise<{ turnId: string; threadId: string; userMessageItemId?: string }>
   reviewThread?(
     threadId: string,
@@ -507,6 +511,7 @@ export interface AgentProvider {
   getRuntimeInfo?(): Promise<CoreRuntimeInfoJson>
   getToolDiagnostics?(): Promise<CoreRuntimeToolDiagnosticsJson>
   listSkills?(scope?: { threadId?: string; workspace?: string }): Promise<CoreRuntimeSkillJson[]>
+  listCallableCapabilities?(scope: CallableCapabilityScope): Promise<CallableCapabilityChoice[]>
   uploadAttachment?(input: {
     name: string
     mimeType?: string

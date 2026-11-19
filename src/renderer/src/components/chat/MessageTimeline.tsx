@@ -24,8 +24,8 @@ import {
 import { extractPlanMetadataFromBlock } from '../../plan/plan-tool'
 import { planDisplayNameFromRelativePath } from '../../plan/plan-path'
 import {
-  isPendingProcessControl,
   deriveSemanticProgress,
+  isInlineProcessControl,
   visibleProcessBlocksForMode
 } from './conversation-visibility'
 
@@ -375,22 +375,22 @@ function MessageTurn({
     () => visibleProcessBlocksForMode(processBlocks, viewMode),
     [processBlocks, viewMode]
   )
-  const pendingControls = visibleProcessBlocks.filter(isPendingProcessControl)
-  const restoredWaiting = pendingControls.some(block => block.kind === 'approval') ? 'waiting_approval'
-    : pendingControls.some(block => block.kind === 'user_input') ? 'waiting_user' : undefined
+  const inlineControls = visibleProcessBlocks.filter(isInlineProcessControl)
+  const restoredWaiting = inlineControls.some(block => block.kind === 'approval' && block.status === 'pending') ? 'waiting_approval'
+    : inlineControls.some(block => block.kind === 'user_input' && block.status === 'pending') ? 'waiting_user' : undefined
   const semanticProgress = useMemo(
     () => deriveSemanticProgress(processBlocks, isProcessing),
     [processBlocks, isProcessing]
   )
   const processSections = useMemo(
-    () => (workExpanded ? groupProcessSections(visibleProcessBlocks.filter(block => !isPendingProcessControl(block))) : []),
+    () => (workExpanded ? groupProcessSections(visibleProcessBlocks.filter(block => !isInlineProcessControl(block))) : []),
     [visibleProcessBlocks, workExpanded]
   )
   const reasoningSectionCount = useMemo(
     () => processSections.filter((section) => section.kind === 'reasoning').length,
     [processSections]
   )
-  const hasProcess = isProcessing || visibleProcessBlocks.length > pendingControls.length
+  const hasProcess = isProcessing || visibleProcessBlocks.length > inlineControls.length
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -424,7 +424,7 @@ function MessageTurn({
         </div>
       ) : null}
 
-      {!professionalSurface ? pendingControls.map(block => (
+      {!professionalSurface ? inlineControls.map(block => (
         <MessageBubble key={block.id} block={block} nested />
       )) : null}
 

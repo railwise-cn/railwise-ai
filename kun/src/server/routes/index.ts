@@ -1,5 +1,6 @@
 import { registerRuntimeUpdateRoutes } from './runtime-update.js'
 import { registerRuntimeMcpRoutes } from './runtime-mcp.js'
+import { listCallableCapabilities } from './callable-capabilities.js'
 import { recordImDelivery } from './im-delivery.js'
 import { randomUUID } from 'node:crypto'
 import { StartTurnRequest } from '../../contracts/turns.js'
@@ -127,6 +128,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
   })
   registerRuntimeUpdateRoutes(router, runtime, request => authorize(request, runtime))
   registerRuntimeMcpRoutes(router, runtime, request => authorize(request, runtime))
+  router.add('POST', '/v1/capabilities/callable', request => authorize(request, runtime)
+    ? listCallableCapabilities(runtime, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/threads/:id/delivery-observations', (request, ctx) => authorize(request, runtime)
     ? recordImDelivery(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   registerTaskDeliveryRoutes(router, runtime, request => authorize(request, runtime))
@@ -527,10 +530,13 @@ export function buildRouter(runtime: ServerRuntime): Router {
           idempotencyKey: parsed.data.idempotencyKey ?? randomUUID(),
           request: parsed.data
         }).catch((error: unknown) => {
-          if ((error as { code?: unknown })?.code === 'skill_unavailable') return null
+          const code = (error as { code?: unknown })?.code
+          if (code === 'skill_unavailable' || code === 'capability_reference_unavailable') {
+            return { kind: 'selection_unavailable' as const, code, message: (error as Error).message }
+          }
           throw error
         })
-        if (!result) return jsonResponse({ code: 'skill_unavailable', message: 'Check Skills & Connectors or select the Skill again from the / menu.' }, 409)
+        if (result.kind === 'selection_unavailable') return jsonResponse({ code: result.code, message: result.message }, 409)
         if (result.kind === 'task_started' || result.kind === 'chat_started') return jsonResponse(result.turn, 202)
         if (result.kind === 'capability_required') return jsonResponse({
           code: 'capability_required', message: result.message, taskId: result.task?.id,

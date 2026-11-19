@@ -149,7 +149,7 @@ export function GuiUpdateControl({
           <button
             type="button"
             onClick={() => void onInstall()}
-            disabled={!canInstall || installing}
+            disabled={!canInstall || busy}
             className="inline-flex items-center gap-1.5 rounded-xl bg-ds-userbubble px-3 py-2 text-[13px] font-medium text-ds-userbubbleFg shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
           >
             {installing ? (

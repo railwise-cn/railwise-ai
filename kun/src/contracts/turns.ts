@@ -7,6 +7,7 @@ import { RUNTIME_RESOURCE_LIMITS_V1 } from './resource-limits.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
 import { UiActionAudit } from './ui-actions.js'
 import { ExternalTaskProviderSchema } from './harness.js'
+import { CallableCapabilityReferencesSchema } from './callable-capabilities.js'
 
 const byteLimitedString = (maxBytes: number) =>
   z.string().refine((value) => new TextEncoder().encode(value).byteLength <= maxBytes, {
@@ -93,6 +94,7 @@ export const TurnSchema = z.object({
   items: z.array(TurnItem).default([]),
   attachmentIds: z.array(z.string().min(1)).default([]),
   workspaceReferences: z.array(WorkspaceReferenceSchema).max(32).optional(),
+  capabilityReferences: CallableCapabilityReferencesSchema.optional(),
   /** Structured Runtime action that started this turn; never a user prompt. */
   uiAction: UiActionAudit.optional(),
   activeSkillIds: z.array(z.string().min(1)).default([]),
@@ -140,6 +142,7 @@ export const StartTurnRequest = z.object({
   mode: TurnModeSchema.optional(),
   attachmentIds: z.array(z.string().min(1)).max(8).default([]),
   workspaceReferences: z.array(WorkspaceReferenceSchema).max(32).default([]),
+  capabilityReferences: CallableCapabilityReferencesSchema.optional(),
   /**
    * Optional GUI plan context. When set, Kun advertises the
    * `create_plan` tool for the turn and writes only to the reserved

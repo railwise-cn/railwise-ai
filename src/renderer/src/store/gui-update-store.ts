@@ -63,7 +63,8 @@ export function checkGuiUpdate(channel?: GuiUpdateChannel): Promise<void> {
   return runOperation('checking', async () => {
     const info = await window.workwise.checkGuiUpdate(channel)
     const snapshot = await window.workwise.getGuiUpdateState()
-    if (snapshot.status === 'error' && snapshot.info?.ok && snapshot.info.downloaded) {
+    if (snapshot.status === 'downloading' || snapshot.status === 'installing' ||
+      (snapshot.status === 'error' && snapshot.info?.ok && snapshot.info.downloaded)) {
       applyState(snapshot)
       return
     }

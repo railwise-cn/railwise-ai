@@ -80,7 +80,8 @@ describe('AnimatedWorkLogo', () => {
       })
     )
 
-    expect(html).toContain('ds-shiny-text')
+    expect(html).toContain('text-ds-muted')
+    expect(html).not.toContain('ds-shiny-text')
     expect(html).not.toContain('ds-work-logo-slot')
   })
 

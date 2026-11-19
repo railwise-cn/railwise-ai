@@ -288,6 +288,26 @@ describe('WorkWiseRuntimeProvider', () => {
     expect(result.userMessageItemId).toBe('item_user_real')
   })
 
+  it('queries callable choices in scope and sends exact contextual references without changing the prompt', async () => {
+    const choice = { kind: 'plugin' as const, id: 'studio-package', label: 'Studio' }
+    const runtimeRequest = vi.fn(async (path: string, _method?: string, _body?: string) => ({
+      ok: true,
+      status: path === '/v1/capabilities/callable' ? 200 : 202,
+      body: JSON.stringify(path === '/v1/capabilities/callable'
+        ? { choices: [choice] }
+        : { threadId: 'thr_1', turnId: 'turn_1' })
+    }))
+    installDsGui({ runtimeRequest })
+    const provider = new WorkWiseRuntimeProvider()
+    const scope = { threadId: 'thr_1', mode: 'agent' as const }
+    await expect(provider.listCallableCapabilities(scope)).resolves.toEqual([choice])
+    expect(runtimeRequest).toHaveBeenCalledWith('/v1/capabilities/callable', 'POST', JSON.stringify(scope))
+    const refs = [{ kind: choice.kind, id: choice.id }]
+    await provider.sendUserMessage('thr_1', '开始', { capabilityReferences: refs })
+    const payload = runtimeRequest.mock.lastCall?.[2]
+    expect(JSON.parse(payload!)).toMatchObject({ prompt: '开始', capabilityReferences: refs })
+  })
+
   it('posts attachment ids with WorkWise Runtime turn requests when provided', async () => {
     const runtimeRequest = vi.fn(async () => ({
       ok: true,

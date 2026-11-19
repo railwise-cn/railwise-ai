@@ -168,7 +168,12 @@ export async function ingestParsedAttachmentBatch(store: AttachmentStore | undef
   const parsed = ParsedBatch.safeParse(body.value); if (!parsed.success) return ERRORS.attachmentValidation('invalid parsed attachment batch', parsed.error.issues)
   try {
     if (parsed.data.replace) await store.replaceSections(id, parsed.data.sections); else await store.appendSections(id, parsed.data.sections)
-    const attachment = parsed.data.final && parsed.data.metadata ? await store.updateV2(id, { ...parsed.data.metadata, indexState: parsed.data.metadata.state === 'failed' ? 'failed' : 'ready', progress: 1 } as never) : await store.getV2(id)
+    const metadata = parsed.data.metadata
+    const noPdfText = parsed.data.replace && parsed.data.sections.length === 0 &&
+      metadata?.state === 'degraded' && metadata.degradationReasons?.includes('no_extractable_pdf_text')
+    const attachment = parsed.data.final && metadata ? await store.updateV2(id, {
+      ...metadata, indexState: metadata.state === 'failed' ? 'failed' : noPdfText ? 'not_applicable' : 'ready', progress: 1
+    }) : await store.getV2(id)
     return jsonResponse({ attachment })
   } catch (error) { return ERRORS.attachmentValidation(errorMessage(error)) }
 }

@@ -1,6 +1,7 @@
 import type { ThreadRecord, ThreadStatus } from '../contracts/threads.js'
 import type { CompactRequest, CompactResponse, StartTurnRequest, StartTurnResponse, Turn, TurnStatus } from '../contracts/turns.js'
 import type { TurnItem } from '../contracts/items.js'
+import { validateCallableCapabilityReferences, type CallableCapabilityCandidate } from './callable-capabilities.js'
 import {
   sanitizeToolResultOutput,
   sanitizeTurnItemForPersistence
@@ -37,6 +38,7 @@ export type TurnServiceDeps = {
   userInputGate?: UserInputGate
   workspaceReferences?: Pick<WorkspaceReferenceService, 'validateReferences'>
   validateSkillSelection?: (prompt: string, workspace: string) => Promise<void>
+  callableCapabilities?: (request: StartTurnRequest, thread: ThreadRecord) => Promise<CallableCapabilityCandidate[]>
 }
 
 export const MAX_TERMINAL_TURN_IDS = 1_000
@@ -122,6 +124,12 @@ export class TurnService {
 
   async validateSkillSelection(prompt: string, workspace: string): Promise<void> {
     await this.deps.validateSkillSelection?.(prompt, workspace)
+  }
+
+  async validateCapabilitySelection(request: StartTurnRequest, thread: ThreadRecord): Promise<void> {
+    if (!request.capabilityReferences?.length) return
+    const current = await this.deps.callableCapabilities?.(request, thread) ?? []
+    validateCallableCapabilityReferences(request.capabilityReferences, current)
   }
 
   async startTurn(input: {
@@ -496,6 +504,7 @@ export class TurnService {
       })
     }
     await this.validateSkillSelection(input.request.displayText ?? input.request.prompt, thread.workspace)
+    await this.validateCapabilitySelection(input.request, thread)
     const selection = this.deps.tasks?.continuationSelection(thread, input.request, input.engineeringExecution, input.continuationTaskId)
     const engineeringPlanId = input.engineeringPlanId ?? selection?.engineeringPlanId
     input = { ...input, engineeringPlanId, engineeringExecution: input.engineeringExecution || Boolean(engineeringPlanId) }
@@ -531,6 +540,7 @@ export class TurnService {
       reasoningEffort: input.request.reasoningEffort,
       attachmentIds: input.request.attachmentIds ?? [],
       workspaceReferences,
+      capabilityReferences: input.request.capabilityReferences,
       guiPlan: input.request.guiPlan,
       guiDesign: input.request.guiDesign,
       mode: input.request.mode,
@@ -1032,6 +1042,7 @@ function sameIdempotentTurnRequest(
     reasoningEffort?: string
     attachmentIds: string[]
     workspaceReferences?: unknown
+    capabilityReferences?: unknown
     guiPlan?: unknown
     guiDesign?: unknown
     mode?: string
@@ -1050,6 +1061,7 @@ function sameIdempotentTurnRequest(
     && (request.reasoningEffort === undefined || (existing.reasoningEffort ?? 'auto') === request.reasoningEffort)
     && JSON.stringify(existing.attachmentIds ?? []) === JSON.stringify(request.attachmentIds ?? [])
     && JSON.stringify(existing.workspaceReferences ?? []) === JSON.stringify(request.workspaceReferences ?? [])
+    && JSON.stringify(existing.capabilityReferences ?? []) === JSON.stringify(request.capabilityReferences ?? [])
     && JSON.stringify(existing.guiPlan ?? null) === JSON.stringify(request.guiPlan ?? null)
     && JSON.stringify(existing.guiDesign ?? null) === JSON.stringify(request.guiDesign ?? null)
     && (existing.mode ?? '') === (request.mode ?? '')

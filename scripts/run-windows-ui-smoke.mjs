@@ -11,6 +11,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency, preparePinnedBrowserStartupCli, browserStartupDependency } from './prepare-browser-skill-smoke.mjs'
+import { runWindowsStartupAppearanceSmoke } from './verify-packaged-startup-appearance.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 
@@ -706,7 +707,7 @@ function validateGuiScheduleMcpEvidence(server) {
   assert.equal(server.toolCount, 8, 'The fixed schedule bridge must discover all eight registered tools')
 }
 
-export async function startWindowsTaskModelFixture({ browser = false, postPlanQuery = false, documentLinkClick = false } = {}) {
+export async function startWindowsTaskModelFixture({ browser = false, postPlanQuery = false, documentLinkClick = false, composerAcceptance } = {}) {
   const observed = { catalogs: [], requests: [] }
   const marker = `RAILWISE_BROWSER_${randomUUID()}`
   const query = '轨道交通监测合成验收'
@@ -745,6 +746,13 @@ export async function startWindowsTaskModelFixture({ browser = false, postPlanQu
     observed.requests.push(observation)
     try {
       const body = JSON.parse(Buffer.concat(chunks).toString())
+      const composerDelta = composerAcceptance?.modelAction(body)
+      if (composerDelta) {
+        response.writeHead(200, { 'content-type': 'text/event-stream' })
+        const finishReason = composerDelta.tool_calls ? 'tool_calls' : 'stop'
+        response.end(`data: ${JSON.stringify({ id: 'windows-task-fixture', choices: [{ index: 0, delta: composerDelta, finish_reason: finishReason }] })}\n\ndata: [DONE]\n\n`)
+        return
+      }
       const names = body.tools?.map(tool => tool.function.name) ?? []
       observed.catalogs.push(names)
       const called = new Set(body.messages?.flatMap(message => message.tool_calls?.map(call => call.id) ?? []))
@@ -2471,7 +2479,7 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
   }
 }
 
-export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true' }) {
+export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true' }) {
   taskSmoke ||= browserSmoke
   mirrorSmoke ||= videoEvaluation
   assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
@@ -2491,7 +2499,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
   const video = videoEvaluation ? await import('./verify-windows-video-evaluation.mjs')
     .then(module => module.startWindowsVideoEvaluation(workspace, environment)) : undefined
-  const taskModel = video ?? (taskSmoke || mirrorSmoke ? await startWindowsTaskModelFixture({ browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke }) : undefined)
+  const composerModule = composerSmoke ? await import('./verify-windows-composer-acceptance.mjs') : undefined
+  const composerAcceptance = composerModule?.createComposerModelAcceptance()
+  const taskModel = video ?? (taskSmoke || mirrorSmoke || composerSmoke ? await startWindowsTaskModelFixture({
+    browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke, composerAcceptance
+  }) : undefined)
   const model = video?.model ?? 'windows-task-fixture'
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
@@ -3084,6 +3096,15 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       validateWindowsTaskEvidence(report.taskExecution)
       report.checks.push('runtime-task-html-and-daily-schedule')
     }
+    if (composerModule && composerAcceptance) {
+      if (!taskSmoke) {
+        await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
+        await cdp.click('.ds-settings-sidebar button', '返回')
+        await cdp.wait(`!document.querySelector('.ds-settings-sidebar')`, 'the workspace after leaving offline help')
+      }
+      report.composerAcceptance = await composerModule.verifyWindowsComposerAcceptance(cdp, { workspace, acceptance: composerAcceptance })
+      report.checks.push('composer-files-skills-and-plugin')
+    }
     if (mirrorSmoke) {
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
       await cdp.click('.ds-settings-sidebar button', '返回')
@@ -3448,9 +3469,20 @@ export async function runWindowsBrowserStartupDiagnostic({ executable, version, 
   return report
 }
 
-export async function dispatchWindowsSmokeEntry(args, environment = process.env, { runUi = runWindowsUiSmoke, runDiagnostic = runWindowsBrowserStartupDiagnostic } = {}) {
+export async function dispatchWindowsSmokeEntry(args, environment = process.env, {
+  runUi = runWindowsUiSmoke,
+  runDiagnostic = runWindowsBrowserStartupDiagnostic,
+  runStartupAppearance = runWindowsStartupAppearanceSmoke
+} = {}) {
   const [executable, version, sourceHead, evidenceDir, flag] = args
   const diagnostic = args.includes('--browser-startup-diagnostic') || environment.RAILWISE_WINDOWS_BROWSER_STARTUP_DIAGNOSTIC === 'true'
+  const startupAppearance = args.includes('--startup-appearance') || environment.RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE === 'true'
+  if (startupAppearance) {
+    assert.ok(!diagnostic && environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&
+      environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_VIDEO_EVALUATION !== 'true' &&
+      !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup appearance is exclusive with browser, task and marketplace acceptance')
+    return runStartupAppearance({ executable, version, sourceHead, evidenceDir }, { connectCdp, windowsUiEnvironment })
+  }
   if (diagnostic) {
     assert.ok(environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&
       environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_VIDEO_EVALUATION !== 'true' &&
