@@ -621,15 +621,20 @@ async function runManifestCommand(command, source, version, flags) {
   if (command === 'validate') return
   if (command === 'verify-public') {
     await verifyProductPublication(manifest)
-    const audit = runRemote(readSshConfig(), String.raw`
+    const report = runRemote(readSshConfig(), String.raw`
 set -eu
-python3 /home/ubuntu/railwise-ops/website-audit/website-ops-check.py || [ "$?" -eq 1 ]
+audit_root=/home/ubuntu/railwise-ops/website-audit
+python3 "$audit_root/website-ops-check.py" || [ "$?" -eq 1 ]
+python3 - "$audit_root/logs/latest.json" <<'PY'
+import json, sys
+checks = json.load(open(sys.argv[1], encoding='utf-8'))['checks']
+for prefix in ('page-integrity:', 'redirect:', 'updater-'):
+    group = [item for item in checks if item['name'].startswith(prefix)]
+    if not group or any(item['ok'] is not True for item in group):
+        raise SystemExit('Incomplete or failed official website audit: ' + prefix)
+PY
 `, [])
-    const result = JSON.parse(audit)
-    const relevant = /^(?:page-integrity:|redirect:|updater-)/
-    if (!Array.isArray(result.failures) || !Array.isArray(result.errors) || !result.checks || result.errors.length || result.failures.some(name => relevant.test(name))) {
-      throw new Error('Official website integrity, redirect or updater audit failed.')
-    }
+    process.stdout.write(report)
     console.log('Official website integrity, redirect and updater audit passed.')
     return
   }
