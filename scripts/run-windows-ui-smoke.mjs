@@ -390,7 +390,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireComposerAcceptance = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -403,6 +403,19 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
   assert.equal(report.errors.length, 0)
+  if (requireComposerAcceptance) {
+    const composer = report.composerAcceptance
+    assert.equal(composer?.status, 'passed')
+    for (const field of ['nativeClipboard', 'chooser', 'drop', 'skillRead', 'pluginRead', 'scanSent', 'chineseTextSent']) {
+      assert.equal(composer[field], true, `Missing composer acceptance: ${field}`)
+    }
+    assert.ok(composer.scanBytes >= 40 * 1024 * 1024)
+    assert.equal(composer.installedPlugin?.id, 'video-shotcraft')
+    assert.match(composer.installedPlugin?.sha256 ?? '', /^[a-f0-9]{64}$/)
+    assert.ok(report.checks.includes('installed-chinese-renderer'))
+    assert.ok(report.checks.includes('composer-files-skills-and-plugin'))
+    if (!requireTaskExecution && !requireBrowserExecution) return true
+  }
   assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
   assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
   assert.equal(report.update.ok, true)
@@ -2482,6 +2495,7 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
 export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true' }) {
   taskSmoke ||= browserSmoke
   mirrorSmoke ||= videoEvaluation
+  const composerOnly = composerSmoke && !taskSmoke && !mirrorSmoke
   assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
@@ -2515,6 +2529,12 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
     sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', workspaceRoot: workspace, productionTouched: false, checks: [], errors: [],
     installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
+  const checkpoint = async phase => {
+    report.phase = phase
+    process.stdout.write(`[Windows exact UI] ${phase}\n`)
+    await writeFile(join(evidenceDir, 'windows-ui-smoke.json'), `${JSON.stringify(report, null, 2)}\n`)
+  }
+  await checkpoint('launching')
   // Electron's supported --user-data-dir overrides chrome::DIR_USER_DATA
   // before application startup. The installed EXE/ASAR and public identity
   // are used unchanged; candidate mode and updater overrides are absent.
@@ -2573,6 +2593,14 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
+    if (composerOnly) {
+      await checkpoint('composer setup')
+      await cdp.wait(`window.workwise.runtimeRequest('/v1/threads','GET').then(response=>response.ok).catch(()=>false)`, 'owned Runtime ready', 60_000)
+      report.composerAcceptance = await composerModule.verifyWindowsComposerAcceptance(cdp, {
+        workspace, acceptance: composerAcceptance, checkpoint
+      })
+      report.checks.push('composer-files-skills-and-plugin')
+    } else {
     await cdp.click('button', '技能与连接器')
     report.tabs = await cdp.wait(`(() => { const tabs=Array.from(document.querySelectorAll('[role="tablist"][aria-label="技能与连接器分类"] [role="tab"]')); return tabs.length===3 && tabs.map(tab=>tab.textContent.trim()); })()`, 'marketplace tabs')
     assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
@@ -3117,6 +3145,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
       }
     }
+    }
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error))
     if (error.browserBootstrap) report.browserBootstrap = error.browserBootstrap
@@ -3159,6 +3188,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       try { report.failureLogs = await readWindowsFailureLogs(profile, output) } catch { report.failureLogs = { readUnavailable: true } }
     }
   } finally {
+    await checkpoint('closing owned application and fixture')
     await stopBindingPostAudit?.()
     mainCdp?.close()
     realBrowser?.cdp.close()
@@ -3182,12 +3212,20 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
-    await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke }); report.status = 'passed' } catch (error) {
+    if (taskModel) {
+      let closeTimer
+      try {
+        await Promise.race([taskModel.close(), new Promise((_, reject) => {
+          closeTimer = setTimeout(() => reject(new Error('Owned model fixture close timed out')), 5_000)
+        })])
+      } catch (error) { report.errors.push(error instanceof Error ? error.message : String(error)) }
+      finally { clearTimeout(closeTimer) }
+    }
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireComposerAcceptance: composerSmoke }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
-    await writeFile(join(evidenceDir, 'windows-ui-smoke.json'), `${JSON.stringify(report, null, 2)}\n`)
+    await checkpoint('finished')
   }
   if (report.status !== 'passed') throw new Error(`Exact Windows Chinese UI smoke failed: ${report.errors.join('; ')}`)
   return report

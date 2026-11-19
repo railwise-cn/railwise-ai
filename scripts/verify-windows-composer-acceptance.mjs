@@ -119,7 +119,7 @@ async function continueAfterResponse(cdp, message) {
   await cdp.wait(`document.body.innerText.includes(${literal(message)}) && Boolean(document.querySelector(${literal(composer)}))`, message, 120_000)
 }
 
-export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptance }) {
+export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptance, checkpoint = async () => {} }) {
   assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
   const files = { scan: join(workspace, scanName), text: join(workspace, textName), invalid: join(workspace, invalidName) }
   const scan = expandScanPdf(await readFile(new URL('../test/fixtures/document-quality/synthetic-image-only-scan.pdf', import.meta.url)))
@@ -130,6 +130,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.wait(`Boolean(document.querySelector(${literal(composer)}))`, 'the real chat composer')
   const threadId = await cdp.wait(`${threadList}.then(items=>items.find(item=>!${literal(previousThreads)}.includes(item.id))?.id)`, 'new owned conversation')
   await cdp.click(composer)
+  await checkpoint('composer native clipboard and scanned PDF')
   // Explorer's file clipboard format is set natively in the isolated runner.
   execFileSync('powershell.exe', ['-NoProfile', '-STA', '-Command',
     `Add-Type -AssemblyName System.Windows.Forms; $files = New-Object System.Collections.Specialized.StringCollection; [void]$files.Add(${psQuote(files.scan)}); [System.Windows.Forms.Clipboard]::SetFileDropList($files)`],
@@ -139,6 +140,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '扫描 PDF 原件已送达')
 
+  await checkpoint('composer file chooser and Chinese PDF')
   // The chooser button runs the normal application handler. CDP fills the
   // actual native file input instead of scripting the desktop file dialog.
   await cdp.click(addMenu)
@@ -156,6 +158,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '中文 PDF 文字已送达')
 
+  await checkpoint('composer drag and invalid PDF')
   const point = await cdp.evaluate(`(() => { const r = document.querySelector(${literal(composer)}).getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`)
   const drag = { ...point, data: { items: [], files: [files.invalid], dragOperationsMask: 1 } }
   await cdp.send('Input.dispatchDragEvent', { type: 'dragEnter', ...drag })
@@ -167,6 +170,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   })()`, 'damaged PDF feedback from the real drop', 120_000)
   await cdp.click(removeAttachment)
 
+  await checkpoint('composer official Skill package')
   const installed = await cdp.evaluate(`(async () => {
     const catalog = await window.workwise.listCatalogPackages()
     const entry = catalog.packages.find(item => item.package.id === 'video-shotcraft')
@@ -183,6 +187,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   const plugin = await cdp.wait(`window.workwise.runtimeRequest('/v1/capabilities/callable','POST',${literal(literal({ threadId, mode: 'agent' }))})
     .then(result=>result.ok&&JSON.parse(result.body).choices.find(item=>item.kind==='plugin'&&item.id==='video-shotcraft'))`, 'plugin callable in the selected conversation')
 
+  await checkpoint('composer Skill selection and real readback')
   await cdp.fill(composer, `${acceptance.skillTurnMarker} 请读取分镜流程说明。`)
   await cdp.click(addMenu)
   await cdp.click('button', '技能')
@@ -191,6 +196,7 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '技能读取验收通过')
 
+  await checkpoint('composer plugin selection and real readback')
   await cdp.fill(composer, `${acceptance.pluginTurnMarker} 请读取插件分镜说明。`)
   await cdp.click(addMenu)
   await cdp.click('button', '插件与连接器')
