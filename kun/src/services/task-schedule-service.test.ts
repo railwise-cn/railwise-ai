@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
@@ -510,17 +510,26 @@ describe('task-owned recurring execution', () => {
 
   it('reuses only the explicitly sealed recurrence inputs and keeps a blocked occurrence for the origin chat', async () => {
     const f = fixture()
-    const thread = f.threads.get('execution')!
+    const workspace = realpathSync(f.root)
+    const sourceFile = join(workspace, 'selected.csv')
+    writeFileSync(sourceFile, 'date,value\n2026-11-13,1\n')
+    f.workspace.canonicalRoot = workspace
+    f.context.workspace = workspace
+    Object.assign(f.context.executionGrant!, { workspaceRoot: workspace, pathAllowlist: [workspace] })
+    f.repository.update(f.task.id, f.task.revision, task => ({ ...task, workspaceRoot: workspace }))
+    const thread = { ...f.threads.get('execution')!, workspace }
+    f.threads.set('origin', { ...f.threads.get('origin')!, workspace })
     const explicit = {
-      attachmentIds: ['selected-pdf'], capabilityReferences: [{ kind: 'plugin' as const, id: 'selected-plugin' }]
+      attachmentIds: ['selected-pdf'], workspaceReferences: [{ kind: 'file' as const, path: 'selected.csv' }],
+      capabilityReferences: [{ kind: 'plugin' as const, id: 'selected-plugin' }]
     }
     const turn = TurnSchema.parse({ id: 'turn', threadId: thread.id, status: 'running', prompt: f.task.goal,
       createdAt: new Date().toISOString(), ...explicit })
     f.threads.set(thread.id, { ...thread, turns: [turn] })
     const plan = await f.service.create(f.context)
     expect(f.resolveAttachment.mock.calls).toEqual([
-      ['selected-pdf', { threadId: 'origin', workspace: '/workspace' }],
-      ['selected-pdf', { threadId: 'execution', workspace: '/workspace' }]
+      ['selected-pdf', { threadId: 'origin', workspace }],
+      ['selected-pdf', { threadId: 'execution', workspace }]
     ])
     f.threads.set(thread.id, { ...thread, turns: [{ ...turn, attachmentIds: ['later-unselected-file'] }] })
 
@@ -529,9 +538,15 @@ describe('task-owned recurring execution', () => {
     await f.flows.tickSchedules(due)
     expect(f.coordinator.command).not.toHaveBeenCalled()
     expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(1)
-    expect(f.repository.attention(`schedule:${plan.id}`)).toMatchObject({ threadId: 'origin', workspaceRoot: '/workspace', status: 'pending',
+    expect(f.repository.attention(`schedule:${plan.id}`)).toMatchObject({ threadId: 'origin', workspaceRoot: workspace, status: 'pending',
       message: expect.stringContaining('请在原会话检查文件'), payload: { reasonCode: 'schedule_source_missing' } })
 
+    rmSync(sourceFile)
+    await f.flows.flushSourceEvents()
+    expect(f.coordinator.command).not.toHaveBeenCalled()
+    expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(1)
+
+    writeFileSync(sourceFile, 'date,value\n2026-11-13,2\n')
     await f.flows.flushSourceEvents()
     expect(f.coordinator.command).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ threadId: 'origin', request: expect.objectContaining(explicit) }),
