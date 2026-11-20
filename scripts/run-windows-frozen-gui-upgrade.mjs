@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { createHash, randomUUID } from 'node:crypto'
+import { X509Certificate, createHash, randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { lstat, mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:https'
@@ -128,29 +128,37 @@ async function officialBaseline(root, version) {
 }
 
 async function createPrivateTrust(root) {
-  const certificate = join(root, 'private-updater.pfx')
-  const password = randomUUID()
-  const friendlyName = `RailWise ephemeral update smoke ${randomUUID()}`
-  const remove = () => powershell(`
-    $ErrorActionPreference = 'Stop'
-    foreach ($store in @('My','Root')) {
-      Get-ChildItem "Cert:\\CurrentUser\\$store" | Where-Object FriendlyName -eq ${psQuote(friendlyName)} | Remove-Item
-    }
-  `)
+  const certificate = join(root, 'private-updater.pem')
+  const privateKey = join(root, 'private-updater.key')
+  const config = join(root, 'private-updater.cnf')
+  const openssl = join(process.env.ProgramFiles, 'Git', 'usr', 'bin', 'openssl.exe')
+  const certutil = join(process.env.SystemRoot, 'System32', 'certutil.exe')
+  await writeFile(config, [
+    '[req]', 'prompt=no', 'distinguished_name=dn', 'x509_extensions=ext',
+    '[dn]', `CN=RailWise ephemeral updater ${randomUUID()}`,
+    '[ext]', 'subjectAltName=IP:127.0.0.1', 'basicConstraints=critical,CA:FALSE',
+    'keyUsage=critical,digitalSignature,keyEncipherment', 'extendedKeyUsage=serverAuth', ''
+  ].join('\n'), { flag: 'wx' })
+  execFileSync(openssl, [
+    'req', '-new', '-newkey', 'rsa:2048', '-x509', '-nodes', '-days', '1',
+    '-keyout', privateKey, '-out', certificate, '-config', config
+  ], { timeout: 30_000, windowsHide: true, stdio: 'ignore' })
+  const [key, cert] = await Promise.all([readFile(privateKey), readFile(certificate)])
+  const identity = new X509Certificate(cert)
+  assert.equal(identity.checkIP('127.0.0.1'), '127.0.0.1')
+  const thumbprint = identity.fingerprint.replaceAll(':', '')
+  const remove = () => execFileSync(certutil, ['-user', '-delstore', 'Root', thumbprint], {
+    timeout: 30_000, windowsHide: true, stdio: 'ignore'
+  })
   try {
-    powershell(`
-      $ErrorActionPreference = 'Stop'
-      $cert = New-SelfSignedCertificate -Type Custom -Subject 'CN=RailWise ephemeral updater' -FriendlyName ${psQuote(friendlyName)} \`
-        -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddHours(1) -KeyExportPolicy Exportable \`
-        -HashAlgorithm SHA256 -KeyUsage DigitalSignature,KeyEncipherment -TextExtension @('2.5.29.17={text}ipaddress=127.0.0.1','2.5.29.37={text}1.3.6.1.5.5.7.3.1')
-      $secure = ConvertTo-SecureString ${psQuote(password)} -AsPlainText -Force
-      Export-PfxCertificate -Cert $cert -FilePath ${psQuote(certificate)} -Password $secure -CryptoAlgorithmOption AES256_SHA256 | Out-Null
-      $root = [System.Security.Cryptography.X509Certificates.X509Store]::new('Root','CurrentUser')
-      try { $root.Open('ReadWrite'); $root.Add($cert) } finally { $root.Close() }
-    `, 30_000)
-    return { pfx: await readFile(certificate), passphrase: password, remove }
+    // The runner owns the temporary user certificate store. Force noninteractive
+    // import so approval dialogs cannot stall the test without disabling TLS.
+    execFileSync(certutil, ['-user', '-f', '-addstore', 'Root', certificate], {
+      timeout: 60_000, windowsHide: true, stdio: 'ignore'
+    })
+    return { key, cert, remove }
   } catch (error) {
-    remove()
+    try { remove() } catch { /* Import may have failed before modifying the store. */ }
     throw error
   }
 }
@@ -164,7 +172,7 @@ async function openPrivateFeed(trust, target) {
   const blockmapStat = await lstat(blockmap).catch(() => null)
   if (blockmapStat?.isFile()) files.set(`${name}.blockmap`, { path: blockmap, size: blockmapStat.size })
   const requests = { manifest: 0, installerBytes: 0 }
-  const server = createServer({ pfx: trust.pfx, passphrase: trust.passphrase }, (request, response) => {
+  const server = createServer({ key: trust.key, cert: trust.cert }, (request, response) => {
     const path = request.url?.split('?')[0]
     response.setHeader('Cache-Control', 'no-store')
     if (!['GET', 'HEAD'].includes(request.method) || !path?.startsWith(prefix)) { response.writeHead(404).end(); return }
