@@ -2614,8 +2614,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     .then(module => module.startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput)) : undefined
   const composerModule = composerSmoke ? await import('./verify-windows-composer-acceptance.mjs') : undefined
   const composerAcceptance = composerModule?.createComposerModelAcceptance()
+  const marketplaceModule = mirrorSmoke ? await import('./verify-windows-cold-marketplace.mjs') : undefined
+  const marketplaceAcceptance = marketplaceModule?.createMarketplaceModelAcceptance()
   const taskModel = video ?? (taskSmoke || mirrorSmoke || composerSmoke ? await startWindowsTaskModelFixture({
-    browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke, composerAcceptance
+    browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke,
+    composerAcceptance: composerAcceptance ?? marketplaceAcceptance
   }) : undefined)
   const model = video?.model ?? 'windows-task-fixture'
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
@@ -3256,8 +3259,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
       await cdp.click('.ds-settings-sidebar button', '返回')
       await cdp.wait(`!document.querySelector('.ds-settings-sidebar')`, 'the workspace after leaving offline help')
-      const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
-      report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root })
+      report.marketplace = await marketplaceModule.verifyWindowsColdMarketplace(cdp, {
+        workspace, environment, ownedRoot: root, acceptance: marketplaceAcceptance
+      })
       report.checks.push('cold-mirror-installs-playwright-docling-and-skill-selection')
     }
     }

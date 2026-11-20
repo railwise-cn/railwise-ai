@@ -70,6 +70,41 @@ async function invokeInstalledPlaywright(server, workspace, environment) {
   }
 }
 
+export function createMarketplaceModelAcceptance() {
+  const probes = new Map()
+  return {
+    expectSkill({ skill, entry }) {
+      const marker = `market-skill-${randomUUID()}`
+      const body = entry.replace(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---\s*/, '')
+      const excerpt = body.match(/[a-z][a-z ]{28,64}/i)?.[0].trim()
+      assert.ok(excerpt, `Expected an instruction excerpt in the installed ${skill.id} entry`)
+      const probe = { marker, excerpt, skill, reply: `已核验技能 ${skill.id}`, resourceVerified: false }
+      probes.set(marker, probe)
+      return probe
+    },
+    modelAction(body) {
+      const messages = body.messages ?? []
+      const lastUser = literal(messages.findLast(message => message.role === 'user')?.content ?? '')
+      const probe = [...probes.values()].find(item => lastUser.includes(item.marker))
+      if (!probe) return null
+      const header = `Active Skill: ${probe.skill.name} (${probe.skill.id})`
+      assert.ok(messages.some(message => message.role === 'system' &&
+        literal(message.content).includes(header) && literal(message.content).includes(probe.excerpt)),
+      `KUN must inject the actual installed instructions for ${probe.skill.id}`)
+      const callId = `${probe.skill.id}-market-read`
+      const readback = messages.find(item => item.role === 'tool' && item.tool_call_id === callId)
+      if (readback) {
+        assert.ok(literal(readback.content).includes(probe.excerpt), 'KUN must read the actual reviewed skill file through its scoped resource tool')
+        probe.resourceVerified = true
+        return { content: probe.reply }
+      }
+      assert.ok(body.tools?.some(item => item.function?.name === 'read_skill_resource'))
+      return { tool_calls: [{ index: 0, id: callId, type: 'function',
+        function: { name: 'read_skill_resource', arguments: literal({ skill_id: probe.skill.id, path: 'SKILL.md' }) } }] }
+    }
+  }
+}
+
 async function installMarketplacePackageViaUi(cdp, id, name, { useUserScope = false, offline = false } = {}) {
   await cdp.fill('input[placeholder="搜索插件、发布者和能力"]', name)
   await cdp.click(`[data-marketplace-package="${id}"] button`, '安装')
@@ -84,16 +119,54 @@ async function installMarketplacePackageViaUi(cdp, id, name, { useUserScope = fa
     `the installed ${name} receipt`, 240_000)
 }
 
-async function verifyMarketplaceSkillSelection(cdp, composer, skillId, label) {
+async function selectMarketplaceSkill(cdp, composer, skillId, label) {
   await cdp.fill(composer, `/${skillId}`)
   await cdp.click('[role="option"] .truncate', label)
   await cdp.wait(`Array.from(document.querySelectorAll('[data-composer-skill]')).some(chip => chip.textContent.includes(${literal(label)}))
     && !document.querySelector(${literal(composer)})?.value.includes('/skill:')`, `the ${label} selection chip`)
+}
+
+async function verifyMarketplaceSkillSelection(cdp, composer, skillId, label) {
+  await selectMarketplaceSkill(cdp, composer, skillId, label)
   await cdp.click('[data-composer-skill] button', `移除 ${label}`)
   await cdp.fill(composer, '')
 }
 
-export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot, videoOnly = false }) {
+async function verifyMarketplaceSkillExecution(cdp, { composer, label, skill, scope, packageId, acceptance }) {
+  const installed = await cdp.evaluate(`window.workwise.listInstalledPlugins().then(all => all.find(row => row.packageId === ${literal(packageId)}))`)
+  const path = await realpath(join(skill.root, 'SKILL.md'))
+  assert.ok(containment(await realpath(installed.artifact.location), path), 'The actual skill entry must come from its exact installed package')
+  const entry = await readFile(path)
+  const probe = acceptance.expectSkill({ skill, entry: entry.toString('utf8') })
+  assert.equal(skill.scope, scope)
+
+  const threadList = "window.workwise.runtimeRequest('/v1/threads','GET').then(result=>JSON.parse(result.body).threads)"
+  const previousThreads = (await cdp.evaluate(threadList)).map(thread => thread.id)
+  await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
+  const threadId = await cdp.wait(`${threadList}.then(items=>items.find(item=>!${literal(previousThreads)}.includes(item.id))?.id)`, 'new owned market validation chat')
+  const prompt = `${probe.marker} 请阅读所选技能的使用说明。`
+  await selectMarketplaceSkill(cdp, composer, skill.id, label)
+  await cdp.fill(composer, prompt)
+  await cdp.wait(`Array.from(document.querySelectorAll('[data-composer-skill]')).some(item=>item.textContent.includes(${literal(label)}))`,
+    `selected ${label} before sending`)
+  await cdp.click('button[aria-label="发送"]:not(:disabled)')
+  await cdp.wait(`document.body.innerText.includes(${literal(probe.reply)}) &&
+    Array.from(document.querySelectorAll('[data-loaded-skill]')).some(chip=>chip.textContent.includes(${literal(label)}))`,
+    `the ${label} real resource read and loaded skill badge`, 120_000)
+  const threadPath = `/v1/threads/${encodeURIComponent(threadId)}`
+  const turn = await cdp.wait(`window.workwise.runtimeRequest(${literal(threadPath)},'GET').then(result=>{
+    const turns = JSON.parse(result.body).turns;
+    return result.ok && turns.find(turn=>turn.prompt === ${literal(prompt)} && turn.status === 'completed');
+  })`, `the completed ${label} turn receipt`, 30_000)
+  assert.ok(turn.activeSkillIds.includes(skill.id) && turn.skillInjectionBytes > 0)
+  assert.ok(turn.capabilityReferences.some(reference => reference.kind === 'skill' && reference.id === skill.id))
+  assert.ok(turn.items.some(item => item.kind === 'tool_result' && item.callId === `${skill.id}-market-read`))
+  assert.equal(probe.resourceVerified, true)
+  return { runtimeSkillId: skill.id, slashSelectionVerified: true, executedInConversation: true,
+    entrySha256: createHash('sha256').update(entry).digest('hex'), installedResourceRead: true, turnId: turn.id }
+}
+
+export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot, videoOnly = false, acceptance }) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' &&
     process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_OS === 'Windows', 'Use only an ephemeral hosted Windows acceptance runner')
   assert.ok(containment(await realpath(process.env.RUNNER_TEMP), await realpath(ownedRoot)))
@@ -175,11 +248,15 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     const blender = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result =>
       result.ok && JSON.parse(result.body).skills.find(row => row.id === 'blender-director' && row.scope === 'global'))`,
       'Blender Skills loaded from the user installation', 90_000)
-    await verifyMarketplaceSkillSelection(cdp, composer, superpowers.id, 'Using Superpowers')
-    await verifyMarketplaceSkillSelection(cdp, composer, blender.id, 'Blender Director')
+    assert.ok(acceptance, 'Full marketplace acceptance requires isolated KUN model readback')
+    const superpowersExecution = await verifyMarketplaceSkillExecution(cdp, {
+      composer, label: 'Using Superpowers', skill: superpowers, scope: 'project', packageId: 'superpowers', acceptance
+    })
+    const blenderExecution = await verifyMarketplaceSkillExecution(cdp, {
+      composer, label: 'Blender Director', skill: blender, scope: 'global', packageId: 'blender-skills', acceptance
+    })
 
     return { ...evidence, playwright, docling: { toolsDiscovered: doclingTools },
-      superpowers: { runtimeSkillId: superpowers.id, offline: true, slashSelectionVerified: true },
-      blender: { runtimeSkillId: blender.id, slashSelectionVerified: true } }
+      superpowers: { ...superpowersExecution, offline: true }, blender: blenderExecution }
   })
 }

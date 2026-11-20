@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
 import { windowsUiClickExpression, windowsManualArtifactTargetExpression, clickWindowsChatManualArtifact, readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
+import { createMarketplaceModelAcceptance } from './verify-windows-cold-marketplace.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact, windowsTaskArtifactPreviewExpression } from './run-windows-ui-smoke.mjs'
@@ -589,6 +590,32 @@ test('default Skills retain the exact packaged PPT upstream overlay provenance',
   const changed = structuredClone(skills)
   changed[1].source.id = 'other'
   assert.throws(() => validateDefaultSkillSources(changed), /Unverified default Skill source/)
+})
+
+test('marketplace synthetic turns require live instruction injection and scoped package file readback', () => {
+  const fixture = createMarketplaceModelAcceptance()
+  const skill = { id: 'using-superpowers', name: 'using-superpowers' }
+  const entry = '---\nname: using-superpowers\n---\nInstructions from the audited skill package for verification.\n'
+  const probe = fixture.expectSkill({ skill, entry })
+  assert.equal(fixture.modelAction({ messages: [{ role: 'user', content: 'unrelated' }] }), null)
+  const request = {
+    messages: [
+      { role: 'system', content: `Active Skill: using-superpowers (using-superpowers)\n${entry}` },
+      { role: 'user', content: probe.marker }
+    ],
+    tools: [{ function: { name: 'read_skill_resource' } }]
+  }
+  assert.throws(() => fixture.modelAction({ ...request, messages: request.messages.slice(1) }), /inject the actual installed instructions/)
+  const first = fixture.modelAction(request)
+  assert.deepEqual(first.tool_calls[0].function, {
+    name: 'read_skill_resource', arguments: JSON.stringify({ skill_id: skill.id, path: 'SKILL.md' })
+  })
+  const readback = content => ({ ...request, messages: [...request.messages, { role: 'tool',
+    tool_call_id: first.tool_calls[0].id, content }] })
+  assert.throws(() => fixture.modelAction(readback('missing actual file contents')), /actual reviewed skill file/)
+  assert.equal(probe.resourceVerified, false)
+  assert.deepEqual(fixture.modelAction(readback(JSON.stringify({ content: entry }))), { content: probe.reply })
+  assert.equal(probe.resourceVerified, true)
 })
 
 test('only the exact installed di-bao agent-pack component with matching packaged bytes is accepted', async () => {
