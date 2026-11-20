@@ -5,6 +5,50 @@ import { setTimeout as wait } from 'node:timers/promises'
 
 const json = path => readFile(path, 'utf8').then(JSON.parse)
 const literal = JSON.stringify
+const addressInput = '[data-u-comp="defined-name"] input:not(:disabled)'
+
+async function key(cdp, key, code, windowsVirtualKeyCode, modifiers = 0) {
+  const event = { key, code, windowsVirtualKeyCode, modifiers }
+  await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...event })
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...event })
+}
+
+export async function selectMacWorkbookCell(cdp, address) {
+  assert.match(address, /^[A-Z]{1,3}[1-9]\d{0,5}$/)
+  const target = await cdp.wait(`(() => {
+    const input=document.querySelector(${literal(addressInput)});
+    if(!input?.getClientRects().length)return null;
+    const box=input.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
+    if(document.elementFromPoint(point.x,point.y)!==input)return null;
+    return {point,rect:box.toJSON(),zoom:getComputedStyle(document.documentElement).getPropertyValue('--ds-ui-scale')};
+  })()`, 'the actual workbook address input')
+  for (const type of ['mousePressed', 'mouseReleased']) await cdp.send('Input.dispatchMouseEvent', { type, button: 'left', clickCount: 1, ...target.point })
+  await cdp.wait(`document.activeElement?.matches(${literal(addressInput)})`, 'workbook address keyboard focus')
+  await key(cdp, 'a', 'KeyA', 65, 4)
+  await key(cdp, 'Backspace', 'Backspace', 8)
+  await cdp.send('Input.insertText', { text: address })
+  await cdp.wait(`document.querySelector(${literal(addressInput)})?.value===${literal(address)}`, 'the typed workbook cell address')
+  await key(cdp, 'Enter', 'Enter', 13)
+  await cdp.wait(`!document.activeElement?.matches(${literal(addressInput)}) && document.querySelector(${literal(addressInput)})?.value===${literal(address)}`,
+    'the selected cell after native address navigation')
+  return { address, ...target }
+}
+
+function observeWorkbookUi() {
+  const rect = node => node?.getBoundingClientRect().toJSON()
+  const active = document.activeElement
+  const input = document.querySelector('[data-u-comp="defined-name"] input')
+  return {
+    devicePixelRatio, scale: getComputedStyle(document.documentElement).getPropertyValue('--ds-ui-scale'),
+    nameBox: input ? { value: input.value, rect: rect(input) } : null,
+    focused: active ? { tag: active.tagName, id: active.id, editable: active.isContentEditable,
+      component: active.getAttribute('data-u-comp'), text: active.isContentEditable ? active.textContent.slice(0, 120) : undefined } : null,
+    canvases: [...document.querySelectorAll('canvas')].filter(node => node.clientWidth > 200 && node.clientHeight > 150)
+      .slice(0, 4).map(node => ({ rect: rect(node), clientWidth: node.clientWidth, clientHeight: node.clientHeight,
+        width: node.width, height: node.height, zoom: getComputedStyle(node).zoom })),
+    status: [...document.querySelectorAll('[role="status"],[role="alert"]')].map(node => node.textContent.trim().slice(0, 160)).slice(0, 6)
+  }
+}
 
 async function until(label, read) {
   const deadline = Date.now() + 12_000
@@ -17,18 +61,22 @@ async function until(label, read) {
 }
 
 export async function verifyMacWorkbook(cdp, { root, workspace }, evidenceDir) {
-  const receipt = { status: 'failed', network: 'renderer HTTP and HTTPS blocked', checks: [] }
+  const receipt = { status: 'failed', network: 'renderer HTTP and HTTPS blocked', checks: [], diagnostics: [] }
+  let original
+  const sample = async phase => {
+    receipt.diagnostics.push({ phase, ui: await cdp.evaluate(`(${observeWorkbookUi.toString()})()`),
+      ...(original ? { savedCells: await json(original).then(saved => {
+        const sheet = saved.workbook.sheets?.[saved.workbook.sheetOrder?.[0]]
+        return Object.entries(sheet?.cellData ?? {}).flatMap(([row, columns]) => Object.entries(columns)
+          .map(([column, cell]) => ({ row, column, formula: cell.f, value: cell.v }))).slice(0, 12)
+      }).catch(() => undefined) } : {}) })
+  }
   try {
     await cdp.send('Network.enable')
     await cdp.send('Network.setBlockedURLs', { urls: ['http://*', 'https://*'] })
     const ready = '[...document.querySelectorAll("button")].some(button=>button.textContent==="保存表格"&&!button.disabled)'
     const click = label => cdp.click('button', label)
     const save = () => click('保存表格')
-    const key = async (key, code, windowsVirtualKeyCode, modifiers = 0) => {
-      const event = { key, code, windowsVirtualKeyCode, modifiers }
-      await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...event })
-      await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...event })
-    }
     const readWorkbook = async path => {
       const saved = await json(path)
       assert.equal(saved.version, 1)
@@ -42,37 +90,46 @@ export async function verifyMacWorkbook(cdp, { root, workspace }, evidenceDir) {
     receipt.checks.push('new-workbook')
     const filename = (await readdir(workspace)).find(name => name.endsWith('.rwsheet'))
     assert.ok(filename)
-    const original = join(workspace, filename)
-    const clickCell = async (row, column, count = 1) => {
-      const canvas = await cdp.wait(canvasExpression, 'grid canvas')
-      const point = { x: canvas.x + 68 + column * 79, y: canvas.y + 30 + row * 22 }
-      for (let clickCount = 1; clickCount <= count; clickCount++) {
-        await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount, ...point })
-        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount, ...point })
-      }
+    original = join(workspace, filename)
+    await sample('new-workbook')
+    const select = async address => {
+      const target = await selectMacWorkbookCell(cdp, address)
+      receipt.diagnostics.push({ phase: 'native-cell-selection', target })
     }
-    const edit = async (row, column, text) => {
-      await clickCell(row, column, 2)
+    const edit = async (address, text) => {
+      await select(address)
+      await key(cdp, 'F2', 'F2', 113)
+      await cdp.wait('Boolean(document.activeElement?.isContentEditable && document.activeElement.id.startsWith("__editor_"))', 'the real focused cell editor')
+      await sample('editing-' + address)
       await cdp.send('Input.insertText', { text })
-      await key('Enter', 'Enter', 13)
+      await key(cdp, 'Enter', 'Enter', 13)
+      await sample('committed-' + address)
     }
 
-    await edit(0, 0, '=SUM(4,5)')
+    await edit('A1', '=SUM(4,5)')
     await wait(300)
     await save()
+    await sample('first-formula-save')
+    let resavedFormula = false
     const formula = await until('a saved calculated formula', async () => {
       const actual = cell(await readWorkbook(original), 0, 0)
+      if (!resavedFormula && actual?.f === '=SUM(4,5)' && actual.v !== 9) {
+        resavedFormula = true
+        await wait(750)
+        await save()
+        await sample('formula-calculation-resave')
+      }
       return actual?.f === '=SUM(4,5)' && actual.v === 9 && actual
     })
     receipt.formula = { expression: formula.f, value: formula.v }
     receipt.checks.push('formula-calculated-and-persisted')
 
-    await edit(0, 1, '撤销前')
+    await edit('B1', '撤销前')
     await wait(200)
     await save()
     await until('the edited value', async () => cell(await readWorkbook(original), 0, 1)?.v === '撤销前')
-    await clickCell(1, 1)
-    await key('z', 'KeyZ', 90, 4)
+    await select('B2')
+    await key(cdp, 'z', 'KeyZ', 90, 4)
     await wait(200)
     await save()
     await until('the reverted value', async () => {
@@ -81,7 +138,7 @@ export async function verifyMacWorkbook(cdp, { root, workspace }, evidenceDir) {
     })
     receipt.checks.push('native-macos-undo-restored-previous-value')
 
-    await edit(0, 1, '保留未保存修改')
+    await edit('B1', '保留未保存修改')
     await wait(200)
     const external = await json(original)
     external.workbook.name = '同时被外部程序修改'
@@ -130,12 +187,21 @@ export async function verifyMacWorkbook(cdp, { root, workspace }, evidenceDir) {
     assert.equal(JSON.parse(reopened.content).workbook.sheetOrder.length, 2)
     assert.equal(await readFile(original, 'utf8'), externalBytes)
     receipt.checks.push('saved-copy-read-back-through-installed-file-reader')
+    await sample('completed-workbook')
     receipt.status = 'passed'
     return receipt
   } catch (error) {
+    receipt.status = 'failed'
     receipt.error = error.message
+    await sample('failure').catch(failure => { receipt.diagnosticError = failure.message })
     throw error
   } finally {
+    try {
+      const capture = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 2000)
+      const screenshot = Buffer.from(capture.data, 'base64')
+      assert.ok(screenshot.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')))
+      await writeFile(join(evidenceDir, `mac-workbook${receipt.status === 'passed' ? '' : '-failure'}.png`), screenshot)
+    } catch (error) { receipt.screenshotError = error.message }
     await writeFile(join(evidenceDir, 'mac-workbook.json'), `${literal(receipt, null, 2)}\n`)
   }
 }

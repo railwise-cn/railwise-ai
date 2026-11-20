@@ -203,7 +203,11 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     // A missed transient capture must still fail, but should not suppress the
     // independently useful real workbook acceptance evidence.
     if (onWorkbenchReady) workbook = await onWorkbenchReady(main, { root, workspace })
-    assert.ok(observation, 'The real transitional startup window was not captured')
+    if (!observation) {
+      const error = new Error('The real transitional startup window was not captured')
+      error.code = 'STARTUP_CAPTURE_MISSED'
+      throw error
+    }
     validateStartupAppearance(observation, expected)
     observation.workbenchTypography = workbenchTypography
     if (workbook) observation.workbook = workbook
@@ -239,7 +243,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     if (expected.screenshotName && screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) {
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
     }
-    await writeFile(join(evidenceDir, `startup-capture-${expected.locale}-${expected.theme}.json`), `${JSON.stringify({
+    await writeFile(join(evidenceDir, `startup-capture-${expected.locale}-${expected.theme}${expected.captureAttempt ? '-retry' : ''}.json`), `${JSON.stringify({
       status: failure ? 'failed' : 'observed', expected, observation, workbenchTypography, workbook,
       error: failure, capture: observer.diagnostics
     }, null, 2)}\n`)

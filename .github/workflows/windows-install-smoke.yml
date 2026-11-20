@@ -385,6 +385,7 @@ jobs:
             ${{ runner.temp }}/exact-mac-source.json
             ${{ runner.temp }}/exact-mac-evidence/mac-startup-appearance.json
             ${{ runner.temp }}/exact-mac-evidence/mac-workbook.json
+            ${{ runner.temp }}/exact-mac-evidence/mac-workbook*.png
             ${{ runner.temp }}/exact-mac-evidence/startup-capture-*.json
             ${{ runner.temp }}/exact-mac-evidence/mac-startup-*.png
 

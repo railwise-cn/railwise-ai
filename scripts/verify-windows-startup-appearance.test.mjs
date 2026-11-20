@@ -3,8 +3,9 @@ import test from 'node:test'
 import { createServer } from 'node:net'
 import { WebSocketServer } from 'ws'
 import { connectCdp, dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
-import { parseMacCandidateChecksums, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
+import { observeMacStartupCase, parseMacCandidateChecksums, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { createStartupTargetObserver, validateStartupAppearance } from './verify-packaged-startup-appearance.mjs'
+import { selectMacWorkbookCell } from './verify-mac-workbook.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const dark = { htmlLang: 'zh-CN', theme: 'dark', scale: 1.25 }
@@ -110,6 +111,48 @@ test('retains missed-capture and target-close evidence without fabricating a spl
   assert.deepEqual(await observer.observe([{ ...target, id: 'main', url: 'file:///app/renderer/index.html' }]), { observation: undefined, screenshot: undefined })
   observer.close()
   assert.equal(closed, 1)
+})
+
+test('one supplemental native relaunch is allowed only for a visually missed English startup', async () => {
+  const attempts = []
+  const expected = { locale: 'en', theme: 'light', screenshotName: 'mac-startup-en-light.png' }
+  const missed = Object.assign(new Error('not captured'), { code: 'STARTUP_CAPTURE_MISSED' })
+  const actual = await observeMacStartupCase(async value => {
+    attempts.push(value)
+    if (attempts.length === 1) throw missed
+    return { actualNativeCapture: true }
+  }, expected)
+  assert.deepEqual(actual, { actualNativeCapture: true })
+  assert.deepEqual(attempts, [expected, { ...expected, captureAttempt: 1, screenshotName: 'mac-startup-en-light-retry.png' }])
+  let failures = 0
+  await assert.rejects(observeMacStartupCase(async () => { failures++; throw missed }, expected), error => error === missed)
+  assert.equal(failures, 2, 'A second missing capture must stay missing')
+})
+
+test('startup retries never hide geometry or primary Chinese workbook failures', async () => {
+  for (const [locale, error] of [['en', new Error('clipped branding')], ['zh', Object.assign(new Error('not captured'), { code: 'STARTUP_CAPTURE_MISSED' })],
+    ['zh', new Error('formula was not persisted')]]) {
+    let attempts = 0
+    await assert.rejects(observeMacStartupCase(async () => { attempts++; throw error }, { locale }), actual => actual === error)
+    assert.equal(attempts, 1)
+  }
+})
+
+test('Mac workbook navigation uses the real address control and native Command+A instead of canvas offsets', async () => {
+  const input = []
+  const cdp = {
+    wait: async (_expression, label) => label === 'the actual workbook address input'
+      ? { point: { x: 173, y: 214 }, rect: { x: 150, y: 204, width: 46, height: 20 }, zoom: '0.9' } : true,
+    send: async (method, parameters) => { input.push({ method, ...parameters }) }
+  }
+  const target = await selectMacWorkbookCell(cdp, 'B2')
+  assert.equal(target.address, 'B2')
+  assert.equal(target.zoom, '0.9')
+  assert.deepEqual(input.slice(0, 2).map(value => [value.type, value.x, value.y]), [['mousePressed', 173, 214], ['mouseReleased', 173, 214]])
+  assert.ok(input.some(value => value.type === 'rawKeyDown' && value.key === 'a' && value.modifiers === 4))
+  assert.deepEqual(input.find(value => value.method === 'Input.insertText'), { method: 'Input.insertText', text: 'B2' })
+  assert.deepEqual(input.slice(-2).map(value => [value.type, value.key]), [['rawKeyDown', 'Enter'], ['keyUp', 'Enter']])
+  await assert.rejects(selectMacWorkbookCell(cdp, '../A1'))
 })
 
 test('selects the scoped startup runner without starting regular UI or task fixtures', async () => {
