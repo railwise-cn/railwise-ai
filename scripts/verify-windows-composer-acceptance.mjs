@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { psQuote } from './run-windows-published-gui-update-smoke.mjs'
+import { psQuote } from './verify-windows-install-smoke.mjs'
 
 const literal = JSON.stringify
 const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
