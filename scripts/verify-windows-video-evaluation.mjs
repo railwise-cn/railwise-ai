@@ -6,7 +6,6 @@ import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { createChineseTextPdf } from './verify-windows-composer-acceptance.mjs'
-import { parseFixtureToolOutput } from './run-windows-ui-smoke.mjs'
 
 const execFile = promisify(execFileCallback)
 const digest = value => createHash('sha256').update(value).digest('hex')
@@ -65,7 +64,7 @@ console.log(${literal(target)});
   return { target, ffmpeg, ffprobe }
 }
 
-function modelAction(body, selection, render) {
+function modelAction(body, selection, render, parseFixtureToolOutput) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
   const results = new Map(body.messages?.filter(message => message.role === 'tool')
     .map(message => [message.tool_call_id, parseFixtureToolOutput(message.content)]))
@@ -108,7 +107,7 @@ function modelAction(body, selection, render) {
   return null
 }
 
-export async function startWindowsVideoEvaluation(workspace, environment) {
+export async function startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput) {
   const toolchain = await provision(workspace, environment)
   const documentPath = join(workspace, pdfName)
   await writeFile(documentPath, createChineseTextPdf())
@@ -128,7 +127,7 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
       for await (const chunk of request) chunks.push(chunk)
       const body = JSON.parse(Buffer.concat(chunks).toString())
       assert.ok(selection.skillId && body.messages?.some(message => message.role === 'user' && literal(message.content).includes(marker)))
-      const action = modelAction(body, selection, render)
+      const action = modelAction(body, selection, render, parseFixtureToolOutput)
       if (action?.[0] === 'eval-render' && !selection.interrupted) {
         selection.interrupted = true
         response.writeHead(200, { 'content-type': 'text/event-stream' })
