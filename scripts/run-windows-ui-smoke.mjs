@@ -361,11 +361,30 @@ export async function verifyInstalledBundledSkillCopy(skill, { applicationRoot, 
     entrySha256: skill.entrySha256, entryRegisteredInAsar: true, metadataVerified: true, ownedPathVerified: true }
 }
 
-export function windowsAuditedSkillDisplayRoots(skill, applicationRoot) {
+export async function windowsAuditedSkillDisplayRoots(skill, applicationRoot) {
   const roots = [skill.root]
   // Discovery may show the bundled source while the runtime uses its owned copy.
   // Accept that exact source only after the copy has passed the ASAR byte check.
   if (verifiedBundledSkillCopy(skill)) roots.push(join(applicationRoot, dirname(skill.bundledCopySource.entryRelativePath)))
+  if (verifiedAgentPackSource(skill)) {
+    // The separately shipped monitoring Skill may be listed instead of the
+    // agent pack's owned copy. Its bytes have a separate packaged origin.
+    const relativeEntry = join('src', 'asset', 'skills', monitoringAgentPack.component, 'SKILL.md')
+    const archive = join(applicationRoot, 'resources', 'app.asar')
+    const unpackedEntry = join(`${archive}.unpacked`, relativeEntry)
+    const info = await lstat(unpackedEntry).catch(error => {
+      if (error.code === 'ENOENT') return null
+      throw error
+    })
+    if (info) {
+      assert.ok(info.isFile() && !info.isSymbolicLink(), 'The bundled monitoring Skill must be an installed file')
+      const entry = asar.statFile(archive, relativeEntry, false)
+      assert.equal(entry.unpacked, true, 'The bundled monitoring Skill must be registered in the exact ASAR')
+      assert.equal(entry.integrity?.hash, createHash('sha256').update(await readFile(unpackedEntry)).digest('hex'),
+        'The bundled monitoring Skill must match its ASAR integrity hash')
+      roots.push(dirname(unpackedEntry))
+    }
+  }
   return roots
 }
 
@@ -673,6 +692,18 @@ export function windowsTaskArtifactPreviewExpression({ marker, relativePath, evi
       return {title:page.title,contentVerified:true,partition};
     } catch { return null; }
   })()`
+}
+
+export async function openWindowsHelpOutline(cdp) {
+  const summary = '.ds-help-outline > summary'
+  const state = await cdp.wait(`(() => {
+    const outline = document.querySelector('.ds-help-outline');
+    if (outline?.open) return 'open';
+    return document.querySelector(${JSON.stringify(summary)})?.getClientRects().length ? 'collapsed' : null;
+  })()`, 'the desktop outline or its compact disclosure')
+  if (state === 'collapsed') await cdp.click(summary, '章节目录')
+  await cdp.wait(`document.querySelector('.ds-help-outline')?.open === true &&
+    document.querySelector('[aria-label="手册目录"]')?.innerText.includes('12. 版本更新')`, 'the visible manual table of contents')
 }
 
 export function windowsTaskPreviewLayoutExpression() {
@@ -2669,7 +2700,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     }))`)
     assert.deepEqual(report.resources.engineeringSkills.map(skill => skill.name), engineeringSkillNames)
     assert.ok(report.resources.engineeringSkills.every(skill => skill.installEnabled))
-    const skills = await cdp.evaluate(`window.workwise.listSkills().then(result=>result.ok?result.skills.map(skill=>({id:skill.id,name:skill.name,root:skill.root,entryPath:skill.entryPath,
+    const skills = await cdp.evaluate(`window.workwise.listSkills(${JSON.stringify(workspace)}).then(result=>result.ok?result.skills.map(skill=>({id:skill.id,name:skill.name,root:skill.root,entryPath:skill.entryPath,
       source:skill.source&&{type:skill.source.type,id:skill.source.id,owner:skill.source.owner,repo:skill.source.repo,path:skill.source.path,ref:skill.source.ref,
         installedSha:skill.source.installedSha,overlaySkillId:skill.source.overlaySkillId,autoUpdate:skill.source.autoUpdate}})):[])`)
     report.resources.defaultSkills = skills.filter(skill => defaultSkillIds.includes(skill.id))
@@ -2695,7 +2726,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         skill.entryRegisteredInAsar = true
       }
       await cdp.fill('input[placeholder*="已索引"]', skill.name || skill.id)
-      const displayRoots = windowsAuditedSkillDisplayRoots(skill, dirname(executable))
+      const displayRoots = await windowsAuditedSkillDisplayRoots(skill, dirname(executable))
       await cdp.wait(`Array.from(document.querySelectorAll('main .truncate')).some(node => {
         if (node.textContent.trim() !== ${JSON.stringify(skill.name || skill.id)}) return false;
         const card = node.parentElement?.parentElement;
@@ -2775,7 +2806,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     await cdp.click('.ds-settings-sidebar nav button', '帮助')
     report.chapters = await cdp.wait(`(() => { const headings=Array.from(document.querySelectorAll('[aria-label="用户使用手册"] .write-markdown-preview h2')); const numbers=headings.map(heading=>Number(/^(\\d+)\\./.exec(heading.textContent.trim())?.[1])).filter(Number.isInteger); return numbers.length===13 && numbers; })()`, 'the complete thirteen-chapter manual')
     assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
-    await cdp.wait(`document.querySelector('[aria-label="手册目录"]')?.innerText.includes('12. 版本更新')`, 'manual table of contents')
+    await openWindowsHelpOutline(cdp)
     report.checks.push('offline-help-thirteen-chapters')
     assert.equal(await cdp.evaluate(`Array.from(document.querySelectorAll('a,button')).some(node=>/个人主页|personal homepage/i.test(node.textContent))`), false)
     report.checks.push('personal-homepage-absent')
@@ -2798,7 +2829,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.checks.push('offline-help-search-and-navigation')
     const helpScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
     await writeFile(join(evidenceDir, 'windows-help-zh-dark.png'), Buffer.from(helpScreenshot.data, 'base64'))
-    if (await cdp.evaluate(`document.querySelector('.ds-help-outline')?.open===false`)) await cdp.click('.ds-help-outline > summary', '章节目录')
+    await openWindowsHelpOutline(cdp)
     await cdp.click('[aria-label="手册目录"] button', '1.4 现有界面截图')
     await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="用户使用手册"] img')).some(image=>image.complete && image.naturalWidth>0)`, 'a packaged manual image offline')
     report.checks.push('offline-help-images')

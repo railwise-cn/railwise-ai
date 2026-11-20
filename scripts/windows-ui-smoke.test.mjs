@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
@@ -18,6 +18,25 @@ import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWin
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
+
+test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {
+  for (const state of ['open', 'collapsed']) {
+    const actions = []
+    const cdp = {
+      wait: async (probe, label) => {
+        actions.push(label)
+        assert.match(probe, /\.ds-help-outline/)
+        return label === 'the desktop outline or its compact disclosure' ? state : true
+      },
+      click: async (selector, label) => {
+        assert.equal(selector, '.ds-help-outline > summary')
+        actions.push(label)
+      }
+    }
+    await permissionSmokeModule.openWindowsHelpOutline(cdp)
+    assert.deepEqual(actions, ['the desktop outline or its compact disclosure', ...(state === 'collapsed' ? ['章节目录'] : []), 'the visible manual table of contents'])
+  }
+})
 
 test('the private video fixture reads its exact indexed PDF section when a CJK search cannot find it', () => {
   const section = { id: 'section-1', attachmentId: 'fixture-pdf', text: '铁 路\u0000合成验收' }
@@ -606,6 +625,18 @@ test('only the exact installed di-bao agent-pack component with matching package
     assert.equal(validateWindowsUiReport(evidence, identity), true)
     assert.equal(valid.agentPackSource.type, 'bundled-agent-pack')
     assert.equal(valid.entryRegisteredInAsar, false)
+    assert.deepEqual(await permissionSmokeModule.windowsAuditedSkillDisplayRoots(valid, applicationRoot), [skillRoot])
+    const archiveSource = join(root, 'archive-source')
+    const relativeEntry = join('src', 'asset', 'skills', 'di-bao-monitoring', 'SKILL.md')
+    const archive = join(applicationRoot, 'resources', 'app.asar')
+    const bundledEntry = join(`${archive}.unpacked`, relativeEntry)
+    await mkdir(dirname(join(archiveSource, relativeEntry)), { recursive: true })
+    await writeFile(join(archiveSource, relativeEntry), 'distinct packaged monitoring Skill\n')
+    await createRequire(import.meta.url)('@electron/asar').createPackageWithOptions(archiveSource, archive, { unpack: '**/SKILL.md' })
+    assert.deepEqual(await permissionSmokeModule.windowsAuditedSkillDisplayRoots(valid, applicationRoot), [skillRoot, dirname(bundledEntry)])
+    await writeFile(bundledEntry, 'modified after packaging')
+    await assert.rejects(permissionSmokeModule.windowsAuditedSkillDisplayRoots(valid, applicationRoot), /ASAR integrity hash/)
+    assert.deepEqual(await permissionSmokeModule.windowsAuditedSkillDisplayRoots(skill(), applicationRoot), [skillRoot])
     for (const mutate of [
       async () => writeFile(join(skillRoot, 'SKILL.md'), 'same name, changed entry'),
       async () => writeFile(join(skillRoot, '.workwise-agent-pack-source.json'), JSON.stringify({ ...metadata, id: 'untrusted-pack' })),
@@ -645,8 +676,8 @@ test('the normal Tender Master installed copy requires its owned path, bundled m
     evidence.resources.defaultSkills[1] = valid
     assert.equal(validateWindowsUiReport(evidence, identity), true)
     const expectedPackagedRoot = join(applicationRoot, 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', 'tender-master')
-    assert.deepEqual(permissionSmokeModule.windowsAuditedSkillDisplayRoots(valid, applicationRoot), [skillRoot, expectedPackagedRoot])
-    assert.deepEqual(permissionSmokeModule.windowsAuditedSkillDisplayRoots(skill(), applicationRoot), [skillRoot])
+    assert.deepEqual(await permissionSmokeModule.windowsAuditedSkillDisplayRoots(valid, applicationRoot), [skillRoot, expectedPackagedRoot])
+    assert.deepEqual(await permissionSmokeModule.windowsAuditedSkillDisplayRoots(skill(), applicationRoot), [skillRoot])
     await writeFile(join(skillRoot, 'SKILL.md'), 'same name, changed bytes')
     await assert.rejects(verifyInstalledBundledSkillCopy(skill(), { applicationRoot, isolatedRoot }))
     await writeFile(join(skillRoot, 'SKILL.md'), 'synthetic exact ASAR source\n')
@@ -684,7 +715,7 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   assert.ok(ui.indexOf("'the loaded local Amap and Zotero catalog entries'") < ui.indexOf("const connectorsScreenshot"))
   assert.ok(ui.indexOf("'the loaded local Amap and Zotero catalog entries'") < ui.indexOf("查看 GitHub MCP 连接详情"))
   assert.match(ui, /window\.workwise\.listCatalogPackages\(\)/)
-  assert.match(ui, /window\.workwise\.listSkills\(\)/)
+  assert.match(ui, /window\.workwise\.listSkills\(\$\{JSON\.stringify\(workspace\)\}\)/)
   // @electron/asar splits archive lookups using the host path separator.
   assert.match(ui, /const entry = join\('src', 'asset', 'skills', skill.id, 'SKILL.md'\)/)
   assert.match(ui, /asar\.extractFile\(join\(dirname\(executable\), 'resources', 'app.asar'\), entry\)/)
