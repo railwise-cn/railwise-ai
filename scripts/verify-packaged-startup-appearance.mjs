@@ -76,7 +76,8 @@ async function collectTargets(launch, profile, port) {
 }
 
 export async function observeInstalledStartup(options, expected, dependencies) {
-  const { executable, version, evidenceDir, temporary, workbench } = options
+  const { executable, version, evidenceDir, temporary, workbench, workbenchOnly = false } = options
+  assert.ok(!workbenchOnly || workbench, 'Task-only verification requires a workbench check')
   const { connectCdp, environmentForRoot } = dependencies
   const root = await mkdtemp(join(temporary, 'railwise-splash-'))
   const profile = join(root, 'profile')
@@ -108,7 +109,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
       const observed = await collectTargets(launch, profile, port)
       port = observed.port
       const splash = observed.targets.find(target => /^data:text\/html(?:;[^,]*)?,/i.test(target.url) && target.title === brand.platform)
-      if (!observation && splash) {
+      if (!workbenchOnly && !observation && splash) {
         let splashCdp
         try {
           splashCdp = await connectCdp(splash.webSocketDebuggerUrl)
@@ -131,8 +132,10 @@ export async function observeInstalledStartup(options, expected, dependencies) {
       await wait(45)
     }
     assert.ok(main, 'The installed startup window must close and reveal the workbench')
-    assert.ok(observation, 'The real transitional startup window was not captured')
-    validateStartupAppearance(observation, expected)
+    if (!workbenchOnly) {
+      assert.ok(observation, 'The real transitional startup window was not captured')
+      validateStartupAppearance(observation, expected)
+    }
     await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
     if (workbench) workbenchObservation = await workbench.observe(main, workspace)
