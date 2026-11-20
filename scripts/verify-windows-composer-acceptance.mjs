@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { psQuote } from './verify-windows-install-smoke.mjs'
@@ -167,10 +167,82 @@ function expandScanPdf(bytes) {
   return Buffer.concat([bytes.subarray(0, position), padding, Buffer.from(trailer)])
 }
 
+function parseComposerToolResult(content) {
+  if (typeof content !== 'string') return undefined
+  if (content.startsWith('UNTRUSTED external web content follows.')) content = content.slice(content.indexOf('\n') + 1)
+  if (content.startsWith('Historical tool execution.')) {
+    const marker = '\n\nRecorded result:\n'
+    const offset = content.lastIndexOf(marker)
+    if (offset < 0) return undefined
+    content = content.slice(offset + marker.length)
+  }
+  try { return JSON.parse(content) } catch { return undefined }
+}
+
+function describeComposerResource(result) {
+  const error = typeof result?.error === 'string' ? result.error : result?.error?.message ?? result?.message
+  const category = [
+    [/scope|not authorized|permission|sandbox/i, 'scope-rejected'],
+    [/not found|does not exist|enoent/i, 'resource-not-found'],
+    [/invalid|must be|is required/i, 'argument-rejected']
+  ].find(([pattern]) => pattern.test(typeof error === 'string' ? error : ''))?.[1]
+  const keys = Object.keys(result ?? {}).filter(key => /^[a-z_]{1,32}$/i.test(key)).sort()
+  return `${category ?? 'unclassified'} keys=${keys.join(',')}`
+}
+
+function composerModelTool(id, name, args) {
+  return { tool_calls: [{ index: 0, id, type: 'function', function: { name, arguments: literal(args) } }] }
+}
+
+function readComposerWorkflow(body, messages, id, skillId, references) {
+  const tools = new Set(body.tools?.map(tool => tool.function?.name))
+  const results = new Map(messages.filter(item => item.role === 'tool').map(item => [item.tool_call_id, parseComposerToolResult(item.content)]))
+  if (!results.has(id)) {
+    assert.ok(tools.has('read_skill_resource'), 'The selected installed Skill must make its resource tool available')
+    return { action: composerModelTool(id, 'read_skill_resource', { skill_id: skillId, path: 'references/pipeline.md' }) }
+  }
+  const result = results.get(id)
+  const reference = result?.contextSpill
+  if (!reference) return { resource: result }
+  assert.ok(tools.has('read_task_context'), 'The spilled installed workflow must provide a scoped context tool')
+  const pin = references.get(id) ?? reference
+  // Later model requests can reproject the same immutable object in a new bundle.
+  // Continue reading the original bundle and verify its object identity and bytes.
+  assert.ok(pin.bundle_id && reference.bundle_id && pin.object_id && pin.object_id === reference.object_id &&
+    pin.sha256 === reference.sha256 && /^[a-f0-9]{64}$/.test(pin.sha256) && pin.totalBytes === reference.totalBytes &&
+    Number.isInteger(pin.totalBytes) && pin.totalBytes > 0 && pin.totalBytes <= 64 * 1024, 'Invalid installed skill context reference')
+  references.set(id, pin)
+  const parts = []
+  let offset = 0
+  for (let index = 0; index < 16; index++) {
+    const recallId = `${id}-recall-${index}`
+    if (!results.has(recallId)) return { action: composerModelTool(recallId, 'read_task_context', {
+      bundle_id: pin.bundle_id, object_id: pin.object_id, offset, max_bytes: 8192
+    }) }
+    const page = results.get(recallId)
+    assert.ok(page?.untrusted && page.bundleId === pin.bundle_id && page.objectId === pin.object_id && page.offset === offset &&
+      page.totalBytes === pin.totalBytes && page.sha256 === pin.sha256 && typeof page.text === 'string',
+    `Skill context recall returned an invalid page (${describeComposerResource(page)})`)
+    const bytes = Buffer.from(page.text, 'utf8')
+    assert.ok(bytes.length > 0 && bytes.length <= 8192)
+    parts.push(bytes)
+    offset += bytes.length
+    if (page.nextOffset === null) {
+      const content = Buffer.concat(parts)
+      assert.equal(content.length, pin.totalBytes)
+      assert.equal(createHash('sha256').update(content).digest('hex'), pin.sha256)
+      return { resource: parseComposerToolResult(content.toString('utf8')) }
+    }
+    assert.ok(page.nextOffset === offset && offset < pin.totalBytes, 'Skill context recall must advance the verified byte offset')
+  }
+  assert.fail('The installed Skill workflow exceeded the bounded recall pages')
+}
+
 export function createComposerModelAcceptance() {
   const observations = { skillRead: false, pluginRead: false, scanSent: false, chineseTextSent: false }
   const skillTurnMarker = `railwise-skill-check-${randomUUID()}`
   const pluginTurnMarker = `railwise-plugin-check-${randomUUID()}`
+  const workflowReferences = new Map()
   let skillId
   return {
     observations, skillTurnMarker, pluginTurnMarker,
@@ -187,15 +259,13 @@ export function createComposerModelAcceptance() {
           assert.ok(messages.some(item => typeof item.content === 'string' && item.content.includes('"kind":"plugin","id":"video-shotcraft"')))
         }
         const id = `composer-${selected}`
-        const readback = messages.find(item => item.role === 'tool' && item.tool_call_id === id)
-        if (readback) {
-          assert.ok(literal(readback.content).includes('remotion render'), 'Real installed plugin documentation must be read')
-          observations[selected] = true
-          return { content: selected === 'pluginRead' ? '插件读取验收通过' : '技能读取验收通过' }
-        }
-        assert.ok(body.tools?.some(item => item.function?.name === 'read_skill_resource'))
-        return { tool_calls: [{ index: 0, id, type: 'function',
-          function: { name: 'read_skill_resource', arguments: literal({ skill_id: skillId, path: 'references/pipeline.md' }) } }] }
+        const { resource, action } = readComposerWorkflow(body, messages, id, skillId, workflowReferences)
+        if (action) return action
+        assert.ok(resource?.skill_id === skillId && resource.path === 'references/pipeline.md' &&
+          typeof resource.content === 'string' && /remotion render/i.test(resource.content),
+        `The selected installed Skill workflow must be read (${describeComposerResource(resource)})`)
+        observations[selected] = true
+        return { content: selected === 'pluginRead' ? '插件读取验收通过' : '技能读取验收通过' }
       }
       if (text.includes('请根据附件中实际可读取的内容继续处理') || text.includes('Please use the content you can read')) {
         if (!observations.scanSent && history.includes(scanName)) {
