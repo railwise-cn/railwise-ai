@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
 import { validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
-import { validateStartupAppearance } from './verify-packaged-startup-appearance.mjs'
+import { validateNarrowWorkbenchComposer, validateStartupAppearance, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const dark = { htmlLang: 'zh-CN', theme: 'dark', scale: 1.25 }
@@ -28,6 +28,30 @@ test('rejects a version label, wrong scale and clipped Chinese text', () => {
   const snapshot = observed()
   snapshot.geometry.textLines[1] = box(90, 105, 160, 18)
   assert.throws(() => validateStartupAppearance(snapshot, dark), /fit inside/)
+})
+
+test('keeps 100%, 125%, and 150% startup cases with a real minimum workbench probe at 150%', () => {
+  assert.deepEqual(windowsStartupCases.map(item => item.scale), [1, 1.25, 1.5])
+  const highestScale = windowsStartupCases[2]
+  assert.equal(highestScale.narrowWorkbench, true)
+  const native = observed()
+  native.viewport.scale = 1.5
+  assert.equal(validateStartupAppearance(native, highestScale), native)
+})
+
+test('accepts bounded composer controls and rejects horizontal overflow, hit obstruction, and an oversized viewport', () => {
+  const geometry = {
+    viewport: { width: 960, height: 640, scale: 1.5 }, horizontalOverflow: false,
+    composer: box(130, 480, 700, 140), textarea: box(142, 496, 675, 48), toolbar: box(142, 550, 675, 52),
+    general: { ...box(483, 559, 113, 36), hit: true, label: 'General', clipped: false },
+    model: { ...box(600, 559, 158, 36), hit: true }, send: { ...box(768, 557, 40, 40), hit: true }
+  }
+  assert.equal(validateNarrowWorkbenchComposer(geometry, 1.5), geometry)
+  assert.doesNotThrow(() => validateNarrowWorkbenchComposer({ ...geometry, general: null }, 1.5))
+  assert.throws(() => validateNarrowWorkbenchComposer({ ...geometry, horizontalOverflow: true }, 1.5), /horizontal/)
+  assert.throws(() => validateNarrowWorkbenchComposer({ ...geometry, model: { ...geometry.model, hit: false } }, 1.5), /pointer/)
+  assert.throws(() => validateNarrowWorkbenchComposer({ ...geometry, general: { ...geometry.general, clipped: true } }, 1.5), /readable/)
+  assert.throws(() => validateNarrowWorkbenchComposer({ ...geometry, viewport: { ...geometry.viewport, width: 1280 } }, 1.5), /minimum-width/)
 })
 
 test('selects the scoped startup runner without starting regular UI or task fixtures', async () => {
