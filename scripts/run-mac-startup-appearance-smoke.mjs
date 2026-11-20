@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { appendFile, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
+import { appendFile, lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { isAbsolute, join, relative, resolve } from 'node:path'
@@ -22,10 +22,10 @@ const command = (file, args) => execFileSync(file, args, { encoding: 'utf8', tim
 const git = (...args) => command('git', args)
 const json = (path) => readFile(path, 'utf8').then(JSON.parse)
 
-async function sha256(file) {
-  const hash = createHash('sha256')
+async function checksum(file, algorithm = 'sha256', encoding = 'hex') {
+  const hash = createHash(algorithm)
   for await (const bytes of createReadStream(file)) hash.update(bytes)
-  return hash.digest('hex')
+  return hash.digest(encoding)
 }
 
 export function validateMacStartupArtifact(source) {
@@ -38,6 +38,13 @@ export function validateMacStartupArtifact(source) {
   assert.match(source.artifactDigest, /^sha256:[a-f0-9]{64}$/)
   assert.equal(source.artifactExpired, false)
   assert.ok(Array.isArray(source.changedFiles) && source.changedFiles.every(file => acceptedDriverFiles.has(file)), 'Application source differs from the reviewed build')
+  if (source.scope === 'private-isolated-candidate') {
+    assert.equal(source.event, 'workflow_dispatch')
+    assert.equal(source.frozenReceiptStep, 'skipped')
+    assert.equal(source.publishJob, 'skipped')
+    assert.equal(source.signedBuildStep, 'success')
+    assert.equal(source.updateMetadataStep, 'success')
+  } else assert.ok(source.scope === undefined || source.scope === 'frozen-public-identity', 'Unknown macOS acceptance source scope')
   return source
 }
 
@@ -54,14 +61,22 @@ async function prepare(buildRunId, sourceFile) {
   assert.equal(driverHead, process.env.GITHUB_SHA)
   git('merge-base', '--is-ancestor', run.head_sha, driverHead)
   const jobs = api(`actions/runs/${buildRunId}/attempts/${run.run_attempt}/jobs?per_page=100`)
-  const build = jobs.jobs.find(job => job.name === 'Build macOS')
+  const [build, duplicateBuild] = jobs.jobs.filter(job => job.name === 'Build macOS')
+  assert.ok(build && !duplicateBuild && build.status === 'completed', 'Expected one completed macOS build in the trusted run attempt')
+  const step = name => build.steps.find(item => item.name === name)?.conclusion
+  const frozenReceiptStep = step('Record frozen public package identity')
   const artifacts = api(`actions/runs/${buildRunId}/artifacts?per_page=100`)
   const [artifact, duplicate] = artifacts.artifacts.filter(item => item.name === 'release-mac' && !item.expired)
   assert.ok(artifact && !duplicate, 'Expected one immutable macOS release artifact')
   assert.equal(artifact.workflow_run.head_sha, run.head_sha)
+  assert.equal(artifact.workflow_run.id, Number(buildRunId))
   const source = validateMacStartupArtifact({ repository, workflow: run.path, runId: Number(buildRunId), runAttempt: run.run_attempt,
     sourceHead: run.head_sha, driverHead, buildConclusion: build?.conclusion, artifactName: artifact.name, artifactId: artifact.id,
     artifactDigest: artifact.digest, artifactExpired: artifact.expired,
+    ...(frozenReceiptStep === 'skipped' ? { scope: 'private-isolated-candidate', event: run.event, frozenReceiptStep,
+      publishJob: jobs.jobs.find(job => job.name === 'Publish GitHub Release')?.conclusion,
+      signedBuildStep: step('Build signed macOS packages'), updateMetadataStep: step('Generate macOS update metadata') }
+      : { scope: 'frozen-public-identity' }),
     changedFiles: git('diff', '--name-only', run.head_sha, driverHead).split('\n').filter(Boolean) })
   await writeFile(sourceFile, `${JSON.stringify(source, null, 2)}\n`, { flag: 'wx' })
   await appendFile(process.env.GITHUB_OUTPUT, `artifact_id=${source.artifactId}\n`)
@@ -180,18 +195,33 @@ async function observeMacTaskNavigation(cdp, workspace, responseCount) {
 async function verify(directory, sourceFile, evidenceDir, temporary) {
   const source = validateMacStartupArtifact(await json(sourceFile))
   assert.equal(source.driverHead, process.env.GITHUB_SHA)
-  const receipt = await json(join(directory, 'reviewed-build.json'))
-  for (const name of ['runId', 'runAttempt', 'sourceHead']) assert.equal(receipt[name], source[name])
   const { version } = await json(new URL('../package.json', import.meta.url))
   assert.match(version, /^\d+\.\d+\.\d+$/)
-  assert.equal(receipt.version, version)
   const name = `RailWise-AI-${version}-mac-${process.arch}.dmg`
   const installer = join(directory, name)
-  const digest = await sha256(installer)
-  const size = (await stat(installer)).size
-  const record = receipt.files.find(file => file.name === name)
-  assert.equal(digest, record?.sha256)
-  assert.equal(size, record.size)
+  const stat = await lstat(installer)
+  assert.ok(stat.isFile() && !stat.isSymbolicLink(), 'The exact installer must be a regular file')
+  const size = stat.size
+  const digest = await checksum(installer)
+  const receipt = await json(join(directory, 'reviewed-build.json')).catch(error => {
+    if (error.code !== 'ENOENT' || source.scope !== 'private-isolated-candidate') throw error
+  })
+  let digestSource = 'frozen-reviewed-build'
+  if (receipt !== undefined) {
+    for (const key of ['runId', 'runAttempt', 'sourceHead']) assert.equal(receipt[key], source[key])
+    assert.equal(receipt.version, version)
+    const record = receipt.files.find(file => file.name === name)
+    assert.equal(digest, record?.sha256)
+    assert.equal(size, record.size)
+  } else {
+    const metadata = require('yaml').parse(await readFile(join(directory, 'latest-mac.yml'), 'utf8'))
+    assert.equal(metadata.version, version)
+    const [record, duplicate] = metadata.files.filter(file => file.url === name)
+    assert.ok(record && !duplicate, 'Expected one exact DMG record in the immutable build update manifest')
+    assert.equal(record.size, size)
+    assert.equal(record.sha512, await checksum(installer, 'sha512', 'base64'))
+    digestSource = 'signed-build-update-manifest'
+  }
   const root = await mkdtemp(join(temporary, 'railwise-mac-startup-'))
   const mountPoint = join(root, 'mounted')
   const install = join(root, 'RailWise AI.app')
@@ -214,10 +244,17 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
   assert.equal(packaged.productName, PUBLIC_IDENTITY.productName)
   assert.equal(packaged.version, version)
   assert.equal(packaged.buildProvenance?.sourceHead, source.sourceHead)
-  const installedAsarSha256 = await sha256(path)
+  const installedAsarSha256 = await checksum(path)
+  if (source.scope === 'private-isolated-candidate') {
+    const updater = require('yaml').parse(await readFile(join(install, 'Contents', 'Resources', 'app-update.yml'), 'utf8'))
+    assert.equal(packaged.updateChannel, 'frontier')
+    assert.equal(updater.provider, 'generic')
+    assert.equal(updater.url, 'https://127.0.0.1/')
+  }
   const report = { schemaVersion: 1, status: 'failed', source, arch: process.arch, version,
-    installer: { name, sha256: digest, size }, installed: { bundleId: info.CFBundleIdentifier, installedArch,
-      signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256 }, observations: [] }
+    installer: { name, sha256: digest, size, digestSource }, installed: { bundleId: info.CFBundleIdentifier, installedArch,
+      signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256,
+      ...(source.scope === 'private-isolated-candidate' ? { privateLoopbackFeedVerified: true } : {}) }, observations: [] }
   try {
     const [major, minor, patch] = version.split('.').map(Number)
     const checkTaskNavigation = major > 0 || minor > 5 || minor === 5 && patch >= 10
@@ -228,7 +265,7 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
           { connectCdp, environmentForRoot: isolatedMacEnvironment }))
       } finally { await workbench?.close() }
     }
-    assert.equal(await sha256(path), installedAsarSha256)
+    assert.equal(await checksum(path), installedAsarSha256)
     report.status = 'passed'
   } catch (error) {
     report.error = error.message
