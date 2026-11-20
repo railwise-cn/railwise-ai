@@ -545,6 +545,11 @@ describe('task-owned recurring execution', () => {
     await f.flows.flushSourceEvents()
     expect(f.coordinator.command).not.toHaveBeenCalled()
     expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(1)
+    expect(f.repository.pendingOutbox('task_command_message')).toEqual([
+      expect.objectContaining({ ownerId: 'origin', payload: expect.objectContaining({
+        threadId: 'origin', assistantText: expect.stringContaining('请在原会话检查文件')
+      }) })
+    ])
 
     writeFileSync(sourceFile, 'date,value\n2026-11-13,2\n')
     await f.flows.flushSourceEvents()

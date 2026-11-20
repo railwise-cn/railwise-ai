@@ -66,7 +66,7 @@ function threadAuthority(thread: ThreadRecord): ThreadAuthority {
 }
 function fail(message: string): never { throw Object.assign(new Error(message), { code: 'schedule_authority_changed' }) }
 function missingSource(): never {
-  throw Object.assign(new Error('定时计划暂时读不到原来选定的资料。请在原会话检查文件或重新添加资料，然后重试本次执行。'), { code: 'schedule_source_missing' })
+  throw Object.assign(new Error('定时计划暂时读不到原来选定的资料。请在原会话检查文件。更换输入资料时，请同时更新计划。'), { code: 'schedule_source_missing' })
 }
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const browserOutput = (receipt: OperationReceipt) => record(record(record(receipt.result).item).output)
@@ -394,6 +394,12 @@ export class TaskScheduleService {
           message: error instanceof Error ? error.message : String(error), status: 'pending', revision: (previous?.revision ?? -1) + 1,
           createdAt, updatedAt: Date.parse(now) < Date.parse(createdAt) ? createdAt : now,
           payload: { scheduleId: input.scheduleId, versionId: input.versionId, dueAt: input.dueAt, ...(missingInput ? { reasonCode: 'schedule_source_missing' } : {}) } })
+        if (missingInput && error instanceof Error) {
+          const threadId = authority.originThreadId
+          const commandId = `schedule_source_${createHash('sha256').update(`${input.scheduleId}:${input.dueAt}`).digest('hex')}`
+          this.deps.repository.enqueueOutbox({ id: `command-message:${commandId}`, ownerId: threadId, kind: 'task_command_message',
+            payload: { threadId, commandId, assistantText: error.message, createdAt }, createdAt })
+        }
       })
       throw error
     }
