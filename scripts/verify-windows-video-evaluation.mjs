@@ -13,6 +13,9 @@ const execFile = promisify(execFileCallback)
 const digest = value => createHash('sha256').update(value).digest('hex')
 const literal = JSON.stringify
 const version = '4.0.484'
+const decoderPackage = '@ffmpeg-installer/win32-x64'
+const decoderVersion = '4.1.0'
+const decoderSha256 = 'c8abc49e7be62dde8e12972af373959e0076a7b8dc8040eb45978e0608f8781e'
 const model = 'windows-video-evaluation-fixture'
 const filename = 'railwise-synthetic-evaluation.mp4'
 const script = 'render-evaluation.mjs'
@@ -42,7 +45,7 @@ async function provision(workspace, environment) {
   const root = join(workspace, 'synthetic-evaluation')
   await mkdir(root)
   await writeFile(join(root, 'package.json'), literal({ name: model, private: true, dependencies: {
-    '@remotion/cli': version, remotion: version, react: '19.2.7', 'react-dom': '19.2.7'
+    '@remotion/cli': version, remotion: version, react: '19.2.7', 'react-dom': '19.2.7', [decoderPackage]: decoderVersion
   } }))
   await writeFile(join(root, 'index.jsx'), scene)
   const npm = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js')
@@ -54,9 +57,11 @@ async function provision(workspace, environment) {
   const cli = join(root, 'node_modules', '@remotion', 'cli', 'remotion-cli.js')
   const binaries = join(root, 'node_modules', '@remotion', 'compositor-win32-x64-msvc')
   const ffprobe = join(binaries, 'ffprobe.exe')
-  const ffmpeg = join(binaries, 'ffmpeg.exe')
+  const ffmpeg = join(root, 'node_modules', decoderPackage, 'ffmpeg.exe')
   for (const path of [cli, ffmpeg, ffprobe]) await access(path)
   assert.equal(JSON.parse(await readFile(join(dirname(cli), 'package.json'), 'utf8')).version, version)
+  assert.equal(JSON.parse(await readFile(join(dirname(ffmpeg), 'package.json'), 'utf8')).version, decoderVersion)
+  assert.equal(digest(await readFile(ffmpeg)), decoderSha256, 'The independent full Windows FFmpeg must match the pinned native image')
   const target = join(workspace, filename)
   const renderDiagnostic = join(root, 'render-diagnostic.json')
   await writeFile(join(workspace, script), `import {spawnSync} from 'node:child_process';
@@ -343,11 +348,17 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       const probe = JSON.parse(execFileSync(toolchain.ffprobe, ['-v', 'error', '-select_streams', 'v:0', '-show_streams', '-of', 'json', toolchain.target],
         { encoding: 'utf8', windowsHide: true, timeout: 15_000 })).streams[0]
       assert.deepEqual([probe.codec_name, probe.width, probe.height, Number(probe.nb_frames)], ['h264', 320, 180, 24])
-      execFileSync(toolchain.ffmpeg, ['-v', 'error', '-xerror', '-i', toolchain.target, '-f', 'null', '-'],
-        { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
+      // Decode a byte-identical copy at an ASCII path so the independent build's path handling cannot affect coverage.
+      const decodeInput = join(dirname(workspace), 'decode-verified-render.mp4')
+      await writeFile(decodeInput, video, { flag: 'wx' })
+      const frameOutput = execFileSync(toolchain.ffmpeg, ['-v', 'error', '-xerror', '-i', decodeInput,
+        '-map', '0:v:0', '-c:v', 'rawvideo', '-f', 'framemd5', '-'], { encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+      const decodedFrames = frameOutput.split(/\r?\n/).filter(line => /^\s*0,\s*-?\d+,\s*-?\d+,\s*\d+,\s*\d+,\s*[0-9a-f]{32}\s*$/i.test(line)).length
+      assert.equal(decodedFrames, Number(probe.nb_frames), 'Decode every actual video frame from the byte-verified MP4')
       return { kind: 'private-noncommercial-synthetic-evaluation', remotionVersion: version, codec: probe.codec_name,
         width: probe.width, height: probe.height, frames: Number(probe.nb_frames), artifact: { id: artifact.id, sha256: artifact.sha256, bytes: video.length },
         installedSkillResourceRead: true, attachedPdfRead: true, sameTaskResumedAfterInterruption: true, appOpenedArtifact: true, runtimeApprovalId: approval.requestId, decoded: true,
+        decoder: { version: decoderVersion, sha256: decoderSha256, decodedFrames },
         originalChat: { interrupted: interruptedChat, approval: approvalChat, completed: completedChat, artifactButtonClicked: true } }
     } }
 }
