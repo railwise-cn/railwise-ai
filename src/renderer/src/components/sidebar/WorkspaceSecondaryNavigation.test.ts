@@ -12,7 +12,7 @@ const labelsByRoute: Partial<Record<ActiveRoute, string>> = {
   write: 'Write',
   plugins: 'Skills &amp; connectors',
   schedule: 'Scheduled tasks',
-  flow: 'Flow',
+  flow: 'Workflows',
   design: 'Design'
 }
 
@@ -90,7 +90,7 @@ describe('WorkspaceSecondaryNavigation', () => {
 
   it('preserves an unavailable deep-linked surface without advertising other tools', () => {
     const html = renderToStaticMarkup(createElement(WorkspaceSecondaryNavigation, { ...props('flow'), toolCapabilities: undefined }))
-    expect(html).toContain('Flow')
+    expect(html).toContain('Workflows')
     expect(html).not.toContain('Scheduled tasks')
     expect(html).not.toContain('>Design<')
   })
