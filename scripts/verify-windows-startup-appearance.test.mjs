@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
 import { validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
-import { observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
+import { observeStartupTargets, observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const dark = { htmlLang: 'zh-CN', theme: 'dark', scale: 1.25 }
@@ -37,6 +37,51 @@ test('keeps 100%, 125%, and 150% startup cases with a real minimum workbench pro
   const native = observed()
   native.viewport.scale = 1.5
   assert.equal(validateStartupAppearance(native, highestScale), native)
+})
+
+test('keeps an early splash connection open until the transitional window and logo are visible', async () => {
+  const splash = { url: 'data:text/html;charset=UTF-8,splash', webSocketDebuggerUrl: 'splash' }
+  const renderer = { url: 'file:///app.asar/out/renderer/index.html', webSocketDebuggerUrl: 'renderer' }
+  const targets = [null, [renderer], [renderer, splash], [renderer, splash], [renderer, splash], [renderer]]
+  const phases = [{ phase: 'logo-loading' }, { phase: 'window-hidden' }, { phase: 'visible', ...observed() }]
+  const attachments = []
+  let screenshotCaptured = false
+  let splashDetached = false
+  const main = { evaluate: async () => targets.length === 0 }
+  const result = await observeStartupTargets({
+    listTargets: async () => targets.shift(), needsScreenshot: true,
+    connectCdp: async target => {
+      attachments.push(target)
+      if (target === 'renderer') return main
+      return { evaluate: async () => phases.shift(), send: async method => {
+        assert.equal(method, 'Page.captureScreenshot')
+        screenshotCaptured = true
+        return { data: 'aGVsbG8=' }
+      }, close: () => { splashDetached = true } }
+    }
+  })
+  assert.deepEqual(attachments, ['renderer', 'splash'])
+  assert.equal(result.main, main)
+  assert.deepEqual(result.observation, observed())
+  assert.equal(screenshotCaptured, true)
+  assert.equal(result.screenshot.toString(), 'hello')
+  assert.equal(splashDetached, true)
+})
+
+test('reports a seen but hidden splash as a missed real capture', async () => {
+  const splash = { url: 'data:text/html,splash', webSocketDebuggerUrl: 'splash' }
+  const renderer = { url: 'file:///app.asar/out/renderer/index.html', webSocketDebuggerUrl: 'renderer' }
+  const targets = [[splash], [renderer]]
+  const closed = []
+  await assert.rejects(observeStartupTargets({ listTargets: async () => targets.shift(),
+    connectCdp: async target => ({ evaluate: async () => target === 'splash' ? { phase: 'window-hidden' } : true,
+      close: () => closed.push(target), send: async method => assert.equal(method, 'Page.close') }) }), error => {
+    assert.match(error.message, /real transitional startup window was not captured/)
+    assert.deepEqual(error.diagnostics, { endpointAvailable: true, splashTargetSeen: true, rendererTargetSeen: true,
+      splashReadiness: 'window-hidden', splashReadErrors: 0 })
+    return true
+  })
+  assert.deepEqual(closed, ['renderer', 'splash'])
 })
 
 test('startup typography inspects a real composer label when the compact sidebar is hidden', async () => {

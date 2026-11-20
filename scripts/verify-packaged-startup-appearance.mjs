@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:net'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { setTimeout as wait } from 'node:timers/promises'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
@@ -59,7 +60,9 @@ function observeSplash() {
   const subtitle = document.querySelector('.splash .subtitle')
   const bar = document.querySelector('.splash [role="progressbar"]')
   const status = document.querySelector('.splash [role="status"]')
-  if (!logo?.naturalWidth || !title || !subtitle || !bar || !status || document.visibilityState !== 'visible') return null
+  if (!title || !subtitle || !bar || !status) return { phase: 'document-loading' }
+  if (!logo?.naturalWidth) return { phase: 'logo-loading' }
+  if (document.visibilityState !== 'visible') return { phase: 'window-hidden' }
   const rect = (element) => {
     const { left, top, right, bottom, width, height } = element.getBoundingClientRect()
     return { left, top, right, bottom, width, height }
@@ -68,7 +71,7 @@ function observeSplash() {
   subtitleRange.selectNodeContents(subtitle)
   const textLines = Array.from(subtitleRange.getClientRects(), ({ left, top, right, bottom, width, height }) => ({ left, top, right, bottom, width, height }))
   return {
-    title: title.textContent.trim(), subtitle: subtitle.textContent.trim(), subtitleLang: subtitle.lang,
+    phase: 'visible', title: title.textContent.trim(), subtitle: subtitle.textContent.trim(), subtitleLang: subtitle.lang,
     theme: document.documentElement.dataset.theme, locale: document.documentElement.lang,
     viewport: { width: innerWidth, height: innerHeight, scale: devicePixelRatio },
     versionVisible: Boolean(document.querySelector('.splash .version') || /\b\d+\.\d+\.\d+\b/.test(document.body.innerText)),
@@ -178,14 +181,81 @@ function assertInside(root, path) {
   assert.ok(child && !child.startsWith('..') && !isAbsolute(child), 'Startup evidence must stay in RUNNER_TEMP')
 }
 
-async function collectTargets(launch, profile, port) {
-  if (!port) port = launch.output.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1]
-    ?? await readFile(join(profile, 'DevToolsActivePort'), 'utf8').then(value => value.split(/\r?\n/)[0]).catch(() => '')
-  if (!/^\d+$/.test(port)) return { targets: [] }
+async function startupDebugPort() {
+  const server = createServer()
+  await new Promise((done, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', done)
+  })
+  const { port } = server.address()
+  await new Promise((done, reject) => server.close(error => error ? reject(error) : done()))
+  return port
+}
+
+async function collectTargets(port) {
   const endpoint = `http://127.0.0.1:${port}`
   const targets = await fetch(`${endpoint}/json/list`, { signal: AbortSignal.timeout(1000) })
-    .then(response => response.json()).catch(() => [])
-  return { port, targets: (Array.isArray(targets) ? targets : []).filter(target => target.type === 'page' && target.webSocketDebuggerUrl?.startsWith(`ws://127.0.0.1:${port}/`)) }
+    .then(response => response.json()).catch(() => null)
+  if (!Array.isArray(targets)) return null
+  return targets.filter(target => target.type === 'page' && target.webSocketDebuggerUrl?.startsWith(`ws://127.0.0.1:${port}/`))
+}
+
+const missedStartupCapture = 'The real transitional startup window was not captured'
+
+export async function observeStartupTargets({ listTargets, connectCdp, needsScreenshot, timeout = 35_000 }) {
+  const diagnostics = { endpointAvailable: false, splashTargetSeen: false, rendererTargetSeen: false, splashReadiness: 'not-observed', splashReadErrors: 0 }
+  let main, splashCdp, splashUrl, observation, screenshot, workbenchVisible = false
+  try {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      const targets = await listTargets()
+      diagnostics.endpointAvailable ||= targets !== null
+      const splash = targets?.find(target => /^data:text\/html(?:;[^,]*)?,/i.test(target.url))
+      const renderer = targets?.find(target => /^file:.*\/renderer\/index\.html(?:[?#]|$)/.test(target.url))
+      diagnostics.splashTargetSeen ||= Boolean(splash)
+      diagnostics.rendererTargetSeen ||= Boolean(renderer)
+      if (splash && !observation) {
+        try {
+          if (splashUrl !== splash.webSocketDebuggerUrl) {
+            splashCdp?.close()
+            splashCdp = await connectCdp(splash.webSocketDebuggerUrl)
+            splashUrl = splash.webSocketDebuggerUrl
+          }
+          const { phase, ...snapshot } = await splashCdp.evaluate(`(${observeSplash.toString()})()`, 500)
+          diagnostics.splashReadiness = phase
+          if (phase === 'visible') {
+            if (needsScreenshot) {
+              const capture = await splashCdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 2000)
+              screenshot = Buffer.from(capture.data, 'base64')
+            }
+            observation = snapshot
+          }
+        } catch {
+          diagnostics.splashReadErrors++
+          splashCdp?.close()
+          splashCdp = undefined
+          splashUrl = undefined
+        }
+      }
+      if (renderer && !splash) {
+        main ??= await connectCdp(renderer.webSocketDebuggerUrl)
+        workbenchVisible = await main.evaluate('document.visibilityState === "visible"', 1000)
+        if (workbenchVisible) break
+      }
+      await wait(25)
+    }
+    assert.ok(workbenchVisible, 'The installed startup window must close and reveal the workbench')
+    assert.ok(observation, missedStartupCapture)
+    return { main, observation, screenshot }
+  } catch (error) {
+    if (main) {
+      await main.send('Page.close', {}, 2000).catch(() => undefined)
+      main.close()
+    }
+    throw Object.assign(error, { diagnostics })
+  } finally {
+    splashCdp?.close()
+  }
 }
 
 export async function observeInstalledStartup(options, expected, dependencies) {
@@ -201,47 +271,24 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     locale: expected.locale, theme: expected.theme, workspaceRoot: workspace,
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
     agents: { kun: { autoStart: false, dataDir: join(root, 'runtime') } } }))
-  const child = spawn(executable, [`--user-data-dir=${profile}`, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1',
+  const port = await startupDebugPort()
+  const child = spawn(executable, [`--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1',
     `--lang=${expected.htmlLang}`, ...(expected.scale === undefined ? [] : [`--force-device-scale-factor=${expected.scale}`]),
     ...(expected.theme === 'dark' ? ['--force-dark-mode'] : [])],
-  { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
-  const launch = { output: '', error: undefined }
-  child.once('error', error => { launch.error = error })
-  for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => { launch.output = (launch.output + bytes).slice(-8000) })
-  let observation, screenshot, main, port
+  { cwd: root, env, stdio: 'ignore' })
+  let launchError, observation, main
+  child.once('error', error => { launchError = error })
   let requestedMacTermination = false
   try {
-    const deadline = Date.now() + 35_000
-    while (Date.now() < deadline) {
-      if (launch.error) throw launch.error
-      assert.equal(child.exitCode, null, 'Installed application exited before startup observation')
-      const observed = await collectTargets(launch, profile, port)
-      port = observed.port
-      const splash = observed.targets.find(target => /^data:text\/html(?:;[^,]*)?,/i.test(target.url) && target.title === brand.platform)
-      if (!observation && splash) {
-        let splashCdp
-        try {
-          splashCdp = await connectCdp(splash.webSocketDebuggerUrl)
-          const snapshot = await splashCdp.evaluate(`(${observeSplash.toString()})()`, 1000)
-          if (snapshot) {
-            if (expected.screenshotName) {
-              const capture = await splashCdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 2000)
-              screenshot = Buffer.from(capture.data, 'base64')
-            }
-            observation = snapshot
-          }
-        } catch { /* The next poll can still capture the transient window. */ }
-        finally { splashCdp?.close() }
-      }
-      const renderer = observed.targets.find(target => /^file:.*\/renderer\/index\.html(?:[?#]|$)/.test(target.url))
-      if (renderer && !splash) {
-        main = await connectCdp(renderer.webSocketDebuggerUrl)
-        break
-      }
-      await wait(45)
-    }
-    assert.ok(main, 'The installed startup window must close and reveal the workbench')
-    assert.ok(observation, 'The real transitional startup window was not captured')
+    const startup = await observeStartupTargets({ connectCdp,
+      needsScreenshot: Boolean(expected.screenshotName), listTargets: () => {
+        if (launchError) throw launchError
+        assert.equal(child.exitCode, null, 'Installed application exited before startup observation')
+        return collectTargets(port)
+      } })
+    main = startup.main
+    observation = startup.observation
+    const { screenshot } = startup
     validateStartupAppearance(observation, expected)
     if (expected.screenshotName) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
@@ -290,13 +337,16 @@ export async function observeInstalledStartup(options, expected, dependencies) {
 }
 
 export async function observeStartupWithCaptureRetry(options, expected, dependencies) {
+  const missedCaptures = []
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       return { ...await observeInstalledStartup(options, expected, dependencies), captureAttempts: attempt }
     } catch (error) {
       // A DevTools target can disappear while the real 1.2-second splash is
       // being attached. Retry only that missed capture in a fresh profile.
-      if (error?.message !== 'The real transitional startup window was not captured' || attempt === 3) throw error
+      if (error?.message !== missedStartupCapture) throw error
+      missedCaptures.push(error.diagnostics)
+      if (attempt === 3) throw Object.assign(error, { diagnostics: missedCaptures })
     }
   }
 }
@@ -322,7 +372,7 @@ export async function runWindowsStartupAppearanceSmoke({ executable, version, so
           connectCdp: dependencies.connectCdp, environmentForRoot: dependencies.windowsUiEnvironment
         }))
       } catch (error) {
-        errors.push(`${expected.locale} ${expected.theme} ${expected.scale}: ${error.message}`)
+        errors.push(`${expected.locale} ${expected.theme} ${expected.scale}: ${error.message}${error.diagnostics ? ` (${JSON.stringify(error.diagnostics)})` : ''}`)
       }
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === installed.asarSha256
