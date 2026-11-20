@@ -166,13 +166,20 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
       assert.match(await readFile(join(install, 'Contents', 'Resources', 'app-update.yml'), 'utf8'), /^\s*url:\s*https:\/\/127\.0\.0\.1\/\s*$/m)
       report.installed.updateFeed = 'loopback-only'
     }
+    const failures = []
     for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
-      report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected,
-        { connectCdp, environmentForRoot: (env, root) => isolatedMacEnvironment(env, root, isolated),
-          ...(isolated && process.arch === 'arm64' && expected.locale === 'zh'
-            ? { onWorkbenchReady: (cdp, paths) => verifyMacWorkbook(cdp, paths, evidenceDir) } : {}) }))
+      try {
+        report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary },
+          { ...expected, screenshotName: `mac-startup-${expected.locale}-${expected.theme}.png` },
+          { connectCdp, environmentForRoot: (env, root) => isolatedMacEnvironment(env, root, isolated),
+            ...(isolated && process.arch === 'arm64' && expected.locale === 'zh'
+              ? { onWorkbenchReady: (cdp, paths) => verifyMacWorkbook(cdp, paths, evidenceDir) } : {}) }))
+      } catch (error) {
+        failures.push(`${expected.locale}/${expected.theme}: ${error.message}`)
+      }
     }
     assert.equal(await sha256(path), installedAsarSha256)
+    assert.equal(failures.length, 0, failures.join('; '))
     report.status = 'passed'
   } catch (error) {
     report.error = error.message

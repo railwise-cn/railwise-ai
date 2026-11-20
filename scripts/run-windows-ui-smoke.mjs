@@ -1931,12 +1931,26 @@ async function availablePort() {
   return port
 }
 
-export async function connectCdp(url) {
+export async function connectCdp(url, connectTimeoutMs = 10_000) {
+  assert.ok(Number.isFinite(connectTimeoutMs) && connectTimeoutMs > 0)
   const socket = new WebSocket(url)
   await new Promise((done, reject) => {
-    const timer = setTimeout(() => reject(new Error('Installed renderer connection timed out')), 10_000)
-    socket.addEventListener('open', () => { clearTimeout(timer); done() }, { once: true })
-    socket.addEventListener('error', () => { clearTimeout(timer); reject(new Error('Installed renderer connection failed')) }, { once: true })
+    const finish = error => {
+      clearTimeout(timer)
+      socket.removeEventListener('open', opened)
+      socket.removeEventListener('error', failed)
+      socket.removeEventListener('close', failed)
+      if (error) {
+        try { socket.close() } catch { /* A rejected handshake may already be closed. */ }
+        reject(error)
+      } else done()
+    }
+    const opened = () => finish()
+    const failed = () => finish(new Error('Installed renderer connection failed'))
+    const timer = setTimeout(() => finish(new Error('Installed renderer connection timed out')), connectTimeoutMs)
+    socket.addEventListener('open', opened, { once: true })
+    socket.addEventListener('error', failed, { once: true })
+    socket.addEventListener('close', failed, { once: true })
   })
   let sequence = 0
   const pending = new Map()

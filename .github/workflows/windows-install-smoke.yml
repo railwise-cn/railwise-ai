@@ -385,6 +385,8 @@ jobs:
             ${{ runner.temp }}/exact-mac-source.json
             ${{ runner.temp }}/exact-mac-evidence/mac-startup-appearance.json
             ${{ runner.temp }}/exact-mac-evidence/mac-workbook.json
+            ${{ runner.temp }}/exact-mac-evidence/startup-capture-*.json
+            ${{ runner.temp }}/exact-mac-evidence/mac-startup-*.png
 
   windows-repaired-gui-update:
     if: ${{ (inputs.run_repaired_gui_update == true || inputs.run_repaired_marketplace_install == true) && inputs.run_published_gui_update != true && inputs.run_frozen_gui_update != true }}

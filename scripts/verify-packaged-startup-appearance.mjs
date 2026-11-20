@@ -63,6 +63,59 @@ function observeSplash() {
   }
 }
 
+// Attach before the data document has acquired its title and reuse that
+// connection while the native window becomes visible. Reconnecting on every
+// poll can consume the entire lifetime of this deliberately short-lived page.
+export function createStartupTargetObserver(connectCdp, screenshotRequired = false) {
+  const connections = new Map()
+  const diagnostics = { targets: [], errors: [], polls: 0 }
+  let observation, screenshot
+  const recordError = error => {
+    if (diagnostics.errors.length < 8) diagnostics.errors.push(String(error.message ?? error).slice(0, 240))
+  }
+  return {
+    diagnostics,
+    async observe(targets) {
+      diagnostics.polls += 1
+      for (const target of targets) {
+        if (!/^data:text\/html(?:;[^,]*)?,/i.test(target.url) && target.url !== 'about:blank') continue
+        const key = target.id ?? target.webSocketDebuggerUrl
+        let record = diagnostics.targets.find(item => item.id === key)
+        if (!record) {
+          record = { id: key, kind: target.url === 'about:blank' ? 'blank' : 'data', titleMatched: target.title === brand.platform, samples: 0 }
+          diagnostics.targets.push(record)
+        }
+        if (observation && (!screenshotRequired || screenshot)) continue
+        let cdp = connections.get(key)
+        try {
+          if (!cdp) { cdp = await connectCdp(target.webSocketDebuggerUrl, 750); connections.set(key, cdp) }
+          const sample = await cdp.evaluate(`({state:{readyState:document.readyState,visibility:document.visibilityState,
+            splashPresent:Boolean(document.querySelector('.splash')),logoLoaded:Boolean(document.querySelector('.splash img.logo')?.naturalWidth)},
+            snapshot:(${observeSplash.toString()})()})`, 750)
+          record.lastState = sample.state
+          record.samples += 1
+          const snapshot = sample.snapshot
+          if (snapshot) {
+            observation = snapshot
+            // This remains an actual screenshot from the same live page; never
+            // reload, reconstruct or pause the application to manufacture it.
+            if (screenshotRequired) {
+              const capture = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 1500)
+              screenshot = Buffer.from(capture.data, 'base64')
+            }
+          }
+        } catch (error) {
+          recordError(error)
+          cdp?.close()
+          connections.delete(key)
+        }
+      }
+      return { observation, screenshot }
+    },
+    close() { for (const cdp of connections.values()) cdp.close(); connections.clear() }
+  }
+}
+
 export function validateStartupAppearance(actual, expected) {
   assert.equal(actual.title, brand.platform)
   assert.equal(actual.subtitle, brand.platformSubtitleZh)
@@ -122,7 +175,8 @@ export async function observeInstalledStartup(options, expected, dependencies) {
   const launch = { output: '', error: undefined }
   child.once('error', error => { launch.error = error })
   for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => { launch.output = (launch.output + bytes).slice(-8000) })
-  let observation, screenshot, main, port
+  let observation, screenshot, main, port, workbenchTypography, workbook, failure
+  const observer = createStartupTargetObserver(connectCdp, Boolean(expected.screenshotName))
   let requestedMacTermination = false
   try {
     const deadline = Date.now() + 35_000
@@ -131,41 +185,36 @@ export async function observeInstalledStartup(options, expected, dependencies) {
       assert.equal(child.exitCode, null, 'Installed application exited before startup observation')
       const observed = await collectTargets(launch, profile, port)
       port = observed.port
-      const splash = observed.targets.find(target => /^data:text\/html(?:;[^,]*)?,/i.test(target.url) && target.title === brand.platform)
-      if (!observation && splash) {
-        let splashCdp
-        try {
-          splashCdp = await connectCdp(splash.webSocketDebuggerUrl)
-          const snapshot = await splashCdp.evaluate(`(${observeSplash.toString()})()`, 1000)
-          if (snapshot) {
-            if (expected.screenshotName) {
-              const capture = await splashCdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 2000)
-              screenshot = Buffer.from(capture.data, 'base64')
-            }
-            observation = snapshot
-          }
-        } catch { /* The next poll can still capture the transient window. */ }
-        finally { splashCdp?.close() }
-      }
+      const splash = observed.targets.find(target => /^data:text\/html(?:;[^,]*)?,/i.test(target.url))
+      const captured = await observer.observe(observed.targets)
+      observation = captured.observation
+      screenshot = captured.screenshot
       const renderer = observed.targets.find(target => /^file:.*\/renderer\/index\.html(?:[?#]|$)/.test(target.url))
       if (renderer && !splash) {
         main = await connectCdp(renderer.webSocketDebuggerUrl)
         break
       }
-      await wait(45)
+      await wait(20)
     }
     assert.ok(main, 'The installed startup window must close and reveal the workbench')
-    assert.ok(observation, 'The real transitional startup window was not captured')
-    validateStartupAppearance(observation, expected)
     await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
-    observation.workbenchTypography = await observeWorkbenchTypography(main)
-    if (onWorkbenchReady) observation.workbook = await onWorkbenchReady(main, { root, workspace })
+    workbenchTypography = await observeWorkbenchTypography(main)
+    // A missed transient capture must still fail, but should not suppress the
+    // independently useful real workbook acceptance evidence.
+    if (onWorkbenchReady) workbook = await onWorkbenchReady(main, { root, workspace })
+    assert.ok(observation, 'The real transitional startup window was not captured')
+    validateStartupAppearance(observation, expected)
+    observation.workbenchTypography = workbenchTypography
+    if (workbook) observation.workbook = workbook
     if (expected.screenshotName) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
-      await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
     }
+  } catch (error) {
+    failure = error.message
+    throw error
   } finally {
+    observer.close()
     if (main) {
       await main.send('Page.close', {}, 2000).catch(() => undefined)
       main.close()
@@ -187,6 +236,13 @@ export async function observeInstalledStartup(options, expected, dependencies) {
         if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
       }
     }
+    if (expected.screenshotName && screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) {
+      await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
+    }
+    await writeFile(join(evidenceDir, `startup-capture-${expected.locale}-${expected.theme}.json`), `${JSON.stringify({
+      status: failure ? 'failed' : 'observed', expected, observation, workbenchTypography, workbook,
+      error: failure, capture: observer.diagnostics
+    }, null, 2)}\n`)
   }
   assert.ok(child.exitCode === 0 || requestedMacTermination && child.signalCode === 'SIGTERM', 'The owned startup acceptance process did not stop as expected')
   return { ...observation, workbenchOpened: true, processExit: { code: child.exitCode, signal: child.signalCode } }
