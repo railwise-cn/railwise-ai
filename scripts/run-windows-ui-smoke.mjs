@@ -358,6 +358,14 @@ export async function verifyInstalledBundledSkillCopy(skill, { applicationRoot, 
     entrySha256: skill.entrySha256, entryRegisteredInAsar: true, metadataVerified: true, ownedPathVerified: true }
 }
 
+export function windowsAuditedSkillDisplayRoots(skill, applicationRoot) {
+  const roots = [skill.root]
+  // Discovery may show the bundled source while the runtime uses its owned copy.
+  // Accept that exact source only after the copy has passed the ASAR byte check.
+  if (verifiedBundledSkillCopy(skill)) roots.push(join(applicationRoot, dirname(skill.bundledCopySource.entryRelativePath)))
+  return roots
+}
+
 export function validateDefaultSkillSources(skills) {
   return defaultSkillIds.map(id => {
     const skill = skills.find(skill => skill.id === id)
@@ -2620,7 +2628,13 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         skill.entryRegisteredInAsar = true
       }
       await cdp.fill('input[placeholder*="已索引"]', skill.name || skill.id)
-      await cdp.wait(`document.body.innerText.includes(${JSON.stringify(skill.root)}) && Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===${JSON.stringify(skill.name || skill.id)})`, `${skill.id} in its actual local package directory`)
+      const displayRoots = windowsAuditedSkillDisplayRoots(skill, dirname(executable))
+      await cdp.wait(`Array.from(document.querySelectorAll('main .truncate')).some(node => {
+        if (node.textContent.trim() !== ${JSON.stringify(skill.name || skill.id)}) return false;
+        const card = node.parentElement?.parentElement;
+        return Array.from(card?.querySelectorAll('span') ?? []).some(path =>
+          ${JSON.stringify(displayRoots)}.includes(path.textContent.trim()));
+      })`, `${skill.id} in its actual local package directory`)
     }
     await cdp.fill('input[placeholder*="已索引"]', '')
     await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'the catalog after clearing the local Skill search')
