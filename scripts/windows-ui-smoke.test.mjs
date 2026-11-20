@@ -1,5 +1,6 @@
 import * as permissionSmokeModule from './run-windows-ui-smoke.mjs'
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -16,6 +17,21 @@ import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsB
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact, windowsTaskArtifactPreviewExpression } from './run-windows-ui-smoke.mjs'
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
+
+test('the optional Windows fixtures load without evaluating the awaiting UI driver', () => {
+  const blockedEntry = new URL('./run-windows-ui-smoke.mjs', import.meta.url).href
+  const fixtures = ['./verify-windows-composer-acceptance.mjs', './verify-windows-video-evaluation.mjs']
+    .map(path => new URL(path, import.meta.url).href)
+  execFileSync(process.execPath, ['--input-type=module', '-e', `
+    import { registerHooks } from 'node:module';
+    registerHooks({ resolve(specifier, context, nextResolve) {
+      const resolved = nextResolve(specifier, context);
+      if (resolved.url === ${JSON.stringify(blockedEntry)}) throw new Error('The optional fixture depends on its awaiting CLI entrypoint');
+      return resolved;
+    } });
+    await Promise.all(${JSON.stringify(fixtures)}.map(url => import(url)));
+  `], { timeout: 10000 })
+})
 
 test('updater metadata diagnostics retain only safe fields and known categories, leaving unexplained failures unclassified', () => {
   const secret = 'private-query-token-do-not-export'
