@@ -12,8 +12,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency, preparePinnedBrowserStartupCli, browserStartupDependency } from './prepare-browser-skill-smoke.mjs'
 import { runWindowsStartupAppearanceSmoke } from './verify-packaged-startup-appearance.mjs'
+import { revealWindowsChatTaskArtifact, validateWindowsTaskChatLayout, windowsTaskChatLayoutExpression } from './windows-task-chat-ui.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
+const windowsDueTaskResult = '本次 HTML 报告已保存并核验，可在原会话查看。'
 
 const windowsUpdateFailureCodes = new Set(['not_configured', 'unsupported', 'unsigned_build', 'manifest_unavailable', 'network',
   'signature_invalid', 'withdrawn', 'download_failed', 'install_failed', 'github_repo_not_found', 'github_forbidden',
@@ -431,6 +433,8 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.ok(input.runtimeApprovalId && input.artifact.id && input.artifact.bytes > 0)
     assert.match(input.artifact.sha256, /^[a-f0-9]{64}$/)
     assert.deepEqual([input.codec, input.width, input.height, input.frames], ['h264', 320, 180, 24])
+    for (const phase of ['interrupted', 'approval', 'completed']) validateWindowsTaskChatLayout(input.originalChat?.[phase])
+    assert.equal(input.originalChat.artifactButtonClicked, true)
     return true
   }
   assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
@@ -589,7 +593,13 @@ export function validateWindowsTaskEvidence(evidence) {
   assert.equal(evidence.preview.automatic, true)
   assert.equal(evidence.preview.contentVerified, true)
   assert.equal(evidence.preview.manualEntryVerified, true)
-  validateWindowsTaskPreviewLayout(evidence.preview.layout)
+  if (evidence.preview.layout?.surface === 'original-chat') {
+    validateWindowsTaskChatLayout(evidence.preview.layout)
+    validateWindowsTaskChatLayout(evidence.dueOccurrence.originalChat)
+    assert.equal(evidence.dueOccurrence.noRepeatedUserRequest, true)
+    assert.equal(evidence.dueOccurrence.resultInOriginChat, true)
+    assert.equal(evidence.schedule.dedicatedEntryOpened, true)
+  } else validateWindowsTaskPreviewLayout(evidence.preview.layout)
   assert.equal(evidence.dueOccurrence.clock, 'real')
   assert.equal(evidence.dueOccurrence.status, 'completed')
   assert.equal(evidence.dueOccurrence.independentTask, true)
@@ -917,7 +927,7 @@ export async function startWindowsTaskModelFixture({ browser = false, postPlanQu
         observation.webArtifactEvidence = verification
       }
       const delta = next ? { tool_calls: [{ index: 0, id: `smoke-${id}`, type: 'function', function: { name: next, arguments: JSON.stringify(args) } }] }
-        : { content: 'HTML 报告已保存并核验，每日计划已创建并读回，可在任务成果中查看。' }
+        : { content: initial ? 'HTML 报告已保存并核验，每日计划已创建并读回，可在原会话查看。' : windowsDueTaskResult }
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       observation.status = 200
       response.end(`data: ${JSON.stringify({ id: 'windows-task-fixture', choices: [{ index: 0, delta, finish_reason: next ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\ndata: [DONE]\n\n`)
@@ -3027,19 +3037,32 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const manualPreviewPassed = await inspectWindowsManualPreview(report, async () => {
         const manualEntryAudit = {}
         report.taskExecution.preview.manualEntryAudit = manualEntryAudit
-        await clickWindowsManualTaskArtifact(cdp, { taskGoal: task.goal, previewExpression, audit: manualEntryAudit })
+        if (browserSmoke) {
+          await clickWindowsManualTaskArtifact(cdp, { taskGoal: task.goal, previewExpression, audit: manualEntryAudit })
+        } else {
+          await cdp.click('button[aria-label="收起右侧栏"]')
+          await cdp.wait(`(()=>{const shell=document.querySelector('.ds-workbench-shell'),main=shell?.querySelector('main');return main&&!main.inert&&!main.hasAttribute('inert')&&shell.dataset.activeOverlay!=='inspector';})()`, 'the original chat becomes interactive after closing the HTML preview')
+          const button = await revealWindowsChatTaskArtifact(cdp, artifact.relativePath.split(/[\\/]/).at(-1))
+          await cdp.click(button, artifact.relativePath.split(/[\\/]/).at(-1))
+          manualEntryAudit.input = 'real-cdp-mouse'
+          manualEntryAudit.surface = 'original-chat'
+        }
         const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
         assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
-        const layout = await cdp.wait(windowsTaskPreviewLayoutExpression(), 'the measured task workspace beside its manual preview')
+        const layout = await cdp.wait(browserSmoke ? windowsTaskPreviewLayoutExpression() : windowsTaskChatLayoutExpression(prompt), 'the measured task navigation and original conversation beside its manual preview')
         report.taskExecution.preview.layout = layout
-        validateWindowsTaskPreviewLayout(layout)
-        assert.equal(layout.navigationPlacement, 'sidebar', 'The exact package must use the existing left task sidebar')
+        if (browserSmoke) {
+          validateWindowsTaskPreviewLayout(layout)
+          assert.equal(layout.navigationPlacement, 'sidebar')
+        } else validateWindowsTaskChatLayout(layout)
       })
       const taskScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
       await writeFile(join(evidenceDir, manualPreviewPassed ? 'windows-task-html-preview-zh-dark.png' : 'windows-task-html-manual-failure.png'), Buffer.from(taskScreenshot.data, 'base64'))
       // Use the normal Flow edit/publish path for one real near-term test occurrence.
       // The original daily schedule and readback above remain separate evidence.
       const originalDefinition = flow.flow
+      const userPromptCount = !browserSmoke && await cdp.evaluate(`document.querySelector('.ds-message-timeline-content')?.textContent.split(${JSON.stringify(prompt)}).length-1`)
+      if (!browserSmoke) assert.ok(userPromptCount >= 1)
       const dueAt = new Date(Date.now() + 20_000).toISOString()
       const dueDefinition = { ...originalDefinition, nodes: originalDefinition.nodes.map(node => node.id === 'schedule' ? { ...node, config: { kind: 'at', atTime: dueAt } } : node) }
       await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`, 'PUT', { definition: dueDefinition, expectedRevision: originalDefinition.revision })
@@ -3076,6 +3099,16 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         dueAt: occurrence.scheduledBy.dueAt, createdAt: occurrence.createdAt, independentTask: occurrence.id !== task.id,
         independentArtifact: occurrenceArtifact.absolutePath !== artifact.absolutePath, artifactSha256: occurrenceArtifact.sha256,
         byteHashMatches: createHash('sha256').update(occurrenceBytes).digest('hex') === occurrenceArtifact.sha256 }
+      if (!browserSmoke) {
+        assert.equal(occurrence.originThreadId, originThreadId)
+        report.taskExecution.dueOccurrence.originalChat = validateWindowsTaskChatLayout(await cdp.wait(windowsTaskChatLayoutExpression(prompt), 'the scheduled occurrence stays associated with the original chat'))
+        const returned = await cdp.wait(`document.querySelector('.ds-message-timeline-content')?.textContent.includes(${JSON.stringify(windowsDueTaskResult)})`, 'the actual scheduled result delivered in the original chat')
+        assert.equal(returned, true)
+        report.taskExecution.dueOccurrence.resultInOriginChat = true
+        const after = await cdp.evaluate(`document.querySelector('.ds-message-timeline-content')?.textContent.split(${JSON.stringify(prompt)}).length-1`)
+        assert.equal(after, userPromptCount, 'A scheduled occurrence must not replay the original user request into chat')
+        report.taskExecution.dueOccurrence.noRepeatedUserRequest = true
+      }
       if (browserSmoke) assert.notEqual(occurrenceArtifact.sha256, artifact.sha256, 'The due report must contain its own freshly read primary-document version')
       if (browserSmoke) {
         const occurrenceThread = await runtimeRequest(`/v1/threads/${encodeURIComponent(occurrence.threadId)}`)
@@ -3136,6 +3169,16 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const restored = (await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`)).flow
       assert.deepEqual(restored.nodes.find(node => node.id === 'schedule').config, schedule.schedule)
       report.taskExecution.dueOccurrence.originalDailyScheduleRestored = true
+      if (!browserSmoke) {
+        if (await cdp.evaluate(`Boolean(document.querySelector('button[aria-label="收起右侧栏"]')?.getClientRects().length)`)) await cdp.click('button[aria-label="收起右侧栏"]')
+        const toolNavigation = 'nav[aria-label="工作区工具"]'
+        if (!await cdp.evaluate(`[...document.querySelectorAll(${JSON.stringify(`${toolNavigation} button`)})].some(button=>button.getClientRects().length&&button.textContent.trim()==='定时任务')`)) {
+          await cdp.click(`${toolNavigation} summary`, '工具')
+        }
+        await cdp.click(`${toolNavigation} button`, '定时任务')
+        await cdp.wait(`[...document.querySelectorAll('h1')].some(node=>node.getClientRects().length&&node.textContent.trim()==='定时任务')`, 'the independent recurring schedule manager')
+        report.taskExecution.schedule.dedicatedEntryOpened = true
+      }
       validateWindowsTaskEvidence(report.taskExecution)
       report.checks.push('runtime-task-html-and-daily-schedule')
     }
