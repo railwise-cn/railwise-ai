@@ -160,10 +160,13 @@ describe('capability waiting card', () => {
     expect(visible).not.toContain('工作区信息尚未加载')
     expect(visible).not.toContain('外部平台')
     expect(visible).not.toContain(raw)
-    expect(container.textContent?.split(raw)).toHaveLength(2)
-    const diagnostics = [...container.querySelectorAll('details')].find(item => item.textContent?.includes(raw))!
+    expect(container.textContent).not.toContain(raw)
+    const diagnostics = [...container.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent === i18n.t('common:capabilityDiagnosticDetails'))!
     expect(diagnostics.open).toBe(false)
-    await act(async () => { diagnostics.open = true })
+    await act(async () => {
+      diagnostics.open = true
+      diagnostics.dispatchEvent(new Event('toggle'))
+    })
     expect(visibleText()).toContain(raw)
     expect(visibleText()).toContain('execution_grant_expired')
     expect(button('确认当前任务权限')).toBeTruthy()
@@ -714,7 +717,7 @@ describe('capability waiting card', () => {
     api.coordinateTaskCommand.mockResolvedValue({ kind: 'capability_required', message: '仍缺少待办 scope', capability: card.capability })
     await render()
     await click('重新检查并继续原任务')
-    expect(container.textContent).toContain('仍缺少待办 scope')
+    expect(container.textContent).toContain('仍缺少待办权限')
     expect(state.selectThread).not.toHaveBeenCalled()
   })
 })

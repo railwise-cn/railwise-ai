@@ -203,7 +203,8 @@ describe('TaskWorkspaceView', () => {
     expect(inbox).toHaveLength(2)
     for(const card of cards){
       expect(card.querySelector(':scope > p')?.textContent).toBe('执行授权已到期')
-      const diagnostics=[...card.querySelectorAll('details')].find(node=>node.textContent?.includes(raw))!
+      expect(card.textContent).not.toContain(raw)
+      const diagnostics=[...card.querySelectorAll('details')].find(node=>node.querySelector('summary')?.textContent===i18n.t('common:capabilityDiagnosticDetails'))!
       expect(diagnostics).toBeTruthy();expect(diagnostics.open).toBe(false)
     }
     expect(window.workwise.resumeTask).not.toHaveBeenCalled()

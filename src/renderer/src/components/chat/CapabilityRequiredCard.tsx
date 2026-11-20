@@ -34,7 +34,7 @@ export function capabilityCardMatchesAttention(card: ExternalTaskCapabilityCard,
 
 /** A capability failure is a durable waiting task, never a completed answer. */
 export function CapabilityRequiredCard({ card, workspaceRoot }: { card: ExternalTaskCapabilityCard; workspaceRoot?: string }): ReactElement {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
   const openFlow = useChatStore((state) => state.openFlow)
   const openPlugins = useChatStore((state) => state.openPlugins)
   const openSettings = useChatStore((state) => state.openSettings)
@@ -151,6 +151,13 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     try { await operation() } catch (error) { setFailure(describeRuntimeError(error, t('taskWorkspaceActionFailed'))) }
     finally { setPending(false) }
   }
+  const presentMessage = (value: string): string => {
+    if (/(?:\bCLI\b|\bspawn\s+(?:EINVAL|ENOENT|EACCES)\b|Error invoking remote method|\bSHA-?[0-9]+\b)/i.test(value)) {
+      return t(isEgo ? 'capabilityEgoNeedsConnection' : isBrowser ? 'capabilityBrowserNeedsConnection' : 'capabilityCheckToContinue')
+    }
+    const chinese = (i18n.resolvedLanguage ?? i18n.language).startsWith('zh')
+    return redactSecretText(value).replace(/\s*\bscopes?\b/gi, chinese ? '权限' : ' permissions')
+  }
   const recheck = async (): Promise<void> => {
     const result = await window.workwise.coordinateTaskCommand({
       threadId: card.threadId, taskId: card.taskId, resolveAttentionId: card.attentionId,
@@ -162,9 +169,10 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     if (result.kind === 'capability_required' || result.kind === 'attention_required') {
       if (result.kind === 'capability_required') {
         setRechecked({ source: card.capability, capability: result.capability })
-        if (isExecutionGrantExpiredCapability(result.capability)) setMessage(t('capabilityExecutionGrantExpiredSummary'))
+        setMessage(isExecutionGrantExpiredCapability(result.capability)
+          ? t('capabilityExecutionGrantExpiredSummary') : presentMessage(result.message))
       } else {
-        setMessage(redactSecretText(result.message))
+        setMessage(presentMessage(result.message))
       }
     } else {
       setSettled(card.capability)
@@ -187,13 +195,11 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     setMessage(t('capabilityDeclined'))
     await refreshTaskState()
   }
-  const technicalMessage = /(?:\bCLI\b|\bspawn\s+(?:EINVAL|ENOENT|EACCES)\b|Error invoking remote method|\bSHA-?[0-9]+\b)/i.test(capability.message)
-  const capabilitySummary = executionGrantExpired ? t('capabilityExecutionGrantExpiredMessage')
-    : technicalMessage ? t(isEgo ? 'capabilityEgoNeedsConnection' : isBrowser ? 'capabilityBrowserNeedsConnection' : 'capabilityCheckToContinue')
-    : redactSecretText(capability.message)
+  const displayedMessage = presentMessage(capability.message)
+  const capabilitySummary = executionGrantExpired ? t('capabilityExecutionGrantExpiredMessage') : displayedMessage
   const snapshot = (<>
       <p className="mt-1 whitespace-pre-wrap">{capabilitySummary}</p>
-      {executionGrantExpired || technicalMessage
+      {executionGrantExpired || displayedMessage !== capability.message
         ? <TechnicalDetails detail={[redactSecretText(capability.message), capability.errorCode].filter(Boolean).join('\n')} label={t('capabilityDiagnosticDetails')} />
         : null}
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
@@ -227,7 +233,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       {showPermissions && interactive ? <TaskPermissionPanel taskId={card.taskId} autoLoad onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
       {showQueryRecovery && interactive && ownerTask ? <TaskPublicQueryRecoveryCard task={ownerTask} runtimeReady={stateKnown} onChanged={refreshTaskState} onNotice={setMessage} /> : null}
       {failure ? <div className="mt-3 text-xs"><p role="alert">{failure.summary}</p><TechnicalDetails detail={failure.detail} /></div> : null}
-      {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
+      {message && (!interactive || message !== capabilitySummary) ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {interactive ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
         <button type="button" disabled={pending} onClick={configure}>{egoTaskReview ? t('capabilityViewTaskRecoveryOptions') : isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isDingTalk ? 'capabilityConfigureDingTalk' : 'capabilityOpenMarketplace')}</button>
         <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
