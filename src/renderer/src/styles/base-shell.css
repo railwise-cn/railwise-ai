@@ -11,6 +11,7 @@
   --ds-window-controls-safe-inset: 0px;
   --ds-write-titlebar-extra-inset: 0px;
   --ds-ui-font: 'RailWise UI', system-ui, sans-serif;
+  --ds-ui-scale: 1;
   --bg-app: #f2f4f7;
   --bg-sidebar: #f5f7fa;
   --bg-canvas: #ffffff;
@@ -525,6 +526,7 @@ body {
   color: var(--ds-text);
   user-select: none;
   -webkit-user-select: none;
+  zoom: var(--ds-ui-scale);
 }
 
 body::before {
