@@ -101,9 +101,10 @@ function isolatedMacEnvironment(environment, root) {
 }
 
 const taskSmokeModel = 'railwise-mac-task-layout-fixture'
-const taskSmokeTitle = '合成资料布局核对'
-const taskSection = '.ds-task-workspace[aria-label="任务"]'
-const taskSidebar = '.ds-task-sidebar[aria-label="任务列表"]'
+const taskSmokePrompt = '新建任务：核对合成资料，只在会话中回复核对结论。'
+const taskSmokeReply = '已核对合成资料。'
+const composer = '.ds-chat-composer-dock textarea'
+const taskStatus = '.ds-chat-composer-dock section[aria-label="任务"]'
 
 async function listen(server) {
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
@@ -117,16 +118,22 @@ async function macTaskFixture() {
   const runtimePort = await listen(available)
   await closeServer(available)
   let responses = 0
+  let release
+  const runningObservation = new Promise(resolve => { release = resolve })
   const server = createServer((request, response) => {
     if (request.method === 'GET' && request.url === '/v1/models') {
       response.setHeader('Content-Type', 'application/json')
       response.end(JSON.stringify({ data: [{ id: taskSmokeModel, object: 'model' }] }))
     } else if (request.method === 'POST' && request.url === '/v1/chat/completions') {
       request.once('end', () => {
-        responses++
         response.setHeader('Content-Type', 'text/event-stream')
-        const choices = [{ index: 0, delta: { content: '已核对合成资料。' }, finish_reason: 'stop' }]
-        response.end(`data: ${JSON.stringify({ id: taskSmokeModel, choices })}\n\ndata: [DONE]\n\n`)
+        response.flushHeaders()
+        void runningObservation.then(() => {
+          if (response.destroyed) return
+          responses++
+          const choices = [{ index: 0, delta: { content: taskSmokeReply }, finish_reason: 'stop' }]
+          response.end('data: ' + JSON.stringify({ id: taskSmokeModel, choices }) + '\n\ndata: [DONE]\n\n')
+        })
       })
       request.resume()
     } else { response.writeHead(404); response.end() }
@@ -134,74 +141,115 @@ async function macTaskFixture() {
   const port = await listen(server)
   return {
     provider: { id: taskSmokeModel, name: '本机合成验收', apiKey: 'synthetic-local-only',
-      models: [taskSmokeModel], baseUrl: `http://127.0.0.1:${port}/v1`, endpointFormat: 'chat_completions' },
+      models: [taskSmokeModel], baseUrl: 'http://127.0.0.1:' + port + '/v1', endpointFormat: 'chat_completions' },
     runtimePort,
-    observe: async (cdp, workspace) => observeMacTaskNavigation(cdp, workspace, () => responses),
-    close: () => closeServer(server)
+    observe: async (cdp, workspace) => observeMacTaskInChat(cdp, workspace, release, () => responses),
+    close: () => { release(); return closeServer(server) }
   }
 }
 
-async function observeMacTaskNavigation(cdp, workspace, responseCount) {
+async function observeMacTaskInChat(cdp, workspace, release, responseCount) {
   let resizeMethod = 'native-window'
-  const atMinimumWidth = 'Math.abs(innerWidth - 960) <= 2 && innerHeight >= 600'
+  const targetView = 'Math.abs(innerWidth - 960) <= 2 && Math.abs(innerHeight - 680) <= 2'
   try {
     const { windowId } = await cdp.send('Browser.getWindowForTarget', {}, 2000)
     await cdp.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } }, 2000)
     await cdp.send('Browser.setWindowBounds', { windowId, bounds: { width: 960, height: 680 } }, 2000)
-    await cdp.wait(atMinimumWidth, 'the minimum-width macOS workbench', 3000)
+    await cdp.wait(targetView, 'the 960 × 680 macOS workbench', 3000)
   } catch {
     resizeMethod = 'renderer-viewport'
     const deviceScaleFactor = await cdp.evaluate('devicePixelRatio')
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 960, height: 680, deviceScaleFactor, mobile: false }, 3000)
-    await cdp.wait(atMinimumWidth, 'the minimum-width installed renderer')
+    await cdp.wait(targetView, 'the 960 × 680 installed renderer')
   }
   await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(result=>result.ok,()=>false)`, 'the owned KUN runtime', 45_000)
-  const created = await cdp.evaluate(`(async () => {
-    const response = await window.workwise.runtimeRequest('/v1/threads', 'POST', JSON.stringify({
-      workspace: ${JSON.stringify(workspace)}, model: ${JSON.stringify(taskSmokeModel)}, mode: 'agent'
-    }));
-    if (!response.ok) throw new Error('Could not create the isolated test conversation');
-    const thread = JSON.parse(response.body);
-    return window.workwise.coordinateTaskCommand({ threadId: thread.id, intent: 'new', idempotencyKey: 'mac-task-navigation-fixture',
-      request: { prompt: ${JSON.stringify(taskSmokeTitle)}, mode: 'agent' } });
-  })()`)
-  assert.equal(created.kind, 'task_started')
-  assert.ok(created.task?.id)
-
+  const runtimeRead = path => `window.workwise.runtimeRequest(${JSON.stringify(path)}, 'GET').then(result => result.ok ? JSON.parse(result.body) : null)`
+  const prior = await cdp.evaluate(runtimeRead('/v1/threads'))
+  assert.deepEqual(prior?.threads, [], 'The installed fixture must use a fresh profile')
   const showNavigation = async () => {
-    if (!await cdp.evaluate(`Boolean(document.querySelector('#workbench-navigation')?.getClientRects().length)`)) {
-      await cdp.click('button[aria-label="展开侧边栏"]')
+    if (!await cdp.evaluate(`Boolean(document.querySelector('#workbench-navigation .ds-sidebar-shell')?.getClientRects().length)`)) {
+      await cdp.click('button[aria-label="展开侧边栏"], button[aria-label="打开导航"]')
+    }
+  }
+  const closeNavigationOverlay = async () => {
+    if (await cdp.evaluate(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay === 'navigation'`)) {
+      await cdp.click('button[aria-label="关闭导航"]')
     }
   }
   await showNavigation()
-  await cdp.click('.ds-sidebar-shell button', '任务')
-  await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(taskSection)}))`, 'the installed task destination')
+  await cdp.click('#workbench-navigation button', '新建会话')
+  await closeNavigationOverlay()
+  const origin = await cdp.wait(`${runtimeRead('/v1/threads')}.then(result=>result?.threads.find(thread=>thread.relation==='primary' && thread.workspace===${JSON.stringify(workspace)}))`, 'the original conversation created by the normal UI')
+  await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(composer + ':not(:disabled)')})?.getClientRects().length)`, 'the ready chat composer')
+  await cdp.click(composer)
+  assert.equal(await cdp.evaluate(`document.activeElement?.matches(${JSON.stringify(composer)})`), true)
+  await cdp.send('Input.insertText', { text: taskSmokePrompt })
+  await cdp.wait(`document.querySelector(${JSON.stringify(composer)})?.value === ${JSON.stringify(taskSmokePrompt)}`, 'the typed task prompt')
+  await cdp.click('button[aria-label="发送"]')
+
+  const task = await cdp.wait(`${runtimeRead('/v1/tasks?limit=100')}.then(tasks=>tasks?.find(item=>item.originThreadId===${JSON.stringify(origin.id)} && item.goal===${JSON.stringify(taskSmokePrompt)}))`, 'the real KUN task admitted from the composer')
+  assert.notEqual(task.threadId, origin.id, 'The fixture must exercise a hidden execution conversation')
+  const worker = await cdp.evaluate(runtimeRead('/v1/threads/' + encodeURIComponent(task.threadId)))
+  assert.equal(worker?.relation, 'side')
+  assert.equal(worker.parentThreadId, origin.id)
+
+  const observeComposer = (status, running) => `(() => {
+    const panel = document.querySelector(${JSON.stringify(taskStatus)});
+    if (!panel?.getClientRects().length || panel.closest('[inert]') ||
+      ![...panel.querySelectorAll('[role="status"]')].some(node => node.textContent.trim() === ${JSON.stringify(status)})) return null;
+    const controls = [...panel.querySelectorAll('button:not(:disabled)')].map(node => node.textContent.trim());
+    const phase = panel.textContent.match(/正在(?:分析任务|推进任务|打开或检索网页|读取页面内容|生成成果|核对成果与来源)/)?.[0] || null;
+    if (${running} && (!phase || !controls.includes('暂停') || !controls.includes('取消任务'))) return null;
+    const {left, right, top, bottom, width} = panel.getBoundingClientRect();
+    return { left, right, top, bottom, width, status: ${JSON.stringify(status)}, controls, phase, viewportWidth: innerWidth, viewportHeight: innerHeight };
+  })()`
+  const running = await cdp.wait(observeComposer('任务执行中', true), 'running task progress and enabled controls above the composer')
+  assert.equal(responseCount(), 0)
+
   await showNavigation()
-  const sidebarObservation = await cdp.wait(`(() => {
-    const element = document.querySelector(${JSON.stringify(taskSidebar)});
-    const row = [...(element?.querySelectorAll('button') ?? [])].find(item => item.textContent.includes(${JSON.stringify(taskSmokeTitle)}));
-    if (!row?.getClientRects().length) return null;
-    const {left, right, width} = element.getBoundingClientRect();
-    return { left, right, width, rowVisible: true };
-  })()`, 'the original task in the left navigation')
-  await cdp.click(`${taskSidebar} button`, taskSmokeTitle)
-  const detailObservation = await cdp.wait(`(() => {
-    const section = document.querySelector(${JSON.stringify(taskSection)});
-    const article = section?.querySelector('article[aria-label="任务详情"]');
-    if (!article?.innerText.includes('任务已完成') || !article.innerText.includes(${JSON.stringify(taskSmokeTitle)}) || article.closest('[inert]')) return null;
-    const {left, right, width} = article.getBoundingClientRect();
-    return { left, right, width, viewportWidth: innerWidth, viewportHeight: innerHeight,
-      resultsVisible: [...article.querySelectorAll('h3')].some(item => item.textContent === '成果'),
-      originalConversationAvailable: [...article.querySelectorAll('button')].some(item => item.textContent.trim() === '打开原会话') };
-  })()`, 'the completed task overview at the minimum desktop width', 45_000)
-  for (const geometry of [sidebarObservation, detailObservation]) {
-    assert.ok(geometry.width > 0 && geometry.left >= -1 && geometry.right <= detailObservation.viewportWidth + 1)
+  const sidebar = await cdp.wait(`(() => {
+    const nav = document.querySelector('#workbench-navigation');
+    if (!nav?.getClientRects().length) return null;
+    const rows = [...nav.querySelectorAll('div.group[title]')].filter(node =>
+      node.getClientRects().length && node.querySelector('button[aria-label="归档会话"]'));
+    if (!rows.length) return null;
+    const {left, right, width} = nav.getBoundingClientRect();
+    return { left, right, width, conversationRows: rows.map(row => row.getAttribute('title')),
+      oldTaskNavigation: [...nav.querySelectorAll('button')].some(button => button.getClientRects().length && button.textContent.trim() === '任务'),
+      oldTaskPage: Boolean(document.querySelector('.ds-task-sidebar, .ds-task-workspace')) };
+  })()`, 'the normal conversation list at 960 × 680')
+  assert.equal(sidebar.conversationRows.length, 1, 'Only the original conversation may appear in the sidebar')
+  assert.equal(sidebar.oldTaskNavigation, false)
+  assert.equal(sidebar.oldTaskPage, false)
+  const currentOrigin = await cdp.evaluate(runtimeRead('/v1/threads/' + encodeURIComponent(origin.id)))
+  assert.deepEqual(sidebar.conversationRows, [currentOrigin.title])
+  await closeNavigationOverlay()
+  release()
+  const completed = await cdp.wait(observeComposer('任务已完成', false), 'the completed task status above the composer', 45_000)
+  const itemId = 'item_command_task_result_' + task.id + '_receipt'
+  const receipt = await cdp.wait(`${runtimeRead('/v1/threads/' + encodeURIComponent(origin.id))}.then(thread=>
+    thread?.conversationItems?.find(item=>item.id===${JSON.stringify(itemId)}))`, 'a durable task reply in the original KUN conversation')
+  assert.ok(JSON.stringify(receipt).includes(taskSmokeReply))
+  const replyRendered = `[...document.querySelectorAll('.ds-chat-timeline p')].filter(node=>
+    node.getClientRects().length && node.textContent.trim() === ${JSON.stringify(taskSmokeReply)}).length === 1`
+  await cdp.wait(replyRendered, 'one real task reply in the original conversation timeline')
+  const firstDocument = await cdp.evaluate('performance.timeOrigin')
+  await cdp.send('Page.reload', {}, 5000)
+  await cdp.wait(`performance.timeOrigin > ${firstDocument} && Boolean(document.querySelector('.ds-chat-composer-dock'))`, 'the reloaded conversation workbench')
+  await cdp.wait(targetView, 'the 960 × 680 viewport after reconnecting')
+  await showNavigation()
+  const originalRow = '#workbench-navigation button[aria-label^=' + JSON.stringify(currentOrigin.title + ' — ') + ']'
+  await cdp.click(originalRow)
+  await cdp.wait(replyRendered, 'the durable reply after reopening the original conversation')
+  for (const geometry of [sidebar, running, completed]) {
+    assert.ok(geometry.width > 0 && geometry.left >= -1 && geometry.right <= completed.viewportWidth + 1)
   }
-  assert.equal(detailObservation.resultsVisible, true)
-  assert.equal(detailObservation.originalConversationAvailable, true)
+  for (const geometry of [running, completed]) {
+    assert.ok(geometry.top >= -1 && geometry.bottom <= completed.viewportHeight + 1)
+  }
   assert.ok(responseCount() > 0, 'The owned KUN runtime must have completed the synthetic task')
-  return { source: 'real-installed-renderer-and-owned-runtime', resizeMethod, taskId: created.task.id,
-    locale: 'zh-CN', sidebar: sidebarObservation, overview: detailObservation }
+  return { source: 'real-installed-renderer-and-owned-runtime', resizeMethod, locale: 'zh-CN',
+    taskId: task.id, threadId: origin.id, receiptId: itemId, sidebar, running, completed, replyReopened: true }
 }
 
 async function verify(directory, sourceFile, evidenceDir, temporary, taskOnly) {
