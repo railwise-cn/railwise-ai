@@ -70,19 +70,21 @@ async function invokeInstalledPlaywright(server, workspace, environment) {
   }
 }
 
-export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot }) {
+export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot, videoOnly = false }) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' &&
     process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_OS === 'Windows', 'Use only an ephemeral hosted Windows acceptance runner')
   assert.ok(containment(await realpath(process.env.RUNNER_TEMP), await realpath(ownedRoot)))
   const lock = JSON.parse(await readFile(new URL('../src/shared/marketplace-mirror-lock.json', import.meta.url), 'utf8'))
   const expected = new Map(lock.packages.filter(row => row.platform === 'win32' && row.arch === 'x64').map(row => [row.packageId, row]))
   assert.ok(expected.size, 'The exact release requires a complete Windows marketplace lock')
+  const selection = videoOnly ? new Map([['video-shotcraft', expected.get('video-shotcraft')]]) : expected
 
   return withPublicUpstreamsBlocked(async () => {
     const catalog = (await cdp.evaluate('window.workwise.listCatalogPackages()')).packages
     const initial = await cdp.evaluate('window.workwise.listInstalledPlugins()')
     const reports = []
-    for (const [id, row] of expected) {
+    for (const [id, row] of selection) {
+      assert.ok(row, `The mirror lock must include ${id}`)
       assert.ok(!initial.some(item => item.packageId === id), `A cold profile must not have ${id}`)
       const catalogEntry = catalog.find(item => item.package.id === id)
       assert.equal(catalogEntry?.reviewSha256, row.reviewSha256)
@@ -100,17 +102,21 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
       reports.push({ id, version: installed.version, reviewSha256: installed.reviewSha256, artifactSha256: installed.artifact.sha256, lockedParts: row.parts.length })
     }
 
-    const getRuntimeServer = id => `window.workwise.runtimeRequest('/v1/runtime/tools','GET').then(result=>{
-      if(!result.ok)return null;
-      const row=JSON.parse(result.body).mcpServers.find(item=>item.id===${literal(id)});
-      return row?.enabled&&row.available&&row.status==='connected'&&row.toolCount>0?row.toolCount:null;
-    })`
-    const doclingTools = await cdp.wait(getRuntimeServer('docling-mcp-server'), 'the installed Docling MCP starting from its locked wheelhouse', 150_000)
-    await cdp.wait(getRuntimeServer('playwright-mcp-server'), 'the installed Playwright MCP in KUN', 90_000)
-    const server = await cdp.evaluate(`window.workwise.listMcpServers(${literal(workspace)}).then(all=>all.find(row=>row.id==='playwright-mcp-server'))`)
-    assert.equal(server?.source, 'managed-tool')
-    assert.equal(server?.transport, 'stdio')
-    const playwright = await invokeInstalledPlaywright(server, workspace, environment)
+    let serviceEvidence
+    if (!videoOnly) {
+      const getRuntimeServer = id => `window.workwise.runtimeRequest('/v1/runtime/tools','GET').then(result=>{
+        if(!result.ok)return null;
+        const row=JSON.parse(result.body).mcpServers.find(item=>item.id===${literal(id)});
+        return row?.enabled&&row.available&&row.status==='connected'&&row.toolCount>0?row.toolCount:null;
+      })`
+      const doclingTools = await cdp.wait(getRuntimeServer('docling-mcp-server'), 'the installed Docling MCP starting from its locked wheelhouse', 150_000)
+      await cdp.wait(getRuntimeServer('playwright-mcp-server'), 'the installed Playwright MCP in KUN', 90_000)
+      const server = await cdp.evaluate(`window.workwise.listMcpServers(${literal(workspace)}).then(all=>all.find(row=>row.id==='playwright-mcp-server'))`)
+      assert.equal(server?.source, 'managed-tool')
+      assert.equal(server?.transport, 'stdio')
+      const playwright = await invokeInstalledPlaywright(server, workspace, environment)
+      serviceEvidence = { playwright, docling: { toolsDiscovered: doclingTools } }
+    }
 
     const scope = `/v1/skills?${new URLSearchParams({ scope: 'available', workspace })}`
     const current = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result=>result.ok&&JSON.parse(result.body).skills.find(row=>row.name==='video-shotcraft'))`, 'Video Shotcraft loaded in the active workspace', 90_000)
@@ -126,7 +132,8 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     await cdp.wait(`document.querySelector(${literal(composer)})?.value === ${literal(`/skill:${current.id} `)}`, 'the exact installed Skill token after choosing /')
     await cdp.fill(composer, '')
 
-    return { status: 'passed', releaseComplete: false, blockedHosts, installed: reports, playwright, docling: { toolsDiscovered: doclingTools },
+    return { status: 'passed', releaseComplete: false, blockedHosts, installed: reports,
+      ...(videoOnly ? { scope: 'video-shotcraft' } : serviceEvidence),
       videoShotcraft: { runtimeSkillId: current.id, slashSelectionVerified: true, entrySha256: createHash('sha256').update(skill).digest('hex'),
         render: 'pending-licensed-remotion-and-video-runtime' } }
   })
