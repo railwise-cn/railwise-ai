@@ -433,6 +433,8 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.ok(input.runtimeApprovalId && input.artifact.id && input.artifact.bytes > 0)
     assert.match(input.artifact.sha256, /^[a-f0-9]{64}$/)
     assert.deepEqual([input.codec, input.width, input.height, input.frames], ['h264', 320, 180, 24])
+    assert.match(input.decoder.sha256, /^[a-f0-9]{64}$/)
+    assert.equal(input.decoder.decodedFrames, input.frames)
     for (const phase of ['interrupted', 'approval', 'completed']) validateWindowsTaskChatLayout(input.originalChat?.[phase])
     assert.equal(input.originalChat.artifactButtonClicked, true)
     return true
