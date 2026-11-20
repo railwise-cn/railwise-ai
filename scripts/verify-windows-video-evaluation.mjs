@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { access, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import { createChineseTextPdf } from './verify-windows-composer-acceptance.mjs'
 
@@ -186,7 +187,7 @@ export function windowsVideoModelAction(body, selection, render, parseFixtureToo
     if (results.has(id)) { output = results.get(id); continue }
     assert.ok(tools.has('host_shell_session') && /^bash_[\da-f-]+$/i.test(output.session_id ?? ''),
       'The approved command must return its task-owned Shell session')
-    return [id, 'host_shell_session', { action: 'poll', session_id: output.session_id, yield_seconds: 4 }]
+    return [id, 'host_shell_session', { action: 'poll', session_id: output.session_id, yield_seconds: 10 }]
   }
   const execution = { status: typeof output?.status === 'string' && /^[a-z_]{3,32}$/.test(output.status) ? output.status : undefined,
     exitCode: Number.isInteger(output?.exit_code) ? output.exit_code : null, commandMatches: output?.commandHash === digest(render.command) }
@@ -223,6 +224,15 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
         response.writeHead(200, { 'content-type': 'text/event-stream' })
         response.end(`data: ${literal({ id: model, choices: [{ index: 0, delta: { content: '资料已核对，准备渲染。' }, finish_reason: null }] })}\n\n`)
         return
+      }
+      if (action?.[1] === 'host_shell_session') {
+        // Pace the fixture by its own process lifecycle. The KUN poll still supplies the actual completion evidence.
+        const until = Date.now() + 25_000
+        while (Date.now() < until) {
+          const progress = await readFile(toolchain.renderDiagnostic, 'utf8').then(JSON.parse).catch(() => null)
+          if (progress?.stage === 'exited') break
+          await delay(500)
+        }
       }
       const delta = action ? { tool_calls: [{ index: 0, id: action[0], type: 'function',
         function: { name: action[1], arguments: literal(action[2]) } }] } :
