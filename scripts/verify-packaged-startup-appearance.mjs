@@ -76,7 +76,7 @@ async function collectTargets(launch, profile, port) {
 }
 
 export async function observeInstalledStartup(options, expected, dependencies) {
-  const { executable, version, evidenceDir, temporary } = options
+  const { executable, version, evidenceDir, temporary, workbench } = options
   const { connectCdp, environmentForRoot } = dependencies
   const root = await mkdtemp(join(temporary, 'railwise-splash-'))
   const profile = join(root, 'profile')
@@ -87,7 +87,10 @@ export async function observeInstalledStartup(options, expected, dependencies) {
   await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: expected.locale, theme: expected.theme, workspaceRoot: workspace,
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
-    agents: { kun: { autoStart: false, dataDir: join(root, 'runtime') } } }))
+    ...(workbench?.provider ? { provider: { providers: [workbench.provider] } } : {}),
+    agents: { kun: { autoStart: Boolean(workbench?.provider), dataDir: join(root, 'runtime'),
+      ...(workbench?.provider ? { providerId: workbench.provider.id, model: workbench.provider.models[0], port: workbench.runtimePort,
+        approvalPolicy: 'on-request', sandboxMode: 'read-only' } : {}) } } }))
   const child = spawn(executable, [`--user-data-dir=${profile}`, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1',
     `--lang=${expected.htmlLang}`, ...(expected.scale === undefined ? [] : [`--force-device-scale-factor=${expected.scale}`]),
     ...(expected.theme === 'dark' ? ['--force-dark-mode'] : [])],
@@ -95,7 +98,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
   const launch = { output: '', error: undefined }
   child.once('error', error => { launch.error = error })
   for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => { launch.output = (launch.output + bytes).slice(-8000) })
-  let observation, screenshot, main, port
+  let observation, screenshot, main, port, workbenchObservation
   let requestedMacTermination = false
   try {
     const deadline = Date.now() + 35_000
@@ -132,6 +135,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     validateStartupAppearance(observation, expected)
     await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
+    if (workbench) workbenchObservation = await workbench.observe(main, workspace)
     if (expected.screenshotName) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
@@ -160,7 +164,8 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     }
   }
   assert.ok(child.exitCode === 0 || requestedMacTermination && child.signalCode === 'SIGTERM', 'The owned startup acceptance process did not stop as expected')
-  return { ...observation, workbenchOpened: true, processExit: { code: child.exitCode, signal: child.signalCode } }
+  return { ...observation, workbenchOpened: true, ...(workbenchObservation ? { taskNavigation: workbenchObservation } : {}),
+    processExit: { code: child.exitCode, signal: child.signalCode } }
 }
 
 export async function runWindowsStartupAppearanceSmoke({ executable, version, sourceHead, evidenceDir }, dependencies) {
