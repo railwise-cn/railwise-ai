@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { appendFile, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -72,6 +73,110 @@ function isolatedMacEnvironment(environment, root) {
     LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' }
 }
 
+const taskSmokeModel = 'railwise-mac-task-layout-fixture'
+const taskSmokeTitle = '合成资料布局核对'
+const taskSection = '.ds-task-workspace[aria-label="任务"]'
+const taskSidebar = '.ds-task-sidebar[aria-label="任务列表"]'
+
+async function listen(server) {
+  await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
+  return server.address().port
+}
+
+const closeServer = (server) => new Promise(done => { server.close(done); server.closeAllConnections() })
+
+async function macTaskFixture() {
+  const available = createServer()
+  const runtimePort = await listen(available)
+  await closeServer(available)
+  let responses = 0
+  const server = createServer((request, response) => {
+    if (request.method === 'GET' && request.url === '/v1/models') {
+      response.setHeader('Content-Type', 'application/json')
+      response.end(JSON.stringify({ data: [{ id: taskSmokeModel, object: 'model' }] }))
+    } else if (request.method === 'POST' && request.url === '/v1/chat/completions') {
+      request.once('end', () => {
+        responses++
+        response.setHeader('Content-Type', 'text/event-stream')
+        const choices = [{ index: 0, delta: { content: '已核对合成资料。' }, finish_reason: 'stop' }]
+        response.end(`data: ${JSON.stringify({ id: taskSmokeModel, choices })}\n\ndata: [DONE]\n\n`)
+      })
+      request.resume()
+    } else { response.writeHead(404); response.end() }
+  })
+  const port = await listen(server)
+  return {
+    provider: { id: taskSmokeModel, name: '本机合成验收', apiKey: 'synthetic-local-only',
+      models: [taskSmokeModel], baseUrl: `http://127.0.0.1:${port}/v1`, endpointFormat: 'chat_completions' },
+    runtimePort,
+    observe: async (cdp, workspace) => observeMacTaskNavigation(cdp, workspace, () => responses),
+    close: () => closeServer(server)
+  }
+}
+
+async function observeMacTaskNavigation(cdp, workspace, responseCount) {
+  let resizeMethod = 'native-window'
+  const atMinimumWidth = 'Math.abs(innerWidth - 960) <= 2 && innerHeight >= 600'
+  try {
+    const { windowId } = await cdp.send('Browser.getWindowForTarget', {}, 2000)
+    await cdp.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } }, 2000)
+    await cdp.send('Browser.setWindowBounds', { windowId, bounds: { width: 960, height: 680 } }, 2000)
+    await cdp.wait(atMinimumWidth, 'the minimum-width macOS workbench', 3000)
+  } catch {
+    resizeMethod = 'renderer-viewport'
+    const deviceScaleFactor = await cdp.evaluate('devicePixelRatio')
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 960, height: 680, deviceScaleFactor, mobile: false }, 3000)
+    await cdp.wait(atMinimumWidth, 'the minimum-width installed renderer')
+  }
+  await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(result=>result.ok,()=>false)`, 'the owned KUN runtime', 45_000)
+  const created = await cdp.evaluate(`(async () => {
+    const response = await window.workwise.runtimeRequest('/v1/threads', 'POST', JSON.stringify({
+      workspace: ${JSON.stringify(workspace)}, model: ${JSON.stringify(taskSmokeModel)}, mode: 'agent'
+    }));
+    if (!response.ok) throw new Error('Could not create the isolated test conversation');
+    const thread = JSON.parse(response.body);
+    return window.workwise.coordinateTaskCommand({ threadId: thread.id, intent: 'new', idempotencyKey: 'mac-task-navigation-fixture',
+      request: { prompt: ${JSON.stringify(taskSmokeTitle)}, mode: 'agent' } });
+  })()`)
+  assert.equal(created.kind, 'task_started')
+  assert.ok(created.task?.id)
+
+  const showNavigation = async () => {
+    if (!await cdp.evaluate(`Boolean(document.querySelector('#workbench-navigation')?.getClientRects().length)`)) {
+      await cdp.click('button[aria-label="展开侧边栏"]')
+    }
+  }
+  await showNavigation()
+  await cdp.click('.ds-sidebar-shell button', '任务')
+  await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(taskSection)}))`, 'the installed task destination')
+  await showNavigation()
+  const sidebarObservation = await cdp.wait(`(() => {
+    const element = document.querySelector(${JSON.stringify(taskSidebar)});
+    const row = [...(element?.querySelectorAll('button') ?? [])].find(item => item.textContent.includes(${JSON.stringify(taskSmokeTitle)}));
+    if (!row?.getClientRects().length) return null;
+    const {left, right, width} = element.getBoundingClientRect();
+    return { left, right, width, rowVisible: true };
+  })()`, 'the original task in the left navigation')
+  await cdp.click(`${taskSidebar} button`, taskSmokeTitle)
+  const detailObservation = await cdp.wait(`(() => {
+    const section = document.querySelector(${JSON.stringify(taskSection)});
+    const article = section?.querySelector('article[aria-label="任务详情"]');
+    if (!article?.innerText.includes('任务已完成') || !article.innerText.includes(${JSON.stringify(taskSmokeTitle)}) || article.closest('[inert]')) return null;
+    const {left, right, width} = article.getBoundingClientRect();
+    return { left, right, width, viewportWidth: innerWidth, viewportHeight: innerHeight,
+      resultsVisible: [...article.querySelectorAll('h3')].some(item => item.textContent === '成果'),
+      originalConversationAvailable: [...article.querySelectorAll('button')].some(item => item.textContent.trim() === '打开原会话') };
+  })()`, 'the completed task overview at the minimum desktop width', 45_000)
+  for (const geometry of [sidebarObservation, detailObservation]) {
+    assert.ok(geometry.width > 0 && geometry.left >= -1 && geometry.right <= detailObservation.viewportWidth + 1)
+  }
+  assert.equal(detailObservation.resultsVisible, true)
+  assert.equal(detailObservation.originalConversationAvailable, true)
+  assert.ok(responseCount() > 0, 'The owned KUN runtime must have completed the synthetic task')
+  return { source: 'real-installed-renderer-and-owned-runtime', resizeMethod, taskId: created.task.id,
+    locale: 'zh-CN', sidebar: sidebarObservation, overview: detailObservation }
+}
+
 async function verify(directory, sourceFile, evidenceDir, temporary) {
   const source = validateMacStartupArtifact(await json(sourceFile))
   assert.equal(source.driverHead, process.env.GITHUB_SHA)
@@ -114,9 +219,14 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
     installer: { name, sha256: digest, size }, installed: { bundleId: info.CFBundleIdentifier, installedArch,
       signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256 }, observations: [] }
   try {
+    const [major, minor, patch] = version.split('.').map(Number)
+    const checkTaskNavigation = major > 0 || minor > 5 || minor === 5 && patch >= 10
     for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
-      report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected,
-        { connectCdp, environmentForRoot: isolatedMacEnvironment }))
+      const workbench = expected.locale === 'zh' && checkTaskNavigation ? await macTaskFixture() : undefined
+      try {
+        report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary, workbench }, expected,
+          { connectCdp, environmentForRoot: isolatedMacEnvironment }))
+      } finally { await workbench?.close() }
     }
     assert.equal(await sha256(path), installedAsarSha256)
     report.status = 'passed'
