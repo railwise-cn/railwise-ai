@@ -39,6 +39,39 @@ test('the private video fixture reads its exact indexed PDF section when a CJK s
   assert.equal(selection.pdfRead, true)
 })
 
+test('the private video fixture reconstructs and hashes authorized UTF-8 Skill context before render', () => {
+  const skillId = 'video-shotcraft'
+  const section = { id: 'section-1', attachmentId: 'fixture-pdf', text: '铁路合成验收' }
+  const content = JSON.stringify({ skill_id: skillId, path: 'references/pipeline.md', content: '工作流 npx remotion render' })
+  const marker = content.indexOf('npx')
+  const hash = createHash('sha256').update(content).digest('hex')
+  const first = content.slice(0, marker)
+  const offset = Buffer.byteLength(first)
+  const totalBytes = Buffer.byteLength(content)
+  const render = { command: 'owned test command' }
+  const body = {
+    messages: [{ role: 'system', content: '- 合成视频资料.pdf (pdf, ready, id=fixture-pdf)' }],
+    tools: ['read_task_context', 'request_host_shell'].map(name => ({ function: { name } }))
+  }
+  const result = (id, output) => body.messages.push({ role: 'tool', tool_call_id: `eval-${id}`, content: JSON.stringify(output) })
+  result('find-pdf', { results: [section] })
+  result('read-pdf', { section })
+  result('read-pipeline', { contextSpill: { bundle_id: 'bundle', object_id: 'object', sha256: hash, totalBytes } })
+  const selection = { skillId }
+  const action = () => windowsVideoModelAction(body, selection, render, permissionSmokeModule.parseFixtureToolOutput)
+  assert.deepEqual(action(), ['eval-recall-workflow-0', 'read_task_context', { bundle_id: 'bundle', object_id: 'object', offset: 0, max_bytes: 8192 }])
+  const page = { untrusted: true, bundleId: 'bundle', objectId: 'object', totalBytes, sha256: hash }
+  result('recall-workflow-0', { ...page, offset: 0, nextOffset: offset, text: first })
+  assert.deepEqual(action(), ['eval-recall-workflow-1', 'read_task_context', { bundle_id: 'bundle', object_id: 'object', offset, max_bytes: 8192 }])
+  result('recall-workflow-1', { ...page, offset, nextOffset: null, text: content.slice(marker).replace('npx', 'npm') })
+  assert.throws(action)
+  assert.notEqual(selection.read, true)
+  body.messages.pop()
+  result('recall-workflow-1', { ...page, offset, nextOffset: null, text: content.slice(marker) })
+  assert.deepEqual(action(), ['eval-render', 'request_host_shell', render])
+  assert.equal(selection.read, true)
+})
+
 test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
   const evidence = report()
   evidence.checks = ['installed-chinese-renderer', 'installed-video-skill-protocol-render-registered-and-decoded']
