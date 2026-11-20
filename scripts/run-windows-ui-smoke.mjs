@@ -3656,7 +3656,7 @@ export async function dispatchWindowsSmokeEntry(args, environment = process.env,
     assert.ok(!diagnostic && environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&
       environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_VIDEO_EVALUATION !== 'true' &&
       !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup appearance is exclusive with browser, task and marketplace acceptance')
-    return runStartupAppearance({ executable, version, sourceHead, evidenceDir }, { connectCdp, windowsUiEnvironment })
+    return runStartupAppearance({ executable, version, sourceHead, evidenceDir }, { connectCdp, windowsUiEnvironment, windowsOwnedWindowScript })
   }
   if (diagnostic) {
     assert.ok(environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&

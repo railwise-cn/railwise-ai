@@ -2149,6 +2149,17 @@ test('startup diagnostic dispatch never enters the application/model/task smoke 
   }
 })
 
+test('startup appearance receives the native window fallback without importing its CLI entry', async () => {
+  const { dispatchWindowsSmokeEntry, windowsOwnedWindowScript } = await import('./run-windows-ui-smoke.mjs')
+  await dispatchWindowsSmokeEntry(['installed.exe', '0.5.10', 'a'.repeat(40), 'evidence', '--startup-appearance'], {}, {
+    runUi: () => assert.fail('Ordinary UI smoke must not run'),
+    runStartupAppearance: async (options, dependencies) => {
+      assert.equal(options.executable, 'installed.exe')
+      assert.equal(dependencies.windowsOwnedWindowScript, windowsOwnedWindowScript)
+    }
+  })
+})
+
 test('startup A/B preserve ignored stdio and conditional C never follows a live unknown child', async () => {
   const { runWindowsDaemonDiagnosticCases } = await import('./run-windows-ui-smoke.mjs')
   const calls = [], consoles = []

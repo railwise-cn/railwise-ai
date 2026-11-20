@@ -164,14 +164,13 @@ export function validateNarrowWorkbenchComposer(observation, expectedScale) {
   return observation
 }
 
-async function observeNarrowWorkbench(cdp, { pid, env, scale }) {
+async function observeNarrowWorkbench(cdp, { pid, env, scale, windowsOwnedWindowScript }) {
   let resizeMethod = 'browser-cdp'
   try {
     const { windowId } = await cdp.send('Browser.getWindowForTarget', {}, 2000)
     await cdp.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } }, 2000)
     await cdp.send('Browser.setWindowBounds', { windowId, bounds: narrowWindowBounds }, 2000)
   } catch {
-    const { windowsOwnedWindowScript } = await import('./run-windows-ui-smoke.mjs')
     const nativeBounds = bounds => JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
       windowsOwnedWindowScript(pid, bounds)], { env, encoding: 'utf8', windowsHide: true, timeout: 15_000 }))
     const original = nativeBounds()
@@ -271,7 +270,7 @@ export async function observeStartupTargets({ listTargets, connectCdp, needsScre
 
 export async function observeInstalledStartup(options, expected, dependencies) {
   const { executable, version, evidenceDir, temporary } = options
-  const { connectCdp, environmentForRoot, checkpoint = async () => {} } = dependencies
+  const { connectCdp, environmentForRoot, windowsOwnedWindowScript, checkpoint = async () => {} } = dependencies
   const root = await mkdtemp(join(temporary, 'railwise-splash-'))
   const profile = join(root, 'profile')
   const workspace = join(root, 'workspace')
@@ -288,7 +287,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     `--lang=${expected.htmlLang}`, ...(expected.scale === undefined ? [] : [`--force-device-scale-factor=${expected.scale}`]),
     ...(expected.theme === 'dark' ? ['--force-dark-mode'] : [])],
   { cwd: root, env, stdio: 'ignore' })
-  let launchError, observation, main
+  let launchError, observation, main, cleanupError
   child.once('error', error => { launchError = error })
   let requestedMacTermination = false
   try {
@@ -323,7 +322,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     observation.workbenchTypography = await observeWorkbenchTypography(main)
     await checkpoint('bundled-font-verified', observation.workbenchTypography)
     if (expected.narrowWorkbench) {
-      observation.narrowWorkbench = await observeNarrowWorkbench(main, { pid: child.pid, env, scale: expected.scale })
+      observation.narrowWorkbench = await observeNarrowWorkbench(main, { pid: child.pid, env, scale: expected.scale, windowsOwnedWindowScript })
       await checkpoint('minimum-width-layout-verified', { viewport: observation.narrowWorkbench.viewport })
     }
   } finally {
@@ -344,7 +343,9 @@ export async function observeInstalledStartup(options, expected, dependencies) {
           execFileSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: cdpOperationMs })
         } catch (error) {
           await wait(100)
-          if (child.exitCode === null && child.signalCode === null) throw new Error('The owned startup process did not exit during bounded cleanup', { cause: error })
+          if (child.exitCode === null && child.signalCode === null) {
+            cleanupError = new Error('The owned startup process did not exit during bounded cleanup', { cause: error })
+          }
         }
         await wait(100)
       } else {
@@ -354,6 +355,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
       }
     }
   }
+  if (cleanupError) throw cleanupError
   assert.ok(child.exitCode === 0 || requestedMacTermination && child.signalCode === 'SIGTERM', 'The owned startup acceptance process did not stop as expected')
   return { ...observation, workbenchOpened: true, processExit: { code: child.exitCode, signal: child.signalCode } }
 }
@@ -401,6 +403,7 @@ export async function runWindowsStartupAppearanceSmoke({ executable, version, so
       try {
         report.observations.push(await observeStartupWithCaptureRetry({ executable, version, evidenceDir, temporary }, expected, {
           connectCdp: dependencies.connectCdp, environmentForRoot: dependencies.windowsUiEnvironment,
+          windowsOwnedWindowScript: dependencies.windowsOwnedWindowScript,
           checkpoint: async (attempt, stage, details) => {
             result.checkpoints.push({ attempt, stage, time: new Date().toISOString(), details })
             await writeReport()
