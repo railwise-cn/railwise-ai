@@ -76,6 +76,7 @@ test('the private video fixture reconstructs and hashes authorized UTF-8 Skill c
 
 test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
   const evidence = report()
+  const taskChat = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
   evidence.checks = ['installed-chinese-renderer', 'installed-video-skill-protocol-render-registered-and-decoded']
   delete evidence.resources
   evidence.marketplace = {
@@ -83,7 +84,8 @@ test('the exact private video scope requires the real skill, document, recovery,
     videoShotcraft: { runtimeSkillId: 'video-shotcraft', entrySha256: 'b'.repeat(64), slashSelectionVerified: true,
       render: { kind: 'private-noncommercial-synthetic-evaluation', installedSkillResourceRead: true, attachedPdfRead: true,
         sameTaskResumedAfterInterruption: true, appOpenedArtifact: true, decoded: true, runtimeApprovalId: 'approval',
-        codec: 'h264', width: 320, height: 180, frames: 24, artifact: { id: 'video', bytes: 1000, sha256: 'c'.repeat(64) } } }
+        codec: 'h264', width: 320, height: 180, frames: 24, artifact: { id: 'video', bytes: 1000, sha256: 'c'.repeat(64) },
+        originalChat: { interrupted: taskChat, approval: taskChat, completed: taskChat, artifactButtonClicked: true } } }
   }
   assert.equal(validateWindowsUiReport(evidence, identity, { requireVideoEvaluation: true }), true)
   assert.throws(() => validateWindowsUiReport(evidence, identity))
@@ -92,6 +94,9 @@ test('the exact private video scope requires the real skill, document, recovery,
     changed.marketplace.videoShotcraft.render[field] = false
     assert.throws(() => validateWindowsUiReport(changed, identity, { requireVideoEvaluation: true }), new RegExp(field))
   }
+  const redirected = structuredClone(evidence)
+  redirected.marketplace.videoShotcraft.render.originalChat.approval.taskWorkbenchLinks = 1
+  assert.throws(() => validateWindowsUiReport(redirected, identity, { requireVideoEvaluation: true }))
 })
 
 test('the optional Windows fixtures load without evaluating the awaiting UI driver', () => {
