@@ -51,7 +51,7 @@ test('the private video fixture reconstructs and hashes authorized UTF-8 Skill c
   const render = { command: 'owned test command' }
   const body = {
     messages: [{ role: 'system', content: '- 合成视频资料.pdf (pdf, ready, id=fixture-pdf)' }],
-    tools: ['read_task_context', 'request_host_shell'].map(name => ({ function: { name } }))
+    tools: ['read_task_context', 'request_host_shell', 'host_shell_session'].map(name => ({ function: { name } }))
   }
   const result = (id, output) => body.messages.push({ role: 'tool', tool_call_id: `eval-${id}`, content: JSON.stringify(output) })
   result('find-pdf', { results: [section] })
@@ -70,6 +70,8 @@ test('the private video fixture reconstructs and hashes authorized UTF-8 Skill c
   result('recall-workflow-1', { ...page, offset, nextOffset: null, text: content.slice(marker) })
   assert.deepEqual(action(), ['eval-render', 'request_host_shell', render])
   assert.equal(selection.read, true)
+  result('render', { status: 'running', authorizationId: '<redacted>', session_id: 'bash_a123' })
+  assert.deepEqual(action(), ['eval-poll-1', 'host_shell_session', { action: 'poll', session_id: 'bash_a123', yield_seconds: 4 }])
 })
 
 test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
