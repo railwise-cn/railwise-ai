@@ -71,7 +71,7 @@ test('the private video fixture reconstructs and hashes authorized UTF-8 Skill c
   assert.deepEqual(action(), ['eval-render', 'request_host_shell', render])
   assert.equal(selection.read, true)
   result('render', { status: 'running', authorizationId: '<redacted>', session_id: 'bash_a123' })
-  assert.deepEqual(action(), ['eval-poll-1', 'host_shell_session', { action: 'poll', session_id: 'bash_a123', yield_seconds: 4 }])
+  assert.deepEqual(action(), ['eval-poll-1', 'host_shell_session', { action: 'poll', session_id: 'bash_a123', yield_seconds: 10 }])
 })
 
 test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
