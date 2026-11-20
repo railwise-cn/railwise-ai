@@ -149,6 +149,7 @@ async function macTaskFixture() {
 }
 
 async function observeMacTaskInChat(cdp, workspace, release, responseCount) {
+  await cdp.send('Page.bringToFront', {}, 2000).catch(() => undefined)
   let resizeMethod = 'native-window'
   const targetView = 'Math.abs(innerWidth - 960) <= 2 && Math.abs(innerHeight - 680) <= 2'
   try {
@@ -237,6 +238,7 @@ async function observeMacTaskInChat(cdp, workspace, release, responseCount) {
   await cdp.send('Page.reload', {}, 5000)
   await cdp.wait(`performance.timeOrigin > ${firstDocument} && Boolean(document.querySelector('.ds-chat-composer-dock'))`, 'the reloaded conversation workbench')
   await cdp.wait(targetView, 'the 960 × 680 viewport after reconnecting')
+  await cdp.send('Page.bringToFront', {}, 2000).catch(() => undefined)
   await showNavigation()
   const originalRow = '#workbench-navigation button[aria-label^=' + JSON.stringify(currentOrigin.title + ' — ') + ']'
   await cdp.click(originalRow)
