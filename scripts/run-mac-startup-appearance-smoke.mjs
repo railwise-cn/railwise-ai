@@ -178,6 +178,9 @@ async function observeMacTaskInChat(cdp, workspace, release, responseCount) {
     }
   }
   await showNavigation()
+  // Capability rows are loaded after KUN responds. Wait for them so their
+  // insertion cannot move the native pointer target after it is measured.
+  await cdp.wait(`Boolean(document.querySelector('#workbench-navigation nav details summary')?.getClientRects().length)`, 'the initialized workspace tools in the sidebar')
   await cdp.click('#workbench-navigation button', '新建会话')
   await closeNavigationOverlay()
   const origin = await cdp.wait(`${runtimeRead('/v1/threads')}.then(result=>result?.threads.find(thread=>thread.relation==='primary' && thread.workspace===${JSON.stringify(workspace)}))`, 'the original conversation created by the normal UI')
