@@ -9,6 +9,7 @@ import { createServer } from 'node:net'
 import { createServer as createHttpServer } from 'node:http'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import WebSocket from 'ws'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency, preparePinnedBrowserStartupCli, browserStartupDependency } from './prepare-browser-skill-smoke.mjs'
 import { observeWorkbenchTypography, runWindowsStartupAppearanceSmoke } from './verify-packaged-startup-appearance.mjs'
@@ -1934,6 +1935,10 @@ async function availablePort() {
 export async function connectCdp(url, connectTimeoutMs = 10_000) {
   assert.ok(Number.isFinite(connectTimeoutMs) && connectTimeoutMs > 0)
   const socket = new WebSocket(url)
+  // Node 22's built-in WebSocket.close() can leave a CONNECTING transport
+  // alive. The existing locked ws transport supports aborting that handshake.
+  // Keep an error listener for the asynchronous abort/close event as well.
+  socket.on('error', () => {})
   await new Promise((done, reject) => {
     const finish = error => {
       clearTimeout(timer)
@@ -1941,7 +1946,7 @@ export async function connectCdp(url, connectTimeoutMs = 10_000) {
       socket.removeEventListener('error', failed)
       socket.removeEventListener('close', failed)
       if (error) {
-        try { socket.close() } catch { /* A rejected handshake may already be closed. */ }
+        try { socket.terminate() } catch { /* A rejected handshake may already be closed. */ }
         reject(error)
       } else done()
     }

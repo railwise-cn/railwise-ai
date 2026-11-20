@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createServer } from 'node:net'
+import { WebSocketServer } from 'ws'
 import { connectCdp, dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
 import { parseMacCandidateChecksums, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { createStartupTargetObserver, validateStartupAppearance } from './verify-packaged-startup-appearance.mjs'
@@ -70,6 +71,28 @@ test('bounds a stalled transient CDP handshake without leaving its socket open',
     assert.equal(sockets.size, 0, 'A timed-out CDP handshake must close its transport')
   } finally {
     for (const socket of sockets) socket.destroy()
+    await new Promise(done => server.close(done))
+  }
+})
+
+test('the owned CDP transport also completes a real loopback protocol round trip', async () => {
+  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 })
+  await new Promise((done, reject) => { server.once('listening', done); server.once('error', reject) })
+  server.on('connection', socket => {
+    socket.on('message', bytes => {
+      const request = JSON.parse(bytes.toString())
+      assert.equal(request.method, 'Runtime.evaluate')
+      assert.equal(request.params.expression, 'loopback fixture expression')
+      socket.send(JSON.stringify({ id: request.id, result: { result: { value: 'loopback fixture result' } } }))
+    })
+  })
+  let cdp
+  try {
+    cdp = await connectCdp(`ws://127.0.0.1:${server.address().port}/devtools/page/fixture`, 750)
+    assert.equal(await cdp.evaluate('loopback fixture expression', 750), 'loopback fixture result')
+  } finally {
+    cdp?.close()
+    for (const socket of server.clients) socket.terminate()
     await new Promise(done => server.close(done))
   }
 })
