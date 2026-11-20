@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:https'
-import { join, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'yaml'
 import { parseByteRange } from './frozen-release-updater-feed.mjs'
 import { inspectInstaller, inspectInstalledPackage, installIdentity } from './verify-windows-install-smoke.mjs'
+import { validateWindowsSmokeSource } from './prepare-windows-install-smoke.mjs'
 import {
   attachPackagedRenderer, installExactNsis, ownedInstallState, powershell, psQuote,
   registryState, sha256, waitUntil, windowsForExecutable
@@ -36,15 +38,55 @@ function requireHostedWindows(env) {
   'Only an ephemeral GitHub-hosted Windows x64 runner may use this acceptance driver')
 }
 
-async function verifiedTarget(directory, source, version, runnerFixture = false) {
+export async function verifyIsolatedWindowsTarget(directory, source, version, { baselineVersion, environment = process.env }) {
+  assert.equal(baselineVersion, '0.5.9', 'The isolated candidate is only accepted after official 0.5.9')
+  assert.equal(version, '0.5.10', 'Use the exact 0.5.10 candidate installer')
+  assert.equal(environment.GITHUB_REPOSITORY, 'railwise-cn/railwise-ai')
+  assert.equal(source.repository, environment.GITHUB_REPOSITORY)
+  validateWindowsSmokeSource(source, { packageSourceHead: source.packageSourceHead, driverSourceHead: environment.GITHUB_SHA })
+  const ownedRelative = relative(await realpath(environment.RUNNER_TEMP), await realpath(directory))
+  assert.ok(ownedRelative && !isAbsolute(ownedRelative) && !ownedRelative.startsWith(`..${sep}`) && ownedRelative !== '..',
+    'Isolated upgrade files must stay inside the hosted runner temporary directory')
+
   const identity = installIdentity(version, source.packageSourceHead)
   const installer = inspectInstaller(join(directory, identity.installerName), identity)
+  const manifest = await readFile(join(directory, 'latest.yml'))
+  const metadata = parse(manifest.toString('utf8'))
+  assert.ok(metadata && Array.isArray(metadata.files), 'Use a valid Windows update manifest')
+  const candidates = metadata.files
+  assert.equal(metadata.path, installer.name, 'The manifest must refer to the exact Windows installer')
+  assert.equal(candidates?.length, 1, 'The isolated manifest must specify only the exact Windows installer')
+  assert.ok(/^[A-Za-z0-9+/]{86}==$/.test(metadata.sha512 ?? '') && metadata.sha512 === candidates[0].sha512,
+    'The manifest header must repeat the exact verified installer SHA-512')
+  const blockmap = join(directory, `${installer.name}.blockmap`)
+  const blockmapStat = await lstat(blockmap)
+  assert.ok(blockmapStat.isFile() && blockmapStat.size > 0, 'The candidate blockmap must be a nonempty regular file')
+  return { identity, installer, directory, source, manifest, isolated: {
+    scope: 'isolated-candidate-acceptance', releaseApproval: false,
+    manifestSha256: createHash('sha256').update(manifest).digest('hex'), installerSha512: metadata.sha512,
+    blockmapSha256: await sha256(blockmap)
+  } }
+}
+
+export function verifyInstalledIsolatedWindowsFeed(text) {
+  const metadata = parse(text)
+  assert.equal(metadata?.provider, 'generic', 'The installed isolated candidate must use the generic update provider')
+  assert.equal(metadata.url, 'https://127.0.0.1/', 'The installed isolated candidate must retain the packaged loopback feed')
+  return { provider: metadata.provider, url: metadata.url }
+}
+
+async function verifiedTarget(directory, source, version, { runnerFixture = false, baselineVersion } = {}) {
+  const identity = installIdentity(version, source.packageSourceHead)
   const receiptPath = join(directory, 'reviewed-build.json')
   const receipt = await readFile(receiptPath, 'utf8').then(JSON.parse).catch(error => {
     if (error.code === 'ENOENT') return null
     throw error
   })
+  if (!receipt && baselineVersion === '0.5.9') {
+    return verifyIsolatedWindowsTarget(directory, source, version, { baselineVersion })
+  }
   if (!runnerFixture) assert.ok(receipt, `Exact ${version} must have its immutable reviewed build receipt`)
+  const installer = inspectInstaller(join(directory, identity.installerName), identity)
   if (runnerFixture) {
     assert.equal(source.purpose, 'private-next-updater-fixture')
     assert.equal(source.packageSourceHead, process.env.GITHUB_SHA)
@@ -116,7 +158,7 @@ async function createPrivateTrust(root) {
 async function openPrivateFeed(trust, target) {
   const prefix = `/private-${randomUUID()}/`
   const name = target.installer.name
-  const manifest = await readFile(join(target.directory, 'latest.yml'))
+  const manifest = target.manifest ?? await readFile(join(target.directory, 'latest.yml'))
   const files = new Map([[name, { path: target.installer.path, size: target.installer.size }]])
   const blockmap = join(target.directory, `${name}.blockmap`)
   const blockmapStat = await lstat(blockmap).catch(() => null)
@@ -246,9 +288,9 @@ async function main(args) {
   assert.ok(args.length === 3 || args.length === 6, 'Pass exact package directory, provenance JSON, evidence directory, and optional private next package directory, provenance and version')
   const [directory, sourceFile, evidence, nextDirectory, nextSourceFile, nextVersion] = args.map(String)
   const readSource = async path => JSON.parse(await readFile(path, 'utf8'))
-  const target = await verifiedTarget(directory, await readSource(sourceFile), targetVersion)
+  const target = await verifiedTarget(directory, await readSource(sourceFile), targetVersion, { baselineVersion: baseVersion })
   if (nextDirectory) assert.equal(nextVersion, '0.5.9', 'Use the private 0.5.9 test installer for the next upgrade')
-  const next = nextDirectory ? await verifiedTarget(nextDirectory, await readSource(nextSourceFile), nextVersion, true) : undefined
+  const next = nextDirectory ? await verifiedTarget(nextDirectory, await readSource(nextSourceFile), nextVersion, { runnerFixture: true }) : undefined
   const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'railwise-frozen-windows-update-'))
   const baseline = await officialBaseline(root, baseVersion)
   const installDirectory = join(root, 'install')
@@ -267,7 +309,8 @@ async function main(args) {
   await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify(settings), { flag: 'wx' })
   const seedSchedule = version => writeFile(join(profile, 'gui-update-schedule.json'), JSON.stringify({ appVersion: version, lastCheckedAt: new Date(Date.now() - oneHour).toISOString() }))
 
-  const report = { status: 'running', scope: 'private-frozen-windows-gui-upgrade', productionTouched: false,
+  const report = { status: 'running', scope: target.isolated ? 'private-isolated-windows-gui-upgrade' : 'private-frozen-windows-gui-upgrade', productionTouched: false,
+    ...(target.isolated ? { targetVerification: target.isolated } : {}),
     driverSource: process.env.GITHUB_SHA, baseline: { installer: baseline.installer }, targetBuild: target.source, steps: [] }
   const save = () => writeFile(join(evidence, 'frozen-windows-update.json'), `${JSON.stringify(report, null, 2)}\n`)
   let trust, feed, running, thread
@@ -281,6 +324,7 @@ async function main(args) {
     feed = await openPrivateFeed(trust, target)
     running = await launchOwned(executable, root, feed.url)
     assert.equal(await running.cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
+    if (target.isolated) assert.equal(await running.cdp.evaluate('localStorage.getItem("railwise.release-highlights.0.5.10")'), null)
     await running.cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(r=>r.ok)`, 'installed KUN service')
     thread = await running.cdp.evaluate(`(async()=>{
       const r=await window.workwise.runtimeRequest('/v1/threads','POST',JSON.stringify({workspace:${JSON.stringify(workspace)}, title:'升级验收会话', model:'deepseek-flash', mode:'agent'}));
@@ -291,10 +335,13 @@ async function main(args) {
       if (!item) break
       const action = await exerciseGuiUpgrade({ running, target: { ...item, installDirectory }, executable, feed,
         allowLegacyFallback: !currentReleaseMode && index === 0, entry })
+      if (item.isolated) report.targetVerification.feedRequests = { ...feed.requests }
       running.cdp.close()
       await closeOwnedWindows(executable)
-      await feed.close()
-      feed = index === 0 && next ? await openPrivateFeed(trust, next) : null
+      if (!item.isolated) {
+        await feed.close()
+        feed = index === 0 && next ? await openPrivateFeed(trust, next) : null
+      }
       await seedSchedule(item.identity.version)
       running = await launchOwned(executable, root, feed?.url)
       assert.equal(await running.cdp.evaluate('window.workwise.getAppVersion()'), item.identity.version)
@@ -304,11 +351,24 @@ async function main(args) {
         profilePreserved: (await readFile(sentinelFile, 'utf8')) === sentinel && samePath(await running.cdp.evaluate('window.workwise.getSettings().then(s=>s.workspaceRoot)'), workspace),
         threadPreserved: await running.cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads/${thread}','GET').then(r=>r.ok&&JSON.parse(r.body).id===${JSON.stringify(thread)})`) }
       verifyFrozenWindowsReadback(actual, item)
+      if (item.isolated) {
+        actual.packagedFeed = verifyInstalledIsolatedWindowsFeed(await readFile(join(installDirectory, 'resources', 'app-update.yml'), 'utf8'))
+        actual.preferencesPreserved = await running.cdp.evaluate('window.workwise.getSettings().then(s=>s.locale==="zh"&&s.theme==="light")')
+        assert.equal(actual.preferencesPreserved, true)
+      }
       if (item.identity.version === '0.5.10') {
-        actual.releaseHighlightsVisible = await running.cdp.wait(
-          `[...document.querySelectorAll('section')].some(section => ['本版更新', 'What’s new'].includes(section.getAttribute('aria-label')) && section.textContent.includes('0.5.10'))`,
+        // The NSIS handoff can open the first upgraded window before CDP is
+        // available. On reconnect retain its one-time announcement readback.
+        const announcement = await running.cdp.wait(`(() => {
+          const visible = [...document.querySelectorAll('section')].some(section =>
+            ['本版更新', 'What’s new'].includes(section.getAttribute('aria-label')) && section.textContent.includes('0.5.10'));
+          const recorded = localStorage.getItem('railwise.release-highlights.0.5.10') === '1';
+          return visible || recorded ? {visible, recorded} : null;
+        })()`,
           'the new 0.5.10 release highlights'
         )
+        actual.releaseHighlightsVisible = announcement.visible
+        actual.releaseHighlightsFirstLaunchRecorded = announcement.recorded
       }
       report.steps.push({ ...actual, action })
       await save()

@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { assertPublishedWindowsUpgrade, repairedScheduleSeed, sidebarUpgradeControlSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
-import { verifyFrozenWindowsReadback } from './run-windows-frozen-gui-upgrade.mjs'
+import { verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const installer = { url: 'RailWise-AI-0.5.7-win-x64.exe', size: 317686658, sha512: manifestDigest }
@@ -108,6 +111,54 @@ test('frozen Windows acceptance preserves native package identity and the local 
   assert.throws(() => verifyFrozenWindowsReadback({ ...result, threadPreserved: false }, target))
   assert.throws(() => verifyFrozenWindowsReadback({ ...result, registry: { displayVersion: '0.5.7' } }, target))
   assert.throws(() => verifyFrozenWindowsReadback({ ...result, installerSha256: '0'.repeat(64) }, target))
+})
+
+test('official 0.5.9 can test a checksummed isolated 0.5.10 without a public build receipt', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-isolated-upgrade-test-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const directory = join(root, 'download')
+  await mkdir(directory)
+  const version = '0.5.10'
+  const name = `RailWise-AI-${version}-win-x64.exe`
+  const payload = Buffer.from('a synthetic fixture for installer hash validation')
+  const sha512 = createHash('sha512').update(payload).digest('base64')
+  const metadata = { version, path: name, sha512, files: [{ url: name, size: payload.length, sha512 }] }
+  const file = join(directory, name)
+  const metadataFile = join(directory, 'latest.yml')
+  const writeManifest = data => writeFile(metadataFile, JSON.stringify(data))
+  await writeFile(file, payload)
+  await writeFile(`${file}.blockmap`, 'owned blockmap')
+  await writeManifest(metadata)
+  const source = { repository: 'railwise-cn/railwise-ai', packageSourceHead: 'a'.repeat(40), driverSourceHead: 'b'.repeat(40),
+    workflow: '.github/workflows/release.yml', windowsBuildConclusion: 'success', runId: 8123, runAttempt: 1,
+    artifactId: 927, artifactName: 'release-win', artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
+    changedFiles: ['scripts/run-windows-frozen-gui-upgrade.mjs'] }
+  const opts = { baselineVersion: '0.5.9', environment: { GITHUB_REPOSITORY: source.repository, GITHUB_SHA: source.driverSourceHead, RUNNER_TEMP: root } }
+
+  const target = await verifyIsolatedWindowsTarget(directory, source, version, opts)
+  assert.deepEqual(target.manifest, Buffer.from(JSON.stringify(metadata)))
+  assert.equal(target.identity.sourceHead, source.packageSourceHead)
+  assert.equal(target.isolated.scope, 'isolated-candidate-acceptance')
+  assert.equal(target.isolated.releaseApproval, false)
+  assert.equal(target.isolated.installerSha512, sha512)
+  await assert.rejects(verifyIsolatedWindowsTarget(directory, source, version, { ...opts, baselineVersion: '0.5.8' }), /only accepted after official 0.5.9/)
+  await assert.rejects(verifyIsolatedWindowsTarget(directory, source, '0.5.11', opts), /exact 0.5.10/)
+  await assert.rejects(verifyIsolatedWindowsTarget(directory, { ...source, repository: 'other-orig/railwise-ai' }, version, opts))
+  await assert.rejects(verifyIsolatedWindowsTarget(directory, { ...source, artifactDigest: 'unverified' }, version, opts))
+  await assert.rejects(verifyIsolatedWindowsTarget(directory, { ...source, changedFiles: ['electron-builder.cjs'] }, version, opts), /build source changed/)
+  await assert.rejects(verifyIsolatedWindowsTarget(directory, { ...source, driverSourceHead: 'd'.repeat(40) }, version, opts))
+  await writeManifest({ ...metadata, sha512: 'b'.repeat(86) + '==' })
+  await assert.rejects(verifyIsolatedWindowsTarget(directory, source, version, opts), /manifest header/)
+  await writeManifest(metadata)
+  await writeFile(file, Buffer.alloc(payload.length, 97))
+  await assert.rejects(verifyIsolatedWindowsTarget(directory, source, version, opts), /Windows update SHA-512/)
+})
+
+test('only the exact isolated feed can pass installed target readback', () => {
+  assert.deepEqual(verifyInstalledIsolatedWindowsFeed('provider: generic\nurl: https://127.0.0.1/\n'),
+    { provider: 'generic', url: 'https://127.0.0.1/' })
+  assert.throws(() => verifyInstalledIsolatedWindowsFeed('provider: generic\nurl: https://www.railwise.cn/\n'))
+  assert.throws(() => verifyInstalledIsolatedWindowsFeed('provider: github\nurl: https://127.0.0.1/\n'))
 })
 
 test('frozen Windows acceptance pins the original artifact and builds the next installer inside its runner', async () => {
