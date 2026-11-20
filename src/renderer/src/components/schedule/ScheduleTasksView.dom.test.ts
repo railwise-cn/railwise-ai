@@ -35,6 +35,49 @@ describe('scheduled task settings races', () => {
     vi.unstubAllGlobals()
   })
 
+  it('shows chat-created plans alongside legacy plans and manages them from one page', async () => {
+    const plan = {
+      id: 'schedule_task_chat', revision: 1, title: '每日网页报告', originThreadId: 'thr_chat',
+      enabled: true, times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', nextRunAt: '2026-11-21T00:30:00Z'
+    }
+    const request = vi.fn()
+      .mockResolvedValueOnce({ ok: true, body: JSON.stringify({ schedules: [plan] }) })
+      .mockResolvedValueOnce({ ok: true, body: JSON.stringify({ schedule: { ...plan, enabled: false, revision: 2 } }) })
+      .mockResolvedValueOnce({ ok: true, body: JSON.stringify({ schedule: { ...plan, revision: 3 } }) })
+    const onOpenThread = vi.fn()
+    vi.stubGlobal('workwise', { getSettings: async () => settings(1, [task('legacy')]), runtimeRequest: request })
+    await act(() => root.render(createElement(ScheduleTasksView, {
+      leftSidebarCollapsed: false, onToggleLeftSidebar: vi.fn(), onOpenThread
+    })))
+    expect(container.textContent).toContain('Plan legacy')
+    expect(container.textContent).toContain('每日网页报告')
+    expect(container.textContent).toContain('08:30, 16:30')
+    expect(container.textContent).toContain('Asia/Shanghai')
+
+    const button = (key: string) =>
+      Array.from(container.querySelectorAll('button')).find(item => item.textContent?.trim() === i18n.t(key))!
+    await act(() => button('scheduleManagedOpenConversation').click())
+    expect(onOpenThread).toHaveBeenCalledWith('thr_chat')
+    await act(() => button('scheduleManagedPause').click())
+    expect(request).toHaveBeenNthCalledWith(2, '/v1/task-schedules/schedule_task_chat', 'PATCH',
+      JSON.stringify({ enabled: false, expectedRevision: 1 }))
+    expect(container.textContent).toContain(i18n.t('scheduleManagedPaused'))
+    await act(() => button('scheduleManagedResume').click())
+    expect(request).toHaveBeenNthCalledWith(3, '/v1/task-schedules/schedule_task_chat', 'PATCH',
+      JSON.stringify({ enabled: true, expectedRevision: 2 }))
+    expect(container.textContent).toContain(i18n.t('scheduleManagedEnabled'))
+  })
+
+  it('gives a recoverable message if saved conversation plans cannot be read', async () => {
+    const request = vi.fn().mockResolvedValue({ ok: false, status: 503, body: '{}' })
+    vi.stubGlobal('workwise', { getSettings: async () => settings(1, []), runtimeRequest: request })
+    await act(() => root.render(createElement(ScheduleTasksView, {
+      leftSidebarCollapsed: false, onToggleLeftSidebar: vi.fn()
+    })))
+    expect(container.textContent).toContain(i18n.t('scheduleManagedUnavailable'))
+    expect(container.textContent).not.toContain(i18n.t('scheduleEmpty'))
+  })
+
   it('ignores an older poll that completes after a later snapshot', async () => {
     let finishOldRead!: (value: WorkWiseSettingsV2) => void
     const oldRead = new Promise<WorkWiseSettingsV2>((resolve) => { finishOldRead = resolve })

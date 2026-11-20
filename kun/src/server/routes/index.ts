@@ -340,6 +340,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('POST', '/v1/flows/test-node', async (request) => authorize(request, runtime) ? flowRoutes.testNode(runtime.flowService, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/flows/migrations/schedules', async (request) => authorize(request, runtime) ? flowRoutes.migrateSchedules(runtime.flowService, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/legacy-schedules', async (request) => authorize(request, runtime) ? flowRoutes.listLegacySchedules(runtime.flowService) : ERRORS.unauthorized())
+  router.add('GET', '/v1/task-schedules', async (request) => authorize(request, runtime) ? flowRoutes.listTaskSchedules(runtime.taskScheduleService) : ERRORS.unauthorized())
+  router.add('PATCH', '/v1/task-schedules/:id', async (request, ctx) => authorize(request, runtime) ? flowRoutes.toggleTaskSchedule(runtime.taskScheduleService, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/legacy-schedules', async (request) => authorize(request, runtime) ? flowRoutes.createLegacySchedule(runtime.flowService, request) : ERRORS.unauthorized())
   router.add('PUT', '/v1/legacy-schedules/:id', async (request, ctx) => authorize(request, runtime) ? flowRoutes.updateLegacySchedule(runtime.flowService, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/legacy-schedules/:id/run', async (request, ctx) => authorize(request, runtime) ? flowRoutes.runLegacySchedule(runtime.flowService, ctx.params.id) : ERRORS.unauthorized())

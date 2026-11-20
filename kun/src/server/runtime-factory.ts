@@ -1028,6 +1028,7 @@ export async function createKunServeRuntime(
     ...(attachmentStore ? { attachmentStore } : {}),
     ...(memoryStore ? { memoryStore } : {}),
     flowService,
+    taskScheduleService,
     engineeringService,
     engineeringContext,
     surveyCollaborationService,

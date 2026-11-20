@@ -51,14 +51,16 @@ function observeAttachmentLayout(expectedName) {
   }
   const visibleRows = [...list.children].filter(item => item.getClientRects().length)
   const sendBounds = rect(send)
-  const expectedFile = [...list.querySelectorAll('.ds-chat-attachment-filename')].find(node => node.title === expectedName)
+  const filenames = [...list.querySelectorAll('.ds-chat-attachment-filename')]
+  const expectedFile = filenames.find(node => node.title === expectedName)
   return {
     expanded: panel.dataset.expanded === 'true', total: list.children.length, visibleRows: visibleRows.length,
     listWidth: list.clientWidth, listScrollWidth: list.scrollWidth, listHeight: list.clientHeight, listScrollHeight: list.scrollHeight,
     editor: rect(textarea), strip: rect(panel), composer: rect(composer), send: sendBounds, viewport: { width: innerWidth, height: innerHeight, devicePixelRatio },
     actionAtCenter: send.contains(document.elementFromPoint(sendBounds.left + sendBounds.width / 2, sendBounds.top + sendBounds.height / 2)),
     validSuffix: expectedFile?.querySelector('[aria-hidden]:last-child')?.textContent === '.pdf',
-    sameNameCount: [...list.querySelectorAll('.ds-chat-attachment-filename')].filter(node => node.title === 'Attachment notes.txt').length,
+    fileNames: filenames.map(node => node.title),
+    sameNameCount: filenames.filter(node => node.title === 'Attachment notes.txt').length,
     thumbnailCount: [...list.querySelectorAll('.ds-composer-attachment-icon img')].filter(img => img.complete && img.naturalWidth > 0).length,
     hiddenFailureSignaled: panel.querySelector('.ds-composer-attachment-toggle')?.textContent.includes('项需要处理')
   }
@@ -70,17 +72,19 @@ async function verifyMixedAttachmentLayout(cdp, workspace, invalidPath) {
   await Promise.all(directories.map(directory => mkdir(directory)))
   const documentPath = join(workspace, filename)
   const imagePath = join(workspace, '合成示意图.png')
+  const sameContentNames = ['合成附件说明.txt', '合成复核附件.txt']
   const textPaths = [
     ...directories.map(directory => join(directory, 'Attachment notes.txt')),
     join(workspace, `${'Long field inspection notes and approved revisions '.repeat(2)}.txt`),
-    join(workspace, '合成附件说明.txt'),
-    join(workspace, '合成复核附件.txt')
+    ...sameContentNames.map(name => join(workspace, name))
   ]
   const files = [documentPath, textPaths[0], invalidPath, imagePath, ...textPaths.slice(1)]
   const image = await readFile(new URL('../fixtures/markdown-workbench/assets/diagram.png', import.meta.url))
   await Promise.all([writeFile(documentPath, createChineseTextPdf('工程附件布局验收')),
     writeFile(imagePath, image),
-    ...textPaths.map((file, index) => writeFile(file, `合成附件 ${index + 1}，供布局验收。`))])
+    ...textPaths.map((file, index) => writeFile(file, index >= textPaths.length - sameContentNames.length
+      ? '相同内容以两个不同名称上传，供布局验收。'
+      : `合成附件 ${index + 1}，供布局验收。`))])
   const prompt = '保留这段输入，核对附件排版。'
   await cdp.fill(composer, prompt)
   await chooseFiles(cdp, files)
@@ -94,6 +98,10 @@ async function verifyMixedAttachmentLayout(cdp, workspace, invalidPath) {
   assert.ok(collapsed.visibleRows > 0 && collapsed.visibleRows <= 2)
   assert.equal(collapsed.validSuffix, true, 'The selected long PDF name and its extension must remain available')
   assert.equal(collapsed.sameNameCount, 2, 'Two distinct files with the same name must remain separate')
+  for (const name of sameContentNames) {
+    assert.equal(collapsed.fileNames.filter(filename => filename === name).length, 1,
+      'Each file with the same bytes must retain its selected name')
+  }
   assert.equal(collapsed.thumbnailCount, 1, 'The image must show a loaded thumbnail')
   assert.equal(collapsed.hiddenFailureSignaled, true, 'The collapsed list must report the damaged attachment')
   assert.ok(collapsed.listHeight <= 60)
@@ -111,10 +119,14 @@ async function verifyMixedAttachmentLayout(cdp, workspace, invalidPath) {
   await cdp.click(failedAction)
   await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${files.length - 1} &&
     document.querySelector(${literal(composer)})?.value === ${literal(prompt)}`, 'only the damaged attachment removed, draft and other files retained')
+  const aliasAction = `${attachmentItem}:has(.ds-chat-attachment-filename[title=${literal(sameContentNames[1])}]) ${removeAttachment}`
+  await cdp.click(aliasAction)
+  await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${files.length - 2} &&
+    ${observeAttachment(sameContentNames[0], 'true')}`, 'removing a differently named copy leaves the original attached')
   await key(cdp, 'Escape', 'Escape', 27)
   // Clicking a removed row can leave focus on the page, so close the same panel control if needed.
   if (await cdp.evaluate(`document.querySelector(${literal(toggle)})?.getAttribute('aria-expanded') === 'true'`)) await cdp.click(toggle)
-  for (let remaining = files.length - 1; remaining > 0; remaining -= 1) {
+  for (let remaining = files.length - 2; remaining > 0; remaining -= 1) {
     await cdp.click(`${attachmentItem} ${removeAttachment}`)
     await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${remaining - 1}`, 'the selected attachment removed')
   }

@@ -223,7 +223,7 @@ export class TaskRunRepository {
     return rows.map(row => this.parseRun(row))
   }
 
-  list(input: { threadId?: string; workspaceRoot?: string; search?: string; status?: TaskRunStatus; limit?: number; offset?: number; cursor?: string } = {}): TaskRun[] {
+  list(input: { threadId?: string; workspaceRoot?: string; scheduleId?: string; search?: string; status?: TaskRunStatus; limit?: number; offset?: number; cursor?: string } = {}): TaskRun[] {
     const clauses: string[] = []
     const values: Array<string | number> = []
     if (input.threadId) {
@@ -237,6 +237,10 @@ export class TaskRunRepository {
     if (input.workspaceRoot) {
       clauses.push("json_extract(data_json, '$.workspaceRoot') = ?")
       values.push(resolve(input.workspaceRoot))
+    }
+    if (input.scheduleId) {
+      clauses.push("json_extract(data_json, '$.scheduledBy.scheduleId') = ?")
+      values.push(input.scheduleId)
     }
     if (input.search?.trim()) {
       clauses.push("instr(lower(json_extract(data_json, '$.goal')), lower(?)) > 0")

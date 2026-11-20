@@ -374,6 +374,20 @@ describe('app-ipc-schemas', () => {
     ]) expect(runtimeRequestPayloadSchema.safeParse(payload).success, JSON.stringify(payload)).toBe(false)
   })
 
+  it('limits conversation schedule access to listing or toggling one plan', () => {
+    const collection = '/v1/task-schedules'
+    const entry = `${collection}/schedule_task_example`
+    expect(runtimeRequestPayloadSchema.safeParse({ path: collection, method: 'GET' }).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({ path: entry, method: 'PATCH',
+      body: '{"enabled":false,"expectedRevision":1}' }).success).toBe(true)
+    for (const request of [
+      { path: collection, method: 'PATCH' },
+      { path: entry, method: 'GET' },
+      { path: entry, method: 'DELETE' },
+      { path: `${entry}/run`, method: 'POST' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(false)
+  })
+
   it('accepts WorkWise Runtime attachment and memory endpoints', () => {
     expect(runtimeRequestPayloadSchema.parse({
       path: '/v1/attachments',

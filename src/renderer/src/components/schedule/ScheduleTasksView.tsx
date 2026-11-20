@@ -35,6 +35,7 @@ import {
   type ScheduledTaskV1,
   type WorkWiseSettingsV2
 } from '@shared/app-settings'
+import { RUNTIME_TASK_SCHEDULES_TEMPLATE, runtimeTaskSchedulePath } from '@shared/runtime-endpoints'
 import { rendererRuntimeClient } from '../../agent/runtime-client'
 import { confirmDialog } from '../../lib/confirm-dialog'
 import { formatWorkspacePickerError } from '../../lib/format-workspace-picker-error'
@@ -55,6 +56,19 @@ type TaskDialogState =
 
 type TaskEdits = Partial<Pick<ScheduledTaskV1,
   'title' | 'prompt' | 'workspaceRoot' | 'model' | 'reasoningEffort' | 'enabled' | 'schedule'>>
+type ConversationSchedule = {
+  id: string
+  revision: number
+  title: string
+  enabled: boolean
+  originThreadId?: string
+  times?: string[]
+  timezone?: string
+  nextRunAt?: string
+  lastRunAt?: string
+  lastStatus?: string
+  needsReview?: boolean
+}
 
 const SCHEDULE_FILTERS: TaskFilter[] = ['all', 'enabled', 'running', 'done']
 const SCHEDULE_KIND_OPTIONS: ScheduleKind[] = ['daily', 'at', 'interval', 'manual']
@@ -219,11 +233,37 @@ function updateScheduledTask(current: ScheduledTaskV1, edits: TaskEdits): Schedu
   }
 }
 
-function formatDateTime(value: string, fallback: string): string {
-  if (!value.trim()) return fallback
+function formatDateTime(value: string | undefined, fallback: string, timeZone?: string): string {
+  if (!value?.trim()) return fallback
   const date = new Date(value)
   if (!Number.isFinite(date.getTime())) return fallback
-  return date.toLocaleString()
+  return date.toLocaleString(undefined, timeZone ? { timeZone } : undefined)
+}
+
+async function readConversationSchedules(): Promise<ConversationSchedule[]> {
+  if (typeof window.workwise?.runtimeRequest !== 'function') return []
+  const response = await rendererRuntimeClient.runtimeRequest(RUNTIME_TASK_SCHEDULES_TEMPLATE, 'GET')
+  if (!response.ok) throw new Error('Could not read conversation schedules')
+  const result = JSON.parse(response.body) as { schedules: ConversationSchedule[] }
+  if (!Array.isArray(result.schedules)) throw new Error('Invalid conversation schedules response')
+  return result.schedules
+}
+
+function conversationScheduleFilter(task: ConversationSchedule, filter: TaskFilter): boolean {
+  if (filter === 'enabled') return task.enabled
+  if (filter === 'running') return task.lastStatus === 'running'
+  if (filter === 'done') return task.lastStatus === 'completed' || task.lastStatus === 'failed'
+  return true
+}
+
+function conversationScheduleStatus(task: ConversationSchedule): string {
+  if (task.needsReview || ['stalled', 'waiting_user', 'waiting_approval', 'waiting_required_info'].includes(task.lastStatus ?? '')) {
+    return 'scheduleManagedReview'
+  }
+  if (['queued', 'running', 'retrying'].includes(task.lastStatus ?? '')) return 'scheduleStatus_running'
+  if (task.lastStatus === 'completed') return 'scheduleStatus_success'
+  if (task.lastStatus === 'failed') return 'scheduleStatus_error'
+  return 'scheduleManagedOrigin'
 }
 
 function statusTone(status: ScheduledTaskV1['lastStatus']): string {
@@ -244,6 +284,10 @@ export function ScheduleTasksView({
   const [status, setStatus] = useState<ScheduleRuntimeStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [conversationPlans, setConversationPlans] = useState<ConversationSchedule[]>([])
+  const [conversationPlansUnavailable, setConversationPlansUnavailable] = useState(false)
+  const [savingPlanIds, setSavingPlanIds] = useState<string[]>([])
+  const pendingPlanActions = useRef(new Set<string>()).current
   const [filter, setFilter] = useState<TaskFilter>('all')
   const [dialog, setDialog] = useState<TaskDialogState | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
@@ -255,15 +299,18 @@ export function ScheduleTasksView({
     if (reads.pendingWrites) return
     const generation = ++reads.generation
     try {
-      const [nextSettings, nextStatus] = await Promise.all([
+      const [nextSettings, nextStatus, nextPlans] = await Promise.all([
         window.workwise.getSettings(),
         typeof window.workwise?.getScheduleStatus === 'function'
           ? window.workwise.getScheduleStatus()
-          : Promise.resolve(null)
+          : Promise.resolve(null),
+        readConversationSchedules().catch(() => null)
       ])
       if (generation !== reads.generation) return
       setSettings((current) => !current || current.revision <= nextSettings.revision ? nextSettings : current)
       setStatus(nextStatus)
+      if (nextPlans) setConversationPlans(nextPlans)
+      setConversationPlansUnavailable(nextPlans === null)
       setError(null)
     } catch (loadError) {
       if (generation === reads.generation) {
@@ -288,6 +335,7 @@ export function ScheduleTasksView({
   const tasks = schedule?.tasks ?? EMPTY_SCHEDULE_TASKS
   const runningTaskIds = useMemo(() => new Set(status?.runningTaskIds ?? []), [status])
   const visibleTasks = useMemo(() => filterScheduledTasks(tasks, filter), [filter, tasks])
+  const visibleConversationPlans = conversationPlans.filter(plan => conversationScheduleFilter(plan, filter))
 
   const persistSchedule = async (patch: (current: ScheduleSettingsV1) => ScheduleSettingsPatchV1): Promise<void> => {
     reads.pendingWrites++
@@ -407,6 +455,38 @@ export function ScheduleTasksView({
   const updateTask = (taskId: string, enabled: boolean): Promise<boolean> =>
     saveListChange((current) => patchTask(current, taskId, { enabled }))
 
+  const toggleConversationPlan = async (plan: ConversationSchedule): Promise<void> => {
+    if (pendingPlanActions.has(plan.id)) return
+    pendingPlanActions.add(plan.id)
+    reads.pendingWrites++
+    reads.generation++
+    setSavingPlanIds([...pendingPlanActions])
+    let failure: string | null = null
+    try {
+      const response = await rendererRuntimeClient.runtimeRequest(runtimeTaskSchedulePath(plan.id), 'PATCH',
+        JSON.stringify({ enabled: !plan.enabled, expectedRevision: plan.revision }))
+      if (!response.ok) {
+        failure = t(response.status === 409 ? 'scheduleManagedChanged' : 'scheduleManagedActionFailed')
+      } else {
+        const { schedule: saved } = JSON.parse(response.body) as { schedule: ConversationSchedule }
+        if (saved?.id !== plan.id) throw new Error('Invalid saved schedule response')
+        setConversationPlans(current => current.map(item => item.id === saved.id ? saved : item))
+      }
+    } catch {
+      failure = t('scheduleManagedActionFailed')
+    } finally {
+      reads.pendingWrites--
+      pendingPlanActions.delete(plan.id)
+      setSavingPlanIds([...pendingPlanActions])
+    }
+    if (failure) {
+      await load()
+      setError(failure)
+    } else {
+      setError(null)
+    }
+  }
+
   const deleteTask = async (taskId: string): Promise<void> => {
     if (!schedule) return
     if (!(await confirmDialog(t('scheduleDeleteConfirm')))) return
@@ -470,7 +550,7 @@ export function ScheduleTasksView({
             <p className="text-[14px] leading-6 text-ds-faint">
               {t('scheduleSubtitle')}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {onOpenFlow ? (
                 <button
                   type="button"
@@ -536,14 +616,60 @@ export function ScheduleTasksView({
               {error}
             </div>
           ) : null}
+          {conversationPlansUnavailable ? (
+            <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ds-border bg-ds-card px-4 py-3 text-[13px] text-ds-muted">
+              <span>{t('scheduleManagedUnavailable')}</span>
+              <button type="button" onClick={() => void load()} className="rounded-md px-2 py-1 font-medium hover:bg-ds-hover">
+                {t('scheduleRefreshList')}
+              </button>
+            </div>
+          ) : null}
           {loading ? (
             <div className="py-20 text-center text-[14px] text-ds-faint">{t('loading')}</div>
-          ) : visibleTasks.length === 0 ? (
+          ) : visibleTasks.length === 0 && visibleConversationPlans.length === 0 && !conversationPlansUnavailable ? (
             <div className="flex min-h-[340px] items-center justify-center text-[13px] text-ds-faint">
-              {tasks.length === 0 ? t('scheduleEmpty') : t('scheduleFilterEmpty')}
+              {tasks.length === 0 && conversationPlans.length === 0 ? t('scheduleEmpty') : t('scheduleFilterEmpty')}
             </div>
           ) : (
             <div className="flex flex-col gap-3">
+              {visibleConversationPlans.map(plan => (
+                <article key={plan.id} className="rounded-xl border border-ds-border bg-ds-card px-4 py-4 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="break-words text-[15px] font-semibold text-ds-ink">{plan.title || t('scheduleUntitled')}</h2>
+                      {plan.times?.length ? (
+                        <p className="mt-1 text-[12px] text-ds-muted">
+                          {t('scheduleDailyAt', { time: plan.times.join(', ') })} · {plan.timezone}
+                        </p>
+                      ) : null}
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ds-faint">
+                        <span>{t(plan.enabled ? 'scheduleManagedEnabled' : 'scheduleManagedPaused')}</span>
+                        <span>{t(conversationScheduleStatus(plan))}</span>
+                        {plan.enabled ? (
+                          <span>{t('scheduleNextRun')}: {formatDateTime(plan.nextRunAt, t('scheduleNotScheduled'), plan.timezone)}</span>
+                        ) : null}
+                        {plan.lastRunAt ? (
+                          <span>{t('scheduleLastRun')}: {formatDateTime(plan.lastRunAt, t('scheduleNeverRun'), plan.timezone)}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {plan.originThreadId && onOpenThread ? (
+                        <button type="button" onClick={() => onOpenThread(plan.originThreadId!)}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] text-ds-muted hover:bg-ds-hover hover:text-ds-ink">
+                          <MessageSquare className="h-4 w-4" strokeWidth={1.8} />
+                          {t('scheduleManagedOpenConversation')}
+                        </button>
+                      ) : null}
+                      <button type="button" onClick={() => void toggleConversationPlan(plan)}
+                        disabled={savingPlanIds.includes(plan.id) || (!plan.enabled && !plan.times?.length)}
+                        className="rounded-lg border border-ds-border px-2 py-1.5 text-[13px] text-ds-muted hover:bg-ds-hover disabled:opacity-45">
+                        {t(plan.enabled ? 'scheduleManagedPause' : 'scheduleManagedResume')}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
               {visibleTasks.map((task) => {
                 const running = runningTaskIds.has(task.id) || task.lastStatus === 'running'
                 const lastThreadId = scheduledTaskLastThreadId(task)

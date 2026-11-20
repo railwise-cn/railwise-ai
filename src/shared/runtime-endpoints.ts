@@ -47,6 +47,11 @@ export const RUNTIME_FLOW_RUN_CANCEL_TEMPLATE = '/v1/flow-runs/{id}/cancel'
 export const RUNTIME_FLOW_RUN_RESUME_TEMPLATE = '/v1/flow-runs/{id}/resume'
 export const RUNTIME_FLOW_RUN_RETRY_TEMPLATE = '/v1/flow-runs/{id}/retry'
 export const RUNTIME_FLOW_RUN_DECISION_TEMPLATE = '/v1/flow-runs/decision'
+export const RUNTIME_TASK_SCHEDULES_TEMPLATE = '/v1/task-schedules'
+export const RUNTIME_TASK_SCHEDULE_TEMPLATE = '/v1/task-schedules/{id}'
+export function runtimeTaskSchedulePath(id: string): string {
+  return `${RUNTIME_TASK_SCHEDULES_TEMPLATE}/${encodeURIComponent(id)}`
+}
 
 // Engineering delivery endpoints. Keep these in the shared endpoint table so
 // renderer calls and the main-process IPC allow-list stay in sync.

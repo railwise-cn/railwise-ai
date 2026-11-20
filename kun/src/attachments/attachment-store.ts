@@ -95,38 +95,40 @@ export class FileAttachmentStore implements AttachmentStore {
       .update('\0')
       .update(threadId ?? '')
       .digest('hex')
-    const id = `att_${hash.slice(0, 24)}`
+    const id = namedAttachmentId(['image', hash, input.name])
     const contentPath = this.contentPath(id)
     const metadataPath = this.metadataPath(id)
-    const now = this.options.nowIso?.() ?? new Date().toISOString()
-    const existing = await this.get(id)
-    if (existing) {
-      const next = mergeScope({
-        ...existing,
+    return withFileMutationQueue(metadataPath, async () => {
+      const now = this.options.nowIso?.() ?? new Date().toISOString()
+      const existing = await this.get(id)
+      if (existing) {
+        const next = mergeScope({
+          ...existing,
+          ...(input.textFallback ? { textFallback: input.textFallback } : {}),
+          updatedAt: now
+        }, scopedInput)
+        await atomicWriteFile(contentPath, input.data)
+        await atomicWriteFile(metadataPath, JSON.stringify(next, null, 2))
+        return next
+      }
+      const metadata: AttachmentMetadata = AttachmentMetadataSchema.parse(mergeScope({
+        id,
+        name: input.name,
+        mimeType: image.mimeType,
+        byteSize: input.data.byteLength,
+        hash,
+        ...(image.width ? { width: image.width } : {}),
+        ...(image.height ? { height: image.height } : {}),
         ...(input.textFallback ? { textFallback: input.textFallback } : {}),
+        threadIds: [],
+        workspaces: [],
+        createdAt: now,
         updatedAt: now
-      }, scopedInput)
+      }, scopedInput))
       await atomicWriteFile(contentPath, input.data)
-      await atomicWriteFile(metadataPath, JSON.stringify(next, null, 2))
-      return next
-    }
-    const metadata: AttachmentMetadata = AttachmentMetadataSchema.parse(mergeScope({
-      id,
-      name: input.name,
-      mimeType: image.mimeType,
-      byteSize: input.data.byteLength,
-      hash,
-      ...(image.width ? { width: image.width } : {}),
-      ...(image.height ? { height: image.height } : {}),
-      ...(input.textFallback ? { textFallback: input.textFallback } : {}),
-      threadIds: [],
-      workspaces: [],
-      createdAt: now,
-      updatedAt: now
-    }, scopedInput))
-    await atomicWriteFile(contentPath, input.data)
-    await atomicWriteFile(metadataPath, JSON.stringify(metadata, null, 2))
-    return metadata
+      await atomicWriteFile(metadataPath, JSON.stringify(metadata, null, 2))
+      return metadata
+    })
   }
 
   async get(id: string): Promise<AttachmentMetadata | null> {
@@ -170,36 +172,42 @@ export class FileAttachmentStore implements AttachmentStore {
     const threadId = input.threadId?.trim() || undefined
     if (!threadId && !workspace) throw new Error('attachment requires a thread or workspace scope')
     const hash = createHash('sha256').update(input.data).digest('hex')
-    const id = `att_${hash.slice(0, 24)}`
-    const now = this.options.nowIso?.() ?? new Date().toISOString()
-    const existing = await this.getV2(id)
-    if (existing) {
-      const next = mergeScopeV2({ ...existing, updatedAt: now }, { threadId, workspace })
-      await atomicWriteFile(this.metadataPath(id), JSON.stringify(next, null, 2))
-      return next
-    }
-    const metadata = AttachmentMetadataV2Schema.parse(mergeScopeV2({
-      schemaVersion: 2,
-      id, name: input.name, originalFileName: input.name, mimeType: input.mimeType,
-      byteSize: input.data.byteLength, hash, kind: input.kind, state: 'parsing',
-      degradationReasons: [], parserWarnings: [], indexState: 'pending', progress: 0,
-      managedRelativePath: `${id}${extname(input.name).toLowerCase()}`,
-      threadIds: [], workspaces: [], createdAt: now, updatedAt: now
-    }, { threadId, workspace }))
-    await atomicWriteFile(this.contentPath(id), input.data)
-    await atomicWriteFile(this.metadataPath(id), JSON.stringify(metadata, null, 2))
-    return metadata
+    const id = namedAttachmentId([input.kind, input.mimeType.toLowerCase(), hash, input.name, workspace ?? '', threadId ?? ''])
+    const metadataPath = this.metadataPath(id)
+    return withFileMutationQueue(metadataPath, async () => {
+      const now = this.options.nowIso?.() ?? new Date().toISOString()
+      const existing = await this.getV2(id)
+      if (existing) {
+        const next = mergeScopeV2({ ...existing, updatedAt: now }, { threadId, workspace })
+        await atomicWriteFile(metadataPath, JSON.stringify(next, null, 2))
+        return next
+      }
+      const metadata = AttachmentMetadataV2Schema.parse(mergeScopeV2({
+        schemaVersion: 2,
+        id, name: input.name, originalFileName: input.name, mimeType: input.mimeType,
+        byteSize: input.data.byteLength, hash, kind: input.kind, state: 'parsing',
+        degradationReasons: [], parserWarnings: [], indexState: 'pending', progress: 0,
+        managedRelativePath: `${id}${extname(input.name).toLowerCase()}`,
+        threadIds: [], workspaces: [], createdAt: now, updatedAt: now
+      }, { threadId, workspace }))
+      await atomicWriteFile(this.contentPath(id), input.data)
+      await atomicWriteFile(metadataPath, JSON.stringify(metadata, null, 2))
+      return metadata
+    })
   }
 
   async updateV2(id: string, update: Partial<Pick<AttachmentMetadataV2,
     'state' | 'parser' | 'sourceStructure' | 'degradationReasons' | 'parserWarnings' | 'indexState' | 'summary' | 'progress'>>): Promise<AttachmentMetadataV2> {
-    const current = await this.getV2(id)
-    if (!current) throw new Error(`attachment not found: ${id}`)
-    const next = AttachmentMetadataV2Schema.parse({
-      ...current, ...update, updatedAt: this.options.nowIso?.() ?? new Date().toISOString()
+    const metadataPath = this.metadataPath(id)
+    return withFileMutationQueue(metadataPath, async () => {
+      const current = await this.getV2(id)
+      if (!current) throw new Error(`attachment not found: ${id}`)
+      const next = AttachmentMetadataV2Schema.parse({
+        ...current, ...update, updatedAt: this.options.nowIso?.() ?? new Date().toISOString()
+      })
+      await atomicWriteFile(metadataPath, JSON.stringify(next, null, 2))
+      return next
     })
-    await atomicWriteFile(this.metadataPath(id), JSON.stringify(next, null, 2))
-    return next
   }
 
   async replaceSections(id: string, sections: AttachmentSectionV1[]): Promise<void> {
@@ -350,6 +358,13 @@ export class FileAttachmentStore implements AttachmentStore {
     this.index?.remove(id)
     await Promise.all([rm(this.contentPath(id), { force: true }), rm(this.metadataPath(id), { force: true })])
   }
+}
+
+// A content fingerprint can be shared by differently named inputs. Keep their
+// references separate while preserving the persisted ID format for older turns.
+function namedAttachmentId(identity: string[]): string {
+  const hash = createHash('sha256').update(JSON.stringify(['named-attachment-v1', ...identity])).digest('hex')
+  return `att_${hash.slice(0, 24)}`
 }
 
 function mergeScopeV2(metadata: AttachmentMetadataV2, input: { threadId?: string; workspace?: string }): AttachmentMetadataV2 {

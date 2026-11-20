@@ -4,7 +4,11 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createApprovalRequest } from '../domain/approval.js'
 import type { TaskRun } from '../contracts/tasks.js'
+import { decideApproval } from '../server/routes/approvals.js'
+import { RuntimeEventRecorder } from '../services/runtime-event-recorder.js'
 import { TaskRunRepository } from '../services/task-run-repository.js'
+import { InMemoryEventBus } from './in-memory-event-bus.js'
+import { InMemorySessionStore } from './in-memory-session-store.js'
 import { PersistentApprovalGate, PersistentUserInputGate } from './persistent-human-gates.js'
 
 const roots: string[] = []
@@ -82,6 +86,48 @@ describe('persistent human gates', () => {
     expect(gate.decide(independent.id, 'allow')).toBe(false)
     await expect(waiting).resolves.toBe('deny')
     repository.close()
+  })
+
+  it.each(['expired', 'revoked', 'prepared'] as const)('settles a %s task approval once after restart without granting it', async reason => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-gate-invalid-')); roots.push(root)
+    const path = join(root, 'tasks.sqlite3')
+    const before = '2026-11-09T00:00:01Z'
+    const after = '2026-11-09T00:02:00Z'
+    const first = new TaskRunRepository(path)
+    first.create({ ...task(), activeTurnId: 'turn-1', authority: {
+      source: 'user', workspaceRoot: '/tmp/ws', externalTargets: [], grantedAt: before,
+      taskApprovalGrant: {
+        id: 'temporary-permission', taskId: 'task-gate', threadId: 'thread-gate', previousPolicy: 'never',
+        approvalPolicy: 'on-request', workspaceRoot: '/tmp/ws', workspaceTrust: 'workspace-write',
+        workspaceRevision: 0, agentRevision: 0, scopeFingerprint: 'a'.repeat(64),
+        status: reason === 'prepared' ? 'prepared' : 'active', confirmed: true, confirmedAt: before,
+        expiresAt: reason === 'expired' ? '2026-11-09T00:01:00Z' : '2026-11-09T00:03:00Z',
+        idempotencyKey: 'permission', ...(reason === 'revoked' ? { revokedAt: before } : {})
+      }
+    } })
+    const approval = createApprovalRequest({ id: 'approval-reopen', threadId: 'thread-gate', turnId: 'turn-1',
+      toolName: 'write', summary: '写入验收文件', createdAt: before })
+    void new PersistentApprovalGate(first, () => before).request(approval)
+    expect(first.get('task-gate')?.status).toBe('waiting_approval')
+    first.close()
+
+    const reopened = new TaskRunRepository(path)
+    try {
+      const gate = new PersistentApprovalGate(reopened, () => after)
+      const eventBus = new InMemoryEventBus()
+      const sessionStore = new InMemorySessionStore()
+      const events = new RuntimeEventRecorder({ eventBus, sessionStore, allocateSeq: id => eventBus.allocateSeq(id), nowIso: () => after })
+      const submit = () => decideApproval({ approvalId: approval.id, gate, events,
+        request: new Request('http://127.0.0.1/v1/approvals/approval-reopen', { method: 'POST', body: '{"decision":"allow"}' }) })
+      expect((await submit()).status).toBe(409)
+      expect((await submit()).status).toBe(409)
+      expect(gate.get(approval.id)).toMatchObject({ status: 'expired', reason: 'task_approval_expired' })
+      expect(reopened.attention(approval.id)?.status).toBe('expired')
+      expect(reopened.get('task-gate')).toMatchObject({ status: 'waiting_user', blockCode: 'approval_expired' })
+      expect(reopened.inputs('task-gate')).toHaveLength(1)
+      expect(reopened.inputs('task-gate')[0]).toMatchObject({ kind: 'approval_resolution', sourceId: approval.id })
+      expect(await sessionStore.highestSeq('thread-gate')).toBe(1)
+    } finally { reopened.close() }
   })
 
   it('persists structured question payloads for reconnecting UIs', async () => {

@@ -33,13 +33,15 @@ export class PersistentApprovalGate implements ApprovalGate {
     if (owner === null || owner?.status === 'paused') return false
     const now = this.nowIso()
     const temporaryGrant = owner?.authority?.taskApprovalGrant
-    if (decision === 'allow' && owner && (owner.authority?.revokedAt || temporaryGrant && Date.parse(temporaryGrant.expiresAt) <= Date.parse(now))) {
+    if (decision === 'allow' && owner && (owner.authority?.revokedAt || temporaryGrant && (
+      temporaryGrant.status !== 'active' || temporaryGrant.revokedAt || Date.parse(temporaryGrant.expiresAt) <= Date.parse(now)
+    ))) {
       this.repository.transact(() => {
-        this.repository.resolveHumanRequest(id, { decision: 'deny', reason: 'task_approval_expired' }, 'expired', now)
         this.repository.update(owner.id, owner.revision, current => ({
           ...current, status: 'waiting_user', blockCode: 'approval_expired',
           waitingReason: '本次任务授权已失效，请重新检查后继续。', updatedAt: now
         }))
+        this.repository.resolveHumanRequest(id, { decision: 'deny', reason: 'task_approval_expired' }, 'expired', now)
       })
       this.resolvers.get(id)?.resolve('deny')
       this.resolvers.delete(id)

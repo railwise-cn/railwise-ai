@@ -35,9 +35,13 @@ export async function decideApproval(input: {
   }
   // A repeated click or a transport retry acknowledges the original decision only.
   if (approval.status === response.status) return jsonResponse(response)
-  if (approval.status !== 'pending' || !input.gate.decide(input.approvalId, parsed.data.decision, parsed.data.reason)) {
+  if (approval.status === 'expired') return ERRORS.conflict('本次授权已失效，请在原对话重新检查后继续。')
+  if (approval.status !== 'pending') {
     return ERRORS.conflict('This approval is no longer available. Refresh the task to see its current state.')
   }
+  const accepted = input.gate.decide(input.approvalId, parsed.data.decision, parsed.data.reason)
+  const expired = !accepted && input.gate.get(input.approvalId)?.status === 'expired'
+  if (!accepted && !expired) return ERRORS.conflict('This approval is no longer available. Refresh the task to see its current state.')
   await input.events.record({
     kind: 'approval_resolved' as const,
     threadId: approval.threadId,
@@ -45,8 +49,8 @@ export async function decideApproval(input: {
     itemId: undefined,
     approvalId: input.approvalId,
     toolName: approval.toolName,
-    status: response.status,
+    status: expired ? 'expired' : response.status,
     summary: approval.summary
   })
-  return jsonResponse(response)
+  return expired ? ERRORS.conflict('本次授权已失效，请在原对话重新检查后继续。') : jsonResponse(response)
 }

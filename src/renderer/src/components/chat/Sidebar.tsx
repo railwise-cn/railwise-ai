@@ -225,10 +225,6 @@ export function Sidebar({
         <DesignSidebarContent workspaceRoot={workspaceRoot} />
       ) : activeView === 'engineering' ? (
         <EngineeringSidebarContent workspaceRoot={workspaceRoot} runtimeReady={runtimeReady} />
-      ) : activeView === 'flow' ? (
-        <div className="ds-no-drag mx-2 rounded-2xl border border-ds-border-muted bg-ds-card/70 p-3 text-[12px] leading-5 text-ds-muted">
-          Flow 仍为 Preview。请在画布中配置、校验并测试流程。
-        </div>
       ) : (
       <SidebarProjectsSection
         threads={threads}

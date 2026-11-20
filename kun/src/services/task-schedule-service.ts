@@ -4,9 +4,9 @@ import { createHash, randomUUID } from 'node:crypto'
 import { BrowserExecutionScope, browserVerificationPolicy, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 import type { EgoBrowserCapabilityConfig } from '../contracts/ego-browser.js'
 import type { ExecutionGrant, ExecutionScope } from '../contracts/permissions.js'
-import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
+import type { OperationReceipt, TaskRun, TaskRunStatus } from '../contracts/tasks.js'
 import type { FlowDefinitionV1 } from '../contracts/flow.js'
-import { scheduleForRequirement, type ScheduleRequirement } from '../contracts/schedule.js'
+import { nextScheduleOccurrence, normalizeScheduleSpec, scheduleForRequirement, type ScheduleRequirement } from '../contracts/schedule.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import type { ThreadRecord } from '../contracts/threads.js'
@@ -14,6 +14,7 @@ import type { AttachmentStore } from '../attachments/attachment-store.js'
 import { createApprovalRequest } from '../domain/approval.js'
 import { waitForApprovalDecision } from '../ports/approval-gate.js'
 import type { FlowRuntimeService } from '../flow/service.js'
+import { FlowRevisionConflictError } from '../flow/repository.js'
 import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
 import type { TaskController } from './task-controller.js'
 import type { TaskCoordinator } from './task-coordinator.js'
@@ -51,6 +52,19 @@ type ScheduledTaskAuthority = {
   authorization: { kind: 'requested_schedule' | 'confirmed_scope' | 'confirmed_task_scope'; sourceScopeReceiptId?: string; expiresAt: null; until: 'disabled'; scopeHash: string; approvalId?: string; receiptKey?: string }
 }
 export type ScheduledTaskDispatch = { scheduleId: string; versionId: string; dueAt: string }
+type ManagedTaskSchedule = {
+  id: string
+  revision: number
+  title: string
+  enabled: boolean
+  originThreadId?: string
+  times?: string[]
+  timezone?: string
+  nextRunAt?: string
+  lastRunAt?: string
+  lastStatus?: TaskRunStatus
+  needsReview: boolean
+}
 const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 /** Read-only projection, including for sealed legacy plans. Never rewrite the
  * saved Grant, its authority hash, or historical approval/operation records.
@@ -90,6 +104,70 @@ export class TaskScheduleService {
   canCreate(context: ToolHostContext): boolean {
     const task = this.deps.tasks.activeTask(context.threadId)
     return Boolean(task?.acceptance.schedule && !task.scheduledBy)
+  }
+
+  /** Desktop management returns display fields only. The sealed authorization stays in KUN. */
+  listManagedPlans() {
+    return this.deps.flows.list()
+      .filter(flow => flow.variables.taskSchedule && flow.variables.archived !== true)
+      .map(flow => this.managedPlan(flow))
+  }
+
+  async setManagedPlanEnabled(id: string, enabled: boolean, expectedRevision: number) {
+    const flow = this.deps.flows.get(id)
+    if (!flow || !flow.variables.taskSchedule || flow.variables.archived === true) {
+      throw new Error('Task schedule not found')
+    }
+    if (flow.revision !== expectedRevision) throw new FlowRevisionConflictError('Task schedule changed')
+    const plan = this.managedPlan(flow)
+    if (enabled && !plan.times) fail('计划需要在原对话重新核对。')
+    if (enabled && plan.enabled) return plan
+    if (enabled) await this.validateAuthority(this.authority(flow))
+
+    return this.deps.flows.repository.transaction(() => {
+      const current = this.deps.flows.get(id)
+      if (!current || current.revision !== expectedRevision) throw new FlowRevisionConflictError('Task schedule changed')
+      const trigger = this.deps.flows.repository.getTriggerState(id, 'schedule')
+      if (!enabled && current.variables.enabled === false && trigger?.enabled !== true) return this.managedPlan(current)
+      const updated = this.deps.flows.update({
+        ...current, variables: { ...current.variables, enabled }
+      }, expectedRevision)
+      const node = updated.nodes.find(item => item.id === 'schedule')
+      if (trigger && node) {
+        const { nextRunAt: _previousRun, ...state } = trigger
+        const nextRunAt = enabled ? nextScheduleOccurrence(node.config, new Date(this.deps.nowIso())) : undefined
+        this.deps.flows.repository.saveTriggerState({ ...state, enabled, ...(nextRunAt ? { nextRunAt } : {}) })
+      }
+      return this.managedPlan(updated)
+    })
+  }
+
+  private managedPlan(flow: FlowDefinitionV1): ManagedTaskSchedule {
+    const base = { id: flow.id, revision: flow.revision, title: flow.name }
+    const trigger = this.deps.flows.repository.getTriggerState(flow.id, 'schedule')
+    const node = flow.nodes.find(item => item.id === 'schedule' && item.type === 'schedule_trigger')
+    const enabled = trigger?.enabled === true && flow.variables.enabled !== false
+    let originThreadId: string | undefined
+    try {
+      const authority = this.authority(flow)
+      originThreadId = authority.originThreadId
+      const published = flow.publishedVersionId ? this.deps.flows.repository.getVersion(flow.publishedVersionId) : null
+      const publishedNode = published?.definition.nodes.find(item => item.id === 'schedule')
+      if (!trigger || !node || node.disabled || !publishedNode ||
+        fingerprint(node.config) !== fingerprint(publishedNode.config) ||
+        fingerprint(published?.definition.variables.taskSchedule) !== fingerprint(authority)) {
+        return { ...base, enabled, originThreadId, needsReview: true }
+      }
+      const schedule = normalizeScheduleSpec(node.config)
+      if (schedule.kind !== 'daily') return { ...base, enabled, originThreadId, needsReview: true }
+      const last = this.deps.repository.list({ scheduleId: flow.id, limit: 1 })[0]
+      const attention = this.deps.repository.attention(`schedule:${flow.id}`)
+      return { ...base, enabled, originThreadId, times: schedule.times, timezone: schedule.timezone,
+        nextRunAt: enabled ? trigger.nextRunAt : undefined, lastRunAt: trigger.lastRunAt, lastStatus: last?.status,
+        needsReview: attention?.status === 'pending' }
+    } catch {
+      return { ...base, enabled, originThreadId, needsReview: true }
+    }
   }
 
   async create(context: ToolHostContext) {

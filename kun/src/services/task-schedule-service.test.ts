@@ -15,6 +15,7 @@ import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { ThreadSchema } from '../contracts/threads.js'
 import { TurnSchema } from '../contracts/turns.js'
 import { TaskScheduleService } from './task-schedule-service.js'
+import { flowRoutes } from '../server/routes/flows.js'
 import { buildTaskScheduleToolProvider } from '../adapters/tool/task-schedule-tool-provider.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
 import { BrowserCapabilityConfig } from '../contracts/browser-skill.js'
@@ -212,6 +213,55 @@ function twiceReboundBrowserFixture(prepare?: (f: ReturnType<typeof reboundBrows
 }
 
 describe('task-owned recurring execution', () => {
+  it('lists existing chat plans for desktop management, then pauses and resumes using the original authorization', async () => {
+    const f = fixture()
+    const created = await f.service.create(f.context)
+    const original = f.flows.get(created.id)!
+    const listed = flowRoutes.listTaskSchedules(f.service)
+    expect(listed.status).toBe(200)
+    expect(JSON.parse(listed.body)).toMatchObject({ schedules: [{
+      id: created.id, title: f.task.goal, revision: original.revision, originThreadId: 'origin',
+      enabled: true, times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', nextRunAt: '2026-11-13T00:30:00.000Z'
+    }] })
+    expect(listed.body).not.toMatch(/scope|grant|authorization|execution/)
+
+    const change = (enabled: boolean, expectedRevision: number) => flowRoutes.toggleTaskSchedule(f.service, created.id,
+      new Request('http://runtime/v1/task-schedules/test', {
+        method: 'PATCH', body: JSON.stringify({ enabled, expectedRevision })
+      }))
+    const paused = await change(false, original.revision)
+    expect(paused.status).toBe(200)
+    expect(JSON.parse(paused.body)).toMatchObject({ schedule: { enabled: false } })
+    expect(f.flowRepository.getTriggerState(created.id, 'schedule')).toMatchObject({ enabled: false })
+    expect(f.flowRepository.getTriggerState(created.id, 'schedule')?.nextRunAt).toBeUndefined()
+
+    vi.setSystemTime(new Date('2026-11-13T02:00:00Z'))
+    expect(await f.flows.tickSchedules()).toBe(0)
+    expect((await change(true, original.revision)).status).toBe(409)
+    const pausedRevision = f.flows.get(created.id)!.revision
+    const resumed = await change(true, pausedRevision)
+    expect(resumed.status).toBe(200)
+    expect(JSON.parse(resumed.body)).toMatchObject({ schedule: {
+      enabled: true, nextRunAt: '2026-11-13T08:30:00.000Z'
+    } })
+    const current = f.flows.get(created.id)!
+    expect(current.publishedVersionId).toBe(original.publishedVersionId)
+    expect(current.variables.taskSchedule).toEqual(original.variables.taskSchedule)
+    expect(f.coordinator.command).not.toHaveBeenCalled()
+    f.flows.archive(created.id)
+    expect(f.service.listManagedPlans()).toEqual([])
+  })
+
+  it('keeps a paused chat plan paused when its saved connector authorization has drifted', async () => {
+    const f = fixture()
+    const saved = await f.service.create(f.context)
+    await f.service.setManagedPlanEnabled(saved.id, false, f.flows.get(saved.id)!.revision)
+    f.identities['mcp:test'] = 'b'.repeat(64)
+    await expect(f.service.setManagedPlanEnabled(saved.id, true, f.flows.get(saved.id)!.revision))
+      .rejects.toMatchObject({ code: 'schedule_authority_changed' })
+    expect(f.service.listManagedPlans()).toMatchObject([{ enabled: false }])
+  })
+
   it.each(['valid', 'forged-destination', 'fake-click-ack', 'unknown'] as const)('retires only a fully verified native document GET across a later browser binding: %s', async mode => {
     let navigation!: OperationReceipt
     const prepare = () => twiceReboundBrowserFixture(base => {
