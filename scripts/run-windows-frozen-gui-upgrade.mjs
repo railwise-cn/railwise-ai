@@ -70,7 +70,7 @@ async function verifiedTarget(directory, source, version, runnerFixture = false)
 }
 
 async function officialBaseline(root, version) {
-  assert.ok(['0.5.7', '0.5.8'].includes(version))
+  assert.ok(['0.5.7', '0.5.8', '0.5.9'].includes(version))
   const gate = JSON.parse(execFileSync('git', ['show', `v${version}:docs/qa/release-gates/v${version}.json`], { encoding: 'utf8' }))
   const build = gate.package.reviewedBuild
   const identity = installIdentity(version, build.sourceHead)
@@ -233,15 +233,20 @@ async function exerciseGuiUpgrade({ running, target, feed, executable, allowLega
 
 async function main(args) {
   requireHostedWindows(process.env)
-  const currentReleaseMode = args.length === 4
+  const currentReleaseMode = args.length === 4 || args.length === 5
   const entry = currentReleaseMode ? args[3] : 'sidebar'
-  const baseVersion = currentReleaseMode ? '0.5.8' : '0.5.7'
-  if (currentReleaseMode) assert.ok(['sidebar', 'settings'].includes(entry))
+  const baseVersion = currentReleaseMode ? args[4] ?? '0.5.8' : '0.5.7'
+  const versions = { '0.5.7': '0.5.8', '0.5.8': '0.5.9', '0.5.9': '0.5.10' }
+  const targetVersion = versions[baseVersion]
+  if (currentReleaseMode) {
+    assert.ok(['sidebar', 'settings'].includes(entry))
+    assert.ok(['0.5.8', '0.5.9'].includes(baseVersion))
+  }
   if (currentReleaseMode) args = args.slice(0, 3)
   assert.ok(args.length === 3 || args.length === 6, 'Pass exact package directory, provenance JSON, evidence directory, and optional private next package directory, provenance and version')
   const [directory, sourceFile, evidence, nextDirectory, nextSourceFile, nextVersion] = args.map(String)
   const readSource = async path => JSON.parse(await readFile(path, 'utf8'))
-  const target = await verifiedTarget(directory, await readSource(sourceFile), currentReleaseMode ? '0.5.9' : '0.5.8')
+  const target = await verifiedTarget(directory, await readSource(sourceFile), targetVersion)
   if (nextDirectory) assert.equal(nextVersion, '0.5.9', 'Use the private 0.5.9 test installer for the next upgrade')
   const next = nextDirectory ? await verifiedTarget(nextDirectory, await readSource(nextSourceFile), nextVersion, true) : undefined
   const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'railwise-frozen-windows-update-'))
@@ -299,6 +304,12 @@ async function main(args) {
         profilePreserved: (await readFile(sentinelFile, 'utf8')) === sentinel && samePath(await running.cdp.evaluate('window.workwise.getSettings().then(s=>s.workspaceRoot)'), workspace),
         threadPreserved: await running.cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads/${thread}','GET').then(r=>r.ok&&JSON.parse(r.body).id===${JSON.stringify(thread)})`) }
       verifyFrozenWindowsReadback(actual, item)
+      if (item.identity.version === '0.5.10') {
+        actual.releaseHighlightsVisible = await running.cdp.wait(
+          `[...document.querySelectorAll('section')].some(section => ['本版更新', 'What’s new'].includes(section.getAttribute('aria-label')) && section.textContent.includes('0.5.10'))`,
+          'the new 0.5.10 release highlights'
+        )
+      }
       report.steps.push({ ...actual, action })
       await save()
     }

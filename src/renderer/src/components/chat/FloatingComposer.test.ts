@@ -15,7 +15,7 @@ import {
   FloatingComposerModelPicker,
   composerReasoningEffortRequestValue,
 } from './FloatingComposerModelPicker'
-import { getGoalPanelDraftObjective, getSkillMentionAtCursor, replaceSkillMentionInInput } from './floating-composer-commands'
+import { getGoalPanelDraftObjective, getSkillMentionAtCursor } from './floating-composer-commands'
 import { useChatStore } from '../../store/chat-store'
 import {
   buildComposerFileContextPrompt,
@@ -27,13 +27,9 @@ import {
 } from '../../lib/composer-file-references'
 
 describe('FloatingComposer slash commands', () => {
-  it('detects and replaces an @ skill mention without consuming the surrounding prompt', () => {
+  it('identifies the range of an @ skill mention without consuming surrounding text', () => {
     const mention = getSkillMentionAtCursor('请检查 @任意设站', 12)
-    expect(mention).toMatchObject({ query: '任意设站' })
-    expect(replaceSkillMentionInInput('请检查 @任意设站', mention!, 'rail-any-station-control-network')).toEqual({
-      input: '请检查 @rail-any-station-control-network ',
-      cursor: '请检查 @rail-any-station-control-network '.length
-    })
+    expect(mention).toEqual({ query: '任意设站', start: 4, end: 9 })
     expect(getSkillMentionAtCursor('路径 @"raw file.csv"', 20)).toBeNull()
   })
 
@@ -541,7 +537,7 @@ describe('FloatingComposer capability controls', () => {
     expect(html).toContain('Openspec Apply Change')
     expect(html).toContain('Implement tasks from an OpenSpec change')
     expect(html).toContain('Project')
-    expect(html).toContain('/skill:openspec-apply-change')
+    expect(html).not.toContain('/skill:openspec-apply-change')
   })
 
   it('enables local Claw input when a WeChat channel is already mapped to a local thread', () => {
@@ -787,7 +783,7 @@ describe('FloatingComposer capability controls', () => {
     )
 
     expect(html).toContain('src="blob:shot-preview"')
-    expect(html).toContain('alt="shot.png"')
+    expect(html).toContain('title="shot.png"')
   })
 
   it('renders @ file reference chips as sendable context', () => {

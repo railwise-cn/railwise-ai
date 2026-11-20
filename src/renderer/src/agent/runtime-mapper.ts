@@ -271,6 +271,7 @@ function applyRuntimeDisclosureMeta(
     meta.displayText = displayText
   }
   if (attachmentIds) meta.attachmentIds = attachmentIds
+  if (item.skillSelections?.length) meta.skillSelections = item.skillSelections
   if (activeSkillIds) meta.activeSkillIds = activeSkillIds
   if (injectedMemoryIds) meta.injectedMemoryIds = injectedMemoryIds
   if (typeof item.skillInjectionBytes === 'number') {
@@ -1255,8 +1256,13 @@ export async function dispatchRuntimeEvent(
       }
       return
     }
-    case 'item_created':
     case 'item_updated':
+      if (event.item?.kind === 'user_message' && event.item.activeSkillIds?.length) {
+        sink.onUserMessage({ ...userMessageEventFromItem(event.item), metadataOnly: true })
+        return
+      }
+      // Fall through for the rest of the item lifecycle projections.
+    case 'item_created':
     case 'item_completed':
     case 'tool_call_started':
     case 'tool_call_finished':

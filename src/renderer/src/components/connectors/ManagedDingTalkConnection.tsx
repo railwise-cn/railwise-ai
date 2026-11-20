@@ -1,3 +1,5 @@
+import { TechnicalDetails } from '../ui/TechnicalDetails'
+import { useConnectionNotice } from './use-connection-notice'
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useTranslation } from 'react-i18next'
@@ -16,7 +18,7 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
   const [status, setStatus] = useState<ManagedDwsStatus>()
   const [login, setLogin] = useState<Login>()
   const [pending, setPending] = useState(false)
-  const [message, setMessage] = useState('')
+  const { message, detail, setMessage, reportError } = useConnectionNotice()
   const [browserError, setBrowserError] = useState(false)
   const [accessMessage, setAccessMessage] = useState('')
   const authorizationRef = useRef<HTMLDivElement>(null)
@@ -32,9 +34,9 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
     busy.current = true
     if (mounted.current) { setPending(true); if (!silent) setMessage('') }
     try { await operation() }
-    catch (error) { if (mounted.current) setMessage(error instanceof Error ? error.message : String(error)) }
+    catch (error) { if (mounted.current) reportError(error) }
     finally { busy.current = false; if (mounted.current) setPending(false) }
-  }, [])
+  }, [reportError, setMessage])
   const apply = useCallback(async (result: ManagedDwsResult): Promise<Login> => {
     if (!result.ok) throw new Error(result.message)
     if (!mounted.current) return result
@@ -44,7 +46,7 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
     else if (result.state) setMessage(t(`managedDwsLogin_${result.state}`))
     else if (result.status) setMessage(result.status.message ?? '')
     return result
-  }, [t])
+  }, [setMessage, t])
   const diagnose = useCallback(async (): Promise<ManagedDwsStatus | undefined> => {
     if (!window.workwise.diagnoseManagedDingTalk) throw new Error(t('capabilityLoginUnavailable'))
     const result = await apply(await window.workwise.diagnoseManagedDingTalk())
@@ -75,7 +77,7 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
     if (result.state === 'succeeded') await changed.current?.()
     // The main process accepts only the pinned official CLI's allowlisted URL.
     if (mounted.current && result.state === 'waiting' && result.verificationUrl) await openAuthorization(result.verificationUrl)
-  }, [apply, diagnose, openAuthorization, t])
+  }, [apply, diagnose, openAuthorization, setMessage, t])
   const check = useCallback(async (): Promise<void> => {
     if (!window.workwise.checkManagedDingTalkLogin) throw new Error(t('capabilityLoginUnavailable'))
     const checked = await window.workwise.checkManagedDingTalkLogin()
@@ -119,6 +121,7 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
       })} className="ml-2 mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('managedDwsCopyLink')}</button>
     </div> : null}
     {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs leading-5">{message}</p> : null}
+    <TechnicalDetails detail={detail} />
     {accessMessage ? <p role="status" className="mt-3 whitespace-pre-wrap text-sm leading-5">{accessMessage}</p> : null}
     <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
       <button type="button" disabled={pending || waiting || status?.enabled === false} onClick={() => void run(connect)}>{t(status?.state === 'installed' ? 'managedDwsReconnect' : 'managedDwsConnect')}</button>

@@ -238,6 +238,23 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     expect(html).not.toContain('Attachments 1')
   })
 
+  it('uses a compact file card and a friendly label for an older attachment with no filename', () => {
+    const filename = `${'长文件名'.repeat(12)}.pdf`
+    const block: ChatBlock = {
+      kind: 'user', id: 'user_attachments', text: '核对附件',
+      meta: {
+        attachmentIds: ['legacy-private-id', 'document'],
+        attachments: [{ id: 'document', name: filename, mimeType: 'application/pdf', byteSize: 4096 }]
+      }
+    }
+    const html = renderToStaticMarkup(createElement(MessageBubble, { block }))
+    expect(html).toContain(`title="${filename}"`)
+    expect(html).toContain('title="Attachment"')
+    expect(html).toContain('4.0 KB')
+    expect(html).not.toContain('legacy-private-id')
+    expect(html).not.toContain('application/pdf')
+  })
+
   it('renders managed Claw prompts as the user-visible message', () => {
     const block: ChatBlock = {
       kind: 'user',

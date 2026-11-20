@@ -1,4 +1,9 @@
 {
+  "guiUpdateInstallRetryHint": "The installer could not start. Try again or open Downloads to install manually.",
+  "guiUpdateDownloadRetryHint": "The download did not finish. Try downloading again.",
+  "firstRunLoadSettingsFailed": "Could not open setup. Close it and try opening Settings again.",
+  "firstRunSaveSettingsFailed": "Could not save your settings. Try again.",
+  "firstRunCloseAfterLoadFailure": "Close setup",
   "title": "Settings",
   "pluginAvailableToInstall": "Available to install",
   "pluginConfiguredUnverified": "Configured · verification pending",

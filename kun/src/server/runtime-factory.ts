@@ -354,9 +354,10 @@ export async function createKunServeRuntime(
     approvalGate,
     userInputGate,
     workspaceReferences: workspaceReferenceService,
-    validateSkillSelection: (prompt, workspace) => skillRuntime.validateSlashSelection(prompt, workspace),
+    validateSkillSelection: (prompt, workspace, selectedIds) => skillRuntime.validateSlashSelection(prompt, workspace, selectedIds),
     callableCapabilities: (request, thread) => readCallableCapabilityCandidates({
-      mode: request.guiPlan ? 'plan' : request.mode
+      mode: request.guiPlan ? 'plan' : request.mode,
+      includeSkills: request.capabilityReferences?.some(reference => reference.kind === 'skill')
     }, thread, request.sandboxMode)
   })
   const uiActionService = new UiActionService({ sessionStore, turns: turnService })
@@ -786,7 +787,8 @@ export async function createKunServeRuntime(
       skills: skillRuntime,
       mcp: mcpRuntime.state(),
       context,
-      tools: registry.listTools(context)
+      tools: registry.listTools(context),
+      includeSkills: scope.includeSkills
     })
   }
   const browserVerification = new BrowserOperationVerificationService({ repository: taskRepository, controller: taskController,

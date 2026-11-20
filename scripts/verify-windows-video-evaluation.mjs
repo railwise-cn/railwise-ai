@@ -152,7 +152,11 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
     async verify(cdp, skillId) {
       selection.skillId = skillId
       const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
-      await cdp.fill(composer, `/skill:${skillId} ${marker}，请读取已安装技能的流水线说明，用本工作区准备的原创一秒合成场景实际制作成片，输出 ${filename} 。请通过明确审批运行本工作区的 ${script} 。`)
+      await cdp.fill(composer, '/Video Shotcraft')
+      await cdp.click('[role="option"] .truncate', 'Video Shotcraft')
+      await cdp.wait(`document.querySelector('[data-composer-skill]')?.textContent.includes('Video Shotcraft') &&
+        document.querySelector(${literal(composer)})?.value === ''`, 'Video Shotcraft displayed by name without an internal ID')
+      await cdp.fill(composer, `${marker}，请读取已安装技能的流水线说明，用本工作区准备的原创一秒合成场景实际制作成片，输出 ${filename} 。请通过明确审批运行本工作区的 ${script} 。`)
       await cdp.click('button[aria-label="更多操作"]')
       await cdp.send('Page.setInterceptFileChooserDialog', { enabled: true })
       await cdp.click('button', '添加文件或图片')
@@ -166,8 +170,9 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
       await cdp.click('button[aria-label="发送"]:not(:disabled)')
       const interrupted = await cdp.wait(`window.workwise.listTaskPage({filter:'all',workspaceRoot:${literal(workspace)}}).then(page=>
         [...page.items, ...page.relatedTasks].find(task=>task.status==='stalled'&&task.presentation?.reason==='response_interrupted'))`, 'durable interrupted response in the same task', 120_000)
-      await cdp.click('button', '打开任务工作台')
-      const detail = 'article[aria-label="任务详情"]'
+      const detail = '.ds-chat-composer-dock section[aria-label="任务"]'
+      await cdp.wait(`Boolean(document.querySelector(${literal(detail)})?.getClientRects().length) &&
+        document.querySelector('.ds-message-timeline-content')?.textContent.includes(${literal(marker)})`, 'the interrupted task in the original chat')
       await cdp.click(`${detail} button`, '继续任务')
       const approval = await cdp.wait(`window.workwise.listTaskInbox(${literal(workspace)}).then(items=>items.find(item=>item.status==='pending'&&item.kind==='approval'&&item.message.includes(${literal(`Command SHA256: ${digest(render.command)}`)})))`, 'the exact reviewed isolated render approval', 90_000)
       assert.equal(approval.payload?.approval?.toolName, 'request_host_shell')
@@ -176,10 +181,10 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
       assert.equal(selection.pdfRead, true)
       assert.equal(approval.taskId, interrupted.id)
       const commandFingerprint = `Command SHA256: ${digest(render.command)}`
-      assert.equal(await cdp.evaluate(`document.querySelector(${literal(detail)})?.innerText.includes(${literal(commandFingerprint)})`), false)
+      assert.equal(await cdp.evaluate(`document.querySelector('.ds-workbench-shell main')?.innerText.includes(${literal(commandFingerprint)})`), false)
       const button = await cdp.wait(`(() => {
-        const article=document.querySelector(${literal(detail)});
-        const options=[...(article?.querySelectorAll('button')??[])].filter(item=>
+        const conversation=document.querySelector('.ds-workbench-shell main');
+        const options=[...(conversation?.querySelectorAll('button')??[])].filter(item=>
           ['允许此操作','允许本次'].includes(item.textContent.trim())&&!item.disabled&&item.getClientRects().length);
         if(options.length!==1)return null;
         const button=options[0];
@@ -197,6 +202,14 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
         return task.status==='completed'&&task.artifacts.find(item=>item.format==='mp4'&&item.validation==='valid'&&item.relativePath===${literal(filename)});
       })`, 'a completed real task and registered MP4', 240_000).catch(error => { throw new Error(selection.failure ?? error.message) })
       assert.equal(selection.rendered, true)
+      const artifactList = `${detail} ul[aria-label="成果"]`
+      if (!await cdp.evaluate(`Boolean(document.querySelector(${literal(artifactList)})?.getClientRects().length)`)) {
+        const toggle = `${detail} button[aria-expanded="false"]`
+        const count = await cdp.wait(`Array.from(document.querySelectorAll(${literal(toggle)}))
+          .find(button => /^\\d+ 个成果$/.test(button.textContent.trim()))?.textContent.trim()`, 'the artifact count in the original chat')
+        await cdp.click(toggle, count)
+      }
+      await cdp.click(`${artifactList} button`, filename)
       const openResult = await cdp.evaluate(artifact.absolutePath
         ? `window.workwise.openTaskArtifact({taskId:${literal(approval.taskId)},artifactId:${literal(artifact.id)}})`
         : `window.workwise.openWorkspaceFile({workspaceRoot:${literal(workspace)},path:${literal(filename)}})`)

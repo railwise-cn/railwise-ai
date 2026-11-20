@@ -36,6 +36,6 @@ describe('loadRuntimeDiagnostics', () => {
     expect(loaded.runtimeInfo).toBe(runtimeInfo)
     expect(loaded.toolDiagnostics).toBe(toolDiagnostics)
     expect(loaded.memoryRecords).toBeUndefined()
-    expect(loaded.errors).toEqual(['Memory: memory store is unavailable'])
+    expect(loaded.errors).toEqual(['Memory: This action could not be completed. Please try again.'])
   })
 })

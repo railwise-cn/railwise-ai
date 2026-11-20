@@ -1,4 +1,6 @@
 import type { ReactElement } from 'react'
+import { guiUpdateNotice } from './settings-utils'
+import { TechnicalDetails } from './ui/TechnicalDetails'
 import type { GuiUpdateInfo, GuiUpdateProgress } from '@shared/gui-update'
 import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw } from 'lucide-react'
 
@@ -23,6 +25,7 @@ export function GuiUpdateControl({
   downloaded,
   progress,
   error,
+  errorDetail,
   onCheck,
   onDownload,
   onInstall,
@@ -35,6 +38,7 @@ export function GuiUpdateControl({
   downloaded: boolean
   progress: GuiUpdateProgress | null
   error: string | null
+  errorDetail?: string
   onCheck: () => Promise<void>
   onDownload: () => Promise<void>
   onInstall: () => Promise<void>
@@ -45,6 +49,7 @@ export function GuiUpdateControl({
   let title = ''
   let detail: string | null = null
   let tone: 'neutral' | 'good' | 'warn' | 'error' = 'neutral'
+  let diagnostics = errorDetail
 
   if (downloading) {
     title = t('guiUpdateDownloading', { percent: Math.max(0, Math.round(progress?.percent ?? 0)) })
@@ -61,7 +66,12 @@ export function GuiUpdateControl({
     tone = 'warn'
   } else if (error) {
     title = t(downloaded ? 'guiUpdateInstallFailedTitle' : 'guiUpdateCheckFailed')
-    detail = error
+    if (info && !info.ok) detail = error
+    else {
+      const notice = guiUpdateNotice(error, t, downloaded)
+      detail = notice.summary
+      diagnostics = notice.detail
+    }
     tone = 'error'
   } else if (downloaded && info?.ok) {
     title = t('guiUpdateDownloaded', { version: info.latestVersion })
@@ -117,6 +127,7 @@ export function GuiUpdateControl({
             {detail ? (
               <div className="mt-0.5 break-words text-[12px] leading-5 opacity-75">{detail}</div>
             ) : null}
+            <TechnicalDetails detail={diagnostics} />
           </div>
         </div>
       </div>

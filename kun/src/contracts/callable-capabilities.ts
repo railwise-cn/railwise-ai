@@ -4,7 +4,7 @@ import { WorkspaceTrustLevelSchema } from './permissions.js'
 const exactId = z.string().min(1).max(256).refine((value) => value === value.trim() && !/\p{Cc}/u.test(value))
 
 export const CallableCapabilityReferenceSchema = z.object({
-  kind: z.enum(['plugin', 'connector']),
+  kind: z.enum(['skill', 'plugin', 'connector']),
   id: exactId
 }).strict()
 export type CallableCapabilityReference = z.infer<typeof CallableCapabilityReferenceSchema>
@@ -12,10 +12,14 @@ export const CallableCapabilityReferencesSchema = z.array(CallableCapabilityRefe
 
 export type CallableCapabilityChoice = CallableCapabilityReference & { label: string; description?: string }
 
+export const SkillSelectionsSchema = z.array(z.object({ id: exactId, name: z.string().min(1) })).max(8)
+export type SkillSelections = z.infer<typeof SkillSelectionsSchema>
+
 export const CallableCapabilityScopeSchema = z.object({
   threadId: exactId.optional(),
   workspace: z.string().max(4096).optional(),
   mode: z.enum(['agent', 'plan']).optional(),
+  includeSkills: z.boolean().optional(),
   agentProfile: z.object({
     trustLevel: WorkspaceTrustLevelSchema,
     toolAllowlist: z.array(exactId).max(512),

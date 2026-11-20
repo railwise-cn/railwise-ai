@@ -1,4 +1,6 @@
-import { useState, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
+import { TechnicalDetails } from '../ui/TechnicalDetails'
+import { redactRuntimeText } from './conversation-visibility'
 import { useTranslation } from 'react-i18next'
 import { BrowserApprovalDetails, browserApprovalFields } from './BrowserApprovalDetails'
 import { taskReasonKey } from '../../agent/ag-ui-activity'
@@ -10,15 +12,23 @@ export function ApprovalOperationDetails({ summary, toolName, presentation }: {
   presentation?: TaskUserPresentation
 }): ReactElement {
   const { t } = useTranslation('common')
-  const [showDetails, setShowDetails] = useState(false)
   if (browserApprovalFields(summary)) return <BrowserApprovalDetails summary={summary} />
   const isHost = presentation?.scope === 'host' || toolName === 'request_host_shell' || summary.startsWith('Run request_host_shell\n')
   const reason = isHost ? 'approval_host_shell' : presentation?.reason ?? 'approval_required'
+  const folderLine = isHost ? /^Workspace(?: \(JSON\))?: (.+)$/m.exec(summary)?.[1] : undefined
+  let folder = folderLine
+  if (folderLine?.startsWith('"')) {
+    try {
+      const parsed: unknown = JSON.parse(folderLine)
+      if (typeof parsed === 'string') folder = parsed
+    } catch { /* Older receipts already contain a displayable folder. */ }
+  }
   return <div className="mt-2 text-xs leading-relaxed">
     <p>{t(taskReasonKey(reason))}</p>
-    <details className="mt-2 text-ds-muted" onToggle={event => setShowDetails(event.currentTarget.open)}>
-      <summary className="cursor-pointer">{t('approvalScopeDetails')}</summary>
-      {showDetails ? <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{summary}</pre> : null}
-    </details>
+    {folder ? <dl className="mt-2 flex flex-wrap gap-x-2 text-ds-muted">
+      <dt>{t('approvalOperationWorkspace')}</dt>
+      <dd className="min-w-0 break-all">{redactRuntimeText(folder)}</dd>
+    </dl> : null}
+    <TechnicalDetails detail={redactRuntimeText(summary)} label={t('approvalScopeDetails')} />
   </div>
 }

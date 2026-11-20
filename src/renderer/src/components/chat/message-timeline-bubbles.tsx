@@ -1,3 +1,4 @@
+import { TechnicalDetails } from '../ui/TechnicalDetails'
 import type { ReactElement } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -24,6 +25,7 @@ import { CapabilityRequiredCard } from './CapabilityRequiredCard'
 import { TaskIntentChoiceCard } from './TaskIntentChoiceCard'
 import { DiffView } from '../DiffView'
 import { AssistantMarkdown } from './AssistantMarkdown'
+import { AttachmentFileName } from './FloatingComposerAttachments'
 import { ModelMetaTag, WritePromptMetaDisclosure } from './message-timeline-cards'
 import { readNumber, formatDuration } from './message-timeline-tools'
 import { redactRuntimeText } from './conversation-visibility'
@@ -53,6 +55,7 @@ function UserMessageBubble({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(block.text)
   const [writeMetaOpen, setWriteMetaOpen] = useState(false)
+  const skillSelections = block.meta?.skillSelections ?? []
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const parsedWritePrompt = useMemo(() => {
     if (route !== 'write') return null
@@ -68,7 +71,13 @@ function UserMessageBubble({
     typeof block.meta?.displayText === 'string' && block.meta.displayText.trim()
       ? block.meta.displayText.trim()
       : null
-  const rawDisplayText = metaDisplayText ?? parsedWritePrompt?.userInput ?? parsedClawPrompt?.text ?? block.text
+  const originalDisplayText = metaDisplayText ?? parsedWritePrompt?.userInput ?? parsedClawPrompt?.text ?? block.text
+  const displayWithoutLegacySkill = originalDisplayText.replace(
+    /(`+)[\s\S]*?\1|"[^"\n]*"|“[^”\n]*”|(^|\s)\/skill:[a-f0-9]{64}(?=\s|$)/gi,
+    (token, quoted: string | undefined, prefix: string | undefined) => quoted || prefix === undefined ? token : prefix
+  )
+  const hasLegacySkillReference = displayWithoutLegacySkill !== originalDisplayText
+  const rawDisplayText = hasLegacySkillReference ? displayWithoutLegacySkill.trim() : originalDisplayText
   const displayText = professionalSurface
     ? engineeringProfessionalUserSurfaceText(rawDisplayText, language)
     : rawDisplayText
@@ -76,8 +85,18 @@ function UserMessageBubble({
   // stored text. Do not offer editing for that prompt: resending the translated
   // label would lose the selector while exposing it in the editor would leak
   // implementation details onto the professional surface.
-  const canEdit = !metaDisplayText && (!professionalSurface || displayText === rawDisplayText)
+  const canEdit = !metaDisplayText && !hasLegacySkillReference && (!professionalSurface || displayText === rawDisplayText)
   const showClawInboundCard = route === 'claw' && parsedClawPrompt?.inbound === true
+  const skillLabels = skillSelections.length > 0 ? (
+    <div className="mb-2 flex min-w-0 flex-wrap justify-end gap-1.5" aria-label={t('composerSelectedSkills')}>
+      {skillSelections.map(skill => {
+        const loaded = block.meta?.activeSkillIds?.includes(skill.id)
+        return <span key={skill.id} data-loaded-skill={loaded ? '' : undefined} title={skill.name} className="max-w-full truncate rounded-md border border-ds-border-muted bg-ds-card px-2 py-1 text-[12px] text-ds-muted">{skill.name}{loaded ? <span className="ml-1.5 text-ds-faint">{t('composerSkillLoaded')}</span> : null}</span>
+      })}
+    </div>
+  ) : hasLegacySkillReference ? (
+    <div className="mb-2 text-right text-[12px] text-ds-muted">{t('composerSelectedSkills')}</div>
+  ) : null
 
   useEffect(() => {
     if (!editing) return
@@ -116,6 +135,7 @@ function UserMessageBubble({
   if (editing) {
     return (
       <div className="ds-user-message">
+        {skillLabels}
         <UserAttachmentPreviews meta={block.meta} />
         <div className="ds-user-message-bubble min-w-0 border border-accent/35 ring-1 ring-accent/15">
           <textarea
@@ -171,6 +191,7 @@ function UserMessageBubble({
 
   return (
     <div className="ds-user-message group relative">
+      {skillLabels}
       <UserAttachmentPreviews meta={block.meta} />
       {showClawInboundCard && parsedClawPrompt ? (
         <ClawInboundMessageCard display={parsedClawPrompt} text={displayText} />
@@ -369,10 +390,10 @@ export function generatedFileActionFailureMessage(
   return result?.message?.trim() || fallback
 }
 
-function mediaName(media: TimelineMediaReference): string {
+function mediaName(media: TimelineMediaReference, fallback = media.id || 'file'): string {
   const path = media.relativePath || media.path || media.absolutePath || ''
   const fromPath = path.split(/[\\/]/).filter(Boolean).at(-1)
-  return media.name || fromPath || media.id || 'file'
+  return media.name || fromPath || fallback
 }
 
 function mediaPath(media: TimelineMediaReference): string | undefined {
@@ -569,7 +590,7 @@ function MediaPreviewTile({
   const globalWorkspaceRoot = useChatStore((s) => s.workspaceRoot)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [actionError, setActionError] = useState<string | null>(null)
-  const title = mediaName(media)
+  const title = mediaName(media, variant === 'user' ? t('composerAttachmentUnnamed') : undefined)
   const filePath = mediaPath(media)
   const owningWorkspaceRoot = resolveGeneratedFileWorkspaceRoot(
     workspaceRootOverride?.trim() || globalWorkspaceRoot
@@ -588,7 +609,7 @@ function MediaPreviewTile({
         : 'min-h-44 w-full overflow-hidden rounded-lg border border-ds-border-muted bg-ds-card shadow-sm'
       : variant === 'tool'
         ? 'block h-32 w-40 overflow-hidden rounded-lg border border-ds-border-muted bg-ds-card shadow-sm'
-        : 'block h-28 w-36 overflow-hidden rounded-lg border border-ds-border-muted bg-ds-card shadow-sm'
+        : 'block h-28 w-36 min-w-0 max-w-full overflow-hidden rounded-lg border border-ds-border-muted bg-ds-card shadow-sm'
   const mediaClass = 'h-full w-full object-contain'
   const canSave = Boolean(filePath || dataUrlPayload(previewUrl))
   const saveLabel =
@@ -727,6 +748,29 @@ function MediaPreviewTile({
   }
 
   const Icon = mediaIsVideo(media) ? Video : mediaIsImage(media) ? ImageIcon : File
+  if (variant === 'user' && !filePath) {
+    return (
+      <div className="w-64 min-w-0 max-w-full rounded-[10px] border border-ds-border-muted bg-ds-card px-2.5 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-ds-subtle text-ds-muted" aria-hidden>
+            <Icon className="h-4 w-4" strokeWidth={1.8} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold leading-5 text-ds-ink">
+              <AttachmentFileName name={title} />
+            </div>
+            {byteSize ? <div className="truncate text-xs leading-4 text-ds-muted">{byteSize}</div> : null}
+          </div>
+          {canSave ? (
+            <button type="button" onClick={() => void handleSaveAs()} disabled={saveState === 'saving'} title={saveLabel} aria-label={saveLabel} className={`${saveButtonClass} shrink-0`}>
+              {saveIcon}
+            </button>
+          ) : null}
+        </div>
+        {actionError ? <p role="alert" className="mt-1 break-words text-xs text-ds-muted">{t('generatedFileActionFailed', { message: actionError })}</p> : null}
+      </div>
+    )
+  }
   return (
     <div className={`${tileClass} flex flex-col justify-between p-3`} title={title}>
       <div className="flex min-w-0 items-start gap-2">
@@ -804,7 +848,7 @@ function MediaAttachmentGallery({
       ? `grid w-full max-w-2xl grid-cols-1 gap-2 ${media.length > 1 ? 'sm:grid-cols-2' : ''}`
       : variant === 'tool'
         ? 'flex min-w-0 flex-wrap gap-2 border-t border-ds-border-muted/60 px-4 py-3'
-        : 'flex max-w-[80%] flex-wrap justify-end gap-2'
+        : 'flex min-w-0 max-w-[min(100%,36rem)] flex-wrap justify-end gap-2'
 
   return (
     <div className={wrapperClass}>
@@ -961,7 +1005,7 @@ function RuntimeMetaChips({
         </span>
       ) : null}
       {activeSkillIds.length > 0 ? (
-        <span className={chipClass} title={activeSkillIds.join(', ')}>
+        <span className={chipClass}>
           {t('toolActiveSkills')} {activeSkillIds.length}
         </span>
       ) : null}
@@ -1579,9 +1623,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
         }`}
       >
         <p className="whitespace-pre-wrap break-words">{block.text}</p>
-        {block.code ? (
-          <p className="mt-1 font-mono text-[11px] opacity-70">{block.code}</p>
-        ) : null}
+        <TechnicalDetails detail={[block.code, block.detail].filter(Boolean).map(value => redactRuntimeText(value!)).join('\n\n')} />
       </div>
     )
   }

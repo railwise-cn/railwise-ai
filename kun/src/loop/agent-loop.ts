@@ -832,8 +832,8 @@ export class AgentLoop {
     const deliveries = this.opts.tasks?.pendingDeliveries(threadId, turnId) ?? []
     const durableIds = new Set(deliveries.map(entry => entry.input.id))
     const hints = this.opts.steering.drainEntries(turnId).filter(entry => !entry.inputId || !durableIds.has(entry.inputId))
-    const entries = [...deliveries.map(entry => ({ text: entry.input.text, inputId: entry.input.id, itemId: entry.delivery.messageItemId, approval: this.opts.tasks?.approvalForInput(entry.input), sourceId: entry.input.sourceId, attachmentIds:entry.input.attachmentIds,workspaceReferences:entry.input.workspaceReferences,capabilityReferences:entry.input.capabilityReferences })),
-      ...hints.filter(entry => !entry.inputId).map(entry => ({ ...entry, itemId: this.opts.ids.next('item_steered'), approval: undefined, sourceId: undefined, attachmentIds:undefined,workspaceReferences:undefined,capabilityReferences:undefined }))]
+    const entries = [...deliveries.map(entry => ({ text: entry.input.text, inputId: entry.input.id, itemId: entry.delivery.messageItemId, approval: this.opts.tasks?.approvalForInput(entry.input), sourceId: entry.input.sourceId, attachmentIds:entry.input.attachmentIds,workspaceReferences:entry.input.workspaceReferences,capabilityReferences:entry.input.capabilityReferences,skillSelections:entry.input.skillSelections })),
+      ...hints.filter(entry => !entry.inputId).map(entry => ({ ...entry, itemId: this.opts.ids.next('item_steered'), approval: undefined, sourceId: undefined, attachmentIds:undefined,workspaceReferences:undefined,capabilityReferences:undefined,skillSelections:undefined }))]
     if (!entries.length) return
     // Stable IDs bridge the JSONL/SQLite boundary. appendItem flushes before resolving.
     const persisted = await this.opts.sessionStore.loadItems(threadId)
@@ -843,7 +843,7 @@ export class AgentLoop {
       const base = { id: entry.itemId, turnId, threadId, createdAt: this.opts.nowIso(), finishedAt: this.opts.nowIso(), taskInputId: entry.inputId, sourceRequestId: entry.sourceId }
       const item: TurnItem = entry.approval
         ? { ...base, role: 'system', kind: 'approval', approvalId: entry.approval.id, toolName: entry.approval.toolName, status: entry.approval.status, summary: entry.approval.status === 'allowed' ? '已允许本次操作' : entry.approval.status === 'expired' ? '本次授权已过期' : '已拒绝本次操作' }
-        : { ...base, role: 'user', status: 'completed', kind: 'user_message', text: entry.text,attachmentIds:entry.attachmentIds,workspaceReferences:entry.workspaceReferences,capabilityReferences:entry.capabilityReferences }
+        : { ...base, role: 'user', status: 'completed', kind: 'user_message', text: entry.text,attachmentIds:entry.attachmentIds,workspaceReferences:entry.workspaceReferences,capabilityReferences:entry.capabilityReferences,skillSelections:entry.skillSelections }
       await this.opts.turns.applyItem(threadId, item)
       present.add(item.id)
     }
@@ -863,7 +863,7 @@ export class AgentLoop {
     turnId: string,
     signal: AbortSignal
   ): Promise<TaskAttemptOutcome | { kind: 'checkpoint_waiting' }> {
-    const executionSkills: { resolution?: SkillTurnResolution; pluginIds?: string } = {}
+    const executionSkills: { resolution?: SkillTurnResolution; selectionKey?: string } = {}
     for (let step = 0; ; step += 1) {
       if (signal.aborted) return { kind: 'cancelled', reason: 'operation_cancelled' }
       if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) {
@@ -949,7 +949,7 @@ export class AgentLoop {
     turnId: string,
     signal: AbortSignal,
     stepIndex: number,
-    executionSkills: { resolution?: SkillTurnResolution; pluginIds?: string }
+    executionSkills: { resolution?: SkillTurnResolution; selectionKey?: string }
   ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown' | 'checkpoint_waiting' | 'suppression_exhausted' | InterruptedModelStep> {
     if (shouldVerifyImmutablePrefix()) {
       verifyImmutablePrefix(this.opts.prefix)
@@ -1056,16 +1056,18 @@ export class AgentLoop {
       : continuationTurn?.activeSkillIds ?? thread?.agentProfile?.preferredSkillIds
     const userMessage = turn?.items.find(item => item.kind === 'user_message')
     const requestedSkillId = requestedSlashSkill(userMessage?.displayText ?? turn?.prompt ?? '')
+    const selectedSkillIds = capabilityReferences.filter(reference => reference.kind === 'skill').map(reference => reference.id)
     const selectedPluginIds = capabilityReferences.filter(reference => reference.kind === 'plugin').map(reference => reference.id)
-    const pluginIds = JSON.stringify(selectedPluginIds)
-    if (executionSkills.pluginIds !== pluginIds) {
-      executionSkills.pluginIds = pluginIds
+    const selectionKey = JSON.stringify([selectedSkillIds, selectedPluginIds])
+    if (executionSkills.selectionKey !== selectionKey) {
+      executionSkills.selectionKey = selectionKey
       executionSkills.resolution = undefined
     }
     const skillResolution = executionSkills.resolution ??= this.opts.skillRuntime?.resolveTurn({
       prompt: turn?.prompt ?? '',
       workspace: thread?.workspace ?? '',
       requestedSkillId,
+      selectedSkillIds,
       selectionPrompt: userMessage?.displayText,
       selectedPluginIds,
       preferredSkillIds,
@@ -1209,6 +1211,12 @@ export class AgentLoop {
       if (executionGrant && !turn.executionGrant) await this.opts.onExecutionGrant?.(executionGrant)
     }
     if (toolCatalogDrift.kind === 'breaking') return 'stop'
+    for (const item of userItems) {
+      const activeIds = item.skillSelections?.filter(skill => skillResolution.activeSkillIds.includes(skill.id)).map(skill => skill.id) ?? []
+      if (activeIds.length && activeIds.some(id => !item.activeSkillIds?.includes(id))) {
+        await this.opts.turns.updateItem(threadId, item.id, { activeSkillIds: activeIds })
+      }
+    }
     const toolKinds = new Map(toolSpecs.map((tool) => [tool.name, tool.toolKind]))
     const createPlanSatisfied = planTurnActive
       ? hasSuccessfulCreatePlanResult(healed.items, turnId)
@@ -1237,6 +1245,8 @@ export class AgentLoop {
       historyItems: history.length
     })
     const occurrenceTask = this.opts.tasks?.activeTask(threadId)
+    // Exact Skill selections are already present in the resolved instructions.
+    const contextualCapabilities = capabilityReferences.filter(reference => reference.kind !== 'skill')
     const contextInstructions = [
       ...(executionGrant ? [executionGrantInstruction(executionGrant)] : []),
       ...(engineeringPolicy ? [engineeringPolicy.instruction] : []),
@@ -1252,8 +1262,8 @@ export class AgentLoop {
       ] : []),
       ...(attachments.evidence.length ? [attachmentEvidenceInstruction(attachments.evidence)] : []),
       ...(workspaceReferences.length ? [workspaceReferenceInstruction(workspaceReferences)] : []),
-      ...(capabilityReferences.length
-        ? [callableCapabilityInstruction(capabilityReferences, this.opts.callableCapabilities?.(toolContext, effectiveToolSpecs) ?? [])]
+      ...(contextualCapabilities.length
+        ? [callableCapabilityInstruction(contextualCapabilities, this.opts.callableCapabilities?.(toolContext, effectiveToolSpecs) ?? [])]
         : []),
       ...formatWorkspaceInstructions(workspaceInstructions),
       ...skillResolution.instructions,

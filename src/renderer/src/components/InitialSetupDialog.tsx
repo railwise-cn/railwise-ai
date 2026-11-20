@@ -9,6 +9,8 @@ import {
 } from '@shared/app-settings'
 import { rendererRuntimeClient } from '../agent/runtime-client'
 import { applyTheme } from '../lib/apply-theme'
+import { describeRuntimeError, type RuntimeErrorView } from '../lib/format-runtime-error'
+import { TechnicalDetails } from './ui/TechnicalDetails'
 import { useChatStore } from '../store/chat-store'
 import { Eye, EyeOff, ExternalLink, Sparkles, Sun, Moon, Monitor, X } from 'lucide-react'
 import { initialSetupSettingsPatch } from './initial-setup-settings'
@@ -35,7 +37,7 @@ export function InitialSetupDialog(): ReactElement {
   const [form, setForm] = useState<AppSettingsV1 | null>(null)
   const [showApiKey, setShowApiKey] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<RuntimeErrorView | null>(null)
   const formRef = useRef<AppSettingsV1 | null>(null)
   const isPreview = initialSetupMode === 'preview'
   const provider = form ? getModelProviderSettings(form) : null
@@ -53,10 +55,10 @@ export function InitialSetupDialog(): ReactElement {
         if (!cancelled) setCurrentForm(s)
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) setError(describeRuntimeError(e, t('firstRunLoadSettingsFailed')))
       })
     return () => { cancelled = true }
-  }, [])
+  }, [t])
 
   const updateForm = (patch: SetupFormPatch) => {
     const current = formRef.current
@@ -102,7 +104,7 @@ export function InitialSetupDialog(): ReactElement {
       void probeRuntime('background')
       if (shouldOpenOfflineWrite) void openWrite()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(describeRuntimeError(e, t('firstRunSaveSettingsFailed')))
     } finally {
       setSaving(false)
     }
@@ -117,7 +119,7 @@ export function InitialSetupDialog(): ReactElement {
     const current = formRef.current
     if (!current) return
     if (!getActiveAgentApiKey(current).trim()) {
-      setError(t('firstRunApiKeyValidation'))
+      setError({ summary: t('firstRunApiKeyValidation') })
       return
     }
     setSaving(true)
@@ -130,7 +132,7 @@ export function InitialSetupDialog(): ReactElement {
       void probeRuntime('background')
       closeInitialSetup()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(describeRuntimeError(e, t('firstRunSaveSettingsFailed')))
     } finally {
       setSaving(false)
     }
@@ -140,7 +142,7 @@ export function InitialSetupDialog(): ReactElement {
     return (
       <div className="ds-no-drag fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-md dark:bg-black/70">
         <div className="rounded-xl border border-ds-border bg-ds-card/95 px-5 py-4 text-sm text-ds-muted shadow-panel backdrop-blur-xl">
-          {t('loading')}
+          {error ? <><p role="alert">{error.summary}</p><TechnicalDetails detail={error.detail} /><button type="button" className="mt-3 rounded-md border border-ds-border px-3 py-1.5" onClick={closeInitialSetup}>{t('firstRunCloseAfterLoadFailure')}</button></> : t('loading')}
         </div>
       </div>
     )
@@ -293,7 +295,8 @@ export function InitialSetupDialog(): ReactElement {
         <div className="shrink-0 space-y-3 border-t border-slate-200/72 bg-white/70 px-5 pb-4 pt-3.5 dark:border-white/10 dark:bg-white/[0.025] sm:space-y-4 sm:px-7 sm:pb-6 sm:pt-4">
           {error && (
             <div className="rounded-xl border border-red-500/18 bg-red-500/[0.08] px-4 py-3 text-[13px] text-red-700 dark:border-red-500/20 dark:bg-red-500/[0.12] dark:text-red-200">
-              {error}
+              {error.summary}
+              <TechnicalDetails detail={error.detail} />
             </div>
           )}
 

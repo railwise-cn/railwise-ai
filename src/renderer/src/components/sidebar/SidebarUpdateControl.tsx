@@ -1,3 +1,5 @@
+import { guiUpdateNotice } from '../settings-utils'
+import { TechnicalDetails } from '../ui/TechnicalDetails'
 import type { ReactElement } from 'react'
 import { ArrowUpCircle, ExternalLink, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -8,6 +10,7 @@ export function SidebarUpdateControl({ docked = false }: { docked?: boolean } = 
   const { state, pending, error } = useGuiUpdate()
   const info = state.info
   if (!info?.ok || !info.hasUpdate || info.withdrawn) return null
+  const notice = error ? guiUpdateNotice(error, t, Boolean(info.downloaded)) : undefined
   const busy = pending || state.status === 'downloading' || state.status === 'installing'
   const Icon = busy ? Loader2 : info.manualOnly ? ExternalLink : ArrowUpCircle
   const label = state.status === 'downloading'
@@ -27,7 +30,7 @@ export function SidebarUpdateControl({ docked = false }: { docked?: boolean } = 
         <Icon className={`h-4 w-4 shrink-0 ${busy ? 'animate-spin' : ''}`} strokeWidth={1.75} />
         <span aria-live="polite">{label}</span>
       </button>
-      {error ? <p role="alert" className="break-words px-3 pb-2 text-xs text-red-600 dark:text-red-400">{error}</p> : null}
+      {notice ? <div className="px-3 pb-2 text-xs text-ds-muted"><p role="alert" className="break-words">{notice.summary}</p><TechnicalDetails detail={notice.detail} /></div> : null}
     </div>
   )
 }

@@ -1,8 +1,16 @@
+@font-face {
+  font-family: 'RailWise UI';
+  src: url('../../../asset/ui-fonts/NotoSansSC.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 :root {
   --ds-window-controls-safe-block: 0px;
   --ds-window-controls-safe-inset: 0px;
   --ds-write-titlebar-extra-inset: 0px;
-  --ds-ui-scale: 1;
+  --ds-ui-font: 'RailWise UI', system-ui, sans-serif;
   --bg-app: #f2f4f7;
   --bg-sidebar: #f5f7fa;
   --bg-canvas: #ffffff;
@@ -512,13 +520,11 @@ body {
   @apply antialiased;
   position: relative;
   isolation: isolate;
-  font-family:
-    'SF Pro Text', 'PingFang SC', 'Noto Sans SC', 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--ds-ui-font);
   background-color: var(--ds-bg-main);
   color: var(--ds-text);
   user-select: none;
   -webkit-user-select: none;
-  zoom: var(--ds-ui-scale);
 }
 
 body::before {
@@ -669,6 +675,182 @@ pre {
     0 0 0 3px rgba(15, 23, 42, 0.035),
     0 14px 40px rgba(15, 23, 42, 0.09),
     0 4px 12px rgba(15, 23, 42, 0.05);
+}
+
+.ds-composer-attachments {
+  container: composer-attachments / inline-size;
+  min-width: 0;
+  margin-block: 2px;
+}
+
+.ds-composer-attachment-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-composer-attachments[data-expanded='true'] .ds-composer-attachment-list {
+  max-height: min(13rem, 26vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.ds-composer-attachments[data-expanded='false'] .ds-composer-attachment-item:nth-child(n+2),
+.ds-composer-attachments[data-expanded='false'] .ds-composer-attachment-description,
+.ds-composer-attachments[data-expanded='false'] .ds-composer-attachment-toggle[data-attachment-count='1'][data-has-summary='false'] {
+  display: none;
+}
+
+@container composer-attachments (min-width: 30rem) {
+  .ds-composer-attachments[data-expanded='false'] .ds-composer-attachment-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ds-composer-attachments[data-expanded='false'] .ds-composer-attachment-item:nth-child(2) {
+    display: block;
+  }
+
+  .ds-composer-attachments[data-expanded='false'] .ds-composer-attachment-toggle[data-attachment-count='2'][data-has-summary='false'] {
+    display: none;
+  }
+}
+
+.ds-composer-attachment-item {
+  min-width: 0;
+  border-radius: 10px;
+  border: 1px solid var(--ds-border-muted);
+  background: color-mix(in srgb, var(--ds-surface-subtle) 58%, var(--ds-bg-canvas));
+}
+
+.ds-composer-attachment-tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 5px 6px 5px 8px;
+}
+
+.ds-composer-attachment-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--ds-surface-card);
+  color: var(--ds-text-muted);
+}
+
+.ds-composer-attachment-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ds-composer-attachment-name {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border-radius: 3px;
+  color: var(--ds-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  text-align: start;
+}
+
+.ds-chat-attachment-filename {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.ds-chat-attachment-basename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-composer-attachments[data-expanded='true'] .ds-chat-attachment-filename {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.ds-composer-attachment-meta {
+  overflow: hidden;
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-composer-attachment-description,
+.ds-composer-attachment-batch-error {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  overflow-wrap: anywhere;
+}
+
+.ds-composer-attachment-description {
+  padding: 0 8px 7px;
+}
+
+.ds-composer-attachment-batch-error {
+  padding: 4px 2px 0;
+}
+
+.ds-composer-attachment-actions {
+  display: flex;
+  gap: 1px;
+}
+
+.ds-composer-attachment-actions button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--ds-text-muted);
+}
+
+.ds-composer-attachment-actions button:hover,
+.ds-composer-attachment-toggle:hover {
+  background: var(--ds-surface-hover);
+  color: var(--ds-text);
+}
+
+.ds-composer-attachment-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 24px;
+  margin-block-start: 3px;
+  padding-inline: 3px 6px;
+  border-radius: 6px;
+  color: var(--ds-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-align: start;
+}
+
+.ds-composer-attachment-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.ds-composer-attachment-control:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: -2px;
 }
 
 [data-theme='dark'] .ds-chat-composer {

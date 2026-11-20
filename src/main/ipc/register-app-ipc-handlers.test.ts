@@ -1602,7 +1602,7 @@ describe('registerAppIpcHandlers', () => {
     await expect(handlers.get('plugin:update-permissions')?.({}, {
       packageId: item.id, expectedCurrentVersion: item.version, reviewSha256: 'a'.repeat(64),
       permissions: [{ permissionId: 'network-connect', decision: 'denied' }], idempotencyKey: 'revoke-with-skill-refresh-error'
-    })).rejects.toThrow('Skill refresh failed')
+    })).rejects.toThrow('[marketplace:refresh-failed] The package was saved')
     expect(onMcpServersChanged).toHaveBeenCalledTimes(3)
     expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ config: expect.objectContaining({ enabled: false }) }))
   })

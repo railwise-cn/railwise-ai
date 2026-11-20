@@ -80,7 +80,9 @@ export class TaskCoordinator {
       return result
     }
     await this.deps.turns.validateSkillSelection(userText, origin.workspace)
-    if (command.request.capabilityReferences?.length) await this.deps.turns.validateCapabilitySelection(command.request, origin)
+    const skillSelections = command.request.capabilityReferences?.length
+      ? await this.deps.turns.validateCapabilitySelection(command.request, origin)
+      : undefined
     if (resolving?.status !== undefined && resolving.status !== 'pending') throw Object.assign(new Error('这条待处理选择已经完成，请刷新当前任务。'), { code: 'stale_request' })
     if (resolving?.payload?.kind === 'task_input_intent' && operationFingerprint(StartTurnRequest.parse(resolving.payload.request)) !== operationFingerprint(command.request)) {
       throw Object.assign(new Error('任务选择必须使用原始请求及附件，请重新打开该待办。'), { code: 'scope_conflict' })
@@ -94,7 +96,7 @@ export class TaskCoordinator {
         payload:{ kind:'external_provider_choice', providers:['dingtalk','lark'], request:command.request, originalText:userText } })
       const result:TaskCommandResult = { kind:'attention_required', ...(task ? {task} : {}), attentionId:id, message }
       this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
-      await this.recordResult(command,result,intent,options)
+      await this.recordResult(command,result,intent,options,skillSelections)
       return result
     }
     const conversationTasks = task && !command.taskId ? this.deps.repository.listActiveByOrigin(origin.id, 2) : []
@@ -146,7 +148,7 @@ export class TaskCoordinator {
         if (capability?.provider === 'workspace' && capability.status !== 'available') {
           await this.validateReferences(command, origin.workspace, task.threadId)
           const saved = this.deps.tasks.appendInput(task.id, command.expectedRevision ?? task.revision, command.idempotencyKey, userText, 'supplement', undefined,
-            { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences })
+            { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences, skillSelections })
           const attentionId = `capability_${task.id}`, now = this.deps.nowIso()
           const prior = this.deps.repository.attention(attentionId)
           this.deps.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: origin.id, workspaceRoot: origin.workspace,
@@ -154,7 +156,7 @@ export class TaskCoordinator {
             payload: { kind: 'capability_required', capability, request: command.request } })
           result = { kind: 'capability_required', task: saved.task, attentionId, capability, message: capability.message }
           this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
-          await this.recordResult(command, result, intent, options)
+          await this.recordResult(command, result, intent, options,skillSelections)
           return result
         }
         if (capability && (unresolvedEffect || priorBinding) && ['waiting_user', 'paused', 'stalled'].includes(task.status)) {
@@ -168,7 +170,7 @@ export class TaskCoordinator {
                 successStatus: ['succeeded'], verification: 'provider_readback' } }, updatedAt: this.deps.nowIso()
             }))
             return this.deps.tasks.appendInput(bound.id, bound.revision, command.idempotencyKey, userText, 'supplement', 'provider-selection',
-              { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences })
+              { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences, skillSelections })
           })
           if (capability.status !== 'available') {
             const attentionId = `capability_${task.id}`
@@ -180,7 +182,7 @@ export class TaskCoordinator {
             result = { kind: 'capability_required', task: saved.task, attentionId, capability, message: capability.message }
           } else result = await this.continueAfterSupplement(command, saved)
           this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
-          await this.recordResult(command, result, intent, options)
+          await this.recordResult(command, result, intent, options,skillSelections)
           return result
         }
         const providerChanged = capability && task.acceptance.effect?.provider !== capability.provider
@@ -200,7 +202,7 @@ export class TaskCoordinator {
           result={kind:'attention_required',task,attentionId,message}
         } else {
           await this.validateReferences(command,origin.workspace,task.threadId)
-          const saved=this.deps.tasks.appendInput(task.id,command.expectedRevision ?? task.revision,command.idempotencyKey,userText,'supplement',undefined,{attachmentIds:command.request.attachmentIds,workspaceReferences:command.request.workspaceReferences,capabilityReferences:command.request.capabilityReferences})
+          const saved=this.deps.tasks.appendInput(task.id,command.expectedRevision ?? task.revision,command.idempotencyKey,userText,'supplement',undefined,{attachmentIds:command.request.attachmentIds,workspaceReferences:command.request.workspaceReferences,capabilityReferences:command.request.capabilityReferences,skillSelections})
           result = await this.continueAfterSupplement(command, saved)
         }
       }
@@ -229,7 +231,7 @@ export class TaskCoordinator {
         result = { kind: 'capability_required', task: this.deps.repository.get(waiting.id) ?? waiting, attentionId, capability, message: capability.message }
         if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:now})
         this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
-        await this.recordResult(command, result, intent, options)
+        await this.recordResult(command, result, intent, options,skillSelections)
         return result
       }
       const turnKey=`command:${command.idempotencyKey}`
@@ -246,7 +248,7 @@ export class TaskCoordinator {
         result={kind:isTask?'task_started':'chat_started',...(linked&&isTask?{task:this.deps.repository.get(linked.id) ?? linked}:{}),turn}
         if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:this.deps.nowIso()})
         this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
-        const history = this.recordResult(command,result,intent,options)
+        const history = this.recordResult(command,result,intent,options,skillSelections)
         if(!oldTurn) {
           void this.deps.runTurn(turn.threadId,turn.turnId)
           dispatched = true
@@ -263,7 +265,7 @@ export class TaskCoordinator {
       if(latest.status==='pending')this.deps.repository.putAttention({...latest,status:'answered',revision:latest.revision+1,updatedAt:this.deps.nowIso()})
     }
     this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
-    await this.recordResult(command,result,intent,options)
+    await this.recordResult(command,result,intent,options,skillSelections)
     return result
   }
 
@@ -309,7 +311,7 @@ export class TaskCoordinator {
     }
   }
 
-  private async recordResult(command:ReturnType<typeof TaskCommandSchema.parse>,result:TaskCommandResult,intent:ReturnType<typeof classifyTaskInput>,options:TaskCommandDispatchOptions):Promise<void> {
+  private async recordResult(command:ReturnType<typeof TaskCommandSchema.parse>,result:TaskCommandResult,intent:ReturnType<typeof classifyTaskInput>,options:TaskCommandDispatchOptions,userSkillSelections?:TaskInput['skillSelections']):Promise<void> {
     if (result.kind === 'chat_started') return
     const scheduled = options.source === 'scheduled-occurrence'
     if (scheduled && result.kind === 'task_started') return
@@ -336,7 +338,7 @@ export class TaskCoordinator {
     const userText = scheduled ? undefined : intent === 'resume' ? '继续任务' : command.request.displayText ?? command.request.prompt
     const assistantText=intent==='resume'&&result.kind==='task_started'?'正在继续任务。':result.kind==='snapshot' ? result.task ? `${result.task.goal}\n${taskStatusSummary(result.task)}` : '当前没有进行中的任务。' : result.kind==='input_queued' ? result.task.status==='paused'?'补充已保存，将在你继续任务后送达。':'补充已保存，将送达当前任务。' : result.kind==='task_updated'?result.action==='pause'?'任务已暂停，补充会继续保存。':'任务已取消，已有成果和记录已保留。': result.kind==='attention_required'?result.message:result.kind==='capability_required'?result.capability.message:'开始处理。'
     this.deps.repository.enqueueOutbox({id:`command-message:${commandId}`,ownerId:command.threadId,kind:'task_command_message',payload:{threadId:command.threadId,commandId,userText,assistantText,
-      ...(userText !== undefined && intent !== 'resume' ? { userAttachmentIds: command.request.attachmentIds, userWorkspaceReferences: command.request.workspaceReferences } : {}),
+      ...(userText !== undefined && intent !== 'resume' ? { userAttachmentIds: command.request.attachmentIds, userWorkspaceReferences: command.request.workspaceReferences, userSkillSelections } : {}),
       ...(result.intentCard ? { intentCard: result.intentCard } : {}),...(result.kind==='capability_required'&&result.task?{capabilityCard:{threadId:command.threadId,taskId:result.task.id,attentionId:result.attentionId,prompt:command.request.prompt,capability:result.capability}}:{}),createdAt:this.deps.nowIso()},createdAt:this.deps.nowIso()})
     await this.flushCommandMessages()
   }

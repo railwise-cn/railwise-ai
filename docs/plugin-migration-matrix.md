@@ -22,6 +22,9 @@ Skills remain readable; an item is not removed or replaced silently.
 | MarkItDown | WorkWise-managed / bundled | Document engine is already managed by WorkWise | Existing conversion configuration is preserved | None |
 | Engineering, bidding, document, data-analysis, PPT Master, Humanizer and other local Skills | Browse-only unless explicitly installed from a reviewed source | Local Skills must remain visible and auditable | `~/.agents/skills`, `~/.codex/skills`, `~/.workwise/skills`, project roots and bundled assets are scanned without deletion | Review duplicate, health and update-source labels |
 | Restricted or unlicensed third-party content | Source/status only | License or redistribution terms are not sufficient for bundling | Source metadata remains visible | Install only after an independent license review |
+| Superpowers `44c9b2d6` | Reviewed RailWise package revision 1. The official archive is bundled for offline installation and the catalog now recognizes `using-superpowers`. | All 14 skills, the upstream commit and license, existing receipts, install scope, permissions and user data are preserved. Rollback remains available. | Existing installs can use skills from chat. Update from the marketplace when convenient. |
+| Blender Skills `8f778d24` | Reviewed RailWise package revision 1 from the RailWise mirror. The catalog now recognizes `blender-director` and shows installed child skills. | The 94 supplied skills, upstream commit and license, existing receipts, install scope, permissions and user data are preserved. Rollback remains available. | Existing installs can use skills from chat. Update from the marketplace when convenient. Blender and its connection still require the listed setup. |
+
 
 ## Migration Rules
 

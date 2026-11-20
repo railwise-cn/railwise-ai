@@ -8,6 +8,7 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: { sans: ['var(--ds-ui-font)'] },
       colors: {
         accent: {
           DEFAULT: 'var(--ds-accent)',

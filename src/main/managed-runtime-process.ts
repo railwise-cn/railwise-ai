@@ -792,7 +792,9 @@ export async function syncManagedSkillCapability(
   const discoveredRoots = await guiSkillRootsForRuntime(settings)
   const managedRoots = discoveredRoots.map(root => root.path)
   const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
-  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId }) => pluginId ? [{ root: path, id: pluginId }] : [])
+  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId, workspace, pluginEntrySkill }) => pluginId
+    ? [{ root: path, id: pluginId, ...(workspace ? { workspace } : {}), ...(pluginEntrySkill ? { entrySkill: pluginEntrySkill } : {}) }]
+    : [])
   await updateManagedConnectorConfig(dataDir, existing => {
     const capabilities = objectValue(existing.capabilities)
     const current = objectValue(capabilities.skills)
@@ -1017,7 +1019,9 @@ async function skillCapabilityConfigForRuntime(
   const discoveredRoots = explicitRoots ? [] : await guiSkillRootsForRuntime(settings)
   const managedRoots = discoveredRoots.map(root => root.path)
   const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
-  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId }) => pluginId ? [{ root: path, id: pluginId }] : [])
+  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId, workspace, pluginEntrySkill }) => pluginId
+    ? [{ root: path, id: pluginId, ...(workspace ? { workspace } : {}), ...(pluginEntrySkill ? { entrySkill: pluginEntrySkill } : {}) }]
+    : [])
   const roots = explicitRoots
     ? uniqueStrings(explicitRoots.map(normalizeSkillRootPath))
     : uniqueStrings([

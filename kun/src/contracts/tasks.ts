@@ -2,7 +2,7 @@ import { BrowserPublicQueryRecoveryBindingSchema } from './browser-public-query-
 import { z } from 'zod'
 import { TaskApprovalGrantSchema } from './permissions.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
-import { CallableCapabilityReferencesSchema } from './callable-capabilities.js'
+import { CallableCapabilityReferencesSchema, SkillSelectionsSchema } from './callable-capabilities.js'
 import type { ContextBundle, HandoffPacket } from './task-context.js'
 import { ResultEvidenceSchema } from './harness.js'
 import { ScheduleRequirementSchema } from './schedule.js'
@@ -163,6 +163,7 @@ export const TaskInputSchema = z.object({
   ,attachmentIds: z.array(z.string().min(1)).max(32).optional()
   ,workspaceReferences: z.array(WorkspaceReferenceSchema).max(32).optional()
   ,capabilityReferences: CallableCapabilityReferencesSchema.optional()
+  ,skillSelections: SkillSelectionsSchema.optional()
 })
 export type TaskInput = z.infer<typeof TaskInputSchema>
 

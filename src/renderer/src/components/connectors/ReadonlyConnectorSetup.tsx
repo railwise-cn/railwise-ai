@@ -1,3 +1,5 @@
+import { TechnicalDetails } from '../ui/TechnicalDetails'
+import { useConnectionNotice } from './use-connection-notice'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { ExternalLink, Loader2, X } from 'lucide-react'
 import type { McpServerConfigV2 } from '@shared/agent-workbench'
@@ -16,7 +18,7 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
   const [server, setServer] = useState<McpServerConfigV2>()
   const [key, setKey] = useState('')
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
+  const { message, detail, setMessage, reportError } = useConnectionNotice()
   const [connected, setConnected] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
@@ -36,15 +38,15 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
     })
       .catch(() => { if (active) setMessage('读取连接配置失败，请重试。') })
     return () => { active = false }
-  }, [serverId])
+  }, [serverId, setMessage])
 
   const check = async (): Promise<void> => {
     setBusy(true); setMessage(''); setConnected(false)
     try {
       let current = (await window.workwise.listMcpServers()).find(item => item.id === serverId)
       if (amap && (key.trim() || !current)) {
-        if (current && (current.source !== 'managed-tool' || current.managedPreset !== 'amap-readonly')) throw new Error('同名的已有连接配置已保留，请在高级 MCP 设置中管理。')
-        if (!key.trim()) throw new Error('请输入高德 Web 服务 Key。')
+        if (current && (current.source !== 'managed-tool' || current.managedPreset !== 'amap-readonly')) { setMessage('同名的已有连接配置已保留，请在高级连接设置中管理。'); return }
+        if (!key.trim()) { setMessage('请输入高德 Web 服务 Key。'); return }
         current = await window.workwise.saveMcpServer({ config: {
           id: serverId, name: '高德地图', scope: 'global', transport: 'http', url: 'https://mcp.amap.com/mcp',
           timeoutMs: 30_000, source: 'managed-tool', managedPreset: 'amap-readonly',
@@ -55,15 +57,16 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
         setKey('')
         setServer(current)
       }
-      if (!current) throw new Error('请先安装连接器。')
-      if (current.managedPreset !== (amap ? 'amap-readonly' : 'zotero-readonly')) throw new Error('同名的已有配置已保留，请在高级 MCP 设置中管理。')
+      if (!current) { setMessage('请先安装连接器。'); return }
+      if (current.managedPreset !== (amap ? 'amap-readonly' : 'zotero-readonly')) { setMessage('同名的已有配置已保留，请在高级连接设置中管理。'); return }
       const result = await window.workwise.testMcpServer(serverId, current.workspaceRoot)
       const updated = (await window.workwise.listMcpServers()).find(item => item.id === serverId)
       setServer(updated)
       setConnected(mcpToolDiscoveryPassed(updated))
-      setMessage(result.state === 'connected' && result.authorized ? '' : result.message ?? '连接尚未就绪。')
+      if (result.state === 'connected' && result.authorized) setMessage('')
+      else reportError(result.message, '连接尚未就绪。请核对配置后再检查连接。')
       await onChanged()
-    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    } catch (error) { reportError(error) }
     finally { setBusy(false) }
   }
 
@@ -72,13 +75,13 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
     setBusy(true)
     try {
       const current = (await window.workwise.listMcpServers()).find(item => item.id === serverId)
-      if (!current) throw new Error('连接配置已变化，请重新打开详情。')
+      if (!current) { setMessage('连接配置有变，请重新打开详情。'); return }
       const saved = await window.workwise.saveMcpServer({ config: { ...current, enabled: !server.enabled }, expectedRevision: current.revision, idempotencyKey: crypto.randomUUID() })
       setServer(saved)
       setConnected(mcpToolDiscoveryPassed(saved))
       setMessage(saved.enabled ? '已启用只读工具。' : '已停用，重新启用前请检查连接。')
       await onChanged()
-    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    } catch (error) { reportError(error) }
     finally { setBusy(false) }
   }
 
@@ -106,6 +109,7 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
         <p className="text-xs text-ds-muted">业务调用结果见任务详情中的操作回执。</p>
       </div> : null}
       {message ? <p role="status" className="mt-4 rounded-lg border border-ds-border p-3 text-sm leading-6">{message}</p> : null}
+      <TechnicalDetails detail={detail} />
     </aside>
   </div>
 }

@@ -43,7 +43,7 @@
     },
     {
       "packageId": "blender-skills",
-      "reviewSha256": "0442e462af8af3fc99207874dbd8e65f5fe1f8e6b4727cf7f72c99d9ed38b956",
+      "reviewSha256": "ab11bfd34b0bdf2e176620572f4a503f014f9e3652601a7ca2a57fd7fcfa0bd7",
       "platform": "darwin",
       "arch": "arm64",
       "parts": [
@@ -319,7 +319,7 @@
     },
     {
       "packageId": "superpowers",
-      "reviewSha256": "757298cdb87136ab60f7213fccc2f5b74f4c42756664aa2b514be2bfd40a7e1a",
+      "reviewSha256": "f65a56ea8d796994dcb02a9b0ca3955938f816e52410124167eb8b4d2b084e2c",
       "platform": "darwin",
       "arch": "arm64",
       "parts": [
@@ -395,7 +395,7 @@
     },
     {
       "packageId": "blender-skills",
-      "reviewSha256": "0442e462af8af3fc99207874dbd8e65f5fe1f8e6b4727cf7f72c99d9ed38b956",
+      "reviewSha256": "ab11bfd34b0bdf2e176620572f4a503f014f9e3652601a7ca2a57fd7fcfa0bd7",
       "platform": "darwin",
       "arch": "x64",
       "parts": [
@@ -683,7 +683,7 @@
     },
     {
       "packageId": "superpowers",
-      "reviewSha256": "757298cdb87136ab60f7213fccc2f5b74f4c42756664aa2b514be2bfd40a7e1a",
+      "reviewSha256": "f65a56ea8d796994dcb02a9b0ca3955938f816e52410124167eb8b4d2b084e2c",
       "platform": "darwin",
       "arch": "x64",
       "parts": [
@@ -759,7 +759,7 @@
     },
     {
       "packageId": "blender-skills",
-      "reviewSha256": "0442e462af8af3fc99207874dbd8e65f5fe1f8e6b4727cf7f72c99d9ed38b956",
+      "reviewSha256": "ab11bfd34b0bdf2e176620572f4a503f014f9e3652601a7ca2a57fd7fcfa0bd7",
       "platform": "win32",
       "arch": "x64",
       "parts": [
@@ -1051,7 +1051,7 @@
     },
     {
       "packageId": "superpowers",
-      "reviewSha256": "757298cdb87136ab60f7213fccc2f5b74f4c42756664aa2b514be2bfd40a7e1a",
+      "reviewSha256": "f65a56ea8d796994dcb02a9b0ca3955938f816e52410124167eb8b4d2b084e2c",
       "platform": "win32",
       "arch": "x64",
       "parts": [

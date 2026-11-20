@@ -651,7 +651,8 @@ describe('thread event sink runtime errors', () => {
       code: 'provider_unavailable',
       severity: 'error'
     })
-    expect(systemBlocks[0].text).toContain('<redacted>')
+    expect(systemBlocks[0].text).not.toContain('Authorization')
+    expect(systemBlocks[0].detail).toContain('<redacted>')
     expect(systemBlocks[0].detail).not.toContain('secret-token')
   })
 
@@ -741,7 +742,8 @@ describe('thread event sink runtime errors', () => {
     expect(state.busy).toBe(false)
     expect(state.currentTurnId).toBeNull()
     expect(state.currentTurnUserId).toBeNull()
-    expect(state.error).toBe('model stream exploded')
+    expect(state.error).not.toContain('model stream exploded')
+    expect(state.runtimeErrorDetail).toContain('model stream exploded')
     expect(state.runtimeErrorDetail).toContain('Code: http_400')
     expect(state.watchTurnCompletion).toEqual({})
     expect(state.unreadThreadIds).toEqual({})

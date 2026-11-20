@@ -63,6 +63,7 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
     guiUpdateDownloaded,
     guiUpdateProgress,
     guiUpdateError,
+    guiUpdateErrorDetail,
     checkGuiUpdate,
     downloadGuiUpdate,
     installGuiUpdate,
@@ -378,6 +379,7 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
                       downloaded={guiUpdateDownloaded}
                       progress={guiUpdateProgress}
                       error={guiUpdateError}
+                      errorDetail={guiUpdateErrorDetail}
                       onCheck={checkGuiUpdate}
                       onDownload={downloadGuiUpdate}
                       onInstall={installGuiUpdate}

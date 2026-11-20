@@ -2098,7 +2098,7 @@ export class TaskController {
 
   markInputDelivered(inputId: string): void { this.repository.markInputDelivered(inputId, this.nowIso()) }
 
-  appendInput(taskId: string, expectedRevision: number, idempotencyKey: string, text: string, kind: TaskInput['kind'] = 'supplement', sourceId?: string, references?:Pick<TaskInput,'attachmentIds'|'workspaceReferences'|'capabilityReferences'>) {
+  appendInput(taskId: string, expectedRevision: number, idempotencyKey: string, text: string, kind: TaskInput['kind'] = 'supplement', sourceId?: string, references?:Pick<TaskInput,'attachmentIds'|'workspaceReferences'|'capabilityReferences'|'skillSelections'>) {
     return this.repository.appendInput({ taskId, expectedRevision, idempotencyKey, text, kind, sourceId, ...references, nowIso: this.nowIso() })
   }
 

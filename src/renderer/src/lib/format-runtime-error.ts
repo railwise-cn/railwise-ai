@@ -51,7 +51,11 @@ function runtimeErrorCode(payload: RuntimeErrorPayload | null, raw: string): str
   if (/^engineering_plan_execution_failed(?::|$)/.test(lowered)) return 'engineering_plan_execution_failed'
   if (/^engineering_plan_steps_incomplete(?::|$)/.test(lowered)) return 'engineering_plan_steps_incomplete'
   if (/^engineering_plan_binding_missing(?::|$)/.test(lowered)) return 'engineering_plan_binding_missing'
+  if (message === '授权账号无法核验') return 'connector_identity_unverified'
+  if (message.startsWith('下载摘要不匹配')) return 'connector_download_corrupt'
+  if (lowered === 'runtime timeout') return 'runtime_timeout'
   if (lowered.startsWith('[skill_unavailable]')) return 'skill_unavailable'
+  if (/\bspawn\s+(?:einval|enoent|eacces)\b/i.test(message)) return 'local_tool_start_failed'
   if (lowered.includes('model_provider_unavailable')) return 'model_provider_unavailable'
   if (lowered.includes('fetch failed')) return 'fetch_failed'
   if (lowered.includes('runtime unhealthy')) return 'runtime_unhealthy'
@@ -89,6 +93,10 @@ function detailString(value: unknown): string {
 
 function localizedRuntimeSummary(code: string | null, text: string): string | null {
   const lowered = text.toLowerCase()
+  if (code === 'connector_identity_unverified') return i18n.t('common:connectorIdentityUnverified')
+  if (code === 'connector_download_corrupt') return i18n.t('common:connectorDownloadCorrupt')
+  if (code === 'runtime_timeout') return i18n.t('common:runtimeTimeoutTryAgain')
+  if (code === 'local_tool_start_failed') return i18n.t('common:runtimeLocalToolStartFailed')
   if (code === 'response_interrupted') return i18n.t('common:runtimeResponseInterrupted')
   if (code === 'capability_reference_unavailable') return i18n.t('common:composerCapabilitySelectionUnavailable')
   if (code === 'engineering_plan_stale') return i18n.t('common:runtimeEngineeringPlanStale')
@@ -96,7 +104,7 @@ function localizedRuntimeSummary(code: string | null, text: string): string | nu
   if (code === 'engineering_plan_steps_incomplete') return i18n.t('common:runtimeEngineeringPlanStepsIncomplete')
   if (code === 'engineering_plan_binding_missing') return i18n.t('common:runtimeEngineeringPlanBindingMissing')
   if (code === 'engineering_plan_typed_resume_required') return i18n.t('common:runtimeEngineeringPlanTypedResumeRequired')
-  if (code === 'model_provider_unavailable' || lowered.includes('model_provider_unavailable')) {
+  if (code === 'model_provider_unavailable' || code === 'provider_unavailable' || lowered.includes('model_provider_unavailable')) {
     return i18n.t('common:runtimeModelProviderUnavailable')
   }
 
@@ -154,7 +162,7 @@ function shouldOpenAgentsSettings(code: string | null): boolean {
     code === 'runtime_port_conflict'
 }
 
-export function describeRuntimeError(error: unknown): RuntimeErrorView {
+export function describeRuntimeError(error: unknown, fallback?: string): RuntimeErrorView {
   const raw = stripIpcPrefix(error instanceof Error ? error.message : String(error ?? ''))
   const payload = readJsonPayload(raw)
   const errorCode = runtimeErrorCode(payload, raw)
@@ -162,7 +170,7 @@ export function describeRuntimeError(error: unknown): RuntimeErrorView {
   const text = stripIpcPrefix(payloadText || raw)
   const redactedText = redactSecretText(text)
   const summary = localizedRuntimeSummary(errorCode, redactedText) ||
-    redactedText ||
+    fallback ||
     i18n.t('common:runtimeRequestFailed')
   const details: string[] = []
   if (errorCode) details.push(`Code: ${errorCode}`)
@@ -184,6 +192,5 @@ export function describeRuntimeError(error: unknown): RuntimeErrorView {
 }
 
 export function formatRuntimeError(error: unknown, fallback?: string): string {
-  const view = describeRuntimeError(error)
-  return fallback && !localizedRuntimeSummary(view.code ?? null, view.summary) ? fallback : view.summary
+  return describeRuntimeError(error, fallback).summary
 }

@@ -1,3 +1,5 @@
+import { TechnicalDetails } from '../ui/TechnicalDetails'
+import { useConnectionNotice } from './use-connection-notice'
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useTranslation } from 'react-i18next'
@@ -18,7 +20,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
   const { t } = useTranslation('common')
   const api: ConnectionApi = window.workwise
   const [pending, setPending] = useState(false)
-  const [message, setMessage] = useState('')
+  const { message, detail, setMessage, reportError } = useConnectionNotice()
   const [state, setState] = useState<ManagedToolState | undefined>(initialState)
   const [skillWarning, setSkillWarning] = useState(initialSkillWarning)
   const [login, setLogin] = useState<Extract<ManagedLarkLoginResult, { ok: true }> | null>(null)
@@ -33,9 +35,9 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
     busy.current = true
     setPending(true)
     setMessage('')
-    try { await operation() } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    try { await operation() } catch (error) { reportError(error) }
     finally { busy.current = false; setPending(false) }
-  }, [])
+  }, [reportError, setMessage])
   const managed = useCallback(async (install: boolean) => {
     const result = await (install ? window.workwise.installManagedTool('lark-cli') : window.workwise.diagnoseManagedTool('lark-cli'))
     if (!result.ok) throw new Error(result.message)
@@ -45,7 +47,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
     setMessage(result.status.skillWarning ? statusMessage.replace(result.status.skillWarning, '').trim() : statusMessage)
     await onChanged?.()
     return result.status
-  }, [onChanged, t])
+  }, [onChanged, setMessage, t])
   const beginAppSetup = useCallback(async (): Promise<void> => {
     if (!api.beginManagedLarkAppSetup) throw new Error(t('capabilityLoginUnavailable'))
     const result = await api.beginManagedLarkAppSetup()
@@ -55,7 +57,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
     if (result.state === 'configured') { setAppRequired(false); setMessage(t('capabilityLarkAppReady')); await onChanged?.(); return }
     if (result.verificationUrl && result.state === 'waiting') await window.workwise.openExternal(result.verificationUrl)
     setMessage(t(`capabilityLarkApp_${result.state}`))
-  }, [api, onChanged, t])
+  }, [api, onChanged, setMessage, t])
   const beginLogin = useCallback(async (setupIfRequired = false): Promise<void> => {
     if (!api.beginManagedLarkLogin) throw new Error(t('capabilityLoginUnavailable'))
     const result = await api.beginManagedLarkLogin({ capability })
@@ -73,7 +75,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
     setMessage(t('capabilityLoginIncomplete'))
     // Main validates the official URL; no app secret or device code crosses IPC.
     await window.workwise.openExternal(result.verificationUrl)
-  }, [api, beginAppSetup, capability, t])
+  }, [api, beginAppSetup, capability, setMessage, t])
   const connect = useCallback(async (): Promise<void> => {
     let status = await managed(false)
     if (status.state === 'not_installed') status = await managed(true)
@@ -98,7 +100,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
       setMessage(t('managedLarkAuthorizationExpired'))
     }, Math.max(0, Math.min(remaining, 2_147_483_647)))
     return () => clearTimeout(timer)
-  }, [login, t])
+  }, [login, setMessage, t])
   useEffect(() => {
     if (appSetup?.state !== 'waiting' || !appSetup.expiresAt) return
     const remaining = Date.parse(appSetup.expiresAt) - Date.now()
@@ -111,7 +113,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
       setMessage(t('capabilityLarkApp_expired'))
     }, Math.max(0, Math.min(remaining, 2_147_483_647)))
     return () => clearTimeout(timer)
-  }, [appSetup, t])
+  }, [appSetup, setMessage, t])
   const checkAppSetup = async (cancel = false): Promise<void> => {
     const action = cancel ? api.cancelManagedLarkAppSetup : api.checkManagedLarkAppSetup
     if (!action) throw new Error(t('capabilityLoginUnavailable'))
@@ -166,6 +168,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
       </> : <button type="button" disabled={pending} onClick={() => void run(finishLogin)} className="ml-2 mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('capabilityLoginCompleted')}</button>}
     </div> : null}
     {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
+    <TechnicalDetails detail={detail} />
     {skillWarning ? <p role="status" className="mt-3 whitespace-pre-wrap rounded-md border border-amber-400/50 p-3 text-xs">{skillWarning}</p> : null}
     <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
       {!compact ? <button type="button" disabled={pending || appSetup?.state === 'waiting' || Boolean(login)} onClick={() => void run(connect)}>{t('managedLarkConnect')}</button> : null}

@@ -7,6 +7,9 @@ import { ApprovalOperationDetails } from '../chat/ApprovalOperationDetails'
 import { CapabilityRequiredCard } from '../chat/CapabilityRequiredCard'
 import { redactRuntimeText } from '../chat/conversation-visibility'
 
+import { describeRuntimeError, type RuntimeErrorView } from '../../lib/format-runtime-error'
+import { TechnicalDetails } from '../ui/TechnicalDetails'
+
 type Question = { id: string; label: string; options?: Array<{ label: string; value?: string }> }
 function attentionQuestions(item: TaskAttentionV1): Question[] {
   const candidate = item.payload?.questions
@@ -28,7 +31,7 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<RuntimeErrorView>()
   const [selectedProvider, setSelectedProvider] = useState<'dingtalk' | 'lark'>('dingtalk')
   const [providerPrompt, setProviderPrompt] = useState('')
   const questions = attentionQuestions(item)
@@ -45,7 +48,7 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
   const resolveFlow = async (decision?: 'approve' | 'reject'): Promise<void> => {
     if (busy || !item.flowRunId || (decision && !item.nodeId)) return
     setBusy(true)
-    setError('')
+    setError(undefined)
     try {
       const path = decision ? '/v1/flow-runs/decision' : `/v1/flow-runs/${encodeURIComponent(item.flowRunId)}/resume`
       const body = decision ? { runId: item.flowRunId, nodeId: item.nodeId, decision } : {}
@@ -56,13 +59,13 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
         throw new Error(message)
       }
       onResolved()
-    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)) } finally { setBusy(false) }
+    } catch (nextError) { setError(describeRuntimeError(nextError, t('taskWorkspaceActionFailed'))) } finally { setBusy(false) }
   }
   const resolveIntent = async (intent: 'supplement' | 'new'): Promise<void> => {
     const request = item.payload?.request
     if (busy || !item.threadId || !request || typeof request !== 'object' || !('prompt' in request) || typeof request.prompt !== 'string') return
     setBusy(true)
-    setError('')
+    setError(undefined)
     try {
       await window.workwise.coordinateTaskCommand({
         threadId: item.threadId, ...(item.taskId ? { taskId: item.taskId } : {}),
@@ -70,25 +73,25 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
         request: request as Record<string, unknown> & { prompt: string }
       })
       onResolved()
-    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)) } finally { setBusy(false) }
+    } catch (nextError) { setError(describeRuntimeError(nextError, t('taskWorkspaceActionFailed'))) } finally { setBusy(false) }
   }
   const resolveProvider = async (): Promise<void> => {
     const original = item.payload?.request
     if (busy || !item.threadId || !providerPrompt.trim() || !original || typeof original !== 'object') return
     setBusy(true)
-    setError('')
+    setError(undefined)
     try {
       await window.workwise.coordinateTaskCommand({ threadId:item.threadId, ...(item.taskId ? {taskId:item.taskId} : {}),
         intent:'new', resolveAttentionId:item.id, selectedExternalProvider:selectedProvider,
         idempotencyKey:`provider-choice:${item.id}:${globalThis.crypto.randomUUID()}`,
         request:{...original,prompt:providerPrompt.trim(),displayText:providerPrompt.trim()} })
       onResolved()
-    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)) } finally { setBusy(false) }
+    } catch (nextError) { setError(describeRuntimeError(nextError, t('taskWorkspaceActionFailed'))) } finally { setBusy(false) }
   }
   const resolve = async (decision?: 'allow' | 'deny'): Promise<void> => {
     if (!item.requestId || busy || submitted) return
     setBusy(true)
-    setError('')
+    setError(undefined)
     try {
       const path = decision ? `/v1/approvals/${encodeURIComponent(item.requestId)}` : `/v1/user-inputs/${encodeURIComponent(item.requestId)}`
       const body = decision ? { decision } : { answers: questions.map(question => ({ id: question.id, label: question.label, value: answers[question.id] ?? '' })) }
@@ -100,7 +103,7 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
       if (!result.ok) throw new Error(t('taskWorkspaceActionFailed'))
       setSubmitted(true)
       onResolved(t(decision ? 'taskWorkspaceDecisionSaved' : 'taskWorkspaceSupplementSaved'))
-    } catch { setError(t('taskWorkspaceActionFailed')) } finally { setBusy(false) }
+    } catch { setError({ summary: t('taskWorkspaceActionFailed') }) } finally { setBusy(false) }
   }
   return <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
     <h4 className="text-sm font-semibold">{item.title}</h4>
@@ -127,6 +130,6 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
       {item.kind === 'question' && item.requestId && questions.length ? <button type="button" disabled={busy || submitted || questions.some(question => !answers[question.id]?.trim())} onClick={() => void resolve()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceSubmitAnswer')}</button> : null}
       {conversationThreadId && onOpenThread ? <button type="button" onClick={() => onOpenThread(conversationThreadId)} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs">{t(item.kind === 'approval' && (item.presentation?.scope === 'host' || item.message.startsWith('Run request_host_shell\n')) ? 'taskWorkspaceFileFromConversation' : 'taskWorkspaceOpenConversation')}</button> : null}
     </div>
-    {error ? <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-300">{error}</p> : null}
+    {error ? <div className="mt-2 text-xs"><p role="alert">{error.summary}</p><TechnicalDetails detail={error.detail} /></div> : null}
   </div>
 }

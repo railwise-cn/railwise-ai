@@ -1,6 +1,9 @@
+import { describeRuntimeError, type RuntimeErrorView } from '../../lib/format-runtime-error'
+import { TechnicalDetails } from '../ui/TechnicalDetails'
 import { useEffect, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TaskAttentionV1 } from '@shared/agent-workbench'
+import { redactSecretText } from '@shared/secret-redaction'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { ManagedLarkConnection } from '../connectors/ManagedLarkConnection'
 import { ManagedDingTalkConnection } from '../connectors/ManagedDingTalkConnection'
@@ -39,6 +42,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
   const live = useTaskState()
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState('')
+  const [failure, setFailure] = useState<RuntimeErrorView>()
   const [settledCapability, setSettled] = useState<ExternalTaskCapabilityCard['capability']>()
   const [rechecked, setRechecked] = useState<{ source: ExternalTaskCapabilityCard['capability']; capability: ExternalTaskCapabilityCard['capability'] }>()
   const capability = rechecked?.source === card.capability ? rechecked.capability : card.capability
@@ -143,7 +147,8 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     if (pending) return
     setPending(true)
     setMessage('')
-    try { await operation() } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    setFailure(undefined)
+    try { await operation() } catch (error) { setFailure(describeRuntimeError(error, t('taskWorkspaceActionFailed'))) }
     finally { setPending(false) }
   }
   const recheck = async (): Promise<void> => {
@@ -155,9 +160,12 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       foregroundTaskArtifactPreview(card.threadId, result.task.id)
     }
     if (result.kind === 'capability_required' || result.kind === 'attention_required') {
-      if (result.kind === 'capability_required') setRechecked({ source: card.capability, capability: result.capability })
-      setMessage(result.kind === 'capability_required' && isExecutionGrantExpiredCapability(result.capability)
-        ? t('capabilityExecutionGrantExpiredSummary') : result.message)
+      if (result.kind === 'capability_required') {
+        setRechecked({ source: card.capability, capability: result.capability })
+        if (isExecutionGrantExpiredCapability(result.capability)) setMessage(t('capabilityExecutionGrantExpiredSummary'))
+      } else {
+        setMessage(redactSecretText(result.message))
+      }
     } else {
       setSettled(card.capability)
       setMessage(result.kind === 'snapshot' ? t('capabilityStateChecked') : t('capabilityResumed'))
@@ -179,13 +187,15 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     setMessage(t('capabilityDeclined'))
     await refreshTaskState()
   }
+  const technicalMessage = /(?:\bCLI\b|\bspawn\s+(?:EINVAL|ENOENT|EACCES)\b|Error invoking remote method|\bSHA-?[0-9]+\b)/i.test(capability.message)
+  const capabilitySummary = executionGrantExpired ? t('capabilityExecutionGrantExpiredMessage')
+    : technicalMessage ? t(isEgo ? 'capabilityEgoNeedsConnection' : isBrowser ? 'capabilityBrowserNeedsConnection' : 'capabilityCheckToContinue')
+    : redactSecretText(capability.message)
   const snapshot = (<>
-      <p className="mt-1 whitespace-pre-wrap">{executionGrantExpired ? t('capabilityExecutionGrantExpiredMessage') : capability.message}</p>
-      {executionGrantExpired ? <details className="mt-2 text-xs text-ds-muted">
-        <summary className="cursor-pointer">{t('capabilityDiagnosticDetails')}</summary>
-        <p className="mt-1 whitespace-pre-wrap">{capability.message}</p>
-        <p>{capability.errorCode}</p>
-      </details> : null}
+      <p className="mt-1 whitespace-pre-wrap">{capabilitySummary}</p>
+      {executionGrantExpired || technicalMessage
+        ? <TechnicalDetails detail={[redactSecretText(capability.message), capability.errorCode].filter(Boolean).join('\n')} label={t('capabilityDiagnosticDetails')} />
+        : null}
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
         <dt className="text-ds-muted">{t(capability.provider === 'workspace' ? 'capabilityPermissionType' : 'capabilityProvider')}</dt><dd>{t(isLark ? 'capabilityLark' : isDingTalk ? 'capabilityDingTalk' : isBrowser ? 'connectorHubBrowserSkill' : isEgo ? 'pluginCliEgoTitle' : capability.provider === 'schedule' ? 'capabilitySchedule' : 'capabilityWorkspaceFiles')}</dd>
         <dt className="text-ds-muted">{t(interactive ? 'capabilityCurrentStatus' : 'capabilityRecordedStatus')}</dt><dd>{t(`capabilityStatus_${capability.status}`)}</dd>
@@ -216,6 +226,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       {showBrowserBinding && interactive ? <BrowserTaskBindingPanel key={browserBindingGeneration} taskId={card.taskId} onConfirmed={setMessage} /> : null}
       {showPermissions && interactive ? <TaskPermissionPanel taskId={card.taskId} autoLoad onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
       {showQueryRecovery && interactive && ownerTask ? <TaskPublicQueryRecoveryCard task={ownerTask} runtimeReady={stateKnown} onChanged={refreshTaskState} onNotice={setMessage} /> : null}
+      {failure ? <div className="mt-3 text-xs"><p role="alert">{failure.summary}</p><TechnicalDetails detail={failure.detail} /></div> : null}
       {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {interactive ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
         <button type="button" disabled={pending} onClick={configure}>{egoTaskReview ? t('capabilityViewTaskRecoveryOptions') : isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isDingTalk ? 'capabilityConfigureDingTalk' : 'capabilityOpenMarketplace')}</button>

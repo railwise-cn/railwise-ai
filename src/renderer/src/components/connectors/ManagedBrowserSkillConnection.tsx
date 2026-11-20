@@ -1,4 +1,6 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { TechnicalDetails } from '../ui/TechnicalDetails'
+import { useConnectionNotice } from './use-connection-notice'
+import { useCallback, useEffect, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ManagedBrowserSkillResult, ManagedBrowserSkillStatus } from '@shared/managed-browser-skill'
 
@@ -6,33 +8,33 @@ export function ManagedBrowserSkillConnection({ onChanged }: { onChanged?: () =>
   const { t } = useTranslation('common')
   const [status, setStatus] = useState<ManagedBrowserSkillStatus>()
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
+  const { message, detail, setMessage, reportError } = useConnectionNotice()
   const [browser, setBrowser] = useState('')
   const [origins, setOrigins] = useState('')
   const [interaction, setInteraction] = useState(false)
   const [enabled, setEnabled] = useState(false)
 
-  const apply = (result: ManagedBrowserSkillResult): void => {
+  const apply = useCallback((result: ManagedBrowserSkillResult): void => {
     setStatus(result.status)
     setBrowser(result.status.browserInstanceId ?? '')
     setOrigins(result.status.origins.join('\n'))
     setInteraction(result.status.interaction === 'interact')
     setEnabled(result.status.enabled)
     setMessage(result.message ?? result.status.message ?? '')
-  }
+  }, [setMessage])
   const run = async (operation: () => Promise<ManagedBrowserSkillResult>): Promise<void> => {
     setBusy(true)
     setMessage('')
     try { apply(await operation()); await onChanged?.() }
-    catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    catch (error) { reportError(error) }
     finally { setBusy(false) }
   }
   useEffect(() => {
     let active = true
     void window.workwise.diagnoseBrowserSkill().then(result => { if (active) apply(result) })
-      .catch(error => { if (active) setMessage(error instanceof Error ? error.message : String(error)) })
+      .catch(error => { if (active) reportError(error) })
     return () => { active = false }
-  }, [])
+  }, [apply, reportError])
 
   const save = async (): Promise<ManagedBrowserSkillResult> => {
     if (!status) throw new Error(t('browserSkillCheckFirst'))
@@ -72,6 +74,7 @@ export function ManagedBrowserSkillConnection({ onChanged }: { onChanged?: () =>
     <button type="button" disabled={busy || !status} className="rounded-md bg-accent px-3 py-2 text-white disabled:opacity-50" onClick={() => void run(save)}>{t('browserSkillSave')}</button>
     <p className="text-ds-muted">{t('browserSkillResumeHint')}</p>
     {message ? <p role="alert" className="whitespace-pre-wrap break-words text-ds-muted">{message}</p> : null}
+    <TechnicalDetails detail={detail} />
     {status?.checkedAt ? <p className="text-ds-muted">{t('browserSkillCheckedAt', { time: new Date(status.checkedAt).toLocaleString() })}</p> : null}
     {status?.code ? <details><summary>{t('browserSkillDiagnostics')}</summary><p>{status.code}</p><p>{status.version} · {status.daemonProtocolVersion}</p></details> : null}
   </section>

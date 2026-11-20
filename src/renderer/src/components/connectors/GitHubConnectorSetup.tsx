@@ -1,3 +1,5 @@
+import { TechnicalDetails } from '../ui/TechnicalDetails'
+import { useConnectionNotice } from './use-connection-notice'
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { ExternalLink, Loader2, X } from 'lucide-react'
 import type { McpServerConfigV2, McpServerStatusV1 } from '@shared/agent-workbench'
@@ -18,7 +20,7 @@ export function GitHubConnectorSetup({ workspaceRoot, onClose, onChanged, onAdva
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
-  const [message, setMessage] = useState('')
+  const { message, detail, setMessage, reportError } = useConnectionNotice()
   const [check, setCheck] = useState<{ revision: number; result: McpServerStatusV1 }>()
   const [runtime, setRuntime] = useState<RuntimeState>()
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -51,7 +53,7 @@ export function GitHubConnectorSetup({ workspaceRoot, onClose, onChanged, onAdva
     }).catch(() => { if (current) setMessage('读取 GitHub 连接配置失败，请重新打开详情。') })
       .finally(() => { if (current) setLoaded(true) })
     return () => { current = false }
-  }, [workspaceRoot, readRuntime])
+  }, [workspaceRoot, readRuntime, setMessage])
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -110,7 +112,7 @@ export function GitHubConnectorSetup({ workspaceRoot, onClose, onChanged, onAdva
       setMessage(result.message ?? '连接检查结束，请查看当前状态。')
       setRuntime(await readRuntime(current.id).catch(() => undefined))
       await onChanged()
-    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    } catch (error) { reportError(error) }
     finally { setBusy(false) }
   }
 
@@ -133,7 +135,7 @@ export function GitHubConnectorSetup({ workspaceRoot, onClose, onChanged, onAdva
       const entries = await window.workwise.listMcpServers(workspaceRoot).catch(() => [])
       const saved = entries.find(item => item.id === server.id)
       if (saved) remember(saved)
-      setMessage(error instanceof Error ? error.message : String(error))
+      reportError(error)
     } finally { setBusy(false) }
   }
 
@@ -163,6 +165,7 @@ export function GitHubConnectorSetup({ workspaceRoot, onClose, onChanged, onAdva
         {server?.enabled ? <button type="button" disabled={busy} onClick={() => void apply(false)} className="rounded-md border border-ds-border px-4 py-2 text-sm hover:bg-ds-hover disabled:opacity-50">停用</button> : null}
       </div>
       {message ? <p role="status" className="mt-4 rounded-lg border border-ds-border p-3 text-sm leading-6">{message}</p> : null}
+      <TechnicalDetails detail={detail} />
       {check?.result.errorCode ? <p className="mt-2 text-xs text-ds-muted">{check.result.errorCode}</p> : null}
       <details className="mt-5"><summary className="cursor-pointer text-sm text-ds-muted">已有 OAuth 与高级配置</summary><p className="mt-2 text-xs leading-5 text-ds-muted">GitHub 远端 OAuth 登录要求宿主应用具有已注册的 GitHub App 或 OAuth App。已有 OAuth 配置和凭据可在高级设置中继续管理。</p><div className="mt-2 flex gap-4"><button type="button" onClick={onAdvanced} className="text-sm text-accent">打开高级 MCP 设置</button><button type="button" onClick={() => open(GITHUB_MCP_AUTH_GUIDE_URL)} className="text-sm text-accent">GitHub 官方认证说明</button></div></details>
     </aside>

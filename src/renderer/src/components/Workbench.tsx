@@ -84,6 +84,7 @@ import { useWorkbenchPlanController } from './workbench-plan-controller'
 import { prepareImageAttachmentUpload } from '../lib/image-attachment-upload'
 import { isChatAttachmentUploadEnabled } from '../lib/attachment-upload-availability'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
+import { formatRuntimeError } from '../lib/format-runtime-error'
 import { useKeyboardShortcutSettings } from '../lib/keyboard-shortcut-settings'
 import { collectComposerChangeSummary } from '../lib/composer-change-summary'
 import { attachmentImportErrorKey, isChatDocumentAttachment, selectFilesForAvailableAttachmentSlots } from '../lib/attachment-selection'
@@ -564,7 +565,6 @@ export function Workbench(): ReactElement {
     [activeThreadId, threads]
   )
   const skillCatalogContext = JSON.stringify([activeThreadId, activeSkillWorkspace, runtimeConnection, skillCatalogGeneration])
-  const runtimeSkills = skillCatalog?.context === skillCatalogContext ? skillCatalog.skills : undefined
   const capabilityDraftKey = JSON.stringify([activeThreadId, activeSkillWorkspace])
   const selectedCapabilities = draftCapabilities[capabilityDraftKey] ?? []
   const explicitAgentProfile = agentProfiles.find(item => item.id === (activeThread?.agentId ?? 'general'))
@@ -572,6 +572,14 @@ export function Workbench(): ReactElement {
     skillCatalogContext, activeThread?.agentId, explicitAgentProfile, mode, capabilityRefresh, route
   ])
   const currentCapabilities = capabilityCatalog?.context === capabilityCatalogContext ? capabilityCatalog : null
+  const runtimeSkills = useMemo(() => {
+    if (!currentCapabilities || skillCatalog?.context !== skillCatalogContext) return undefined
+    const labels = new Map(currentCapabilities.choices.filter(choice => choice.kind === 'skill').map(choice => [choice.id, choice.label]))
+    return skillCatalog.skills.flatMap(skill => {
+      const name = labels.get(skill.id)
+      return name ? [{ ...skill, name }] : []
+    })
+  }, [currentCapabilities, skillCatalog, skillCatalogContext])
   const composerChangeSummary = useMemo(
     () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
     [activeSkillWorkspace, timelineBlocks]
@@ -991,13 +999,14 @@ export function Workbench(): ReactElement {
   }, [activeSkillWorkspace, activeThreadId, runtimeConnection, skillCatalogContext])
 
   useEffect(() => {
-    if (!capabilityRefresh || route !== 'chat' || runtimeConnection !== 'ready' || !activeSkillWorkspace) return
+    if (route !== 'chat' || runtimeConnection !== 'ready') return
     const provider = getProvider()
     let cancelled = false
     const load = provider.listCallableCapabilities?.({
       threadId: activeThreadId ?? undefined,
       workspace: activeSkillWorkspace,
       mode,
+      includeSkills: true,
       ...(!activeThreadId && explicitAgentProfile ? {
         agentProfile: {
           toolAllowlist: explicitAgentProfile.toolAllowlist,
@@ -1016,6 +1025,10 @@ export function Workbench(): ReactElement {
   }, [capabilityCatalogContext, capabilityRefresh, route, runtimeConnection, activeThreadId, activeSkillWorkspace, mode, explicitAgentProfile])
 
   const selectComposerCapability = (choice: CallableCapabilityChoice): void => {
+    if (selectedCapabilities.length >= 8 && !selectedCapabilities.some(item => item.kind === choice.kind && item.id === choice.id)) {
+      setError(t('composerCapabilitySelectionLimit'))
+      return
+    }
     setDraftCapabilities(drafts => {
       const current = drafts[capabilityDraftKey] ?? []
       if (current.some(item => item.kind === choice.kind && item.id === choice.id)) return drafts
@@ -1708,6 +1721,13 @@ export function Workbench(): ReactElement {
     const capabilityReferences = route === 'chat' && !activeSddDraft
       ? selectedCapabilities.map(({ kind, id }) => ({ kind, id }))
       : []
+    const skillSelections = selectedCapabilities.filter(choice => choice.kind === 'skill')
+      .map(choice => ({ id: choice.id, name: choice.label }))
+    if (skillSelections.length && currentCapabilities && !currentCapabilities.failed &&
+      skillSelections.some(skill => !currentCapabilities.choices.some(choice => choice.kind === 'skill' && choice.id === skill.id))) {
+      setError(t('slashSkillUnavailable'))
+      return
+    }
     const prepareChatMessage = async (): Promise<{
       text: string
       displayText?: string
@@ -1745,7 +1765,7 @@ export function Workbench(): ReactElement {
           ...(displayText ? { displayText } : {})
         }
       } catch (error) {
-        setError(error instanceof Error ? error.message : String(error))
+        setError(formatRuntimeError(error, t('composerFileContextUnavailable')))
         return null
       }
     }
@@ -1770,7 +1790,8 @@ export function Workbench(): ReactElement {
           ? { workspaceReferences: prepared.workspaceReferences }
           : {}),
         ...(attachmentIds.length ? { attachmentIds, attachments } : {}),
-        ...(capabilityReferences.length ? { capabilityReferences } : {})
+        ...(capabilityReferences.length ? { capabilityReferences } : {}),
+        ...(skillSelections.length ? { skillSelections } : {})
       })
       clearComposerDraftAfterSuccessfulSend(sent, {
         clearInput: () => setInput(''),
@@ -1882,7 +1903,8 @@ export function Workbench(): ReactElement {
         ? { workspaceReferences: prepared.workspaceReferences }
         : {}),
       ...(attachmentIds.length ? { attachmentIds, attachments } : {}),
-      ...(capabilityReferences.length ? { capabilityReferences } : {})
+      ...(capabilityReferences.length ? { capabilityReferences } : {}),
+      ...(skillSelections.length ? { skillSelections } : {})
     })
     clearComposerDraftAfterSuccessfulSend(sent, {
       clearInput: () => setInput(''),
@@ -2640,14 +2662,14 @@ export function Workbench(): ReactElement {
                 executionSettingsApplying={composerExecutionApplying}
                 changedFiles={composerChangeSummary?.files}
                 changedFileStats={composerChangeSummary}
-                skillCommands={runtimeSkills}
-                skillsLoading={runtimeConnection === 'ready' && runtimeSkills === undefined}
+                skillCommands={route === 'chat' && !activeSddDraft ? runtimeSkills : undefined}
+                skillsLoading={route === 'chat' && !activeSddDraft && runtimeConnection === 'ready' && runtimeSkills === undefined}
                 callableCapabilities={currentCapabilities?.choices}
                 callableCapabilitiesLoading={runtimeConnection === 'ready' && Boolean(activeSkillWorkspace) && !currentCapabilities}
                 callableCapabilitiesError={currentCapabilities?.failed ? t('composerCallableCapabilitiesUnavailable') : null}
                 selectedCapabilities={route === 'chat' && !activeSddDraft ? selectedCapabilities : undefined}
                 onOpenCapabilities={route === 'chat' && !activeSddDraft ? () => setCapabilityRefresh(value => value + 1) : undefined}
-                onSelectCapability={selectComposerCapability}
+                onSelectCapability={route === 'chat' && !activeSddDraft ? selectComposerCapability : undefined}
                 onRemoveCapability={removeComposerCapability}
                 onManagePlugins={route === 'chat' && !activeSddDraft ? openPluginsView : undefined}
                 onPickAttachments={(files) => void handlePickAttachments(files)}

@@ -921,6 +921,7 @@ describe('WorkWise Runtime extension metadata mapping', () => {
       displayText: 'Inspect attached image',
       attachmentIds: ['att_1'],
       activeSkillIds: ['skill_review'],
+      skillSelections: [{ id: 'skill_review', name: 'Review Skill' }],
       injectedMemoryIds: ['mem_1'],
       skillInjectionBytes: 128
     })
@@ -930,6 +931,7 @@ describe('WorkWise Runtime extension metadata mapping', () => {
         displayText: 'Inspect attached image',
         attachmentIds: ['att_1'],
         activeSkillIds: ['skill_review'],
+        skillSelections: [{ id: 'skill_review', name: 'Review Skill' }],
         injectedMemoryIds: ['mem_1'],
         skillInjectionBytes: 128
       }

@@ -601,9 +601,9 @@ describe('PluginMarketplaceView unified catalog', () => {
     const location = 'C:\\RailWise\\plugins\\versions\\current'
     vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([{ ...INSTALLED, packageId: skill.id, artifact: { ...INSTALLED.artifact, location } }])
     const diagnostics = (root: string, enabled = true) => ({
-      ok: true, status: 200, body: JSON.stringify({ skills: {
+      ok: true, status: 200, body: JSON.stringify({
         enabled, skills: enabled ? [{ id: 'hashed-id', name: 'video-shotcraft', root }] : []
-      } })
+      })
     })
     const runtimeRequest = vi.fn(async () => diagnostics('C:\\RailWise\\plugins\\versions\\older', status !== 'disabled'))
     const refreshSkills = vi.fn(async () => {
@@ -614,13 +614,14 @@ describe('PluginMarketplaceView unified catalog', () => {
     await act(async () => iconButton('Refresh').click())
     const selected = [...container.querySelectorAll('[role="button"]')]
       .find(row => row.querySelector('.truncate')?.textContent === skill.name)
-    expect(selected?.textContent).toContain(status === 'disabled' ? 'Runtime Skills disabled' : 'Runtime load pending')
+    expect(runtimeRequest).toHaveBeenCalledWith('/v1/skills?scope=available&workspace=%2Ftmp%2Fworkwise-marketplace-qa', 'GET')
+    expect(selected?.textContent).toContain(status === 'disabled' ? 'Skills are turned off' : 'Refresh to check if the skills are ready')
     await act(async () => (selected as HTMLElement).click())
     await act(async () => exactButton(status === 'disabled' ? 'Enable and load Skills' : 'Recheck Skill load').click())
     expect(refreshSkills).toHaveBeenCalledOnce()
     expect(refreshSkills).toHaveBeenCalledWith('/tmp/workwise-marketplace-qa', status === 'disabled' ? { enable: true } : undefined)
     expect(window.workwise.installPreparedPlugin).not.toHaveBeenCalled()
-    expect(container.querySelector('aside')?.textContent).toContain('loaded by Runtime')
+    expect(container.querySelector('aside')?.textContent).toContain('Ready to use in chat')
   })
 
   it('shows featured recommendations on the default Skills overview', async () => {
@@ -738,7 +739,7 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(window.workwise.cancelPluginImport).toHaveBeenCalledWith(`prepared-${id}`)
     expect(container.textContent).toContain(`已安装 ${item.name}`)
     const installedRow = [...container.querySelectorAll<HTMLElement>('[role="button"]')].find(candidate => candidate.textContent?.includes(item.name))!
-    expect(installedRow.textContent).toContain('已安装')
+    expect(installedRow.textContent).toContain('已安装，暂时无法确认能否在对话中使用')
     expect(installedRow.textContent).toContain('权限')
     expect(window.workwise.openExternal).not.toHaveBeenCalled()
     expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()

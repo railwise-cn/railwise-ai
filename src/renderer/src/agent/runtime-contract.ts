@@ -418,6 +418,7 @@ export type CoreTurnItemJson = {
   severity?: 'info' | 'warning' | 'error'
   attachmentIds?: string[]
   workspaceReferences?: CoreWorkspaceReferenceJson[]
+  skillSelections?: import('@shared/callable-capabilities').SkillSelections
   activeSkillIds?: string[]
   injectedMemoryIds?: string[]
   skillInjectionBytes?: number

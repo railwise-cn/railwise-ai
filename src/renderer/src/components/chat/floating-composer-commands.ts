@@ -20,7 +20,6 @@ export type SlashCommand = {
   icon: ReactElement
   badge?: string
   scopeLabel?: string
-  skillPrompt?: string
   disabled?: boolean
 }
 
@@ -74,29 +73,6 @@ export function getSkillMentionAtCursor(input: string, cursor: number): SkillMen
     end: boundedCursor,
     query
   }
-}
-
-export function replaceSkillMentionInInput(
-  input: string,
-  mention: SkillMentionContext,
-  skillId: string
-): { input: string; cursor: number } {
-  const replacement = `@${skillId}${input[mention.end] && /\s/u.test(input[mention.end] ?? '') ? '' : ' '}`
-  const nextInput = `${input.slice(0, mention.start)}${replacement}${input.slice(mention.end)}`
-  return {
-    input: nextInput,
-    cursor: mention.start + replacement.length
-  }
-}
-
-export function insertSkillCommandAtCursor(input: string, cursor: number, skillId: string): { input: string; cursor: number } {
-  const start = Math.max(0, Math.min(cursor, input.length))
-  const before = input.slice(0, start)
-  const after = input.slice(start)
-  const spaceBefore = before && !/\s$/u.test(before) ? ' ' : ''
-  const spaceAfter = /^\s/u.test(after) ? '' : ' '
-  const token = `${spaceBefore}/skill:${skillId}${spaceAfter}`
-  return { input: `${before}${token}${after}`, cursor: before.length + token.length }
 }
 
 export function getGoalPanelDraftObjective(input: string, goalPanelOpen: boolean): string {

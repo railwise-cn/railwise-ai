@@ -11,7 +11,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency, preparePinnedBrowserStartupCli, browserStartupDependency } from './prepare-browser-skill-smoke.mjs'
-import { runWindowsStartupAppearanceSmoke } from './verify-packaged-startup-appearance.mjs'
+import { observeWorkbenchTypography, runWindowsStartupAppearanceSmoke } from './verify-packaged-startup-appearance.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 
@@ -238,13 +238,14 @@ async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment, aud
     return { ...value, escapeFocusRestored: true, keyboard: { before, after } }
   }
   await cdp.wait(`Boolean(document.querySelector('button[aria-label="切换智能体"]:not(:disabled)')&&document.querySelector('button[aria-label="模型与推理设置"]:not(:disabled)'))`, 'actual enabled composer controls')
-  const baseline = { font: 'small', agent: await menu('切换智能体'), model: await menu('模型与推理设置') }
+  const typography = () => observeWorkbenchTypography(cdp, 'button[aria-label="切换智能体"]')
+  const baseline = { font: 'small', typography: await typography(), agent: await menu('切换智能体'), model: await menu('模型与推理设置') }
   assert.ok(Math.abs(baseline.model.bodyZoom - 0.9) < 0.01)
   try {
     await resize(); await font('large')
     await cdp.wait(`document.querySelector('.ds-workbench-shell')?.dataset.navigationOverlay==='true'`, 'the actual narrow workbench drawer layout')
     if (await cdp.evaluate(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay==='navigation'`)) await cdp.click('button[aria-label="关闭导航"]')
-    const narrow = { font: 'large', agent: await menu('切换智能体'), model: await menu('模型与推理设置') }
+    const narrow = { font: 'large', typography: await typography(), agent: await menu('切换智能体'), model: await menu('模型与推理设置') }
     assert.ok(Math.abs(narrow.model.bodyZoom - 1.1) < 0.01)
     await openNavigation()
     narrow.navigation = await cdp.wait(`(() => {const shell=document.querySelector('.ds-workbench-shell'),nav=document.getElementById('workbench-navigation'),main=document.querySelector('.ds-workbench-shell > main');if(shell?.dataset.activeOverlay!=='navigation'||nav?.getAttribute('role')!=='dialog')return null;const r=nav.getBoundingClientRect();return {modal:nav.getAttribute('aria-modal')==='true',mainInert:Boolean(main?.inert),width:r.width,viewportWidth:innerWidth}})()`, 'the visible standard navigation drawer')
@@ -3102,7 +3103,12 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         await cdp.click('.ds-settings-sidebar button', '返回')
         await cdp.wait(`!document.querySelector('.ds-settings-sidebar')`, 'the workspace after leaving offline help')
       }
-      report.composerAcceptance = await composerModule.verifyWindowsComposerAcceptance(cdp, { workspace, acceptance: composerAcceptance })
+      report.composerAcceptance = await composerModule.verifyWindowsComposerAcceptance(cdp, { workspace, acceptance: composerAcceptance,
+        onComposerReady: report.adaptiveWorkbench ? undefined : async () => {
+          report.adaptiveWorkbench = { status: 'running', menus: [] }
+          report.adaptiveWorkbench = await runWindowsAdaptiveComposerAcceptance(cdp, { pid: child.pid, environment, audit: report.adaptiveWorkbench })
+          report.checks.push('native-window-composer-menus-and-narrow-navigation')
+        } })
       report.checks.push('composer-files-skills-and-plugin')
     }
     if (mirrorSmoke) {

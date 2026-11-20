@@ -281,8 +281,8 @@ export class SkillRuntime {
     this.validationErrors = loaded.validationErrors
   }
 
-  async validateSlashSelection(prompt: string, workspace: string): Promise<void> {
-    const ids = requestedSlashSkills(prompt)
+  async validateSlashSelection(prompt: string, workspace: string, selectedIds: readonly string[] = []): Promise<void> {
+    const ids = [...new Set([...selectedIds, ...requestedSlashSkills(prompt)])]
     if (!ids.length) return
     await this.refreshForWorkspace(workspace)
     const available = new Map(this.skillsForWorkspace(workspace).map(skill => [skill.id, skill]))
@@ -296,26 +296,45 @@ export class SkillRuntime {
     if (unavailable) throw unavailableSlashSkill(unavailable)
   }
 
+  callableSkills(workspace: string, toolNames: ReadonlySet<string>): CallableCapabilityChoice[] {
+    if (!this.config.enabled || this.options.activeLimit < 1) return []
+    return this.skillsForWorkspace(workspace).flatMap(skill => {
+      if (skill.allowedTools.length && !skill.allowedTools.includes('*') &&
+          !skill.allowedTools.some(tool => toolNames.has(tool))) return []
+      if (!buildSkillInstruction({ skill, skillId: skill.id, reason: 'explicit:id', score: 1_000 }, this.options.instructionBudgetBytes)) return []
+      return [{ kind: 'skill', id: skill.id, label: skillDisplayName(skill), description: skill.description }]
+    })
+  }
+
   callablePluginSkills(workspace: string, toolNames?: ReadonlySet<string>): Array<{
     choice: CallableCapabilityChoice; skillId: string
   }> {
     if (!this.config.enabled || this.options.activeLimit < 1) return []
     const roots = this.config.pluginRoots ?? []
-    const choices = new Map<string, { choice: CallableCapabilityChoice; skillId: string }>()
+    const packages = new Map<string, { skills: LoadedSkill[]; entrySkill?: string }>()
     for (const skill of this.skillsForWorkspace(workspace)) {
       const owner = roots.find(({ root }) => {
         const fromRoot = relative(resolve(root), skill.root)
         return !isAbsolute(fromRoot) && fromRoot !== '..' && !fromRoot.startsWith('..' + sep)
       })
-      if (!owner || choices.has(owner.id)) continue
-      if (toolNames && skill.allowedTools.length && !skill.allowedTools.includes('*') && !skill.allowedTools.some(tool => toolNames.has(tool))) continue
-      if (!buildSkillInstruction({ skill, skillId: skill.id, reason: 'explicit:id', score: 1_000 }, this.options.instructionBudgetBytes)) continue
-      choices.set(owner.id, {
-        choice: { kind: 'plugin', id: owner.id, label: skill.name, ...(skill.description ? { description: skill.description } : {}) },
-        skillId: skill.id
-      })
+      if (!owner) continue
+      const installed = packages.get(owner.id) ?? { skills: [], entrySkill: owner.entrySkill }
+      installed.skills.push(skill)
+      packages.set(owner.id, installed)
     }
-    return [...choices.values()]
+    return [...packages.entries()].flatMap(([id, { skills, entrySkill }]) => {
+      const skill = entrySkill
+        ? skills.find(candidate => candidate.id === slug(entrySkill) || slug(candidate.name) === slug(entrySkill))
+        : skills.length === 1 ? skills[0] : undefined
+      if (!skill) return []
+      if (toolNames && skill.allowedTools.length && !skill.allowedTools.includes('*') &&
+          !skill.allowedTools.some(tool => toolNames.has(tool))) return []
+      if (!buildSkillInstruction({ skill, skillId: skill.id, reason: 'explicit:id', score: 1_000 }, this.options.instructionBudgetBytes)) return []
+      return [{
+        choice: { kind: 'plugin' as const, id, label: skillDisplayName(skill), ...(skill.description ? { description: skill.description } : {}) },
+        skillId: skill.id
+      }]
+    })
   }
 
   async refreshForWorkspace(workspace: string): Promise<void> {
@@ -333,6 +352,7 @@ export class SkillRuntime {
     prompt: string
     workspace: string
     requestedSkillId?: string
+    selectedSkillIds?: readonly string[]
     selectionPrompt?: string
     selectedPluginIds?: readonly string[]
     filePaths?: readonly string[]
@@ -340,6 +360,7 @@ export class SkillRuntime {
     contextPrompt?: string
   }): SkillTurnResolution {
     const explicitSkillIds = [...new Set([
+      ...(input.selectedSkillIds ?? []),
       ...(input.requestedSkillId ? [input.requestedSkillId] : []),
       ...requestedSlashSkills(input.selectionPrompt ?? input.prompt)
     ])]
@@ -508,6 +529,9 @@ async function discoverSkills(
   for (const rawRoot of config.roots) {
     const root = resolve(rawRoot)
     const workspace = scopedRoots.get(root)
+    const verifiedPluginRoot = workspace && config.pluginRoots?.some(plugin =>
+      resolve(plugin.root) === root && plugin.workspace && resolve(plugin.workspace) === workspace
+    ) ? root : undefined
     const previousInScope = previousSkills.filter(skill => skill.workspace === workspace)
     const startedAt = Date.now()
     const pendingRootTimer = setTimeout(() => {
@@ -529,7 +553,7 @@ async function discoverSkills(
         })
         if (loaded) {
           loaded.workspace = workspace
-          loaded.resourceScope = await snapshotResourceScope(loaded).catch(() => undefined)
+          loaded.resourceScope = await snapshotResourceScope(loaded, verifiedPluginRoot).catch(() => undefined)
           loaded.dependencyInstructions = await loadCatalogDependencyInstructions(loaded, root)
           skills.push(loaded)
           onProgress({ skills: uniqueSkills(skills), validationErrors: [...validationErrors] })
@@ -623,13 +647,17 @@ async function loadSkillPackage(root: string, allowLegacy: boolean): Promise<Loa
   }
 }
 
-async function snapshotResourceScope(skill: LoadedSkill): Promise<SkillResourceScope | undefined> {
+async function snapshotResourceScope(skill: LoadedSkill, verifiedPluginRoot?: string): Promise<SkillResourceScope | undefined> {
   const info = await lstat(skill.root)
   if (!info.isDirectory() || info.isSymbolicLink()) return undefined
   const canonicalRoot = await realpath(skill.root)
   if (skill.workspace) {
-    const fromWorkspace = relative(await realpath(skill.workspace), canonicalRoot)
-    if (!fromWorkspace || fromWorkspace === '..' || fromWorkspace.startsWith('..' + sep) || isAbsolute(fromWorkspace)) return undefined
+    // Managed package files are verified before Main registers their exact roots.
+    // Ordinary workspace skills may only expose resources inside that workspace.
+    const admittedRoot = await realpath(verifiedPluginRoot ?? skill.workspace)
+    const fromRoot = relative(admittedRoot, canonicalRoot)
+    if ((!fromRoot && !verifiedPluginRoot) || fromRoot === '..' ||
+        fromRoot.startsWith('..' + sep) || isAbsolute(fromRoot)) return undefined
   }
   return Object.freeze({
     skillId: skill.id,
@@ -806,6 +834,13 @@ function unavailableSlashSkill(id: string): Error {
   return Object.assign(new Error(`Skill "${id}" is unavailable. Check Skills & Connectors or select it again from the / menu.`), {
     code: 'skill_unavailable'
   })
+}
+
+function skillDisplayName(skill: LoadedSkill): string {
+  if (/^[a-f0-9]{32,}$/i.test(skill.name)) return 'Skill'
+  return /^[a-z0-9]+(?:[-_][a-z0-9]+)+$/.test(skill.name)
+    ? skill.name.split(/[-_]/).map(word => word[0].toUpperCase() + word.slice(1)).join(' ')
+    : skill.name
 }
 
 function explicitSkillMention(skill: LoadedSkill, prompt: string): string | undefined {

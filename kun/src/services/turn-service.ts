@@ -1,7 +1,8 @@
 import type { ThreadRecord, ThreadStatus } from '../contracts/threads.js'
 import type { CompactRequest, CompactResponse, StartTurnRequest, StartTurnResponse, Turn, TurnStatus } from '../contracts/turns.js'
 import type { TurnItem } from '../contracts/items.js'
-import { validateCallableCapabilityReferences, type CallableCapabilityCandidate } from './callable-capabilities.js'
+import { findCallableCapability, validateCallableCapabilityReferences, type CallableCapabilityCandidate } from './callable-capabilities.js'
+import type { SkillSelections } from '../contracts/callable-capabilities.js'
 import {
   sanitizeToolResultOutput,
   sanitizeTurnItemForPersistence
@@ -37,7 +38,7 @@ export type TurnServiceDeps = {
   approvalGate?: ApprovalGate
   userInputGate?: UserInputGate
   workspaceReferences?: Pick<WorkspaceReferenceService, 'validateReferences'>
-  validateSkillSelection?: (prompt: string, workspace: string) => Promise<void>
+  validateSkillSelection?: (prompt: string, workspace: string, selectedIds?: readonly string[]) => Promise<void>
   callableCapabilities?: (request: StartTurnRequest, thread: ThreadRecord) => Promise<CallableCapabilityCandidate[]>
 }
 
@@ -126,10 +127,15 @@ export class TurnService {
     await this.deps.validateSkillSelection?.(prompt, workspace)
   }
 
-  async validateCapabilitySelection(request: StartTurnRequest, thread: ThreadRecord): Promise<void> {
-    if (!request.capabilityReferences?.length) return
+  async validateCapabilitySelection(request: StartTurnRequest, thread: ThreadRecord): Promise<SkillSelections> {
+    if (!request.capabilityReferences?.length) return []
     const current = await this.deps.callableCapabilities?.(request, thread) ?? []
     validateCallableCapabilityReferences(request.capabilityReferences, current)
+    const selected = [...new Map(request.capabilityReferences.filter(reference => reference.kind === 'skill')
+      .map(reference => [reference.id, reference])).values()]
+    if (!selected.length) return []
+    await this.deps.validateSkillSelection?.(request.displayText ?? request.prompt, thread.workspace, selected.map(reference => reference.id))
+    return selected.map(reference => ({ id: reference.id, name: findCallableCapability(current, reference)!.choice.label }))
   }
 
   async startTurn(input: {
@@ -176,13 +182,14 @@ export class TurnService {
   }
 
   /** Conversation receipts are durable history, not model execution Turns. */
-  async recordCommandExchange(input: {threadId:string;commandId:string;userText?:string;assistantText:string;createdAt:string;capabilityCard?:import('../contracts/items.js').AssistantTextTurnItem['capabilityCard'];intentCard?:import('../contracts/items.js').TaskIntentCard;userAttachmentIds?:Parameters<typeof makeUserItem>[0]['attachmentIds'];userWorkspaceReferences?:Parameters<typeof makeUserItem>[0]['workspaceReferences']}): Promise<void> {
+  async recordCommandExchange(input: {threadId:string;commandId:string;userText?:string;assistantText:string;createdAt:string;capabilityCard?:import('../contracts/items.js').AssistantTextTurnItem['capabilityCard'];intentCard?:import('../contracts/items.js').TaskIntentCard;userAttachmentIds?:Parameters<typeof makeUserItem>[0]['attachmentIds'];userWorkspaceReferences?:Parameters<typeof makeUserItem>[0]['workspaceReferences'];userSkillSelections?:SkillSelections}): Promise<void> {
     const turnId=`command_${input.commandId}`
     const existing = new Set((await this.deps.sessionStore.loadItems(input.threadId)).map(item=>item.id))
     const recorded = new Set((await this.deps.sessionStore.loadEventsSince(input.threadId,0)).filter(event=>event.kind==='item_created').map(event=>'itemId' in event?event.itemId:undefined))
     const items = [
       ...(input.userText !== undefined ? [makeUserItem({ id: `item_${turnId}_user`, turnId, threadId: input.threadId,
-        text: input.userText, attachmentIds: input.userAttachmentIds, workspaceReferences: input.userWorkspaceReferences })] : []),
+        text: input.userText, attachmentIds: input.userAttachmentIds, workspaceReferences: input.userWorkspaceReferences,
+        skillSelections: input.userSkillSelections })] : []),
       makeAssistantTextItem({ id: `item_${turnId}_receipt`, turnId, threadId: input.threadId, text: input.assistantText, status: 'completed' })
     ]
     for(const value of items) {
@@ -508,7 +515,7 @@ export class TurnService {
       })
     }
     await this.validateSkillSelection(input.request.displayText ?? input.request.prompt, thread.workspace)
-    await this.validateCapabilitySelection(input.request, thread)
+    const skillSelections = await this.validateCapabilitySelection(input.request, thread)
     const selection = this.deps.tasks?.continuationSelection(thread, input.request, input.engineeringExecution, input.continuationTaskId)
     const engineeringPlanId = input.engineeringPlanId ?? selection?.engineeringPlanId
     input = { ...input, engineeringPlanId, engineeringExecution: input.engineeringExecution || Boolean(engineeringPlanId) }
@@ -563,7 +570,8 @@ export class TurnService {
       text: input.request.prompt,
       displayText: input.request.displayText,
       attachmentIds: input.request.attachmentIds ?? [],
-      workspaceReferences
+      workspaceReferences,
+      skillSelections
       })
       const controller = new AbortController()
       await this.upsertThread(input.threadId, (current) => ({

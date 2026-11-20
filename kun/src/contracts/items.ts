@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { ReviewOutputSchema, ReviewTargetSchema } from './review.js'
 import { RuntimeErrorSeverity } from './errors.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
-import { CallableCapabilityReferencesSchema } from './callable-capabilities.js'
+import { CallableCapabilityReferencesSchema, SkillSelectionsSchema } from './callable-capabilities.js'
 import { DshUiBlock } from './dsh-ui.js'
 import { UiActionAudit } from './ui-actions.js'
 import { CapabilityPreflightSchema } from './harness.js'
@@ -58,7 +58,9 @@ export const UserTurnItem = TurnItemBase.extend({
   displayText: z.string().optional(),
   attachmentIds: z.array(z.string().min(1)).optional(),
   workspaceReferences: z.array(WorkspaceReferenceSchema).max(32).optional(),
-  capabilityReferences: CallableCapabilityReferencesSchema.optional()
+  capabilityReferences: CallableCapabilityReferencesSchema.optional(),
+  skillSelections: SkillSelectionsSchema.optional(),
+  activeSkillIds: z.array(z.string().min(1)).max(8).optional()
 })
 export type UserTurnItem = z.infer<typeof UserTurnItem>
 

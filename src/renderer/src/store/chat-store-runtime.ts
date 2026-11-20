@@ -209,7 +209,8 @@ function isUserInputInterruptError(message: string | undefined): boolean {
   return lowered.includes('cancel') && lowered.includes('awaiting user input')
 }
 
-function isInterruptSettledError(error: unknown, message: string): boolean {
+function isInterruptSettledError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '')
   const code = getRuntimeErrorCode(error)
   if (code === 'aborted') return true
   if (isUserInputInterruptError(message)) return true
@@ -251,10 +252,7 @@ export async function readWriteWorkspaceRoots(): Promise<string[]> {
 }
 
 export function runtimeErrorDetail(error: unknown): string {
-  const view = describeRuntimeError(error)
-  if (view.detail) return view.detail
-  const raw = error instanceof Error ? error.message : String(error ?? '')
-  return raw === view.summary ? '' : raw
+  return describeRuntimeError(error).detail ?? ''
 }
 
 export function runtimeStreamRecoveringMessage(): string {
@@ -691,6 +689,7 @@ export function buildThreadEventSink(
     onUserMessage: (ev) =>
       set((s) => {
         if (!isCurrentStream()) return {}
+        if (ev.metadataOnly) return { blocks: upsertUserBlock(s.blocks, ev) }
         resetBusyRecoveryAttempts()
         const flushed = flushLiveBlocks(s)
         const baseBlocks = flushed.blocks ?? s.blocks
@@ -1252,7 +1251,7 @@ export function buildThreadEventSink(
       if (!isCurrentStream()) return
       const terminal = options?.terminal === true
       const message = formatRuntimeError(err)
-      const interrupted = isInterruptSettledError(err, message)
+      const interrupted = isInterruptSettledError(err)
       if ((terminal || interrupted) && !isCurrentTurn(options?.turnId)) return
       resetBusyRecoveryAttempts()
       clearBusyWatchdog()

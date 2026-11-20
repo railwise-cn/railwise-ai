@@ -63,6 +63,11 @@ on:
         type: boolean
         required: false
         default: false
+      upgrade_059_to_candidate:
+        description: 'Exercise both GUI paths from the released 0.5.9 to the same exact 0.5.10 candidate over private HTTPS.'
+        type: boolean
+        required: false
+        default: false
       run_startup_appearance:
         description: 'Capture the real startup window in the exact installed package and verify theme and scaling.'
         type: boolean
@@ -120,7 +125,7 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
+    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.upgrade_059_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || inputs.run_composer_acceptance && 35 || inputs.run_browser_execution && 25 || 15 }}
@@ -196,21 +201,21 @@ jobs:
             ${{ runner.temp }}/windows-package-source.json
 
   windows-frozen-gui-update:
-    if: ${{ inputs.run_frozen_gui_update == true || inputs.upgrade_058_to_candidate == true }}
-    name: ${{ inputs.upgrade_058_to_candidate && 'Official 0.5.8 to exact candidate' || 'Official 0.5.7 to exact frozen 0.5.8' }} (${{ matrix.entry }})
+    if: ${{ inputs.run_frozen_gui_update == true || inputs.upgrade_058_to_candidate == true || inputs.upgrade_059_to_candidate == true }}
+    name: ${{ inputs.upgrade_059_to_candidate && 'Official 0.5.9 to exact candidate' || inputs.upgrade_058_to_candidate && 'Official 0.5.8 to exact candidate' || 'Official 0.5.7 to exact frozen 0.5.8' }} (${{ matrix.entry }})
     runs-on: windows-2022
     timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
-        entry: ${{ fromJSON(inputs.upgrade_058_to_candidate && '["sidebar","settings"]' || '["sidebar"]') }}
+        entry: ${{ fromJSON((inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && '["sidebar","settings"]' || '["sidebar"]') }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Validate exclusive acceptance scope
-        if: ${{ inputs.package_run_id == '' || (inputs.run_frozen_gui_update && inputs.upgrade_058_to_candidate) || inputs.run_startup_appearance || inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation }}
+        if: ${{ inputs.package_run_id == '' || (inputs.run_frozen_gui_update && (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate)) || (inputs.upgrade_058_to_candidate && inputs.upgrade_059_to_candidate) || inputs.run_startup_appearance || inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation }}
         run: throw 'Select one original frozen package run and optional private next package run'
       - uses: actions/setup-node@v7
         with:
@@ -232,12 +237,12 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/frozen-windows
       - name: Prepare checksummed Electron runtime for the private fixture
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
+        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
         env:
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
         run: npm run prepare:electron
       - name: Reuse the original build's Windows document sidecar
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
+        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
         uses: actions/download-artifact@v4
         with:
           name: markitdown-win32-x64
@@ -245,12 +250,12 @@ jobs:
           github-token: ${{ github.token }}
           path: build/sidecars/markitdown-win32-x64
       - name: Verify the reused Windows document sidecar
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
+        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
         env:
           WORKWISE_SIDECAR_ARCH: x64
         run: node scripts/build-markitdown-sidecar.mjs --verify-only
       - name: Build the runner-local higher-version NSIS fixture
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
+        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
         env:
           WORKWISE_APP_VERSION: '0.5.9'
           WORKWISE_CANDIDATE_SOURCE_HEAD: ${{ github.sha }}
@@ -263,11 +268,13 @@ jobs:
         run: npm run dist:win
       - name: Exercise native update or the exact overlay fallback and reopen the existing conversation
         env:
-          INCLUDE_PRIVATE_NEXT: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
-          CANDIDATE_UPGRADE_ENTRY: ${{ inputs.upgrade_058_to_candidate && matrix.entry || '' }}
+          INCLUDE_PRIVATE_NEXT: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
+          CANDIDATE_UPGRADE_ENTRY: ${{ (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && matrix.entry || '' }}
+          CANDIDATE_UPGRADE_BASELINE: ${{ inputs.upgrade_059_to_candidate && '0.5.9' || '' }}
         run: |
           $arguments = @("$env:RUNNER_TEMP/frozen-windows", "$env:RUNNER_TEMP/frozen-windows-source.json", "$env:RUNNER_TEMP/frozen-windows-evidence")
           if ($env:CANDIDATE_UPGRADE_ENTRY) { $arguments += $env:CANDIDATE_UPGRADE_ENTRY }
+          if ($env:CANDIDATE_UPGRADE_BASELINE) { $arguments += $env:CANDIDATE_UPGRADE_BASELINE }
           if ($env:INCLUDE_PRIVATE_NEXT -eq 'true') {
             @{ packageSourceHead=$env:GITHUB_SHA; runId=$env:GITHUB_RUN_ID; runAttempt=$env:GITHUB_RUN_ATTEMPT; purpose='private-next-updater-fixture' } | ConvertTo-Json | Set-Content -LiteralPath "$env:RUNNER_TEMP/private-next-windows-source.json"
             $arguments += @("$env:RUNNER_TEMP/private-next-windows", "$env:RUNNER_TEMP/private-next-windows-source.json", '0.5.9')
@@ -277,7 +284,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: frozen-windows-gui-upgrade-${{ github.run_id }}${{ inputs.upgrade_058_to_candidate && format('-{0}', matrix.entry) || '' }}
+          name: frozen-windows-gui-upgrade-${{ github.run_id }}${{ (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && format('-{0}', matrix.entry) || '' }}
           retention-days: 7
           if-no-files-found: warn
           path: ${{ runner.temp }}/frozen-windows-evidence/

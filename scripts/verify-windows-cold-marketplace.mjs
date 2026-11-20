@@ -20,17 +20,17 @@ const containment = (root, path) => {
 }
 const literal = JSON.stringify
 
-async function withPublicUpstreamsBlocked(run) {
+async function withPublicUpstreamsBlocked(run, hosts = blockedHosts) {
   const hostsFile = join(process.env.SystemRoot, 'System32', 'drivers', 'etc', 'hosts')
   assert.ok((await lstat(hostsFile)).isFile(), 'Expected the hosted runner system hosts file')
   const before = await readFile(hostsFile)
   const marker = randomUUID()
-  const policy = Buffer.concat([before, Buffer.from(`\r\n# RailWise isolated mirror smoke ${marker}\r\n${blockedHosts.map(host => `127.0.0.1 ${host}\r\n::1 ${host}`).join('\r\n')}\r\n`)])
+  const policy = Buffer.concat([before, Buffer.from(`\r\n# RailWise isolated mirror smoke ${marker}\r\n${hosts.map(host => `127.0.0.1 ${host}\r\n::1 ${host}`).join('\r\n')}\r\n`)])
   const flush = () => execFileSync('ipconfig.exe', ['/flushdns'], { windowsHide: true, stdio: 'ignore' })
   try {
     await writeFile(hostsFile, policy)
     flush()
-    for (const host of blockedHosts) {
+    for (const host of hosts) {
       const result = await lookup(host, { all: true })
       assert.ok(result.length && result.every(entry => ['127.0.0.1', '::1'].includes(entry.address)), `Upstream is still resolvable: ${host}`)
     }
@@ -70,6 +70,29 @@ async function invokeInstalledPlaywright(server, workspace, environment) {
   }
 }
 
+async function installMarketplacePackageViaUi(cdp, id, name, { useUserScope = false, offline = false } = {}) {
+  await cdp.fill('input[placeholder="搜索插件、发布者和能力"]', name)
+  await cdp.click(`[data-marketplace-package="${id}"] button`, '安装')
+  if (offline) {
+    await cdp.wait(`document.querySelector('[role="dialog"]')?.textContent.includes('安装包随应用提供，已通过验证')`,
+      'the verified bundled archive in the installation review')
+  }
+  if (useUserScope) await cdp.click('[role="dialog"] button', '个人')
+  await cdp.click('[role="dialog"] button', '安装')
+  await cdp.wait(`!document.querySelector('[role="dialog"]')`, `the completed ${name} review`, 240_000)
+  return cdp.wait(`window.workwise.listInstalledPlugins().then(all => all.find(row => row.packageId === ${literal(id)}))`,
+    `the installed ${name} receipt`, 240_000)
+}
+
+async function verifyMarketplaceSkillSelection(cdp, composer, skillId, label) {
+  await cdp.fill(composer, `/${skillId}`)
+  await cdp.click('[role="option"] .truncate', label)
+  await cdp.wait(`Array.from(document.querySelectorAll('[data-composer-skill]')).some(chip => chip.textContent.includes(${literal(label)}))
+    && !document.querySelector(${literal(composer)})?.value.includes('/skill:')`, `the ${label} selection chip`)
+  await cdp.click('[data-composer-skill] button', `移除 ${label}`)
+  await cdp.fill(composer, '')
+}
+
 export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot }) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' &&
     process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_OS === 'Windows', 'Use only an ephemeral hosted Windows acceptance runner')
@@ -82,10 +105,26 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     const catalog = (await cdp.evaluate('window.workwise.listCatalogPackages()')).packages
     const initial = await cdp.evaluate('window.workwise.listInstalledPlugins()')
     const reports = []
+    await cdp.click('.ds-sidebar-shell button', '技能与连接器')
+    await cdp.click('[role="tab"]', '插件')
     for (const [id, row] of expected) {
       assert.ok(!initial.some(item => item.packageId === id), `A cold profile must not have ${id}`)
       const catalogEntry = catalog.find(item => item.package.id === id)
       assert.equal(catalogEntry?.reviewSha256, row.reviewSha256)
+      if (id === 'superpowers' || id === 'blender-skills') {
+        const offline = id === 'superpowers'
+        const install = () => installMarketplacePackageViaUi(cdp, id, catalogEntry.package.name, { useUserScope: !offline, offline })
+        const installed = offline ? await withPublicUpstreamsBlocked(install, ['www.railwise.cn']) : await install()
+        assert.equal(installed.reviewSha256, row.reviewSha256)
+        assert.equal(installed.scope, offline ? 'workspace' : 'user')
+        if (offline) assert.equal(await realpath(installed.workspaceRoot), await realpath(workspace))
+        const sourceReceipt = JSON.parse(await readFile(join(installed.artifact.location, 'workwise.mirror.json'), 'utf8'))
+        assert.deepEqual(sourceReceipt.parts, row.parts)
+        assert.ok(containment(await realpath(ownedRoot), await realpath(installed.artifact.location)))
+        reports.push({ id, version: installed.version, reviewSha256: installed.reviewSha256,
+          artifactSha256: installed.artifact.sha256, lockedParts: row.parts.length, scope: installed.scope, offline, installedViaUi: true })
+        continue
+      }
       const handle = await cdp.evaluate(`window.workwise.prepareCatalogPlugin(${literal({ sourceId: catalogEntry.sourceId, packageId: id })})`, 360_000)
       assert.equal(handle.reviewSha256, row.reviewSha256)
       const requested = {
@@ -121,12 +160,19 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     assert.match(skill.toString('utf8'), /^name:\s*video-shotcraft\s*$/m)
     await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
     const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
-    await cdp.fill(composer, '/video-shotcraft')
-    await cdp.click('[role="option"] .truncate', 'Video Shotcraft')
-    await cdp.wait(`document.querySelector(${literal(composer)})?.value === ${literal(`/skill:${current.id} `)}`, 'the exact installed Skill token after choosing /')
-    await cdp.fill(composer, '')
+    await verifyMarketplaceSkillSelection(cdp, composer, current.id, 'Video Shotcraft')
+    const superpowers = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result =>
+      result.ok && JSON.parse(result.body).skills.find(row => row.id === 'using-superpowers' && row.scope === 'project'))`,
+      'Superpowers loaded in the workspace that installed it', 90_000)
+    const blender = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result =>
+      result.ok && JSON.parse(result.body).skills.find(row => row.id === 'blender-director' && row.scope === 'global'))`,
+      'Blender Skills loaded from the user installation', 90_000)
+    await verifyMarketplaceSkillSelection(cdp, composer, superpowers.id, 'Using Superpowers')
+    await verifyMarketplaceSkillSelection(cdp, composer, blender.id, 'Blender Director')
 
     return { status: 'passed', releaseComplete: false, blockedHosts, installed: reports, playwright, docling: { toolsDiscovered: doclingTools },
+      superpowers: { runtimeSkillId: superpowers.id, offline: true, slashSelectionVerified: true },
+      blender: { runtimeSkillId: blender.id, slashSelectionVerified: true },
       videoShotcraft: { runtimeSkillId: current.id, slashSelectionVerified: true, entrySha256: createHash('sha256').update(skill).digest('hex'),
         render: 'pending-licensed-remotion-and-video-runtime' } }
   })

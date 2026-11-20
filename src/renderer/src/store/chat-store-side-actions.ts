@@ -103,6 +103,7 @@ function buildSideSink(sideId: string, ctx: SideContext, sinceSeq = 0): ThreadEv
     onUserMessage: (ev) => {
       ctx.set((s) =>
         patchSide(s, sideId, (side) => {
+          if (ev.metadataOnly) return { ...side, blocks: upsertUserBlock(side.blocks, ev) }
           const flushed = flushSideLiveBlocks(side)
           const blocks = upsertUserBlock(flushed.blocks, ev)
           return {

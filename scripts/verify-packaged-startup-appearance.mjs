@@ -12,6 +12,33 @@ const windowsCases = [
   { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark', scale: 1.25, screenshotName: 'windows-startup-appearance-zh-dark.png' }
 ]
 
+export async function observeWorkbenchTypography(cdp, selector = '.ds-sidebar-shell button.w-full') {
+  await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(selector)})?.getClientRects().length)`, 'representative visible workbench text')
+  const page = await cdp.evaluate(`document.fonts.ready.then(() => {
+    const node = document.querySelector(${JSON.stringify(selector)});
+    const style = getComputedStyle(node);
+    return {fontFamily:style.fontFamily,fontSize:style.fontSize,lineHeight:style.lineHeight,devicePixelRatio,window:{width:innerWidth,height:innerHeight}};
+  })`)
+  assert.match(page.fontFamily, /RailWise UI/)
+  await cdp.send('DOM.enable')
+  await cdp.send('CSS.enable')
+  await cdp.send('DOM.getDocument')
+  const target = await cdp.send('Runtime.evaluate', { expression: `(() => {
+    const node = document.querySelector(${JSON.stringify(selector)});
+    return [node, ...node.querySelectorAll('*')].find(element => element.getClientRects().length &&
+      getComputedStyle(element).visibility === 'visible' && [...element.childNodes].some(child =>
+        child.nodeType === Node.TEXT_NODE && child.textContent.trim()));
+  })()` })
+  assert.ok(target.result.objectId, 'Expected a visible workbench text element')
+  const { nodeId } = await cdp.send('DOM.requestNode', { objectId: target.result.objectId })
+  assert.ok(nodeId, 'Expected a rendered workbench text node')
+  const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId })
+  await cdp.send('Runtime.releaseObject', { objectId: target.result.objectId })
+  assert.ok(fonts.some(font => font.isCustomFont && /Noto\s*Sans\s*SC/i.test(font.familyName) && font.glyphCount > 0),
+    `The bundled Noto Sans SC font must draw actual workbench glyphs: ${JSON.stringify(fonts)}`)
+  return { ...page, fonts }
+}
+
 function observeSplash() {
   const logo = document.querySelector('.splash img.logo')
   const title = document.querySelector('.splash h1')
@@ -132,6 +159,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     validateStartupAppearance(observation, expected)
     await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
+    observation.workbenchTypography = await observeWorkbenchTypography(main)
     if (expected.screenshotName) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)

@@ -240,6 +240,11 @@ const builderConfig = {
       filter: ['**/*']
     },
     {
+      from: 'src/asset/marketplace-offline',
+      to: 'marketplace-offline',
+      filter: ['*.zip']
+    },
+    {
       from: 'src/asset/builtin-integrations',
       to: 'third-party/builtin-integrations',
       filter: ['**/*']
