@@ -1428,6 +1428,7 @@
   "scheduleAt": "One-time · {{datetime}}",
   "scheduleEvery": "Every {{minutes}} min",
   "scheduleDailyAt": "Daily at {{time}}",
+  "scheduleBeijingTime": "China Standard Time",
   "scheduleManual": "Manual",
   "scheduleNextRun": "Next run",
   "scheduleLastRun": "Last run",

@@ -24,6 +24,8 @@ import { promptRequiresFileDeliverable } from '../loop/turn-completion-guard.js'
 export type TaskCommandDispatchOptions = {
   /** Internal recurrence dispatch does not represent a new user message. */
   source?: 'scheduled-occurrence'
+  /** Recheck the source immediately before creating its durable command receipt. */
+  assertMayBegin?: () => void
   /** Server-only preparation of a durable recurrence context before capability admission. */
   prepareExecutionThread?: (thread: ThreadRecord) => Promise<void>
   /** Internal integration hook. Persist source linkage and outbox before any worker dispatch. */
@@ -72,6 +74,7 @@ export class TaskCoordinator {
       throw Object.assign(new Error('attention decision does not match this task command'), {code:'scope_conflict'})
     }
     if (command.selectedExternalProvider && resolving?.payload?.kind !== 'external_provider_choice') throw Object.assign(new Error('Provider selection requires its original pending decision.'), { code: 'scope_conflict' })
+    options.assertMayBegin?.()
     const receipt = this.deps.repository.execution.command(command.threadId,command.idempotencyKey,command)
     if (receipt.result) {
       const result = receipt.result as TaskCommandResult

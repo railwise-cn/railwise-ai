@@ -262,6 +262,89 @@ describe('task-owned recurring execution', () => {
     expect(f.service.listManagedPlans()).toMatchObject([{ enabled: false }])
   })
 
+  it.each(['not-started', 'unknown', 'admitted'] as const)('does not repeat a pre-pause occurrence: %s', async outcome => {
+    const f = fixture()
+    const saved = await f.service.create(f.context)
+    const dueAt = '2026-11-13T00:30:00.000Z'
+    const key = `schedule:${saved.id}:${dueAt}`
+    const versionId = f.flows.get(saved.id)!.publishedVersionId!
+    f.coordinator.command.mockImplementationOnce(async (command) => {
+      if (outcome !== 'not-started') f.repository.execution.command('origin', key, command)
+      if (outcome === 'admitted') f.repository.execution.finishCommand('origin', key, { kind: 'task_started' })
+      throw new Error('Controlled admission response lost')
+    })
+    vi.setSystemTime(new Date('2026-11-13T00:31:00Z'))
+    expect(await f.flows.tickSchedules()).toBe(1)
+    expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(1)
+    await f.service.setManagedPlanEnabled(saved.id, false, f.flows.get(saved.id)!.revision)
+    await f.service.setManagedPlanEnabled(saved.id, true, f.flows.get(saved.id)!.revision)
+    expect(f.service.listManagedPlans()[0]).toMatchObject({ nextRunAt: '2026-11-13T08:30:00.000Z' })
+    await f.flows.flushSourceEvents()
+    expect(f.coordinator.command).toHaveBeenCalledTimes(1)
+    expect(f.flowRepository.operation(saved.id, key)).toMatchObject({ status: 'succeeded', result: { dueAt } })
+    if (outcome === 'unknown') {
+      expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(1)
+      expect(f.repository.attention(`schedule:${saved.id}`)).toMatchObject({
+        status: 'pending', payload: { dueAt, versionId, reasonCode: 'schedule_dispatch_needs_review' }
+      })
+      f.repository.execution.finishCommand('origin', key, { kind: 'task_started' })
+      await f.flows.flushSourceEvents()
+      expect(f.coordinator.command).toHaveBeenCalledTimes(1)
+    } else if (outcome === 'not-started') {
+      expect(f.flowRepository.operation(saved.id, `paused:${key}`)).toMatchObject({
+        status: 'succeeded', result: { skippedBeforeAdmission: true }
+      })
+    }
+    expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(0)
+  })
+
+  it('closes the pending admission window when the plan is paused and resumed', async () => {
+    const f = fixture()
+    const saved = await f.service.create(f.context)
+    let enterAdmission!: () => void
+    let releaseAdmission!: () => void
+    const atAdmission = new Promise<void>(resolve => { enterAdmission = resolve })
+    const release = new Promise<void>(resolve => { releaseAdmission = resolve })
+    let admitted = false
+    f.coordinator.command.mockImplementationOnce(async (_command, options) => {
+      enterAdmission()
+      await release
+      const admission = options as { assertMayBegin: () => void }
+      admission.assertMayBegin()
+      admitted = true
+      return { kind: 'task_started' }
+    })
+    vi.setSystemTime(new Date('2026-11-13T00:31:00Z'))
+    const tick = f.flows.tickSchedules()
+    await atAdmission
+    try {
+      await f.service.setManagedPlanEnabled(saved.id, false, f.flows.get(saved.id)!.revision)
+      await f.service.setManagedPlanEnabled(saved.id, true, f.flows.get(saved.id)!.revision)
+    } finally {
+      releaseAdmission()
+    }
+    await tick
+    expect(admitted).toBe(false)
+    expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(0)
+  })
+
+  it('also retires dormant occurrences when resuming a plan paused before this change', async () => {
+    const f = fixture()
+    const saved = await f.service.create(f.context)
+    f.coordinator.command.mockRejectedValueOnce(new Error('Controlled pre-admission failure'))
+    vi.setSystemTime(new Date('2026-11-13T00:31:00Z'))
+    await f.flows.tickSchedules()
+    const flow = f.flows.get(saved.id)!
+    f.flows.update({ ...flow, variables: { ...flow.variables, enabled: false } }, flow.revision)
+    const trigger = f.flowRepository.getTriggerState(saved.id, 'schedule')!
+    f.flowRepository.saveTriggerState({ ...trigger, enabled: false })
+    expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(1)
+    await f.service.setManagedPlanEnabled(saved.id, true, f.flows.get(saved.id)!.revision)
+    await f.flows.flushSourceEvents()
+    expect(f.coordinator.command).toHaveBeenCalledTimes(1)
+    expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(0)
+  })
+
   it.each(['valid', 'forged-destination', 'fake-click-ack', 'unknown'] as const)('retires only a fully verified native document GET across a later browser binding: %s', async mode => {
     let navigation!: OperationReceipt
     const prepare = () => twiceReboundBrowserFixture(base => {

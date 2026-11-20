@@ -233,11 +233,18 @@ function updateScheduledTask(current: ScheduledTaskV1, edits: TaskEdits): Schedu
   }
 }
 
-function formatDateTime(value: string | undefined, fallback: string, timeZone?: string): string {
+function formatDateTime(value: string | undefined, fallback: string, timeZone?: string, locale?: string): string {
   if (!value?.trim()) return fallback
   const date = new Date(value)
   if (!Number.isFinite(date.getTime())) return fallback
-  return date.toLocaleString(undefined, timeZone ? { timeZone } : undefined)
+  return date.toLocaleString(locale, timeZone ? { timeZone, dateStyle: 'medium', timeStyle: 'short' } : undefined)
+}
+
+function conversationScheduleZone(timeZone: string | undefined, locale: string, beijingTime: string): string {
+  if (!timeZone) return ''
+  if (timeZone === 'Asia/Shanghai') return beijingTime
+  return Intl.DateTimeFormat(locale, { timeZone, timeZoneName: 'longGeneric' }).formatToParts()
+    .find(part => part.type === 'timeZoneName')?.value ?? timeZone
 }
 
 async function readConversationSchedules(): Promise<ConversationSchedule[]> {
@@ -279,7 +286,8 @@ export function ScheduleTasksView({
   onOpenThread,
   onOpenFlow
 }: Props): ReactElement {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
+  const locale = i18n.resolvedLanguage ?? i18n.language
   const [settings, setSettings] = useState<WorkWiseSettingsV2 | null>(null)
   const [status, setStatus] = useState<ScheduleRuntimeStatus | null>(null)
   const [loading, setLoading] = useState(true)
@@ -639,17 +647,17 @@ export function ScheduleTasksView({
                       <h2 className="break-words text-[15px] font-semibold text-ds-ink">{plan.title || t('scheduleUntitled')}</h2>
                       {plan.times?.length ? (
                         <p className="mt-1 text-[12px] text-ds-muted">
-                          {t('scheduleDailyAt', { time: plan.times.join(', ') })} · {plan.timezone}
+                          {t('scheduleDailyAt', { time: plan.times.join(', ') })} · {conversationScheduleZone(plan.timezone, locale, t('scheduleBeijingTime'))}
                         </p>
                       ) : null}
                       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ds-faint">
                         <span>{t(plan.enabled ? 'scheduleManagedEnabled' : 'scheduleManagedPaused')}</span>
                         <span>{t(conversationScheduleStatus(plan))}</span>
                         {plan.enabled ? (
-                          <span>{t('scheduleNextRun')}: {formatDateTime(plan.nextRunAt, t('scheduleNotScheduled'), plan.timezone)}</span>
+                          <span>{t('scheduleNextRun')}: {formatDateTime(plan.nextRunAt, t('scheduleNotScheduled'), plan.timezone, locale)}</span>
                         ) : null}
                         {plan.lastRunAt ? (
-                          <span>{t('scheduleLastRun')}: {formatDateTime(plan.lastRunAt, t('scheduleNeverRun'), plan.timezone)}</span>
+                          <span>{t('scheduleLastRun')}: {formatDateTime(plan.lastRunAt, t('scheduleNeverRun'), plan.timezone, locale)}</span>
                         ) : null}
                       </div>
                     </div>

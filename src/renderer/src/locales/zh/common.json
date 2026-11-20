@@ -1427,6 +1427,7 @@
   "scheduleAt": "一次性 · {{datetime}}",
   "scheduleEvery": "每 {{minutes}} 分钟",
   "scheduleDailyAt": "每天 {{time}}",
+  "scheduleBeijingTime": "北京时间",
   "scheduleManual": "手动",
   "scheduleNextRun": "下次运行",
   "scheduleLastRun": "上次运行",

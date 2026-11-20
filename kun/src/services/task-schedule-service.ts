@@ -122,7 +122,10 @@ export class TaskScheduleService {
     const plan = this.managedPlan(flow)
     if (enabled && !plan.times) fail('计划需要在原对话重新核对。')
     if (enabled && plan.enabled) return plan
-    if (enabled) await this.validateAuthority(this.authority(flow))
+    if (enabled) {
+      const authority = this.authority(flow)
+      await this.validateAuthority(authority, undefined, undefined, this.recoveryForAuthority(authority))
+    }
 
     return this.deps.flows.repository.transaction(() => {
       const current = this.deps.flows.get(id)
@@ -135,8 +138,16 @@ export class TaskScheduleService {
       const node = updated.nodes.find(item => item.id === 'schedule')
       if (trigger && node) {
         const { nextRunAt: _previousRun, ...state } = trigger
-        const nextRunAt = enabled ? nextScheduleOccurrence(node.config, new Date(this.deps.nowIso())) : undefined
-        this.deps.flows.repository.saveTriggerState({ ...state, enabled, ...(nextRunAt ? { nextRunAt } : {}) })
+        // Older paused plans did not persist a cutoff. Retire their existing
+        // pending dates on the first resume in this management path as well.
+        const cutoffSet = typeof state.state.retiredDueThrough === 'string' && Number.isFinite(Date.parse(state.state.retiredDueThrough))
+        const stateData = enabled && cutoffSet ? state.state : {
+          ...state.state, retiredDueThrough: this.retiredDispatchCutoff(id, state.state.retiredDueThrough)
+        }
+        const cutoff = typeof stateData.retiredDueThrough === 'string' ? Date.parse(stateData.retiredDueThrough) : NaN
+        const now = Date.parse(this.deps.nowIso())
+        const nextRunAt = enabled ? nextScheduleOccurrence(node.config, new Date(Number.isFinite(cutoff) ? Math.max(now, cutoff) : now)) : undefined
+        this.deps.flows.repository.saveTriggerState({ ...state, state: stateData, enabled, ...(nextRunAt ? { nextRunAt } : {}) })
       }
       return this.managedPlan(updated)
     })
@@ -167,6 +178,50 @@ export class TaskScheduleService {
         needsReview: attention?.status === 'pending' }
     } catch {
       return { ...base, enabled, originThreadId, needsReview: true }
+    }
+  }
+
+  private retiredDispatchCutoff(id: string, previous: unknown): string {
+    const pendingDue = this.deps.flows.repository.pendingOutbox('scheduled_task_dispatch')
+      .filter(item => item.ownerId === id)
+      .map(item => record(item.payload).dueAt)
+    const dates = [previous, ...pendingDue].filter((value): value is string => typeof value === 'string')
+      .map(value => Date.parse(value)).filter(Number.isFinite)
+    return new Date(Math.max(Date.parse(this.deps.nowIso()), ...dates)).toISOString()
+  }
+
+  private isRetiredDispatch(input: ScheduledTaskDispatch): boolean {
+    const state = this.deps.flows.repository.getTriggerState(input.scheduleId, 'schedule')?.state
+    return typeof state?.retiredDueThrough === 'string' && Date.parse(input.dueAt) <= Date.parse(state.retiredDueThrough)
+  }
+
+  private reconcileRetiredDispatch(input: ScheduledTaskDispatch, authority: ScheduledTaskAuthority): void {
+    const key = `schedule:${input.scheduleId}:${input.dueAt}`
+    const command = this.deps.repository.execution.commandReceipt(authority.originThreadId, key)
+    const attentionId = `schedule:${input.scheduleId}`
+    const attention = this.deps.repository.attention(attentionId)
+    const matchingAttention = attention?.ownerKind === 'flow' && attention.ownerId === input.scheduleId &&
+      attention.threadId === authority.originThreadId && attention.payload?.dueAt === input.dueAt &&
+      attention.payload?.versionId === input.versionId
+    if (command && command.result === undefined) {
+      if (!attention || matchingAttention && attention.payload?.reasonCode !== 'schedule_dispatch_needs_review') {
+        const now = this.deps.nowIso()
+        this.deps.repository.putAttention({ id: attentionId, ownerKind: 'flow', ownerId: input.scheduleId,
+          flowId: input.scheduleId, threadId: authority.originThreadId, workspaceRoot: authority.grant.workspaceRoot,
+          kind: 'blocked', title: '定时计划等待核对', message: '暂停前有一次执行结果尚未确认，请在原对话查看。系统不会自动重跑这次任务。',
+          status: 'pending', revision: (attention?.revision ?? -1) + 1, createdAt: attention?.createdAt ?? now,
+          updatedAt: now, payload: { ...input, reasonCode: 'schedule_dispatch_needs_review' } })
+      }
+      throw Object.assign(new Error('The earlier scheduled occurrence needs reconciliation'), { code: 'schedule_dispatch_needs_review' })
+    }
+    if (!command) {
+      // Record the decision separately. The original due event and submission receipt remain intact.
+      const receipt = this.deps.flows.repository.beginOperation(input.scheduleId, `paused:${key}`, input)
+      if (receipt.created) this.deps.flows.repository.finishOperation(input.scheduleId, `paused:${key}`, 'succeeded', { skippedBeforeAdmission: true })
+    }
+    if (matchingAttention && attention.status === 'pending') {
+      this.deps.repository.putAttention({ ...attention, status: 'answered', revision: attention.revision + 1,
+        updatedAt: this.deps.nowIso() })
     }
   }
 
@@ -407,10 +462,20 @@ export class TaskScheduleService {
 
   async dispatch(input: ScheduledTaskDispatch): Promise<void> {
     const current = this.deps.flows.get(input.scheduleId)
-    if (!current || current.variables.archived === true || current.variables.enabled === false) return
+    if (!current || current.variables.archived === true) return
+    const retired = this.isRetiredDispatch(input)
+    if (current.variables.enabled === false && !retired) return
     const version = this.deps.flows.repository.getVersion(input.versionId)
+    if (retired && version?.definition.id === input.scheduleId) {
+      return this.reconcileRetiredDispatch(input, this.authority(version.definition))
+    }
     if (!version || current.publishedVersionId !== input.versionId) fail('计划配置已变化，请核对待执行计划。')
     const authority = this.authority(version.definition)
+    const assertMayBegin = () => {
+      const latest = this.deps.flows.get(input.scheduleId)
+      if (this.isRetiredDispatch(input) || !latest || latest.variables.archived === true ||
+        latest.variables.enabled === false || latest.publishedVersionId !== input.versionId) fail('计划已暂停或配置已变化。')
+    }
     const attentionId = `schedule:${input.scheduleId}`
     const pending = this.deps.repository.attention(attentionId)
     // Legacy items did not store versionId. Only the original durable dispatch
@@ -425,10 +490,11 @@ export class TaskScheduleService {
     try {
       const recovery=this.recoveryForAuthority(authority)
       await this.validateAuthority(authority,undefined,undefined,recovery)
+      assertMayBegin()
       const result = await this.deps.coordinator.command({ threadId: authority.originThreadId, intent: 'new',
         idempotencyKey: `schedule:${input.scheduleId}:${input.dueAt}`,
         request: { prompt: authority.prompt, model: authority.model, providerId: authority.providerId, mode: 'agent', ...authority.inputs }
-      }, { source: 'scheduled-occurrence', prepareExecutionThread: async thread => {
+      }, { source: 'scheduled-occurrence', assertMayBegin, prepareExecutionThread: async thread => {
         if (thread.workspace !== authority.execution.workspace) fail('周期执行工作区与原授权不一致。')
         const prepared = this.deps.repository.beginOperation({ ownerId: thread.id, idempotencyKey: 'scheduled-task-context', kind: 'scheduled_task_prepare',
           request: { ...input, authorityHash: fingerprint(authority) }, nowIso: this.deps.nowIso() })
@@ -458,6 +524,7 @@ export class TaskScheduleService {
         this.deps.repository.putAttention({ ...latest, status: 'answered', revision: latest.revision + 1, updatedAt: this.deps.nowIso() })
       })
     } catch (error) {
+      if (this.isRetiredDispatch(input)) return this.reconcileRetiredDispatch(input, authority)
       const now = this.deps.nowIso()
       const missingInput = error instanceof Error && (error as Error & { code?: string }).code === 'schedule_source_missing'
       this.deps.repository.transact(() => {

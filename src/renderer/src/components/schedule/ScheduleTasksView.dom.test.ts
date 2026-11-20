@@ -52,7 +52,7 @@ describe('scheduled task settings races', () => {
     expect(container.textContent).toContain('Plan legacy')
     expect(container.textContent).toContain('每日网页报告')
     expect(container.textContent).toContain('08:30, 16:30')
-    expect(container.textContent).toContain('Asia/Shanghai')
+    expect(container.textContent).toContain(i18n.t('scheduleBeijingTime'))
 
     const button = (key: string) =>
       Array.from(container.querySelectorAll('button')).find(item => item.textContent?.trim() === i18n.t(key))!
@@ -66,6 +66,25 @@ describe('scheduled task settings races', () => {
     expect(request).toHaveBeenNthCalledWith(3, '/v1/task-schedules/schedule_task_chat', 'PATCH',
       JSON.stringify({ enabled: true, expectedRevision: 2 }))
     expect(container.textContent).toContain(i18n.t('scheduleManagedEnabled'))
+  })
+
+  it('uses the Chinese interface locale and the plan time zone for the next run', async () => {
+    const savedLanguage = i18n.language
+    await i18n.changeLanguage('zh')
+    try {
+      const plan = { id: 'schedule_task_localized', revision: 1, title: '早报', enabled: true,
+        times: ['08:30'], timezone: 'Asia/Shanghai', nextRunAt: '2026-11-21T00:30:00Z' }
+      vi.stubGlobal('workwise', { getSettings: async () => settings(1, []),
+        runtimeRequest: async () => ({ ok: true, body: JSON.stringify({ schedules: [plan] }) }) })
+      await act(() => root.render(createElement(ScheduleTasksView, {
+        leftSidebarCollapsed: false, onToggleLeftSidebar: vi.fn()
+      })))
+      expect(container.textContent).toContain('北京时间')
+      expect(container.textContent).toContain('2026年11月21日 08:30')
+      expect(container.textContent).not.toMatch(/AM|Asia\/Shanghai/)
+    } finally {
+      await act(() => i18n.changeLanguage(savedLanguage))
+    }
   })
 
   it('gives a recoverable message if saved conversation plans cannot be read', async () => {
