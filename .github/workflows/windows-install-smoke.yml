@@ -48,6 +48,11 @@ on:
         type: boolean
         required: false
         default: false
+      mac_use_isolated_candidate:
+        description: 'With macOS startup checks, verify an unpublished candidate-installers artifact and exercise the Apple Silicon workbook.'
+        type: boolean
+        required: false
+        default: false
       run_published_gui_update:
         description: 'Install released 0.5.6 and click the real sidebar upgrade to released Stable 0.5.7 on an ephemeral Windows runner'
         type: boolean
@@ -335,6 +340,7 @@ jobs:
             arch: x64
     env:
       EXACT_MAC_ARCH: ${{ matrix.arch }}
+      EXACT_MAC_ISOLATED_CANDIDATE: ${{ inputs.mac_use_isolated_candidate }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -349,7 +355,7 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify startup acceptance contracts
         run: node --test scripts/verify-windows-startup-appearance.test.mjs
-      - name: Resolve the immutable macOS release artifact
+      - name: Resolve the immutable macOS installer artifact
         id: source
         env:
           GH_TOKEN: ${{ github.token }}
@@ -378,6 +384,7 @@ jobs:
           path: |
             ${{ runner.temp }}/exact-mac-source.json
             ${{ runner.temp }}/exact-mac-evidence/mac-startup-appearance.json
+            ${{ runner.temp }}/exact-mac-evidence/mac-workbook.json
 
   windows-repaired-gui-update:
     if: ${{ (inputs.run_repaired_gui_update == true || inputs.run_repaired_marketplace_install == true) && inputs.run_published_gui_update != true && inputs.run_frozen_gui_update != true }}

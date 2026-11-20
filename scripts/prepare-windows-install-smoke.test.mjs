@@ -81,7 +81,7 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   const { run_published_gui_update: publishedUpdate, run_repaired_gui_update: repairedUpdate,
     run_frozen_gui_update: frozenUpdate, upgrade_058_to_candidate: currentUpgrade, upgrade_059_to_candidate: nextUpgrade, build_private_next: buildPrivateNext,
     run_repaired_marketplace_install: marketplaceInstall, run_private_video_evaluation: privateVideoEvaluation,
-    run_mac_startup_appearance: macStartup,
+    run_mac_startup_appearance: macStartup, mac_use_isolated_candidate: macIsolatedCandidate,
     package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
   assert.equal(publishedUpdate.default, false)
   assert.equal(repairedUpdate.default, false)
@@ -91,6 +91,7 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.equal(nextUpgrade.default, false)
   assert.equal(privateVideoEvaluation.default, false)
   assert.equal(macStartup.default, false)
+  assert.equal(macIsolatedCandidate.default, false)
   assert.equal(buildPrivateNext.default, true)
   assert.equal(packageRun.required, false)
   assert.deepEqual(workflow.on.workflow_call.inputs, { package_run_id: { ...packageRun, required: true }, ...inspectionInputs })
