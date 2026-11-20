@@ -112,8 +112,10 @@ export class HostShellVerificationService {
       ...(!success ? { errorCode: 'host_shell_failed_exit' } : {}) }
     const { code: _code, error: _error, message: _message, ...previousOutput } = object(object(saved.shell).output)
     const shellOutput = { ...previousOutput, session_id: sessionId, status: success ? 'completed' : 'failed', exit_code: session.exitCode,
+      cwd: session.cwd, started_at: session.startedAt, finished_at: session.finishedAt,
       output_sha256: outputSha256, output_bytes: outputBytes, read_only_verification: true }
-    if (object(saved.verification).outputSha256 === outputSha256 && object(saved.verification).status === verification.status) return verification
+    if (object(saved.verification).outputSha256 === outputSha256 && object(saved.verification).status === verification.status &&
+      previousOutput.cwd === session.cwd && previousOutput.started_at === session.startedAt && previousOutput.finished_at === session.finishedAt) return verification
     this.repository.transact(() => {
       const receipt = this.repository.operation(original.ownerId, original.idempotencyKey)!
       const current = object(receipt.result)

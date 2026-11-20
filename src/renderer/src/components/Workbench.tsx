@@ -1,6 +1,6 @@
-import { requestTaskDetail } from '../store/task-live-store'
-import { useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
-import { openGeneratedWorkspaceFile } from '../lib/generated-file-actions'
+import { requestTaskDetail, takeRequestedTask, updateTaskNavigation } from '../store/task-live-store'
+import { findTaskOriginConversation } from '../lib/task-conversation-navigation'
+import { listenToForegroundTask, useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -177,7 +177,6 @@ const registerBuiltinWorkbenchView = <Module,>(
 }
 registerBuiltinWorkbenchView('plugins', 10, 'plugins', () => import('./PluginMarketplaceView'))
 registerBuiltinWorkbenchView('flow', 20, 'flow', () => import('./flow/FlowWorkspaceView'))
-registerBuiltinWorkbenchView('tasks', 15, 'tasks', () => import('./tasks/TaskWorkspaceView'))
 registerBuiltinWorkbenchView('schedule', 30, 'schedule', () => import('./schedule/ScheduleTasksView'))
 registerBuiltinWorkbenchView('design', 40, 'design', () => import('./design/DesignWorkspaceView'))
 registerBuiltinWorkbenchView('engineering', 50, 'engineering', () => import('./engineering/EngineeringWorkspaceView'))
@@ -481,6 +480,15 @@ export function Workbench(): ReactElement {
   const sddUpgradeTargetRef = useRef<PendingSddPlanTarget | null>(null)
   const writeContextGenerationRef = useRef(0)
   const pendingNotificationThreadRef = useRef<string | null>(null)
+  const [requestedTaskLink, setRequestedTaskLink] = useState<{ id: string } | null>(null)
+  const [linkedTask, setLinkedTask] = useState<{ id: string; threadId: string } | null>(null)
+
+  useEffect(() => listenToForegroundTask(({ threadId, taskId }) => {
+    if (useChatStore.getState().activeThreadId !== threadId) return
+    setRequestedTaskLink(null)
+    setLinkedTask({ id: taskId, threadId })
+    updateTaskNavigation({ selectedTaskId: taskId })
+  }), [])
 
   useEffect(() => {
     if (route !== 'write' || runtimeConnection !== 'ready' || busy) return
@@ -515,6 +523,12 @@ export function Workbench(): ReactElement {
     }
     return cards
   }, [timelineBlocks])
+  const inlineTaskRequests = useMemo(() => timelineBlocks.flatMap(block => {
+    if (block.kind === 'approval' && block.status === 'pending') return [block.approvalId]
+    if (block.kind === 'user_input' && block.status === 'pending') return [block.requestId]
+    return []
+  }), [timelineBlocks])
+  const timelineMessageIds = useMemo(() => new Set(timelineBlocks.map(block => block.id)), [timelineBlocks])
   const timelineLiveReasoning = liveReasoning
   const timelineLiveAssistant = liveAssistant
   const devPreviewBlocks = useMemo<ChatBlock[]>(() => {
@@ -562,14 +576,9 @@ export function Workbench(): ReactElement {
     () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
     [activeSkillWorkspace, timelineBlocks]
   )
-  const conversationArtifactPreview = useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready' && route !== 'tasks')
-  // Follow only the selected task's current execution, independently of chat.
-  const workspaceArtifactPreview = useTaskArtifactPreview(null, runtimeConnection === 'ready' && route === 'tasks', { followSelectedTask: true })
-  const taskArtifactPreview = route === 'tasks' ? workspaceArtifactPreview : conversationArtifactPreview
-  const artifactPreviewRouteRef = useRef(route)
-  artifactPreviewRouteRef.current = route
-  const latestDevPreviewUrl = taskArtifactPreview.url ?? (route === 'tasks' ? null : detectedDevPreviewUrls[0]) ?? null
-  const latestAutoOpenDevPreviewUrl = taskArtifactPreview.url ?? (route === 'tasks' ? null : autoOpenDevPreviewUrls[0]) ?? null
+  const taskArtifactPreview = useTaskArtifactPreview(activeThreadId, runtimeConnection === 'ready')
+  const latestDevPreviewUrl = taskArtifactPreview.url ?? detectedDevPreviewUrls[0] ?? null
+  const latestAutoOpenDevPreviewUrl = taskArtifactPreview.url ?? autoOpenDevPreviewUrls[0] ?? null
   const currentSideConversations = useMemo(
     () =>
       Object.values(sideConversations)
@@ -659,7 +668,7 @@ export function Workbench(): ReactElement {
     toggleLeftSidebar,
     toggleRightPanelMode,
   } = useWorkbenchLayout({
-    activeThreadId: route === 'tasks' ? workspaceArtifactPreview.scopeKey ?? 'task-workspace-preview' : activeThreadId,
+    activeThreadId,
     latestAutoOpenDevPreviewKey: taskArtifactPreview.key,
     latestAutoOpenDevPreviewUrl,
     latestDevPreviewUrl,
@@ -1884,6 +1893,7 @@ export function Workbench(): ReactElement {
   }
 
   const openThread = (id: string): void => {
+    setRequestedTaskLink(null)
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
     const selectedThread = threads.find((thread) => thread.id === id)
@@ -1926,10 +1936,47 @@ export function Workbench(): ReactElement {
     })
   }, [])
 
-  useEffect(()=>{
-    if(typeof window.workwise.onNotificationOpenTask!=='function')return
-    return window.workwise.onNotificationOpenTask(taskId=>{requestTaskDetail(taskId);setRoute('tasks')})
-  },[setRoute])
+  const openTaskConversationRef = useRef<(threadId: string) => void>(() => undefined)
+  openTaskConversationRef.current = (threadId) => {
+    if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
+    setConnectPhoneSidebarOpen(false)
+    closeCompactNavigation()
+    setRoute('chat')
+    if (activeThreadId !== threadId) void selectThread(threadId)
+  }
+
+  useEffect(() => {
+    const queue = (id: unknown): void => {
+      if (typeof id === 'string' && id.trim()) setRequestedTaskLink({ id })
+    }
+    const openTask = (event: Event): void => {
+      takeRequestedTask()
+      queue((event as CustomEvent<unknown>).detail)
+    }
+    window.addEventListener('railwise:open-task', openTask)
+    queue(takeRequestedTask())
+    const unsubscribe = window.workwise?.onNotificationOpenTask?.(requestTaskDetail)
+    return () => {
+      unsubscribe?.()
+      window.removeEventListener('railwise:open-task', openTask)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (runtimeConnection !== 'ready' || !requestedTaskLink) return
+    let active = true
+    const finish = (threadId: string | null): void => {
+      if (!active) return
+      setRequestedTaskLink(null)
+      if (threadId) {
+        setLinkedTask({ id: requestedTaskLink.id, threadId })
+        openTaskConversationRef.current(threadId)
+      } else setError(t('taskOriginConversationUnavailable'))
+    }
+    void findTaskOriginConversation(requestedTaskLink.id, path => rendererRuntimeClient.runtimeRequest(path))
+      .then(finish, () => finish(null))
+    return () => { active = false }
+  }, [requestedTaskLink, runtimeConnection, setError, t])
   useEffect(()=>{
     if(typeof window.workwise.onNotificationOpenFlow!=='function')return
     return window.workwise.onNotificationOpenFlow(reference=>{requestFlowDetail(reference);openFlow()})
@@ -1938,6 +1985,7 @@ export function Workbench(): ReactElement {
   const startNewChat = (): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
+    closeCompactNavigation()
     setRoute('chat')
     void createThread()
   }
@@ -1945,6 +1993,7 @@ export function Workbench(): ReactElement {
   const startNewChatInWorkspace = (workspaceRoot: string): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
+    closeCompactNavigation()
     setRoute('chat')
     void createThread({ workspaceRoot })
   }
@@ -1977,11 +2026,6 @@ export function Workbench(): ReactElement {
   const openFlowView = (): void => {
     setConnectPhoneSidebarOpen(false)
     openFlow()
-  }
-
-  const openTasksView = (): void => {
-    setConnectPhoneSidebarOpen(false)
-    setRoute('tasks')
   }
 
   const openDesignView = (): void => {
@@ -2036,12 +2080,9 @@ export function Workbench(): ReactElement {
   }
 
   const openWorkspaceArtifact = async (request: { taskId: string; artifactId: string }): Promise<void> => {
-    try {
-      await workspaceArtifactPreview.open(request)
-      if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
-    } catch {
-      // The preview hook retains the error for the task workspace retry card.
-    }
+    await taskArtifactPreview.open(request)
+    const { route: currentRoute, activeThreadId: currentThreadId } = useChatStore.getState()
+    if ((currentRoute === 'chat' || currentRoute === 'claw') && currentThreadId === activeThreadId) setRightPanelMode('browser')
   }
 
   const createLocalWorkbook = async (): Promise<void> => {
@@ -2228,7 +2269,7 @@ export function Workbench(): ReactElement {
     },
     browser: (module) => {
       const Panel = (module as typeof import('./DevBrowserPanel')).DevBrowserPanel
-      return <Panel blocks={route === 'tasks' ? [] : devPreviewBlocks} preferredUrl={latestDevPreviewUrl} sourceEvidenceStatus={taskArtifactPreview.sourceEvidenceStatus} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
+      return <Panel blocks={devPreviewBlocks} preferredUrl={latestDevPreviewUrl} sourceEvidenceStatus={taskArtifactPreview.sourceEvidenceStatus} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
     },
     plan: (module) => {
       const Panel = (module as typeof import('./plan/PlanPanel')).PlanPanel
@@ -2285,34 +2326,6 @@ export function Workbench(): ReactElement {
   }
 
   const workbenchViewRenderers: Record<string, (module: unknown) => ReactElement | null> = {
-    tasks: (module) => {
-      const View = (module as typeof import('./tasks/TaskWorkspaceView')).TaskWorkspaceView
-      return <div className="flex min-h-0 min-w-0 flex-1">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {workspaceArtifactPreview.error ? <div role="alert" className="ds-no-drag m-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-          <p>{workspaceArtifactPreview.error}</p>
-          <button type="button" className="mt-2 text-accent" onClick={() => {
-            void workspaceArtifactPreview.retry().then(() => {
-              if (artifactPreviewRouteRef.current === 'tasks') setRightPanelMode('browser')
-            }).catch(() => undefined)
-          }}>重新打开网页成果</button>
-        </div> : null}
-        <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path, artifactId) => {
-        if (/\.html?$/i.test(path) && artifactId) {
-          await openWorkspaceArtifact({ taskId: task.id, artifactId })
-        } else if (/\.(?:mp4|m4v|mov)$/i.test(path)) {
-          const result = await openGeneratedWorkspaceFile({ workspaceRoot: task.workspaceRoot, path })
-          if (!result.ok) throw new Error(result.message)
-        } else if (/\.(?:md|mdx|markdown)$/i.test(path)) {
-          await useWriteWorkspaceStore.getState().openFile(task.workspaceRoot, path)
-          setRoute('write')
-        } else {
-          window.dispatchEvent(new CustomEvent('kun:workspace-file-preview', { detail: { workspaceRoot: task.workspaceRoot, path } }))
-        }
-      }} onOpenFlow={(flowId, flowRunId) => { requestFlowDetail({flowId,flowRunId}); openFlow() }} onConfigureReplyDelivery={() => openSettings('claw')} onConfigureProvider={provider => { setConnectPhoneSidebarOpen(false); openPlugins(sidebarView === 'claw' ? 'claw' : 'chat', provider === 'lark' || provider === 'feishu' ? 'lark' : provider === 'dingtalk' ? 'dingtalk' : undefined) }} />
-        </div>
-      </div>
-    },
     plugins: (module) => {
       const View = (module as typeof import('./PluginMarketplaceView')).PluginMarketplaceView
       return (
@@ -2379,7 +2392,6 @@ export function Workbench(): ReactElement {
                 onOpenPlugins={openPluginsView}
                 onScheduleOpen={openScheduleView}
                 onFlowOpen={openFlowView}
-                onTasksOpen={openTasksView}
                 onDesignOpen={openDesignView}
                 onNewRequirement={() => void startNewSddRequirement()}
                 onOpenSettings={(section) => openSettings(section)}
@@ -2416,11 +2428,9 @@ export function Workbench(): ReactElement {
               onToggleFocusMode={toggleFocusMode}
               onScheduleOpen={openScheduleView}
               onFlowOpen={openFlowView}
-              onTasksOpen={openTasksView}
               onDesignOpen={openDesignView}
               onEngineeringOpen={openEngineeringMode}
               onToggleSidebar={toggleLeftSidebar}
-              onNavigate={closeCompactNavigation}
             />
             )}
           </div>
@@ -2542,12 +2552,6 @@ export function Workbench(): ReactElement {
                 </div>
               </div>
             </header>
-            <TaskRunStatusBar
-              threadId={activeThreadId}
-              runtimeReady={runtimeConnection === 'ready'}
-              onOpenTasks={openTasksView}
-              inlineCapabilityCards={inlineCapabilityCards}
-            />
             <MessageTimeline
               viewMode={conversationViewMode}
               blocks={timelineBlocks}
@@ -2579,6 +2583,19 @@ export function Workbench(): ReactElement {
             />
             <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8">
               <FloatingComposer
+                renderTaskControls={route === 'chat' || route === 'claw' ? ({ focusComposer, pickAttachments }) => (
+                  <TaskRunStatusBar
+                    threadId={activeThreadId}
+                    runtimeReady={runtimeConnection === 'ready'}
+                    inlineCapabilityCards={inlineCapabilityCards}
+                    inlineRequests={inlineTaskRequests}
+                    visibleMessageIds={timelineMessageIds}
+                    linkedTask={linkedTask ?? undefined}
+                    onSupplement={focusComposer}
+                    onPickAttachments={pickAttachments}
+                    onOpenArtifact={(task, artifact) => openWorkspaceArtifact({ taskId: task.id, artifactId: artifact.id })}
+                  />
+                ) : undefined}
                 input={input}
                 setInput={setInput}
                 mode={mode}

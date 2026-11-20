@@ -10,6 +10,7 @@ import { scheduleForRequirement, type ScheduleRequirement } from '../contracts/s
 import type { ToolHostContext } from '../ports/tool-host.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import type { ThreadRecord } from '../contracts/threads.js'
+import type { AttachmentStore } from '../attachments/attachment-store.js'
 import { createApprovalRequest } from '../domain/approval.js'
 import { waitForApprovalDecision } from '../ports/approval-gate.js'
 import type { FlowRuntimeService } from '../flow/service.js'
@@ -17,6 +18,7 @@ import { operationFingerprint, type TaskRunRepository } from './task-run-reposit
 import type { TaskController } from './task-controller.js'
 import type { TaskCoordinator } from './task-coordinator.js'
 import type { WorkspaceTrustReader } from './workspace-trust-reader.js'
+import { WorkspaceReferenceService } from './workspace-reference-service.js'
 import { taskPublicQueryAuthority, taskPublicQueryGrant, verifiedTaskPublicQueryAction, verifiedTaskPublicQueryDocumentNavigation } from './browser-public-query-authority.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { BrowserScheduleActionSchema, type BrowserScheduleAction, type BrowserScheduleBinding } from '../contracts/browser-schedule-actions.js'
@@ -25,6 +27,7 @@ import { verifiedTaskRetryLineage } from './task-retry-lineage.js'
 import { isTaskScheduleBridgeProvider, taskScheduleConnectorIdentities } from '../contracts/task-schedule-policy.js'
 
 type ThreadAuthority = Pick<ThreadRecord, 'workspace' | 'agentId' | 'agentRevision' | 'agentProfile' | 'approvalPolicy' | 'sandboxMode' | 'mode'>
+type ScheduledInputs = Pick<ThreadRecord['turns'][number], 'attachmentIds' | 'workspaceReferences' | 'capabilityReferences'>
 type RetiredBrowserActionEvidence = {
   dispatchReceiptId: string; toolReceiptId: string; retiredBindingReceiptId: string; currentBindingReceiptId: string; bindingLineageReceiptIds: string[]
   evidenceKind: 'historical_task_scope' | 'historical_exact_approval'; settlementReceiptId?: string
@@ -37,6 +40,7 @@ type ScheduledTaskAuthority = {
   model: string
   providerId?: string
   prompt: string
+  inputs?: ScheduledInputs
   webEvidenceBasis?: 'primary_document' | 'observed_feed'
   requirement: ScheduleRequirement
   grant: ExecutionGrant
@@ -61,6 +65,9 @@ function threadAuthority(thread: ThreadRecord): ThreadAuthority {
     approvalPolicy: thread.approvalPolicy, sandboxMode: thread.sandboxMode, mode: thread.mode }
 }
 function fail(message: string): never { throw Object.assign(new Error(message), { code: 'schedule_authority_changed' }) }
+function missingSource(): never {
+  throw Object.assign(new Error('定时计划暂时读不到原来选定的资料。请在原会话检查文件或重新添加资料，然后重试本次执行。'), { code: 'schedule_source_missing' })
+}
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const browserOutput = (receipt: OperationReceipt) => record(record(record(receipt.result).item).output)
 const validTimes = (...values: unknown[]): boolean => values.every(value => typeof value === 'string' && Number.isFinite(Date.parse(value)))
@@ -76,6 +83,7 @@ export class TaskScheduleService {
   constructor(private readonly deps: {
     flows: FlowRuntimeService; repository: TaskRunRepository; tasks: TaskController
     coordinator: TaskCoordinator; threads: ThreadStore; workspaceTrust: WorkspaceTrustReader
+    attachments?: Pick<AttachmentStore, 'resolveMetadataV2'>
     connectorIdentities(): Record<string, string>; browserState?(): BrowserCapabilityConfig; egoBrowserState?(): EgoBrowserCapabilityConfig; nowIso(): string
   }) {}
 
@@ -104,10 +112,15 @@ export class TaskScheduleService {
       connectorIdentityFingerprints: grant.connectorIdentityFingerprints, connectorBackends: grant.connectorBackends, browserScope: grant.browserScope,
       ...(permission?.scope ? { permissionScope: permission.scope } : {}), ...(grant.workspaceWriteException ? { workspaceWriteException: true } : {}),
       ...(browserActions.length || scopedSchedule ? { browserScheduleActions: browserActions } : {}) })
-    const scopeHash = fingerprint({ taskId: task.id, requirement: task.acceptance.schedule, scope, execution: threadAuthority(execution), origin: threadAuthority(origin) })
+    const turn = execution.turns.find(item => item.id === grant.turnId)
+    const inputs = turn && (turn.attachmentIds.length || turn.workspaceReferences?.length || turn.capabilityReferences?.length)
+      ? { attachmentIds: turn.attachmentIds, workspaceReferences: turn.workspaceReferences, capabilityReferences: turn.capabilityReferences }
+      : undefined
+    const scopeHash = fingerprint({ taskId: task.id, requirement: task.acceptance.schedule, scope, execution: threadAuthority(execution), origin: threadAuthority(origin), ...(inputs ? { inputs } : {}) })
     let authority: ScheduledTaskAuthority = {
       taskId: task.id, threadId: context.threadId, originThreadId: task.originThreadId ?? context.threadId,
       model: task.model ?? context.model?.id ?? 'auto', providerId: task.providerId, prompt: task.goal,
+      ...(inputs ? { inputs } : {}),
       ...(task.acceptance.webEvidenceBasis ? { webEvidenceBasis: task.acceptance.webEvidenceBasis } : {}), requirement: task.acceptance.schedule, grant,
       execution: threadAuthority(execution), origin: threadAuthority(origin), sourceAuthorityHash: fingerprint(task.authority ?? null), scope,
       authorization: { kind: scopedSchedule ? 'confirmed_task_scope' : 'requested_schedule', expiresAt: null, until: 'disabled', scopeHash,
@@ -128,6 +141,7 @@ export class TaskScheduleService {
       const previous = saved.scope.browserScheduleActions ?? []
       if (fingerprint(previous) === fingerprint(browserActions)) return this.snapshot(existing)
       if (browserActions.length <= previous.length || previous.some(action => !browserActions.some(candidate => fingerprint(candidate) === fingerprint(action)))) fail('已有浏览器动作范围已变化，请先核对原计划授权。')
+      if (fingerprint(saved.inputs ?? null) !== fingerprint(inputs ?? null)) fail('原计划选定的资料已变化，请在原会话核对后更新计划。')
       const { browserScheduleActions: _previousActions, ...previousScope } = taskScheduleScope(saved.scope)
       const { browserScheduleActions: _nextActions, ...nextScope } = scope
       if (fingerprint(previousScope) !== fingerprint(nextScope)) fail('重新保存浏览器动作不能扩大原计划的其他权限。')
@@ -335,8 +349,8 @@ export class TaskScheduleService {
       await this.validateAuthority(authority,undefined,undefined,recovery)
       const result = await this.deps.coordinator.command({ threadId: authority.originThreadId, intent: 'new',
         idempotencyKey: `schedule:${input.scheduleId}:${input.dueAt}`,
-        request: { prompt: authority.prompt, model: authority.model, providerId: authority.providerId, mode: 'agent' }
-      }, { prepareExecutionThread: async thread => {
+        request: { prompt: authority.prompt, model: authority.model, providerId: authority.providerId, mode: 'agent', ...authority.inputs }
+      }, { source: 'scheduled-occurrence', prepareExecutionThread: async thread => {
         if (thread.workspace !== authority.execution.workspace) fail('周期执行工作区与原授权不一致。')
         const prepared = this.deps.repository.beginOperation({ ownerId: thread.id, idempotencyKey: 'scheduled-task-context', kind: 'scheduled_task_prepare',
           request: { ...input, authorityHash: fingerprint(authority) }, nowIso: this.deps.nowIso() })
@@ -367,6 +381,7 @@ export class TaskScheduleService {
       })
     } catch (error) {
       const now = this.deps.nowIso()
+      const missingInput = error instanceof Error && (error as Error & { code?: string }).code === 'schedule_source_missing'
       this.deps.repository.transact(() => {
         const previous = this.deps.repository.attention(attentionId), flow = this.deps.flows.get(input.scheduleId)
         if (!flow || flow.variables.archived === true || flow.variables.enabled === false || flow.publishedVersionId !== input.versionId ||
@@ -375,10 +390,10 @@ export class TaskScheduleService {
         const createdAt = previous?.status === 'pending' ? previous.createdAt
           : previousCreated !== undefined && Number.isFinite(previousCreated) && Date.parse(now) <= previousCreated ? new Date(previousCreated + 1).toISOString() : now
         this.deps.repository.putAttention({ id: attentionId, ownerKind: 'flow', ownerId: input.scheduleId,
-          flowId: input.scheduleId, threadId: authority.originThreadId, kind: 'blocked', title: '定时计划等待核对',
+          flowId: input.scheduleId, threadId: authority.originThreadId, ...(missingInput ? { workspaceRoot: authority.grant.workspaceRoot } : {}), kind: 'blocked', title: '定时计划等待核对',
           message: error instanceof Error ? error.message : String(error), status: 'pending', revision: (previous?.revision ?? -1) + 1,
           createdAt, updatedAt: Date.parse(now) < Date.parse(createdAt) ? createdAt : now,
-          payload: { scheduleId: input.scheduleId, versionId: input.versionId, dueAt: input.dueAt } })
+          payload: { scheduleId: input.scheduleId, versionId: input.versionId, dueAt: input.dueAt, ...(missingInput ? { reasonCode: 'schedule_source_missing' } : {}) } })
       })
       throw error
     }
@@ -773,6 +788,7 @@ export class TaskScheduleService {
       workspace.revision !== grant.workspaceRevision || workspace.level !== grant.workspaceTrust ||
       (execution.agentRevision ?? 0) !== grant.agentRevision || (execution.agentProfile?.trustLevel ?? 'full-access') !== grant.agentTrust ||
       execution.approvalPolicy !== grant.approvalPolicy) fail('原计划的工作区、Agent 或授权范围已变化，请核对后再执行。')
+    await this.validateInputs(authority)
     if ((source.authority?.taskApprovalGrant?.scope || grant.workspaceWriteException) && authority.authorization.kind !== 'confirmed_scope') fail('持续路径权限尚未确认。')
     const publicScope = grant.browserScope?.publicQueryAuthorization
     if (publicScope) {
@@ -793,6 +809,22 @@ export class TaskScheduleService {
     }
     this.validateConnectorBindings(authority)
     return browserHistory
+  }
+
+  private async validateInputs(authority: ScheduledTaskAuthority): Promise<void> {
+    const inputs = authority.inputs
+    if (!inputs) return
+    const workspace = authority.grant.workspaceRoot
+    const attachments = this.deps.attachments
+    if (inputs.attachmentIds.length && !attachments) missingSource()
+    try {
+      if (inputs.workspaceReferences?.length) await new WorkspaceReferenceService().validateReferences(workspace, inputs.workspaceReferences)
+      if (attachments) await Promise.all(inputs.attachmentIds.map(async id => {
+        for (const threadId of new Set([authority.originThreadId, authority.threadId])) {
+          await attachments.resolveMetadataV2(id, { threadId, workspace })
+        }
+      }))
+    } catch { missingSource() }
   }
 
   private recoveryForAuthority(authority: ScheduledTaskAuthority) {

@@ -146,6 +146,14 @@ describe('production task coordinator and durable Worker delivery',()=>{
     expect(deliveredBeforeCheckpoint).toBe(true)
     expect(runtime.taskRepository!.get(task.id)?.status).toBe('completed')
     expect((await runtime.threadService.list()).map(thread=>thread.id)).toEqual([origin.id])
+    await runtime.taskCoordinator!.flushCommandMessages()
+    const originItems = await runtime.sessionStore.loadItems(origin.id)
+    expect(originItems.find(item => item.id === `item_command_task_result_${task.id}_receipt`)).toMatchObject({
+      kind: 'assistant_text', text: '合成测试结论：资料记载本期数据完整，风险分析需继续核查阈值。', status: 'completed'
+    })
+    expect(originItems.filter(item => item.kind === 'user_message' && item.workspaceReferences?.some(ref => ref.path === 'risk.md'))).toHaveLength(1)
+    await runtime.taskCoordinator!.flushCommandMessages()
+    expect((await runtime.sessionStore.loadItems(origin.id)).filter(item => item.id === `item_command_task_result_${task.id}_receipt`)).toHaveLength(1)
     const bundles=runtime.taskContextRuntime!.repository.listContextBundles(task.id)
     expect(bundles.length).toBeGreaterThan(0)
   },15_000)

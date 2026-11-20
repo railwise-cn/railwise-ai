@@ -27,7 +27,6 @@ import {
   SidebarCommandRow,
   SidebarFrame
 } from '../sidebar/SidebarPrimitives'
-import { TaskSidebar } from '../tasks/TaskSidebar'
 import { WorkspaceSecondaryNavigation } from '../sidebar/WorkspaceSecondaryNavigation'
 
 type Props = {
@@ -58,10 +57,8 @@ type Props = {
   onScheduleOpen: () => void
   onFlowOpen: () => void
   onDesignOpen: () => void
-  onTasksOpen?: () => void
   onEngineeringOpen: () => void
   onToggleSidebar: () => void
-  onNavigate?: () => void
 }
 
 export function Sidebar({
@@ -92,10 +89,8 @@ export function Sidebar({
   onScheduleOpen,
   onFlowOpen,
   onDesignOpen,
-  onTasksOpen,
   onEngineeringOpen,
-  onToggleSidebar,
-  onNavigate
+  onToggleSidebar
 }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
@@ -162,7 +157,6 @@ export function Sidebar({
           onScheduleOpen={onScheduleOpen}
           onFlowOpen={onFlowOpen}
           onDesignOpen={onDesignOpen}
-          onTasksOpen={onTasksOpen}
         />
 
         <div className="mx-2 my-2 border-t border-[var(--ds-sidebar-divider)]" />
@@ -189,8 +183,6 @@ export function Sidebar({
           onDisconnect={(channelId) => deleteClawChannel(channelId)}
           onOpenSettings={() => onOpenSettings('claw')}
         />
-      ) : navigationRoute === 'tasks' ? (
-        <TaskSidebar workspaceRoot={workspaceRoot} runtimeReady={runtimeReady} onChooseWorkspace={() => void chooseWorkspace()} onNavigate={onNavigate} />
       ) : activeView === 'claw' ? (
         <ClawSidebarContent
           channels={clawChannels}

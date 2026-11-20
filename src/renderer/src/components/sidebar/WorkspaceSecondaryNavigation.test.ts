@@ -10,7 +10,6 @@ type ActiveRoute = ComponentProps<typeof WorkspaceSecondaryNavigation>['activeRo
 
 const labelsByRoute: Partial<Record<ActiveRoute, string>> = {
   write: 'Write',
-  tasks: 'Tasks',
   plugins: 'Skills &amp; connectors',
   schedule: 'Scheduled tasks',
   flow: 'Flow',
@@ -21,7 +20,6 @@ function props(activeRoute: ActiveRoute): ComponentProps<typeof WorkspaceSeconda
   return {
     activeRoute,
     onWriteOpen: vi.fn(),
-    onTasksOpen: vi.fn(),
     toolCapabilities: {
       flow: { enabled: true, available: true, status: 'available' },
       schedule: { enabled: true, available: true, status: 'available' },
@@ -60,11 +58,11 @@ describe('WorkspaceSecondaryNavigation', () => {
 
     await act(async () => root.render(createElement(WorkspaceSecondaryNavigation, callbacks)))
     const buttons = container.querySelectorAll<HTMLButtonElement>('nav[aria-label="Workspace tools"] button')
-    expect(buttons).toHaveLength(6)
+    expect(buttons).toHaveLength(5)
+    expect([...buttons].map(button => button.textContent)).not.toContain('Tasks')
     for (const button of buttons) await act(async () => button.click())
 
     expect(callbacks.onWriteOpen).toHaveBeenCalledOnce()
-    expect(callbacks.onTasksOpen).toHaveBeenCalledOnce()
     expect(callbacks.onOpenPlugins).toHaveBeenCalledOnce()
     expect(callbacks.onScheduleOpen).toHaveBeenCalledOnce()
     expect(callbacks.onFlowOpen).toHaveBeenCalledOnce()

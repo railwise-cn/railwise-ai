@@ -145,13 +145,15 @@ describe('configured provider identity over real HTTP', () => {
       data: Buffer.from('%PDF-1.7 synthetic test metadata'), threadId: thread.id, workspace: first.root
     })
     await first.runtime.attachmentStore!.updateV2(attachment.id, { state: 'ready', indexState: 'ready', summary: 'Authorized task source' })
-    const started = await first.runtime.turnService.startTurn({
-      threadId: thread.id,
+    const result = await first.runtime.taskCoordinator!.command({
+      threadId: thread.id, intent: 'new', idempotencyKey: 'start-interrupted-fixture',
       request: { prompt: 'What is 2+3?', providerId: 'a', taskIntent: 'new', attachmentIds: [attachment.id] }
     })
+    if (result.kind !== 'task_started') throw new Error('expected task started from the original conversation')
+    const started = result.turn
     const initial = first.runtime.taskRepository!.findByTurn(started.turnId)!
 
-    await expect(first.runtime.runTurn(thread.id, started.turnId)).resolves.toBe('failed')
+    await expect(first.runtime.runTurn(started.threadId, started.turnId)).resolves.toBe('failed')
     expect(first.runtime.taskRepository!.get(initial.id)).toMatchObject({ status: 'stalled', blockCode: 'response_interrupted' })
     expect(first.runtime.taskRepository!.operations(initial.id, 'tool')).toHaveLength(0)
     expect(provider.requests).toHaveLength(1)
@@ -161,10 +163,13 @@ describe('configured provider identity over real HTTP', () => {
     const second = await runtimeFor([provider.route], 'a', first.root)
     const saved = second.runtime.taskRepository!.get(initial.id)!
     expect(saved).toMatchObject({ status: 'stalled', blockCode: 'response_interrupted' })
-    expect((await second.runtime.sessionStore.loadItems(thread.id)).filter(item => item.kind === 'assistant_text')).toEqual([
+    expect((await second.runtime.sessionStore.loadItems(started.threadId)).filter(item => item.kind === 'assistant_text')).toEqual([
       expect.objectContaining({ text: 'Some visible text before disconnect.', status: 'failed' })
     ])
-    expect((await second.runtime.sessionStore.loadEventsSince(thread.id, 0)).filter(event => event.kind === 'turn_failed')).toEqual([
+    expect((await second.runtime.sessionStore.loadItems(thread.id)).filter(item => item.id === `item_command_task_partial_${started.turnId}_receipt`)).toEqual([
+      expect.objectContaining({ text: expect.stringContaining('Some visible text before disconnect.'), kind: 'assistant_text' })
+    ])
+    expect((await second.runtime.sessionStore.loadEventsSince(started.threadId, 0)).filter(event => event.kind === 'turn_failed')).toEqual([
       expect.objectContaining({ reason: 'response_interrupted' })
     ])
     expect(provider.requests).toHaveLength(1)
@@ -177,7 +182,7 @@ describe('configured provider identity over real HTTP', () => {
     await vi.waitFor(() => expect(second.runtime.taskRepository!.get(saved.id)?.status).toBe('completed'))
     expect(provider.requests).toHaveLength(2)
     expect(JSON.stringify(provider.requests[1]?.body.messages)).toContain(`resume-source.pdf (pdf, ready, id=${attachment.id})`)
-    expect(await second.runtime.turnService.getTurn(thread.id, resumed.turn!.turnId)).toMatchObject({ attachmentIds: [attachment.id] })
+    expect(await second.runtime.turnService.getTurn(started.threadId, resumed.turn!.turnId)).toMatchObject({ attachmentIds: [attachment.id] })
   })
 
   it('carries identity through Auto and child requests while Flow internal requests retain the default', async () => {

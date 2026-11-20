@@ -176,11 +176,15 @@ export class TurnService {
   }
 
   /** Conversation receipts are durable history, not model execution Turns. */
-  async recordCommandExchange(input: {threadId:string;commandId:string;userText?:string;assistantText:string;createdAt:string;capabilityCard?:import('../contracts/items.js').AssistantTextTurnItem['capabilityCard'];intentCard?:import('../contracts/items.js').TaskIntentCard}): Promise<void> {
+  async recordCommandExchange(input: {threadId:string;commandId:string;userText?:string;assistantText:string;createdAt:string;capabilityCard?:import('../contracts/items.js').AssistantTextTurnItem['capabilityCard'];intentCard?:import('../contracts/items.js').TaskIntentCard;userAttachmentIds?:Parameters<typeof makeUserItem>[0]['attachmentIds'];userWorkspaceReferences?:Parameters<typeof makeUserItem>[0]['workspaceReferences']}): Promise<void> {
     const turnId=`command_${input.commandId}`
     const existing = new Set((await this.deps.sessionStore.loadItems(input.threadId)).map(item=>item.id))
     const recorded = new Set((await this.deps.sessionStore.loadEventsSince(input.threadId,0)).filter(event=>event.kind==='item_created').map(event=>'itemId' in event?event.itemId:undefined))
-    const items = [...(input.userText !== undefined ? [makeUserItem({id:`item_${turnId}_user`,turnId,threadId:input.threadId,text:input.userText})] : []),makeAssistantTextItem({id:`item_${turnId}_receipt`,turnId,threadId:input.threadId,text:input.assistantText,status:'completed'})]
+    const items = [
+      ...(input.userText !== undefined ? [makeUserItem({ id: `item_${turnId}_user`, turnId, threadId: input.threadId,
+        text: input.userText, attachmentIds: input.userAttachmentIds, workspaceReferences: input.userWorkspaceReferences })] : []),
+      makeAssistantTextItem({ id: `item_${turnId}_receipt`, turnId, threadId: input.threadId, text: input.assistantText, status: 'completed' })
+    ]
     for(const value of items) {
       const item={...value,conversationReceiptId:turnId,createdAt:input.createdAt,finishedAt:input.createdAt,...(value.kind==='assistant_text'&&input.capabilityCard?{capabilityCard:input.capabilityCard}:{}),...(value.kind==='assistant_text'&&input.intentCard?{intentCard:input.intentCard}:{})}
       if (!existing.has(item.id)) await this.deps.sessionStore.appendItem(input.threadId,item)

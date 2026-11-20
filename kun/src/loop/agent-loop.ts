@@ -1247,7 +1247,8 @@ export class AgentLoop {
       ...(attachments.documentManifests.length ? [documentAttachmentInstruction(attachments.documentManifests)] : []),
       ...(occurrenceTask && stepIndex === 0 ? [
         'Use the task’s explicitly attached documents and workspace references as primary inputs. Read them with the advertised scoped tools before attempting production. If a necessary file is missing or a scanned PDF has no usable text, ask the user to attach the specific file or a readable copy. Do not search the user profile or whole disk for material.',
-        'Check only the dependencies required by the active Skill. If a renderer or runtime is unavailable, state which dependency is missing and preserve the draft and source materials for continuation.'
+        'Check only the dependencies required by the active Skill. If a renderer or runtime is unavailable, state which dependency is missing and preserve the draft and source materials for continuation.',
+        'Resolve routine choices from the request and authorized sources. Ask a concise question only when an essential detail is missing, and continue the same work after the answer. Use the dedicated approval flow for operations that require authorization.'
       ] : []),
       ...(attachments.evidence.length ? [attachmentEvidenceInstruction(attachments.evidence)] : []),
       ...(workspaceReferences.length ? [workspaceReferenceInstruction(workspaceReferences)] : []),
@@ -1594,6 +1595,7 @@ export class AgentLoop {
       )
     }
     if (interrupted) {
+      this.opts.tasks?.projectInterruptedResponse?.(threadId, turnId, textAccumulator.value)
       if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) return 'outcome_unknown'
       const interruption = textAccumulator.value ? '模型响应中断，已保留收到的部分回复。' : '模型响应中断。'
       const message = interruption + (activeTask ? '可以从原任务继续。' : '可以在当前会话继续。')

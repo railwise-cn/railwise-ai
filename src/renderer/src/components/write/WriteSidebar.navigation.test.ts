@@ -19,7 +19,6 @@ function createProps(): ComponentProps<typeof WriteSidebar> {
     onEngineeringOpen: vi.fn(),
     onWriteOpen: vi.fn(),
     onOpenPlugins: vi.fn(),
-    onTasksOpen: vi.fn(),
     onScheduleOpen: vi.fn(),
     onFlowOpen: vi.fn(),
     onDesignOpen: vi.fn(),
@@ -58,7 +57,6 @@ describe('WriteSidebar navigation', () => {
     expect([...primaryButtons].map((button) => button.textContent)).toEqual(['Code', 'Survey'])
     expect([...toolButtons].map((button) => button.textContent)).toEqual([
       'Write',
-      'Tasks',
       'Skills & connectors'
     ])
     expect(toolButtons[0]?.getAttribute('aria-current')).toBe('page')
@@ -69,7 +67,6 @@ describe('WriteSidebar navigation', () => {
     expect(sidebarProps.onCodeOpen).toHaveBeenCalledOnce()
     expect(sidebarProps.onEngineeringOpen).toHaveBeenCalledOnce()
     expect(sidebarProps.onWriteOpen).toHaveBeenCalledOnce()
-    expect(sidebarProps.onTasksOpen).toHaveBeenCalledOnce()
     expect(sidebarProps.onOpenPlugins).toHaveBeenCalledOnce()
     expect(sidebarProps.onScheduleOpen).not.toHaveBeenCalled()
     expect(sidebarProps.onFlowOpen).not.toHaveBeenCalled()

@@ -7,9 +7,10 @@ import { ManagedDingTalkConnection } from '../connectors/ManagedDingTalkConnecti
 import { BrowserTaskBindingPanel } from '../connectors/BrowserTaskBindingPanel'
 import { ManagedBrowserSkillConnection } from '../connectors/ManagedBrowserSkillConnection'
 import { TaskPermissionPanel } from './TaskPermissionPanel'
+import { TaskPublicQueryRecoveryCard } from '../tasks/TaskPublicQueryRecoveryCard'
 import { requestFlowDetail } from '../../store/flow-navigation'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
-import { refreshTaskState, requestTaskDetail, useTaskState } from '../../store/task-live-store'
+import { refreshTaskState, useTaskState } from '../../store/task-live-store'
 import { isExecutionGrantExpiredCapability, taskHasExecutionEvidence } from '@shared/task-presentation'
 import { foregroundTaskArtifactPreview } from '../../lib/use-task-artifact-preview'
 
@@ -35,7 +36,6 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
   const openPlugins = useChatStore((state) => state.openPlugins)
   const openSettings = useChatStore((state) => state.openSettings)
   const chooseWorkspace = useChatStore((state) => state.chooseWorkspace)
-  const setRoute = useChatStore((state) => state.setRoute)
   const live = useTaskState()
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState('')
@@ -43,6 +43,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
   const [rechecked, setRechecked] = useState<{ source: ExternalTaskCapabilityCard['capability']; capability: ExternalTaskCapabilityCard['capability'] }>()
   const capability = rechecked?.source === card.capability ? rechecked.capability : card.capability
   const [showPermissions, setShowPermissions] = useState(false)
+  const [showQueryRecovery, setShowQueryRecovery] = useState(false)
   const [showBrowserBinding, setShowBrowserBinding] = useState(false)
   const [browserBindingGeneration, setBrowserBindingGeneration] = useState(0)
   const [checkedRequest, setCheckedRequest] = useState('')
@@ -74,10 +75,8 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     ? ownerTask && !taskHasExecutionEvidence(ownerTask) ? 'capabilityRequiredTitle' : 'capabilityBlockedAfterProgressTitle'
     : settled ? 'capabilityHistoryTitle' : 'capabilityRecordTitle'
   const executionGrantExpired = isExecutionGrantExpiredCapability(capability)
-  const openOriginalTask = (): void => { requestTaskDetail(card.taskId); setRoute('tasks') }
   const openConfiguration = (): void => {
-    if (isEgo && action?.route === 'task/ego-browser-review') openOriginalTask()
-    else if (isEgo) openPlugins()
+    if (isEgo) openPlugins()
     else if (connector) openPlugins(undefined, connector)
     else if (capability.provider === 'schedule' && action?.route.startsWith('flow/')) {
       requestFlowDetail({ flowId: action.route.slice('flow/'.length) })
@@ -91,11 +90,11 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     }
     const route = action?.route ?? ''
     if (isEgo && route === 'task/ego-browser-review') {
-      openOriginalTask()
+      setShowPermissions(value => !value)
       return
     }
     if (isBrowser && route === 'task/public-query-recovery') {
-      openOriginalTask()
+      setShowQueryRecovery(value => !value)
       return
     }
     if (capability.provider === 'schedule' && route === 'task/schedule-review') {
@@ -216,14 +215,13 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       {isBrowser && interactive ? <ManagedBrowserSkillConnection onChanged={() => setBrowserBindingGeneration(value => value + 1)} /> : null}
       {showBrowserBinding && interactive ? <BrowserTaskBindingPanel key={browserBindingGeneration} taskId={card.taskId} onConfirmed={setMessage} /> : null}
       {showPermissions && interactive ? <TaskPermissionPanel taskId={card.taskId} autoLoad onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
+      {showQueryRecovery && interactive && ownerTask ? <TaskPublicQueryRecoveryCard task={ownerTask} runtimeReady={stateKnown} onChanged={refreshTaskState} onNotice={setMessage} /> : null}
       {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {interactive ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
-        {executionGrantExpired ? <button type="button" onClick={openOriginalTask}>{t('taskRunOpenTaskWorkspace')}</button> : null}
         <button type="button" disabled={pending} onClick={configure}>{egoTaskReview ? t('capabilityViewTaskRecoveryOptions') : isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isDingTalk ? 'capabilityConfigureDingTalk' : 'capabilityOpenMarketplace')}</button>
         <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
         <button type="button" disabled={pending} onClick={() => void run(decline)}>{t('capabilityDecline')}</button>
       </div> : <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
-        <button type="button" onClick={openOriginalTask}>{t('taskRunOpenTaskWorkspace')}</button>
         <button type="button" onClick={openConfiguration}>{t('capabilityViewConfiguration')}</button>
         {!stateKnown ? <button type="button" disabled={pending} onClick={() => void run(refreshTaskState)}>{t('capabilityRefreshTaskState')}</button> : null}
       </div>}

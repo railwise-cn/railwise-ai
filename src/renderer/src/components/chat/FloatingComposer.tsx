@@ -10,7 +10,8 @@ import {
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
-  type ReactElement
+  type ReactElement,
+  type ReactNode
 } from 'react'
 import {
   Archive,
@@ -107,6 +108,7 @@ export type { ComposerFileReference } from '../../lib/composer-file-references'
 export type { ComposerExecutionSettings } from './FloatingComposerExecutionPicker'
 
 type Props = {
+  renderTaskControls?: (controls: { focusComposer: () => void; pickAttachments?: () => void }) => ReactNode
   variant?: 'default' | 'compact'
   composerMinHeight?: number
   composerMaxHeight?: number
@@ -600,6 +602,7 @@ function moveComposerOption(current: number, options: ComposerCommand[], step: 1
 }
 
 export function FloatingComposer({
+  renderTaskControls,
   variant = 'default',
   composerMinHeight = 36,
   composerMaxHeight = 176,
@@ -1704,6 +1707,10 @@ export function FloatingComposer({
         messages={queuedMessages}
         onRemove={onRemoveQueuedMessage}
       />
+      {renderTaskControls?.({
+        focusComposer: draft.focusComposer,
+        pickAttachments: canPickAttachment && onPickAttachments ? handleAttachmentMenuClick : undefined
+      })}
 
       <div ref={suggestionAnchorRef} className="relative">
         {!compact && activeThreadGoal && slashQuery == null && !goalPanelOpen && !composerMenuOpen ? (

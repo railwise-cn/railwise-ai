@@ -7,6 +7,7 @@ import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
 import { FileThreadStore } from '../adapters/file/file-thread-store.js'
 import { FileSessionStore } from '../adapters/file/file-session-store.js'
 import { InMemoryEventBus } from '../adapters/in-memory-event-bus.js'
+import { PersistentUserInputGate } from '../adapters/persistent-human-gates.js'
 import { RuntimeEventRecorder } from './runtime-event-recorder.js'
 import { ThreadService } from './thread-service.js'
 import { TurnService } from './turn-service.js'
@@ -41,6 +42,16 @@ async function fixture(persistent = false, nowIso = () => new Date().toISOString
 }
 
 describe('task commands before Turn allocation',()=>{
+  it('runs a due occurrence without adding its internal prompt to the conversation', async () => {
+    const f = await fixture()
+    const command = { threadId: f.origin.id, intent: 'new' as const, idempotencyKey: 'due', request: { prompt: '按既有计划整理本期资料' } }
+    const first = await f.coordinator.command(command, { source: 'scheduled-occurrence' })
+    expect(first.kind).toBe('task_started')
+    await f.coordinator.command(command, { source: 'scheduled-occurrence' })
+    expect(await f.sessionStore.loadItems(f.origin.id)).toEqual([])
+    expect(f.runTurn).toHaveBeenCalledOnce()
+  })
+
   it('keeps durable admission owned while a scheduled task is prepared before worker dispatch', async () => {
     let now = '2026-11-17T00:30:00.000Z'
     const f = await fixture(false, () => now)
@@ -397,9 +408,63 @@ describe('task commands before Turn allocation',()=>{
     expect(f.runTurn).toHaveBeenCalledTimes(1)
   })
 
-  it('persists ambiguous ownership and resolves it only after an explicit successful decision',async()=>{
+  it('uses ordinary conversational input to supplement the only active task', async () => {
+    const f = await fixture()
+    const started = await f.coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'start', request: { prompt: '完成报告' } })
+    const followup = await f.coordinator.command({ threadId: f.origin.id, idempotencyKey: 'followup', request: { prompt: '这里需要调整一下' } })
+    expect(followup).toMatchObject({ kind: 'input_queued', task: { id: started.task!.id }, input: { text: '这里需要调整一下' } })
+    const running = await f.coordinator.command({ threadId: f.origin.id, idempotencyKey: 'continue', request: { prompt: '继续' } })
+    expect(running).toMatchObject({ kind: 'snapshot', task: { id: started.task!.id } })
+    expect(f.repository.inbox(f.root)).toEqual([])
+    expect(f.runTurn).toHaveBeenCalledOnce()
+  })
+
+  it('uses the chat reply to resume a task that ended while waiting for missing information', async () => {
+    const f = await fixture()
+    const command = { threadId: f.origin.id, idempotencyKey: 'details', request: { prompt: '采用本月的报告周期。' } }
+    const started = await f.coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'start', request: { prompt: '完成合成报告' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    await f.turns.finishTurn({ threadId: started.turn.threadId, turnId: started.turn.turnId, status: 'failed' })
+    const task = f.repository.get(started.task!.id)!
+    f.repository.update(task.id, task.revision, current => ({ ...current, status: 'waiting_user', waitingReason: '请补充报告周期。' }))
+
+    const followup = await f.coordinator.command(command)
+    expect(followup).toMatchObject({ kind: 'input_queued', task: { id: task.id }, input: { text: command.request.prompt } })
+    expect(f.repository.get(task.id)).toMatchObject({ status: 'retrying' })
+    expect(f.runTurn).toHaveBeenCalledTimes(2)
+    await f.coordinator.command(command)
+    expect(f.runTurn).toHaveBeenCalledTimes(2)
+    expect(f.repository.inputs(task.id, true)).toHaveLength(1)
+  })
+
+  it.each([false, true])('routes a plain chat reply only to an open-ended worker question (hasOptions=%s)', async hasOptions => {
+    const f = await fixture()
+    const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
+    const coordinator = new TaskCoordinator({ ...f, userInputGate, nowIso: () => new Date().toISOString() })
+    const started = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'start', request: { prompt: '完成合成报告' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const requestId = 'input-period'
+    const answer = userInputGate.request({ id: requestId, itemId: 'item-period', threadId: started.turn.threadId, turnId: started.turn.turnId,
+      prompt: '报告采用什么周期？', questions: [{ id: 'period', header: '周期', question: '采用什么周期？',
+        options: hasOptions ? [{ label: '月报', description: '' }, { label: '周报', description: '' }] : [] }] })
+
+    const result = await coordinator.command({ threadId: f.origin.id, idempotencyKey: 'answer', request: { prompt: '采用本月。' } })
+    expect(result.kind).toBe('input_queued')
+    if (hasOptions) {
+      expect(f.repository.humanRequest(requestId)?.status).toBe('pending')
+      expect(userInputGate.resolve(requestId, { status: 'cancelled' })).toBe(true)
+    } else {
+      expect(await answer).toEqual({ status: 'submitted', answers: [{ id: 'period', label: '周期', value: '采用本月。' }] })
+    }
+    expect(f.runTurn).toHaveBeenCalledOnce()
+  })
+
+  it('persists ambiguous ownership across multiple active tasks and keeps explicit decisions supported',async()=>{
     const f=await fixture()
     await f.coordinator.command({threadId:f.origin.id,intent:'new',idempotencyKey:'start',request:{prompt:'完成报告'}})
+    await f.coordinator.command({threadId:f.origin.id,intent:'new',idempotencyKey:'second',request:{prompt:'校对另一份资料'}})
+    expect(await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'cancel',request:{prompt:'取消任务'}})).toMatchObject({kind:'attention_required'})
+    expect(f.repository.list().every(task => task.status === 'queued')).toBe(true)
     const ambiguous=await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'unknown',request:{prompt:'这里需要调整一下'}})
     expect(ambiguous.kind).toBe('attention_required')
     if(ambiguous.kind!=='attention_required') throw new Error('expected decision')

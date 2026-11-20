@@ -13,6 +13,7 @@ import { saveTaskPublicQueryAction, verifiedTaskPublicQueryDocumentNavigation } 
 import { TaskRunSchema } from '../contracts/tasks.js'
 import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { ThreadSchema } from '../contracts/threads.js'
+import { TurnSchema } from '../contracts/turns.js'
 import { TaskScheduleService } from './task-schedule-service.js'
 import { buildTaskScheduleToolProvider } from '../adapters/tool/task-schedule-tool-provider.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
@@ -54,9 +55,10 @@ function fixture() {
   const origin = { ...execution, id: 'origin', approvalPolicy: 'never' as const }
   const threads = new Map([['execution', execution], ['origin', origin]])
   const coordinator = { command: vi.fn(async (_command: unknown, _options?: unknown) => ({ kind: 'task_started' })) }
+  const resolveAttachment = vi.fn(async (_id: string, _scope: { threadId?: string; workspace?: string }) => ({} as never))
   let activeTaskId = task.id
   const service = new TaskScheduleService({ flows, repository, tasks: { activeTask: () => repository.get(activeTaskId) } as never,
-    coordinator: coordinator as never, threads: { get: async (id: string) => threads.get(id), upsert: async (value: typeof execution) => { threads.set(value.id, value); return value } } as never,
+    coordinator: coordinator as never, attachments: { resolveMetadataV2: resolveAttachment }, threads: { get: async (id: string) => threads.get(id), upsert: async (value: typeof execution) => { threads.set(value.id, value); return value } } as never,
     workspaceTrust: { get: async () => workspace } as never, connectorIdentities: () => identities, browserState: () => browser, egoBrowserState: () => ego, nowIso: () => new Date().toISOString() })
   flows.setTaskScheduleDispatcher(input => service.dispatch(input))
   const context = { threadId: 'execution', turnId: 'turn', workspace: '/workspace', executionGrant: grant, validateExecutionGrant: vi.fn(), abortSignal: new AbortController().signal, awaitApproval: vi.fn(async () => 'allow') } as unknown as ToolHostContext
@@ -100,7 +102,7 @@ function fixture() {
     } })
     return repository.finishOperation(task.id, key, { status })
   }
-  return { selectTask: (id: string) => { activeTaskId = id }, service, flows, flowRepository, repository, task, context, coordinator, identities, workspace, threads, temporaryPaths, approveBrowserAction, browserTool, browserDispatch, browser, ego, root }
+  return { selectTask: (id: string) => { activeTaskId = id }, service, flows, flowRepository, repository, task, context, coordinator, resolveAttachment, identities, workspace, threads, temporaryPaths, approveBrowserAction, browserTool, browserDispatch, browser, ego, root }
 }
 
 /** Safe-equivalent of the real c9/rev3 -> f84/rev4 durable binding history. */
@@ -499,11 +501,45 @@ describe('task-owned recurring execution', () => {
     await f.flows.tickSchedules(new Date('2026-11-13T00:30:00Z'))
     expect(f.coordinator.command).toHaveBeenCalledTimes(1)
     expect(f.coordinator.command.mock.calls[0]?.[0]).toMatchObject({ threadId: 'origin', intent: 'new', idempotencyKey: 'schedule:schedule_task-test:2026-11-13T00:30:00.000Z' })
+    expect(f.coordinator.command.mock.calls[0]?.[1]).toMatchObject({ source: 'scheduled-occurrence' })
     await f.flows.tickSchedules(new Date('2026-11-13T08:30:00Z'))
     expect(f.coordinator.command).toHaveBeenCalledTimes(2)
     expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(0)
     expect(f.flows.history('schedule_task-test')).toHaveLength(0)
   })
+
+  it('reuses only the explicitly sealed recurrence inputs and keeps a blocked occurrence for the origin chat', async () => {
+    const f = fixture()
+    const thread = f.threads.get('execution')!
+    const explicit = {
+      attachmentIds: ['selected-pdf'], capabilityReferences: [{ kind: 'plugin' as const, id: 'selected-plugin' }]
+    }
+    const turn = TurnSchema.parse({ id: 'turn', threadId: thread.id, status: 'running', prompt: f.task.goal,
+      createdAt: new Date().toISOString(), ...explicit })
+    f.threads.set(thread.id, { ...thread, turns: [turn] })
+    const plan = await f.service.create(f.context)
+    expect(f.resolveAttachment.mock.calls).toEqual([
+      ['selected-pdf', { threadId: 'origin', workspace: '/workspace' }],
+      ['selected-pdf', { threadId: 'execution', workspace: '/workspace' }]
+    ])
+    f.threads.set(thread.id, { ...thread, turns: [{ ...turn, attachmentIds: ['later-unselected-file'] }] })
+
+    f.resolveAttachment.mockRejectedValueOnce(new Error('source no longer readable'))
+    const due = new Date('2026-11-13T00:30:00Z')
+    await f.flows.tickSchedules(due)
+    expect(f.coordinator.command).not.toHaveBeenCalled()
+    expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(1)
+    expect(f.repository.attention(`schedule:${plan.id}`)).toMatchObject({ threadId: 'origin', workspaceRoot: '/workspace', status: 'pending',
+      message: expect.stringContaining('请在原会话检查文件'), payload: { reasonCode: 'schedule_source_missing' } })
+
+    await f.flows.flushSourceEvents()
+    expect(f.coordinator.command).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ threadId: 'origin', request: expect.objectContaining(explicit) }),
+      expect.objectContaining({ source: 'scheduled-occurrence' })
+    )
+    expect(f.flowRepository.pendingOutbox('scheduled_task_dispatch')).toHaveLength(0)
+  })
+
   it('preserves a pending occurrence when connector identity changes and recovers without replay', async () => {
     const f = fixture()
     await f.service.create(f.context)

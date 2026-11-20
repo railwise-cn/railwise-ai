@@ -8,7 +8,7 @@ import i18n from '../../i18n'
 import { takeRequestedFlow } from '../../store/flow-navigation'
 import { CapabilityRequiredCard } from './CapabilityRequiredCard'
 import { TaskRunStatusBar } from './TaskRunStatusBar'
-import { refreshTaskState, resetTaskStateForTests, takeRequestedTask } from '../../store/task-live-store'
+import { refreshTaskState, resetTaskStateForTests } from '../../store/task-live-store'
 
 const state = vi.hoisted(() => ({
   openFlow: vi.fn(), openPlugins: vi.fn(), openSettings: vi.fn(), chooseWorkspace: vi.fn(), setRoute: vi.fn(),
@@ -57,7 +57,8 @@ const api = {
     browserInstanceId: 'browser-instance', origins: ['https://example.com'], interaction: 'interact', browsers: [] } })),
   getBrowserTaskBinding: vi.fn(async () => ({ taskId: card.taskId, taskRevision: 5, browserRevision: 3, browserInstanceId: 'browser-instance',
     browserLabel: '测试 Chrome', origins: ['https://example.com'], interaction: 'interact' })),
-  confirmBrowserTaskBinding: vi.fn()
+  confirmBrowserTaskBinding: vi.fn(),
+  getTaskPublicQueryRecovery: vi.fn(async () => ({ taskId: card.taskId, taskRevision: 1, state: 'unavailable' }))
 }
 function button(label: string): HTMLButtonElement {
   const result = [...container.querySelectorAll('button')].find(item => item.textContent === label)
@@ -143,14 +144,14 @@ describe('capability waiting card', () => {
     const before = JSON.stringify({ tasks, inbox, expired })
     await act(async () => {
       root.render(createElement('div', null,
-        createElement(TaskRunStatusBar, { threadId: card.threadId, runtimeReady: true }),
+        createElement(TaskRunStatusBar, { threadId: card.threadId, runtimeReady: true, inlineCapabilityCards: [expired] }),
         createElement(CapabilityRequiredCard, { card: expired })))
     })
     const visible = visibleText()
     expect(visible).toContain('1 个成果')
     expect(visible).not.toContain('1/3 个节点完成')
     expect(visible).toContain('执行授权已到期')
-    expect(visible).toContain('本次执行授权已到期，已有成果和记录会保留。请到原任务详情核对并确认权限，再单独继续原任务。')
+    expect(visible).toContain('本次执行授权已到期，已有成果和记录会保留。请在此会话核对并确认权限，再继续原任务。')
     expect(visible).toContain('任务执行受阻，等待处理')
     expect(visible).toContain('/workspace/original-task')
     expect(visible).toContain('权限类型')
@@ -167,7 +168,7 @@ describe('capability waiting card', () => {
     expect(visibleText()).toContain('execution_grant_expired')
     expect(button('确认当前任务权限')).toBeTruthy()
     expect(button('重新检查并继续原任务')).toBeTruthy()
-    expect(button('打开任务工作台')).toBeTruthy()
+    expect(visibleText()).not.toContain('打开任务工作台')
     expect(JSON.stringify({ tasks, inbox, expired })).toBe(before)
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
@@ -237,9 +238,9 @@ describe('capability waiting card', () => {
     expect(button('确认当前任务权限')).toBeTruthy()
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
-    await click('打开任务工作台')
-    expect(takeRequestedTask()).toBe(card.taskId)
-    expect(state.setRoute).toHaveBeenCalledWith('tasks')
+    await click('确认当前任务权限')
+    expect(api.getTaskPermissions).toHaveBeenCalledWith(card.taskId)
+    expect(state.setRoute).not.toHaveBeenCalled()
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
   })
@@ -255,9 +256,8 @@ describe('capability waiting card', () => {
     expect(container.querySelector('details')?.open).toBe(false)
     expect(container.querySelector('section')?.className).not.toContain('border-amber')
     expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
-    await click('打开任务工作台')
-    expect(takeRequestedTask()).toBe(legacy.taskId)
-    expect(state.setRoute).toHaveBeenCalledWith('tasks')
+    expect(visibleText()).not.toContain('打开任务工作台')
+    expect(state.setRoute).not.toHaveBeenCalled()
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     await click('查看配置')
     expect(state.openPlugins).toHaveBeenCalledWith(undefined, 'browser-skill')
@@ -453,8 +453,8 @@ describe('capability waiting card', () => {
       await render({...card,capability:{provider:'browser-skill',status:'blocked',errorCode,
         message:'请核对原任务的恢复范围。',resolution:{kind:'grant',route:'task/public-query-recovery',label:'查看原任务的恢复范围'}}})
       await click('查看原任务的恢复范围')
-      expect(takeRequestedTask()).toBe(card.taskId)
-      expect(state.setRoute).toHaveBeenCalledWith('tasks')
+      expect(api.getTaskPublicQueryRecovery).toHaveBeenCalledWith(card.taskId)
+      expect(state.setRoute).not.toHaveBeenCalled()
       expect(state.openSettings).not.toHaveBeenCalled()
       expect(state.openPlugins).not.toHaveBeenCalled()
       expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
@@ -490,23 +490,23 @@ describe('capability waiting card', () => {
     expect(visibleText()).toContain('Ego 浏览器助手')
     expect(visibleText()).toContain('恢复时重新核对原任务范围')
     expect(visibleText()).not.toContain('尚未授予')
-    await click('查看任务与恢复选项')
-    expect(takeRequestedTask()).toBe(card.taskId)
-    expect(state.setRoute).toHaveBeenCalledWith('tasks')
+    await click('查看任务权限与恢复选项')
+    expect(api.getTaskPermissions).toHaveBeenCalledWith(card.taskId)
+    expect(state.setRoute).not.toHaveBeenCalled()
     expect(state.openSettings).not.toHaveBeenCalled()
     expect(state.openPlugins).not.toHaveBeenCalled()
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
     expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
-    expect(api.runtimeRequest).not.toHaveBeenCalled()
+    expect(api.runtimeRequest).toHaveBeenCalledExactlyOnceWith('/v1/threads/hidden-execution', 'GET')
     expect(api.diagnoseBrowserSkill).not.toHaveBeenCalled()
 
     await render(ego, undefined, [])
     await click('查看配置')
-    expect(takeRequestedTask()).toBe(card.taskId)
+    expect(state.setRoute).not.toHaveBeenCalled()
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     expect(state.openSettings).not.toHaveBeenCalled()
-    expect(state.openPlugins).not.toHaveBeenCalled()
+    expect(state.openPlugins).toHaveBeenCalledOnce()
   })
 
   it.each(['zh', 'en'])('shows neutral scope and an accurate task-review action for a runtime Ego read failure in %s', async language => {
@@ -520,12 +520,11 @@ describe('capability waiting card', () => {
     expect(visibleText()).not.toContain(i18n.t('capabilityScopeNotGranted', { ns: 'common' }))
     expect(visibleText()).not.toContain('查看当前任务并检查Ego连接')
     await click(i18n.t('capabilityViewTaskRecoveryOptions', { ns: 'common' }))
-    expect(takeRequestedTask()).toBe(card.taskId)
-    expect(state.setRoute).toHaveBeenCalledWith('tasks')
+    expect(api.getTaskPermissions).toHaveBeenCalledWith(card.taskId)
+    expect(state.setRoute).not.toHaveBeenCalled()
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
-    expect(api.getTaskPermissions).not.toHaveBeenCalled()
-    expect(api.runtimeRequest).not.toHaveBeenCalled()
+    expect(api.runtimeRequest).toHaveBeenCalledExactlyOnceWith('/v1/threads/hidden-execution', 'GET')
     expect(state.openPlugins).not.toHaveBeenCalled()
     expect(JSON.stringify(ego)).toBe(before)
 

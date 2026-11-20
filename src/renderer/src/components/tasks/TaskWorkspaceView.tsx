@@ -5,15 +5,13 @@ import { useTranslation } from 'react-i18next'
 import type { TaskAttentionV1, TaskEventV1, TaskInputV1, TaskOperationReceiptV1, TaskPublicQueryRecoverySnapshotV1, TaskRunV1, TaskTemplateId, TaskTemplateStartV1, TaskTemplateV1 } from '@shared/agent-workbench'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { TaskArtifactReview } from './TaskArtifactReview'
+import { TaskAttentionCard } from './TaskAttentionCard'
 import { AssistantMarkdown } from '../chat/AssistantMarkdown'
 import { TaskExecutionEvidence } from './TaskExecutionEvidence'
 import { currentTaskBranch } from '@shared/task-projection'
-import { isMatchingExecutionGrantExpiredAttention, taskDisplayGoal, taskDisplayTitle } from '@shared/task-presentation'
+import { taskDisplayGoal, taskDisplayTitle } from '@shared/task-presentation'
 import { taskArtifactValidationLabelKey } from '@shared/task-artifact-source-evidence'
-import type { ExternalTaskCapabilityCard } from '@shared/task-command'
-import { ApprovalOperationDetails } from '../chat/ApprovalOperationDetails'
 import { redactRuntimeText } from '../chat/conversation-visibility'
-import { CapabilityRequiredCard } from '../chat/CapabilityRequiredCard'
 import { filterWorkspaceTasks, taskGroupForTask, taskGroupArtifacts, scopeWorkspaceTasks } from '@shared/task-workspace-projection'
 export { filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from '@shared/task-workspace-projection'
 import { legacyLocalArtifactSourceMismatch } from '@shared/task-source-intent'
@@ -85,130 +83,6 @@ function errorMessage(error: unknown): string {
 function dateLabel(value: string): string {
   const date = new Date(value)
   return Number.isFinite(date.getTime()) ? date.toLocaleString() : value
-}
-
-type Question = { id: string; label: string; options?: Array<{ label: string; value?: string }> }
-function attentionQuestions(item: TaskAttentionV1): Question[] {
-  const candidate = item.payload?.questions
-  if (!Array.isArray(candidate)) return []
-  return candidate.flatMap((value: unknown) => {
-    if (!value || typeof value !== 'object' || !('id' in value) || typeof value.id !== 'string') return []
-    const record = value as Record<string, unknown>
-    const label = typeof record.label === 'string' ? record.label : typeof record.question === 'string' ? record.question : item.title
-    const options = Array.isArray(record.options) ? record.options.flatMap(option => {
-      if (!option || typeof option !== 'object' || typeof option.label !== 'string') return []
-      return [{ label: option.label as string, ...(typeof option.value === 'string' ? { value: option.value } : {}) }]
-    }) : undefined
-    return [{ id: value.id, label, options }]
-  })
-}
-
-function AttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow }: { item: TaskAttentionV1; ownerTask?: TaskRunV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: (notice?: string) => void; onOpenThread: (id: string) => void; onOpenFlow?: Props['onOpenFlow'] }): ReactElement {
-  const { t } = useTranslation('common')
-  const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [error, setError] = useState('')
-  const [selectedProvider, setSelectedProvider] = useState<'dingtalk' | 'lark'>('dingtalk')
-  const [providerPrompt, setProviderPrompt] = useState('')
-  const questions = attentionQuestions(item)
-  const capability = item.payload?.capability
-  const originalRequest = item.payload?.request
-  const capabilityCard: ExternalTaskCapabilityCard | null = item.payload?.kind === 'capability_required' && item.taskId &&
-    (conversationThreadId || item.threadId) && originalRequest && typeof originalRequest === 'object' &&
-    'prompt' in originalRequest && typeof originalRequest.prompt === 'string' && capability && typeof capability === 'object' &&
-    'provider' in capability && ['dingtalk','lark','feishu','browser-skill','workspace','schedule'].includes(String(capability.provider)) &&
-    'status' in capability && ['available','not_installed','needs_authorization','unsupported','blocked'].includes(String(capability.status)) &&
-    'message' in capability && typeof capability.message === 'string'
-      ? {threadId:(conversationThreadId || item.threadId)!,taskId:item.taskId,attentionId:item.id,prompt:originalRequest.prompt,capability:capability as ExternalTaskCapabilityCard['capability']}
-      : null
-  const resolveFlow = async (decision?: 'approve' | 'reject'): Promise<void> => {
-    if (busy || !item.flowRunId || (decision && !item.nodeId)) return
-    setBusy(true)
-    setError('')
-    try {
-      const path = decision ? '/v1/flow-runs/decision' : `/v1/flow-runs/${encodeURIComponent(item.flowRunId)}/resume`
-      const body = decision ? { runId: item.flowRunId, nodeId: item.nodeId, decision } : {}
-      const result = await window.workwise.runtimeRequest(path, 'POST', JSON.stringify(body))
-      if (!result.ok) {
-        let message = t('taskWorkspaceActionFailed')
-        try { message = JSON.parse(result.body).message ?? message } catch { /* Keep the actionable fallback. */ }
-        throw new Error(message)
-      }
-      onResolved()
-    } catch (nextError) { setError(errorMessage(nextError)) } finally { setBusy(false) }
-  }
-  const resolveIntent = async (intent: 'supplement' | 'new'): Promise<void> => {
-    const request = item.payload?.request
-    if (busy || !item.threadId || !request || typeof request !== 'object' || !('prompt' in request) || typeof request.prompt !== 'string') return
-    setBusy(true)
-    setError('')
-    try {
-      await window.workwise.coordinateTaskCommand({
-        threadId: item.threadId, ...(item.taskId ? { taskId: item.taskId } : {}),
-        intent, resolveAttentionId: item.id, idempotencyKey: `attention:${item.id}:${intent}`,
-        request: request as Record<string, unknown> & { prompt: string }
-      })
-      onResolved()
-    } catch (nextError) { setError(errorMessage(nextError)) } finally { setBusy(false) }
-  }
-  const resolveProvider = async (): Promise<void> => {
-    const original = item.payload?.request
-    if (busy || !item.threadId || !providerPrompt.trim() || !original || typeof original !== 'object') return
-    setBusy(true)
-    setError('')
-    try {
-      await window.workwise.coordinateTaskCommand({ threadId:item.threadId, ...(item.taskId ? {taskId:item.taskId} : {}),
-        intent:'new', resolveAttentionId:item.id, selectedExternalProvider:selectedProvider,
-        idempotencyKey:`provider-choice:${item.id}:${operationKey()}`,
-        request:{...original,prompt:providerPrompt.trim(),displayText:providerPrompt.trim()} })
-      onResolved()
-    } catch (nextError) { setError(errorMessage(nextError)) } finally { setBusy(false) }
-  }
-  const resolve = async (decision?: 'allow' | 'deny'): Promise<void> => {
-    if (!item.requestId || busy || submitted) return
-    setBusy(true)
-    setError('')
-    try {
-      const path = decision ? `/v1/approvals/${encodeURIComponent(item.requestId)}` : `/v1/user-inputs/${encodeURIComponent(item.requestId)}`
-      const body = decision ? { decision } : { answers: questions.map(question => ({ id: question.id, label: question.label, value: answers[question.id] ?? '' })) }
-      const result = await window.workwise.runtimeRequest(path, 'POST', JSON.stringify(body))
-      if (result.status === 404 || result.status === 409 || result.status === 410) {
-        onResolved(t('taskWorkspaceDecisionRefresh'))
-        return
-      }
-      if (!result.ok) throw new Error(t('taskWorkspaceActionFailed'))
-      setSubmitted(true)
-      onResolved(t(decision ? 'taskWorkspaceDecisionSaved' : 'taskWorkspaceSupplementSaved'))
-    } catch { setError(t('taskWorkspaceActionFailed')) } finally { setBusy(false) }
-  }
-  return <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-    <h4 className="text-sm font-semibold">{item.title}</h4>
-    {item.kind === 'approval' && item.requestId ? <ApprovalOperationDetails summary={item.message} presentation={item.presentation} /> : <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed">{capabilityCard && isMatchingExecutionGrantExpiredAttention(item, ownerTask) ? t('capabilityExecutionGrantExpiredSummary') : redactRuntimeText(item.message)}</p>}
-    {capabilityCard ? <CapabilityRequiredCard card={capabilityCard} workspaceRoot={item.workspaceRoot || workspaceRoot} /> : null}
-    {item.payload?.kind === 'external_provider_choice' ? <div className="mt-3 space-y-2">
-      <label className="block text-xs">{t('taskCommandProvider')}<select aria-label={t('taskCommandProvider')} value={selectedProvider} onChange={event => setSelectedProvider(event.target.value as 'dingtalk' | 'lark')} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink"><option value="dingtalk">{t('taskEffectProvider_dingtalk')}</option><option value="lark">{t('taskEffectProvider_lark')}</option></select></label>
-      <label className="block text-xs">{t('taskCommandSingleProviderRequest')}<textarea aria-label={t('taskCommandSingleProviderRequest')} value={providerPrompt} onChange={event => setProviderPrompt(event.target.value)} rows={3} placeholder={t('taskCommandSingleProviderHint')} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink" /></label>
-      <button type="button" disabled={busy || !providerPrompt.trim()} onClick={() => void resolveProvider()} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs disabled:opacity-50">{t('taskCommandCreateProviderTask')}</button>
-    </div> : null}
-    {questions.map(question => <label key={question.id} className="mt-3 block text-xs font-medium">{question.label}
-      {question.options?.length ? <select value={answers[question.id] ?? ''} onChange={event => setAnswers(current => ({ ...current, [question.id]: event.target.value }))} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink"><option value="">{t('taskWorkspaceChooseAnswer')}</option>{question.options.map(option => <option key={option.value ?? option.label} value={option.value ?? option.label}>{option.label}</option>)}</select> : null}
-      <textarea aria-label={question.label} value={answers[question.id] ?? ''} onChange={event => setAnswers(current => ({ ...current, [question.id]: event.target.value }))} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink" rows={2} />
-    </label>)}
-    <div className="mt-3 flex flex-wrap gap-2">
-      {item.ownerKind === 'flow' && item.payload?.action === 'review_flow' ? <><button type="button" disabled={busy} onClick={() => void resolveFlow('approve')} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceAllow')}</button><button type="button" disabled={busy} onClick={() => void resolveFlow('reject')} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs disabled:opacity-50">{t('taskWorkspaceDeny')}</button></> : null}
-      {item.ownerKind === 'flow' && item.payload?.action === 'continue_flow' ? <button type="button" disabled={busy} onClick={() => void resolveFlow()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskRunResume')}</button> : null}
-      {item.ownerKind === 'flow' && onOpenFlow ? <button type="button" onClick={() => onOpenFlow(item.flowId, item.flowRunId)} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs">{t('taskWorkspaceOpenFlow')}</button> : null}
-      {item.payload?.kind === 'task_input_intent' ? <>{(!Array.isArray(item.payload.choices) || item.payload.choices.includes('supplement')) ? <button type="button" disabled={busy} onClick={() => void resolveIntent('supplement')} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskCommandChooseSupplement')}</button> : null}{(!Array.isArray(item.payload.choices) || item.payload.choices.includes('new')) ? <button type="button" disabled={busy} onClick={() => void resolveIntent('new')} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs disabled:opacity-50">{t('taskCommandChooseNew')}</button> : null}</> : null}
-      {item.kind === 'approval' && item.requestId ? <>
-        {!item.presentation || item.presentation.actions.includes('approve') ? <button type="button" disabled={busy || submitted} onClick={() => void resolve('allow')} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceAllow')}</button> : null}
-        {!item.presentation || item.presentation.actions.includes('deny') ? <button type="button" disabled={busy || submitted} onClick={() => void resolve('deny')} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs disabled:opacity-50">{t('taskWorkspaceDeny')}</button> : null}
-      </> : null}
-      {item.kind === 'question' && item.requestId && questions.length ? <button type="button" disabled={busy || submitted || questions.some(question => !answers[question.id]?.trim())} onClick={() => void resolve()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceSubmitAnswer')}</button> : null}
-      {conversationThreadId ? <button type="button" onClick={() => onOpenThread(conversationThreadId)} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs">{t(item.kind === 'approval' && (item.presentation?.scope === 'host' || item.message.startsWith('Run request_host_shell\n')) ? 'taskWorkspaceFileFromConversation' : 'taskWorkspaceOpenConversation')}</button> : null}
-    </div>
-    {error ? <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-300">{error}</p> : null}
-  </div>
 }
 
 export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarCollapsed, onToggleLeftSidebar, onOpenThread, onOpenArtifact, onOpenFlow, onConfigureProvider, onConfigureReplyDelivery }: Props): ReactElement {
@@ -511,12 +385,12 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
         <details className="rounded-lg border border-ds-border bg-ds-card p-3"><summary className="cursor-pointer text-xs font-medium text-ds-muted">{t('taskWorkspaceTemplates')}</summary><div className="ds-task-workspace-templates mt-3 grid gap-2">{templates.map(template => <button type="button" key={template.id} disabled={!runtimeReady || !workspaceRoot} onClick={() => { setTemplateId(template.id); setTemplateMessage('') }} className="rounded-xl border border-ds-border bg-ds-card p-3 text-left transition hover:border-accent disabled:opacity-50"><div className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4 text-accent" />{t(`taskTemplate_${template.id}`, { defaultValue: template.name })}</div><p className="mt-1 text-xs leading-relaxed text-ds-muted">{t(`taskTemplateDescription_${template.id}`, { defaultValue: template.description })}</p></button>)}</div></details>
       </div>
       <div className="ds-task-workspace-detail min-w-0 flex-1 p-5">
-        {selectedAttentionId ? standaloneAttention.filter(item => item.id === selectedAttentionId).map(item => <AttentionCard key={item.id} item={item} conversationThreadId={conversationForAttention(item)} onResolved={onAttentionResolved} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />) : null}
+        {selectedAttentionId ? standaloneAttention.filter(item => item.id === selectedAttentionId).map(item => <TaskAttentionCard key={item.id} item={item} conversationThreadId={conversationForAttention(item)} onResolved={onAttentionResolved} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />) : null}
         {selected ? <article aria-label={t('taskWorkspaceDetails')} className="mx-auto w-full min-w-0 max-w-4xl rounded-xl border border-ds-border bg-ds-card p-4 sm:p-5">
           <h2 className="break-words text-lg font-semibold">{taskDisplayTitle(selected)}</h2>
           <p className="mt-2 text-xs font-semibold text-ds-ink">{t(`taskRunStatus_${runActivity?.status ?? (currentExecution ?? selected).status}`)}</p>
           {reason && !selectedAttention.length && reason !== 'queued' ? <p className="mt-1 text-sm text-ds-muted">{t(taskReasonKey(reason))}</p> : null}
-          {selectedAttention.length ? <div className="mb-4 mt-3 space-y-2">{selectedAttention.filter(item => visibleAttention.has(item.id)).map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} ownerTask={selectedGroup?.all.find(task => task.id === item.taskId)} conversationThreadId={conversationForAttention(item)} workspaceRoot={selectedGroup?.all.find(task => task.id === item.taskId)?.workspaceRoot} onResolved={onAttentionResolved} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
+          {selectedAttention.length ? <div className="mb-4 mt-3 space-y-2">{selectedAttention.filter(item => visibleAttention.has(item.id)).map(item => <TaskAttentionCard key={`${item.id}:${item.revision}`} item={item} ownerTask={selectedGroup?.all.find(task => task.id === item.taskId)} conversationThreadId={conversationForAttention(item)} workspaceRoot={selectedGroup?.all.find(task => task.id === item.taskId)?.workspaceRoot} onResolved={onAttentionResolved} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
           <details className="mt-3 text-xs text-ds-muted"><summary className="cursor-pointer">{t('taskWorkspaceOriginalRequest')}</summary><p className="mt-2 whitespace-pre-wrap break-words leading-relaxed">{taskDisplayGoal(selected)}</p><p className="mt-2 break-all">{t('taskWorkspaceLocation')}: {selected.workspaceRoot}</p></details>
           <div className="my-4 flex min-w-0 max-w-full flex-wrap gap-2 [&>button]:min-w-0 [&>button]:max-w-full [&>button]:whitespace-normal">
             {['stalled', 'failed', 'paused'].includes((currentExecution ?? selected).status) && legacyLocalArtifactSourceMismatch(currentExecution ?? selected) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('revalidate')} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceRevalidateArtifacts')}</button> : null}

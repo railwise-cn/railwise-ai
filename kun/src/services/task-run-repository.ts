@@ -209,13 +209,18 @@ export class TaskRunRepository {
   }
 
   findActiveByOrigin(threadId: string): TaskRun | null {
-    const row = this.db.prepare(`SELECT * FROM task_runs
+    return this.listActiveByOrigin(threadId, 1)[0] ?? null
+  }
+
+  listActiveByOrigin(threadId: string, limit: number): TaskRun[] {
+    const rows = this.db.prepare(`SELECT * FROM task_runs
       WHERE (thread_id = ? OR json_extract(data_json,'$.originThreadId') = ?)
       AND status NOT IN ('completed','failed','cancelled')
       AND json_extract(data_json,'$.parentTaskId') IS NULL
       AND COALESCE(json_extract(data_json,'$.visibility'),'task') NOT IN ('chat','internal')
-      ORDER BY updated_at DESC,id DESC LIMIT 1`).get(threadId,threadId) as TaskRunRow | undefined
-    return row ? this.parseRun(row) : null
+      ORDER BY CASE WHEN json_extract(data_json,'$.scheduledBy') IS NULL THEN 0 ELSE 1 END,
+      updated_at DESC,id DESC LIMIT ?`).all(threadId, threadId, limit) as TaskRunRow[]
+    return rows.map(row => this.parseRun(row))
   }
 
   list(input: { threadId?: string; workspaceRoot?: string; search?: string; status?: TaskRunStatus; limit?: number; offset?: number; cursor?: string } = {}): TaskRun[] {

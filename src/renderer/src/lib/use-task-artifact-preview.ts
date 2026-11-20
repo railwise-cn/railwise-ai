@@ -13,6 +13,17 @@ export function foregroundTaskArtifactPreview(threadId: string, taskId: string):
   window.dispatchEvent(new CustomEvent(FOREGROUND_PREVIEW_EVENT, { detail: { threadId, taskId } }))
 }
 
+export function listenToForegroundTask(listener: (selection: { threadId: string; taskId: string }) => void): () => void {
+  const handle = (event: Event): void => {
+    const detail = (event as CustomEvent<unknown>).detail
+    if (!detail || typeof detail !== 'object' || !('threadId' in detail) || !('taskId' in detail)
+      || typeof detail.threadId !== 'string' || !detail.threadId || typeof detail.taskId !== 'string' || !detail.taskId) return
+    listener({ threadId: detail.threadId, taskId: detail.taskId })
+  }
+  window.addEventListener(FOREGROUND_PREVIEW_EVENT, handle)
+  return () => window.removeEventListener(FOREGROUND_PREVIEW_EVENT, handle)
+}
+
 function belongsToConversation(task: TaskRunV1, threadId: string | null): boolean {
   return task.threadId === threadId || (task.originThreadId ?? task.threadId) === threadId
 }
@@ -50,26 +61,17 @@ export function useTaskArtifactPreview(threadId: string | null, enabled: boolean
   const generation = useRef(0)
   const foregroundTasksRef = useRef<Record<string, string>>({})
   const [foregroundTasks, setForegroundTasks] = useState<Record<string, string>>({})
-  useEffect(() => {
-    const foreground = (event: Event): void => {
-      const detail = (event as CustomEvent<unknown>).detail
-      if (!detail || typeof detail !== 'object' || !('threadId' in detail) || !('taskId' in detail)
-        || typeof detail.threadId !== 'string' || !detail.threadId || typeof detail.taskId !== 'string' || !detail.taskId) return
-      const { threadId, taskId } = detail
-      if (!followSelectedTask && threadId === scopeThreadId && lastRequest.current?.taskId !== taskId) {
-        // Keep the visible page, but a late response for the old foreground must not replace it.
-        generation.current++
-        opened.current = null
-        lastRequest.current = null
-      }
-      if (foregroundTasksRef.current[threadId] === taskId) return
-      foregroundTasksRef.current = { ...foregroundTasksRef.current, [threadId]: taskId }
-      setForegroundTasks(foregroundTasksRef.current)
+  useEffect(() => listenToForegroundTask(({ threadId: foregroundThreadId, taskId }) => {
+    if (!followSelectedTask && foregroundThreadId === threadId && lastRequest.current?.taskId !== taskId) {
+      // Keep the visible page, but a late response for the old foreground must not replace it.
+      generation.current++
+      opened.current = null
+      lastRequest.current = null
     }
-    const scopeThreadId = threadId
-    window.addEventListener(FOREGROUND_PREVIEW_EVENT, foreground)
-    return () => window.removeEventListener(FOREGROUND_PREVIEW_EVENT, foreground)
-  }, [threadId, followSelectedTask])
+    if (foregroundTasksRef.current[foregroundThreadId] === taskId) return
+    foregroundTasksRef.current = { ...foregroundTasksRef.current, [foregroundThreadId]: taskId }
+    setForegroundTasks(foregroundTasksRef.current)
+  }), [threadId, followSelectedTask])
   const selectedTaskId = followSelectedTask ? state.navigation.selectedTaskId : null
   const currentTaskId = useMemo(() => {
     const group = taskGroupForTask(selectedTaskId, state.tasks)

@@ -1192,6 +1192,7 @@ export class TaskController {
       createdAt: now
     })
       this.resolveCompletedWebEvidenceAttention(result)
+      this.enqueueConversationOutcome(result)
       return result
     })
     this.releaseExecutionLease(task.id)
@@ -1953,9 +1954,28 @@ export class TaskController {
           acceptance, completed: complete, artifacts: valid.map(artifact => ({ id: artifact.id, sha256: artifact.sha256, writerReceiptId: writes.get(artifact.absolutePath ?? resolve(task.workspaceRoot, artifact.relativePath))!.operationId })), preservedUsage: true, resumed: false }
       })
       const result = { task: checked, corrected: true, completed: complete, ...(reason ? { reason } : {}) }
+      if (complete) this.enqueueConversationOutcome(checked)
       this.repository.finishOperation(taskId, request.idempotencyKey, { status: 'succeeded', result }, now)
       return result
     })
+  }
+
+  private enqueueConversationOutcome(task: TaskRun): void {
+    this.enqueueConversationResponse(task, `task_result_${task.id}`, task.finalResponse?.trim() || '任务已完成。', task.finishedAt ?? task.updatedAt)
+  }
+
+  projectInterruptedResponse(threadId: string, turnId: string, text: string): void {
+    const task = this.repository.findByTurn(turnId)
+    if (task?.threadId !== threadId || !text.trim()) return
+    this.enqueueConversationResponse(task, `task_partial_${turnId}`, `响应中断，以下为已收到的部分回复。\n\n${text}`, this.nowIso())
+  }
+
+  private enqueueConversationResponse(task: TaskRun, commandId: string, assistantText: string, createdAt: string): void {
+    const threadId = task.originThreadId
+    if (!threadId || task.threadId === threadId || task.parentTaskId ||
+        (task as TaskRun & { visible?: boolean }).visible === false || task.visibility === 'internal') return
+    this.repository.enqueueOutbox({ id: `command-message:${commandId}`, ownerId: threadId, kind: 'task_command_message',
+      payload: { threadId, commandId, assistantText, createdAt }, createdAt })
   }
 
   /** Attach trusted readback evidence without overwriting the original unknown dispatch or resuming execution. */

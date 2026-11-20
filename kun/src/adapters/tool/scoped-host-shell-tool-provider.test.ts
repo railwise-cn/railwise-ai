@@ -1,11 +1,14 @@
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { InMemoryThreadStore } from '../in-memory-thread-store.js'
 import { InMemorySessionStore } from '../in-memory-session-store.js'
 import { PersistentApprovalGate } from '../persistent-human-gates.js'
 import { createThreadRecord } from '../../domain/thread.js'
+import { makeAssistantTextItem } from '../../domain/item.js'
+import { verifiedShellDeliverablePaths } from '../../loop/turn-completion-guard.js'
+import { validateArtifactFile } from '../../services/artifact-validator.js'
 import { TaskController } from '../../services/task-controller.js'
 import { TaskRunRepository } from '../../services/task-run-repository.js'
 import { ExecutionGrantSchema } from '../../contracts/permissions.js'
@@ -13,6 +16,7 @@ import type { ToolHostContext } from '../../ports/tool-host.js'
 import { CapabilityRegistry } from './capability-registry.js'
 import { LocalToolHost } from './local-tool-host.js'
 import { createBashLocalTool, stopAllBashSessions } from './builtin-bash-tool.js'
+import { shellRuntimeInfo } from './builtin-tool-utils.js'
 import { buildScopedHostShellToolProviders } from './scoped-host-shell-tool-provider.js'
 import { HostShellVerificationService } from '../../services/host-shell-verification.js'
 import { getTaskOperationReceipts } from '../../server/routes/tasks.js'
@@ -178,6 +182,54 @@ describe('one-shot, explicitly reviewed host shell', () => {
 })
 
 describe('read-only host command outcome verification', () => {
+  it('registers a fresh MP4 from the exact reconciled command while refusing stale and out-of-scope claims', async () => {
+    const f = await fixture('请制作视频并保存为 fresh.mp4。')
+    const outside = await mkdtemp(join(tmpdir(), 'railwise-other-shell-'))
+    cleanup.push(() => rm(outside, { recursive: true, force: true }))
+    const video = await readFile(new URL('../../../../src/asset/img/web.mp4', import.meta.url))
+    const stale = join(f.root, 'stale.mp4')
+    const foreign = join(outside, 'foreign.mp4')
+    const candidate = join(f.root, 'fresh.mp4')
+    const recorder = join(f.root, 'video-fixture.cjs')
+    await writeFile(stale, video)
+    await utimes(stale, new Date(0), new Date(0))
+    await writeFile(recorder, `const fs = require('node:fs');
+      const timer = setInterval(() => {
+        if (!fs.existsSync('record-video')) return;
+        clearInterval(timer);
+        fs.copyFileSync('stale.mp4', 'fresh.mp4');
+        fs.copyFileSync('stale.mp4', ${JSON.stringify(foreign)});
+      }, 10);
+    `)
+    const argumentsForCommand = [process.execPath, recorder]
+    const powershell = ['pwsh', 'powershell'].includes(shellRuntimeInfo().name)
+    const command = powershell
+      ? `& ${argumentsForCommand.map(value => `'${value.replaceAll("'", "''")}'`).join(' ')}`
+      : argumentsForCommand.map(value => `"${value.replaceAll('"', '\\"')}"`).join(' ')
+    const running = await f.run('render', { ...f.args, command })
+    const receipt = f.repository.operations(f.task.id, 'host_shell')[0]!
+    expect(receipt.status).toBe('running')
+    expect(running.item).toMatchObject({ output: { status: 'running' } })
+    await writeFile(join(f.root, 'record-video'), '')
+    const verification = new HostShellVerificationService(f.repository, join(f.root, 'shell-output'), () => new Date().toISOString())
+    await vi.waitFor(async () => {
+      await verification.reconcile(f.task.id)
+      expect(f.repository.operation(f.task.id, receipt.idempotencyKey)?.status).toBe('succeeded')
+    }, { timeout: 4000 })
+    const { sessionId } = receipt.result as { sessionId: string }
+    const session = f.repository.getShellSession(sessionId)!
+    const recovered = await f.host.execute({ callId: 'poll-render', toolName: 'host_shell_session', arguments: {
+      session_id: sessionId, action: 'poll'
+    } }, f.context)
+    const claim = makeAssistantTextItem({ id: 'result', turnId: 'turn', threadId: 'thread', status: 'completed',
+      text: `已保存 \`fresh.mp4\`、\`stale.mp4\` 和 \`${relative(f.root, foreign)}\`。` })
+    expect(verifiedShellDeliverablePaths([claim, recovered.item], 'turn')).toEqual([candidate])
+    expect(verifiedShellDeliverablePaths([{ ...claim, turnId: 'next-turn' }, recovered.item], 'next-turn')).toEqual([])
+    expect(recovered.item).toMatchObject({ output: { cwd: f.root, started_at: session.startedAt, finished_at: session.finishedAt, exit_code: 0 } })
+    await expect(validateArtifactFile(candidate, 'mp4')).resolves.toMatchObject({ valid: true, format: 'mp4' })
+    expect(f.execute).toHaveBeenCalledOnce()
+  }, 10_000)
+
   it('recovers a lost response from the real session and settles both receipts without another command', async () => {
     const f = await fixture()
     await f.run('lost-response')
