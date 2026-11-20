@@ -23,6 +23,31 @@ const composition = 'RailWiseSyntheticEvaluation'
 const pdfName = '合成视频资料.pdf'
 const pdfText = '铁路合成验收'
 
+export function summarizeWindowsVideoRender(result, elapsedMs) {
+  // Classify only in memory. Never persist renderer logs, paths, URLs or tokens.
+  const output = String(result.stdout ?? '') + '\n' + String(result.stderr ?? '')
+  const timedOut = /timed? out|timeout|ETIMEDOUT/i.test(output)
+  const issue = [
+    [result.error?.code === 'ETIMEDOUT', 'process-timeout'],
+    [/timed out[^\n]*connect[^\n]*browser/i.test(output), 'browser-connect-timeout'],
+    [timedOut && /delayRender/i.test(output), 'frame-timeout'],
+    [/navigation[^\n]*timeout|timed out[^\n]*(?:navigation|page)|page[^\n]*timed out/i.test(output), 'page-timeout'],
+    [/invalid.*(?:option|flag|chrome-mode)|unknown option|not a valid option/i.test(output), 'invalid-option'],
+    [/could not find.*chrome|browser.*failed|browser process|failed to launch|WebSocket/i.test(output), 'browser-startup'],
+    [/cannot find (?:module|package)|MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND/i.test(output), 'module-not-found'],
+    [/ffmpeg|ffprobe|compositor/i.test(output), 'media-toolchain'],
+    [timedOut, 'render-timeout'],
+    [/permission denied|access is denied|EPERM/i.test(output), 'access-denied'],
+    [/ESBuild|Webpack|compile|Parsing error|syntax error/i.test(output), 'bundle']
+  ].find(([matches]) => matches)?.[1] ?? 'unclassified'
+  const timeout = /\b(?:after|timeout(?: of)?)\s*:?\s*(\d{2,8})\s*(?:ms|milliseconds)/i.exec(output)
+  const reportedTimeoutMs = timeout ? Number(timeout[1]) : undefined
+  return { stage: 'exited', exitCode: result.status, elapsedMs,
+    issue: result.status === 0 ? undefined : issue,
+    code: typeof result.error?.code === 'string' && /^[A-Z_]{3,32}$/.test(result.error.code) ? result.error.code : undefined,
+    ...(reportedTimeoutMs > 0 && reportedTimeoutMs <= 140_000 ? { reportedTimeoutMs } : {}) }
+}
+
 // Original geometry only. This evaluation does not rely on the media omitted from the Skill.
 const scene = `import React from 'react';
 import { AbsoluteFill, Composition, registerRoot, useCurrentFrame } from 'remotion';
@@ -63,29 +88,37 @@ async function provision(workspace, environment) {
   assert.equal(JSON.parse(await readFile(join(dirname(ffmpeg), 'package.json'), 'utf8')).version, decoderVersion)
   assert.equal(digest(await readFile(ffmpeg)), decoderSha256, 'The independent full Windows FFmpeg must match the pinned native image')
   const target = join(workspace, filename)
+  // v4.0.484 starts Chrome's fixed 25-second connection clock concurrently
+  // with a cold Webpack build. Prepare only the JS bundle first, then let the
+  // real approved command do all MP4 rendering. The pinned CLI accepts a local
+  // bundle directory with index.html (entry-point.ts and setup-cache.ts).
+  const bundle = join(root, 'prepared-bundle')
+  const bundleStartedAt = Date.now()
+  await execFile(process.execPath, [cli, 'bundle', 'index.jsx', '--out-dir', bundle, '--disable-git-source'], {
+    cwd: root, env: packageEnvironment, windowsHide: true, timeout: 140_000, maxBuffer: 4 * 1024 * 1024
+  })
+  const bundleIndex = join(bundle, 'index.html')
+  const index = await lstat(bundleIndex)
+  assert.ok(index.isFile() && !index.isSymbolicLink(), 'The synthetic scene must have a real compiled bundle')
+  assert.equal(await access(target).then(() => true, error => { if (error.code !== 'ENOENT') throw error; return false }), false,
+    'Preparing the synthetic bundle must not render the expected MP4')
+  const preparedBundle = { sourceSha256: digest(scene), indexSha256: digest(await readFile(bundleIndex)), elapsedMs: Date.now() - bundleStartedAt,
+    mp4RenderedDuringPreparation: false }
   const renderDiagnostic = join(root, 'render-diagnostic.json')
   await writeFile(join(workspace, script), `import {spawnSync} from 'node:child_process';
 import {writeFileSync} from 'node:fs';
+const summarize = ${summarizeWindowsVideoRender.toString()};
 const report = ${literal(renderDiagnostic)};
-writeFileSync(report, JSON.stringify({stage: 'started'}));
-const result = spawnSync(${literal(process.execPath)}, ${literal([cli, 'render', 'index.jsx', composition, target, '--codec=h264',
-    '--concurrency=1', '--chrome-mode=chrome-for-testing', '--browser-executable', browser])}, {cwd:${literal(root)},encoding:'utf8',windowsHide:true,timeout:140000,maxBuffer:4*1024*1024});
-const output = (result.stdout ?? '') + '\\n' + (result.stderr ?? '');
-const issue = [
-  [/invalid.*(?:option|flag|chrome-mode)|unknown option|not a valid option/i, 'invalid-option'],
-  [/could not find.*chrome|browser.*failed|browser process|failed to launch|WebSocket/i, 'browser-startup'],
-  [/cannot find (?:module|package)|MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND/i, 'module-not-found'],
-  [/ffmpeg|ffprobe|compositor/i, 'media-toolchain'],
-  [/timed? out|ETIMEDOUT/i, 'timeout'],
-  [/permission denied|access is denied|EPERM/i, 'access-denied'],
-  [/ESBuild|Webpack|compile|Parsing error|syntax error/i, 'bundle'],
-].find(([pattern]) => pattern.test(output))?.[1] ?? 'unclassified';
-const code = typeof result.error?.code === 'string' && /^[A-Z_]{3,32}$/.test(result.error.code) ? result.error.code : undefined;
-writeFileSync(report, JSON.stringify({stage: 'exited', exitCode: result.status, issue: result.status === 0 ? undefined : issue, code}));
-if (result.status !== 0) { console.error('Synthetic render failed:', issue, code ?? ''); process.exitCode = result.status || 1; }
+writeFileSync(report, JSON.stringify({stage: 'started', bundlePrepared: true}));
+const startedAt = Date.now();
+const result = spawnSync(${literal(process.execPath)}, ${literal([cli, 'render', bundle, composition, target, '--codec=h264',
+    '--concurrency=1', '--timeout=60000', '--chrome-mode=chrome-for-testing', '--browser-executable', browser])}, {cwd:${literal(root)},encoding:'utf8',windowsHide:true,timeout:140000,maxBuffer:4*1024*1024});
+const diagnostic = summarize(result, Date.now() - startedAt);
+writeFileSync(report, JSON.stringify({...diagnostic, bundlePrepared: true}));
+if (result.status !== 0) { console.error('Synthetic render failed:', diagnostic.issue, diagnostic.code ?? ''); process.exitCode = result.status || 1; }
 else console.log(${literal(target)});
 `)
-  return { target, ffmpeg, ffprobe, renderDiagnostic }
+  return { target, ffmpeg, ffprobe, renderDiagnostic, preparedBundle }
 }
 
 function matchesPdfText(value) {
@@ -362,6 +395,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       return { kind: 'private-noncommercial-synthetic-evaluation', remotionVersion: version, codec: probe.codec_name,
         width: probe.width, height: probe.height, frames: Number(probe.nb_frames), artifact: { id: artifact.id, sha256: artifact.sha256, bytes: video.length },
         installedSkillResourceRead: true, attachedPdfRead: true, sameTaskResumedAfterInterruption: true, appOpenedArtifact: true, runtimeApprovalId: approval.requestId, decoded: true,
+        fixturePreparation: { bundle: toolchain.preparedBundle, frameTimeoutMs: 60_000, approvedCommandTimeoutSeconds: render.timeout_seconds },
         decoder: { version: decoderVersion, sha256: decoderSha256, decodedFrames },
         originalChat: { interrupted: interruptedChat, approval: approvalChat, completed: completedChat, artifactButtonClicked: true } }
     } }
