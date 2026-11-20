@@ -600,6 +600,7 @@ export function validateWindowsTaskEvidence(evidence) {
     validateWindowsTaskChatLayout(evidence.dueOccurrence.originalChat)
     assert.equal(evidence.dueOccurrence.noRepeatedUserRequest, true)
     assert.equal(evidence.dueOccurrence.resultInOriginChat, true)
+    assert.equal(evidence.dueOccurrence.durableOriginReceipt, true)
     assert.equal(evidence.schedule.dedicatedEntryOpened, true)
   } else validateWindowsTaskPreviewLayout(evidence.preview.layout)
   assert.equal(evidence.dueOccurrence.clock, 'real')
@@ -3129,6 +3130,17 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         const after = await cdp.evaluate(`document.querySelector('.ds-message-timeline-content')?.textContent.split(${JSON.stringify(prompt)}).length-1`)
         assert.equal(after, userPromptCount, 'A scheduled occurrence must not replay the original user request into chat')
         report.taskExecution.dueOccurrence.noRepeatedUserRequest = true
+        const reloadedOrigin = await runtimeRequest(`/v1/threads/${encodeURIComponent(originThreadId)}`)
+        const commandId = `command_task_result_${occurrence.id}`
+        const receiptId = `item_${commandId}_receipt`
+        const receipts = reloadedOrigin.conversationItems.filter(item => item.id === receiptId)
+        assert.equal(receipts.length, 1, 'Reopening the original chat must load one durable scheduled result')
+        assert.equal(receipts[0].threadId, originThreadId)
+        assert.equal(receipts[0].conversationReceiptId, commandId)
+        assert.equal(receipts[0].kind, 'assistant_text')
+        assert.equal(receipts[0].status, 'completed')
+        assert.equal(receipts[0].text, windowsDueTaskResult)
+        report.taskExecution.dueOccurrence.durableOriginReceipt = true
       }
       if (browserSmoke) assert.notEqual(occurrenceArtifact.sha256, artifact.sha256, 'The due report must contain its own freshly read primary-document version')
       if (browserSmoke) {
@@ -3191,12 +3203,29 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       assert.deepEqual(restored.nodes.find(node => node.id === 'schedule').config, schedule.schedule)
       report.taskExecution.dueOccurrence.originalDailyScheduleRestored = true
       if (!browserSmoke) {
-        if (await cdp.evaluate(`Boolean(document.querySelector('button[aria-label="收起右侧栏"]')?.getClientRects().length)`)) await cdp.click('button[aria-label="收起右侧栏"]')
-        const toolNavigation = 'nav[aria-label="工作区工具"]'
-        if (!await cdp.evaluate(`[...document.querySelectorAll(${JSON.stringify(`${toolNavigation} button`)})].some(button=>button.getClientRects().length&&button.textContent.trim()==='定时任务')`)) {
-          await cdp.click(`${toolNavigation} summary`, '工具')
+        const closeInspector = 'button[aria-label="收起右侧栏"]'
+        if (await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(closeInspector)})?.getClientRects().length)`)) {
+          await cdp.click(closeInspector)
         }
-        await cdp.click(`${toolNavigation} button`, '定时任务')
+        await cdp.wait(`(() => {
+          const shell=document.querySelector('.ds-workbench-shell'), main=shell?.querySelector('main');
+          return main&&!main.inert&&!main.hasAttribute('inert')&&shell.dataset.activeOverlay!=='inspector'&&
+            !document.querySelector(${JSON.stringify(closeInspector)})?.getClientRects().length;
+        })()`, 'the report preview to finish closing before accessing workspace tools')
+        const toolNavigation = 'nav[aria-label="工作区工具"]'
+        const toolsDisclosure = `${toolNavigation} details`
+        await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(toolsDisclosure)}))`, 'the actual workspace Tools disclosure')
+        // A closed native disclosure can leave layout boxes for its unpainted children.
+        if (!await cdp.evaluate(`document.querySelector(${JSON.stringify(toolsDisclosure)}).open`)) {
+          await cdp.click(`${toolsDisclosure} > summary`, '工具')
+        }
+        const scheduleButton = `${toolsDisclosure}[open] button`
+        await cdp.wait(`document.querySelector(${JSON.stringify(toolsDisclosure)})?.open === true`, 'workspace Tools to open')
+        const scheduleTarget = await cdp.evaluate(windowsManualArtifactTargetExpression({ stable: true, selector: scheduleButton, label: '定时任务' }))
+        report.taskExecution.schedule.targetAudit = scheduleTarget
+        assert.equal(scheduleTarget.ready, true, `Workspace recurring schedule entry is covered or unstable: ${JSON.stringify(scheduleTarget)}`)
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...scheduleTarget.point })
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...scheduleTarget.point })
         await cdp.wait(`[...document.querySelectorAll('h1')].some(node=>node.getClientRects().length&&node.textContent.trim()==='定时任务')`, 'the independent recurring schedule manager')
         report.taskExecution.schedule.dedicatedEntryOpened = true
       }

@@ -713,6 +713,18 @@ for (const [name, change] of [
   assert.throws(() => validateWindowsTaskEvidence(evidence))
 })
 
+test('the scheduled original-chat result must survive reopening the conversation', () => {
+  const evidence = report().taskExecution
+  const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0,
+    taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
+  evidence.preview.layout = layout
+  evidence.schedule.dedicatedEntryOpened = true
+  Object.assign(evidence.dueOccurrence, { originalChat: layout, noRepeatedUserRequest: true, resultInOriginChat: true })
+  assert.throws(() => validateWindowsTaskEvidence(evidence))
+  evidence.dueOccurrence.durableOriginReceipt = true
+  validateWindowsTaskEvidence(evidence)
+})
+
 test('the local model protocol fixture requests real tools and never impersonates a browser result', async () => {
   const fixture = await startWindowsTaskModelFixture()
   try {
