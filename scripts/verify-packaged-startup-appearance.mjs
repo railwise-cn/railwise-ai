@@ -104,7 +104,7 @@ async function collectTargets(launch, profile, port) {
 
 export async function observeInstalledStartup(options, expected, dependencies) {
   const { executable, version, evidenceDir, temporary } = options
-  const { connectCdp, environmentForRoot } = dependencies
+  const { connectCdp, environmentForRoot, onWorkbenchReady } = dependencies
   const root = await mkdtemp(join(temporary, 'railwise-splash-'))
   const profile = join(root, 'profile')
   const workspace = join(root, 'workspace')
@@ -160,6 +160,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
     observation.workbenchTypography = await observeWorkbenchTypography(main)
+    if (onWorkbenchReady) observation.workbook = await onWorkbenchReady(main, { root, workspace })
     if (expected.screenshotName) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
