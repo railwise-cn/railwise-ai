@@ -68,6 +68,19 @@ function matchesPdfText(value) {
   return typeof value === 'string' && value.replace(/[\s\u0000]/gu, '').includes(pdfText)
 }
 
+function sectionResultStatus(result, key) {
+  if (Array.isArray(result?.[key])) return `${result[key].length} sections`
+  if (typeof result !== 'object' || !result) return 'unreadable'
+  const error = typeof result.error === 'string' ? result.error : typeof result.message === 'string' ? result.message : ''
+  const diagnostic = [
+    [/attachment is not authorized for this turn/i, 'attachment scope rejected'], [/attachment not found/i, 'attachment not found'],
+    [/not authorized|permission|sandbox/i, 'execution policy rejected'], [/database|sqlite|could not locate the bindings/i, 'attachment index error'],
+    [/not available|unknown tool|tool not found/i, 'tool unavailable'], [/invalid|must be|is required/i, 'argument rejected']
+  ].find(([pattern]) => pattern.test(error))?.[1]
+  const code = typeof result.code === 'string' && /^[a-z_]{3,48}$/.test(result.code) ? result.code : undefined
+  return [code, diagnostic, `keys=${Object.keys(result).filter(name => /^[a-z_]{2,32}$/i.test(name)).sort().join(',')}`].filter(Boolean).join(' ')
+}
+
 export function windowsVideoModelAction(body, selection, render, parseFixtureToolOutput) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
   const results = new Map(body.messages?.filter(message => message.role === 'tool')
@@ -95,8 +108,7 @@ export function windowsVideoModelAction(body, selection, render, parseFixtureToo
     }
     const list = results.get(listPdfId)
     section = match(list?.sections)
-    const status = (result, key) => Array.isArray(result?.[key]) ? result[key].length : result === undefined ? 'unreadable' : 'no section array'
-    assert.ok(section, `No matching indexed PDF section from the runtime (search: ${status(search, 'results')}, list: ${status(list, 'sections')})`)
+    assert.ok(section, `No matching indexed PDF section from the runtime (search: ${sectionResultStatus(search, 'results')}; list: ${sectionResultStatus(list, 'sections')})`)
   }
   if (!results.has(readPdfId)) {
     assert.ok(tools.has('read_attachment_section'))
