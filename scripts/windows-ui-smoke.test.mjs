@@ -18,6 +18,26 @@ import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWin
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 
+test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
+  const evidence = report()
+  evidence.checks = ['installed-chinese-renderer', 'installed-video-skill-protocol-render-registered-and-decoded']
+  delete evidence.resources
+  evidence.marketplace = {
+    status: 'passed', scope: 'video-shotcraft', installed: [{ id: 'video-shotcraft', artifactSha256: 'a'.repeat(64) }],
+    videoShotcraft: { runtimeSkillId: 'video-shotcraft', entrySha256: 'b'.repeat(64), slashSelectionVerified: true,
+      render: { kind: 'private-noncommercial-synthetic-evaluation', installedSkillResourceRead: true, attachedPdfRead: true,
+        sameTaskResumedAfterInterruption: true, appOpenedArtifact: true, decoded: true, runtimeApprovalId: 'approval',
+        codec: 'h264', width: 320, height: 180, frames: 24, artifact: { id: 'video', bytes: 1000, sha256: 'c'.repeat(64) } } }
+  }
+  assert.equal(validateWindowsUiReport(evidence, identity, { requireVideoEvaluation: true }), true)
+  assert.throws(() => validateWindowsUiReport(evidence, identity))
+  for (const field of ['installedSkillResourceRead', 'attachedPdfRead', 'sameTaskResumedAfterInterruption', 'appOpenedArtifact', 'decoded']) {
+    const changed = structuredClone(evidence)
+    changed.marketplace.videoShotcraft.render[field] = false
+    assert.throws(() => validateWindowsUiReport(changed, identity, { requireVideoEvaluation: true }), new RegExp(field))
+  }
+})
+
 test('the optional Windows fixtures load without evaluating the awaiting UI driver', () => {
   const blockedEntry = new URL('./run-windows-ui-smoke.mjs', import.meta.url).href
   const fixtures = ['./verify-windows-composer-acceptance.mjs', './verify-windows-video-evaluation.mjs']

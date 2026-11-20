@@ -398,7 +398,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -411,6 +411,28 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
   assert.equal(report.errors.length, 0)
+  if (requireVideoEvaluation) {
+    assert.ok(report.checks.includes('installed-chinese-renderer'))
+    assert.ok(report.checks.includes('installed-video-skill-protocol-render-registered-and-decoded'))
+    const marketplace = report.marketplace
+    assert.equal(marketplace.status, 'passed')
+    assert.equal(marketplace.scope, 'video-shotcraft')
+    assert.deepEqual(marketplace.installed.map(item => item.id), ['video-shotcraft'])
+    assert.match(marketplace.installed[0].artifactSha256, /^[a-f0-9]{64}$/)
+    const videoSkill = marketplace.videoShotcraft
+    assert.ok(videoSkill.runtimeSkillId)
+    assert.match(videoSkill.entrySha256, /^[a-f0-9]{64}$/)
+    assert.equal(videoSkill.slashSelectionVerified, true)
+    const input = videoSkill.render
+    assert.equal(input.kind, 'private-noncommercial-synthetic-evaluation')
+    for (const flag of ['installedSkillResourceRead', 'attachedPdfRead', 'sameTaskResumedAfterInterruption', 'appOpenedArtifact', 'decoded']) {
+      assert.equal(input[flag], true, `Missing private video acceptance evidence: ${flag}`)
+    }
+    assert.ok(input.runtimeApprovalId && input.artifact.id && input.artifact.bytes > 0)
+    assert.match(input.artifact.sha256, /^[a-f0-9]{64}$/)
+    assert.deepEqual([input.codec, input.width, input.height, input.frames], ['h264', 320, 180, 24])
+    return true
+  }
   assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
   assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
   assert.equal(report.update.ok, true)
@@ -2489,7 +2511,6 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
 
 export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true' }) {
   taskSmoke ||= browserSmoke
-  mirrorSmoke ||= videoEvaluation
   assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
@@ -2581,6 +2602,14 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
+    if (video) {
+      const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
+      report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: true })
+      report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
+      report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
+    } else await verifyFullWorkbench()
+
+    async function verifyFullWorkbench() {
     await cdp.click('button', '技能与连接器')
     report.tabs = await cdp.wait(`(() => { const tabs=Array.from(document.querySelectorAll('[role="tablist"][aria-label="技能与连接器分类"] [role="tab"]')); return tabs.length===3 && tabs.map(tab=>tab.textContent.trim()); })()`, 'marketplace tabs')
     assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
@@ -3126,10 +3155,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
       report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root })
       report.checks.push('cold-mirror-installs-playwright-docling-and-skill-selection')
-      if (video) {
-        report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
-        report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
-      }
+    }
     }
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error))
@@ -3197,7 +3223,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel?.observed) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke }); report.status = 'passed' } catch (error) {
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
