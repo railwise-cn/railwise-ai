@@ -43,7 +43,7 @@ export async function observeWorkbenchTypography(cdp, selector = '.ds-sidebar-sh
 }
 
 function observeSplash() {
-  const logo = document.querySelector('.splash img.logo')
+  const logo = [...document.querySelectorAll('.splash img.logo')].find(image => image.getClientRects().length)
   const title = document.querySelector('.splash h1')
   const subtitle = document.querySelector('.splash .subtitle')
   const bar = document.querySelector('.splash [role="progressbar"]')
@@ -295,13 +295,19 @@ export async function runWindowsStartupAppearanceSmoke({ executable, version, so
   const report = { schemaVersion: 1, scope: 'private-exact-package-startup-appearance', status: 'failed',
     sourceHead, version, provenance, installedAsarSha256: installed.asarSha256, observations: [], productionTouched: false }
   try {
+    const errors = []
     for (const expected of windowsStartupCases) {
-      report.observations.push(await observeStartupWithCaptureRetry({ executable, version, evidenceDir, temporary }, expected, {
-        connectCdp: dependencies.connectCdp, environmentForRoot: dependencies.windowsUiEnvironment
-      }))
+      try {
+        report.observations.push(await observeStartupWithCaptureRetry({ executable, version, evidenceDir, temporary }, expected, {
+          connectCdp: dependencies.connectCdp, environmentForRoot: dependencies.windowsUiEnvironment
+        }))
+      } catch (error) {
+        errors.push(`${expected.locale} ${expected.theme} ${expected.scale}: ${error.message}`)
+      }
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === installed.asarSha256
     assert.equal(report.packageUnchanged, true)
+    assert.deepEqual(errors, [], 'Each startup and workbench case must pass')
     report.status = 'passed'
   } catch (error) {
     report.error = error.message
