@@ -2105,8 +2105,9 @@ test('diagnostic quick identity retry receives only the remaining startup budget
   assert.equal(value.result.cleanup.verifiedBirth, true)
 })
 
-// Offline renderer protocol fixture: the production layout hook, not a mocked
-// activeOverlay response, reacts to a deferred preview after the real route click.
+// Keep the legacy task-navigation controls for the install driver, with the
+// deferred preview owned by the original conversation as in the workbench.
+// The production layout hook still controls projection and modal dismissal.
 async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false, selectedTaskKeyUnchanged = false } = {}) {
   const { Window } = await import('happy-dom')
   const window = new Window({ url: 'http://localhost/' }), temporary = await mkdtemp(join(tmpdir(), 'railwise-manual-route-'))
@@ -2126,7 +2127,7 @@ async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false, sele
       export const events=[];
       export function Harness(){
         const [route,setRoute]=useState('chat'),[ready,setReady]=useState(0);
-        const layout=useWorkbenchLayout({route,workspaceRoot:'/synthetic-ui-only',activeThreadId:route==='tasks'?'task-workspace-preview:synthetic':'chat',latestAutoOpenDevPreviewKey:ready?'synthetic-current-hash-'+ready:null,latestAutoOpenDevPreviewUrl:ready?'http://localhost/report':null,latestDevPreviewUrl:ready?'http://localhost/report':null,writeAssistantOpen:false});
+        const layout=useWorkbenchLayout({route:'chat',workspaceRoot:'/synthetic-ui-only',activeThreadId:'synthetic-origin-chat',latestAutoOpenDevPreviewKey:ready?'synthetic-current-hash-'+ready:null,latestAutoOpenDevPreviewUrl:ready?'http://localhost/report':null,latestDevPreviewUrl:ready?'http://localhost/report':null,writeAssistantOpen:false});
         const artifact=()=>{events.push('artifact-click');layout.openDevPreview()};
         const select=()=>{events.push('select-task');if(${JSON.stringify(selectedTaskKeyUnchanged)})return;Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
         return h('div',{className:'ds-workbench-shell',ref:layout.shellRef,'data-active-overlay':layout.activeOverlay??''},
