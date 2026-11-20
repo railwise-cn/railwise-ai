@@ -93,21 +93,25 @@ async function verifyMarketplaceSkillSelection(cdp, composer, skillId, label) {
   await cdp.fill(composer, '')
 }
 
-export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot }) {
+export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot, videoOnly = false }) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' &&
     process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_OS === 'Windows', 'Use only an ephemeral hosted Windows acceptance runner')
   assert.ok(containment(await realpath(process.env.RUNNER_TEMP), await realpath(ownedRoot)))
   const lock = JSON.parse(await readFile(new URL('../src/shared/marketplace-mirror-lock.json', import.meta.url), 'utf8'))
   const expected = new Map(lock.packages.filter(row => row.platform === 'win32' && row.arch === 'x64').map(row => [row.packageId, row]))
   assert.ok(expected.size, 'The exact release requires a complete Windows marketplace lock')
+  const selection = videoOnly ? new Map([['video-shotcraft', expected.get('video-shotcraft')]]) : expected
 
   return withPublicUpstreamsBlocked(async () => {
     const catalog = (await cdp.evaluate('window.workwise.listCatalogPackages()')).packages
     const initial = await cdp.evaluate('window.workwise.listInstalledPlugins()')
     const reports = []
-    await cdp.click('.ds-sidebar-shell button', '技能与连接器')
-    await cdp.click('[role="tab"]', '插件')
-    for (const [id, row] of expected) {
+    if (!videoOnly) {
+      await cdp.click('.ds-sidebar-shell button', '技能与连接器')
+      await cdp.click('[role="tab"]', '插件')
+    }
+    for (const [id, row] of selection) {
+      assert.ok(row, `The mirror lock must include ${id}`)
       assert.ok(!initial.some(item => item.packageId === id), `A cold profile must not have ${id}`)
       const catalogEntry = catalog.find(item => item.package.id === id)
       assert.equal(catalogEntry?.reviewSha256, row.reviewSha256)
@@ -139,6 +143,21 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
       reports.push({ id, version: installed.version, reviewSha256: installed.reviewSha256, artifactSha256: installed.artifact.sha256, lockedParts: row.parts.length })
     }
 
+    const scope = `/v1/skills?${new URLSearchParams({ scope: 'available', workspace })}`
+    const current = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result=>result.ok&&JSON.parse(result.body).skills.find(row=>row.name==='video-shotcraft'))`, 'Video Shotcraft loaded in the active workspace', 90_000)
+    const skill = await readFile(join(current.root, 'SKILL.md'))
+    const videoArtifact = await cdp.evaluate(`window.workwise.listInstalledPlugins().then(all=>all.find(row=>row.packageId==='video-shotcraft'))`)
+    assert.ok(containment(await realpath(videoArtifact.artifact.location), await realpath(join(current.root, 'SKILL.md'))),
+      'The runtime Skill entry must be inside the reviewed installed mirror payload')
+    assert.match(skill.toString('utf8'), /^name:\s*video-shotcraft\s*$/m)
+    await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
+    const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
+    await verifyMarketplaceSkillSelection(cdp, composer, current.id, 'Video Shotcraft')
+    const evidence = { status: 'passed', releaseComplete: false, blockedHosts, installed: reports,
+      videoShotcraft: { runtimeSkillId: current.id, slashSelectionVerified: true, entrySha256: createHash('sha256').update(skill).digest('hex'),
+        render: 'pending-licensed-remotion-and-video-runtime' } }
+    if (videoOnly) return { ...evidence, scope: 'video-shotcraft' }
+
     const getRuntimeServer = id => `window.workwise.runtimeRequest('/v1/runtime/tools','GET').then(result=>{
       if(!result.ok)return null;
       const row=JSON.parse(result.body).mcpServers.find(item=>item.id===${literal(id)});
@@ -150,17 +169,6 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     assert.equal(server?.source, 'managed-tool')
     assert.equal(server?.transport, 'stdio')
     const playwright = await invokeInstalledPlaywright(server, workspace, environment)
-
-    const scope = `/v1/skills?${new URLSearchParams({ scope: 'available', workspace })}`
-    const current = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result=>result.ok&&JSON.parse(result.body).skills.find(row=>row.name==='video-shotcraft'))`, 'Video Shotcraft loaded in the active workspace', 90_000)
-    const skill = await readFile(join(current.root, 'SKILL.md'))
-    const videoArtifact = await cdp.evaluate(`window.workwise.listInstalledPlugins().then(all=>all.find(row=>row.packageId==='video-shotcraft'))`)
-    assert.ok(containment(await realpath(videoArtifact.artifact.location), await realpath(join(current.root, 'SKILL.md'))),
-      'The runtime Skill entry must be inside the reviewed installed mirror payload')
-    assert.match(skill.toString('utf8'), /^name:\s*video-shotcraft\s*$/m)
-    await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
-    const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
-    await verifyMarketplaceSkillSelection(cdp, composer, current.id, 'Video Shotcraft')
     const superpowers = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result =>
       result.ok && JSON.parse(result.body).skills.find(row => row.id === 'using-superpowers' && row.scope === 'project'))`,
       'Superpowers loaded in the workspace that installed it', 90_000)
@@ -170,10 +178,8 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     await verifyMarketplaceSkillSelection(cdp, composer, superpowers.id, 'Using Superpowers')
     await verifyMarketplaceSkillSelection(cdp, composer, blender.id, 'Blender Director')
 
-    return { status: 'passed', releaseComplete: false, blockedHosts, installed: reports, playwright, docling: { toolsDiscovered: doclingTools },
+    return { ...evidence, playwright, docling: { toolsDiscovered: doclingTools },
       superpowers: { runtimeSkillId: superpowers.id, offline: true, slashSelectionVerified: true },
-      blender: { runtimeSkillId: blender.id, slashSelectionVerified: true },
-      videoShotcraft: { runtimeSkillId: current.id, slashSelectionVerified: true, entrySha256: createHash('sha256').update(skill).digest('hex'),
-        render: 'pending-licensed-remotion-and-video-runtime' } }
+      blender: { runtimeSkillId: blender.id, slashSelectionVerified: true } }
   })
 }

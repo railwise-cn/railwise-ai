@@ -9,7 +9,7 @@ import { pipeline } from 'node:stream/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
-import { inspectInstalledPackage, inspectInstaller, installIdentity } from './verify-windows-install-smoke.mjs'
+import { inspectInstalledPackage, inspectInstaller, installIdentity, psQuote } from './verify-windows-install-smoke.mjs'
 import { connectCdp, summarizeWindowsUpdateMetadata, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 
 const baseVersion = '0.5.6'
@@ -78,7 +78,7 @@ export function assertPublishedWindowsUpgrade(report) {
   assert.equal(report.profile?.sentinelPreserved, true)
 }
 
-export const psQuote = value => "'" + value.replaceAll("'", "''") + "'"
+export { psQuote }
 export function powershell(script, timeout = 12_000) {
   return execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', script], {
     encoding: 'utf8', maxBuffer: 128 * 1024, timeout, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']
