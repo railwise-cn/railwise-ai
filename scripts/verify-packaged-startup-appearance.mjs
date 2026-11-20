@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
@@ -7,10 +7,13 @@ import { setTimeout as wait } from 'node:timers/promises'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
 
 const brand = JSON.parse(readFileSync(new URL('../src/shared/product-brand.json', import.meta.url), 'utf8'))
-const windowsCases = [
+export const windowsStartupCases = [
   { locale: 'en', htmlLang: 'en', theme: 'light', scale: 1 },
-  { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark', scale: 1.25, screenshotName: 'windows-startup-appearance-zh-dark.png' }
+  { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark', scale: 1.25, screenshotName: 'windows-startup-appearance-zh-dark.png' },
+  { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark', scale: 1.5, narrowWorkbench: true }
 ]
+
+const narrowWindowBounds = { width: 960, height: 640 }
 
 export async function observeWorkbenchTypography(cdp, selector = '.ds-sidebar-shell button.w-full') {
   await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(selector)})?.getClientRects().length)`, 'representative visible workbench text')
@@ -87,6 +90,78 @@ export function validateStartupAppearance(actual, expected) {
   return actual
 }
 
+function observeComposerGeometry() {
+  const composer = document.querySelector('.ds-floating-composer .ds-chat-composer')
+  const textarea = composer?.querySelector('textarea')
+  const toolbar = composer?.querySelector('.ds-composer-toolbar')
+  const model = toolbar?.querySelector('.ds-composer-model-picker button')
+  const send = toolbar?.querySelector('button[aria-label="发送"]')
+  const general = toolbar?.querySelector('.ds-composer-agent-picker button')
+  if (!composer || !textarea || !toolbar || !model || !send) return null
+  const rect = node => {
+    const { left, top, right, bottom, width, height } = node.getBoundingClientRect()
+    return { left, top, right, bottom, width, height }
+  }
+  const target = node => {
+    const box = rect(node)
+    return { ...box, hit: node.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)) }
+  }
+  const label = general?.querySelector('span.truncate')
+  return {
+    viewport: { width: innerWidth, height: innerHeight, scale: devicePixelRatio },
+    composer: rect(composer), textarea: rect(textarea), toolbar: rect(toolbar), model: target(model), send: target(send),
+    horizontalOverflow: [document.documentElement, composer, textarea, toolbar].some(node => node.scrollWidth > node.clientWidth + 2),
+    general: general?.getClientRects().length && label
+      ? { ...target(general), label: label.textContent, clipped: label.scrollWidth > label.clientWidth + 1 }
+      : null
+  }
+}
+
+export function validateNarrowWorkbenchComposer(observation, expectedScale) {
+  const { viewport, composer, textarea, toolbar, model, send, general } = observation
+  assert.ok(Math.abs(viewport.scale - expectedScale) < 0.01, 'Expected real workbench device scale')
+  assert.ok(Math.abs(viewport.width - narrowWindowBounds.width) <= 24, 'Expected the real minimum-width workbench')
+  assert.ok(Math.abs(viewport.height - narrowWindowBounds.height) <= 40, 'Expected the real minimum-height workbench')
+  assert.equal(observation.horizontalOverflow, false, 'The actual workbench composer must fit without horizontal scrolling')
+  for (const box of [composer, textarea, toolbar, model, send, ...(general ? [general] : [])]) {
+    assert.ok(box.width > 0 && box.height > 0 && box.left >= -1 && box.top >= -1 &&
+      box.right <= viewport.width + 1 && box.bottom <= viewport.height + 1, 'Composer controls must fit within the viewport')
+  }
+  for (const box of [textarea, toolbar]) {
+    assert.ok(box.left >= composer.left - 1 && box.right <= composer.right + 1, 'Composer rows must fit the input shell')
+  }
+  assert.ok(textarea.bottom <= toolbar.top + 1, 'Composer controls must stay below the text input')
+  for (const box of [model, send, ...(general ? [general] : [])]) {
+    assert.ok(box.left >= toolbar.left - 1 && box.right <= toolbar.right + 1 && box.hit,
+      'Composer selectors and send must remain visible and receive pointer hits')
+  }
+  if (general) assert.equal(general.clipped, false, 'The current agent label must remain readable')
+  return observation
+}
+
+async function observeNarrowWorkbench(cdp, { pid, env, scale }) {
+  let resizeMethod = 'browser-cdp'
+  try {
+    const { windowId } = await cdp.send('Browser.getWindowForTarget', {}, 2000)
+    await cdp.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } }, 2000)
+    await cdp.send('Browser.setWindowBounds', { windowId, bounds: narrowWindowBounds }, 2000)
+  } catch {
+    const { windowsOwnedWindowScript } = await import('./run-windows-ui-smoke.mjs')
+    const nativeBounds = bounds => JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      windowsOwnedWindowScript(pid, bounds)], { env, encoding: 'utf8', windowsHide: true, timeout: 15_000 }))
+    const original = nativeBounds()
+    assert.equal(original.ownerVerified, true)
+    assert.equal(nativeBounds({ ...original, ...narrowWindowBounds, windowState: 'normal' }).ownerVerified, true)
+    resizeMethod = 'verified-pid-native-window'
+  }
+  const geometry = await cdp.wait(`(() => {
+    const state = (${observeComposerGeometry.toString()})();
+    return state && Math.abs(state.viewport.width - ${narrowWindowBounds.width}) <= 24 && state;
+  })()`, 'real composer at the minimum Windows workbench width', 15_000)
+  validateNarrowWorkbenchComposer(geometry, scale)
+  return { resizeMethod, ...geometry }
+}
+
 function assertInside(root, path) {
   const child = relative(root, resolve(path))
   assert.ok(child && !child.startsWith('..') && !isAbsolute(child), 'Startup evidence must stay in RUNNER_TEMP')
@@ -160,6 +235,9 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
     observation.workbenchTypography = await observeWorkbenchTypography(main)
+    if (expected.narrowWorkbench) {
+      observation.narrowWorkbench = await observeNarrowWorkbench(main, { pid: child.pid, env, scale: expected.scale })
+    }
     if (expected.screenshotName) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
@@ -205,7 +283,7 @@ export async function runWindowsStartupAppearanceSmoke({ executable, version, so
   const report = { schemaVersion: 1, scope: 'private-exact-package-startup-appearance', status: 'failed',
     sourceHead, version, provenance, installedAsarSha256: installed.asarSha256, observations: [], productionTouched: false }
   try {
-    for (const expected of windowsCases) {
+    for (const expected of windowsStartupCases) {
       report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected, {
         connectCdp: dependencies.connectCdp, environmentForRoot: dependencies.windowsUiEnvironment
       }))
