@@ -7,6 +7,7 @@ import { dirname, isAbsolute, join, normalize } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import { createChineseTextPdf } from './verify-windows-composer-acceptance.mjs'
+import { revealWindowsChatTaskArtifact, validateWindowsTaskChatLayout, windowsTaskChatLayoutExpression, windowsTaskChatRegion } from './windows-task-chat-ui.mjs'
 
 const execFile = promisify(execFileCallback)
 const digest = value => createHash('sha256').update(value).digest('hex')
@@ -272,9 +273,9 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       const interrupted = await cdp.wait(`window.workwise.listTaskPage({filter:'all',workspaceRoot:${literal(workspace)}}).then(page=>
         [...page.items, ...page.relatedTasks].find(task=>task.status==='stalled'&&task.presentation?.reason==='response_interrupted'))`, 'durable interrupted response in the same task', 120_000)
         .catch(error => { throw new Error(selection.failure ?? error.message) })
-      await cdp.click('button', '打开任务工作台')
-      const detail = 'article[aria-label="任务详情"]'
-      await cdp.click(`${detail} button`, '继续任务')
+      const chat = windowsTaskChatLayoutExpression(marker)
+      const interruptedChat = validateWindowsTaskChatLayout(await cdp.wait(chat, 'interrupted task controls in the original chat'))
+      await cdp.click(`${windowsTaskChatRegion} button`, '继续任务')
       const approval = await cdp.wait(`window.workwise.listTaskInbox(${literal(workspace)}).then(items=>items.find(item=>item.status==='pending'&&item.kind==='approval'&&item.message.includes(${literal(`Command SHA256: ${digest(render.command)}`)})))`, 'the exact reviewed isolated render approval', 90_000)
         .catch(error => { throw new Error(selection.failure ?? error.message) })
       assert.equal(approval.payload?.approval?.toolName, 'request_host_shell')
@@ -282,11 +283,12 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       assert.equal(selection.read, true)
       assert.equal(selection.pdfRead, true)
       assert.equal(approval.taskId, interrupted.id)
+      const approvalChat = validateWindowsTaskChatLayout(await cdp.wait(chat, 'approval state in the original chat'))
       const commandFingerprint = `Command SHA256: ${digest(render.command)}`
-      assert.equal(await cdp.evaluate(`document.querySelector(${literal(detail)})?.innerText.includes(${literal(commandFingerprint)})`), false)
+      assert.equal(await cdp.evaluate(`document.querySelector('.ds-workbench-shell main')?.innerText.includes(${literal(commandFingerprint)})`), false)
       const button = await cdp.wait(`(() => {
-        const article=document.querySelector(${literal(detail)});
-        const options=[...(article?.querySelectorAll('button')??[])].filter(item=>
+        const conversation=document.querySelector('.ds-workbench-shell main');
+        const options=[...(conversation?.querySelectorAll('button')??[])].filter(item=>
           ['允许此操作','允许本次'].includes(item.textContent.trim())&&!item.disabled&&item.getClientRects().length);
         if(options.length!==1)return null;
         const button=options[0];
@@ -327,6 +329,9 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
         throw new Error(`${selection.failure ?? error.message}; ${JSON.stringify({ process: processReport, shell: selection.shell, state, file })}`)
       })
       assert.equal(selection.rendered, true)
+      const completedChat = validateWindowsTaskChatLayout(await cdp.wait(chat, 'the completed task in its original chat'))
+      const artifactButton = await revealWindowsChatTaskArtifact(cdp, filename)
+      await cdp.click(artifactButton, filename)
       const openResult = await cdp.evaluate(artifact.absolutePath
         ? `window.workwise.openTaskArtifact({taskId:${literal(approval.taskId)},artifactId:${literal(artifact.id)}})`
         : `window.workwise.openWorkspaceFile({workspaceRoot:${literal(workspace)},path:${literal(filename)}})`)
@@ -342,6 +347,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
         { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
       return { kind: 'private-noncommercial-synthetic-evaluation', remotionVersion: version, codec: probe.codec_name,
         width: probe.width, height: probe.height, frames: Number(probe.nb_frames), artifact: { id: artifact.id, sha256: artifact.sha256, bytes: video.length },
-        installedSkillResourceRead: true, attachedPdfRead: true, sameTaskResumedAfterInterruption: true, appOpenedArtifact: true, runtimeApprovalId: approval.requestId, decoded: true }
+        installedSkillResourceRead: true, attachedPdfRead: true, sameTaskResumedAfterInterruption: true, appOpenedArtifact: true, runtimeApprovalId: approval.requestId, decoded: true,
+        originalChat: { interrupted: interruptedChat, approval: approvalChat, completed: completedChat, artifactButtonClicked: true } }
     } }
 }
