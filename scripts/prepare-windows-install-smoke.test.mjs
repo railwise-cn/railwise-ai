@@ -13,7 +13,7 @@ function source() {
     workflow: '.github/workflows/release.yml', packageSourceHead: 'a'.repeat(40), driverSourceHead: 'b'.repeat(40),
     windowsBuildConclusion: 'success', artifactId: 4567, artifactName: 'release-win',
     artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
-    changedFiles: ['scripts/run-windows-ui-smoke.mjs', 'scripts/windows-ui-smoke.test.mjs',
+    changedFiles: ['scripts/run-windows-ui-smoke.mjs', 'scripts/windows-ui-smoke.test.mjs', 'scripts/windows-task-chat-ui.mjs',
       '.github/workflows/windows-install-smoke.yml', '.github/workflows/release.yml', 'scripts/deploy-website-release.mjs',
       'src/renderer/src/components/connectors/ManagedLarkConnection.test.ts']
   }
@@ -27,7 +27,7 @@ test('existing Windows acceptance binds separate driver and package heads to the
 
 for (const file of ['src/renderer/src/components/HelpReader.tsx', 'kun/package.json', 'package-lock.json',
   'kun/src/adapters/tool/browser-skill-tool-provider.ts', 'docs/USER_GUIDE.md',
-  'electron-builder.config.cjs', 'build/icon.ico', 'scripts/prepare-runtime.cjs']) {
+  'electron-builder.config.cjs', 'build/icon.ico', 'scripts/prepare-runtime.cjs', 'scripts/other-chat-ui.mjs']) {
   test(`existing artifact cannot stand in for changed application source ${file}`, () => {
     assert.throws(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }), /application or build source changed/)
   })
