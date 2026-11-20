@@ -81,6 +81,40 @@ function sectionResultStatus(result, key) {
   return [code, diagnostic, `keys=${Object.keys(result).filter(name => /^[a-z_]{2,32}$/i.test(name)).sort().join(',')}`].filter(Boolean).join(' ')
 }
 
+function recoverWorkflow(resource, prefix, tools, results, selection) {
+  if (!resource?.contextSpill) return { resource }
+  assert.ok(tools.has('read_task_context'), 'The installed workflow has a scoped context reference')
+  const reference = resource.contextSpill
+  const pinned = (selection.workflowReferences ??= {})[prefix] ??= reference
+  assert.ok(pinned.bundle_id && pinned.object_id === reference.object_id && pinned.sha256 === reference.sha256 &&
+    /^[a-f0-9]{64}$/.test(pinned.sha256) && pinned.totalBytes === reference.totalBytes &&
+    Number.isInteger(pinned.totalBytes) && pinned.totalBytes > 0 && pinned.totalBytes <= 64 * 1024)
+  const parts = []
+  let offset = 0
+  for (let index = 0; index < 16; index++) {
+    const id = `${prefix}-recall-workflow-${index}`
+    if (!results.has(id)) return { action: [id, 'read_task_context', {
+      bundle_id: pinned.bundle_id, object_id: pinned.object_id, offset, max_bytes: 8192
+    }] }
+    const page = results.get(id)
+    assert.ok(page?.untrusted && page.bundleId === pinned.bundle_id && page.objectId === pinned.object_id &&
+      page.offset === offset && page.totalBytes === pinned.totalBytes && page.sha256 === pinned.sha256 && typeof page.text === 'string',
+    `The scoped workflow page must have the reviewed identity and next UTF-8 offset (${sectionResultStatus(page, 'sections')})`)
+    const pageBytes = Buffer.from(page.text, 'utf8')
+    assert.ok(pageBytes.length > 0 && pageBytes.length <= 8192)
+    parts.push(pageBytes)
+    offset += pageBytes.length
+    if (page.nextOffset === null) {
+      const bytes = Buffer.concat(parts)
+      assert.equal(bytes.length, pinned.totalBytes)
+      assert.equal(digest(bytes), pinned.sha256)
+      return { resource: JSON.parse(bytes.toString('utf8')) }
+    }
+    assert.ok(page.nextOffset === offset && offset < pinned.totalBytes)
+  }
+  assert.fail('The installed workflow did not fit its bounded context recall')
+}
+
 export function windowsVideoModelAction(body, selection, render, parseFixtureToolOutput) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
   const results = new Map(body.messages?.filter(message => message.role === 'tool')
@@ -118,9 +152,10 @@ export function windowsVideoModelAction(body, selection, render, parseFixtureToo
   assert.ok(readSection?.id === section.id && readSection.attachmentId === attachmentId && matchesPdfText(readSection.text),
     'The renderer input must have come from the exact authorized PDF section')
   selection.pdfRead = true
-  const resource = results.get(readPipelineId)
   if (!results.has(readPipelineId)) return tools.has('read_skill_resource') ?
     [readPipelineId, 'read_skill_resource', { skill_id: selection.skillId, path: 'references/pipeline.md' }] : null
+  const { resource, action } = recoverWorkflow(results.get(readPipelineId), prefix, tools, results, selection)
+  if (action) return action
   const workflow = { skillMatches: resource?.skill_id === selection.skillId, pathMatches: resource?.path === 'references/pipeline.md',
     bytes: typeof resource?.content === 'string' ? Buffer.byteLength(resource.content) : 0,
     includesRender: /remotion render/i.test(resource?.content ?? '') }
