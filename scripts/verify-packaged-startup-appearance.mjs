@@ -269,6 +269,18 @@ export async function observeInstalledStartup(options, expected, dependencies) {
   return { ...observation, workbenchOpened: true, processExit: { code: child.exitCode, signal: child.signalCode } }
 }
 
+export async function observeStartupWithCaptureRetry(options, expected, dependencies) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return { ...await observeInstalledStartup(options, expected, dependencies), captureAttempts: attempt }
+    } catch (error) {
+      // A DevTools target can disappear while the real 1.2-second splash is
+      // being attached. Retry only that missed capture in a fresh profile.
+      if (error?.message !== 'The real transitional startup window was not captured' || attempt === 3) throw error
+    }
+  }
+}
+
 export async function runWindowsStartupAppearanceSmoke({ executable, version, sourceHead, evidenceDir }, dependencies) {
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact startup appearance smoke requires the clean GitHub-hosted Windows installer runner')
@@ -284,7 +296,7 @@ export async function runWindowsStartupAppearanceSmoke({ executable, version, so
     sourceHead, version, provenance, installedAsarSha256: installed.asarSha256, observations: [], productionTouched: false }
   try {
     for (const expected of windowsStartupCases) {
-      report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected, {
+      report.observations.push(await observeStartupWithCaptureRetry({ executable, version, evidenceDir, temporary }, expected, {
         connectCdp: dependencies.connectCdp, environmentForRoot: dependencies.windowsUiEnvironment
       }))
     }
