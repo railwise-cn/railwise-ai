@@ -64,12 +64,17 @@ console.log(${literal(target)});
   return { target, ffmpeg, ffprobe }
 }
 
-function modelAction(body, selection, render, parseFixtureToolOutput) {
+function matchesPdfText(value) {
+  return typeof value === 'string' && value.replace(/[\s\u0000]/gu, '').includes(pdfText)
+}
+
+export function windowsVideoModelAction(body, selection, render, parseFixtureToolOutput) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
   const results = new Map(body.messages?.filter(message => message.role === 'tool')
     .map(message => [message.tool_call_id, parseFixtureToolOutput(message.content)]))
   const prefix = selection.interrupted ? 'eval-resume' : 'eval'
   const findPdfId = `${prefix}-find-pdf`
+  const listPdfId = `${prefix}-list-pdf`
   const readPdfId = `${prefix}-read-pdf`
   const readPipelineId = `${prefix}-read-pipeline`
   const context = body.messages?.map(message => typeof message.content === 'string' ? message.content : '').join('\n') ?? ''
@@ -79,13 +84,27 @@ function modelAction(body, selection, render, parseFixtureToolOutput) {
     assert.ok(tools.has('search_attachment'))
     return [findPdfId, 'search_attachment', { attachment_id: attachmentId, query: pdfText }]
   }
-  const sectionId = results.get(findPdfId)?.results?.[0]?.id
-  assert.ok(sectionId)
+  const search = results.get(findPdfId)
+  const match = sections => Array.isArray(sections) ? sections.find(section =>
+    section?.attachmentId === attachmentId && typeof section.id === 'string' && matchesPdfText(section.text)) : undefined
+  let section = match(search?.results)
+  if (!section) {
+    if (!results.has(listPdfId)) {
+      assert.ok(tools.has('list_attachment_sections'))
+      return [listPdfId, 'list_attachment_sections', { attachment_id: attachmentId, offset: 0, limit: 5 }]
+    }
+    const list = results.get(listPdfId)
+    section = match(list?.sections)
+    const status = (result, key) => Array.isArray(result?.[key]) ? result[key].length : result === undefined ? 'unreadable' : 'no section array'
+    assert.ok(section, `No matching indexed PDF section from the runtime (search: ${status(search, 'results')}, list: ${status(list, 'sections')})`)
+  }
   if (!results.has(readPdfId)) {
     assert.ok(tools.has('read_attachment_section'))
-    return [readPdfId, 'read_attachment_section', { attachment_id: attachmentId, section_id: sectionId }]
+    return [readPdfId, 'read_attachment_section', { attachment_id: attachmentId, section_id: section.id }]
   }
-  assert.ok(literal(results.get(readPdfId)).includes(pdfText), 'The renderer input must have come from the PDF')
+  const readSection = results.get(readPdfId)?.section
+  assert.ok(readSection?.id === section.id && readSection.attachmentId === attachmentId && matchesPdfText(readSection.text),
+    'The renderer input must have come from the exact authorized PDF section')
   selection.pdfRead = true
   const resource = results.get(readPipelineId)
   if (!results.has(readPipelineId)) return tools.has('read_skill_resource') ?
@@ -128,7 +147,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       for await (const chunk of request) chunks.push(chunk)
       const body = JSON.parse(Buffer.concat(chunks).toString())
       assert.ok(selection.skillId && body.messages?.some(message => message.role === 'user' && literal(message.content).includes(marker)))
-      const action = modelAction(body, selection, render, parseFixtureToolOutput)
+      const action = windowsVideoModelAction(body, selection, render, parseFixtureToolOutput)
       if (action?.[0] === 'eval-render' && !selection.interrupted) {
         selection.interrupted = true
         response.writeHead(200, { 'content-type': 'text/event-stream' })
@@ -166,10 +185,12 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       await cdp.click('button[aria-label="发送"]:not(:disabled)')
       const interrupted = await cdp.wait(`window.workwise.listTaskPage({filter:'all',workspaceRoot:${literal(workspace)}}).then(page=>
         [...page.items, ...page.relatedTasks].find(task=>task.status==='stalled'&&task.presentation?.reason==='response_interrupted'))`, 'durable interrupted response in the same task', 120_000)
+        .catch(error => { throw new Error(selection.failure ?? error.message) })
       await cdp.click('button', '打开任务工作台')
       const detail = 'article[aria-label="任务详情"]'
       await cdp.click(`${detail} button`, '继续任务')
       const approval = await cdp.wait(`window.workwise.listTaskInbox(${literal(workspace)}).then(items=>items.find(item=>item.status==='pending'&&item.kind==='approval'&&item.message.includes(${literal(`Command SHA256: ${digest(render.command)}`)})))`, 'the exact reviewed isolated render approval', 90_000)
+        .catch(error => { throw new Error(selection.failure ?? error.message) })
       assert.equal(approval.payload?.approval?.toolName, 'request_host_shell')
       assert.equal(approval.payload.approval.requestHash, digest(literal(render)))
       assert.equal(selection.read, true)
