@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
 import { validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
-import { validateNarrowWorkbenchComposer, validateStartupAppearance, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
+import { observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const dark = { htmlLang: 'zh-CN', theme: 'dark', scale: 1.25 }
@@ -37,6 +37,40 @@ test('keeps 100%, 125%, and 150% startup cases with a real minimum workbench pro
   const native = observed()
   native.viewport.scale = 1.5
   assert.equal(validateStartupAppearance(native, highestScale), native)
+})
+
+test('startup typography inspects a real composer label when the compact sidebar is hidden', async () => {
+  const { Window } = await import('happy-dom')
+  const window = new Window()
+  try {
+    window.document.body.innerHTML = '<aside class="ds-sidebar-shell" inert><button class="w-full">新建会话</button></aside><main class="ds-floating-composer"><div class="ds-composer-model-picker"><button><span style="visibility: visible; font-family: RailWise UI; font-size: 14px; line-height: 20px">自动选择模型</span></button></div></main>'
+    const sidebar = window.document.querySelector('aside button')
+    const composer = window.document.querySelector('main button')
+    const label = composer.querySelector('span')
+    for (const element of [sidebar, composer, label]) {
+      element.getClientRects = () => [box(20, 40, 120, 25)]
+      element.getBoundingClientRect = () => box(20, 40, 120, 25)
+    }
+    Object.defineProperty(window.document, 'fonts', { value: { ready: Promise.resolve() } })
+    const cdp = {
+      wait: async expression => assert.equal(window.eval(expression), true),
+      evaluate: async expression => window.eval(expression),
+      send: async (method, parameters) => {
+        if (method === 'Runtime.evaluate') {
+          assert.equal(window.eval(parameters.expression), label)
+          return { result: { objectId: 'composed-label' } }
+        }
+        if (method === 'DOM.requestNode') return { nodeId: 11 }
+        if (method === 'CSS.getPlatformFontsForNode') {
+          assert.equal(parameters.nodeId, 11)
+          return { fonts: [{ familyName: 'Noto Sans SC', isCustomFont: true, glyphCount: 6 }] }
+        }
+      }
+    }
+    const observed = await observeWorkbenchTypography(cdp)
+    assert.equal(observed.fontSize, '14px')
+    assert.equal(observed.lineHeight, '20px')
+  } finally { await window.happyDOM.close() }
 })
 
 test('accepts bounded composer controls and rejects horizontal overflow, hit obstruction, and an oversized viewport', () => {

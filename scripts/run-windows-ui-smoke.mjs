@@ -242,11 +242,12 @@ async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment, aud
     receipt.stage = 'passed'
     return { ...value, escapeFocusRestored: true, keyboard: { before, after } }
   }
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="切换智能体"]:not(:disabled)')&&document.querySelector('button[aria-label="模型与推理设置"]:not(:disabled)'))`, 'actual enabled composer controls')
   const typography = () => observeWorkbenchTypography(cdp, 'button[aria-label="切换智能体"]')
-  const baseline = { font: 'small', typography: await typography(), agent: await menu('切换智能体'), model: await menu('模型与推理设置') }
-  assert.ok(Math.abs(baseline.model.bodyZoom - 0.9) < 0.01)
   try {
+    await font('small')
+    await cdp.wait(`Boolean(document.querySelector('button[aria-label="切换智能体"]:not(:disabled)')&&document.querySelector('button[aria-label="模型与推理设置"]:not(:disabled)'))`, 'actual enabled composer controls')
+    const baseline = { font: 'small', typography: await typography(), agent: await menu('切换智能体'), model: await menu('模型与推理设置') }
+    assert.ok(Math.abs(baseline.model.bodyZoom - 0.9) < 0.01)
     await resize(); await font('large')
     await cdp.wait(`document.querySelector('.ds-workbench-shell')?.dataset.navigationOverlay==='true'`, 'the actual narrow workbench drawer layout')
     if (await cdp.evaluate(`document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay==='navigation'`)) await cdp.click('button[aria-label="关闭导航"]')

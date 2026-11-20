@@ -15,10 +15,26 @@ export const windowsStartupCases = [
 
 const narrowWindowBounds = { width: 960, height: 640 }
 
-export async function observeWorkbenchTypography(cdp, selector = '.ds-sidebar-shell button.w-full') {
-  await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(selector)})?.getClientRects().length)`, 'representative visible workbench text')
+function visibleWorkbenchText(selector) {
+  for (const control of document.querySelectorAll(selector)) {
+    if (!control.getClientRects().length || control.closest('[inert]')) continue
+    for (const element of [control, ...control.querySelectorAll('*')]) {
+      if (![...element.childNodes].some(child => child.nodeType === Node.TEXT_NODE && child.textContent.trim())) continue
+      const bounds = element.getBoundingClientRect()
+      if (bounds.width > 0 && bounds.height > 0 && bounds.right > 0 && bounds.bottom > 0 &&
+          bounds.left < innerWidth && bounds.top < innerHeight && getComputedStyle(element).visibility === 'visible') return element
+    }
+  }
+  return null
+}
+
+const workbenchTypographyTargets = '.ds-sidebar-shell button.w-full, .ds-floating-composer .ds-composer-model-picker button'
+
+export async function observeWorkbenchTypography(cdp, selector = workbenchTypographyTargets) {
+  const locate = `(${visibleWorkbenchText.toString()})(${JSON.stringify(selector)})`
+  await cdp.wait(`Boolean(${locate})`, 'representative visible workbench text')
   const page = await cdp.evaluate(`document.fonts.ready.then(() => {
-    const node = document.querySelector(${JSON.stringify(selector)});
+    const node = ${locate};
     const style = getComputedStyle(node);
     return {fontFamily:style.fontFamily,fontSize:style.fontSize,lineHeight:style.lineHeight,devicePixelRatio,window:{width:innerWidth,height:innerHeight}};
   })`)
@@ -26,12 +42,7 @@ export async function observeWorkbenchTypography(cdp, selector = '.ds-sidebar-sh
   await cdp.send('DOM.enable')
   await cdp.send('CSS.enable')
   await cdp.send('DOM.getDocument')
-  const target = await cdp.send('Runtime.evaluate', { expression: `(() => {
-    const node = document.querySelector(${JSON.stringify(selector)});
-    return [node, ...node.querySelectorAll('*')].find(element => element.getClientRects().length &&
-      getComputedStyle(element).visibility === 'visible' && [...element.childNodes].some(child =>
-        child.nodeType === Node.TEXT_NODE && child.textContent.trim()));
-  })()` })
+  const target = await cdp.send('Runtime.evaluate', { expression: locate })
   assert.ok(target.result.objectId, 'Expected a visible workbench text element')
   const { nodeId } = await cdp.send('DOM.requestNode', { objectId: target.result.objectId })
   assert.ok(nodeId, 'Expected a rendered workbench text node')
@@ -232,15 +243,24 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     assert.ok(main, 'The installed startup window must close and reveal the workbench')
     assert.ok(observation, 'The real transitional startup window was not captured')
     validateStartupAppearance(observation, expected)
-    await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
-    assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
-    observation.workbenchTypography = await observeWorkbenchTypography(main)
-    if (expected.narrowWorkbench) {
-      observation.narrowWorkbench = await observeNarrowWorkbench(main, { pid: child.pid, env, scale: expected.scale })
-    }
     if (expected.screenshotName) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
+    }
+    await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
+    assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
+    if (process.platform === 'win32' && version === '0.5.10' && expected.screenshotName) {
+      observation.releaseHighlights = await main.wait(`(() => {
+        const section = document.querySelector('main section[aria-label="本版更新"]');
+        const bounds = section?.getBoundingClientRect();
+        return bounds?.width > 0 && bounds.height > 0 && bounds.top >= 0 && bounds.bottom <= innerHeight &&
+          getComputedStyle(section).visibility === 'visible' && section.innerText.includes('0.5.10') &&
+          { title: section.getAttribute('aria-label'), version: '0.5.10', visibleOnFirstOpen: true };
+      })()`, 'the visible 0.5.10 release highlights on first open', 12_000)
+    }
+    observation.workbenchTypography = await observeWorkbenchTypography(main)
+    if (expected.narrowWorkbench) {
+      observation.narrowWorkbench = await observeNarrowWorkbench(main, { pid: child.pid, env, scale: expected.scale })
     }
   } finally {
     if (main) {
