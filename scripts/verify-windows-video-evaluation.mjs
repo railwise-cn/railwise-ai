@@ -3,7 +3,7 @@ import { execFile as execFileCallback, execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, normalize } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import { createChineseTextPdf } from './verify-windows-composer-acceptance.mjs'
@@ -193,6 +193,12 @@ export function windowsVideoModelAction(body, selection, render, parseFixtureToo
     exitCode: Number.isInteger(output?.exit_code) ? output.exit_code : null, commandMatches: output?.commandHash === digest(render.command) }
   assert.ok(execution.exitCode === 0 && execution.commandMatches,
     `The exact approved render must exit successfully (${JSON.stringify(execution)}; ${sectionResultStatus(output, 'sections')})`)
+  const shell = { ...execution, cwdAbsolute: typeof output.cwd === 'string' && isAbsolute(output.cwd),
+    cwdMatches: typeof output.cwd === 'string' && typeof selection.workspace === 'string' && normalize(output.cwd).toLowerCase() === normalize(selection.workspace).toLowerCase(),
+    started: typeof output.started_at === 'string' ? Date.parse(output.started_at) : null,
+    finished: typeof output.finished_at === 'string' ? Date.parse(output.finished_at) : null,
+    outputNamesFile: typeof output.output === 'string' && output.output.includes(filename) }
+  selection.shell = shell
   selection.rendered = true
   return null
 }
@@ -205,7 +211,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
   const render = { command: `& ${quote(process.execPath)} ${quote(join(workspace, script))}`,
     timeout_seconds: 180, ttl_seconds: 240, idempotency_key: 'private-synthetic-render-once' }
   const marker = '独立的 Video Shotcraft 非商用合成评估'
-  const selection = { requests: 0, read: false, rendered: false }
+  const selection = { requests: 0, read: false, rendered: false, workspace }
   const server = createServer(async (request, response) => {
     if (request.method === 'GET') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -297,8 +303,28 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
         const payload=JSON.parse(result.body),task=payload.task??payload;
         return task.status==='completed'&&task.artifacts.find(item=>item.format==='mp4'&&item.validation==='valid'&&item.relativePath===${literal(filename)});
       })`, 'a completed real task and registered MP4', 240_000).catch(async error => {
-        const processReport = await readFile(toolchain.renderDiagnostic, 'utf8').then(JSON.parse).catch(() => ({ stage: 'not-started' }))
-        throw new Error(`${selection.failure ?? error.message}; owned render process ${JSON.stringify(processReport)}`)
+        const [processReport, state, file] = await Promise.all([
+          readFile(toolchain.renderDiagnostic, 'utf8').then(JSON.parse).catch(() => ({ stage: 'not-started' })),
+          cdp.evaluate(`Promise.all([${literal(taskPath)},${literal(`${taskPath}/receipts`)},${literal(`${taskPath}/diagnostics`)}].map(path=>window.workwise.runtimeRequest(path,'GET'))).then(results=>{
+            const parse=result=>result.ok?JSON.parse(result.body):{};
+            const payload=parse(results[0]),task=payload.task??payload,receipts=parse(results[1]),diagnostics=parse(results[2]);
+            return {status:task.status,reason:task.presentation?.reason,blockCode:task.blockCode,acceptance:task.acceptance?.kind,
+              hasExpectedArtifact:task.artifacts?.some(item=>item.relativePath===${literal(filename)}),artifactCount:task.artifacts?.length,
+              artifactStates:task.artifacts?.map(item=>({format:item.format,validation:item.validation})),
+              receipts:Array.isArray(receipts)?receipts.filter(item=>item.purpose==='host_shell').map(item=>({status:item.status,exitCode:item.shell?.exitCode})):[],
+              diagnosticKeys:Object.keys(diagnostics),spanErrors:diagnostics.spans?.map(item=>item.errorCode).filter(Boolean)};
+          })`).catch(() => ({ diagnosticUnavailable: true })),
+          lstat(toolchain.target).then(info => ({ present: info.isFile(), bytes: info.size, mtime: info.mtimeMs })).catch(() => ({ present: false }))
+        ])
+        if (file.present) {
+          try {
+            const streams = JSON.parse(execFileSync(toolchain.ffprobe, ['-v', 'error', '-select_streams', 'v:0', '-show_streams', '-of', 'json', toolchain.target],
+              { encoding: 'utf8', windowsHide: true, timeout: 15000 })).streams
+            const [stream] = streams
+            file.expectedVideo = stream.codec_name === 'h264' && stream.width === 320 && stream.height === 180 && Number(stream.nb_frames) === 24
+          } catch { file.expectedVideo = false }
+        }
+        throw new Error(`${selection.failure ?? error.message}; ${JSON.stringify({ process: processReport, shell: selection.shell, state, file })}`)
       })
       assert.equal(selection.rendered, true)
       const openResult = await cdp.evaluate(artifact.absolutePath
