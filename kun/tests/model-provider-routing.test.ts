@@ -60,7 +60,7 @@ async function runtimeFor(routes: ModelProviderRoutes, defaultModelProviderId = 
   const runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: root,
     runtimeToken: 'test-token', ...route, modelProviders: routes, defaultModelProviderId,
     approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false,
-    insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({}) })
+    insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({ attachments: { enabled: true } }) })
   cleanup.push(async () => { await runtime.shutdown?.() })
   return { runtime, root }
 }
@@ -140,9 +140,14 @@ describe('configured provider identity over real HTTP', () => {
     ])
     const first = await runtimeFor([provider.route])
     const thread = await first.runtime.threadService.create({ workspace: first.root, model: 'shared-model', mode: 'agent' })
+    const attachment = await first.runtime.attachmentStore!.createDocument({
+      name: 'resume-source.pdf', mimeType: 'application/pdf', kind: 'pdf',
+      data: Buffer.from('%PDF-1.7 synthetic test metadata'), threadId: thread.id, workspace: first.root
+    })
+    await first.runtime.attachmentStore!.updateV2(attachment.id, { state: 'ready', indexState: 'ready', summary: 'Authorized task source' })
     const started = await first.runtime.turnService.startTurn({
       threadId: thread.id,
-      request: { prompt: 'What is 2+3?', providerId: 'a', taskIntent: 'new' }
+      request: { prompt: 'What is 2+3?', providerId: 'a', taskIntent: 'new', attachmentIds: [attachment.id] }
     })
     const initial = first.runtime.taskRepository!.findByTurn(started.turnId)!
 
@@ -171,6 +176,8 @@ describe('configured provider identity over real HTTP', () => {
     expect(resumed.task.id).toBe(saved.id)
     await vi.waitFor(() => expect(second.runtime.taskRepository!.get(saved.id)?.status).toBe('completed'))
     expect(provider.requests).toHaveLength(2)
+    expect(JSON.stringify(provider.requests[1]?.body.messages)).toContain(`resume-source.pdf (pdf, ready, id=${attachment.id})`)
+    expect(await second.runtime.turnService.getTurn(thread.id, resumed.turn!.turnId)).toMatchObject({ attachmentIds: [attachment.id] })
   })
 
   it('carries identity through Auto and child requests while Flow internal requests retain the default', async () => {

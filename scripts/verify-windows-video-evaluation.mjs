@@ -69,24 +69,28 @@ function modelAction(body, selection, render) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
   const results = new Map(body.messages?.filter(message => message.role === 'tool')
     .map(message => [message.tool_call_id, parseFixtureToolOutput(message.content)]))
+  const prefix = selection.interrupted ? 'eval-resume' : 'eval'
+  const findPdfId = `${prefix}-find-pdf`
+  const readPdfId = `${prefix}-read-pdf`
+  const readPipelineId = `${prefix}-read-pipeline`
   const context = body.messages?.map(message => typeof message.content === 'string' ? message.content : '').join('\n') ?? ''
   const attachmentId = context.match(/合成视频资料\.pdf [^\n]*?id=([\w-]+)/)?.[1]
   assert.ok(attachmentId, 'The approved task receives its original document attachment')
-  if (!results.has('eval-find-pdf')) {
+  if (!results.has(findPdfId)) {
     assert.ok(tools.has('search_attachment'))
-    return ['eval-find-pdf', 'search_attachment', { attachment_id: attachmentId, query: pdfText }]
+    return [findPdfId, 'search_attachment', { attachment_id: attachmentId, query: pdfText }]
   }
-  const sectionId = results.get('eval-find-pdf')?.results?.[0]?.id
+  const sectionId = results.get(findPdfId)?.results?.[0]?.id
   assert.ok(sectionId)
-  if (!results.has('eval-read-pdf')) {
+  if (!results.has(readPdfId)) {
     assert.ok(tools.has('read_attachment_section'))
-    return ['eval-read-pdf', 'read_attachment_section', { attachment_id: attachmentId, section_id: sectionId }]
+    return [readPdfId, 'read_attachment_section', { attachment_id: attachmentId, section_id: sectionId }]
   }
-  assert.ok(literal(results.get('eval-read-pdf')).includes(pdfText), 'The renderer input must have come from the PDF')
+  assert.ok(literal(results.get(readPdfId)).includes(pdfText), 'The renderer input must have come from the PDF')
   selection.pdfRead = true
-  const resource = results.get('eval-read-pipeline')
-  if (!results.has('eval-read-pipeline')) return tools.has('read_skill_resource') ?
-    ['eval-read-pipeline', 'read_skill_resource', { skill_id: selection.skillId, path: 'references/pipeline.md' }] : null
+  const resource = results.get(readPipelineId)
+  if (!results.has(readPipelineId)) return tools.has('read_skill_resource') ?
+    [readPipelineId, 'read_skill_resource', { skill_id: selection.skillId, path: 'references/pipeline.md' }] : null
   assert.ok(resource?.skill_id === selection.skillId && resource?.path === 'references/pipeline.md' && /remotion render/i.test(resource.content),
     'The installed Skill workflow must actually be read before requesting rendering')
   selection.read = true
@@ -159,9 +163,7 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
       await cdp.send('Page.setInterceptFileChooserDialog', { enabled: false })
       await cdp.wait(`document.querySelector('.ds-floating-composer')?.innerText.includes(${literal(pdfName)})
         && /已就绪|文字提取受限/.test(document.querySelector('.ds-floating-composer').innerText)`, 'a parsed PDF attached through the composer', 120_000)
-      const key = { code: 'Enter', key: 'Enter', windowsVirtualKeyCode: 13 }
-      await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
-      await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+      await cdp.click('button[aria-label="发送"]:not(:disabled)')
       const interrupted = await cdp.wait(`window.workwise.listTaskPage({filter:'all',workspaceRoot:${literal(workspace)}}).then(page=>
         [...page.items, ...page.relatedTasks].find(task=>task.status==='stalled'&&task.presentation?.reason==='response_interrupted'))`, 'durable interrupted response in the same task', 120_000)
       await cdp.click('button', '打开任务工作台')
@@ -195,7 +197,10 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
         return task.status==='completed'&&task.artifacts.find(item=>item.format==='mp4'&&item.validation==='valid'&&item.relativePath===${literal(filename)});
       })`, 'a completed real task and registered MP4', 240_000).catch(error => { throw new Error(selection.failure ?? error.message) })
       assert.equal(selection.rendered, true)
-      await cdp.click(`${detail} button`, filename)
+      const openResult = await cdp.evaluate(artifact.absolutePath
+        ? `window.workwise.openTaskArtifact({taskId:${literal(approval.taskId)},artifactId:${literal(artifact.id)}})`
+        : `window.workwise.openWorkspaceFile({workspaceRoot:${literal(workspace)},path:${literal(filename)}})`)
+      assert.ok(openResult?.ok, 'The installed application must be able to open the registered MP4')
       const video = await readFile(toolchain.target)
       assert.equal((await lstat(toolchain.target)).isSymbolicLink(), false)
       assert.equal(digest(video), artifact.sha256)
@@ -207,6 +212,6 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
         { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
       return { kind: 'private-noncommercial-synthetic-evaluation', remotionVersion: version, codec: probe.codec_name,
         width: probe.width, height: probe.height, frames: Number(probe.nb_frames), artifact: { id: artifact.id, sha256: artifact.sha256, bytes: video.length },
-        installedSkillResourceRead: true, attachedPdfRead: true, sameTaskResumedAfterInterruption: true, runtimeApprovalId: approval.requestId, decoded: true }
+        installedSkillResourceRead: true, attachedPdfRead: true, sameTaskResumedAfterInterruption: true, appOpenedArtifact: true, runtimeApprovalId: approval.requestId, decoded: true }
     } }
 }

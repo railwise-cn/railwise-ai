@@ -547,6 +547,11 @@ export class TurnService {
       disableUserInput: input.request.disableUserInput,
       idempotencyKey
       })
+      const continuingTask = input.continuationTaskId ? this.deps.tasks?.activeTask(input.threadId) : undefined
+      if (continuingTask && continuingTask.id === input.continuationTaskId) {
+        const previousTurn = thread.turns.find(candidate => candidate.id === continuingTask.activeTurnId)
+        turn.activeSkillIds = [...(previousTurn?.activeSkillIds ?? [])]
+      }
       const userItem = makeUserItem({
       id: `item_${turnId}_user`,
       turnId,

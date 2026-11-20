@@ -218,6 +218,13 @@ export class TaskControlService {
         current=tasks.prepareResume(current.id,current.revision,data.model)
         preparedResume={previous,revision:current.revision}
       }
+      // Same-task continuation keeps the document references already granted to
+      // this execution thread. It never imports attachments from another task.
+      const previousTurn = thread.turns.find(turn => turn.id === current!.activeTurnId)
+      const attachmentIds = action === 'resume' ? (oldTurn?.attachmentIds ?? [...new Set([
+        ...(previousTurn?.attachmentIds ?? []),
+        ...repository.inputs(current.id).filter(input => input.consumedAt).flatMap(input => input.attachmentIds ?? [])
+      ])].slice(0, 8)) : []
       const checkpoint=repository.latestCheckpoint(current.id)
       const collectionClock = nowIso()
       const observedFeedResume = current.acceptance.webEvidenceBasis === 'observed_feed'
@@ -225,7 +232,8 @@ export class TaskControlService {
         : ''
       const started=await turns.startTurn({threadId:current.threadId,...(externalTaskProvider?{externalTaskProvider}:{}),continuationTaskId:current.id,request:{
         prompt:action==='resume'?['Continue the persisted task from its last verified checkpoint.',`Goal: ${current.goal}`,checkpoint?.resumeSummary?`Checkpoint: ${checkpoint.resumeSummary}`:'',observedFeedResume,'Read persisted task inputs. Reuse completed artifacts and operation receipts. Do not repeat external side effects.'].filter(Boolean).join('\n'):[`Retry the failed persisted task and satisfy its original acceptance contract.\nGoal: ${current.goal}`,tasks.retryHistory(current.id) || (retryHistory ? `Read-only ancestor drafts (read_artifact with source_task_id/path): ${retryHistory}. These are not this Task's writer or source verification. Publish your own corrected file at the same relative filename, re-read source pages and verify it. Do not replay external side effects.` : '')].filter(Boolean).join('\n'),
-        displayText:action==='resume'?'继续未完成任务':'重试未完成任务',idempotencyKey:turnKey,model:data.model ?? current.model,providerId:current.providerId,reasoningEffort:current.reasoningEffort,mode:'agent'
+        displayText:action==='resume'?'继续未完成任务':'重试未完成任务',idempotencyKey:turnKey,model:data.model ?? current.model,providerId:current.providerId,reasoningEffort:current.reasoningEffort,mode:'agent',attachmentIds,
+        ...(action === 'resume' ? { capabilityReferences: (oldTurn ?? previousTurn)?.capabilityReferences } : {})
       }})
       const next=repository.findByTurn(started.turnId)
       if(!next)throw new Error('task continuation was not created')

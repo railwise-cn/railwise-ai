@@ -1051,8 +1051,9 @@ export class AgentLoop {
       turnId,
       turn?.prompt ?? ''
     )
-    const preferredSkillIds = continuationTurn?.activeSkillIds
-      ?? thread?.agentProfile?.preferredSkillIds
+    const preferredSkillIds = turn?.activeSkillIds.length
+      ? turn.activeSkillIds
+      : continuationTurn?.activeSkillIds ?? thread?.agentProfile?.preferredSkillIds
     const userMessage = turn?.items.find(item => item.kind === 'user_message')
     const requestedSkillId = requestedSlashSkill(userMessage?.displayText ?? turn?.prompt ?? '')
     const selectedPluginIds = capabilityReferences.filter(reference => reference.kind === 'plugin').map(reference => reference.id)
