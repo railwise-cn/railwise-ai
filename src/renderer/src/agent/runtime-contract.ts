@@ -585,7 +585,7 @@ export type CoreRuntimeEventJson = {
 	  changeKind?: 'additive' | 'breaking'
 	  toolNames?: string[]
   status?: string
-  reason?: 'completed' | 'error' | 'aborted' | 'blocked' | 'max_tokens'
+  reason?: 'completed' | 'error' | 'aborted' | 'blocked' | 'max_tokens' | 'response_interrupted'
   stage?:
     | 'setup'
     | 'pre_start'

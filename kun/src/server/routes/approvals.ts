@@ -28,14 +28,15 @@ export async function decideApproval(input: {
   if (!approval) {
     return ERRORS.notFound(`approval not found: ${input.approvalId}`)
   }
-  const ok = input.gate.decide(input.approvalId, parsed.data.decision, parsed.data.reason)
-  if (!ok) {
-    return ERRORS.conflict(`approval already decided: ${input.approvalId}`)
-  }
   const response: ApprovalDecisionResponse = {
     approvalId: input.approvalId,
     decision: parsed.data.decision,
     status: parsed.data.decision === 'allow' ? 'allowed' : 'denied'
+  }
+  // A repeated click or a transport retry acknowledges the original decision only.
+  if (approval.status === response.status) return jsonResponse(response)
+  if (approval.status !== 'pending' || !input.gate.decide(input.approvalId, parsed.data.decision, parsed.data.reason)) {
+    return ERRORS.conflict('This approval is no longer available. Refresh the task to see its current state.')
   }
   await input.events.record({
     kind: 'approval_resolved' as const,

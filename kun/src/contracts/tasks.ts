@@ -8,6 +8,17 @@ import { ResultEvidenceSchema } from './harness.js'
 import { ScheduleRequirementSchema } from './schedule.js'
 import { BrowserExecutionScope } from './browser-skill.js'
 
+export const TaskBlockCodeSchema = z.enum([
+  'response_interrupted', 'outcome_unknown', 'approval_expired', 'tool_repeated_failure', 'execution_failed'
+])
+
+export type TaskUserPresentation = {
+  reason: z.infer<typeof TaskBlockCodeSchema> | 'execution_budget' | 'input_required' | 'approval_required'
+    | 'approval_host_shell' | 'approval_browser' | 'paused' | 'retrying' | 'stalled' | 'queued' | 'blocked'
+  actions: Array<'answer' | 'approve' | 'deny' | 'verify' | 'resume' | 'retry' | 'supplement' | 'extend_budget' | 'open_thread'>
+  scope?: 'host' | 'browser' | 'unknown'
+}
+
 export const TaskRunStatusSchema = z.enum([
   'queued',
   'running',
@@ -238,6 +249,7 @@ export const TaskRunSchema = z.object({
   artifacts: z.array(TaskArtifactSchema),
   finalResponse: z.string().optional(),
   resultEvidence: z.array(ResultEvidenceSchema).optional(),
+  blockCode: TaskBlockCodeSchema.optional(),
   stalledReason: z.string().optional(),
   waitingReason: z.string().optional(),
   createdAt: z.string().min(1),

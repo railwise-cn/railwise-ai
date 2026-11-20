@@ -89,6 +89,7 @@ function detailString(value: unknown): string {
 
 function localizedRuntimeSummary(code: string | null, text: string): string | null {
   const lowered = text.toLowerCase()
+  if (code === 'response_interrupted') return i18n.t('common:runtimeResponseInterrupted')
   if (code === 'capability_reference_unavailable') return i18n.t('common:composerCapabilitySelectionUnavailable')
   if (code === 'engineering_plan_stale') return i18n.t('common:runtimeEngineeringPlanStale')
   if (code === 'engineering_plan_execution_failed') return i18n.t('common:runtimeEngineeringPlanExecutionFailed')

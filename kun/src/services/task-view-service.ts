@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import type { Database } from 'better-sqlite3'
 import type { AttentionItem, TaskRun } from '../contracts/tasks.js'
 import type { TaskRunRepository } from './task-run-repository.js'
+import { presentTaskAttention, presentTaskRun } from './task-user-presentation.js'
 import { projectTaskProgress, type TaskProgressProjection } from './task-progress-projection.js'
 
 export type TaskViewFilter = 'ongoing' | 'attention' | 'completed' | 'all'
@@ -45,7 +46,7 @@ export class TaskViewService {
   }
   watermark(): number { return (this.db.prepare('SELECT COALESCE(MAX(seq),0) AS seq FROM task_change_feed').get() as { seq: number }).seq }
   changes(after: number, limit = 200): TaskFeedEvent[] {
-    return (this.db.prepare('SELECT * FROM task_change_feed WHERE seq > ? ORDER BY seq LIMIT ?').all(after, limit) as Array<{ seq: number; task_id: string | null; kind: TaskFeedEvent['kind']; payload_json: string; created_at: string }>).map(row => ({ seq: row.seq, ...(row.task_id ? { taskId: row.task_id } : {}), kind: row.kind, payload: row.kind === 'task_changed' ? this.withTiming(JSON.parse(row.payload_json) as TaskRun) as unknown as Record<string,unknown> : JSON.parse(row.payload_json) as Record<string, unknown>, createdAt: row.created_at }))
+    return (this.db.prepare('SELECT * FROM task_change_feed WHERE seq > ? ORDER BY seq LIMIT ?').all(after, limit) as Array<{ seq: number; task_id: string | null; kind: TaskFeedEvent['kind']; payload_json: string; created_at: string }>).map(row => ({ seq: row.seq, ...(row.task_id ? { taskId: row.task_id } : {}), kind: row.kind, payload: row.kind === 'task_changed' ? this.withTiming(JSON.parse(row.payload_json) as TaskRun) as unknown as Record<string,unknown> : presentTaskAttention(JSON.parse(row.payload_json) as AttentionItem) as unknown as Record<string, unknown>, createdAt: row.created_at }))
   }
   /** The authenticated global task feed may read these visible task groups, including their real child owners. */
   progress(): TaskProgressProjection[] {
@@ -71,10 +72,10 @@ export class TaskViewService {
   }
   private withTiming(task: TaskRun, now = this.now()): TaskRun {
     const spans = this.db.prepare('SELECT status,started_at,finished_at FROM task_status_spans WHERE task_id=? ORDER BY id').all(task.id) as Array<{status:string;started_at:string;finished_at:string|null}>
-    if (!spans.length) return task
+    if (!spans.length) return presentTaskRun(task)
     const duration = (statuses: string[]) => spans.filter(span => statuses.includes(span.status)).reduce((total, span) => total + Math.max(0, (span.finished_at ? Date.parse(span.finished_at) : now) - Date.parse(span.started_at)), 0)
     const timing = { executionMs: this.repository.execution.usedExecutionMs(task.rootTaskId ?? task.id, now), queuedMs: duration(['queued']), humanWaitMs: duration(['waiting_user','waiting_approval']), pausedMs: duration(['paused']), sampledAt: new Date(now).toISOString(), coverage: spans[0].started_at === task.createdAt ? 'complete' : 'partial' }
-    return { ...task, timing } as TaskRun
+    return { ...presentTaskRun(task), timing } as TaskRun
   }
   page(query: TaskPageQuery): TaskPage {
     const normalized = { workspaceRoot: query.workspaceRoot ? resolve(query.workspaceRoot) : '', threadId: query.threadId ?? '', search: (query.search ?? '').trim().toLocaleLowerCase(), filter: query.filter ?? 'all' }
@@ -122,7 +123,7 @@ export class TaskViewService {
         this.db.prepare('INSERT INTO task_query_snapshots VALUES(?,?,?,?)').run(id,queryHash,expiresAt,JSON.stringify(saved))
       }
       const slice = saved.groups.slice(offset, offset + limit)
-      return { items: slice.map(g => g.root), relatedTasks: slice.flatMap(g => g.members.filter(t => t.id !== g.root.id)), attention: saved.attention, total: saved.groups.length, counts: saved.counts, snapshotId: id, expiresAt: new Date(expiresAt).toISOString(), eventWatermark: saved.eventWatermark, ...(offset + limit < saved.groups.length ? { nextCursor: Buffer.from(JSON.stringify({ id, offset: offset + limit })).toString('base64url') } : {}) }
+      return { items: slice.map(g => g.root), relatedTasks: slice.flatMap(g => g.members.filter(t => t.id !== g.root.id)), attention: saved.attention.map(presentTaskAttention), total: saved.groups.length, counts: saved.counts, snapshotId: id, expiresAt: new Date(expiresAt).toISOString(), eventWatermark: saved.eventWatermark, ...(offset + limit < saved.groups.length ? { nextCursor: Buffer.from(JSON.stringify({ id, offset: offset + limit })).toString('base64url') } : {}) }
     })
   }
 }

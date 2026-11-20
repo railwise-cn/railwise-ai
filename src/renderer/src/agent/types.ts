@@ -390,7 +390,7 @@ export type ThreadDeltaEvent = {
 
 export type ThreadErrorOptions = {
   terminal?: boolean
-  terminalReason?: 'error' | 'blocked' | 'max_tokens'
+  terminalReason?: 'error' | 'blocked' | 'max_tokens' | 'response_interrupted'
   threadId?: string
   turnId?: string
 }

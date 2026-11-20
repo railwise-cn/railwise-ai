@@ -78,20 +78,22 @@ function settingsWith(
 
 function createStore(initial: AppSettingsV1) {
   let current = initial
+  const patch = vi.fn(async (partial: AppSettingsPatch) => {
+    current = {
+      ...current,
+      schedule: mergeScheduleSettings(
+        current.schedule,
+        partial.schedule,
+        getManagedRuntimeSettings(current).providerId || undefined
+      ),
+      claw: current.claw
+    }
+    return current
+  })
   return {
     load: vi.fn(async () => current),
-    patch: vi.fn(async (partial: AppSettingsPatch) => {
-      current = {
-        ...current,
-        schedule: mergeScheduleSettings(
-          current.schedule,
-          partial.schedule,
-          getManagedRuntimeSettings(current).providerId || undefined
-        ),
-        claw: current.claw
-      }
-      return current
-    }),
+    patch,
+    patchPrepared: vi.fn(async (prepare: (latest: AppSettingsV1) => AppSettingsPatch) => patch(prepare(current))),
     replace: (next: AppSettingsV1) => { current = next },
     read: () => current
   }
@@ -176,6 +178,39 @@ describe('ScheduleRuntime', () => {
         atTime: '2026-06-03T09:00:00.000+08:00'
       }
     }), from)).toBe('2026-06-03T09:00:00.000+08:00')
+  })
+
+  it('revalidates a due occurrence against the current plan before dispatch', async () => {
+    const due = makeTask({ nextRunAt: '2026-06-02T00:00:00.000Z', schedule: {
+      kind: 'daily', everyMinutes: 60, timeOfDay: '09:00', atTime: ''
+    } })
+    const actual = makeTask({ ...due, enabled: false, lastStatus: 'success', lastMessage: 'Saved report', lastThreadId: 'thr_previous' })
+    const initial = settingsWith([due])
+    const { runtime, store, runtimeRequest } = createRuntime(initial)
+    store.patchPrepared.mockImplementationOnce(async (prepare) => {
+      store.replace(settingsWith([actual]))
+      return store.patch(prepare(store.read()))
+    })
+    const internalRuntime = runtime as unknown as { runTaskInternal: (task: ScheduledTaskV1, scheduled: boolean) => Promise<unknown> }
+
+    await expect(internalRuntime.runTaskInternal(due, true)).resolves.toMatchObject({ ok: false })
+    expect(runtimeRequest).not.toHaveBeenCalled()
+    expect(store.read().schedule.tasks[0]).toMatchObject(actual)
+    expect((await runtime.status()).runningTaskIds).toEqual([])
+  })
+
+  it('preserves completion and sibling changes when an older next-run pass writes', async () => {
+    const stale = makeTask({ schedule: { kind: 'daily', everyMinutes: 60, timeOfDay: '09:00', atTime: '' } })
+    const latest = makeTask({ ...stale, lastStatus: 'success', lastMessage: 'New report', lastThreadId: 'thr_new',
+      nextRunAt: '2099-06-02T00:00:00.000Z' })
+    const sibling = makeTask({ id: 'new-task', title: 'New task' })
+    const initial = settingsWith([stale])
+    const { runtime, store } = createRuntime(settingsWith([latest, sibling], { keepAwake: true }))
+    const internalRuntime = runtime as unknown as { ensureNextRuns: (settings: AppSettingsV1) => Promise<void> }
+
+    await internalRuntime.ensureNextRuns(initial)
+
+    expect(store.read().schedule).toMatchObject({ keepAwake: true, tasks: [latest, sibling] })
   })
 
   it('builds compact Scheduled task thread titles from task names', () => {

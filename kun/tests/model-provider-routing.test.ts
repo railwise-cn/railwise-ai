@@ -23,7 +23,7 @@ import { StartTurnRequest } from '../src/contracts/turns.js'
 const cleanup: Array<() => Promise<unknown>> = []
 afterEach(async () => { vi.restoreAllMocks(); while (cleanup.length) await cleanup.pop()!(); vi.unstubAllEnvs() })
 
-async function endpoint(id: string) {
+async function endpoint(id: string, firstStream?: Array<Record<string, unknown>>) {
   const requests: Array<{ body: Record<string, unknown>; authorization?: string }> = []
   const server: Server = createServer(async (request, response) => {
     let raw = ''
@@ -36,6 +36,10 @@ async function endpoint(id: string) {
     const payload = { id: `${id}-reply`, choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11 } }
     if (body.stream) {
       response.writeHead(200, { 'content-type': 'text/event-stream' })
+      if (firstStream && requests.length === 1) {
+        response.end(firstStream.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(''))
+        return
+      }
       response.end(`data: ${JSON.stringify({ ...payload, choices: [{ index: 0, delta: { content: text }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`)
     } else {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -127,6 +131,46 @@ describe('configured provider identity over real HTTP', () => {
     const router = new ProviderRoutingModelClient(new DeepseekCompatModelClient(b.route), [a.route, b.route])
     for await (const _ of router.stream({ ...request(saved?.providerId, saved?.model), reasoningEffort: saved?.reasoningEffort })) { /* Drain the real response. */ }
     expect(a.requests).toHaveLength(1); expect(b.requests).toHaveLength(0)
+  })
+
+  it('reopens an interrupted task and continues only after an explicit resume', async () => {
+    const provider = await endpoint('a', [
+      { choices: [{ index: 0, delta: { content: 'Some visible text before disconnect.' } }] },
+      { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: 'interrupted-ls', function: { name: 'ls', arguments: '{}' } }] } }] }
+    ])
+    const first = await runtimeFor([provider.route])
+    const thread = await first.runtime.threadService.create({ workspace: first.root, model: 'shared-model', mode: 'agent' })
+    const started = await first.runtime.turnService.startTurn({
+      threadId: thread.id,
+      request: { prompt: 'What is 2+3?', providerId: 'a', taskIntent: 'new' }
+    })
+    const initial = first.runtime.taskRepository!.findByTurn(started.turnId)!
+
+    await expect(first.runtime.runTurn(thread.id, started.turnId)).resolves.toBe('failed')
+    expect(first.runtime.taskRepository!.get(initial.id)).toMatchObject({ status: 'stalled', blockCode: 'response_interrupted' })
+    expect(first.runtime.taskRepository!.operations(initial.id, 'tool')).toHaveLength(0)
+    expect(provider.requests).toHaveLength(1)
+    await first.runtime.shutdown?.()
+    cleanup.pop()
+
+    const second = await runtimeFor([provider.route], 'a', first.root)
+    const saved = second.runtime.taskRepository!.get(initial.id)!
+    expect(saved).toMatchObject({ status: 'stalled', blockCode: 'response_interrupted' })
+    expect((await second.runtime.sessionStore.loadItems(thread.id)).filter(item => item.kind === 'assistant_text')).toEqual([
+      expect.objectContaining({ text: 'Some visible text before disconnect.', status: 'failed' })
+    ])
+    expect((await second.runtime.sessionStore.loadEventsSince(thread.id, 0)).filter(event => event.kind === 'turn_failed')).toEqual([
+      expect.objectContaining({ reason: 'response_interrupted' })
+    ])
+    expect(provider.requests).toHaveLength(1)
+
+    const resumed = await second.runtime.taskControlService!.mutate(saved.id, 'resume', {
+      expectedRevision: saved.revision,
+      idempotencyKey: 'explicit-interruption-resume'
+    })
+    expect(resumed.task.id).toBe(saved.id)
+    await vi.waitFor(() => expect(second.runtime.taskRepository!.get(saved.id)?.status).toBe('completed'))
+    expect(provider.requests).toHaveLength(2)
   })
 
   it('carries identity through Auto and child requests while Flow internal requests retain the default', async () => {

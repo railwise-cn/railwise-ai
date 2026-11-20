@@ -25,6 +25,7 @@ import type { TokenEconomyConfig } from '../src/loop/token-economy.js'
 import type { ToolStormBreakerOptions } from '../src/loop/tool-storm-breaker.js'
 import type { ContextCompactionConfig } from '../src/loop/model-context-profile.js'
 import type { VisionEvidencePort } from '../src/contracts/vision-evidence.js'
+import type { TaskController } from '../src/services/task-controller.js'
 
 export type Harness = {
   threadId: string
@@ -84,6 +85,7 @@ export function makeHarness(
     tokenEconomy?: TokenEconomyConfig
     contextCompaction?: ContextCompactionConfig
     toolStorm?: ToolStormBreakerOptions & { enabled?: boolean }
+    tasks?: TaskController
     nowMs?: () => number
     toolArgumentRepair?: {
       maxStringBytes?: number
@@ -134,6 +136,7 @@ export function makeHarness(
     ids,
     nowIso,
     nowMs,
+    tasks: options.tasks,
     ...(options.workspaceTrust ? { workspaceTrust: options.workspaceTrust } : {}),
     ...(options.skillRuntime ? { skillRuntime: options.skillRuntime } : {}),
     ...(options.attachmentStore ? { attachmentStore: options.attachmentStore } : {}),

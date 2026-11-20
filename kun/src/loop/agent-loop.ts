@@ -110,10 +110,30 @@ import {
   requiredFileExtensionsForPrompt
 } from './turn-completion-guard.js'
 
-function terminalReasonForAttemptCode(code: string): Extract<TurnTerminalReason, 'error' | 'blocked' | 'max_tokens'> {
+function terminalReasonForAttemptCode(code: string): Exclude<TurnTerminalReason, 'completed' | 'aborted'> {
   if (code === 'max_tokens') return 'max_tokens'
+  if (code === 'response_interrupted') return 'response_interrupted'
   if (code === 'budget_limited' || code === 'policy_blocked') return 'blocked'
   return 'error'
+}
+
+type InterruptedModelStep = { kind: 'response_interrupted'; message: string }
+
+async function* modelStreamWithInterruption(
+  model: ModelClient,
+  request: ModelRequest,
+  hasOutput: () => boolean
+): AsyncIterable<ModelStreamChunk> {
+  try {
+    yield* model.stream(request)
+  } catch (error) {
+    if (request.abortSignal.aborted || !hasOutput()) throw error
+    yield {
+      kind: 'error',
+      message: 'Model response stopped after it started streaming.',
+      code: runtimeErrorCode(error, 'model_stream_failed')
+    }
+  }
 }
 
 // Tool argument fragments are projected to usage as bounded character counts;
@@ -626,7 +646,7 @@ export class AgentLoop {
             })
             return 'failed'
           }
-        } else if (outcome.kind === 'retryable' && this.opts.tasks) {
+        } else if (this.opts.tasks && (outcome.kind === 'retryable' || (outcome.kind === 'failed' && outcome.code === 'response_interrupted'))) {
           const blocked = await this.opts.tasks.assessNonRetryableBlock?.(threadId, turnId)
           if (blocked?.kind === 'stalled') return await this.finishUnknownToolOutcome(threadId, turnId, 'outcome_unknown: 操作结果尚未核验，执行已停止。')
           if (blocked?.kind === 'waiting_user') {
@@ -639,13 +659,15 @@ export class AgentLoop {
             outcome.code,
             outcome.message
           )
-          if (decision?.kind === 'continue') continue
-          if (decision && decision.kind !== 'completed') {
+          if (decision?.kind === 'continue' && outcome.kind === 'retryable') continue
+          if (decision && decision.kind !== 'completed' && decision.kind !== 'continue') {
             await this.opts.turns.finishTurn({
               threadId,
               turnId,
               status: 'failed',
-              reason: terminalReasonForAttemptCode(outcome.code),
+              reason: decision.kind === 'stalled' && decision.task.blockCode === 'outcome_unknown'
+                ? 'blocked'
+                : terminalReasonForAttemptCode(outcome.code),
               error: decision.reason
             })
             return 'failed'
@@ -878,6 +900,9 @@ export class AgentLoop {
       }
       await this.drainSteering(threadId, turnId, signal)
       const stepResult = await this.modelStep(threadId, turnId, signal, step, executionSkills)
+      if (typeof stepResult === 'object') {
+        return { kind: 'failed', code: stepResult.kind, message: stepResult.message }
+      }
       if (stepResult === 'checkpoint_waiting') return { kind: 'checkpoint_waiting' }
       if (stepResult === 'outcome_unknown') return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
       if (stepResult === 'stop') return { kind: 'candidate' }
@@ -925,7 +950,7 @@ export class AgentLoop {
     signal: AbortSignal,
     stepIndex: number,
     executionSkills: { resolution?: SkillTurnResolution; pluginIds?: string }
-  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown' | 'checkpoint_waiting' | 'suppression_exhausted'> {
+  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown' | 'checkpoint_waiting' | 'suppression_exhausted' | InterruptedModelStep> {
     if (shouldVerifyImmutablePrefix()) {
       verifyImmutablePrefix(this.opts.prefix)
     }
@@ -1219,6 +1244,10 @@ export class AgentLoop {
       ...(activeTodoInstruction ? [activeTodoInstruction] : []),
       ...memoryInstructions(memories),
       ...(attachments.documentManifests.length ? [documentAttachmentInstruction(attachments.documentManifests)] : []),
+      ...(occurrenceTask && stepIndex === 0 ? [
+        'Use the task’s explicitly attached documents and workspace references as primary inputs. Read them with the advertised scoped tools before attempting production. If a necessary file is missing or a scanned PDF has no usable text, ask the user to attach the specific file or a readable copy. Do not search the user profile or whole disk for material.',
+        'Check only the dependencies required by the active Skill. If a renderer or runtime is unavailable, state which dependency is missing and preserve the draft and source materials for continuation.'
+      ] : []),
       ...(attachments.evidence.length ? [attachmentEvidenceInstruction(attachments.evidence)] : []),
       ...(workspaceReferences.length ? [workspaceReferenceInstruction(workspaceReferences)] : []),
       ...(capabilityReferences.length
@@ -1305,7 +1334,9 @@ export class AgentLoop {
     let textItemId = ''
     let reasoningItemId = ''
     const completedToolCalls: ToolCallLike[] = []
-    let stopReason: 'stop' | 'tool_calls' | 'length' | 'error' = 'stop'
+    let stopReason: Extract<ModelStreamChunk, { kind: 'completed' }>['stopReason'] | undefined
+    let observedToolCall = false
+    const hasModelOutput = (): boolean => Boolean(textAccumulator.value || reasoningAccumulator.value || observedToolCall)
     let modelErrorCode: string | undefined
     let inputTokens: number | undefined
     let outputTokens: number | undefined
@@ -1349,7 +1380,7 @@ export class AgentLoop {
       const remainingMs = this.opts.tasks?.workBudget(turnId)?.remainingMs
       if (remainingMs !== undefined) { workTimer = setTimeout(() => this.opts.turns.abortTurn(turnId, 'execution_budget_exhausted'), Math.max(1, remainingMs)); workTimer.unref?.() }
       if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) return 'outcome_unknown'
-      for await (const chunk of this.opts.model.stream(request)) {
+      modelChunks: for await (const chunk of modelStreamWithInterruption(this.opts.model, request, hasModelOutput)) {
         if (modelToken) this.opts.tasks?.assertToken(modelToken)
         if (signal.aborted) {
           if (modelSpanId) this.opts.spanService?.finish(modelSpanId, { status: 'cancelled' })
@@ -1391,6 +1422,7 @@ export class AgentLoop {
           })
           break
         case 'tool_call_delta':
+          observedToolCall = true
           if (chunk.argumentsDelta) {
             const characterCount = boundedUnicodeCharacterCount(
               chunk.argumentsDelta,
@@ -1409,6 +1441,7 @@ export class AgentLoop {
           }
           break
         case 'tool_call_complete': {
+          observedToolCall = true
           const provider = toolProviderMetadata.get(chunk.toolName)
           const toolKind = toolKinds.get(chunk.toolName)
           const repaired = repairDispatchToolArguments(chunk.arguments, {
@@ -1483,16 +1516,18 @@ export class AgentLoop {
           stopReason = chunk.stopReason
           break
         case 'error':
-          await this.opts.events.record({
-            kind: 'error',
-            threadId,
-            turnId,
-            message: chunk.message,
-            code: chunk.code
-          })
+          if (!hasModelOutput()) {
+            await this.opts.events.record({
+              kind: 'error',
+              threadId,
+              turnId,
+              message: chunk.message,
+              code: chunk.code
+            })
+          }
           modelErrorCode = chunk.code ?? 'model_stream_error'
           stopReason = 'error'
-          break
+          break modelChunks
         }
       }
     } catch (error) {
@@ -1511,6 +1546,11 @@ export class AgentLoop {
       finishWork?.()
       modelPermit?.release()
     }
+    if (!stopReason) {
+      modelErrorCode = 'model_stream_incomplete'
+      stopReason = 'error'
+    }
+    const interrupted = stopReason === 'error' && hasModelOutput()
     if (modelSpanId) {
       this.opts.spanService?.finish(modelSpanId, {
         status: stopReason === 'error' ? 'error' : 'ok',
@@ -1534,7 +1574,7 @@ export class AgentLoop {
           turnId,
           threadId,
           text: reasoningAccumulator.value,
-          status: 'completed'
+          status: interrupted ? 'failed' : 'completed'
         })
       )
     }
@@ -1547,10 +1587,17 @@ export class AgentLoop {
           turnId,
           threadId,
           text: textAccumulator.value,
-          status: 'completed',
-          uiBlocks: parseDshUiBlocks(textAccumulator.value)
+          status: interrupted ? 'failed' : 'completed',
+          ...(interrupted ? {} : { uiBlocks: parseDshUiBlocks(textAccumulator.value) })
         })
       )
+    }
+    if (interrupted) {
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) return 'outcome_unknown'
+      const interruption = textAccumulator.value ? '模型响应中断，已保留收到的部分回复。' : '模型响应中断。'
+      const message = interruption + (activeTask ? '可以从原任务继续。' : '可以在当前会话继续。')
+      await this.opts.events.record({ kind: 'error', threadId, turnId, code: 'response_interrupted', message })
+      return { kind: 'response_interrupted', message }
     }
     if (stopReason === 'error') return 'failed'
     if (stopReason === 'length') return 'max_tokens'

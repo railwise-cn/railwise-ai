@@ -855,7 +855,9 @@ describe('app-ipc-schemas', () => {
             kind: 'daily',
             everyMinutes: 60,
             timeOfDay: '09:30',
-            atTime: ''
+            atTime: '',
+            times: ['09:30', '16:30'],
+            timezone: 'Asia/Shanghai'
           },
           lastStatus: 'waiting_user',
           runtimeTaskId: 'runtime_task'

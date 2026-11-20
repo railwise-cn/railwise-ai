@@ -55,7 +55,8 @@ export const TurnTerminalReason = z.enum([
   'error',
   'aborted',
   'blocked',
-  'max_tokens'
+  'max_tokens',
+  'response_interrupted'
 ])
 export type TurnTerminalReason = z.infer<typeof TurnTerminalReason>
 

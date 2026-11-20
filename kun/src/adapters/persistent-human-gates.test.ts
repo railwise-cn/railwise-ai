@@ -56,6 +56,34 @@ describe('persistent human gates', () => {
     repository.close()
   })
 
+  it('rejects an old decision after pause or cancellation and accepts duplicates only for the same decision', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-gate-stale-')); roots.push(root)
+    const repository = new TaskRunRepository(join(root, 'tasks.sqlite3'))
+    repository.create({ ...task(), activeTurnId: 'turn-1' })
+    const date = '2026-11-09T00:00:01Z'
+    const gate = new PersistentApprovalGate(repository, () => date)
+    const approval = createApprovalRequest({ id: 'approval-paused', threadId: 'thread-gate', turnId: 'turn-1',
+      toolName: 'request_host_shell', summary: 'exact reviewed operation', createdAt: date })
+    void gate.request(approval)
+    const updateStatus = (status: TaskRun['status']) => {
+      const current = repository.get('task-gate')!
+      repository.update(current.id, current.revision, row => ({ ...row, status, updatedAt: date }))
+    }
+    updateStatus('paused')
+    expect(gate.decide(approval.id, 'allow')).toBe(false)
+    updateStatus('cancelled')
+    expect(gate.decide(approval.id, 'allow')).toBe(false)
+    expect(repository.pendingOutbox('human_answer')).toHaveLength(0)
+
+    const independent = { ...approval, id: 'approval-independent', threadId: 'chat-without-task' }
+    const waiting = gate.request(independent)
+    expect(gate.decide(independent.id, 'deny')).toBe(true)
+    expect(gate.decide(independent.id, 'deny')).toBe(true)
+    expect(gate.decide(independent.id, 'allow')).toBe(false)
+    await expect(waiting).resolves.toBe('deny')
+    repository.close()
+  })
+
   it('persists structured question payloads for reconnecting UIs', async () => {
     const root = await mkdtemp(join(tmpdir(), 'railwise-question-')); roots.push(root)
     const repository = new TaskRunRepository(join(root, 'tasks.sqlite3')); repository.create(task())

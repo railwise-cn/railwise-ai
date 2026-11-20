@@ -1112,7 +1112,9 @@ const scheduledTaskSchedulePatchSchema = z.object({
   kind: clawScheduleKindSchema.optional(),
   everyMinutes: z.number().int().min(1).max(10_080).optional(),
   timeOfDay: z.string().max(16).optional(),
-  atTime: z.string().max(128).optional()
+  atTime: z.string().max(128).optional(),
+  times: z.array(z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)).min(1).max(24).optional(),
+  timezone: trimmedString(128).optional()
 }).strict()
 
 const scheduledTaskPatchSchema = z.object({
@@ -1777,7 +1779,7 @@ export const notificationPayloadSchema = z
     turnId: optionalTrimmedString(MAX_ID_LENGTH),
     approvalId: optionalTrimmedString(MAX_ID_LENGTH),
     activeThread: z.boolean().optional(),
-    reason: z.enum(['completed', 'error', 'aborted', 'blocked', 'max_tokens', 'waiting_approval']).optional(),
+    reason: z.enum(['completed', 'error', 'aborted', 'blocked', 'max_tokens', 'waiting_approval', 'response_interrupted']).optional(),
     title: trimmedString(MAX_NOTIFICATION_TITLE_LENGTH),
     body: trimmedString(MAX_NOTIFICATION_BODY_LENGTH)
   })

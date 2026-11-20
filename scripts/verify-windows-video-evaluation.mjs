@@ -5,6 +5,7 @@ import { access, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
+import { createChineseTextPdf } from './verify-windows-composer-acceptance.mjs'
 import { parseFixtureToolOutput } from './run-windows-ui-smoke.mjs'
 
 const execFile = promisify(execFileCallback)
@@ -15,6 +16,8 @@ const model = 'windows-video-evaluation-fixture'
 const filename = 'railwise-synthetic-evaluation.mp4'
 const script = 'render-evaluation.mjs'
 const composition = 'RailWiseSyntheticEvaluation'
+const pdfName = '合成视频资料.pdf'
+const pdfText = '铁路合成验收'
 
 // Original geometry only. This evaluation does not rely on the media omitted from the Skill.
 const scene = `import React from 'react';
@@ -24,6 +27,7 @@ const Scene = () => {
   return <AbsoluteFill style={{background:'#17263d', alignItems:'center', justifyContent:'center'}}>
     <svg width="320" height="180" viewBox="0 0 320 180">
       <path d="M38 113H282M38 129H282" fill="none" stroke="#c5e2ef" strokeWidth="4"/>
+      <text x="38" y="52" fill="#d8e9f8" fontSize="18">${pdfText}</text>
       <circle cx={52 + frame * 9} cy="92" r="24" fill="#74e1be"/>
     </svg>
   </AbsoluteFill>;
@@ -65,6 +69,21 @@ function modelAction(body, selection, render) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
   const results = new Map(body.messages?.filter(message => message.role === 'tool')
     .map(message => [message.tool_call_id, parseFixtureToolOutput(message.content)]))
+  const context = body.messages?.map(message => typeof message.content === 'string' ? message.content : '').join('\n') ?? ''
+  const attachmentId = context.match(/合成视频资料\.pdf [^\n]*?id=([\w-]+)/)?.[1]
+  assert.ok(attachmentId, 'The approved task receives its original document attachment')
+  if (!results.has('eval-find-pdf')) {
+    assert.ok(tools.has('search_attachment'))
+    return ['eval-find-pdf', 'search_attachment', { attachment_id: attachmentId, query: pdfText }]
+  }
+  const sectionId = results.get('eval-find-pdf')?.results?.[0]?.id
+  assert.ok(sectionId)
+  if (!results.has('eval-read-pdf')) {
+    assert.ok(tools.has('read_attachment_section'))
+    return ['eval-read-pdf', 'read_attachment_section', { attachment_id: attachmentId, section_id: sectionId }]
+  }
+  assert.ok(literal(results.get('eval-read-pdf')).includes(pdfText), 'The renderer input must have come from the PDF')
+  selection.pdfRead = true
   const resource = results.get('eval-read-pipeline')
   if (!results.has('eval-read-pipeline')) return tools.has('read_skill_resource') ?
     ['eval-read-pipeline', 'read_skill_resource', { skill_id: selection.skillId, path: 'references/pipeline.md' }] : null
@@ -87,6 +106,8 @@ function modelAction(body, selection, render) {
 
 export async function startWindowsVideoEvaluation(workspace, environment) {
   const toolchain = await provision(workspace, environment)
+  const documentPath = join(workspace, pdfName)
+  await writeFile(documentPath, createChineseTextPdf())
   const quote = value => `'${value.replace(/'/g, "''")}'`
   const render = { command: `& ${quote(process.execPath)} ${quote(join(workspace, script))}`,
     timeout_seconds: 180, ttl_seconds: 240, idempotency_key: 'private-synthetic-render-once' }
@@ -104,6 +125,12 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
       const body = JSON.parse(Buffer.concat(chunks).toString())
       assert.ok(selection.skillId && body.messages?.some(message => message.role === 'user' && literal(message.content).includes(marker)))
       const action = modelAction(body, selection, render)
+      if (action?.[0] === 'eval-render' && !selection.interrupted) {
+        selection.interrupted = true
+        response.writeHead(200, { 'content-type': 'text/event-stream' })
+        response.end(`data: ${literal({ id: model, choices: [{ index: 0, delta: { content: '资料已核对，准备渲染。' }, finish_reason: null }] })}\n\n`)
+        return
+      }
       const delta = action ? { tool_calls: [{ index: 0, id: action[0], type: 'function',
         function: { name: action[1], arguments: literal(action[2]) } }] } :
         { content: selection.rendered ? `已渲染并保存 ${filename} 。` : '合成验收所需工具未就绪。' }
@@ -122,20 +149,36 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
       selection.skillId = skillId
       const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
       await cdp.fill(composer, `/skill:${skillId} ${marker}，请读取已安装技能的流水线说明，用本工作区准备的原创一秒合成场景实际制作成片，输出 ${filename} 。请通过明确审批运行本工作区的 ${script} 。`)
+      await cdp.click('button[aria-label="更多操作"]')
+      await cdp.send('Page.setInterceptFileChooserDialog', { enabled: true })
+      await cdp.click('button', '添加文件或图片')
+      const { root } = await cdp.send('DOM.getDocument')
+      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: 'input[type="file"]' })
+      assert.ok(nodeId)
+      await cdp.send('DOM.setFileInputFiles', { nodeId, files: [documentPath] })
+      await cdp.send('Page.setInterceptFileChooserDialog', { enabled: false })
+      await cdp.wait(`document.querySelector('.ds-floating-composer')?.innerText.includes(${literal(pdfName)})
+        && /已就绪|文字提取受限/.test(document.querySelector('.ds-floating-composer').innerText)`, 'a parsed PDF attached through the composer', 120_000)
       const key = { code: 'Enter', key: 'Enter', windowsVirtualKeyCode: 13 }
       await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
       await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+      const interrupted = await cdp.wait(`window.workwise.listTaskPage({filter:'all',workspaceRoot:${literal(workspace)}}).then(page=>
+        [...page.items, ...page.relatedTasks].find(task=>task.status==='stalled'&&task.presentation?.reason==='response_interrupted'))`, 'durable interrupted response in the same task', 120_000)
+      await cdp.click('button', '打开任务工作台')
+      const detail = 'article[aria-label="任务详情"]'
+      await cdp.click(`${detail} button`, '继续任务')
       const approval = await cdp.wait(`window.workwise.listTaskInbox(${literal(workspace)}).then(items=>items.find(item=>item.status==='pending'&&item.kind==='approval'&&item.message.includes(${literal(`Command SHA256: ${digest(render.command)}`)})))`, 'the exact reviewed isolated render approval', 90_000)
       assert.equal(approval.payload?.approval?.toolName, 'request_host_shell')
       assert.equal(approval.payload.approval.requestHash, digest(literal(render)))
       assert.equal(selection.read, true)
-      await cdp.click('button', '打开任务工作台')
-      const detail = 'article[aria-label="任务详情"]'
+      assert.equal(selection.pdfRead, true)
+      assert.equal(approval.taskId, interrupted.id)
       const commandFingerprint = `Command SHA256: ${digest(render.command)}`
+      assert.equal(await cdp.evaluate(`document.querySelector(${literal(detail)})?.innerText.includes(${literal(commandFingerprint)})`), false)
       const button = await cdp.wait(`(() => {
         const article=document.querySelector(${literal(detail)});
         const options=[...(article?.querySelectorAll('button')??[])].filter(item=>
-          item.textContent.trim()==='允许此操作'&&!item.disabled&&item.getClientRects().length&&item.parentElement.parentElement.innerText.includes(${literal(commandFingerprint)}));
+          ['允许此操作','允许本次'].includes(item.textContent.trim())&&!item.disabled&&item.getClientRects().length);
         if(options.length!==1)return null;
         const button=options[0];
         button.scrollIntoView({block:'center'});
@@ -152,6 +195,7 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
         return task.status==='completed'&&task.artifacts.find(item=>item.format==='mp4'&&item.validation==='valid'&&item.relativePath===${literal(filename)});
       })`, 'a completed real task and registered MP4', 240_000).catch(error => { throw new Error(selection.failure ?? error.message) })
       assert.equal(selection.rendered, true)
+      await cdp.click(`${detail} button`, filename)
       const video = await readFile(toolchain.target)
       assert.equal((await lstat(toolchain.target)).isSymbolicLink(), false)
       assert.equal(digest(video), artifact.sha256)
@@ -163,6 +207,6 @@ export async function startWindowsVideoEvaluation(workspace, environment) {
         { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
       return { kind: 'private-noncommercial-synthetic-evaluation', remotionVersion: version, codec: probe.codec_name,
         width: probe.width, height: probe.height, frames: Number(probe.nb_frames), artifact: { id: artifact.id, sha256: artifact.sha256, bytes: video.length },
-        installedSkillResourceRead: true, runtimeApprovalId: approval.requestId, decoded: true }
+        installedSkillResourceRead: true, attachedPdfRead: true, sameTaskResumedAfterInterruption: true, runtimeApprovalId: approval.requestId, decoded: true }
     } }
 }

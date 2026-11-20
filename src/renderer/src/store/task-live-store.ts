@@ -2,6 +2,8 @@ import { useCallback, useSyncExternalStore } from 'react'
 import type { TaskRunV1, TaskAttentionV1, TaskChangeEvent, TaskProgressV1 } from '@shared/agent-workbench'
 import type { TaskFilter } from '@shared/task-workspace-projection'
 import { taskArtifactSourceEvidenceState } from '@shared/task-artifact-source-evidence'
+import i18n from '../i18n'
+import { taskReasonKey } from '../agent/ag-ui-activity'
 
 export type TaskNavigation = { selectedTaskId: string | null; selectedAttentionId: string | null; filter: TaskFilter; search: string; allWorkspaces: boolean }
 type State = {
@@ -49,7 +51,10 @@ function notifyAttention(item: TaskAttentionV1): void {
   if (item.status !== 'pending' || (!item.taskId && !item.flowRunId)) return
   void window.workwise.notifyTask({
     key: `attention:${item.id}:${item.createdAt}`, taskId: item.taskId, flowId:item.flowId,flowRunId:item.flowRunId,
-    kind: 'attention', title: item.title, body: item.message.slice(0, 500)
+    kind: 'attention',
+    title: i18n.t('common:taskWorkspaceTitle'),
+    body: i18n.t(`common:${taskReasonKey(item.presentation?.reason ??
+      (item.kind === 'approval' ? 'approval_required' : item.kind === 'question' ? 'input_required' : 'blocked'))}`)
   }).catch(() => undefined)
 }
 export async function refreshTaskState(): Promise<void> {

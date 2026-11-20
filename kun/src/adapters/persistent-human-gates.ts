@@ -1,6 +1,7 @@
 import type { ApprovalGate } from '../ports/approval-gate.js'
 import type { UserInputGate, UserInputRequest, UserInputResolution } from '../ports/user-input-gate.js'
 import type { ApprovalRequest } from '../domain/approval.js'
+import type { TaskRun } from '../contracts/tasks.js'
 import type { DurableHumanRequest, TaskRunRepository } from '../services/task-run-repository.js'
 
 /** SQLite is authoritative; these maps only wake a currently live tool call. */
@@ -27,7 +28,24 @@ export class PersistentApprovalGate implements ApprovalGate {
   decide(id: string, decision: 'allow' | 'deny', reason?: string): boolean {
     const saved = this.repository.humanRequest(id)
     if (!saved || saved.kind !== 'approval') return false
-    this.repository.resolveHumanRequest(id, { decision, ...(reason ? { reason } : {}) }, 'answered', this.nowIso())
+    if (saved.status !== 'pending') return saved.status === 'answered' && approvalDecision(saved) === decision
+    const owner = taskRequestOwner(this.repository, saved)
+    if (owner === null || owner?.status === 'paused') return false
+    const now = this.nowIso()
+    const temporaryGrant = owner?.authority?.taskApprovalGrant
+    if (decision === 'allow' && owner && (owner.authority?.revokedAt || temporaryGrant && Date.parse(temporaryGrant.expiresAt) <= Date.parse(now))) {
+      this.repository.transact(() => {
+        this.repository.resolveHumanRequest(id, { decision: 'deny', reason: 'task_approval_expired' }, 'expired', now)
+        this.repository.update(owner.id, owner.revision, current => ({
+          ...current, status: 'waiting_user', blockCode: 'approval_expired',
+          waitingReason: '本次任务授权已失效，请重新检查后继续。', updatedAt: now
+        }))
+      })
+      this.resolvers.get(id)?.resolve('deny')
+      this.resolvers.delete(id)
+      return false
+    }
+    this.repository.resolveHumanRequest(id, { decision, ...(reason ? { reason } : {}) }, 'answered', now)
     this.flush()
     return true
   }
@@ -62,18 +80,16 @@ export class PersistentApprovalGate implements ApprovalGate {
     for (const [id, live] of this.resolvers) {
       const saved = this.repository.humanRequest(id)
       if (!saved || saved.status === 'pending') continue
-      const task = this.repository.findActiveByThread(saved.threadId)
+      const task = taskRequestOwner(this.repository, saved)
       if (task?.status === 'paused') continue
-      this.markDelivered(saved)
       this.resolvers.delete(id)
-      live.resolve(approvalDecision(saved))
+      if (task !== null) this.markDelivered(saved, task)
+      live.resolve(task === null || saved.status !== 'answered' ? 'deny' : approvalDecision(saved))
     }
   }
-  private markDelivered(saved: DurableHumanRequest): void {
-    const task = this.repository.findActiveByThread(saved.threadId)
+  private markDelivered(saved: DurableHumanRequest, task: TaskRun | undefined): void {
     if (!task) return
-    if (['waiting_approval', 'waiting_user'].includes(task.status)) this.repository.update(task.id, task.revision, current => ({ ...current, status: 'running', waitingReason: undefined, executionStartedAt: this.nowIso(), updatedAt: this.nowIso() }))
-    this.repository.acknowledgeOutbox(`human:${saved.id}`, this.nowIso())
+    markTaskHumanRequestDelivered(this.repository, task, saved.id, this.nowIso())
   }
 }
 
@@ -93,7 +109,8 @@ export class PersistentUserInputGate implements UserInputGate {
   }
   resolve(id: string, answer: UserInputResolution): boolean {
     const saved = this.repository.humanRequest(id)
-    if (!saved || saved.kind !== 'question') return false
+    if (!saved || saved.kind !== 'question' || saved.status !== 'pending') return false
+    if (taskRequestOwner(this.repository, saved) === null) return false
     this.repository.resolveHumanRequest(id, answer, answer.status === 'submitted' ? 'answered' : 'cancelled', this.nowIso())
     this.flush()
     return true
@@ -106,14 +123,11 @@ export class PersistentUserInputGate implements UserInputGate {
     for (const [id, resolver] of this.resolvers) {
       const saved = this.repository.humanRequest(id)
       if (!saved || saved.status === 'pending') continue
-      const task = this.repository.findActiveByThread(saved.threadId)
+      const task = taskRequestOwner(this.repository, saved)
       if (task?.status === 'paused') continue
       this.resolvers.delete(id)
-      if (task) {
-        if (['waiting_user', 'waiting_approval'].includes(task.status)) this.repository.update(task.id, task.revision, current => ({ ...current, status: 'running', waitingReason: undefined, executionStartedAt: this.nowIso(), updatedAt: this.nowIso() }))
-      }
-      this.repository.acknowledgeOutbox(`human:${id}`, this.nowIso())
-      resolver.resolve(saved.resolution as UserInputResolution)
+      if (task) markTaskHumanRequestDelivered(this.repository, task, id, this.nowIso())
+      resolver.resolve(task === null ? { status: 'cancelled' } : saved.resolution as UserInputResolution)
     }
   }
   reset(): void {
@@ -121,6 +135,27 @@ export class PersistentUserInputGate implements UserInputGate {
     for (const resolver of this.resolvers.values()) resolver.reject(new Error('user input runtime stopped'))
     this.resolvers.clear()
   }
+}
+
+/** An unbound request belongs to a normal chat. A stale task request cannot wake another run. */
+function taskRequestOwner(repository: TaskRunRepository, request: DurableHumanRequest): TaskRun | null | undefined {
+  const attention = repository.attention(request.id)
+  if (!attention?.taskId) return undefined
+  const task = repository.get(attention.taskId)
+  if (!task || task.threadId !== request.threadId || (task.activeTurnId && task.activeTurnId !== request.turnId) ||
+      ['completed', 'failed', 'cancelled'].includes(task.status) || repository.currentExecution(task.id)?.id !== task.id) return null
+  return task
+}
+
+function markTaskHumanRequestDelivered(repository: TaskRunRepository, task: TaskRun, requestId: string, now: string): void {
+  const stillWaiting = repository.inbox(task.workspaceRoot).some(item => item.taskId === task.id &&
+    (item.kind === 'approval' || item.kind === 'question'))
+  if (!stillWaiting && ['waiting_user', 'waiting_approval'].includes(task.status)) {
+    repository.update(task.id, task.revision, current => ({
+      ...current, status: 'running', blockCode: undefined, waitingReason: undefined, executionStartedAt: now, updatedAt: now
+    }))
+  }
+  repository.acknowledgeOutbox(`human:${requestId}`, now)
 }
 
 function approvalDecision(saved: DurableHumanRequest): 'allow' | 'deny' {

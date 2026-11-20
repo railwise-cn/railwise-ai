@@ -806,7 +806,7 @@ type TurnCompleteNotificationPayload = {
   threadId?: string
   turnId?: string
   approvalId?: string
-  reason?: 'completed' | 'error' | 'aborted' | 'blocked' | 'max_tokens' | 'waiting_approval'
+  reason?: 'completed' | 'error' | 'aborted' | 'blocked' | 'max_tokens' | 'waiting_approval' | 'response_interrupted'
   activeThread?: boolean
   title?: string
   body?: string
@@ -818,6 +818,7 @@ async function showTurnCompleteNotification(
   const settings = await store.load()
   const visibilityAwarePayload = {
     ...payload,
+    reason: payload.reason === 'response_interrupted' ? 'error' as const : payload.reason,
     activeThread: isActiveThreadActuallyVisible(mainWindow, payload.activeThread)
   }
   if (!shouldShowTerminalNotification(settings.notifications, visibilityAwarePayload)) {

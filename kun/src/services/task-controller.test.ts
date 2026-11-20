@@ -573,6 +573,19 @@ describe('TaskController reliability boundaries', () => {
     repository.close()
   })
 
+  it('leaves an interrupted model response at a checkpoint of the same resumable task', async () => {
+    const { repository, controller, task } = await fixture('整理已上传的资料。')
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const decision = controller.recordAttemptFailure(task.threadId, 'turn_reliability', 'response_interrupted', '模型回复中断。')
+
+    expect(decision).toMatchObject({ kind: 'stalled', task: { id: task.id, status: 'stalled', blockCode: 'response_interrupted', attempts: 1 } })
+    expect(repository.events(task.id).filter(event => event.kind === 'attempt_retrying')).toHaveLength(0)
+    expect(repository.latestCheckpoint(task.id)?.resumeSummary).toBe('模型回复中断。')
+    const current = repository.get(task.id)!
+    expect(controller.prepareResume(current.id, current.revision)).toMatchObject({ id: task.id, status: 'retrying', blockCode: undefined })
+    repository.close()
+  })
+
   it('durably fails exhausted observation feedback once without spending further attempts or accepting a candidate', async () => {
     const { repository, controller, task } = await fixture('读取公开列表并整理汇总。')
     controller.beginAttempt(task.threadId, 'turn_reliability')

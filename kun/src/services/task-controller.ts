@@ -1407,9 +1407,27 @@ export class TaskController {
       return this.finish(task, code === 'operation_cancelled' ? 'cancelled' : 'failed', message)
     }
     if (code === 'web_access_exhausted' || code === 'max_tokens' || code === 'tool_storm_recovery_exhausted') {
-      return this.finish(task, 'failed', message)
+      return this.finish(task, 'failed', message, code === 'tool_storm_recovery_exhausted' ? 'tool_repeated_failure' : undefined)
     }
     if (hostShell.lastFailed) return this.waitForUser(task,'最后一次已授权命令没有执行成功。请先处理失败原因，再明确授权新的检查命令。', '', `host-shell-failed:${hostShell.lastFailed.id}`,turnId)
+    if (code === 'response_interrupted') {
+      const reason = message
+      const now = this.nowIso()
+      const next = this.updateExecution(task.id, task.revision, current => ({
+        ...current,
+        status: 'stalled',
+        blockCode: 'response_interrupted',
+        stalledReason: reason,
+        waitingReason: undefined,
+        executionMs: (current.executionMs ?? 0) + activeExecutionMs(current, now),
+        executionStartedAt: undefined,
+        updatedAt: now
+      }), { key: `response-interrupted:${turnId}`, kind: 'task_stalled', payload: { code, turnId }, createdAt: now })
+      this.saveCheckpoint(next, reason, `response-interrupted:${turnId}`)
+      this.spans?.finishTurn(next.id, turnId, { status: 'error', errorCode: code })
+      this.releaseExecutionLease(task.id)
+      return { kind: 'stalled', task: next, reason }
+    }
     if (hostShell.pending.length) return this.retry(task,'模型请求中断，但原命令仍有待核验回执。请只读轮询已有命令，不能重新执行。',`host-shell-pending:${hostShell.pending.map(operation => operation.id).join(',')}`,turnId)
     return this.retry(
       task,
@@ -1453,7 +1471,7 @@ export class TaskController {
   private stallUnknown(task: TaskRun, operationIds: string[]): Extract<TaskCandidateDecision,{kind:'stalled'}> {
     const reason = '操作已派发，但结果尚未核实。请先检查原执行回执，系统不会重复派发。'
     const now=this.nowIso()
-    const next=this.updateExecution(task.id,task.revision,current=>({...current,status:'stalled',waitingReason:undefined,stalledReason:reason,updatedAt:now}),{key:`unknown:${task.revision}`,kind:'task_stalled',payload:{operationIds},createdAt:now})
+    const next=this.updateExecution(task.id,task.revision,current=>({...current,status:'stalled',blockCode:'outcome_unknown',waitingReason:undefined,stalledReason:reason,updatedAt:now}),{key:`unknown:${task.revision}`,kind:'task_stalled',payload:{operationIds},createdAt:now})
     this.saveCheckpoint(next,reason,`unknown:${task.revision}`)
     this.repository.putAttention({id:`unknown_${task.id}`,ownerKind:'task',ownerId:task.id,taskId:task.id,threadId:task.originThreadId ?? task.threadId,kind:'blocked',title:'核实上次操作结果',message:reason,status:'pending',revision:0,createdAt:now,updatedAt:now,payload:{operationIds}})
     this.releaseExecutionLease(task.id)
@@ -2079,6 +2097,7 @@ export class TaskController {
       status: 'retrying',
       ...(model ? { model } : {}),
       noProgressCount: 0,
+      blockCode: undefined,
       stalledReason: undefined,
       waitingReason: '用户要求从最近 checkpoint 继续。',
       nodes: current.nodes.map((node) => node.status === 'completed'
@@ -2147,7 +2166,7 @@ export class TaskController {
       const unknownShell = this.repository.listShellSessions(task.id).some(session => ['running', 'starting', 'outcome_unknown'].includes(session.status))
       const unknown = this.repository.unsettledOperations(task.id)
       if (unknown.length || unknownShell) {
-        return this.repository.update(task.id, task.revision, current => ({ ...current, status: 'stalled', waitingReason: undefined, stalledReason: '上次操作结果尚未确认，请先核实执行回执后继续。', updatedAt: now }), { key: `recovery-unknown:${task.revision}`, kind: 'task_stalled', payload: { operationIds: unknown.map(item => item.id) }, createdAt: now })
+        return this.repository.update(task.id, task.revision, current => ({ ...current, status: 'stalled', blockCode: 'outcome_unknown', waitingReason: undefined, stalledReason: '上次操作结果尚未确认，请先核实执行回执后继续。', updatedAt: now }), { key: `recovery-unknown:${task.revision}`, kind: 'task_stalled', payload: { operationIds: unknown.map(item => item.id) }, createdAt: now })
       }
       const hostShell = this.hostShellState(task)
       if (hostShell.lastFailed) {
@@ -2383,11 +2402,12 @@ export class TaskController {
     return { kind: 'waiting_user', task: next, reason }
   }
 
-  private finish(task: TaskRun, status: Extract<TaskRunStatus, 'failed' | 'cancelled'>, reason: string): Extract<TaskCandidateDecision, { kind: 'failed' }> {
+  private finish(task: TaskRun, status: Extract<TaskRunStatus, 'failed' | 'cancelled'>, reason: string, blockCode?: TaskRun['blockCode']): Extract<TaskCandidateDecision, { kind: 'failed' }> {
     const now = this.nowIso()
     const next = this.updateExecution(task.id, task.revision, (current) => ({
       ...current,
       status,
+      blockCode,
       authority: current.authority ? { ...current.authority, ...(status === 'cancelled' ? { revokedAt: now } : {}) } : undefined,
       executionMs: (current.executionMs ?? 0) + activeExecutionMs(current, now),
       executionStartedAt: undefined,

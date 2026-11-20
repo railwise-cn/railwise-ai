@@ -1354,11 +1354,13 @@ export async function dispatchRuntimeEvent(
       })
       return
     case 'turn_failed': {
-      const payload = runtimeErrorFromEvent(event, 'RailWise AI Runtime turn failed')
-      sink.onRuntimeError?.(payload)
+      const responseInterrupted = event.reason === 'response_interrupted'
+      const payload = runtimeErrorFromEvent(responseInterrupted ? { ...event, code: event.reason } : event, 'RailWise AI Runtime turn failed')
+      // The interruption itself is already recorded as a runtime event.
+      if (!responseInterrupted) sink.onRuntimeError?.(payload)
       sink.onError(errorForRuntimeEvent(payload), {
         terminal: true,
-        terminalReason: event.reason === 'blocked' || event.reason === 'max_tokens' || event.reason === 'error'
+        terminalReason: event.reason === 'blocked' || event.reason === 'max_tokens' || event.reason === 'error' || event.reason === 'response_interrupted'
           ? event.reason
           : terminalReasonForFailure(payload.code, payload.message),
         threadId: event.threadId,

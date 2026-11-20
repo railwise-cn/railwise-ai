@@ -527,7 +527,7 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     expect(html).not.toContain('read detail should stay tucked away')
   })
 
-  it('auto-expands pending approvals while keeping other tool details tucked away', () => {
+  it('exposes the pending approval decision and keeps the command available on demand', () => {
     const readBlock: ChatBlock = toolBlock({
       id: 'tool_read',
       summary: 'read: file',
@@ -554,7 +554,8 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     )
 
     expect(html).toContain('ds-work-stack')
-    expect(html).toContain('Run edit(path=&quot;/tmp/app.ts&quot;)')
+    expect(html).not.toContain('Run edit(path=&quot;/tmp/app.ts&quot;)')
+    expect(html).toMatch(/View scope and technical details|查看.+权限范围|approvalScopeDetails/)
     expect(html).toMatch(/Approval required|需要审批|approvalTitle/)
     expect(html).toMatch(/Allow|允许|approvalAllow/)
     expect(html).not.toContain('read detail should stay tucked away')

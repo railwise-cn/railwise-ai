@@ -323,7 +323,7 @@ export type TurnCompleteNotificationPayload = {
   threadId?: string
   turnId?: string
   approvalId?: string
-  reason?: 'completed' | 'error' | 'aborted' | 'blocked' | 'max_tokens' | 'waiting_approval'
+  reason?: 'completed' | 'error' | 'aborted' | 'blocked' | 'max_tokens' | 'waiting_approval' | 'response_interrupted'
   activeThread?: boolean
   title: string
   body: string

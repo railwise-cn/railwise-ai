@@ -76,7 +76,7 @@ function terminalReason(
     ? explicit === 'completed'
     : status === 'aborted'
       ? explicit === 'aborted'
-      : explicit === 'error' || explicit === 'blocked' || explicit === 'max_tokens'
+      : explicit === 'error' || explicit === 'blocked' || explicit === 'max_tokens' || explicit === 'response_interrupted'
   if (!valid) throw new Error(`terminal reason ${explicit} is incompatible with turn status ${status}`)
   return explicit
 }

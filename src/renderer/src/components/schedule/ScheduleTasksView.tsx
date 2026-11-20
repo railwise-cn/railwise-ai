@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Brain,
@@ -24,16 +24,16 @@ import {
   DEFAULT_SCHEDULE_MODEL,
   DEFAULT_SCHEDULE_REASONING_EFFORT,
   getManagedRuntimeSettings,
-  mergeScheduleSettings,
   normalizeScheduleModelForProvider,
   normalizeScheduleSettings,
   scheduleModelOptionsForProvider,
-  type AppSettingsV1,
   type ScheduleKind,
   type ScheduleReasoningEffort,
   type ScheduleRuntimeStatus,
+  type ScheduleSettingsPatchV1,
   type ScheduleSettingsV1,
-  type ScheduledTaskV1
+  type ScheduledTaskV1,
+  type WorkWiseSettingsV2
 } from '@shared/app-settings'
 import { rendererRuntimeClient } from '../../agent/runtime-client'
 import { confirmDialog } from '../../lib/confirm-dialog'
@@ -51,7 +51,10 @@ type Props = {
 type TaskFilter = 'all' | 'enabled' | 'running' | 'done'
 type TaskDialogState =
   | { mode: 'create'; draft: ScheduledTaskV1 }
-  | { mode: 'edit'; taskId: string; draft: ScheduledTaskV1 }
+  | { mode: 'edit'; original: ScheduledTaskV1; draft: ScheduledTaskV1 }
+
+type TaskEdits = Partial<Pick<ScheduledTaskV1,
+  'title' | 'prompt' | 'workspaceRoot' | 'model' | 'reasoningEffort' | 'enabled' | 'schedule'>>
 
 const SCHEDULE_FILTERS: TaskFilter[] = ['all', 'enabled', 'running', 'done']
 const SCHEDULE_KIND_OPTIONS: ScheduleKind[] = ['daily', 'at', 'interval', 'manual']
@@ -193,6 +196,29 @@ export function scheduledTaskResultIsExpandable(message: string): boolean {
     trimmed.split(/\r?\n/u).length > RESULT_PREVIEW_LINE_THRESHOLD
 }
 
+function scheduledTaskEdits(original: ScheduledTaskV1, draft: ScheduledTaskV1): TaskEdits {
+  return {
+    ...(draft.title !== original.title ? { title: draft.title } : {}),
+    ...(draft.prompt !== original.prompt ? { prompt: draft.prompt } : {}),
+    ...(draft.workspaceRoot !== original.workspaceRoot ? { workspaceRoot: draft.workspaceRoot } : {}),
+    ...(draft.model !== original.model ? { model: draft.model } : {}),
+    ...(draft.reasoningEffort !== original.reasoningEffort ? { reasoningEffort: draft.reasoningEffort } : {}),
+    ...(draft.enabled !== original.enabled ? { enabled: draft.enabled } : {}),
+    ...(JSON.stringify(draft.schedule) !== JSON.stringify(original.schedule) ? { schedule: draft.schedule } : {})
+  }
+}
+
+function updateScheduledTask(current: ScheduledTaskV1, edits: TaskEdits): ScheduledTaskV1 {
+  const changedTime = edits.schedule && JSON.stringify(edits.schedule) !== JSON.stringify(current.schedule)
+  const changedEnabled = edits.enabled !== undefined && edits.enabled !== current.enabled
+  return {
+    ...current,
+    ...edits,
+    ...(changedTime || changedEnabled ? { nextRunAt: '' } : {}),
+    updatedAt: nowIso()
+  }
+}
+
 function formatDateTime(value: string, fallback: string): string {
   if (!value.trim()) return fallback
   const date = new Date(value)
@@ -214,7 +240,7 @@ export function ScheduleTasksView({
   onOpenFlow
 }: Props): ReactElement {
   const { t } = useTranslation('common')
-  const [settings, setSettings] = useState<AppSettingsV1 | null>(null)
+  const [settings, setSettings] = useState<WorkWiseSettingsV2 | null>(null)
   const [status, setStatus] = useState<ScheduleRuntimeStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -223,30 +249,39 @@ export function ScheduleTasksView({
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
   const [expandedResultTaskIds, setExpandedResultTaskIds] = useState<Set<string>>(() => new Set())
+  const reads = useRef({ generation: 0, pendingWrites: 0 }).current
 
   const load = useCallback(async (): Promise<void> => {
+    if (reads.pendingWrites) return
+    const generation = ++reads.generation
     try {
       const [nextSettings, nextStatus] = await Promise.all([
-        rendererRuntimeClient.getSettings({ forceRefresh: true }),
+        window.workwise.getSettings(),
         typeof window.workwise?.getScheduleStatus === 'function'
           ? window.workwise.getScheduleStatus()
           : Promise.resolve(null)
       ])
-      setSettings(nextSettings)
+      if (generation !== reads.generation) return
+      setSettings((current) => !current || current.revision <= nextSettings.revision ? nextSettings : current)
       setStatus(nextStatus)
       setError(null)
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError))
+      if (generation === reads.generation) {
+        setError(loadError instanceof Error ? loadError.message : String(loadError))
+      }
     } finally {
-      setLoading(false)
+      if (generation === reads.generation) setLoading(false)
     }
-  }, [])
+  }, [reads])
 
   useEffect(() => {
     void load()
     const id = window.setInterval(() => void load(), 5_000)
-    return () => window.clearInterval(id)
-  }, [load])
+    return () => {
+      reads.generation++
+      window.clearInterval(id)
+    }
+  }, [load, reads])
 
   const providerId = settings ? getManagedRuntimeSettings(settings).providerId || undefined : undefined
   const schedule = settings ? normalizeScheduleSettings(settings.schedule, providerId) : null
@@ -254,14 +289,17 @@ export function ScheduleTasksView({
   const runningTaskIds = useMemo(() => new Set(status?.runningTaskIds ?? []), [status])
   const visibleTasks = useMemo(() => filterScheduledTasks(tasks, filter), [filter, tasks])
 
-  const persistSchedule = async (patch: Parameters<typeof mergeScheduleSettings>[1]): Promise<void> => {
-    if (!settings) return
-    const nextSchedule = mergeScheduleSettings(settings.schedule, patch, providerId)
-    setSettings({ ...settings, schedule: nextSchedule })
-    const saved = await rendererRuntimeClient.setSettings({ schedule: nextSchedule })
-    setSettings(saved)
-    if (typeof window.workwise?.getScheduleStatus === 'function') {
-      setStatus(await window.workwise.getScheduleStatus())
+  const persistSchedule = async (patch: (current: ScheduleSettingsV1) => ScheduleSettingsPatchV1): Promise<void> => {
+    reads.pendingWrites++
+    reads.generation++
+    try {
+      const saved = await rendererRuntimeClient.updateSettings((current) => ({ schedule: patch(current.schedule) }))
+      setSettings((current) => !current || current.revision <= saved.revision ? saved : current)
+      setStatus(null)
+      setLoading(false)
+      setError(null)
+    } finally {
+      reads.pendingWrites--
     }
   }
 
@@ -280,12 +318,12 @@ export function ScheduleTasksView({
   }
 
   const openEditDialog = (task: ScheduledTaskV1): void => {
+    const original = { ...task, workspaceRoot: resolveDialogWorkspaceRoot(task.workspaceRoot) }
     setDialog({
       mode: 'edit',
-      taskId: task.id,
+      original,
       draft: {
-        ...task,
-        workspaceRoot: resolveDialogWorkspaceRoot(task.workspaceRoot),
+        ...original,
         schedule: { ...task.schedule }
       }
     })
@@ -313,7 +351,7 @@ export function ScheduleTasksView({
 
   const saveDialog = async (): Promise<void> => {
     if (!dialog || !schedule || !settings) return
-    const validation = validateScheduledTaskDraft(dialog.draft, t)
+    const validation = dialog.mode === 'create' ? validateScheduledTaskDraft(dialog.draft, t) : null
     if (validation) {
       setDialogError(validation)
       return
@@ -329,42 +367,50 @@ export function ScheduleTasksView({
       updatedAt: now,
       nextRunAt: ''
     }
-    if (dialog.mode === 'create') {
-      await persistSchedule({
-        enabled: true,
-        tasks: [...schedule.tasks, { ...task, createdAt: now }]
-      })
-    } else {
-      await persistSchedule({
-        tasks: schedule.tasks.map((item) => item.id === dialog.taskId ? task : item)
-      })
+    try {
+      if (dialog.mode === 'create') {
+        await persistSchedule((current) => ({
+          enabled: true,
+          tasks: current.tasks.some((item) => item.id === task.id)
+            ? current.tasks : [...current.tasks, { ...task, createdAt: now }]
+        }))
+      } else {
+        await persistSchedule((current) => patchTask(current, dialog.original.id, scheduledTaskEdits(dialog.original, task)))
+      }
+      setDialog(null)
+      setDialogError(null)
+    } catch (saveError) {
+      setDialogError(saveError instanceof Error ? saveError.message : String(saveError))
     }
-    setDialog(null)
-    setDialogError(null)
   }
 
-  const updateTask = async (taskId: string, patch: Partial<ScheduledTaskV1>): Promise<void> => {
-    if (!schedule) return
-    const now = nowIso()
-    await persistSchedule({
-      tasks: schedule.tasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              ...patch,
-              ...(patch.schedule ? { schedule: { ...task.schedule, ...patch.schedule } } : {}),
-              nextRunAt: patch.enabled !== undefined || patch.schedule ? '' : task.nextRunAt,
-              updatedAt: now
-            }
-          : task
-      )
-    })
+  const patchTask = (current: ScheduleSettingsV1, taskId: string, edits: TaskEdits): ScheduleSettingsPatchV1 => {
+    const task = current.tasks.find((item) => item.id === taskId)
+    if (!task) throw new Error(t('scheduleTaskMissing'))
+    const updated = updateScheduledTask(task, edits)
+    const disabling = edits.enabled === false && Object.keys(edits).length === 1
+    const validation = disabling ? null : validateScheduledTaskDraft(updated, t)
+    if (validation) throw new Error(validation)
+    return { tasks: current.tasks.map((item) => item.id === taskId ? updated : item) }
   }
+
+  const saveListChange = async (patch: (current: ScheduleSettingsV1) => ScheduleSettingsPatchV1): Promise<boolean> => {
+    try {
+      await persistSchedule(patch)
+      return true
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : String(saveError))
+      return false
+    }
+  }
+
+  const updateTask = (taskId: string, enabled: boolean): Promise<boolean> =>
+    saveListChange((current) => patchTask(current, taskId, { enabled }))
 
   const deleteTask = async (taskId: string): Promise<void> => {
     if (!schedule) return
     if (!(await confirmDialog(t('scheduleDeleteConfirm')))) return
-    await persistSchedule({ tasks: schedule.tasks.filter((task) => task.id !== taskId) })
+    await saveListChange((current) => ({ tasks: current.tasks.filter((task) => task.id !== taskId) }))
   }
 
   const runTask = async (taskId: string): Promise<void> => {
@@ -378,7 +424,7 @@ export function ScheduleTasksView({
   }
 
   const toggleKeepAwake = async (value: boolean): Promise<void> => {
-    await persistSchedule({ keepAwake: value })
+    await saveListChange(() => ({ keepAwake: value }))
   }
 
   const toggleResultPreview = (taskId: string): void => {
@@ -485,12 +531,13 @@ export function ScheduleTasksView({
             </label>
           </div>
 
-          {loading ? (
-            <div className="py-20 text-center text-[14px] text-ds-faint">{t('loading')}</div>
-          ) : error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+          {error ? (
+            <div role="alert" className="rounded-xl border border-ds-border bg-ds-card px-4 py-3 text-[13px] text-ds-muted">
               {error}
             </div>
+          ) : null}
+          {loading ? (
+            <div className="py-20 text-center text-[14px] text-ds-faint">{t('loading')}</div>
           ) : visibleTasks.length === 0 ? (
             <div className="flex min-h-[340px] items-center justify-center text-[13px] text-ds-faint">
               {tasks.length === 0 ? t('scheduleEmpty') : t('scheduleFilterEmpty')}
@@ -566,7 +613,8 @@ export function ScheduleTasksView({
                           <input
                             type="checkbox"
                             checked={task.enabled}
-                            onChange={(event) => void updateTask(task.id, { enabled: event.target.checked })}
+                            aria-label={t('scheduleToggleTask', { title: task.title })}
+                            onChange={(event) => void updateTask(task.id, event.target.checked)}
                             className="sr-only"
                           />
                           <span className={`relative h-5 w-9 rounded-full transition ${task.enabled ? 'bg-ds-ink' : 'bg-ds-border-strong'}`}>
@@ -640,8 +688,7 @@ export function ScheduleTasksView({
           providerId={providerId}
           onClose={() => setSettingsDialogOpen(false)}
           onSave={async (patch) => {
-            await persistSchedule(patch)
-            setSettingsDialogOpen(false)
+            if (await saveListChange(() => patch ?? {})) setSettingsDialogOpen(false)
           }}
           t={t}
         />
@@ -815,7 +862,10 @@ function ScheduleTaskDialog({
                     <FieldLabel>{t('scheduleDailyTime')}</FieldLabel>
                     <ScheduleTimePicker
                       value={draft.schedule.timeOfDay}
-                      onChange={(timeOfDay) => updateSchedule({ timeOfDay, times: [timeOfDay] })}
+                      onChange={(timeOfDay) => updateSchedule({
+                        timeOfDay,
+                        times: [...new Set([timeOfDay, ...(draft.schedule.times ?? []).filter(time => time !== draft.schedule.timeOfDay)])]
+                      })}
                       t={t}
                     />
                   </div>
