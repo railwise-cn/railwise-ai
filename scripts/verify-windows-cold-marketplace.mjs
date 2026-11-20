@@ -128,7 +128,7 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
     const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
     await cdp.fill(composer, '/video-shotcraft')
-    await cdp.click('[role="option"] .truncate', 'Video Shotcraft')
+    await cdp.click('[role="option"] .truncate', current.name)
     await cdp.wait(`document.querySelector(${literal(composer)})?.value === ${literal(`/skill:${current.id} `)}`, 'the exact installed Skill token after choosing /')
     await cdp.fill(composer, '')
 
