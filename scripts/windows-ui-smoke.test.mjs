@@ -85,6 +85,7 @@ test('the exact private video scope requires the real skill, document, recovery,
       render: { kind: 'private-noncommercial-synthetic-evaluation', installedSkillResourceRead: true, attachedPdfRead: true,
         sameTaskResumedAfterInterruption: true, appOpenedArtifact: true, decoded: true, runtimeApprovalId: 'approval',
         codec: 'h264', width: 320, height: 180, frames: 24, artifact: { id: 'video', bytes: 1000, sha256: 'c'.repeat(64) },
+        decoder: { version: '4.1.0', sha256: 'd'.repeat(64), decodedFrames: 24 },
         originalChat: { interrupted: taskChat, approval: taskChat, completed: taskChat, artifactButtonClicked: true } } }
   }
   assert.equal(validateWindowsUiReport(evidence, identity, { requireVideoEvaluation: true }), true)
@@ -97,6 +98,9 @@ test('the exact private video scope requires the real skill, document, recovery,
   const redirected = structuredClone(evidence)
   redirected.marketplace.videoShotcraft.render.originalChat.approval.taskWorkbenchLinks = 1
   assert.throws(() => validateWindowsUiReport(redirected, identity, { requireVideoEvaluation: true }))
+  const skippedFrame = structuredClone(evidence)
+  skippedFrame.marketplace.videoShotcraft.render.decoder.decodedFrames--
+  assert.throws(() => validateWindowsUiReport(skippedFrame, identity, { requireVideoEvaluation: true }))
 })
 
 test('the optional Windows fixtures load without evaluating the awaiting UI driver', () => {
