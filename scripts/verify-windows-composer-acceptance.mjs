@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { psQuote } from './verify-windows-install-smoke.mjs'
 
@@ -58,28 +58,44 @@ function observeAttachmentLayout(expectedName) {
     editor: rect(textarea), strip: rect(panel), composer: rect(composer), send: sendBounds, viewport: { width: innerWidth, height: innerHeight, devicePixelRatio },
     actionAtCenter: send.contains(document.elementFromPoint(sendBounds.left + sendBounds.width / 2, sendBounds.top + sendBounds.height / 2)),
     validSuffix: expectedFile?.querySelector('[aria-hidden]:last-child')?.textContent === '.pdf',
+    sameNameCount: [...list.querySelectorAll('.ds-chat-attachment-filename')].filter(node => node.title === 'Attachment notes.txt').length,
+    thumbnailCount: [...list.querySelectorAll('.ds-composer-attachment-icon img')].filter(img => img.complete && img.naturalWidth > 0).length,
     hiddenFailureSignaled: panel.querySelector('.ds-composer-attachment-toggle')?.textContent.includes('项需要处理')
   }
 }
 
 async function verifyMixedAttachmentLayout(cdp, workspace, invalidPath) {
   const filename = `${'合成工程现场监测成果复核资料'.repeat(5)}.pdf`
-  const files = [join(workspace, filename), join(workspace, '附件说明.txt'), invalidPath,
-    ...Array.from({ length: 5 }, (_, index) => join(workspace, `合成附件-${index + 1}.txt`))]
-  await Promise.all([writeFile(files[0], createChineseTextPdf()),
-    ...files.filter(file => file.endsWith('.txt')).map(file => writeFile(file, '合成附件，供布局验收。'))])
+  const directories = ['本期', '上期'].map(name => join(workspace, name))
+  await Promise.all(directories.map(directory => mkdir(directory)))
+  const documentPath = join(workspace, filename)
+  const imagePath = join(workspace, '合成示意图.png')
+  const textPaths = [
+    ...directories.map(directory => join(directory, 'Attachment notes.txt')),
+    join(workspace, `${'Long field inspection notes and approved revisions '.repeat(2)}.txt`),
+    join(workspace, '合成附件说明.txt'),
+    join(workspace, '合成复核附件.txt')
+  ]
+  const files = [documentPath, textPaths[0], invalidPath, imagePath, ...textPaths.slice(1)]
+  const image = await readFile(new URL('../fixtures/markdown-workbench/assets/diagram.png', import.meta.url))
+  await Promise.all([writeFile(documentPath, createChineseTextPdf('工程附件布局验收')),
+    writeFile(imagePath, image),
+    ...textPaths.map((file, index) => writeFile(file, `合成附件 ${index + 1}，供布局验收。`))])
   const prompt = '保留这段输入，核对附件排版。'
   await cdp.fill(composer, prompt)
   await chooseFiles(cdp, files)
   await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${files.length} &&
-    [...document.querySelectorAll(${literal(attachmentItem)})].filter(row => row.querySelector('[aria-label="在文件夹中显示原件"]')).length === ${files.length - 1} &&
+    [...document.querySelectorAll(${literal(attachmentItem)})].filter(row => row.querySelector('[aria-label="在文件夹中显示原件"]')).length === ${files.length - 2} &&
+    [...document.querySelectorAll(${literal(attachmentItem)} + ' img')].some(img => img.complete && img.naturalWidth > 0) &&
     ${observeAttachment(invalidName, "item.textContent.includes('读取失败')")}`, 'mixed attachment batch loaded with one damaged file', 120_000)
   const expression = `(${observeAttachmentLayout.toString()})(${literal(filename)})`
   const collapsed = await cdp.evaluate(expression)
   assert.equal(collapsed.expanded, false)
   assert.ok(collapsed.visibleRows > 0 && collapsed.visibleRows <= 2)
-  assert.equal(collapsed.validSuffix, true)
-  assert.equal(collapsed.hiddenFailureSignaled, true)
+  assert.equal(collapsed.validSuffix, true, 'The selected long PDF name and its extension must remain available')
+  assert.equal(collapsed.sameNameCount, 2, 'Two distinct files with the same name must remain separate')
+  assert.equal(collapsed.thumbnailCount, 1, 'The image must show a loaded thumbnail')
+  assert.equal(collapsed.hiddenFailureSignaled, true, 'The collapsed list must report the damaged attachment')
   assert.ok(collapsed.listHeight <= 60)
   const toggle = `${attachmentPanel} .ds-composer-attachment-toggle`
   await cdp.click(toggle)
@@ -105,8 +121,8 @@ async function verifyMixedAttachmentLayout(cdp, workspace, invalidPath) {
   return { collapsed, expanded, preservedDraft: true }
 }
 
-export function createChineseTextPdf() {
-  const glyphs = Array.from(fontMap)
+export function createChineseTextPdf(contentText = fontMap) {
+  const glyphs = Array.from(contentText)
   const map = [
     '/CIDInit /ProcSet findresource begin 12 dict begin begincmap',
     '/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def',
