@@ -17,6 +17,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_docling_conversion:
+        description: 'Run focused Docling startup and mirrored CSV backend checks plus native Superpowers and Blender skill calls.'
+        type: boolean
+        required: false
+        default: false
       run_browser_startup_diagnostic:
         description: 'Collect isolated pinned daemon startup diagnostics only; no application, model or task execution'
         type: boolean
@@ -103,6 +108,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_docling_conversion:
+        description: 'Run focused Docling startup and mirrored CSV backend checks plus native Superpowers and Blender skill calls.'
+        type: boolean
+        required: false
+        default: false
       run_private_video_evaluation:
         description: 'Privately evaluate the installed Video Shotcraft Skill using separately provisioned Remotion and synthetic media. No license or binaries are distributed.'
         type: boolean
@@ -128,7 +138,7 @@ jobs:
     if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.upgrade_059_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
-    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || inputs.run_composer_acceptance && 35 || inputs.run_browser_execution && 25 || 15 }}
+    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || (inputs.run_composer_acceptance || inputs.run_docling_conversion) && 35 || inputs.run_browser_execution && 25 || 15 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -141,6 +151,9 @@ jobs:
       - name: Preserve the isolated cold marketplace profile
         if: (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation) && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance)
         run: throw 'Cold marketplace acceptance must use its own clean profile'
+      - name: Preserve the isolated focused marketplace profile
+        if: inputs.run_docling_conversion && (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation || inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.run_startup_appearance)
+        run: throw 'Focused marketplace acceptance must use its own clean profile'
       - name: Require the original package build ID
         if: ${{ inputs.package_run_id == '' }}
         run: throw 'package_run_id is required to inspect an existing package'
@@ -175,6 +188,7 @@ jobs:
           RAILWISE_WINDOWS_TASK_SMOKE: ${{ inputs.run_task_execution }}
           RAILWISE_WINDOWS_BROWSER_SMOKE: ${{ inputs.run_browser_execution }}
           RAILWISE_WINDOWS_MIRROR_SMOKE: ${{ inputs.run_mirror_acceptance }}
+          RAILWISE_WINDOWS_DOCLING_CONVERSION: ${{ inputs.run_docling_conversion }}
           RAILWISE_WINDOWS_VIDEO_EVALUATION: ${{ inputs.run_private_video_evaluation }}
           RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE: ${{ inputs.run_startup_appearance }}
           RAILWISE_WINDOWS_COMPOSER_SMOKE: ${{ inputs.run_composer_acceptance }}

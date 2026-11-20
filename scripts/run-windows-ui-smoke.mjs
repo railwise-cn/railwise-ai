@@ -424,7 +424,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -437,6 +437,27 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
   assert.equal(report.errors.length, 0)
+  if (requireDoclingConversion) {
+    assert.ok(report.checks.includes('installed-chinese-renderer'))
+    assert.ok(report.checks.includes('cold-mirror-docling-backend-and-two-skill-calls'))
+    const marketplace = report.marketplace
+    assert.equal(marketplace.status, 'passed')
+    assert.equal(marketplace.scope, 'docling-and-two-installed-skills')
+    assert.deepEqual(marketplace.installed.map(item => item.id), ['superpowers', 'blender-skills', 'docling-mcp'])
+    assert.ok(marketplace.docling.toolsDiscovered > 0)
+    assert.equal(marketplace.docling.csvBackend.method, 'direct-mirrored-csv-backend')
+    assert.equal(marketplace.docling.csvBackend.preservedChineseCells, true)
+    assert.equal(marketplace.docling.csvBackend.artifactSha256, marketplace.installed[2].artifactSha256)
+    for (const [skill, id] of [[marketplace.superpowers, 'using-superpowers'], [marketplace.blender, 'blender-director']]) {
+      assert.equal(skill.runtimeSkillId, id)
+      assert.equal(skill.executedInConversation, true)
+      assert.equal(skill.installedResourceRead, true)
+      assert.match(skill.entrySha256, /^[a-f0-9]{64}$/)
+    }
+    assert.equal(marketplace.superpowers.offline, true)
+    assert.notEqual(marketplace.superpowers.turnId, marketplace.blender.turnId)
+    return true
+  }
   if (requireVideoEvaluation) {
     assert.ok(report.checks.includes('installed-chinese-renderer'))
     assert.ok(report.checks.includes('installed-video-skill-protocol-render-registered-and-decoded'))
@@ -2593,9 +2614,10 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
   }
 }
 
-export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true' }) {
+export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true', doclingConversion = process.env.RAILWISE_WINDOWS_DOCLING_CONVERSION === 'true' }) {
   taskSmoke ||= browserSmoke
   assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
+  assert.ok(!doclingConversion || !(taskSmoke || mirrorSmoke || videoEvaluation || composerSmoke), 'Use a clean profile for focused marketplace acceptance')
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
   }
@@ -2614,9 +2636,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     .then(module => module.startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput)) : undefined
   const composerModule = composerSmoke ? await import('./verify-windows-composer-acceptance.mjs') : undefined
   const composerAcceptance = composerModule?.createComposerModelAcceptance()
-  const marketplaceModule = mirrorSmoke ? await import('./verify-windows-cold-marketplace.mjs') : undefined
+  const marketplaceModule = mirrorSmoke || doclingConversion ? await import('./verify-windows-cold-marketplace.mjs') : undefined
   const marketplaceAcceptance = marketplaceModule?.createMarketplaceModelAcceptance()
-  const taskModel = video ?? (taskSmoke || mirrorSmoke || composerSmoke ? await startWindowsTaskModelFixture({
+  const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke ? await startWindowsTaskModelFixture({
     browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke,
     composerAcceptance: composerAcceptance ?? marketplaceAcceptance
   }) : undefined)
@@ -2694,6 +2716,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: true })
       report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
       report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
+    } else if (doclingConversion) {
+      report.marketplace = await marketplaceModule.verifyWindowsColdMarketplace(cdp, {
+        workspace, environment, ownedRoot: root, focused: true, acceptance: marketplaceAcceptance
+      })
+      report.checks.push('cold-mirror-docling-backend-and-two-skill-calls')
     } else await verifyFullWorkbench()
 
     async function verifyFullWorkbench() {
@@ -3331,7 +3358,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel?.observed) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation }); report.status = 'passed' } catch (error) {
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }

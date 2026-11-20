@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import { lstat, readFile, realpath, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { isAbsolute, join, relative, sep } from 'node:path'
+import { isAbsolute, join, relative, sep, win32 } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
@@ -68,6 +68,37 @@ async function invokeInstalledPlaywright(server, workspace, environment) {
     await client.close()
     await new Promise(done => { page.close(done); page.closeAllConnections() })
   }
+}
+
+async function verifyInstalledDoclingCsvBackend(cdp, { workspace, environment, ownedRoot }) {
+  const server = await cdp.evaluate(`window.workwise.listMcpServers(${literal(workspace)}).then(all=>all.find(row=>row.id==='docling-mcp-server'))`)
+  const installed = await cdp.evaluate("window.workwise.listInstalledPlugins().then(all=>all.find(row=>row.packageId==='docling-mcp'))")
+  assert.equal(server?.source, 'managed-tool')
+  assert.equal(server?.transport, 'stdio')
+  assert.deepEqual(server.args.slice(3), ['docling-mcp', 'docling-mcp-server', '--transport', 'stdio'])
+  const command = await realpath(server.command)
+  const artifact = await realpath(installed.artifact.location)
+  const sitePackages = await realpath(server.args[2])
+  assert.ok(containment(await realpath(ownedRoot), command))
+  assert.ok(containment(artifact, sitePackages))
+  const marker = `RailWise-Docling-${randomUUID()}`
+  const file = join(workspace, 'Docling synthetic table.csv')
+  await writeFile(file, `项目,值\n${marker},42\n`)
+  const probe = `
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from docling.backend.csv_backend import CsvDocumentBackend
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.document import InputDocument
+source = InputDocument(path_or_stream=Path(sys.argv[2]), format=InputFormat.CSV, backend=CsvDocumentBackend)
+print(source._backend.convert().export_to_markdown())
+`
+  const markdown = execFileSync(command, ['-I', '-B', '-X', 'utf8', '-c', probe, win32.toNamespacedPath(sitePackages), file],
+    { cwd: workspace, env: environment, encoding: 'utf8', timeout: 30_000, windowsHide: true, maxBuffer: 64_000 })
+  for (const text of ['项目', '值', marker, '42']) assert.ok(markdown.includes(text), 'The verified Docling backend must preserve the synthetic CSV contents')
+  return { method: 'direct-mirrored-csv-backend', fixture: 'synthetic-utf8-csv', preservedChineseCells: true,
+    documentConversionTool: 'requires-configured-docling-serve-or-local-extra', artifactSha256: installed.artifact.sha256 }
 }
 
 export function createMarketplaceModelAcceptance() {
@@ -140,10 +171,8 @@ async function verifyMarketplaceSkillExecution(cdp, { composer, label, skill, sc
   const probe = acceptance.expectSkill({ skill, entry: entry.toString('utf8') })
   assert.equal(skill.scope, scope)
 
-  const threadList = "window.workwise.runtimeRequest('/v1/threads','GET').then(result=>JSON.parse(result.body).threads)"
-  const previousThreads = (await cdp.evaluate(threadList)).map(thread => thread.id)
   await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
-  const threadId = await cdp.wait(`${threadList}.then(items=>items.find(item=>!${literal(previousThreads)}.includes(item.id))?.id)`, 'new owned market validation chat')
+  await cdp.wait(`document.querySelector(${literal(composer)})?.value === ''`, 'the empty market validation chat composer')
   const prompt = `${probe.marker} 请阅读所选技能的使用说明。`
   await selectMarketplaceSkill(cdp, composer, skill.id, label)
   await cdp.fill(composer, prompt)
@@ -153,11 +182,18 @@ async function verifyMarketplaceSkillExecution(cdp, { composer, label, skill, sc
   await cdp.wait(`document.body.innerText.includes(${literal(probe.reply)}) &&
     Array.from(document.querySelectorAll('[data-loaded-skill]')).some(chip=>chip.textContent.includes(${literal(label)}))`,
     `the ${label} real resource read and loaded skill badge`, 120_000)
-  const threadPath = `/v1/threads/${encodeURIComponent(threadId)}`
-  const turn = await cdp.wait(`window.workwise.runtimeRequest(${literal(threadPath)},'GET').then(result=>{
-    const turns = JSON.parse(result.body).turns;
-    return result.ok && turns.find(turn=>turn.prompt === ${literal(prompt)} && turn.status === 'completed');
-  })`, `the completed ${label} turn receipt`, 30_000)
+  // New chat reuses an untouched draft, which may only be listed after Send.
+  const turn = await cdp.wait(`(async () => {
+    const list = await window.workwise.runtimeRequest('/v1/threads','GET');
+    if (!list.ok) return null;
+    for (const {id} of JSON.parse(list.body).threads) {
+      const result = await window.workwise.runtimeRequest('/v1/threads/' + encodeURIComponent(id),'GET');
+      if (!result.ok) continue;
+      const turn = JSON.parse(result.body).turns.find(item=>item.prompt === ${literal(prompt)} && item.status === 'completed');
+      if (turn) return turn;
+    }
+    return null;
+  })()`, `the completed ${label} turn receipt`, 30_000)
   assert.ok(turn.activeSkillIds.includes(skill.id) && turn.skillInjectionBytes > 0)
   assert.ok(turn.capabilityReferences.some(reference => reference.kind === 'skill' && reference.id === skill.id))
   assert.ok(turn.items.some(item => item.kind === 'tool_result' && item.callId === `${skill.id}-market-read`))
@@ -166,14 +202,16 @@ async function verifyMarketplaceSkillExecution(cdp, { composer, label, skill, sc
     entrySha256: createHash('sha256').update(entry).digest('hex'), installedResourceRead: true, turnId: turn.id }
 }
 
-export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot, videoOnly = false, acceptance }) {
+export async function verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot, videoOnly = false, focused = false, acceptance }) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' &&
     process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_OS === 'Windows', 'Use only an ephemeral hosted Windows acceptance runner')
   assert.ok(containment(await realpath(process.env.RUNNER_TEMP), await realpath(ownedRoot)))
   const lock = JSON.parse(await readFile(new URL('../src/shared/marketplace-mirror-lock.json', import.meta.url), 'utf8'))
   const expected = new Map(lock.packages.filter(row => row.platform === 'win32' && row.arch === 'x64').map(row => [row.packageId, row]))
   assert.ok(expected.size, 'The exact release requires a complete Windows marketplace lock')
-  const selection = videoOnly ? new Map([['video-shotcraft', expected.get('video-shotcraft')]]) : expected
+  const focusedIds = ['superpowers', 'blender-skills', 'docling-mcp']
+  const onlyIds = videoOnly ? ['video-shotcraft'] : focused ? focusedIds : null
+  const selection = onlyIds ? new Map(onlyIds.map(id => [id, expected.get(id)])) : expected
 
   return withPublicUpstreamsBlocked(async () => {
     const catalog = (await cdp.evaluate('window.workwise.listCatalogPackages()')).packages
@@ -217,18 +255,20 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     }
 
     const scope = `/v1/skills?${new URLSearchParams({ scope: 'available', workspace })}`
-    const current = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result=>result.ok&&JSON.parse(result.body).skills.find(row=>row.name==='video-shotcraft'))`, 'Video Shotcraft loaded in the active workspace', 90_000)
-    const skill = await readFile(join(current.root, 'SKILL.md'))
-    const videoArtifact = await cdp.evaluate(`window.workwise.listInstalledPlugins().then(all=>all.find(row=>row.packageId==='video-shotcraft'))`)
-    assert.ok(containment(await realpath(videoArtifact.artifact.location), await realpath(join(current.root, 'SKILL.md'))),
-      'The runtime Skill entry must be inside the reviewed installed mirror payload')
-    assert.match(skill.toString('utf8'), /^name:\s*video-shotcraft\s*$/m)
-    await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
     const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
-    await verifyMarketplaceSkillSelection(cdp, composer, current.id, 'Video Shotcraft')
-    const evidence = { status: 'passed', releaseComplete: false, blockedHosts, installed: reports,
-      videoShotcraft: { runtimeSkillId: current.id, slashSelectionVerified: true, entrySha256: createHash('sha256').update(skill).digest('hex'),
-        render: 'pending-licensed-remotion-and-video-runtime' } }
+    const evidence = { status: 'passed', releaseComplete: false, blockedHosts, installed: reports }
+    if (!focused) {
+      const current = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result=>result.ok&&JSON.parse(result.body).skills.find(row=>row.name==='video-shotcraft'))`, 'Video Shotcraft loaded in the active workspace', 90_000)
+      const skill = await readFile(join(current.root, 'SKILL.md'))
+      const videoArtifact = await cdp.evaluate(`window.workwise.listInstalledPlugins().then(all=>all.find(row=>row.packageId==='video-shotcraft'))`)
+      assert.ok(containment(await realpath(videoArtifact.artifact.location), await realpath(join(current.root, 'SKILL.md'))),
+        'The runtime Skill entry must be inside the reviewed installed mirror payload')
+      assert.match(skill.toString('utf8'), /^name:\s*video-shotcraft\s*$/m)
+      await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
+      await verifyMarketplaceSkillSelection(cdp, composer, current.id, 'Video Shotcraft')
+      evidence.videoShotcraft = { runtimeSkillId: current.id, slashSelectionVerified: true, entrySha256: createHash('sha256').update(skill).digest('hex'),
+        render: 'pending-licensed-remotion-and-video-runtime' }
+    }
     if (videoOnly) return { ...evidence, scope: 'video-shotcraft' }
 
     const getRuntimeServer = id => `window.workwise.runtimeRequest('/v1/runtime/tools','GET').then(result=>{
@@ -237,11 +277,17 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
       return row?.enabled&&row.available&&row.status==='connected'&&row.toolCount>0?row.toolCount:null;
     })`
     const doclingTools = await cdp.wait(getRuntimeServer('docling-mcp-server'), 'the installed Docling MCP starting from its locked wheelhouse', 150_000)
-    await cdp.wait(getRuntimeServer('playwright-mcp-server'), 'the installed Playwright MCP in KUN', 90_000)
-    const server = await cdp.evaluate(`window.workwise.listMcpServers(${literal(workspace)}).then(all=>all.find(row=>row.id==='playwright-mcp-server'))`)
-    assert.equal(server?.source, 'managed-tool')
-    assert.equal(server?.transport, 'stdio')
-    const playwright = await invokeInstalledPlaywright(server, workspace, environment)
+    const docling = { toolsDiscovered: doclingTools }
+    if (focused) {
+      evidence.scope = 'docling-and-two-installed-skills'
+      docling.csvBackend = await verifyInstalledDoclingCsvBackend(cdp, { workspace, environment, ownedRoot })
+    } else {
+      await cdp.wait(getRuntimeServer('playwright-mcp-server'), 'the installed Playwright MCP in KUN', 90_000)
+      const server = await cdp.evaluate(`window.workwise.listMcpServers(${literal(workspace)}).then(all=>all.find(row=>row.id==='playwright-mcp-server'))`)
+      assert.equal(server?.source, 'managed-tool')
+      assert.equal(server?.transport, 'stdio')
+      evidence.playwright = await invokeInstalledPlaywright(server, workspace, environment)
+    }
     const superpowers = await cdp.wait(`window.workwise.runtimeRequest(${literal(scope)},'GET').then(result =>
       result.ok && JSON.parse(result.body).skills.find(row => row.id === 'using-superpowers' && row.scope === 'project'))`,
       'Superpowers loaded in the workspace that installed it', 90_000)
@@ -256,7 +302,7 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
       composer, label: 'Blender Director', skill: blender, scope: 'global', packageId: 'blender-skills', acceptance
     })
 
-    return { ...evidence, playwright, docling: { toolsDiscovered: doclingTools },
+    return { ...evidence, docling,
       superpowers: { ...superpowersExecution, offline: true }, blender: blenderExecution }
   })
 }
