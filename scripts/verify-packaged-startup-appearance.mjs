@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { lstat, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, rename, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { setTimeout as wait } from 'node:timers/promises'
@@ -15,6 +15,17 @@ export const windowsStartupCases = [
 ]
 
 const narrowWindowBounds = { width: 960, height: 640 }
+const cdpOperationMs = 5_000
+
+export async function waitForStartupCondition(cdp, expression, label, timeout) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    const result = await cdp.evaluate(expression, Math.min(cdpOperationMs, Math.max(1, deadline - Date.now())))
+    if (result) return result
+    await wait(Math.min(75, Math.max(0, deadline - Date.now())))
+  }
+  throw new Error(`Installed UI did not show ${label}`)
+}
 
 function visibleWorkbenchText(selector) {
   for (const control of document.querySelectorAll(selector)) {
@@ -33,22 +44,22 @@ const workbenchTypographyTargets = '.ds-sidebar-shell button.w-full, .ds-floatin
 
 export async function observeWorkbenchTypography(cdp, selector = workbenchTypographyTargets) {
   const locate = `(${visibleWorkbenchText.toString()})(${JSON.stringify(selector)})`
-  await cdp.wait(`Boolean(${locate})`, 'representative visible workbench text')
+  await waitForStartupCondition(cdp, `Boolean(${locate})`, 'representative visible workbench text', 12_000)
   const page = await cdp.evaluate(`document.fonts.ready.then(() => {
     const node = ${locate};
     const style = getComputedStyle(node);
     return {fontFamily:style.fontFamily,fontSize:style.fontSize,lineHeight:style.lineHeight,devicePixelRatio,window:{width:innerWidth,height:innerHeight}};
-  })`)
+  })`, cdpOperationMs)
   assert.match(page.fontFamily, /RailWise UI/)
-  await cdp.send('DOM.enable')
-  await cdp.send('CSS.enable')
-  await cdp.send('DOM.getDocument')
-  const target = await cdp.send('Runtime.evaluate', { expression: locate })
+  await cdp.send('DOM.enable', {}, cdpOperationMs)
+  await cdp.send('CSS.enable', {}, cdpOperationMs)
+  await cdp.send('DOM.getDocument', {}, cdpOperationMs)
+  const target = await cdp.send('Runtime.evaluate', { expression: locate }, cdpOperationMs)
   assert.ok(target.result.objectId, 'Expected a visible workbench text element')
-  const { nodeId } = await cdp.send('DOM.requestNode', { objectId: target.result.objectId })
+  const { nodeId } = await cdp.send('DOM.requestNode', { objectId: target.result.objectId }, cdpOperationMs)
   assert.ok(nodeId, 'Expected a rendered workbench text node')
-  const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId })
-  await cdp.send('Runtime.releaseObject', { objectId: target.result.objectId })
+  const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId }, cdpOperationMs)
+  await cdp.send('Runtime.releaseObject', { objectId: target.result.objectId }, cdpOperationMs)
   assert.ok(fonts.some(font => font.isCustomFont && /Noto\s*Sans\s*SC/i.test(font.familyName) && font.glyphCount > 0),
     `The bundled Noto Sans SC font must draw actual workbench glyphs: ${JSON.stringify(fonts)}`)
   return { ...page, fonts }
@@ -168,7 +179,7 @@ async function observeNarrowWorkbench(cdp, { pid, env, scale }) {
     assert.equal(nativeBounds({ ...original, ...narrowWindowBounds, windowState: 'normal' }).ownerVerified, true)
     resizeMethod = 'verified-pid-native-window'
   }
-  const geometry = await cdp.wait(`(() => {
+  const geometry = await waitForStartupCondition(cdp, `(() => {
     const state = (${observeComposerGeometry.toString()})();
     return state && Math.abs(state.viewport.width - ${narrowWindowBounds.width}) <= 24 && state;
   })()`, 'real composer at the minimum Windows workbench width', 15_000)
@@ -260,7 +271,7 @@ export async function observeStartupTargets({ listTargets, connectCdp, needsScre
 
 export async function observeInstalledStartup(options, expected, dependencies) {
   const { executable, version, evidenceDir, temporary } = options
-  const { connectCdp, environmentForRoot } = dependencies
+  const { connectCdp, environmentForRoot, checkpoint = async () => {} } = dependencies
   const root = await mkdtemp(join(temporary, 'railwise-splash-'))
   const profile = join(root, 'profile')
   const workspace = join(root, 'workspace')
@@ -272,6 +283,7 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
     agents: { kun: { autoStart: false, dataDir: join(root, 'runtime') } } }))
   const port = await startupDebugPort()
+  await checkpoint('launching')
   const child = spawn(executable, [`--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1',
     `--lang=${expected.htmlLang}`, ...(expected.scale === undefined ? [] : [`--force-device-scale-factor=${expected.scale}`]),
     ...(expected.theme === 'dark' ? ['--force-dark-mode'] : [])],
@@ -294,20 +306,25 @@ export async function observeInstalledStartup(options, expected, dependencies) {
       assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
       await writeFile(join(evidenceDir, expected.screenshotName), screenshot)
     }
-    await main.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
+    await checkpoint('visible-splash-verified', { viewport: observation.viewport, screenshot: expected.screenshotName })
+    await waitForStartupCondition(main, `Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
+    await checkpoint('visible-workbench-verified', { version })
     if (process.platform === 'win32' && version === '0.5.10' && expected.screenshotName) {
-      observation.releaseHighlights = await main.wait(`(() => {
+      observation.releaseHighlights = await waitForStartupCondition(main, `(() => {
         const section = document.querySelector('main section[aria-label="本版更新"]');
         const bounds = section?.getBoundingClientRect();
         return bounds?.width > 0 && bounds.height > 0 && bounds.top >= 0 && bounds.bottom <= innerHeight &&
           getComputedStyle(section).visibility === 'visible' && section.innerText.includes('0.5.10') &&
           { title: section.getAttribute('aria-label'), version: '0.5.10', visibleOnFirstOpen: true };
       })()`, 'the visible 0.5.10 release highlights on first open', 12_000)
+      await checkpoint('release-highlights-verified', observation.releaseHighlights)
     }
     observation.workbenchTypography = await observeWorkbenchTypography(main)
+    await checkpoint('bundled-font-verified', observation.workbenchTypography)
     if (expected.narrowWorkbench) {
       observation.narrowWorkbench = await observeNarrowWorkbench(main, { pid: child.pid, env, scale: expected.scale })
+      await checkpoint('minimum-width-layout-verified', { viewport: observation.narrowWorkbench.viewport })
     }
   } finally {
     if (main) {
@@ -323,8 +340,13 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     while (child.pid && child.exitCode === null && child.signalCode === null && Date.now() < deadline) await wait(80)
     if (child.pid && child.exitCode === null && child.signalCode === null) {
       if (process.platform === 'win32') {
-        const cleanup = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
-        await new Promise(done => { cleanup.once('close', done); cleanup.once('error', done) })
+        try {
+          execFileSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: cdpOperationMs })
+        } catch (error) {
+          await wait(100)
+          if (child.exitCode === null && child.signalCode === null) throw new Error('The owned startup process did not exit during bounded cleanup', { cause: error })
+        }
+        await wait(100)
       } else {
         child.kill('SIGTERM')
         await wait(800)
@@ -340,12 +362,14 @@ export async function observeStartupWithCaptureRetry(options, expected, dependen
   const missedCaptures = []
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      return { ...await observeInstalledStartup(options, expected, dependencies), captureAttempts: attempt }
+      return { ...await observeInstalledStartup(options, expected, { ...dependencies,
+        checkpoint: (stage, details) => dependencies.checkpoint?.(attempt, stage, details) }), captureAttempts: attempt }
     } catch (error) {
       // A DevTools target can disappear while the real 1.2-second splash is
       // being attached. Retry only that missed capture in a fresh profile.
       if (error?.message !== missedStartupCapture) throw error
       missedCaptures.push(error.diagnostics)
+      await dependencies.checkpoint?.(attempt, 'splash-capture-missed', error.diagnostics)
       if (attempt === 3) throw Object.assign(error, { diagnostics: missedCaptures })
     }
   }
@@ -362,28 +386,45 @@ export async function runWindowsStartupAppearanceSmoke({ executable, version, so
   const identity = installIdentity(version, sourceHead)
   const installed = inspectInstalledPackage(dirname(executable), identity)
   await mkdir(evidenceDir, { recursive: true })
-  const report = { schemaVersion: 1, scope: 'private-exact-package-startup-appearance', status: 'failed',
-    sourceHead, version, provenance, installedAsarSha256: installed.asarSha256, observations: [], productionTouched: false }
+  const report = { schemaVersion: 1, scope: 'private-exact-package-startup-appearance', status: 'running',
+    sourceHead, version, provenance, installedAsarSha256: installed.asarSha256, observations: [], cases: [], productionTouched: false }
+  const reportPath = join(evidenceDir, 'windows-startup-appearance.json')
+  const writeReport = async () => {
+    await writeFile(`${reportPath}.tmp`, `${JSON.stringify(report, null, 2)}\n`)
+    await rename(`${reportPath}.tmp`, reportPath)
+  }
   try {
     const errors = []
     for (const expected of windowsStartupCases) {
+      const result = { locale: expected.locale, theme: expected.theme, scale: expected.scale, status: 'running', checkpoints: [] }
+      report.cases.push(result)
       try {
         report.observations.push(await observeStartupWithCaptureRetry({ executable, version, evidenceDir, temporary }, expected, {
-          connectCdp: dependencies.connectCdp, environmentForRoot: dependencies.windowsUiEnvironment
+          connectCdp: dependencies.connectCdp, environmentForRoot: dependencies.windowsUiEnvironment,
+          checkpoint: async (attempt, stage, details) => {
+            result.checkpoints.push({ attempt, stage, time: new Date().toISOString(), details })
+            await writeReport()
+          }
         }))
+        result.status = 'passed'
       } catch (error) {
-        errors.push(`${expected.locale} ${expected.theme} ${expected.scale}: ${error.message}${error.diagnostics ? ` (${JSON.stringify(error.diagnostics)})` : ''}`)
+        result.status = 'failed'
+        result.error = error.message
+        result.diagnostics = error.diagnostics
+        errors.push(`${expected.locale} ${expected.theme} ${expected.scale}: ${result.error}`)
       }
+      await writeReport()
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === installed.asarSha256
     assert.equal(report.packageUnchanged, true)
     assert.deepEqual(errors, [], 'Each startup and workbench case must pass')
     report.status = 'passed'
   } catch (error) {
+    report.status = 'failed'
     report.error = error.message
     throw error
   } finally {
-    await writeFile(join(evidenceDir, 'windows-startup-appearance.json'), `${JSON.stringify(report, null, 2)}\n`)
+    await writeReport()
   }
   return report
 }

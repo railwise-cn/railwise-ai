@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
 import { validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
-import { observeStartupTargets, observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
+import { observeStartupTargets, observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, waitForStartupCondition, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const dark = { htmlLang: 'zh-CN', theme: 'dark', scale: 1.25 }
@@ -84,6 +84,18 @@ test('reports a seen but hidden splash as a missed real capture', async () => {
   assert.deepEqual(closed, ['renderer', 'splash'])
 })
 
+test('startup readiness limits each renderer evaluation to the remaining stage time', async () => {
+  const budgets = []
+  const cdp = { evaluate: async (expression, budget) => {
+    assert.equal(expression, 'ready')
+    budgets.push(budget)
+    return false
+  } }
+  await assert.rejects(waitForStartupCondition(cdp, 'ready', 'the actual ready window', 30), /actual ready window/)
+  assert.ok(budgets.length > 0)
+  assert.ok(budgets.every(budget => budget > 0 && budget <= 30))
+})
+
 test('startup typography inspects a real composer label when the compact sidebar is hidden', async () => {
   const { Window } = await import('happy-dom')
   const window = new Window()
@@ -98,9 +110,12 @@ test('startup typography inspects a real composer label when the compact sidebar
     }
     Object.defineProperty(window.document, 'fonts', { value: { ready: Promise.resolve() } })
     const cdp = {
-      wait: async expression => assert.equal(window.eval(expression), true),
-      evaluate: async expression => window.eval(expression),
-      send: async (method, parameters) => {
+      evaluate: async (expression, budget) => {
+        assert.ok(budget > 0 && budget <= 5000)
+        return window.eval(expression)
+      },
+      send: async (method, parameters, budget) => {
+        assert.ok(budget > 0 && budget <= 5000)
         if (method === 'Runtime.evaluate') {
           assert.equal(window.eval(parameters.expression), label)
           return { result: { objectId: 'composed-label' } }
