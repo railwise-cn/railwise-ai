@@ -212,7 +212,11 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     observation.workbenchTypography = workbenchTypography
     if (workbook) observation.workbook = workbook
     if (expected.screenshotName) {
-      assert.ok(screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), 'Actual startup screenshot is missing')
+      if (!screenshot?.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) {
+        const error = new Error('Actual startup screenshot is missing')
+        error.code = 'STARTUP_CAPTURE_MISSED'
+        throw error
+      }
     }
   } catch (error) {
     failure = error.message

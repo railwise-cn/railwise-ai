@@ -5,7 +5,7 @@ import { WebSocketServer } from 'ws'
 import { connectCdp, dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
 import { observeMacStartupCase, parseMacCandidateChecksums, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { createStartupTargetObserver, validateStartupAppearance } from './verify-packaged-startup-appearance.mjs'
-import { selectMacWorkbookCell } from './verify-mac-workbook.mjs'
+import { macWorkbookCanvasPoint, selectMacWorkbookCell } from './verify-mac-workbook.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const dark = { htmlLang: 'zh-CN', theme: 'dark', scale: 1.25 }
@@ -141,8 +141,8 @@ test('startup retries never hide geometry or primary Chinese workbook failures',
 test('Mac workbook navigation uses the real address control and native Command+A instead of canvas offsets', async () => {
   const input = []
   const cdp = {
-    wait: async (_expression, label) => label === 'the actual workbook address input'
-      ? { point: { x: 173, y: 214 }, rect: { x: 150, y: 204, width: 46, height: 20 }, zoom: '0.9' } : true,
+    wait: async (_expression, label) => label === 'the actual workbook cell target'
+      ? { kind: 'address', point: { x: 173, y: 214 }, rect: { x: 150, y: 204, width: 46, height: 20 }, zoom: '0.9' } : true,
     send: async (method, parameters) => { input.push({ method, ...parameters }) }
   }
   const target = await selectMacWorkbookCell(cdp, 'B2')
@@ -153,6 +153,28 @@ test('Mac workbook navigation uses the real address control and native Command+A
   assert.deepEqual(input.find(value => value.method === 'Input.insertText'), { method: 'Input.insertText', text: 'B2' })
   assert.deepEqual(input.slice(-2).map(value => [value.type, value.key]), [['rawKeyDown', 'Enter'], ['keyUp', 'Enter']])
   await assert.rejects(selectMacWorkbookCell(cdp, '../A1'))
+})
+
+test('headerless workbook cell centers use the actual canvas scale once, including the observed .9 native geometry', () => {
+  const canvas = { rect: { x: 414, y: 110.953125, width: 609.296875, height: 539.09375 }, clientWidth: 677, clientHeight: 599 }
+  const actual = macWorkbookCanvasPoint(canvas, 'A1')
+  assert.ok(Math.abs(actual.x - 495) < 0.01)
+  assert.ok(Math.abs(actual.y - 139.753125) < 0.01)
+  const b2 = macWorkbookCanvasPoint(canvas, 'B2')
+  assert.ok(Math.abs(b2.x - 574.2) < 0.01)
+  assert.ok(Math.abs(b2.y - 161.353125) < 0.01)
+  assert.throws(() => macWorkbookCanvasPoint(canvas, 'Z999'), /outside/)
+  assert.throws(() => macWorkbookCanvasPoint({ ...canvas, clientWidth: 0 }, 'A1'), /canvas scale/)
+})
+
+test('a headerless workbook fallback selects only its measured real canvas point', async () => {
+  const input = []
+  const target = { kind: 'canvas', point: { x: 495, y: 139.75 }, zoom: '0.9', clientWidth: 677, clientHeight: 599 }
+  const cdp = { wait: async () => target, send: async (method, parameters) => { input.push({ method, ...parameters }) } }
+  assert.deepEqual(await selectMacWorkbookCell(cdp, 'A1'), { address: 'A1', ...target })
+  assert.deepEqual(input.map(value => [value.method, value.type, value.x, value.y]), [
+    ['Input.dispatchMouseEvent', 'mousePressed', 495, 139.75], ['Input.dispatchMouseEvent', 'mouseReleased', 495, 139.75]
+  ])
 })
 
 test('selects the scoped startup runner without starting regular UI or task fixtures', async () => {

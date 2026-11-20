@@ -7,22 +7,47 @@ const json = path => readFile(path, 'utf8').then(JSON.parse)
 const literal = JSON.stringify
 const addressInput = '[data-u-comp="defined-name"] input:not(:disabled)'
 
+export function macWorkbookCanvasPoint(canvas, address, layout = {}) {
+  const match = /^([A-Z]{1,3})([1-9]\d{0,5})$/.exec(address)
+  if (!match) throw new Error('Invalid workbook address')
+  const column = [...match[1]].reduce((value, letter) => value * 26 + letter.charCodeAt(0) - 64, 0) - 1
+  const row = Number(match[2]) - 1
+  const { rect, clientWidth, clientHeight } = canvas
+  const scaleX = rect.width / clientWidth, scaleY = rect.height / clientHeight
+  if (![scaleX, scaleY].every(scale => Number.isFinite(scale) && scale > 0)) throw new Error('Invalid measured canvas scale')
+  // Defaults of the pinned Univer 1.5.2 blank sheet; prefer the actual saved
+  // sheet dimensions when supplied. Coordinates remain viewport CSS pixels.
+  const x = rect.x + ((layout.rowHeader?.width ?? 46) + (column + 0.5) * (layout.defaultColumnWidth ?? 88)) * scaleX
+  const y = rect.y + ((layout.columnHeader?.height ?? 20) + (row + 0.5) * (layout.defaultRowHeight ?? 24)) * scaleY
+  if (x <= rect.x || y <= rect.y || x >= rect.x + rect.width || y >= rect.y + rect.height) throw new Error('Cell is outside the visible canvas')
+  return { x, y }
+}
+
 async function key(cdp, key, code, windowsVirtualKeyCode, modifiers = 0) {
   const event = { key, code, windowsVirtualKeyCode, modifiers }
   await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...event })
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...event })
 }
 
-export async function selectMacWorkbookCell(cdp, address) {
+export async function selectMacWorkbookCell(cdp, address, layout = {}) {
   assert.match(address, /^[A-Z]{1,3}[1-9]\d{0,5}$/)
   const target = await cdp.wait(`(() => {
     const input=document.querySelector(${literal(addressInput)});
-    if(!input?.getClientRects().length)return null;
-    const box=input.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
-    if(document.elementFromPoint(point.x,point.y)!==input)return null;
-    return {point,rect:box.toJSON(),zoom:getComputedStyle(document.documentElement).getPropertyValue('--ds-ui-scale')};
-  })()`, 'the actual workbook address input')
+    const zoom=getComputedStyle(document.documentElement).getPropertyValue('--ds-ui-scale');
+    if(input?.getClientRects().length){
+      const box=input.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
+      if(document.elementFromPoint(point.x,point.y)!==input)return null;
+      return {kind:'address',point,rect:box.toJSON(),zoom};
+    }
+    const canvas=[...document.querySelectorAll('canvas')].find(node=>node.clientWidth>200&&node.clientHeight>150&&node.getClientRects().length);
+    if(!canvas)return null;
+    const geometry={rect:canvas.getBoundingClientRect().toJSON(),clientWidth:canvas.clientWidth,clientHeight:canvas.clientHeight};
+    const point=(${macWorkbookCanvasPoint.toString()})(geometry,${literal(address)},${literal(layout)});
+    if(document.elementFromPoint(point.x,point.y)!==canvas)return null;
+    return {kind:'canvas',point,...geometry,zoom};
+  })()`, 'the actual workbook cell target')
   for (const type of ['mousePressed', 'mouseReleased']) await cdp.send('Input.dispatchMouseEvent', { type, button: 'left', clickCount: 1, ...target.point })
+  if (target.kind === 'canvas') return { address, ...target }
   await cdp.wait(`document.activeElement?.matches(${literal(addressInput)})`, 'workbook address keyboard focus')
   await key(cdp, 'a', 'KeyA', 65, 4)
   await key(cdp, 'Backspace', 'Backspace', 8)
@@ -72,6 +97,7 @@ export async function verifyMacWorkbook(cdp, { root, workspace }, evidenceDir) {
       }).catch(() => undefined) } : {}) })
   }
   try {
+    await cdp.send('Page.bringToFront')
     await cdp.send('Network.enable')
     await cdp.send('Network.setBlockedURLs', { urls: ['http://*', 'https://*'] })
     const ready = '[...document.querySelectorAll("button")].some(button=>button.textContent==="保存表格"&&!button.disabled)'
@@ -84,6 +110,19 @@ export async function verifyMacWorkbook(cdp, { root, workspace }, evidenceDir) {
     }
     const cell = (workbook, row, column) => workbook.sheets?.[workbook.sheetOrder?.[0]]?.cellData?.[row]?.[column]
 
+    let returnedFromSettings = false
+    const returnFromSettings = async () => {
+      const settingsBack = await cdp.evaluate(`Boolean([...document.querySelectorAll('button')].find(button=>button.textContent.trim()==='返回'&&button.getClientRects().length))`)
+      if (!settingsBack) return
+      assert.equal(returnedFromSettings, false, 'Unexpected repeated navigation to settings')
+      await cdp.click('button', '返回')
+      returnedFromSettings = true
+      receipt.diagnostics.push({ phase: 'returned-from-settings-through-real-back-button' })
+      await wait(300)
+    }
+
+    await wait(750)
+    await returnFromSettings()
     await cdp.click('button[aria-label="新建表格"]')
     const canvasExpression = '[...document.querySelectorAll("canvas")].map(c=>c.getBoundingClientRect().toJSON()).find(box=>box.width>200&&box.height>150)'
     await cdp.wait(ready + ' && (' + canvasExpression + ')', 'real editable workbook')
@@ -92,8 +131,13 @@ export async function verifyMacWorkbook(cdp, { root, workspace }, evidenceDir) {
     assert.ok(filename)
     original = join(workspace, filename)
     await sample('new-workbook')
+    const initialWorkbook = await readWorkbook(original)
+    const sheetLayout = initialWorkbook.sheets?.[initialWorkbook.sheetOrder?.[0]] ?? {}
+    const layout = { rowHeader: sheetLayout.rowHeader, columnHeader: sheetLayout.columnHeader,
+      defaultColumnWidth: sheetLayout.defaultColumnWidth, defaultRowHeight: sheetLayout.defaultRowHeight }
     const select = async address => {
-      const target = await selectMacWorkbookCell(cdp, address)
+      await returnFromSettings()
+      const target = await selectMacWorkbookCell(cdp, address, layout)
       receipt.diagnostics.push({ phase: 'native-cell-selection', target })
     }
     const edit = async (address, text) => {
