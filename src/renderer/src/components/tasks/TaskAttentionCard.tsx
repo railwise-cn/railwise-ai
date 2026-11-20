@@ -130,4 +130,3 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
     {error ? <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-300">{error}</p> : null}
   </div>
 }
-
