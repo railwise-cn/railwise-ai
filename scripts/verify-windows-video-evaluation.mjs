@@ -89,7 +89,7 @@ else console.log(${literal(target)});
 }
 
 function matchesPdfText(value) {
-  return typeof value === 'string' && value.replace(/[\s\u0000]/gu, '').includes(pdfText)
+  return typeof value === 'string' && value.replaceAll('\u0000', '').replace(/\s/gu, '').includes(pdfText)
 }
 
 function sectionResultStatus(result, key) {
