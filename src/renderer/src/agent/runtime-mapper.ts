@@ -1057,7 +1057,9 @@ function emitItem(
 ): void {
   // Coordinator messages are local conversation history. Older persisted
   // records have the same exact IDs but predate conversationReceiptId.
-  const conversationReceipt = /^command_[a-f0-9]{32}$/.test(item.turnId) &&
+  const markedReceipt = item.conversationReceiptId === item.turnId && /^command_[a-z0-9_-]{1,256}$/i.test(item.turnId)
+  const legacyReceipt = item.conversationReceiptId === undefined && /^command_[a-f0-9]{32}$/.test(item.turnId)
+  const conversationReceipt = (markedReceipt || legacyReceipt) &&
     (item.kind === 'user_message' && item.id === `item_${item.turnId}_user` ||
       item.kind === 'assistant_text' && item.id === `item_${item.turnId}_receipt`)
   if (conversationReceipt) {

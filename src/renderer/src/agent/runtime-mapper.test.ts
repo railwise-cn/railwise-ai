@@ -20,6 +20,27 @@ function makeSink(): ThreadEventSink {
   }
 }
 
+describe('live conversation receipts', () => {
+  it.each([
+    ['command_task_result_task_example', true, true],
+    ['command_task_partial_turn_example', true, true],
+    [`command_schedule_source_${'a'.repeat(64)}`, true, true],
+    [`command_${'a'.repeat(32)}`, false, true],
+    ['command_task_result_task_example', false, false],
+    ['turn_ordinary', true, false]
+  ] as const)('routes %s to the original timeline only with a valid receipt marker (%s)', async (turnId, marked, expected) => {
+    const items: unknown[] = []
+    const sink = { ...makeSink(), onConversationItem: (item: unknown) => items.push(item) }
+    const item: CoreTurnItemJson = {
+      id: `item_${turnId}_receipt`, turnId, threadId: 'origin', role: 'assistant',
+      status: 'completed', createdAt: '2026-11-20T00:00:00Z', kind: 'assistant_text', text: '合成成果已完成。',
+      ...(marked ? { conversationReceiptId: turnId } : {})
+    }
+    await dispatchRuntimeEvent({ kind: 'item_created', seq: 1, item }, sink, async () => undefined)
+    expect(items).toEqual(expected ? [expect.objectContaining({ id: item.id, kind: 'assistant', text: item.text })] : [])
+  })
+})
+
 describe('thread summary mapping', () => {
   it('restores a capability action from persisted assistant metadata', () => {
     const capabilityCard = {
