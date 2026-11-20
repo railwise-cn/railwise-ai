@@ -121,8 +121,11 @@ export function windowsVideoModelAction(body, selection, render, parseFixtureToo
   const resource = results.get(readPipelineId)
   if (!results.has(readPipelineId)) return tools.has('read_skill_resource') ?
     [readPipelineId, 'read_skill_resource', { skill_id: selection.skillId, path: 'references/pipeline.md' }] : null
-  assert.ok(resource?.skill_id === selection.skillId && resource?.path === 'references/pipeline.md' && /remotion render/i.test(resource.content),
-    'The installed Skill workflow must actually be read before requesting rendering')
+  const workflow = { skillMatches: resource?.skill_id === selection.skillId, pathMatches: resource?.path === 'references/pipeline.md',
+    bytes: typeof resource?.content === 'string' ? Buffer.byteLength(resource.content) : 0,
+    includesRender: /remotion render/i.test(resource?.content ?? '') }
+  assert.ok(workflow.skillMatches && workflow.pathMatches && workflow.includesRender,
+    `The installed Skill workflow must be read before rendering (${JSON.stringify(workflow)}; ${sectionResultStatus(resource, 'sections')})`)
   selection.read = true
   if (!results.has('eval-render')) return tools.has('request_host_shell') ? ['eval-render', 'request_host_shell', render] : null
   let output = results.get('eval-render')
