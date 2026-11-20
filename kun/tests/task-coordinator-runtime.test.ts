@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { afterEach,describe,expect,it,vi } from 'vitest'
 import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
+import { getThread } from '../src/server/routes/threads.js'
 
 const cleanup:Array<()=>Promise<unknown>>=[]
 afterEach(async()=>{while(cleanup.length)await cleanup.pop()!()})
@@ -92,7 +93,7 @@ describe('production task coordinator and durable Worker delivery',()=>{
     expect((await runtime.threadService.get(started.turn.threadId))?.turns).toHaveLength(2)
   },15_000)
 
-  it('queries locally, delivers a supplementary file reference to the original Worker and checkpoints before consuming',async()=>{
+  it.each(['file', 'hybrid'] as const)('delivers a supplementary file to the original worker and reopens its reply with %s storage', async backend => {
     const root=await mkdtemp(join(tmpdir(),'railwise-task-production-'))
     cleanup.push(()=>rm(root,{recursive:true,force:true}))
     await writeFile(join(root,'source.md'),'# 合成资料\n本期数据完整。\n')
@@ -113,7 +114,7 @@ describe('production task coordinator and durable Worker delivery',()=>{
     await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve))
     cleanup.push(()=>new Promise<void>((resolve,reject)=>{server.close(error=>error?reject(error):resolve());server.closeAllConnections()}))
     const address=server.address();if(!address||typeof address==='string')throw new Error('listener unavailable')
-    const runtime=await createKunServeRuntime({host:'127.0.0.1',port:0,dataDir:join(root,'state'),runtimeToken:'fixture',baseUrl:`http://127.0.0.1:${address.port}/v1`,apiKey:'',endpointFormat:'chat_completions',model:'fixture',approvalPolicy:'auto',sandboxMode:'workspace-write',tokenEconomyMode:false,insecure:false,storage:{backend:'file'},capabilities:KunCapabilitiesConfig.parse({})})
+    const runtime=await createKunServeRuntime({host:'127.0.0.1',port:0,dataDir:join(root,'state'),runtimeToken:'fixture',baseUrl:`http://127.0.0.1:${address.port}/v1`,apiKey:'',endpointFormat:'chat_completions',model:'fixture',approvalPolicy:'auto',sandboxMode:'workspace-write',tokenEconomyMode:false,insecure:false,storage:{backend},capabilities:KunCapabilitiesConfig.parse({})})
     cleanup.push(async()=>{releaseFirst();await runtime.shutdown?.()})
     const origin=await runtime.threadService.create({workspace:root,model:'fixture',mode:'agent'})
     await runtime.taskCoordinator!.command({threadId:origin.id,idempotencyKey:'status',request:{prompt:'wrapper',displayText:'现在做到哪了'}})
@@ -148,12 +149,18 @@ describe('production task coordinator and durable Worker delivery',()=>{
     expect((await runtime.threadService.list()).map(thread=>thread.id)).toEqual([origin.id])
     await runtime.taskCoordinator!.flushCommandMessages()
     const originItems = await runtime.sessionStore.loadItems(origin.id)
-    expect(originItems.find(item => item.id === `item_command_task_result_${task.id}_receipt`)).toMatchObject({
+    const replyId = `item_command_task_result_${task.id}_receipt`
+    expect(originItems.find(item => item.id === replyId)).toMatchObject({
       kind: 'assistant_text', text: '合成测试结论：资料记载本期数据完整，风险分析需继续核查阈值。', status: 'completed'
     })
+    const detail = await getThread(runtime.threadService, origin.id, runtime.sessionStore, runtime.taskController)
+    expect(detail.status).toBe(200)
+    const conversation = JSON.parse(detail.body)
+    expect(conversation.conversationItems.filter((item: { id: string }) => item.id === replyId)).toHaveLength(1)
+    expect(conversation.turns).toHaveLength(0)
     expect(originItems.filter(item => item.kind === 'user_message' && item.workspaceReferences?.some(ref => ref.path === 'risk.md'))).toHaveLength(1)
     await runtime.taskCoordinator!.flushCommandMessages()
-    expect((await runtime.sessionStore.loadItems(origin.id)).filter(item => item.id === `item_command_task_result_${task.id}_receipt`)).toHaveLength(1)
+    expect((await runtime.sessionStore.loadItems(origin.id)).filter(item => item.id === replyId)).toHaveLength(1)
     const bundles=runtime.taskContextRuntime!.repository.listContextBundles(task.id)
     expect(bundles.length).toBeGreaterThan(0)
   },15_000)

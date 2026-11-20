@@ -167,12 +167,7 @@ export const ErrorTurnItem = TurnItemBase.extend({
 })
 export type ErrorTurnItem = z.infer<typeof ErrorTurnItem>
 
-/** Also recognizes the exact immutable shape written before the marker existed. */
-export function isConversationReceiptItem(item: Pick<z.infer<typeof TurnItemBase>, 'id' | 'turnId' | 'conversationReceiptId'> & { kind: string }): boolean {
-  if (!/^command_[a-f0-9]{32}$/.test(item.turnId)) return false
-  return item.kind === 'user_message' && item.id === `item_${item.turnId}_user` ||
-    item.kind === 'assistant_text' && item.id === `item_${item.turnId}_receipt`
-}
+export { isConversationReceiptItem } from './conversation-receipt.js'
 
 export const TurnItem = z.discriminatedUnion('kind', [
   UserTurnItem,

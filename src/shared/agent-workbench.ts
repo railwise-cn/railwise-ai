@@ -1,3 +1,5 @@
+export { isConversationReceiptItem } from '../../kun/src/contracts/conversation-receipt.js'
+
 export const TASK_RUN_STATUSES = [
   'queued',
   'running',
