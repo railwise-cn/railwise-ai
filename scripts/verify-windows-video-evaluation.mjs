@@ -115,7 +115,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
   const render = { command: `& ${quote(process.execPath)} ${quote(join(workspace, script))}`,
     timeout_seconds: 180, ttl_seconds: 240, idempotency_key: 'private-synthetic-render-once' }
   const marker = '独立的 Video Shotcraft 非商用合成评估'
-  const selection = { read: false, rendered: false }
+  const selection = { requests: 0, read: false, rendered: false }
   const server = createServer(async (request, response) => {
     if (request.method === 'GET') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -123,6 +123,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       return
     }
     try {
+      selection.requests++
       const chunks = []
       for await (const chunk of request) chunks.push(chunk)
       const body = JSON.parse(Buffer.concat(chunks).toString())
@@ -146,7 +147,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
     }
   })
   await new Promise((ready, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', ready) })
-  return { model, baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
+  return { model, observed: selection, baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
     close: () => new Promise(done => { server.close(done); server.closeAllConnections() }),
     async verify(cdp, skillId) {
       selection.skillId = skillId
