@@ -56,12 +56,29 @@ async function provision(workspace, environment) {
   for (const path of [cli, ffmpeg, ffprobe]) await access(path)
   assert.equal(JSON.parse(await readFile(join(dirname(cli), 'package.json'), 'utf8')).version, version)
   const target = join(workspace, filename)
-  await writeFile(join(workspace, script), `import {execFileSync} from 'node:child_process';
-execFileSync(${literal(process.execPath)}, ${literal([cli, 'render', 'index.jsx', composition, target, '--codec=h264',
-    '--concurrency=1', '--chrome-mode=chrome-for-testing', '--browser-executable', browser])}, {cwd:${literal(root)},stdio:'inherit',windowsHide:true,timeout:140000});
-console.log(${literal(target)});
+  const renderDiagnostic = join(root, 'render-diagnostic.json')
+  await writeFile(join(workspace, script), `import {spawnSync} from 'node:child_process';
+import {writeFileSync} from 'node:fs';
+const report = ${literal(renderDiagnostic)};
+writeFileSync(report, JSON.stringify({stage: 'started'}));
+const result = spawnSync(${literal(process.execPath)}, ${literal([cli, 'render', 'index.jsx', composition, target, '--codec=h264',
+    '--concurrency=1', '--chrome-mode=chrome-for-testing', '--browser-executable', browser])}, {cwd:${literal(root)},encoding:'utf8',windowsHide:true,timeout:140000,maxBuffer:4*1024*1024});
+const output = (result.stdout ?? '') + '\\n' + (result.stderr ?? '');
+const issue = [
+  [/invalid.*(?:option|flag|chrome-mode)|unknown option|not a valid option/i, 'invalid-option'],
+  [/could not find.*chrome|browser.*failed|browser process|failed to launch|WebSocket/i, 'browser-startup'],
+  [/cannot find (?:module|package)|MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND/i, 'module-not-found'],
+  [/ffmpeg|ffprobe|compositor/i, 'media-toolchain'],
+  [/timed? out|ETIMEDOUT/i, 'timeout'],
+  [/permission denied|access is denied|EPERM/i, 'access-denied'],
+  [/ESBuild|Webpack|compile|Parsing error|syntax error/i, 'bundle'],
+].find(([pattern]) => pattern.test(output))?.[1] ?? 'unclassified';
+const code = typeof result.error?.code === 'string' && /^[A-Z_]{3,32}$/.test(result.error.code) ? result.error.code : undefined;
+writeFileSync(report, JSON.stringify({stage: 'exited', exitCode: result.status, issue: result.status === 0 ? undefined : issue, code}));
+if (result.status !== 0) { console.error('Synthetic render failed:', issue, code ?? ''); process.exitCode = result.status || 1; }
+else console.log(${literal(target)});
 `)
-  return { target, ffmpeg, ffprobe }
+  return { target, ffmpeg, ffprobe, renderDiagnostic }
 }
 
 function matchesPdfText(value) {
@@ -170,8 +187,10 @@ export function windowsVideoModelAction(body, selection, render, parseFixtureToo
     assert.ok(tools.has('host_shell_session') && typeof output.authorizationId === 'string')
     return [id, 'host_shell_session', { action: 'poll', authorization_id: output.authorizationId, yield_seconds: 4 }]
   }
-  assert.ok(output?.exit_code === 0 && output.commandHash === digest(render.command),
-    'The exact user-approved rendering command must complete with exit code zero')
+  const execution = { status: typeof output?.status === 'string' && /^[a-z_]{3,32}$/.test(output.status) ? output.status : undefined,
+    exitCode: Number.isInteger(output?.exit_code) ? output.exit_code : null, commandMatches: output?.commandHash === digest(render.command) }
+  assert.ok(execution.exitCode === 0 && execution.commandMatches,
+    `The exact approved render must exit successfully (${JSON.stringify(execution)}; ${sectionResultStatus(output, 'sections')})`)
   selection.rendered = true
   return null
 }
@@ -266,7 +285,10 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
         if(!result.ok)return null;
         const payload=JSON.parse(result.body),task=payload.task??payload;
         return task.status==='completed'&&task.artifacts.find(item=>item.format==='mp4'&&item.validation==='valid'&&item.relativePath===${literal(filename)});
-      })`, 'a completed real task and registered MP4', 240_000).catch(error => { throw new Error(selection.failure ?? error.message) })
+      })`, 'a completed real task and registered MP4', 240_000).catch(async error => {
+        const processReport = await readFile(toolchain.renderDiagnostic, 'utf8').then(JSON.parse).catch(() => ({ stage: 'not-started' }))
+        throw new Error(`${selection.failure ?? error.message}; owned render process ${JSON.stringify(processReport)}`)
+      })
       assert.equal(selection.rendered, true)
       const openResult = await cdp.evaluate(artifact.absolutePath
         ? `window.workwise.openTaskArtifact({taskId:${literal(approval.taskId)},artifactId:${literal(artifact.id)}})`
