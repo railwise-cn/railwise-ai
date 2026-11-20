@@ -17,6 +17,27 @@ import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsB
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact, windowsTaskArtifactPreviewExpression } from './run-windows-ui-smoke.mjs'
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
+import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
+
+test('the private video fixture reads its exact indexed PDF section when a CJK search cannot find it', () => {
+  const section = { id: 'section-1', attachmentId: 'fixture-pdf', text: '铁 路\u0000合成验收' }
+  const selection = { skillId: 'video-shotcraft' }
+  const body = {
+    messages: [{ role: 'system', content: '- 合成视频资料.pdf (pdf, ready, id=fixture-pdf)' }],
+    tools: ['search_attachment', 'list_attachment_sections', 'read_attachment_section', 'read_skill_resource']
+      .map(name => ({ function: { name } }))
+  }
+  const result = (id, output) => body.messages.push({ role: 'tool', tool_call_id: `eval-${id}`, content: JSON.stringify(output) })
+  const action = () => windowsVideoModelAction(body, selection, {}, permissionSmokeModule.parseFixtureToolOutput)
+  assert.equal(action()[1], 'search_attachment')
+  result('find-pdf', { results: [{ ...section, attachmentId: 'another-file' }] })
+  assert.equal(action()[1], 'list_attachment_sections')
+  result('list-pdf', { sections: [section] })
+  assert.deepEqual(action(), ['eval-read-pdf', 'read_attachment_section', { attachment_id: 'fixture-pdf', section_id: 'section-1' }])
+  result('read-pdf', { section })
+  assert.equal(action()[1], 'read_skill_resource')
+  assert.equal(selection.pdfRead, true)
+})
 
 test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
   const evidence = report()
