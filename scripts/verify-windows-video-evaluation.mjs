@@ -184,8 +184,9 @@ export function windowsVideoModelAction(body, selection, render, parseFixtureToo
   for (let index = 1; output?.status === 'running' && index < 45; index++) {
     const id = `eval-poll-${index}`
     if (results.has(id)) { output = results.get(id); continue }
-    assert.ok(tools.has('host_shell_session') && typeof output.authorizationId === 'string')
-    return [id, 'host_shell_session', { action: 'poll', authorization_id: output.authorizationId, yield_seconds: 4 }]
+    assert.ok(tools.has('host_shell_session') && /^bash_[\da-f-]+$/i.test(output.session_id ?? ''),
+      'The approved command must return its task-owned Shell session')
+    return [id, 'host_shell_session', { action: 'poll', session_id: output.session_id, yield_seconds: 4 }]
   }
   const execution = { status: typeof output?.status === 'string' && /^[a-z_]{3,32}$/.test(output.status) ? output.status : undefined,
     exitCode: Number.isInteger(output?.exit_code) ? output.exit_code : null, commandMatches: output?.commandHash === digest(render.command) }
