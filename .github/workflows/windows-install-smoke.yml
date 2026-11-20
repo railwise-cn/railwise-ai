@@ -48,6 +48,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_mac_task_navigation:
+        description: 'Inspect only the installed Chinese task workbench on signed Apple Silicon and Intel packages.'
+        type: boolean
+        required: false
+        default: false
       run_published_gui_update:
         description: 'Install released 0.5.6 and click the real sidebar upgrade to released Stable 0.5.7 on an ephemeral Windows runner'
         type: boolean
@@ -120,7 +125,7 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
+    if: ${{ ((inputs.run_mac_startup_appearance != true && inputs.run_mac_task_navigation != true) || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || inputs.run_composer_acceptance && 35 || inputs.run_browser_execution && 25 || 15 }}
@@ -314,8 +319,8 @@ jobs:
           path: ${{ runner.temp }}/published-windows-gui-upgrade-evidence/
 
   exact-mac-startup-appearance:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_mac_startup_appearance == true }}
-    name: Exact startup appearance on macOS ${{ matrix.arch }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.run_mac_startup_appearance == true || inputs.run_mac_task_navigation == true) }}
+    name: ${{ inputs.run_mac_task_navigation && 'Exact Chinese task navigation' || 'Exact startup appearance' }} on macOS ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     strategy:
@@ -328,6 +333,7 @@ jobs:
             arch: x64
     env:
       EXACT_MAC_ARCH: ${{ matrix.arch }}
+      EXACT_MAC_TASK_ONLY: ${{ inputs.run_mac_task_navigation }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -356,7 +362,7 @@ jobs:
           github-token: ${{ github.token }}
           merge-multiple: true
           path: ${{ runner.temp }}/exact-mac-packages
-      - name: Inspect the signed installed application and real startup surfaces
+      - name: Inspect the signed installed application in the requested mode
         run: >-
           node scripts/run-mac-startup-appearance-smoke.mjs --run
           "$RUNNER_TEMP/exact-mac-packages" "$RUNNER_TEMP/exact-mac-source.json"

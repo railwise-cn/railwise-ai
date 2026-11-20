@@ -7,6 +7,7 @@ import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { setTimeout as wait } from 'node:timers/promises'
 import { connectCdp } from './run-windows-ui-smoke.mjs'
 import { observeInstalledStartup } from './verify-packaged-startup-appearance.mjs'
 import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
@@ -52,20 +53,31 @@ async function prepare(buildRunId, sourceFile) {
   assert.match(buildRunId, /^[1-9]\d*$/)
   const repository = process.env.GITHUB_REPOSITORY
   assert.equal(repository, RELEASE_REPOSITORY)
-  const api = (suffix) => JSON.parse(command('gh', ['api', `repos/${repository}/${suffix}`]))
-  const run = api(`actions/runs/${buildRunId}`)
+  const api = async (suffix) => {
+    for (let attempt = 1; ; attempt++) {
+      try { return JSON.parse(command('gh', ['api', `repos/${repository}/${suffix}`])) }
+      catch (error) {
+        const transient = /HTTP (?:429|5\d\d)|timeout|ETIMEDOUT|connection reset|unexpected EOF|temporary failure/i.test(String(error.stderr ?? error.message))
+        if (!transient || attempt === 4) throw error
+        await wait(750 * attempt)
+      }
+    }
+  }
+  const run = await api(`actions/runs/${buildRunId}`)
   assert.equal(run.repository.full_name, repository)
   assert.equal(run.head_repository.full_name, repository)
   assert.equal(run.path, RELEASE_WORKFLOW)
   const driverHead = git('rev-parse', 'HEAD')
   assert.equal(driverHead, process.env.GITHUB_SHA)
   git('merge-base', '--is-ancestor', run.head_sha, driverHead)
-  const jobs = api(`actions/runs/${buildRunId}/attempts/${run.run_attempt}/jobs?per_page=100`)
+  const [jobs, artifacts] = await Promise.all([
+    api(`actions/runs/${buildRunId}/attempts/${run.run_attempt}/jobs?per_page=100`),
+    api(`actions/runs/${buildRunId}/artifacts?per_page=100`)
+  ])
   const [build, duplicateBuild] = jobs.jobs.filter(job => job.name === 'Build macOS')
   assert.ok(build && !duplicateBuild && build.status === 'completed', 'Expected one completed macOS build in the trusted run attempt')
   const step = name => build.steps.find(item => item.name === name)?.conclusion
   const frozenReceiptStep = step('Record frozen public package identity')
-  const artifacts = api(`actions/runs/${buildRunId}/artifacts?per_page=100`)
   const [artifact, duplicate] = artifacts.artifacts.filter(item => item.name === 'release-mac' && !item.expired)
   assert.ok(artifact && !duplicate, 'Expected one immutable macOS release artifact')
   assert.equal(artifact.workflow_run.head_sha, run.head_sha)
@@ -192,7 +204,7 @@ async function observeMacTaskNavigation(cdp, workspace, responseCount) {
     locale: 'zh-CN', sidebar: sidebarObservation, overview: detailObservation }
 }
 
-async function verify(directory, sourceFile, evidenceDir, temporary) {
+async function verify(directory, sourceFile, evidenceDir, temporary, taskOnly) {
   const source = validateMacStartupArtifact(await json(sourceFile))
   assert.equal(source.driverHead, process.env.GITHUB_SHA)
   const { version } = await json(new URL('../package.json', import.meta.url))
@@ -252,17 +264,21 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
     assert.equal(updater.url, 'https://127.0.0.1/')
   }
   const report = { schemaVersion: 1, status: 'failed', source, arch: process.arch, version,
+    mode: taskOnly ? 'task-navigation' : 'startup-appearance',
     installer: { name, sha256: digest, size, digestSource }, installed: { bundleId: info.CFBundleIdentifier, installedArch,
       signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256,
       ...(source.scope === 'private-isolated-candidate' ? { privateLoopbackFeedVerified: true } : {}) }, observations: [] }
   try {
     const [major, minor, patch] = version.split('.').map(Number)
     const checkTaskNavigation = major > 0 || minor > 5 || minor === 5 && patch >= 10
-    for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
+    assert.ok(!taskOnly || checkTaskNavigation, 'Task navigation requires a 0.5.10 or newer package')
+    const chinese = { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }
+    const cases = taskOnly ? [chinese] : [{ locale: 'en', htmlLang: 'en', theme: 'light' }, chinese]
+    for (const expected of cases) {
       const workbench = expected.locale === 'zh' && checkTaskNavigation ? await macTaskFixture() : undefined
       try {
-        report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary, workbench }, expected,
-          { connectCdp, environmentForRoot: isolatedMacEnvironment }))
+        report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary, workbench,
+          workbenchOnly: taskOnly }, expected, { connectCdp, environmentForRoot: isolatedMacEnvironment }))
       } finally { await workbench?.close() }
     }
     assert.equal(await checksum(path), installedAsarSha256)
@@ -291,7 +307,7 @@ async function main([mode, directory, source, evidenceDir, arch]) {
     const child = relative(temporary, resolve(path))
     assert.ok(child && !child.startsWith('..') && !isAbsolute(child), 'macOS acceptance paths must be owned by the runner')
   }
-  return verify(directory, source, evidenceDir, temporary)
+  return verify(directory, source, evidenceDir, temporary, process.env.EXACT_MAC_TASK_ONLY === 'true')
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main(process.argv.slice(2))
