@@ -1945,6 +1945,30 @@ export async function clickWindowsManualTaskArtifact(cdp, { taskGoal, previewExp
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...audit.target.point })
 }
 
+export async function clickWindowsChatManualArtifact(cdp, { artifactName, previewExpression, audit }) {
+  const closeButton = 'button[aria-label="收起右侧栏"]'
+  const closeInspector = async () => {
+    if (!await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(closeButton)})?.getClientRects().length)`)) return
+    await cdp.wait(previewExpression, 'the actual inspector preview before dismissal', 30_000)
+    await cdp.click(closeButton)
+    await cdp.wait(`(()=>{const shell=document.querySelector('.ds-workbench-shell'),main=shell?.querySelector('main');return main&&!main.inert&&!main.hasAttribute('inert')&&shell.dataset.activeOverlay!=='inspector';})()`, 'the original chat becomes interactive after closing the HTML preview')
+  }
+  await closeInspector()
+  const selector = await revealWindowsChatTaskArtifact(cdp, artifactName)
+  const probe = windowsManualArtifactTargetExpression({ stable: true, selector, label: artifactName })
+  audit.target = await cdp.wait(probe, 'the current chat artifact after two stable uncovered frames')
+  if (!audit.target.ready && audit.target.activeOverlay === 'inspector') {
+    audit.targetBeforeDismiss = audit.target
+    await closeInspector()
+    audit.target = await cdp.wait(probe, 'the chat artifact after dismissing its late inspector')
+  }
+  assert.equal(audit.target.ready, true, `UI target is covered or unstable: ${artifactName} ${JSON.stringify(audit.target)}`)
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...audit.target.point })
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...audit.target.point })
+  audit.input = 'real-cdp-mouse'
+  audit.surface = 'original-chat'
+}
+
 export async function inspectWindowsManualPreview(report, inspect) {
   try {
     await inspect()
@@ -3040,12 +3064,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         if (browserSmoke) {
           await clickWindowsManualTaskArtifact(cdp, { taskGoal: task.goal, previewExpression, audit: manualEntryAudit })
         } else {
-          await cdp.click('button[aria-label="收起右侧栏"]')
-          await cdp.wait(`(()=>{const shell=document.querySelector('.ds-workbench-shell'),main=shell?.querySelector('main');return main&&!main.inert&&!main.hasAttribute('inert')&&shell.dataset.activeOverlay!=='inspector';})()`, 'the original chat becomes interactive after closing the HTML preview')
-          const button = await revealWindowsChatTaskArtifact(cdp, artifact.relativePath.split(/[\\/]/).at(-1))
-          await cdp.click(button, artifact.relativePath.split(/[\\/]/).at(-1))
-          manualEntryAudit.input = 'real-cdp-mouse'
-          manualEntryAudit.surface = 'original-chat'
+          await clickWindowsChatManualArtifact(cdp, { artifactName: artifact.relativePath.split(/[\\/]/).at(-1), previewExpression, audit: manualEntryAudit })
         }
         const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
         assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
