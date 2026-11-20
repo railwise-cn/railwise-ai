@@ -16,6 +16,9 @@ import { revealWindowsChatTaskArtifact, validateWindowsTaskChatLayout, windowsTa
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 const windowsDueTaskResult = '本次 HTML 报告已保存并核验，可在原会话查看。'
+const legacyBrowserTaskSurface = 'article[aria-label="任务详情"]'
+const originalBrowserTaskSurface = '.ds-workbench-shell main'
+const browserTaskAttention = 'section[aria-label="等待连接或授权，尚未执行"]'
 
 const windowsUpdateFailureCodes = new Set(['not_configured', 'unsupported', 'unsigned_build', 'manifest_unavailable', 'network',
   'signature_invalid', 'withdrawn', 'download_failed', 'install_failed', 'github_repo_not_found', 'github_forbidden',
@@ -549,7 +552,9 @@ export function validateWindowsPermissionRuntimeEvidence(evidence) {
 
 export function validateWindowsBrowserRecoveryEvidence(evidence, browserInstanceId) {
   assert.ok(evidence, 'The original browser task must exercise first-Turn capability recovery through its real UI')
-  for (const [key, status] of [['initial', 'waiting_user'], ['pausedBeforeConfiguration', 'paused'], ['blockedResume', 'paused'], ['confirmed', 'paused']]) {
+  const waitState = evidence.originalChat ? 'waiting_user' : 'paused'
+  const beforeConfigKey = evidence.originalChat ? 'beforeConfiguration' : 'pausedBeforeConfiguration'
+  for (const [key, status] of [['initial', 'waiting_user'], [beforeConfigKey, waitState], ['blockedResume', waitState], ['confirmed', waitState]]) {
     const state = evidence[key]
     assert.equal(state.taskId, evidence.taskId)
     assert.equal(state.threadId, evidence.threadId)
@@ -557,6 +562,9 @@ export function validateWindowsBrowserRecoveryEvidence(evidence, browserInstance
     assert.equal(state.status, status)
     assert.equal(state.turns, 0)
     assert.equal(state.modelRequests, 0)
+  }
+  if (evidence.originalChat) {
+    for (const key of ['initial', 'confirmed', 'resumed']) validateWindowsTaskChatLayout(evidence.originalChat[key])
   }
   assert.equal(evidence.initialCapability, 'browser_disabled')
   assert.equal(evidence.blockedCapability, 'browser_task_scope_required')
@@ -573,7 +581,7 @@ export function validateWindowsBrowserRecoveryEvidence(evidence, browserInstance
   }
   const beforePublic = evidence.policyReview.beforePublicSelection
   assert.equal(beforePublic.taskId, evidence.taskId)
-  assert.equal(beforePublic.status, 'paused')
+  assert.equal(beforePublic.status, waitState)
   assert.equal(beforePublic.turns, 0)
   assert.equal(beforePublic.modelRequests, 0)
   assert.deepEqual(evidence.confirmed.binding.origins, [evidence.fixtureOrigin])
@@ -1222,14 +1230,15 @@ export function inspectWindowsBrowserRecoveryState({ task, thread, originThreadI
   return { taskId, threadId: task.threadId, originThreadId, status, turns: 0, modelRequests: 0, ...(binding ? { binding } : {}) }
 }
 
-export function windowsBrowserBindingUiExpression({ pointerAudit = false, control = 'confirm' } = {}) {
+export function windowsBrowserBindingUiExpression({ pointerAudit = false, control = 'confirm', originalChat = false } = {}) {
   assert.ok(['confirm', 'policy'].includes(control))
+  const surface = originalChat ? originalBrowserTaskSurface : legacyBrowserTaskSurface
   return `(async () => {
     const target=(node,button)=>({tag:node?.tagName ?? null,confirmationButton:Boolean(button?.contains(node))});
     const sample=()=>{
-      const detail=document.querySelector('article[aria-label="任务详情"]');
+      const detail=document.querySelector(${JSON.stringify(surface)});
       if(!detail || !detail.getClientRects().length)return null;
-      const candidates=Array.from(detail.querySelectorAll('section[aria-label="等待连接或授权，尚未执行"] button'))
+      const candidates=Array.from(detail.querySelectorAll(${JSON.stringify(`${browserTaskAttention} button`)}))
         .filter(button=>button.textContent.trim()==='确认本任务的浏览器范围' && button.getClientRects().length);
       if(candidates.length!==1)return null;
       const confirmButton=candidates[0],root=confirmButton.parentElement;
@@ -1277,9 +1286,9 @@ export function windowsBrowserBindingUiExpression({ pointerAudit = false, contro
 }
 
 /** No Runtime read or screenshot may intervene between this fresh hit test and the actual mouse events. */
-export async function clickWindowsBrowserBinding(cdp, audit) {
+export async function clickWindowsBrowserBinding(cdp, audit, { originalChat = false } = {}) {
   await cdp.send('Page.bringToFront')
-  audit.measurement = await cdp.wait(windowsBrowserBindingUiExpression({ pointerAudit: true }), 'the current uncovered browser binding confirmation button')
+  audit.measurement = await cdp.wait(windowsBrowserBindingUiExpression({ pointerAudit: true, originalChat }), 'the current uncovered browser binding confirmation button')
   try {
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...audit.measurement.point })
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...audit.measurement.point })
@@ -1289,10 +1298,10 @@ export async function clickWindowsBrowserBinding(cdp, audit) {
   assert.ok(audit.pointerEvents.some(event => event.type === 'pointerdown' && event.trusted && event.target.confirmationButton), 'The real mouse pointerdown must reach the current browser binding confirmation button')
 }
 
-export async function selectWindowsBrowserPolicy(cdp, policy, audit) {
+export async function selectWindowsBrowserPolicy(cdp, policy, audit, { originalChat = false } = {}) {
   assert.ok(['strict', 'public_query_target'].includes(policy))
   await cdp.send('Page.bringToFront')
-  audit.measurement = await cdp.wait(windowsBrowserBindingUiExpression({ control: 'policy' }), 'the current uncovered web operation mode selector')
+  audit.measurement = await cdp.wait(windowsBrowserBindingUiExpression({ control: 'policy', originalChat }), 'the current uncovered web operation mode selector')
   assert.deepEqual(audit.measurement.policy.options.map(option => [option.value, option.label]), [['strict', '严格网页操作'], ['public_query_target', '公开资料查询']])
   assert.equal(audit.measurement.policy.disabled, false)
   assert.equal(audit.measurement.policy.options.find(option => option.value === policy).disabled, false)
@@ -1303,17 +1312,22 @@ export async function selectWindowsBrowserPolicy(cdp, policy, audit) {
     await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code: key, windowsVirtualKeyCode })
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode })
   }
-  audit.selected = await cdp.wait(`(() => {const select=document.querySelector('article[aria-label="任务详情"] select[aria-label="网页操作方式"]');return select && select.value===${JSON.stringify(policy)} && {value:select.value,label:select.selectedOptions[0]?.textContent,description:select.parentElement.querySelector('p')?.textContent};})()`, 'the explicitly selected browser verification mode')
+  const surface = originalChat ? originalBrowserTaskSurface : legacyBrowserTaskSurface
+  audit.selected = await cdp.wait(`(() => {const select=document.querySelector(${JSON.stringify(`${surface} ${browserTaskAttention} select[aria-label="网页操作方式"]`)});return select && select.value===${JSON.stringify(policy)} && {value:select.value,label:select.selectedOptions[0]?.textContent,description:select.parentElement.querySelector('p')?.textContent};})()`, 'the explicitly selected browser verification mode')
   audit.input = 'real-cdp-mouse-and-keyboard'
 }
 
 /** Selects the visible consent controls; never writes the Runtime binding directly. */
-export async function selectWindowsPublicQueryAuthorization(cdp, duration, audit) {
+export async function selectWindowsPublicQueryAuthorization(cdp, duration, audit, { originalChat = false } = {}) {
   assert.ok(['task', 'schedule'].includes(duration))
+  const surface = originalChat ? originalBrowserTaskSurface : legacyBrowserTaskSurface
+  const panel = `${surface} ${browserTaskAttention}`
+  const durationControl = 'select[aria-label="公开查询授权期限"]'
+  const consentControl = 'input[type="checkbox"][aria-label="同意以上公开查询范围"]'
   const controls = `(() => {
-    const root=document.querySelector('article[aria-label="任务详情"] section[aria-label="等待连接或授权，尚未执行"]');
-    const select=root?.querySelector('select[aria-label="公开查询授权期限"]');
-    const consent=root?.querySelector('input[type="checkbox"][aria-label="同意以上公开查询范围"]');
+    const root=Array.from(document.querySelectorAll(${JSON.stringify(panel)})).find(card=>card.querySelector(${JSON.stringify(durationControl)}));
+    const select=root?.querySelector(${JSON.stringify(durationControl)});
+    const consent=root?.querySelector(${JSON.stringify(consentControl)});
     if(!select || !consent || select.disabled || consent.disabled)return null;
     return {duration:select.value,checked:consent.checked,options:Array.from(select.options).map(item=>item.value),text:root.textContent};
   })()`
@@ -1326,7 +1340,7 @@ export async function selectWindowsPublicQueryAuthorization(cdp, duration, audit
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point })
   }
   await cdp.send('Page.bringToFront')
-  await click('article[aria-label="任务详情"] select[aria-label="公开查询授权期限"]')
+  await click(`${panel} ${durationControl}`)
   for (const [key, windowsVirtualKeyCode] of [['Home', 36], ...(duration === 'schedule' ? [['ArrowDown', 40]] : []), ['Enter', 13]]) {
     await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code: key, windowsVirtualKeyCode })
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode })
@@ -1337,7 +1351,7 @@ export async function selectWindowsPublicQueryAuthorization(cdp, duration, audit
     for (const value of ['08:30', '16:30', '09:00', '17:00', 'Asia/Shanghai']) assert.ok(audit.selectedBeforeConsent.text.includes(value), `The actual continuous scope must display ${value}`)
     assert.match(audit.selectedBeforeConsent.text, /停用|撤销/)
   }
-  await click('article[aria-label="任务详情"] input[type="checkbox"][aria-label="同意以上公开查询范围"]')
+  await click(`${panel} ${consentControl}`)
   audit.selected = await cdp.wait(`(async()=>{const state=await (${controls});return state?.duration===${JSON.stringify(duration)}&&state.checked?state:null;})()`, 'explicit agreement to the displayed public-query scope')
   audit.input = 'real-cdp-mouse-and-keyboard'
 }
@@ -2866,40 +2880,42 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       report.taskAttemptId = task.id
       assert.equal(task.originThreadId, originThreadId, 'Installing the Skill must preserve the already open conversation')
       if (browserSmoke) {
+        const originalChat = windowsTaskChatLayoutExpression(prompt)
+        const card = `${originalBrowserTaskSurface} ${browserTaskAttention}`
+        const recheckInChat = async () => {
+          await cdp.send('Page.bringToFront')
+          await cdp.click(`${card} button`, '重新检查并继续原任务')
+        }
         const taskId = task.id
         const readRecovery = async status => inspectWindowsBrowserRecoveryState({ task: await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`),
           thread: await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`), originThreadId, taskId, prompt,
           modelRequests: taskModel.observed.requests.length, status })
         const initial = await readRecovery('waiting_user')
-        const browserRecovery = { taskId, threadId: task.threadId, originThreadId, fixtureOrigin: new URL(taskModel.fixtureUrl).origin, initial }
+        const browserRecovery = { taskId, threadId: task.threadId, originThreadId, fixtureOrigin: new URL(taskModel.fixtureUrl).origin, initial,
+          originalChat: { initial: validateWindowsTaskChatLayout(await cdp.wait(originalChat, 'the original blocked browser task in its chat')) } }
         report.taskSetup = { originThreadId, browserRecovery }
         const initialAttention = (await runtimeRequest('/v1/inbox')).find(item => item.taskId === taskId && item.kind === 'blocked')
         assert.equal(initialAttention?.payload?.capability?.provider, 'browser-skill')
         assert.equal(initialAttention.payload.capability.errorCode, 'browser_disabled')
-        await cdp.click('button', '打开任务工作台')
-        await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes(${JSON.stringify(prompt)}))`, 'the original blocked browser task')
-        await cdp.click('article[aria-label="任务详情"] button', '暂停')
-        await cdp.wait(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/tasks/${encodeURIComponent(taskId)}`)},'GET').then(result=>JSON.parse(result.body).status==='paused')`, 'the original task paused before its first Turn')
-        const pausedBeforeConfiguration = await readRecovery('paused')
-        browserRecovery.pausedBeforeConfiguration = pausedBeforeConfiguration
+        browserRecovery.beforeConfiguration = await readRecovery('waiting_user')
         skillInstallation = await installMarketplaceBrowserSkill({ cdp, root, workspace, runtimeRequest, originThreadId })
         realBrowser = await startRealBrowserSmoke({ cdp, root, environment, fixtureUrl: taskModel.fixtureUrl })
         const runtimeAfter = await runtimeRequest('/v1/runtime/info')
         assert.equal(runtimeAfter.pid, skillInstallation.runtimePid)
         assert.equal(runtimeAfter.startedAt, skillInstallation.runtimeStartedAt)
         Object.assign(report.taskSetup, { skillInstallation, browser: realBrowser.evidence })
-        await cdp.click('article[aria-label="任务详情"] button', '继续任务')
-        await cdp.wait(`Boolean(Array.from(document.querySelectorAll('article[aria-label="任务详情"] section[aria-label="等待连接或授权，尚未执行"] button')).find(button=>button.textContent.trim()==='确认当前任务的浏览器范围'))`, 'the durable browser-scope preflight card')
-        const blockedResume = await readRecovery('paused')
+        await recheckInChat()
+        await cdp.wait(`Array.from(document.querySelectorAll(${JSON.stringify(`${card} button`)})).some(button=>button.textContent.trim()==='确认当前任务的浏览器范围' && !button.disabled && button.getClientRects().length)`, 'the durable browser-scope preflight card in the original chat')
+        const blockedResume = await readRecovery('waiting_user')
         browserRecovery.blockedResume = blockedResume
         const attention = (await runtimeRequest('/v1/inbox')).find(item => item.taskId === taskId && item.kind === 'blocked')
         assert.equal(attention?.payload?.capability?.provider, 'browser-skill')
         assert.equal(attention.payload.capability.errorCode, 'browser_task_scope_required')
         const resolution = attention.payload.capability.resolution ?? attention.payload.capability.action
         assert.equal(resolution?.route, 'task/browser-binding')
-        await cdp.click('article[aria-label="任务详情"] section[aria-label="等待连接或授权，尚未执行"] button', '确认当前任务的浏览器范围')
+        await cdp.click(`${card} button`, '确认当前任务的浏览器范围')
         await cdp.send('Page.bringToFront')
-        const panel = await cdp.wait(windowsBrowserBindingUiExpression(), 'the real browser binding panel loaded through main-process IPC')
+        const panel = await cdp.wait(windowsBrowserBindingUiExpression({ originalChat: true }), 'the real browser binding panel loaded through main-process IPC')
         // Corroborate the displayed preview through the same main-process read boundary.
         // Confirmation is performed only by the visible panel button below.
         const previewSnapshot = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}/browser-binding`)
@@ -2916,17 +2932,17 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         assert.equal(previewSnapshot.policyChangeBlocked, undefined)
         const policyReview = { snapshotPolicy: previewSnapshot.verificationPolicy, initialUiPolicy: panel.policy?.value, strictSelection: {}, publicQuerySelection: {} }
         browserRecovery.policyReview = policyReview
-        await selectWindowsBrowserPolicy(cdp, 'strict', policyReview.strictSelection)
+        await selectWindowsBrowserPolicy(cdp, 'strict', policyReview.strictSelection, { originalChat: true })
         assert.equal(policyReview.strictSelection.selected.description, '核对完整页面与目标。账号操作、业务提交及其他写操作使用此方式。')
-        policyReview.beforePublicSelection = await readRecovery('paused')
+        policyReview.beforePublicSelection = await readRecovery('waiting_user')
         const beforePolicyConfirmation = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`)
         assert.equal(beforePolicyConfirmation.authority?.browserScope?.verificationPolicy ?? 'strict', 'strict', 'UI selection alone must not silently widen task authority')
-        await selectWindowsBrowserPolicy(cdp, 'public_query_target', policyReview.publicQuerySelection)
+        await selectWindowsBrowserPolicy(cdp, 'public_query_target', policyReview.publicQuerySelection, { originalChat: true })
         assert.equal(policyReview.publicQuerySelection.selected.description, '仅用于无需账号的搜索、阅读和翻页，核对原目标及同一表单的明确依赖。不能用于账号操作或业务提交。')
         browserRecovery.publicQueryAuthorizationReview = {}
-        await selectWindowsPublicQueryAuthorization(cdp, 'schedule', browserRecovery.publicQueryAuthorizationReview)
+        await selectWindowsPublicQueryAuthorization(cdp, 'schedule', browserRecovery.publicQueryAuthorizationReview, { originalChat: true })
         const beforeScopeConfirmation = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`)
-        assert.equal(beforeScopeConfirmation.status, 'paused')
+        assert.equal(beforeScopeConfirmation.status, 'waiting_user')
         assert.equal(beforeScopeConfirmation.authority?.browserScope?.publicQueryAuthorization, undefined,
           'Changing the scope controls must not grant permission before the visible confirmation')
         assert.equal(taskModel.observed.requests.length, 0)
@@ -2947,10 +2963,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         const bindingScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
         await writeFile(join(evidenceDir, 'windows-task-browser-binding-before-confirm-zh-dark.png'), Buffer.from(bindingScreenshot.data, 'base64'))
         try {
-          await clickWindowsBrowserBinding(cdp, confirmationAudit)
-          await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes('浏览器范围已确认。点击继续原任务。'))`, 'the actual UI confirmation without starting the task')
+          await clickWindowsBrowserBinding(cdp, confirmationAudit, { originalChat: true })
+          await cdp.wait(`Array.from(document.querySelectorAll(${JSON.stringify(card)})).some(element=>element.innerText.includes('浏览器范围已确认。点击继续原任务。'))`, 'the actual UI confirmation without starting the task')
         } finally { await stopBindingPostAudit?.() }
-        const confirmed = await readRecovery('paused')
+        browserRecovery.originalChat.confirmed = validateWindowsTaskChatLayout(await cdp.wait(originalChat, 'browser confirmation remained in the original chat'))
+        const confirmed = await readRecovery('waiting_user')
         const confirmedTask = await runtimeRequest(`/v1/tasks/${encodeURIComponent(taskId)}`)
         const binding = confirmedTask.authority.browserScope
         const { publicQueryAuthorization, ...baseBinding } = binding
@@ -2961,8 +2978,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         assert.match(publicQueryAuthorization.requirementHash, /^[a-f0-9]{64}$/)
         confirmed.binding = binding
         const confirmedScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
-        await writeFile(join(evidenceDir, 'windows-task-browser-binding-confirmed-paused-zh-dark.png'), Buffer.from(confirmedScreenshot.data, 'base64'))
-        await cdp.click('article[aria-label="任务详情"] button', '继续任务')
+        await writeFile(join(evidenceDir, 'windows-task-browser-binding-confirmed-chat-zh-dark.png'), Buffer.from(confirmedScreenshot.data, 'base64'))
+        await recheckInChat()
         await cdp.wait(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/threads/${encodeURIComponent(task.threadId)}`)},'GET').then(result=>{const turns=JSON.parse(result.body).turns;return turns.length===1 && Boolean(turns[0].executionGrant);})`, 'one first Turn with its actual Grant from a separate explicit resume')
         const resumedThread = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
         assert.equal(resumedThread.turns.length, 1)
@@ -2975,12 +2992,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           uiPreviewVerified: true, uiConfirmVerified: true, resumed: { taskId, threadId: task.threadId, turns: 1, firstTurnId: resumedThread.turns[0].id,
             executionGrant: { id: firstGrant.id, verificationPolicy: firstGrant.browserScope.verificationPolicy,
               publicQueryAuthorization: firstGrant.browserScope.publicQueryAuthorization } } })
+        browserRecovery.originalChat.resumed = validateWindowsTaskChatLayout(await cdp.wait(originalChat, 'the resumed browser task in its original chat'))
         validateWindowsBrowserRecoveryEvidence(browserRecovery, realBrowser.evidence.browserInstanceId)
         report.taskSetup = { originThreadId, skillInstallation, browser: realBrowser.evidence, browserRecovery }
-        browserRecovery.originalConversationNavigation = await openWindowsTaskConversation(cdp, task)
       }
       const uiApprovals = []
-      const reviewedRequests = []
       if (browserSmoke) report.sourceUiApprovals = uiApprovals
       const assertFixturePrerequisites = () => assert.equal(taskModel?.observed.failure, undefined,
         `The controlled fixture stopped after a real prerequisite failure: ${JSON.stringify(taskModel?.observed.failure)}`)
@@ -2988,39 +3004,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       while (Date.now() < taskDeadline && !['completed', 'failed', 'stalled', 'waiting_user'].includes(task.status)) {
         assertFixturePrerequisites()
         if (browserSmoke) {
-          const thread = await runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`)
           const pending = windowsFixturePendingApprovals(await runtimeRequest('/v1/inbox'), task)
           assert.equal(pending.length, 0, 'The explicitly reviewed task scope must run these public queries without per-action or repeated plan approvals')
-          for (const approval of pending) {
-            assert.ok(!uiApprovals.some(item => item.approvalId === approval.approvalId), 'An allowed approval must not be replayed')
-            const review = reviewWindowsFixtureApproval(approval, { fixture: taskModel, prompt, workspace,
-              browserLabel: realBrowser.browserLabel, planBrowserLabel: realBrowser.planBrowserLabel, thread, index: uiApprovals.length })
-            await cdp.click('button', '打开任务工作台')
-            await cdp.wait(`Boolean(document.querySelector('article[aria-label="任务详情"]')?.textContent.includes(${JSON.stringify(task.goal)}))`, 'the original task details')
-            await cdp.wait(windowsFixtureApprovalUiExpression(review.uiValues, approval.summary, { businessOnly: true }), 'the ordinary business approval card and visible allow button')
-            const businessScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
-            await writeFile(join(evidenceDir, `windows-task-approval-${uiApprovals.length + 1}-business-zh-dark.png`), Buffer.from(businessScreenshot.data, 'base64'))
-            const detailPoint = await cdp.wait(windowsFixtureApprovalUiExpression(review.uiValues, approval.summary, { openDetails: true }), 'the exact reviewed task approval card')
-            await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...detailPoint })
-            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...detailPoint })
-            const point = await cdp.wait(windowsFixtureApprovalUiExpression(review.uiValues, approval.summary), 'the original request hash and actionable allow button')
-            const reviewScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
-            await writeFile(join(evidenceDir, `windows-task-approval-${uiApprovals.length + 1}-zh-dark.png`), Buffer.from(reviewScreenshot.data, 'base64'))
-            await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point })
-            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point })
-            const deadline = Date.now() + 15_000
-            let saved
-            while (Date.now() < deadline) {
-              saved = windowsFixtureApprovalResolution(await runtimeRequest(`/v1/tasks/${encodeURIComponent(task.id)}/inputs`), approval, task.id)
-              if (saved) break
-              await sleep(100)
-            }
-            assert.equal(saved?.status, 'allowed', 'The actual UI must resolve this exact approval as allowed')
-            const { uiValues: _values, ...record } = review
-            reviewedRequests.push(approval)
-            uiApprovals.push({ ...record, uiFieldsVerified: true, businessCardDisplayedVerified: true, originalSummaryVerified: true, cardDisplayedVerified: true, buttonOperableVerified: true, status: saved.status })
-            await cdp.click('article[aria-label="任务详情"] button', '打开原会话')
-          }
         }
         await sleep(250)
         task = await runtimeRequest(`/v1/tasks/${encodeURIComponent(task.id)}`)
@@ -3064,8 +3049,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           sourceUrl: html.sourceUrl, htmlSha256: createHash('sha256').update(html.html).digest('hex'), artifactSha256: artifact.sha256 }
         const resolutions = await runtimeRequest(`/v1/tasks/${encodeURIComponent(task.id)}/inputs`)
         assert.equal(resolutions.filter(item => item.kind === 'approval_resolution').length, 0)
-        assert.equal(reviewedRequests.length, 0)
-        for (const approval of reviewedRequests) assert.equal(windowsFixtureApprovalResolution(resolutions, approval, task.id)?.status, 'allowed')
+        assert.equal(windowsFixturePendingApprovals(await runtimeRequest('/v1/inbox'), task).length, 0)
         const actions = flow.flow.variables.taskSchedule.scope.browserScheduleActions ?? []
         assert.equal(flow.flow.variables.taskSchedule.scope.browserScope.verificationPolicy, 'public_query_target')
         assert.deepEqual(flow.flow.variables.taskSchedule.scope.browserScope.publicQueryAuthorization, task.authority.browserScope.publicQueryAuthorization)
@@ -3096,27 +3080,20 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const manualPreviewPassed = await inspectWindowsManualPreview(report, async () => {
         const manualEntryAudit = {}
         report.taskExecution.preview.manualEntryAudit = manualEntryAudit
-        if (browserSmoke) {
-          await clickWindowsManualTaskArtifact(cdp, { taskGoal: task.goal, previewExpression, audit: manualEntryAudit })
-        } else {
-          await clickWindowsChatManualArtifact(cdp, { artifactName: artifact.relativePath.split(/[\\/]/).at(-1), previewExpression, audit: manualEntryAudit })
-        }
+        await clickWindowsChatManualArtifact(cdp, { artifactName: artifact.relativePath.split(/[\\/]/).at(-1), previewExpression, audit: manualEntryAudit })
         const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
         assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
-        const layout = await cdp.wait(browserSmoke ? windowsTaskPreviewLayoutExpression() : windowsTaskChatLayoutExpression(prompt), 'the measured task navigation and original conversation beside its manual preview')
+        const layout = await cdp.wait(windowsTaskChatLayoutExpression(prompt), 'the original conversation beside its manual preview')
         report.taskExecution.preview.layout = layout
-        if (browserSmoke) {
-          validateWindowsTaskPreviewLayout(layout)
-          assert.equal(layout.navigationPlacement, 'sidebar')
-        } else validateWindowsTaskChatLayout(layout)
+        validateWindowsTaskChatLayout(layout)
       })
       const taskScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
       await writeFile(join(evidenceDir, manualPreviewPassed ? 'windows-task-html-preview-zh-dark.png' : 'windows-task-html-manual-failure.png'), Buffer.from(taskScreenshot.data, 'base64'))
       // Use the normal Flow edit/publish path for one real near-term test occurrence.
       // The original daily schedule and readback above remain separate evidence.
       const originalDefinition = flow.flow
-      const userPromptCount = !browserSmoke && await cdp.evaluate(`document.querySelector('.ds-message-timeline-content')?.textContent.split(${JSON.stringify(prompt)}).length-1`)
-      if (!browserSmoke) assert.ok(userPromptCount >= 1)
+      const userPromptCount = await cdp.evaluate(`document.querySelector('.ds-message-timeline-content')?.textContent.split(${JSON.stringify(prompt)}).length-1`)
+      assert.ok(userPromptCount >= 1)
       const dueAt = new Date(Date.now() + 20_000).toISOString()
       const dueDefinition = { ...originalDefinition, nodes: originalDefinition.nodes.map(node => node.id === 'schedule' ? { ...node, config: { kind: 'at', atTime: dueAt } } : node) }
       await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`, 'PUT', { definition: dueDefinition, expectedRevision: originalDefinition.revision })
@@ -3153,27 +3130,25 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         dueAt: occurrence.scheduledBy.dueAt, createdAt: occurrence.createdAt, independentTask: occurrence.id !== task.id,
         independentArtifact: occurrenceArtifact.absolutePath !== artifact.absolutePath, artifactSha256: occurrenceArtifact.sha256,
         byteHashMatches: createHash('sha256').update(occurrenceBytes).digest('hex') === occurrenceArtifact.sha256 }
-      if (!browserSmoke) {
-        assert.equal(occurrence.originThreadId, originThreadId)
-        report.taskExecution.dueOccurrence.originalChat = validateWindowsTaskChatLayout(await cdp.wait(windowsTaskChatLayoutExpression(prompt), 'the scheduled occurrence stays associated with the original chat'))
-        const returned = await cdp.wait(`document.querySelector('.ds-message-timeline-content')?.textContent.includes(${JSON.stringify(windowsDueTaskResult)})`, 'the actual scheduled result delivered in the original chat')
-        assert.equal(returned, true)
-        report.taskExecution.dueOccurrence.resultInOriginChat = true
-        const after = await cdp.evaluate(`document.querySelector('.ds-message-timeline-content')?.textContent.split(${JSON.stringify(prompt)}).length-1`)
-        assert.equal(after, userPromptCount, 'A scheduled occurrence must not replay the original user request into chat')
-        report.taskExecution.dueOccurrence.noRepeatedUserRequest = true
-        const reloadedOrigin = await runtimeRequest(`/v1/threads/${encodeURIComponent(originThreadId)}`)
-        const commandId = `command_task_result_${occurrence.id}`
-        const receiptId = `item_${commandId}_receipt`
-        const receipts = reloadedOrigin.conversationItems.filter(item => item.id === receiptId)
-        assert.equal(receipts.length, 1, 'Reopening the original chat must load one durable scheduled result')
-        assert.equal(receipts[0].threadId, originThreadId)
-        assert.equal(receipts[0].conversationReceiptId, commandId)
-        assert.equal(receipts[0].kind, 'assistant_text')
-        assert.equal(receipts[0].status, 'completed')
-        assert.equal(receipts[0].text, windowsDueTaskResult)
-        report.taskExecution.dueOccurrence.durableOriginReceipt = true
-      }
+      assert.equal(occurrence.originThreadId, originThreadId)
+      report.taskExecution.dueOccurrence.originalChat = validateWindowsTaskChatLayout(await cdp.wait(windowsTaskChatLayoutExpression(prompt), 'the scheduled occurrence stays associated with the original chat'))
+      const returned = await cdp.wait(`document.querySelector('.ds-message-timeline-content')?.textContent.includes(${JSON.stringify(windowsDueTaskResult)})`, 'the actual scheduled result delivered in the original chat')
+      assert.equal(returned, true)
+      report.taskExecution.dueOccurrence.resultInOriginChat = true
+      const after = await cdp.evaluate(`document.querySelector('.ds-message-timeline-content')?.textContent.split(${JSON.stringify(prompt)}).length-1`)
+      assert.equal(after, userPromptCount, 'A scheduled occurrence must not replay the original user request into chat')
+      report.taskExecution.dueOccurrence.noRepeatedUserRequest = true
+      const reloadedOrigin = await runtimeRequest(`/v1/threads/${encodeURIComponent(originThreadId)}`)
+      const commandId = `command_task_result_${occurrence.id}`
+      const receiptId = `item_${commandId}_receipt`
+      const receipts = reloadedOrigin.conversationItems.filter(item => item.id === receiptId)
+      assert.equal(receipts.length, 1, 'Reopening the original chat must load one durable scheduled result')
+      assert.equal(receipts[0].threadId, originThreadId)
+      assert.equal(receipts[0].conversationReceiptId, commandId)
+      assert.equal(receipts[0].kind, 'assistant_text')
+      assert.equal(receipts[0].status, 'completed')
+      assert.equal(receipts[0].text, windowsDueTaskResult)
+      report.taskExecution.dueOccurrence.durableOriginReceipt = true
       if (browserSmoke) assert.notEqual(occurrenceArtifact.sha256, artifact.sha256, 'The due report must contain its own freshly read primary-document version')
       if (browserSmoke) {
         const occurrenceThread = await runtimeRequest(`/v1/threads/${encodeURIComponent(occurrence.threadId)}`)
@@ -3234,33 +3209,31 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const restored = (await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`)).flow
       assert.deepEqual(restored.nodes.find(node => node.id === 'schedule').config, schedule.schedule)
       report.taskExecution.dueOccurrence.originalDailyScheduleRestored = true
-      if (!browserSmoke) {
-        const closeInspector = 'button[aria-label="收起右侧栏"]'
-        if (await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(closeInspector)})?.getClientRects().length)`)) {
-          await cdp.click(closeInspector)
-        }
-        await cdp.wait(`(() => {
-          const shell=document.querySelector('.ds-workbench-shell'), main=shell?.querySelector('main');
-          return main&&!main.inert&&!main.hasAttribute('inert')&&shell.dataset.activeOverlay!=='inspector'&&
-            !document.querySelector(${JSON.stringify(closeInspector)})?.getClientRects().length;
-        })()`, 'the report preview to finish closing before accessing workspace tools')
-        const toolNavigation = 'nav[aria-label="工作区工具"]'
-        const toolsDisclosure = `${toolNavigation} details`
-        await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(toolsDisclosure)}))`, 'the actual workspace Tools disclosure')
-        // A closed native disclosure can leave layout boxes for its unpainted children.
-        if (!await cdp.evaluate(`document.querySelector(${JSON.stringify(toolsDisclosure)}).open`)) {
-          await cdp.click(`${toolsDisclosure} > summary`, '工具')
-        }
-        const scheduleButton = `${toolsDisclosure}[open] button`
-        await cdp.wait(`document.querySelector(${JSON.stringify(toolsDisclosure)})?.open === true`, 'workspace Tools to open')
-        const scheduleTarget = await cdp.evaluate(windowsManualArtifactTargetExpression({ stable: true, selector: scheduleButton, label: '定时任务' }))
-        report.taskExecution.schedule.targetAudit = scheduleTarget
-        assert.equal(scheduleTarget.ready, true, `Workspace recurring schedule entry is covered or unstable: ${JSON.stringify(scheduleTarget)}`)
-        await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...scheduleTarget.point })
-        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...scheduleTarget.point })
-        await cdp.wait(`[...document.querySelectorAll('h1')].some(node=>node.getClientRects().length&&node.textContent.trim()==='定时任务')`, 'the independent recurring schedule manager')
-        report.taskExecution.schedule.dedicatedEntryOpened = true
+      const closeInspector = 'button[aria-label="收起右侧栏"]'
+      if (await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(closeInspector)})?.getClientRects().length)`)) {
+        await cdp.click(closeInspector)
       }
+      await cdp.wait(`(() => {
+        const shell=document.querySelector('.ds-workbench-shell'), main=shell?.querySelector('main');
+        return main&&!main.inert&&!main.hasAttribute('inert')&&shell.dataset.activeOverlay!=='inspector'&&
+          !document.querySelector(${JSON.stringify(closeInspector)})?.getClientRects().length;
+      })()`, 'the report preview to finish closing before accessing workspace tools')
+      const toolNavigation = 'nav[aria-label="工作区工具"]'
+      const toolsDisclosure = `${toolNavigation} details`
+      await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(toolsDisclosure)}))`, 'the actual workspace Tools disclosure')
+      // A closed native disclosure can leave layout boxes for its unpainted children.
+      if (!await cdp.evaluate(`document.querySelector(${JSON.stringify(toolsDisclosure)}).open`)) {
+        await cdp.click(`${toolsDisclosure} > summary`, '工具')
+      }
+      const scheduleButton = `${toolsDisclosure}[open] button`
+      await cdp.wait(`document.querySelector(${JSON.stringify(toolsDisclosure)})?.open === true`, 'workspace Tools to open')
+      const scheduleTarget = await cdp.evaluate(windowsManualArtifactTargetExpression({ stable: true, selector: scheduleButton, label: '定时任务' }))
+      report.taskExecution.schedule.targetAudit = scheduleTarget
+      assert.equal(scheduleTarget.ready, true, `Workspace recurring schedule entry is covered or unstable: ${JSON.stringify(scheduleTarget)}`)
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...scheduleTarget.point })
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...scheduleTarget.point })
+      await cdp.wait(`[...document.querySelectorAll('h1')].some(node=>node.getClientRects().length&&node.textContent.trim()==='定时任务')`, 'the independent recurring schedule manager')
+      report.taskExecution.schedule.dedicatedEntryOpened = true
       validateWindowsTaskEvidence(report.taskExecution)
       report.checks.push('runtime-task-html-and-daily-schedule')
     }

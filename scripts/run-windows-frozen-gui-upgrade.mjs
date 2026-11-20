@@ -147,13 +147,13 @@ async function createPrivateTrust(root) {
   const identity = new X509Certificate(cert)
   assert.equal(identity.checkIP('127.0.0.1'), '127.0.0.1')
   const thumbprint = identity.fingerprint.replaceAll(':', '')
-  const remove = () => execFileSync(certutil, ['-user', '-delstore', 'Root', thumbprint], {
+  const remove = () => execFileSync(certutil, ['-delstore', 'Root', thumbprint], {
     timeout: 30_000, windowsHide: true, stdio: 'ignore'
   })
   try {
-    // The runner owns the temporary user certificate store. Force noninteractive
-    // import so approval dialogs cannot stall the test without disabling TLS.
-    execFileSync(certutil, ['-user', '-f', '-addstore', 'Root', certificate], {
+    // This exact hosted runner is ephemeral. Its administrator-managed store
+    // avoids interactive CurrentUser approval dialogs. Remove only this certificate.
+    execFileSync(certutil, ['-f', '-addstore', 'Root', certificate], {
       timeout: 60_000, windowsHide: true, stdio: 'ignore'
     })
     return { key, cert, remove }

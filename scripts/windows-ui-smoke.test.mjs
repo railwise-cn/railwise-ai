@@ -1329,14 +1329,25 @@ test('browser recovery keeps the exact original task at zero Turns and model req
   assert.throws(() => validateWindowsBrowserRecoveryEvidence(implicit, binding.browserInstanceId))
   const strictBinding = structuredClone(evidence); delete strictBinding.confirmed.binding.verificationPolicy
   assert.throws(() => validateWindowsBrowserRecoveryEvidence(strictBinding, binding.browserInstanceId))
+  const inChat = structuredClone(evidence)
+  const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 420, overflow: 0 }
+  inChat.originalChat = { initial: layout, confirmed: layout, resumed: layout }
+  inChat.beforeConfiguration = initial
+  inChat.blockedResume = initial
+  inChat.confirmed = { ...initial, binding }
+  inChat.policyReview.beforePublicSelection = initial
+  delete inChat.pausedBeforeConfiguration
+  assert.equal(validateWindowsBrowserRecoveryEvidence(inChat, binding.browserInstanceId), true)
+  assert.throws(() => validateWindowsBrowserRecoveryEvidence({ ...inChat, originalChat: { ...inChat.originalChat, resumed: { ...layout, taskWorkbenchLinks: 1 } } }, binding.browserInstanceId))
+  assert.throws(() => validateWindowsBrowserRecoveryEvidence({ ...inChat, blockedResume: { ...initial, turns: 1 } }, binding.browserInstanceId))
   const script = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
   const start = script.indexOf('const initial = await readRecovery(')
   const end = script.indexOf('const uiApprovals = []', start)
   const flow = script.slice(start, end)
-  assert.ok(flow.indexOf("'暂停'") < flow.indexOf('await installMarketplaceBrowserSkill('))
-  assert.ok(flow.indexOf('await startRealBrowserSmoke(') < flow.indexOf("'确认当前任务的浏览器范围'"))
-  assert.ok(flow.indexOf('const confirmed = await readRecovery(') < flow.lastIndexOf("'继续任务'"))
-  assert.doesNotMatch(flow, /confirmBrowserTaskBinding|runtimeRequest\([^\n]*browser-binding[^\n]*POST|authority\s*=/)
+  assert.ok(flow.indexOf('browserRecovery.beforeConfiguration') < flow.indexOf('await installMarketplaceBrowserSkill('))
+  assert.ok(flow.indexOf('await startRealBrowserSmoke(') < flow.indexOf('await recheckInChat()'))
+  assert.ok(flow.indexOf('const confirmed = await readRecovery(') < flow.lastIndexOf('await recheckInChat()'))
+  assert.doesNotMatch(flow, /打开任务工作台|确认原任务详情|confirmBrowserTaskBinding|runtimeRequest\([^\n]*browser-binding[^\n]*POST|authority\s*=/)
 })
 
 test('browser binding UI selection requires the actual task card, complete preview and enabled real confirmation control', async () => {
@@ -1376,8 +1387,20 @@ test('browser binding UI selection requires the actual task card, complete previ
     button.disabled = true
     assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null)
     button.disabled = false
+    const legacy = detail.outerHTML
     detail.querySelector('dd').remove()
     assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null)
+    window.document.body.innerHTML = `<div class="ds-workbench-shell"><main>${panel}</main></div>${legacy}`
+    const main = window.document.querySelector('main'), chatButton = main.querySelector('button')
+    main.getClientRects = chatButton.getClientRects = () => [{}]
+    chatButton.scrollIntoView = () => undefined
+    chatButton.getBoundingClientRect = () => ({ x: 20, y: 30, width: 20, height: 10 })
+    window.document.elementFromPoint = () => chatButton
+    const originalChat = await window.eval(windowsBrowserBindingUiExpression({ originalChat: true }))
+    assert.deepEqual(JSON.parse(JSON.stringify(originalChat.point)), { x: 30, y: 35 })
+    assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null, 'The old task page cannot pass an original-chat interaction')
+    window.document.body.innerHTML = `<article aria-label="任务详情">${panel}</article>`
+    assert.equal(await window.eval(windowsBrowserBindingUiExpression({ originalChat: true })), null)
   } finally { await window.happyDOM.close() }
 })
 
@@ -1417,7 +1440,8 @@ test('after an autonomous task leaves Needs you, navigation re-selects the same 
     all.addEventListener('click', () => list.append(list.firstElementChild.cloneNode(true)))
     await assert.rejects(openWindowsTaskConversation(cdp, task), /mounted UI state/, 'Ambiguous same-goal tasks must not open a different conversation')
     const source = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
-    assert.match(source, /originalConversationNavigation = await openWindowsTaskConversation\(cdp, task\)/)
+    assert.doesNotMatch(source, /await openWindowsTaskConversation\(cdp, task\)/)
+    assert.match(source, /originalChat\.resumed = validateWindowsTaskChatLayout/)
     assert.doesNotMatch(openWindowsTaskConversation.toString(), /runtimeRequest|dispatchEvent|setSelected|setFilter|\.click\(\)/)
   } finally { await window.happyDOM.close() }
 })
@@ -1440,7 +1464,7 @@ test('browser binding samples the current hit point immediately before real mous
   const source = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
   const preview = source.indexOf('const previewSnapshot = await runtimeRequest(')
   const screenshot = source.indexOf("await writeFile(join(evidenceDir, 'windows-task-browser-binding-before-confirm-zh-dark.png')", preview)
-  const click = source.indexOf('await clickWindowsBrowserBinding(cdp, confirmationAudit)', screenshot)
+  const click = source.indexOf('await clickWindowsBrowserBinding(cdp, confirmationAudit, { originalChat: true })', screenshot)
   assert.ok(preview > 0 && screenshot > preview && click > screenshot)
   assert.doesNotMatch(source.slice(screenshot, click), /runtimeRequest\(|cdp\.send\(/)
   assert.doesNotMatch(clickWindowsBrowserBinding.toString(), /\.click\(|runtimeRequest|captureScreenshot/)
