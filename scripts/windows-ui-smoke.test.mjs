@@ -1,5 +1,6 @@
 import * as permissionSmokeModule from './run-windows-ui-smoke.mjs'
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -10,12 +11,112 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { windowsUiClickExpression, windowsManualArtifactTargetExpression, clickWindowsManualTaskArtifact, readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
+import { windowsUiClickExpression, windowsManualArtifactTargetExpression, clickWindowsChatManualArtifact, readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact, windowsTaskArtifactPreviewExpression } from './run-windows-ui-smoke.mjs'
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
+import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
+
+test('the private video fixture reads its exact indexed PDF section when a CJK search cannot find it', () => {
+  const section = { id: 'section-1', attachmentId: 'fixture-pdf', text: '铁 路\u0000合成验收' }
+  const selection = { skillId: 'video-shotcraft' }
+  const body = {
+    messages: [{ role: 'system', content: '- 合成视频资料.pdf (pdf, ready, id=fixture-pdf)' }],
+    tools: ['search_attachment', 'list_attachment_sections', 'read_attachment_section', 'read_skill_resource']
+      .map(name => ({ function: { name } }))
+  }
+  const result = (id, output) => body.messages.push({ role: 'tool', tool_call_id: `eval-${id}`, content: JSON.stringify(output) })
+  const action = () => windowsVideoModelAction(body, selection, {}, permissionSmokeModule.parseFixtureToolOutput)
+  assert.equal(action()[1], 'search_attachment')
+  result('find-pdf', { results: [{ ...section, attachmentId: 'another-file' }] })
+  assert.equal(action()[1], 'list_attachment_sections')
+  result('list-pdf', { sections: [section] })
+  assert.deepEqual(action(), ['eval-read-pdf', 'read_attachment_section', { attachment_id: 'fixture-pdf', section_id: 'section-1' }])
+  result('read-pdf', { section })
+  assert.equal(action()[1], 'read_skill_resource')
+  assert.equal(selection.pdfRead, true)
+})
+
+test('the private video fixture reconstructs and hashes authorized UTF-8 Skill context before render', () => {
+  const skillId = 'video-shotcraft'
+  const section = { id: 'section-1', attachmentId: 'fixture-pdf', text: '铁路合成验收' }
+  const content = JSON.stringify({ skill_id: skillId, path: 'references/pipeline.md', content: '工作流 npx remotion render' })
+  const marker = content.indexOf('npx')
+  const hash = createHash('sha256').update(content).digest('hex')
+  const first = content.slice(0, marker)
+  const offset = Buffer.byteLength(first)
+  const totalBytes = Buffer.byteLength(content)
+  const render = { command: 'owned test command' }
+  const body = {
+    messages: [{ role: 'system', content: '- 合成视频资料.pdf (pdf, ready, id=fixture-pdf)' }],
+    tools: ['read_task_context', 'request_host_shell', 'host_shell_session'].map(name => ({ function: { name } }))
+  }
+  const result = (id, output) => body.messages.push({ role: 'tool', tool_call_id: `eval-${id}`, content: JSON.stringify(output) })
+  result('find-pdf', { results: [section] })
+  result('read-pdf', { section })
+  result('read-pipeline', { contextSpill: { bundle_id: 'bundle', object_id: 'object', sha256: hash, totalBytes } })
+  const selection = { skillId }
+  const action = () => windowsVideoModelAction(body, selection, render, permissionSmokeModule.parseFixtureToolOutput)
+  assert.deepEqual(action(), ['eval-recall-workflow-0', 'read_task_context', { bundle_id: 'bundle', object_id: 'object', offset: 0, max_bytes: 8192 }])
+  const page = { untrusted: true, bundleId: 'bundle', objectId: 'object', totalBytes, sha256: hash }
+  result('recall-workflow-0', { ...page, offset: 0, nextOffset: offset, text: first })
+  assert.deepEqual(action(), ['eval-recall-workflow-1', 'read_task_context', { bundle_id: 'bundle', object_id: 'object', offset, max_bytes: 8192 }])
+  result('recall-workflow-1', { ...page, offset, nextOffset: null, text: content.slice(marker).replace('npx', 'npm') })
+  assert.throws(action)
+  assert.notEqual(selection.read, true)
+  body.messages.pop()
+  result('recall-workflow-1', { ...page, offset, nextOffset: null, text: content.slice(marker) })
+  assert.deepEqual(action(), ['eval-render', 'request_host_shell', render])
+  assert.equal(selection.read, true)
+  result('render', { status: 'running', authorizationId: '<redacted>', session_id: 'bash_a123' })
+  assert.deepEqual(action(), ['eval-poll-1', 'host_shell_session', { action: 'poll', session_id: 'bash_a123', yield_seconds: 10 }])
+})
+
+test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
+  const evidence = report()
+  const taskChat = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
+  evidence.checks = ['installed-chinese-renderer', 'installed-video-skill-protocol-render-registered-and-decoded']
+  delete evidence.resources
+  evidence.marketplace = {
+    status: 'passed', scope: 'video-shotcraft', installed: [{ id: 'video-shotcraft', artifactSha256: 'a'.repeat(64) }],
+    videoShotcraft: { runtimeSkillId: 'video-shotcraft', entrySha256: 'b'.repeat(64), slashSelectionVerified: true,
+      render: { kind: 'private-noncommercial-synthetic-evaluation', installedSkillResourceRead: true, attachedPdfRead: true,
+        sameTaskResumedAfterInterruption: true, appOpenedArtifact: true, decoded: true, runtimeApprovalId: 'approval',
+        codec: 'h264', width: 320, height: 180, frames: 24, artifact: { id: 'video', bytes: 1000, sha256: 'c'.repeat(64) },
+        decoder: { version: '4.1.0', sha256: 'd'.repeat(64), decodedFrames: 24 },
+        originalChat: { interrupted: taskChat, approval: taskChat, completed: taskChat, artifactButtonClicked: true } } }
+  }
+  assert.equal(validateWindowsUiReport(evidence, identity, { requireVideoEvaluation: true }), true)
+  assert.throws(() => validateWindowsUiReport(evidence, identity))
+  for (const field of ['installedSkillResourceRead', 'attachedPdfRead', 'sameTaskResumedAfterInterruption', 'appOpenedArtifact', 'decoded']) {
+    const changed = structuredClone(evidence)
+    changed.marketplace.videoShotcraft.render[field] = false
+    assert.throws(() => validateWindowsUiReport(changed, identity, { requireVideoEvaluation: true }), new RegExp(field))
+  }
+  const redirected = structuredClone(evidence)
+  redirected.marketplace.videoShotcraft.render.originalChat.approval.taskWorkbenchLinks = 1
+  assert.throws(() => validateWindowsUiReport(redirected, identity, { requireVideoEvaluation: true }))
+  const skippedFrame = structuredClone(evidence)
+  skippedFrame.marketplace.videoShotcraft.render.decoder.decodedFrames--
+  assert.throws(() => validateWindowsUiReport(skippedFrame, identity, { requireVideoEvaluation: true }))
+})
+
+test('the optional Windows fixtures load without evaluating the awaiting UI driver', () => {
+  const blockedEntry = new URL('./run-windows-ui-smoke.mjs', import.meta.url).href
+  const fixtures = ['./verify-windows-composer-acceptance.mjs', './verify-windows-video-evaluation.mjs']
+    .map(path => new URL(path, import.meta.url).href)
+  execFileSync(process.execPath, ['--input-type=module', '-e', `
+    import { registerHooks } from 'node:module';
+    registerHooks({ resolve(specifier, context, nextResolve) {
+      const resolved = nextResolve(specifier, context);
+      if (resolved.url === ${JSON.stringify(blockedEntry)}) throw new Error('The optional fixture depends on its awaiting CLI entrypoint');
+      return resolved;
+    } });
+    await Promise.all(${JSON.stringify(fixtures)}.map(url => import(url)));
+  `], { timeout: 10000 })
+})
 
 test('updater metadata diagnostics retain only safe fields and known categories, leaving unexplained failures unclassified', () => {
   const secret = 'private-query-token-do-not-export'
@@ -543,6 +644,9 @@ test('the normal Tender Master installed copy requires its owned path, bundled m
     const evidence = report()
     evidence.resources.defaultSkills[1] = valid
     assert.equal(validateWindowsUiReport(evidence, identity), true)
+    const expectedPackagedRoot = join(applicationRoot, 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', 'tender-master')
+    assert.deepEqual(permissionSmokeModule.windowsAuditedSkillDisplayRoots(valid, applicationRoot), [skillRoot, expectedPackagedRoot])
+    assert.deepEqual(permissionSmokeModule.windowsAuditedSkillDisplayRoots(skill(), applicationRoot), [skillRoot])
     await writeFile(join(skillRoot, 'SKILL.md'), 'same name, changed bytes')
     await assert.rejects(verifyInstalledBundledSkillCopy(skill(), { applicationRoot, isolatedRoot }))
     await writeFile(join(skillRoot, 'SKILL.md'), 'synthetic exact ASAR source\n')
@@ -607,6 +711,18 @@ for (const [name, change] of [
   const evidence = report().taskExecution
   change(evidence)
   assert.throws(() => validateWindowsTaskEvidence(evidence))
+})
+
+test('the scheduled original-chat result must survive reopening the conversation', () => {
+  const evidence = report().taskExecution
+  const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0,
+    taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
+  evidence.preview.layout = layout
+  evidence.schedule.dedicatedEntryOpened = true
+  Object.assign(evidence.dueOccurrence, { originalChat: layout, noRepeatedUserRequest: true, resultInOriginChat: true })
+  assert.throws(() => validateWindowsTaskEvidence(evidence))
+  evidence.dueOccurrence.durableOriginReceipt = true
+  validateWindowsTaskEvidence(evidence)
 })
 
 test('the local model protocol fixture requests real tools and never impersonates a browser result', async () => {
@@ -2105,10 +2221,8 @@ test('diagnostic quick identity retry receives only the remaining startup budget
   assert.equal(value.result.cleanup.verifiedBirth, true)
 })
 
-// Keep the legacy task-navigation controls for the install driver, with the
-// deferred preview owned by the original conversation as in the workbench.
-// The production layout hook still controls projection and modal dismissal.
-async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false, selectedTaskKeyUnchanged = false } = {}) {
+// The production layout hook reacts to a deferred preview while the original chat stays open.
+async function manualPreviewChatFixture(run, { initialPreview = false, newPreviewOnReveal = true } = {}) {
   const { Window } = await import('happy-dom')
   const window = new Window({ url: 'http://localhost/' }), temporary = await mkdtemp(join(tmpdir(), 'railwise-manual-route-'))
   const prior = new Map()
@@ -2126,21 +2240,21 @@ async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false, sele
       export {act,createRoot,h};
       export const events=[];
       export function Harness(){
-        const [route,setRoute]=useState('chat'),[ready,setReady]=useState(0);
-        const layout=useWorkbenchLayout({route:'chat',workspaceRoot:'/synthetic-ui-only',activeThreadId:'synthetic-origin-chat',latestAutoOpenDevPreviewKey:ready?'synthetic-current-hash-'+ready:null,latestAutoOpenDevPreviewUrl:ready?'http://localhost/report':null,latestDevPreviewUrl:ready?'http://localhost/report':null,writeAssistantOpen:false});
+        const [ready,setReady]=useState(${initialPreview ? 1 : 0}),[results,setResults]=useState(false);
+        const layout=useWorkbenchLayout({route:'chat',workspaceRoot:'/synthetic-ui-only',activeThreadId:'original-chat',latestAutoOpenDevPreviewKey:ready?'synthetic-current-hash-'+ready:null,latestAutoOpenDevPreviewUrl:ready?'http://localhost/report':null,latestDevPreviewUrl:ready?'http://localhost/report':null,writeAssistantOpen:false});
         const artifact=()=>{events.push('artifact-click');layout.openDevPreview()};
-        const select=()=>{events.push('select-task');if(${JSON.stringify(selectedTaskKeyUnchanged)})return;Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
+        const reveal=()=>{events.push('reveal-chat-results');setResults(true);if(${JSON.stringify(newPreviewOnReveal)})Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
         return h('div',{className:'ds-workbench-shell',ref:layout.shellRef,'data-active-overlay':layout.activeOverlay??''},
-          h('nav',{'aria-label':'工作区工具'},h('button',{id:'task-route',onClick:()=>{events.push('route-tasks');setRoute('tasks');if(${JSON.stringify(latePreviewOnRoute)})Promise.resolve().then(()=>{events.push('route-preview-projection');setReady(value=>value+1)})}},'任务')),
           layout.activeOverlay?h('button',{'aria-label':'返回当前任务',id:'backdrop',onClick:layout.closeDevPreview}):null,
-          h('main',{inert:layout.activeOverlay?true:undefined},route==='tasks'?h('section',{className:'ds-task-sidebar','aria-label':'任务列表'},h('div',{'aria-label':'任务筛选'},h('button',{id:'completed'},'已完成 1')),h('button',{id:'task-row',title:'合成 UI 任务',onClick:select},'合成 UI 任务')):null,
-            route==='tasks'?h('article',{'aria-label':'任务详情'},h('button',{id:'artifact',onClick:artifact},'每日网页报告.html')):null),
+          h('main',{inert:layout.activeOverlay?true:undefined},h('div',{className:'ds-chat-composer-dock'},
+            h('section',{'aria-label':'任务'},h('button',{id:'reveal','aria-expanded':results,onClick:reveal},'1 个成果'),
+              results?h('ul',{'aria-label':'成果'},h('li',null,h('button',{id:'artifact',onClick:artifact},'每日网页报告.html'))):null))),
           layout.rightPanelVisible?h('aside',{id:'workbench-inspector'},h('button',{'aria-label':'收起右侧栏',id:'collapse',onClick:()=>{events.push('collapse-panel');layout.closeDevPreview()}}),h('webview'),ready?h('div',{id:'workspace-preview-ready'}):null):null);
       }`, resolveDir: fileURLToPath(new URL('..', import.meta.url)), loader: 'tsx' }, outfile: output, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', define: { 'process.env.NODE_ENV': '"development"' } })
     fixture = createRequire(import.meta.url)(output)
     const box = node => {
-      const x = node.id === 'artifact' ? 297 : node.id === 'collapse' ? 940 : node.id === 'backdrop' ? 0 : node.id === 'task-route' ? 20 : node.id === 'completed' ? 20 : 20
-      const y = node.id === 'artifact' ? 500 : node.id === 'collapse' ? 20 : node.id === 'backdrop' ? 0 : node.id === 'task-route' ? 20 : node.id === 'completed' ? 100 : 160
+      const x = node.id === 'artifact' ? 297 : node.id === 'collapse' ? 940 : node.id === 'backdrop' ? 0 : 20
+      const y = node.id === 'artifact' ? 500 : node.id === 'collapse' ? 20 : node.id === 'backdrop' ? 0 : 160
       const width = node.id === 'artifact' ? 674 : node.id === 'backdrop' ? 1024 : 60, height = node.id === 'backdrop' ? 728 : 36
       return { x, y, left: x, top: y, width, height, right: x + width, bottom: y + height }
     }
@@ -2173,17 +2287,17 @@ async function manualPreviewRouteFixture(run, { latePreviewOnRoute = false, sele
   }
 }
 
-test('manual artifact entry waits for the actual route late-preview overlay and dismisses its panel control before pointer input', async () => {
-  await manualPreviewRouteFixture(async ({ cdp, events, input }) => {
+test('manual chat artifact entry dismisses a late-preview overlay before real pointer input', async () => {
+  await manualPreviewChatFixture(async ({ cdp, events, input }) => {
     const audit = {}
-    await clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `document.querySelector('#workspace-preview-ready') && {partition:'railwise-artifact-synthetic'}`, audit })
-    assert.ok(events.indexOf('route-tasks') < events.indexOf('late-preview-projection'))
+    await clickWindowsChatManualArtifact(cdp, { artifactName: '每日网页报告.html', previewExpression: `document.querySelector('#workspace-preview-ready') && {partition:'railwise-artifact-synthetic'}`, audit })
+    assert.ok(events.indexOf('reveal-chat-results') < events.indexOf('late-preview-projection'))
     assert.ok(events.indexOf('late-preview-projection') < events.indexOf('collapse-panel'))
     assert.equal(events.filter(event => event === 'artifact-click').length, 1)
     assert.equal(events.filter(event => event === 'collapse-panel').length, 1)
-    assert.equal(audit.afterProjection.activeOverlay, 'inspector')
-    assert.equal(audit.afterProjection.mainInert, true)
-    assert.equal(audit.afterProjection.hit.target, false)
+    assert.equal(audit.targetBeforeDismiss.activeOverlay, 'inspector')
+    assert.equal(audit.targetBeforeDismiss.mainInert, true)
+    assert.equal(audit.targetBeforeDismiss.hit.target, false)
     assert.ok(audit.target.stableFrames >= 2)
     assert.equal(audit.target.mainInert, false)
     assert.equal(input.at(-1).type, 'mouseReleased')
@@ -2191,11 +2305,11 @@ test('manual artifact entry waits for the actual route late-preview overlay and 
 })
 
 test('manual artifact permanent coverage stays failed with first geometry and no input behind the blocker', async () => {
-  await manualPreviewRouteFixture(async ({ window, cdp, events }) => {
+  await manualPreviewChatFixture(async ({ window, cdp, events }) => {
     const originalHit = window.document.elementFromPoint.bind(window.document)
     window.document.elementFromPoint = (x, y) => { const hit = originalHit(x, y); return hit?.id === 'artifact' ? window.document.body : hit }
     const audit = {}, evidence = report()
-    assert.equal(await inspectWindowsManualPreview(evidence, () => clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })), false)
+    assert.equal(await inspectWindowsManualPreview(evidence, () => clickWindowsChatManualArtifact(cdp, { artifactName: '每日网页报告.html', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })), false)
     assert.equal(audit.target.ready, false)
     assert.equal(audit.target.observedFrames, 60)
     assert.equal(audit.target.initial.hit.tag, 'BODY')
@@ -2206,7 +2320,7 @@ test('manual artifact permanent coverage stays failed with first geometry and no
     assert.match(evidence.errors[0], /UI target is covered or unstable/)
     assert.throws(() => validateWindowsTaskEvidence(evidence.taskExecution))
     assert.throws(() => validateWindowsUiReport(evidence, identity))
-  })
+  }, { newPreviewOnReveal: false })
 })
 
 test('manual artifact pointer probe waits through a covered frame, moving geometry and DOM replacement', async () => {
@@ -2232,39 +2346,35 @@ test('manual artifact pointer probe waits through a covered frame, moving geomet
   } finally { await window.happyDOM.close() }
 })
 
-test('manual task navigation dismisses a late route overlay as well as the selected-task preview without bypassing either', async () => {
-  await manualPreviewRouteFixture(async ({ cdp, events }) => {
+test('manual chat artifact entry dismisses both an existing preview and the late updated preview', async () => {
+  await manualPreviewChatFixture(async ({ cdp, events }) => {
     const audit = {}
-    await clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })
-    assert.ok(events.indexOf('route-tasks') < events.indexOf('route-preview-projection'))
-    assert.ok(events.indexOf('route-preview-projection') < events.indexOf('select-task'))
+    await clickWindowsChatManualArtifact(cdp, { artifactName: '每日网页报告.html', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })
+    assert.ok(events.indexOf('collapse-panel') < events.indexOf('reveal-chat-results'))
+    assert.ok(events.indexOf('late-preview-projection') < events.lastIndexOf('collapse-panel'))
     assert.equal(events.filter(event => event === 'collapse-panel').length, 2)
     assert.equal(events.filter(event => event === 'artifact-click').length, 1)
-    assert.equal(audit.navigation[0].initial.activeOverlay, 'inspector')
-    assert.equal(audit.navigation[0].initial.mainInert, true)
-    assert.equal(audit.navigation[0].afterDismiss.ready, true)
+    assert.equal(audit.targetBeforeDismiss.activeOverlay, 'inspector')
+    assert.equal(audit.targetBeforeDismiss.mainInert, true)
     assert.equal(audit.target.ready, true)
-  }, { latePreviewOnRoute: true })
+  }, { initialPreview: true })
 })
 
 
-test('manual artifact entry respects an already dismissed workspace preview when selecting the same task and hash again', async () => {
-  await manualPreviewRouteFixture(async ({ cdp, events }) => {
+test('manual chat artifact entry respects an already dismissed preview when its hash is unchanged', async () => {
+  await manualPreviewChatFixture(async ({ cdp, events }) => {
     const audit = {}
-    await clickWindowsManualTaskArtifact(cdp, { taskGoal: '合成 UI 任务', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })
-    assert.equal(events.filter(event => event === 'route-preview-projection').length, 1)
-    assert.equal(events.filter(event => event === 'late-preview-projection').length, 0, 'Selecting the current task must not invent a new IPC projection or artifact hash')
+    await clickWindowsChatManualArtifact(cdp, { artifactName: '每日网页报告.html', previewExpression: `Boolean(document.querySelector('#workspace-preview-ready'))`, audit })
+    assert.equal(events.filter(event => event === 'late-preview-projection').length, 0, 'Revealing chat results must not invent a new IPC projection or artifact hash')
     assert.equal(events.filter(event => event === 'collapse-panel').length, 1)
     assert.equal(events.filter(event => event === 'artifact-click').length, 1)
-    assert.ok(events.indexOf('collapse-panel') < events.indexOf('select-task'))
-    assert.ok(events.indexOf('select-task') < events.indexOf('artifact-click'))
-    assert.equal(audit.beforeManual.activeOverlay, null)
-    assert.equal(audit.beforeManual.mainInert, false)
+    assert.ok(events.indexOf('collapse-panel') < events.indexOf('reveal-chat-results'))
+    assert.ok(events.indexOf('reveal-chat-results') < events.indexOf('artifact-click'))
     assert.equal(audit.targetBeforeDismiss, undefined)
     assert.equal(audit.target.ready, true)
     assert.equal(audit.target.mainInert, false)
     assert.equal(audit.target.stableFrames, 2)
-  }, { latePreviewOnRoute: true, selectedTaskKeyUnchanged: true })
+  }, { initialPreview: true, newPreviewOnReveal: false })
 })
 
 

@@ -12,8 +12,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency, preparePinnedBrowserStartupCli, browserStartupDependency } from './prepare-browser-skill-smoke.mjs'
 import { observeWorkbenchTypography, runWindowsStartupAppearanceSmoke } from './verify-packaged-startup-appearance.mjs'
+import { revealWindowsChatTaskArtifact, validateWindowsTaskChatLayout, windowsTaskChatLayoutExpression } from './windows-task-chat-ui.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
+const windowsDueTaskResult = '本次 HTML 报告已保存并核验，可在原会话查看。'
 
 const windowsUpdateFailureCodes = new Set(['not_configured', 'unsupported', 'unsigned_build', 'manifest_unavailable', 'network',
   'signature_invalid', 'withdrawn', 'download_failed', 'install_failed', 'github_repo_not_found', 'github_forbidden',
@@ -359,6 +361,14 @@ export async function verifyInstalledBundledSkillCopy(skill, { applicationRoot, 
     entrySha256: skill.entrySha256, entryRegisteredInAsar: true, metadataVerified: true, ownedPathVerified: true }
 }
 
+export function windowsAuditedSkillDisplayRoots(skill, applicationRoot) {
+  const roots = [skill.root]
+  // Discovery may show the bundled source while the runtime uses its owned copy.
+  // Accept that exact source only after the copy has passed the ASAR byte check.
+  if (verifiedBundledSkillCopy(skill)) roots.push(join(applicationRoot, dirname(skill.bundledCopySource.entryRelativePath)))
+  return roots
+}
+
 export function validateDefaultSkillSources(skills) {
   return defaultSkillIds.map(id => {
     const skill = skills.find(skill => skill.id === id)
@@ -391,7 +401,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -404,6 +414,32 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
   assert.equal(report.errors.length, 0)
+  if (requireVideoEvaluation) {
+    assert.ok(report.checks.includes('installed-chinese-renderer'))
+    assert.ok(report.checks.includes('installed-video-skill-protocol-render-registered-and-decoded'))
+    const marketplace = report.marketplace
+    assert.equal(marketplace.status, 'passed')
+    assert.equal(marketplace.scope, 'video-shotcraft')
+    assert.deepEqual(marketplace.installed.map(item => item.id), ['video-shotcraft'])
+    assert.match(marketplace.installed[0].artifactSha256, /^[a-f0-9]{64}$/)
+    const videoSkill = marketplace.videoShotcraft
+    assert.ok(videoSkill.runtimeSkillId)
+    assert.match(videoSkill.entrySha256, /^[a-f0-9]{64}$/)
+    assert.equal(videoSkill.slashSelectionVerified, true)
+    const input = videoSkill.render
+    assert.equal(input.kind, 'private-noncommercial-synthetic-evaluation')
+    for (const flag of ['installedSkillResourceRead', 'attachedPdfRead', 'sameTaskResumedAfterInterruption', 'appOpenedArtifact', 'decoded']) {
+      assert.equal(input[flag], true, `Missing private video acceptance evidence: ${flag}`)
+    }
+    assert.ok(input.runtimeApprovalId && input.artifact.id && input.artifact.bytes > 0)
+    assert.match(input.artifact.sha256, /^[a-f0-9]{64}$/)
+    assert.deepEqual([input.codec, input.width, input.height, input.frames], ['h264', 320, 180, 24])
+    assert.match(input.decoder.sha256, /^[a-f0-9]{64}$/)
+    assert.equal(input.decoder.decodedFrames, input.frames)
+    for (const phase of ['interrupted', 'approval', 'completed']) validateWindowsTaskChatLayout(input.originalChat?.[phase])
+    assert.equal(input.originalChat.artifactButtonClicked, true)
+    return true
+  }
   assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
   assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
   assert.equal(report.update.ok, true)
@@ -560,7 +596,14 @@ export function validateWindowsTaskEvidence(evidence) {
   assert.equal(evidence.preview.automatic, true)
   assert.equal(evidence.preview.contentVerified, true)
   assert.equal(evidence.preview.manualEntryVerified, true)
-  validateWindowsTaskPreviewLayout(evidence.preview.layout)
+  if (evidence.preview.layout?.surface === 'original-chat') {
+    validateWindowsTaskChatLayout(evidence.preview.layout)
+    validateWindowsTaskChatLayout(evidence.dueOccurrence.originalChat)
+    assert.equal(evidence.dueOccurrence.noRepeatedUserRequest, true)
+    assert.equal(evidence.dueOccurrence.resultInOriginChat, true)
+    assert.equal(evidence.dueOccurrence.durableOriginReceipt, true)
+    assert.equal(evidence.schedule.dedicatedEntryOpened, true)
+  } else validateWindowsTaskPreviewLayout(evidence.preview.layout)
   assert.equal(evidence.dueOccurrence.clock, 'real')
   assert.equal(evidence.dueOccurrence.status, 'completed')
   assert.equal(evidence.dueOccurrence.independentTask, true)
@@ -888,7 +931,7 @@ export async function startWindowsTaskModelFixture({ browser = false, postPlanQu
         observation.webArtifactEvidence = verification
       }
       const delta = next ? { tool_calls: [{ index: 0, id: `smoke-${id}`, type: 'function', function: { name: next, arguments: JSON.stringify(args) } }] }
-        : { content: 'HTML 报告已保存并核验，每日计划已创建并读回，可在任务成果中查看。' }
+        : { content: initial ? 'HTML 报告已保存并核验，每日计划已创建并读回，可在原会话查看。' : windowsDueTaskResult }
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       observation.status = 200
       response.end(`data: ${JSON.stringify({ id: 'windows-task-fixture', choices: [{ index: 0, delta, finish_reason: next ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\ndata: [DONE]\n\n`)
@@ -1906,6 +1949,30 @@ export async function clickWindowsManualTaskArtifact(cdp, { taskGoal, previewExp
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...audit.target.point })
 }
 
+export async function clickWindowsChatManualArtifact(cdp, { artifactName, previewExpression, audit }) {
+  const closeButton = 'button[aria-label="收起右侧栏"]'
+  const closeInspector = async () => {
+    if (!await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(closeButton)})?.getClientRects().length)`)) return
+    await cdp.wait(previewExpression, 'the actual inspector preview before dismissal', 30_000)
+    await cdp.click(closeButton)
+    await cdp.wait(`(()=>{const shell=document.querySelector('.ds-workbench-shell'),main=shell?.querySelector('main');return main&&!main.inert&&!main.hasAttribute('inert')&&shell.dataset.activeOverlay!=='inspector';})()`, 'the original chat becomes interactive after closing the HTML preview')
+  }
+  await closeInspector()
+  const selector = await revealWindowsChatTaskArtifact(cdp, artifactName)
+  const probe = windowsManualArtifactTargetExpression({ stable: true, selector, label: artifactName })
+  audit.target = await cdp.wait(probe, 'the current chat artifact after two stable uncovered frames')
+  if (!audit.target.ready && audit.target.activeOverlay === 'inspector') {
+    audit.targetBeforeDismiss = audit.target
+    await closeInspector()
+    audit.target = await cdp.wait(probe, 'the chat artifact after dismissing its late inspector')
+  }
+  assert.equal(audit.target.ready, true, `UI target is covered or unstable: ${artifactName} ${JSON.stringify(audit.target)}`)
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...audit.target.point })
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...audit.target.point })
+  audit.input = 'real-cdp-mouse'
+  audit.surface = 'original-chat'
+}
+
 export async function inspectWindowsManualPreview(report, inspect) {
   try {
     await inspect()
@@ -2482,7 +2549,6 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
 
 export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true' }) {
   taskSmoke ||= browserSmoke
-  mirrorSmoke ||= videoEvaluation
   assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
@@ -2499,7 +2565,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const environment = windowsUiEnvironment(process.env, root)
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
   const video = videoEvaluation ? await import('./verify-windows-video-evaluation.mjs')
-    .then(module => module.startWindowsVideoEvaluation(workspace, environment)) : undefined
+    .then(module => module.startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput)) : undefined
   const composerModule = composerSmoke ? await import('./verify-windows-composer-acceptance.mjs') : undefined
   const composerAcceptance = composerModule?.createComposerModelAcceptance()
   const taskModel = video ?? (taskSmoke || mirrorSmoke || composerSmoke ? await startWindowsTaskModelFixture({
@@ -2574,6 +2640,14 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
+    if (video) {
+      const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
+      report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: true })
+      report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
+      report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
+    } else await verifyFullWorkbench()
+
+    async function verifyFullWorkbench() {
     await cdp.click('button', '技能与连接器')
     report.tabs = await cdp.wait(`(() => { const tabs=Array.from(document.querySelectorAll('[role="tablist"][aria-label="技能与连接器分类"] [role="tab"]')); return tabs.length===3 && tabs.map(tab=>tab.textContent.trim()); })()`, 'marketplace tabs')
     assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
@@ -2621,7 +2695,13 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         skill.entryRegisteredInAsar = true
       }
       await cdp.fill('input[placeholder*="已索引"]', skill.name || skill.id)
-      await cdp.wait(`document.body.innerText.includes(${JSON.stringify(skill.root)}) && Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===${JSON.stringify(skill.name || skill.id)})`, `${skill.id} in its actual local package directory`)
+      const displayRoots = windowsAuditedSkillDisplayRoots(skill, dirname(executable))
+      await cdp.wait(`Array.from(document.querySelectorAll('main .truncate')).some(node => {
+        if (node.textContent.trim() !== ${JSON.stringify(skill.name || skill.id)}) return false;
+        const card = node.parentElement?.parentElement;
+        return Array.from(card?.querySelectorAll('span') ?? []).some(path =>
+          ${JSON.stringify(displayRoots)}.includes(path.textContent.trim()));
+      })`, `${skill.id} in its actual local package directory`)
     }
     await cdp.fill('input[placeholder*="已索引"]', '')
     await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'the catalog after clearing the local Skill search')
@@ -2985,19 +3065,27 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const manualPreviewPassed = await inspectWindowsManualPreview(report, async () => {
         const manualEntryAudit = {}
         report.taskExecution.preview.manualEntryAudit = manualEntryAudit
-        await clickWindowsManualTaskArtifact(cdp, { taskGoal: task.goal, previewExpression, audit: manualEntryAudit })
+        if (browserSmoke) {
+          await clickWindowsManualTaskArtifact(cdp, { taskGoal: task.goal, previewExpression, audit: manualEntryAudit })
+        } else {
+          await clickWindowsChatManualArtifact(cdp, { artifactName: artifact.relativePath.split(/[\\/]/).at(-1), previewExpression, audit: manualEntryAudit })
+        }
         const preview = await cdp.wait(previewExpression, 'the actual HTML body opened from the task artifact entry', 30_000)
         assert.ok(preview.partition?.startsWith('railwise-artifact-'), 'The task HTML preview must use its isolated partition')
-        const layout = await cdp.wait(windowsTaskPreviewLayoutExpression(), 'the measured task workspace beside its manual preview')
+        const layout = await cdp.wait(browserSmoke ? windowsTaskPreviewLayoutExpression() : windowsTaskChatLayoutExpression(prompt), 'the measured task navigation and original conversation beside its manual preview')
         report.taskExecution.preview.layout = layout
-        validateWindowsTaskPreviewLayout(layout)
-        assert.equal(layout.navigationPlacement, 'sidebar', 'The exact package must use the existing left task sidebar')
+        if (browserSmoke) {
+          validateWindowsTaskPreviewLayout(layout)
+          assert.equal(layout.navigationPlacement, 'sidebar')
+        } else validateWindowsTaskChatLayout(layout)
       })
       const taskScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
       await writeFile(join(evidenceDir, manualPreviewPassed ? 'windows-task-html-preview-zh-dark.png' : 'windows-task-html-manual-failure.png'), Buffer.from(taskScreenshot.data, 'base64'))
       // Use the normal Flow edit/publish path for one real near-term test occurrence.
       // The original daily schedule and readback above remain separate evidence.
       const originalDefinition = flow.flow
+      const userPromptCount = !browserSmoke && await cdp.evaluate(`document.querySelector('.ds-message-timeline-content')?.textContent.split(${JSON.stringify(prompt)}).length-1`)
+      if (!browserSmoke) assert.ok(userPromptCount >= 1)
       const dueAt = new Date(Date.now() + 20_000).toISOString()
       const dueDefinition = { ...originalDefinition, nodes: originalDefinition.nodes.map(node => node.id === 'schedule' ? { ...node, config: { kind: 'at', atTime: dueAt } } : node) }
       await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`, 'PUT', { definition: dueDefinition, expectedRevision: originalDefinition.revision })
@@ -3034,6 +3122,27 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         dueAt: occurrence.scheduledBy.dueAt, createdAt: occurrence.createdAt, independentTask: occurrence.id !== task.id,
         independentArtifact: occurrenceArtifact.absolutePath !== artifact.absolutePath, artifactSha256: occurrenceArtifact.sha256,
         byteHashMatches: createHash('sha256').update(occurrenceBytes).digest('hex') === occurrenceArtifact.sha256 }
+      if (!browserSmoke) {
+        assert.equal(occurrence.originThreadId, originThreadId)
+        report.taskExecution.dueOccurrence.originalChat = validateWindowsTaskChatLayout(await cdp.wait(windowsTaskChatLayoutExpression(prompt), 'the scheduled occurrence stays associated with the original chat'))
+        const returned = await cdp.wait(`document.querySelector('.ds-message-timeline-content')?.textContent.includes(${JSON.stringify(windowsDueTaskResult)})`, 'the actual scheduled result delivered in the original chat')
+        assert.equal(returned, true)
+        report.taskExecution.dueOccurrence.resultInOriginChat = true
+        const after = await cdp.evaluate(`document.querySelector('.ds-message-timeline-content')?.textContent.split(${JSON.stringify(prompt)}).length-1`)
+        assert.equal(after, userPromptCount, 'A scheduled occurrence must not replay the original user request into chat')
+        report.taskExecution.dueOccurrence.noRepeatedUserRequest = true
+        const reloadedOrigin = await runtimeRequest(`/v1/threads/${encodeURIComponent(originThreadId)}`)
+        const commandId = `command_task_result_${occurrence.id}`
+        const receiptId = `item_${commandId}_receipt`
+        const receipts = reloadedOrigin.conversationItems.filter(item => item.id === receiptId)
+        assert.equal(receipts.length, 1, 'Reopening the original chat must load one durable scheduled result')
+        assert.equal(receipts[0].threadId, originThreadId)
+        assert.equal(receipts[0].conversationReceiptId, commandId)
+        assert.equal(receipts[0].kind, 'assistant_text')
+        assert.equal(receipts[0].status, 'completed')
+        assert.equal(receipts[0].text, windowsDueTaskResult)
+        report.taskExecution.dueOccurrence.durableOriginReceipt = true
+      }
       if (browserSmoke) assert.notEqual(occurrenceArtifact.sha256, artifact.sha256, 'The due report must contain its own freshly read primary-document version')
       if (browserSmoke) {
         const occurrenceThread = await runtimeRequest(`/v1/threads/${encodeURIComponent(occurrence.threadId)}`)
@@ -3094,6 +3203,33 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const restored = (await runtimeRequest(`/v1/flows/${encodeURIComponent(schedule.id)}`)).flow
       assert.deepEqual(restored.nodes.find(node => node.id === 'schedule').config, schedule.schedule)
       report.taskExecution.dueOccurrence.originalDailyScheduleRestored = true
+      if (!browserSmoke) {
+        const closeInspector = 'button[aria-label="收起右侧栏"]'
+        if (await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(closeInspector)})?.getClientRects().length)`)) {
+          await cdp.click(closeInspector)
+        }
+        await cdp.wait(`(() => {
+          const shell=document.querySelector('.ds-workbench-shell'), main=shell?.querySelector('main');
+          return main&&!main.inert&&!main.hasAttribute('inert')&&shell.dataset.activeOverlay!=='inspector'&&
+            !document.querySelector(${JSON.stringify(closeInspector)})?.getClientRects().length;
+        })()`, 'the report preview to finish closing before accessing workspace tools')
+        const toolNavigation = 'nav[aria-label="工作区工具"]'
+        const toolsDisclosure = `${toolNavigation} details`
+        await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(toolsDisclosure)}))`, 'the actual workspace Tools disclosure')
+        // A closed native disclosure can leave layout boxes for its unpainted children.
+        if (!await cdp.evaluate(`document.querySelector(${JSON.stringify(toolsDisclosure)}).open`)) {
+          await cdp.click(`${toolsDisclosure} > summary`, '工具')
+        }
+        const scheduleButton = `${toolsDisclosure}[open] button`
+        await cdp.wait(`document.querySelector(${JSON.stringify(toolsDisclosure)})?.open === true`, 'workspace Tools to open')
+        const scheduleTarget = await cdp.evaluate(windowsManualArtifactTargetExpression({ stable: true, selector: scheduleButton, label: '定时任务' }))
+        report.taskExecution.schedule.targetAudit = scheduleTarget
+        assert.equal(scheduleTarget.ready, true, `Workspace recurring schedule entry is covered or unstable: ${JSON.stringify(scheduleTarget)}`)
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...scheduleTarget.point })
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...scheduleTarget.point })
+        await cdp.wait(`[...document.querySelectorAll('h1')].some(node=>node.getClientRects().length&&node.textContent.trim()==='定时任务')`, 'the independent recurring schedule manager')
+        report.taskExecution.schedule.dedicatedEntryOpened = true
+      }
       validateWindowsTaskEvidence(report.taskExecution)
       report.checks.push('runtime-task-html-and-daily-schedule')
     }
@@ -3118,10 +3254,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
       report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root })
       report.checks.push('cold-mirror-installs-playwright-docling-and-skill-selection')
-      if (video) {
-        report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
-        report.checks.push('installed-video-skill-protocol-render-registered-and-decoded')
-      }
+    }
     }
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error))
@@ -3187,9 +3320,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       }
     }
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
-    if (taskModel) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
+    if (taskModel?.observed) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke }); report.status = 'passed' } catch (error) {
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }

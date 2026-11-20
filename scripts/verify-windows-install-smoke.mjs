@@ -9,6 +9,8 @@ import { PUBLIC_IDENTITY } from './verify-reviewed-release-artifacts.mjs'
 import publication from './release-publication.cjs'
 import { validateWindowsSmokeSource } from './prepare-windows-install-smoke.mjs'
 
+export const psQuote = value => "'" + value.replaceAll("'", "''") + "'"
+
 const require = createRequire(import.meta.url)
 const NSIS_NAMESPACE = Buffer.from('50e065bc313411e69bab38c9862bdaf3', 'hex')
 const fail = message => { throw new Error(`[windows-install-smoke] ${message}`) }
