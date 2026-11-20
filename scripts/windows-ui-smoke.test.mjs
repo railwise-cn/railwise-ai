@@ -559,6 +559,9 @@ test('the normal Tender Master installed copy requires its owned path, bundled m
     const evidence = report()
     evidence.resources.defaultSkills[1] = valid
     assert.equal(validateWindowsUiReport(evidence, identity), true)
+    const expectedPackagedRoot = join(applicationRoot, 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', 'tender-master')
+    assert.deepEqual(permissionSmokeModule.windowsAuditedSkillDisplayRoots(valid, applicationRoot), [skillRoot, expectedPackagedRoot])
+    assert.deepEqual(permissionSmokeModule.windowsAuditedSkillDisplayRoots(skill(), applicationRoot), [skillRoot])
     await writeFile(join(skillRoot, 'SKILL.md'), 'same name, changed bytes')
     await assert.rejects(verifyInstalledBundledSkillCopy(skill(), { applicationRoot, isolatedRoot }))
     await writeFile(join(skillRoot, 'SKILL.md'), 'synthetic exact ASAR source\n')
