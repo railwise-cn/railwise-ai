@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
-import { isolatedMacDmgMember, validateIsolatedMacStartupBundle, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
+import { gatekeeperEnforcement, isolatedMacDmgMember, validateIsolatedMacStartupBundle, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { observeStartupTargets, observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, waitForStartupCondition, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
@@ -194,4 +194,11 @@ test('isolated Mac startup accepts only the exact installer entries and loopback
   assert.doesNotThrow(() => validateIsolatedMacStartupBundle(packaged, updater))
   assert.throws(() => validateIsolatedMacStartupBundle({ ...packaged, updateChannel: 'stable' }, updater))
   assert.throws(() => validateIsolatedMacStartupBundle(packaged, { ...updater, url: 'https://www.railwise.cn/' }))
+})
+
+test('records Gatekeeper enforcement separately from a successful bundle assessment', () => {
+  assert.equal(gatekeeperEnforcement('assessments enabled\n'), 'enabled')
+  assert.equal(gatekeeperEnforcement('assessments disabled\n'), 'disabled')
+  assert.equal(gatekeeperEnforcement('status unavailable'), 'unknown')
+  assert.equal(gatekeeperEnforcement(null), 'unknown')
 })

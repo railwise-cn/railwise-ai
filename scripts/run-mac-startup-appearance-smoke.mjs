@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { appendFile, mkdir, mkdtemp, open, readFile, stat, writeFile } from 'node:fs/promises'
@@ -123,6 +123,11 @@ export function validateIsolatedMacStartupBundle(packaged, updater) {
   assert.equal(updater.url, 'https://127.0.0.1/')
 }
 
+export function gatekeeperEnforcement(statusOutput) {
+  const match = /^\s*assessments (enabled|disabled)\s*$/i.exec(statusOutput ?? '')
+  return match?.[1].toLowerCase() ?? 'unknown'
+}
+
 function isolatedMacEnvironment(environment, root) {
   const home = join(root, 'home')
   return { PATH: environment.PATH, HOME: home, XDG_CONFIG_HOME: home, XDG_CACHE_HOME: home, TMPDIR: root,
@@ -153,9 +158,12 @@ async function readInstalledStartupBundle(installer, temporary, source, version,
   finally { command('/usr/bin/hdiutil', ['detach', mountPoint]) }
   command('/usr/bin/codesign', ['--verify', '--deep', '--strict', install])
   command('/usr/bin/xcrun', ['stapler', 'validate', install])
+  let gatekeeper
   if (isolated) {
     command('/usr/bin/codesign', ['--verify', '-R', 'anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists', install])
+    const status = spawnSync('/usr/sbin/spctl', ['--status'], { encoding: 'utf8', timeout: 10_000 })
     command('/usr/sbin/spctl', ['--assess', '--type', 'execute', install])
+    gatekeeper = { assessment: 'succeeded', enforcement: gatekeeperEnforcement(status.stdout), statusCommandExitCode: status.status }
   }
   const info = JSON.parse(command('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(install, 'Contents', 'Info.plist')]))
   assert.equal(info.CFBundleIdentifier, PUBLIC_IDENTITY.bundleId)
@@ -176,7 +184,7 @@ async function readInstalledStartupBundle(installer, temporary, source, version,
   }
   return { executable, asarPath: path, installed: { bundleId: info.CFBundleIdentifier, installedArch,
     signature: 'verified', notarization: 'staple-verified', asarSha256: await sha256(path),
-    ...(isolated ? { developerId: 'verified', gatekeeper: 'verified', updateChannel: packaged.updateChannel } : {}) } }
+    ...(isolated ? { developerId: 'verified', gatekeeper, updateChannel: packaged.updateChannel } : {}) } }
 }
 
 async function verify(directory, sourceFile, evidenceDir, temporary, isolated) {
