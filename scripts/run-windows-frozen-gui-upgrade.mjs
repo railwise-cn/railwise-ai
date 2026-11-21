@@ -64,6 +64,20 @@ export function validateFirstLaunchWindowsObservation(observed, { window, execut
   return { ...observed, packageMetadata }
 }
 
+export function readFirstLaunchWindowsUiAutomation(window, executable, version, execute = execFileSync) {
+  const script = firstLaunchWindowsUiAutomationScript(window, executable, version)
+  try {
+    return JSON.parse(execute('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], {
+      encoding: 'utf8', maxBuffer: 128 * 1024, timeout: 10_000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']
+    }).trim())
+  } catch (error) {
+    // A newly created Chromium HWND can precede its native accessibility provider.
+    // Retry this exact UIA unavailability only; identity and all other failures stay hard errors.
+    if (/FullyQualifiedErrorId\s*:\s*ElementNotAvailableException(?:_x000D_|[\s<])/.test(String(error.stderr ?? ''))) return null
+    throw error
+  }
+}
+
 export function verifyFrozenWindowsReadback({ expectedVersion, expectedSource, installerSha256, registry, packageMetadata, profilePreserved, threadPreserved }, target) {
   assert.equal(expectedVersion, target.identity.version)
   assert.equal(expectedSource, target.identity.sourceHead)
@@ -345,14 +359,17 @@ async function exerciseGuiUpgrade({ running, target, feed, executable, allowLega
   }
   if (verifyFirstLaunch) {
     const packageMetadata = inspectInstalledPackage(target.installDirectory, target.identity)
+    const firstWindow = { ...result.window }
+    let probeAttempts = 0
     const observation = await waitUntil(() => {
-      const script = firstLaunchWindowsUiAutomationScript(result.window, executable, version)
-      const observed = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], {
-        encoding: 'utf8', maxBuffer: 128 * 1024, timeout: 10_000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']
-      }).trim())
-      return observed.visible && observed.titleVisible && observed.versionVisible ? observed : null
+      const currentWindow = windowsForExecutable(executable).find(item => item.pid === firstWindow.pid && item.title === target.identity.productName)
+      if (!currentWindow) return null
+      probeAttempts++
+      const observed = readFirstLaunchWindowsUiAutomation(currentWindow, executable, version)
+      return observed?.visible && observed.titleVisible && observed.versionVisible ? { observed, window: currentWindow } : null
     }, 'the actual first upgraded window showing 本版更新 and its version through UIA', 60_000, 500)
-    result.firstLaunch = validateFirstLaunchWindowsObservation(observation, { window: result.window, executable, version, packageMetadata })
+    result.window = observation.window
+    result.firstLaunch = { ...validateFirstLaunchWindowsObservation(observation.observed, { window: observation.window, executable, version, packageMetadata }), initialWindow: firstWindow, probeAttempts }
   }
   return result
 }
