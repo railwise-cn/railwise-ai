@@ -293,7 +293,12 @@ describe('R2 release delivery gates', () => {
       versions: Record<string, Record<string, { name: string; sha256: string; size: number }>>
     }
     expect(baselines.schemaVersion).toBe(1)
-    expect(Object.keys(baselines.versions).sort()).toEqual(['0.3.5', '0.4.0', '0.4.1', '0.5.1', '0.5.4', '0.5.6'])
+    expect(Object.keys(baselines.versions).sort()).toEqual(['0.3.5', '0.4.0', '0.4.1', '0.5.1', '0.5.4', '0.5.6', '0.5.9'])
+    expect(baselines.versions['0.5.9']).toEqual({
+      'darwin-arm64': { name: 'RailWise-AI-0.5.9-mac-Apple-Silicon.dmg', sha256: '0fb309df7c4f73fe74fa0e7b96d5bfc437a0f2c4e6f6023c2a15e4ac96324c66', size: 402395197 },
+      'darwin-x64': { name: 'RailWise-AI-0.5.9-mac-Intel.dmg', sha256: '0f2d5c787d05596a3e7b5296a5ffa1a5276ad2ba7ed0c1bcf387b65738e03ce2', size: 411136357 },
+      'win32-x64': { name: 'RailWise-AI-0.5.9-win-x64.exe', sha256: '7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c', size: 320871735 }
+    })
     expect(baselines.versions['0.5.6']).toEqual({
       'darwin-arm64': { name: 'RailWise-AI-0.5.6-mac-Apple-Silicon.dmg', sha256: '27ddbc81b909208125e222cba4fddc1b9a7e01ab53a64af595fbe0ac97329d21', size: 395569874 },
       'darwin-x64': { name: 'RailWise-AI-0.5.6-mac-Intel.dmg', sha256: '31daae24204bd0976f875407556c5925118f13b2382f39242f200cfaf5b1a08d', size: 406107895 },
