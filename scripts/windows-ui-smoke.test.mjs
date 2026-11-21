@@ -1417,7 +1417,7 @@ test('browser binding UI selection requires the actual task card, complete previ
     const legacy = detail.outerHTML
     detail.querySelector('dd').remove()
     assert.equal(await window.eval(windowsBrowserBindingUiExpression()), null)
-    window.document.body.innerHTML = `<div class="ds-workbench-shell"><main>${panel}</main></div>${legacy}`
+    window.document.body.innerHTML = `<div class="ds-workbench-shell"><main><div class="ds-message-timeline-content">${panel}</div></main></div>${legacy}`
     const main = window.document.querySelector('main'), chatButton = main.querySelector('button')
     main.getClientRects = chatButton.getClientRects = () => [{}]
     chatButton.scrollIntoView = () => undefined

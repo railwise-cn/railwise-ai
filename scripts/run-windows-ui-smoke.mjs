@@ -17,7 +17,7 @@ import { revealWindowsChatTaskArtifact, validateWindowsTaskChatLayout, windowsTa
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 const windowsDueTaskResult = '本次 HTML 报告已保存并核验，可在原会话查看。'
 const legacyBrowserTaskSurface = 'article[aria-label="任务详情"]'
-const originalBrowserTaskSurface = '.ds-workbench-shell main'
+const originalBrowserTaskSurface = '.ds-workbench-shell main .ds-message-timeline-content'
 const browserTaskAttention = 'section[aria-label="等待连接或授权，尚未执行"]'
 
 const windowsUpdateFailureCodes = new Set(['not_configured', 'unsupported', 'unsigned_build', 'manifest_unavailable', 'network',
