@@ -214,6 +214,14 @@ test('only the exact isolated feed can pass installed target readback', () => {
   assert.throws(() => verifyInstalledIsolatedWindowsFeed('provider: github\nurl: https://127.0.0.1/\n'))
 })
 
+test('a private Stable-configured package must retain the exact Stable URL', () => {
+  const stable = 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/'
+  const genericFeed = url => `provider: generic\nurl: ${url}\n`
+  assert.deepEqual(verifyInstalledIsolatedWindowsFeed(genericFeed(stable), true), { provider: 'generic', url: stable })
+  assert.throws(() => verifyInstalledIsolatedWindowsFeed(genericFeed(stable)))
+  assert.throws(() => verifyInstalledIsolatedWindowsFeed(genericFeed('https://127.0.0.1/'), true))
+})
+
 test('frozen Windows acceptance pins the original artifact and builds the next installer inside its runner', async () => {
   const workflow = parse(await readFile(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   const job = workflow.jobs['windows-frozen-gui-update']
@@ -309,7 +317,7 @@ test('supplemental first-launch mode is opt-in, pins the 0.5.9 route and retains
   assert.equal(workflow.on.workflow_dispatch.inputs.verify_upgrade_first_launch.default,false)
   assert.match(job.strategy.matrix.entry,/inputs.verify_upgrade_first_launch && '\["sidebar"\]'/)
   assert.match(job.strategy.matrix.entry,/\["sidebar","settings"\]/)
-  assert.match(job.steps.find(step=>step.name==='Validate exclusive acceptance scope').if,/inputs.verify_upgrade_first_launch && inputs.upgrade_059_to_candidate != true/)
+  assert.match(job.steps.find(step=>step.name==='Validate exclusive acceptance scope').if,/\(inputs.verify_upgrade_first_launch \|\| inputs.private_stable_package\) && inputs.upgrade_059_to_candidate != true/)
   assert.equal(job.steps.find(step=>step.name==='Exercise native update or the exact overlay fallback and reopen the existing conversation').env.VERIFY_UPGRADE_FIRST_LAUNCH,'${{ inputs.verify_upgrade_first_launch }}')
 })
 

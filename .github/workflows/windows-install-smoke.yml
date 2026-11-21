@@ -85,6 +85,11 @@ on:
         type: boolean
         required: false
         default: false
+      private_stable_package:
+        description: 'Verify the exact private 0.5.10 build with the Stable URL packaged, using the runner-local HTTPS feed for the upgrade.'
+        type: boolean
+        required: false
+        default: false
       verify_upgrade_first_launch:
         description: 'Supplement the exact 0.5.9 sidebar upgrade with a read-only UIA observation of the first automatically relaunched 0.5.10 window before closing it.'
         type: boolean
@@ -246,7 +251,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Validate exclusive acceptance scope
-        if: ${{ inputs.package_run_id == '' || (inputs.verify_upgrade_first_launch && inputs.upgrade_059_to_candidate != true) || (inputs.run_frozen_gui_update && (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate)) || (inputs.upgrade_058_to_candidate && inputs.upgrade_059_to_candidate) || inputs.run_startup_appearance || inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation }}
+        if: ${{ inputs.package_run_id == '' || ((inputs.verify_upgrade_first_launch || inputs.private_stable_package) && inputs.upgrade_059_to_candidate != true) || (inputs.run_frozen_gui_update && (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate)) || (inputs.upgrade_058_to_candidate && inputs.upgrade_059_to_candidate) || inputs.run_startup_appearance || inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation }}
         run: throw 'Select one original frozen package run and optional private next package run'
       - uses: actions/setup-node@v7
         with:
@@ -303,6 +308,7 @@ jobs:
           CANDIDATE_UPGRADE_ENTRY: ${{ (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && matrix.entry || '' }}
           CANDIDATE_UPGRADE_BASELINE: ${{ inputs.upgrade_059_to_candidate && '0.5.9' || '' }}
           VERIFY_UPGRADE_FIRST_LAUNCH: ${{ inputs.verify_upgrade_first_launch }}
+          WORKWISE_PRIVATE_STABLE_PACKAGE: ${{ inputs.private_stable_package }}
         run: |
           $arguments = @("$env:RUNNER_TEMP/frozen-windows", "$env:RUNNER_TEMP/frozen-windows-source.json", "$env:RUNNER_TEMP/frozen-windows-evidence")
           if ($env:CANDIDATE_UPGRADE_ENTRY) { $arguments += $env:CANDIDATE_UPGRADE_ENTRY }
