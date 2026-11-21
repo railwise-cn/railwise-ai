@@ -1132,6 +1132,18 @@ export function validateWindowsOriginChecklist(evidence) {
   return evidence
 }
 
+export function findWindowsChecklistOrigin(threads, tasks, existingIds, prompt = originChecklistPrompt) {
+  const origins = threads.filter(thread => !existingIds.has(thread.id) && thread.relation === 'primary' && !thread.parentThreadId)
+  const matching = tasks.filter(task => task.goal === prompt)
+  assert.ok(origins.length <= 1, 'The UI must create exactly one new primary origin conversation')
+  assert.ok(matching.length <= 1, 'The UI must admit exactly one matching delegated task')
+  if (!origins.length || !matching.length) return null
+  const origin = origins[0], task = matching[0]
+  assert.equal(task.originThreadId, origin.id, 'The delegated task must belong to the new origin conversation')
+  assert.ok(task.threadId && task.threadId !== origin.id, 'The real task must execute on a distinct worker thread')
+  return { origin, task }
+}
+
 async function verifyWindowsOriginChecklist(cdp, fixture, attempt, evidenceDir) {
   const read = path => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},'GET').then(result=>{
     if(!result.ok)throw new Error('Runtime checklist readback failed: '+result.status);
@@ -1142,19 +1154,20 @@ async function verifyWindowsOriginChecklist(cdp, fixture, attempt, evidenceDir) 
   const composer = originChecklistDraft + ' textarea:not(:disabled)'
   await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
   await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(composer)})?.getClientRects().length)`, 'the ordinary chat composer')
-  const origins = (await read('/v1/threads')).threads.filter(thread => !existing.has(thread.id))
-  assert.equal(origins.length, 1, 'Use the real newly created origin conversation')
-  const originThreadId = origins[0].id
-  Object.assign(attempt, { phase: 'origin-created', originThreadId })
   await cdp.fill(composer, originChecklistPrompt)
   await cdp.click('button[aria-label="发送"]:not(:disabled)')
-  let task
+  // A fresh UI conversation can remain draft-only until its first actual send.
+  // Observe the authoritative origin and worker after sending, never invent them.
+  attempt.phase = 'prompt-sent'
+  let admitted
   const deadline = Date.now() + 90_000
-  while (!task && Date.now() < deadline) {
-    task = (await read('/v1/tasks?limit=100')).find(item => item.originThreadId === originThreadId && item.goal === originChecklistPrompt)
-    if (!task) await sleep(150)
+  while (!admitted && Date.now() < deadline) {
+    const [threads, tasks] = await Promise.all([read('/v1/threads'), read('/v1/tasks?limit=100')])
+    admitted = findWindowsChecklistOrigin(threads.threads, tasks, existing)
+    if (!admitted) await sleep(150)
   }
-  assert.ok(task && task.threadId !== originThreadId, 'The ordinary chat must create a task on a real delegated worker thread')
+  assert.ok(admitted, 'The real send must create one new origin and its matching delegated worker task')
+  const { task, origin: { id: originThreadId } } = admitted
   Object.assign(attempt, { phase: 'worker-admitted', taskId: task.id, workerThreadId: task.threadId })
   const workerSnapshot = async () => {
     const { todos } = await read('/v1/threads/' + encodeURIComponent(task.threadId) + '/todos')
