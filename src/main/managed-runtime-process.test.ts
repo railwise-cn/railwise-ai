@@ -198,20 +198,30 @@ describe('startManagedRuntimeChild', () => {
     await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
     await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true })).rejects.toThrow('Windows 安全退出通道')
     expect(module.isManagedRuntimeChildRunning()).toBe(true)
+    expect(module.getPendingManagedRuntimeShutdown()).toBeUndefined()
   })
 
   it('keeps a slow clean shutdown alive after update timeout and verifies it on retry', async () => {
     const script = writeScript('slow-update-stop.js', [
-      "process.on('SIGTERM', () => setTimeout(() => process.exit(0), 200))",
-      "process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }) + '\\n')",
+      "const stop = () => setTimeout(() => process.exit(0), 300)",
+      "const ready = () => process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }) + '\\n')",
+      "process.on('SIGTERM', stop)",
+      "if (process.platform === 'win32') {",
+      "  process.on('message', value => { if (value?.type === 'railwise:runtime-shutdown' && value.version === 1) stop() })",
+      "  process.send({ type: 'railwise:runtime-shutdown-ready', version: 1 }, ready)",
+      "} else ready()",
       "setInterval(() => {}, 1000)"
     ].join('\n'))
     const module = await import('./managed-runtime-process')
     await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
+    expect(module.getPendingManagedRuntimeShutdown()).toBeUndefined()
     await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true, timeoutMs: 25 })).rejects.toThrow('更新包已保留')
     expect(module.isManagedRuntimeChildRunning()).toBe(true)
-    await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true, timeoutMs: 1000 })).resolves.toBeUndefined()
+    const pendingShutdown = module.getPendingManagedRuntimeShutdown()
+    expect(pendingShutdown).toBeInstanceOf(Promise)
+    await Promise.all([pendingShutdown, module.stopManagedRuntimeChildAndWait({ requireCleanExit: true, timeoutMs: 1000 })])
     expect(module.isManagedRuntimeChildRunning()).toBe(false)
+    expect(module.getPendingManagedRuntimeShutdown()).toBeUndefined()
   })
 
   it('keeps the application alive until a real owned Runtime exits after the former five-second GUI deadline', async () => {

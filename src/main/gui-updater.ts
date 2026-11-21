@@ -16,7 +16,10 @@ import type {
 } from '../shared/gui-update'
 import { GUI_UPDATE_CHECK_INTERVAL_MS, nextGuiUpdateCheckDelay } from '../shared/gui-update-schedule'
 import { DEFAULT_GUI_UPDATE_CHANNEL, normalizeGuiUpdateChannel } from '../shared/gui-update'
+import { redactSecretText } from '../shared/secret-redaction'
 import { configurePrivateUpdaterTls } from './private-updater-tls'
+import { GuiUpdateRecoveryPendingError } from './gui-update-shutdown'
+import { logWarn } from './logger'
 import { WindowsGuiUpdater, WindowsUpdateCacheError } from './windows-gui-update'
 import {
   legacyDownloadUrl,
@@ -1049,6 +1052,12 @@ function failInstall(attempt: InstallAttempt, error: unknown): Promise<GuiUpdate
   if (!attempt.failure) {
     attempt.failure = Promise.resolve().then(async () => {
       let message = error instanceof Error ? error.message : String(error)
+      logWarn('updater', 'Update installation stopped.', {
+        currentVersion: app.getVersion(),
+        targetVersion: lastInfo?.latestVersion,
+        platform: process.platform,
+        reason: redactSecretText(message).slice(0, 1000)
+      })
       const nativeEvents: EventEmitter | undefined = nativeAutoUpdater
       for (const listener of attempt.nativeDownloadListeners ?? []) {
         nativeEvents?.removeListener('update-downloaded', listener as (...args: unknown[]) => void)
@@ -1059,8 +1068,12 @@ function failInstall(attempt: InstallAttempt, error: unknown): Promise<GuiUpdate
         if (lastInfo) lastInfo = { ...lastInfo, downloaded: false }
       }
       try { await afterInstallFailed?.() } catch (recoveryError) {
-        console.error('[workwise updater] failed to recover Runtime after aborted install:', recoveryError)
-        message += ' The task service could not reopen. Quit and reopen the app to continue.'
+        if (recoveryError instanceof GuiUpdateRecoveryPendingError) {
+          message += ` ${recoveryError.message}`
+        } else {
+          console.error('[workwise updater] failed to recover Runtime after aborted install:', recoveryError)
+          message += ' The task service could not reopen. Quit and reopen the app to continue.'
+        }
       }
       emitGuiUpdateState({ status: 'error', info: lastInfo ?? undefined, message, code: 'install_failed' })
       return { ok: false as const, currentVersion: app.getVersion(), code: 'install_failed' as const, message }

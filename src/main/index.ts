@@ -505,6 +505,7 @@ async function stopManagedRuntimes(): Promise<void> {
 }
 
 async function prepareManagedRuntimeForUpdate(confirmedSnapshotId?: string): Promise<void> {
+  if (stopManagedRuntimesForUpdate.isRecovering()) throw new Error('任务服务仍在恢复，请稍候再升级。')
   if (updateRuntimePrepared) return
   // A lost response can leave the Runtime fenced even when the desktop never saw success.
   updateRuntimeNeedsRecovery = true
@@ -534,6 +535,9 @@ function recoverManagedRuntimeAfterUpdateFailure(): Promise<void> {
   quittingForNativeUpdate = false
   return stopManagedRuntimesForUpdate.recover(async () => {
     if (!updateRuntimeNeedsRecovery || isQuitting) return
+    const pendingShutdown = managedRuntimeAdapter.pendingShutdown()
+    if (pendingShutdown) await pendingShutdown
+    if (isQuitting) return
     if (managedRuntimeAdapter.isChildRunning()) {
       try {
         // Use the already-owned child without calling ensureRuntime through the fence.

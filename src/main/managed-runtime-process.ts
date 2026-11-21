@@ -84,6 +84,7 @@ import type { TaskDocumentExportBridge } from './services/task-document-export-s
 let child: ChildProcess | null = null
 let lastManagedRuntimeExit: { code: number | null; signal: NodeJS.Signals | null } | undefined
 let ipcShutdownChild: ChildProcess | null = null
+let pendingManagedRuntimeShutdown: { child: ChildProcess; exited: Promise<void> } | undefined
 let childLogCapture: RuntimeLogCapture | null = null
 let lastResolvedBinary: string | null = null
 let actualManagedRuntimePort: number | null = null
@@ -392,6 +393,10 @@ export function isManagedRuntimeChildRunning(): boolean {
   return child !== null && child.exitCode === null && child.signalCode === null
 }
 
+export function getPendingManagedRuntimeShutdown(): Promise<void> | undefined {
+  return pendingManagedRuntimeShutdown?.child === child ? pendingManagedRuntimeShutdown?.exited : undefined
+}
+
 export type StartManagedRuntimeChildOptions = {
   allowStart?: () => boolean
   autoInstallBundledAgentPack?: boolean
@@ -613,6 +618,7 @@ export async function startManagedRuntimeChild(
   startedChild.on('exit', (code, signal) => {
     if (child === startedChild) lastManagedRuntimeExit = { code, signal }
     if (ipcShutdownChild === startedChild) ipcShutdownChild = null
+    if (pendingManagedRuntimeShutdown?.child === startedChild) pendingManagedRuntimeShutdown = undefined
     void startedExportBridge.close()
     if (documentExportBridge === startedExportBridge) documentExportBridge = null
     startedLogCapture.logLifecycle(
@@ -1487,18 +1493,19 @@ export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit
   const stoppingChild = child
   const pid = child.pid
   const capture = childLogCapture
-  if (stoppingChild.exitCode === null && stoppingChild.signalCode === null) {
+  if (stoppingChild.exitCode === null && stoppingChild.signalCode === null && pendingManagedRuntimeShutdown?.child !== stoppingChild) {
     if (process.platform === 'win32' && stoppingChild === ipcShutdownChild && stoppingChild.connected) {
       stoppingChild.send(MANAGED_RUNTIME_SHUTDOWN_REQUEST, (error) => {
         if (error) capture?.logLifecycle(`shutdown IPC failed: ${error.message}`)
       })
+      trackManagedRuntimeShutdown(stoppingChild)
     } else {
       // Windows kill terminates the Runtime without running its save/close handler.
       if (options.requireCleanExit && process.platform === 'win32') {
         throw new Error('当前 Runtime 未提供 Windows 安全退出通道，更新包已保留。')
       }
       try {
-        stoppingChild.kill('SIGTERM')
+        if (stoppingChild.kill('SIGTERM')) trackManagedRuntimeShutdown(stoppingChild)
       } catch {
         /* already gone */
       }
@@ -1528,6 +1535,11 @@ export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit
     childLogCapture = null
     await capture.close()
   }
+}
+
+function trackManagedRuntimeShutdown(stoppingChild: ChildProcess): void {
+  const exited = new Promise<void>(resolve => { stoppingChild.once('exit', () => resolve()) })
+  pendingManagedRuntimeShutdown = { child: stoppingChild, exited }
 }
 
 function waitForChildExit(process: ChildProcess, timeoutMs: number): Promise<boolean> {
