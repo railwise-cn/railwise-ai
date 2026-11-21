@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse } from 'yaml'
-import { assertPublishedWindowsUpgrade, repairedScheduleSeed, sidebarUpgradeControlSelector, sidebarUpgradeSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
+import { assertPublishedWindowsUpgrade, legacyUpdaterReason, repairedScheduleSeed, sidebarUpgradeControlSelector, sidebarUpgradeSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
 import { verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
@@ -105,12 +105,18 @@ test('a visible offer alone or an unexpected relaunch cannot pass the real updat
   assert.throws(() => assertPublishedWindowsUpgrade({ ...repaired, baseline }))
 })
 
+test('the legacy diagnostic records the known shutdown fault without disclosing arbitrary internal messages', () => {
+  assert.equal(legacyUpdaterReason('Runtime 未正常退出，更新已停止。请检查日志后重试。'), 'runtime-not-cleanly-exited')
+  assert.equal(legacyUpdaterReason('The update has not finished downloading yet.'), undefined)
+})
+
 test('published Windows smoke is a separate opt-in job with read-only GitHub permissions', async () => {
   const workflow = parse(await readFile(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   assert.equal(workflow.on.workflow_dispatch.inputs.run_published_gui_update.default, false)
   assert.deepEqual(workflow.on.workflow_dispatch.inputs.published_gui_upgrade_scenario.options,
     ['released-056-to-057', 'released-057-to-059'])
   assert.equal(workflow.on.workflow_dispatch.inputs.published_gui_upgrade_scenario.default, 'released-056-to-057')
+  assert.equal(workflow.on.workflow_dispatch.inputs.published_gui_verify_overlay.default, false)
   assert.equal(workflow.on.workflow_call.inputs.package_run_id.required, true)
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   assert.match(workflow.jobs['windows-install'].if, /run_published_gui_update != true/)
@@ -120,6 +126,8 @@ test('published Windows smoke is a separate opt-in job with read-only GitHub per
   assert.ok(job.steps.some(step => step.if?.includes('package_run_id') && step.run.startsWith('throw ')))
   assert.match(job.steps.find(step => step.run === 'node scripts/run-windows-published-gui-update-smoke.mjs').env.PUBLISHED_GUI_UPGRADE_SCENARIO,
     /inputs\.published_gui_upgrade_scenario/)
+  assert.match(job.steps.find(step => step.run === 'node scripts/run-windows-published-gui-update-smoke.mjs').env.PUBLISHED_GUI_VERIFY_OVERLAY,
+    /inputs\.published_gui_verify_overlay/)
   assert.ok(job.steps.some(step => step.if === 'always()' && step.uses.startsWith('actions/upload-artifact@')))
 
   assert.equal(workflow.on.workflow_dispatch.inputs.run_repaired_gui_update.default, false)

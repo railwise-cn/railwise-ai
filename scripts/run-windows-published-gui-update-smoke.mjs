@@ -183,22 +183,28 @@ export async function waitUntil(read, label, timeout, interval = 250) {
 }
 
 export async function sha256(path) {
-  const digest = createHash('sha256')
-  for await (const bytes of createReadStream(path)) digest.update(bytes)
-  return digest.digest('hex')
+  return hashFile(path, 'sha256', 'hex')
 }
 
-async function downloadBaseline(directory, { baseVersion, baseline }) {
-  const url = `https://github.com/railwise-cn/railwise-ai/releases/download/v${baseVersion}/${baseline.name}`
-  const path = join(directory, baseline.name)
+async function hashFile(path, algorithm, encoding) {
+  const digest = createHash(algorithm)
+  for await (const bytes of createReadStream(path)) digest.update(bytes)
+  return digest.digest(encoding)
+}
+
+async function downloadReleasedInstaller(directory, version, installer, { sha512, feed } = {}) {
+  const url = feed ? new URL(installer.name, feed).href :
+    `https://github.com/railwise-cn/railwise-ai/releases/download/v${version}/${installer.name}`
+  const path = join(directory, installer.name)
   const response = await fetch(url, { signal: AbortSignal.timeout(300_000) })
-  assert.ok(response.ok && response.body, `Baseline installer download returned HTTP ${response.status}`)
+  assert.ok(response.ok && response.body, `Released ${version} installer download returned HTTP ${response.status}`)
   await pipeline(Readable.fromWeb(response.body), createWriteStream(path, { flags: 'wx' }))
   const info = await lstat(path)
   const digest = await sha256(path)
-  assert.equal(info.size, baseline.size)
-  assert.equal(digest, baseline.sha256)
-  return { path, name: baseline.name, url, size: info.size, sha256: digest }
+  assert.equal(info.size, installer.size)
+  assert.equal(digest, installer.sha256)
+  if (sha512) assert.equal(await hashFile(path, 'sha512', 'base64'), sha512)
+  return { path, name: installer.name, url, size: info.size, sha256: digest }
 }
 
 export async function attachPackagedRenderer(child, executable, devtoolsPort) {
@@ -234,6 +240,50 @@ export function installExactNsis(installerPath, directory) {
   assert.equal(Number(exitCode), 0, 'Windows installer exit code')
 }
 
+function launchPackagedApp(executable, cwd, env, customProfile) {
+  const args = ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN']
+  if (customProfile) args.unshift(`--user-data-dir=${customProfile}`)
+  const child = spawn(executable, args, { env, cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+  let devtoolsPort, launchError
+  let output = ''
+  child.once('error', error => { launchError = error })
+  for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => {
+    output = (output + chunk).slice(-8_000)
+    devtoolsPort ??= output.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1]
+  })
+  const renderer = attachPackagedRenderer(child, executable, async () => {
+    if (launchError) throw launchError
+    if (!devtoolsPort && customProfile) {
+      const portFile = await readFile(join(customProfile, 'DevToolsActivePort'), 'utf8').catch(() => '')
+      const port = portFile.split(/\r?\n/)[0]
+      if (/^\d+$/.test(port)) devtoolsPort = port
+    }
+    return devtoolsPort
+  })
+  return { child, renderer }
+}
+
+async function closeOwnedApp(executable) {
+  for (const { pid } of windowsForExecutable(executable)) powershell(`
+    $process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
+    if ($process.Path -eq ${psQuote(executable)} -and $process.MainWindowHandle -ne 0) { $null = $process.CloseMainWindow() }
+  `)
+  await waitUntil(() => powershell(`
+    $running = @(Get-Process -ErrorAction SilentlyContinue | Where-Object Path -eq ${psQuote(executable)})
+    $running.Count
+  `) === '0', 'the original installed application to close', 60_000)
+}
+
+function authenticodeStatus(path) {
+  const status = powershell(`(Get-AuthenticodeSignature -LiteralPath ${psQuote(path)}).Status`)
+  assert.ok(['Valid', 'NotSigned'].includes(status), `Unexpected Authenticode status ${status}`)
+  return status
+}
+
+export function legacyUpdaterReason(message) {
+  if (message === 'Runtime 未正常退出，更新已停止。请检查日志后重试。') return 'runtime-not-cleanly-exited'
+}
+
 async function main(args) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.GITHUB_ACTIONS === 'true' &&
     process.env.RUNNER_ENVIRONMENT === 'github-hosted' && process.env.RUNNER_OS === 'Windows',
@@ -242,7 +292,9 @@ async function main(args) {
   const repaired = marketplace || (args.length === 1 && args[0] === '--repaired-baseline')
   assert.ok(!args.length || repaired, 'Unsupported Windows package smoke arguments')
   const scenario = process.env.PUBLISHED_GUI_UPGRADE_SCENARIO || historicalScenario
+  const verifyOverlay = process.env.PUBLISHED_GUI_VERIFY_OVERLAY === 'true'
   assert.ok(!repaired || scenario === historicalScenario, 'The newer published scenario requires the original retail baseline')
+  assert.ok(!verifyOverlay || scenario === 'released-057-to-059', 'The repair check requires the original 0.5.7 scenario')
   const selected = publishedScenario(scenario)
   const { baseVersion, baseSource, targetVersion, targetSource, feed } = selected
   const rootIdentity = installIdentity(baseVersion, baseSource)
@@ -261,6 +313,7 @@ async function main(args) {
   }
   let cdp
   let child
+  let recoverUsingExactInstaller
   try {
     await save()
     assert.deepEqual(registryState(), [], 'An existing public installation was found')
@@ -287,7 +340,7 @@ async function main(args) {
     const baselineIdentity = repaired ? installIdentity(baseVersion, process.env.GITHUB_SHA) : rootIdentity
     report.baseline.installer = repaired
       ? inspectInstaller(join(process.env.RUNNER_TEMP, 'repaired-updater-baseline', baselineIdentity.installerName), baselineIdentity)
-      : await downloadBaseline(root, selected)
+      : await downloadReleasedInstaller(root, baseVersion, selected.baseline)
     await save()
     installExactNsis(report.baseline.installer.path, directory)
     report.baseline.executable = executable
@@ -312,8 +365,7 @@ async function main(args) {
       report.schedule = { seededAt: new Date(seededAt).toISOString(), seededRecord }
       await save()
     }
-    const chromeArgs = ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN']
-    const workspace = join(root, '工程 插件验收')
+    const workspace = join(root, verifyOverlay ? '工程 升级验收' : '工程 插件验收')
     const marketplaceProfile = join(root, 'marketplace-profile')
     if (marketplace) {
       cleanEnvironment = windowsUiEnvironment(cleanEnvironment, root)
@@ -324,26 +376,19 @@ async function main(args) {
         appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
         agents: { kun: { autoStart: true, dataDir: join(root, 'runtime') } }
       }) + '\n', { flag: 'wx' })
-      chromeArgs.unshift(`--user-data-dir=${marketplaceProfile}`)
     }
-    child = spawn(executable, chromeArgs, { env: cleanEnvironment, cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
-    let devtoolsPort
-    let output = ''
-    let launchError
-    child.once('error', error => { launchError = error })
-    for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => {
-      output = (output + chunk).slice(-8_000)
-      devtoolsPort ??= output.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1]
-    })
-    cdp = await attachPackagedRenderer(child, executable, async () => {
-      if (launchError) throw launchError
-      if (!devtoolsPort && marketplace) {
-        const portFile = await readFile(join(marketplaceProfile, 'DevToolsActivePort'), 'utf8').catch(() => '')
-        const port = portFile.split(/\r?\n/)[0]
-        if (/^\d+$/.test(port)) devtoolsPort = port
-      }
-      return devtoolsPort
-    })
+    if (verifyOverlay) {
+      await mkdir(profile)
+      await mkdir(workspace)
+      await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({
+        schema: 'workwise.settings', version: 2, revision: 0, locale: 'zh', theme: 'light', workspaceRoot: workspace,
+        appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
+        agents: { kun: { autoStart: true, dataDir: join(root, 'runtime') } }
+      }) + '\n', { flag: 'wx' })
+    }
+    const launch = launchPackagedApp(executable, root, cleanEnvironment, marketplace ? marketplaceProfile : undefined)
+    child = launch.child
+    cdp = await launch.renderer
     await cdp.wait('Boolean(window.workwise?.getAppVersion && document.querySelector("button"))', 'baseline workbench')
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
     report.baseline.pid = child.pid
@@ -413,6 +458,54 @@ async function main(args) {
     const sentinelValue = `Synthetic updater continuity marker ${randomUUID()}\n`
     await writeFile(sentinel, sentinelValue, { flag: 'wx' })
     report.profile = { directory: activeProfiles[0], sentinelSha256: await sha256(sentinel) }
+    if (verifyOverlay) {
+      assert.ok(pathEquals(activeProfiles[0], profile), 'The old application must use the seeded profile')
+      const thread = await cdp.evaluate(`(async () => {
+        const request = JSON.stringify({workspace: ${JSON.stringify(workspace)}, title: '升级验收会话', model: 'deepseek-flash', mode: 'agent'});
+        const response = await window.workwise.runtimeRequest('/v1/threads','POST',request);
+        if (!response.ok) throw new Error('Could not seed a local KUN conversation');
+        return JSON.parse(response.body).id;
+      })()`)
+      assert.match(thread, /^[A-Za-z0-9_-]+$/, 'Expected a real local conversation identifier')
+      const settingsView = `window.workwise.getSettings().then(({locale, theme, workspaceRoot}) => ({locale, theme, workspaceRoot}))`
+      const before = await cdp.evaluate(settingsView)
+      assert.equal(before.locale, 'zh')
+      assert.equal(before.theme, 'light')
+      assert.ok(pathEquals(before.workspaceRoot, workspace))
+      recoverUsingExactInstaller = async recovery => {
+        recovery.registryBefore = ownedInstallState(directory, baseVersion)
+        assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
+        recovery.installer = await downloadReleasedInstaller(root, targetVersion, selected.target, {
+          sha512: selected.targetInstallerSha512, feed
+        })
+        recovery.installer.authenticode = authenticodeStatus(recovery.installer.path)
+        await closeOwnedApp(executable)
+        cdp.close()
+        report.directTargetInstallerLaunches++
+        installExactNsis(recovery.installer.path, directory)
+        recovery.package = inspectInstalledPackage(directory, targetIdentity)
+        assert.equal(recovery.package.asarSha256, selected.targetAsar)
+        recovery.package.authenticode = authenticodeStatus(executable)
+        recovery.registry = ownedInstallState(directory, targetVersion)
+        const replacement = launchPackagedApp(executable, root, cleanEnvironment)
+        child = replacement.child
+        cdp = await replacement.renderer
+        await cdp.wait('Boolean(window.workwise?.getAppVersion && document.querySelector("button"))', 'repaired application window')
+        recovery.appVersion = await cdp.evaluate('window.workwise.getAppVersion()')
+        assert.equal(recovery.appVersion, targetVersion)
+        await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(response => response.ok)`, 'repaired KUN service')
+        const after = await cdp.evaluate(settingsView)
+        recovery.persistedSettings = { workspace: pathEquals(after.workspaceRoot, before.workspaceRoot),
+          locale: after.locale === before.locale, theme: after.theme === before.theme }
+        recovery.profilePreserved = await readFile(sentinel, 'utf8') === sentinelValue
+        recovery.threadPreserved = await cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads/${thread}','GET').then(response =>
+          response.ok && JSON.parse(response.body).id === ${JSON.stringify(thread)})`)
+        assert.deepEqual(recovery.persistedSettings, { workspace: true, locale: true, theme: true })
+        assert.equal(recovery.profilePreserved, true)
+        assert.equal(recovery.threadPreserved, true)
+        await capture(cdp, 'windows-exact-installer-overlay.png')
+      }
+    }
 
     report.phase = 'sidebar-upgrade'
     await cdp.click(control)
@@ -424,7 +517,8 @@ async function main(args) {
         const state = await cdp.evaluate('window.workwise.getGuiUpdateState()', 3_000).catch(() => null)
         if (state?.status && report.updaterStates.at(-1) !== state.status) report.updaterStates.push(state.status)
         if (state?.status === 'error') {
-          report.lastUpdateState = { status: state.status, ...summarizeWindowsUpdateMetadata({ ...state.info, ok: false, code: state.code, message: state.message }) }
+          report.lastUpdateState = { status: state.status, ...summarizeWindowsUpdateMetadata({ ...state.info, ok: false, code: state.code, message: state.message }),
+            reason: legacyUpdaterReason(state.message) }
           throw new Error('The packaged updater reported a failure after the sidebar click')
         }
         if (scenario === 'released-057-to-059') {
@@ -454,6 +548,18 @@ async function main(args) {
       const state = await cdp.evaluate('window.workwise.getGuiUpdateState()', 3_000).catch(() => null)
       if (state && !report.lastUpdateState) report.lastUpdateState = { status: state.status, ...summarizeWindowsUpdateMetadata(state.info ?? state) }
       await capture(cdp, marketplace ? 'windows-marketplace-failure.png' : 'windows-published-upgrade-failure.png').catch(() => undefined)
+    }
+    if (recoverUsingExactInstaller && report.action && (report.lastUpdateState?.status === 'error' || report.sidebarError)) {
+      const recovery = { method: 'exact-official-installer-overlay', status: 'running' }
+      report.overlayRecovery = recovery
+      await save()
+      try {
+        await recoverUsingExactInstaller(recovery)
+        recovery.status = 'passed'
+      } catch (repairError) {
+        recovery.status = 'failed'
+        recovery.failure = repairError instanceof Error ? repairError.message.split(/\r?\n/, 1)[0] : 'Unexpected overlay failure'
+      }
     }
     throw error
   } finally {

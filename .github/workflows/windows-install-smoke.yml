@@ -65,6 +65,11 @@ on:
           - released-056-to-057
           - released-057-to-059
         default: released-056-to-057
+      published_gui_verify_overlay:
+        description: 'After a demonstrated 0.5.7 sidebar failure, separately verify in-place installation with a synthetic profile'
+        type: boolean
+        required: false
+        default: false
       run_frozen_gui_update:
         description: 'Install official 0.5.7 then test the exact frozen 0.5.8 installer with a runner-only HTTPS update feed and installed profile continuity.'
         type: boolean
@@ -333,6 +338,7 @@ jobs:
       - name: Install the released baseline and upgrade through the packaged UI
         env:
           PUBLISHED_GUI_UPGRADE_SCENARIO: ${{ inputs.published_gui_upgrade_scenario || 'released-056-to-057' }}
+          PUBLISHED_GUI_VERIFY_OVERLAY: ${{ inputs.published_gui_verify_overlay }}
         run: node scripts/run-windows-published-gui-update-smoke.mjs
       - name: Retain actual updater evidence and diagnostics
         if: always()
