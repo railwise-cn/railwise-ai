@@ -9,7 +9,7 @@ export function windowsTaskChatLayoutExpression(marker) {
     const status=document.querySelector(${JSON.stringify(windowsTaskChatRegion)});
     const timeline=document.querySelector('.ds-message-timeline-content');
     if(!composer?.querySelector('textarea')?.getClientRects().length||!status?.getClientRects().length||!timeline)return null;
-    const taskLabels=new Set(['继续任务','继续原任务','重新检查并继续原任务','取消任务','暂停','重试','允许','拒绝','授权并继续','提交','清空步骤']);
+    const taskLabels=new Set(['继续任务','继续原任务','重新检查并继续原任务','取消任务','暂停','重试','允许','允许此操作','允许本次','拒绝','授权并继续','提交','清空步骤','补充当前任务','核验结果','选择资料','查看当前任务权限','允许当前任务请求审批']);
     const bottomControls=new Set(composer.querySelectorAll('section[aria-label="任务"], .ds-chat-task-context, select[aria-label$="的状态"]'));
     for(const button of composer.querySelectorAll('button'))if(taskLabels.has(button.textContent.trim()))bottomControls.add(button);
     for(const summary of composer.querySelectorAll('details > summary'))if(summary.textContent.includes('执行步骤'))bottomControls.add(summary);
