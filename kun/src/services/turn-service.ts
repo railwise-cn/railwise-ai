@@ -145,6 +145,7 @@ export class TurnService {
     engineeringExecution?: boolean
     engineeringPlanId?: string
     continuationTaskId?: string
+    assertMayStart?: () => void
   }): Promise<StartTurnResponse> {
     this.assertAdmission()
     const previous = this.startQueues.get(input.threadId) ?? Promise.resolve()
@@ -482,6 +483,7 @@ export class TurnService {
     engineeringExecution?: boolean
     engineeringPlanId?: string
     continuationTaskId?: string
+    assertMayStart?: () => void
   }): Promise<StartTurnResponse> {
     this.assertAdmission()
     const thread = await this.deps.threadStore.get(input.threadId)
@@ -537,6 +539,7 @@ export class TurnService {
             input.request.workspaceReferences
           )
         : []
+      input.assertMayStart?.()
       turnId = this.deps.ids.next('turn')
       this.terminalTurns.delete(turnId)
       const turn = createTurnRecord({
@@ -607,6 +610,7 @@ export class TurnService {
       turnId
       })
       this.deps.steering.setTurn(turnId)
+      input.assertMayStart?.()
       this.deps.tasks?.ensureTask({ thread, turnId, request: input.request, engineeringExecution: input.engineeringExecution, engineeringPlanId: input.engineeringPlanId, continuationTaskId: input.continuationTaskId })
       return { threadId: input.threadId, turnId, userMessageItemId: userItem.id }
     } catch (error) {

@@ -21,6 +21,7 @@ import { ContextCompactor } from '../loop/context-compactor.js'
 import { makeUserItem } from '../domain/item.js'
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import { defaultExternalTaskCapability } from './external-task-capability.js'
+import { workspacePermissionCapability } from './workspace-write-preflight.js'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async()=>{ for(const close of cleanup.splice(0)) await close() })
@@ -166,6 +167,54 @@ describe('task commands before Turn allocation',()=>{
     await coordinator.command({ threadId: f.origin.id, taskId: waiting.task.id, intent: 'supplement', idempotencyKey: 'actual-supplement', request: { prompt: supplement } })
     expect((await readHistory()).filter(item => item.kind === 'user_message').map(item => item.text)).toEqual([prompt, '继续任务', supplement])
     expect(f.repository.inputs(waiting.task.id).at(-1)).toMatchObject({ kind: 'supplement', text: supplement })
+  })
+
+  it.each(['current', 'stale-before-resume', 'changed-during-preflight', 'changed-before-turn'] as const)('binds one-click resume to the reviewed pending attention (%s)', async scenario => {
+    const f = await fixture()
+    const blocker = workspacePermissionCapability('approval_policy_blocked', '请确认此任务的审批权限。')
+    let ready = false
+    let replaceAttention = () => {}
+    const coordinator = new TaskCoordinator({ ...f, nowIso: () => new Date().toISOString(), preflightExternalTask: async () => {
+      if (ready && scenario === 'changed-during-preflight') replaceAttention()
+      return ready ? null : blocker
+    } })
+    const prompt = '整理资料。'
+    const waiting = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'reviewed-resume-original', request: { prompt } })
+    if (waiting.kind !== 'capability_required' || !waiting.task || !waiting.attentionId) throw new Error('expected a blocked task')
+    const original = f.repository.attention(waiting.attentionId)!
+    replaceAttention = () => {
+      const latest = f.repository.attention(original.id)!
+      if (latest.revision !== original.revision) return
+      f.repository.putAttention({ ...latest, revision: latest.revision + 1, message: '已有更新的待核对事项。' })
+    }
+    const exact = { threadId: f.origin.id, taskId: waiting.task.id, intent: 'resume' as const, idempotencyKey: 'reviewed-resume',
+      resolveAttentionId: original.id, expectedRevision: waiting.task.revision, expectedAttentionRevision: original.revision, request: { prompt } }
+    if (scenario === 'stale-before-resume') replaceAttention()
+    if (scenario === 'changed-before-turn') {
+      const validate = f.turns.validateSkillSelection.bind(f.turns)
+      vi.spyOn(f.turns, 'validateSkillSelection').mockImplementation(async (text, workspace) => {
+        if (text === '继续未完成任务') replaceAttention()
+        return validate(text, workspace)
+      })
+    }
+    ready = true
+    if (scenario !== 'current') {
+      await expect(coordinator.command(exact)).rejects.toMatchObject({ code: 'stale_request' })
+      expect(f.runTurn).not.toHaveBeenCalled()
+      expect((await f.threads.get(waiting.task.threadId))?.turns).toHaveLength(0)
+      expect(f.repository.attention(original.id)).toMatchObject({ status: 'pending', revision: original.revision + 1 })
+      return
+    }
+    const resumed = await coordinator.command(exact)
+    expect(resumed).toMatchObject({ kind: 'task_started', task: { id: waiting.task.id } })
+    expect(f.repository.attention(original.id)).toMatchObject({ status: 'answered', revision: original.revision + 1 })
+    expect(await coordinator.command(exact)).toMatchObject({ kind: 'task_started', task: { id: waiting.task.id } })
+    // Recover a committed control receipt even if the outer command response
+    // was interrupted before its result was recorded.
+    f.repository.connection().prepare('UPDATE task_command_receipts SET result_json=NULL WHERE owner_id=? AND command_key=?').run(f.origin.id, exact.idempotencyKey)
+    expect(await coordinator.command(exact)).toMatchObject({ kind: 'task_started', task: { id: waiting.task.id } })
+    expect(f.runTurn).toHaveBeenCalledOnce()
+    expect((await f.threads.get(waiting.task.threadId))?.turns).toHaveLength(1)
   })
 
   it('admits the original ordinary-chat video request as a durable file and source task', async () => {

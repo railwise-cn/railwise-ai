@@ -674,6 +674,9 @@ describe('app-ipc-schemas', () => {
       expect(runtimeRequestPayloadSchema.safeParse({ path: '/v1/task-commands', method: 'POST', body }).success, intent).toBe(true)
     }
     expect(runtimeRequestPayloadSchema.safeParse({ path: '/v1/task-commands', method: 'POST', body: JSON.stringify({ ...command, resolveAttentionId: 'attention_1' }) }).success).toBe(true)
+    const resumeApproval = { ...command, intent: 'resume', resolveAttentionId: 'attention_1', expectedAttentionRevision: 3 }
+    expect(runtimeRequestPayloadSchema.safeParse({ path: '/v1/task-commands', method: 'POST', body: JSON.stringify(resumeApproval) }).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({ path: '/v1/task-commands', method: 'POST', body: JSON.stringify({ ...resumeApproval, expectedAttentionRevision: -1 }) }).success).toBe(false)
     for (const request of [
       { path: '/v1/task-commands', method: 'GET' },
       { path: '/v1/task-commands', method: 'POST' },

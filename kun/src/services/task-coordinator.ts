@@ -15,7 +15,7 @@ import type { TaskController } from './task-controller.js'
 import type { TaskContextRuntime } from './task-context-runtime.js'
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import { WorkspaceReferenceService } from './workspace-reference-service.js'
-import { TaskControlService } from './task-control-service.js'
+import { TaskControlService, type TaskResumeAttention } from './task-control-service.js'
 import { preflightExternalTask, externalTaskIntent, externalProviderAmbiguity, type ExternalTaskPreflight } from './external-task-capability.js'
 import { externalPreflightThreadContext } from './contextual-external-task-preflight.js'
 import { explicitWorkspaceWrite } from './workspace-write-preflight.js'
@@ -64,9 +64,16 @@ export class TaskCoordinator {
       ['waiting_user', 'paused', 'stalled'].includes(task.status) && /^(?:请)?(?:使用|用|通过|在).*(?:钉钉|飞书|dingtalk|lark|feishu)/i.test(userText)) intent = 'supplement'
     // An explicit chat hint cannot bypass provider admission for an action.
     if (intent === 'chat' && (externalTaskIntent(userText) || explicitWorkspaceWrite(userText))) intent = 'new'
+    let resumeAttention: TaskResumeAttention | undefined
+    if (command.expectedAttentionRevision !== undefined) {
+      if (command.intent !== 'resume' || !command.resolveAttentionId || !command.taskId || command.expectedRevision === undefined) {
+        throw Object.assign(new Error('重新确认任务及待处理事项后继续。'), { code: 'scope_conflict' })
+      }
+      resumeAttention = { id: command.resolveAttentionId, revision: command.expectedAttentionRevision, threadId: origin.id }
+    }
     if(intent==='status') return {kind:'snapshot',task}
     const resolving = command.resolveAttentionId ? this.deps.repository.attention(command.resolveAttentionId) : null
-    if (command.resolveAttentionId && (!resolving || resolving.threadId !== origin.id ||
+    if (!resumeAttention && command.resolveAttentionId && (!resolving || resolving.threadId !== origin.id ||
       !(resolving.payload?.kind === 'task_input_intent' && ['supplement','new'].includes(intent) &&
           (!Array.isArray(resolving.payload.choices) || resolving.payload.choices.includes(intent)) ||
         resolving.payload?.kind === 'external_provider_choice' && intent === 'new' && command.selectedExternalProvider && !externalProviderAmbiguity(userText) && externalTaskIntent(userText)?.provider === command.selectedExternalProvider ||
@@ -86,7 +93,7 @@ export class TaskCoordinator {
     const skillSelections = command.request.capabilityReferences?.length
       ? await this.deps.turns.validateCapabilitySelection(command.request, origin)
       : undefined
-    if (resolving?.status !== undefined && resolving.status !== 'pending') throw Object.assign(new Error('这条待处理选择已经完成，请刷新当前任务。'), { code: 'stale_request' })
+    if (!resumeAttention && resolving?.status !== undefined && resolving.status !== 'pending') throw Object.assign(new Error('这条待处理选择已经完成，请刷新当前任务。'), { code: 'stale_request' })
     if (resolving?.payload?.kind === 'task_input_intent' && operationFingerprint(StartTurnRequest.parse(resolving.payload.request)) !== operationFingerprint(command.request)) {
       throw Object.assign(new Error('任务选择必须使用原始请求及附件，请重新打开该待办。'), { code: 'scope_conflict' })
     }
@@ -123,13 +130,13 @@ export class TaskCoordinator {
     else if(intent==='pause'||intent==='resume'||intent==='cancel') {
       if(!task)result={kind:'attention_required',message:'当前对话没有可操作的任务。你可以直接输入要做的事。'}
       else if(multipleTasks) result={kind:'attention_required',message:'这段对话有多项工作，请在需要操作的进度卡上选择。'}
-      else if(intent==='resume' && (['queued', 'running'].includes(task.status) ||
+      else if(intent==='resume' && !resumeAttention && (['queued', 'running'].includes(task.status) ||
         ['waiting_user', 'waiting_approval'].includes(task.status) && this.deps.repository.inbox(task.workspaceRoot)
           .some(item => item.taskId === task.id && (item.kind === 'question' || item.kind === 'approval')))) {
         result={kind:'snapshot',task}
       }
       else {
-        const changed=await this.controls.mutate(task.id,intent,{expectedRevision:command.expectedRevision ?? task.revision,idempotencyKey:`command:${command.idempotencyKey}`,model:command.request.model})
+        const changed=await this.controls.mutate(resumeAttention ? command.taskId! : task.id,intent,{expectedRevision:command.expectedRevision ?? task.revision,idempotencyKey:`command:${command.idempotencyKey}`,model:command.request.model,...(resumeAttention ? { resumeAttention } : {})})
         if(intent==='resume') {
           if(changed.capability) result={kind:'capability_required',task:changed.task,attentionId:`capability_${changed.task.id}`,capability:changed.capability,message:changed.capability.message,...(changed.receipt ? {receipt:changed.receipt} : {})}
           else {

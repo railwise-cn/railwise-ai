@@ -191,6 +191,70 @@ describe('task permission authority overview',()=>{
     expect(api.setThreadAgent).not.toHaveBeenCalled()
   })
 
+  it('only offers authorize and continue to an explicitly attached waiting-task action', async () => {
+    const onContinue = vi.fn(async () => undefined)
+    const task = {id:'task-1',threadId:'hidden-1',status:'waiting_user',revision:6} as TaskRunV1
+    const permission: TaskPermissionSnapshotV1 = {...snapshot,taskRevision:6,approvalPolicy:'on-request',grant:{id:'new-grant',status:'active',duration:'task',confirmedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+900_000).toISOString()}}
+    api.confirmTaskPermissions.mockResolvedValue({task,permission,resumed:false})
+    await act(async()=>root.render(createElement(TaskPermissionPanel,{taskId:'task-1',onConfirmed,onContinue,autoLoad:true})))
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled(); expect(onContinue).not.toHaveBeenCalled()
+    expect(button('授权并继续').disabled).toBe(true)
+    await act(async()=>container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    expect(onContinue).toHaveBeenCalledExactlyOnceWith(task,permission)
+    expect(onConfirmed).not.toHaveBeenCalled()
+  })
+
+  it.each(['inactive', 'expired', 'wrong duration', 'changed authority', 'refused', 'already resumed'] as const)('does not continue a %s confirmation reply', async scenario => {
+    const onContinue = vi.fn(async () => undefined)
+    const task = {id:'task-1',threadId:'hidden-1',status:'waiting_user',revision:6} as TaskRunV1
+    const permission: TaskPermissionSnapshotV1 = {...snapshot,taskRevision:6,approvalPolicy:'on-request',grant:{id:'new-grant',status:'active',duration:'task',confirmedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+900_000).toISOString()}}
+    if(scenario==='inactive') permission.grant!.status='prepared'
+    if(scenario==='expired') permission.grant!.expiresAt=new Date(Date.now()-1).toISOString()
+    if(scenario==='wrong duration') permission.grant!.duration='next_operation'
+    if(scenario==='changed authority') permission.agentRevision++
+    if(scenario==='refused') permission.canConfirm=false
+    api.confirmTaskPermissions.mockResolvedValue({task,permission,resumed:scenario==='already resumed'})
+    await act(async()=>root.render(createElement(TaskPermissionPanel,{taskId:'task-1',onConfirmed,onContinue,autoLoad:true})))
+    await act(async()=>container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    expect(onContinue).not.toHaveBeenCalled(); expect(onConfirmed).not.toHaveBeenCalled()
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(i18n.t('common:taskPermissionRecoveryReadFailed'))
+  })
+
+  it('never continues an expired review or a failed task recovered into paused state', async () => {
+    const onContinue = vi.fn(async () => undefined)
+    const expired: TaskPermissionSnapshotV1 = {...snapshot,recoveryEligible:true,grant:{id:'old-grant',status:'expired',confirmedAt:'2026-11-14T12:00:00Z',expiresAt:'2026-11-14T12:15:00Z'}}
+    api.getTaskPermissions.mockResolvedValue(expired)
+    api.getTaskRun.mockResolvedValue({id:'task-1',threadId:'hidden-1',status:'failed',revision:4} as TaskRunV1)
+    api.confirmTaskPermissions.mockResolvedValue({task:{id:'task-1',threadId:'hidden-1',status:'paused',revision:6} as TaskRunV1,permission:{...snapshot,taskRevision:6},resumed:false})
+    await act(async()=>root.render(createElement(TaskPermissionPanel,{taskId:'task-1',onConfirmed,onContinue,autoLoad:true})))
+    expect(container.textContent).not.toContain('授权并继续')
+    await act(async()=>container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click(i18n.t('common:taskPermissionRenew'))
+    expect(onConfirmed).toHaveBeenCalledWith(i18n.t('common:taskPermissionSaved')); expect(onContinue).not.toHaveBeenCalled()
+  })
+
+  it.each(['expired', 'invalid', 'prepared', 'consumed'] as const)('keeps an existing %s grant in the separate review flow', async status => {
+    const onContinue = vi.fn(async () => undefined)
+    api.getTaskPermissions.mockResolvedValue({...snapshot,grant:{id:'previous-grant',status,confirmedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+900_000).toISOString()}})
+    await act(async()=>root.render(createElement(TaskPermissionPanel,{taskId:'task-1',onConfirmed,onContinue,autoLoad:true})))
+    expect(container.textContent).not.toContain('授权并继续')
+    expect(onContinue).not.toHaveBeenCalled(); expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+  })
+
+  it('does not continue a confirmation that returns after its review was replaced', async () => {
+    const onContinue = vi.fn(async () => undefined)
+    let resolve!: (value: Awaited<ReturnType<typeof api.confirmTaskPermissions>>) => void
+    api.confirmTaskPermissions.mockImplementationOnce(()=>new Promise(done=>{resolve=done}))
+    await act(async()=>root.render(createElement(TaskPermissionPanel,{taskId:'task-1',onConfirmed,onContinue,autoLoad:true})))
+    await act(async()=>container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    await act(async()=>root.render(createElement(TaskPermissionPanel,{taskId:'task-1',revision:1,onConfirmed,onContinue,autoLoad:true})))
+    await act(async()=>resolve({task:{id:'task-1',threadId:'hidden-1',status:'waiting_user',revision:6} as TaskRunV1,permission:{...snapshot,taskRevision:6},resumed:false}))
+    expect(onContinue).not.toHaveBeenCalled(); expect(onConfirmed).not.toHaveBeenCalled()
+  })
+
   it('handles a deleted task without inventing authority or reading an invalid thread',async()=>{
     api.getTaskRun.mockResolvedValue(null)
     await click('查看当前任务权限')

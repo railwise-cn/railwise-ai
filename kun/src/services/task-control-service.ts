@@ -21,7 +21,8 @@ import { taskPermissionCapability, taskPermissionFailure } from './task-permissi
 import type { ApprovalRequest } from '../domain/approval.js'
 
 export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget' | 'revalidate_artifacts' | 'prepare_public_query_recovery' | 'revoke_public_query_recovery'
-export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number; confirmed?:boolean; publicQueryRecoveryReceiptId?:string; scopeConfirmation?:import('../contracts/browser-public-query-recovery.js').OneOffScopeConfirmation; consentReceiptId?:string }
+export type TaskResumeAttention = { id: string; revision: number; threadId: string }
+export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number; confirmed?:boolean; publicQueryRecoveryReceiptId?:string; scopeConfirmation?:import('../contracts/browser-public-query-recovery.js').OneOffScopeConfirmation; consentReceiptId?:string; resumeAttention?: TaskResumeAttention }
 export type TaskControlResult = { task:TaskRun; corrected?:boolean; completed?:boolean; reason?:string; turn?:StartTurnResponse; capability?:ExternalTaskCapability; attentionId?:string; receipt?:{userMessageItemId:string;resultMessageItemId:string} }
 
 /** One deterministic mutation path for chat commands and the task HTTP API. */
@@ -149,6 +150,10 @@ export class TaskControlService {
       if(action==='retry')await this.assertRetrySafe(current,recovery?.context.unknowns.map(ref=>ref.id),recovery?.binding,recovery?.context.previousRecovery)
     }
     if(action==='resume'||action==='retry') {
+      if (data.resumeAttention && (action !== 'resume' || current.id !== taskId || current.revision !== data.expectedRevision || current.status !== 'waiting_user')) {
+        throw Object.assign(new Error('任务状态已变化，请在原对话重新确认。'), { code: 'stale_request' })
+      }
+      this.assertResumeAttention(current, data.resumeAttention)
       // Prove persisted recovery scope before a new control/child/Turn can consume an attempt.
       // Explicit first-use preparation is validated by forRetry against the
       // unconsumed proof; its owner is deliberately not an execution consumer.
@@ -167,6 +172,7 @@ export class TaskControlService {
         }
       }
       if (action === 'resume' && !current.retryOfTaskId && !current.activeTurnId && !repository.inputs(current.id).some(input => input.sourceId === 'capability-original')) {
+        this.assertResumeAttention(current, data.resumeAttention)
         const original = StartTurnRequest.safeParse(repository.attention(`capability_${current.id}`)?.payload?.request)
         if (original.success) current = tasks.appendInput(current.id, current.revision, `capability-original:${current.id}`, original.data.prompt, 'supplement', 'capability-original',
           { attachmentIds: original.data.attachmentIds, workspaceReferences: original.data.workspaceReferences, capabilityReferences: original.data.capabilityReferences }).task
@@ -176,6 +182,7 @@ export class TaskControlService {
       const capabilities = [current.goal, ...tasks.taskInputs(current.id, true).filter(input => !tasks.approvalForInput(input)).map(input => input.text)]
         .map(text => recovery&&this.deps.preflightRecoveryTask ? this.deps.preflightRecoveryTask(text,externalPreflightThreadContext(executionThread,{mode:'agent'}),recovery.binding) : this.deps.preflightExternalTask ? this.deps.preflightExternalTask(text, externalPreflightThreadContext(executionThread, { mode: 'agent' }), action === 'retry' ? current! : undefined) : preflightExternalTask(text))
       const checked = await Promise.all(capabilities)
+      this.assertResumeAttention(current, data.resumeAttention)
       const requiredCapabilities = checked.filter((capability): capability is ExternalTaskCapability => capability !== null)
       const capability = requiredCapabilities.find(item => item.status !== 'available')
       if(capability) {
@@ -251,6 +258,7 @@ export class TaskControlService {
         }
       }
       const oldTurn=thread?.turns.find(turn=>turn.idempotencyKey===turnKey)
+      this.assertResumeAttention(current, data.resumeAttention)
       if(action==='resume'&&!oldTurn&&current.status!=='retrying') {
         const previous=current
         current=tasks.prepareResume(current.id,current.revision,data.model)
@@ -271,7 +279,9 @@ export class TaskControlService {
       const observedFeedResume = current.acceptance.webEvidenceBasis === 'observed_feed'
         ? `本轮时间 UTC ${collectionClock}；北京时间 ${new Date(Date.parse(collectionClock) + 8 * 60 * 60 * 1000).toISOString().replace('Z', '+08:00')}。旧来源、旧报告和完成回执仅作为历史素材保留，不代表本轮已采集当前订阅列表。必须先用原任务已授权的原生浏览器工具实际打开并读取当前列表或真实单条记录，再整理、发布并核验本轮报告；不要把 read_task_context 的旧快照当作新读取。公告/列表标注日期按原文保留，与本轮实际采集日期分开。旧空间确已关闭时遵循已有继续授权恢复，不另建任务、不扩大权限、不重复外部副作用。`
         : ''
-      const started=await turns.startTurn({threadId:current.threadId,...(externalTaskProvider?{externalTaskProvider}:{}),continuationTaskId:current.id,request:{
+      const taskToStart = current
+      const started=await turns.startTurn({threadId:current.threadId,...(externalTaskProvider?{externalTaskProvider}:{}),continuationTaskId:current.id,
+        ...(data.resumeAttention ? { assertMayStart: () => this.assertResumeAttention(taskToStart, data.resumeAttention) } : {}), request:{
         prompt:action==='resume'?['Continue the persisted task from its last verified checkpoint.',`Goal: ${current.goal}`,checkpoint?.resumeSummary?`Checkpoint: ${checkpoint.resumeSummary}`:'',observedFeedResume,'Read persisted task inputs. Reuse completed artifacts and operation receipts. Do not repeat external side effects.'].filter(Boolean).join('\n'):[`Retry the failed persisted task and satisfy its original acceptance contract.\nGoal: ${current.goal}`,tasks.retryHistory(current.id) || (retryHistory ? `Read-only ancestor drafts (read_artifact with source_task_id/path): ${retryHistory}. These are not this Task's writer or source verification. Publish your own corrected file at the same relative filename, re-read source pages and verify it. Do not replay external side effects.` : '')].filter(Boolean).join('\n'),
         displayText:action==='resume'?'继续未完成任务':'重试未完成任务',idempotencyKey:turnKey,model:data.model ?? current.model,providerId:current.providerId,reasoningEffort:current.reasoningEffort,mode:'agent',attachmentIds,
         ...(action === 'resume' ? { capabilityReferences: (oldTurn ?? previousTurn)?.capabilityReferences } : {})
@@ -279,8 +289,8 @@ export class TaskControlService {
       const next=repository.findByTurn(started.turnId)
       if(!next)throw new Error('task continuation was not created')
       const result={task:next,turn:started}
-      const attention=repository.attention(`capability_${current.id}`)
-      if(attention?.status==='pending')repository.putAttention({...attention,status:'answered',revision:attention.revision+1,updatedAt:nowIso()})
+      const attention=repository.attention(data.resumeAttention?.id ?? `capability_${current.id}`)
+      if(attention?.status==='pending' && (!data.resumeAttention || attention.revision === data.resumeAttention.revision))repository.putAttention({...attention,status:'answered',revision:attention.revision+1,updatedAt:nowIso()})
       repository.finishOperation(taskId,data.idempotencyKey,{status:'succeeded',result},nowIso())
       if(!oldTurn)void this.deps.runTurn(started.threadId,started.turnId)
       return result
@@ -295,9 +305,24 @@ export class TaskControlService {
     }
   }
 
+  private assertResumeAttention(task: TaskRun, reference: TaskResumeAttention | undefined): void {
+    if (!reference) return
+    const { repository } = this.deps
+    const current = repository.currentExecution(task.id)
+    const attention = repository.attention(reference.id)
+    if (current?.id !== task.id || current.revision !== task.revision ||
+        (task.originThreadId ?? task.threadId) !== reference.threadId || attention?.taskId !== task.id ||
+        attention.threadId !== reference.threadId || attention.revision !== reference.revision ||
+        attention.status !== 'pending' || attention.payload?.kind !== 'capability_required' ||
+        repository.inbox(task.workspaceRoot).some(item => item.taskId === task.id && (item.kind === 'question' || item.kind === 'approval'))) {
+      throw Object.assign(new Error('任务或待处理事项已变化，请在原对话重新确认。'), { code: 'stale_request' })
+    }
+  }
+
   private persistResumeCapability(taskId: string, current: TaskRun, request: TaskControlRequest, capability: ExternalTaskCapability): TaskControlResult {
     const { repository, nowIso } = this.deps
     return repository.transact(() => {
+      this.assertResumeAttention(current, request.resumeAttention)
       const latest = repository.currentExecution(taskId)
       if (!latest || latest.id !== current.id || latest.revision !== current.revision) {
         throw Object.assign(new Error('task revision conflict'), { code: 'stale_request' })

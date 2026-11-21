@@ -11,7 +11,7 @@ it('shows the existing conversation checklist inside a collapsed section and edi
   const previous = useChatStore.getState()
   const now = '2026-11-21T04:00:00Z'
   const item = { id: 'one', content: '核对报告', status: 'in_progress' as const, createdAt: now, updatedAt: now }
-  const update = vi.fn(async () => undefined)
+  const update = vi.fn(async () => true)
   const host = document.createElement('div')
   const root = createRoot(host)
   try {

@@ -134,8 +134,14 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   const inFlight = useRef(false)
   const requests = useRef(new Map<string, RevisionRequest>())
   const [message, setMessage] = useState('')
+  const [acknowledgement, setAcknowledgement] = useState<{ text: string; taskId: string; turnId?: string; status: TaskRunStatus }>()
   const [resultsOpen, setResultsOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
+  const notice = message || (acknowledgement?.taskId === task.id && acknowledgement.turnId === task.activeTurnId &&
+    acknowledgement.status === task.status ? acknowledgement.text : '')
+  const acknowledge = (text: string): void => {
+    setAcknowledgement({ text, taskId: task.id, turnId: task.activeTurnId, status: task.status })
+  }
   const disabled = !runtimeReady || Boolean(live.error) || Boolean(busy)
   const rawReason = taskProgressReason(task, t('taskApprovalReviewHint'))
   const legacyReason = rawReason && !/\n|request_host_shell|SHA256|[a-f0-9]{48,}|(?:^|\s)\{/i.test(rawReason) ? redactRuntimeText(rawReason) : undefined
@@ -152,6 +158,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     inFlight.current = true
     setBusy(action)
     setMessage('')
+    setAcknowledgement(undefined)
     const key = `${task.id}:${action}`
     const request = requests.current.get(key) ?? { expectedRevision: task.revision, idempotencyKey: crypto.randomUUID() }
     requests.current.set(key, request)
@@ -159,7 +166,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
       const api = window.workwise
       if (action === 'resume' || action === 'retry') {
         const result = await (action === 'resume' ? api.resumeTask(task.id, request) : api.retryTask(task.id, request))
-        if (!result.capability) setMessage(t('taskWorkspaceResumeSubmitted'))
+        if (!result.capability) acknowledge(t('taskWorkspaceResumeSubmitted'))
         if (result.turn && threadId) foregroundTaskArtifactPreview(threadId, result.task.id)
       } else if (action === 'pause') await api.pauseTask(task.id, request)
       else await api.cancelTask(task.id, request)
@@ -189,11 +196,11 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   }
 
   const onResolved = (notice?: string): void => {
-    if (notice) setMessage(notice)
+    if (notice) acknowledge(notice)
     void refreshTaskState()
   }
 
-  if (task.status === 'completed' && !artifacts.length && !legacyWorkerResponse && !message) return <></>
+  if (task.status === 'completed' && !artifacts.length && !legacyWorkerResponse && !notice) return <></>
 
   return <section aria-label={showTitle ? taskDisplayTitle(group.root) : t('taskWorkspaceTitle')} className="min-w-0 text-ds-ink [&+section]:border-t [&+section]:border-ds-border-muted">
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
@@ -228,7 +235,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
       </details> : null}
     </div> : null}
     {actions?.includes('extend_budget') ? <TaskBudgetControl task={task} onChanged={refreshTaskState} /> : null}
-    {message || live.error ? <p role="status" className="pb-1 text-xs text-ds-muted">{message || t('taskRunUnavailable')}</p> : null}
+    {notice || live.error ? <p role="status" className="pb-1 text-xs text-ds-muted">{notice || t('taskRunUnavailable')}</p> : null}
   </section>
 }
 

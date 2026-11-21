@@ -3,7 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
-import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskPermissionSnapshotV1, TaskRunV1 } from '@shared/agent-workbench'
 import i18n from '../../i18n'
 import { takeRequestedFlow } from '../../store/flow-navigation'
 import { CapabilityRequiredCard } from './CapabilityRequiredCard'
@@ -48,7 +48,7 @@ const api = {
     approvalPolicy: 'never', targetApprovalPolicy: 'on-request', maxTtlSeconds: 900, canConfirm: true })),
   getTaskRun: vi.fn(async () => ({ id: 'task-original', threadId: 'hidden-execution', status: 'waiting_user' })),
   listAgentProfiles: vi.fn(async () => ({ profiles: [] })), runtimeRequest: vi.fn(async () => ({ ok: true, body: '{}' })),
-  confirmTaskPermissions: vi.fn(async () => ({ resumed: false, permission: { canConfirm: false, taskTitle: '处理飞书待办' } })),
+  confirmTaskPermissions: vi.fn(async (): Promise<{ resumed: boolean; task?: TaskRunV1; permission: Partial<TaskPermissionSnapshotV1> }> => ({ resumed: false, permission: { canConfirm: false, taskTitle: '处理飞书待办' } })),
   listTaskPage: vi.fn(async () => ({ items: tasks, relatedTasks: [], attention: inbox, eventWatermark: watermark })),
   startTaskSse: vi.fn(async (_after: number, _streamId: string) => undefined), stopSse: vi.fn(async () => undefined),
   onSseEvent: vi.fn(callback => { taskEvent = callback; return () => undefined }),
@@ -83,6 +83,14 @@ function visibleText(): string {
     details.replaceChildren(...(summary ? [summary.cloneNode(true)] : []))
   }
   return visible.textContent ?? ''
+}
+const policyCard: ExternalTaskCapabilityCard = { ...card, capability: { ...card.capability, status: 'blocked', errorCode: 'approval_policy_blocked',
+  checkedAt: '2026-11-13T00:03:00Z', resolution: { kind: 'grant', route: 'settings', label: '调整任务审批策略' } } }
+async function confirmedPermission() {
+  const task = { ...tasks[0], threadId: 'hidden-execution', originThreadId: card.threadId, revision: 5 }
+  const permission: TaskPermissionSnapshotV1 = { ...await api.getTaskPermissions() as TaskPermissionSnapshotV1, taskRevision: 5, approvalPolicy: 'on-request',
+    grant: { id: 'verified-task-grant', status: 'active', duration: 'task', confirmedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 900_000).toISOString() } }
+  return { task, permission, resumed: false }
 }
 
 describe('capability waiting card', () => {
@@ -607,19 +615,119 @@ describe('capability waiting card', () => {
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
   })
 
-  it('resolves blocked task policy through the mounted task permission panel without resuming', async () => {
-    await render({...card, capability:{...card.capability,status:'blocked',errorCode:'approval_policy_blocked',
-      resolution:{kind:'grant',route:'settings',label:'调整任务审批策略'}}})
+  it('authorizes and continues the original waiting task in one explicit action after a verified grant', async () => {
+    const confirmation = await confirmedPermission()
+    api.confirmTaskPermissions.mockImplementationOnce(async () => { tasks = [confirmation.task]; watermark++; return confirmation })
+    api.coordinateTaskCommand.mockResolvedValueOnce({ kind: 'task_started', task: confirmation.task, turn: { threadId: 'hidden-execution', turnId: 'continued-turn' } })
+    await render(policyCard)
     await click('调整任务审批策略')
     expect(api.getTaskPermissions).toHaveBeenCalledWith('task-original')
     expect(container.textContent).toContain('查看当前任务权限')
     expect(state.openSettings).not.toHaveBeenCalled()
     expect(state.openPlugins).not.toHaveBeenCalled()
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(button('授权并继续').disabled).toBe(true)
     await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
-    await click('允许当前任务请求审批')
+    await click('授权并继续')
     expect(api.confirmTaskPermissions).toHaveBeenCalledWith('task-original', expect.objectContaining({ expectedRevision: 3, scopeHash: 'reviewed-scope', duration: 'task', ttlSeconds: 900 }))
+    expect(api.coordinateTaskCommand).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ threadId: card.threadId, taskId: card.taskId,
+      resolveAttentionId: card.attentionId, intent: 'resume', expectedRevision: 5, expectedAttentionRevision: 0, request: { prompt: card.prompt } }))
+    expect(api.confirmTaskPermissions.mock.invocationCallOrder[0]).toBeLessThan(api.coordinateTaskCommand.mock.invocationCallOrder[0])
+    expect(container.textContent).not.toContain('点击“继续原任务”执行')
+  })
+
+  it('does not continue when the permission reply does not verify an active task grant', async () => {
+    await render(policyCard)
+    await click('调整任务审批策略')
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(i18n.t('common:taskPermissionRecoveryReadFailed'))
+  })
+
+  it.each(['paused', 'failed', 'unknown outcome', 'configuration'] as const)('keeps a separate continuation for %s', async scenario => {
+    if (scenario === 'paused' || scenario === 'failed') tasks[0].status = scenario
+    if (scenario === 'unknown outcome') tasks[0].presentation = { reason: 'outcome_unknown', actions: ['verify'] }
+    const value = scenario === 'configuration' ? { ...policyCard, capability: { ...policyCard.capability, errorCode: 'agent_tool_blocked' } } : policyCard
+    await render(value)
+    await click('调整任务审批策略')
+    expect(container.textContent).not.toContain('授权并继续')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+  })
+
+  it.each(['attention replaced', 'task paused', 'task changed'] as const)('does not continue a delayed grant after %s', async scenario => {
+    const confirmation = await confirmedPermission()
+    api.confirmTaskPermissions.mockImplementationOnce(async () => {
+      tasks = [{ ...confirmation.task, ...(scenario === 'task paused' ? { status: 'paused' as const } : {}), ...(scenario === 'task changed' ? { revision: 6 } : {}) }]
+      if (scenario === 'attention replaced') inbox = [{ ...attentionFor(policyCard), revision: 1 }]
+      watermark++
+      return confirmation
+    })
+    await render(policyCard)
+    await click('调整任务审批策略')
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    expect(api.confirmTaskPermissions).toHaveBeenCalledOnce()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
+
+  it('does not continue when scope confirmation is refused', async () => {
+    api.confirmTaskPermissions.mockRejectedValueOnce(new Error('scope was refused'))
+    await render(policyCard)
+    await click('调整任务审批策略')
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('scope was refused')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
+
+  it('waits out a pre-grant coalesced read and checks a fresh task snapshot before continuing', async () => {
+    const confirmation = await confirmedPermission()
+    let resolveOldRead!: () => void
+    api.confirmTaskPermissions.mockImplementationOnce(async () => {
+      const oldPage = { items: [...tasks], relatedTasks: [], attention: [...inbox], eventWatermark: watermark }
+      api.listTaskPage.mockImplementationOnce(() => new Promise(done => { resolveOldRead = () => done(oldPage) }))
+      void refreshTaskState()
+      tasks = [confirmation.task]; watermark++
+      return confirmation
+    })
+    api.coordinateTaskCommand.mockResolvedValueOnce({ kind: 'task_started', task: confirmation.task, turn: { threadId: 'hidden-execution', turnId: 'continued-turn' } })
+    await render(policyCard)
+    await click('调整任务审批策略')
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    await act(async () => { resolveOldRead(); await Promise.resolve(); await Promise.resolve() })
+    expect(api.coordinateTaskCommand).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ taskId: card.taskId, expectedRevision: 5, expectedAttentionRevision: 0 }))
+  })
+
+  it('does not claim execution or hide the waiting card when continuation only returns a snapshot', async () => {
+    const confirmation = await confirmedPermission()
+    api.confirmTaskPermissions.mockImplementationOnce(async () => { tasks = [confirmation.task]; watermark++; return confirmation })
+    api.coordinateTaskCommand.mockResolvedValueOnce({ kind: 'snapshot', task: confirmation.task })
+    await render(policyCard)
+    await click('调整任务审批策略')
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    expect(container.textContent).toContain(i18n.t('common:taskPermissionContinueNotStarted'))
+    expect(container.textContent).not.toContain(i18n.t('common:capabilityResumed'))
+    expect(button('重新检查并继续原任务')).toBeTruthy()
+  })
+
+  it.each(['other task', 'chat', 'missing task'] as const)('does not claim the original task resumed for a %s reply', async scenario => {
+    const confirmation = await confirmedPermission()
+    api.confirmTaskPermissions.mockImplementationOnce(async () => { tasks = [confirmation.task]; watermark++; return confirmation })
+    api.coordinateTaskCommand.mockResolvedValueOnce({ kind: scenario === 'chat' ? 'chat_started' : 'task_started',
+      ...(scenario === 'missing task' ? {} : { task: { ...confirmation.task, id: scenario === 'other task' ? 'unrelated-task' : card.taskId } }),
+      turn: { threadId: 'hidden-execution', turnId: 'continued-turn' } })
+    await render(policyCard)
+    await click('调整任务审批策略')
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(i18n.t('common:taskPermissionContinueUnavailable'))
+    expect(container.textContent).not.toContain(i18n.t('common:capabilityResumed'))
+    expect(button('重新检查并继续原任务')).toBeTruthy()
   })
 
   it('routes Agent scope inspection and workspace selection to their specific controls', async () => {
