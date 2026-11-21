@@ -55,7 +55,7 @@ export function taskStatusSummary(task: TaskRun): string {
   return {
     queued: '任务已排队。', running: '任务正在执行。', retrying: '任务正在恢复。', paused: '任务已暂停。',
     waiting_user: '任务需要你补充信息或处理卡点。', waiting_approval: '任务正在等待你确认操作。',
-    completed: '任务已完成。', stalled: '任务遇到阻塞，请打开任务查看可用操作。',
-    failed: '任务未完成，请打开任务查看可用操作。', cancelled: '任务已取消。'
+    completed: '任务已完成。', stalled: '任务暂时无法继续，请回到原对话查看原因和可用操作。',
+    failed: '任务未完成，请回到原对话查看原因和可用操作。', cancelled: '任务已取消。'
   }[task.status]
 }

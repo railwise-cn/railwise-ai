@@ -18,14 +18,12 @@ import { TaskPublicQueryRecoveryCard } from '../tasks/TaskPublicQueryRecoveryCar
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { capabilityCardMatchesAttention } from './CapabilityRequiredCard'
 import { redactRuntimeText } from './conversation-visibility'
-import { MessageBubble } from './message-timeline-bubbles'
 
 type Props = {
   threadId: string | null
   runtimeReady: boolean
   linkedTask?: { id: string; threadId: string }
-  composerControls?: readonly ChatBlock[]
-  composerReplyId?: string
+  conversationControls?: readonly ChatBlock[]
   composerReplies?: boolean
   inlineCapabilityCards?: readonly ExternalTaskCapabilityCard[]
   inlineRequests?: readonly string[]
@@ -56,7 +54,7 @@ function pendingForBranch(members: TaskRunV1[], attention: readonly TaskAttentio
 }
 
 function isInTimeline(item: TaskAttentionV1, { inlineRequests, inlineCapabilityCards }: Pick<Props, 'inlineRequests' | 'inlineCapabilityCards'>): boolean {
-  return Boolean(item.requestId && inlineRequests?.includes(item.requestId) ||
+  return Boolean(inlineRequests?.includes(item.id) || item.requestId && inlineRequests?.includes(item.requestId) ||
     inlineCapabilityCards?.some(card => capabilityCardMatchesAttention(card, item)))
 }
 
@@ -68,18 +66,19 @@ export function TaskRunStatusBar(props: Props): ReactElement | null {
     (root.originThreadId === props.threadId || root.threadId === props.threadId || all.some(item => item.id === linkedId))) : [],
   [live.tasks, props.threadId, linkedId])
   const primary = groups.find(({ all }) => all.some(item => item.id === (linkedId ?? live.navigation.selectedTaskId))) ?? groups[0]
-  const composerControls = (props.threadId && props.composerControls) || EMPTY_CONTROLS
+  const conversationControls = (props.threadId && props.conversationControls) || EMPTY_CONTROLS
   const presented = useMemo(() => ({
-    inlineRequests: props.inlineRequests ?? composerControls.flatMap(block => {
+    inlineRequests: props.inlineRequests ?? conversationControls.flatMap(block => {
       if (block.kind === 'approval') return [block.approvalId]
       if (block.kind === 'user_input') return [block.requestId]
+      if (block.kind === 'assistant' && block.intentCard) return [block.intentCard.attentionId]
       return []
     }),
-    inlineCapabilityCards: props.inlineCapabilityCards ?? composerControls.flatMap(block =>
+    inlineCapabilityCards: props.inlineCapabilityCards ?? conversationControls.flatMap(block =>
       block.kind === 'assistant' && block.capabilityCard ? [block.capabilityCard] : [])
-  }), [composerControls, props.inlineRequests, props.inlineCapabilityCards])
+  }), [conversationControls, props.inlineRequests, props.inlineCapabilityCards])
 
-  if (!primary && !composerControls.length) return null
+  if (!primary) return null
   const otherActive = groups.filter(group => {
     if (group === primary) return false
     const branch = currentTaskBranch(group.all, group.root)
@@ -87,10 +86,9 @@ export function TaskRunStatusBar(props: Props): ReactElement | null {
       pendingForBranch(branch.members, live.attention, false).some(item => !isInTimeline(item, presented))
   })
   const current = primary ? [primary, ...otherActive] : []
-  return <div className="ds-composer-task-controls min-w-0 max-h-[min(34dvh,20rem)] overflow-y-auto border-b border-ds-border-muted px-1 pb-1 empty:hidden">
-    {composerControls.map(block => <MessageBubble key={block.id} block={block} nested inComposer replyInComposer={block.id === props.composerReplyId} />)}
+  return <div className="min-w-0 border-l border-ds-border-muted pl-3 empty:hidden">
     {current.map(group => <ConversationTask key={group.root.id} {...props} {...presented} group={group} live={live}
-      composerReplies={props.composerReplies && current.length === 1 && composerControls.length === 0}
+      composerReplies={props.composerReplies && current.length === 1 && conversationControls.length === 0}
       showTitle={current.length > 1} isPrimary={group === primary} />)}
   </div>
 }

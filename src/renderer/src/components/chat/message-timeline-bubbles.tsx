@@ -1481,7 +1481,7 @@ function formatMessageDateTime(input: string, locale: string): string {
   }).format(date)
 }
 
-export function MessageBubble({ block, nested = false, professionalSurface = false, language, inComposer = false, replyInComposer = false }: { block: ChatBlock; nested?: boolean; professionalSurface?: boolean; language?: string; inComposer?: boolean; replyInComposer?: boolean }): ReactElement {
+export function MessageBubble({ block, nested = false, professionalSurface = false, language, replyInComposer = false }: { block: ChatBlock; nested?: boolean; professionalSurface?: boolean; language?: string; replyInComposer?: boolean }): ReactElement {
   const { t, i18n } = useTranslation('common')
   const activeThreadId = useChatStore((s) => s.activeThreadId)
   const hideRuntimeBlock = professionalSurface && block.kind !== 'assistant' && block.kind !== 'user'
@@ -1559,7 +1559,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
     return <UserInputBubble block={block} nested={nested} replyInComposer={replyInComposer} />
   }
   if (block.kind === 'approval') {
-    return <ApprovalBubble block={block} inComposer={inComposer} />
+    return <ApprovalBubble block={block} />
   }
   if (block.kind === 'compaction') {
     return (
@@ -1601,7 +1601,7 @@ const approvalLabels = {
   expired: 'approvalExpired', error: 'approvalFailed'
 } as const
 
-function ApprovalBubble({ block, inComposer }: { block: Extract<ChatBlock, { kind: 'approval' }>; inComposer: boolean }): ReactElement {
+function ApprovalBubble({ block }: { block: Extract<ChatBlock, { kind: 'approval' }> }): ReactElement {
   const { t } = useTranslation('common')
   const resolveApproval = useChatStore(state => state.resolveApproval)
   const runtimeConnection = useChatStore(state => state.runtimeConnection)
@@ -1617,7 +1617,7 @@ function ApprovalBubble({ block, inComposer }: { block: Extract<ChatBlock, { kin
     }
   }
   return (
-    <div className={inComposer ? 'min-w-0 px-1 py-1.5 text-ds-ink' : 'min-w-0 rounded-2xl border border-ds-border bg-ds-card px-4 py-3 text-ds-ink'}>
+    <div className="min-w-0 rounded-2xl border border-ds-border bg-ds-card px-4 py-3 text-ds-ink">
       <div className="text-[13px] font-semibold">{t('approvalTitle')}</div>
       <ApprovalOperationDetails summary={block.summary} toolName={block.toolName} />
       {block.errorMessage ? <p role="status" className="mt-2 text-xs text-ds-muted">{block.errorMessage}</p> : null}

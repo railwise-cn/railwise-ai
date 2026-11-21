@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -11,7 +12,8 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
-  type ReactNode
+  type ReactNode,
+  type Ref
 } from 'react'
 import {
   Archive,
@@ -106,8 +108,10 @@ import { resolveUsageTokenDisplay } from '../../store/live-usage-projection'
 export type { ComposerFileReference } from '../../lib/composer-file-references'
 export type { ComposerExecutionSettings } from './FloatingComposerExecutionPicker'
 
+export type ComposerActions = { focus: () => void; pickAttachments: () => void }
+
 type Props = {
-  renderTaskControls?: (controls: { focusComposer: () => void; pickAttachments?: () => void }) => ReactNode
+  actionsRef?: Ref<ComposerActions>
   replyingToQuestion?: boolean
   variant?: 'default' | 'compact'
   composerMinHeight?: number
@@ -602,7 +606,7 @@ function moveComposerOption(current: number, options: ComposerCommand[], step: 1
 }
 
 export function FloatingComposer({
-  renderTaskControls,
+  actionsRef,
   replyingToQuestion = false,
   variant = 'default',
   composerMinHeight = 36,
@@ -1333,6 +1337,8 @@ export function FloatingComposer({
     fileInputRef.current?.click()
     draft.focusComposer()
   }
+
+  useImperativeHandle(actionsRef, () => ({ focus: draft.focusComposer, pickAttachments: handleAttachmentMenuClick }))
 
   const handlePlanToolbarClick = (): void => {
     if (!canTogglePlanMode) return
@@ -2112,10 +2118,6 @@ export function FloatingComposer({
           onDragOver={handleComposerDragOver}
           onDrop={handleComposerDrop}
         >
-          {renderTaskControls?.({
-            focusComposer: draft.focusComposer,
-            pickAttachments: canPickAttachment && onPickAttachments ? handleAttachmentMenuClick : undefined
-          })}
           {showChangeSummary ? (
             <div className="ds-no-drag mb-1 rounded-2xl border border-ds-border-muted bg-ds-card/78 px-3 py-2 shadow-sm">
               <div className="flex min-w-0 items-center gap-2">

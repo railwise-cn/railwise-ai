@@ -96,14 +96,16 @@ async function paint(): Promise<void> {
   await act(async () => { await new Promise(requestAnimationFrame) })
 }
 
-it('places task controls inside the input shell and keeps the existing draft', async () => {
+it('focuses the ordinary input from the conversation without changing the draft', async () => {
+  const actionsRef = { current: null } as { current: import('./FloatingComposer').ComposerActions | null }
   await act(async () => root.render(createElement(Harness, {
     menu: 'toolbar', seed: '当前草稿',
-    composerProps: { renderTaskControls: () => createElement('button', { type: 'button' }, '审批') }
+    composerProps: { actionsRef }
   })))
-  const shell = host.querySelector('.ds-composer-shell')!
-  expect(shell.contains(buttonByLabel('审批'))).toBe(true)
-  expect(shell.querySelector('textarea')?.value).toBe('当前草稿')
+  const textarea = host.querySelector<HTMLTextAreaElement>('.ds-composer-shell textarea')
+  await act(async () => actionsRef.current?.focus())
+  expect(document.activeElement).toBe(textarea)
+  expect(textarea?.value).toBe('当前草稿')
 })
 
 describe('composer attachment entry points', () => {

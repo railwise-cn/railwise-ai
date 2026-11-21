@@ -37,6 +37,17 @@ describe('Workbench responsive panel contract', () => {
     expect(baseShell).toMatch(/\.ds-chat-composer\s*\{[\s\S]*background:\s*rgba\(255, 255, 255, 0\.97\);/)
   })
 
+  it('places task activity and steps in the conversation scroll surface', async () => {
+    const { readFile } = await import(/* @vite-ignore */ 'node:fs/promises')
+    const workbench = await readFile(new URL('./Workbench.tsx', import.meta.url), 'utf8')
+    const timeline = workbench.slice(workbench.lastIndexOf('<MessageTimeline'), workbench.lastIndexOf('<FloatingComposer'))
+    const input = workbench.slice(workbench.lastIndexOf('<FloatingComposer'))
+    expect(timeline).toContain('taskActivity=')
+    expect(timeline).toContain('<TaskRunStatusBar')
+    expect(timeline).toContain('<ConversationChecklist')
+    expect(input).not.toMatch(/TaskRunStatusBar|ConversationChecklist|renderTaskControls/)
+  })
+
   it('routes notification clicks to the requested chat thread', async () => {
     const nodeFs = 'node:fs/promises'
     const { readFile } = await import(/* @vite-ignore */ nodeFs)

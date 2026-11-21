@@ -36,11 +36,12 @@ import { Sidebar } from './chat/Sidebar'
 import { ReleaseHighlights } from './ReleaseHighlights'
 import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { MessageTimeline } from './chat/MessageTimeline'
-import { composerReplyQuestion, conversationComposerControls } from './chat/conversation-visibility'
+import { activeConversationControls, composerReplyQuestion } from './chat/conversation-visibility'
 import { TaskRunStatusBar } from './chat/TaskRunStatusBar'
 import { ConversationChecklist } from './chat/ConversationChecklist'
 import {
   FloatingComposer,
+  type ComposerActions,
   type ComposerExecutionSettings,
   type ComposerFileReference
 } from './chat/FloatingComposer'
@@ -516,9 +517,9 @@ export function Workbench(): ReactElement {
   ])
   const timelineBlocks = blocks
   const chatOwnsTaskControls = route === 'chat' || route === 'claw'
-  const composerTaskControls = useMemo(() => conversationComposerControls(timelineBlocks), [timelineBlocks])
-  const composerControlIds = useMemo(() => new Set(composerTaskControls.map(block => block.id)), [composerTaskControls])
-  const replyQuestion = route === 'chat' ? composerReplyQuestion(composerTaskControls) : undefined
+  const conversationControls = useMemo(() => activeConversationControls(timelineBlocks), [timelineBlocks])
+  const replyQuestion = route === 'chat' ? composerReplyQuestion(conversationControls) : undefined
+  const composerActionsRef = useRef<ComposerActions>(null)
   const submittingQuestion = useRef<string | null>(null)
   const timelineMessageIds = useMemo(() => new Set(timelineBlocks.map(block => block.id)), [timelineBlocks])
   const timelineLiveReasoning = liveReasoning
@@ -2582,7 +2583,22 @@ export function Workbench(): ReactElement {
             <MessageTimeline
               viewMode={conversationViewMode}
               blocks={timelineBlocks}
-              composerControlIds={chatOwnsTaskControls ? composerControlIds : undefined}
+              activeControls={chatOwnsTaskControls ? conversationControls : undefined}
+              replyQuestionId={replyQuestion?.id}
+              taskActivity={chatOwnsTaskControls && activeThreadId ? <>
+                <TaskRunStatusBar
+                  threadId={activeThreadId}
+                  runtimeReady={runtimeConnection === 'ready'}
+                  conversationControls={conversationControls}
+                  composerReplies={route === 'chat' && mode === 'agent'}
+                  visibleMessageIds={timelineMessageIds}
+                  linkedTask={linkedTask ?? undefined}
+                  onSupplement={() => composerActionsRef.current?.focus()}
+                  onPickAttachments={attachmentUploadEnabled && !attachmentUploadBusy ? () => composerActionsRef.current?.pickAttachments() : undefined}
+                  onOpenArtifact={(task, artifact) => openWorkspaceArtifact({ taskId: task.id, artifactId: artifact.id })}
+                />
+                <ConversationChecklist key={activeThreadId} threadId={activeThreadId} onOpenPlan={openGuiPlanPanel} />
+              </> : undefined}
               liveReasoning={timelineLiveReasoning}
               live={timelineLiveAssistant}
               activeThreadId={activeThreadId}
@@ -2611,22 +2627,8 @@ export function Workbench(): ReactElement {
             />
             <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8">
               <FloatingComposer
+                actionsRef={composerActionsRef}
                 replyingToQuestion={Boolean(replyQuestion)}
-                renderTaskControls={chatOwnsTaskControls ? ({ focusComposer, pickAttachments }) => <>
-                  <TaskRunStatusBar
-                    threadId={activeThreadId}
-                    runtimeReady={runtimeConnection === 'ready'}
-                    composerControls={composerTaskControls}
-                    composerReplyId={replyQuestion?.id}
-                    composerReplies={route === 'chat' && mode === 'agent'}
-                    visibleMessageIds={timelineMessageIds}
-                    linkedTask={linkedTask ?? undefined}
-                    onSupplement={focusComposer}
-                    onPickAttachments={pickAttachments}
-                    onOpenArtifact={(task, artifact) => openWorkspaceArtifact({ taskId: task.id, artifactId: artifact.id })}
-                  />
-                  {activeThreadId ? <ConversationChecklist key={activeThreadId} threadId={activeThreadId} onOpenPlan={openGuiPlanPanel} /> : null}
-                </> : undefined}
                 input={input}
                 setInput={setInput}
                 mode={mode}

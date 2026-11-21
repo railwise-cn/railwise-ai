@@ -6,7 +6,7 @@ import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
 import type { ChatBlock } from '../../agent/types'
 import { TaskRunStatusBar } from './TaskRunStatusBar'
 import { MessageTimeline } from './MessageTimeline'
-import { composerReplyQuestion, conversationComposerControls } from './conversation-visibility'
+import { activeConversationControls, composerReplyQuestion } from './conversation-visibility'
 import { useChatStore } from '../../store/chat-store'
 import { refreshTaskState, resetTaskStateForTests } from '../../store/task-live-store'
 import i18n from '../../i18n'
@@ -39,6 +39,20 @@ async function render(props: Partial<ComponentProps<typeof TaskRunStatusBar>> = 
   })
 }
 
+async function renderConversation(blocks: ChatBlock[], replyQuestionId?: string): Promise<void> {
+  const activeControls = activeConversationControls(blocks)
+  await act(async () => {
+    await refreshTaskState()
+    root.render(createElement('div', null,
+      createElement(MessageTimeline, { blocks, activeControls, replyQuestionId,
+        activeThreadId: threadId, runtimeConnection: 'ready', liveReasoning: '', live: '',
+        onRetryConnection: () => undefined, onOpenSettings: () => undefined,
+        taskActivity: createElement(TaskRunStatusBar, { threadId, runtimeReady: true, conversationControls: activeControls }) }),
+      createElement('div', { className: 'ds-composer-shell' }, createElement('textarea'))
+    ))
+  })
+}
+
 function button(label: string): HTMLButtonElement | undefined {
   return [...container.querySelectorAll('button')].find(button => button.textContent === label)
 }
@@ -57,7 +71,7 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); resetTaskStateForTests(); container.remove() })
 
 describe('task actions in the original conversation', () => {
-  it('shows one composer approval for a replayed request and submits only one decision', async () => {
+  it('shows one approval in message order for a replayed request and submits only one decision', async () => {
     tasks = [run('permission', 'waiting_approval', { presentation: { reason: 'approval_required', actions: ['approve', 'deny'] } })]
     attention = [{ id: 'persisted', requestId: 'approval-id', taskId: 'permission', ownerId: 'permission', ownerKind: 'task',
       threadId: 'worker-permission', kind: 'approval', title: '需要授权', message: 'Approve access', status: 'pending',
@@ -66,24 +80,22 @@ describe('task actions in the original conversation', () => {
     let finish!: () => void
     const resolveApproval = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
     const approval: ChatBlock = { kind: 'approval', id: 'initial', approvalId: 'approval-id', summary: 'Approve access', status: 'pending' }
-    const blocks: ChatBlock[] = [approval, { ...approval, id: 'replayed' }]
-    const composerControls = conversationComposerControls(blocks)
-    expect(conversationComposerControls([approval, { ...approval, status: 'allowed' }, ...blocks])).toEqual([])
+    const blocks: ChatBlock[] = [
+      { kind: 'assistant', id: 'before', text: '已收到资料。' }, approval, { ...approval, id: 'replayed' },
+      { kind: 'assistant', id: 'after', text: '以下是后续说明。' }
+    ]
+    expect(activeConversationControls([approval, { ...approval, status: 'allowed' }, ...blocks])).toEqual([])
     useChatStore.setState({ runtimeConnection: 'ready', route: 'chat', activeThreadId: threadId, resolveApproval })
     try {
-      await act(async () => {
-        await refreshTaskState()
-        root.render(createElement('div', null,
-          createElement(MessageTimeline, { blocks, composerControlIds: new Set(composerControls.map(block => block.id)),
-            activeThreadId: threadId, runtimeConnection: 'ready', liveReasoning: '', live: '',
-            onRetryConnection: () => undefined, onOpenSettings: () => undefined }),
-          createElement(TaskRunStatusBar, { threadId, runtimeReady: true, composerControls })
-        ))
-      })
+      await renderConversation(blocks)
       const allow = i18n.t('common:approvalAllow')
       const choices = [...container.querySelectorAll('button')].filter(control => control.textContent === allow)
       expect(choices).toHaveLength(1)
-      expect(choices[0].closest('.ds-composer-task-controls')).not.toBeNull()
+      expect(choices[0].closest('.ds-message-timeline-content')).not.toBeNull()
+      expect(choices[0].closest('.ds-composer-shell')).toBeNull()
+      const content = container.querySelector('.ds-message-timeline-content')!.textContent!
+      expect(content.indexOf('已收到资料。')).toBeLessThan(content.indexOf(allow))
+      expect(content.indexOf(allow)).toBeLessThan(content.indexOf('以下是后续说明。'))
       await act(async () => { choices[0].click(); choices[0].click() })
       expect(resolveApproval).toHaveBeenCalledExactlyOnceWith('replayed', 'allow')
       expect(api.runtimeRequest).not.toHaveBeenCalled()
@@ -99,14 +111,15 @@ describe('task actions in the original conversation', () => {
     const open: ChatBlock = { kind: 'user_input', id: 'question', requestId: 'input-id', status: 'pending',
       questions: [{ id: 'document', header: '资料', question: '请提供资料名称', options: [] }] }
     expect(composerReplyQuestion([open])?.id).toBe(open.id)
-    await render({ composerControls: [open], composerReplyId: open.id })
+    await renderConversation([open], open.id)
     expect(container.textContent).toContain('请提供资料名称')
     expect(container.textContent).toContain('在下方输入框直接回复')
-    expect(container.querySelector('textarea')).toBeNull()
+    expect(container.querySelectorAll('textarea')).toHaveLength(1)
+    expect(container.querySelector('.ds-message-timeline-content textarea')).toBeNull()
 
     const structured = { ...open, questions: [{ ...open.questions[0], options: [{ label: '报告一', description: '第一份报告' }] }] }
     expect(composerReplyQuestion([structured])).toBeUndefined()
-    await render({ composerControls: [structured] })
+    await renderConversation([structured])
     expect(container.textContent).toContain('报告一')
     expect(container.textContent).not.toContain('在下方输入框直接回复')
 

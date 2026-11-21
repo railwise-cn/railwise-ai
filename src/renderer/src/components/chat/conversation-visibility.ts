@@ -83,12 +83,17 @@ export function isPendingProcessControl(block: ChatBlock): boolean {
   return (block.kind === 'approval' || block.kind === 'user_input') && block.status === 'pending'
 }
 
-export function conversationComposerControls(blocks: readonly ChatBlock[]): ChatBlock[] {
+export function activeConversationControls(blocks: readonly ChatBlock[]): ChatBlock[] {
   const controls = new Map<string, Extract<ChatBlock, { kind: 'approval' | 'user_input' }>>()
   let latestCapability: ChatBlock | undefined
+  let latestIntent: ChatBlock | undefined
   for (const block of blocks) {
-    if (block.kind === 'user') latestCapability = undefined
+    if (block.kind === 'user') {
+      latestCapability = undefined
+      latestIntent = undefined
+    }
     if (block.kind === 'assistant' && block.capabilityCard) latestCapability = block
+    if (block.kind === 'assistant' && block.intentCard) latestIntent = block
     if (block.kind !== 'approval' && block.kind !== 'user_input') continue
     const key = block.kind === 'approval' ? `approval:${block.approvalId}` : `input:${block.requestId}`
     const earlier = controls.get(key)
@@ -96,7 +101,7 @@ export function conversationComposerControls(blocks: readonly ChatBlock[]): Chat
     controls.set(key, block)
   }
   const pending = [...controls.values()].filter(isPendingProcessControl)
-  return latestCapability ? [...pending, latestCapability] : pending
+  return [...new Set([...pending, latestCapability, latestIntent].filter(block => block !== undefined))]
 }
 
 export function composerReplyQuestion(controls: readonly ChatBlock[]): Extract<ChatBlock, { kind: 'user_input' }> | undefined {
