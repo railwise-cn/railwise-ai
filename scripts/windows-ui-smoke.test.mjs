@@ -63,6 +63,22 @@ test('the delegated checklist DOM probe rejects the old composer location and du
   } finally { await window.happyDOM.close() }
 })
 
+test('draft-only checklist admission waits for a real send to materialize one origin and its distinct worker', () => {
+  const existing = new Set(['previous-origin'])
+  const origin = { id: 'new-origin', relation: 'primary' }
+  const worker = { id: 'worker', relation: 'side', parentThreadId: origin.id }
+  const task = { id: 'new-task', goal: 'controlled checklist', originThreadId: origin.id, threadId: worker.id }
+  const find = (threads, tasks) => permissionSmokeModule.findWindowsChecklistOrigin(threads, tasks, existing, task.goal)
+  assert.equal(find([], []), null)
+  assert.equal(find([origin], []), null)
+  assert.deepEqual(find([origin, worker], [task]), { origin, task })
+  assert.throws(() => find([origin, {id:'extra-origin',relation:'primary'}], [task]), /one new primary origin/)
+  assert.throws(() => find([origin, worker], [task, {...task,id:'duplicate'}]), /one matching delegated task/)
+  assert.throws(() => find([origin], [{...task,originThreadId:'previous-origin'}]), /belong to the new origin/)
+  assert.throws(() => find([origin], [{...task,threadId:origin.id}]), /distinct worker/)
+  assert.equal(find([origin], [{...task,goal:'unrelated'}]), null)
+})
+
 test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {
   for (const state of ['open', 'collapsed']) {
     const actions = []
