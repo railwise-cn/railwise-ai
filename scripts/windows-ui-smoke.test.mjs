@@ -20,6 +20,49 @@ import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEv
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
 
+test('the delegated checklist fixture sends two real writes and checks their worker-thread readback', async () => {
+  const fixture = permissionSmokeModule.createWindowsOriginChecklistModel()
+  const body = { messages: [{ role: 'user', content: '合成校对 [RW-CUA-STEPS]' }],
+    tools: [{ function: { name: 'todo_write' } }] }
+  const response = (call, threadId = 'worker') => ({
+    role: 'tool', tool_call_id: call.id, content: JSON.stringify({ todos: { threadId, items: JSON.parse(call.function.arguments).todos } })
+  })
+  const first = (await fixture.modelAction(body)).tool_calls[0]
+  assert.equal(first.function.name, 'todo_write')
+  body.messages.push(response(first))
+  let continued = false
+  const next = fixture.modelAction(body).then(value => { continued = true; return value })
+  assert.equal(continued, false)
+  fixture.finish()
+  const second = (await next).tool_calls[0]
+  assert.notEqual(second.id, first.id)
+  assert.deepEqual(JSON.parse(second.function.arguments).todos.map(item => item.status), ['completed', 'completed'])
+  body.messages.push(response(second))
+  assert.match((await fixture.modelAction({ ...body, tools: [] })).content, /均已完成/)
+  assert.deepEqual(fixture.evidence.reads.map(read => read.threadId), ['worker', 'worker'])
+  body.messages[2].content = '{"todos":{"threadId":"worker","items":[]}}'
+  await assert.rejects(fixture.modelAction(body))
+})
+
+test('the delegated checklist DOM probe rejects the old composer location and duplicate task actions', async () => {
+  const { Window } = await import('happy-dom')
+  const window = new Window()
+  try {
+    window.document.body.innerHTML = '<div class="ds-message-timeline-content"><p>合成校对</p><section><details open><summary>执行步骤 · 已完成 1 / 2</summary><ul><li><span>核对合成报告</span><span>完成</span></li><li><span>复核表头</span><span>待处理</span></li></ul></details></section></div><div class="ds-chat-composer-dock"><textarea></textarea></div>'
+    for (const node of window.document.querySelectorAll('summary, li')) node.getClientRects = () => [{}]
+    const expression = permissionSmokeModule.windowsOriginChecklistExpression('执行步骤 · 已完成 1 / 2', '合成校对')
+    const before = window.eval(expression)
+    assert.equal(before.taskInTranscript, true)
+    assert.equal(before.draftTaskControls, 0)
+    assert.equal(before.rows.length, 2)
+    const draft = window.document.querySelector('.ds-chat-composer-dock')
+    draft.insertAdjacentHTML('beforeend', '<button>允许此操作</button>')
+    assert.equal(window.eval(expression).draftTaskControls, 1)
+    draft.append(window.document.querySelector('section'))
+    assert.equal(window.eval(expression), null)
+  } finally { await window.happyDOM.close() }
+})
+
 test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {
   for (const state of ['open', 'collapsed']) {
     const actions = []
@@ -735,7 +778,7 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   const leaveHelp = ui.indexOf("cdp.click('.ds-settings-sidebar button', '返回')", ui.indexOf("report.checks.push('offline-help-images')"))
   assert.ok(leaveHelp > ui.indexOf("report.checks.push('offline-help-images')"))
   assert.ok(leaveHelp < ui.indexOf("'the main workspace after leaving help'"))
-  assert.ok(ui.indexOf("'the main workspace after leaving help'") < ui.indexOf("cdp.click('.ds-sidebar-shell button.w-full', '新建会话')"))
+  assert.ok(ui.indexOf("'the main workspace after leaving help'") < ui.indexOf("cdp.click('.ds-sidebar-shell button.w-full', '新建会话')", leaveHelp))
   assert.doesNotMatch(ui, /cdp\.hover\('button\[aria-label="新建会话"\]'/)
   const sidebar = readFileSync(new URL('../src/renderer/src/components/chat/Sidebar.tsx', import.meta.url), 'utf8')
   assert.match(sidebar, /label=\{activeView === 'engineering' \? t\('engineeringNewProject'\) : t\('newAgent'\)\}[\s\S]*?disabled=\{!runtimeReady\}/)
