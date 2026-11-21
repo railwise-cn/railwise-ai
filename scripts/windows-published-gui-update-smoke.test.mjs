@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { assertPublishedWindowsUpgrade, legacyUpdaterReason, repairedScheduleSeed, sidebarUpgradeControlSelector, sidebarUpgradeSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
-import { createPrivateTrust, recordWindowsUpgradePhase, verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
+import { createPrivateTrust, recordWindowsUpgradePhase, firstLaunchWindowsUiAutomationScript, validateFirstLaunchWindowsObservation, verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const installer = { url: 'RailWise-AI-0.5.7-win-x64.exe', size: 317686658, sha512: manifestDigest }
@@ -281,4 +281,40 @@ test('updater phase receipt distinguishes environment preparation from actual up
   assert.equal(report.phases.at(-1).category, 'owned-process-timeout')
   assert.equal(report.phases.at(-1).status, 'failed')
   assert.equal('status' in report, false, 'a helper observation cannot declare acceptance passed')
+})
+
+test('first-upgrade UIA observation binds the actual new HWND, process, version and visible announcement', () => {
+  const window={handle:123456,pid:9000},executable='D:\\owned\\RailWise AI.exe',version='0.5.10'
+  const packageMetadata={version,sourceHead:'a'.repeat(40),asarSha256:'b'.repeat(64)}
+  const observed={observation:'native-uia-first-automatic-relaunch-before-close',hwnd:window.handle,ownerPid:window.pid,executable,
+    executableVersion:version,windowTitle:'RailWise AI',visible:true,titleVisible:true,versionVisible:true,
+    processStartedAt:'2026-11-21T05:00:00Z',observedAt:'2026-11-21T05:00:01Z'}
+  assert.deepEqual(validateFirstLaunchWindowsObservation(observed,{window,executable,version,packageMetadata}),{...observed,packageMetadata})
+  for(const change of [{hwnd:1},{ownerPid:1},{executable:'D:\\foreign\\RailWise AI.exe'},{executableVersion:'0.5.9'},{windowTitle:'Another app'},
+    {visible:false},{titleVisible:false},{versionVisible:false},{processStartedAt:'invalid'},{observedAt:'invalid'},{observation:'second-manual-relaunch'}]) {
+    assert.throws(()=>validateFirstLaunchWindowsObservation({...observed,...change},{window,executable,version,packageMetadata}))
+  }
+  const script=firstLaunchWindowsUiAutomationScript(window,executable,version)
+  assert.match(script,/AutomationElement\]::FromHandle/)
+  assert.match(script,/ProcessId -ne 9000/)
+  assert.match(script,/本版更新/)
+  assert.match(script,/0\\\.5\\\.10/)
+  assert.doesNotMatch(script,/InvokePattern|SetValue|SendKeys|SetForeground|CloseMainWindow|localStorage|Stop-Process/)
+  assert.throws(()=>firstLaunchWindowsUiAutomationScript({...window,handle:0},executable,version))
+})
+
+test('supplemental first-launch mode is opt-in, pins the 0.5.9 route and retains both default entry points', async () => {
+  const workflow=parse(await readFile(new URL('../.github/workflows/windows-install-smoke.yml',import.meta.url),'utf8'))
+  const job=workflow.jobs['windows-frozen-gui-update']
+  assert.equal(workflow.on.workflow_dispatch.inputs.verify_upgrade_first_launch.default,false)
+  assert.match(job.strategy.matrix.entry,/inputs.verify_upgrade_first_launch && '\["sidebar"\]'/)
+  assert.match(job.strategy.matrix.entry,/\["sidebar","settings"\]/)
+  assert.match(job.steps.find(step=>step.name==='Validate exclusive acceptance scope').if,/inputs.verify_upgrade_first_launch && inputs.upgrade_059_to_candidate != true/)
+  assert.equal(job.steps.find(step=>step.name==='Exercise native update or the exact overlay fallback and reopen the existing conversation').env.VERIFY_UPGRADE_FIRST_LAUNCH,'${{ inputs.verify_upgrade_first_launch }}')
+})
+
+test('first-upgrade UIA PowerShell parses on its native Windows runtime', {skip:process.platform!=='win32'}, () => {
+  const script=firstLaunchWindowsUiAutomationScript({handle:123456,pid:9000},'D:\\owned\\RailWise AI.exe','0.5.10')
+  const parser=`$tokens=$null;$errors=$null;[void][System.Management.Automation.Language.Parser]::ParseInput([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('${Buffer.from(script,'utf16le').toString('base64')}')),[ref]$tokens,[ref]$errors);if($errors.Count){throw ($errors.Message -join '; ')}`
+  execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(parser,'utf16le').toString('base64')],{timeout:10_000})
 })
