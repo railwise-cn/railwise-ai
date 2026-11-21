@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse } from 'yaml'
-import { assertPublishedWindowsUpgrade, repairedScheduleSeed, sidebarUpgradeControlSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
+import { assertPublishedWindowsUpgrade, repairedScheduleSeed, sidebarUpgradeControlSelector, sidebarUpgradeSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
 import { verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
@@ -27,6 +27,43 @@ test('live feed preflight binds the complete reviewed Windows installer', () => 
   assert.throws(() => verifyPublishedWindowsManifest({ ...manifest, version: '0.5.8' }))
   assert.throws(() => verifyPublishedWindowsManifest({ ...manifest, files: [{ ...installer, size: 1 }] }))
   assert.throws(() => verifyPublishedWindowsManifest({ ...manifest, files: [installer, installer] }))
+})
+
+test('the live 0.5.7 route is pinned to the exact reviewed 0.5.9 installer and rejects edge overrides', () => {
+  const scenario = 'released-057-to-059'
+  const sha512 = 'MuU84Ysjr5iFad2JGhtHWWxVYU095Fkioid7kpddVr5csS9Z9QklrY9P5/MSJgk1qLc9kgY+HQGdcBRP0ia1DQ=='
+  const targetInstaller = { url: 'RailWise-AI-0.5.9-win-x64.exe', size: 320871735, sha512 }
+  const targetManifest = { version: '0.5.9', path: targetInstaller.url, sha512, files: [targetInstaller] }
+  assert.equal(verifyPublishedWindowsManifest(targetManifest, scenario).reviewedSha256,
+    '7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c')
+  assert.throws(() => verifyPublishedWindowsManifest(manifest, scenario))
+  assert.throws(() => verifyPublishedWindowsManifest(targetManifest, 'unreviewed'))
+  assert.match(sidebarUpgradeSelector(scenario), /升级到 0\.5\.9，/)
+  const installLocation = '/runner/live-upgrade'
+  const executable = installLocation + '/RailWise AI.exe'
+  const report = {
+    scenario, scope: 'published-windows-gui-upgrade', directTargetInstallerLaunches: 0, applicationUpdaterOverrides: 0,
+    baseline: {
+      package: { version: '0.5.7', sourceHead: '52779c7b0cf46452a05ccf80a413f0b5d046a7b3' },
+      installer: { sha256: '113a88a8601b04a49233267dc8321c17063a949fecce9fa5ad3e6ff37ed66dd7' },
+      packagedFeed: 'https://www.railwise.cn/downloads/railwise-ai/channels/stable/latest/',
+      executable, pid: 100, registry: { installLocation }
+    },
+    offer: { status: 'available', hasUpdate: true },
+    action: { method: 'trusted-pointer-on-sidebar', manualOnly: false, latestVersion: '0.5.9' },
+    target: {
+      package: { version: '0.5.9', sourceHead: '389ee737a62cf4b889d5cb1958402e84911c5725',
+        asarSha256: 'a90bca9b4fb10a43e1ae23b4a5a43d343656138e8ab9969256b9e2c08fca9d58' },
+      registry: { installLocation, displayVersion: '0.5.9' },
+      window: { pid: 101, handle: 42, title: 'RailWise AI', path: executable }
+    },
+    profile: { sentinelPreserved: true }
+  }
+  assert.doesNotThrow(() => assertPublishedWindowsUpgrade(report))
+  assert.throws(() => assertPublishedWindowsUpgrade({ ...report, directTargetInstallerLaunches: 1 }))
+  assert.throws(() => assertPublishedWindowsUpgrade({ ...report, applicationUpdaterOverrides: 1 }))
+  assert.throws(() => assertPublishedWindowsUpgrade({ ...report, baseline: { ...report.baseline, packagedFeed: 'https://127.0.0.1/' } }))
+  assert.throws(() => assertPublishedWindowsUpgrade({ ...report, baseline: { ...report.baseline, package: { ...report.baseline.package, version: '0.5.8' } } }))
 })
 
 test('a visible offer alone or an unexpected relaunch cannot pass the real updater smoke', () => {
@@ -68,6 +105,9 @@ test('a visible offer alone or an unexpected relaunch cannot pass the real updat
 test('published Windows smoke is a separate opt-in job with read-only GitHub permissions', async () => {
   const workflow = parse(await readFile(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   assert.equal(workflow.on.workflow_dispatch.inputs.run_published_gui_update.default, false)
+  assert.deepEqual(workflow.on.workflow_dispatch.inputs.published_gui_upgrade_scenario.options,
+    ['released-056-to-057', 'released-057-to-059'])
+  assert.equal(workflow.on.workflow_dispatch.inputs.published_gui_upgrade_scenario.default, 'released-056-to-057')
   assert.equal(workflow.on.workflow_call.inputs.package_run_id.required, true)
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   assert.match(workflow.jobs['windows-install'].if, /run_published_gui_update != true/)
@@ -75,7 +115,8 @@ test('published Windows smoke is a separate opt-in job with read-only GitHub per
   assert.match(job.if, /run_published_gui_update == true/)
   assert.equal(job['runs-on'], 'windows-2022')
   assert.ok(job.steps.some(step => step.if?.includes('package_run_id') && step.run.startsWith('throw ')))
-  assert.ok(job.steps.some(step => step.run === 'node scripts/run-windows-published-gui-update-smoke.mjs'))
+  assert.match(job.steps.find(step => step.run === 'node scripts/run-windows-published-gui-update-smoke.mjs').env.PUBLISHED_GUI_UPGRADE_SCENARIO,
+    /inputs\.published_gui_upgrade_scenario/)
   assert.ok(job.steps.some(step => step.if === 'always()' && step.uses.startsWith('actions/upload-artifact@')))
 
   assert.equal(workflow.on.workflow_dispatch.inputs.run_repaired_gui_update.default, false)

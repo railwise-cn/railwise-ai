@@ -54,10 +54,17 @@ on:
         required: false
         default: false
       run_published_gui_update:
-        description: 'Install released 0.5.6 and click the real sidebar upgrade to released Stable 0.5.7 on an ephemeral Windows runner'
+        description: 'Install the exact released baseline and upgrade from the app sidebar over the live Stable feed on an ephemeral Windows runner'
         type: boolean
         required: false
         default: false
+      published_gui_upgrade_scenario:
+        description: 'Pinned official pair for the live Windows sidebar upgrade'
+        type: choice
+        options:
+          - released-056-to-057
+          - released-057-to-059
+        default: released-056-to-057
       run_frozen_gui_update:
         description: 'Install official 0.5.7 then test the exact frozen 0.5.8 installer with a runner-only HTTPS update feed and installed profile continuity.'
         type: boolean
@@ -305,7 +312,7 @@ jobs:
 
   windows-published-gui-update:
     if: ${{ inputs.run_published_gui_update == true && inputs.run_frozen_gui_update != true }}
-    name: Released Windows 0.5.6 to 0.5.7 via the real sidebar upgrade
+    name: Released Windows sidebar upgrade (${{ inputs.published_gui_upgrade_scenario || 'released-056-to-057' }})
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -324,6 +331,8 @@ jobs:
       - name: Verify the published GUI upgrade contract
         run: node --test scripts/windows-published-gui-update-smoke.test.mjs scripts/windows-install-smoke.test.mjs
       - name: Install the released baseline and upgrade through the packaged UI
+        env:
+          PUBLISHED_GUI_UPGRADE_SCENARIO: ${{ inputs.published_gui_upgrade_scenario || 'released-056-to-057' }}
         run: node scripts/run-windows-published-gui-update-smoke.mjs
       - name: Retain actual updater evidence and diagnostics
         if: always()

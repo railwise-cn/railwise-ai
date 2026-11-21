@@ -24,17 +24,44 @@ const baseline = baselines.versions[baseVersion]['win32-x64']
 const reviewedBuild = releaseGate.package.reviewedBuild
 const target = reviewedBuild.files.find(file => file.name === `RailWise-AI-${targetVersion}-win-x64.exe`)
 const rootIdentity = installIdentity(baseVersion, baseSource)
-const targetIdentity = installIdentity(targetVersion, reviewedBuild.sourceHead)
 const pathEquals = (one, other) => resolve(one).toLowerCase() === resolve(other).toLowerCase()
 const hourMs = 60 * 60 * 1000
-export const sidebarUpgradeControlSelector =
-  `button[title^="升级到 ${targetVersion}，"], button[title^="Update to ${targetVersion},"]`
+const historicalScenario = 'released-056-to-057'
+const upgradeScenarios = Object.freeze({
+  [historicalScenario]: {
+    baseVersion, baseSource, baseline, targetVersion, target, targetAsar, targetInstallerSha512,
+    targetSource: reviewedBuild.sourceHead
+  },
+  'released-057-to-059': {
+    baseVersion: '0.5.7', baseSource: reviewedBuild.sourceHead, baseline: target,
+    targetVersion: '0.5.9', targetSource: '389ee737a62cf4b889d5cb1958402e84911c5725',
+    targetAsar: 'a90bca9b4fb10a43e1ae23b4a5a43d343656138e8ab9969256b9e2c08fca9d58',
+    targetInstallerSha512: 'MuU84Ysjr5iFad2JGhtHWWxVYU095Fkioid7kpddVr5csS9Z9QklrY9P5/MSJgk1qLc9kgY+HQGdcBRP0ia1DQ==',
+    target: {
+      name: 'RailWise-AI-0.5.9-win-x64.exe', size: 320871735,
+      sha256: '7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c'
+    }
+  }
+})
+
+function publishedScenario(name = historicalScenario) {
+  assert.ok(Object.hasOwn(upgradeScenarios, name), 'Unsupported published Windows upgrade scenario')
+  return upgradeScenarios[name]
+}
+
+export function sidebarUpgradeSelector(scenario) {
+  const { targetVersion } = publishedScenario(scenario)
+  return `button[title^="升级到 ${targetVersion}，"], button[title^="Update to ${targetVersion},"]`
+}
+
+export const sidebarUpgradeControlSelector = sidebarUpgradeSelector()
 
 export function repairedScheduleSeed(nowMs) {
   return { appVersion: baseVersion, lastCheckedAt: new Date(nowMs - hourMs).toISOString() }
 }
 
-export function verifyPublishedWindowsManifest(manifest) {
+export function verifyPublishedWindowsManifest(manifest, scenario) {
+  const { targetVersion, targetInstallerSha512, target } = publishedScenario(scenario)
   assert.equal(manifest.version, targetVersion, 'The current Stable feed must match the pinned target')
   assert.equal(manifest.path, target.name)
   assert.equal(manifest.sha512, targetInstallerSha512)
@@ -46,8 +73,11 @@ export function verifyPublishedWindowsManifest(manifest) {
 }
 
 export function assertPublishedWindowsUpgrade(report) {
+  const { baseline, baseVersion, targetVersion, targetAsar, targetSource } = publishedScenario(report.scenario)
+  const targetIdentity = installIdentity(targetVersion, targetSource)
   assert.equal(report.baseline?.package?.version, baseVersion)
   if (report.scope === 'private-repaired-windows-gui-upgrade') {
+    assert.ok(!report.scenario || report.scenario === historicalScenario, 'Private baseline cannot stand in for the released 0.5.7 scenario')
     assert.ok(/^[a-f0-9]{40}$/.test(report.provenance?.driverSourceHead ?? ''))
     assert.equal(report.baseline.package.sourceHead, report.provenance.driverSourceHead)
     assert.match(report.baseline?.installer?.sha256 ?? '', /^[a-f0-9]{64}$/)
@@ -60,6 +90,13 @@ export function assertPublishedWindowsUpgrade(report) {
   } else {
     assert.equal(report.scope, 'published-windows-gui-upgrade')
     assert.equal(report.baseline?.installer?.sha256, baseline.sha256)
+  }
+  if (report.scenario === 'released-057-to-059') {
+    assert.equal(report.baseline.package.sourceHead, publishedScenario(report.scenario).baseSource)
+    assert.equal(report.baseline.packagedFeed, officialFeed)
+    assert.equal(report.target?.package?.sourceHead, targetSource)
+    assert.equal(report.directTargetInstallerLaunches, 0)
+    assert.equal(report.applicationUpdaterOverrides, 0)
   }
   assert.equal(report.offer?.status, 'available')
   assert.equal(report.offer?.hasUpdate, true)
@@ -146,7 +183,7 @@ export async function sha256(path) {
   return digest.digest('hex')
 }
 
-async function downloadBaseline(directory) {
+async function downloadBaseline(directory, { baseVersion, baseline }) {
   const url = `https://github.com/railwise-cn/railwise-ai/releases/download/v${baseVersion}/${baseline.name}`
   const path = join(directory, baseline.name)
   const response = await fetch(url, { signal: AbortSignal.timeout(300_000) })
@@ -199,12 +236,18 @@ async function main(args) {
   const marketplace = args.length === 1 && args[0] === '--repaired-marketplace'
   const repaired = marketplace || (args.length === 1 && args[0] === '--repaired-baseline')
   assert.ok(!args.length || repaired, 'Unsupported Windows package smoke arguments')
+  const scenario = process.env.PUBLISHED_GUI_UPGRADE_SCENARIO || historicalScenario
+  assert.ok(!repaired || scenario === historicalScenario, 'The newer published scenario requires the original retail baseline')
+  const selected = publishedScenario(scenario)
+  const { baseVersion, baseSource, targetVersion, targetSource } = selected
+  const rootIdentity = installIdentity(baseVersion, baseSource)
+  const targetIdentity = installIdentity(targetVersion, targetSource)
   const evidenceDir = join(process.env.RUNNER_TEMP, 'published-windows-gui-upgrade-evidence')
   await mkdir(evidenceDir)
   const scope = marketplace ? 'private-windows-npm-marketplace' : repaired ? 'private-repaired-windows-gui-upgrade' : 'published-windows-gui-upgrade'
   const report = { schemaVersion: 1, scope, status: 'running',
     provenance: { driverSourceHead: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT },
-    baseVersion, targetVersion, phase: 'preflight', baseline: {},
+    scenario, baseVersion, targetVersion, phase: 'preflight', baseline: {},
     officialFeed, directTargetInstallerLaunches: 0, applicationUpdaterOverrides: 0 }
   const save = () => writeFile(join(evidenceDir, marketplace ? 'windows-npm-marketplace.json' : 'windows-published-gui-upgrade.json'), JSON.stringify(report, null, 2) + '\n')
   const capture = async (cdp, filename) => {
@@ -230,7 +273,7 @@ async function main(args) {
         cache: 'no-store', signal: AbortSignal.timeout(30_000)
       })
       assert.ok(response.ok, `Current Stable feed returned HTTP ${response.status}`)
-      report.manifest = verifyPublishedWindowsManifest(parse(await response.text()))
+      report.manifest = verifyPublishedWindowsManifest(parse(await response.text()), scenario)
     }
     const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'railwise-published-gui-upgrade-'))
     const directory = join(root, 'install')
@@ -239,7 +282,7 @@ async function main(args) {
     const baselineIdentity = repaired ? installIdentity(baseVersion, process.env.GITHUB_SHA) : rootIdentity
     report.baseline.installer = repaired
       ? inspectInstaller(join(process.env.RUNNER_TEMP, 'repaired-updater-baseline', baselineIdentity.installerName), baselineIdentity)
-      : await downloadBaseline(root)
+      : await downloadBaseline(root, selected)
     await save()
     installExactNsis(report.baseline.installer.path, directory)
     report.baseline.executable = executable
@@ -248,6 +291,7 @@ async function main(args) {
     const appUpdate = parse(await readFile(join(directory, 'resources', 'app-update.yml'), 'utf8'))
     assert.equal(appUpdate.provider, 'generic')
     assert.match(appUpdate.url, /^https:\/\/www\.railwise\.cn\/downloads\/(?:railwise-ai|workwise)\/channels\/stable\/latest\/?$/)
+    if (scenario === 'released-057-to-059') assert.equal(appUpdate.url, officialFeed)
     report.baseline.packagedFeed = appUpdate.url
     report.phase = 'baseline-renderer'
     let cleanEnvironment = { ...process.env }
@@ -309,7 +353,7 @@ async function main(args) {
       return
     }
     report.phase = 'automatic-offer'
-    const control = sidebarUpgradeControlSelector
+    const control = sidebarUpgradeSelector(scenario)
     const button = await cdp.wait(`(() => {
       const element = document.querySelector(${JSON.stringify(control)})
       if (!element || element.disabled || !element.getClientRects().length) return null
@@ -324,7 +368,7 @@ async function main(args) {
     assert.equal(available.info?.latestVersion, targetVersion)
     assert.equal(available.info?.channel, 'stable')
     assert.equal(available.info?.manualOnly, false)
-    await capture(cdp, 'windows-056-sidebar-upgrade.png')
+    await capture(cdp, `windows-${baseVersion.replaceAll('.', '')}-sidebar-upgrade.png`)
     await save()
 
     // The clean baseline writes its schedule file before making the automatic
@@ -359,6 +403,13 @@ async function main(args) {
         if (state?.status === 'error') {
           report.lastUpdateState = { status: state.status, ...summarizeWindowsUpdateMetadata({ ...state.info, ok: false, code: state.code, message: state.message }) }
           throw new Error('The packaged updater reported a failure after the sidebar click')
+        }
+        if (scenario === 'released-057-to-059') {
+          const sidebarError = await cdp.evaluate(`document.querySelector(${JSON.stringify(control)})?.parentElement?.querySelector('[role="alert"]')?.textContent?.trim() || null`, 3_000).catch(() => null)
+          if (sidebarError) {
+            report.sidebarError = sidebarError.slice(0, 500)
+            throw new Error('The packaged sidebar displayed a failure after the upgrade click')
+          }
         }
         return null
       }
