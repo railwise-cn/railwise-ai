@@ -96,7 +96,7 @@ test('the private video fixture reconstructs and hashes authorized UTF-8 Skill c
 
 test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
   const evidence = report()
-  const taskChat = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
+  const taskChat = { surface: 'original-chat', originalPrompt: true, taskInTranscript: true, composerTaskControlCount: 0, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
   evidence.checks = ['installed-chinese-renderer', 'installed-video-skill-protocol-render-registered-and-decoded']
   delete evidence.resources
   evidence.marketplace = {
@@ -773,7 +773,7 @@ for (const [name, change] of [
 
 test('the scheduled original-chat result must survive reopening the conversation', () => {
   const evidence = report().taskExecution
-  const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0,
+  const layout = { surface: 'original-chat', originalPrompt: true, taskInTranscript: true, composerTaskControlCount: 0, taskListCount: 0,
     taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
   evidence.preview.layout = layout
   evidence.schedule.dedicatedEntryOpened = true
@@ -1357,7 +1357,7 @@ test('browser recovery keeps the exact original task at zero Turns and model req
   const strictBinding = structuredClone(evidence); delete strictBinding.confirmed.binding.verificationPolicy
   assert.throws(() => validateWindowsBrowserRecoveryEvidence(strictBinding, binding.browserInstanceId))
   const inChat = structuredClone(evidence)
-  const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 420, overflow: 0 }
+  const layout = { surface: 'original-chat', originalPrompt: true, taskInTranscript: true, composerTaskControlCount: 0, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 420, overflow: 0 }
   inChat.originalChat = { initial: layout, confirmed: layout, resumed: layout }
   inChat.beforeConfiguration = initial
   inChat.blockedResume = initial
@@ -2339,9 +2339,10 @@ async function manualPreviewChatFixture(run, { initialPreview = false, newPrevie
         const reveal=()=>{events.push('reveal-chat-results');setResults(true);if(${JSON.stringify(newPreviewOnReveal)})Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
         return h('div',{className:'ds-workbench-shell',ref:layout.shellRef,'data-active-overlay':layout.activeOverlay??''},
           layout.activeOverlay?h('button',{'aria-label':'返回当前任务',id:'backdrop',onClick:layout.closeDevPreview}):null,
-          h('main',{inert:layout.activeOverlay?true:undefined},h('div',{className:'ds-chat-composer-dock'},
+          h('main',{inert:layout.activeOverlay?true:undefined},h('div',{className:'ds-message-timeline-content'},
             h('section',{'aria-label':'任务'},h('button',{id:'reveal','aria-expanded':results,onClick:reveal},'1 个成果'),
-              results?h('ul',{'aria-label':'成果'},h('li',null,h('button',{id:'artifact',onClick:artifact},'每日网页报告.html'))):null))),
+              results?h('ul',{'aria-label':'成果'},h('li',null,h('button',{id:'artifact',onClick:artifact},'每日网页报告.html'))):null)),
+            h('div',{className:'ds-chat-composer-dock'},h('textarea',{'aria-label':'合成输入框'}))),
           layout.rightPanelVisible?h('aside',{id:'workbench-inspector'},h('button',{'aria-label':'收起右侧栏',id:'collapse',onClick:()=>{events.push('collapse-panel');layout.closeDevPreview()}}),h('webview'),ready?h('div',{id:'workspace-preview-ready'}):null):null);
       }`, resolveDir: fileURLToPath(new URL('..', import.meta.url)), loader: 'tsx' }, outfile: output, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', define: { 'process.env.NODE_ENV': '"development"' } })
     fixture = createRequire(import.meta.url)(output)
