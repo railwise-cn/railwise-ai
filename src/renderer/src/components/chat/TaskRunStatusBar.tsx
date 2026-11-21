@@ -9,7 +9,8 @@ import { isExecutionGrantExpiredCapability, isMatchingExecutionGrantExpiredAtten
 import { taskArtifactValidationLabelKey } from '@shared/task-artifact-source-evidence'
 import { refreshTaskState, useTaskState } from '../../store/task-live-store'
 import { projectTaskRunActivity, taskReasonKey } from '../../agent/ag-ui-activity'
-import type { ChatBlock } from '../../agent/types'
+import { getProvider } from '../../agent/registry'
+import type { ChatBlock, ThreadTodoList } from '../../agent/types'
 import { foregroundTaskArtifactPreview } from '../../lib/use-task-artifact-preview'
 import { TaskAttentionCard } from '../tasks/TaskAttentionCard'
 import { TaskBudgetControl } from '../tasks/TaskBudgetControl'
@@ -17,6 +18,7 @@ import { TaskExecutionEvidence } from '../tasks/TaskExecutionEvidence'
 import { TaskPublicQueryRecoveryCard } from '../tasks/TaskPublicQueryRecoveryCard'
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { capabilityCardMatchesAttention } from './CapabilityRequiredCard'
+import { ConversationChecklistDetails } from './ConversationChecklist'
 import { redactRuntimeText } from './conversation-visibility'
 
 type Props = {
@@ -115,6 +117,19 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   const legacyWorkerResponse = task.status === 'completed' && task.threadId !== threadId &&
     !visibleMessageIds?.has(`item_command_task_result_${task.id}_receipt`) ? task.finalResponse : undefined
   const sample = live.progress?.[task.id]
+  const workerThreadId = task.threadId === threadId ? undefined : task.threadId
+  const [workerChecklist, setWorkerChecklist] = useState<ThreadTodoList | null>(null)
+  const checklist = workerChecklist?.threadId === workerThreadId ? workerChecklist : null
+  // The worker records steps on its own thread. Read the snapshot on durable
+  // changes and on the existing progress feed without opening its approval stream.
+  useEffect(() => {
+    if (!runtimeReady || !workerThreadId) return
+    let active = true
+    void getProvider().getThreadTodos?.(workerThreadId).then(todos => {
+      if (active && (!todos || todos.threadId === workerThreadId)) setWorkerChecklist(todos)
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [runtimeReady, workerThreadId, task.revision, sample?.sampledAt])
   const activity = projectTaskRunActivity(task, sample, artifacts.length, pending, artifacts.map(entry => ({ taskId: entry.task.id, artifactId: entry.artifact.id })))
   const running = ACTIVE_STATUSES.has(task.status)
   const actions = task.presentation?.actions
@@ -198,7 +213,9 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     void refreshTaskState()
   }
 
-  if (task.status === 'completed' && !artifacts.length && !legacyWorkerResponse && !notice) return <></>
+  if (task.status === 'completed' && !artifacts.length && !legacyWorkerResponse && !notice) {
+    return <ConversationChecklistDetails checklist={checklist} />
+  }
 
   return <section aria-label={showTitle ? taskDisplayTitle(group.root) : t('taskWorkspaceTitle')} className="min-w-0 text-ds-ink [&+section]:border-t [&+section]:border-ds-border-muted">
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
@@ -232,6 +249,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
         <AssistantMarkdown text={legacyWorkerResponse} streaming={false} workspaceRoot={task.workspaceRoot} restricted className="ds-markdown min-w-0 break-words text-sm text-ds-ink" />
       </details> : null}
     </div> : null}
+    <ConversationChecklistDetails checklist={checklist} />
     {actions?.includes('extend_budget') ? <TaskBudgetControl task={task} onChanged={refreshTaskState} /> : null}
     {notice || live.error ? <p role="status" className="pb-1 text-xs text-ds-muted">{notice || t('taskRunUnavailable')}</p> : null}
   </section>
