@@ -8,7 +8,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { connectCdp } from './run-windows-ui-smoke.mjs'
-import { observeInstalledStartup } from './verify-packaged-startup-appearance.mjs'
+import { observeStartupWithCaptureRetry } from './verify-packaged-startup-appearance.mjs'
 import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
 
 const require = createRequire(import.meta.url)
@@ -116,12 +116,18 @@ async function isolatedMacInstaller(source, directory, version, arch, report) {
   return installer
 }
 
+const packagedUpdateFeeds = {
+  frontier: 'https://127.0.0.1/',
+  stable: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/'
+}
+
 export function validateIsolatedMacStartupBundle(packaged, updater) {
-  assert.equal(packaged.updateChannel, 'frontier')
+  const expectedFeed = Object.hasOwn(packagedUpdateFeeds, packaged.updateChannel) && packagedUpdateFeeds[packaged.updateChannel]
+  assert.ok(expectedFeed, 'Unexpected packaged update channel')
   assert.equal(packaged.buildHints?.macSigningEnabled, true)
   assert.equal(packaged.buildHints?.notarizationEnabled, true)
   assert.equal(updater.provider, 'generic')
-  assert.equal(updater.url, 'https://127.0.0.1/')
+  assert.equal(updater.url, expectedFeed)
 }
 
 export function gatekeeperEnforcement(statusOutput) {
@@ -209,8 +215,11 @@ async function verify(directory, sourceFile, evidenceDir, temporary, isolated) {
     }
     const bundle = await readInstalledStartupBundle(installer, temporary, source, version, isolated)
     report.installed = bundle.installed
-    for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
-      report.observations.push(await observeInstalledStartup({ executable: bundle.executable, version, evidenceDir, temporary }, expected,
+    for (const expected of [
+      { locale: 'en', htmlLang: 'en', theme: 'light' },
+      { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark', screenshotName: 'mac-startup-appearance-zh-dark.png' }
+    ]) {
+      report.observations.push(await observeStartupWithCaptureRetry({ executable: bundle.executable, version, evidenceDir, temporary }, expected,
         { connectCdp, environmentForRoot: isolatedMacEnvironment }))
     }
     assert.equal(await sha256(bundle.asarPath), bundle.installed.asarSha256)

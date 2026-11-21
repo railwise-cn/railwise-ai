@@ -54,7 +54,7 @@ on:
         required: false
         default: false
       mac_startup_isolated_artifact:
-        description: 'Use an unreviewed artifacts-only candidate for the Mac startup checks without granting release approval.'
+        description: 'Verify the immutable archive of an unreviewed Mac candidate, including a stable-configured private build.'
         type: boolean
         required: false
         default: false

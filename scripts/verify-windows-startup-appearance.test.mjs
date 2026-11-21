@@ -182,7 +182,7 @@ test('binds native Mac startup acceptance to a successful immutable release buil
   }
 })
 
-test('isolated Mac startup accepts only the exact installer entries and loopback feed', () => {
+test('isolated Mac startup accepts only the exact installer entries and recognized update feeds', () => {
   const installers = ['latest-mac.yml', 'RailWise-AI-0.5.10-mac-arm64.dmg', 'RailWise-AI-0.5.10-mac-arm64.zip',
     'RailWise-AI-0.5.10-mac-x64.dmg', 'RailWise-AI-0.5.10-mac-x64.zip']
   assert.equal(isolatedMacDmgMember(installers, '0.5.10', 'arm64'), installers[1])
@@ -193,7 +193,11 @@ test('isolated Mac startup accepts only the exact installer entries and loopback
   const packaged = { updateChannel: 'frontier', buildHints: { macSigningEnabled: true, notarizationEnabled: true } }
   const updater = { provider: 'generic', url: 'https://127.0.0.1/' }
   assert.doesNotThrow(() => validateIsolatedMacStartupBundle(packaged, updater))
-  assert.throws(() => validateIsolatedMacStartupBundle({ ...packaged, updateChannel: 'stable' }, updater))
+  const stable = { ...packaged, updateChannel: 'stable' }
+  assert.doesNotThrow(() => validateIsolatedMacStartupBundle(stable,
+    { ...updater, url: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/' }))
+  assert.throws(() => validateIsolatedMacStartupBundle(stable, updater))
+  assert.throws(() => validateIsolatedMacStartupBundle({ ...packaged, updateChannel: 'beta' }, updater))
   assert.throws(() => validateIsolatedMacStartupBundle(packaged, { ...updater, url: 'https://www.railwise.cn/' }))
 })
 
