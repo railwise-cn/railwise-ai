@@ -20,6 +20,50 @@ import {
 const samePath = (left, right) => resolve(left).toLowerCase() === resolve(right).toLowerCase()
 const oneHour = 60 * 60_000
 
+export function firstLaunchWindowsUiAutomationScript({ handle, pid }, executable, version) {
+  assert.ok(Number.isSafeInteger(handle) && handle > 0 && Number.isSafeInteger(pid) && pid > 0)
+  assert.match(version, /^\d+\.\d+\.\d+$/)
+  return `
+    $ErrorActionPreference = 'Stop'
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    Add-Type -AssemblyName UIAutomationClient
+    $owner = Get-Process -Id ${pid} -ErrorAction Stop
+    if ($owner.Path -ine ${psQuote(executable)}) { throw 'The first upgraded HWND has a different process owner' }
+    $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]::new(${handle}))
+    if ($null -eq $root -or $root.Current.ProcessId -ne ${pid}) { throw 'The first upgraded HWND identity changed' }
+    $visible = -not $root.Current.IsOffscreen
+    $items = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+    $titleVisible = $false; $versionVisible = $false
+    foreach ($item in $items) {
+      try {
+        if ($item.Current.IsOffscreen) { continue }
+        $name = $item.Current.Name
+        if ($name -eq '本版更新') { $titleVisible = $true }
+        if ($name -match ${psQuote(`(^|[^0-9.])v?${version.replaceAll('.', '\\.')}($|[^0-9.])`)}) { $versionVisible = $true }
+      } catch [System.Windows.Automation.ElementNotAvailableException] { }
+    }
+    @{ hwnd=${handle}; ownerPid=$root.Current.ProcessId; executable=$owner.Path;
+      processStartedAt=$owner.StartTime.ToUniversalTime().ToString('o');
+      executableVersion=(Get-Item -LiteralPath $owner.Path).VersionInfo.FileVersion;
+      windowTitle=$root.Current.Name; visible=$visible; titleVisible=$titleVisible; versionVisible=$versionVisible;
+      observation='native-uia-first-automatic-relaunch-before-close'; observedAt=[DateTime]::UtcNow.ToString('o')
+    } | ConvertTo-Json -Depth 4 -Compress
+  `
+}
+
+export function validateFirstLaunchWindowsObservation(observed, { window, executable, version, packageMetadata }) {
+  assert.equal(observed.observation, 'native-uia-first-automatic-relaunch-before-close')
+  assert.equal(observed.hwnd, window.handle); assert.equal(observed.ownerPid, window.pid)
+  assert.ok(samePath(observed.executable, executable))
+  assert.ok([version, `${version}.0`].includes(observed.executableVersion))
+  assert.equal(observed.windowTitle, 'RailWise AI')
+  assert.equal(observed.visible, true); assert.equal(observed.titleVisible, true); assert.equal(observed.versionVisible, true)
+  assert.ok(Number.isFinite(Date.parse(observed.processStartedAt)) && Number.isFinite(Date.parse(observed.observedAt)))
+  assert.equal(packageMetadata.version, version); assert.match(packageMetadata.sourceHead, /^[a-f0-9]{40}$/)
+  assert.match(packageMetadata.asarSha256, /^[a-f0-9]{64}$/)
+  return { ...observed, packageMetadata }
+}
+
 export function verifyFrozenWindowsReadback({ expectedVersion, expectedSource, installerSha256, registry, packageMetadata, profilePreserved, threadPreserved }, target) {
   assert.equal(expectedVersion, target.identity.version)
   assert.equal(expectedSource, target.identity.sourceHead)
@@ -266,7 +310,7 @@ async function clickLabeledButton(cdp, labels, action, timeout = 90_000) {
   await cdp.click(selector)
 }
 
-async function exerciseGuiUpgrade({ running, target, feed, executable, allowLegacyFallback, entry }) {
+async function exerciseGuiUpgrade({ running, target, feed, executable, allowLegacyFallback, entry, verifyFirstLaunch = false }) {
   const { cdp, child } = running
   const version = target.identity.version
   const control = `button[title^="升级到 ${version}，"], button[title^="Update to ${version},"]`
@@ -299,6 +343,17 @@ async function exerciseGuiUpgrade({ running, target, feed, executable, allowLega
     installExactNsis(target.installer.path, target.installDirectory)
     return { method: 'exact-installer-overlay', oldUpdaterError: result.code }
   }
+  if (verifyFirstLaunch) {
+    const packageMetadata = inspectInstalledPackage(target.installDirectory, target.identity)
+    const observation = await waitUntil(() => {
+      const script = firstLaunchWindowsUiAutomationScript(result.window, executable, version)
+      const observed = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], {
+        encoding: 'utf8', maxBuffer: 128 * 1024, timeout: 10_000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']
+      }).trim())
+      return observed.visible && observed.titleVisible && observed.versionVisible ? observed : null
+    }, 'the actual first upgraded window showing 本版更新 and its version through UIA', 60_000, 500)
+    result.firstLaunch = validateFirstLaunchWindowsObservation(observation, { window: result.window, executable, version, packageMetadata })
+  }
   return result
 }
 
@@ -307,12 +362,14 @@ async function main(args) {
   const currentReleaseMode = args.length === 4 || args.length === 5
   const entry = currentReleaseMode ? args[3] : 'sidebar'
   const baseVersion = currentReleaseMode ? args[4] ?? '0.5.8' : '0.5.7'
+  const verifyFirstLaunch = process.env.VERIFY_UPGRADE_FIRST_LAUNCH === 'true'
   const versions = { '0.5.7': '0.5.8', '0.5.8': '0.5.9', '0.5.9': '0.5.10' }
   const targetVersion = versions[baseVersion]
   if (currentReleaseMode) {
     assert.ok(['sidebar', 'settings'].includes(entry))
     assert.ok(['0.5.8', '0.5.9'].includes(baseVersion))
   }
+  if (verifyFirstLaunch) assert.ok(currentReleaseMode && entry === 'sidebar' && baseVersion === '0.5.9', 'First launch UIA observation requires one exact 0.5.9 sidebar upgrade')
   if (currentReleaseMode) args = args.slice(0, 3)
   assert.ok(args.length === 3 || args.length === 6, 'Pass exact package directory, provenance JSON, evidence directory, and optional private next package directory, provenance and version')
   const [directory, sourceFile, evidence, nextDirectory, nextSourceFile, nextVersion] = args.map(String)
@@ -365,7 +422,7 @@ async function main(args) {
     for (const [index, item] of [target, next].entries()) {
       if (!item) break
       const action = await phase(`upgrade-${item.identity.version}-${entry}`, () => exerciseGuiUpgrade({ running,
-        target: { ...item, installDirectory }, executable, feed, allowLegacyFallback: !currentReleaseMode && index === 0, entry }))
+        target: { ...item, installDirectory }, executable, feed, allowLegacyFallback: !currentReleaseMode && index === 0, entry, verifyFirstLaunch }))
       if (item.isolated) report.targetVerification.feedRequests = { ...feed.requests }
       running.cdp.close()
       await closeOwnedWindows(executable)
@@ -382,6 +439,7 @@ async function main(args) {
         profilePreserved: (await readFile(sentinelFile, 'utf8')) === sentinel && samePath(await running.cdp.evaluate('window.workwise.getSettings().then(s=>s.workspaceRoot)'), workspace),
         threadPreserved: await running.cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads/${thread}','GET').then(r=>r.ok&&JSON.parse(r.body).id===${JSON.stringify(thread)})`) }
       verifyFrozenWindowsReadback(actual, item)
+      if (verifyFirstLaunch) assert.equal(action.firstLaunch.packageMetadata.asarSha256, actual.packageMetadata.asarSha256)
       if (item.isolated) {
         actual.packagedFeed = verifyInstalledIsolatedWindowsFeed(await readFile(join(installDirectory, 'resources', 'app-update.yml'), 'utf8'))
         actual.preferencesPreserved = await running.cdp.evaluate('window.workwise.getSettings().then(s=>s.locale==="zh"&&s.theme==="light")')
