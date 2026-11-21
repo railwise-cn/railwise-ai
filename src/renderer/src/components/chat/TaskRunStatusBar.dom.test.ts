@@ -28,7 +28,7 @@ const api = {
   startTaskSse: vi.fn(async () => undefined), stopSse: vi.fn(async () => undefined),
   onSseEvent: vi.fn(() => () => undefined), onSseEnd: vi.fn(() => () => undefined), onSseError: vi.fn(() => () => undefined),
   notifyTask: vi.fn(async () => undefined), resumeTask: vi.fn(), retryTask: vi.fn(), pauseTask: vi.fn(),
-  runtimeRequest: vi.fn(async () => ({ ok: true, body: '{}' })),
+  runtimeRequest: vi.fn(async (_path: string, _method?: string, _body?: string) => ({ ok: true, body: '{}' })),
   openTaskArtifact: vi.fn(async () => ({ ok: true })), openWorkspaceFile: vi.fn(async () => ({ ok: true }))
 }
 
@@ -59,6 +59,7 @@ function button(label: string): HTMLButtonElement | undefined {
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  api.runtimeRequest.mockResolvedValue({ ok: true, body: '{}' })
   resetTaskStateForTests()
   tasks = []; attention = []
   await i18n.changeLanguage('zh')
@@ -98,7 +99,7 @@ describe('task actions in the original conversation', () => {
       expect(content.indexOf(allow)).toBeLessThan(content.indexOf('以下是后续说明。'))
       await act(async () => { choices[0].click(); choices[0].click() })
       expect(resolveApproval).toHaveBeenCalledExactlyOnceWith('replayed', 'allow')
-      expect(api.runtimeRequest).not.toHaveBeenCalled()
+      expect(api.runtimeRequest.mock.calls.filter(([, method]) => method !== 'GET')).toEqual([])
       expect(api.resumeTask).not.toHaveBeenCalled()
       expect(button('继续任务')).toBeUndefined()
       await act(async () => finish())
@@ -156,7 +157,9 @@ describe('task actions in the original conversation', () => {
     expect(container.querySelector('[aria-label="制作 older"]')).not.toBeNull()
     expect(container.querySelector('details')?.open).toBe(false)
     await act(async () => button('允许此操作')!.click())
-    expect(api.runtimeRequest).toHaveBeenCalledExactlyOnceWith('/v1/approvals/approval-id', 'POST', JSON.stringify({ decision: 'allow' }))
+    expect(api.runtimeRequest.mock.calls.filter(([, method]) => method === 'POST')).toEqual([
+      ['/v1/approvals/approval-id', 'POST', JSON.stringify({ decision: 'allow' })]
+    ])
     expect(api.resumeTask).not.toHaveBeenCalled()
     await render({ inlineRequests: ['approval-id'] })
     expect(button('允许此操作')).toBeUndefined()
@@ -186,5 +189,35 @@ describe('task actions in the original conversation', () => {
     await render({ visibleMessageIds: new Set(['item_command_task_result_video_receipt']) })
     expect(container.textContent).not.toContain('影片已生成并验证。')
     expect(button('output.mp4')).toBeTruthy()
+  })
+
+  it('shows the delegated worker steps in the original message flow through completion without mutation controls', async () => {
+    tasks = [run('review', 'running')]
+    const updatedAt = tasks[0].updatedAt
+    const checklist = {
+      threadId: 'worker-review', updatedAt,
+      items: [
+        { id: 'review-report', content: '核对合成报告', status: 'completed', createdAt: updatedAt, updatedAt },
+        { id: 'review-heading', content: '复核表头', status: 'pending', createdAt: updatedAt, updatedAt }
+      ]
+    }
+    api.runtimeRequest.mockImplementation(async (path, method) => ({
+      ok: true,
+      body: JSON.stringify(path === '/v1/threads/worker-review/todos' && method === 'GET' ? { todos: checklist } : {})
+    }))
+    const blocks: ChatBlock[] = [{ kind: 'assistant', id: 'accepted', text: '开始审核报告。' }]
+    await renderConversation(blocks)
+    const timeline = container.querySelector('.ds-message-timeline-content')!
+    expect(timeline.querySelector('summary')?.textContent).toBe('执行步骤 · 已完成 1 / 2')
+    expect(timeline.textContent).toContain('核对合成报告')
+    expect(timeline.querySelector('details select')).toBeNull()
+    expect(container.querySelector('.ds-composer-shell details')).toBeNull()
+
+    checklist.items[1].status = 'completed'
+    tasks = [{ ...tasks[0], status: 'completed', revision: 10 }]
+    await renderConversation(blocks)
+    expect(timeline.querySelector('summary')?.textContent).toBe('执行步骤 · 已完成 2 / 2')
+    expect(timeline.textContent).toContain('复核表头')
+    expect(api.runtimeRequest.mock.calls.every(([, method]) => method === 'GET')).toBe(true)
   })
 })
