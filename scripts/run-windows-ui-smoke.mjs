@@ -424,7 +424,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false, requireOriginChecklist = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -437,6 +437,11 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
   assert.equal(report.errors.length, 0)
+  if (requireOriginChecklist) {
+    assert.ok(report.checks.includes('installed-delegated-steps-in-original-conversation'))
+    validateWindowsOriginChecklist(report.originChecklist)
+    return true
+  }
   if (requireDoclingConversion) {
     assert.ok(report.checks.includes('installed-chinese-renderer'))
     assert.ok(report.checks.includes('cold-mirror-docling-backend-and-two-skill-calls'))
@@ -851,9 +856,10 @@ export async function startWindowsTaskModelFixture({ browser = false, postPlanQu
     observed.requests.push(observation)
     try {
       const body = JSON.parse(Buffer.concat(chunks).toString())
-      const composerDelta = composerAcceptance?.modelAction(body)
+      const composerDelta = await composerAcceptance?.modelAction(body)
       if (composerDelta) {
         response.writeHead(200, { 'content-type': 'text/event-stream' })
+        observation.status = 200
         const finishReason = composerDelta.tool_calls ? 'tool_calls' : 'stop'
         response.end(`data: ${JSON.stringify({ id: 'windows-task-fixture', choices: [{ index: 0, delta: composerDelta, finish_reason: finishReason }] })}\n\ndata: [DONE]\n\n`)
         return
@@ -1021,6 +1027,161 @@ export function parseFixtureToolOutput(content) {
     content = content.slice(offset + marker.length)
   }
   try { return JSON.parse(content) } catch { return undefined }
+}
+
+const originChecklistPrompt = '请把这项合成校对工作分成两步，核对合成报告和复核表头。[RW-CUA-STEPS]'
+const originChecklistDone = '合成校对的两条步骤均已完成。'
+const originChecklistItems = [
+  { content: '核对合成报告', status: 'completed' },
+  { content: '复核表头', status: 'pending' }
+]
+const originChecklistCompletedItems = originChecklistItems.map(item => ({ ...item, status: 'completed' }))
+const originChecklistCompleted = [1, 2].map(count => '执行步骤 · 已完成 ' + count + ' / 2')
+const originChecklistDraft = '.ds-chat-composer-dock'
+
+export function createWindowsOriginChecklistModel() {
+  let finish
+  const gate = new Promise(resolve => { finish = resolve })
+  const evidence = { calls: [], reads: [] }
+  const action = (id, todos) => ({
+    tool_calls: [{ index: 0, id, type: 'function', function: { name: 'todo_write', arguments: JSON.stringify({ todos }) } }]
+  })
+  const verifyOutput = (result, expected) => {
+    const output = parseFixtureToolOutput(result.content)
+    assert.ok(output?.todos?.threadId, 'todo_write did not return the actual worker thread checklist')
+    assert.deepEqual(output.todos.items.map(({ content, status }) => ({ content, status })), expected)
+    evidence.reads.push({ callId: result.tool_call_id, threadId: output.todos.threadId })
+  }
+  return {
+    finish,
+    evidence,
+    async modelAction({ messages, tools }) {
+      if (!messages?.some(message => message.role === 'user' && JSON.stringify(message.content).includes('[RW-CUA-STEPS]'))) {
+        return { content: '本机合成校对验收。' }
+      }
+      const initial = messages.find(message => message.role === 'tool' && message.tool_call_id === 'checklist-initial')
+      const completed = messages.find(message => message.role === 'tool' && message.tool_call_id === 'checklist-completed')
+      if (completed) {
+        verifyOutput(completed, originChecklistCompletedItems)
+        return { content: originChecklistDone }
+      }
+      assert.ok(tools?.some(tool => tool.function.name === 'todo_write'), 'The actual runtime must advertise todo_write')
+      if (initial) {
+        verifyOutput(initial, originChecklistItems)
+        await gate
+        evidence.calls.push('checklist-completed')
+        return action('checklist-completed', originChecklistCompletedItems)
+      }
+      evidence.calls.push('checklist-initial')
+      return action('checklist-initial', originChecklistItems)
+    }
+  }
+}
+
+function observeOriginChecklist(summary, prompt) {
+  const timeline = document.querySelector('.ds-message-timeline-content')
+  const draft = document.querySelector('.ds-chat-composer-dock')
+  if (!timeline || !draft) return null
+  const summaries = [...timeline.querySelectorAll('details > summary')]
+    .filter(node => node.textContent.trim() === summary && node.getClientRects().length)
+  if (summaries.length !== 1 || !timeline.textContent.includes(prompt)) return null
+  const details = summaries[0].parentElement
+  const draftControls = new Set(['暂停', '取消任务', '继续任务', '允许', '允许此操作', '允许本次', '拒绝', '提交', '授权并继续', '清空步骤'])
+  return {
+    summary,
+    open: details.open,
+    rows: details.open ? [...details.querySelectorAll('li')].map(row => ({
+      content: row.firstElementChild?.textContent.trim(), status: row.lastElementChild?.textContent.trim(),
+      visible: Boolean(row.getClientRects().length)
+    })) : [],
+    taskInTranscript: timeline.contains(details) && !draft.contains(details),
+    draftTextareas: draft.querySelectorAll('textarea').length,
+    draftTaskControls: [...draft.querySelectorAll('section, summary, select, button')]
+      .filter(node => node.getAttribute('aria-label') === '任务' || node.textContent.trim().startsWith('执行步骤 ·') ||
+        node.getAttribute('aria-label')?.endsWith('的状态') || draftControls.has(node.textContent.trim())).length,
+    checklistActions: details.querySelectorAll('button, select, textarea').length,
+    separateTaskList: Boolean(document.querySelector('[aria-label="任务列表"], .ds-task-sidebar, .ds-task-workspace'))
+  }
+}
+
+export function windowsOriginChecklistExpression(summary, prompt = originChecklistPrompt) {
+  return '(' + observeOriginChecklist.toString() + ')(' + JSON.stringify(summary) + ',' + JSON.stringify(prompt) + ')'
+}
+
+export function validateWindowsOriginChecklist(evidence) {
+  assert.ok(evidence.taskId && evidence.originThreadId && evidence.workerThreadId)
+  assert.notEqual(evidence.originThreadId, evidence.workerThreadId)
+  assert.equal(evidence.completedTaskStatus, 'completed')
+  assert.equal(evidence.originTodoCount, 0)
+  assert.deepEqual(evidence.workerSnapshots, [originChecklistItems, originChecklistCompletedItems])
+  assert.deepEqual(evidence.model, { calls: ['checklist-initial', 'checklist-completed'],
+    reads: ['checklist-initial', 'checklist-completed'].map(callId => ({ callId, threadId: evidence.workerThreadId })) })
+  assert.equal(evidence.collapsedByDefault, true)
+  for (const [index, state] of [evidence.running, evidence.completed].entries()) {
+    assert.equal(state.summary, originChecklistCompleted[index])
+    assert.equal(state.open, true)
+    assert.equal(state.taskInTranscript, true)
+    assert.equal(state.draftTextareas, 1)
+    assert.equal(state.draftTaskControls, 0)
+    assert.equal(state.checklistActions, 0)
+    assert.equal(state.separateTaskList, false)
+    assert.deepEqual(state.rows, evidence.workerSnapshots[index].map(item => ({
+      content: item.content, status: item.status === 'completed' ? '完成' : '待处理', visible: true
+    })))
+  }
+  return evidence
+}
+
+async function verifyWindowsOriginChecklist(cdp, fixture, attempt) {
+  const read = path => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},'GET').then(result=>{
+    if(!result.ok)throw new Error('Runtime checklist readback failed: '+result.status);
+    return JSON.parse(result.body);
+  })`)
+  await cdp.wait("window.workwise.runtimeRequest('/v1/runtime/info','GET').then(result=>result.ok)", 'the owned task runtime')
+  const existing = new Set((await read('/v1/threads')).threads.map(thread => thread.id))
+  const composer = originChecklistDraft + ' textarea:not(:disabled)'
+  await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
+  await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(composer)})?.getClientRects().length)`, 'the ordinary chat composer')
+  const origins = (await read('/v1/threads')).threads.filter(thread => !existing.has(thread.id))
+  assert.equal(origins.length, 1, 'Use the real newly created origin conversation')
+  const originThreadId = origins[0].id
+  Object.assign(attempt, { phase: 'origin-created', originThreadId })
+  await cdp.fill(composer, originChecklistPrompt)
+  await cdp.click('button[aria-label="发送"]:not(:disabled)')
+  let task
+  const deadline = Date.now() + 90_000
+  while (!task && Date.now() < deadline) {
+    task = (await read('/v1/tasks?limit=100')).find(item => item.originThreadId === originThreadId && item.goal === originChecklistPrompt)
+    if (!task) await sleep(150)
+  }
+  assert.ok(task && task.threadId !== originThreadId, 'The ordinary chat must create a task on a real delegated worker thread')
+  Object.assign(attempt, { phase: 'worker-admitted', taskId: task.id, workerThreadId: task.threadId })
+  const workerSnapshot = async () => {
+    const { todos } = await read('/v1/threads/' + encodeURIComponent(task.threadId) + '/todos')
+    assert.equal(todos.threadId, task.threadId)
+    return todos.items.map(({ content, status }) => ({ content, status }))
+  }
+  const runningExpression = windowsOriginChecklistExpression(originChecklistCompleted[0])
+  const collapsed = await cdp.wait(runningExpression, 'the real worker checklist under its originating message at one of two steps', 90_000)
+  assert.equal(collapsed.open, false)
+  assert.equal((await read('/v1/tasks/' + encodeURIComponent(task.id))).status, 'running')
+  const initial = await workerSnapshot()
+  const summarySelector = '.ds-message-timeline-content details > summary'
+  await cdp.click(summarySelector, originChecklistCompleted[0])
+  const running = await cdp.wait(`(${runningExpression})?.open ? ${runningExpression} : null`, 'the two real read-only steps inside the transcript')
+  attempt.phase = 'running-steps-observed'
+  fixture.finish()
+  await cdp.wait(`window.workwise.runtimeRequest(${JSON.stringify('/v1/tasks/' + encodeURIComponent(task.id))},'GET').then(result=>result.ok&&JSON.parse(result.body).status==='completed')`, 'the same delegated task to complete', 90_000)
+  const completedExpression = windowsOriginChecklistExpression(originChecklistCompleted[1])
+  const completedView = await cdp.wait(completedExpression, 'the completed checklist remains in the same transcript', 90_000)
+  if (!completedView.open) await cdp.click(summarySelector, originChecklistCompleted[1])
+  const completed = await cdp.wait(`(${completedExpression})?.open ? ${completedExpression} : null`, 'both completed step statuses in the same transcript')
+  const final = await workerSnapshot()
+  const originTodoCount = (await read('/v1/threads/' + encodeURIComponent(originThreadId) + '/todos')).todos?.items.length ?? 0
+  const evidence = validateWindowsOriginChecklist({ taskId: task.id, originThreadId, workerThreadId: task.threadId, completedTaskStatus: 'completed',
+    originTodoCount, workerSnapshots: [initial, final], model: fixture.evidence, collapsedByDefault: !collapsed.open, running, completed })
+  attempt.phase = 'completed-steps-observed'
+  return evidence
 }
 
 export function validateWindowsFixtureQueryHtml(html, { marker, query }) {
@@ -2614,10 +2775,11 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
   }
 }
 
-export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true', doclingConversion = process.env.RAILWISE_WINDOWS_DOCLING_CONVERSION === 'true' }) {
+export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true', doclingConversion = process.env.RAILWISE_WINDOWS_DOCLING_CONVERSION === 'true', originChecklist = process.env.RAILWISE_WINDOWS_ORIGIN_CHECKLIST === 'true' }) {
   taskSmoke ||= browserSmoke
   assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
   assert.ok(!doclingConversion || !(taskSmoke || mirrorSmoke || videoEvaluation || composerSmoke), 'Use a clean profile for focused marketplace acceptance')
+  assert.ok(!originChecklist || !(taskSmoke || mirrorSmoke || videoEvaluation || composerSmoke || doclingConversion), 'Use a clean profile for the origin conversation checklist')
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
   }
@@ -2636,11 +2798,12 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     .then(module => module.startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput)) : undefined
   const composerModule = composerSmoke ? await import('./verify-windows-composer-acceptance.mjs') : undefined
   const composerAcceptance = composerModule?.createComposerModelAcceptance()
+  const originChecklistModel = originChecklist ? createWindowsOriginChecklistModel() : undefined
   const marketplaceModule = mirrorSmoke || doclingConversion ? await import('./verify-windows-cold-marketplace.mjs') : undefined
   const marketplaceAcceptance = marketplaceModule?.createMarketplaceModelAcceptance()
-  const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke ? await startWindowsTaskModelFixture({
+  const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke || originChecklistModel ? await startWindowsTaskModelFixture({
     browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke,
-    composerAcceptance: composerAcceptance ?? marketplaceAcceptance
+    composerAcceptance: composerAcceptance ?? marketplaceAcceptance ?? originChecklistModel
   }) : undefined)
   const model = video?.model ?? 'windows-task-fixture'
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
@@ -2711,7 +2874,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
-    if (video) {
+    if (originChecklistModel) {
+      report.originChecklistAttempt = { phase: 'waiting-for-runtime', model: originChecklistModel.evidence }
+      report.originChecklist = await verifyWindowsOriginChecklist(cdp, originChecklistModel, report.originChecklistAttempt)
+      report.checks.push('installed-delegated-steps-in-original-conversation')
+    } else if (video) {
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
       report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: true })
       report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
@@ -3334,6 +3501,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       try { report.failureLogs = await readWindowsFailureLogs(profile, output) } catch { report.failureLogs = { readUnavailable: true } }
     }
   } finally {
+    originChecklistModel?.finish()
     await stopBindingPostAudit?.()
     mainCdp?.close()
     realBrowser?.cdp.close()
@@ -3358,7 +3526,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel?.observed) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion }); report.status = 'passed' } catch (error) {
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion, requireOriginChecklist: originChecklist }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
