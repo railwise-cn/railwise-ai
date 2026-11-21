@@ -9,6 +9,7 @@ import { isExecutionGrantExpiredCapability, isMatchingExecutionGrantExpiredAtten
 import { taskArtifactValidationLabelKey } from '@shared/task-artifact-source-evidence'
 import { refreshTaskState, useTaskState } from '../../store/task-live-store'
 import { projectTaskRunActivity, taskReasonKey } from '../../agent/ag-ui-activity'
+import type { ChatBlock } from '../../agent/types'
 import { foregroundTaskArtifactPreview } from '../../lib/use-task-artifact-preview'
 import { TaskAttentionCard } from '../tasks/TaskAttentionCard'
 import { TaskBudgetControl } from '../tasks/TaskBudgetControl'
@@ -17,11 +18,15 @@ import { TaskPublicQueryRecoveryCard } from '../tasks/TaskPublicQueryRecoveryCar
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { capabilityCardMatchesAttention } from './CapabilityRequiredCard'
 import { redactRuntimeText } from './conversation-visibility'
+import { MessageBubble } from './message-timeline-bubbles'
 
 type Props = {
   threadId: string | null
   runtimeReady: boolean
   linkedTask?: { id: string; threadId: string }
+  composerControls?: readonly ChatBlock[]
+  composerReplyId?: string
+  composerReplies?: boolean
   inlineCapabilityCards?: readonly ExternalTaskCapabilityCard[]
   inlineRequests?: readonly string[]
   visibleMessageIds?: ReadonlySet<string>
@@ -34,6 +39,7 @@ type TaskAction = 'resume' | 'retry' | 'pause' | 'cancel'
 type RevisionRequest = { expectedRevision: number; idempotencyKey: string }
 const ACTIVE_STATUSES = new Set<TaskRunStatus>(['queued', 'running', 'retrying'])
 const TERMINAL_STATUSES = new Set<TaskRunStatus>(['completed', 'failed', 'cancelled'])
+const EMPTY_CONTROLS: readonly ChatBlock[] = []
 const taskButtonClass = 'max-w-full rounded-md border border-ds-border px-2.5 py-1.5 text-left text-xs font-medium hover:bg-ds-hover disabled:opacity-50'
 
 export function taskProgress(task: TaskRunV1): { completed: number; total: number } {
@@ -55,7 +61,6 @@ function isInTimeline(item: TaskAttentionV1, { inlineRequests, inlineCapabilityC
 }
 
 export function TaskRunStatusBar(props: Props): ReactElement | null {
-  const { t } = useTranslation('common')
   const live = useTaskState(props.runtimeReady)
   const linkedId = props.linkedTask?.threadId === props.threadId ? props.linkedTask?.id : undefined
   const groups = useMemo(() => props.threadId ? groupWorkspaceTasks(live.tasks).filter(({ root, all }) =>
@@ -63,22 +68,34 @@ export function TaskRunStatusBar(props: Props): ReactElement | null {
     (root.originThreadId === props.threadId || root.threadId === props.threadId || all.some(item => item.id === linkedId))) : [],
   [live.tasks, props.threadId, linkedId])
   const primary = groups.find(({ all }) => all.some(item => item.id === (linkedId ?? live.navigation.selectedTaskId))) ?? groups[0]
+  const composerControls = (props.threadId && props.composerControls) || EMPTY_CONTROLS
+  const presented = useMemo(() => ({
+    inlineRequests: props.inlineRequests ?? composerControls.flatMap(block => {
+      if (block.kind === 'approval') return [block.approvalId]
+      if (block.kind === 'user_input') return [block.requestId]
+      return []
+    }),
+    inlineCapabilityCards: props.inlineCapabilityCards ?? composerControls.flatMap(block =>
+      block.kind === 'assistant' && block.capabilityCard ? [block.capabilityCard] : [])
+  }), [composerControls, props.inlineRequests, props.inlineCapabilityCards])
 
-  if (!primary) return live.error ? <p role="status" className="mb-2 px-3 text-xs text-ds-muted">{t('taskRunUnavailable')}</p> : null
+  if (!primary && !composerControls.length) return null
   const otherActive = groups.filter(group => {
     if (group === primary) return false
     const branch = currentTaskBranch(group.all, group.root)
     return ACTIVE_STATUSES.has(branch.current.status) || branch.current.status === 'paused' ||
-      pendingForBranch(branch.members, live.attention, false).some(item => !isInTimeline(item, props))
+      pendingForBranch(branch.members, live.attention, false).some(item => !isInTimeline(item, presented))
   })
-  const current = [primary, ...otherActive]
-  return <div className={otherActive.length ? 'max-h-[min(42vh,24rem)] overflow-y-auto' : undefined}>
-    {current.map(group => <ConversationTask key={group.root.id} {...props} group={group} live={live}
+  const current = primary ? [primary, ...otherActive] : []
+  return <div className="ds-composer-task-controls min-w-0 max-h-[min(34dvh,20rem)] overflow-y-auto border-b border-ds-border-muted px-1 pb-1 empty:hidden">
+    {composerControls.map(block => <MessageBubble key={block.id} block={block} nested inComposer replyInComposer={block.id === props.composerReplyId} />)}
+    {current.map(group => <ConversationTask key={group.root.id} {...props} {...presented} group={group} live={live}
+      composerReplies={props.composerReplies && current.length === 1 && composerControls.length === 0}
       showTitle={current.length > 1} isPrimary={group === primary} />)}
   </div>
 }
 
-function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilityCards, inlineRequests, visibleMessageIds, onSupplement, onPickAttachments, onOpenArtifact, showTitle, isPrimary }: Props & {
+function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilityCards, inlineRequests, composerReplies, visibleMessageIds, onSupplement, onPickAttachments, onOpenArtifact, showTitle, isPrimary }: Props & {
   group: TaskWorkspaceTaskGroup
   live: ReturnType<typeof useTaskState>
   showTitle: boolean
@@ -105,6 +122,8 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   const actions = task.presentation?.actions
   const verify = actions?.includes('verify') || pending.some(item => item.presentation?.actions.includes('verify'))
   const needsReview = pending.length > 0
+  const canReplyInComposer = composerReplies && task.status === 'waiting_user' && Boolean(task.activeTurnId) &&
+    (!task.presentation || task.presentation.reason === 'input_required') && pending.length === 1
   const canResume = !verify && (task.status === 'paused' || !needsReview && (actions?.includes('resume') ?? ['stalled', 'waiting_user'].includes(task.status)))
   const canRetry = !verify && !needsReview && (actions?.includes('retry') ?? task.status === 'failed')
   const canSupplement = !verify && !(pending.some(item => item.kind === 'question' || item.kind === 'approval')) &&
@@ -174,17 +193,17 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     void refreshTaskState()
   }
 
-  return <section aria-label={showTitle ? taskDisplayTitle(group.root) : t('taskWorkspaceTitle')} className="ds-no-drag mb-2 min-w-0 rounded-xl border border-ds-border bg-ds-card text-ds-ink">
-    {showTitle ? <p className="px-3 pt-2 text-xs font-medium text-ds-ink">{taskDisplayTitle(group.root)}</p> : null}
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+  if (task.status === 'completed' && !artifacts.length && !legacyWorkerResponse && !message) return <></>
+
+  return <section aria-label={showTitle ? taskDisplayTitle(group.root) : t('taskWorkspaceTitle')} className="min-w-0 text-ds-ink [&+section]:border-t [&+section]:border-ds-border-muted">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
+      {showTitle ? <span className="min-w-0 truncate text-xs font-medium text-ds-ink">{taskDisplayTitle(group.root)}</span> : null}
       <span role="status" className="inline-flex items-center gap-1.5 text-xs font-semibold">
         <span aria-hidden="true">{statusIcon}</span>{t(`taskRunStatus_${activity?.status ?? task.status}`)}
       </span>
       {running && activity?.phase ? <span className="text-xs text-ds-muted">{t(`taskActivity_${activity.phase}`)}</span> : null}
       {reason ? <span className="min-w-0 flex-1 break-words text-xs text-ds-muted">{reason}</span> : <span className="flex-1" />}
       {artifacts.length > 0 ? <button type="button" aria-expanded={resultsOpen} onClick={() => setResultsOpen(open => !open)} className={taskButtonClass}>{t('taskWorkspaceArtifactCount', { count: artifacts.length })}</button> : null}
-    </div>
-    {canResume || canRetry || canSupplement || verify || !TERMINAL_STATUSES.has(task.status) ? <div className="flex flex-wrap gap-1.5 px-3 pb-2">
       {canResume ? <button type="button" disabled={disabled} onClick={() => void run('resume')} className={taskButtonClass}>{t('taskRunResume')}</button> : null}
       {canRetry ? <button type="button" disabled={disabled} onClick={() => void run('retry')} className={taskButtonClass}>{t('taskRunRetry')}</button> : null}
       {canSupplement && onSupplement ? <button type="button" disabled={disabled} onClick={onSupplement} className={taskButtonClass}>{t('taskWorkspaceSupplement')}</button> : null}
@@ -192,10 +211,10 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
       {verify ? <button type="button" aria-expanded={verifyOpen} onClick={() => setVerifyOpen(open => !open)} className={taskButtonClass}>{t('taskEffectVerifyResult')}</button> : null}
       {running ? <button type="button" disabled={disabled} onClick={() => void run('pause')} className={taskButtonClass}>{t('taskWorkspacePause')}</button> : null}
       {!TERMINAL_STATUSES.has(task.status) ? <button type="button" disabled={disabled} onClick={() => void run('cancel')} className={taskButtonClass}>{t('taskRunCancel')}</button> : null}
-    </div> : null}
-    {remainingAttention.length || resultsOpen || verifyOpen || legacyWorkerResponse ? <div className="max-h-[min(32vh,18rem)] overflow-y-auto px-3 pb-2">
+    </div>
+    {remainingAttention.length || resultsOpen || verifyOpen || legacyWorkerResponse ? <div className="space-y-1 pb-1">
       {remainingAttention.map(item => <TaskAttentionCard key={`${item.id}:${item.revision}`} item={item} ownerTask={members.find(owner => owner.id === item.taskId)}
-        conversationThreadId={threadId ?? undefined} onResolved={onResolved} />)}
+        conversationThreadId={threadId ?? undefined} onResolved={onResolved} replyInComposer={canReplyInComposer} />)}
       {resultsOpen ? <ul className="space-y-1" aria-label={t('taskRunArtifacts')}>{artifacts.map(({ task: owner, artifact }) => <li key={`${owner.id}:${artifact.id}`} className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
         <button type="button" onClick={() => void openArtifact(owner, artifact)} className="inline-flex min-w-0 items-center gap-1.5 text-left text-accent hover:underline">
           <FileText className="h-3.5 w-3.5 shrink-0" /><span className="break-all">{artifact.relativePath.split(/[\\/]/).at(-1)}</span>
@@ -208,8 +227,8 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
         <AssistantMarkdown text={legacyWorkerResponse} streaming={false} workspaceRoot={task.workspaceRoot} restricted className="ds-markdown min-w-0 break-words text-sm text-ds-ink" />
       </details> : null}
     </div> : null}
-    {actions?.includes('extend_budget') ? <div className="px-3"><TaskBudgetControl task={task} onChanged={refreshTaskState} /></div> : null}
-    {message || live.error ? <p role="status" className="px-3 pb-2 text-xs text-ds-muted">{message || t('taskRunUnavailable')}</p> : null}
+    {actions?.includes('extend_budget') ? <TaskBudgetControl task={task} onChanged={refreshTaskState} /> : null}
+    {message || live.error ? <p role="status" className="pb-1 text-xs text-ds-muted">{message || t('taskRunUnavailable')}</p> : null}
   </section>
 }
 

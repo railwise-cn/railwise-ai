@@ -26,7 +26,7 @@ function attentionQuestions(item: TaskAttentionV1): Question[] {
   })
 }
 
-export function TaskAttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow }: { item: TaskAttentionV1; ownerTask?: TaskRunV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: (notice?: string) => void; onOpenThread?: (id: string) => void; onOpenFlow?: (flowId?: string, flowRunId?: string) => void }): ReactElement {
+export function TaskAttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow, replyInComposer }: { item: TaskAttentionV1; ownerTask?: TaskRunV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: (notice?: string) => void; onOpenThread?: (id: string) => void; onOpenFlow?: (flowId?: string, flowRunId?: string) => void; replyInComposer?: boolean }): ReactElement {
   const { t } = useTranslation('common')
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -35,6 +35,7 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
   const [selectedProvider, setSelectedProvider] = useState<'dingtalk' | 'lark'>('dingtalk')
   const [providerPrompt, setProviderPrompt] = useState('')
   const questions = attentionQuestions(item)
+  const composerQuestion = replyInComposer && item.kind === 'question' && item.requestId && questions.length === 1 && !questions[0].options?.length
   const capability = item.payload?.capability
   const originalRequest = item.payload?.request
   const capabilityCard: ExternalTaskCapabilityCard | null = item.payload?.kind === 'capability_required' && item.taskId &&
@@ -105,6 +106,10 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
       onResolved(t(decision ? 'taskWorkspaceDecisionSaved' : 'taskWorkspaceSupplementSaved'))
     } catch { setError({ summary: t('taskWorkspaceActionFailed') }) } finally { setBusy(false) }
   }
+  if (composerQuestion) return <div className="min-w-0 py-1.5 text-ds-ink">
+    <p className="break-words text-[13px] font-medium">{questions[0].label}</p>
+    <p className="text-xs text-ds-muted">{t('userInputReplyInComposer')}</p>
+  </div>
   return <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
     <h4 className="text-sm font-semibold">{item.title}</h4>
     {item.kind === 'approval' && item.requestId ? <ApprovalOperationDetails summary={item.message} presentation={item.presentation} /> : <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed">{capabilityCard && isMatchingExecutionGrantExpiredAttention(item, ownerTask) ? t('capabilityExecutionGrantExpiredSummary') : redactRuntimeText(item.message)}</p>}

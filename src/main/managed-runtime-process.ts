@@ -61,6 +61,7 @@ import {
   type ClawScheduleMcpLaunchConfig
 } from './claw-schedule-mcp-config'
 import { defaultManagedRuntimeDataDir } from './runtime/managed-runtime-adapter'
+import { RuntimeStartBlockedForShutdownError } from './runtime/gui-update-ownership'
 import { isRuntimeHealthResponseBody } from './runtime-health'
 import { appendManagedLogLine } from './logger'
 import {
@@ -432,7 +433,7 @@ export async function startManagedRuntimeChild(
   options: StartManagedRuntimeChildOptions = {}
 ): Promise<void> {
   const assertStartAllowed = (): void => {
-    if (options.allowStart?.() === false) throw new Error('runtime_shutdown_in_progress')
+    if (options.allowStart?.() === false) throw new RuntimeStartBlockedForShutdownError()
   }
   assertStartAllowed()
   const candidateRoot = options.candidateRoot?.trim()

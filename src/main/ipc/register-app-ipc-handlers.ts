@@ -340,6 +340,7 @@ type RegisterAppIpcHandlersOptions = {
   getAppVersion: () => string
   guiUpdateRuntime?: {
     isPrepared: () => boolean
+    readSnapshot?: () => Promise<RuntimeRequestResult | undefined>
     prepare: (confirmedSnapshotId?: string) => Promise<void>
     recover: () => Promise<void>
   }
@@ -368,10 +369,11 @@ function safeSaveAsFileName(input: string | undefined, fallback = 'generated-fil
 }
 
 async function collectGuiUpdateActiveWork(
-  runtimeRequest: RegisterAppIpcHandlersOptions['runtimeRequest']
+  readSnapshot: () => Promise<RuntimeRequestResult | undefined>
 ): Promise<GuiUpdateInstallPreflight> {
   try {
-    const response = await runtimeRequest('/v1/runtime/update', 'GET')
+    const response = await readSnapshot()
+    if (!response) return { ok: true, activeWork: [] }
     if (!response.ok) throw new Error(runtimeResponseMessage(response))
     return z.object({
       ok: z.literal(true),
@@ -2678,7 +2680,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   let installRequest: Promise<GuiUpdateInstallResult> | undefined
   ipcMain.handle('gui:update-install-preflight', async (): Promise<GuiUpdateInstallPreflight> =>
-    options.guiUpdateRuntime?.isPrepared() ? { ok: true, activeWork: [] } : collectGuiUpdateActiveWork(runtimeRequest)
+    options.guiUpdateRuntime?.isPrepared() ? { ok: true, activeWork: [] } : collectGuiUpdateActiveWork(
+      options.guiUpdateRuntime?.readSnapshot ?? (() => runtimeRequest('/v1/runtime/update', 'GET'))
+    )
   )
   ipcMain.handle('gui:update-install', async (_, payload: unknown): Promise<GuiUpdateInstallResult> => {
     const request = parseIpcPayload(

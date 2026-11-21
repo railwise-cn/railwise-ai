@@ -108,6 +108,7 @@ export type { ComposerExecutionSettings } from './FloatingComposerExecutionPicke
 
 type Props = {
   renderTaskControls?: (controls: { focusComposer: () => void; pickAttachments?: () => void }) => ReactNode
+  replyingToQuestion?: boolean
   variant?: 'default' | 'compact'
   composerMinHeight?: number
   composerMaxHeight?: number
@@ -602,6 +603,7 @@ function moveComposerOption(current: number, options: ComposerCommand[], step: 1
 
 export function FloatingComposer({
   renderTaskControls,
+  replyingToQuestion = false,
   variant = 'default',
   composerMinHeight = 36,
   composerMaxHeight = 176,
@@ -813,6 +815,8 @@ export function FloatingComposer({
       ? t('workspaceRequiredToCreateThread')
       : goalPanelOpen && route !== 'claw'
         ? t('goalComposerPlaceholder')
+      : replyingToQuestion
+        ? t('userInputCustomPlaceholder')
       : busy
         ? t('composerQueuePlaceholder')
         : route === 'claw'
@@ -1075,6 +1079,8 @@ export function FloatingComposer({
       ? t('slashCommandApply')
       : canSetGoalPanelDraft
       ? t('goalSetCurrentInput')
+    : replyingToQuestion
+      ? t('userInputSubmit')
     : busy
       ? t('queueMessage')
       : t('send')
@@ -1695,11 +1701,6 @@ export function FloatingComposer({
         messages={queuedMessages}
         onRemove={onRemoveQueuedMessage}
       />
-      {renderTaskControls?.({
-        focusComposer: draft.focusComposer,
-        pickAttachments: canPickAttachment && onPickAttachments ? handleAttachmentMenuClick : undefined
-      })}
-
       <div ref={suggestionAnchorRef} className="relative">
         {!compact && activeThreadGoal && slashQuery == null && !goalPanelOpen && !composerMenuOpen ? (
           <div className="pointer-events-none absolute inset-x-3 bottom-full z-20 mb-2 flex justify-center">
@@ -2111,6 +2112,10 @@ export function FloatingComposer({
           onDragOver={handleComposerDragOver}
           onDrop={handleComposerDrop}
         >
+          {renderTaskControls?.({
+            focusComposer: draft.focusComposer,
+            pickAttachments: canPickAttachment && onPickAttachments ? handleAttachmentMenuClick : undefined
+          })}
           {showChangeSummary ? (
             <div className="ds-no-drag mb-1 rounded-2xl border border-ds-border-muted bg-ds-card/78 px-3 py-2 shadow-sm">
               <div className="flex min-w-0 items-center gap-2">

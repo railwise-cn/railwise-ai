@@ -26,6 +26,7 @@ import { planDisplayNameFromRelativePath } from '../../plan/plan-path'
 import {
   deriveSemanticProgress,
   isInlineProcessControl,
+  isPendingProcessControl,
   visibleProcessBlocksForMode
 } from './conversation-visibility'
 
@@ -33,6 +34,7 @@ export { summarizeToolBlock } from './message-timeline-process'
 
 type Props = {
   blocks: ChatBlock[]
+  composerControlIds?: ReadonlySet<string>
   liveReasoning: string
   live: string
   activeThreadId: string | null
@@ -78,6 +80,7 @@ function blockScrollStamp(block: ChatBlock | undefined): string {
 
 export function MessageTimeline({
   blocks,
+  composerControlIds,
   liveReasoning,
   live,
   activeThreadId,
@@ -230,6 +233,7 @@ export function MessageTimeline({
               {showForkPoint ? <ThreadForkPoint parentTitle={forkedFromTitle} /> : null}
               <MemoMessageTurn
                 turn={turn}
+                composerControlIds={composerControlIds}
                 professionalSurface={professionalSurface}
                 isProcessing={(busy && isLatestTurn) || turnPending || hasLiveStream}
                 runActivity={isLatestTurn ? runActivity : undefined}
@@ -305,6 +309,7 @@ export function MessageTimeline({
 
 function MessageTurn({
   turn,
+  composerControlIds,
   isProcessing,
   runActivity,
   liveReasoning,
@@ -322,6 +327,7 @@ function MessageTurn({
   professionalSurface
 }: {
   turn: Turn
+  composerControlIds?: ReadonlySet<string>
   isProcessing: boolean
   runActivity?: ThreadRunActivity
   liveReasoning: string
@@ -377,6 +383,7 @@ function MessageTurn({
     [processBlocks, viewMode]
   )
   const inlineControls = visibleProcessBlocks.filter(isInlineProcessControl)
+  const pendingInComposer = composerControlIds && inlineControls.some(isPendingProcessControl)
   const restoredWaiting = inlineControls.some(block => block.kind === 'approval' && block.status === 'pending') ? 'waiting_approval'
     : inlineControls.some(block => block.kind === 'user_input' && block.status === 'pending') ? 'waiting_user' : undefined
   const semanticProgress = useMemo(
@@ -425,11 +432,11 @@ function MessageTurn({
         </div>
       ) : null}
 
-      {!professionalSurface ? inlineControls.map(block => (
+      {!professionalSurface ? inlineControls.filter(block => !composerControlIds || !isPendingProcessControl(block)).map(block => (
         <MessageBubble key={block.id} block={block} nested />
       )) : null}
 
-      {assistantContentBlocks.map((block) => (
+      {assistantContentBlocks.filter(block => !composerControlIds?.has(block.id)).map((block) => (
         <MessageBubble key={block.id} block={block} professionalSurface={professionalSurface} />
       ))}
 
@@ -444,7 +451,7 @@ function MessageTurn({
         <ReviewSummaryCard key={review.id} review={review} />
       )) : null}
 
-      {isProcessing && !professionalSurface ? <LiveTurnProgressRow progress={semanticProgress} activity={runActivity} restoredWaiting={restoredWaiting} /> : null}
+      {isProcessing && !professionalSurface && !pendingInComposer ? <LiveTurnProgressRow progress={semanticProgress} activity={runActivity} restoredWaiting={restoredWaiting} /> : null}
 
       {!isProcessing && !professionalSurface && devPreviewCard ? devPreviewCard : null}
 
@@ -488,6 +495,7 @@ function LiveTurnProgressRow({ progress, activity, restoredWaiting }: {
 
 const MemoMessageTurn = memo(MessageTurn, (prev, next) => (
   sameTurnContent(prev.turn, next.turn) &&
+  prev.composerControlIds === next.composerControlIds &&
   prev.isProcessing === next.isProcessing &&
   prev.runActivity === next.runActivity &&
   prev.liveReasoning === next.liveReasoning &&

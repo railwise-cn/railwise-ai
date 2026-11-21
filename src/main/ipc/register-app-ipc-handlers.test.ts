@@ -496,6 +496,19 @@ describe('registerAppIpcHandlers', () => {
     await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toMatchObject({ ok: true, activeWork, snapshotId })
   })
 
+  it('reports an idle desktop update without implicitly starting a task service', async () => {
+    const runtimeRequest = vi.fn()
+    const readSnapshot = vi.fn(async () => undefined)
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({
+      runtimeRequest,
+      guiUpdateRuntime: { isPrepared: () => false, readSnapshot, prepare: vi.fn(), recover: vi.fn() }
+    }))
+    await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toEqual({ ok: true, activeWork: [] })
+    expect(readSnapshot).toHaveBeenCalledOnce()
+    expect(runtimeRequest).not.toHaveBeenCalled()
+  })
+
   it('rejects renderer-supplied paths at the task artifact opening boundary', async () => {
     const runtimeRequest = vi.fn()
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')

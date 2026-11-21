@@ -72,35 +72,38 @@ export class ChatAttachmentImportService {
     if (this.active.has(importId)) throw new Error('attachment import is already active')
     const controller = new AbortController()
     this.active.set(importId, controller)
-    const source = await canonicalSourceFile(input.sourcePath)
-    const format = FORMATS[extname(source).toLowerCase()]
-    if (!format) throw new Error('unsupported attachment format')
-    if (input.declaredMimeType && !mimeCompatible(input.declaredMimeType, format.mime)) {
-      throw new Error('declared MIME type does not match file extension')
-    }
-    const sourceStat = await stat(source)
-    if (!sourceStat.isFile()) throw new Error('attachment source is not a regular file')
-    if (sourceStat.size > MAX_FILE_BYTES) throw new Error('attachment exceeds 200 MiB limit')
-    await mkdir(this.options.managedRoot, { recursive: true })
-    const managedRoot = await canonicalizeContainmentRoot(this.options.managedRoot)
-    const targetDirectory = await resolveContainedPath({ root: managedRoot, target: join('imports', importId), expect: 'directory' })
-    await mkdir(targetDirectory, { recursive: true })
-    const target = await resolveContainedPath({
-      root: managedRoot,
-      target: join('imports', importId, sanitizeFileName(basename(source))),
-      expect: 'file', rejectFinalLink: true
-    })
-    const hash = createHash('sha256')
-    let bytes = 0
-    const limiter = new Transform({
-      transform(chunk: Buffer, _encoding, callback) {
-        bytes += chunk.byteLength
-        if (bytes > MAX_FILE_BYTES) return callback(new Error('attachment exceeds 200 MiB limit'))
-        hash.update(chunk)
-        callback(null, chunk)
-      }
-    })
+    let createdTargetDirectory: string | undefined
     try {
+      const source = await canonicalSourceFile(input.sourcePath)
+      const format = FORMATS[extname(source).toLowerCase()]
+      if (!format) throw new Error('unsupported attachment format')
+      if (input.declaredMimeType && !mimeCompatible(input.declaredMimeType, format.mime)) {
+        throw new Error('declared MIME type does not match file extension')
+      }
+      const sourceStat = await stat(source)
+      if (!sourceStat.isFile()) throw new Error('attachment source is not a regular file')
+      if (sourceStat.size > MAX_FILE_BYTES) throw new Error('attachment exceeds 200 MiB limit')
+      await mkdir(this.options.managedRoot, { recursive: true })
+      const managedRoot = await canonicalizeContainmentRoot(this.options.managedRoot)
+      const targetDirectory = await resolveContainedPath({ root: managedRoot, target: join('imports', importId), expect: 'directory' })
+      await mkdir(dirname(targetDirectory), { recursive: true })
+      await mkdir(targetDirectory)
+      createdTargetDirectory = targetDirectory
+      const target = await resolveContainedPath({
+        root: managedRoot,
+        target: join('imports', importId, sanitizeFileName(basename(source))),
+        expect: 'file', rejectFinalLink: true
+      })
+      const hash = createHash('sha256')
+      let bytes = 0
+      const limiter = new Transform({
+        transform(chunk: Buffer, _encoding, callback) {
+          bytes += chunk.byteLength
+          if (bytes > MAX_FILE_BYTES) return callback(new Error('attachment exceeds 200 MiB limit'))
+          hash.update(chunk)
+          callback(null, chunk)
+        }
+      })
       await pipeline(createReadStream(source), limiter, createWriteStream(target, { flags: 'wx', mode: 0o600 }), { signal: controller.signal })
       const content = await readFile(target)
       await verifyFormat(content, format.kind, format.mime)
@@ -112,7 +115,7 @@ export class ChatAttachmentImportService {
         byteSize: bytes, sha256: hash.digest('hex')
       }
     } catch (error) {
-      await rm(targetDirectory, { recursive: true, force: true })
+      if (createdTargetDirectory) await rm(createdTargetDirectory, { recursive: true, force: true })
       throw error
     } finally {
       this.active.delete(importId)

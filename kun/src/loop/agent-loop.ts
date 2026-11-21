@@ -1296,6 +1296,9 @@ export class AgentLoop {
       ...optionalInstruction(webSearchCapabilityInstruction(workflowPrompt, toolSpecs)),
       ...optionalInstruction(webFailureGuard?.recoveryInstruction()),
       ...(effectiveToolSpecs.some((tool) => tool.name === 'bash' || tool.name === 'request_host_shell') ? [shellRuntimeInstruction()] : []),
+      ...(effectiveToolSpecs.some((tool) => tool.name === 'request_host_shell') ? [
+        'Before requesting a host command, use listed, scoped document, file inspection, connector and task artifact tools for equivalent work. Read supplied material through those tools and ask for a specific missing file if needed. Do not search the user profile or request host-wide access for attached-file reads, workspace reads, connector operations or normal task deliverables. If a necessary command has no scoped alternative, propose only the exact operation and use the returned tool result or session to continue. Do not re-request an unchanged rejected or completed command.'
+      ] : []),
       ...(toolCatalogDriftMessage ? [toolCatalogDriftMessage] : [])
     ]
     await this.recordPipelineStage(threadId, turnId, 'input_remembered', {
@@ -2135,18 +2138,25 @@ export class AgentLoop {
       sandboxMode: input.sandboxMode,
       abortSignal: input.signal,
       awaitApproval: async (approval) => {
-        await this.opts.events.record({
-          kind: 'approval_requested',
-          threadId: approval.threadId,
-          turnId: approval.turnId,
-          approvalId: approval.id,
-          toolName: approval.toolName,
-          status: 'pending',
-          approvalPolicy: input.approvalPolicy,
-          sandboxMode: input.sandboxMode,
-          summary: approval.summary
-        })
-        return waitForApprovalDecision(() => this.opts.approvalGate.request(approval), input.signal)
+        return waitForApprovalDecision(async () => {
+          const existing = this.opts.approvalGate.get(approval.id)
+          const decision = this.opts.approvalGate.request(approval)
+          if (existing) return decision
+          // The client may respond immediately to this event. Make the request
+          // durable and register its waiter before publishing the event.
+          const [result] = await Promise.all([decision, this.opts.events.record({
+            kind: 'approval_requested',
+            threadId: approval.threadId,
+            turnId: approval.turnId,
+            approvalId: approval.id,
+            toolName: approval.toolName,
+            status: 'pending',
+            approvalPolicy: input.approvalPolicy,
+            sandboxMode: input.sandboxMode,
+            summary: approval.summary
+          })])
+          return result
+        }, input.signal)
       },
       ...(input.userInputDisabled
         ? {}

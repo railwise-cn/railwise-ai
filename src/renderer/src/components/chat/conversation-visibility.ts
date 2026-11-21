@@ -83,6 +83,28 @@ export function isPendingProcessControl(block: ChatBlock): boolean {
   return (block.kind === 'approval' || block.kind === 'user_input') && block.status === 'pending'
 }
 
+export function conversationComposerControls(blocks: readonly ChatBlock[]): ChatBlock[] {
+  const controls = new Map<string, Extract<ChatBlock, { kind: 'approval' | 'user_input' }>>()
+  let latestCapability: ChatBlock | undefined
+  for (const block of blocks) {
+    if (block.kind === 'user') latestCapability = undefined
+    if (block.kind === 'assistant' && block.capabilityCard) latestCapability = block
+    if (block.kind !== 'approval' && block.kind !== 'user_input') continue
+    const key = block.kind === 'approval' ? `approval:${block.approvalId}` : `input:${block.requestId}`
+    const earlier = controls.get(key)
+    if (block.status === 'pending' && earlier && earlier.status !== 'pending' && earlier.status !== 'error') continue
+    controls.set(key, block)
+  }
+  const pending = [...controls.values()].filter(isPendingProcessControl)
+  return latestCapability ? [...pending, latestCapability] : pending
+}
+
+export function composerReplyQuestion(controls: readonly ChatBlock[]): Extract<ChatBlock, { kind: 'user_input' }> | undefined {
+  const block = controls.length === 1 ? controls[0] : undefined
+  if (block?.kind === 'user_input' && block.status === 'pending' && block.questions.length === 1 && block.questions[0].options.length === 0) return block
+  return undefined
+}
+
 export function isInlineProcessControl(block: ChatBlock): boolean {
   return isPendingProcessControl(block) ||
     ((block.kind === 'approval' || block.kind === 'user_input') && block.status === 'error')

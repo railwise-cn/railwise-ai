@@ -6,6 +6,7 @@ import { jsonResponse, type JsonResponse } from '../response.js'
 import { readJsonBody } from '../read-json-body.js'
 import { ERRORS } from './runtime-error.js'
 import type { ApprovalGate } from '../../ports/approval-gate.js'
+import type { ApprovalRequest } from '../../domain/approval.js'
 import type { RuntimeEventRecorder } from '../../services/runtime-event-recorder.js'
 
 /**
@@ -17,6 +18,7 @@ export async function decideApproval(input: {
   request: Request
   gate: ApprovalGate
   events: RuntimeEventRecorder
+  continueDetachedApproval?: (approval: ApprovalRequest) => Promise<void>
 }): Promise<JsonResponse | Response> {
   const body = await readJsonBody(input.request)
   if (!body.ok) return body.response
@@ -33,8 +35,16 @@ export async function decideApproval(input: {
     decision: parsed.data.decision,
     status: parsed.data.decision === 'allow' ? 'allowed' : 'denied'
   }
-  // A repeated click or a transport retry acknowledges the original decision only.
-  if (approval.status === response.status) return jsonResponse(response)
+  const detached = input.gate.hasLiveResolver?.(input.approvalId) === false
+  const continueDetached = async (): Promise<void> => {
+    if (detached && response.decision === 'allow') await input.continueDetachedApproval?.(approval)
+  }
+  // A repeated click acknowledges the same decision. It can also recover a
+  // continuation interrupted after the decision was committed.
+  if (approval.status === response.status) {
+    await continueDetached()
+    return jsonResponse(response)
+  }
   if (approval.status === 'expired') return ERRORS.conflict('本次授权已失效，请在原对话重新检查后继续。')
   if (approval.status !== 'pending') {
     return ERRORS.conflict('This approval is no longer available. Refresh the task to see its current state.')
@@ -52,5 +62,6 @@ export async function decideApproval(input: {
     status: expired ? 'expired' : response.status,
     summary: approval.summary
   })
+  if (accepted) await continueDetached()
   return expired ? ERRORS.conflict('本次授权已失效，请在原对话重新检查后继续。') : jsonResponse(response)
 }

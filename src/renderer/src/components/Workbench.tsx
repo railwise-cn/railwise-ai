@@ -36,6 +36,7 @@ import { Sidebar } from './chat/Sidebar'
 import { ReleaseHighlights } from './ReleaseHighlights'
 import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { MessageTimeline } from './chat/MessageTimeline'
+import { composerReplyQuestion, conversationComposerControls } from './chat/conversation-visibility'
 import { TaskRunStatusBar } from './chat/TaskRunStatusBar'
 import {
   FloatingComposer,
@@ -514,21 +515,11 @@ export function Workbench(): ReactElement {
     workspaceRoot
   ])
   const timelineBlocks = blocks
-  const inlineCapabilityCards = useMemo(() => {
-    // The newest turn remains mounted even when earlier history is folded.
-    const cards = []
-    for (let index = timelineBlocks.length - 1; index >= 0; index -= 1) {
-      const block = timelineBlocks[index]
-      if (block.kind === 'user') break
-      if (block.kind === 'assistant' && block.capabilityCard) cards.push(block.capabilityCard)
-    }
-    return cards
-  }, [timelineBlocks])
-  const inlineTaskRequests = useMemo(() => timelineBlocks.flatMap(block => {
-    if (block.kind === 'approval' && block.status === 'pending') return [block.approvalId]
-    if (block.kind === 'user_input' && block.status === 'pending') return [block.requestId]
-    return []
-  }), [timelineBlocks])
+  const chatOwnsTaskControls = route === 'chat' || route === 'claw'
+  const composerTaskControls = useMemo(() => conversationComposerControls(timelineBlocks), [timelineBlocks])
+  const composerControlIds = useMemo(() => new Set(composerTaskControls.map(block => block.id)), [composerTaskControls])
+  const replyQuestion = route === 'chat' ? composerReplyQuestion(composerTaskControls) : undefined
+  const submittingQuestion = useRef<string | null>(null)
   const timelineMessageIds = useMemo(() => new Set(timelineBlocks.map(block => block.id)), [timelineBlocks])
   const timelineLiveReasoning = liveReasoning
   const timelineLiveAssistant = liveAssistant
@@ -1780,6 +1771,24 @@ export function Workbench(): ReactElement {
       void handleGuiPlanCommand(planCommand.kind === 'create' ? planCommand.request : undefined)
       return
     }
+    if (replyQuestion && v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
+      if (submittingQuestion.current === replyQuestion.requestId) return
+      submittingQuestion.current = replyQuestion.requestId
+      const question = replyQuestion.questions[0]
+      try {
+        await useChatStore.getState().resolveUserInput(replyQuestion.id, {
+          kind: 'submit', answers: [{ id: question.id, label: question.header || question.question, value: v }]
+        })
+        const state = useChatStore.getState()
+        if (state.activeThreadId === activeThreadId &&
+            state.blocks.some(block => block.id === replyQuestion.id && block.kind === 'user_input' && block.status === 'submitted')) {
+          setComposerDrafts(drafts => drafts[composerScope] === input ? setWorkbenchComposerDraft(drafts, composerScope, '') : drafts)
+        }
+      } finally {
+        if (submittingQuestion.current === replyQuestion.requestId) submittingQuestion.current = null
+      }
+      return
+    }
     if (route === 'chat' && mode === 'plan') {
       const prepared = await prepareChatMessage()
       if (!prepared) return
@@ -2577,6 +2586,7 @@ export function Workbench(): ReactElement {
             <MessageTimeline
               viewMode={conversationViewMode}
               blocks={timelineBlocks}
+              composerControlIds={chatOwnsTaskControls ? composerControlIds : undefined}
               liveReasoning={timelineLiveReasoning}
               live={timelineLiveAssistant}
               activeThreadId={activeThreadId}
@@ -2605,12 +2615,14 @@ export function Workbench(): ReactElement {
             />
             <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8">
               <FloatingComposer
-                renderTaskControls={route === 'chat' || route === 'claw' ? ({ focusComposer, pickAttachments }) => (
+                replyingToQuestion={Boolean(replyQuestion)}
+                renderTaskControls={chatOwnsTaskControls ? ({ focusComposer, pickAttachments }) => (
                   <TaskRunStatusBar
                     threadId={activeThreadId}
                     runtimeReady={runtimeConnection === 'ready'}
-                    inlineCapabilityCards={inlineCapabilityCards}
-                    inlineRequests={inlineTaskRequests}
+                    composerControls={composerTaskControls}
+                    composerReplyId={replyQuestion?.id}
+                    composerReplies={route === 'chat' && mode === 'agent'}
                     visibleMessageIds={timelineMessageIds}
                     linkedTask={linkedTask ?? undefined}
                     onSupplement={focusComposer}

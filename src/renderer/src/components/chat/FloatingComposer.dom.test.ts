@@ -96,6 +96,16 @@ async function paint(): Promise<void> {
   await act(async () => { await new Promise(requestAnimationFrame) })
 }
 
+it('places task controls inside the input shell and keeps the existing draft', async () => {
+  await act(async () => root.render(createElement(Harness, {
+    menu: 'toolbar', seed: '当前草稿',
+    composerProps: { renderTaskControls: () => createElement('button', { type: 'button' }, '审批') }
+  })))
+  const shell = host.querySelector('.ds-composer-shell')!
+  expect(shell.contains(buttonByLabel('审批'))).toBe(true)
+  expect(shell.querySelector('textarea')?.value).toBe('当前草稿')
+})
+
 describe('composer attachment entry points', () => {
   it.each(['paste', 'drop', 'picker'])('accepts a PDF and image together via %s without duplicating the batch', async (entry) => {
     const onPickAttachments = vi.fn()

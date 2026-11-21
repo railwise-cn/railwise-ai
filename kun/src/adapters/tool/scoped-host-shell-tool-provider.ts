@@ -3,7 +3,7 @@ import { realpath } from 'node:fs/promises'
 import { z } from 'zod'
 import { HostShellAuthorizationSchema, type HostShellAuthorization } from '../../contracts/permissions.js'
 import type { TaskController } from '../../services/task-controller.js'
-import type { TaskRunRepository } from '../../services/task-run-repository.js'
+import { operationFingerprint, type TaskRunRepository } from '../../services/task-run-repository.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import { buildToolArgumentSummary, sanitizeToolResultOutput } from '../../security/tool-persistence-security.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
@@ -56,18 +56,33 @@ export function buildScopedHostShellToolProviders(options: {
   const resultFor = (result: SavedResult | undefined) => result?.shell
     ? { output: { authorizationId: result.authorization.id, commandHash: result.authorization.commandHash, expiresAt: result.authorization.expiresAt, ...objectOutput(result.shell.output) }, ...(result.shell.isError ? { isError: true } : {}) }
     : { output: { status: 'outcome_unknown', code: 'outcome_unknown', authorizationId: result?.authorization.id, session_id: result?.sessionId, message: 'The approved command may have started. Verify its process and output; it will not be replayed.' }, isError: true }
+  const review = async (raw: unknown, context: ToolHostContext) => {
+    const request = requestSchema.parse(raw)
+    if (connectorProxy.test(request.command)) return fail('host_shell_connector_proxy_blocked', 'External platform operations must use a configured typed connector, never host Shell.')
+    const checked = await assertContext(context)
+    const requestHash = hash(JSON.stringify(raw)), key = `host-shell:${request.idempotency_key}`
+    const operationRequest = { commandHash: hash(request.command), requestHash, timeoutSeconds: request.timeout_seconds, ttlSeconds: request.ttl_seconds, taskId: checked.task.id, threadId: context.threadId, turnId: context.turnId, workspaceRoot: checked.workspace, grantId: checked.grant.id, executionId: checked.token.executionId, leaseRevision: checked.token.leaseRevision }
+    return { request, checked, requestHash, key, operationRequest }
+  }
   return [{ id: 'scoped-host-shell', kind: 'built-in', enabled: true, available: true, tools: [
     defineLocalTool({
       name: 'request_host_shell',
       description: 'Propose ONE exact host shell command for explicit user approval. The approval shows the full redacted command, workspace, hashes and lifetime; it grants full host access only for this command, never changes workspace trust, and cannot be used for connector/platform operations. No command executes before approval. Returns real output or a server-owned session_id. Pass that session_id to host_shell_session to poll or stop; stdin writes are not authorized. Unknown outcomes are never replayed.',
       inputSchema: z.toJSONSchema(requestSchema) as Record<string, unknown>, policy: 'on-request', requireExplicitApproval: true,
       shouldAdvertise: context => Boolean(current(context)) && context.approvalPolicy !== 'never',
+      hasScopedApproval: async (raw, context) => {
+        const { checked, key, operationRequest } = await review(raw, context)
+        const previous = repository.operation(checked.task.id, key)
+        if (!previous) return false
+        // Existing immutable receipts return their recorded status without
+        // dispatching a command or asking for another approval.
+        if (previous.kind !== 'host_shell' || previous.fingerprint !== operationFingerprint(operationRequest)) {
+          return fail('idempotency_conflict', 'The reviewed command changed. Use the original receipt or request approval for a new command.')
+        }
+        return true
+      },
       execute: async (raw, context, onUpdate) => {
-        const request = requestSchema.parse(raw)
-        if (connectorProxy.test(request.command)) return fail('host_shell_connector_proxy_blocked', 'External platform operations must use a configured typed connector, never host Shell.')
-        const checked = await assertContext(context)
-        const requestHash = hash(JSON.stringify(raw)), key = `host-shell:${request.idempotency_key}`
-        const operationRequest = { commandHash: hash(request.command), requestHash, timeoutSeconds: request.timeout_seconds, ttlSeconds: request.ttl_seconds, taskId: checked.task.id, threadId: context.threadId, turnId: context.turnId, workspaceRoot: checked.workspace, grantId: checked.grant.id, executionId: checked.token.executionId, leaseRevision: checked.token.leaseRevision }
+        const { request, checked, requestHash, key, operationRequest } = await review(raw, context)
         const prior = repository.operation(checked.task.id, key)
         if (prior) {
           // beginOperation checks a matching key against the complete immutable request.

@@ -2102,6 +2102,30 @@ export class TaskController {
     return this.repository.appendInput({ taskId, expectedRevision, idempotencyKey, text, kind, sourceId, ...references, nowIso: this.nowIso() })
   }
 
+  canContinueDetachedApproval(task: TaskRun, approval: ApprovalRequest): boolean {
+    if (this.admissionSuspended || task.status !== 'waiting_approval' || task.authority?.revokedAt ||
+        task.parentTaskId || task.activeTurnId !== approval.turnId || task.threadId !== approval.threadId ||
+        this.repository.currentExecution(task.id)?.id !== task.id || this.attemptTokens.has(approval.turnId) ||
+        this.repository.inbox(task.workspaceRoot).some(item => item.taskId === task.id) ||
+        !approval.callId || !approval.requestHash) return false
+    const request = this.repository.humanRequest(approval.id)
+    if (request?.status !== 'answered' || (request.resolution as { decision?: string } | undefined)?.decision !== 'allow') return false
+    const attempt = this.repository.execution.latestAttempt(task.id)
+    if (!attempt || attempt.turnId !== approval.turnId || (attempt.status === 'running' && inspectProcess(attempt.process) !== 'exited')) return false
+    const operation = this.repository.operation(task.id, `tool:${approval.turnId}:${approval.callId}`)
+    const grant = ExecutionGrantSchema.safeParse(operation?.request?.executionGrant)
+    if (!operation || !grant.success || grant.data.taskId !== task.id || grant.data.threadId !== approval.threadId ||
+        grant.data.turnId !== approval.turnId || operation.request?.dispatchTracking !== 'host-v1' ||
+        operation.request?.executionId !== attempt.executionId || operation.request?.toolName !== approval.toolName ||
+        operation.request?.approvalRequestHash !== approval.requestHash) return false
+    const item = (operation.result as ToolHostResult | undefined)?.item
+    const provedUndispatched = operation.status === 'prepared' || (operation.status === 'failed' &&
+      item?.kind === 'tool_result' && (item.output as { code?: string } | undefined)?.code === 'operation_not_dispatched')
+    // The normal resume path settles prepared Host calls and verifies all other
+    // receipts before starting a Turn. Only exact-operation transfer can use this approval.
+    return provedUndispatched
+  }
+
   prepareResume(taskId: string, expectedRevision: number, model?: string): TaskRun {
     const task = this.repository.get(taskId)
     if (!task) throw Object.assign(new Error(`task not found: ${taskId}`), { code: 'not_found' })

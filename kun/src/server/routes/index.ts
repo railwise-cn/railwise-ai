@@ -608,7 +608,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
       approvalId: ctx.params.id,
       request,
       gate: runtime.approvalGate,
-      events: runtime.events
+      events: runtime.events,
+      continueDetachedApproval: approval => runtime.taskControlService?.continueDetachedApproval(approval) ?? Promise.resolve()
     })
   })
   router.add('POST', '/v1/user-inputs/:id', async (request, ctx) => {

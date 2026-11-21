@@ -3,7 +3,11 @@ import { act, createElement, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
+import type { ChatBlock } from '../../agent/types'
 import { TaskRunStatusBar } from './TaskRunStatusBar'
+import { MessageTimeline } from './MessageTimeline'
+import { composerReplyQuestion, conversationComposerControls } from './conversation-visibility'
+import { useChatStore } from '../../store/chat-store'
 import { refreshTaskState, resetTaskStateForTests } from '../../store/task-live-store'
 import i18n from '../../i18n'
 
@@ -53,6 +57,68 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); resetTaskStateForTests(); container.remove() })
 
 describe('task actions in the original conversation', () => {
+  it('shows one composer approval for a replayed request and submits only one decision', async () => {
+    tasks = [run('permission', 'waiting_approval', { presentation: { reason: 'approval_required', actions: ['approve', 'deny'] } })]
+    attention = [{ id: 'persisted', requestId: 'approval-id', taskId: 'permission', ownerId: 'permission', ownerKind: 'task',
+      threadId: 'worker-permission', kind: 'approval', title: '需要授权', message: 'Approve access', status: 'pending',
+      revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const previous = useChatStore.getState()
+    let finish!: () => void
+    const resolveApproval = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+    const approval: ChatBlock = { kind: 'approval', id: 'initial', approvalId: 'approval-id', summary: 'Approve access', status: 'pending' }
+    const blocks: ChatBlock[] = [approval, { ...approval, id: 'replayed' }]
+    const composerControls = conversationComposerControls(blocks)
+    expect(conversationComposerControls([approval, { ...approval, status: 'allowed' }, ...blocks])).toEqual([])
+    useChatStore.setState({ runtimeConnection: 'ready', route: 'chat', activeThreadId: threadId, resolveApproval })
+    try {
+      await act(async () => {
+        await refreshTaskState()
+        root.render(createElement('div', null,
+          createElement(MessageTimeline, { blocks, composerControlIds: new Set(composerControls.map(block => block.id)),
+            activeThreadId: threadId, runtimeConnection: 'ready', liveReasoning: '', live: '',
+            onRetryConnection: () => undefined, onOpenSettings: () => undefined }),
+          createElement(TaskRunStatusBar, { threadId, runtimeReady: true, composerControls })
+        ))
+      })
+      const allow = i18n.t('common:approvalAllow')
+      const choices = [...container.querySelectorAll('button')].filter(control => control.textContent === allow)
+      expect(choices).toHaveLength(1)
+      expect(choices[0].closest('.ds-composer-task-controls')).not.toBeNull()
+      await act(async () => { choices[0].click(); choices[0].click() })
+      expect(resolveApproval).toHaveBeenCalledExactlyOnceWith('replayed', 'allow')
+      expect(api.runtimeRequest).not.toHaveBeenCalled()
+      expect(api.resumeTask).not.toHaveBeenCalled()
+      expect(button('继续任务')).toBeUndefined()
+      await act(async () => finish())
+    } finally {
+      useChatStore.setState(previous)
+    }
+  })
+
+  it('uses the ordinary composer for one open question and keeps structured questions available', async () => {
+    const open: ChatBlock = { kind: 'user_input', id: 'question', requestId: 'input-id', status: 'pending',
+      questions: [{ id: 'document', header: '资料', question: '请提供资料名称', options: [] }] }
+    expect(composerReplyQuestion([open])?.id).toBe(open.id)
+    await render({ composerControls: [open], composerReplyId: open.id })
+    expect(container.textContent).toContain('请提供资料名称')
+    expect(container.textContent).toContain('在下方输入框直接回复')
+    expect(container.querySelector('textarea')).toBeNull()
+
+    const structured = { ...open, questions: [{ ...open.questions[0], options: [{ label: '报告一', description: '第一份报告' }] }] }
+    expect(composerReplyQuestion([structured])).toBeUndefined()
+    await render({ composerControls: [structured] })
+    expect(container.textContent).toContain('报告一')
+    expect(container.textContent).not.toContain('在下方输入框直接回复')
+
+    tasks = [run('worker-question', 'waiting_user', { activeTurnId: 'waiting-turn' })]
+    attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
+      threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供资料名称', status: 'pending',
+      payload: { questions: open.questions }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    await render({ composerReplies: true })
+    expect(container.textContent).toContain('在下方输入框直接回复')
+    expect(container.querySelector('textarea')).toBeNull()
+  })
+
   it('continues the same durable run once and uses the existing composer and chooser', async () => {
     tasks = [run('paused-task', 'paused', { presentation: { reason: 'paused', actions: ['resume', 'supplement'] } })]
     api.resumeTask.mockResolvedValue({ task: tasks[0] })

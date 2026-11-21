@@ -428,8 +428,9 @@ export class LocalToolHost implements ToolHost {
     if (tool.policy === 'never' || approvalPolicy === 'never') return false
     if (tool.requireExplicitApproval) {
       const provider = this.registry.resolveTool(call.toolName, context, call.providerId).provider
-      if (provider.id === 'browser-skill' && ['browser_click', 'browser_fill'].includes(tool.name) &&
-        await tool.hasScopedApproval?.(call.arguments, context)) return false
+      const knownScopedApproval = (provider.id === 'browser-skill' && ['browser_click', 'browser_fill'].includes(tool.name)) ||
+        (provider.id === 'scoped-host-shell' && tool.name === 'request_host_shell')
+      if (knownScopedApproval && await tool.hasScopedApproval?.(call.arguments, context)) return false
       return true
     }
     if (context.executionGrant && tool.toolKind === 'command_execution') return true

@@ -30,6 +30,19 @@ async function serviceWithFile(name: string, contents: string | Buffer, parse?: 
 }
 
 describe('ChatAttachmentImportService parse states', () => {
+  it('clears the import id when the draft file is unavailable, so the same draft can retry', async () => {
+    const fixture = await serviceWithFile('restored.txt', '合成资料')
+    const request = { sourcePath: fixture.sourcePath, importId: 'same-draft-id' }
+    await rm(fixture.sourcePath)
+    await expect(fixture.service.stage(request)).rejects.toThrow()
+    expect(fixture.service.cancel(request.importId)).toBe(false)
+    await writeFile(fixture.sourcePath, '已恢复的附件资料')
+    const staged = await fixture.service.stage(request)
+    expect(staged.importId).toBe(request.importId)
+    await expect(fixture.service.stage(request)).rejects.toMatchObject({ code: 'EEXIST' })
+    await expect(readFile(staged.absolutePath, 'utf8')).resolves.toBe('已恢复的附件资料')
+  })
+
   it.each([
     ['image.png', 'image/png', Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])],
     ['image.jpg', 'image/jpeg', Buffer.from([0xff, 0xd8, 0xff])],

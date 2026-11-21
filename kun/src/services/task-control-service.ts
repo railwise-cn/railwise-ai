@@ -18,6 +18,7 @@ import { externalOperationForTool } from './external-effect-evidence.js'
 import { toolCanProveExternalEffect } from '../loop/turn-completion-guard.js'
 import { createHash } from 'node:crypto'
 import { taskPermissionCapability, taskPermissionFailure } from './task-permission-recovery.js'
+import type { ApprovalRequest } from '../domain/approval.js'
 
 export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel' | 'extend_budget' | 'revalidate_artifacts' | 'prepare_public_query_recovery' | 'revoke_public_query_recovery'
 export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string; additionalExecutionMs?:number; confirmed?:boolean; publicQueryRecoveryReceiptId?:string; scopeConfirmation?:import('../contracts/browser-public-query-recovery.js').OneOffScopeConfirmation; consentReceiptId?:string }
@@ -29,13 +30,36 @@ export class TaskControlService {
   constructor(private readonly deps:{publicQueryRecovery?:BrowserPublicQueryRecoveryService;repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;preflightRecoveryTask?(text:string,thread:import('../contracts/threads.js').ThreadRecord,binding:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):ReturnType<ExternalTaskPreflight>;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;validateRecoveryExecution?(task:TaskRun):Promise<void>;validateRecoveryPermission?(threadId:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;validateRetryLocalSchedule?(task:TaskRun,receipt:OperationReceipt,recovery?:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):Promise<boolean>;nowIso():string}) {}
 
   async mutate(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
+    return this.serialize(taskId, () => this.execute(taskId, action, data))
+  }
+
+  async continueDetachedApproval(approval: ApprovalRequest): Promise<void> {
+    const { repository, tasks, turns } = this.deps
+    const taskId = repository.attention(approval.id)?.taskId
+    if (!taskId) return
+    await this.serialize(taskId, async () => {
+      const task = repository.get(taskId)
+      if (!task || !tasks.canContinueDetachedApproval(task, approval) || turns.getAbortController(approval.turnId)) return
+      try {
+        await this.execute(task.id, 'resume', {
+          expectedRevision: task.revision, idempotencyKey: `approval-resume:${approval.id}`
+        }, approval.turnId)
+      } catch (error) {
+        // The approval is still saved. Leave the original task available for
+        // review if its current scope or earlier outcome cannot be verified.
+        console.warn('[kun] Could not continue the approved task:', (error as { code?: string }).code ?? 'resume_unavailable')
+      }
+    })
+  }
+
+  private async serialize<T>(taskId: string, run: () => Promise<T>): Promise<T> {
     const previous=this.pending.get(taskId) ?? Promise.resolve()
-    const operation=previous.catch(()=>undefined).then(()=>this.execute(taskId,action,data))
+    const operation=previous.catch(()=>undefined).then(run)
     this.pending.set(taskId,operation)
     try { return await operation } finally { if(this.pending.get(taskId)===operation)this.pending.delete(taskId) }
   }
 
-  private async execute(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
+  private async execute(taskId:string, action:TaskControlAction, data:TaskControlRequest, detachedApprovalTurnId?: string):Promise<TaskControlResult> {
     const {repository,tasks,threads,turns,nowIso}=this.deps
     if (action === 'prepare_public_query_recovery') { if (!this.deps.publicQueryRecovery) throw new Error('recovery unavailable'); return this.deps.publicQueryRecovery.prepare(taskId, data) }
     if(action==='revoke_public_query_recovery'){const task=repository.get(taskId);if(!task||!this.deps.publicQueryRecovery)throw new Error('recovery unavailable');return this.deps.publicQueryRecovery.revoke(task,data)}
@@ -217,6 +241,9 @@ export class TaskControlService {
         const previous=current
         current=tasks.prepareResume(current.id,current.revision,data.model)
         preparedResume={previous,revision:current.revision}
+        if (detachedApprovalTurnId && thread.turns.some(turn => turn.id === detachedApprovalTurnId && turn.status === 'running')) {
+          await turns.finishTurn({ threadId: current.threadId, turnId: detachedApprovalTurnId, status: 'aborted' })
+        }
       }
       // Same-task continuation keeps the document references already granted to
       // this execution thread. It never imports attachments from another task.

@@ -61,13 +61,15 @@ async function fixture(prompt = '在工作区运行一次本地检查命令。')
       revision: 0, workspaceRevision: 0, agentRevision: 0, idempotencyKey: 'grant', issuedAt: nowIso() }) }
   const command = `"${process.execPath.replaceAll('"', '\\"')}" -e "process.stdout.write('approved-once')"`
   const args = { command, idempotency_key: 'one-command', ttl_seconds: 60, timeout_seconds: 10 }
+  const invoke = (callId: string, raw = args, activeContext = context) =>
+    host.execute({ callId, toolName: 'request_host_shell', arguments: raw }, activeContext)
   const run = async (callId: string, raw = args, decision: 'allow' | 'deny' = 'allow', activeContext = context) => {
-    const pending = host.execute({ callId, toolName: 'request_host_shell', arguments: raw }, activeContext)
+    const pending = invoke(callId, raw, activeContext)
     await vi.waitFor(() => expect(gate.pending()).toHaveLength(1))
     gate.decide(gate.pending()[0]!.id, decision)
     return pending
   }
-  return { root, repository, tasks, task, gate, abort, bashTool, execute, onAuthorized, providers, host, context, args, run, advance: (seconds: number) => { now = new Date(Date.parse(now) + seconds * 1000).toISOString() } }
+  return { root, repository, tasks, task, gate, abort, bashTool, execute, onAuthorized, providers, host, context, args, run, invoke, advance: (seconds: number) => { now = new Date(Date.parse(now) + seconds * 1000).toISOString() } }
 }
 
 describe('one-shot, explicitly reviewed host shell', () => {
@@ -87,12 +89,13 @@ describe('one-shot, explicitly reviewed host shell', () => {
     expect(f.onAuthorized).toHaveBeenCalledOnce()
     expect(f.context.executionGrant).toMatchObject({ workspaceTrust: 'workspace-write', sandboxMode: 'workspace-write', revision: 0 })
     expect(f.repository.operations(f.task.id, 'host_shell')).toMatchObject([{ status: 'succeeded', request: { workspaceRoot: f.root }, result: { authorization: { executionGrantId: 'grant', leaseRevision: f.tasks.tokenForTurn('turn')!.leaseRevision } } }])
-    const repeated = await f.run('repeat')
+    const repeated = await f.invoke('repeat')
     expect(repeated.item).toMatchObject({ output: { output: 'approved-once' } })
     expect(f.execute).toHaveBeenCalledOnce()
-    const conflicting = await f.run('conflict', { ...f.args, command: `${f.args.command} ` })
+    const conflicting = await f.invoke('conflict', { ...f.args, command: `${f.args.command} ` })
     expect(conflicting.item).toMatchObject({ isError: true, output: { code: 'idempotency_conflict' } })
     expect(f.execute).toHaveBeenCalledOnce()
+    expect(f.repository.humanRequests('approval', false)).toHaveLength(1)
   })
 
   it('rejects denial, fake approval, changed arguments and revoked grants before any side effect', async () => {
@@ -105,7 +108,7 @@ describe('one-shot, explicitly reviewed host shell', () => {
     changing.command += ' '
     f.gate.decide(f.gate.pending()[0]!.id, 'allow')
     await expect(pending).resolves.toMatchObject({ item: { isError: true, output: { code: 'approval_request_changed' } } })
-    const revokedContext = { ...f.context, validateExecutionGrant: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValue(new Error('revoked')) }
+    const revokedContext = { ...f.context, validateExecutionGrant: vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined).mockRejectedValue(new Error('revoked')) }
     const revoked = await f.run('revoked', f.args, 'allow', revokedContext)
     expect(revoked.item).toMatchObject({ isError: true })
     expect(f.execute).not.toHaveBeenCalled()
@@ -115,10 +118,11 @@ describe('one-shot, explicitly reviewed host shell', () => {
   it('blocks connector proxy commands and never advertises elevation for external tasks', async () => {
     const f = await fixture()
     for (const command of ['dws todo list', 'lark-cli task list', 'curl https://open.larksuite.com/api', 'curl https://oapi.dingtalk.com']) {
-      const result = await f.run(`proxy-${command.length}`, { ...f.args, command })
+      const result = await f.invoke(`proxy-${command.length}`, { ...f.args, command })
       expect(result.item).toMatchObject({ isError: true, output: { code: 'host_shell_connector_proxy_blocked' } })
     }
     expect(f.execute).not.toHaveBeenCalled()
+    expect(f.repository.humanRequests('approval', false)).toHaveLength(0)
     const external = await fixture('帮我处理钉钉待办。')
     expect((await external.host.listTools(external.context)).map(tool => tool.name)).not.toContain('request_host_shell')
     await expect(external.providers[0]!.tools[0]!.execute(external.args, external.context)).rejects.toMatchObject({ code: 'host_shell_scope_blocked' })
@@ -130,7 +134,8 @@ describe('one-shot, explicitly reviewed host shell', () => {
     const result = await f.run('unknown')
     expect(result.item).toMatchObject({ isError: true, output: { status: 'outcome_unknown' } })
     expect(f.repository.operations(f.task.id, 'host_shell')).toMatchObject([{ status: 'outcome_unknown' }])
-    expect((await f.run('unknown-repeat')).item).toMatchObject({ isError: true, output: { status: 'outcome_unknown' } })
+    expect((await f.invoke('unknown-repeat')).item).toMatchObject({ isError: true, output: { status: 'outcome_unknown' } })
+    expect(f.repository.humanRequests('approval', false)).toHaveLength(1)
     expect(f.execute).toHaveBeenCalledOnce()
     f.tasks.endRun('turn')
     const direct = f.providers[0]!.tools[0]!

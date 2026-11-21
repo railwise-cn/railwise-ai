@@ -1113,10 +1113,12 @@ function CopyFeedbackButton({
 
 function UserInputBubble({
   block,
-  nested = false
+  nested = false,
+  replyInComposer = false
 }: {
   block: Extract<ChatBlock, { kind: 'user_input' }>
   nested?: boolean
+  replyInComposer?: boolean
 }): ReactElement {
   const { t } = useTranslation('common')
   const resolveUserInput = useChatStore((s) => s.resolveUserInput)
@@ -1155,6 +1157,16 @@ function UserInputBubble({
   const cancel = (): void => {
     if (!pending) return
     void resolveUserInput(block.id, { kind: 'cancel' })
+  }
+
+  if (replyInComposer && pending && block.questions[0]) {
+    return <div className="flex min-w-0 flex-wrap items-start gap-2 px-1 py-1.5 text-ds-ink">
+      <div className="min-w-0 flex-1 break-words">
+        <p className="text-[13px] font-medium">{block.questions[0].question}</p>
+        <p className="text-xs text-ds-muted">{t('userInputReplyInComposer')}</p>
+      </div>
+      <button type="button" className="rounded-md border border-ds-border px-2.5 py-1 text-xs hover:bg-ds-hover" onClick={cancel}>{t('userInputCancel')}</button>
+    </div>
   }
 
   const statusLabel =
@@ -1469,9 +1481,8 @@ function formatMessageDateTime(input: string, locale: string): string {
   }).format(date)
 }
 
-export function MessageBubble({ block, nested = false, professionalSurface = false, language }: { block: ChatBlock; nested?: boolean; professionalSurface?: boolean; language?: string }): ReactElement {
+export function MessageBubble({ block, nested = false, professionalSurface = false, language, inComposer = false, replyInComposer = false }: { block: ChatBlock; nested?: boolean; professionalSurface?: boolean; language?: string; inComposer?: boolean; replyInComposer?: boolean }): ReactElement {
   const { t, i18n } = useTranslation('common')
-  const resolveApproval = useChatStore((s) => s.resolveApproval)
   const activeThreadId = useChatStore((s) => s.activeThreadId)
   const hideRuntimeBlock = professionalSurface && block.kind !== 'assistant' && block.kind !== 'user'
   // The professional conversation surface renders assistant answers and user
@@ -1545,55 +1556,10 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
     return <ToolEntry key={block.id} block={block} />
   }
   if (block.kind === 'user_input') {
-    return <UserInputBubble block={block} nested={nested} />
+    return <UserInputBubble block={block} nested={nested} replyInComposer={replyInComposer} />
   }
   if (block.kind === 'approval') {
-    const done = block.status !== 'pending'
-    const statusLabel =
-      block.status === 'allowed'
-        ? t('approvalAllowed')
-        : block.status === 'denied'
-          ? t('approvalDenied')
-          : block.status === 'expired'
-            ? t('approvalExpired')
-          : block.status === 'error'
-            ? t('approvalFailed')
-            : t('approvalPending')
-    return (
-      <div
-        className={`rounded-[22px] border px-4 py-4 text-[13px] leading-6 shadow-[0_12px_30px_rgba(86,103,136,0.04)] ${
-          block.status === 'error'
-            ? 'border-red-300/80 bg-red-500/10 dark:border-red-800/60 dark:bg-red-950/35'
-            : 'border-accent/35 bg-[linear-gradient(180deg,rgba(79,124,255,0.08),rgba(79,124,255,0.12))] text-ds-ink'
-        }`}
-      >
-        <div className="font-semibold text-accent">{t('approvalTitle')}</div>
-        <ApprovalOperationDetails summary={block.summary} toolName={block.toolName} />
-        {block.errorMessage ? (
-          <p className="mt-2 text-[12px] text-red-700 dark:text-red-300">{block.errorMessage}</p>
-        ) : null}
-        {!done ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-emerald-700"
-              onClick={() => void resolveApproval(block.id, 'allow')}
-            >
-              {t('approvalAllow')}
-            </button>
-            <button
-              type="button"
-              className="rounded-lg border border-ds-border bg-ds-card px-3 py-1.5 text-[13px] font-medium text-ds-ink hover:bg-ds-hover"
-              onClick={() => void resolveApproval(block.id, 'deny')}
-            >
-              {t('approvalDeny')}
-            </button>
-          </div>
-        ) : (
-          <p className="mt-2 text-[12px] font-medium text-ds-muted">{statusLabel}</p>
-        )}
-      </div>
-    )
+    return <ApprovalBubble block={block} inComposer={inComposer} />
   }
   if (block.kind === 'compaction') {
     return (
@@ -1628,6 +1594,46 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
     )
   }
   return <></>
+}
+
+const approvalLabels = {
+  pending: 'approvalPending', allowed: 'approvalAllowed', denied: 'approvalDenied',
+  expired: 'approvalExpired', error: 'approvalFailed'
+} as const
+
+function ApprovalBubble({ block, inComposer }: { block: Extract<ChatBlock, { kind: 'approval' }>; inComposer: boolean }): ReactElement {
+  const { t } = useTranslation('common')
+  const resolveApproval = useChatStore(state => state.resolveApproval)
+  const runtimeConnection = useChatStore(state => state.runtimeConnection)
+  const inFlight = useRef(false)
+  const [submitting, setSubmitting] = useState(false)
+  const submit = async (decision: 'allow' | 'deny'): Promise<void> => {
+    if (inFlight.current || runtimeConnection !== 'ready' || block.status !== 'pending') return
+    inFlight.current = true
+    setSubmitting(true)
+    try { await resolveApproval(block.id, decision) } finally {
+      inFlight.current = false
+      setSubmitting(false)
+    }
+  }
+  return (
+    <div className={inComposer ? 'min-w-0 px-1 py-1.5 text-ds-ink' : 'min-w-0 rounded-2xl border border-ds-border bg-ds-card px-4 py-3 text-ds-ink'}>
+      <div className="text-[13px] font-semibold">{t('approvalTitle')}</div>
+      <ApprovalOperationDetails summary={block.summary} toolName={block.toolName} />
+      {block.errorMessage ? <p role="status" className="mt-2 text-xs text-ds-muted">{block.errorMessage}</p> : null}
+      {block.status === 'pending' ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button type="button" disabled={submitting || runtimeConnection !== 'ready'}
+            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            onClick={() => void submit('allow')}>{t('approvalAllow')}</button>
+          <button type="button" disabled={submitting || runtimeConnection !== 'ready'}
+            className="rounded-lg border border-ds-border px-3 py-1.5 text-xs font-medium hover:bg-ds-hover disabled:opacity-50"
+            onClick={() => void submit('deny')}>{t('approvalDeny')}</button>
+          {submitting ? <span role="status" className="text-xs text-ds-muted">{t('approvalSubmitting')}</span> : null}
+        </div>
+      ) : <p className="mt-2 text-xs text-ds-muted">{t(approvalLabels[block.status])}</p>}
+    </div>
+  )
 }
 
 function ToolEntry({ block }: { block: ToolBlock }): ReactElement {
