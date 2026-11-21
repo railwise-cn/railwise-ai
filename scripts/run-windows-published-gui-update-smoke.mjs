@@ -355,7 +355,7 @@ async function main(args) {
       const runtimePid = await waitUntil(() => {
         const pids = JSON.parse(powershell(`
           $processes = @(Get-CimInstance Win32_Process -Filter 'ParentProcessId = ${child.pid}' |
-            Where-Object { $_.ExecutablePath -eq ${psQuote(executable)} -and $_.CommandLine -match '\\sserve(?:\\s|$)' } |
+            Where-Object { $_.ExecutablePath -eq ${psQuote(executable)} -and $_.CommandLine -match 'serve-entry\\.js"?(?:\\s|$)' } |
             ForEach-Object { [int]$_.ProcessId })
           ConvertTo-Json -InputObject $processes -Compress
         `))
