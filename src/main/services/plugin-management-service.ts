@@ -38,6 +38,7 @@ import { materializePypiPackage } from './pypi-package-materializer'
 import { readCatalogLicenseEvidence } from './package-license-evidence'
 import { describeNetworkFailure, systemFetch } from './system-network'
 import { parseCatalogPackageArtifact } from './marketplace-catalog-service'
+import { MarketplaceInstallError } from '../../shared/marketplace-install-errors'
 import { materializeMarketplaceMirror, mirrorRecordFor } from './marketplace-mirror'
 import { curateVideoShotcraftMirror } from './video-shotcraft-distribution'
 import {
@@ -284,9 +285,9 @@ export class PluginManagementService {
     await this.cleanupExpired()
     const preparedId = requiredString(request.preparedId, 'Prepared plugin ID')
     const current = this.prepared.get(preparedId)
-    if (!current) throw new Error('Prepared plugin import was not found or has expired.')
+    if (!current) throw new MarketplaceInstallError('review-expired', 'Prepared plugin import was not found or has expired.')
     if (request.reviewSha256.toLowerCase() !== current.value.reviewSha256) {
-      throw new Error('Prepared plugin review changed; review the package again before installation.')
+      throw new MarketplaceInstallError('review-expired', 'Prepared plugin review changed; review the package again before installation.')
     }
     const installed = await installPreparedPluginPackage(
       this.installationService,
@@ -298,7 +299,9 @@ export class PluginManagementService {
         permissions: request.permissions,
         idempotencyKey: request.idempotencyKey
       }
-    )
+    ).catch(error => {
+      throw new MarketplaceInstallError('install-failed', error instanceof Error ? error.message : String(error), error)
+    })
     try {
       await afterInstall?.(installed, clone(current.value.package))
     } catch (error) {
@@ -861,7 +864,7 @@ export async function materializeCatalogPackage(
   if (await exists(targetDirectory)) throw new Error('Catalog package staging directory already exists.')
   if (item.installation?.mode === 'direct-mirror' && item.source.catalogSourceId === 'workwise-official') {
     const record = mirrorRecordFor(item)
-    if (!record) throw new Error('当前版本没有此插件的睿威官方镜像，请检查应用更新。')
+    if (!record) throw new MarketplaceInstallError('package-unavailable', '当前版本没有此插件的睿威官方镜像，请检查应用更新。')
     await materializeMarketplaceMirror(item, record, targetDirectory)
     return
   }

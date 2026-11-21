@@ -472,6 +472,43 @@ describe('registerAppIpcHandlers', () => {
     expect(installGuiUpdate).toHaveBeenCalledTimes(1)
   })
 
+  it('releases a failed Runtime prepare and reads current work before retrying', async () => {
+    let prepared = false
+    const guiUpdateRuntime = {
+      isPrepared: () => prepared,
+      prepare: vi.fn(async () => { prepared = true; throw new Error('Prepare response lost') }),
+      recover: vi.fn(async () => { prepared = false })
+    }
+    const installGuiUpdate = vi.fn(async () => ({ ok: true as const }))
+    const snapshotId = 'b'.repeat(64)
+    const activeWork = [{ kind: 'agent', id: 'task-2', label: '整理资料', status: 'running', recoverable: true }]
+    const runtimeRequest = vi.fn(async () => ({ ok: true, status: 200, body: JSON.stringify({ ok: true, activeWork, snapshotId }) }))
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({
+      guiUpdateRuntime,
+      runtimeRequest: runtimeRequest as never,
+      loadGuiUpdaterModule: vi.fn(async () => ({ installGuiUpdate, getGuiUpdateState: () => ({ status: 'downloaded' }) })) as never
+    }))
+
+    await expect(handlers.get('gui:update-install')?.({}, { confirmActiveWork: true, confirmedSnapshotId: snapshotId })).resolves.toMatchObject({ ok: false, message: 'Prepare response lost' })
+    expect(guiUpdateRuntime.recover).toHaveBeenCalledOnce()
+    expect(installGuiUpdate).not.toHaveBeenCalled()
+    await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toMatchObject({ ok: true, activeWork, snapshotId })
+  })
+
+  it('reports an idle desktop update without implicitly starting a task service', async () => {
+    const runtimeRequest = vi.fn()
+    const readSnapshot = vi.fn(async () => undefined)
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({
+      runtimeRequest,
+      guiUpdateRuntime: { isPrepared: () => false, readSnapshot, prepare: vi.fn(), recover: vi.fn() }
+    }))
+    await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toEqual({ ok: true, activeWork: [] })
+    expect(readSnapshot).toHaveBeenCalledOnce()
+    expect(runtimeRequest).not.toHaveBeenCalled()
+  })
+
   it('rejects renderer-supplied paths at the task artifact opening boundary', async () => {
     const runtimeRequest = vi.fn()
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
@@ -1602,7 +1639,7 @@ describe('registerAppIpcHandlers', () => {
     await expect(handlers.get('plugin:update-permissions')?.({}, {
       packageId: item.id, expectedCurrentVersion: item.version, reviewSha256: 'a'.repeat(64),
       permissions: [{ permissionId: 'network-connect', decision: 'denied' }], idempotencyKey: 'revoke-with-skill-refresh-error'
-    })).rejects.toThrow('Skill refresh failed')
+    })).rejects.toThrow('[marketplace:refresh-failed] The package was saved')
     expect(onMcpServersChanged).toHaveBeenCalledTimes(3)
     expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ config: expect.objectContaining({ enabled: false }) }))
   })

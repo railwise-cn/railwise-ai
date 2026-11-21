@@ -9,7 +9,7 @@ import { pipeline } from 'node:stream/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
-import { inspectInstalledPackage, inspectInstaller, installIdentity } from './verify-windows-install-smoke.mjs'
+import { inspectInstalledPackage, inspectInstaller, installIdentity, psQuote } from './verify-windows-install-smoke.mjs'
 import { connectCdp, summarizeWindowsUpdateMetadata, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 
 const baseVersion = '0.5.6'
@@ -18,23 +18,52 @@ const baseSource = 'ce5b00cc41c3a53144144c85ecc772efe5872718'
 const targetAsar = 'd0b02f0cf4ff19c7891a1722706932d10c33ee77f3b03c53f3fdd3ab3998ce3a'
 const targetInstallerSha512 = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const officialFeed = 'https://www.railwise.cn/downloads/railwise-ai/channels/stable/latest/'
+const retailLegacyFeed = 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/'
 const baselines = JSON.parse(await readFile(new URL('../release/updater-acceptance-baselines.json', import.meta.url), 'utf8'))
 const releaseGate = JSON.parse(await readFile(new URL('../docs/qa/release-gates/v0.5.7.json', import.meta.url), 'utf8'))
 const baseline = baselines.versions[baseVersion]['win32-x64']
 const reviewedBuild = releaseGate.package.reviewedBuild
 const target = reviewedBuild.files.find(file => file.name === `RailWise-AI-${targetVersion}-win-x64.exe`)
 const rootIdentity = installIdentity(baseVersion, baseSource)
-const targetIdentity = installIdentity(targetVersion, reviewedBuild.sourceHead)
 const pathEquals = (one, other) => resolve(one).toLowerCase() === resolve(other).toLowerCase()
 const hourMs = 60 * 60 * 1000
-export const sidebarUpgradeControlSelector =
-  `button[title^="升级到 ${targetVersion}，"], button[title^="Update to ${targetVersion},"]`
+const historicalScenario = 'released-056-to-057'
+const upgradeScenarios = Object.freeze({
+  [historicalScenario]: {
+    baseVersion, baseSource, baseline, targetVersion, target, targetAsar, targetInstallerSha512,
+    targetSource: reviewedBuild.sourceHead, feed: officialFeed
+  },
+  'released-057-to-059': {
+    baseVersion: '0.5.7', baseSource: reviewedBuild.sourceHead, baseline: target,
+    feed: retailLegacyFeed,
+    targetVersion: '0.5.9', targetSource: '389ee737a62cf4b889d5cb1958402e84911c5725',
+    targetAsar: 'a90bca9b4fb10a43e1ae23b4a5a43d343656138e8ab9969256b9e2c08fca9d58',
+    targetInstallerSha512: 'MuU84Ysjr5iFad2JGhtHWWxVYU095Fkioid7kpddVr5csS9Z9QklrY9P5/MSJgk1qLc9kgY+HQGdcBRP0ia1DQ==',
+    target: {
+      name: 'RailWise-AI-0.5.9-win-x64.exe', size: 320871735,
+      sha256: '7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c'
+    }
+  }
+})
+
+function publishedScenario(name = historicalScenario) {
+  assert.ok(Object.hasOwn(upgradeScenarios, name), 'Unsupported published Windows upgrade scenario')
+  return upgradeScenarios[name]
+}
+
+export function sidebarUpgradeSelector(scenario) {
+  const { targetVersion } = publishedScenario(scenario)
+  return `button[title^="升级到 ${targetVersion}，"], button[title^="Update to ${targetVersion},"]`
+}
+
+export const sidebarUpgradeControlSelector = sidebarUpgradeSelector()
 
 export function repairedScheduleSeed(nowMs) {
   return { appVersion: baseVersion, lastCheckedAt: new Date(nowMs - hourMs).toISOString() }
 }
 
-export function verifyPublishedWindowsManifest(manifest) {
+export function verifyPublishedWindowsManifest(manifest, scenario) {
+  const { targetVersion, targetInstallerSha512, target } = publishedScenario(scenario)
   assert.equal(manifest.version, targetVersion, 'The current Stable feed must match the pinned target')
   assert.equal(manifest.path, target.name)
   assert.equal(manifest.sha512, targetInstallerSha512)
@@ -46,8 +75,11 @@ export function verifyPublishedWindowsManifest(manifest) {
 }
 
 export function assertPublishedWindowsUpgrade(report) {
+  const { baseline, baseVersion, baseSource, targetVersion, targetAsar, targetSource, feed } = publishedScenario(report.scenario)
+  const targetIdentity = installIdentity(targetVersion, targetSource)
   assert.equal(report.baseline?.package?.version, baseVersion)
   if (report.scope === 'private-repaired-windows-gui-upgrade') {
+    assert.ok(!report.scenario || report.scenario === historicalScenario, 'Private baseline cannot stand in for the released 0.5.7 scenario')
     assert.ok(/^[a-f0-9]{40}$/.test(report.provenance?.driverSourceHead ?? ''))
     assert.equal(report.baseline.package.sourceHead, report.provenance.driverSourceHead)
     assert.match(report.baseline?.installer?.sha256 ?? '', /^[a-f0-9]{64}$/)
@@ -60,6 +92,16 @@ export function assertPublishedWindowsUpgrade(report) {
   } else {
     assert.equal(report.scope, 'published-windows-gui-upgrade')
     assert.equal(report.baseline?.installer?.sha256, baseline.sha256)
+  }
+  if (report.scenario === 'released-057-to-059') {
+    assert.equal(report.baseline.package.sourceHead, baseSource)
+    assert.equal(report.baseline.packagedFeed, feed)
+    assert.equal(report.officialFeed, feed)
+    assert.equal(report.baseline.runtime?.authenticatedRead, true)
+    assert.ok(report.baseline.runtime?.pid > 0 && report.baseline.runtime.pid !== report.baseline.pid)
+    assert.equal(report.target?.package?.sourceHead, targetSource)
+    assert.equal(report.directTargetInstallerLaunches, 0)
+    assert.equal(report.applicationUpdaterOverrides, 0)
   }
   assert.equal(report.offer?.status, 'available')
   assert.equal(report.offer?.hasUpdate, true)
@@ -78,7 +120,7 @@ export function assertPublishedWindowsUpgrade(report) {
   assert.equal(report.profile?.sentinelPreserved, true)
 }
 
-export const psQuote = value => "'" + value.replaceAll("'", "''") + "'"
+export { psQuote }
 export function powershell(script, timeout = 12_000) {
   return execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', script], {
     encoding: 'utf8', maxBuffer: 128 * 1024, timeout, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']
@@ -141,22 +183,28 @@ export async function waitUntil(read, label, timeout, interval = 250) {
 }
 
 export async function sha256(path) {
-  const digest = createHash('sha256')
-  for await (const bytes of createReadStream(path)) digest.update(bytes)
-  return digest.digest('hex')
+  return hashFile(path, 'sha256', 'hex')
 }
 
-async function downloadBaseline(directory) {
-  const url = `https://github.com/railwise-cn/railwise-ai/releases/download/v${baseVersion}/${baseline.name}`
-  const path = join(directory, baseline.name)
+async function hashFile(path, algorithm, encoding) {
+  const digest = createHash(algorithm)
+  for await (const bytes of createReadStream(path)) digest.update(bytes)
+  return digest.digest(encoding)
+}
+
+async function downloadReleasedInstaller(directory, version, installer, { sha512, feed } = {}) {
+  const url = feed ? new URL(installer.name, feed).href :
+    `https://github.com/railwise-cn/railwise-ai/releases/download/v${version}/${installer.name}`
+  const path = join(directory, installer.name)
   const response = await fetch(url, { signal: AbortSignal.timeout(300_000) })
-  assert.ok(response.ok && response.body, `Baseline installer download returned HTTP ${response.status}`)
+  assert.ok(response.ok && response.body, `Released ${version} installer download returned HTTP ${response.status}`)
   await pipeline(Readable.fromWeb(response.body), createWriteStream(path, { flags: 'wx' }))
   const info = await lstat(path)
   const digest = await sha256(path)
-  assert.equal(info.size, baseline.size)
-  assert.equal(digest, baseline.sha256)
-  return { path, name: baseline.name, url, size: info.size, sha256: digest }
+  assert.equal(info.size, installer.size)
+  assert.equal(digest, installer.sha256)
+  if (sha512) assert.equal(await hashFile(path, 'sha512', 'base64'), sha512)
+  return { path, name: installer.name, url, size: info.size, sha256: digest }
 }
 
 export async function attachPackagedRenderer(child, executable, devtoolsPort) {
@@ -192,6 +240,50 @@ export function installExactNsis(installerPath, directory) {
   assert.equal(Number(exitCode), 0, 'Windows installer exit code')
 }
 
+function launchPackagedApp(executable, cwd, env, customProfile) {
+  const args = ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN']
+  if (customProfile) args.unshift(`--user-data-dir=${customProfile}`)
+  const child = spawn(executable, args, { env, cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+  let devtoolsPort, launchError
+  let output = ''
+  child.once('error', error => { launchError = error })
+  for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => {
+    output = (output + chunk).slice(-8_000)
+    devtoolsPort ??= output.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1]
+  })
+  const renderer = attachPackagedRenderer(child, executable, async () => {
+    if (launchError) throw launchError
+    if (!devtoolsPort && customProfile) {
+      const portFile = await readFile(join(customProfile, 'DevToolsActivePort'), 'utf8').catch(() => '')
+      const port = portFile.split(/\r?\n/)[0]
+      if (/^\d+$/.test(port)) devtoolsPort = port
+    }
+    return devtoolsPort
+  })
+  return { child, renderer }
+}
+
+async function closeOwnedApp(executable) {
+  for (const { pid } of windowsForExecutable(executable)) powershell(`
+    $process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
+    if ($process.Path -eq ${psQuote(executable)} -and $process.MainWindowHandle -ne 0) { $null = $process.CloseMainWindow() }
+  `)
+  await waitUntil(() => powershell(`
+    $running = @(Get-Process -ErrorAction SilentlyContinue | Where-Object Path -eq ${psQuote(executable)})
+    $running.Count
+  `) === '0', 'the original installed application to close', 60_000)
+}
+
+function authenticodeStatus(path) {
+  const status = powershell(`(Get-AuthenticodeSignature -LiteralPath ${psQuote(path)}).Status`)
+  assert.ok(['Valid', 'NotSigned'].includes(status), `Unexpected Authenticode status ${status}`)
+  return status
+}
+
+export function legacyUpdaterReason(message) {
+  if (message === 'Runtime 未正常退出，更新已停止。请检查日志后重试。') return 'runtime-not-cleanly-exited'
+}
+
 async function main(args) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && process.env.GITHUB_ACTIONS === 'true' &&
     process.env.RUNNER_ENVIRONMENT === 'github-hosted' && process.env.RUNNER_OS === 'Windows',
@@ -199,13 +291,21 @@ async function main(args) {
   const marketplace = args.length === 1 && args[0] === '--repaired-marketplace'
   const repaired = marketplace || (args.length === 1 && args[0] === '--repaired-baseline')
   assert.ok(!args.length || repaired, 'Unsupported Windows package smoke arguments')
+  const scenario = process.env.PUBLISHED_GUI_UPGRADE_SCENARIO || historicalScenario
+  const verifyOverlay = process.env.PUBLISHED_GUI_VERIFY_OVERLAY === 'true'
+  assert.ok(!repaired || scenario === historicalScenario, 'The newer published scenario requires the original retail baseline')
+  assert.ok(!verifyOverlay || scenario === 'released-057-to-059', 'The repair check requires the original 0.5.7 scenario')
+  const selected = publishedScenario(scenario)
+  const { baseVersion, baseSource, targetVersion, targetSource, feed } = selected
+  const rootIdentity = installIdentity(baseVersion, baseSource)
+  const targetIdentity = installIdentity(targetVersion, targetSource)
   const evidenceDir = join(process.env.RUNNER_TEMP, 'published-windows-gui-upgrade-evidence')
   await mkdir(evidenceDir)
   const scope = marketplace ? 'private-windows-npm-marketplace' : repaired ? 'private-repaired-windows-gui-upgrade' : 'published-windows-gui-upgrade'
   const report = { schemaVersion: 1, scope, status: 'running',
     provenance: { driverSourceHead: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT },
-    baseVersion, targetVersion, phase: 'preflight', baseline: {},
-    officialFeed, directTargetInstallerLaunches: 0, applicationUpdaterOverrides: 0 }
+    scenario, baseVersion, targetVersion, phase: 'preflight', baseline: {},
+    officialFeed: feed, directTargetInstallerLaunches: 0, applicationUpdaterOverrides: 0 }
   const save = () => writeFile(join(evidenceDir, marketplace ? 'windows-npm-marketplace.json' : 'windows-published-gui-upgrade.json'), JSON.stringify(report, null, 2) + '\n')
   const capture = async (cdp, filename) => {
     const image = await cdp.send('Page.captureScreenshot', { format: 'png' })
@@ -213,6 +313,7 @@ async function main(args) {
   }
   let cdp
   let child
+  let recoverUsingExactInstaller
   try {
     await save()
     assert.deepEqual(registryState(), [], 'An existing public installation was found')
@@ -226,11 +327,11 @@ async function main(args) {
       assert.equal(present, false, 'An existing RailWise profile was found')
     }
     if (!marketplace) {
-      const response = await fetch(new URL('latest.yml', officialFeed), {
+      const response = await fetch(new URL('latest.yml', feed), {
         cache: 'no-store', signal: AbortSignal.timeout(30_000)
       })
       assert.ok(response.ok, `Current Stable feed returned HTTP ${response.status}`)
-      report.manifest = verifyPublishedWindowsManifest(parse(await response.text()))
+      report.manifest = verifyPublishedWindowsManifest(parse(await response.text()), scenario)
     }
     const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'railwise-published-gui-upgrade-'))
     const directory = join(root, 'install')
@@ -239,7 +340,7 @@ async function main(args) {
     const baselineIdentity = repaired ? installIdentity(baseVersion, process.env.GITHUB_SHA) : rootIdentity
     report.baseline.installer = repaired
       ? inspectInstaller(join(process.env.RUNNER_TEMP, 'repaired-updater-baseline', baselineIdentity.installerName), baselineIdentity)
-      : await downloadBaseline(root)
+      : await downloadReleasedInstaller(root, baseVersion, selected.baseline)
     await save()
     installExactNsis(report.baseline.installer.path, directory)
     report.baseline.executable = executable
@@ -248,6 +349,7 @@ async function main(args) {
     const appUpdate = parse(await readFile(join(directory, 'resources', 'app-update.yml'), 'utf8'))
     assert.equal(appUpdate.provider, 'generic')
     assert.match(appUpdate.url, /^https:\/\/www\.railwise\.cn\/downloads\/(?:railwise-ai|workwise)\/channels\/stable\/latest\/?$/)
+    if (scenario === 'released-057-to-059') assert.equal(appUpdate.url, feed)
     report.baseline.packagedFeed = appUpdate.url
     report.phase = 'baseline-renderer'
     let cleanEnvironment = { ...process.env }
@@ -263,8 +365,7 @@ async function main(args) {
       report.schedule = { seededAt: new Date(seededAt).toISOString(), seededRecord }
       await save()
     }
-    const chromeArgs = ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--lang=zh-CN']
-    const workspace = join(root, '工程 插件验收')
+    const workspace = join(root, verifyOverlay ? '工程 升级验收' : '工程 插件验收')
     const marketplaceProfile = join(root, 'marketplace-profile')
     if (marketplace) {
       cleanEnvironment = windowsUiEnvironment(cleanEnvironment, root)
@@ -275,29 +376,40 @@ async function main(args) {
         appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
         agents: { kun: { autoStart: true, dataDir: join(root, 'runtime') } }
       }) + '\n', { flag: 'wx' })
-      chromeArgs.unshift(`--user-data-dir=${marketplaceProfile}`)
     }
-    child = spawn(executable, chromeArgs, { env: cleanEnvironment, cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
-    let devtoolsPort
-    let output = ''
-    let launchError
-    child.once('error', error => { launchError = error })
-    for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => {
-      output = (output + chunk).slice(-8_000)
-      devtoolsPort ??= output.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1]
-    })
-    cdp = await attachPackagedRenderer(child, executable, async () => {
-      if (launchError) throw launchError
-      if (!devtoolsPort && marketplace) {
-        const portFile = await readFile(join(marketplaceProfile, 'DevToolsActivePort'), 'utf8').catch(() => '')
-        const port = portFile.split(/\r?\n/)[0]
-        if (/^\d+$/.test(port)) devtoolsPort = port
-      }
-      return devtoolsPort
-    })
+    if (verifyOverlay) {
+      await mkdir(profile)
+      await mkdir(workspace)
+      await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({
+        schema: 'workwise.settings', version: 2, revision: 0, locale: 'zh', theme: 'light', workspaceRoot: workspace,
+        appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
+        agents: { kun: { autoStart: true, dataDir: join(root, 'runtime') } }
+      }) + '\n', { flag: 'wx' })
+    }
+    const launch = launchPackagedApp(executable, root, cleanEnvironment, marketplace ? marketplaceProfile : undefined)
+    child = launch.child
+    cdp = await launch.renderer
     await cdp.wait('Boolean(window.workwise?.getAppVersion && document.querySelector("button"))', 'baseline workbench')
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
     report.baseline.pid = child.pid
+    if (scenario === 'released-057-to-059') {
+      report.phase = 'baseline-owned-runtime'
+      await save()
+      const health = await cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads', 'GET').then(({ok, status}) => ({ok, status}))`, 90_000)
+      assert.deepEqual(health, { ok: true, status: 200 }, 'The original bundled Runtime must answer an authenticated local read')
+      const runtimePid = await waitUntil(() => {
+        const pids = JSON.parse(powershell(`
+          $processes = @(Get-CimInstance Win32_Process -Filter 'ParentProcessId = ${child.pid}' |
+            Where-Object { $_.ExecutablePath -eq ${psQuote(executable)} -and $_.CommandLine -match 'serve-entry\\.js"?(?:\\s|$)' } |
+            ForEach-Object { [int]$_.ProcessId })
+          ConvertTo-Json -InputObject $processes -Compress
+        `))
+        assert.ok(pids.length < 2, 'The installed application must own exactly one bundled Runtime')
+        return pids[0]
+      }, 'the exact installed app’s owned Runtime process', 30_000)
+      report.baseline.runtime = { authenticatedRead: true, pid: runtimePid }
+      await save()
+    }
     if (marketplace) {
       report.phase = 'marketplace-install'
       await save()
@@ -309,7 +421,7 @@ async function main(args) {
       return
     }
     report.phase = 'automatic-offer'
-    const control = sidebarUpgradeControlSelector
+    const control = sidebarUpgradeSelector(scenario)
     const button = await cdp.wait(`(() => {
       const element = document.querySelector(${JSON.stringify(control)})
       if (!element || element.disabled || !element.getClientRects().length) return null
@@ -324,7 +436,7 @@ async function main(args) {
     assert.equal(available.info?.latestVersion, targetVersion)
     assert.equal(available.info?.channel, 'stable')
     assert.equal(available.info?.manualOnly, false)
-    await capture(cdp, 'windows-056-sidebar-upgrade.png')
+    await capture(cdp, `windows-${baseVersion.replaceAll('.', '')}-sidebar-upgrade.png`)
     await save()
 
     // The clean baseline writes its schedule file before making the automatic
@@ -346,6 +458,54 @@ async function main(args) {
     const sentinelValue = `Synthetic updater continuity marker ${randomUUID()}\n`
     await writeFile(sentinel, sentinelValue, { flag: 'wx' })
     report.profile = { directory: activeProfiles[0], sentinelSha256: await sha256(sentinel) }
+    if (verifyOverlay) {
+      assert.ok(pathEquals(activeProfiles[0], profile), 'The old application must use the seeded profile')
+      const thread = await cdp.evaluate(`(async () => {
+        const request = JSON.stringify({workspace: ${JSON.stringify(workspace)}, title: '升级验收会话', model: 'deepseek-flash', mode: 'agent'});
+        const response = await window.workwise.runtimeRequest('/v1/threads','POST',request);
+        if (!response.ok) throw new Error('Could not seed a local KUN conversation');
+        return JSON.parse(response.body).id;
+      })()`)
+      assert.match(thread, /^[A-Za-z0-9_-]+$/, 'Expected a real local conversation identifier')
+      const settingsView = `window.workwise.getSettings().then(({locale, theme, workspaceRoot}) => ({locale, theme, workspaceRoot}))`
+      const before = await cdp.evaluate(settingsView)
+      assert.equal(before.locale, 'zh')
+      assert.equal(before.theme, 'light')
+      assert.ok(pathEquals(before.workspaceRoot, workspace))
+      recoverUsingExactInstaller = async recovery => {
+        recovery.registryBefore = ownedInstallState(directory, baseVersion)
+        assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
+        recovery.installer = await downloadReleasedInstaller(root, targetVersion, selected.target, {
+          sha512: selected.targetInstallerSha512, feed
+        })
+        recovery.installer.authenticode = authenticodeStatus(recovery.installer.path)
+        await closeOwnedApp(executable)
+        cdp.close()
+        report.directTargetInstallerLaunches++
+        installExactNsis(recovery.installer.path, directory)
+        recovery.package = inspectInstalledPackage(directory, targetIdentity)
+        assert.equal(recovery.package.asarSha256, selected.targetAsar)
+        recovery.package.authenticode = authenticodeStatus(executable)
+        recovery.registry = ownedInstallState(directory, targetVersion)
+        const replacement = launchPackagedApp(executable, root, cleanEnvironment)
+        child = replacement.child
+        cdp = await replacement.renderer
+        await cdp.wait('Boolean(window.workwise?.getAppVersion && document.querySelector("button"))', 'repaired application window')
+        recovery.appVersion = await cdp.evaluate('window.workwise.getAppVersion()')
+        assert.equal(recovery.appVersion, targetVersion)
+        await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(response => response.ok)`, 'repaired KUN service')
+        const after = await cdp.evaluate(settingsView)
+        recovery.persistedSettings = { workspace: pathEquals(after.workspaceRoot, before.workspaceRoot),
+          locale: after.locale === before.locale, theme: after.theme === before.theme }
+        recovery.profilePreserved = await readFile(sentinel, 'utf8') === sentinelValue
+        recovery.threadPreserved = await cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads/${thread}','GET').then(response =>
+          response.ok && JSON.parse(response.body).id === ${JSON.stringify(thread)})`)
+        assert.deepEqual(recovery.persistedSettings, { workspace: true, locale: true, theme: true })
+        assert.equal(recovery.profilePreserved, true)
+        assert.equal(recovery.threadPreserved, true)
+        await capture(cdp, 'windows-exact-installer-overlay.png')
+      }
+    }
 
     report.phase = 'sidebar-upgrade'
     await cdp.click(control)
@@ -357,8 +517,16 @@ async function main(args) {
         const state = await cdp.evaluate('window.workwise.getGuiUpdateState()', 3_000).catch(() => null)
         if (state?.status && report.updaterStates.at(-1) !== state.status) report.updaterStates.push(state.status)
         if (state?.status === 'error') {
-          report.lastUpdateState = { status: state.status, ...summarizeWindowsUpdateMetadata({ ...state.info, ok: false, code: state.code, message: state.message }) }
+          report.lastUpdateState = { status: state.status, ...summarizeWindowsUpdateMetadata({ ...state.info, ok: false, code: state.code, message: state.message }),
+            reason: legacyUpdaterReason(state.message) }
           throw new Error('The packaged updater reported a failure after the sidebar click')
+        }
+        if (scenario === 'released-057-to-059') {
+          const sidebarError = await cdp.evaluate(`document.querySelector(${JSON.stringify(control)})?.parentElement?.querySelector('[role="alert"]')?.textContent?.trim() || null`, 3_000).catch(() => null)
+          if (sidebarError) {
+            report.sidebarError = sidebarError.slice(0, 500)
+            throw new Error('The packaged sidebar displayed a failure after the upgrade click')
+          }
         }
         return null
       }
@@ -380,6 +548,18 @@ async function main(args) {
       const state = await cdp.evaluate('window.workwise.getGuiUpdateState()', 3_000).catch(() => null)
       if (state && !report.lastUpdateState) report.lastUpdateState = { status: state.status, ...summarizeWindowsUpdateMetadata(state.info ?? state) }
       await capture(cdp, marketplace ? 'windows-marketplace-failure.png' : 'windows-published-upgrade-failure.png').catch(() => undefined)
+    }
+    if (recoverUsingExactInstaller && report.action && (report.lastUpdateState?.status === 'error' || report.sidebarError)) {
+      const recovery = { method: 'exact-official-installer-overlay', status: 'running' }
+      report.overlayRecovery = recovery
+      await save()
+      try {
+        await recoverUsingExactInstaller(recovery)
+        recovery.status = 'passed'
+      } catch (repairError) {
+        recovery.status = 'failed'
+        recovery.failure = repairError instanceof Error ? repairError.message.split(/\r?\n/, 1)[0] : 'Unexpected overlay failure'
+      }
     }
     throw error
   } finally {

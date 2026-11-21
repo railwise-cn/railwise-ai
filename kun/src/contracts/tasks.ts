@@ -2,11 +2,22 @@ import { BrowserPublicQueryRecoveryBindingSchema } from './browser-public-query-
 import { z } from 'zod'
 import { TaskApprovalGrantSchema } from './permissions.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
-import { CallableCapabilityReferencesSchema } from './callable-capabilities.js'
+import { CallableCapabilityReferencesSchema, SkillSelectionsSchema } from './callable-capabilities.js'
 import type { ContextBundle, HandoffPacket } from './task-context.js'
 import { ResultEvidenceSchema } from './harness.js'
 import { ScheduleRequirementSchema } from './schedule.js'
 import { BrowserExecutionScope } from './browser-skill.js'
+
+export const TaskBlockCodeSchema = z.enum([
+  'response_interrupted', 'outcome_unknown', 'approval_expired', 'tool_repeated_failure', 'execution_failed'
+])
+
+export type TaskUserPresentation = {
+  reason: z.infer<typeof TaskBlockCodeSchema> | 'execution_budget' | 'input_required' | 'approval_required'
+    | 'approval_host_shell' | 'approval_browser' | 'paused' | 'retrying' | 'stalled' | 'queued' | 'blocked'
+  actions: Array<'answer' | 'approve' | 'deny' | 'verify' | 'resume' | 'retry' | 'supplement' | 'extend_budget' | 'open_thread'>
+  scope?: 'host' | 'browser' | 'unknown'
+}
 
 export const TaskRunStatusSchema = z.enum([
   'queued',
@@ -152,6 +163,7 @@ export const TaskInputSchema = z.object({
   ,attachmentIds: z.array(z.string().min(1)).max(32).optional()
   ,workspaceReferences: z.array(WorkspaceReferenceSchema).max(32).optional()
   ,capabilityReferences: CallableCapabilityReferencesSchema.optional()
+  ,skillSelections: SkillSelectionsSchema.optional()
 })
 export type TaskInput = z.infer<typeof TaskInputSchema>
 
@@ -238,6 +250,7 @@ export const TaskRunSchema = z.object({
   artifacts: z.array(TaskArtifactSchema),
   finalResponse: z.string().optional(),
   resultEvidence: z.array(ResultEvidenceSchema).optional(),
+  blockCode: TaskBlockCodeSchema.optional(),
   stalledReason: z.string().optional(),
   waitingReason: z.string().optional(),
   createdAt: z.string().min(1),

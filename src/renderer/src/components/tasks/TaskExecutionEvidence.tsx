@@ -8,8 +8,9 @@ function dateLabel(value: string): string {
   return Number.isFinite(date.getTime()) ? date.toLocaleString() : value
 }
 
-export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, onConfirmBrowser, onConfigureProvider, onConfigureReplyDelivery }: {
+export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, onConfirmBrowser, onConfigureProvider, onConfigureReplyDelivery, compact = false }: {
   task: TaskRunV1
+  compact?: boolean
   relatedTasks: TaskRunV1[]
   receipts: TaskOperationReceiptV1[]
   onVerify?: (receipt: TaskOperationReceiptV1) => Promise<TaskOperationVerificationV1>
@@ -82,15 +83,29 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
       {item.targetVersion ? <div><dt className="inline font-medium">{t('taskEffectTargetVersion')}: </dt><dd className="inline">{item.targetVersion}</dd></div> : null}
     </dl>
   </details>
-  return <>{browser.length ? <section aria-label={t('taskBrowserEvidence')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3"><h3 className="text-xs font-semibold">{t('taskBrowserEvidence')}</h3><ul className="mt-2 space-y-2">{browser.map(receipt => <BrowserOperationEvidence key={receipt.id} receipt={receipt} ended={['completed', 'failed', 'cancelled'].includes(relatedTasks.find(item => item.id === receipt.taskId)?.status ?? task.status)} onVerify={onVerify} onConfirm={onConfirmBrowser} onConfigure={onConfigureProvider ? () => onConfigureProvider('browser-skill') : undefined} />)}</ul></section> : null}{hostShell.length ? <section aria-label={t('taskHostShellEvidence')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
-    <h3 className="text-xs font-semibold">{t('taskHostShellEvidence')}</h3>
-    <ul className="mt-2 space-y-2">{hostShell.map(receipt => <li key={receipt.id} className="rounded-lg bg-ds-main p-2 text-xs">
-      <p className={receipt.status === 'failed' ? 'text-red-700 dark:text-red-300' : 'text-ds-muted'}>{t(receipt.status === 'succeeded' && receipt.shell?.exitCode === 0 ? 'taskHostShellSucceeded' : `taskReceiptStatus_${receipt.status}`)}{receipt.shell?.exitCode !== undefined ? ` · ${t('taskHostShellExitCode')} ${receipt.shell.exitCode}` : ''}</p>
-      {messages[receipt.id] || receipt.shell?.message ? <p role="status" className="mt-1 text-ds-muted">{messages[receipt.id] || receipt.shell?.message}</p> : null}
-      {onVerify && ['running', 'outcome_unknown', 'prepared'].includes(receipt.status) ? <button type="button" disabled={verifying !== null} onClick={() => { pollAttempts.current.set(receipt.id, 0); void verify(receipt) }} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t(verifying === receipt.id ? 'taskEffectVerifying' : 'taskHostShellReadback')}</button> : null}
-      <details className="mt-2 text-ds-muted"><summary className="cursor-pointer">{t('taskEffectReceiptDetails')}</summary><p className="mt-1 break-all">{receipt.id}</p>{receipt.shell?.outputSha256 ? <p className="break-all">SHA256 {receipt.shell.outputSha256}</p> : null}</details>
-    </li>)}</ul>
-  </section> : null}{requiresEffects || evidence.length || effects.length ? <section aria-label={t(sectionTitle)} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
+  const review = compact ? hostShell.filter(receipt => onVerify && (receipt.status === 'outcome_unknown' ||
+      (['stalled', 'waiting_user'].includes(task.status) && ['running', 'prepared'].includes(receipt.status)))) : []
+  const history = hostShell.length ?  <section aria-label={t('taskHostShellEvidence')} className="rounded-xl border border-ds-border bg-ds-card p-3 text-ds-muted">
+      <h3 className="text-xs font-semibold">{t('taskHostShellEvidence')}</h3>
+      <ul className="mt-2 space-y-2">{hostShell.map(receipt => <li key={receipt.id} className="rounded-lg bg-ds-main p-2 text-xs">
+        <p>{t(receipt.status === 'succeeded' && receipt.shell?.exitCode === 0 ? 'taskHostShellSucceeded' : `taskReceiptStatus_${receipt.status}`)}{receipt.shell?.exitCode !== undefined ? ` · ${t('taskHostShellExitCode')} ${receipt.shell.exitCode}` : ''}</p>
+        {messages[receipt.id] || receipt.shell?.message ? <p role="status" className="mt-1 break-words">{messages[receipt.id] || receipt.shell?.message}</p> : null}
+        {onVerify && !review.includes(receipt) && ['running', 'outcome_unknown', 'prepared'].includes(receipt.status) ? <button type="button" disabled={verifying !== null} onClick={() => { pollAttempts.current.set(receipt.id, 0); void verify(receipt) }} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t(verifying === receipt.id ? 'taskEffectVerifying' : 'taskHostShellReadback')}</button> : null}
+        <details className="mt-2"><summary className="cursor-pointer">{t('taskEffectReceiptDetails')}</summary><p className="mt-1 break-all">{receipt.id}</p>{receipt.shell?.outputSha256 ? <p className="break-all">SHA256 {receipt.shell.outputSha256}</p> : null}</details>
+      </li>)}</ul>
+    </section> : null
+  const hostShellContent = compact && history ? <>
+      {review.length ? <section aria-label={t('taskWorkspaceHostShellReadback')} className="mb-4 rounded-xl border border-ds-border p-3">
+        <p className="text-xs text-ds-muted">{t('taskPresentation_outcome_unknown')}</p>
+        <div className="mt-2 flex flex-wrap gap-2">{review.map(receipt => <button key={receipt.id} type="button" disabled={verifying !== null} onClick={() => { pollAttempts.current.set(receipt.id, 0); void verify(receipt) }} className="rounded-md border border-ds-border px-3 py-1.5 text-xs disabled:opacity-50">{t(verifying === receipt.id ? 'taskEffectVerifying' : 'taskHostShellReadback')}</button>)}</div>
+        {review.some(receipt => messages[receipt.id]) ? <p role="status" className="mt-2 text-xs text-ds-muted">{t('taskWorkspaceHostShellResultUpdated')}</p> : null}
+      </section> : null}
+      <details className="mb-4 text-xs text-ds-muted">
+        <summary className="cursor-pointer">{t('taskWorkspaceHostShellHistory', { count: hostShell.length })}</summary>
+        <div className="mt-2">{history}</div>
+      </details>
+    </> : history
+  return <>{browser.length ? <section aria-label={t('taskBrowserEvidence')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3"><h3 className="text-xs font-semibold">{t('taskBrowserEvidence')}</h3><ul className="mt-2 space-y-2">{browser.map(receipt => <BrowserOperationEvidence key={receipt.id} receipt={receipt} ended={['completed', 'failed', 'cancelled'].includes(relatedTasks.find(item => item.id === receipt.taskId)?.status ?? task.status)} onVerify={onVerify} onConfirm={onConfirmBrowser} onConfigure={onConfigureProvider ? () => onConfigureProvider('browser-skill') : undefined} />)}</ul></section> : null}{hostShellContent}{requiresEffects || evidence.length || effects.length ? <section aria-label={t(sectionTitle)} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
     <h3 className="text-xs font-semibold">{t(sectionTitle)}</h3>
     {effect ? <div className="mt-2 text-xs">
       <p><span className="text-ds-muted">{t('taskEffectProvider')}: </span>{provider(effect.provider)}</p>
@@ -106,7 +121,7 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
     {showEffects ? <><h4 className="mt-3 text-xs font-semibold text-ds-muted">{t('taskEffectReceipts')} ({effects.length})</h4>
     {effects.length ? <ul className="mt-2 space-y-2">{effects.map(receipt => <li key={receipt.id} className="rounded-lg border border-ds-border p-2 text-xs">
       <p className="break-all">{provider(receipt.provider)} · {operation(receipt.operation)} · {receipt.target ? targetLabel(receipt.target) : t('taskEffectTargetPending')}</p>
-      <p className={`mt-1 ${receipt.status === 'failed' ? 'text-red-700 dark:text-red-300' : receipt.status === 'outcome_unknown' && !receipt.resolution ? 'text-amber-700 dark:text-amber-300' : 'text-ds-muted'}`}>{t(receipt.resolution ? 'taskEffectReadbackVerified' : receipt.status === 'succeeded' && receipt.evidence?.verified ? 'taskEffectVerified' : `taskReceiptStatus_${receipt.status}`)} · {dateLabel(receipt.resolution?.resolvedAt ?? receipt.updatedAt)}</p>
+      <p className="mt-1 text-ds-muted">{t(receipt.resolution ? 'taskEffectReadbackVerified' : receipt.status === 'succeeded' && receipt.evidence?.verified ? 'taskEffectVerified' : `taskReceiptStatus_${receipt.status}`)} · {dateLabel(receipt.resolution?.resolvedAt ?? receipt.updatedAt)}</p>
       {receipt.status === 'failed' ? <p className="mt-1 text-ds-muted">{t('taskEffectFailedRetryGuidance')}</p> : null}
       {receipt.status === 'outcome_unknown' && !receipt.resolution ? <>
         <p className="mt-1 text-amber-700 dark:text-amber-300">{t('taskEffectUnknownGuidance')}</p>

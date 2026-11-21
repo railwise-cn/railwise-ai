@@ -14,6 +14,7 @@ export type UpdateSnapshot = { ok: true; activeWork: UpdateActiveWork[]; snapsho
 export class RuntimeUpdateLifecycle {
   private suspended = false
   private preparation?: Promise<void>
+  private cancellation?: Promise<void>
 
   constructor(private readonly dependencies: {
     snapshot: () => UpdateActiveWork[]
@@ -32,6 +33,7 @@ export class RuntimeUpdateLifecycle {
   }
 
   async prepare(confirmedSnapshotId?: string): Promise<UpdateSnapshot> {
+    if (this.cancellation) await this.cancellation
     if (!this.preparation) {
       this.suspended = true
       this.preparation = (async () => {
@@ -63,5 +65,18 @@ export class RuntimeUpdateLifecycle {
       ])
       return this.snapshot()
     } finally { clearTimeout(timer) }
+  }
+
+  cancel(): Promise<void> {
+    if (!this.cancellation) {
+      this.cancellation = (async () => {
+        // Let the existing checkpoint/stop sequence settle before accepting work again.
+        await this.preparation?.catch(() => undefined)
+        if (this.suspended) this.dependencies.resume()
+        this.suspended = false
+        this.preparation = undefined
+      })().finally(() => { this.cancellation = undefined })
+    }
+    return this.cancellation
   }
 }

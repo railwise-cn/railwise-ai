@@ -639,7 +639,7 @@ function RuntimeMetaBadges({
         </span>
       ) : null}
       {activeSkillIds.length > 0 ? (
-        <span className={chipClass} title={activeSkillIds.join(', ')}>
+        <span className={chipClass}>
           {t('toolActiveSkills')} {activeSkillIds.length}
         </span>
       ) : null}

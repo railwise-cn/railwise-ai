@@ -637,7 +637,13 @@ export function createMaintenanceActions(
       error: null
     })
 
-    await get().sendMessage(trimmed)
+    const original = state.blocks[idx]
+    const skillSelections = original?.kind === 'user' ? original.meta?.skillSelections ?? [] : []
+    const sent = await get().sendMessage(trimmed, undefined, skillSelections.length ? {
+      capabilityReferences: skillSelections.map(skill => ({ kind: 'skill', id: skill.id })),
+      skillSelections
+    } : undefined)
+    if (!sent && skillSelections.length) set({ blocks: state.blocks })
   },
 
   resolveApproval: async (blockId, decision) => {

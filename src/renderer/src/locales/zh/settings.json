@@ -1,4 +1,9 @@
 {
+  "guiUpdateInstallRetryHint": "安装程序未能启动。请重试，或打开下载页手动安装。",
+  "guiUpdateDownloadRetryHint": "更新包未下载完成，请重新下载。",
+  "firstRunLoadSettingsFailed": "无法打开初始设置。请关闭后重新打开设置。",
+  "firstRunSaveSettingsFailed": "设置未能保存，请重试。",
+  "firstRunCloseAfterLoadFailure": "关闭初始设置",
   "title": "设置",
   "pluginAvailableToInstall": "可安装",
   "pluginConfiguredUnverified": "已配置 · 待验证授权",

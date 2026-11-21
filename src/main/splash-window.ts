@@ -1,4 +1,5 @@
 import brand from '../shared/product-brand.json'
+import splashFont from '../asset/ui-fonts/NotoSansSC-Splash.woff2?inline'
 import { BrowserWindow } from 'electron'
 import type { WindowAppearanceV1 } from '../shared/window-appearance'
 import { applyWindowMaterial, windowMaterialOptions } from './window-appearance'
@@ -77,16 +78,22 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
 <html lang="${lang}" data-theme="${theme}" data-material="${material}">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
   <meta name="color-scheme" content="light dark" />
   <title>${escapeHtml(brand.platform)}</title>
   <style>
+    @font-face {
+      font-family: 'RailWise UI';
+      src: url('${splashFont}') format('woff2');
+      font-weight: 100 900;
+      font-display: swap;
+    }
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
     body {
       display: grid;
       place-items: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      font-family: 'RailWise UI', system-ui, sans-serif;
       color: #20242b;
       user-select: none;
     }
@@ -130,7 +137,6 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
       max-width: 100%;
       margin: 5px 0 0;
       color: #475569;
-      font-family: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
       font-size: 13px;
       line-height: 1.4;
       overflow-wrap: anywhere;

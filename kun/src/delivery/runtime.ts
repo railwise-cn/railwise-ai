@@ -290,6 +290,18 @@ export class TaskDeliveryCoordinator {
         repository.acknowledgeOutbox(message.id, this.runtime.nowIso())
         continue
       }
+      if (request.kind === 'approval') {
+        const approval = this.runtime.approvalGate.get(request.id)
+        const exactHostCall = approval?.status === 'allowed' && approval.toolName === 'request_host_shell' && approval.callId &&
+          repository.operation(task.id, `tool:${request.turnId}:${approval.callId}`)?.request?.providerId === 'scoped-host-shell'
+        if (exactHostCall) {
+          if (task.activeTurnId !== request.turnId) repository.acknowledgeOutbox(message.id, this.runtime.nowIso())
+          else if (!this.runtime.approvalGate.hasLiveResolver?.(request.id)) {
+            await this.runtime.taskControlService?.continueDetachedApproval(approval)
+          }
+          continue
+        }
+      }
       // A user-initiated resume/retry owns tasks that are already executing;
       // only a task still waiting on this human request may be auto-woken.
       if (!['waiting_user', 'waiting_approval'].includes(task.status)) continue

@@ -354,9 +354,10 @@ export async function createKunServeRuntime(
     approvalGate,
     userInputGate,
     workspaceReferences: workspaceReferenceService,
-    validateSkillSelection: (prompt, workspace) => skillRuntime.validateSlashSelection(prompt, workspace),
+    validateSkillSelection: (prompt, workspace, selectedIds) => skillRuntime.validateSlashSelection(prompt, workspace, selectedIds),
     callableCapabilities: (request, thread) => readCallableCapabilityCandidates({
-      mode: request.guiPlan ? 'plan' : request.mode
+      mode: request.guiPlan ? 'plan' : request.mode,
+      includeSkills: request.capabilityReferences?.some(reference => reference.kind === 'skill')
     }, thread, request.sandboxMode)
   })
   const uiActionService = new UiActionService({ sessionStore, turns: turnService })
@@ -786,7 +787,8 @@ export async function createKunServeRuntime(
       skills: skillRuntime,
       mcp: mcpRuntime.state(),
       context,
-      tools: registry.listTools(context)
+      tools: registry.listTools(context),
+      includeSkills: scope.includeSkills
     })
   }
   const browserVerification = new BrowserOperationVerificationService({ repository: taskRepository, controller: taskController,
@@ -966,7 +968,7 @@ export async function createKunServeRuntime(
   const localWritePreflight = workspaceWritePreflight({ workspaceTrust, restriction: (threadId, sourceTaskId) => taskExecutionRestriction(threadId, undefined, sourceTaskId) })
   const externalPreflight: typeof connectorPreflight = async (text, thread, sourceTask) => await localWritePreflight(text, thread, sourceTask) ?? await connectorPreflight(text, thread, sourceTask)
   const taskControlService=new TaskControlService({publicQueryRecovery,validateRecoveryExecution,preflightRecoveryTask:(text,thread,binding)=>externalTaskIntent(text)?.kind==='external_task'?Promise.resolve(workspacePermissionCapability('public_query_recovery_read_only','重新检索仅允许公开查询与本机成果，不能执行外部业务写入。')):browserRuntime.preflight(text,thread,publicQueryRecovery.reviewedBrowserScope(binding),undefined,binding.mode==='task_reauthorization'?publicQueryRecovery.reviewedBrowserScope(binding):undefined),validateRecoveryPermission:threadId=>taskPermissionService.executionRestriction(threadId),repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>{void browserRuntime.stopThread(threadId);return delegationRuntime?.abortParent(threadId,reason)},preflightExternalTask:externalPreflight,validateTaskPermission:(threadId,sourceTaskId)=>taskExecutionRestriction(threadId,undefined,sourceTaskId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),validateRetryLocalSchedule:(task,receipt,recovery)=>taskScheduleService?.validateRetryLocalSchedule(task,receipt,recovery) ?? Promise.resolve(false),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
-  const taskCoordinator = new TaskCoordinator({ preflightExternalTask:externalPreflight, controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore,
+  const taskCoordinator = new TaskCoordinator({ preflightExternalTask:externalPreflight, controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore, userInputGate,
     async classifyIntent(text, task) {
       const abort = new AbortController()
       const timer = setTimeout(() => abort.abort(),8_000)
@@ -991,7 +993,7 @@ export async function createKunServeRuntime(
   taskScheduleService = new TaskScheduleService({ flows: flowService, repository: taskRepository, tasks: taskController,
     browserState: () => browserRuntime.state(),
     egoBrowserState: () => egoRuntime.state(),
-    coordinator: taskCoordinator, threads: threadStore, workspaceTrust, nowIso,
+    coordinator: taskCoordinator, threads: threadStore, workspaceTrust, attachments: attachmentStore, nowIso,
     connectorIdentities: () => ({ ...mcpRuntime.state().authorityFingerprints,
       'browser-skill': browserRuntime.identityFingerprint(),
       ...(options.capabilities?.egoBrowser ? {'ego-browser':egoRuntime.fingerprint()} : {}),
@@ -1026,6 +1028,7 @@ export async function createKunServeRuntime(
     ...(attachmentStore ? { attachmentStore } : {}),
     ...(memoryStore ? { memoryStore } : {}),
     flowService,
+    taskScheduleService,
     engineeringService,
     engineeringContext,
     surveyCollaborationService,

@@ -203,7 +203,8 @@ describe('TaskWorkspaceView', () => {
     expect(inbox).toHaveLength(2)
     for(const card of cards){
       expect(card.querySelector(':scope > p')?.textContent).toBe('执行授权已到期')
-      const diagnostics=[...card.querySelectorAll('details')].find(node=>node.textContent?.includes(raw))!
+      expect(card.textContent).not.toContain(raw)
+      const diagnostics=[...card.querySelectorAll('details')].find(node=>node.querySelector('summary')?.textContent===i18n.t('common:capabilityDiagnosticDetails'))!
       expect(diagnostics).toBeTruthy();expect(diagnostics.open).toBe(false)
     }
     expect(window.workwise.resumeTask).not.toHaveBeenCalled()
@@ -884,6 +885,64 @@ describe('TaskWorkspaceView', () => {
       expect(foreground.map(event => event.detail)).toEqual(action === 'blocked'
         ? [] : [{ threadId: 'original-chat', taskId: tasks[0].id }])
     } finally { dispatch.mockRestore() }
+  })
+
+  it('requires attention without displaying host command history or approval internals by default', async () => {
+    const command = 'Run request_host_shell\nCommand (JSON): private example command\nRequest SHA256: abc123'
+    inbox = [{ ...approval, message: command, presentation: { reason: 'approval_host_shell', scope: 'host', actions: ['approve', 'deny', 'open_thread'] } }]
+    vi.mocked(window.workwise.listTaskOperationReceipts).mockResolvedValue([{
+      id: 'shell-receipt', taskId: 't2', purpose: 'host_shell', provider: 'host', operation: 'shell', toolName: 'request_host_shell',
+      requestHash: 'request-sha', status: 'failed', createdAt: now, updatedAt: now
+    }])
+    await act(async () => refreshTaskState())
+    await click('Needs you')
+    const taskView = container.querySelector('article')!
+    const approvalDetails = [...taskView.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent?.includes('View scope and technical details'))!
+    const history = [...taskView.querySelectorAll('details')].find(item => item.querySelector('summary')?.textContent?.includes('Local command history'))!
+    expect(taskView.textContent).toContain('full host access')
+    expect(taskView.textContent).not.toContain('private example command')
+    expect(history.open).toBe(false)
+    expect(approvalDetails.open).toBe(false)
+    expect(JSON.stringify(vi.mocked(window.workwise.notifyTask).mock.calls)).not.toContain('private example command')
+    await act(async () => {
+      approvalDetails.open = true
+      approvalDetails.dispatchEvent(new Event('toggle'))
+    })
+    expect(approvalDetails.textContent).toContain(command)
+    await click('Allow this action')
+    expect(container.textContent).toContain('Your decision is saved')
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
+  })
+
+  it('imports a selected document into the original task and describes a scanned PDF accurately', async () => {
+    const first = { ...tasks[0], originThreadId: 'original-chat', status: 'waiting_user' as const }
+    tasks = [first]
+    inbox = []
+    const getPathForFile = vi.fn(() => '/user-selected/brochure.pdf')
+    const importChatAttachment = vi.fn(async () => ({ attachment: {
+      id: 'document-id', name: 'brochure.pdf', kind: 'document', state: 'degraded',
+      degradationReasons: ['no_extractable_pdf_text']
+    } }))
+    const coordinateTaskCommand = vi.fn(async () => ({ kind: 'input_queued', task: first }))
+    Object.assign(window.workwise, { getPathForFile, importChatAttachment, coordinateTaskCommand })
+    await act(async () => refreshTaskState())
+    const chooser = container.querySelector<HTMLInputElement>('article input[type="file"]')!
+    const file = new File(['yes'], 'brochure.pdf', { type: 'application/pdf' })
+    await act(async () => {
+      Object.defineProperty(chooser, 'files', { configurable: true, value: [file] })
+      chooser.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await settle()
+    expect(importChatAttachment).toHaveBeenCalledExactlyOnceWith({ sourcePath: '/user-selected/brochure.pdf', threadId: 'original-chat', workspace: '/workspace' })
+    expect(container.textContent).toContain('No text could be extracted')
+    await click('Save and send to task')
+    expect(coordinateTaskCommand).toHaveBeenCalledExactlyOnceWith({
+      taskId: first.id, threadId: 'original-chat', intent: 'supplement', expectedRevision: first.revision,
+      idempotencyKey: expect.any(String),
+      request: { prompt: 'Use the attached document for the current task.', attachmentIds: ['document-id'] }
+    })
+    expect(container.textContent).toContain('The update is saved')
+    expect(window.workwise.resumeTask).not.toHaveBeenCalled()
   })
 
   it('shows pending decisions and resolves them through the original approval API', async () => {

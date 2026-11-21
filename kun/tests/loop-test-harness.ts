@@ -6,7 +6,7 @@ import { InMemoryUserInputGate } from '../src/adapters/in-memory-user-input-gate
 import { InMemoryThreadStore } from '../src/adapters/in-memory-thread-store.js'
 import { InMemorySessionStore } from '../src/adapters/in-memory-session-store.js'
 import { LocalToolHost, defaultLocalTools, type LocalTool } from '../src/adapters/tool/local-tool-host.js'
-import { TurnService } from '../src/services/turn-service.js'
+import { TurnService, type TurnServiceDeps } from '../src/services/turn-service.js'
 import { ThreadService } from '../src/services/thread-service.js'
 import { UsageService } from '../src/services/usage-service.js'
 import { RuntimeEventRecorder } from '../src/services/runtime-event-recorder.js'
@@ -25,6 +25,7 @@ import type { TokenEconomyConfig } from '../src/loop/token-economy.js'
 import type { ToolStormBreakerOptions } from '../src/loop/tool-storm-breaker.js'
 import type { ContextCompactionConfig } from '../src/loop/model-context-profile.js'
 import type { VisionEvidencePort } from '../src/contracts/vision-evidence.js'
+import type { TaskController } from '../src/services/task-controller.js'
 
 export type Harness = {
   threadId: string
@@ -77,6 +78,7 @@ export function makeHarness(
     compactor?: ContextCompactor
     tools?: LocalTool[]
     skillRuntime?: SkillRuntime
+    skillSelection?: Pick<TurnServiceDeps, 'callableCapabilities' | 'validateSkillSelection'>
     attachmentStore?: AttachmentStore
     visionEvidence?: VisionEvidencePort
     memoryStore?: MemoryStore
@@ -84,6 +86,7 @@ export function makeHarness(
     tokenEconomy?: TokenEconomyConfig
     contextCompaction?: ContextCompactionConfig
     toolStorm?: ToolStormBreakerOptions & { enabled?: boolean }
+    tasks?: TaskController
     nowMs?: () => number
     toolArgumentRepair?: {
       maxStringBytes?: number
@@ -114,7 +117,8 @@ export function makeHarness(
     steering,
     compactor,
     ids,
-    nowIso
+    nowIso,
+    ...options.skillSelection
   })
   const threads = new ThreadService({ threadStore, sessionStore, events, ids, nowIso })
   const loop = new AgentLoop({
@@ -134,6 +138,7 @@ export function makeHarness(
     ids,
     nowIso,
     nowMs,
+    tasks: options.tasks,
     ...(options.workspaceTrust ? { workspaceTrust: options.workspaceTrust } : {}),
     ...(options.skillRuntime ? { skillRuntime: options.skillRuntime } : {}),
     ...(options.attachmentStore ? { attachmentStore: options.attachmentStore } : {}),

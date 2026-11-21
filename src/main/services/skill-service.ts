@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import type { AppSettingsV1 } from '../../shared/app-settings'
-import type { InstalledPackageV1 } from '../../shared/marketplace'
+import type { InstalledPackageV1, MarketplacePackageV1 } from '../../shared/marketplace'
+import { declaredMarketplaceSkills } from '../../shared/marketplace-skill-readiness'
 import type {
   BundledSkillInstallResult,
   BundledSkillSource,
@@ -19,6 +20,7 @@ import { LEGACY_SKILL_SOURCE_METADATA_FILE } from '../compat/legacy-metadata'
 import { resolveContainedPath } from './canonical-containment'
 import {
   inspectPackageDirectory,
+  marketplacePackageReviewSha256,
   PackageInstallationService,
   packageInstallLimitsForSource
 } from './package-installation-service'
@@ -54,6 +56,7 @@ export type GuiSkillRoot = {
   scope: GuiSkillScope
   workspace?: string
   pluginId?: string
+  pluginEntrySkill?: string
   validation: 'strict' | 'trusted-plugin'
 }
 
@@ -409,12 +412,17 @@ async function discoverInstalledPluginSkillEntries(records?: InstalledPackageV1[
       packageInstallLimitsForSource(record.source)
     ).catch(() => null)
     if (!inspection || inspection.sha256 !== record.artifact.sha256) continue
-    const roots: string[] = []
-    await collectInstalledSkillRoots(record.artifact.location, roots, 0, 6)
+    const roots = await marketplacePackageSkillRoots(record.artifact.location)
+    const catalog = await readOptionalJson(join(record.artifact.location, 'workwise.catalog.json'))
+    const reviewed = catalog as MarketplacePackageV1 | null
+    const declared = reviewed && marketplacePackageReviewSha256(reviewed) === record.reviewSha256
+      ? declaredMarketplaceSkills(reviewed.components, reviewed) : undefined
+    const pluginEntrySkill = declared?.length === 1 ? declared[0] : undefined
     const workspace = record.scope === 'workspace' ? record.workspaceRoot : undefined
     if (record.scope === 'workspace' && !workspace) continue
     entries.push(...roots.map(path => ({
       path, pluginId: record.packageId, scope: workspace ? 'project' as const : 'global' as const,
+      ...(pluginEntrySkill ? { pluginEntrySkill } : {}),
       ...(workspace ? { workspace } : {}), validation: 'trusted-plugin' as const
     })))
   }
@@ -425,6 +433,12 @@ async function discoverInstalledPluginSkillEntries(records?: InstalledPackageV1[
 export function isManagedPluginSkillRoot(value: string): boolean {
   const path = relative(join(homedir(), '.workwise', 'plugins', 'packages'), resolve(value)).split(sep)
   return path.length >= 3 && path[0] !== '..' && path[1] === 'versions' && /^[a-f0-9]{64}$/.test(path[2])
+}
+
+export async function marketplacePackageSkillRoots(directory: string): Promise<string[]> {
+  const roots: string[] = []
+  await collectInstalledSkillRoots(directory, roots, 0, 6)
+  return roots
 }
 
 async function collectInstalledSkillRoots(

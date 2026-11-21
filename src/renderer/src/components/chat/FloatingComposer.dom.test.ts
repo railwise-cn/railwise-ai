@@ -6,6 +6,7 @@ import { rendererRuntimeClient } from '../../agent/runtime-client'
 import i18n from '../../i18n'
 import { useChatStore } from '../../store/chat-store'
 import { FloatingComposer } from './FloatingComposer'
+import type { CallableCapabilityChoice } from '@shared/callable-capabilities'
 
 type Menu = 'skill' | 'file' | 'slash' | 'toolbar'
 let host: HTMLDivElement, root: Root
@@ -19,12 +20,16 @@ function Harness({ menu, seed, available, onSend = vi.fn(), composerProps }: {
   composerProps?: Partial<ComponentProps<typeof FloatingComposer>>
 }) {
   const [input, setInput] = useState(seed ?? (menu === 'slash' ? '/' : '@工程'))
+  const [selected, setSelected] = useState<CallableCapabilityChoice[]>([])
   return createElement(FloatingComposer, {
     input, setInput, mode: 'agent', setMode: vi.fn(), busy: false, runtimeReady: true, hasActiveThread: true,
     composerModel: 'auto', composerPickList: ['auto'], onComposerModelChange: vi.fn(),
     queuedMessages: [], onRemoveQueuedMessage: vi.fn(), onSend, onInterrupt: vi.fn(),
     fileReferenceEnabled: menu === 'file', onAddFileReference,
     skillCommands: available ?? (menu === 'file' ? [] : skillCommands),
+    selectedCapabilities: selected,
+    onSelectCapability: choice => setSelected(current => [...current.filter(item => item.kind !== choice.kind || item.id !== choice.id), choice]),
+    onRemoveCapability: choice => setSelected(current => current.filter(item => item.kind !== choice.kind || item.id !== choice.id)),
     ...composerProps
   })
 }
@@ -90,6 +95,18 @@ async function click(button: HTMLButtonElement): Promise<void> {
 async function paint(): Promise<void> {
   await act(async () => { await new Promise(requestAnimationFrame) })
 }
+
+it('focuses the ordinary input from the conversation without changing the draft', async () => {
+  const actionsRef = { current: null } as { current: import('./FloatingComposer').ComposerActions | null }
+  await act(async () => root.render(createElement(Harness, {
+    menu: 'toolbar', seed: '当前草稿',
+    composerProps: { actionsRef }
+  })))
+  const textarea = host.querySelector<HTMLTextAreaElement>('.ds-composer-shell textarea')
+  await act(async () => actionsRef.current?.focus())
+  expect(document.activeElement).toBe(textarea)
+  expect(textarea?.value).toBe('当前草稿')
+})
 
 describe('composer attachment entry points', () => {
   it.each(['paste', 'drop', 'picker'])('accepts a PDF and image together via %s without duplicating the batch', async (entry) => {
@@ -165,20 +182,37 @@ describe('composer keyboard suggestion visibility', () => {
     expect(rows).toHaveLength(6)
   })
 
-  it('finds a multi-word skill past the previous 40-item cut and inserts its exact ID without sending', async () => {
+  it('finds a named skill after the previous 40-item cut and shows its name without exposing an opaque ID', async () => {
     const onSend = vi.fn()
     const available = Array.from({ length: 45 }, (_, index) => ({
       id: `sample-${index}`, name: `Analysis ${index}`, description: 'Analysis'
     }))
-    available.push({ id: 'vendor-video-shotcraft', name: 'Video Shotcraft', description: '制作和渲染视频' })
+    const opaqueId = 'fedcba0123456789'.repeat(4)
+    available.push({ id: opaqueId, name: 'Video Shotcraft', description: '制作和渲染视频' })
     await act(async () => root.render(createElement(Harness, { menu: 'slash', seed: '/Video Shot', available, onSend })))
     const textarea = host.querySelector('textarea')!
     expect(host.querySelector('[role=option]')?.textContent).toContain('Video Shotcraft')
+    expect(host.querySelector('[role=option]')?.textContent).not.toContain(opaqueId)
     expect(textarea.getAttribute('aria-activedescendant')).toEqual(host.querySelector('[role=option]')?.id)
     await key(textarea, 'Enter')
-    expect(textarea.value).toEqual('/skill:vendor-video-shotcraft ')
+    expect(textarea.value).toEqual('')
+    expect(host.querySelector('[data-composer-skill]')?.textContent).toContain('Video Shotcraft')
+    expect(host.textContent).not.toContain(opaqueId)
     expect(host.querySelector('[role=listbox]')).toBeNull()
     expect(onSend).not.toHaveBeenCalled()
+    await click(host.querySelector('[data-composer-skill] button')!)
+    expect(host.querySelector('[data-composer-skill]')).toBeNull()
+  })
+
+  it('keeps the selected skill visible and identifies it as unavailable when the callable list changes', async () => {
+    const available = [{ id: 'video-shotcraft', name: 'Video Shotcraft', description: '制作视频' }]
+    await act(async () => root.render(createElement(Harness, { menu: 'slash', seed: '/Video Shot', available })))
+    await key(host.querySelector('textarea')!, 'Enter')
+    await act(async () => root.render(createElement(Harness, { menu: 'slash', available: [] })))
+    const chip = host.querySelector('[data-composer-skill]')
+    expect(chip?.textContent).toContain('Video Shotcraft')
+    expect(chip?.textContent).toContain('Unavailable')
+    expect(chip?.querySelector('button')?.disabled).toBe(false)
   })
 
   it('keeps the existing mouse choice and prevents it from taking textarea focus', async () => {
@@ -220,9 +254,10 @@ describe('composer plus actions', () => {
     expect(host.querySelector('[role="option"][aria-selected="true"]')?.textContent).toContain('Video Shotcraft')
     await key(search, 'Enter')
     await paint()
-    expect(textarea.value).toBe('前半草稿 /skill:video-shotcraft 后半')
-    expect(textarea.selectionStart).toBe('前半草稿 /skill:video-shotcraft '.length)
-    expect(textarea.selectionEnd).toBe(textarea.selectionStart)
+    expect(textarea.value).toBe('前半草稿后半')
+    expect(textarea.selectionStart).toBe(4)
+    expect(textarea.selectionEnd).toBe(6)
+    expect(host.querySelector('[data-composer-skill]')?.textContent).toContain('Video Shotcraft')
     expect(document.activeElement).toBe(textarea)
     expect(host.querySelector('[role="listbox"]')).toBeNull()
     expect(onSend).not.toHaveBeenCalled()

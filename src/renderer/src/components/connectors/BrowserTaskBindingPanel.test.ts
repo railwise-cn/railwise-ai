@@ -104,7 +104,8 @@ describe('browser task reauthorization', () => {
       allowedVerificationPolicies: ['strict'] as const, policyChangeBlocked: 'browser_unresolved_operation' as const }
     const api = { getBrowserTaskBinding: vi.fn(async () => snapshot), confirmBrowserTaskBinding: vi.fn(), coordinateTaskCommand: vi.fn() }
     Object.assign(window, { workwise: api })
-    const route = vi.spyOn(useChatStore.getState(), 'setRoute').mockImplementation(() => undefined)
+    const openTask = vi.fn()
+    window.addEventListener('railwise:open-task', openTask)
     const element = document.createElement('div'), root = createRoot(element), confirmed = vi.fn()
     try {
       await act(async () => root.render(createElement(BrowserTaskBindingPanel, { taskId: binding.taskId, onConfirmed: confirmed })))
@@ -113,10 +114,14 @@ describe('browser task reauthorization', () => {
       expect(element.textContent).toContain(i18n.t('common:browserTaskUnresolvedOperation'))
       await act(async () => button(element, 'browserTaskOpenOriginalReview').click())
       expect(takeRequestedTask()).toBe(binding.taskId)
-      expect(route).toHaveBeenCalledWith('tasks')
+      expect(openTask).toHaveBeenCalledWith(expect.objectContaining({ detail: binding.taskId }))
       expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
       expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
-    } finally { await act(async () => root.unmount()); route.mockRestore(); takeRequestedTask() }
+    } finally {
+      await act(async () => root.unmount())
+      window.removeEventListener('railwise:open-task', openTask)
+      takeRequestedTask()
+    }
   })
 
   it.each(['browser_verification_policy_blocked', 'browser_unresolved_operation'])('shows actionable %s without claiming success', async code => {

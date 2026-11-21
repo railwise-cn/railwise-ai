@@ -20,4 +20,12 @@ export function registerRuntimeUpdateRoutes(router: Router, runtime: ServerRunti
     try { return jsonResponse(await runtime.updateLifecycle.prepare(parsed.data.confirmedSnapshotId)) }
     catch (error) { return ERRORS.conflict(error instanceof Error ? error.message : String(error)) }
   })
+  router.add('POST', '/v1/runtime/update/cancel', async request => {
+    if (!authorize(request)) return ERRORS.unauthorized()
+    if (!runtime.updateLifecycle) return ERRORS.unavailable('Update handoff is unavailable.')
+    try {
+      await runtime.updateLifecycle.cancel()
+      return jsonResponse({ ok: true })
+    } catch (error) { return ERRORS.conflict(error instanceof Error ? error.message : String(error)) }
+  })
 }

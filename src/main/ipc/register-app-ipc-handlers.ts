@@ -253,6 +253,7 @@ import { TaskArtifactPreviewService } from '../services/task-artifact-preview-se
 import { MarketplaceCatalogService } from '../services/marketplace-catalog-service'
 import { PluginManagementService } from '../services/plugin-management-service'
 import type { CatalogSourceV1, InstalledPackageV1 } from '../../shared/marketplace'
+import { MarketplaceInstallError } from '../../shared/marketplace-install-errors'
 import {
   declaredMarketplaceSkills,
   marketplaceSkillReadiness,
@@ -337,7 +338,12 @@ type RegisterAppIpcHandlersOptions = {
     payload: TurnCompleteNotificationPayload
   ) => Promise<SystemNotificationResult>
   getAppVersion: () => string
-  onGuiUpdatePrepared?: () => void
+  guiUpdateRuntime?: {
+    isPrepared: () => boolean
+    readSnapshot?: () => Promise<RuntimeRequestResult | undefined>
+    prepare: (confirmedSnapshotId?: string) => Promise<void>
+    recover: () => Promise<void>
+  }
   readGuiUpdateState: () => Promise<GuiUpdateState>
   loadGuiUpdaterModule: () => Promise<GuiUpdaterModule>
   resolveLogDirectory: () => string
@@ -363,10 +369,11 @@ function safeSaveAsFileName(input: string | undefined, fallback = 'generated-fil
 }
 
 async function collectGuiUpdateActiveWork(
-  runtimeRequest: RegisterAppIpcHandlersOptions['runtimeRequest']
+  readSnapshot: () => Promise<RuntimeRequestResult | undefined>
 ): Promise<GuiUpdateInstallPreflight> {
   try {
-    const response = await runtimeRequest('/v1/runtime/update', 'GET')
+    const response = await readSnapshot()
+    if (!response) return { ok: true, activeWork: [] }
     if (!response.ok) throw new Error(runtimeResponseMessage(response))
     return z.object({
       ok: z.literal(true),
@@ -743,10 +750,17 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       ...(skills.status === 'rejected' && skillNames === undefined ? [skills.reason] : []),
       ...(mcp.status === 'rejected' ? [mcp.reason] : [])
     ]
-    if (errors.length === 1) throw errors[0]
-    if (errors.length > 1) throw new AggregateError(errors, '插件已保存，但技能与连接器均未能完成 Runtime 更新。请重试刷新。')
+    if (errors.length) {
+      throw new MarketplaceInstallError('refresh-failed', 'The package was saved, but its capabilities could not be refreshed.',
+        errors.length === 1 ? errors[0] : new AggregateError(errors))
+    }
     if (installed && skillNames !== undefined) {
-      const snapshot = skills.status === 'fulfilled' ? readMarketplaceSkillSnapshot(skills.value, 'state') : undefined
+      if (skills.status !== 'fulfilled') return 'unavailable'
+      const snapshot = installed.workspaceRoot
+        ? readMarketplaceSkillSnapshot(await runtimeRequest(
+          `/v1/skills?${new URLSearchParams({ scope: 'available', workspace: installed.workspaceRoot })}`, 'GET'
+        ).catch(() => undefined))
+        : readMarketplaceSkillSnapshot(skills.value, 'state')
       return marketplaceSkillReadiness(snapshot, installed.artifact.location, skillNames)
     }
   }
@@ -1168,7 +1182,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const entry = catalog.packages.find((candidate) =>
       candidate.sourceId === request.sourceId && candidate.package.id === request.packageId
     )
-    if (!entry) throw new Error('Catalog package was not found.')
+    if (!entry) throw new MarketplaceInstallError('package-unavailable', 'Catalog package was not found.')
     return pluginManagementService.prepareCatalogPackage(entry.package)
   })
   ipcMain.handle('plugin:cancel-import', async (_, payload: unknown) => {
@@ -1182,7 +1196,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const installed = await pluginManagementService.installPrepared(
       request,
       async (record, item) => {
-        skillNames = declaredMarketplaceSkills(item.components)
+        skillNames = declaredMarketplaceSkills(item.components, item)
         const applied = await activatePluginPackage({
           item,
           installed: record,
@@ -1203,7 +1217,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const installed = await pluginManagementService.rollback(
       request,
       async (record, item) => {
-        skillNames = declaredMarketplaceSkills(item.components)
+        skillNames = declaredMarketplaceSkills(item.components, item)
         const applied = await activatePluginPackage({
           item,
           installed: record,
@@ -2664,10 +2678,11 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       ).channel
     )
   })
-  let updatePrepared = false
   let installRequest: Promise<GuiUpdateInstallResult> | undefined
   ipcMain.handle('gui:update-install-preflight', async (): Promise<GuiUpdateInstallPreflight> =>
-    updatePrepared ? { ok: true, activeWork: [] } : collectGuiUpdateActiveWork(runtimeRequest)
+    options.guiUpdateRuntime?.isPrepared() ? { ok: true, activeWork: [] } : collectGuiUpdateActiveWork(
+      options.guiUpdateRuntime?.readSnapshot ?? (() => runtimeRequest('/v1/runtime/update', 'GET'))
+    )
   )
   ipcMain.handle('gui:update-install', async (_, payload: unknown): Promise<GuiUpdateInstallResult> => {
     const request = parseIpcPayload(
@@ -2683,18 +2698,20 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         if (!(state.info?.ok && state.info.downloaded) && state.status !== 'downloaded') {
           return { ok: false, currentVersion: getAppVersion(), code: 'install_failed', message: '更新包尚未下载完成。' }
         }
-        if (!updatePrepared) {
-          const prepared = await runtimeRequest('/v1/runtime/update/prepare', 'POST', JSON.stringify({
-            ...(request.confirmActiveWork && request.confirmedSnapshotId ? { confirmedSnapshotId: request.confirmedSnapshotId } : {})
-          }))
+        const confirmedSnapshotId = request.confirmActiveWork ? request.confirmedSnapshotId : undefined
+        if (options.guiUpdateRuntime) {
+          await options.guiUpdateRuntime.prepare(confirmedSnapshotId)
+        } else {
+          const prepared = await runtimeRequest('/v1/runtime/update/prepare', 'POST', JSON.stringify({ confirmedSnapshotId }))
           if (!prepared.ok) throw new Error(runtimeResponseMessage(prepared))
           const result = JSON.parse(prepared.body) as { ok?: unknown }
           if (result.ok !== true) throw new Error('Runtime 未确认安全停止，应用仍保持打开。')
-          updatePrepared = true
-          options.onGuiUpdatePrepared?.()
         }
         return await module.installGuiUpdate()
       } catch (error) {
+        await options.guiUpdateRuntime?.recover().catch(recoveryError => {
+          logError('updater', 'Could not release the Runtime update handoff.', recoveryError)
+        })
         return { ok: false, currentVersion: getAppVersion(), code: 'install_failed', message: error instanceof Error ? error.message : String(error) }
       }
     })().finally(() => { installRequest = undefined })

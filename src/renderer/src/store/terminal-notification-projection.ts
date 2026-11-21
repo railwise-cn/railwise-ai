@@ -5,6 +5,7 @@ export type TerminalNotificationReason =
   | 'blocked'
   | 'max_tokens'
   | 'waiting_approval'
+  | 'response_interrupted'
 
 export type TerminalNotificationInput = {
   reason: TerminalNotificationReason
@@ -42,6 +43,7 @@ export function shouldProjectTerminalNotification(
 
 export function terminalReasonForFailure(code?: string, message?: string): Exclude<TerminalNotificationReason, 'completed' | 'aborted' | 'waiting_approval'> {
   const value = `${code ?? ''} ${message ?? ''}`.toLowerCase()
+  if (code === 'response_interrupted' || message?.startsWith('模型响应中断')) return 'response_interrupted'
   if (value.includes('max_tokens') || value.includes('max tokens') || value.includes('token limit')) return 'max_tokens'
   if (value.includes('blocked') || value.includes('budget_limited') || value.includes('policy_blocked')) return 'blocked'
   return 'error'

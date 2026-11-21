@@ -9,6 +9,7 @@ const STICK_TO_BOTTOM_PX = 96
 
 type UseTimelineScrollOptions = {
   containerRef: RefObject<HTMLDivElement | null>
+  contentRef?: RefObject<HTMLDivElement | null>
   endRef: RefObject<HTMLDivElement | null>
   activeThreadId: string | null
   pageSize: number
@@ -55,6 +56,7 @@ export function deriveTimelineVisibleTurnCount({
  */
 export function useTimelineScroll({
   containerRef,
+  contentRef,
   endRef,
   activeThreadId,
   pageSize,
@@ -145,6 +147,19 @@ export function useTimelineScroll({
       })
     })
   }, [contentKey, endRef, followEnd, streaming])
+
+  useEffect(() => {
+    const content = contentRef?.current
+    if (!content || !followEnd || typeof ResizeObserver === 'undefined') return
+    // Background task activity can change without adding a chat block.
+    const observer = new ResizeObserver(() => {
+      if (stickToBottomRef.current && !pendingPrependRef.current && scrollFrameRef.current === null) {
+        endRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
+      }
+    })
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [contentRef, endRef, followEnd])
 
   // Hard reset on thread switch.
   useEffect(() => {

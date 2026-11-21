@@ -532,6 +532,7 @@ export function createThreadActions(
     }
     let coordinatedTurn: {threadId:string;turnId:string;userMessageItemId?:string}|undefined
     const capabilityReferences = queued?.capabilityReferences ?? overrides?.capabilityReferences ?? []
+    const skillSelections = queued?.skillSelections ?? overrides?.skillSelections ?? []
     const canCoordinate = !queued?.guiPlan && !overrides?.guiPlan && !overrides?.guiDesign && ['chat', 'write'].includes(get().route) && typeof window !== 'undefined' && typeof window.workwise?.coordinateTaskCommand === 'function'
     const commandAttachmentIds = queued?.attachmentIds ?? overrides?.attachmentIds?.filter(id => id.trim()) ?? messageAttachments.map(item => item.id)
     const commandReferences = queued?.workspaceReferences ?? overrides?.workspaceReferences
@@ -620,7 +621,8 @@ export function createThreadActions(
             ...(attachmentIds?.length ? { attachmentIds } : {}),
             ...(attachments?.length ? { attachments } : {}),
             ...(workspaceReferences?.length ? { workspaceReferences } : {}),
-            ...(capabilityReferences.length ? { capabilityReferences } : {})
+            ...(capabilityReferences.length ? { capabilityReferences } : {}),
+            ...(skillSelections.length ? { skillSelections } : {})
           }
         ],
         error: null
@@ -681,12 +683,13 @@ export function createThreadActions(
           createdAt: new Date(now).toISOString(),
           text: displayText,
           ...(userModelChip ? { modelLabel: userModelChip } : {}),
-          ...(userDisplayText || attachmentIds.length || attachments.length
+          ...(userDisplayText || attachmentIds.length || attachments.length || skillSelections.length
             ? {
                 meta: {
                   ...(userDisplayText ? { displayText: userDisplayText } : {}),
                   ...(attachmentIds.length ? { attachmentIds } : {}),
-                  ...(attachments.length ? { attachments } : {})
+                  ...(attachments.length ? { attachments } : {}),
+                  ...(skillSelections.length ? { skillSelections } : {})
                 }
               }
             : {})

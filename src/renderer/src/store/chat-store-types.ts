@@ -22,7 +22,7 @@ import type {
   ClawModel
 } from '@shared/app-settings'
 import type { ModelProviderModelGroup } from '@shared/workwise-api'
-import type { CallableCapabilityReference } from '@shared/callable-capabilities'
+import type { CallableCapabilityReference, SkillSelections } from '@shared/callable-capabilities'
 
 export type QueuedUserMessage = {
   id: string
@@ -37,6 +37,7 @@ export type QueuedUserMessage = {
   attachments?: AttachmentReference[]
   workspaceReferences?: Array<{ path: string; kind: 'file' | 'directory' }>
   capabilityReferences?: CallableCapabilityReference[]
+  skillSelections?: SkillSelections
   /**
    * Optional GUI plan context forwarded to WorkWise Runtime. The renderer
    * attaches it for plan/refine turns so the runtime can advertise
@@ -87,6 +88,7 @@ export type SendMessageOverrides = {
   attachments?: AttachmentReference[]
   workspaceReferences?: Array<{ path: string; kind: 'file' | 'directory' }>
   capabilityReferences?: CallableCapabilityReference[]
+  skillSelections?: SkillSelections
 }
 
 export type InitialSetupMode = 'required' | 'preview'

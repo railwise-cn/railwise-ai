@@ -107,6 +107,11 @@ export class ExecutionStore {
   }
   finishOrphanedWork(executionId: string, throughMs: number): void { this.db.prepare('UPDATE task_work_spans SET finished_ms=MAX(started_ms,?) WHERE execution_id=? AND finished_ms IS NULL').run(throughMs,executionId) }
   usedCost(rootId: string): number { return (this.db.prepare("SELECT COALESCE(SUM(amount),0) AS total FROM task_budget_usage WHERE root_id=? AND kind='cost'").get(rootId) as {total:number}).total }
+  commandReceipt(ownerId: string, key: string): { result?: unknown } | null {
+    const row = this.db.prepare('SELECT result_json FROM task_command_receipts WHERE owner_id=? AND command_key=?')
+      .get(ownerId, key) as { result_json: string | null } | undefined
+    return row ? row.result_json === null ? {} : { result: JSON.parse(row.result_json) } : null
+  }
   command(ownerId: string, key: string, request: unknown): { created: boolean; result?: unknown } {
     const fingerprint = createHash('sha256').update(canonical(request)).digest('hex')
     const prior = this.db.prepare('SELECT fingerprint,result_json FROM task_command_receipts WHERE owner_id=? AND command_key=?').get(ownerId,key) as {fingerprint:string;result_json:string|null} | undefined

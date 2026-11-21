@@ -13,7 +13,7 @@ function source() {
     workflow: '.github/workflows/release.yml', packageSourceHead: 'a'.repeat(40), driverSourceHead: 'b'.repeat(40),
     windowsBuildConclusion: 'success', artifactId: 4567, artifactName: 'release-win',
     artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
-    changedFiles: ['scripts/run-windows-ui-smoke.mjs', 'scripts/windows-ui-smoke.test.mjs',
+    changedFiles: ['scripts/run-windows-ui-smoke.mjs', 'scripts/windows-ui-smoke.test.mjs', 'scripts/windows-task-chat-ui.mjs',
       '.github/workflows/windows-install-smoke.yml', '.github/workflows/release.yml', 'scripts/deploy-website-release.mjs',
       'src/renderer/src/components/connectors/ManagedLarkConnection.test.ts']
   }
@@ -27,7 +27,7 @@ test('existing Windows acceptance binds separate driver and package heads to the
 
 for (const file of ['src/renderer/src/components/HelpReader.tsx', 'kun/package.json', 'package-lock.json',
   'kun/src/adapters/tool/browser-skill-tool-provider.ts', 'docs/USER_GUIDE.md',
-  'electron-builder.config.cjs', 'build/icon.ico', 'scripts/prepare-runtime.cjs']) {
+  'electron-builder.config.cjs', 'build/icon.ico', 'scripts/prepare-runtime.cjs', 'scripts/other-chat-ui.mjs']) {
   test(`existing artifact cannot stand in for changed application source ${file}`, () => {
     assert.throws(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }), /application or build source changed/)
   })
@@ -79,15 +79,21 @@ test('Windows provenance keeps the actual workflow SHA and requires source evide
 test('Windows acceptance workflow downloads the original artifact and performs no packaging or publication', () => {
   const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   const { run_published_gui_update: publishedUpdate, run_repaired_gui_update: repairedUpdate,
-    run_frozen_gui_update: frozenUpdate, upgrade_058_to_candidate: currentUpgrade, build_private_next: buildPrivateNext,
+    published_gui_upgrade_scenario: publishedScenario, published_gui_verify_overlay: publishedOverlay,
+    run_frozen_gui_update: frozenUpdate, upgrade_058_to_candidate: currentUpgrade, upgrade_059_to_candidate: nextUpgrade, build_private_next: buildPrivateNext,
     run_repaired_marketplace_install: marketplaceInstall, run_private_video_evaluation: privateVideoEvaluation,
     run_mac_startup_appearance: macStartup,
     package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
   assert.equal(publishedUpdate.default, false)
+  assert.equal(publishedScenario.default, 'released-056-to-057')
+  assert.equal(publishedOverlay.default, false)
+  assert.equal(workflow.on.workflow_call.inputs.published_gui_upgrade_scenario, undefined)
+  assert.equal(workflow.on.workflow_call.inputs.published_gui_verify_overlay, undefined)
   assert.equal(repairedUpdate.default, false)
   assert.equal(marketplaceInstall.default, false)
   assert.equal(frozenUpdate.default, false)
   assert.equal(currentUpgrade.default, false)
+  assert.equal(nextUpgrade.default, false)
   assert.equal(privateVideoEvaluation.default, false)
   assert.equal(macStartup.default, false)
   assert.equal(buildPrivateNext.default, true)

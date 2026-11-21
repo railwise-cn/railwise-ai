@@ -25,6 +25,14 @@ import { evaluateMarketplaceLicense } from '../../shared/marketplace'
 import { VIDEO_SHOTCRAFT_COMMIT, VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION } from './video-shotcraft-distribution'
 
 const OFFICIAL_CATALOG_SOURCE_ID = 'workwise-official'
+const SUPERPOWERS_COMMIT = '44c9b2d6e889982ac18c27d05a19fefe335194e1'
+const BLENDER_SKILLS_COMMIT = '8f778d2405a214b508d4c7d80742be8e43acdd52'
+const GIT_DISTRIBUTION_VERSIONS: Readonly<Record<string, string>> = {
+  'video-shotcraft': VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION,
+  'superpowers': `${SUPERPOWERS_COMMIT}-railwise.1`,
+  'blender-skills': `${BLENDER_SKILLS_COMMIT}-railwise.1`
+}
+
 const SHA1_COMMIT = /^[0-9a-f]{40}$/
 const AUTOCAD_REDRAW_COMMIT = AUTOCAD_UPSTREAM.commit
 const AUTOCAD_REDRAW_ARCHIVE_SHA256 = AUTOCAD_UPSTREAM.sha256
@@ -743,7 +751,7 @@ const officialPackages: MarketplacePackageV1[] = [
     summary: 'Add the Superpowers development workflow Skills.',
     tier: 'recommended',
     categories: ['agent-workflows'],
-    version: '44c9b2d6e889982ac18c27d05a19fefe335194e1',
+    version: GIT_DISTRIBUTION_VERSIONS.superpowers!,
     publisher: publisher('obra', 'Jesse Vincent', 'https://github.com/obra', true),
     license: 'MIT',
     source: {
@@ -753,18 +761,18 @@ const officialPackages: MarketplacePackageV1[] = [
       repository: 'superpowers',
       defaultBranch: 'main',
       requestedRef: 'main',
-      resolvedRef: '44c9b2d6e889982ac18c27d05a19fefe335194e1',
+      resolvedRef: SUPERPOWERS_COMMIT,
       subpath: 'skills'
     },
     components: [{
       id: 'superpowers-skills',
       name: 'Superpowers Skills',
       type: 'skill',
-      skillNames: ['superpowers'],
+      skillNames: ['using-superpowers'],
       runtime: {
         kind: 'github',
         repository: 'https://github.com/obra/superpowers',
-        resolvedCommit: '44c9b2d6e889982ac18c27d05a19fefe335194e1',
+        resolvedCommit: SUPERPOWERS_COMMIT,
         subpath: 'skills',
         install: { strategy: 'managed-git', verifyBeforeActivation: true }
       }
@@ -1208,9 +1216,10 @@ const officialPackages: MarketplacePackageV1[] = [
     publisher: publisher('arjun988', 'arjun988', 'https://github.com/arjun988/blender-skills'),
     owner: 'arjun988',
     repository: 'blender-skills',
-    commit: '8f778d2405a214b508d4c7d80742be8e43acdd52',
+    commit: BLENDER_SKILLS_COMMIT,
+    version: GIT_DISTRIBUTION_VERSIONS['blender-skills'],
     subpath: '.claude/skills',
-    skillNames: ['blender-skills'],
+    skillNames: ['blender-director'],
     license: 'MIT',
     categories: ['development'],
     usage: { howToUse: '安装 Skill 和 Blender MCP 插件后，直接描述场景、建模、材质、动画或导出任务；AI 会在 Blender 中执行并反馈结果。', requirements: ['Blender', 'Blender MCP 插件'], examples: ['创建一个低多边形地铁车站场景并导出预览。'] },
@@ -1638,7 +1647,7 @@ function assertCatalogInvariants(): void {
       }
       if (component.runtime.kind === 'github') {
         const curatedVideo = item.id === 'video-shotcraft'
-        const expectedVersion = curatedVideo ? VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION : component.runtime.resolvedCommit
+        const expectedVersion = GIT_DISTRIBUTION_VERSIONS[item.id] ?? component.runtime.resolvedCommit
         if (source.kind !== 'github' ||
             source.resolvedRef !== component.runtime.resolvedCommit ||
             (curatedVideo && source.resolvedRef !== VIDEO_SHOTCRAFT_COMMIT) ||

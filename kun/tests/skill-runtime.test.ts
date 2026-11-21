@@ -359,6 +359,41 @@ describe('SkillRuntime', () => {
     expect(turn?.skillInjectionBytes).toBeGreaterThan(0)
   })
 
+  it('validates a structured selection, persists its name, proves activation, and rejects an unavailable Skill', async () => {
+    const id = '0123456789abcdef'.repeat(4)
+    await writeLegacySkill(id, '---\nname: video-shotcraft\n---\nFollow the video production workflow.')
+    const skillRuntime = await createRuntime()
+    const requests: ModelRequest[] = []
+    const h = makeHarness({
+      provider: 'fixture', model: 'fixture',
+      async *stream(request) {
+        requests.push(request)
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    }, {
+      skillRuntime,
+      skillSelection: {
+        callableCapabilities: async (_, thread) => skillRuntime.callableSkills(thread.workspace, new Set()).map(choice => ({ choice })),
+        validateSkillSelection: (prompt, workspace, selectedIds) => skillRuntime.validateSlashSelection(prompt, workspace, selectedIds)
+      }
+    })
+    const request = { prompt: '请生成视频', capabilityReferences: [{ kind: 'skill' as const, id }] }
+    await bootstrapThread(h, { workspace: root, request })
+    const getUserItem = async () => (await h.sessionStore.loadItems(h.threadId)).find(item => item.kind === 'user_message')
+    expect(await getUserItem()).toMatchObject({ text: request.prompt, skillSelections: [{ id, name: 'Video Shotcraft' }] })
+    expect(await getUserItem()).not.toHaveProperty('activeSkillIds')
+    await h.loop.runTurn(h.threadId, h.turnId)
+    expect(requests[0]?.contextInstructions?.join('\n')).toContain('Follow the video production workflow.')
+    expect(await getUserItem()).toMatchObject({ text: request.prompt, activeSkillIds: [id] })
+    expect(await h.sessionStore.loadEventsSince(h.threadId, 0)).toContainEqual(expect.objectContaining({
+      kind: 'item_updated', item: expect.objectContaining({ kind: 'user_message', activeSkillIds: [id] })
+    }))
+    const requestsBeforeDisabling = requests.length
+    await skillRuntime.updateConfiguration({ enabled: false, roots: [root], legacySkillMd: true, revision: 1 })
+    await expect(h.turns.startTurn({ threadId: h.threadId, request })).rejects.toMatchObject({ code: 'capability_reference_unavailable' })
+    expect(requests).toHaveLength(requestsBeforeDisabling)
+  })
+
   it('keeps the previous turn Skills active for a short confirmation turn', async () => {
     await writeLegacySkill('ppt-master', [
       '---',

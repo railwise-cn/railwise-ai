@@ -101,7 +101,7 @@ export function deriveTurnSections({
       if (split.think) {
         processBlocks.push({ kind: 'reasoning', id: `${block.id}-think`, text: split.think })
       }
-      if (split.content.trim()) {
+      if (split.content.trim() || block.capabilityCard || block.intentCard) {
         const contentBlock: TurnAssistantBlock = { ...block, text: split.content }
         latestAssistantContentBlock = contentBlock
         assistantContentBlocks.push(contentBlock)

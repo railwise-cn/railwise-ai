@@ -38,14 +38,14 @@ describe('MessageTimelineEmptyHero — runtime offline hero (issue #78)', () => 
   it('uses the waking title when no runtime error is available', () => {
     const html = renderOfflineHero(null)
     expect(html).toContain('RailWise AI Runtime is waking the local agent')
-    expect(html).not.toContain('Cannot connect to the local runtime')
+    expect(html).not.toContain('Could not connect to the local assistant')
   })
 
   it('switches to the error title and surfaces the localized error when a runtime error is provided', () => {
     const portConflict = i18n.t('common:runtimePortConflict')
     const html = renderOfflineHero(portConflict)
     // New error title should appear (so users see the failure immediately)
-    expect(html).toContain('Cannot connect to the local runtime')
+    expect(html).toContain('Could not connect to the local assistant')
     // The old "waking" title must NOT appear — that's the bug we're fixing
     expect(html).not.toContain('RailWise AI Runtime is waking the local agent')
     // The specific localized port-conflict message should appear in the body
@@ -56,7 +56,7 @@ describe('MessageTimelineEmptyHero — runtime offline hero (issue #78)', () => 
     const html = renderOfflineHero('   \n  ')
     // Falls back to the generic waking hero
     expect(html).toContain('RailWise AI Runtime is waking the local agent')
-    expect(html).not.toContain('Cannot connect to the local runtime')
+    expect(html).not.toContain('Could not connect to the local assistant')
   })
 
   it('keeps both the retry and open-settings actions visible on the error hero', () => {
@@ -74,13 +74,13 @@ describe('MessageTimelineEmptyHero — runtime offline hero (issue #78, zh-CN)',
   it('uses 正在唤醒 title when no runtime error is available', () => {
     const html = renderOfflineHero(null)
     expect(html).toContain('正在唤醒本地智能体')
-    expect(html).not.toContain('无法连接到本地运行时')
+    expect(html).not.toContain('无法连接到本机助手')
   })
 
-  it('switches to 无法连接到本地运行时 title and surfaces the localized port-conflict error', () => {
+  it('switches to 无法连接到本机助手 title and surfaces the localized port-conflict error', () => {
     const portConflict = i18n.t('common:runtimePortConflict')
     const html = renderOfflineHero(portConflict)
-    expect(html).toContain('无法连接到本地运行时')
+    expect(html).toContain('无法连接到本机助手')
     expect(html).not.toContain('正在唤醒本地智能体')
     expect(html).toContain(portConflict)
   })

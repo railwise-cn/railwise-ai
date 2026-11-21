@@ -725,12 +725,14 @@ export class DeepseekCompatModelClient implements ModelClient {
     let reasoningAccumulator = ''
     let stopReason: ModelStopReason = 'stop'
     let finishReason: string | null = null
-    let sawDone = false
+    let terminalFrameSeen = false
+    let streamDone = false
     const idleTimeoutMs = normalizeStreamIdleTimeoutMs(this.config.streamIdleTimeoutMs)
     try {
       while (!signal.aborted) {
         const read = await readStreamChunk(reader, signal, idleTimeoutMs)
         if (read.kind === 'timeout') {
+          if (terminalFrameSeen) break
           yield {
             kind: 'error',
             message: `model stream stalled for ${idleTimeoutMs}ms without data`,
@@ -740,16 +742,18 @@ export class DeepseekCompatModelClient implements ModelClient {
         }
         if (read.kind === 'aborted') break
         if (read.kind === 'error') {
+          if (terminalFrameSeen) break
           yield { kind: 'error', message: read.message, code: 'stream_read_error' }
           return
         }
         const { value, done } = read
         if (done) break
         buffer += decoder.decode(value, { stream: true })
-        let boundary: number
-        while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+        let separator: RegExpExecArray | null
+        while ((separator = /\r?\n\r?\n/.exec(buffer))) {
+          const boundary = separator.index
           const frame = buffer.slice(0, boundary)
-          buffer = buffer.slice(boundary + 2)
+          buffer = buffer.slice(boundary + separator[0].length)
           if (Buffer.byteLength(frame, 'utf8') > RUNTIME_RESOURCE_LIMITS_V1.modelFrameBytes) {
             yield {
               kind: 'error',
@@ -759,14 +763,16 @@ export class DeepseekCompatModelClient implements ModelClient {
             return
           }
           const dataLines = frame
-            .split('\n')
+            .split(/\r?\n/)
             .filter((line) => line.startsWith('data:'))
             .map((line) => line.slice(5).trim())
             .join('')
           if (!dataLines) continue
           if (dataLines === '[DONE]') {
-            finishReason = finishReason ?? 'stop'
-            sawDone = true
+            if (endpointFormat === 'chat_completions' && !pendingArguments.size) {
+              terminalFrameSeen = true
+            }
+            streamDone = true
             break
           }
           let payload: unknown
@@ -814,7 +820,17 @@ export class DeepseekCompatModelClient implements ModelClient {
           }
           if (result.usage) usage = mergeUsageSnapshots(usage, result.usage)
           if (result.finishReason) finishReason = result.finishReason
+          const type = (payload as Record<string, unknown>).type
+          if (endpointFormat === 'chat_completions') {
+            terminalFrameSeen ||= Boolean(result.finishReason)
+          } else if (endpointFormat === 'responses') {
+            terminalFrameSeen ||= type === 'response.completed' || type === 'response.incomplete'
+          } else {
+            terminalFrameSeen ||= type === 'message_stop'
+          }
           for (const chunk of result.chunks) yield chunk
+          if (result.chunks.some((chunk) => chunk.kind === 'error')) return
+          if (endpointFormat !== 'chat_completions' && terminalFrameSeen) break
         }
         if (Buffer.byteLength(buffer, 'utf8') > RUNTIME_RESOURCE_LIMITS_V1.modelFrameBytes) {
           yield {
@@ -824,7 +840,7 @@ export class DeepseekCompatModelClient implements ModelClient {
           }
           return
         }
-        if (sawDone) break
+        if (streamDone || (endpointFormat !== 'chat_completions' && terminalFrameSeen)) break
       }
     } finally {
       try {
@@ -838,6 +854,10 @@ export class DeepseekCompatModelClient implements ModelClient {
       return
     }
     if (usage) yield { kind: 'usage', usage }
+    if (!terminalFrameSeen) {
+      yield { kind: 'error', message: 'Model response ended before its protocol completion marker.', code: 'model_stream_incomplete' }
+      return
+    }
     stopReason = ((): ModelStopReason => {
       switch (finishReason) {
         case 'tool_calls':

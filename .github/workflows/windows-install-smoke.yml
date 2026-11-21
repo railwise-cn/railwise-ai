@@ -17,6 +17,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_docling_conversion:
+        description: 'Run focused Docling startup and mirrored CSV backend checks plus native Superpowers and Blender skill calls.'
+        type: boolean
+        required: false
+        default: false
       run_browser_startup_diagnostic:
         description: 'Collect isolated pinned daemon startup diagnostics only; no application, model or task execution'
         type: boolean
@@ -49,7 +54,19 @@ on:
         required: false
         default: false
       run_published_gui_update:
-        description: 'Install released 0.5.6 and click the real sidebar upgrade to released Stable 0.5.7 on an ephemeral Windows runner'
+        description: 'Install the exact released baseline and upgrade from the app sidebar over the live Stable feed on an ephemeral Windows runner'
+        type: boolean
+        required: false
+        default: false
+      published_gui_upgrade_scenario:
+        description: 'Pinned official pair for the live Windows sidebar upgrade'
+        type: choice
+        options:
+          - released-056-to-057
+          - released-057-to-059
+        default: released-056-to-057
+      published_gui_verify_overlay:
+        description: 'After a demonstrated 0.5.7 sidebar failure, separately verify in-place installation with a synthetic profile'
         type: boolean
         required: false
         default: false
@@ -60,6 +77,11 @@ on:
         default: false
       upgrade_058_to_candidate:
         description: 'Exercise both GUI paths from the released 0.5.8 to the same exact 0.5.9 candidate over private HTTPS.'
+        type: boolean
+        required: false
+        default: false
+      upgrade_059_to_candidate:
+        description: 'Exercise both GUI paths from the released 0.5.9 to the same exact 0.5.10 candidate over private HTTPS.'
         type: boolean
         required: false
         default: false
@@ -98,6 +120,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_docling_conversion:
+        description: 'Run focused Docling startup and mirrored CSV backend checks plus native Superpowers and Blender skill calls.'
+        type: boolean
+        required: false
+        default: false
       run_private_video_evaluation:
         description: 'Privately evaluate the installed Video Shotcraft Skill using separately provisioned Remotion and synthetic media. No license or binaries are distributed.'
         type: boolean
@@ -120,10 +147,10 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
+    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.upgrade_059_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
-    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || inputs.run_composer_acceptance && 35 || inputs.run_browser_execution && 25 || 15 }}
+    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || (inputs.run_composer_acceptance || inputs.run_docling_conversion) && 35 || inputs.run_browser_execution && 25 || 15 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -136,6 +163,9 @@ jobs:
       - name: Preserve the isolated cold marketplace profile
         if: (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation) && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance)
         run: throw 'Cold marketplace acceptance must use its own clean profile'
+      - name: Preserve the isolated focused marketplace profile
+        if: inputs.run_docling_conversion && (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation || inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.run_startup_appearance)
+        run: throw 'Focused marketplace acceptance must use its own clean profile'
       - name: Require the original package build ID
         if: ${{ inputs.package_run_id == '' }}
         run: throw 'package_run_id is required to inspect an existing package'
@@ -170,6 +200,7 @@ jobs:
           RAILWISE_WINDOWS_TASK_SMOKE: ${{ inputs.run_task_execution }}
           RAILWISE_WINDOWS_BROWSER_SMOKE: ${{ inputs.run_browser_execution }}
           RAILWISE_WINDOWS_MIRROR_SMOKE: ${{ inputs.run_mirror_acceptance }}
+          RAILWISE_WINDOWS_DOCLING_CONVERSION: ${{ inputs.run_docling_conversion }}
           RAILWISE_WINDOWS_VIDEO_EVALUATION: ${{ inputs.run_private_video_evaluation }}
           RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE: ${{ inputs.run_startup_appearance }}
           RAILWISE_WINDOWS_COMPOSER_SMOKE: ${{ inputs.run_composer_acceptance }}
@@ -196,21 +227,21 @@ jobs:
             ${{ runner.temp }}/windows-package-source.json
 
   windows-frozen-gui-update:
-    if: ${{ inputs.run_frozen_gui_update == true || inputs.upgrade_058_to_candidate == true }}
-    name: ${{ inputs.upgrade_058_to_candidate && 'Official 0.5.8 to exact candidate' || 'Official 0.5.7 to exact frozen 0.5.8' }} (${{ matrix.entry }})
+    if: ${{ inputs.run_frozen_gui_update == true || inputs.upgrade_058_to_candidate == true || inputs.upgrade_059_to_candidate == true }}
+    name: ${{ inputs.upgrade_059_to_candidate && 'Official 0.5.9 to exact candidate' || inputs.upgrade_058_to_candidate && 'Official 0.5.8 to exact candidate' || 'Official 0.5.7 to exact frozen 0.5.8' }} (${{ matrix.entry }})
     runs-on: windows-2022
     timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
-        entry: ${{ fromJSON(inputs.upgrade_058_to_candidate && '["sidebar","settings"]' || '["sidebar"]') }}
+        entry: ${{ fromJSON((inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && '["sidebar","settings"]' || '["sidebar"]') }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Validate exclusive acceptance scope
-        if: ${{ inputs.package_run_id == '' || (inputs.run_frozen_gui_update && inputs.upgrade_058_to_candidate) || inputs.run_startup_appearance || inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation }}
+        if: ${{ inputs.package_run_id == '' || (inputs.run_frozen_gui_update && (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate)) || (inputs.upgrade_058_to_candidate && inputs.upgrade_059_to_candidate) || inputs.run_startup_appearance || inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation }}
         run: throw 'Select one original frozen package run and optional private next package run'
       - uses: actions/setup-node@v7
         with:
@@ -232,12 +263,12 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/frozen-windows
       - name: Prepare checksummed Electron runtime for the private fixture
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
+        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
         env:
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
         run: npm run prepare:electron
       - name: Reuse the original build's Windows document sidecar
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
+        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
         uses: actions/download-artifact@v4
         with:
           name: markitdown-win32-x64
@@ -245,12 +276,12 @@ jobs:
           github-token: ${{ github.token }}
           path: build/sidecars/markitdown-win32-x64
       - name: Verify the reused Windows document sidecar
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
+        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
         env:
           WORKWISE_SIDECAR_ARCH: x64
         run: node scripts/build-markitdown-sidecar.mjs --verify-only
       - name: Build the runner-local higher-version NSIS fixture
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
+        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
         env:
           WORKWISE_APP_VERSION: '0.5.9'
           WORKWISE_CANDIDATE_SOURCE_HEAD: ${{ github.sha }}
@@ -263,11 +294,13 @@ jobs:
         run: npm run dist:win
       - name: Exercise native update or the exact overlay fallback and reopen the existing conversation
         env:
-          INCLUDE_PRIVATE_NEXT: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate }}
-          CANDIDATE_UPGRADE_ENTRY: ${{ inputs.upgrade_058_to_candidate && matrix.entry || '' }}
+          INCLUDE_PRIVATE_NEXT: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
+          CANDIDATE_UPGRADE_ENTRY: ${{ (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && matrix.entry || '' }}
+          CANDIDATE_UPGRADE_BASELINE: ${{ inputs.upgrade_059_to_candidate && '0.5.9' || '' }}
         run: |
           $arguments = @("$env:RUNNER_TEMP/frozen-windows", "$env:RUNNER_TEMP/frozen-windows-source.json", "$env:RUNNER_TEMP/frozen-windows-evidence")
           if ($env:CANDIDATE_UPGRADE_ENTRY) { $arguments += $env:CANDIDATE_UPGRADE_ENTRY }
+          if ($env:CANDIDATE_UPGRADE_BASELINE) { $arguments += $env:CANDIDATE_UPGRADE_BASELINE }
           if ($env:INCLUDE_PRIVATE_NEXT -eq 'true') {
             @{ packageSourceHead=$env:GITHUB_SHA; runId=$env:GITHUB_RUN_ID; runAttempt=$env:GITHUB_RUN_ATTEMPT; purpose='private-next-updater-fixture' } | ConvertTo-Json | Set-Content -LiteralPath "$env:RUNNER_TEMP/private-next-windows-source.json"
             $arguments += @("$env:RUNNER_TEMP/private-next-windows", "$env:RUNNER_TEMP/private-next-windows-source.json", '0.5.9')
@@ -277,14 +310,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: frozen-windows-gui-upgrade-${{ github.run_id }}${{ inputs.upgrade_058_to_candidate && format('-{0}', matrix.entry) || '' }}
+          name: frozen-windows-gui-upgrade-${{ github.run_id }}${{ (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && format('-{0}', matrix.entry) || '' }}
           retention-days: 7
           if-no-files-found: warn
           path: ${{ runner.temp }}/frozen-windows-evidence/
 
   windows-published-gui-update:
     if: ${{ inputs.run_published_gui_update == true && inputs.run_frozen_gui_update != true }}
-    name: Released Windows 0.5.6 to 0.5.7 via the real sidebar upgrade
+    name: Released Windows sidebar upgrade (${{ inputs.published_gui_upgrade_scenario || 'released-056-to-057' }})
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -303,6 +336,9 @@ jobs:
       - name: Verify the published GUI upgrade contract
         run: node --test scripts/windows-published-gui-update-smoke.test.mjs scripts/windows-install-smoke.test.mjs
       - name: Install the released baseline and upgrade through the packaged UI
+        env:
+          PUBLISHED_GUI_UPGRADE_SCENARIO: ${{ inputs.published_gui_upgrade_scenario || 'released-056-to-057' }}
+          PUBLISHED_GUI_VERIFY_OVERLAY: ${{ inputs.published_gui_verify_overlay }}
         run: node scripts/run-windows-published-gui-update-smoke.mjs
       - name: Retain actual updater evidence and diagnostics
         if: always()

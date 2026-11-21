@@ -209,16 +209,21 @@ export class TaskRunRepository {
   }
 
   findActiveByOrigin(threadId: string): TaskRun | null {
-    const row = this.db.prepare(`SELECT * FROM task_runs
+    return this.listActiveByOrigin(threadId, 1)[0] ?? null
+  }
+
+  listActiveByOrigin(threadId: string, limit: number): TaskRun[] {
+    const rows = this.db.prepare(`SELECT * FROM task_runs
       WHERE (thread_id = ? OR json_extract(data_json,'$.originThreadId') = ?)
       AND status NOT IN ('completed','failed','cancelled')
       AND json_extract(data_json,'$.parentTaskId') IS NULL
       AND COALESCE(json_extract(data_json,'$.visibility'),'task') NOT IN ('chat','internal')
-      ORDER BY updated_at DESC,id DESC LIMIT 1`).get(threadId,threadId) as TaskRunRow | undefined
-    return row ? this.parseRun(row) : null
+      ORDER BY CASE WHEN json_extract(data_json,'$.scheduledBy') IS NULL THEN 0 ELSE 1 END,
+      updated_at DESC,id DESC LIMIT ?`).all(threadId, threadId, limit) as TaskRunRow[]
+    return rows.map(row => this.parseRun(row))
   }
 
-  list(input: { threadId?: string; workspaceRoot?: string; search?: string; status?: TaskRunStatus; limit?: number; offset?: number; cursor?: string } = {}): TaskRun[] {
+  list(input: { threadId?: string; workspaceRoot?: string; scheduleId?: string; search?: string; status?: TaskRunStatus; limit?: number; offset?: number; cursor?: string } = {}): TaskRun[] {
     const clauses: string[] = []
     const values: Array<string | number> = []
     if (input.threadId) {
@@ -232,6 +237,10 @@ export class TaskRunRepository {
     if (input.workspaceRoot) {
       clauses.push("json_extract(data_json, '$.workspaceRoot') = ?")
       values.push(resolve(input.workspaceRoot))
+    }
+    if (input.scheduleId) {
+      clauses.push("json_extract(data_json, '$.scheduledBy.scheduleId') = ?")
+      values.push(input.scheduleId)
     }
     if (input.search?.trim()) {
       clauses.push("instr(lower(json_extract(data_json, '$.goal')), lower(?)) > 0")
@@ -711,7 +720,7 @@ export class TaskRunRepository {
   /** All callbacks here are synchronous: external I/O must happen after commit. */
   transact<T>(fn: () => T): T { return this.transaction(fn) }
 
-  appendInput(input: { taskId: string; expectedRevision: number; idempotencyKey: string; text: string; kind?: TaskInput['kind']; sourceId?: string; nowIso: string } & Pick<TaskInput, 'attachmentIds' | 'workspaceReferences' | 'capabilityReferences'>): { input: TaskInput; task: TaskRun } {
+  appendInput(input: { taskId: string; expectedRevision: number; idempotencyKey: string; text: string; kind?: TaskInput['kind']; sourceId?: string; nowIso: string } & Pick<TaskInput, 'attachmentIds' | 'workspaceReferences' | 'capabilityReferences' | 'skillSelections'>): { input: TaskInput; task: TaskRun } {
     return this.transaction(() => {
       const prior = this.db.prepare('SELECT data_json FROM task_inputs WHERE task_id = ? AND idempotency_key = ?').get(input.taskId, input.idempotencyKey) as { data_json: string } | undefined
       const task = this.get(input.taskId)
@@ -723,7 +732,7 @@ export class TaskRunRepository {
         return { input: saved, task }
       }
       if (TERMINAL_TASK_STATUSES.has(task.status)) throw Object.assign(new Error('cannot append input to a terminal task'), { code: 'invalid_state' })
-      const saved = TaskInputSchema.parse({ id: `input_${randomUUID()}`, taskId: task.id, kind: input.kind ?? 'supplement', text: input.text.trim(), idempotencyKey: input.idempotencyKey, sourceId: input.sourceId, createdAt: input.nowIso,attachmentIds:input.attachmentIds,workspaceReferences:input.workspaceReferences,capabilityReferences:input.capabilityReferences })
+      const saved = TaskInputSchema.parse({ id: `input_${randomUUID()}`, taskId: task.id, kind: input.kind ?? 'supplement', text: input.text.trim(), idempotencyKey: input.idempotencyKey, sourceId: input.sourceId, createdAt: input.nowIso,attachmentIds:input.attachmentIds,workspaceReferences:input.workspaceReferences,capabilityReferences:input.capabilityReferences,skillSelections:input.skillSelections })
       const next = this.update(task.id, input.expectedRevision, current => ({ ...current, updatedAt: input.nowIso }), { key: `input:${saved.id}`, kind: 'task_input_received', payload: { inputId: saved.id, kind: saved.kind }, createdAt: input.nowIso })
       this.db.prepare('INSERT INTO task_inputs(id, task_id, idempotency_key, consumed_at, data_json) VALUES (?, ?, ?, NULL, ?)').run(saved.id, task.id, saved.idempotencyKey, JSON.stringify(saved))
       const session = this.execution.ensureSession(next, input.nowIso)

@@ -77,6 +77,13 @@ describe('format runtime error', () => {
     expect(view.detail).not.toContain('runtime-token')
   })
 
+  it('keeps unknown technical failures in redacted details', () => {
+    const view = describeRuntimeError(new Error("Error invoking remote method 'connector:start': child process returned exit code 1 password=private"), 'Check the connector and try again.')
+    expect(view.summary).toBe('Check the connector and try again.')
+    expect(view.detail).toContain('exit code 1')
+    expect(view.detail).not.toContain('private')
+  })
+
   it('supports legacy error envelopes and Electron IPC prefixes', () => {
     const error = new Error(
       `Error invoking remote method 'runtime:request': Error: ${JSON.stringify({

@@ -1,4 +1,4 @@
-import type { ReactElement, RefObject } from 'react'
+import type { ReactElement, ReactNode, RefObject } from 'react'
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ChatBlock, RuntimeConnectionStatus } from '../../agent/types'
@@ -18,7 +18,7 @@ import {
   sameTurnContent,
   splitThink,
   stableTurnKey,
-  turnHasPendingRuntimeWork,
+  blockHasPendingRuntimeWork,
   type Turn
 } from './message-timeline-turns'
 import { extractPlanMetadataFromBlock } from '../../plan/plan-tool'
@@ -26,6 +26,7 @@ import { planDisplayNameFromRelativePath } from '../../plan/plan-path'
 import {
   deriveSemanticProgress,
   isInlineProcessControl,
+  isPendingProcessControl,
   visibleProcessBlocksForMode
 } from './conversation-visibility'
 
@@ -33,6 +34,9 @@ export { summarizeToolBlock } from './message-timeline-process'
 
 type Props = {
   blocks: ChatBlock[]
+  activeControls?: readonly ChatBlock[]
+  replyQuestionId?: string
+  taskActivity?: ReactNode
   liveReasoning: string
   live: string
   activeThreadId: string | null
@@ -78,6 +82,9 @@ function blockScrollStamp(block: ChatBlock | undefined): string {
 
 export function MessageTimeline({
   blocks,
+  activeControls,
+  replyQuestionId,
+  taskActivity,
   liveReasoning,
   live,
   activeThreadId,
@@ -116,6 +123,7 @@ export function MessageTimeline({
   const hasContent = blocks.length > 0 || Boolean(live || liveReasoning)
   const endRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   const turns = useMemo(() => groupTurns(blocks), [blocks])
   const latestBlock = blocks[blocks.length - 1]
@@ -134,6 +142,7 @@ export function MessageTimeline({
     collapseEarlierTurns
   } = useTimelineScroll({
     containerRef,
+    contentRef,
     endRef,
     activeThreadId,
     pageSize: TURN_PAGE_SIZE,
@@ -151,6 +160,16 @@ export function MessageTimeline({
     () => (hiddenTurnCount > 0 ? turns.slice(hiddenTurnCount) : turns),
     [hiddenTurnCount, turns]
   )
+  const activeControlIds = useMemo(() => activeControls && new Set(activeControls.map(block => block.id)), [activeControls])
+  const pendingControlsOutsidePage = useMemo(() => {
+    if (!hiddenTurnCount || !activeControls?.length) return []
+    const shown = new Set(visibleTurns.flatMap(turn => turn.blocks.map(block => block.id)))
+    return visibleProcessBlocksForMode(activeControls.filter(block => isPendingProcessControl(block) && !shown.has(block.id)), viewMode)
+  }, [activeControls, hiddenTurnCount, viewMode, visibleTurns])
+  const latestTaskActivity = pendingControlsOutsidePage.length ? <>
+    {pendingControlsOutsidePage.map(block => <MessageBubble key={block.id} block={block} nested replyInComposer={block.id === replyQuestionId} />)}
+    {taskActivity}
+  </> : taskActivity
   const forkedFromTitle = activeThread?.forkedFromTitle?.trim() ?? ''
   const timelineWorkspaceRoot = resolveTimelineWorkspaceRoot(activeThread, workspaceRoot)
   const forkBoundaryTurnCount =
@@ -172,7 +191,7 @@ export function MessageTimeline({
       ref={containerRef}
       className="ds-chat-timeline ds-no-drag flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
     >
-      <div className="ds-message-timeline-content ds-chat-column-inset mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-8 pb-10 pt-8">
+      <div ref={contentRef} className="ds-message-timeline-content ds-chat-column-inset mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-8 pb-10 pt-8">
         {!hasContent || !activeThreadId ? (
           <MessageTimelineEmptyHero
             route={heroRoute}
@@ -220,7 +239,8 @@ export function MessageTimeline({
             typeof reasoningFirst === 'number' && typeof reasoningLast === 'number'
               ? Math.max(0, reasoningLast - reasoningFirst)
               : undefined
-          const turnPending = turnHasPendingRuntimeWork(turn)
+          const turnPending = turn.blocks.some(block => blockHasPendingRuntimeWork(block) &&
+            (!activeControlIds || !isPendingProcessControl(block) || activeControlIds.has(block.id)))
           const isLatestTurn = index === visibleTurns.length - 1
           const hasLiveStream = isLatestTurn && !!(liveReasoning.trim() || live.trim())
           const showForkPoint = !professionalSurface &&
@@ -230,6 +250,9 @@ export function MessageTimeline({
               {showForkPoint ? <ThreadForkPoint parentTitle={forkedFromTitle} /> : null}
               <MemoMessageTurn
                 turn={turn}
+                activeControlIds={activeControlIds}
+                replyQuestionId={replyQuestionId}
+                taskActivity={isLatestTurn ? latestTaskActivity : undefined}
                 professionalSurface={professionalSurface}
                 isProcessing={(busy && isLatestTurn) || turnPending || hasLiveStream}
                 runActivity={isLatestTurn ? runActivity : undefined}
@@ -273,6 +296,7 @@ export function MessageTimeline({
         {blocks.length === 0 && (live || liveReasoning) ? (
           <MemoMessageTurn
             turn={{ blocks: [] }}
+            taskActivity={taskActivity}
             professionalSurface={professionalSurface}
             isProcessing={busy}
             runActivity={runActivity}
@@ -297,6 +321,7 @@ export function MessageTimeline({
             })()}
           />
         ) : null}
+        {blocks.length === 0 && !live && !liveReasoning ? taskActivity : null}
         <div ref={endRef} aria-hidden className="h-px w-full shrink-0" />
       </div>
     </div>
@@ -305,6 +330,9 @@ export function MessageTimeline({
 
 function MessageTurn({
   turn,
+  activeControlIds,
+  replyQuestionId,
+  taskActivity,
   isProcessing,
   runActivity,
   liveReasoning,
@@ -322,6 +350,9 @@ function MessageTurn({
   professionalSurface
 }: {
   turn: Turn
+  activeControlIds?: ReadonlySet<string>
+  replyQuestionId?: string
+  taskActivity?: ReactNode
   isProcessing: boolean
   runActivity?: ThreadRunActivity
   liveReasoning: string
@@ -377,6 +408,16 @@ function MessageTurn({
     [processBlocks, viewMode]
   )
   const inlineControls = visibleProcessBlocks.filter(isInlineProcessControl)
+  const shownInlineControls = inlineControls.filter(block => !activeControlIds || !isPendingProcessControl(block) || activeControlIds.has(block.id))
+  const visibleMessages = new Map([...assistantContentBlocks, ...(professionalSurface ? [] : shownInlineControls)].map(block => [block.id, block]))
+  const orderedMessages: ChatBlock[] = []
+  for (const source of turn.blocks) {
+    const message = visibleMessages.get(source.id)
+    if (message) orderedMessages.push(message)
+    visibleMessages.delete(source.id)
+  }
+  orderedMessages.push(...visibleMessages.values())
+  const showingPendingControl = shownInlineControls.some(isPendingProcessControl)
   const restoredWaiting = inlineControls.some(block => block.kind === 'approval' && block.status === 'pending') ? 'waiting_approval'
     : inlineControls.some(block => block.kind === 'user_input' && block.status === 'pending') ? 'waiting_user' : undefined
   const semanticProgress = useMemo(
@@ -425,12 +466,9 @@ function MessageTurn({
         </div>
       ) : null}
 
-      {!professionalSurface ? inlineControls.map(block => (
-        <MessageBubble key={block.id} block={block} nested />
-      )) : null}
-
-      {assistantContentBlocks.map((block) => (
-        <MessageBubble key={block.id} block={block} professionalSurface={professionalSurface} />
+      {orderedMessages.map(block => (
+        <MessageBubble key={block.id} block={block} nested={isInlineProcessControl(block)}
+          professionalSurface={professionalSurface} replyInComposer={block.id === replyQuestionId} />
       ))}
 
       <GeneratedFilesPanel
@@ -444,7 +482,9 @@ function MessageTurn({
         <ReviewSummaryCard key={review.id} review={review} />
       )) : null}
 
-      {isProcessing && !professionalSurface ? <LiveTurnProgressRow progress={semanticProgress} activity={runActivity} restoredWaiting={restoredWaiting} /> : null}
+      {isProcessing && !professionalSurface && !(activeControlIds && showingPendingControl) ? <LiveTurnProgressRow progress={semanticProgress} activity={runActivity} restoredWaiting={restoredWaiting} /> : null}
+
+      {taskActivity}
 
       {!isProcessing && !professionalSurface && devPreviewCard ? devPreviewCard : null}
 
@@ -488,6 +528,9 @@ function LiveTurnProgressRow({ progress, activity, restoredWaiting }: {
 
 const MemoMessageTurn = memo(MessageTurn, (prev, next) => (
   sameTurnContent(prev.turn, next.turn) &&
+  prev.activeControlIds === next.activeControlIds &&
+  prev.replyQuestionId === next.replyQuestionId &&
+  prev.taskActivity === next.taskActivity &&
   prev.isProcessing === next.isProcessing &&
   prev.runActivity === next.runActivity &&
   prev.liveReasoning === next.liveReasoning &&

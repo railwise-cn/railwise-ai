@@ -332,7 +332,7 @@ describe('chat-store-maintenance-actions goal actions', () => {
 
       expect(state.busy).toBe(false)
       expect(state.currentTurnId).toBeNull()
-      expect(state.error).toBe('runtime timeout')
+      expect(state.error).toBe('The assistant took too long to respond. Try again.')
       expect(recoverActiveTurn).toHaveBeenCalledTimes(1)
     } finally {
       delete (globalThis as { window?: unknown }).window

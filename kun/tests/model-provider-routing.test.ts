@@ -23,7 +23,7 @@ import { StartTurnRequest } from '../src/contracts/turns.js'
 const cleanup: Array<() => Promise<unknown>> = []
 afterEach(async () => { vi.restoreAllMocks(); while (cleanup.length) await cleanup.pop()!(); vi.unstubAllEnvs() })
 
-async function endpoint(id: string) {
+async function endpoint(id: string, firstStream?: Array<Record<string, unknown>>) {
   const requests: Array<{ body: Record<string, unknown>; authorization?: string }> = []
   const server: Server = createServer(async (request, response) => {
     let raw = ''
@@ -36,6 +36,10 @@ async function endpoint(id: string) {
     const payload = { id: `${id}-reply`, choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11 } }
     if (body.stream) {
       response.writeHead(200, { 'content-type': 'text/event-stream' })
+      if (firstStream && requests.length === 1) {
+        response.end(firstStream.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(''))
+        return
+      }
       response.end(`data: ${JSON.stringify({ ...payload, choices: [{ index: 0, delta: { content: text }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`)
     } else {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -56,7 +60,7 @@ async function runtimeFor(routes: ModelProviderRoutes, defaultModelProviderId = 
   const runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: root,
     runtimeToken: 'test-token', ...route, modelProviders: routes, defaultModelProviderId,
     approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false,
-    insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({}) })
+    insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({ attachments: { enabled: true } }) })
   cleanup.push(async () => { await runtime.shutdown?.() })
   return { runtime, root }
 }
@@ -127,6 +131,58 @@ describe('configured provider identity over real HTTP', () => {
     const router = new ProviderRoutingModelClient(new DeepseekCompatModelClient(b.route), [a.route, b.route])
     for await (const _ of router.stream({ ...request(saved?.providerId, saved?.model), reasoningEffort: saved?.reasoningEffort })) { /* Drain the real response. */ }
     expect(a.requests).toHaveLength(1); expect(b.requests).toHaveLength(0)
+  })
+
+  it('reopens an interrupted task and continues only after an explicit resume', async () => {
+    const provider = await endpoint('a', [
+      { choices: [{ index: 0, delta: { content: 'Some visible text before disconnect.' } }] },
+      { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: 'interrupted-ls', function: { name: 'ls', arguments: '{}' } }] } }] }
+    ])
+    const first = await runtimeFor([provider.route])
+    const thread = await first.runtime.threadService.create({ workspace: first.root, model: 'shared-model', mode: 'agent' })
+    const attachment = await first.runtime.attachmentStore!.createDocument({
+      name: 'resume-source.pdf', mimeType: 'application/pdf', kind: 'pdf',
+      data: Buffer.from('%PDF-1.7 synthetic test metadata'), threadId: thread.id, workspace: first.root
+    })
+    await first.runtime.attachmentStore!.updateV2(attachment.id, { state: 'ready', indexState: 'ready', summary: 'Authorized task source' })
+    const result = await first.runtime.taskCoordinator!.command({
+      threadId: thread.id, intent: 'new', idempotencyKey: 'start-interrupted-fixture',
+      request: { prompt: 'What is 2+3?', providerId: 'a', taskIntent: 'new', attachmentIds: [attachment.id] }
+    })
+    if (result.kind !== 'task_started') throw new Error('expected task started from the original conversation')
+    const started = result.turn
+    const initial = first.runtime.taskRepository!.findByTurn(started.turnId)!
+
+    await expect(first.runtime.runTurn(started.threadId, started.turnId)).resolves.toBe('failed')
+    expect(first.runtime.taskRepository!.get(initial.id)).toMatchObject({ status: 'stalled', blockCode: 'response_interrupted' })
+    expect(first.runtime.taskRepository!.operations(initial.id, 'tool')).toHaveLength(0)
+    expect(provider.requests).toHaveLength(1)
+    await first.runtime.shutdown?.()
+    cleanup.pop()
+
+    const second = await runtimeFor([provider.route], 'a', first.root)
+    const saved = second.runtime.taskRepository!.get(initial.id)!
+    expect(saved).toMatchObject({ status: 'stalled', blockCode: 'response_interrupted' })
+    expect((await second.runtime.sessionStore.loadItems(started.threadId)).filter(item => item.kind === 'assistant_text')).toEqual([
+      expect.objectContaining({ text: 'Some visible text before disconnect.', status: 'failed' })
+    ])
+    expect((await second.runtime.sessionStore.loadItems(thread.id)).filter(item => item.id === `item_command_task_partial_${started.turnId}_receipt`)).toEqual([
+      expect.objectContaining({ text: expect.stringContaining('Some visible text before disconnect.'), kind: 'assistant_text' })
+    ])
+    expect((await second.runtime.sessionStore.loadEventsSince(started.threadId, 0)).filter(event => event.kind === 'turn_failed')).toEqual([
+      expect.objectContaining({ reason: 'response_interrupted' })
+    ])
+    expect(provider.requests).toHaveLength(1)
+
+    const resumed = await second.runtime.taskControlService!.mutate(saved.id, 'resume', {
+      expectedRevision: saved.revision,
+      idempotencyKey: 'explicit-interruption-resume'
+    })
+    expect(resumed.task.id).toBe(saved.id)
+    await vi.waitFor(() => expect(second.runtime.taskRepository!.get(saved.id)?.status).toBe('completed'))
+    expect(provider.requests).toHaveLength(2)
+    expect(JSON.stringify(provider.requests[1]?.body.messages)).toContain(`resume-source.pdf (pdf, ready, id=${attachment.id})`)
+    expect(await second.runtime.turnService.getTurn(started.threadId, resumed.turn!.turnId)).toMatchObject({ attachmentIds: [attachment.id] })
   })
 
   it('carries identity through Auto and child requests while Flow internal requests retain the default', async () => {

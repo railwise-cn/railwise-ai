@@ -1,9 +1,11 @@
+import { taskStatusSummary } from './task-user-presentation.js'
 import { createHash } from 'node:crypto'
 import type { TaskCommand, TaskCommandResult } from '../contracts/execution.js'
 import { TaskCommandSchema } from '../contracts/execution.js'
-import type { TaskRun } from '../contracts/tasks.js'
+import type { TaskInput, TaskRun } from '../contracts/tasks.js'
 import type { ThreadRecord } from '../contracts/threads.js'
 import type { ThreadStore } from '../ports/thread-store.js'
+import type { UserInputGate } from '../ports/user-input-gate.js'
 import type { TaskRunRepository } from './task-run-repository.js'
 import { operationFingerprint } from './task-run-repository.js'
 import { StartTurnRequest } from '../contracts/turns.js'
@@ -13,13 +15,17 @@ import type { TaskController } from './task-controller.js'
 import type { TaskContextRuntime } from './task-context-runtime.js'
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import { WorkspaceReferenceService } from './workspace-reference-service.js'
-import { TaskControlService } from './task-control-service.js'
+import { TaskControlService, type TaskResumeAttention } from './task-control-service.js'
 import { preflightExternalTask, externalTaskIntent, externalProviderAmbiguity, type ExternalTaskPreflight } from './external-task-capability.js'
 import { externalPreflightThreadContext } from './contextual-external-task-preflight.js'
 import { explicitWorkspaceWrite } from './workspace-write-preflight.js'
 import { promptRequiresFileDeliverable } from '../loop/turn-completion-guard.js'
 
 export type TaskCommandDispatchOptions = {
+  /** Internal recurrence dispatch does not represent a new user message. */
+  source?: 'scheduled-occurrence'
+  /** Recheck the source immediately before creating its durable command receipt. */
+  assertMayBegin?: () => void
   /** Server-only preparation of a durable recurrence context before capability admission. */
   prepareExecutionThread?: (thread: ThreadRecord) => Promise<void>
   /** Internal integration hook. Persist source linkage and outbox before any worker dispatch. */
@@ -30,7 +36,7 @@ export class TaskCoordinator {
   private readonly pending = new Map<string, Promise<TaskCommandResult>>()
   private flushingMessages?: Promise<void>
   private readonly controls:TaskControlService
-  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
+  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; userInputGate?: UserInputGate; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
   async command(raw: TaskCommand, options: TaskCommandDispatchOptions = {}): Promise<TaskCommandResult> {
     const command = TaskCommandSchema.parse(raw)
     const queueKey = `${command.threadId}:${command.idempotencyKey}`
@@ -58,9 +64,16 @@ export class TaskCoordinator {
       ['waiting_user', 'paused', 'stalled'].includes(task.status) && /^(?:请)?(?:使用|用|通过|在).*(?:钉钉|飞书|dingtalk|lark|feishu)/i.test(userText)) intent = 'supplement'
     // An explicit chat hint cannot bypass provider admission for an action.
     if (intent === 'chat' && (externalTaskIntent(userText) || explicitWorkspaceWrite(userText))) intent = 'new'
+    let resumeAttention: TaskResumeAttention | undefined
+    if (command.expectedAttentionRevision !== undefined) {
+      if (command.intent !== 'resume' || !command.resolveAttentionId || !command.taskId || command.expectedRevision === undefined) {
+        throw Object.assign(new Error('重新确认任务及待处理事项后继续。'), { code: 'scope_conflict' })
+      }
+      resumeAttention = { id: command.resolveAttentionId, revision: command.expectedAttentionRevision, threadId: origin.id }
+    }
     if(intent==='status') return {kind:'snapshot',task}
     const resolving = command.resolveAttentionId ? this.deps.repository.attention(command.resolveAttentionId) : null
-    if (command.resolveAttentionId && (!resolving || resolving.threadId !== origin.id ||
+    if (!resumeAttention && command.resolveAttentionId && (!resolving || resolving.threadId !== origin.id ||
       !(resolving.payload?.kind === 'task_input_intent' && ['supplement','new'].includes(intent) &&
           (!Array.isArray(resolving.payload.choices) || resolving.payload.choices.includes(intent)) ||
         resolving.payload?.kind === 'external_provider_choice' && intent === 'new' && command.selectedExternalProvider && !externalProviderAmbiguity(userText) && externalTaskIntent(userText)?.provider === command.selectedExternalProvider ||
@@ -68,16 +81,19 @@ export class TaskCoordinator {
       throw Object.assign(new Error('attention decision does not match this task command'), {code:'scope_conflict'})
     }
     if (command.selectedExternalProvider && resolving?.payload?.kind !== 'external_provider_choice') throw Object.assign(new Error('Provider selection requires its original pending decision.'), { code: 'scope_conflict' })
+    options.assertMayBegin?.()
     const receipt = this.deps.repository.execution.command(command.threadId,command.idempotencyKey,command)
     if (receipt.result) {
       const result = receipt.result as TaskCommandResult
       if (result.task) await options.prepareTask?.(this.deps.repository.get(result.task.id) ?? result.task)
-      await this.recordResult(command, result, intent)
+      await this.recordResult(command, result, intent, options)
       return result
     }
     await this.deps.turns.validateSkillSelection(userText, origin.workspace)
-    if (command.request.capabilityReferences?.length) await this.deps.turns.validateCapabilitySelection(command.request, origin)
-    if (resolving?.status !== undefined && resolving.status !== 'pending') throw Object.assign(new Error('这条待处理选择已经完成，请刷新当前任务。'), { code: 'stale_request' })
+    const skillSelections = command.request.capabilityReferences?.length
+      ? await this.deps.turns.validateCapabilitySelection(command.request, origin)
+      : undefined
+    if (!resumeAttention && resolving?.status !== undefined && resolving.status !== 'pending') throw Object.assign(new Error('这条待处理选择已经完成，请刷新当前任务。'), { code: 'stale_request' })
     if (resolving?.payload?.kind === 'task_input_intent' && operationFingerprint(StartTurnRequest.parse(resolving.payload.request)) !== operationFingerprint(command.request)) {
       throw Object.assign(new Error('任务选择必须使用原始请求及附件，请重新打开该待办。'), { code: 'scope_conflict' })
     }
@@ -90,24 +106,37 @@ export class TaskCoordinator {
         payload:{ kind:'external_provider_choice', providers:['dingtalk','lark'], request:command.request, originalText:userText } })
       const result:TaskCommandResult = { kind:'attention_required', ...(task ? {task} : {}), attentionId:id, message }
       this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
-      await this.recordResult(command,result,intent)
+      await this.recordResult(command,result,intent,options,skillSelections)
       return result
     }
+    const conversationTasks = task && !command.taskId ? this.deps.repository.listActiveByOrigin(origin.id, 2) : []
+    const multipleTasks = conversationTasks.length > 1 && Boolean(conversationTasks[0]?.scheduledBy) === Boolean(conversationTasks[1]?.scheduledBy)
+    const focusedTask = task && !multipleTasks
+    if (intent === 'ambiguous' && focusedTask && task.status === 'waiting_user') intent = 'supplement'
     if (intent === 'ambiguous' && task && this.deps.classifyIntent) {
-      try { intent = await this.deps.classifyIntent(userText,task) } catch { /* uncertainty remains a durable human decision */ }
+      try { intent = await this.deps.classifyIntent(userText,task) } catch { /* use the current conversation context */ }
+    }
+    if (intent === 'ambiguous' && focusedTask) {
+      intent = 'supplement'
     }
     let result:TaskCommandResult
     if(intent==='ambiguous') {
       const id = `input_intent_${createHash('sha256').update(`${command.threadId}:${command.idempotencyKey}`).digest('hex').slice(0,32)}`
       const now = this.deps.nowIso()
-      const message = '请选择补充当前任务或新建任务；当前任务会继续保留。'
+      const message = '这段对话有多项工作。请选择将这条消息补充给当前工作，或在本对话处理新请求。'
       this.deps.repository.putAttention({ id, ownerKind:'task', ownerId:task?.id ?? command.threadId, ...(task?{taskId:task.id}:{}), threadId:command.threadId, kind:'question', title:'确定这条补充的归属', message, status:'pending', revision:0, createdAt:now, updatedAt:now, payload:{ kind:'task_input_intent', commandKey:command.idempotencyKey, text:userText, request:command.request, choices:['supplement','new'] } })
       result={kind:'attention_required',...(task?{task}:{}),message,attentionId:id}
     }
     else if(intent==='pause'||intent==='resume'||intent==='cancel') {
-      if(!task)result={kind:'attention_required',message:'没有可操作的任务，请先选择任务。'}
+      if(!task)result={kind:'attention_required',message:'当前对话没有可操作的任务。你可以直接输入要做的事。'}
+      else if(multipleTasks) result={kind:'attention_required',message:'这段对话有多项工作，请在需要操作的进度卡上选择。'}
+      else if(intent==='resume' && !resumeAttention && (['queued', 'running'].includes(task.status) ||
+        ['waiting_user', 'waiting_approval'].includes(task.status) && this.deps.repository.inbox(task.workspaceRoot)
+          .some(item => item.taskId === task.id && (item.kind === 'question' || item.kind === 'approval')))) {
+        result={kind:'snapshot',task}
+      }
       else {
-        const changed=await this.controls.mutate(task.id,intent,{expectedRevision:command.expectedRevision ?? task.revision,idempotencyKey:`command:${command.idempotencyKey}`,model:command.request.model})
+        const changed=await this.controls.mutate(resumeAttention ? command.taskId! : task.id,intent,{expectedRevision:command.expectedRevision ?? task.revision,idempotencyKey:`command:${command.idempotencyKey}`,model:command.request.model,...(resumeAttention ? { resumeAttention } : {})})
         if(intent==='resume') {
           if(changed.capability) result={kind:'capability_required',task:changed.task,attentionId:`capability_${changed.task.id}`,capability:changed.capability,message:changed.capability.message,...(changed.receipt ? {receipt:changed.receipt} : {})}
           else {
@@ -118,7 +147,7 @@ export class TaskCoordinator {
       }
     }
     else if(intent==='supplement') {
-      if(!task) result={kind:'attention_required',message:'没有可接收补充的任务，请选择任务或新建任务。'}
+      if(!task) result={kind:'attention_required',message:'当前对话没有需要补充的任务。你可以直接输入完整要求。'}
       else {
         const executionThread = await this.deps.threadStore.get(task.threadId)
         if (!executionThread) throw Object.assign(new Error('task execution thread not found'), { code: 'not_found' })
@@ -129,7 +158,7 @@ export class TaskCoordinator {
         if (capability?.provider === 'workspace' && capability.status !== 'available') {
           await this.validateReferences(command, origin.workspace, task.threadId)
           const saved = this.deps.tasks.appendInput(task.id, command.expectedRevision ?? task.revision, command.idempotencyKey, userText, 'supplement', undefined,
-            { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences })
+            { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences, skillSelections })
           const attentionId = `capability_${task.id}`, now = this.deps.nowIso()
           const prior = this.deps.repository.attention(attentionId)
           this.deps.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: origin.id, workspaceRoot: origin.workspace,
@@ -137,7 +166,7 @@ export class TaskCoordinator {
             payload: { kind: 'capability_required', capability, request: command.request } })
           result = { kind: 'capability_required', task: saved.task, attentionId, capability, message: capability.message }
           this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
-          await this.recordResult(command, result, intent)
+          await this.recordResult(command, result, intent, options,skillSelections)
           return result
         }
         if (capability && (unresolvedEffect || priorBinding) && ['waiting_user', 'paused', 'stalled'].includes(task.status)) {
@@ -151,7 +180,7 @@ export class TaskCoordinator {
                 successStatus: ['succeeded'], verification: 'provider_readback' } }, updatedAt: this.deps.nowIso()
             }))
             return this.deps.tasks.appendInput(bound.id, bound.revision, command.idempotencyKey, userText, 'supplement', 'provider-selection',
-              { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences })
+              { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences, capabilityReferences: command.request.capabilityReferences, skillSelections })
           })
           if (capability.status !== 'available') {
             const attentionId = `capability_${task.id}`
@@ -161,9 +190,9 @@ export class TaskCoordinator {
               status: 'pending', revision: 0, createdAt: now, updatedAt: now,
               payload: { kind: 'capability_required', capability, request: command.request } })
             result = { kind: 'capability_required', task: saved.task, attentionId, capability, message: capability.message }
-          } else result = { kind: 'input_queued', task: saved.task, input: saved.input }
+          } else result = await this.continueAfterSupplement(command, saved)
           this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
-          await this.recordResult(command, result, intent)
+          await this.recordResult(command, result, intent, options,skillSelections)
           return result
         }
         const providerChanged = capability && task.acceptance.effect?.provider !== capability.provider
@@ -183,9 +212,8 @@ export class TaskCoordinator {
           result={kind:'attention_required',task,attentionId,message}
         } else {
           await this.validateReferences(command,origin.workspace,task.threadId)
-          const saved=this.deps.tasks.appendInput(task.id,command.expectedRevision ?? task.revision,command.idempotencyKey,userText,'supplement',undefined,{attachmentIds:command.request.attachmentIds,workspaceReferences:command.request.workspaceReferences,capabilityReferences:command.request.capabilityReferences})
-          // The durable queue is authoritative; no in-memory steering acknowledgement.
-          result={kind:'input_queued',task:saved.task,input:saved.input}
+          const saved=this.deps.tasks.appendInput(task.id,command.expectedRevision ?? task.revision,command.idempotencyKey,userText,'supplement',undefined,{attachmentIds:command.request.attachmentIds,workspaceReferences:command.request.workspaceReferences,capabilityReferences:command.request.capabilityReferences,skillSelections})
+          result = await this.continueAfterSupplement(command, saved)
         }
       }
     } else {
@@ -213,7 +241,7 @@ export class TaskCoordinator {
         result = { kind: 'capability_required', task: this.deps.repository.get(waiting.id) ?? waiting, attentionId, capability, message: capability.message }
         if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:now})
         this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
-        await this.recordResult(command, result, intent)
+        await this.recordResult(command, result, intent, options,skillSelections)
         return result
       }
       const turnKey=`command:${command.idempotencyKey}`
@@ -230,11 +258,12 @@ export class TaskCoordinator {
         result={kind:isTask?'task_started':'chat_started',...(linked&&isTask?{task:this.deps.repository.get(linked.id) ?? linked}:{}),turn}
         if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:this.deps.nowIso()})
         this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
+        const history = this.recordResult(command,result,intent,options,skillSelections)
         if(!oldTurn) {
           void this.deps.runTurn(turn.threadId,turn.turnId)
           dispatched = true
         }
-        await this.recordResult(command,result,intent)
+        await history
         return result
       } catch (error) {
         if (!dispatched) this.deps.tasks.releasePendingAdmission(turn.threadId, turn.turnId)
@@ -246,8 +275,42 @@ export class TaskCoordinator {
       if(latest.status==='pending')this.deps.repository.putAttention({...latest,status:'answered',revision:latest.revision+1,updatedAt:this.deps.nowIso()})
     }
     this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
-    await this.recordResult(command,result,intent)
+    await this.recordResult(command,result,intent,options,skillSelections)
     return result
+  }
+
+  private async continueAfterSupplement(
+    command: ReturnType<typeof TaskCommandSchema.parse>, saved: { task: TaskRun; input: TaskInput }
+  ): Promise<TaskCommandResult> {
+    const { repository, threadStore, userInputGate } = this.deps
+    const { task, input } = saved
+    const queued = { kind: 'input_queued' as const, task, input }
+    if (task.status !== 'waiting_user' || !task.activeTurnId || task.blockCode) return queued
+    const pending = repository.inbox(task.workspaceRoot).filter(item => item.taskId === task.id)
+    const attention = pending.length === 1 && pending[0]?.kind === 'question' ? pending[0] : undefined
+    const request = attention?.requestId ? userInputGate?.get(attention.requestId) : undefined
+    const question = request?.questions.length === 1 ? request.questions[0] : undefined
+    if (request?.turnId === task.activeTurnId && question && question.options.length === 0 &&
+        userInputGate?.resolve(request.id, { status: 'submitted', answers: [{ id: question.id, label: question.header || question.question, value: input.text }] })) {
+      return { ...queued, task: repository.get(task.id) ?? task }
+    }
+    if (pending.length) return queued
+    const turn = (await threadStore.get(task.threadId))?.turns.find(item => item.id === task.activeTurnId)
+    if (!turn || !['completed', 'failed', 'aborted'].includes(turn.status)) return queued
+    try {
+      // The user's reply is already durable. Reuse the normal scoped recovery
+      // checks and bind a single resume to this exact supplement.
+      const resumed = await this.controls.mutate(task.id, 'resume', {
+        expectedRevision: task.revision, idempotencyKey: `supplement:${input.id}`, model: command.request.model
+      })
+      if (resumed.capability) return { kind: 'capability_required', task: resumed.task,
+        attentionId: `capability_${task.id}`, capability: resumed.capability, message: resumed.capability.message,
+        ...(resumed.receipt ? { receipt: resumed.receipt } : {}) }
+      return { ...queued, task: resumed.task }
+    } catch (error) {
+      if (!['stale_request', 'invalid_state', 'outcome_unknown'].includes((error as { code?: string }).code ?? '')) throw error
+      return { ...queued, task: repository.get(task.id) ?? task }
+    }
   }
 
   private async validateReferences(command:ReturnType<typeof TaskCommandSchema.parse>,workspace:string,targetThreadId:string):Promise<void> {
@@ -258,8 +321,10 @@ export class TaskCoordinator {
     }
   }
 
-  private async recordResult(command:ReturnType<typeof TaskCommandSchema.parse>,result:TaskCommandResult,intent:ReturnType<typeof classifyTaskInput>):Promise<void> {
+  private async recordResult(command:ReturnType<typeof TaskCommandSchema.parse>,result:TaskCommandResult,intent:ReturnType<typeof classifyTaskInput>,options:TaskCommandDispatchOptions,userSkillSelections?:TaskInput['skillSelections']):Promise<void> {
     if (result.kind === 'chat_started') return
+    const scheduled = options.source === 'scheduled-occurrence'
+    if (scheduled && result.kind === 'task_started') return
     if (result.kind === 'capability_required' && result.task) {
       const pending = this.deps.repository.attention(result.attentionId ?? `capability_${result.task.id}`)
       if (typeof pending?.payload?.resumeCommandId === 'string') {
@@ -280,9 +345,11 @@ export class TaskCoordinator {
     result.receipt={userMessageItemId:`item_command_${commandId}_user`,resultMessageItemId:`item_command_${commandId}_receipt`}
     // A resume command retains its original request for execution and audit,
     // but its conversation receipt describes the control instead of resending the goal.
-    const userText = intent === 'resume' ? '继续任务' : command.request.displayText ?? command.request.prompt
-    const assistantText=intent==='resume'&&result.kind==='task_started'?'正在继续任务。':result.kind==='snapshot' ? result.task ? `${result.task.goal}\n${result.task.waitingReason ?? result.task.stalledReason ?? ({queued:'已接收任务',running:'正在执行',retrying:'正在继续',paused:'已暂停',waiting_user:'等待你补充',waiting_approval:'等待必要授权',completed:'已完成',stalled:'需要处理阻塞',failed:'执行失败',cancelled:'已取消'} as const)[result.task.status]}` : '当前没有进行中的任务。' : result.kind==='input_queued' ? result.task.status==='paused'?'补充已保存，将在你继续任务后送达。':'补充已保存，将送达当前任务。' : result.kind==='task_updated'?result.action==='pause'?'任务已暂停，补充会继续保存。':'任务已取消，已有成果和记录已保留。': result.kind==='attention_required'?result.message:result.kind==='capability_required'?result.capability.message:`已接收任务：${result.task?.goal ?? command.request.displayText ?? command.request.prompt}`
-    this.deps.repository.enqueueOutbox({id:`command-message:${commandId}`,ownerId:command.threadId,kind:'task_command_message',payload:{threadId:command.threadId,commandId,userText,assistantText,...(result.intentCard ? { intentCard: result.intentCard } : {}),...(result.kind==='capability_required'&&result.task?{capabilityCard:{threadId:command.threadId,taskId:result.task.id,attentionId:result.attentionId,prompt:command.request.prompt,capability:result.capability}}:{}),createdAt:this.deps.nowIso()},createdAt:this.deps.nowIso()})
+    const userText = scheduled ? undefined : intent === 'resume' ? '继续任务' : command.request.displayText ?? command.request.prompt
+    const assistantText=intent==='resume'&&result.kind==='task_started'?'正在继续任务。':result.kind==='snapshot' ? result.task ? `${result.task.goal}\n${taskStatusSummary(result.task)}` : '当前没有进行中的任务。' : result.kind==='input_queued' ? result.task.status==='paused'?'补充已保存，将在你继续任务后送达。':'补充已保存，将送达当前任务。' : result.kind==='task_updated'?result.action==='pause'?'任务已暂停，补充会继续保存。':'任务已取消，已有成果和记录已保留。': result.kind==='attention_required'?result.message:result.kind==='capability_required'?result.capability.message:'开始处理。'
+    this.deps.repository.enqueueOutbox({id:`command-message:${commandId}`,ownerId:command.threadId,kind:'task_command_message',payload:{threadId:command.threadId,commandId,userText,assistantText,
+      ...(userText !== undefined && intent !== 'resume' ? { userAttachmentIds: command.request.attachmentIds, userWorkspaceReferences: command.request.workspaceReferences, userSkillSelections } : {}),
+      ...(result.intentCard ? { intentCard: result.intentCard } : {}),...(result.kind==='capability_required'&&result.task?{capabilityCard:{threadId:command.threadId,taskId:result.task.id,attentionId:result.attentionId,prompt:command.request.prompt,capability:result.capability}}:{}),createdAt:this.deps.nowIso()},createdAt:this.deps.nowIso()})
     await this.flushCommandMessages()
   }
 

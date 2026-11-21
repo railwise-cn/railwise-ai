@@ -75,6 +75,7 @@ import {
   RUNTIME_USER_INPUT_TEMPLATE,
   RUNTIME_USAGE_TEMPLATE,
   RUNTIME_FLOWS_TEMPLATE, RUNTIME_FLOW_TEMPLATE, RUNTIME_FLOW_VALIDATE_TEMPLATE,
+  RUNTIME_TASK_SCHEDULES_TEMPLATE, RUNTIME_TASK_SCHEDULE_TEMPLATE,
   RUNTIME_FLOW_PUBLISH_TEMPLATE, RUNTIME_FLOW_RUN_TEMPLATE, RUNTIME_FLOW_TEST_NODE_TEMPLATE,
   RUNTIME_FLOW_HISTORY_TEMPLATE, RUNTIME_FLOW_EXPORT_TEMPLATE, RUNTIME_FLOW_RUN_DETAILS_TEMPLATE,
   RUNTIME_FLOW_RUN_CANCEL_TEMPLATE, RUNTIME_FLOW_RUN_RESUME_TEMPLATE, RUNTIME_FLOW_RUN_RETRY_TEMPLATE,
@@ -342,6 +343,8 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_ATTACHMENT_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_ATTACHMENT_CONTENT_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_FLOWS_TEMPLATE, ['GET', 'POST']),
+  compileEndpoint(RUNTIME_TASK_SCHEDULES_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_TASK_SCHEDULE_TEMPLATE, ['PATCH']),
   compileEndpoint(RUNTIME_FLOW_TEMPLATE, ['GET', 'PUT']),
   compileEndpoint(RUNTIME_FLOW_VALIDATE_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_FLOW_PUBLISH_TEMPLATE, ['POST']),
@@ -1112,7 +1115,9 @@ const scheduledTaskSchedulePatchSchema = z.object({
   kind: clawScheduleKindSchema.optional(),
   everyMinutes: z.number().int().min(1).max(10_080).optional(),
   timeOfDay: z.string().max(16).optional(),
-  atTime: z.string().max(128).optional()
+  atTime: z.string().max(128).optional(),
+  times: z.array(z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)).min(1).max(24).optional(),
+  timezone: trimmedString(128).optional()
 }).strict()
 
 const scheduledTaskPatchSchema = z.object({
@@ -1777,7 +1782,7 @@ export const notificationPayloadSchema = z
     turnId: optionalTrimmedString(MAX_ID_LENGTH),
     approvalId: optionalTrimmedString(MAX_ID_LENGTH),
     activeThread: z.boolean().optional(),
-    reason: z.enum(['completed', 'error', 'aborted', 'blocked', 'max_tokens', 'waiting_approval']).optional(),
+    reason: z.enum(['completed', 'error', 'aborted', 'blocked', 'max_tokens', 'waiting_approval', 'response_interrupted']).optional(),
     title: trimmedString(MAX_NOTIFICATION_TITLE_LENGTH),
     body: trimmedString(MAX_NOTIFICATION_BODY_LENGTH)
   })

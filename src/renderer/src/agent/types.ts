@@ -63,6 +63,7 @@ export type WebCitationSource = {
 
 export type RuntimeDisclosureMetadata = {
   displayText?: string
+  skillSelections?: import('@shared/callable-capabilities').SkillSelections
   attachmentIds?: string[]
   attachments?: AttachmentReference[]
   generatedFiles?: GeneratedFileReference[]
@@ -374,6 +375,7 @@ export type UserInputStatusPayload = {
 
 export type UserMessageEventPayload = {
   itemId: string
+  metadataOnly?: boolean
   turnId?: string
   createdAt?: string
   text: string
@@ -390,7 +392,7 @@ export type ThreadDeltaEvent = {
 
 export type ThreadErrorOptions = {
   terminal?: boolean
-  terminalReason?: 'error' | 'blocked' | 'max_tokens'
+  terminalReason?: 'error' | 'blocked' | 'max_tokens' | 'response_interrupted'
   threadId?: string
   turnId?: string
 }

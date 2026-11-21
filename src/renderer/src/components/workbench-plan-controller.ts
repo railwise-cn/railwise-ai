@@ -40,6 +40,7 @@ type PlanTurnOverrides = Pick<
   | 'guiPlan'
   | 'model'
   | 'reasoningEffort'
+  | 'skillSelections'
   | 'workspaceReferences'
 > & {
   workspaceRoot?: string

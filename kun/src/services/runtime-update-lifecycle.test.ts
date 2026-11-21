@@ -46,4 +46,31 @@ describe('Runtime update handoff', () => {
     await retry
     expect(stop).toHaveBeenCalledOnce()
   })
+
+  it('reopens admission once after an aborted update and a timed-out handoff has settled', async () => {
+    vi.useFakeTimers()
+    let finish!: () => void
+    const stop = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+    const resume = vi.fn()
+    const lifecycle = new RuntimeUpdateLifecycle({ snapshot: () => [], suspend: async () => undefined, resume, stop, timeoutMs: 100 })
+    const pending = expect(lifecycle.prepare()).rejects.toThrow('更新包已保留')
+    await vi.advanceTimersByTimeAsync(100)
+    await pending
+
+    const cancelled = lifecycle.cancel()
+    expect(lifecycle.cancel()).toBe(cancelled)
+    expect(lifecycle.isSuspended()).toBe(true)
+    expect(resume).not.toHaveBeenCalled()
+    finish()
+    await cancelled
+    expect(resume).toHaveBeenCalledOnce()
+    expect(lifecycle.isSuspended()).toBe(false)
+
+    const retried = lifecycle.prepare()
+    await vi.advanceTimersByTimeAsync(0)
+    finish()
+    await retried
+    expect(stop).toHaveBeenCalledTimes(2)
+    expect(lifecycle.isSuspended()).toBe(true)
+  })
 })

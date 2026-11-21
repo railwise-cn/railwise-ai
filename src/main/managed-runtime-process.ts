@@ -61,6 +61,7 @@ import {
   type ClawScheduleMcpLaunchConfig
 } from './claw-schedule-mcp-config'
 import { defaultManagedRuntimeDataDir } from './runtime/managed-runtime-adapter'
+import { RuntimeStartBlockedForShutdownError } from './runtime/gui-update-ownership'
 import { isRuntimeHealthResponseBody } from './runtime-health'
 import { appendManagedLogLine } from './logger'
 import {
@@ -84,6 +85,7 @@ import type { TaskDocumentExportBridge } from './services/task-document-export-s
 let child: ChildProcess | null = null
 let lastManagedRuntimeExit: { code: number | null; signal: NodeJS.Signals | null } | undefined
 let ipcShutdownChild: ChildProcess | null = null
+let pendingManagedRuntimeShutdown: { child: ChildProcess; exited: Promise<void> } | undefined
 let childLogCapture: RuntimeLogCapture | null = null
 let lastResolvedBinary: string | null = null
 let actualManagedRuntimePort: number | null = null
@@ -392,6 +394,10 @@ export function isManagedRuntimeChildRunning(): boolean {
   return child !== null && child.exitCode === null && child.signalCode === null
 }
 
+export function getPendingManagedRuntimeShutdown(): Promise<void> | undefined {
+  return pendingManagedRuntimeShutdown?.child === child ? pendingManagedRuntimeShutdown?.exited : undefined
+}
+
 export type StartManagedRuntimeChildOptions = {
   allowStart?: () => boolean
   autoInstallBundledAgentPack?: boolean
@@ -427,7 +433,7 @@ export async function startManagedRuntimeChild(
   options: StartManagedRuntimeChildOptions = {}
 ): Promise<void> {
   const assertStartAllowed = (): void => {
-    if (options.allowStart?.() === false) throw new Error('runtime_shutdown_in_progress')
+    if (options.allowStart?.() === false) throw new RuntimeStartBlockedForShutdownError()
   }
   assertStartAllowed()
   const candidateRoot = options.candidateRoot?.trim()
@@ -613,6 +619,7 @@ export async function startManagedRuntimeChild(
   startedChild.on('exit', (code, signal) => {
     if (child === startedChild) lastManagedRuntimeExit = { code, signal }
     if (ipcShutdownChild === startedChild) ipcShutdownChild = null
+    if (pendingManagedRuntimeShutdown?.child === startedChild) pendingManagedRuntimeShutdown = undefined
     void startedExportBridge.close()
     if (documentExportBridge === startedExportBridge) documentExportBridge = null
     startedLogCapture.logLifecycle(
@@ -792,7 +799,9 @@ export async function syncManagedSkillCapability(
   const discoveredRoots = await guiSkillRootsForRuntime(settings)
   const managedRoots = discoveredRoots.map(root => root.path)
   const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
-  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId }) => pluginId ? [{ root: path, id: pluginId }] : [])
+  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId, workspace, pluginEntrySkill }) => pluginId
+    ? [{ root: path, id: pluginId, ...(workspace ? { workspace } : {}), ...(pluginEntrySkill ? { entrySkill: pluginEntrySkill } : {}) }]
+    : [])
   await updateManagedConnectorConfig(dataDir, existing => {
     const capabilities = objectValue(existing.capabilities)
     const current = objectValue(capabilities.skills)
@@ -1017,7 +1026,9 @@ async function skillCapabilityConfigForRuntime(
   const discoveredRoots = explicitRoots ? [] : await guiSkillRootsForRuntime(settings)
   const managedRoots = discoveredRoots.map(root => root.path)
   const projectRoots = discoveredRoots.flatMap(({ path, workspace }) => workspace ? [{ root: path, workspace }] : [])
-  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId }) => pluginId ? [{ root: path, id: pluginId }] : [])
+  const pluginRoots = discoveredRoots.flatMap(({ path, pluginId, workspace, pluginEntrySkill }) => pluginId
+    ? [{ root: path, id: pluginId, ...(workspace ? { workspace } : {}), ...(pluginEntrySkill ? { entrySkill: pluginEntrySkill } : {}) }]
+    : [])
   const roots = explicitRoots
     ? uniqueStrings(explicitRoots.map(normalizeSkillRootPath))
     : uniqueStrings([
@@ -1483,18 +1494,19 @@ export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit
   const stoppingChild = child
   const pid = child.pid
   const capture = childLogCapture
-  if (stoppingChild.exitCode === null && stoppingChild.signalCode === null) {
+  if (stoppingChild.exitCode === null && stoppingChild.signalCode === null && pendingManagedRuntimeShutdown?.child !== stoppingChild) {
     if (process.platform === 'win32' && stoppingChild === ipcShutdownChild && stoppingChild.connected) {
       stoppingChild.send(MANAGED_RUNTIME_SHUTDOWN_REQUEST, (error) => {
         if (error) capture?.logLifecycle(`shutdown IPC failed: ${error.message}`)
       })
+      trackManagedRuntimeShutdown(stoppingChild)
     } else {
       // Windows kill terminates the Runtime without running its save/close handler.
       if (options.requireCleanExit && process.platform === 'win32') {
         throw new Error('当前 Runtime 未提供 Windows 安全退出通道，更新包已保留。')
       }
       try {
-        stoppingChild.kill('SIGTERM')
+        if (stoppingChild.kill('SIGTERM')) trackManagedRuntimeShutdown(stoppingChild)
       } catch {
         /* already gone */
       }
@@ -1524,6 +1536,11 @@ export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit
     childLogCapture = null
     await capture.close()
   }
+}
+
+function trackManagedRuntimeShutdown(stoppingChild: ChildProcess): void {
+  const exited = new Promise<void>(resolve => { stoppingChild.once('exit', () => resolve()) })
+  pendingManagedRuntimeShutdown = { child: stoppingChild, exited }
 }
 
 function waitForChildExit(process: ChildProcess, timeoutMs: number): Promise<boolean> {

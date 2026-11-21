@@ -4,6 +4,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FlowWorkspaceView, createStarterFlowInput, ScheduleConfigFields } from './FlowWorkspaceView'
+import i18n from '../../i18n'
 
 let container: HTMLDivElement
 let root: Root
@@ -19,6 +20,7 @@ function runtimeResponse(body: unknown): { ok: true; status: 200; body: string }
 }
 
 beforeEach(async () => {
+  await i18n.changeLanguage('zh')
   let savedFlow: ReturnType<typeof createStarterFlowInput> & {
     revision: number
     createdAt: string
@@ -44,6 +46,10 @@ beforeEach(async () => {
   })
 
   const registry = [
+    {
+      type: 'schedule_trigger', category: 'trigger', label: 'Schedule', available: true,
+      inputs: [], outputs: [{ id: 'output', label: 'Output', type: 'json', required: false, multiple: false }]
+    },
     {
       type: 'manual_trigger', category: 'trigger', label: '手动触发', available: true,
       inputs: [], outputs: [{ id: 'output', label: '输出', type: 'json', required: false, multiple: false }]
@@ -98,7 +104,7 @@ afterEach(async () => {
 describe('FlowWorkspaceView mounted canvas', () => {
   it('visibly mounts both starter nodes after creating the first Flow', async () => {
     const newFlowButton = [...container.querySelectorAll('button')]
-      .find((button) => button.textContent?.trim() === '新建 Flow')
+      .find((button) => button.textContent?.trim() === '新建流程')
     expect(newFlowButton).toBeInstanceOf(HTMLButtonElement)
 
     await act(async () => {
@@ -107,14 +113,14 @@ describe('FlowWorkspaceView mounted canvas', () => {
     await settle()
     await settle()
 
-    expect(container.querySelector('[aria-label="Flow 画布"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="流程画布"]')).not.toBeNull()
     const nodes = container.querySelectorAll('.react-flow__node')
     expect(nodes).toHaveLength(2)
     for (const node of nodes) {
       expect(getComputedStyle(node).visibility).toBe('visible')
     }
     expect(container.textContent).toContain('手动触发')
-    expect(container.textContent).toContain('Agent 处理')
+    expect(container.textContent).toContain('智能体处理')
   })
 
   it('keeps a newly created scheduled starter visible in the scheduled filter', async () => {
@@ -128,7 +134,7 @@ describe('FlowWorkspaceView mounted canvas', () => {
     await settle()
 
     const newFlowButton = [...container.querySelectorAll('button')]
-      .find((button) => button.textContent?.trim() === '新建 Flow')
+      .find((button) => button.textContent?.trim() === '新建流程')
     expect(newFlowButton).toBeInstanceOf(HTMLButtonElement)
 
     await act(async () => {
@@ -137,9 +143,14 @@ describe('FlowWorkspaceView mounted canvas', () => {
     await settle()
     await settle()
 
-    expect(container.querySelector('[aria-label="Flow 画布"]')).not.toBeNull()
-    expect(container.textContent).toContain('定时触发')
-    expect(container.textContent).toContain('Agent 处理')
+    expect(container.querySelector('[aria-label="流程画布"]')).not.toBeNull()
+    expect(container.querySelector('h1')?.textContent).toBe('定时流程')
+    expect(container.querySelector('.react-flow__node [role="group"][aria-label="定时触发"]')).not.toBeNull()
+    expect(container.textContent).toContain('启动方式')
+    expect(container.textContent).toContain('智能体处理')
+    expect(container.textContent).not.toContain('schedule_trigger')
+    expect(container.textContent).not.toContain('Preview')
+    expect([...container.querySelectorAll('[aria-label]')].some(element => element.getAttribute('aria-label')?.includes('schedule_trigger'))).toBe(false)
   })
 })
 

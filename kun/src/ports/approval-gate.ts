@@ -28,6 +28,7 @@ export interface ApprovalGate {
   decide(approvalId: string, decision: 'allow' | 'deny', reason?: string): boolean
   pending(threadId?: string): ApprovalRequest[]
   get(approvalId: string): ApprovalRequest | undefined
+  hasLiveResolver?(approvalId: string): boolean
   expireTurn(turnId: string, reason?: string): number
   expireAll(reason?: string): number
 }

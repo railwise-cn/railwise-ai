@@ -509,6 +509,8 @@ describe('official marketplace catalog', () => {
         subpath: 'skills/chart-visualization'
       }
     })
+    expect(superpowers.version).toBe('44c9b2d6e889982ac18c27d05a19fefe335194e1-railwise.1')
+    expect(superpowers.components[0]).toMatchObject({ skillNames: ['using-superpowers'] })
     expect(superpowers.source).toMatchObject({
       kind: 'github',
       resolvedRef: '44c9b2d6e889982ac18c27d05a19fefe335194e1'
@@ -568,7 +570,7 @@ describe('official marketplace catalog', () => {
     for (const [id, [commit, license, subpath]] of expected) {
       const item = packageById(id)
       expect(item.installation.mode).toBe('direct-mirror')
-      expect(item.version).toBe(id === 'video-shotcraft' ? `${commit}-railwise.1` : commit)
+      expect(item.version).toBe(['video-shotcraft', 'blender-skills'].includes(id) ? `${commit}-railwise.1` : commit)
       expect(item.source).toMatchObject({
         kind: 'github', resolvedRef: commit,
         ...(subpath ? { subpath } : {})

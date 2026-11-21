@@ -27,6 +27,10 @@ describe('app lifecycle', () => {
     expect(shouldCloseMainWindowToTray(true, true)).toBe(false)
   })
 
+  it('closes the main window for a native update even with close-to-tray enabled', () => {
+    expect(shouldCloseMainWindowToTray(true, false, true)).toBe(false)
+  })
+
   it('does not show a blocking startup dialog in headless candidate mode', () => {
     expect(shouldShowStartupErrorDialog(true)).toBe(false)
     expect(shouldShowStartupErrorDialog(false)).toBe(true)

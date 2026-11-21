@@ -12,6 +12,7 @@ import {
 } from '../resolve-managed-runtime'
 import {
   isManagedRuntimeChildRunning,
+  getPendingManagedRuntimeShutdown,
   getManagedRuntimeActualPort,
   reclaimManagedRuntimePort,
   startManagedRuntimeChild,
@@ -59,6 +60,8 @@ export const managedRuntimeAdapter = {
   isChildRunning(): boolean {
     return isManagedRuntimeChildRunning()
   },
+
+  pendingShutdown: getPendingManagedRuntimeShutdown,
 
   getBaseUrl(settings: AppSettingsV1): string {
     const runtime = getManagedRuntimeSettings(settings)

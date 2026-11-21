@@ -39,5 +39,15 @@ export type TaskIntentCard = {
   request: Record<string, unknown> & { prompt: string }
   choices: Array<'supplement' | 'new'>
 }
-export type TaskCommandRequest = { threadId:string; taskId?:string; resolveAttentionId?:string; selectedExternalProvider?:'dingtalk'|'lark'; intent:'auto'|'status'|'supplement'|'new'|'chat'|'pause'|'resume'|'cancel'; idempotencyKey:string; expectedRevision?:number; request:Record<string,unknown> & {prompt:string;capabilityReferences?:CallableCapabilityReference[]} }
+export type TaskCommandRequest = {
+  threadId: string
+  taskId?: string
+  resolveAttentionId?: string
+  expectedAttentionRevision?: number
+  selectedExternalProvider?: 'dingtalk' | 'lark'
+  intent: 'auto' | 'status' | 'supplement' | 'new' | 'chat' | 'pause' | 'resume' | 'cancel'
+  idempotencyKey: string
+  expectedRevision?: number
+  request: Record<string, unknown> & { prompt: string; capabilityReferences?: CallableCapabilityReference[] }
+}
 export type TaskCommandResult = ({kind:'snapshot';task:TaskRunV1|null} | {kind:'input_queued';task:TaskRunV1;input:TaskInputV1} | {kind:'task_updated';action:'pause'|'cancel';task:TaskRunV1} | {kind:'task_started'|'chat_started';task?:TaskRunV1;turn:{threadId:string;turnId:string;userMessageItemId?:string}} | {kind:'attention_required';task?:TaskRunV1;attentionId?:string;message:string} | {kind:'capability_required';task?:TaskRunV1;attentionId?:string;message:string;capability:ExternalTaskCapability}) & {receipt?:{userMessageItemId:string;resultMessageItemId:string};intentCard?:TaskIntentCard}

@@ -87,6 +87,31 @@ describe('Skill installation runtime acknowledgement', () => {
     expect(runtime.resolveTurn({ workspace: '', prompt: 'browser-skill' }).activeSkillIds).toEqual([])
   })
 
+  it('binds verified marketplace references to the workspace that installed the package', async () => {
+    const installed = await skillRoot('using-superpowers')
+    const brainstorming = join(installed, 'brainstorming')
+    await mkdir(brainstorming)
+    await writeFile(join(brainstorming, 'SKILL.md'), '---\nname: brainstorming\n---\nAsk about the design.')
+    const workspace = await mkdtemp(join(tmpdir(), 'skill-workspace-'))
+    const otherWorkspace = await mkdtemp(join(tmpdir(), 'skill-other-workspace-'))
+    roots.push(workspace, otherWorkspace)
+    const config = { enabled: true, roots: [installed], legacySkillMd: true, projectRoots: [{ root: installed, workspace }] }
+    const prompt = '/skill:using-superpowers check local references'
+    const unregistered = await SkillRuntime.create(config)
+    expect(unregistered.resolveTurn({ workspace, prompt }).activeSkillResources).toBeUndefined()
+    const runtime = await SkillRuntime.create({
+      ...config, pluginRoots: [{ root: installed, id: 'superpowers', workspace, entrySkill: 'using-superpowers' }]
+    })
+    expect(runtime.callablePluginSkills(workspace)).toMatchObject([
+      { choice: { kind: 'plugin', id: 'superpowers' }, skillId: 'using-superpowers' }
+    ])
+    expect(runtime.callablePluginSkills(otherWorkspace)).toEqual([])
+    expect(runtime.resolveTurn({ workspace, prompt }).activeSkillResources).toMatchObject([
+      { skillId: 'using-superpowers', root: join(installed, 'using-superpowers') }
+    ])
+    await expect(runtime.validateSlashSelection(prompt, otherWorkspace)).rejects.toMatchObject({ code: 'skill_unavailable' })
+  })
+
   it('validates inline picker tokens and ignores quoted and negated references', async () => {
     const root = await skillRoot('selected-skill')
     const runtime = await SkillRuntime.create({ enabled: true, roots: [root], legacySkillMd: true })
@@ -94,6 +119,21 @@ describe('Skill installation runtime acknowledgement', () => {
     await expect(runtime.validateSlashSelection('请说明 `/skill:missing-skill` 的含义，不要用 /skill:another-missing ', '')).resolves.toBeUndefined()
     expect(runtime.resolveTurn({ workspace: '', prompt: '请使用 /skill:selected-skill 处理' }).activeSkillIds).toEqual(['selected-skill'])
     expect(runtime.resolveTurn({ workspace: '', prompt: '示例是 `/skill:selected-skill`' }).activeSkillIds).not.toContain('selected-skill')
+  })
+
+  it('selects a named legacy skill by its exact opaque ID without adding a prompt token', async () => {
+    const id = 'fedcba0123456789'.repeat(4)
+    const root = await skillRoot(id)
+    await writeFile(join(root, id, 'SKILL.md'), '---\nname: video-shotcraft\n---\nFollow the video workflow.\n')
+    const runtime = await SkillRuntime.create({ enabled: true, roots: [root], legacySkillMd: true })
+    expect(runtime.callableSkills('', new Set())).toMatchObject([{ kind: 'skill', id, label: 'Video Shotcraft' }])
+    await expect(runtime.validateSlashSelection('请生成视频', '', [id])).resolves.toBeUndefined()
+    expect(runtime.resolveTurn({ workspace: '', prompt: '请生成视频', selectedSkillIds: [id] })).toMatchObject({
+      activeSkillIds: [id], activations: [{ skillId: id, reason: 'explicit:id' }]
+    })
+    await runtime.updateConfiguration({ enabled: false, roots: [root], legacySkillMd: true, revision: 1 })
+    expect(runtime.callableSkills('', new Set())).toEqual([])
+    await expect(runtime.validateSlashSelection('请生成视频', '', [id])).rejects.toMatchObject({ code: 'skill_unavailable' })
   })
 
   it('activates the exact verified Plugin Skill as context without changing the ordinary tool allowlist', async () => {

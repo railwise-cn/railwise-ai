@@ -4,7 +4,7 @@ import type { AgentProfileV1, TaskPermissionSnapshotV1, TaskRunV1 } from '@share
 import { runtimeTaskPermissionsPath, runtimeThreadPath } from '@shared/runtime-endpoints'
 
 /** Explicit task-scoped confirmation. Reading this panel never changes authority or resumes work. */
-export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, revision }: { taskId: string; onConfirmed: (message: string) => void; autoLoad?: boolean; revision?: number }): ReactElement {
+export function TaskPermissionPanel({ taskId, onConfirmed, onContinue, autoLoad = false, revision }: { taskId: string; onConfirmed: (message: string) => void; onContinue?: (task: TaskRunV1, permission: TaskPermissionSnapshotV1) => Promise<void>; autoLoad?: boolean; revision?: number }): ReactElement {
   const { t } = useTranslation('common')
   const [snapshot, setSnapshot] = useState<TaskPermissionSnapshotV1 | null>(null)
   const [task, setTask] = useState<TaskRunV1 | null>(null)
@@ -20,6 +20,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
   const loadGeneration = useRef(0)
   const terminal = Boolean(task && (['completed', 'cancelled'].includes(task.status) || task.status === 'failed' && snapshot?.recoveryEligible !== true))
   const expired = Boolean(snapshot?.grant && (snapshot.grant.status === 'expired' || Date.parse(snapshot.grant.expiresAt) <= Date.now()))
+  const continueAfterGrant = Boolean(onContinue && task?.status === 'waiting_user' && reviewGrantIsCurrent(snapshot))
   const run = async (operation: () => Promise<void>): Promise<void> => {
     if (pending) return
     setPending(true); setError('')
@@ -51,6 +52,8 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
   }, [taskId, revision, autoLoad])
   const allow = async (): Promise<void> => {
     if (terminal || !snapshot || !confirmed || !snapshot.canConfirm) return
+    const generation = loadGeneration.current
+    const continuation = continueAfterGrant && reviewGrantIsCurrent(snapshot) ? onContinue : undefined
     const result: {task?: TaskRunV1; permission: TaskPermissionSnapshotV1; resumed?: boolean} = await window.workwise.confirmTaskPermissions(taskId, {
       expectedRevision: snapshot.taskRevision, scopeHash: snapshot.scopeHash, confirmed: true,
       approvalPolicy: 'on-request', ttlSeconds: 900, idempotencyKey: crypto.randomUUID(), duration,
@@ -61,9 +64,18 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
         ...(scopeFields.externalTargets.trim() ? { externalTargets: lines(scopeFields.externalTargets) } : {})
       } } : {})
     })
+    // A response from a closed or replaced review must never continue its task.
+    if (generation !== loadGeneration.current) return
     if (result.resumed === true || result.permission.taskId !== taskId || result.task && result.task.id !== taskId || task?.status === 'failed' && (!result.task || result.task.status !== 'paused' || result.resumed !== false)) throw new Error(t('taskPermissionRecoveryReadFailed'))
+    if (continuation && (result.resumed !== false || !result.task || result.task.status !== 'waiting_user' || result.task.threadId !== task?.threadId ||
+      !Number.isSafeInteger(result.task.revision) || result.task.revision <= snapshot.taskRevision || result.permission.taskRevision !== result.task.revision ||
+      !result.permission.canConfirm || result.permission.approvalPolicy !== 'on-request' || result.permission.workspaceRoot !== snapshot.workspaceRoot ||
+      result.permission.workspaceRevision !== snapshot.workspaceRevision || result.permission.agentRevision !== snapshot.agentRevision ||
+      result.permission.grant?.status !== 'active' || !result.permission.grant.id || result.permission.grant.id === snapshot.grant?.id || result.permission.grant.duration !== duration ||
+      !Number.isFinite(Date.parse(result.permission.grant.expiresAt)) || Date.parse(result.permission.grant.expiresAt) <= Date.now())) throw new Error(t('taskPermissionRecoveryReadFailed'))
     setSnapshot(result.permission); if (result.task) setTask(result.task); setConfirmed(false)
-    onConfirmed(t('taskPermissionSaved'))
+    if (continuation) await continuation(result.task!, result.permission)
+    else onConfirmed(t('taskPermissionSaved'))
   }
   const revoke = async (restoreBase = false):Promise<void> => {
     if(terminal || !snapshot?.grant || restoreBase && snapshot.canRestoreBase !== true)return
@@ -134,7 +146,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
           ['providerIds', 'taskPermissionScopeProviders'], ['externalTargets', 'taskPermissionTargets']
         ] as const).map(([field, label]) => <label key={field} className="block">{t(label)}<textarea rows={2} value={scopeFields[field]} disabled={field === 'writePaths' && snapshot.sandboxMode === 'read-only' && !snapshot.canWritePaths} onChange={event => { setScopeFields(current => ({ ...current, [field]: event.target.value })); setConfirmed(false) }} className="mt-1 block w-full rounded border border-ds-border bg-ds-main p-2" /></label>)}</div> : null}
       </div> : null}
-      <button type="button" disabled={pending || !confirmed || !snapshot.canConfirm} onClick={() => void run(allow)} className="rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t(expired ? 'taskPermissionRenew' : 'taskPermissionAllow')}</button>
+      <button type="button" disabled={pending || !confirmed || !snapshot.canConfirm} onClick={() => void run(allow)} className="rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t(continueAfterGrant ? 'taskPermissionAllowAndContinue' : expired ? 'taskPermissionRenew' : 'taskPermissionAllow')}</button>
       {profiles.length && task && ['waiting_user', 'stalled', 'paused'].includes(task.status) ? <div className="flex flex-wrap gap-2">
         <select aria-label={t('taskPermissionSelectAgent')} value={agentId} disabled={pending} onChange={event => setAgentId(event.target.value)} className="max-w-full rounded border border-ds-border bg-ds-main p-1">
           <option value="">{t('taskPermissionSelectAgent')}</option>{profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
@@ -148,3 +160,6 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
 }
 
 function lines(value: string): string[] { return value.split('\n').map(item => item.trim()).filter(Boolean) }
+function reviewGrantIsCurrent(snapshot: TaskPermissionSnapshotV1 | null): boolean {
+  return Boolean(snapshot && (!snapshot.grant || snapshot.grant.status === 'active' && Number.isFinite(Date.parse(snapshot.grant.expiresAt)) && Date.parse(snapshot.grant.expiresAt) > Date.now()))
+}
