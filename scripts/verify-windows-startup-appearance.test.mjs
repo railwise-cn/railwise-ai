@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
-import { gatekeeperEnforcement, isolatedMacDmgMember, validateIsolatedMacStartupBundle, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
+import { gatekeeperEnforcement, isolatedMacDmgMember, macDeveloperIdRequirement, validateIsolatedMacStartupBundle, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { observeStartupTargets, observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, waitForStartupCondition, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
@@ -201,4 +202,12 @@ test('records Gatekeeper enforcement separately from a successful bundle assessm
   assert.equal(gatekeeperEnforcement('assessments disabled\n'), 'disabled')
   assert.equal(gatekeeperEnforcement('status unavailable'), 'unknown')
   assert.equal(gatekeeperEnforcement(null), 'unknown')
+})
+
+test('the macOS code requirement parser accepts the actual Developer ID verification argument', { skip: process.platform !== 'darwin' }, () => {
+  const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10_000 }
+  const canonical = execFileSync('/usr/bin/csreq', ['-r', macDeveloperIdRequirement, '-t'], options)
+  assert.match(canonical, /anchor apple generic and certificate leaf\[field\.1\.2\.840\.113635\.100\.6\.1\.13\]/)
+  assert.throws(() => execFileSync('/usr/bin/csreq', ['-r', macDeveloperIdRequirement.slice(1), '-t'], options),
+    /invalid requirement specification/)
 })
