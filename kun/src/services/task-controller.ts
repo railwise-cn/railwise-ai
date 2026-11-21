@@ -1689,6 +1689,7 @@ export class TaskController {
           grant.data.taskId !== token.taskId || grant.data.turnId !== token.turnId) return false
       const now = this.nowIso()
       if (grant.data.expiresAt && Date.parse(grant.data.expiresAt) <= Date.parse(now)) return false
+      const hostCommandApproval = current.request?.providerId === 'scoped-host-shell' && approval.toolName === 'request_host_shell'
       const approvedRequests = this.repository.humanRequests('approval', false)
       for (const previous of this.repository.operations(token.taskId, 'tool')) {
         const output = (previous.result as ToolHostResult | undefined)?.item
@@ -1701,7 +1702,7 @@ export class TaskController {
             typeof originalRequestHash !== 'string' || !/^[a-f0-9]{64}$/.test(originalRequestHash)) continue
         const priorGrant = ExecutionGrantSchema.safeParse(previous.request.executionGrant)
         if (!priorGrant.success || priorGrant.data.taskId !== token.taskId ||
-            approvalAuthorityFingerprint(priorGrant.data) !== approvalAuthorityFingerprint(grant.data)) continue
+            approvalAuthorityFingerprint(priorGrant.data, hostCommandApproval) !== approvalAuthorityFingerprint(grant.data, hostCommandApproval)) continue
         const source = approvedRequests.find(request => {
           const original = request.payload.approval as ApprovalRequest | undefined
           const continuedFrom = request.payload.continuedFromApprovalId
@@ -1710,9 +1711,9 @@ export class TaskController {
           return request.status === 'answered' && (request.resolution as { decision?: string })?.decision === 'allow' &&
             request.threadId === approval.threadId &&
             request.turnId === previous.request?.turnId && original?.toolName === approval.toolName &&
-            (!approval.toolName.startsWith('browser_') || original.summary === approval.summary) &&
+            (!(hostCommandApproval || approval.toolName.startsWith('browser_')) || original.summary === approval.summary) &&
             (original.callId === previous.request?.callId || request.id === `appr_${previous.request?.callId}`) &&
-            (!original.requestHash || original.requestHash === originalRequestHash)
+            ((!hostCommandApproval && !original.requestHash) || original.requestHash === originalRequestHash)
         })
         if (!source) continue
         const transferKey = `approval-transfer:${source.id}`
@@ -2720,8 +2721,14 @@ function activeExecutionMs(task: TaskRun, now: string): number {
 }
 
 /** Turn identity changes after restart; all reviewed authority and account bindings must agree. */
-function approvalAuthorityFingerprint(grant: ExecutionGrant): string {
+function approvalAuthorityFingerprint(grant: ExecutionGrant, hostCommandApproval: boolean): string {
   const { id: _id, turnId: _turnId, idempotencyKey: _idempotencyKey, issuedAt: _issuedAt, expiresAt: _expiresAt, ...authority } = grant
+  if (hostCommandApproval) {
+    // The desktop-only scheduler bridge rotates its identity every launch and
+    // cannot dispatch this one-command authority. Keep all other bindings.
+    const { 'mcp:gui_schedule': _guiScheduler, ...connectorIdentityFingerprints } = authority.connectorIdentityFingerprints ?? {}
+    return operationFingerprint({ ...authority, connectorIdentityFingerprints })
+  }
   return operationFingerprint(authority)
 }
 

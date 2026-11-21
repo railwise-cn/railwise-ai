@@ -1,10 +1,11 @@
 import { createServer } from 'node:http'
-import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createKunServeRuntime, startKunServe, type KunServeRuntimeOptions } from '../src/server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
+import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
 
 const cleanup: Array<() => Promise<unknown>> = []
 afterEach(async () => { while (cleanup.length) await cleanup.pop()!() })
@@ -58,6 +59,21 @@ describe('production one-command host authority', () => {
   it.each(['resume', 'pause', 'cancel'] as const)('handles a detached in-chat approval after a Runtime restart (%s)', async action => {
     const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-host-approval-restart-')))
     cleanup.push(() => rm(root, { recursive: true, force: true }))
+    const bridgeScript = join(root, 'scheduler-bridge.cjs')
+    await writeFile(bridgeScript, `
+      require('node:readline').createInterface({ input: process.stdin }).on('line', line => {
+        const request = JSON.parse(line)
+        if (request.id === undefined) return
+        const result = request.method === 'initialize' ? {
+          protocolVersion: request.params.protocolVersion, capabilities: { tools: {} },
+          serverInfo: { name: 'fixture-scheduler', version: '1' }
+        } : { tools: [{ name: 'gui_schedule_list', description: 'Fixture', inputSchema: { type: 'object' } }] }
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }) + '\\n')
+      })
+    `)
+    const bridgeCapabilities = (generation: string) => KunCapabilitiesConfig.parse({ mcp: { enabled: true, servers: {
+      gui_schedule: { transport: 'stdio', command: process.execPath, args: [bridgeScript, generation], trustScope: 'user' }
+    } } })
     const command = `"${process.execPath.replaceAll('"', '\\"')}" -e "require('fs').appendFileSync('shell-count.txt','1');process.stdout.write('synthetic-check-ok')"`
     const args = { command, timeout_seconds: 10, ttl_seconds: 60, idempotency_key: 'same-reviewed-command' }
     let calls = 0
@@ -79,7 +95,7 @@ describe('production one-command host authority', () => {
     const address = model.address(); if (!address || typeof address === 'string') throw new Error('fixture listener unavailable')
     const options: KunServeRuntimeOptions = { host: '127.0.0.1', port: 0, dataDir: join(root, 'state'), runtimeToken: 'fixture',
       baseUrl: `http://127.0.0.1:${address.port}/v1`, apiKey: '', endpointFormat: 'chat_completions', model: 'fixture', approvalPolicy: 'auto',
-      sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({}) }
+      sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' }, capabilities: bridgeCapabilities('before-restart') }
     const first = await startKunServe(options)
     let firstClosed = false
     cleanup.push(async () => { if (!firstClosed) await first.close() })
@@ -101,7 +117,7 @@ describe('production one-command host authority', () => {
     await first.close()
     firstClosed = true
 
-    const restarted = await startKunServe(options)
+    const restarted = await startKunServe({ ...options, capabilities: bridgeCapabilities('after-restart') })
     cleanup.push(() => restarted.close())
     const repository = restarted.runtime.taskRepository!
     expect(restarted.runtime.approvalGate.get(requestId)).toMatchObject({ status: 'pending' })
@@ -128,6 +144,11 @@ describe('production one-command host authority', () => {
     expect(repository.operations(taskId, 'resume')).toHaveLength(1)
     expect(repository.operations(taskId, 'approval_transfer')).toHaveLength(1)
     expect(repository.operations(taskId, 'host_shell')).toMatchObject([{ status: 'succeeded' }])
+    const bridgeFingerprints = repository.operations(taskId, 'tool').filter(operation => operation.request?.toolName === 'request_host_shell')
+      .map(operation => ExecutionGrantSchema.parse(operation.request?.executionGrant).connectorIdentityFingerprints?.['mcp:gui_schedule'])
+    expect(bridgeFingerprints).toHaveLength(2)
+    expect(bridgeFingerprints.every(Boolean)).toBe(true)
+    expect(new Set(bridgeFingerprints).size).toBe(2)
     expect(restarted.runtime.approvalGate.pending()).toEqual([])
     expect(calls).toBe(3)
   }, 25_000)
