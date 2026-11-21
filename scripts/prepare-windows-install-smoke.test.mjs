@@ -82,7 +82,7 @@ test('Windows acceptance workflow downloads the original artifact and performs n
     published_gui_upgrade_scenario: publishedScenario, published_gui_verify_overlay: publishedOverlay,
     run_frozen_gui_update: frozenUpdate, upgrade_058_to_candidate: currentUpgrade, upgrade_059_to_candidate: nextUpgrade, build_private_next: buildPrivateNext,
     run_repaired_marketplace_install: marketplaceInstall, run_private_video_evaluation: privateVideoEvaluation,
-    run_mac_startup_appearance: macStartup,
+    run_mac_startup_appearance: macStartup, run_origin_checklist: originChecklist,
     package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
   assert.equal(publishedUpdate.default, false)
   assert.equal(publishedScenario.default, 'released-056-to-057')
@@ -96,11 +96,14 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.equal(nextUpgrade.default, false)
   assert.equal(privateVideoEvaluation.default, false)
   assert.equal(macStartup.default, false)
+  assert.equal(originChecklist.default, false)
   assert.equal(buildPrivateNext.default, true)
   assert.equal(packageRun.required, false)
   assert.deepEqual(workflow.on.workflow_call.inputs, { package_run_id: { ...packageRun, required: true }, ...inspectionInputs })
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   const steps = workflow.jobs['windows-install'].steps
+  assert.equal(steps.find(step => step.name === 'Install, inspect the Chinese UI and uninstall the temporary instance')
+    .env.RAILWISE_WINDOWS_ORIGIN_CHECKLIST, '${{ inputs.run_origin_checklist }}')
   const download = steps.find(step => step.uses === 'actions/download-artifact@v4')
   assert.equal(download.with['artifact-ids'], '${{ steps.source.outputs.artifact_id }}')
   assert.equal(download.with['run-id'], '${{ inputs.package_run_id }}')
