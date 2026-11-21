@@ -39,15 +39,29 @@ export class TaskControlService {
     if (!taskId) return
     await this.serialize(taskId, async () => {
       const task = repository.get(taskId)
-      if (!task || !tasks.canContinueDetachedApproval(task, approval) || turns.getAbortController(approval.turnId)) return
+      if (!task || turns.getAbortController(approval.turnId) || !tasks.prepareDetachedApprovalContinuation(task, approval)) return
       try {
         await this.execute(task.id, 'resume', {
-          expectedRevision: task.revision, idempotencyKey: `approval-resume:${approval.id}`
+          expectedRevision: task.revision, idempotencyKey: `approval-resume:${approval.id}:${task.revision}`
         }, approval.turnId)
+        repository.acknowledgeOutbox(`human:${approval.id}`, this.deps.nowIso())
       } catch (error) {
         // The approval is still saved. Leave the original task available for
         // review if its current scope or earlier outcome cannot be verified.
-        console.warn('[kun] Could not continue the approved task:', (error as { code?: string }).code ?? 'resume_unavailable')
+        const code = (error as { code?: string })?.code ?? 'resume_unavailable'
+        if (['task_lease_conflict', 'turn_in_progress', 'resource_limit', 'stale_request'].includes(code)) return
+        const current = repository.get(task.id)
+        if (current?.status === 'waiting_approval' && current.activeTurnId === approval.turnId) {
+          const now = this.deps.nowIso()
+          const reason = code === 'outcome_unknown' ? '授权已保存。上次操作的结果还需核验，请在原对话查看执行详情。'
+            : code === 'skill_unavailable' || code === 'capability_reference_unavailable' ? '授权已保存。原技能或连接器已不可用，请检查后从本对话继续。'
+            : '授权已保存。任务暂时无法自动继续，可从原对话检查后再次尝试。'
+          repository.update(current.id, current.revision, item => ({ ...item, status: 'stalled',
+            blockCode: code === 'outcome_unknown' ? 'outcome_unknown' : 'execution_failed', waitingReason: undefined, stalledReason: reason, updatedAt: now
+          }), { key: `approval-resume-blocked:${approval.id}`, kind: 'task_stalled', payload: { code }, createdAt: now })
+        }
+        repository.acknowledgeOutbox(`human:${approval.id}`, this.deps.nowIso())
+        console.warn('[kun] Could not continue the approved task:', code)
       }
     })
   }

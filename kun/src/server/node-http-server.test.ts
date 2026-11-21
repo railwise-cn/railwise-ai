@@ -125,3 +125,43 @@ describe('Node HTTP request body framing', () => {
     })
   })
 })
+
+describe('Node HTTP server shutdown', () => {
+  it('closes persistent event subscriptions and lets an admitted request finish', async () => {
+    const cancelEvents = vi.fn()
+    let finishRequest!: () => void
+    let requestStarted!: () => void
+    const started = new Promise<void>(resolve => { requestStarted = resolve })
+    const admitted = new Promise<void>(resolve => { finishRequest = resolve })
+    const router = new Router()
+    router.add('GET', '/events', () => new Response(new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new TextEncoder().encode('data: ready\n\n')) },
+      cancel: cancelEvents
+    }), { headers: { 'content-type': 'text/event-stream; charset=utf-8' } }))
+    router.add('POST', '/body', async () => {
+      requestStarted()
+      await admitted
+      return new Response('saved')
+    })
+
+    await withServer(router, async server => {
+      const response = await fetch(`http://127.0.0.1:${server.port}/events`)
+      const reader = response.body!.getReader()
+      expect(new TextDecoder().decode((await reader.read()).value)).toBe('data: ready\n\n')
+      const pendingRead = reader.read().catch(() => ({ done: true }))
+      const pendingRequest = send(server.port, { 'content-length': '0' })
+      try {
+        await started
+        const closing = server.close()
+        expect(await pendingRead).toMatchObject({ done: true })
+        expect(cancelEvents).toHaveBeenCalledOnce()
+        finishRequest()
+        expect(await pendingRequest).toEqual({ status: 200, body: 'saved' })
+        await closing
+      } finally {
+        finishRequest()
+        reader.releaseLock()
+      }
+    })
+  })
+})

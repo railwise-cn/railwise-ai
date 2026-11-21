@@ -15,8 +15,15 @@ export async function startNodeHttpServer(input: {
   host: string
   port: number
 }): Promise<NodeHttpServerHandle> {
+  const eventStreams = new Set<() => void>()
+  let closing: Promise<void> | undefined
+  const watchEventStream = (cancel: () => void): (() => void) => {
+    if (closing) cancel()
+    else eventStreams.add(cancel)
+    return () => { eventStreams.delete(cancel) }
+  }
   const server = createServer((request, response) => {
-    void handleNodeRequest(input.router, request, response)
+    void handleNodeRequest(input.router, request, response, watchEventStream)
   })
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
@@ -31,22 +38,30 @@ export async function startNodeHttpServer(input: {
     server,
     host: input.host,
     port,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()))
-      })
+    close: () => {
+      if (!closing) {
+        closing = new Promise<void>((resolve, reject) => {
+          server.close((error) => (error ? reject(error) : resolve()))
+        })
+        // Event subscribers can stay connected indefinitely. Drain them so
+        // shutdown can reach the runtime cleanup while ordinary requests finish.
+        for (const cancel of eventStreams) cancel()
+      }
+      return closing
+    }
   }
 }
 
 async function handleNodeRequest(
   router: Router,
   incoming: IncomingMessage,
-  outgoing: ServerResponse
+  outgoing: ServerResponse,
+  watchEventStream: (cancel: () => void) => () => void
 ): Promise<void> {
   try {
     const request = toFetchRequest(incoming)
     const response = await dispatchRequest(router, request)
-    await writeFetchResponse(outgoing, response)
+    await writeFetchResponse(outgoing, response, watchEventStream)
   } catch (error) {
     const body = JSON.stringify({
       code: 'internal_error',
@@ -90,7 +105,11 @@ function toFetchRequest(incoming: IncomingMessage): Request {
   return new Request(url, init)
 }
 
-async function writeFetchResponse(outgoing: ServerResponse, response: Response): Promise<void> {
+async function writeFetchResponse(
+  outgoing: ServerResponse,
+  response: Response,
+  watchEventStream: (cancel: () => void) => () => void
+): Promise<void> {
   outgoing.statusCode = response.status
   response.headers.forEach((value, key) => {
     outgoing.setHeader(key, value)
@@ -101,13 +120,20 @@ async function writeFetchResponse(outgoing: ServerResponse, response: Response):
   }
   const reader = response.body.getReader()
   let closed = false
-  const cancel = () => {
+  const cancel = (): void => {
+    if (closed) return
     closed = true
     void reader.cancel().catch(() => { /* A transport close can race a completed stream. */ })
   }
   outgoing.once('close', cancel)
-  outgoing.flushHeaders()
+  const isEventStream = response.headers.get('content-type')?.split(';', 1)[0].trim() === 'text/event-stream'
+  const unwatch = isEventStream ? watchEventStream(() => {
+    cancel()
+    // Release any pending write backpressure immediately during shutdown.
+    if (!outgoing.destroyed) outgoing.destroy()
+  }) : undefined
   try {
+    if (!closed) outgoing.flushHeaders()
     while (!closed) {
       const { done, value } = await reader.read()
       if (done) break
@@ -121,6 +147,7 @@ async function writeFetchResponse(outgoing: ServerResponse, response: Response):
       }
     }
   } finally {
+    unwatch?.()
     outgoing.off('close', cancel)
     if (!outgoing.destroyed) outgoing.end()
     reader.releaseLock()

@@ -38,6 +38,7 @@ import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { MessageTimeline } from './chat/MessageTimeline'
 import { composerReplyQuestion, conversationComposerControls } from './chat/conversation-visibility'
 import { TaskRunStatusBar } from './chat/TaskRunStatusBar'
+import { ConversationChecklist } from './chat/ConversationChecklist'
 import {
   FloatingComposer,
   type ComposerExecutionSettings,
@@ -149,7 +150,6 @@ const registerBuiltinRightPanel = <Module,>(
 registerBuiltinRightPanel('sdd-ai', 10, (context) => context.mode === 'sdd-ai' && context.activeSddDraft, builtinRightPanelLoaders['sdd-ai'])
 registerBuiltinRightPanel('write-assistant', 20, (context) => context.route === 'write' && context.writeAssistantOpen, builtinRightPanelLoaders['write-assistant'])
 registerBuiltinRightPanel('changes', 30, (context) => context.mode === 'changes', () => import('./ChangeInspector'))
-registerBuiltinRightPanel('todo', 40, (context) => context.mode === 'todo', () => import('./todo/TodoPanel'))
 registerBuiltinRightPanel('browser', 50, (context) => context.mode === 'browser', () => import('./DevBrowserPanel'))
 registerBuiltinRightPanel('plan', 60, (context) => context.mode === 'plan', () => import('./plan/PlanPanel'))
 registerBuiltinRightPanel('file', 70, (context) => context.mode === 'file', () => import('./WorkspaceFilePreviewPanel'))
@@ -2294,10 +2294,6 @@ export function Workbench(): ReactElement {
       const Panel = (module as typeof import('./ChangeInspector')).ChangeInspector
       return <Panel blocks={blocks} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
     },
-    todo: (module) => {
-      const Panel = (module as typeof import('./todo/TodoPanel')).TodoPanel
-      return <Panel className="h-full max-h-full w-full" onCollapse={closeRightPanel} onOpenPlan={openGuiPlanPanel} />
-    },
     browser: (module) => {
       const Panel = (module as typeof import('./DevBrowserPanel')).DevBrowserPanel
       return <Panel blocks={devPreviewBlocks} preferredUrl={latestDevPreviewUrl} sourceEvidenceStatus={taskArtifactPreview.sourceEvidenceStatus} className="h-full max-h-full w-full flex-col" onCollapse={closeRightPanel} />
@@ -2616,7 +2612,7 @@ export function Workbench(): ReactElement {
             <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8">
               <FloatingComposer
                 replyingToQuestion={Boolean(replyQuestion)}
-                renderTaskControls={chatOwnsTaskControls ? ({ focusComposer, pickAttachments }) => (
+                renderTaskControls={chatOwnsTaskControls ? ({ focusComposer, pickAttachments }) => <>
                   <TaskRunStatusBar
                     threadId={activeThreadId}
                     runtimeReady={runtimeConnection === 'ready'}
@@ -2629,7 +2625,8 @@ export function Workbench(): ReactElement {
                     onPickAttachments={pickAttachments}
                     onOpenArtifact={(task, artifact) => openWorkspaceArtifact({ taskId: task.id, artifactId: artifact.id })}
                   />
-                ) : undefined}
+                  {activeThreadId ? <ConversationChecklist key={activeThreadId} threadId={activeThreadId} onOpenPlan={openGuiPlanPanel} /> : null}
+                </> : undefined}
                 input={input}
                 setInput={setInput}
                 mode={mode}
