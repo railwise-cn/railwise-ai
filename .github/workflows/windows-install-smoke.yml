@@ -48,6 +48,10 @@ on:
         description: 'Same-repository release run containing the exact installer artifact to inspect'
         type: string
         required: false
+      mac_native_upgrade:
+        description: 'QA branch only. Pin the original Mac release and exact package head as 0.5.9:<40-character SHA> (0.5.7 also supported).'
+        type: string
+        required: false
       run_mac_startup_appearance:
         description: 'Run exact startup checks on signed Apple Silicon and Intel installers from the selected release build.'
         type: boolean
@@ -147,7 +151,7 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.upgrade_059_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
+    if: ${{ !inputs.mac_native_upgrade && (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.upgrade_059_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || (inputs.run_composer_acceptance || inputs.run_docling_conversion) && 35 || inputs.run_browser_execution && 25 || 15 }}
@@ -348,6 +352,47 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
           path: ${{ runner.temp }}/published-windows-gui-upgrade-evidence/
+
+  exact-mac-native-updater:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/qa-mac-native-updater-reuse-0510' && inputs.mac_native_upgrade != '' }}
+    name: Native Mac upgrade into existing signed QA package
+    runs-on: macos-15
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - name: Install verification tools and baseline services
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm --prefix kun ci --ignore-scripts --no-audit --no-fund
+          npm --prefix kun run build
+      - name: Verify scoped reuse and frozen updater contracts
+        run: node --test scripts/qa-reused-mac-updater.test.mjs scripts/frozen-release-updater-acceptance.test.mjs scripts/macos-updater-trust.test.mjs
+      - name: Exercise the exact signed candidate on a fresh Mac runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_UPGRADE_TARGET: ${{ inputs.mac_native_upgrade }}
+          QA_RELEASE_RUN: ${{ inputs.package_run_id }}
+        run: |
+          node scripts/run-frozen-release-updater-acceptance.mjs \
+            --qa-reuse-target="${QA_UPGRADE_TARGET}" \
+            --qa-build-run-id="${QA_RELEASE_RUN}" \
+            --evidence-dir="${RUNNER_TEMP}/qa-native-mac-evidence"
+      - name: Retain QA receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-exact-mac-native-upgrade-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/qa-native-mac-evidence/
 
   exact-mac-startup-appearance:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_mac_startup_appearance == true }}

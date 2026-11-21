@@ -17,6 +17,7 @@ import { boundedCommand } from './updater-acceptance-process.mjs'
 import { captureMacosTrustEnvironment, verifyMacosUpdaterTrust } from './macos-updater-trust.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 import { FROZEN_BASE_VERSION, FROZEN_BASELINE_PINS, readFrozenSourceVersion, resolveUpdaterBaseline, validateFrozenTargetVersion } from './frozen-release-version.mjs'
+import { downloadQaMacArtifact, QA_MAC_BASELINES, readQaMacReuseInput, verifyQaMacArtifact } from './qa-reused-mac-updater.mjs'
 
 const require = createRequire(import.meta.url)
 const scriptRoot = dirname(fileURLToPath(import.meta.url))
@@ -78,6 +79,13 @@ export function requireExactPackageRunner(env = process.env, platform = process.
   return { ...provenance, workflowPath: RELEASE_WORKFLOW, workflowRef: expectedRef, mode: 'private-exact-package-smoke' }
 }
 
+function requireQaMacReuseRunner(env = process.env) {
+  const input = readQaMacReuseInput({ plan: argument('qa-reuse-target'), runId: argument('qa-build-run-id'), env })
+  const runner = requireFrozenRunner({ ...env, GITHUB_REF: 'refs/heads/main', GITHUB_WORKFLOW_REF: FROZEN_UPDATER_WORKFLOW_REF })
+  return { input, provenance: { ...runner, mode: 'qa-reused-artifact', workflowPath: '.github/workflows/windows-install-smoke.yml',
+    workflowRef: env.GITHUB_WORKFLOW_REF, scope: 'qa-only' } }
+}
+
 export async function verifyExactPackageArtifacts(directory, version) {
   const files = []
   // expectedReleaseFiles uses the runtime platform names (darwin-*), while the
@@ -116,7 +124,7 @@ export function assertFreshProfile(home, exists = existsSync) {
   if (productPaths(home).some(exists)) throw new Error('Existing product data or updater cache detected; refusing to reuse or delete it.')
 }
 
-export function validatePublicBundle(info, metadata, updater, version, head) {
+export function validatePublicBundle(info, metadata, updater, version, head, updaterMode = 'stable') {
   equal(info.CFBundleIdentifier, PUBLIC_IDENTITY.bundleId, 'Public bundle ID')
   equal(info.CFBundleExecutable, PUBLIC_IDENTITY.productName, 'Public executable')
   equal(info.CFBundleShortVersionString, version, 'Public bundle version')
@@ -124,21 +132,27 @@ export function validatePublicBundle(info, metadata, updater, version, head) {
   equal(metadata.productName, PUBLIC_IDENTITY.productName, 'Public product name')
   equal(metadata.version, version, 'Packaged version')
   equal(updater.provider, 'generic', 'Public updater provider')
-  if (!publication.namespaces.some(releasePrefix => updater.url === publication.updateUrl({ releasePrefix }))) throw new Error('Public updater URL mismatch')
+  if (updaterMode === 'qa-frontier') {
+    if (!head) throw new Error('QA candidate requires its exact source HEAD.')
+    equal(updater.url, 'https://127.0.0.1/', 'QA frontier updater URL')
+  } else {
+    equal(updaterMode, 'stable', 'Public updater configuration mode')
+    if (!publication.namespaces.some(releasePrefix => updater.url === publication.updateUrl({ releasePrefix }))) throw new Error('Public updater URL mismatch')
+  }
   equal(updater.updaterCacheDirName, 'workwise-updater', 'Public updater cache')
   if (head) {
     equal(metadata.buildProvenance?.sourceHead, head, 'Frozen source HEAD')
     equal(metadata.buildHints?.macSigningEnabled, true, 'Packaged signing flag')
     equal(metadata.buildHints?.notarizationEnabled, true, 'Packaged notarization flag')
-    equal(metadata.updateChannel, 'stable', 'Packaged update channel')
+    equal(metadata.updateChannel, updaterMode === 'qa-frontier' ? 'frontier' : 'stable', 'Packaged update channel')
   }
 }
 
-export function verifyBundle(app, version, head, run, { boundary, record, expectedPreflightSeal, onVerifiedSeal } = {}) {
+export function verifyBundle(app, version, head, run, { boundary, record, expectedPreflightSeal, onVerifiedSeal, updaterMode } = {}) {
   const resources = join(app, 'Contents/Resources')
   const info = JSON.parse(run('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(app, 'Contents/Info.plist')]).stdout)
   const metadata = JSON.parse(require('@electron/asar').extractFile(join(resources, 'app.asar'), 'package.json').toString('utf8'))
-  validatePublicBundle(info, metadata, parse(readFileSync(join(resources, 'app-update.yml'), 'utf8')), version, head)
+  validatePublicBundle(info, metadata, parse(readFileSync(join(resources, 'app-update.yml'), 'utf8')), version, head, updaterMode)
   let verifiedSeal
   const trust = verifyMacosUpdaterTrust(app, { boundary, run, record, expectedPreflightSeal,
     ...(onVerifiedSeal ? { onVerifiedSeal: seal => { verifiedSeal = seal } } : {}) })
@@ -456,8 +470,11 @@ export async function main() {
   const evidence = resolve(argument('evidence-dir') ?? '')
   const privateDist = argument('target-dist')
   if (privateDist && argument('build-file')) throw new Error('Select a private target directory or reviewed build, never both.')
-  const provenance = privateDist ? requireExactPackageRunner() : requireFrozenRunner()
-  const baseline = resolveUpdaterBaseline(argument('base-version') ?? FROZEN_BASE_VERSION)
+  const reuse = argument('qa-reuse-target') !== undefined || argument('qa-build-run-id') !== undefined
+  if (reuse && (privateDist || argument('build-file') || argument('base-version') || argument('target-version'))) throw new Error('QA reuse has its own input and version binding.')
+  const qa = reuse ? requireQaMacReuseRunner() : undefined
+  const provenance = qa?.provenance ?? (privateDist ? requireExactPackageRunner() : requireFrozenRunner())
+  const baseline = resolveUpdaterBaseline(qa?.input.baseline ?? argument('base-version') ?? FROZEN_BASE_VERSION, qa ? QA_MAC_BASELINES : undefined)
   const baseVersion = baseline.version
   const targetVersion = privateDist ? validateFrozenTargetVersion(argument('target-version'), baseVersion) : readFrozenSourceVersion(baseVersion)
   const runnerTemp = realpathSync(process.env.RUNNER_TEMP)
@@ -479,8 +496,16 @@ export async function main() {
     if (!['arm64', 'x64'].includes(process.arch)) throw new Error('Unsupported runner architecture.')
     captureMacosTrustEnvironment({ run, record: progress })
     assertFreshProfile(home)
-    let build; let verified
-    if (privateDist) {
+    let build; let verified; let updaterMode = 'stable'
+    if (qa) {
+      const reference = verifyQaMacArtifact(qa.input, run)
+      const archive = await downloadQaMacArtifact(reference, root, targetVersion, run)
+      verified = archive.directory
+      updaterMode = archive.updaterMode
+      const files = await verifyExactPackageArtifacts(verified, targetVersion)
+      build = { sourceHead: reference.targetHead, files }
+      report.qaPackage = { ...reference, updaterMode, files }
+    } else if (privateDist) {
       verified = realpathSync(resolve(privateDist))
       if (!verified.startsWith(runnerTemp + '/')) throw new Error('Private package input must be within RUNNER_TEMP.')
       const files = await verifyExactPackageArtifacts(verified, targetVersion)
@@ -509,7 +534,7 @@ export async function main() {
     const target = join(targetRoot, 'RailWise AI.app')
     let targetPreflightSeal
     report.targetIdentity = verifyBundle(target, targetVersion, build.sourceHead, run, { boundary: 'target-zip-preflight', record: progress,
-      onVerifiedSeal: seal => { targetPreflightSeal = seal } })
+      updaterMode, onVerifiedSeal: seal => { targetPreflightSeal = seal } })
     equal(report.targetIdentity.designatedRequirement, report.baselineIdentity.designatedRequirement, 'Baseline/target signing requirement')
     report.targetZipSha256 = await hashFile(targetZip)
     report.targetAsarSha256 = await hashFile(join(target, 'Contents/Resources/app.asar'))
@@ -548,7 +573,7 @@ export async function main() {
     const nativeRoots = readdirSync(join(root, 'native-temp')).filter(name => /^workwise-native-updater-/.test(name))
     equal(nativeRoots.length, 1, 'Owned native installation count')
     const installed = join(root, 'native-temp', nativeRoots[0], 'Applications/RailWise AI.app')
-    report.installedIdentity = verifyBundle(installed, targetVersion, build.sourceHead, run, { boundary: 'native-installed-target', record: progress, expectedPreflightSeal: targetPreflightSeal })
+    report.installedIdentity = verifyBundle(installed, targetVersion, build.sourceHead, run, { boundary: 'native-installed-target', record: progress, expectedPreflightSeal: targetPreflightSeal, updaterMode })
     report.installedAsarSha256 = await hashFile(join(installed, 'Contents/Resources/app.asar'))
     equal(report.installedAsarSha256, report.targetAsarSha256, 'Installed/exact frozen ZIP ASAR')
     equal(readFileSync(join(paths.profile, 'frozen-release-sentinel.json')).toString(), beforeSentinel.toString(), 'Independent user-data sentinel')
