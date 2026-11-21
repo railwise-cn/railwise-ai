@@ -82,7 +82,7 @@ test('Windows acceptance workflow downloads the original artifact and performs n
     published_gui_upgrade_scenario: publishedScenario, published_gui_verify_overlay: publishedOverlay,
     run_frozen_gui_update: frozenUpdate, upgrade_058_to_candidate: currentUpgrade, upgrade_059_to_candidate: nextUpgrade, build_private_next: buildPrivateNext,
     run_repaired_marketplace_install: marketplaceInstall, run_private_video_evaluation: privateVideoEvaluation,
-    run_mac_startup_appearance: macStartup, run_origin_checklist: originChecklist,
+    run_mac_startup_appearance: macStartup, run_origin_checklist: originChecklist, verify_upgrade_first_launch: firstLaunch,
     package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
   assert.equal(publishedUpdate.default, false)
   assert.equal(publishedScenario.default, 'released-056-to-057')
@@ -94,6 +94,8 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.equal(frozenUpdate.default, false)
   assert.equal(currentUpgrade.default, false)
   assert.equal(nextUpgrade.default, false)
+  assert.equal(firstLaunch.default, false)
+  assert.equal(workflow.on.workflow_call.inputs.verify_upgrade_first_launch, undefined)
   assert.equal(privateVideoEvaluation.default, false)
   assert.equal(macStartup.default, false)
   assert.equal(originChecklist.default, false)
