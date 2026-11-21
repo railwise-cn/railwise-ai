@@ -1132,7 +1132,7 @@ export function validateWindowsOriginChecklist(evidence) {
   return evidence
 }
 
-async function verifyWindowsOriginChecklist(cdp, fixture, attempt) {
+async function verifyWindowsOriginChecklist(cdp, fixture, attempt, evidenceDir) {
   const read = path => cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(path)},'GET').then(result=>{
     if(!result.ok)throw new Error('Runtime checklist readback failed: '+result.status);
     return JSON.parse(result.body);
@@ -1180,6 +1180,10 @@ async function verifyWindowsOriginChecklist(cdp, fixture, attempt) {
   const originTodoCount = (await read('/v1/threads/' + encodeURIComponent(originThreadId) + '/todos')).todos?.items.length ?? 0
   const evidence = validateWindowsOriginChecklist({ taskId: task.id, originThreadId, workerThreadId: task.threadId, completedTaskStatus: 'completed',
     originTodoCount, workerSnapshots: [initial, final], model: fixture.evidence, collapsedByDefault: !collapsed.open, running, completed })
+  const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+  const screenshotName = 'windows-origin-checklist-completed-zh-dark.png'
+  await writeFile(join(evidenceDir, screenshotName), Buffer.from(screenshot.data, 'base64'))
+  evidence.screenshot = screenshotName
   attempt.phase = 'completed-steps-observed'
   return evidence
 }
@@ -2876,7 +2880,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
 
     if (originChecklistModel) {
       report.originChecklistAttempt = { phase: 'waiting-for-runtime', model: originChecklistModel.evidence }
-      report.originChecklist = await verifyWindowsOriginChecklist(cdp, originChecklistModel, report.originChecklistAttempt)
+      report.originChecklist = await verifyWindowsOriginChecklist(cdp, originChecklistModel, report.originChecklistAttempt, evidenceDir)
       report.checks.push('installed-delegated-steps-in-original-conversation')
     } else if (video) {
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
