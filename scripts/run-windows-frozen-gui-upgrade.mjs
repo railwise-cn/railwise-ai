@@ -10,6 +10,7 @@ import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { parseByteRange } from './frozen-release-updater-feed.mjs'
+import publication from './release-publication.cjs'
 import { inspectInstaller, inspectInstalledPackage, installIdentity } from './verify-windows-install-smoke.mjs'
 import { validateWindowsSmokeSource } from './prepare-windows-install-smoke.mjs'
 import {
@@ -147,10 +148,13 @@ export async function verifyIsolatedWindowsTarget(directory, source, version, { 
   } }
 }
 
-export function verifyInstalledIsolatedWindowsFeed(text) {
+export function verifyInstalledIsolatedWindowsFeed(text, privateStablePackage = false) {
   const metadata = parse(text)
-  assert.equal(metadata?.provider, 'generic', 'The installed isolated candidate must use the generic update provider')
-  assert.equal(metadata.url, 'https://127.0.0.1/', 'The installed isolated candidate must retain the packaged loopback feed')
+  const expectedUrl = privateStablePackage
+    ? publication.updateUrl({ releasePrefix: publication.policy.storageNamespace })
+    : 'https://127.0.0.1/'
+  assert.equal(metadata?.provider, 'generic', 'The installed package must use the generic update provider')
+  assert.equal(metadata.url, expectedUrl, 'The installed package must retain the expected packaged feed')
   return { provider: metadata.provider, url: metadata.url }
 }
 
@@ -380,6 +384,7 @@ async function main(args) {
   const entry = currentReleaseMode ? args[3] : 'sidebar'
   const baseVersion = currentReleaseMode ? args[4] ?? '0.5.8' : '0.5.7'
   const verifyFirstLaunch = process.env.VERIFY_UPGRADE_FIRST_LAUNCH === 'true'
+  const privateStablePackage = process.env.WORKWISE_PRIVATE_STABLE_PACKAGE === 'true'
   const versions = { '0.5.7': '0.5.8', '0.5.8': '0.5.9', '0.5.9': '0.5.10' }
   const targetVersion = versions[baseVersion]
   if (currentReleaseMode) {
@@ -392,6 +397,7 @@ async function main(args) {
   const [directory, sourceFile, evidence, nextDirectory, nextSourceFile, nextVersion] = args.map(String)
   const readSource = async path => JSON.parse(await readFile(path, 'utf8'))
   const target = await verifiedTarget(directory, await readSource(sourceFile), targetVersion, { baselineVersion: baseVersion })
+  if (privateStablePackage) assert.ok(currentReleaseMode && baseVersion === '0.5.9' && target.isolated, 'Stable-configured private package acceptance requires the same-run artifact and official 0.5.9')
   if (nextDirectory) assert.equal(nextVersion, '0.5.9', 'Use the private 0.5.9 test installer for the next upgrade')
   const next = nextDirectory ? await verifiedTarget(nextDirectory, await readSource(nextSourceFile), nextVersion, { runnerFixture: true }) : undefined
   const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'railwise-frozen-windows-update-'))
@@ -413,7 +419,7 @@ async function main(args) {
   const seedSchedule = version => writeFile(join(profile, 'gui-update-schedule.json'), JSON.stringify({ appVersion: version, lastCheckedAt: new Date(Date.now() - oneHour).toISOString() }))
 
   const report = { status: 'running', scope: target.isolated ? 'private-isolated-windows-gui-upgrade' : 'private-frozen-windows-gui-upgrade', productionTouched: false,
-    ...(target.isolated ? { targetVerification: target.isolated } : {}),
+    ...(target.isolated ? { targetVerification: { ...target.isolated, packagedFeedMode: privateStablePackage ? 'stable' : 'loopback' } } : {}),
     driverSource: process.env.GITHUB_SHA, baseline: { installer: baseline.installer }, targetBuild: target.source, steps: [] }
   const save = () => writeFile(join(evidence, 'frozen-windows-update.json'), `${JSON.stringify(report, null, 2)}\n`)
   const phase = (name, operation) => recordWindowsUpgradePhase(report, save, name, operation)
@@ -458,7 +464,9 @@ async function main(args) {
       verifyFrozenWindowsReadback(actual, item)
       if (verifyFirstLaunch) assert.equal(action.firstLaunch.packageMetadata.asarSha256, actual.packageMetadata.asarSha256)
       if (item.isolated) {
-        actual.packagedFeed = verifyInstalledIsolatedWindowsFeed(await readFile(join(installDirectory, 'resources', 'app-update.yml'), 'utf8'))
+        actual.packagedFeed = verifyInstalledIsolatedWindowsFeed(
+          await readFile(join(installDirectory, 'resources', 'app-update.yml'), 'utf8'), privateStablePackage
+        )
         actual.preferencesPreserved = await running.cdp.evaluate('window.workwise.getSettings().then(s=>s.locale==="zh"&&s.theme==="light")')
         assert.equal(actual.preferencesPreserved, true)
       }
