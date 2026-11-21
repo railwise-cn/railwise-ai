@@ -23,6 +23,7 @@ const acceptedDriverFiles = new Set([
 const command = (file, args) => execFileSync(file, args, { encoding: 'utf8', timeout: 90_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const git = (...args) => command('git', args)
 const json = (path) => readFile(path, 'utf8').then(JSON.parse)
+export const macDeveloperIdRequirement = '=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists'
 
 async function sha256(file) {
   const hash = createHash('sha256')
@@ -160,7 +161,7 @@ async function readInstalledStartupBundle(installer, temporary, source, version,
   command('/usr/bin/xcrun', ['stapler', 'validate', install])
   let gatekeeper
   if (isolated) {
-    command('/usr/bin/codesign', ['--verify', '-R', 'anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists', install])
+    command('/usr/bin/codesign', ['--verify', '-R', macDeveloperIdRequirement, install])
     const status = spawnSync('/usr/sbin/spctl', ['--status'], { encoding: 'utf8', timeout: 10_000 })
     command('/usr/sbin/spctl', ['--assess', '--type', 'execute', install])
     gatekeeper = { assessment: 'succeeded', enforcement: gatekeeperEnforcement(status.stdout), statusCommandExitCode: status.status }
