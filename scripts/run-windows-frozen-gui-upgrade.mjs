@@ -32,6 +32,27 @@ export function verifyFrozenWindowsReadback({ expectedVersion, expectedSource, i
   assert.equal(threadPreserved, true)
 }
 
+export async function recordWindowsUpgradePhase(report, save, phase, operation) {
+  report.currentPhase = phase
+  report.phases ??= []
+  const observation = { phase, status: 'started', startedAt: new Date().toISOString() }
+  report.phases.push(observation)
+  await save()
+  try {
+    const result = await operation()
+    observation.status = 'completed'
+    observation.completedAt = new Date().toISOString()
+    await save()
+    return result
+  } catch (error) {
+    observation.status = 'failed'
+    observation.completedAt = new Date().toISOString()
+    observation.category = error?.code === 'ETIMEDOUT' ? 'owned-process-timeout' : 'operation-failed'
+    await save()
+    throw error
+  }
+}
+
 function requireHostedWindows(env) {
   assert.ok(process.platform === 'win32' && process.arch === 'x64' && env.GITHUB_ACTIONS === 'true' &&
     env.RUNNER_ENVIRONMENT === 'github-hosted' && env.RUNNER_OS === 'Windows' && env.RUNNER_TEMP,
@@ -127,19 +148,19 @@ async function officialBaseline(root, version) {
   return { identity, installer: { path, sha256: release.sha256, size: release.size } }
 }
 
-async function createPrivateTrust(root) {
+export async function createPrivateTrust(root, { execute = execFileSync, environment = process.env } = {}) {
   const certificate = join(root, 'private-updater.pem')
   const privateKey = join(root, 'private-updater.key')
   const config = join(root, 'private-updater.cnf')
-  const openssl = join(process.env.ProgramFiles, 'Git', 'usr', 'bin', 'openssl.exe')
-  const certutil = join(process.env.SystemRoot, 'System32', 'certutil.exe')
+  const openssl = join(environment.ProgramFiles, 'Git', 'usr', 'bin', 'openssl.exe')
+  const certutil = join(environment.SystemRoot, 'System32', 'certutil.exe')
   await writeFile(config, [
     '[req]', 'prompt=no', 'distinguished_name=dn', 'x509_extensions=ext',
     '[dn]', `CN=RailWise ephemeral updater ${randomUUID()}`,
     '[ext]', 'subjectAltName=IP:127.0.0.1', 'basicConstraints=critical,CA:FALSE',
     'keyUsage=critical,digitalSignature,keyEncipherment', 'extendedKeyUsage=serverAuth', ''
   ].join('\n'), { flag: 'wx' })
-  execFileSync(openssl, [
+  execute(openssl, [
     'req', '-new', '-newkey', 'rsa:2048', '-x509', '-nodes', '-days', '1',
     '-keyout', privateKey, '-out', certificate, '-config', config
   ], { timeout: 30_000, windowsHide: true, stdio: 'ignore' })
@@ -147,16 +168,16 @@ async function createPrivateTrust(root) {
   const identity = new X509Certificate(cert)
   assert.equal(identity.checkIP('127.0.0.1'), '127.0.0.1')
   const thumbprint = identity.fingerprint.replaceAll(':', '')
-  const remove = () => execFileSync(certutil, ['-delstore', 'Root', thumbprint], {
+  const remove = () => execute(certutil, ['-delstore', 'Root', thumbprint], {
     timeout: 30_000, windowsHide: true, stdio: 'ignore'
   })
   try {
     // This exact hosted runner is ephemeral. Its administrator-managed store
     // avoids interactive CurrentUser approval dialogs. Remove only this certificate.
-    execFileSync(certutil, ['-f', '-addstore', 'Root', certificate], {
+    execute(certutil, ['-f', '-addstore', 'Root', certificate], {
       timeout: 60_000, windowsHide: true, stdio: 'ignore'
     })
-    return { key, cert, remove }
+    return { key, cert, remove, scope: 'ephemeral-github-hosted-windows-machine-root', thumbprint }
   } catch (error) {
     try { remove() } catch { /* Import may have failed before modifying the store. */ }
     throw error
@@ -321,16 +342,18 @@ async function main(args) {
     ...(target.isolated ? { targetVerification: target.isolated } : {}),
     driverSource: process.env.GITHUB_SHA, baseline: { installer: baseline.installer }, targetBuild: target.source, steps: [] }
   const save = () => writeFile(join(evidence, 'frozen-windows-update.json'), `${JSON.stringify(report, null, 2)}\n`)
+  const phase = (name, operation) => recordWindowsUpgradePhase(report, save, name, operation)
   let trust, feed, running, thread
   try {
     await save()
-    installExactNsis(baseline.installer.path, installDirectory)
+    await phase('install-official-baseline', () => installExactNsis(baseline.installer.path, installDirectory))
     report.baseline.package = inspectInstalledPackage(installDirectory, baseline.identity)
     report.baseline.registry = ownedInstallState(installDirectory, baseVersion)
     await seedSchedule(baseVersion)
-    trust = await createPrivateTrust(root)
-    feed = await openPrivateFeed(trust, target)
-    running = await launchOwned(executable, root, feed.url)
+    trust = await phase('prepare-private-https-trust', () => createPrivateTrust(root))
+    report.privateTrust = { scope: trust.scope, thumbprint: trust.thumbprint }
+    feed = await phase('start-private-https-feed', () => openPrivateFeed(trust, target))
+    running = await phase('launch-official-baseline', () => launchOwned(executable, root, feed.url))
     assert.equal(await running.cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
     if (target.isolated) assert.equal(await running.cdp.evaluate('localStorage.getItem("railwise.release-highlights.0.5.10")'), null)
     await running.cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(r=>r.ok)`, 'installed KUN service')
@@ -341,8 +364,8 @@ async function main(args) {
     assert.ok(/^[A-Za-z0-9_-]+$/.test(thread), 'Real KUN conversation identity required')
     for (const [index, item] of [target, next].entries()) {
       if (!item) break
-      const action = await exerciseGuiUpgrade({ running, target: { ...item, installDirectory }, executable, feed,
-        allowLegacyFallback: !currentReleaseMode && index === 0, entry })
+      const action = await phase(`upgrade-${item.identity.version}-${entry}`, () => exerciseGuiUpgrade({ running,
+        target: { ...item, installDirectory }, executable, feed, allowLegacyFallback: !currentReleaseMode && index === 0, entry }))
       if (item.isolated) report.targetVerification.feedRequests = { ...feed.requests }
       running.cdp.close()
       await closeOwnedWindows(executable)

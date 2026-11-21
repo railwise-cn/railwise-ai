@@ -79,11 +79,16 @@ test('Windows provenance keeps the actual workflow SHA and requires source evide
 test('Windows acceptance workflow downloads the original artifact and performs no packaging or publication', () => {
   const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   const { run_published_gui_update: publishedUpdate, run_repaired_gui_update: repairedUpdate,
+    published_gui_upgrade_scenario: publishedScenario, published_gui_verify_overlay: publishedOverlay,
     run_frozen_gui_update: frozenUpdate, upgrade_058_to_candidate: currentUpgrade, upgrade_059_to_candidate: nextUpgrade, build_private_next: buildPrivateNext,
     run_repaired_marketplace_install: marketplaceInstall, run_private_video_evaluation: privateVideoEvaluation,
     run_mac_startup_appearance: macStartup,
     package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
   assert.equal(publishedUpdate.default, false)
+  assert.equal(publishedScenario.default, 'released-056-to-057')
+  assert.equal(publishedOverlay.default, false)
+  assert.equal(workflow.on.workflow_call.inputs.published_gui_upgrade_scenario, undefined)
+  assert.equal(workflow.on.workflow_call.inputs.published_gui_verify_overlay, undefined)
   assert.equal(repairedUpdate.default, false)
   assert.equal(marketplaceInstall.default, false)
   assert.equal(frozenUpdate.default, false)

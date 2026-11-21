@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -6,7 +7,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { assertPublishedWindowsUpgrade, legacyUpdaterReason, repairedScheduleSeed, sidebarUpgradeControlSelector, sidebarUpgradeSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
-import { verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
+import { createPrivateTrust, recordWindowsUpgradePhase, verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const installer = { url: 'RailWise-AI-0.5.7-win-x64.exe', size: 317686658, sha512: manifestDigest }
@@ -220,4 +221,64 @@ test('frozen Windows acceptance pins the original artifact and builds the next i
   assert.ok(job.steps.some(step => step.with?.['artifact-ids'] === '${{ steps.frozen.outputs.artifact_id }}'))
   assert.ok(job.steps.some(step => step.run === 'npm run dist:win' && step.env?.WORKWISE_APP_VERSION === '0.5.9'))
   assert.ok(job.steps.filter(step => step.uses?.startsWith('actions/upload-artifact@')).every(step => step.with.path.includes('frozen-windows-evidence/')))
+})
+
+test('private updater trust avoids CurrentUser confirmation and removes only its exact certificate', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-private-trust test-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const environment = { ProgramFiles: 'C:\\Program Files', SystemRoot: 'C:\\Windows' }, commands = []
+  const execute = (path, args, options) => {
+    commands.push({ path, args, options })
+    if (path.endsWith('openssl.exe')) {
+      // Generate only a disposable certificate/key. No real certificate store is opened by the test.
+      return execFileSync(process.platform === 'win32' ? path : 'openssl', args, options)
+    }
+    assert.ok(path.endsWith('certutil.exe'))
+    assert.equal(options.stdio, 'ignore')
+    assert.ok(options.timeout > 0 && options.timeout <= 60_000)
+    assert.equal(args.includes('-user'), false, 'CurrentUser root import can wait on an invisible confirmation')
+    return Buffer.alloc(0)
+  }
+  const trust = await createPrivateTrust(root, { environment, execute })
+  assert.equal(trust.scope, 'ephemeral-github-hosted-windows-machine-root')
+  assert.match(trust.thumbprint, /^[A-F0-9]{40}$/)
+  assert.ok(trust.key.length > 0 && trust.cert.length > 0)
+  const imported = commands.find(command => command.args.includes('-addstore'))
+  assert.deepEqual(imported.args, ['-f', '-addstore', 'Root', join(root, 'private-updater.pem')])
+  trust.remove()
+  assert.deepEqual(commands.at(-1).args, ['-delstore', 'Root', trust.thumbprint])
+  assert.equal(commands.filter(command => command.args.includes('-addstore')).length, 1)
+})
+
+test('private trust import failure retains the error and makes one exact cleanup attempt', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-private-trust failure-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const commands = [], timeout = Object.assign(new Error('synthetic trust import timeout'), { code: 'ETIMEDOUT' })
+  await assert.rejects(createPrivateTrust(root, {
+    environment: { ProgramFiles: 'C:\\Program Files', SystemRoot: 'C:\\Windows' },
+    execute: (path, args, options) => {
+      commands.push(args)
+      if (path.endsWith('openssl.exe')) return execFileSync(process.platform === 'win32' ? path : 'openssl', args, options)
+      if (args.includes('-addstore')) throw timeout
+      assert.deepEqual(args.slice(0, 2), ['-delstore', 'Root'])
+      assert.match(args[2], /^[A-F0-9]{40}$/)
+      throw new Error('synthetic cleanup failure must not replace the import error')
+    }
+  }), error => error === timeout)
+  assert.equal(commands.filter(args => args.includes('-addstore')).length, 1)
+  assert.equal(commands.filter(args => args.includes('-delstore')).length, 1)
+})
+
+test('updater phase receipt distinguishes environment preparation from actual upgrade', async () => {
+  const report = {}, snapshots = [], save = async () => snapshots.push(structuredClone(report))
+  let calls = 0
+  assert.equal(await recordWindowsUpgradePhase(report, save, 'prepare-private-https-trust', () => { calls++; return 'prepared' }), 'prepared')
+  assert.equal(calls, 1)
+  assert.deepEqual(snapshots.map(snapshot => snapshot.phases[0].status), ['started', 'completed'])
+  const error = Object.assign(new Error('synthetic timeout'), { code: 'ETIMEDOUT' })
+  await assert.rejects(recordWindowsUpgradePhase(report, save, 'upgrade-0.5.10-sidebar', () => { throw error }), value => value === error)
+  assert.equal(report.currentPhase, 'upgrade-0.5.10-sidebar')
+  assert.equal(report.phases.at(-1).category, 'owned-process-timeout')
+  assert.equal(report.phases.at(-1).status, 'failed')
+  assert.equal('status' in report, false, 'a helper observation cannot declare acceptance passed')
 })
