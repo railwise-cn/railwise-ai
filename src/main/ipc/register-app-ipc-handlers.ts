@@ -338,7 +338,11 @@ type RegisterAppIpcHandlersOptions = {
     payload: TurnCompleteNotificationPayload
   ) => Promise<SystemNotificationResult>
   getAppVersion: () => string
-  onGuiUpdatePrepared?: () => void
+  guiUpdateRuntime?: {
+    isPrepared: () => boolean
+    prepare: (confirmedSnapshotId?: string) => Promise<void>
+    recover: () => Promise<void>
+  }
   readGuiUpdateState: () => Promise<GuiUpdateState>
   loadGuiUpdaterModule: () => Promise<GuiUpdaterModule>
   resolveLogDirectory: () => string
@@ -2672,10 +2676,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       ).channel
     )
   })
-  let updatePrepared = false
   let installRequest: Promise<GuiUpdateInstallResult> | undefined
   ipcMain.handle('gui:update-install-preflight', async (): Promise<GuiUpdateInstallPreflight> =>
-    updatePrepared ? { ok: true, activeWork: [] } : collectGuiUpdateActiveWork(runtimeRequest)
+    options.guiUpdateRuntime?.isPrepared() ? { ok: true, activeWork: [] } : collectGuiUpdateActiveWork(runtimeRequest)
   )
   ipcMain.handle('gui:update-install', async (_, payload: unknown): Promise<GuiUpdateInstallResult> => {
     const request = parseIpcPayload(
@@ -2691,18 +2694,20 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         if (!(state.info?.ok && state.info.downloaded) && state.status !== 'downloaded') {
           return { ok: false, currentVersion: getAppVersion(), code: 'install_failed', message: '更新包尚未下载完成。' }
         }
-        if (!updatePrepared) {
-          const prepared = await runtimeRequest('/v1/runtime/update/prepare', 'POST', JSON.stringify({
-            ...(request.confirmActiveWork && request.confirmedSnapshotId ? { confirmedSnapshotId: request.confirmedSnapshotId } : {})
-          }))
+        const confirmedSnapshotId = request.confirmActiveWork ? request.confirmedSnapshotId : undefined
+        if (options.guiUpdateRuntime) {
+          await options.guiUpdateRuntime.prepare(confirmedSnapshotId)
+        } else {
+          const prepared = await runtimeRequest('/v1/runtime/update/prepare', 'POST', JSON.stringify({ confirmedSnapshotId }))
           if (!prepared.ok) throw new Error(runtimeResponseMessage(prepared))
           const result = JSON.parse(prepared.body) as { ok?: unknown }
           if (result.ok !== true) throw new Error('Runtime 未确认安全停止，应用仍保持打开。')
-          updatePrepared = true
-          options.onGuiUpdatePrepared?.()
         }
         return await module.installGuiUpdate()
       } catch (error) {
+        await options.guiUpdateRuntime?.recover().catch(recoveryError => {
+          logError('updater', 'Could not release the Runtime update handoff.', recoveryError)
+        })
         return { ok: false, currentVersion: getAppVersion(), code: 'install_failed', message: error instanceof Error ? error.message : String(error) }
       }
     })().finally(() => { installRequest = undefined })

@@ -1,8 +1,8 @@
 /** Timeout reports an incomplete handoff without cancelling it or treating it as success. */
-export function createGuiUpdateShutdown(stop: () => Promise<void>, timeoutMs = 30_000): () => Promise<void> {
+export function createGuiUpdateShutdown(stop: () => Promise<void>, timeoutMs = 30_000) {
   let stopping: Promise<void> | undefined
   let stopped = false
-  return async () => {
+  const shutdown = async () => {
     if (stopped) return
     if (!stopping) {
       stopping = Promise.resolve().then(stop).then(() => { stopped = true }, error => {
@@ -20,4 +20,13 @@ export function createGuiUpdateShutdown(stop: () => Promise<void>, timeoutMs = 3
       ])
     } finally { clearTimeout(timer) }
   }
+  return Object.assign(shutdown, {
+    async recover(resume: () => Promise<void>): Promise<void> {
+      // The UI deadline does not cancel the owned process shutdown underneath it.
+      await stopping?.catch(() => undefined)
+      await resume()
+      stopped = false
+      stopping = undefined
+    }
+  })
 }

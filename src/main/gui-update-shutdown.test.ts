@@ -27,4 +27,24 @@ describe('update shutdown confirmation', () => {
     await expect(shutdown()).resolves.toBeUndefined()
     expect(stop).toHaveBeenCalledTimes(2)
   })
+
+  it('waits for the real stop after an install timeout before restoring the Runtime', async () => {
+    vi.useFakeTimers()
+    let finish!: () => void
+    const resume = vi.fn().mockResolvedValue(undefined)
+    const stop = vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+      .mockResolvedValue(undefined)
+    const shutdown = createGuiUpdateShutdown(stop, 100)
+    const timedOut = expect(shutdown()).rejects.toThrow('更新包已保留')
+    await vi.advanceTimersByTimeAsync(100)
+    await timedOut
+    const restoring = shutdown.recover(resume)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(resume).not.toHaveBeenCalled()
+    finish()
+    await restoring
+    expect(resume).toHaveBeenCalledTimes(1)
+    await shutdown()
+    expect(stop).toHaveBeenCalledTimes(2)
+  })
 })

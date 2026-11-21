@@ -121,7 +121,7 @@ import { registerTaskDeliveryRoutes } from './task-delivery.js'
 export function buildRouter(runtime: ServerRuntime): Router {
   const router = new Router(request => {
     if (runtime.updateLifecycle?.isSuspended() && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
-      && new URL(request.url).pathname !== '/v1/runtime/update/prepare') {
+      && !['/v1/runtime/update/prepare', '/v1/runtime/update/cancel'].includes(new URL(request.url).pathname)) {
       return ERRORS.unavailable('应用正在准备升级，已停止接收新的执行。')
     }
     return undefined

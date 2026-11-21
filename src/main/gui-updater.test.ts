@@ -92,6 +92,7 @@ describe('installGuiUpdate', () => {
 
     const installing = module.installGuiUpdate()
     await Promise.resolve()
+    await Promise.resolve()
 
     expect(beforeInstall).toHaveBeenCalledTimes(1)
     expect(updater.quitAndInstall).not.toHaveBeenCalled()
@@ -110,10 +111,12 @@ describe('installGuiUpdate', () => {
       finishCleanup = resolve
     }))
 
-    module.initializeGuiUpdater(() => null, () => 'stable', beforeInstall)
+    const willQuit = vi.fn()
+    module.initializeGuiUpdater(() => null, () => 'stable', beforeInstall, undefined, undefined, willQuit)
     updater.emit('update-downloaded', { version: '0.2.0', releaseDate: '2026-06-06T00:00:00.000Z' })
 
     nativeUpdater.emit('before-quit-for-update')
+    expect(willQuit).toHaveBeenCalledOnce()
     const installing = module.installGuiUpdate()
     await Promise.resolve()
 
@@ -135,6 +138,58 @@ describe('installGuiUpdate', () => {
     await Promise.all([module.installGuiUpdate(), module.installGuiUpdate()])
     expect(updater.downloadUpdate).not.toHaveBeenCalled()
     expect(updater.quitAndInstall).toHaveBeenCalledTimes(1)
+  })
+
+  it('unfences after a delayed Squirrel install error, removes only failed-attempt listeners, and retries with a new cleanup', async () => {
+    const module = await import('./gui-updater')
+    const cleanup = vi.fn().mockResolvedValue(undefined)
+    const resume = vi.fn().mockResolvedValue(undefined)
+    const persistentListener = vi.fn()
+    const installerListener = vi.fn()
+    nativeUpdater.on('update-downloaded', persistentListener)
+    updater.quitAndInstall.mockImplementationOnce(() => nativeUpdater.on('update-downloaded', installerListener))
+    module.initializeGuiUpdater(() => null, () => 'stable', cleanup, undefined, resume)
+    updater.emit('update-downloaded', { version: '0.2.0' })
+    await expect(module.installGuiUpdate()).resolves.toEqual({ ok: true })
+    expect(resume).not.toHaveBeenCalled()
+    updater.emit('error', new Error('Squirrel refused to install'))
+    updater.emit('error', new Error('Repeated native error'))
+    await expect(module.installGuiUpdate()).resolves.toMatchObject({ ok: false, code: 'install_failed', message: 'Squirrel refused to install' })
+    expect(resume).toHaveBeenCalledTimes(1)
+    expect(nativeUpdater.listeners('update-downloaded')).toEqual([persistentListener])
+    expect(module.getGuiUpdateState()).toMatchObject({ status: 'error', code: 'install_failed' })
+    await expect(module.installGuiUpdate()).resolves.toEqual({ ok: true })
+    expect(cleanup).toHaveBeenCalledTimes(2)
+    expect(updater.quitAndInstall).toHaveBeenCalledTimes(2)
+    expect(resume).toHaveBeenCalledTimes(1)
+  })
+
+  it('restores the Runtime when handing off to the installer throws synchronously', async () => {
+    const module = await import('./gui-updater')
+    const cleanup = vi.fn().mockResolvedValue(undefined)
+    const resume = vi.fn().mockResolvedValue(undefined)
+    updater.quitAndInstall.mockImplementationOnce(() => { throw new Error('Could not start installer') })
+    module.initializeGuiUpdater(() => null, () => 'stable', cleanup, undefined, resume)
+    updater.emit('update-downloaded', { version: '0.2.0' })
+    await expect(module.installGuiUpdate()).resolves.toMatchObject({ ok: false, message: 'Could not start installer' })
+    expect(resume).toHaveBeenCalledTimes(1)
+    await expect(module.installGuiUpdate()).resolves.toEqual({ ok: true })
+    expect(cleanup).toHaveBeenCalledTimes(2)
+  })
+
+  it('releases a dispatched update when Electron is prevented from quitting', async () => {
+    const module = await import('./gui-updater')
+    const resume = vi.fn().mockResolvedValue(undefined)
+    module.initializeGuiUpdater(() => null, () => 'stable', async () => undefined, undefined, resume)
+    updater.emit('update-downloaded', { version: '0.2.0' })
+    await module.reportGuiUpdateQuitFailure(new Error('Unrelated quit failed'))
+    expect(resume).not.toHaveBeenCalled()
+
+    await expect(module.installGuiUpdate()).resolves.toEqual({ ok: true })
+    await module.reportGuiUpdateQuitFailure(new Error('Unable to finish saving'))
+    expect(resume).toHaveBeenCalledOnce()
+    expect(module.getGuiUpdateState()).toMatchObject({ status: 'error', message: 'Unable to finish saving' })
+    await expect(module.installGuiUpdate()).resolves.toEqual({ ok: true })
   })
 
   it('keeps a verified downloaded package actionable when a later feed check is offline', async () => {
