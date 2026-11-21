@@ -72,8 +72,8 @@ it('runs the fixed TaskSpace SDK script and distinguishes exact selector matches
  globals.document=window.document;globals.location=window.location
  const AsyncFunction=Object.getPrototypeOf(async()=>undefined).constructor as new(...args:string[])=>(...args:unknown[])=>Promise<void>
  let injectedReadError:Record<string,unknown>|undefined,unknownEvaluationFailure=false
- const task={spaceId:7,name:'server-task-space-nonce',ownership:'agent',page:()=>({label:'p1',url:async()=>window.location.href,evaluate:async(fn:(arg:unknown)=>unknown,arg:unknown)=>{if(injectedReadError)return injectedReadError;try{if(unknownEvaluationFailure)throw new Error('private page/selector diagnostic');return JSON.parse(JSON.stringify(await fn(arg))) as unknown}catch{throw new Error('SDK remote evaluation failed')}},snapshot:async()=> 'article 无独立链接的测绘项目'})}
- const run=async(params:Record<string,unknown>)=>{const rows:Record<string,unknown>[]=[];await new AsyncFunction('taskSpace','console','listTaskSpaces','setTimeout',egoReadScript({spaceId:7,spaceName:task.name,origins:['https://feed.test'],maxBytes:4096,deadline:Date.now()+60000,...params}))(async(id:unknown)=>{if(params.recoverExistingOnly)expect(id).toBe(7);return task},{log:(s:string)=>rows.push(JSON.parse(s.slice('RAILWISE_EGO_RESULT:'.length)) as Record<string,unknown>)},async()=>params.matchingSpaces??[{id:7,name:task.name,ownership:task.ownership}],(callback:()=>void,ms:number)=>{expect(ms).toBe(500);callback()});return rows[0]!}
+ const task={spaceId:7,name:'server-task-space-nonce',ownership:'agent',page:()=>({label:'p1',url:async()=>window.location.href,evaluate:async(fn:(arg:unknown)=>unknown,arg:unknown)=>{if(injectedReadError)return injectedReadError;try{if(unknownEvaluationFailure)throw new Error('private page/selector diagnostic');return JSON.parse(JSON.stringify(await fn(arg))) as unknown}catch{throw new Error('SDK remote evaluation failed')}},snapshot:async()=>window.document.querySelector('article')?.textContent??''})}
+ const run=async(params:Record<string,unknown>,onWait?:()=>void)=>{const rows:Record<string,unknown>[]=[];await new AsyncFunction('taskSpace','console','listTaskSpaces','setTimeout',egoReadScript({spaceId:7,spaceName:task.name,origins:['https://feed.test'],maxBytes:4096,deadline:Date.now()+60000,...params}))(async(id:unknown)=>{if(params.recoverExistingOnly)expect(id).toBe(7);return task},{log:(s:string)=>rows.push(JSON.parse(s.slice('RAILWISE_EGO_RESULT:'.length)) as Record<string,unknown>)},async()=>params.matchingSpaces??[{id:7,name:task.name,ownership:task.ownership}],(callback:()=>void,ms:number)=>{expect(ms).toBe(500);onWait?.();callback()});return rows[0]!}
  try{
   const full=await run({action:'read'});expect(full).toMatchObject({ok:true,truncated:false});expect(String(full.html)).not.toContain('never export');expect(full.loadingObserved).toBe(false)
   expect(await run({action:'open',recoverExistingOnly:true,url:'https://feed.test/list'})).toMatchObject({ok:true,taskSpaceId:7})
@@ -95,6 +95,19 @@ it('runs the fixed TaskSpace SDK script and distinguishes exact selector matches
   window.document.body.innerHTML+='<article>第二条</article>'
   expect(await run({action:'read',selector:'article',expectedDocumentHtml:full.documentHtml,expectedSourceUrl:'https://feed.test/list'})).toMatchObject({ok:false,code:'ego_browser_element_ambiguous',failurePhase:'selection'})
   window.document.body.innerHTML+='<div role="progressbar">正在加载</div>';expect(await run({action:'read'})).toMatchObject({loadingObserved:true})
+  window.document.body.innerHTML='<svg><title>订阅图标</title><desc>装饰说明</desc><metadata>图标信息</metadata></svg>'
+  const emptyPage=await run({action:'read'})
+  expect(emptyPage).toMatchObject({ok:true,visibleText:false,loadingObserved:false})
+  expect(emptyPage.html).toContain('<title>订阅图标</title>')
+  let waits=0
+  const settled=await run({action:'observe'},()=>{
+    waits++
+    window.document.body.insertAdjacentHTML('beforeend','<article>已加载的测绘公告</article>')
+  })
+  expect(waits).toBe(1)
+  expect(settled).toMatchObject({ok:true,visibleText:true,snapshot:'已加载的测绘公告'})
+  window.document.body.innerHTML='<svg><title>图表</title><text>可见的读数</text></svg>'
+  expect(await run({action:'read'})).toMatchObject({ok:true,visibleText:true})
   task.ownership='user';expect(await run({action:'observe'})).toMatchObject({ok:false,code:'ego_browser_user_control'})
  }finally{globals.document=oldDocument;globals.location=oldLocation;await window.happyDOM.close()}
 })

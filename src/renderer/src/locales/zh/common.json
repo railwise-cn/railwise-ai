@@ -1883,6 +1883,8 @@
   "pluginCatalogPackage_dbhub_summary": "通过持续维护的 DBHub MCP 连接受支持的数据库。",
   "pluginCatalogPackage_antv-chart-mcp_summary": "通过 AntV Chart MCP 生成数据图表与可视化结果。",
   "pluginCatalogPackage_markitdown_summary": "{{productName}} 内置的本地文档解析与转换能力。",
+  "pluginCatalogPackage_docling-mcp_summary": "转换 PDF 等文档。PDF 转换需要另行配置 Docling 转换服务或本地转换环境。",
+  "pluginDoclingPdfRequirements": "安装后可以启动连接器。要用 Docling 转换 PDF，请先配置 Docling Serve，或单独安装支持本地转换的 Docling。日常读取 PDF 正文，可直接把文件添加到对话。",
   "pluginCatalogPackage_railwise-kb_name": "RailWise 知识库",
   "pluginCatalogPackage_railwise-kb_summary": "{{productName}} 管理的 RailWise 官方公开知识库连接，写作助手会在回答中按需检索并附来源。",
   "pluginCatalogPackage_officecli_summary": "由 {{productName}} 管理的 Office 文档命令行工具与配套 Skills。",

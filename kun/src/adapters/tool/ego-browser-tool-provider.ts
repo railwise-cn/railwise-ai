@@ -72,14 +72,19 @@ try {
    const visibleClone=root=>{if(hidden(root))throw Object.assign(new Error(),{code:'ego_browser_element_not_visible'});const clone=root.cloneNode(true),originals=[root,...root.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];for(let i=1;i<originals.length;i++)if(hidden(originals[i]))copies[i].remove();return clone};
    const loadingObserved=[...document.querySelectorAll('[aria-busy="true"],[role="progressbar"]')].some(n=>!hidden(n));
    const clone=document.body?visibleClone(document.body):undefined;
-   if(!clone) return {sourceUrl,html:'',truncated:false,candidates:[]};
+   if(!clone) return {sourceUrl,html:'',truncated:false,candidates:[],loadingObserved,visibleText:false};
    clone.querySelectorAll('script,style,noscript,template,iframe,input,textarea,select,[contenteditable]').forEach(n=>n.remove());
    for(const n of [clone,...clone.querySelectorAll('*')]) for(const a of [...n.attributes]) if(!['href','title','datetime','role','aria-label'].includes(a.name)) n.removeAttribute(a.name);
    for(const a of clone.querySelectorAll('a[href]')) { try {const u=new URL(a.getAttribute('href'),sourceUrl); if(!['http:','https:'].includes(u.protocol)||u.username||u.password)a.removeAttribute('href');else a.setAttribute('href',u.href);} catch {a.removeAttribute('href');} }
    const documentHtml=clone.outerHTML; let selection;
    if(argumentsSelection) { phase='selection'; let matches;try {matches=document.querySelectorAll(argumentsSelection);}catch(error){if(error?.name==='SyntaxError'||error?.name==='DOMException')return {readError:{version:1,code:'ego_browser_selector_invalid',failurePhase:phase}};throw error;} if(matches.length!==1)throw Object.assign(new Error(),{code:'ego_browser_element_ambiguous'}); if(matches[0].matches('script,style,noscript,template,iframe,input,textarea,select,[contenteditable]')||matches[0].closest('[contenteditable]'))throw Object.assign(new Error(),{code:'ego_browser_element_unsupported'}); const selected=visibleClone(matches[0]); selected.querySelectorAll('script,style,noscript,template,iframe,input,textarea,select,[contenteditable]').forEach(n=>n.remove()); for(const n of [selected,...selected.querySelectorAll('*')])for(const a of [...n.attributes])if(!['href','title','datetime','role','aria-label'].includes(a.name))n.removeAttribute(a.name); for(const a of [selected,...selected.querySelectorAll('a[href]')])if(a.matches('a[href]')) {try{const u=new URL(a.getAttribute('href'),sourceUrl);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)a.removeAttribute('href');else a.setAttribute('href',u.href)}catch{a.removeAttribute('href')}} selection={selector:argumentsSelection,matchedCount:1}; clone.replaceChildren(selected); }
    const raw=selection?clone.innerHTML:documentHtml, bytes=new TextEncoder().encode(raw), truncated=bytes.length>maxBytes;
-   return {sourceUrl,html:truncated?new TextDecoder().decode(bytes.slice(0,maxBytes)):raw,truncated,candidates,documentHtml,selection,loadingObserved,visibleText:(clone.textContent||'').trim().length>0};
+   // SVG metadata can fill textContent while the page still shows no text.
+   for(const node of clone.querySelectorAll('title,desc,metadata')){
+    if(node.namespaceURI==='http://www.w3.org/2000/svg')node.remove();
+   }
+   const visibleText=Boolean(clone.textContent?.trim());
+   return {sourceUrl,html:truncated?new TextDecoder().decode(bytes.slice(0,maxBytes)):raw,truncated,candidates,documentHtml,selection,loadingObserved,visibleText};
    }catch(error){const code=error?.code;if(['ego_browser_element_ambiguous','ego_browser_element_not_visible','ego_browser_element_unsupported','ego_browser_page_changed'].includes(code))return {readError:{version:1,code,failurePhase:phase}};throw error;}
   },{maxBytes:p.maxBytes,selector,expectedReadSourceUrl:p.expectedReadSourceUrl});
   if(result && Object.prototype.hasOwnProperty.call(result,'readError')) {
@@ -98,10 +103,10 @@ try {
    check(); failurePhase='navigation';sdkStage='navigation'; await page.goto(p.url,{timeout:25000});
  }
  failurePhase='control';sdkStage='control_check';check();sdkStage='initial_url'; const sourceUrl=await page.url(); if(!allowed(sourceUrl)) throw Object.assign(new Error(),{code:'ego_browser_origin_denied'});
- if(p.action==='observe'){failurePhase='snapshot';sdkStage='snapshot';}
- const snapshot=p.action==='observe'?await page.snapshot({scope:'full_page'}):undefined;
  const reading=await settledRead();
  if(p.selector && (reading.documentHtml!==p.expectedDocumentHtml || reading.sourceUrl!==p.expectedSourceUrl)){failurePhase='selection';throw Object.assign(new Error(),{code:'ego_browser_observation_stale'});}
+ if(p.action==='observe'){check();failurePhase='snapshot';sdkStage='snapshot';}
+ const snapshot=p.action==='observe'?await page.snapshot({scope:'full_page'}):undefined;
  failurePhase='control';sdkStage='final_control';check();sdkStage='final_url';if(reading.sourceUrl!==await page.url())throw Object.assign(new Error(),{code:'ego_browser_page_changed'});
  if(p.action==='observe')emit({...identity,ok:true,sourceUrl:reading.sourceUrl,documentHtml:reading.documentHtml,loadingObserved:reading.loadingObserved,visibleText:reading.visibleText,snapshot:String(snapshot).slice(0,64000)});
  else emit({...identity,ok:true,...reading});
