@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { assertPublishedWindowsUpgrade, legacyUpdaterReason, repairedScheduleSeed, sidebarUpgradeControlSelector, sidebarUpgradeSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
-import { createPrivateTrust, recordWindowsUpgradePhase, firstLaunchWindowsUiAutomationScript, validateFirstLaunchWindowsObservation, verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
+import { createPrivateTrust, recordWindowsUpgradePhase, firstLaunchWindowsUiAutomationScript, readFirstLaunchWindowsUiAutomation, validateFirstLaunchWindowsObservation, verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const installer = { url: 'RailWise-AI-0.5.7-win-x64.exe', size: 317686658, sha512: manifestDigest }
@@ -317,4 +317,20 @@ test('first-upgrade UIA PowerShell parses on its native Windows runtime', {skip:
   const script=firstLaunchWindowsUiAutomationScript({handle:123456,pid:9000},'D:\\owned\\RailWise AI.exe','0.5.10')
   const parser=`$tokens=$null;$errors=$null;[void][System.Management.Automation.Language.Parser]::ParseInput([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('${Buffer.from(script,'utf16le').toString('base64')}')),[ref]$tokens,[ref]$errors);if($errors.Count){throw ($errors.Message -join '; ')}`
   execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(parser,'utf16le').toString('base64')],{timeout:10_000})
+})
+
+test('first-upgrade UIA retries only the observed transient provider-unavailable error', () => {
+  const window={handle:123456,pid:9000},exe='D:\\owned\\RailWise AI.exe',version='0.5.10'
+  const unavailable=Object.assign(new Error('UIA provider not ready'),{stderr:'#< CLIXML\n<S S="Error">FullyQualifiedErrorId : ElementNotAvailableException_x000D__x000A_</S>'})
+  assert.equal(readFirstLaunchWindowsUiAutomation(window,exe,version,()=>{throw unavailable}),null)
+  for(const stderr of ['The first upgraded HWND has a different process owner','FullyQualifiedErrorId : AccessDeniedException','code containing catch [ElementNotAvailableException]']){
+    const error=Object.assign(new Error('wrong owner or another error'),{stderr})
+    assert.throws(()=>readFirstLaunchWindowsUiAutomation(window,exe,version,()=>{throw error}),next=>next===error)
+  }
+  const result={hwnd:window.handle,ownerPid:window.pid,visible:true,titleVisible:true,versionVisible:true}
+  assert.deepEqual(readFirstLaunchWindowsUiAutomation(window,exe,version,(file,args,options)=>{
+    assert.equal(file,'powershell.exe');assert.ok(args.includes('-EncodedCommand'));assert.equal(options.timeout,10_000)
+    return JSON.stringify(result)
+  }),result)
+  assert.throws(()=>readFirstLaunchWindowsUiAutomation(window,exe,version,()=>'{invalid'),SyntaxError)
 })
