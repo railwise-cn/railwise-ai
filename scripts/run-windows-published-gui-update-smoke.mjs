@@ -18,6 +18,7 @@ const baseSource = 'ce5b00cc41c3a53144144c85ecc772efe5872718'
 const targetAsar = 'd0b02f0cf4ff19c7891a1722706932d10c33ee77f3b03c53f3fdd3ab3998ce3a'
 const targetInstallerSha512 = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const officialFeed = 'https://www.railwise.cn/downloads/railwise-ai/channels/stable/latest/'
+const retailLegacyFeed = 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/'
 const baselines = JSON.parse(await readFile(new URL('../release/updater-acceptance-baselines.json', import.meta.url), 'utf8'))
 const releaseGate = JSON.parse(await readFile(new URL('../docs/qa/release-gates/v0.5.7.json', import.meta.url), 'utf8'))
 const baseline = baselines.versions[baseVersion]['win32-x64']
@@ -30,10 +31,11 @@ const historicalScenario = 'released-056-to-057'
 const upgradeScenarios = Object.freeze({
   [historicalScenario]: {
     baseVersion, baseSource, baseline, targetVersion, target, targetAsar, targetInstallerSha512,
-    targetSource: reviewedBuild.sourceHead
+    targetSource: reviewedBuild.sourceHead, feed: officialFeed
   },
   'released-057-to-059': {
     baseVersion: '0.5.7', baseSource: reviewedBuild.sourceHead, baseline: target,
+    feed: retailLegacyFeed,
     targetVersion: '0.5.9', targetSource: '389ee737a62cf4b889d5cb1958402e84911c5725',
     targetAsar: 'a90bca9b4fb10a43e1ae23b4a5a43d343656138e8ab9969256b9e2c08fca9d58',
     targetInstallerSha512: 'MuU84Ysjr5iFad2JGhtHWWxVYU095Fkioid7kpddVr5csS9Z9QklrY9P5/MSJgk1qLc9kgY+HQGdcBRP0ia1DQ==',
@@ -73,7 +75,7 @@ export function verifyPublishedWindowsManifest(manifest, scenario) {
 }
 
 export function assertPublishedWindowsUpgrade(report) {
-  const { baseline, baseVersion, targetVersion, targetAsar, targetSource } = publishedScenario(report.scenario)
+  const { baseline, baseVersion, baseSource, targetVersion, targetAsar, targetSource, feed } = publishedScenario(report.scenario)
   const targetIdentity = installIdentity(targetVersion, targetSource)
   assert.equal(report.baseline?.package?.version, baseVersion)
   if (report.scope === 'private-repaired-windows-gui-upgrade') {
@@ -92,8 +94,11 @@ export function assertPublishedWindowsUpgrade(report) {
     assert.equal(report.baseline?.installer?.sha256, baseline.sha256)
   }
   if (report.scenario === 'released-057-to-059') {
-    assert.equal(report.baseline.package.sourceHead, publishedScenario(report.scenario).baseSource)
-    assert.equal(report.baseline.packagedFeed, officialFeed)
+    assert.equal(report.baseline.package.sourceHead, baseSource)
+    assert.equal(report.baseline.packagedFeed, feed)
+    assert.equal(report.officialFeed, feed)
+    assert.equal(report.baseline.runtime?.authenticatedRead, true)
+    assert.ok(report.baseline.runtime?.pid > 0 && report.baseline.runtime.pid !== report.baseline.pid)
     assert.equal(report.target?.package?.sourceHead, targetSource)
     assert.equal(report.directTargetInstallerLaunches, 0)
     assert.equal(report.applicationUpdaterOverrides, 0)
@@ -239,7 +244,7 @@ async function main(args) {
   const scenario = process.env.PUBLISHED_GUI_UPGRADE_SCENARIO || historicalScenario
   assert.ok(!repaired || scenario === historicalScenario, 'The newer published scenario requires the original retail baseline')
   const selected = publishedScenario(scenario)
-  const { baseVersion, baseSource, targetVersion, targetSource } = selected
+  const { baseVersion, baseSource, targetVersion, targetSource, feed } = selected
   const rootIdentity = installIdentity(baseVersion, baseSource)
   const targetIdentity = installIdentity(targetVersion, targetSource)
   const evidenceDir = join(process.env.RUNNER_TEMP, 'published-windows-gui-upgrade-evidence')
@@ -248,7 +253,7 @@ async function main(args) {
   const report = { schemaVersion: 1, scope, status: 'running',
     provenance: { driverSourceHead: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT },
     scenario, baseVersion, targetVersion, phase: 'preflight', baseline: {},
-    officialFeed, directTargetInstallerLaunches: 0, applicationUpdaterOverrides: 0 }
+    officialFeed: feed, directTargetInstallerLaunches: 0, applicationUpdaterOverrides: 0 }
   const save = () => writeFile(join(evidenceDir, marketplace ? 'windows-npm-marketplace.json' : 'windows-published-gui-upgrade.json'), JSON.stringify(report, null, 2) + '\n')
   const capture = async (cdp, filename) => {
     const image = await cdp.send('Page.captureScreenshot', { format: 'png' })
@@ -269,7 +274,7 @@ async function main(args) {
       assert.equal(present, false, 'An existing RailWise profile was found')
     }
     if (!marketplace) {
-      const response = await fetch(new URL('latest.yml', officialFeed), {
+      const response = await fetch(new URL('latest.yml', feed), {
         cache: 'no-store', signal: AbortSignal.timeout(30_000)
       })
       assert.ok(response.ok, `Current Stable feed returned HTTP ${response.status}`)
@@ -291,7 +296,7 @@ async function main(args) {
     const appUpdate = parse(await readFile(join(directory, 'resources', 'app-update.yml'), 'utf8'))
     assert.equal(appUpdate.provider, 'generic')
     assert.match(appUpdate.url, /^https:\/\/www\.railwise\.cn\/downloads\/(?:railwise-ai|workwise)\/channels\/stable\/latest\/?$/)
-    if (scenario === 'released-057-to-059') assert.equal(appUpdate.url, officialFeed)
+    if (scenario === 'released-057-to-059') assert.equal(appUpdate.url, feed)
     report.baseline.packagedFeed = appUpdate.url
     report.phase = 'baseline-renderer'
     let cleanEnvironment = { ...process.env }
@@ -342,6 +347,24 @@ async function main(args) {
     await cdp.wait('Boolean(window.workwise?.getAppVersion && document.querySelector("button"))', 'baseline workbench')
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
     report.baseline.pid = child.pid
+    if (scenario === 'released-057-to-059') {
+      report.phase = 'baseline-owned-runtime'
+      await save()
+      const health = await cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads', 'GET').then(({ok, status}) => ({ok, status}))`, 90_000)
+      assert.deepEqual(health, { ok: true, status: 200 }, 'The original bundled Runtime must answer an authenticated local read')
+      const runtimePid = await waitUntil(() => {
+        const pids = JSON.parse(powershell(`
+          $processes = @(Get-CimInstance Win32_Process -Filter 'ParentProcessId = ${child.pid}' |
+            Where-Object { $_.ExecutablePath -eq ${psQuote(executable)} -and $_.CommandLine -match '\\sserve(?:\\s|$)' } |
+            ForEach-Object { [int]$_.ProcessId })
+          ConvertTo-Json -InputObject $processes -Compress
+        `))
+        assert.ok(pids.length < 2, 'The installed application must own exactly one bundled Runtime')
+        return pids[0]
+      }, 'the exact installed app’s owned Runtime process', 30_000)
+      report.baseline.runtime = { authenticatedRead: true, pid: runtimePid }
+      await save()
+    }
     if (marketplace) {
       report.phase = 'marketplace-install'
       await save()

@@ -43,10 +43,12 @@ test('the live 0.5.7 route is pinned to the exact reviewed 0.5.9 installer and r
   const executable = installLocation + '/RailWise AI.exe'
   const report = {
     scenario, scope: 'published-windows-gui-upgrade', directTargetInstallerLaunches: 0, applicationUpdaterOverrides: 0,
+    officialFeed: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/',
     baseline: {
       package: { version: '0.5.7', sourceHead: '52779c7b0cf46452a05ccf80a413f0b5d046a7b3' },
       installer: { sha256: '113a88a8601b04a49233267dc8321c17063a949fecce9fa5ad3e6ff37ed66dd7' },
-      packagedFeed: 'https://www.railwise.cn/downloads/railwise-ai/channels/stable/latest/',
+      packagedFeed: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/',
+      runtime: { authenticatedRead: true, pid: 200 },
       executable, pid: 100, registry: { installLocation }
     },
     offer: { status: 'available', hasUpdate: true },
@@ -63,6 +65,7 @@ test('the live 0.5.7 route is pinned to the exact reviewed 0.5.9 installer and r
   assert.throws(() => assertPublishedWindowsUpgrade({ ...report, directTargetInstallerLaunches: 1 }))
   assert.throws(() => assertPublishedWindowsUpgrade({ ...report, applicationUpdaterOverrides: 1 }))
   assert.throws(() => assertPublishedWindowsUpgrade({ ...report, baseline: { ...report.baseline, packagedFeed: 'https://127.0.0.1/' } }))
+  assert.throws(() => assertPublishedWindowsUpgrade({ ...report, baseline: { ...report.baseline, runtime: undefined } }))
   assert.throws(() => assertPublishedWindowsUpgrade({ ...report, baseline: { ...report.baseline, package: { ...report.baseline.package, version: '0.5.8' } } }))
 })
 
