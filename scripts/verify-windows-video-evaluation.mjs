@@ -23,6 +23,20 @@ const composition = 'RailWiseSyntheticEvaluation'
 const pdfName = '合成视频资料.pdf'
 const pdfText = '铁路合成验收'
 
+export function windowsVideoApprovalUiExpression() {
+  return `(() => {
+    const conversation=document.querySelector('.ds-workbench-shell main .ds-message-timeline-content');
+    const options=[...(conversation?.querySelectorAll('button')??[])].filter(item=>
+      ['允许','允许此操作','允许本次'].includes(item.textContent.trim())&&!item.disabled&&item.getClientRects().length);
+    if(options.length!==1)return null;
+    const button=options[0];
+    button.scrollIntoView({block:'center'});
+    const box=button.getBoundingClientRect();
+    const point={x:box.x+box.width/2,y:box.y+box.height/2};
+    return button.contains(document.elementFromPoint(point.x,point.y))?point:null;
+  })()`
+}
+
 export function summarizeWindowsVideoRender(result, elapsedMs) {
   // Classify only in memory. Never persist renderer logs, paths, URLs or tokens.
   const output = String(result.stdout ?? '') + '\n' + String(result.stderr ?? '')
@@ -328,17 +342,7 @@ export async function startWindowsVideoEvaluation(workspace, environment, parseF
       const approvalChat = validateWindowsTaskChatLayout(await cdp.wait(chat, 'approval state in the original chat'))
       const commandFingerprint = `Command SHA256: ${digest(render.command)}`
       assert.equal(await cdp.evaluate(`document.querySelector('.ds-workbench-shell main')?.innerText.includes(${literal(commandFingerprint)})`), false)
-      const button = await cdp.wait(`(() => {
-        const conversation=document.querySelector('.ds-workbench-shell main');
-        const options=[...(conversation?.querySelectorAll('button')??[])].filter(item=>
-          ['允许此操作','允许本次'].includes(item.textContent.trim())&&!item.disabled&&item.getClientRects().length);
-        if(options.length!==1)return null;
-        const button=options[0];
-        button.scrollIntoView({block:'center'});
-        const box=button.getBoundingClientRect();
-        const point={x:box.x+box.width/2,y:box.y+box.height/2};
-        return button.contains(document.elementFromPoint(point.x,point.y))?point:null;
-      })()`, 'the visible approval for the exact command')
+      const button = await cdp.wait(windowsVideoApprovalUiExpression(), 'the visible approval for the exact command in the transcript')
       await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...button })
       await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...button })
       const taskPath = `/v1/tasks/${encodeURIComponent(approval.taskId)}`
