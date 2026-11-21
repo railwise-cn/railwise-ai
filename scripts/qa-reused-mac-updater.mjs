@@ -69,10 +69,26 @@ export function verifyQaMacArtifact(input, run, api = githubApi) {
     && sourceRun.head_sha === input.targetHead,
   'Release package run did not match the trusted repository, workflow, or exact target source.')
   const jobs = api(repositoryPath + '/actions/runs/' + input.runId + '/attempts/' + sourceRun.run_attempt + '/jobs?per_page=100').jobs
-  requireMatch(jobs.some(job => job.name === 'Build macOS' && job.conclusion === 'success')
-    && jobs.some(job => job.name === 'Verify three-client candidate' && job.conclusion === 'success')
-    && jobs.some(job => job.name === 'Publish GitHub Release' && job.conclusion === 'skipped'),
-  'The exact run must contain a signed candidate build and skipped publication.')
+  const matches = (name, conclusion) => jobs.filter(job => job.name === name).length === 1
+    && jobs.some(job => job.name === name && job.status === 'completed' && job.conclusion === conclusion)
+  const build = jobs.find(job => job.name === 'Build macOS')
+  requireMatch(matches('Build macOS', 'success') && matches('Publish GitHub Release', 'skipped')
+    && ['Build signed macOS packages', 'Verify final signed macOS artifacts', 'Upload macOS installers'].every(name =>
+      build?.steps?.some(step => step.name === name && step.status === 'completed' && step.conclusion === 'success')),
+  'The exact run must contain a verified signed macOS build and skipped publication.')
+
+  let packageMode
+  if (sourceRun.conclusion === 'success' && matches('Verify three-client candidate', 'success')) {
+    packageMode = 'candidate'
+  } else if (matches('Prepare release version', 'success') && matches('Build Windows', 'success')
+    && matches('Verify three-client candidate', 'skipped') && matches('Private exact-package Windows install smoke', 'success')
+    && (sourceRun.conclusion === 'success' && matches('Private exact-package updater smoke', 'success')
+      || sourceRun.conclusion === 'failure' && matches('Private exact-package updater smoke', 'failure')
+      && jobs.every(job => job.name === 'Private exact-package updater smoke' || ['success', 'skipped'].includes(job.conclusion)))) {
+    // The retry is the private Mac smoke, so this job may be the sole failure of the source run.
+    packageMode = 'private-stable'
+  }
+  requireMatch(packageMode, 'The run must be a completed candidate or a private Stable build with its Windows install smoke completed.')
   const artifacts = api(repositoryPath + '/actions/runs/' + input.runId + '/artifacts?per_page=100').artifacts
   const candidates = artifacts.filter(asset => asset.name === 'release-mac' && !asset.expired)
   const [artifact] = candidates
@@ -85,17 +101,19 @@ export function verifyQaMacArtifact(input, run, api = githubApi) {
   run('git', ['merge-base', '--is-ancestor', input.targetHead, input.driverHead])
   const changed = run('git', ['diff', '--name-only', input.targetHead, input.driverHead]).stdout.trim().split('\n').filter(Boolean)
   requireMatch(changed.every(file => QA_FILES.has(file)), 'Differences between target and driver must be limited to the QA workflow.')
-  return { ...input, repository: RELEASE_REPOSITORY, runAttempt: sourceRun.run_attempt,
+  return { ...input, repository: RELEASE_REPOSITORY, runAttempt: sourceRun.run_attempt, packageMode,
     artifact: { id: artifact.id, digest: artifact.digest, name: artifact.name }, scope: 'qa-only' }
 }
 
-export function verifyQaMacArchiveEntries(names, version) {
+export function verifyQaMacArchiveEntries(names, version, packageMode) {
   const expected = publication.expectedReleaseFiles(version).filter(file => file.artifact === 'release-mac').map(file => file.name)
+  requireMatch(['candidate', 'private-stable'].includes(packageMode), 'Missing admitted Mac package mode.')
   const frozen = names.includes('reviewed-build.json')
+  requireMatch(!frozen || packageMode === 'candidate', 'A private Stable archive must not contain a candidate build receipt.')
   if (frozen) expected.push('reviewed-build.json')
   requireMatch(names.length === expected.length && expected.every(name => names.includes(name)),
     'Mac artifact archive contains an unexpected package entry set.')
-  return frozen ? 'stable' : 'qa-frontier'
+  return frozen || packageMode === 'private-stable' ? 'stable' : 'qa-frontier'
 }
 
 export async function downloadQaMacArtifact(reference, root, version, run) {
@@ -109,7 +127,7 @@ export async function downloadQaMacArtifact(reference, root, version, run) {
   }
   requireMatch('sha256:' + await hashFile(archive) === reference.artifact.digest, 'Immutable Mac artifact archive digest mismatch.')
   const names = run('/usr/bin/unzip', ['-Z1', archive]).stdout.trim().split(/\r?\n/)
-  const updaterMode = verifyQaMacArchiveEntries(names, version)
+  const updaterMode = verifyQaMacArchiveEntries(names, version, reference.packageMode)
   const directory = join(root, 'qa-exact-mac')
   mkdirSync(directory)
   run('/usr/bin/ditto', ['-x', '-k', archive, directory])

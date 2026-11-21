@@ -355,7 +355,7 @@ jobs:
 
   exact-mac-native-updater:
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/qa-mac-native-updater-reuse-0510' && inputs.mac_native_upgrade != '' }}
-    name: Native Mac upgrade into existing signed QA package
+    name: Native Mac upgrade into existing signed package
     runs-on: macos-15
     timeout-minutes: 65
     steps:
@@ -375,7 +375,7 @@ jobs:
           npm --prefix kun run build
       - name: Verify scoped reuse and frozen updater contracts
         run: node --test scripts/qa-reused-mac-updater.test.mjs scripts/frozen-release-updater-acceptance.test.mjs scripts/macos-updater-trust.test.mjs
-      - name: Exercise the exact signed candidate on a fresh Mac runner
+      - name: Exercise the exact signed package on a fresh Mac runner
         env:
           GH_TOKEN: ${{ github.token }}
           QA_UPGRADE_TARGET: ${{ inputs.mac_native_upgrade }}
