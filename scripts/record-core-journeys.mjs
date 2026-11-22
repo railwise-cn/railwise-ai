@@ -49,10 +49,26 @@ function startupJourney(reportFile) {
     evidence: `${reportFile} records the actual cold startup appearance and transition to the installed workbench.` }
 }
 
-export function macCoreJourneys(startup, live) {
+export function macCoreJourneys(startup, live, spreadsheet) {
   assert.equal(startup.status, 'passed')
   assert.ok(visitedWorkbench(startup.observations, ['zh-CN', 'en']) || visitedWorkbench(startup.observations, ['zh', 'en']))
   const journeys = [startupJourney('mac-startup-appearance.json')]
+  assert.equal(spreadsheet?.status, 'passed')
+  assert.equal(spreadsheet.platform, 'darwin')
+  assert.equal(spreadsheet.arch, startup.arch)
+  assert.equal(spreadsheet.version, startup.version)
+  assert.equal(spreadsheet.sourceHead, startup.source.sourceHead)
+  assert.equal(spreadsheet.installerSha256, startup.installer.sha256)
+  assert.equal(spreadsheet.installedAsarSha256, startup.installed.asarSha256)
+  assert.equal(spreadsheet.execution, 'installed-ui')
+  assert.equal(spreadsheet.packageUnchanged, true)
+  for (const check of ['new-local-rwsheet', 'formula-calculation-saved', 'undo-restores-prior-cell-value',
+    'external-save-conflict-preserves-original-and-saves-copy', 'utf8-chinese-csv-import-export-preserves-leading-zero-and-decimal',
+    'save-reopen-multiple-sheets-through-production-reader', 'xlsx-read-only-preview-preserves-sheet-names-positions-and-source-bytes']) {
+    assert.ok(spreadsheet.checks.includes(check), `Missing installed spreadsheet check: ${check}`)
+  }
+  journeys.push({ id: 'offline-spreadsheet', method: 'installed-ui', status: 'passed',
+    evidence: `${spreadsheet.platform}/${spreadsheet.arch} ran the offline workbook workflow in the exact installed package and recorded the workbook and read-only XLSX assertions.` })
   if (live?.status === 'passed' && live.modelMode === 'live') {
     assert.equal(live.platform, 'darwin')
     assert.equal(live.arch, startup.arch)
@@ -99,6 +115,71 @@ export function windowsCoreJourneys(install, environment = process.env) {
     assert.equal(ui.packageUnchanged, true)
     const ppt = livePptJourney(ui.webPpt, 'windows-ui-smoke.json', 'desktop-open-request-accepted')
     if (ppt) journeys.push(ppt)
+  }
+  if (ui?.status === 'passed') {
+    const checks = new Set(ui.checks ?? [])
+    const task = ui.taskExecution
+    if (checks.has('runtime-task-html-and-daily-schedule')) {
+      assert.equal(task?.status, 'completed')
+      assert.ok(task.taskId)
+      assert.equal(task.artifact?.format, 'html')
+      assert.equal(task.artifact?.validation, 'valid')
+      assert.equal(task.artifact?.byteHashMatches, true)
+      assert.equal(task.preview?.automatic, true)
+      assert.equal(task.preview?.contentVerified, true)
+      assert.equal(task.preview?.manualEntryVerified, true)
+      journeys.push({ id: 'conversation-task', method: 'installed-ui', status: 'passed',
+        evidence: 'windows-install-smoke.json records a completed task, valid HTML and automatic and manual previews from the installed conversation.' })
+      const occurrence = task.dueOccurrence
+      assert.equal(occurrence?.clock, 'real')
+      assert.equal(occurrence?.status, 'completed')
+      assert.equal(occurrence?.resultInOriginChat, true)
+      assert.equal(occurrence?.durableOriginReceipt, true)
+      assert.equal(occurrence?.noRepeatedUserRequest, true)
+      assert.equal(occurrence?.byteHashMatches, true)
+      journeys.push({ id: 'daily-schedule', method: 'installed-ui', status: 'passed',
+        evidence: 'windows-install-smoke.json records a real-clock due run, one verified artifact and its durable result in the original conversation.' })
+    }
+    if (checks.has('composer-files-skills-and-plugin')) {
+      const composer = ui.composerAcceptance
+      assert.equal(composer?.status, 'passed')
+      for (const flag of ['skillRead', 'pluginRead', 'scanSent', 'chineseTextSent', 'nativeClipboard', 'chooser', 'drop']) {
+        assert.equal(composer[flag], true, `Missing installed composer assertion: ${flag}`)
+      }
+      assert.ok(Number.isSafeInteger(composer.scanBytes) && composer.scanBytes >= 40 * 1024 * 1024)
+      assert.equal(composer.attachmentLayout?.preservedDraft, true)
+      journeys.push({ id: 'composer-capabilities', method: 'installed-ui', status: 'passed',
+        evidence: 'windows-install-smoke.json records Skill and plugin calls from the installed composer with the draft preserved.' })
+      journeys.push({ id: 'pdf-attachments', method: 'installed-ui', status: 'passed',
+        evidence: 'windows-install-smoke.json records a 40 MiB scan PDF, Chinese text PDF and chooser, clipboard and drop intake.' })
+    }
+    if (checks.has('native-window-composer-menus-and-narrow-navigation')) {
+      assert.equal(ui.adaptiveWorkbench?.status, 'passed')
+      journeys.push({ id: 'responsive-layout', method: 'installed-ui', status: 'passed',
+        evidence: 'windows-install-smoke.json records actual native window resizing, composer menu keyboard behavior and narrow navigation.' })
+    }
+    if (checks.has('cold-mirror-installs-playwright-docling-and-skill-selection')) {
+      assert.equal(ui.marketplace?.status, 'passed')
+      assert.equal(ui.marketplace?.playwright?.navigated, true)
+      assert.ok(ui.marketplace?.playwright?.observed > 0)
+      assert.ok(ui.marketplace?.docling?.toolsDiscovered > 0)
+      assert.ok(ui.marketplace?.installed?.some(item => item.id === 'superpowers' && item.installedViaUi))
+      assert.ok(ui.marketplace?.installed?.some(item => item.id === 'blender-skills' && item.installedViaUi))
+      journeys.push({ id: 'marketplace-mirror', method: 'installed-ui', status: 'passed',
+        evidence: 'windows-install-smoke.json records cold mirrored market installs, installed Skill entries, Docling startup and Playwright navigation.' })
+    }
+    if (checks.has('installed-video-skill-protocol-render-registered-and-decoded')) {
+      const render = ui.marketplace?.videoShotcraft?.render
+      assert.equal(ui.marketplace?.scope, 'video-shotcraft')
+      assert.ok(render?.runtimeApprovalId)
+      assert.equal(render.sameTaskResumedAfterInterruption, true)
+      assert.equal(render.decoded, true)
+      assert.ok(render.artifact?.id)
+      journeys.push({ id: 'approval-resume', method: 'installed-ui', status: 'passed',
+        evidence: 'windows-install-smoke.json records one approved Video Shotcraft render, same-task recovery and verified playable output.' })
+      journeys.push({ id: 'video-shotcraft', method: 'installed-ui', status: 'passed',
+        evidence: 'windows-install-smoke.json records the installed Video Shotcraft skill, PDF read, registered MP4 and full decode.' })
+    }
   }
   return { version, sourceHead, platform, arch, installerSha256, installedAsarSha256,
     buildRunId: Number(packageBuild.runId), buildRunAttempt: Number(packageBuild.runAttempt), journeys }

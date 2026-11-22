@@ -23,6 +23,7 @@ import './dependency-artifact-policy.test.cjs'
 import './windows-install-smoke.test.mjs'
 import './verify-exact-updater-evidence.test.mjs'
 import './verify-core-journeys.test.mjs'
+import './record-core-journeys.test.mjs'
 
 const workflowPath = new URL('../.github/workflows/release.yml', import.meta.url)
 const workflowSource = readFileSync(workflowPath, 'utf8')

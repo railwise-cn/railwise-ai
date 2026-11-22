@@ -36,7 +36,7 @@ export class TaskCoordinator {
   private readonly pending = new Map<string, Promise<TaskCommandResult>>()
   private flushingMessages?: Promise<void>
   private readonly controls:TaskControlService
-  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; userInputGate?: UserInputGate; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
+  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; userInputGate?: UserInputGate; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; requiresBrowserScopeRefresh?: (task: TaskRun, turnId: string, text: string) => boolean | Promise<boolean>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
   async command(raw: TaskCommand, options: TaskCommandDispatchOptions = {}): Promise<TaskCommandResult> {
     const command = TaskCommandSchema.parse(raw)
     const queueKey = `${command.threadId}:${command.idempotencyKey}`
@@ -290,9 +290,29 @@ export class TaskCoordinator {
     const attention = pending.length === 1 && pending[0]?.kind === 'question' ? pending[0] : undefined
     const request = attention?.requestId ? userInputGate?.get(attention.requestId) : undefined
     const question = request?.questions.length === 1 ? request.questions[0] : undefined
-    if (request?.turnId === task.activeTurnId && question && question.options.length === 0 &&
-        userInputGate?.resolve(request.id, { status: 'submitted', answers: [{ id: question.id, label: question.header || question.question, value: input.text }] })) {
-      return { ...queued, task: repository.get(task.id) ?? task }
+    if (request?.turnId === task.activeTurnId && question && question.options.length === 0) {
+      if (await this.deps.requiresBrowserScopeRefresh?.(task, request.turnId, input.text)) {
+        const current = repository.get(task.id) ?? task
+        const paused = this.deps.tasks.pauseTask(current.id, current.revision, '正在根据补充网址更新只读网页读取范围。')
+        userInputGate?.resolveForTurnRestart(request.id)
+        await this.deps.turns.interruptTurn({ threadId: task.threadId, turnId: request.turnId })
+        const ready = repository.get(task.id) ?? paused
+        try {
+          const resumed = await this.controls.mutate(task.id, 'resume', {
+            expectedRevision: ready.revision, idempotencyKey: `supplement-browser-scope:${input.id}`, model: command.request.model
+          })
+          if (resumed.capability) return { kind: 'capability_required', task: resumed.task,
+            attentionId: `capability_${task.id}`, capability: resumed.capability, message: resumed.capability.message,
+            ...(resumed.receipt ? { receipt: resumed.receipt } : {}) }
+          return { ...queued, task: resumed.task }
+        } catch (error) {
+          if (!['stale_request', 'invalid_state', 'outcome_unknown'].includes((error as { code?: string }).code ?? '')) throw error
+          return { ...queued, task: repository.get(task.id) ?? ready }
+        }
+      }
+      if (userInputGate?.resolve(request.id, { status: 'submitted', answers: [{ id: question.id, label: question.header || question.question, value: input.text }] })) {
+        return { ...queued, task: repository.get(task.id) ?? task }
+      }
     }
     if (pending.length) return queued
     const turn = (await threadStore.get(task.threadId))?.turns.find(item => item.id === task.activeTurnId)

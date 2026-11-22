@@ -513,6 +513,36 @@ describe('task commands before Turn allocation',()=>{
     expect(f.runTurn).toHaveBeenCalledOnce()
   })
 
+  it('continues the same task in a fresh Turn when an open answer adds a configured browser source', async () => {
+    const f = await fixture()
+    const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
+    const requiresBrowserScopeRefresh = vi.fn(async (_task, _turnId, text) => text === 'www.railwise.cn')
+    const coordinator = new TaskCoordinator({ ...f, userInputGate, requiresBrowserScopeRefresh, nowIso: () => new Date().toISOString() })
+    const started = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'website-task', request: { prompt: '制作官网介绍 PPT' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const requestId = 'input-website'
+    const answer = userInputGate.request({ id: requestId, itemId: 'item-website', threadId: started.turn.threadId, turnId: started.turn.turnId,
+      prompt: '请提供官网网址。', questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] })
+    expect(f.repository.get(started.task!.id)).toMatchObject({ status: 'waiting_user', activeTurnId: started.turn.turnId })
+
+    const result = await coordinator.command({ threadId: f.origin.id, idempotencyKey: 'answer-website', request: { prompt: 'www.railwise.cn' } })
+
+    expect(result).toMatchObject({ kind: 'input_queued', task: { id: started.task!.id } })
+    expect(requiresBrowserScopeRefresh).toHaveBeenCalledWith(expect.objectContaining({ id: started.task!.id }), started.turn.turnId, 'www.railwise.cn')
+    expect(f.repository.humanRequest(requestId)?.status).toBe('cancelled')
+    await expect(answer).resolves.toEqual({ status: 'cancelled' })
+    const supplements = f.repository.inputs(started.task!.id).filter(input => input.kind === 'supplement' && input.sourceId === undefined)
+    expect(supplements).toHaveLength(1)
+    expect(supplements[0]?.text).toBe('www.railwise.cn')
+    const turns = (await f.threadStore.get(started.turn.threadId))?.turns
+    expect(turns).toHaveLength(2)
+    expect(turns?.[0]).toMatchObject({ id: started.turn.turnId, status: 'aborted' })
+    expect(turns?.[1]).toMatchObject({ status: 'running', prompt: expect.stringContaining('Continue the persisted task') })
+    expect(turns?.[1]?.items[0]).toMatchObject({ kind: 'user_message', displayText: '继续未完成任务' })
+    expect(f.repository.get(started.task!.id)?.activeTurnId).toBe(turns?.[1]?.id)
+    expect(f.runTurn).toHaveBeenCalledTimes(2)
+  })
+
   it('persists ambiguous ownership across multiple active tasks and keeps explicit decisions supported',async()=>{
     const f=await fixture()
     await f.coordinator.command({threadId:f.origin.id,intent:'new',idempotencyKey:'start',request:{prompt:'完成报告'}})

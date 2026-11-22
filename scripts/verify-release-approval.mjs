@@ -363,7 +363,7 @@ function requireCompatibleCheckSource(value, label, packagedSourceHead, releaseH
   requireReviewedSource(value, releaseHead, 2)
 }
 
-function requireCoreJourneyEvidence(evidence, { version, build, packageIdentity, updater, releaseHead }) {
+function requireCoreJourneyEvidence(evidence, { version, build, packageIdentity, updater, changedPaths, releaseHead }) {
   const label = 'acceptance.coreJourneys'
   requireStatus(evidence, label)
   if (!Array.isArray(evidence.receipts) || !evidence.receipts.length || evidence.receipts.length > 64) fail(`${label} must include core journey receipts`)
@@ -380,7 +380,7 @@ function requireCoreJourneyEvidence(evidence, { version, build, packageIdentity,
     return { receipt, bytes, workflowRun: value.workflowRun }
   })
   return validateCoreJourneyReceipts(records, {
-    version, build, packageIdentity, updater,
+    version, build, packageIdentity, updater, changedPaths,
     requireSource: value => requireCompatibleCheckSource(value, `${label} receipt workflow source`, build.sourceHead, releaseHead)
   })
 }
@@ -523,7 +523,8 @@ export function verifyReleaseApproval({
   }
   const coreJourneyReceipts = coreJourneysRequired
     ? requireCoreJourneyEvidence(acceptance.coreJourneys, {
-      version, build: reviewedBuild, packageIdentity, updater: requirements.updater, releaseHead: sourceHead
+      version, build: reviewedBuild, packageIdentity, updater: requirements.updater,
+      changedPaths: requirements.changedPaths, releaseHead: sourceHead
     })
     : []
   if (requirements.updater && !acceptance.updaterRoundTrip) fail('this release changes updater/download paths and requires one exact-package updater smoke')

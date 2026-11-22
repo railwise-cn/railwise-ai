@@ -7,7 +7,7 @@ import { isAbsolute, join, relative, sep } from 'node:path'
 export const webPptSourceHost = 'www.railwise.cn'
 export const webPptSourceUrl = `https://${webPptSourceHost}/`
 export const webPptQuestion = '请提供制作 PPT 所需的官网网址。'
-const prompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和安全监测资料制作，并在演示文稿内列出来源。'
+export const webPptJourneyPrompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和安全监测资料制作，并在演示文稿内列出来源。'
 const project = 'deck'
 const filename = 'website.pptx'
 const artifactPath = `${project}/${filename}`
@@ -108,7 +108,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
   return {
     modelAction(body) {
       const { messages, tools = [] } = body
-      if (!messages.some(message => message.role === 'user' && typeof message.content === 'string' && message.content.includes(prompt))) return undefined
+      if (!messages.some(message => message.role === 'user' && typeof message.content === 'string' && message.content.includes(webPptJourneyPrompt))) return undefined
       const output = id => {
         const item = messages.find(message => message.role === 'tool' && message.tool_call_id === `web-ppt-${id}`)
         if (!item) return undefined

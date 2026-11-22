@@ -980,6 +980,20 @@ export async function createKunServeRuntime(
   const externalPreflight: typeof connectorPreflight = async (text, thread, sourceTask) => await localWritePreflight(text, thread, sourceTask) ?? await connectorPreflight(text, thread, sourceTask)
   const taskControlService=new TaskControlService({publicQueryRecovery,validateRecoveryExecution,preflightRecoveryTask:(text,thread,binding)=>externalTaskIntent(text)?.kind==='external_task'?Promise.resolve(workspacePermissionCapability('public_query_recovery_read_only','重新检索仅允许公开查询与本机成果，不能执行外部业务写入。')):browserRuntime.preflight(text,thread,publicQueryRecovery.reviewedBrowserScope(binding),undefined,binding.mode==='task_reauthorization'?publicQueryRecovery.reviewedBrowserScope(binding):undefined),validateRecoveryPermission:threadId=>taskPermissionService.executionRestriction(threadId),repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>{void browserRuntime.stopThread(threadId);return delegationRuntime?.abortParent(threadId,reason)},preflightExternalTask:externalPreflight,validateTaskPermission:(threadId,sourceTaskId)=>taskExecutionRestriction(threadId,undefined,sourceTaskId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),validateRetryLocalSchedule:(task,receipt,recovery)=>taskScheduleService?.validateRetryLocalSchedule(task,receipt,recovery) ?? Promise.resolve(false),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
   const taskCoordinator = new TaskCoordinator({ preflightExternalTask:externalPreflight, controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore, userInputGate,
+    async requiresBrowserScopeRefresh(task, turnId) {
+      const turn = (await threadStore.get(task.threadId))?.turns.find(item => item.id === turnId)
+      if (!turn) return false
+      const sources = [task.goal, ...taskController.taskInputs(task.id)
+        .filter(input => input.kind === 'supplement' && input.sourceId === undefined)
+        .map(input => input.text)]
+      const requestedScope = browserRuntime.sourceReadScope(sources)
+      if (!requestedScope) return false
+      const grant = turn.executionGrant
+      return !grant?.allowedProviderIds?.includes('browser-skill') ||
+        requestedScope.origins.some(origin => !grant.browserScope?.origins.includes(origin)) ||
+        grant.browserScope?.interaction !== 'observe' || grant.browserScope.sourceReadOnly !== true ||
+        grant.connectorIdentityFingerprints?.['browser-skill'] !== browserRuntime.identityFingerprint()
+    },
     async classifyIntent(text, task) {
       const abort = new AbortController()
       const timer = setTimeout(() => abort.abort(),8_000)

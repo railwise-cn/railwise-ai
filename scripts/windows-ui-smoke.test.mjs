@@ -19,6 +19,45 @@ import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWin
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
+import { createWebPptJourney, webPptJourneyPrompt } from './web-ppt-journey.mjs'
+
+test('website-to-PPT asks in the selected conversation and fetches the answered bare host', () => {
+  const journey = createWebPptJourney({ workspace: '/owned/workspace', sidecar: '/unused/sidecar', parseToolOutput: JSON.parse })
+  const body = {
+    messages: [{ role: 'user', content: webPptJourneyPrompt }],
+    tools: ['request_user_input', 'web_fetch', 'write', 'ppt_master_export'].map(name => ({ function: { name } }))
+  }
+  const response = journey.modelAction(body)
+  assert.equal(response.tool_calls[0].function.name, 'request_user_input')
+  assert.deepEqual(JSON.parse(response.tool_calls[0].function.arguments), { question: '请提供制作 PPT 所需的官网网址。' })
+
+  body.messages.push({ role: 'tool', tool_call_id: 'web-ppt-request_user_input', content: JSON.stringify({ answers: [{ value: 'www.railwise.cn' }] }) })
+  const fetch = journey.modelAction(body)
+  assert.equal(fetch.tool_calls[0].function.name, 'web_fetch')
+  assert.deepEqual(JSON.parse(fetch.tool_calls[0].function.arguments), { url: 'www.railwise.cn' })
+
+  body.messages.push({ role: 'tool', tool_call_id: 'web-ppt-web_fetch', content: JSON.stringify({
+    finalUrl: 'https://www.railwise.cn/', text: '工程测量与安全监测资料', title: '睿威科技', resultHash: 'a'.repeat(64), byteCount: 512
+  }) })
+  const write = journey.modelAction(body)
+  assert.equal(write.tool_calls[0].function.name, 'write')
+  const args = JSON.parse(write.tool_calls[0].function.arguments)
+  assert.equal(args.path, 'deck/spec_lock.md')
+  assert.match(args.content, /spec-lock\/v1/)
+})
+
+test('website-to-PPT stops after a failed source fetch instead of creating an unverified deck', () => {
+  const journey = createWebPptJourney({ workspace: '/owned/workspace', sidecar: '/unused/sidecar', parseToolOutput: JSON.parse })
+  const body = {
+    messages: [{ role: 'user', content: webPptJourneyPrompt }],
+    tools: ['request_user_input', 'web_fetch', 'write', 'ppt_master_export'].map(name => ({ function: { name } }))
+  }
+  journey.modelAction(body)
+  body.messages.push({ role: 'tool', tool_call_id: 'web-ppt-request_user_input', content: JSON.stringify({ answers: [{ value: 'www.railwise.cn' }] }) })
+  journey.modelAction(body)
+  body.messages.push({ role: 'tool', tool_call_id: 'web-ppt-web_fetch', content: JSON.stringify({ error: 'source unavailable' }) })
+  assert.throws(() => journey.modelAction(body), /The installed Runtime tool failed: web_fetch/)
+})
 
 test('website-to-PPT report matches its requested model and verifies a desktop-open response for the live gate', () => {
   const sourceHead = '1'.repeat(40)

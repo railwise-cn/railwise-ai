@@ -38,6 +38,29 @@ function fixture() {
   })
 }
 
+function futureFixture(changedPaths = []) {
+  const futureVersion = '0.5.12'
+  const futureBuild = {
+    ...build,
+    files: expectedReleaseFiles(futureVersion).map(file => ({ ...file, sha256: reportSha256(file.name) }))
+  }
+  const futureIdentity = {
+    ...packageIdentity,
+    artifactSha256: futureBuild.files.find(file => file.platform === 'darwin-arm64').sha256
+  }
+  const records = [...requiredCoreJourneys(futureVersion, { changedPaths })].map(([target, ids]) => {
+    const [platform, arch] = target.split('-')
+    return { receipt: {
+      schemaVersion: 1, status: 'passed', version: futureVersion, sourceHead, platform, arch, execution: 'field',
+      buildRunId: futureBuild.runId, buildRunAttempt: futureBuild.runAttempt,
+      installerSha256: futureBuild.files.find(file => file.platform === target && /\.(exe|dmg)$/.test(file.name)).sha256,
+      installedAsarSha256: 'e'.repeat(64),
+      journeys: ids.map(id => ({ id, status: 'passed', method: methods[id] ?? 'installed-ui', evidence: 'Synthetic installed application observation', proofSha256: 'a'.repeat(64) }))
+    } }
+  })
+  return { records, options: { version: futureVersion, build: futureBuild, packageIdentity: futureIdentity, changedPaths } }
+}
+
 function hosted(record, t) {
   const { receipt } = record
   receipt.execution = 'hosted'
@@ -85,6 +108,31 @@ test('new stable release versions require the structured matrix and legacy versi
   assert.ok(!requiredCoreJourneys('0.5.12').get('win32-x64').includes('windows-updater-sidebar'))
   assert.ok(requiredCoreJourneys('0.5.12', { updater: true }).get('win32-x64').includes('windows-updater-sidebar'))
   assert.deepEqual(validateCoreJourneyReceipts(fixture(), options), [])
+})
+
+test('later releases require field journeys only for related production changes', () => {
+  const unrelatedChanges = [
+    'README.md', 'kun/src/services/agent-loop.test.ts', 'scripts/verify-core-journeys.test.mjs',
+    'src/shared/marketplace.test.ts',
+    'docs/qa/release-gates/acceptance.md'
+  ]
+  const unrelated = futureFixture(unrelatedChanges)
+  assert.ok(!requiredCoreJourneys('0.5.12', { changedPaths: unrelatedChanges }).get('darwin-arm64').includes('ego-dadan-report'))
+  assert.ok(!requiredCoreJourneys('0.5.12', { changedPaths: unrelatedChanges }).get('win32-x64').includes('mainland-windows-install'))
+  assert.deepEqual(validateCoreJourneyReceipts(unrelated.records, unrelated.options), [])
+
+  const browserChanges = ['kun/src/services/ego-browser-runtime.ts']
+  const browser = futureFixture()
+  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: browserChanges }).get('darwin-arm64').includes('ego-dadan-report'))
+  assert.throws(() => validateCoreJourneyReceipts(browser.records, { ...browser.options, changedPaths: browserChanges }), /missing required journeys.*ego-dadan-report/)
+
+  const marketplaceChanges = ['src/main/services/marketplace-mirror.ts']
+  const marketplace = futureFixture()
+  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: marketplaceChanges }).get('win32-x64').includes('mainland-windows-install'))
+  assert.throws(() => validateCoreJourneyReceipts(marketplace.records, { ...marketplace.options, changedPaths: marketplaceChanges }), /missing required journeys.*mainland-windows-install/)
+
+  const lockChange = ['src/shared/marketplace-mirror-lock.json']
+  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: lockChange }).get('win32-x64').includes('mainland-windows-install'))
 })
 
 test('core receipts reject stale, incomplete, failed and simulated results', async t => {

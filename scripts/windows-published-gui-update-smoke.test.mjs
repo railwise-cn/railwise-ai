@@ -218,6 +218,8 @@ test('frozen Windows acceptance pins the original artifact and builds the next i
   const workflow = parse(await readFile(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   const job = workflow.jobs['windows-frozen-gui-update']
   assert.match(job.if, /inputs.run_frozen_gui_update == true/)
+  assert.match(job.strategy.matrix.entry, /\["overlay","sidebar","settings"\]/)
+  assert.doesNotMatch(job.steps.find(step => step.name === 'Validate exclusive acceptance scope').env.HAS_OTHER_CASE, /run_startup_appearance/)
   assert.ok(job.steps.some(step => step.with?.['artifact-ids'] === '${{ steps.frozen.outputs.artifact_id }}'))
   assert.ok(job.steps.some(step => step.run === 'npm run dist:win' && step.env?.WORKWISE_APP_VERSION === '0.5.9'))
   assert.ok(job.steps.filter(step => step.uses?.startsWith('actions/upload-artifact@')).every(step => step.with.path.includes('frozen-windows-evidence/')))

@@ -29,6 +29,22 @@ const specializedMethods = {
 }
 const fieldJourneys = new Set(['ego-dadan-report', 'mainland-windows-install'])
 
+function requiredFieldJourneys(changedPaths) {
+  const productionPaths = changedPaths.filter(path =>
+    !/(?:^|\/)(?:__tests__|tests?|fixtures?)(?:\/|$)/i.test(path)
+    && !/\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(path)
+  )
+  const affectsEgoBrowser = productionPaths.some(path =>
+    /^(?:kun\/src|src)\/.*(?:browser|ego)/i.test(path)
+    || /^(?:kun\/src\/(?:contracts\/capabilities|server\/runtime-factory|services\/task-controller)|src\/main\/managed-runtime-process)\.[cm]?[jt]sx?$/i.test(path)
+  )
+  const affectsMarketplace = productionPaths.some(path =>
+    /^src\/(?:main|renderer|shared|asset)\/.*(?:marketplace|plugin|skill)/i.test(path)
+    || /^scripts\/(?:build-marketplace-mirror|stage-managed-dependencies|verify-marketplace-mirror-lock)\.[cm]?[jt]s$/i.test(path)
+  )
+  return { egoBrowser: affectsEgoBrowser, marketplace: affectsMarketplace }
+}
+
 function fail(message) { throw new Error(`[core-journeys] ${message}`) }
 function equal(actual, expected, label) { if (actual !== expected) fail(`${label} mismatch`) }
 function hash(value, label) { if (!SHA256.test(value ?? '')) fail(`${label} must be a lowercase SHA-256`) }
@@ -42,16 +58,18 @@ export function requiresCoreJourneys(version) {
   return major > 0 || minor > 5 || minor === 5 && patch >= 11
 }
 
-export function requiredCoreJourneys(version, { updater = false } = {}) {
+export function requiredCoreJourneys(version, { updater = false, changedPaths = [] } = {}) {
   const firstRelease = version === '0.5.11'
+  const fieldRequirements = requiredFieldJourneys(changedPaths)
   const windows = [
-    ...desktopJourneys, 'marketplace-mirror', 'video-shotcraft', 'mainland-windows-install',
+    ...desktopJourneys, 'marketplace-mirror', 'video-shotcraft',
+    ...(firstRelease || fieldRequirements.marketplace ? ['mainland-windows-install'] : []),
     ...(updater || firstRelease ? ['windows-updater-sidebar', 'windows-updater-settings'] : []),
     ...(firstRelease ? ['windows-legacy-overlay'] : [])
   ]
   return new Map([
     [WIN, windows],
-    [MAC, [...desktopJourneys, 'ego-dadan-report']],
+    [MAC, [...desktopJourneys, ...(firstRelease || fieldRequirements.egoBrowser ? ['ego-dadan-report'] : [])]],
     [INTEL, ['startup-branding', 'offline-spreadsheet']]
   ])
 }
@@ -94,10 +112,10 @@ function validateWorkflowRun(workflowRun, receipt, build, platform) {
   return workflowRun
 }
 
-export function validateCoreJourneyReceipts(records, { version, build, packageIdentity, updater = false, requireSource = () => {} }) {
+export function validateCoreJourneyReceipts(records, { version, build, packageIdentity, updater = false, changedPaths = [], requireSource = () => {} }) {
   if (build.mode !== 'exact-build') fail('core journeys require exact-build package provenance')
   if (!Array.isArray(records) || !records.length || records.length > 64) fail('core journey receipts are required')
-  const required = requiredCoreJourneys(version, { updater })
+  const required = requiredCoreJourneys(version, { updater, changedPaths })
   const seen = new Set()
   const installations = new Map()
   const installers = new Map([...required.keys()].map(platform => [
@@ -209,12 +227,12 @@ export function verifyCoreJourneyArchive(archive, run, bytes) {
     if (entries.filter(entry => entry === reportPath).length !== 1) fail('receipt archive must contain the reported file exactly once')
     const downloaded = execFileSync('unzip', ['-p', path, reportPath], { maxBuffer: MAX_REPORT, timeout: 30_000 })
     if (!downloaded.equals(bytes)) fail('committed receipt differs from the trusted immutable report')
-    const directory = reportPath.slice(0, -'core-journeys.json'.length)
+    const reportDirectory = reportPath.slice(0, -'core-journeys.json'.length)
     const rawDigests = new Map()
     const receipt = JSON.parse(downloaded.toString('utf8'))
     for (const journey of receipt.journeys) {
       if (!PROOF_FILE.test(journey.proofFile ?? '')) fail('invalid receipt raw report filename')
-      const file = `${directory}${journey.proofFile}`
+      const file = `${reportDirectory}${journey.proofFile}`
       if (!rawDigests.has(file)) {
         if (entries.filter(entry => entry === file).length !== 1) fail('receipt archive must contain the raw report exactly once')
         const original = execFileSync('unzip', ['-p', path, file], { maxBuffer: MAX_ARCHIVE, timeout: 30_000 })

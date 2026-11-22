@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { connectCdp } from './run-windows-ui-smoke.mjs'
-import { observeInstalledStartup } from './verify-packaged-startup-appearance.mjs'
+import { observeStartupWithCaptureRetry } from './verify-packaged-startup-appearance.mjs'
 import { macCoreJourneys, recordHostedCoreJourneys } from './record-core-journeys.mjs'
 import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256 } from './verify-frozen-updater-evidence.mjs'
@@ -16,6 +16,7 @@ const require = createRequire(import.meta.url)
 const acceptedDriverFiles = new Set([
   '.github/workflows/windows-install-smoke.yml',
   'scripts/run-mac-ppt-journey.mjs',
+  'scripts/run-mac-offline-spreadsheet-journey.mjs',
   'scripts/record-core-journeys.mjs',
   'scripts/run-mac-startup-appearance-smoke.mjs',
   'scripts/run-windows-ui-smoke.mjs',
@@ -120,9 +121,17 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
       signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256 }, observations: [] }
   let live
   try {
-    for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
-      report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected,
-        { connectCdp, environmentForRoot: isolatedMacEnvironment }))
+    for (const expected of [
+      { locale: 'en', htmlLang: 'en', theme: 'light' },
+      { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark', screenshotName: 'mac-startup-zh-dark.png' }
+    ]) {
+      const observation = await observeStartupWithCaptureRetry({ executable, version, evidenceDir, temporary }, expected,
+        { connectCdp, environmentForRoot: isolatedMacEnvironment })
+      if (expected.screenshotName) {
+        const screenshotPath = join(evidenceDir, expected.screenshotName)
+        observation.screenshot = { name: expected.screenshotName, sha256: await sha256(screenshotPath), size: (await stat(screenshotPath)).size }
+      }
+      report.observations.push(observation)
     }
     const journey = process.env.RAILWISE_MAC_PPT_JOURNEY || 'off'
     assert.ok(['off', 'controlled', 'live', 'both'].includes(journey), 'Invalid Mac PPT journey mode')
@@ -134,17 +143,23 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
         if (mode === 'live') live = result
       }
     }
+    const { runInstalledMacOfflineSpreadsheetJourney } = await import('./run-mac-offline-spreadsheet-journey.mjs')
+    const spreadsheet = await runInstalledMacOfflineSpreadsheetJourney({ executable, temporary, evidenceDir, version,
+      installedAsarSha256, installer: report.installer, source })
     assert.equal(await sha256(path), installedAsarSha256)
     report.status = 'passed'
+    report.offlineSpreadsheet = { status: spreadsheet.status, file: 'mac-offline-spreadsheet.json' }
   } catch (error) {
     report.error = error.message
     throw error
   } finally {
     await writeFile(join(evidenceDir, 'mac-startup-appearance.json'), `${JSON.stringify(report, null, 2)}\n`)
   }
-  const result = macCoreJourneys(report, live)
+  const spreadsheet = await json(join(evidenceDir, 'mac-offline-spreadsheet.json'))
+  const result = macCoreJourneys(report, live, spreadsheet)
   for (const item of result.journeys) {
-    const file = item.id === 'startup-branding' ? 'mac-startup-appearance.json' : 'mac-ppt-journey-live.json'
+    const file = item.id === 'startup-branding' ? 'mac-startup-appearance.json'
+      : item.id === 'offline-spreadsheet' ? 'mac-offline-spreadsheet.json' : 'mac-ppt-journey-live.json'
     item.proofFile = file
     item.proofSha256 = reportSha256(await readFile(join(evidenceDir, file)))
   }

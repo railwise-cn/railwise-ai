@@ -106,6 +106,9 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.deepEqual(workflow.on.workflow_call.inputs, { package_run_id: { ...packageRun, required: true }, ...inspectionInputs })
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   const steps = workflow.jobs['windows-install'].steps
+  assert.doesNotMatch(workflow.jobs['windows-install'].if, /inputs\.upgrade_0510_to_candidate|inputs\.overlay_057_to_candidate/)
+  assert.equal(steps.find(step => step.name === 'Install, inspect the Chinese UI and uninstall the temporary instance').env.RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE,
+    '${{ inputs.run_startup_appearance }}')
   const download = steps.find(step => step.uses === 'actions/download-artifact@v4')
   assert.equal(download.with['artifact-ids'], '${{ steps.source.outputs.artifact_id }}')
   assert.equal(download.with['run-id'], '${{ inputs.package_run_id }}')
@@ -113,6 +116,14 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.match(commands, /prepare-windows-install-smoke/)
   assert.match(commands, /run-windows-install-smoke\.ps1/)
   assert.doesNotMatch(commands, /dist:|publish-r2|gh release|deploy-/)
+  const frozen = workflow.jobs['windows-frozen-gui-update']
+  assert.match(frozen.strategy.matrix.entry, /\["overlay","sidebar","settings"\]/)
+  const mixedMode = frozen.steps.find(step => step.name === 'Validate exclusive acceptance scope')
+  assert.doesNotMatch(mixedMode.env.HAS_OTHER_CASE, /run_startup_appearance/)
+  assert.match(mixedMode.run, /OVERLAY_0511 -eq 'true' -and \$env:UPGRADE_0510 -eq 'true'/)
+  const invoke = frozen.steps.find(step => step.name === 'Exercise native update or the exact overlay fallback and reopen the existing conversation')
+  assert.match(invoke.env.CANDIDATE_UPGRADE_BASELINE, /matrix\.entry != 'overlay'/)
+  assert.match(invoke.run, /CANDIDATE_UPGRADE_BASELINE/)
 })
 
 test('existing Windows package routing excludes every other release action and has independent concurrency', () => {
