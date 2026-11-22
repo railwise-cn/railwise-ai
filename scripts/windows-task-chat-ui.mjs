@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-export const windowsTaskChatRegion = '.ds-chat-composer-dock section[aria-label="任务"]'
+export const windowsTaskChatRegion = '.ds-message-timeline-content section[aria-label="任务"]'
 
 /** Read the visible task in its originating conversation with debug-only task pages excluded. */
 export function windowsTaskChatLayoutExpression(marker) {

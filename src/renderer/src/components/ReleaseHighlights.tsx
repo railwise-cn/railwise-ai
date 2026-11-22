@@ -10,6 +10,10 @@ const releaseHighlights = {
   '0.5.10': {
     zh: '附件以紧凑卡片呈现，所选技能显示真实名称。任务可在原对话审批、继续并查看成果。Windows 与 Mac 采用统一的界面字体。',
     en: 'Attachments use compact cards and selected skills show their names. Approve tasks, resume work, and open results in the original conversation. Windows and Mac share the same interface font.'
+  },
+  '0.5.11': {
+    zh: '补交官网地址后可在原对话继续制作演示文稿。技能名称统一为 PPT Master，执行遇到问题时可在对话里查看原因。',
+    en: 'Continue a presentation in the original conversation after sharing a website. The skill appears as PPT Master, and conversation notices show execution problems.'
   }
 } satisfies Record<string, { zh: string; en: string }>
 

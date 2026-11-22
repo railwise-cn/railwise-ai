@@ -309,14 +309,14 @@ export async function observeInstalledStartup(options, expected, dependencies) {
     await waitForStartupCondition(main, `Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible')`, 'the visible installed workbench', 12_000)
     assert.equal(await main.evaluate('window.workwise.getAppVersion()', 2000), version)
     await checkpoint('visible-workbench-verified', { version })
-    if (process.platform === 'win32' && version === '0.5.10' && expected.screenshotName) {
+    if (process.platform === 'win32' && ['0.5.10', '0.5.11'].includes(version) && expected.screenshotName) {
       observation.releaseHighlights = await waitForStartupCondition(main, `(() => {
         const section = document.querySelector('main section[aria-label="本版更新"]');
         const bounds = section?.getBoundingClientRect();
         return bounds?.width > 0 && bounds.height > 0 && bounds.top >= 0 && bounds.bottom <= innerHeight &&
-          getComputedStyle(section).visibility === 'visible' && section.innerText.includes('0.5.10') &&
-          { title: section.getAttribute('aria-label'), version: '0.5.10', visibleOnFirstOpen: true };
-      })()`, 'the visible 0.5.10 release highlights on first open', 12_000)
+          getComputedStyle(section).visibility === 'visible' && section.innerText.includes(${JSON.stringify(version)}) &&
+          { title: section.getAttribute('aria-label'), version: ${JSON.stringify(version)}, visibleOnFirstOpen: true };
+      })()`, `the visible ${version} release highlights on first open`, 12_000)
       await checkpoint('release-highlights-verified', observation.releaseHighlights)
     }
     observation.workbenchTypography = await observeWorkbenchTypography(main)

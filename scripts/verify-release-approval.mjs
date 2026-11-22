@@ -21,6 +21,7 @@ import { reportSha256, validateUpdaterEvidenceRun, verifyRemoteUpdaterEvidence }
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 import { FROZEN_BASE_VERSION, resolveUpdaterBaseline, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 import { EXACT_UPDATER_BASE_VERSION, validateExactUpdaterEvidenceRun, verifyRemoteExactUpdaterEvidence } from './verify-exact-updater-evidence.mjs'
+import { requiresCoreJourneys, validateCoreJourneyReceipts, verifyRemoteCoreJourneyReceipts } from './verify-core-journeys.mjs'
 
 const ROOT = process.cwd()
 
@@ -54,6 +55,14 @@ function git(args) {
 const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/verify-release-approval.mjs',
   'scripts/release-gate.test.mjs',
+  'scripts/verify-core-journeys.mjs',
+  'scripts/verify-core-journeys.test.mjs',
+  'scripts/record-core-journeys.mjs',
+  'scripts/record-core-journeys.test.mjs',
+  '.github/workflows/windows-install-smoke.yml',
+  'scripts/run-mac-ppt-journey.mjs',
+  'scripts/run-mac-startup-appearance-smoke.mjs',
+  'scripts/web-ppt-journey.mjs',
   'scripts/verify-reviewed-release-artifacts.mjs',
   'scripts/verify-reviewed-release-artifacts.test.mjs',
   'scripts/verify-exact-updater-evidence.mjs',
@@ -354,6 +363,28 @@ function requireCompatibleCheckSource(value, label, packagedSourceHead, releaseH
   requireReviewedSource(value, releaseHead, 2)
 }
 
+function requireCoreJourneyEvidence(evidence, { version, build, packageIdentity, updater, releaseHead }) {
+  const label = 'acceptance.coreJourneys'
+  requireStatus(evidence, label)
+  if (!Array.isArray(evidence.receipts) || !evidence.receipts.length || evidence.receipts.length > 64) fail(`${label} must include core journey receipts`)
+  const paths = new Set()
+  const records = evidence.receipts.map(value => {
+    const path = requireTrackedArtifact(value?.path, `${label} receipt`, releaseHead)
+    if (paths.has(path)) fail(`${label} contains a duplicate receipt: ${path}`)
+    paths.add(path)
+    const bytes = execFileSync('git', ['show', `${releaseHead}:${path}`], {
+      cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024
+    })
+    let receipt
+    try { receipt = JSON.parse(bytes.toString('utf8')) } catch (error) { fail(`${label} receipt is invalid JSON: ${path}: ${error.message}`) }
+    return { receipt, bytes, workflowRun: value.workflowRun }
+  })
+  return validateCoreJourneyReceipts(records, {
+    version, build, packageIdentity, updater,
+    requireSource: value => requireCompatibleCheckSource(value, `${label} receipt workflow source`, build.sourceHead, releaseHead)
+  })
+}
+
 export function verifyRequiredCI(run, sourceHead, api = githubApi) {
   if (!run || typeof run !== 'object') fail('checks.requiredCI.workflowRun is required')
   if (!/^[a-f0-9]{40}$/.test(sourceHead ?? '') || run.repository !== RELEASE_REPOSITORY || run.workflowPath !== QUALITY_WORKFLOW || run.sourceHead !== sourceHead
@@ -411,6 +442,8 @@ export function verifyReleaseApproval({
   const manifest = readCommittedJson(relativePath, sourceHead, 'release evidence')
 
   if (![1, 2].includes(manifest.schemaVersion)) fail('release evidence schemaVersion must be 1 or 2')
+  const coreJourneysRequired = requiresCoreJourneys(version)
+  if (coreJourneysRequired && manifest.schemaVersion !== 2) fail('core journeys require schemaVersion 2 release evidence')
   if (manifest.scope !== 'public-release') fail('release evidence scope must be public-release')
   requireStatus(manifest.status, 'release evidence')
 
@@ -488,6 +521,11 @@ export function verifyReleaseApproval({
       requireTrackedArtifact(acceptance[key], `acceptance.${key}`, sourceHead)
     }
   }
+  const coreJourneyReceipts = coreJourneysRequired
+    ? requireCoreJourneyEvidence(acceptance.coreJourneys, {
+      version, build: reviewedBuild, packageIdentity, updater: requirements.updater, releaseHead: sourceHead
+    })
+    : []
   if (requirements.updater && !acceptance.updaterRoundTrip) fail('this release changes updater/download paths and requires one exact-package updater smoke')
   const updaterEvidence = acceptance.updaterRoundTrip
     ? requireUpdaterEvidence(acceptance.updaterRoundTrip, reviewedBuild, packageIdentity, version, sourceHead)
@@ -500,7 +538,7 @@ export function verifyReleaseApproval({
     if (!/ai|agent|simulat/i.test(reviewerLabel)) fail('independentSeniorEngineerReview must identify itself as AI/agent review when supplied')
     requireTrackedArtifact(independentReview, 'acceptance.independentSeniorEngineerReview', sourceHead)
   }
-  return { tag, version, sourceHead, reviewedSourceHead, evidence: relativePath, reviewedBuild, updaterEvidence,
+  return { tag, version, sourceHead, reviewedSourceHead, evidence: relativePath, reviewedBuild, updaterEvidence, coreJourneyReceipts,
     requiredCI: manifest.schemaVersion === 2 ? manifest.checks.requiredCI.workflowRun : null, requirements }
 }
 
@@ -520,6 +558,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         requiredSourceJobs: result.reviewedBuild.mode === 'exact-build'
           ? ['Private exact-package Windows install smoke', ...(result.requirements.updater ? ['Private exact-package updater smoke'] : [])] : [] })
       if (result.requiredCI) verifyRequiredCI(result.requiredCI, result.requiredCI.sourceHead)
+      verifyRemoteCoreJourneyReceipts(result.coreJourneyReceipts)
       verifyPreviousFormalRelease(result.requirements.previousTag)
       if (result.updaterEvidence?.mode === 'exact-build') verifyRemoteExactUpdaterEvidence(result.updaterEvidence)
       else if (result.updaterEvidence) verifyRemoteUpdaterEvidence(result.updaterEvidence)

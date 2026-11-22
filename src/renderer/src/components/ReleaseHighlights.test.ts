@@ -7,7 +7,7 @@ import { ReleaseHighlights } from './ReleaseHighlights'
 
 afterEach(() => vi.unstubAllGlobals())
 
-it('presents the release highlights once on the installed version and supports dismissal', async () => {
+it.each(['0.5.9', '0.5.10', '0.5.11'])('presents the %s highlights once and supports dismissal', async (version) => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   await i18n.changeLanguage('zh')
   const getAppVersion = vi.fn(async () => '0.5.8')
@@ -20,9 +20,9 @@ it('presents the release highlights once on the installed version and supports d
   try {
     await act(async () => root.render(createElement(ReleaseHighlights, { key: 'old' })))
     expect(container.textContent).toBe('')
-    getAppVersion.mockResolvedValue('0.5.9')
+    getAppVersion.mockResolvedValue(version)
     await act(async () => root.render(createElement(ReleaseHighlights, { key: 'first' })))
-    expect(container.textContent).toContain('本版更新 · 0.5.9')
+    expect(container.textContent).toContain(`本版更新 · ${version}`)
     await act(async () => container.querySelector('button')?.click())
     expect(openExternal).toHaveBeenCalledWith('https://www.railwise.cn/products/railwise-ai/#download')
     await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="关闭本版更新"]')?.click())

@@ -81,6 +81,7 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   const { run_published_gui_update: publishedUpdate, run_repaired_gui_update: repairedUpdate,
     published_gui_upgrade_scenario: publishedScenario, published_gui_verify_overlay: publishedOverlay,
     run_frozen_gui_update: frozenUpdate, upgrade_058_to_candidate: currentUpgrade, upgrade_059_to_candidate: nextUpgrade, build_private_next: buildPrivateNext,
+    upgrade_0510_to_candidate: upgrade0510, overlay_057_to_candidate: overlay057, web_ppt_journey: webPptJourney,
     run_repaired_marketplace_install: marketplaceInstall, run_private_video_evaluation: privateVideoEvaluation,
     run_mac_startup_appearance: macStartup,
     package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
@@ -94,6 +95,10 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.equal(frozenUpdate.default, false)
   assert.equal(currentUpgrade.default, false)
   assert.equal(nextUpgrade.default, false)
+  assert.equal(upgrade0510.default, false)
+  assert.equal(overlay057.default, false)
+  assert.equal(webPptJourney.default, 'off')
+  assert.deepEqual(webPptJourney.options, ['off', 'controlled', 'live'])
   assert.equal(privateVideoEvaluation.default, false)
   assert.equal(macStartup.default, false)
   assert.equal(buildPrivateNext.default, true)

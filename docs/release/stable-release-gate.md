@@ -28,6 +28,15 @@ for existing release evidence. Additional stability runs, UI matrices,
 screenshot archives and separate AI reviews are optional unless the user's
 request or a concrete change requires them.
 
+Starting with 0.5.11, include `acceptance.coreJourneys` with the required
+results from `scripts/verify-core-journeys.mjs`. Each receipt identifies the
+build run and attempt, platform, installer SHA-256 and installed ASAR SHA-256.
+The verifier compares hosted reports with their immutable Actions artifacts.
+Field reports identify the SHA-256 of original proof retained privately for
+authenticated browser and mainland Windows tests. A missing required journey
+leaves the release pending. Controlled model diagnostics have their own
+receipts and do not certify live model journeys.
+
 Verify the immutable artifact archive digests and each installer's, updater
 package's and metadata file's hashes and sizes. The installed UI-reviewed ASAR
 must match the selected package. When updater acceptance applies, its target

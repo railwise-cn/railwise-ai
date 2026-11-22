@@ -8,14 +8,19 @@ import { isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { connectCdp } from './run-windows-ui-smoke.mjs'
 import { observeInstalledStartup } from './verify-packaged-startup-appearance.mjs'
+import { macCoreJourneys, recordHostedCoreJourneys } from './record-core-journeys.mjs'
 import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
+import { reportSha256 } from './verify-frozen-updater-evidence.mjs'
 
 const require = createRequire(import.meta.url)
 const acceptedDriverFiles = new Set([
   '.github/workflows/windows-install-smoke.yml',
+  'scripts/run-mac-ppt-journey.mjs',
+  'scripts/record-core-journeys.mjs',
   'scripts/run-mac-startup-appearance-smoke.mjs',
   'scripts/run-windows-ui-smoke.mjs',
-  'scripts/verify-packaged-startup-appearance.mjs'
+  'scripts/verify-packaged-startup-appearance.mjs',
+  'scripts/web-ppt-journey.mjs'
 ])
 const command = (file, args) => execFileSync(file, args, { encoding: 'utf8', timeout: 90_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const git = (...args) => command('git', args)
@@ -113,10 +118,21 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
   const report = { schemaVersion: 1, status: 'failed', source, arch: process.arch, version,
     installer: { name, sha256: digest, size }, installed: { bundleId: info.CFBundleIdentifier, installedArch,
       signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256 }, observations: [] }
+  let live
   try {
     for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
       report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected,
         { connectCdp, environmentForRoot: isolatedMacEnvironment }))
+    }
+    const journey = process.env.RAILWISE_MAC_PPT_JOURNEY || 'off'
+    assert.ok(['off', 'controlled', 'live', 'both'].includes(journey), 'Invalid Mac PPT journey mode')
+    if (journey !== 'off') {
+      const { runInstalledMacPptJourney } = await import('./run-mac-ppt-journey.mjs')
+      for (const mode of journey === 'both' ? ['controlled', 'live'] : [journey]) {
+        const result = await runInstalledMacPptJourney({ executable, temporary, evidenceDir, version, installedAsarSha256,
+          installer: report.installer, source, mode, environmentForRoot: isolatedMacEnvironment })
+        if (mode === 'live') live = result
+      }
     }
     assert.equal(await sha256(path), installedAsarSha256)
     report.status = 'passed'
@@ -126,6 +142,13 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
   } finally {
     await writeFile(join(evidenceDir, 'mac-startup-appearance.json'), `${JSON.stringify(report, null, 2)}\n`)
   }
+  const result = macCoreJourneys(report, live)
+  for (const item of result.journeys) {
+    const file = item.id === 'startup-branding' ? 'mac-startup-appearance.json' : 'mac-ppt-journey-live.json'
+    item.proofFile = file
+    item.proofSha256 = reportSha256(await readFile(join(evidenceDir, file)))
+  }
+  await recordHostedCoreJourneys(evidenceDir, result)
 }
 
 async function main([mode, directory, source, evidenceDir, arch]) {

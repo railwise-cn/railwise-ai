@@ -20,6 +20,31 @@ import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEv
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
 
+test('website-to-PPT report matches its requested model and verifies a desktop-open response for the live gate', () => {
+  const sourceHead = '1'.repeat(40)
+  const version = '0.5.11'
+  const report = {
+    schemaVersion: 1, scope: 'private-exact-package-chinese-ui', platform: 'win32', sourceHead, version,
+    locale: 'zh', theme: 'dark', workspaceRoot: windowsSmokeWorkspaceName, productionTouched: false,
+    packageUnchanged: true, cleanExit: true, errors: [], checks: ['installed-chat-web-ppt'],
+    webPpt: {
+      status: 'passed', model: 'controlled-protocol', input: 'installed-chat-ui', sameThread: true, sameTurn: true,
+      source: { url: 'https://www.railwise.cn/', tool: 'web_fetch', sha256: '2'.repeat(64), bytes: 512 },
+      artifact: { nativeEditableText: true, originalChatButtonClicked: true, sha256: '3'.repeat(64), bytes: 1024 },
+      open: { status: 'handler-unavailable' }
+    }
+  }
+  const identity = { version, sourceHead }
+  assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true }), true)
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.model = 'live-model'
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.open.status = 'desktop-open-request-accepted'
+  assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
+  report.webPpt.sameTurn = false
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+})
+
 test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {
   for (const state of ['open', 'collapsed']) {
     const actions = []
@@ -2339,7 +2364,7 @@ async function manualPreviewChatFixture(run, { initialPreview = false, newPrevie
         const reveal=()=>{events.push('reveal-chat-results');setResults(true);if(${JSON.stringify(newPreviewOnReveal)})Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
         return h('div',{className:'ds-workbench-shell',ref:layout.shellRef,'data-active-overlay':layout.activeOverlay??''},
           layout.activeOverlay?h('button',{'aria-label':'返回当前任务',id:'backdrop',onClick:layout.closeDevPreview}):null,
-          h('main',{inert:layout.activeOverlay?true:undefined},h('div',{className:'ds-chat-composer-dock'},
+          h('main',{inert:layout.activeOverlay?true:undefined},h('div',{className:'ds-message-timeline-content'},
             h('section',{'aria-label':'任务'},h('button',{id:'reveal','aria-expanded':results,onClick:reveal},'1 个成果'),
               results?h('ul',{'aria-label':'成果'},h('li',null,h('button',{id:'artifact',onClick:artifact},'每日网页报告.html'))):null))),
           layout.rightPanelVisible?h('aside',{id:'workbench-inspector'},h('button',{'aria-label':'收起右侧栏',id:'collapse',onClick:()=>{events.push('collapse-panel');layout.closeDevPreview()}}),h('webview'),ready?h('div',{id:'workspace-preview-ready'}):null):null);

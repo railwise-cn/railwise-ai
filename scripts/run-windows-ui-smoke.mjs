@@ -13,6 +13,7 @@ import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency, preparePinnedBrowserStartupCli, browserStartupDependency } from './prepare-browser-skill-smoke.mjs'
 import { observeWorkbenchTypography, runWindowsStartupAppearanceSmoke } from './verify-packaged-startup-appearance.mjs'
 import { revealWindowsChatTaskArtifact, validateWindowsTaskChatLayout, windowsTaskChatLayoutExpression } from './windows-task-chat-ui.mjs'
+import { createWebPptJourney } from './web-ppt-journey.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 const windowsDueTaskResult = '本次 HTML 报告已保存并核验，可在原会话查看。'
@@ -424,7 +425,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false, requireWebPpt = false, requireLiveWebPpt = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -437,6 +438,25 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
   assert.equal(report.errors.length, 0)
+  if (requireWebPpt) {
+    assert.ok(report.checks.includes('installed-chat-web-ppt'))
+    const proof = report.webPpt
+    assert.equal(proof.status, 'passed')
+    assert.equal(proof.input, 'installed-chat-ui')
+    assert.equal(proof.model, requireLiveWebPpt ? 'live-model' : 'controlled-protocol')
+    assert.equal(proof.source.url, 'https://www.railwise.cn/')
+    assert.equal(proof.source.tool, 'web_fetch')
+    assert.match(proof.source.sha256, /^[a-f0-9]{64}$/)
+    assert.ok(proof.source.bytes > 0)
+    assert.equal(proof.sameThread, true)
+    assert.equal(proof.sameTurn, true)
+    assert.equal(proof.artifact.nativeEditableText, true)
+    assert.equal(proof.artifact.originalChatButtonClicked, true)
+    assert.match(proof.artifact.sha256, /^[a-f0-9]{64}$/)
+    assert.ok(proof.artifact.bytes > 0)
+    if (requireLiveWebPpt) assert.equal(proof.open.status, 'desktop-open-request-accepted')
+    return true
+  }
   if (requireDoclingConversion) {
     assert.ok(report.checks.includes('installed-chinese-renderer'))
     assert.ok(report.checks.includes('cold-mirror-docling-backend-and-two-skill-calls'))
@@ -2614,10 +2634,12 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
   }
 }
 
-export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true', doclingConversion = process.env.RAILWISE_WINDOWS_DOCLING_CONVERSION === 'true' }) {
+export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true', doclingConversion = process.env.RAILWISE_WINDOWS_DOCLING_CONVERSION === 'true', webPptSmoke = process.env.RAILWISE_WINDOWS_WEB_PPT_SMOKE === 'true', webPptLive = process.env.RAILWISE_WINDOWS_WEB_PPT_LIVE === 'true' }) {
   taskSmoke ||= browserSmoke
   assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
   assert.ok(!doclingConversion || !(taskSmoke || mirrorSmoke || videoEvaluation || composerSmoke), 'Use a clean profile for focused marketplace acceptance')
+  assert.ok(!webPptSmoke || !(taskSmoke || mirrorSmoke || videoEvaluation || composerSmoke || doclingConversion), 'Use a clean profile for the website-to-PPT acceptance')
+  assert.ok(!webPptLive || webPptSmoke, 'Live model mode requires the website-to-PPT acceptance')
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
   }
@@ -2638,18 +2660,32 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const composerAcceptance = composerModule?.createComposerModelAcceptance()
   const marketplaceModule = mirrorSmoke || doclingConversion ? await import('./verify-windows-cold-marketplace.mjs') : undefined
   const marketplaceAcceptance = marketplaceModule?.createMarketplaceModelAcceptance()
-  const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke ? await startWindowsTaskModelFixture({
+  const webPpt = webPptSmoke ? createWebPptJourney({
+    workspace, live: webPptLive, parseToolOutput: parseFixtureToolOutput,
+    sidecar: join(dirname(executable), 'resources', 'app.asar.unpacked', 'sidecars', 'markitdown', 'workwise-markitdown.exe')
+  }) : undefined
+  const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke || (webPpt && !webPptLive) ? await startWindowsTaskModelFixture({
     browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke,
-    composerAcceptance: composerAcceptance ?? marketplaceAcceptance
+    composerAcceptance: composerAcceptance ?? marketplaceAcceptance ?? webPpt
   }) : undefined)
-  const model = video?.model ?? 'windows-task-fixture'
+  const model = webPptLive ? process.env.RAILWISE_QA_MODEL?.trim() : video?.model ?? 'windows-task-fixture'
+  const providerId = webPptLive ? 'railwise-qa-live-model' : model
+  const apiKey = webPptLive ? process.env.RAILWISE_QA_MODEL_API_KEY?.trim() : 'synthetic-local-only'
+  const baseUrl = webPptLive ? process.env.RAILWISE_QA_MODEL_BASE_URL?.trim() : taskModel?.baseUrl
+  if (webPptLive) {
+    assert.ok(model && apiKey && URL.canParse(baseUrl), 'Live PPT acceptance requires an isolated QA model name, API key and HTTPS endpoint')
+    const endpoint = new URL(baseUrl)
+    assert.ok(endpoint.protocol === 'https:' && !endpoint.username && !endpoint.password && !endpoint.search && !endpoint.hash,
+      'The live QA model endpoint must be HTTPS and free of embedded credentials')
+  }
+  const configuredModel = Boolean(taskModel || webPptLive)
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
   await writeFile(settingsPath, JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: 'zh', theme: 'dark', workspaceRoot: workspace, uiFontScale: 'small',
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
-    ...(taskModel ? { provider: { providers: [{ id: model, name: '本机验收协议模型', apiKey: 'synthetic-local-only', baseUrl: taskModel.baseUrl, endpointFormat: 'chat_completions', models: [model] }] } } : {}),
-    agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'), ...(taskModel ? { providerId: model, model, approvalPolicy: 'auto', sandboxMode: 'read-only' } : {}) } } }))
+    ...(configuredModel ? { provider: { providers: [{ id: providerId, name: webPptLive ? '隔离验收模型' : '本机验收协议模型', apiKey, baseUrl, endpointFormat: 'chat_completions', models: [model] }] } } : {}),
+    agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'), ...(configuredModel ? { providerId, model, approvalPolicy: 'auto', sandboxMode: webPpt ? 'workspace-write' : 'read-only' } : {}) } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
     sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', workspaceRoot: workspace, productionTouched: false, checks: [], errors: [],
     installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
@@ -2711,7 +2747,22 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
-    if (video) {
+    if (webPpt) {
+      // Use the owned workspace only and keep the normal runtime trust checks enabled.
+      const trust = await cdp.evaluate(`window.workwise.getWorkspaceTrust(${JSON.stringify(workspace)})`)
+      if (trust.level !== 'workspace-write') {
+        await cdp.evaluate(`window.workwise.setWorkspaceTrust(${JSON.stringify({
+          workspaceRoot: workspace, level: 'workspace-write', expectedRevision: trust.revision, confirmed: true, idempotencyKey: randomUUID()
+        })})`)
+      }
+      report.webPpt = await webPpt.verify(cdp, { openArtifact: async (driver, { task, artifact }) => {
+        const opened = await driver.evaluate(artifact.absolutePath || artifact.storage === 'task'
+          ? `window.workwise.openTaskArtifact(${JSON.stringify({ taskId: task.id, artifactId: artifact.id })})`
+          : `window.workwise.openWorkspaceFile(${JSON.stringify({ workspaceRoot: workspace, path: artifact.relativePath })})`)
+        return { status: opened?.ok ? 'desktop-open-request-accepted' : 'handler-unavailable' }
+      } })
+      report.checks.push('installed-chat-web-ppt')
+    } else if (video) {
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
       report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: true })
       report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
@@ -3293,9 +3344,10 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     }
     }
   } catch (error) {
-    report.errors.push(error instanceof Error ? error.message : String(error))
+    // The isolated live provider may include its request URL or payload in errors.
+    report.errors.push(webPptLive ? 'Live model acceptance did not complete' : error instanceof Error ? error.message : String(error))
     if (error.browserBootstrap) report.browserBootstrap = error.browserBootstrap
-    if (cdp) {
+    if (cdp && !webPptLive) {
       try {
         const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
         await writeFile(join(evidenceDir, 'windows-ui-failure.png'), Buffer.from(screenshot.data, 'base64'))
@@ -3358,7 +3410,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel?.observed) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion }); report.status = 'passed' } catch (error) {
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion, requireWebPpt: webPptSmoke, requireLiveWebPpt: webPptLive }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
@@ -3655,12 +3707,14 @@ export async function dispatchWindowsSmokeEntry(args, environment = process.env,
   if (startupAppearance) {
     assert.ok(!diagnostic && environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&
       environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_VIDEO_EVALUATION !== 'true' &&
+      environment.RAILWISE_WINDOWS_WEB_PPT_SMOKE !== 'true' &&
       !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup appearance is exclusive with browser, task and marketplace acceptance')
     return runStartupAppearance({ executable, version, sourceHead, evidenceDir }, { connectCdp, windowsUiEnvironment, windowsOwnedWindowScript })
   }
   if (diagnostic) {
     assert.ok(environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&
       environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_VIDEO_EVALUATION !== 'true' &&
+      environment.RAILWISE_WINDOWS_WEB_PPT_SMOKE !== 'true' &&
       !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup diagnostic is exclusive with task/browser execution')
     return runDiagnostic({ executable, version, sourceHead, evidenceDir })
   }

@@ -53,6 +53,11 @@ on:
         type: boolean
         required: false
         default: false
+      web_ppt_journey:
+        description: 'Run the website-to-PPTX journey in the installed client. Live mode requires the dedicated QA model credentials.'
+        type: choice
+        options: ['off', controlled, live]
+        default: 'off'
       run_published_gui_update:
         description: 'Install the exact released baseline and upgrade from the app sidebar over the live Stable feed on an ephemeral Windows runner'
         type: boolean
@@ -82,6 +87,16 @@ on:
         default: false
       upgrade_059_to_candidate:
         description: 'Exercise both GUI paths from the released 0.5.9 to the same exact 0.5.10 candidate over private HTTPS.'
+        type: boolean
+        required: false
+        default: false
+      upgrade_0510_to_candidate:
+        description: 'Exercise both GUI paths from the released 0.5.10 to the exact 0.5.11 candidate over private HTTPS.'
+        type: boolean
+        required: false
+        default: false
+      overlay_057_to_candidate:
+        description: 'Install the exact 0.5.11 candidate over released 0.5.7, then reopen the seeded profile.'
         type: boolean
         required: false
         default: false
@@ -147,10 +162,10 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.upgrade_059_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
+    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.upgrade_059_to_candidate != true && inputs.upgrade_0510_to_candidate != true && inputs.overlay_057_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
-    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || (inputs.run_composer_acceptance || inputs.run_docling_conversion) && 35 || inputs.run_browser_execution && 25 || 15 }}
+    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || ((inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') || inputs.run_composer_acceptance || inputs.run_docling_conversion) && 35 || inputs.run_browser_execution && 25 || 15 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -158,13 +173,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Reject mixed diagnostic and business acceptance modes
-        if: inputs.run_browser_startup_diagnostic && (inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance)
+        if: inputs.run_browser_startup_diagnostic && (inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live')
         run: throw 'Browser startup diagnostic is exclusive with task and browser execution'
       - name: Preserve the isolated cold marketplace profile
-        if: (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation) && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance)
+        if: (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation) && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live')
         run: throw 'Cold marketplace acceptance must use its own clean profile'
       - name: Preserve the isolated focused marketplace profile
-        if: inputs.run_docling_conversion && (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation || inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.run_startup_appearance)
+        if: inputs.run_docling_conversion && (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation || inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.run_startup_appearance || inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live')
         run: throw 'Focused marketplace acceptance must use its own clean profile'
       - name: Require the original package build ID
         if: ${{ inputs.package_run_id == '' }}
@@ -204,6 +219,11 @@ jobs:
           RAILWISE_WINDOWS_VIDEO_EVALUATION: ${{ inputs.run_private_video_evaluation }}
           RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE: ${{ inputs.run_startup_appearance }}
           RAILWISE_WINDOWS_COMPOSER_SMOKE: ${{ inputs.run_composer_acceptance }}
+          RAILWISE_WINDOWS_WEB_PPT_SMOKE: ${{ inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live' }}
+          RAILWISE_WINDOWS_WEB_PPT_LIVE: ${{ inputs.web_ppt_journey == 'live' }}
+          RAILWISE_QA_MODEL_BASE_URL: ${{ inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL_BASE_URL || '' }}
+          RAILWISE_QA_MODEL: ${{ inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL || '' }}
+          RAILWISE_QA_MODEL_API_KEY: ${{ inputs.web_ppt_journey == 'live' && secrets.RAILWISE_QA_MODEL_API_KEY || '' }}
         run: |
           $packages = Join-Path $env:RUNNER_TEMP 'exact-windows-packages'
           $installers = @(Get-ChildItem -LiteralPath $packages -Filter '*.exe' -File)
@@ -215,6 +235,8 @@ jobs:
             -Version $Matches[1] `
             -SourceHead $env:PACKAGE_SOURCE_HEAD `
             -EvidenceDir (Join-Path $env:RUNNER_TEMP 'exact-windows-evidence')
+      - name: Record verified installed journeys
+        run: node scripts/record-core-journeys.mjs windows "$env:RUNNER_TEMP/exact-windows-evidence"
       - name: Retain package identity and actual Windows evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -227,22 +249,33 @@ jobs:
             ${{ runner.temp }}/windows-package-source.json
 
   windows-frozen-gui-update:
-    if: ${{ inputs.run_frozen_gui_update == true || inputs.upgrade_058_to_candidate == true || inputs.upgrade_059_to_candidate == true }}
-    name: ${{ inputs.upgrade_059_to_candidate && 'Official 0.5.9 to exact candidate' || inputs.upgrade_058_to_candidate && 'Official 0.5.8 to exact candidate' || 'Official 0.5.7 to exact frozen 0.5.8' }} (${{ matrix.entry }})
+    if: ${{ inputs.run_frozen_gui_update == true || inputs.upgrade_058_to_candidate == true || inputs.upgrade_059_to_candidate == true || inputs.upgrade_0510_to_candidate == true || inputs.overlay_057_to_candidate == true }}
+    name: ${{ inputs.overlay_057_to_candidate && 'Official 0.5.7 to exact candidate' || inputs.upgrade_0510_to_candidate && 'Official 0.5.10 to exact candidate' || inputs.upgrade_059_to_candidate && 'Official 0.5.9 to exact candidate' || inputs.upgrade_058_to_candidate && 'Official 0.5.8 to exact candidate' || 'Official 0.5.7 to exact frozen 0.5.8' }} (${{ matrix.entry }})
     runs-on: windows-2022
     timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
-        entry: ${{ fromJSON((inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && '["sidebar","settings"]' || '["sidebar"]') }}
+        entry: ${{ fromJSON(inputs.overlay_057_to_candidate && '["overlay"]' || (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate || inputs.upgrade_0510_to_candidate) && '["sidebar","settings"]' || '["sidebar"]') }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Validate exclusive acceptance scope
-        if: ${{ inputs.package_run_id == '' || (inputs.run_frozen_gui_update && (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate)) || (inputs.upgrade_058_to_candidate && inputs.upgrade_059_to_candidate) || inputs.run_startup_appearance || inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation }}
-        run: throw 'Select one original frozen package run and optional private next package run'
+        env:
+          PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+          OVERLAY_BASELINE: ${{ inputs.run_frozen_gui_update }}
+          OVERLAY_0511: ${{ inputs.overlay_057_to_candidate }}
+          UPGRADE_058: ${{ inputs.upgrade_058_to_candidate }}
+          UPGRADE_059: ${{ inputs.upgrade_059_to_candidate }}
+          UPGRADE_0510: ${{ inputs.upgrade_0510_to_candidate }}
+          HAS_OTHER_CASE: ${{ inputs.run_startup_appearance || inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation || inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live' }}
+        run: |
+          $selected = @(@($env:OVERLAY_BASELINE, $env:OVERLAY_0511, $env:UPGRADE_058, $env:UPGRADE_059, $env:UPGRADE_0510) | Where-Object { $_ -eq 'true' })
+          if (!$env:PACKAGE_RUN_ID -or $selected.Count -ne 1 -or $env:HAS_OTHER_CASE -eq 'true') {
+            throw 'Select one original frozen package run and optional private next package run'
+          }
       - uses: actions/setup-node@v7
         with:
           node-version: '22.22.0'
@@ -263,12 +296,12 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/frozen-windows
       - name: Prepare checksummed Electron runtime for the private fixture
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
+        if: ${{ inputs.build_private_next && inputs.run_frozen_gui_update }}
         env:
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
         run: npm run prepare:electron
       - name: Reuse the original build's Windows document sidecar
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
+        if: ${{ inputs.build_private_next && inputs.run_frozen_gui_update }}
         uses: actions/download-artifact@v4
         with:
           name: markitdown-win32-x64
@@ -276,12 +309,12 @@ jobs:
           github-token: ${{ github.token }}
           path: build/sidecars/markitdown-win32-x64
       - name: Verify the reused Windows document sidecar
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
+        if: ${{ inputs.build_private_next && inputs.run_frozen_gui_update }}
         env:
           WORKWISE_SIDECAR_ARCH: x64
         run: node scripts/build-markitdown-sidecar.mjs --verify-only
       - name: Build the runner-local higher-version NSIS fixture
-        if: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
+        if: ${{ inputs.build_private_next && inputs.run_frozen_gui_update }}
         env:
           WORKWISE_APP_VERSION: '0.5.9'
           WORKWISE_CANDIDATE_SOURCE_HEAD: ${{ github.sha }}
@@ -294,9 +327,9 @@ jobs:
         run: npm run dist:win
       - name: Exercise native update or the exact overlay fallback and reopen the existing conversation
         env:
-          INCLUDE_PRIVATE_NEXT: ${{ inputs.build_private_next && !inputs.upgrade_058_to_candidate && !inputs.upgrade_059_to_candidate }}
-          CANDIDATE_UPGRADE_ENTRY: ${{ (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && matrix.entry || '' }}
-          CANDIDATE_UPGRADE_BASELINE: ${{ inputs.upgrade_059_to_candidate && '0.5.9' || '' }}
+          INCLUDE_PRIVATE_NEXT: ${{ inputs.build_private_next && inputs.run_frozen_gui_update }}
+          CANDIDATE_UPGRADE_ENTRY: ${{ (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate || inputs.upgrade_0510_to_candidate || inputs.overlay_057_to_candidate) && matrix.entry || '' }}
+          CANDIDATE_UPGRADE_BASELINE: ${{ inputs.upgrade_0510_to_candidate && '0.5.10' || inputs.upgrade_059_to_candidate && '0.5.9' || '' }}
         run: |
           $arguments = @("$env:RUNNER_TEMP/frozen-windows", "$env:RUNNER_TEMP/frozen-windows-source.json", "$env:RUNNER_TEMP/frozen-windows-evidence")
           if ($env:CANDIDATE_UPGRADE_ENTRY) { $arguments += $env:CANDIDATE_UPGRADE_ENTRY }
@@ -306,11 +339,16 @@ jobs:
             $arguments += @("$env:RUNNER_TEMP/private-next-windows", "$env:RUNNER_TEMP/private-next-windows-source.json", '0.5.9')
           }
           node scripts/run-windows-frozen-gui-upgrade.mjs @arguments
+      - name: Record verified updater journey
+        if: ${{ inputs.upgrade_0510_to_candidate || inputs.overlay_057_to_candidate }}
+        env:
+          ENTRY: ${{ matrix.entry }}
+        run: node scripts/record-core-journeys.mjs windows-upgrade "$env:RUNNER_TEMP/frozen-windows-evidence" "$env:ENTRY"
       - name: Retain exact-package Windows updater evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: frozen-windows-gui-upgrade-${{ github.run_id }}${{ (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate) && format('-{0}', matrix.entry) || '' }}
+          name: frozen-windows-gui-upgrade-${{ github.run_id }}${{ (inputs.upgrade_058_to_candidate || inputs.upgrade_059_to_candidate || inputs.upgrade_0510_to_candidate || inputs.overlay_057_to_candidate) && format('-{0}', matrix.entry) || '' }}
           retention-days: 7
           if-no-files-found: warn
           path: ${{ runner.temp }}/frozen-windows-evidence/
@@ -353,7 +391,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_mac_startup_appearance == true }}
     name: Exact startup appearance on macOS ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: ${{ inputs.web_ppt_journey == 'live' && 35 || 20 }}
     strategy:
       fail-fast: false
       matrix:
@@ -393,6 +431,11 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/exact-mac-packages
       - name: Inspect the signed installed application and real startup surfaces
+        env:
+          RAILWISE_MAC_PPT_JOURNEY: ${{ matrix.arch == 'arm64' && (inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') && inputs.web_ppt_journey || '' }}
+          RAILWISE_QA_MODEL_BASE_URL: ${{ matrix.arch == 'arm64' && inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL_BASE_URL || '' }}
+          RAILWISE_QA_MODEL: ${{ matrix.arch == 'arm64' && inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL || '' }}
+          RAILWISE_QA_MODEL_API_KEY: ${{ matrix.arch == 'arm64' && inputs.web_ppt_journey == 'live' && secrets.RAILWISE_QA_MODEL_API_KEY || '' }}
         run: >-
           node scripts/run-mac-startup-appearance-smoke.mjs --run
           "$RUNNER_TEMP/exact-mac-packages" "$RUNNER_TEMP/exact-mac-source.json"
@@ -407,6 +450,9 @@ jobs:
           path: |
             ${{ runner.temp }}/exact-mac-source.json
             ${{ runner.temp }}/exact-mac-evidence/mac-startup-appearance.json
+            ${{ runner.temp }}/exact-mac-evidence/core-journeys.json
+            ${{ runner.temp }}/exact-mac-evidence/mac-ppt-journey-*.json
+            ${{ runner.temp }}/exact-mac-evidence/mac-startup-*.png
 
   windows-repaired-gui-update:
     if: ${{ (inputs.run_repaired_gui_update == true || inputs.run_repaired_marketplace_install == true) && inputs.run_published_gui_update != true && inputs.run_frozen_gui_update != true }}

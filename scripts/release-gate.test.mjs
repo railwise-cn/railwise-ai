@@ -22,6 +22,7 @@ import './verify-markdown-packaging-filesets.test.cjs'
 import './dependency-artifact-policy.test.cjs'
 import './windows-install-smoke.test.mjs'
 import './verify-exact-updater-evidence.test.mjs'
+import './verify-core-journeys.test.mjs'
 
 const workflowPath = new URL('../.github/workflows/release.yml', import.meta.url)
 const workflowSource = readFileSync(workflowPath, 'utf8')
@@ -38,7 +39,7 @@ function verifierWithoutDependencies(t) {
   for (const path of [
     'scripts/verify-release-approval.mjs', 'scripts/verify-reviewed-release-artifacts.mjs',
     'scripts/verify-frozen-updater-evidence.mjs', 'scripts/frozen-release-updater-service-contract.mjs',
-    'scripts/frozen-release-version.mjs', 'scripts/verify-exact-updater-evidence.mjs',
+    'scripts/frozen-release-version.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/verify-core-journeys.mjs',
     'scripts/release-publication.cjs', 'src/shared/product-brand.json',
     'release/updater-acceptance-baselines.json',
   ]) {
@@ -814,6 +815,18 @@ test('current policy accepts focused checks and exact package inspection without
   const f = currentPolicyFixture(t)
   f.recordEvidence()
   assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('0.5.11 publication requires core journey receipts even when the earlier evidence checks pass', t => {
+  const f = currentPolicyFixture(t, { version: '0.5.11', previousTag: 'v0.5.10', exact: true })
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /acceptance\.coreJourneys must have status=passed/)
+})
+
+test('0.5.10 publication evidence remains readable without core journey receipts', t => {
+  const f = currentPolicyFixture(t, { version: '0.5.10', previousTag: 'v0.5.9', exact: true })
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.10/)
 })
 
 test('clean checkout verifies committed exact-build evidence without node_modules', t => {
