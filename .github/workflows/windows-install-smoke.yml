@@ -53,6 +53,11 @@ on:
         type: boolean
         required: false
         default: false
+      mac_startup_isolated_artifact:
+        description: 'Verify the immutable archive of an unreviewed Mac candidate, including a stable-configured private build.'
+        type: boolean
+        required: false
+        default: false
       run_published_gui_update:
         description: 'Install the exact released baseline and upgrade from the app sidebar over the live Stable feed on an ephemeral Windows runner'
         type: boolean
@@ -364,6 +369,7 @@ jobs:
             arch: x64
     env:
       EXACT_MAC_ARCH: ${{ matrix.arch }}
+      MAC_STARTUP_ISOLATED_ARTIFACT: ${{ inputs.mac_startup_isolated_artifact }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -385,6 +391,7 @@ jobs:
           PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
         run: node scripts/run-mac-startup-appearance-smoke.mjs --prepare "$PACKAGE_RUN_ID" "$RUNNER_TEMP/exact-mac-source.json" "$EXACT_MAC_ARCH"
       - name: Download the precise installer artifact
+        if: ${{ inputs.mac_startup_isolated_artifact != true }}
         uses: actions/download-artifact@v4
         with:
           artifact-ids: ${{ steps.source.outputs.artifact_id }}
@@ -393,6 +400,8 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/exact-mac-packages
       - name: Inspect the signed installed application and real startup surfaces
+        env:
+          GH_TOKEN: ${{ inputs.mac_startup_isolated_artifact && github.token || '' }}
         run: >-
           node scripts/run-mac-startup-appearance-smoke.mjs --run
           "$RUNNER_TEMP/exact-mac-packages" "$RUNNER_TEMP/exact-mac-source.json"
@@ -406,7 +415,7 @@ jobs:
           if-no-files-found: warn
           path: |
             ${{ runner.temp }}/exact-mac-source.json
-            ${{ runner.temp }}/exact-mac-evidence/mac-startup-appearance.json
+            ${{ runner.temp }}/exact-mac-evidence/
 
   windows-repaired-gui-update:
     if: ${{ (inputs.run_repaired_gui_update == true || inputs.run_repaired_marketplace_install == true) && inputs.run_published_gui_update != true && inputs.run_frozen_gui_update != true }}

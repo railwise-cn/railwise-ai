@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
-import { validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
+import { gatekeeperEnforcement, isolatedMacDmgMember, macDeveloperIdRequirement, validateIsolatedMacStartupBundle, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { observeStartupTargets, observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, waitForStartupCondition, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
@@ -172,4 +173,45 @@ test('binds native Mac startup acceptance to a successful immutable release buil
   assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['src/main/splash-window.ts'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactExpired: true }))
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactName: 'release-win' }))
+  const isolated = { ...source, classification: 'isolated-unreviewed', publicReleaseApproved: false,
+    buildHead: source.sourceHead, buildJob: 'Build macOS', buildJobId: 300 }
+  assert.equal(validateMacStartupArtifact(isolated, { isolated: true }), isolated)
+  assert.throws(() => validateMacStartupArtifact(isolated), /explicit opt-in/)
+  for (const patch of [{ publicReleaseApproved: true }, { buildHead: source.driverHead }, { buildJobId: 0 }, { classification: undefined }]) {
+    assert.throws(() => validateMacStartupArtifact({ ...isolated, ...patch }, { isolated: true }))
+  }
+})
+
+test('isolated Mac startup accepts only the exact installer entries and recognized update feeds', () => {
+  const installers = ['latest-mac.yml', 'RailWise-AI-0.5.10-mac-arm64.dmg', 'RailWise-AI-0.5.10-mac-arm64.zip',
+    'RailWise-AI-0.5.10-mac-x64.dmg', 'RailWise-AI-0.5.10-mac-x64.zip']
+  assert.equal(isolatedMacDmgMember(installers, '0.5.10', 'arm64'), installers[1])
+  assert.equal(isolatedMacDmgMember(installers, '0.5.10', 'x64'), installers[3])
+  for (const entry of ['reviewed-build.json', installers[1], '../' + installers[3]]) {
+    assert.throws(() => isolatedMacDmgMember([...installers, entry], '0.5.10', 'arm64'), /artifact entries/)
+  }
+  const packaged = { updateChannel: 'frontier', buildHints: { macSigningEnabled: true, notarizationEnabled: true } }
+  const updater = { provider: 'generic', url: 'https://127.0.0.1/' }
+  assert.doesNotThrow(() => validateIsolatedMacStartupBundle(packaged, updater))
+  const stable = { ...packaged, updateChannel: 'stable' }
+  assert.doesNotThrow(() => validateIsolatedMacStartupBundle(stable,
+    { ...updater, url: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/' }))
+  assert.throws(() => validateIsolatedMacStartupBundle(stable, updater))
+  assert.throws(() => validateIsolatedMacStartupBundle({ ...packaged, updateChannel: 'beta' }, updater))
+  assert.throws(() => validateIsolatedMacStartupBundle(packaged, { ...updater, url: 'https://www.railwise.cn/' }))
+})
+
+test('records Gatekeeper enforcement separately from a successful bundle assessment', () => {
+  assert.equal(gatekeeperEnforcement('assessments enabled\n'), 'enabled')
+  assert.equal(gatekeeperEnforcement('assessments disabled\n'), 'disabled')
+  assert.equal(gatekeeperEnforcement('status unavailable'), 'unknown')
+  assert.equal(gatekeeperEnforcement(null), 'unknown')
+})
+
+test('the macOS code requirement parser accepts the actual Developer ID verification argument', { skip: process.platform !== 'darwin' }, () => {
+  const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10_000 }
+  const canonical = execFileSync('/usr/bin/csreq', ['-r', macDeveloperIdRequirement, '-t'], options)
+  assert.match(canonical, /anchor apple generic and certificate leaf\[field\.1\.2\.840\.113635\.100\.6\.1\.13\]/)
+  assert.throws(() => execFileSync('/usr/bin/csreq', ['-r', macDeveloperIdRequirement.slice(1), '-t'], options),
+    /invalid requirement specification/)
 })
