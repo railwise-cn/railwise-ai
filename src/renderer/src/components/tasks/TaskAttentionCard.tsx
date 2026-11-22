@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
@@ -11,6 +11,7 @@ import { describeRuntimeError, type RuntimeErrorView } from '../../lib/format-ru
 import { TechnicalDetails } from '../ui/TechnicalDetails'
 
 type Question = { id: string; label: string; options?: Array<{ label: string; value?: string }> }
+export type TaskComposerQuestion = { taskId: string; threadId: string; requestId: string; questionId: string; label: string }
 function attentionQuestions(item: TaskAttentionV1): Question[] {
   const candidate = item.payload?.questions
   if (!Array.isArray(candidate)) return []
@@ -26,7 +27,7 @@ function attentionQuestions(item: TaskAttentionV1): Question[] {
   })
 }
 
-export function TaskAttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow, replyInComposer }: { item: TaskAttentionV1; ownerTask?: TaskRunV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: (notice?: string) => void; onOpenThread?: (id: string) => void; onOpenFlow?: (flowId?: string, flowRunId?: string) => void; replyInComposer?: boolean }): ReactElement {
+export function TaskAttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow, replyInComposer, onComposerQuestionChange }: { item: TaskAttentionV1; ownerTask?: TaskRunV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: (notice?: string) => void; onOpenThread?: (id: string) => void; onOpenFlow?: (flowId?: string, flowRunId?: string) => void; replyInComposer?: boolean; onComposerQuestionChange?: (question: TaskComposerQuestion | null) => void }): ReactElement {
   const { t } = useTranslation('common')
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -36,6 +37,14 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
   const [providerPrompt, setProviderPrompt] = useState('')
   const questions = attentionQuestions(item)
   const composerQuestion = replyInComposer && item.kind === 'question' && item.requestId && questions.length === 1 && !questions[0].options?.length
+  const composerQuestionId = composerQuestion ? questions[0].id : undefined
+  const composerQuestionLabel = composerQuestion ? questions[0].label : undefined
+  useEffect(() => {
+    if (!onComposerQuestionChange || !composerQuestion || !item.taskId || !item.requestId || !conversationThreadId || !composerQuestionId || !composerQuestionLabel) return
+    onComposerQuestionChange({ taskId: item.taskId, threadId: conversationThreadId, requestId: item.requestId,
+      questionId: composerQuestionId, label: composerQuestionLabel })
+    return () => onComposerQuestionChange(null)
+  }, [composerQuestion, composerQuestionId, composerQuestionLabel, conversationThreadId, item.requestId, item.taskId, onComposerQuestionChange])
   const capability = item.payload?.capability
   const originalRequest = item.payload?.request
   const capabilityCard: ExternalTaskCapabilityCard | null = item.payload?.kind === 'capability_required' && item.taskId &&

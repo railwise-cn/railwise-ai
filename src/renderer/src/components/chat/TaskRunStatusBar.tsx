@@ -12,7 +12,7 @@ import { projectTaskRunActivity, taskReasonKey } from '../../agent/ag-ui-activit
 import { getProvider } from '../../agent/registry'
 import type { ChatBlock, ThreadTodoList } from '../../agent/types'
 import { foregroundTaskArtifactPreview } from '../../lib/use-task-artifact-preview'
-import { TaskAttentionCard } from '../tasks/TaskAttentionCard'
+import { TaskAttentionCard, type TaskComposerQuestion } from '../tasks/TaskAttentionCard'
 import { TaskBudgetControl } from '../tasks/TaskBudgetControl'
 import { TaskExecutionEvidence } from '../tasks/TaskExecutionEvidence'
 import { TaskPublicQueryRecoveryCard } from '../tasks/TaskPublicQueryRecoveryCard'
@@ -32,6 +32,7 @@ type Props = {
   visibleMessageIds?: ReadonlySet<string>
   onSupplement?: () => void
   onPickAttachments?: () => void
+  onComposerQuestionChange?: (question: TaskComposerQuestion | null) => void
   onOpenArtifact?: (task: TaskRunV1, artifact: TaskRunV1['artifacts'][number]) => void | Promise<void>
 }
 
@@ -95,7 +96,7 @@ export function TaskRunStatusBar(props: Props): ReactElement | null {
   </div>
 }
 
-function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilityCards, inlineRequests, composerReplies, visibleMessageIds, onSupplement, onPickAttachments, onOpenArtifact, showTitle, isPrimary }: Props & {
+function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilityCards, inlineRequests, composerReplies, visibleMessageIds, onSupplement, onPickAttachments, onComposerQuestionChange, onOpenArtifact, showTitle, isPrimary }: Props & {
   group: TaskWorkspaceTaskGroup
   live: ReturnType<typeof useTaskState>
   showTitle: boolean
@@ -135,7 +136,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   const actions = task.presentation?.actions
   const verify = actions?.includes('verify') || pending.some(item => item.presentation?.actions.includes('verify'))
   const needsReview = pending.length > 0
-  const canReplyInComposer = composerReplies && task.status === 'waiting_user' && Boolean(task.activeTurnId) &&
+  const canReplyInComposer = isPrimary && composerReplies && task.status === 'waiting_user' && Boolean(task.activeTurnId) &&
     (!task.presentation || task.presentation.reason === 'input_required') && pending.length === 1
   const canResume = !verify && (task.status === 'paused' || !needsReview && (actions?.includes('resume') ?? ['stalled', 'waiting_user'].includes(task.status)))
   const canRetry = !verify && !needsReview && (actions?.includes('retry') ?? task.status === 'failed')
@@ -236,7 +237,8 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     </div>
     {remainingAttention.length || resultsOpen || verifyOpen || legacyWorkerResponse ? <div className="space-y-1 pb-1">
       {remainingAttention.map(item => <TaskAttentionCard key={`${item.id}:${item.revision}`} item={item} ownerTask={members.find(owner => owner.id === item.taskId)}
-        conversationThreadId={threadId ?? undefined} onResolved={onResolved} replyInComposer={canReplyInComposer} />)}
+        conversationThreadId={threadId ?? undefined} onResolved={onResolved} replyInComposer={canReplyInComposer}
+        onComposerQuestionChange={canReplyInComposer ? onComposerQuestionChange : undefined} />)}
       {resultsOpen ? <ul className="space-y-1" aria-label={t('taskRunArtifacts')}>{artifacts.map(({ task: owner, artifact }) => <li key={`${owner.id}:${artifact.id}`} className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
         <button type="button" onClick={() => void openArtifact(owner, artifact)} className="inline-flex min-w-0 items-center gap-1.5 text-left text-accent hover:underline">
           <FileText className="h-3.5 w-3.5 shrink-0" /><span className="break-all">{artifact.relativePath.split(/[\\/]/).at(-1)}</span>

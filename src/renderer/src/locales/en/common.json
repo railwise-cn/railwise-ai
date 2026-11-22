@@ -3356,6 +3356,7 @@
   "taskRunStatus_retrying": "Retrying automatically",
   "taskRunStatus_stalled": "Task stalled",
   "taskRunStatus_completed": "Task completed",
+  "taskComposerReplyTextOnly": "Answer the current question with text first. You can send files or use a Skill after this reply.",
   "taskRunStatus_failed": "Task failed",
   "taskRunStatus_cancelled": "Task cancelled",
   "taskRunUnavailable": "Task status unavailable",

@@ -128,9 +128,15 @@ describe('task actions in the original conversation', () => {
     attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
       threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供资料名称', status: 'pending',
       payload: { questions: open.questions }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
-    await render({ composerReplies: true })
+    const onComposerQuestionChange = vi.fn()
+    await render({ composerReplies: true, onComposerQuestionChange })
     expect(container.textContent).toContain('在下方输入框直接回复')
     expect(container.querySelector('textarea')).toBeNull()
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
+      requestId: 'worker-request', questionId: 'document', label: '请提供资料名称' })
+    attention = []
+    await render({ composerReplies: true, onComposerQuestionChange })
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
   })
 
   it('continues the same durable run once and uses the existing composer and chooser', async () => {

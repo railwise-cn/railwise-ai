@@ -1,4 +1,4 @@
-import { requestTaskDetail, takeRequestedTask, updateTaskNavigation } from '../store/task-live-store'
+import { refreshTaskState, requestTaskDetail, takeRequestedTask, updateTaskNavigation } from '../store/task-live-store'
 import { findTaskOriginConversation } from '../lib/task-conversation-navigation'
 import { listenToForegroundTask, useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
 import type { ReactElement } from 'react'
@@ -38,6 +38,7 @@ import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { MessageTimeline } from './chat/MessageTimeline'
 import { activeConversationControls, composerReplyQuestion } from './chat/conversation-visibility'
 import { TaskRunStatusBar } from './chat/TaskRunStatusBar'
+import type { TaskComposerQuestion } from './tasks/TaskAttentionCard'
 import { ConversationChecklist } from './chat/ConversationChecklist'
 import {
   FloatingComposer,
@@ -519,6 +520,9 @@ export function Workbench(): ReactElement {
   const chatOwnsTaskControls = route === 'chat' || route === 'claw'
   const conversationControls = useMemo(() => activeConversationControls(timelineBlocks), [timelineBlocks])
   const replyQuestion = route === 'chat' ? composerReplyQuestion(conversationControls) : undefined
+  const [taskComposerQuestion, setTaskComposerQuestion] = useState<TaskComposerQuestion | null>(null)
+  const activeTaskComposerQuestion = route === 'chat' && mode === 'agent' && !replyQuestion &&
+    taskComposerQuestion?.threadId === activeThreadId ? taskComposerQuestion : undefined
   const composerActionsRef = useRef<ComposerActions>(null)
   const submittingQuestion = useRef<string | null>(null)
   const timelineMessageIds = useMemo(() => new Set(timelineBlocks.map(block => block.id)), [timelineBlocks])
@@ -1772,6 +1776,10 @@ export function Workbench(): ReactElement {
       void handleGuiPlanCommand(planCommand.kind === 'create' ? planCommand.request : undefined)
       return
     }
+    if (activeTaskComposerQuestion && v && (attachmentIds.length || fileReferences.length || capabilityReferences.length)) {
+      setError(t('taskComposerReplyTextOnly'))
+      return
+    }
     if (replyQuestion && v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
       if (submittingQuestion.current === replyQuestion.requestId) return
       submittingQuestion.current = replyQuestion.requestId
@@ -1787,6 +1795,36 @@ export function Workbench(): ReactElement {
         }
       } finally {
         if (submittingQuestion.current === replyQuestion.requestId) submittingQuestion.current = null
+      }
+      return
+    }
+    if (activeTaskComposerQuestion && v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
+      if (submittingQuestion.current === activeTaskComposerQuestion.requestId) return
+      submittingQuestion.current = activeTaskComposerQuestion.requestId
+      try {
+        const result = await window.workwise.runtimeRequest(
+          `/v1/user-inputs/${encodeURIComponent(activeTaskComposerQuestion.requestId)}`,
+          'POST',
+          JSON.stringify({ answers: [{ id: activeTaskComposerQuestion.questionId, label: activeTaskComposerQuestion.label, value: v }] })
+        )
+        if ([404, 409, 410].includes(result.status)) {
+          setError(t('taskWorkspaceDecisionRefresh'))
+          await refreshTaskState()
+          return
+        }
+        if (!result.ok) {
+          setError(t('taskWorkspaceActionFailed'))
+          return
+        }
+        if (useChatStore.getState().activeThreadId === activeTaskComposerQuestion.threadId) {
+          setComposerDrafts(drafts => drafts[composerScope] === input ? setWorkbenchComposerDraft(drafts, composerScope, '') : drafts)
+        }
+        setTaskComposerQuestion(current => current?.requestId === activeTaskComposerQuestion.requestId ? null : current)
+        await refreshTaskState()
+      } catch {
+        setError(t('taskWorkspaceActionFailed'))
+      } finally {
+        if (submittingQuestion.current === activeTaskComposerQuestion.requestId) submittingQuestion.current = null
       }
       return
     }
@@ -2594,6 +2632,7 @@ export function Workbench(): ReactElement {
                   runtimeReady={runtimeConnection === 'ready'}
                   conversationControls={conversationControls}
                   composerReplies={route === 'chat' && mode === 'agent'}
+                  onComposerQuestionChange={setTaskComposerQuestion}
                   visibleMessageIds={timelineMessageIds}
                   linkedTask={linkedTask ?? undefined}
                   onSupplement={() => composerActionsRef.current?.focus()}
@@ -2632,7 +2671,7 @@ export function Workbench(): ReactElement {
             <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8">
               <FloatingComposer
                 actionsRef={composerActionsRef}
-                replyingToQuestion={Boolean(replyQuestion)}
+                replyingToQuestion={Boolean(replyQuestion || activeTaskComposerQuestion)}
                 input={input}
                 setInput={setInput}
                 mode={mode}

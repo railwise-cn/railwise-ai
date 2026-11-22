@@ -225,7 +225,8 @@ test('the private video fixture reconstructs and hashes authorized UTF-8 Skill c
 
 test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
   const evidence = report()
-  const taskChat = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
+  const taskChat = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0,
+    statusLabel: '任务已完成', activityLabels: ['任务已完成'], artifactNames: ['成果.html'], width: 410, overflow: 0 }
   evidence.checks = ['installed-chinese-renderer', 'installed-video-skill-protocol-render-registered-and-decoded']
   delete evidence.resources
   evidence.marketplace = {
@@ -554,11 +555,15 @@ function report() {
     update: { ok: true, hasUpdate: false }, helpOffline: true,
     taskSmokeRequested: true,
     permissionRuntime: permissionRuntimeEvidence(),
-    taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', sha256: 'a'.repeat(64), byteHashMatches: true },
-      schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true },
+    taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', relativePath: '成果.html', sha256: 'a'.repeat(64), byteHashMatches: true },
+      schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true, dedicatedEntryOpened: true },
       preview: { automatic: true, contentVerified: true, manualEntryVerified: true,
-        layout: { coordinateUnit: 'viewport-css-px', scale: 1, workspace: { width: 560 }, workspaceInlineSize: 560, readableWidth: 400, availableWidth: 520, stackThresholdPx: 704, details: { width: 520, x: 20, y: 300, bottom: 800 }, list: { width: 520, x: 20, y: 20, bottom: 280 }, overflow: { workspace: 0, columns: 0, details: 0 } } },
+        layout: { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0,
+          taskWorkbenchLinks: 0, statusLabel: '任务已完成', activityLabels: ['任务已完成'], artifactNames: ['成果.html'], width: 560, overflow: 0 } },
       dueOccurrence: { clock: 'real', status: 'completed', independentTask: true, independentArtifact: true, byteHashMatches: true,
+        originalChat: { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0,
+          taskWorkbenchLinks: 0, statusLabel: '任务已完成', activityLabels: ['任务已完成'], artifactNames: ['成果.html'], width: 560, overflow: 0 },
+        noRepeatedUserRequest: true, resultInOriginChat: true, durableOriginReceipt: true,
         dueAt: '2026-11-13T00:00:00Z', createdAt: '2026-11-13T00:00:10Z' } },
     resources: {
       defaultSkills: ['ppt-master', 'tender-master', 'di-bao-monitoring'].map(id => ({
@@ -903,12 +908,22 @@ for (const [name, change] of [
 test('the scheduled original-chat result must survive reopening the conversation', () => {
   const evidence = report().taskExecution
   const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0,
-    taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
+    taskNavigationCount: 0, taskWorkbenchLinks: 0, statusLabel: '任务已完成', activityLabels: ['任务已完成'],
+    artifactNames: ['成果.html'], width: 410, overflow: 0 }
   evidence.preview.layout = layout
   evidence.schedule.dedicatedEntryOpened = true
-  Object.assign(evidence.dueOccurrence, { originalChat: layout, noRepeatedUserRequest: true, resultInOriginChat: true })
+  Object.assign(evidence.dueOccurrence, { originalChat: layout, noRepeatedUserRequest: true, resultInOriginChat: true, durableOriginReceipt: false })
   assert.throws(() => validateWindowsTaskEvidence(evidence))
   evidence.dueOccurrence.durableOriginReceipt = true
+  validateWindowsTaskEvidence(evidence)
+})
+
+test('task acceptance requires visible status and deliverables in the original conversation', () => {
+  const evidence = report().taskExecution
+  evidence.schedule.dedicatedEntryOpened = true
+  assert.throws(() => validateWindowsTaskEvidence({ ...evidence, preview: { ...evidence.preview, layout: { ...evidence.preview.layout, surface: 'task-workspace' } } }))
+  assert.throws(() => validateWindowsTaskEvidence({ ...evidence, preview: { ...evidence.preview, layout: { ...evidence.preview.layout, statusLabel: '' } } }))
+  assert.throws(() => validateWindowsTaskEvidence({ ...evidence, preview: { ...evidence.preview, layout: { ...evidence.preview.layout, artifactNames: [] } } }))
   validateWindowsTaskEvidence(evidence)
 })
 
@@ -1486,7 +1501,8 @@ test('browser recovery keeps the exact original task at zero Turns and model req
   const strictBinding = structuredClone(evidence); delete strictBinding.confirmed.binding.verificationPolicy
   assert.throws(() => validateWindowsBrowserRecoveryEvidence(strictBinding, binding.browserInstanceId))
   const inChat = structuredClone(evidence)
-  const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 420, overflow: 0 }
+  const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0,
+    statusLabel: '正在打开网页', activityLabels: ['正在推进任务', '正在打开网页'], artifactNames: [], width: 420, overflow: 0 }
   inChat.originalChat = { initial: layout, confirmed: layout, resumed: layout }
   inChat.beforeConfiguration = initial
   inChat.blockedResume = initial
@@ -1781,7 +1797,9 @@ test('binding POST audit observes actual Node fetch path/status, proves transpor
 })
 
 test('manual-preview layout keeps task details readable and stacks narrow containers using the actual rem threshold', () => {
-  const valid = report().taskExecution.preview.layout
+  const valid = { coordinateUnit: 'viewport-css-px', scale: 1, workspace: { width: 560 }, workspaceInlineSize: 560,
+    readableWidth: 400, availableWidth: 520, stackThresholdPx: 704, details: { width: 520, x: 20, y: 300, bottom: 800 },
+    list: { width: 520, x: 20, y: 20, bottom: 280 }, overflow: { workspace: 0, columns: 0, details: 0 } }
   assert.equal(validateWindowsTaskPreviewLayout(valid), true)
   const smallFont = { ...structuredClone(valid), workspace: { width: 630 }, workspaceInlineSize: 630, stackThresholdPx: 616,
     details: { width: 410, x: 220, y: 20, bottom: 600 }, list: { ...valid.list, width: 180 } }

@@ -158,7 +158,28 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), version)
 
     const editableReady = '[...document.querySelectorAll("button")].some(button => button.textContent === "保存表格" && !button.disabled)'
-    const click = (text) => cdp.click('button', text)
+    const click = async text => {
+      try { await cdp.click('button', text) } catch (error) {
+        report.lastClickFailure = {
+          label: text,
+          error: error instanceof Error ? error.message : String(error),
+          state: await cdp.evaluate(`(() => ({url:location.href,title:document.title,
+            activeOverlay:document.querySelector('.ds-workbench-shell')?.dataset.activeOverlay??null,
+            visibleButtons:[...document.querySelectorAll('button')].filter(button=>button.getClientRects().length).map(button=>({
+              text:button.textContent.trim().slice(0,80),ariaLabel:button.getAttribute('aria-label'),disabled:button.disabled
+            })).slice(-60),
+            visibleSections:[...document.querySelectorAll('section')].filter(section=>section.getClientRects().length).map(section=>section.getAttribute('aria-label')).filter(Boolean)
+          }))()`, 2000).catch(() => undefined)
+        }
+        const capture = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 5000).catch(() => undefined)
+        if (capture?.data) {
+          const name = 'mac-offline-spreadsheet-click-failure.png'
+          await writeFile(join(evidenceDir, name), Buffer.from(capture.data, 'base64'))
+          report.lastClickFailure.screenshot = name
+        }
+        throw error
+      }
+    }
     const save = () => click('保存表格')
     const key = async (keyValue, code, windowsVirtualKeyCode, modifiers = 0) => {
       const event = { key: keyValue, code, windowsVirtualKeyCode, modifiers }

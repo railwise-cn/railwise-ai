@@ -669,14 +669,14 @@ export function validateWindowsTaskEvidence(evidence) {
   assert.equal(evidence.preview.automatic, true)
   assert.equal(evidence.preview.contentVerified, true)
   assert.equal(evidence.preview.manualEntryVerified, true)
-  if (evidence.preview.layout?.surface === 'original-chat') {
-    validateWindowsTaskChatLayout(evidence.preview.layout)
-    validateWindowsTaskChatLayout(evidence.dueOccurrence.originalChat)
-    assert.equal(evidence.dueOccurrence.noRepeatedUserRequest, true)
-    assert.equal(evidence.dueOccurrence.resultInOriginChat, true)
-    assert.equal(evidence.dueOccurrence.durableOriginReceipt, true)
-    assert.equal(evidence.schedule.dedicatedEntryOpened, true)
-  } else validateWindowsTaskPreviewLayout(evidence.preview.layout)
+  const conversation = validateWindowsTaskChatLayout(evidence.preview.layout)
+  validateWindowsTaskChatLayout(evidence.dueOccurrence.originalChat)
+  const artifactName = evidence.artifact.relativePath?.split(/[\\/]/).at(-1)
+  assert.ok(artifactName && conversation.artifactNames.includes(artifactName), 'The task result must be listed in the original conversation')
+  assert.equal(evidence.dueOccurrence.noRepeatedUserRequest, true)
+  assert.equal(evidence.dueOccurrence.resultInOriginChat, true)
+  assert.equal(evidence.dueOccurrence.durableOriginReceipt, true)
+  assert.equal(evidence.schedule.dedicatedEntryOpened, true)
   assert.equal(evidence.dueOccurrence.clock, 'real')
   assert.equal(evidence.dueOccurrence.status, 'completed')
   assert.equal(evidence.dueOccurrence.independentTask, true)
@@ -3129,7 +3129,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       assert.deepEqual(schedule.schedule.times, ['08:30', '16:30'])
       assert.equal(schedule.schedule.timezone, 'Asia/Shanghai')
       report.taskExecution = { model: 'local-protocol-fixture', status: task.status, taskId: task.id,
-        artifact: { format: artifact.format, validation: artifact.validation, sizeBytes: bytes.length, sha256: artifact.sha256,
+        artifact: { format: artifact.format, validation: artifact.validation, relativePath: artifact.relativePath, sizeBytes: bytes.length, sha256: artifact.sha256,
           byteHashMatches: createHash('sha256').update(bytes).digest('hex') === artifact.sha256 },
         schedule: { ...schedule.schedule, id: schedule.id, enabled: schedule.enabled, nextRunAt: schedule.nextRunAt, readBackFromTool: true },
         browserSkill: { status: 'not_exercised', reason: 'A real connected BrowserSkill extension requires a separate installed-browser session.' } }
