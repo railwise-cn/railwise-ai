@@ -93,8 +93,18 @@ export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
   await cdp.wait(`(${chip})?.unavailable===true`, 'the selected skill to become unavailable after refresh')
   evidence.selectedSkillMarkedUnavailable = true
   await cdp.click(sendButton)
-  await cdp.wait(`document.body.innerText.includes('选中的技能、插件或连接器在当前会话已不可用。')&&${draftContent}===${literal(draft)}&&${attachment}`, 'the stale send to preserve the draft and explain what to do')
-  assert.equal((await read('/v1/threads/' + threads[0].id)).turns.length, 1)
+  const alerts = ['这个技能在当前会话已不可用。请移除技能标签，或输入 / 重新选择。', '选中的技能、插件或连接器在当前会话已不可用。请移除后重新选择。']
+  const readDraft = `({text:${draftContent},attachmentPresent:${attachment},skill:${chip},alert:${literal(alerts)}.find(message=>document.body.innerText.includes(message))??null})`
+  try {
+    await cdp.wait(`(${readDraft}).alert`, 'the stale skill explanation')
+  } finally {
+    evidence.afterStaleSend = await cdp.evaluate(readDraft)
+    evidence.afterStaleSend.turnCount = (await read('/v1/threads/' + threads[0].id)).turns.length
+  }
+  assert.equal(evidence.afterStaleSend.text, draft)
+  assert.equal(evidence.afterStaleSend.attachmentPresent, true)
+  assert.deepEqual(evidence.afterStaleSend.skill, { name: skill.label, unavailable: true })
+  assert.equal(evidence.afterStaleSend.turnCount, 1)
   evidence.rejectedStaleSkillPreservedDraft = true
   await cdp.click('[data-composer-skill] button')
   await cdp.wait(`!(${chip})&&${draftContent}===${literal(draft)}&&${attachment}`, 'removing the unavailable chip without changing the draft or attachment')
