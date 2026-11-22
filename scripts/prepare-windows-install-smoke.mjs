@@ -17,6 +17,7 @@ const driverFiles = new Set([
   'scripts/verify-packaged-startup-appearance.mjs',
   'scripts/verify-windows-cold-marketplace.mjs',
   'scripts/verify-windows-composer-acceptance.mjs',
+  'scripts/windows-local-ocr-fixture.py',
   'scripts/verify-windows-video-evaluation.mjs',
   'scripts/prepare-browser-skill-smoke.mjs',
   'scripts/verify-windows-install-smoke.mjs',

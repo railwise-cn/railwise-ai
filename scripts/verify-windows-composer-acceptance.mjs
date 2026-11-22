@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { createServer } from 'node:http'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import { psQuote } from './verify-windows-install-smoke.mjs'
 
 const literal = JSON.stringify
@@ -379,4 +382,126 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   assert.deepEqual(acceptance.observations, { skillRead: true, pluginRead: true, scanSent: true, chineseTextSent: true })
   return { status: 'passed', scanBytes: scan.length, nativeClipboard: true, chooser: true, drop: true, attachmentLayout,
     installedPlugin: { id: installed.packageId, sha256: installed.artifact.sha256 }, ...acceptance.observations }
+}
+
+const ocrName = '合成扫描识别.pdf'
+const ocrResponse = '已收到两页扫描件的实际识别文字。'
+const normalizeOcrText = text => text.replaceAll(/\s/g, '')
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
+const run = promisify(execFile)
+
+export async function startWindowsOcrAcceptance({ ownedRoot, workspace }) {
+  const fixture = fileURLToPath(new URL('./windows-local-ocr-fixture.py', import.meta.url))
+  const font = fileURLToPath(new URL('../kun/assets/fonts/NotoSansSC-Regular.ttf', import.meta.url))
+  const source = join(workspace, ocrName)
+  const recognizeInput = join(ownedRoot, 'received-scan.pdf')
+  const python = async (...args) => JSON.parse((await run(process.env.RAILWISE_WINDOWS_OCR_PYTHON,
+    [fixture, ...args], { timeout: 120_000, windowsHide: true })).stdout)
+  const expected = await python('create', source, font)
+  const inputSha256 = sha256(await readFile(source))
+  const evidence = { inputSha256, requests: [], modelObservedOcr: false }
+  let recognition
+  const server = createServer(async (request, response) => {
+    const reply = (status, payload) => {
+      response.writeHead(status, { 'content-type': 'application/json' })
+      response.end(JSON.stringify(payload))
+    }
+    try {
+      evidence.requests.push(`${request.method} ${request.url}`)
+      if (request.method === 'GET' && request.url === '/health') {
+        return reply(200, { status: 'ok', service: 'RapidOCR', version: '1.4.4' })
+      }
+      if (request.method === 'POST' && request.url === '/v1/infer') {
+        assert.equal(recognition, undefined, 'OCR must run once for the new scan')
+        const chunks = []
+        let bytes = 0
+        for await (const chunk of request) {
+          bytes += chunk.length
+          assert.ok(bytes <= 2 * 1024 * 1024, 'Only the expected synthetic scan may be submitted')
+          chunks.push(chunk)
+        }
+        const multipart = new Response(Buffer.concat(chunks), { headers: { 'content-type': request.headers['content-type'] } })
+        const original = (await multipart.formData()).get('image')
+        assert.equal(original.type, 'application/pdf')
+        const input = Buffer.from(await original.arrayBuffer())
+        assert.equal(sha256(input), inputSha256)
+        await writeFile(recognizeInput, input)
+        recognition = await python('recognize', recognizeInput)
+        assert.equal(recognition.platform, 'Windows')
+        assert.equal(recognition.imageOnly, true)
+        assert.equal(recognition.pages.length, expected.length)
+        expected.forEach((lines, index) => lines.forEach(line => {
+          assert.ok(normalizeOcrText(recognition.pages[index]).includes(normalizeOcrText(line)),
+            `OCR missed expected text on page ${index + 1}: ${recognition.pages[index]}`)
+        }))
+        evidence.recognition = recognition
+        // Return page jobs out of order to verify attachment provenance.
+        return reply(200, { jobs: [2, 1].map(page => ({ id: `ocr-${page}`, status_url: `/job/${page}` })) })
+      }
+      const page = request.url.match(/^\/job\/([12])$/)?.[1]
+      if (request.method === 'GET' && page && recognition) {
+        return reply(200, { status: 'succeeded', document_page: Number(page),
+          result: { generated_text: recognition.pages[Number(page) - 1] } })
+      }
+      return reply(404, { message: 'No OCR route' })
+    } catch (error) {
+      evidence.error = error.message
+      return reply(500, { message: 'Local OCR acceptance failed' })
+    }
+  })
+  await new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve))
+  const baseUrl = `http://127.0.0.1:${server.address().port}`
+  const requestRuntime = async (cdp, path) => cdp.evaluate(`window.workwise.runtimeRequest(${literal(path)},'GET').then(result=>{
+    if(!result.ok)throw new Error(result.body);return JSON.parse(result.body)
+  })`)
+  return {
+    baseUrl, evidence,
+    close: () => new Promise(resolve => server.close(resolve)),
+    modelAction(body) {
+      const messages = body.messages ?? []
+      const user = [...messages].reverse().find(item => item.role === 'user')
+      if (!literal(user?.content ?? '').includes('请根据附件中实际可读取的内容继续处理')) return null
+      const history = normalizeOcrText(literal(messages))
+      assert.ok(history.includes(ocrName))
+      for (const line of expected.flat()) assert.ok(history.includes(normalizeOcrText(line)), 'Recognized text missing in the installed Runtime model request')
+      assert.equal(evidence.recognition?.pages.length, 2)
+      evidence.modelObservedOcr = true
+      return { content: ocrResponse }
+    },
+    async verify(cdp) {
+      assert.equal(await cdp.evaluate('window.workwise.getSettings().then(settings=>settings.documents.unlimitedOcrServerUrl)'), baseUrl)
+      const threadList = '/v1/threads'
+      const previous = (await requestRuntime(cdp, threadList)).threads.map(item => item.id)
+      await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
+      await cdp.wait(`Boolean(document.querySelector(${literal(composer)}))`, 'the real chat composer')
+      const threadId = await cdp.wait(`window.workwise.runtimeRequest('/v1/threads','GET').then(result=>JSON.parse(result.body).threads.find(item=>!${literal(previous)}.includes(item.id))?.id)`, 'new owned conversation')
+      await chooseFiles(cdp, [source])
+      await cdp.wait(observeAttachment(ocrName, `item.querySelector('[aria-label="在文件夹中显示原件"]') && !item.innerText.includes('文字提取受限')`), 'the scanned PDF recognized in the composer', 180_000)
+      assert.equal(await cdp.evaluate(`document.querySelector(${literal(composer)}).value`), '')
+      await cdp.click(sendButton)
+      await continueAfterResponse(cdp, ocrResponse)
+      const threadPath = `/v1/threads/${threadId}`
+      const turn = await cdp.wait(`window.workwise.runtimeRequest(${literal(threadPath)},'GET').then(result=>
+        result.ok&&JSON.parse(result.body).turns.find(item=>item.attachmentIds?.length===1&&item.status==='completed')
+      )`, 'the original conversation receives the completed attachment-only turn')
+      assert.ok(turn.prompt.includes('请根据附件中实际可读取的内容继续处理'))
+      const path = `/v1/attachments/${turn.attachmentIds[0]}`, scope = `?thread_id=${encodeURIComponent(threadId)}`
+      const [{ attachment, dataBase64 }, { sections }] = await Promise.all([
+        requestRuntime(cdp, `${path}/content${scope}`),
+        requestRuntime(cdp, `${path}/sections${scope}`)
+      ])
+      assert.equal(sha256(Buffer.from(dataBase64, 'base64')), inputSha256)
+      assert.equal(attachment.state, 'ready')
+      assert.equal(attachment.indexState, 'ready')
+      assert.equal(attachment.sourceStructure.pageCount, 2)
+      assert.equal(attachment.parser.engine, 'unlimited-ocr-local')
+      const indexedPages = sections.map(section => section.provenance.page)
+      assert.deepEqual(indexedPages, [1, 2])
+      expected.forEach((lines, index) => lines.forEach(line => {
+        assert.ok(normalizeOcrText(sections[index].text).includes(normalizeOcrText(line)))
+      }))
+      return { ...evidence, status: 'passed', indexedPages, originalRetained: true, attachmentOnlySend: true,
+        parser: attachment.parser.engine, threadId, turnId: turn.id }
+    }
+  }
 }
