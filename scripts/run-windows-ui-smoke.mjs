@@ -186,8 +186,19 @@ async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment, aud
   const { execFile } = await import('node:child_process')
   const { promisify } = await import('node:util')
   const osWindow = async bounds => {
-    const { stdout } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', windowsOwnedWindowScript(pid, bounds)], { env: environment, windowsHide: true, shell: false, timeout: 15_000, maxBuffer: 16_384 })
-    const value = JSON.parse(stdout.trim()); assert.equal(value.ownerVerified, true); return value
+    const args = ['-NoProfile', '-NonInteractive', '-Command', windowsOwnedWindowScript(pid, bounds)]
+    const options = { env: environment, windowsHide: true, shell: false, timeout: 15_000, maxBuffer: 16_384 }
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const { stdout } = await promisify(execFile)('powershell.exe', args, options)
+        const value = JSON.parse(stdout.trim())
+        assert.equal(value.ownerVerified, true)
+        return value
+      } catch (error) {
+        if (attempt >= 2 || !/Owned (?:visible window|window bounds) unavailable/.test(error.stderr ?? '')) throw error
+        await sleep(250)
+      }
+    }
   }
   const original = await osWindow()
   const navigationWasVisible = await cdp.evaluate(`Boolean(document.querySelector('#workbench-navigation')?.getClientRects().length)`)
