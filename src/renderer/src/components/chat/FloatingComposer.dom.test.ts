@@ -213,6 +213,10 @@ describe('composer keyboard suggestion visibility', () => {
     expect(chip?.textContent).toContain('Video Shotcraft')
     expect(chip?.textContent).toContain('Unavailable')
     expect(chip?.querySelector('button')?.disabled).toBe(false)
+    const guidance = 'This skill is unavailable in the current conversation.'
+    expect(host.querySelector('[role="group"] [role="status"]')?.textContent).toContain(guidance)
+    await click(chip!.querySelector('button')!)
+    expect(host.textContent).not.toContain(guidance)
   })
 
   it('keeps the existing mouse choice and prevents it from taking textarea focus', async () => {

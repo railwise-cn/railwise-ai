@@ -39,7 +39,7 @@ describe('MessageTimeline initial heatmap empty hero routing', () => {
 
   it('keeps offline, missing-workspace, and Claw empty states gated away from the heatmap', () => {
     const offlineHtml = renderHero({ ready: false })
-    expect(offlineHtml).toContain('RailWise AI Runtime is waking the local agent')
+    expect(offlineHtml).toContain('Connecting to the local assistant')
     expect(offlineHtml).toContain('ds-runtime-wake-logo')
     expect(offlineHtml).toContain('ds-work-logo')
     expect(renderHero({ hasWorkspace: false })).toContain('Choose working directory')
