@@ -414,7 +414,9 @@ async function validateWorkbook(cdp, workspace, root, report, evidenceDir) {
   assert.equal(await sha256(excel), excelHash)
   report.checks.push('xlsx-read-only-multiple-sheets-original-unchanged')
   await openWorkbook(copy)
-  await ui('reopened workbook', workbookReady + ' && document.body.innerText.includes("监测导入")')
+  await ui('reopened workbook grid after the loading overlay clears', workbookReady +
+    ' && document.body.innerText.includes("监测导入") && (' + grid +
+    ') && !document.querySelector(\'[data-u-comp="workbench-skeleton-toolbar"]\')')
   const reopened = await evaluate('window.workwise.openSpreadsheet(' + JSON.stringify({ path: copy, workspaceRoot: workspace }) + ')')
   assert.equal(reopened.kind, 'workbook')
   assert.equal(cell(JSON.parse(reopened.content).workbook, 0, 0)?.v, 9)
