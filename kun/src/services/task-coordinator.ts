@@ -36,7 +36,7 @@ export class TaskCoordinator {
   private readonly pending = new Map<string, Promise<TaskCommandResult>>()
   private flushingMessages?: Promise<void>
   private readonly controls:TaskControlService
-  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; userInputGate?: UserInputGate; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; requiresBrowserScopeRefresh?: (task: TaskRun, turnId: string, text: string) => boolean | Promise<boolean>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
+  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; userInputGate?: UserInputGate; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; requiresBrowserScopeRefresh?: (task: TaskRun, turnId: string, text: string) => boolean | Promise<boolean>; waitTurn?: (threadId: string, turnId: string) => Promise<void>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
   async command(raw: TaskCommand, options: TaskCommandDispatchOptions = {}): Promise<TaskCommandResult> {
     const command = TaskCommandSchema.parse(raw)
     const queueKey = `${command.threadId}:${command.idempotencyKey}`
@@ -296,6 +296,7 @@ export class TaskCoordinator {
         const paused = this.deps.tasks.pauseTask(current.id, current.revision, '正在根据补充网址更新只读网页读取范围。')
         userInputGate?.resolveForTurnRestart(request.id)
         await this.deps.turns.interruptTurn({ threadId: task.threadId, turnId: request.turnId })
+        await this.deps.waitTurn?.(task.threadId, request.turnId)
         const ready = repository.get(task.id) ?? paused
         try {
           const resumed = await this.controls.mutate(task.id, 'resume', {

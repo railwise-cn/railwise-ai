@@ -540,6 +540,10 @@ export class AgentLoop {
 
   async awaitIdle(): Promise<void> { await Promise.allSettled([...this.activeRuns.values()]) }
 
+  async awaitTurnIdle(threadId: string, turnId: string): Promise<void> {
+    await this.activeRuns.get(`${threadId}:${turnId}`)?.catch(() => undefined)
+  }
+
   private async executeRunTurn(threadId: string, turnId: string): Promise<'completed' | 'failed' | 'aborted'> {
     const signal = this.opts.turns.getAbortController(turnId)
     if (!signal) {

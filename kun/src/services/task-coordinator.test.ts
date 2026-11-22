@@ -517,7 +517,10 @@ describe('task commands before Turn allocation',()=>{
     const f = await fixture()
     const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
     const requiresBrowserScopeRefresh = vi.fn(async (_task, _turnId, text) => text === 'www.railwise.cn')
-    const coordinator = new TaskCoordinator({ ...f, userInputGate, requiresBrowserScopeRefresh, nowIso: () => new Date().toISOString() })
+    let finishOldTurn!: () => void
+    const waitTurn = vi.fn(() => new Promise<void>(resolve => { finishOldTurn = resolve }))
+    const coordinator = new TaskCoordinator({ ...f, userInputGate, requiresBrowserScopeRefresh, waitTurn,
+      nowIso: () => new Date().toISOString() })
     const started = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'website-task', request: { prompt: '制作官网介绍 PPT' } })
     if (started.kind !== 'task_started') throw new Error('expected task')
     const requestId = 'input-website'
@@ -525,7 +528,12 @@ describe('task commands before Turn allocation',()=>{
       prompt: '请提供官网网址。', questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] })
     expect(f.repository.get(started.task!.id)).toMatchObject({ status: 'waiting_user', activeTurnId: started.turn.turnId })
 
-    const result = await coordinator.command({ threadId: f.origin.id, idempotencyKey: 'answer-website', request: { prompt: 'www.railwise.cn' } })
+    const answering = coordinator.command({ threadId: f.origin.id, idempotencyKey: 'answer-website', request: { prompt: 'www.railwise.cn' } })
+    await vi.waitFor(() => expect(waitTurn).toHaveBeenCalledOnce())
+    expect(f.repository.get(started.task!.id)?.status).toBe('paused')
+    expect(f.runTurn).toHaveBeenCalledOnce()
+    finishOldTurn()
+    const result = await answering
 
     expect(result).toMatchObject({ kind: 'input_queued', task: { id: started.task!.id } })
     expect(requiresBrowserScopeRefresh).toHaveBeenCalledWith(expect.objectContaining({ id: started.task!.id }), started.turn.turnId, 'www.railwise.cn')
