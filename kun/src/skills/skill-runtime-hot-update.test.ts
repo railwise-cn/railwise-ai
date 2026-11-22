@@ -17,6 +17,12 @@ async function skillRoot(name: string) {
 }
 
 describe('Skill installation runtime acknowledgement', () => {
+  it('advertises PPT Master with its official capitalisation and exact ID', async () => {
+    const root = await skillRoot('ppt-master')
+    const runtime = await SkillRuntime.create({ enabled: true, roots: [root], legacySkillMd: true })
+    expect(runtime.callableSkills('', new Set())).toMatchObject([{ kind: 'skill', id: 'ppt-master', label: 'PPT Master' }])
+  })
+
   it.each(['broswer-skill', 'browse skill'])('loads the installed BrowserSkill for the reported %s spelling', async spelling => {
     const root = await skillRoot('browser-skill')
     const runtime = await SkillRuntime.create({ enabled: true, roots: [root], legacySkillMd: true })

@@ -32,6 +32,7 @@ export const BrowserExecutionScope = z.object({
   browserInstanceId: z.string().min(1).max(512),
   origins: z.array(BrowserOrigin).max(64),
   interaction: z.enum(['observe', 'interact']),
+  sourceReadOnly: z.literal(true).optional(),
   verificationPolicy: BrowserVerificationPolicy.optional(),
   publicQueryAuthorization: BrowserPublicQueryAuthorization.optional(),
   revision: z.number().int().nonnegative()

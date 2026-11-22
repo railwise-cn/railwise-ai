@@ -4,3 +4,4 @@ export type {
   CallableCapabilityScope,
   SkillSelections
 } from '../../kun/src/contracts/callable-capabilities.js'
+export { canonicalSkillDisplayName } from '../../kun/src/contracts/callable-capabilities.js'

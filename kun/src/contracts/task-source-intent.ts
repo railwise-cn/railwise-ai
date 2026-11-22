@@ -15,6 +15,13 @@ export function bareWwwHosts(text: string): string[] {
     .map((host) => host.toLowerCase())
 }
 
+/** Resolve a user-facing source address without accepting arbitrary relative URLs. */
+export function parseWebSourceAddress(value: string): URL {
+  const address = value.trim()
+  const host = address.match(/^(www\.[a-z0-9.-]+)(?=[/?#]|$)/i)?.[1]
+  return new URL(host && bareWwwHost.test(host) && host.length <= 253 ? `https://${address}` : address)
+}
+
 function asksForExternalRead(text: string): boolean {
   // Explicit local inputs and prohibitions are not requests to fetch a website.
   const request = text.replace(/(?:无需|不需要|不要|禁止|不必)(?:(?:从|在|去)(?:互联网|网上|网站|网页|官网)上?)?(?:联网|采集|抓取|爬取|检索|搜索|查询|查找|查阅|读取|获取|访问)(?:网页|网站|官网|平台|外部(?:资料|数据|来源)|互联网|网上)?/g, '')

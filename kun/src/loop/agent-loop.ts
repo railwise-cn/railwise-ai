@@ -1294,6 +1294,7 @@ export class AgentLoop {
         + 'Do not replay mutations, reset guards, fabricate evidence or weaken verification. Existing unknown outcomes and all execution budgets remain binding.'
       ] : []),
       ...optionalInstruction(webSearchCapabilityInstruction(workflowPrompt, toolSpecs)),
+      ...optionalInstruction(webSourceToolInstruction(effectiveToolSpecs)),
       ...optionalInstruction(webFailureGuard?.recoveryInstruction()),
       ...(effectiveToolSpecs.some((tool) => tool.name === 'bash' || tool.name === 'request_host_shell') ? [shellRuntimeInstruction()] : []),
       ...(effectiveToolSpecs.some((tool) => tool.name === 'request_host_shell') ? [
@@ -3127,6 +3128,16 @@ export function webSearchCapabilityInstruction(
 
 function isWebToolName(name: string): boolean {
   return name === 'web_search' || name === 'web_fetch'
+}
+
+function webSourceToolInstruction(tools: readonly ModelToolSpec[]): string | undefined {
+  const names = new Set(tools.map(tool => tool.name))
+  if (!names.has('web_fetch')) return undefined
+  const directRead = 'For public website source material supplied for a document or presentation, use web_fetch with the user’s actual address, including a continuation reply, unless the user selected a specific browser. Reuse the returned source URL and content in the deliverable.'
+  if (['browser_session_start', 'browser_navigate', 'browser_get_html'].every(name => names.has(name))) {
+    return `${directRead} If direct reading fails or the page requires rendering, use the connected BrowserSkill read tools: browser_session_start({}), browser_navigate with its actual sessionId and the authorized HTTPS URL, then browser_get_html with that sessionId. Do not invent browser globals or use shell/JavaScript to drive a browser. Keep access restrictions in force.`
+  }
+  return `${directRead} Use only the tools advertised in this turn. Do not invent browser globals, terminal commands for an unconnected browser, or a claim that a browser has opened. If the website still cannot be read, explain the source-specific limitation and continue work supported by other verified material.`
 }
 
 function attachmentRequestPipelineDetails(input: {

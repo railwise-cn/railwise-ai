@@ -154,6 +154,10 @@ async function nativeTransport(input: {
       method: 'GET',
       path: `${input.url.pathname}${input.url.search}`,
       servername: input.url.hostname,
+      // A validated address is already selected. Modern Node otherwise asks
+      // the custom lookup for an array and rejects the single pinned address.
+      family: input.family,
+      agent: false,
       headers: {
         Host: input.url.host,
         'Accept-Encoding': 'identity',

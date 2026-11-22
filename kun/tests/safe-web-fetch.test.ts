@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { createServer } from 'node:http'
+import { once } from 'node:events'
+import ipaddr from 'ipaddr.js'
+import { describe, expect, it, vi } from 'vitest'
 import {
   SafeWebFetchError,
   isPublicInternetAddress,
@@ -88,5 +91,30 @@ describe('safeWebFetch', () => {
       }
     })
     expect(result.body.toString('utf8')).toBe('safe')
+  })
+
+  it('connects to a single pinned address using the native Node transport', async () => {
+    const server = createServer((request, response) => {
+      expect(request.headers.host).toMatch(/^fixture\.example:/)
+      response.end('pinned source')
+    })
+    // Treat only the local fixture as public so this offline test exercises
+    // Node's actual lookup callback rather than a synthetic transport.
+    const parse = ipaddr.parse.bind(ipaddr)
+    const addressFixture = vi.spyOn(ipaddr, 'parse').mockImplementation(address =>
+      parse(address === '127.0.0.1' ? '93.184.216.34' : address))
+    try {
+      server.listen(0, '127.0.0.1')
+      await once(server, 'listening')
+      const address = server.address()
+      if (!address || typeof address === 'string') throw new Error('Fixture address unavailable')
+      const result = await safeWebFetch(`http://fixture.example:${address.port}/source`, {}, undefined, {
+        lookup: async () => [{ address: '127.0.0.1', family: 4 }]
+      })
+      expect(result.body.toString('utf8')).toBe('pinned source')
+    } finally {
+      addressFixture.mockRestore()
+      await new Promise<void>(resolve => server.close(() => resolve()))
+    }
   })
 })

@@ -51,4 +51,20 @@ describe('WebToolFailureGuard', () => {
     expect(guard.shouldFailDegradedCompletion()).toBe(false)
     expect(guard.recoveryInstruction()).toContain('Report source coverage accurately')
   })
+
+  it('allows completion after a verified BrowserSkill read even when direct fetch was exhausted', () => {
+    const guard = new WebToolFailureGuard({ threshold: 1 })
+    const fetch = { ...call('web_fetch'), arguments: { url: 'www.example.com' } }
+    guard.observe(fetch, true)
+    expect(guard.inspect({ ...fetch, arguments: { url: 'https://www.example.com/' } }).suppress).toBe(true)
+
+    const browser = { ...call('browser_get_html'), providerId: 'browser-skill' }
+    const read = { status: 'succeeded', evidence: { verified: true, contentRead: true } }
+    guard.observe({ ...browser, providerId: 'mcp:unrelated' }, false, read)
+    guard.observe(browser, false, { ...read, truncated: true })
+    expect(guard.shouldFailDegradedCompletion()).toBe(true)
+
+    guard.observe(browser, false, read)
+    expect(guard.shouldFailDegradedCompletion()).toBe(false)
+  })
 })

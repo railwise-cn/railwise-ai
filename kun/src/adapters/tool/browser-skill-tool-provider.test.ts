@@ -1331,6 +1331,23 @@ describe('typed BrowserSkill production provider', () => {
     expect(approval).not.toHaveBeenCalled()
     expect(f.runner.mock.calls.some(([, args]) => ['click', 'fill', 'press'].includes(args[0]))).toBe(false)
   })
+
+  it('reads through an optional source scope without advertising or requesting interaction', async () => {
+    const f = fixture()
+    f.context.executionGrant!.browserScope = { ...f.context.executionGrant!.browserScope!, interaction: 'observe', sourceReadOnly: true }
+    f.context.awaitApproval = vi.fn(async () => 'allow')
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
+    const names = (await host.listTools(f.context)).map(item => item.name)
+    expect(names).toContain('browser_get_html')
+    expect(names).not.toContain('browser_request_interaction')
+    expect(names).not.toContain('browser_click')
+
+    await host.execute({ callId: 'start', toolName: 'browser_session_start', arguments: {} }, f.context)
+    await host.execute({ callId: 'open', toolName: 'browser_navigate', arguments: { sessionId: 'session-one', url: 'https://example.com/about' } }, f.context)
+    const result = await host.execute({ callId: 'source', toolName: 'browser_get_html', arguments: { sessionId: 'session-one' } }, f.context)
+    expect(result.item).toMatchObject({ isError: false, output: { sourceUrl: 'https://example.com/about', evidence: { contentRead: true, verified: true } } })
+    expect(f.context.awaitApproval).not.toHaveBeenCalled()
+  })
   it('reviews the actual site, target and complete safe input with the original argument fingerprint', async () => {
     const f = fixture()
     await f.execute('browser_session_start')

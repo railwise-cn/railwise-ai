@@ -847,12 +847,17 @@ export async function createKunServeRuntime(
     const externalTargets = effects.map(effect => externalTargetGrantKey(effect.provider, effect.operation, effect.target))
     const egoTask=Boolean(turn&&egoRuntime.selected(turn.prompt,task?.authority?.browserScope))
     const browserTask = Boolean(turn && (egoTask || isBrowserTask(turn.prompt) || task?.authority?.browserScope))
+    const browserFallback = turn && task?.activeTurnId === turnId && !browserTask && !selectedProviderId && !task.scheduledBy
+      ? browserRuntime.sourceReadScope([task.goal, ...taskController.taskInputs(task.id)
+        .filter(input => input.kind === 'supplement' && input.sourceId === undefined)
+        .map(input => input.text)])
+      : undefined
     const externalProviderIds = new Set(['lark-cli', 'dingtalk'])
     const allowedProviderIds = toolHost.diagnostics()
       .filter(provider => provider.enabled && provider.available)
       .map(provider => provider.id)
       .filter(providerId => !externalProviderIds.has(providerId) || providerId === selectedProviderId)
-      .filter(providerId => providerId !== 'browser-skill' || browserTask&&!egoTask)
+      .filter(providerId => providerId !== 'browser-skill' || (browserTask || browserFallback) && !egoTask)
       .filter(providerId => providerId !== 'ego-browser' || egoTask)
       .filter(providerId => !egoTask || ['builtin','ego-browser','managed-artifacts','document-delivery','task-schedule','todo'].includes(providerId))
     let providerScope: ExecutionScope = { networkAllowlist: ['*'], connectorScopes: [], externalTargets: [] }
@@ -862,6 +867,12 @@ export async function createKunServeRuntime(
       providerScope = egoTask ? egoRuntime.scope(turn.prompt,task?.authority?.browserScope,restriction.permissionScope?.networkOrigins) : browserRuntime.scope(turn.prompt, task?.authority?.browserScope, restriction.permissionScope?.networkOrigins)
       if (task && providerScope.browserScope && !task.authority?.browserScope) {
         taskRepository.update(task.id, task.revision, current => ({ ...current, authority: { ...current.authority!, browserScope: providerScope.browserScope } }))
+      }
+    } else if (browserFallback) {
+      providerScope = {
+        ...providerScope,
+        browserScope: browserFallback,
+        connectorIdentityFingerprints: { 'browser-skill': browserRuntime.identityFingerprint() }
       }
     }
     const scheduledScope = task ? await taskScheduleService?.executionScope(task) : undefined

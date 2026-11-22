@@ -101,13 +101,15 @@ export const AssistantReasoningTurnItem = TurnItemBase.extend({
 })
 export type AssistantReasoningTurnItem = z.infer<typeof AssistantReasoningTurnItem>
 
+export const MAX_TOOL_ARGUMENT_SUMMARY_LENGTH = 1_000
+
 export const ToolCallTurnItem = TurnItemBase.extend({
   kind: z.literal('tool_call'),
   toolName: z.string().min(1),
   callId: z.string().min(1),
   toolKind: z.enum(['tool_call', 'command_execution', 'file_change']),
   arguments: z.record(z.string(), z.unknown()),
-  argumentSummary: z.string().max(1_000).optional(),
+  argumentSummary: z.string().max(MAX_TOOL_ARGUMENT_SUMMARY_LENGTH).optional(),
   summary: z.string().optional()
 })
 export type ToolCallTurnItem = z.infer<typeof ToolCallTurnItem>

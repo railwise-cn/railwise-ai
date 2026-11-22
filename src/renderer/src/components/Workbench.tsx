@@ -2162,13 +2162,14 @@ export function Workbench(): ReactElement {
     void createWriteThread(writeWorkspaceRoot, writeState.activeFilePath)
   }
 
-  const renderRuntimeBanner = (message: string, detail?: string | null): ReactElement => (
+  const renderRuntimeBanner = (message: string, detail?: string | null, inConversation = false): ReactElement => (
     <RuntimeBanner
       message={message}
       detail={detail}
       logPath={runtimeLogPath || null}
       runtimeReady={runtimeConnection === 'ready'}
-      stageInsetClass={stageInsetClass}
+      stageInsetClass={inConversation ? 'px-3.5' : stageInsetClass}
+      inConversation={inConversation}
       t={t}
       onOpenLogDir={
         typeof window !== 'undefined' && typeof window.workwise?.openLogDir === 'function'
@@ -2179,6 +2180,8 @@ export function Workbench(): ReactElement {
       onRetryConnection={() => void probeRuntime('user')}
     />
   )
+  const showConversationError = chatOwnsTaskControls && Boolean(activeThreadId) &&
+    runtimeConnection === 'ready' && !activeSddDraft
 
   const writeRuntimeBannerMessage = runtimeConnection !== 'ready'
     ? (error?.trim() || t('writeRuntimeUnavailable'))
@@ -2527,7 +2530,7 @@ export function Workbench(): ReactElement {
           </>
         ) : (
           <>
-        {error && !(runtimeConnection !== 'ready' && !activeThreadId) ? renderRuntimeBanner(error, runtimeErrorDetail) : null}
+        {error && !showConversationError && !(runtimeConnection !== 'ready' && !activeThreadId) ? renderRuntimeBanner(error, runtimeErrorDetail) : null}
 
         <div className="flex min-h-0 flex-1">
           <div className={`flex min-h-0 min-w-0 flex-1 ${activeSddDraft ? '' : stageInsetClass}`}>
@@ -2603,7 +2606,8 @@ export function Workbench(): ReactElement {
               live={timelineLiveAssistant}
               activeThreadId={activeThreadId}
               runtimeConnection={runtimeConnection}
-              runtimeError={error}
+              runtimeError={showConversationError ? null : error}
+              runtimeNotice={error && showConversationError ? renderRuntimeBanner(error, runtimeErrorDetail, true) : undefined}
               onRetryConnection={() => void probeRuntime('user')}
               onOpenSettings={() => openSettings('agents')}
               onSelectSuggestion={(text) => setInput(text)}

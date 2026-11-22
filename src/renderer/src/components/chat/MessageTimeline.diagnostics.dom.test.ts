@@ -6,6 +6,7 @@ import { chatBlockFromItem } from '../../agent/runtime-mapper'
 import type { ChatBlock } from '../../agent/types'
 import i18n from '../../i18n'
 import { useChatStore } from '../../store/chat-store'
+import { RuntimeBanner } from '../RuntimeBanner'
 import { MessageTimeline } from './MessageTimeline'
 import { MessageBubble } from './message-timeline-bubbles'
 
@@ -66,6 +67,35 @@ describe('conversation execution details', () => {
     expect(container.querySelector('[role="status"]')?.textContent).toContain('Researching…')
     await act(async () => useChatStore.setState({ currentTurnId: 'newer' }))
     expect(container.querySelector('[role="status"]')?.textContent).toContain('Continuing the task…')
+  })
+
+  it('places a conversation failure below the relevant messages with collapsed neutral details', async () => {
+    const onRetryConnection = () => undefined
+    const onOpenSettings = () => undefined
+    await act(async () => root.render(createElement(MessageTimeline, {
+      blocks: [
+        { kind: 'user', id: 'url', text: 'www.railwise.cn' },
+        { kind: 'assistant', id: 'partial', text: 'I will read the website.' }
+      ],
+      activeThreadId: 'thread-test', runtimeConnection: 'ready', liveReasoning: '', live: '',
+      onRetryConnection, onOpenSettings,
+      runtimeNotice: createElement(RuntimeBanner, {
+        message: 'The website could not be read.', detail: 'Connection timed out.',
+        inConversation: true, runtimeReady: true, stageInsetClass: 'px-3.5',
+        t: (key: string) => i18n.t(`common:${key}`), onRetryConnection, onOpenSettings
+      })
+    })))
+    const summary = container.querySelector('[role="status"]')
+    expect(summary?.textContent).toContain('The website could not be read.')
+    expect(summary?.className).toContain('text-ds-muted')
+    const text = container.textContent ?? ''
+    expect(text.indexOf('I will read the website.')).toBeLessThan(text.indexOf('The website could not be read.'))
+    expect(text).not.toContain('Connection timed out.')
+    const details = control(i18n.t('common:runtimeErrorDetails'))
+    expect(details.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => details.click())
+    expect(container.querySelector('pre')?.textContent).toContain('Connection timed out.')
+    expect(container.querySelector('pre')?.className).toContain('text-ds-muted')
   })
 
   it.each(['concise', 'standard', 'developer'] as const)('keeps recoverable errors behind neutral disclosures in %s mode', async viewMode => {

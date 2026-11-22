@@ -42,6 +42,7 @@ type Props = {
   activeThreadId: string | null
   runtimeConnection: RuntimeConnectionStatus
   runtimeError?: string | null
+  runtimeNotice?: ReactNode
   onRetryConnection: () => void
   onOpenSettings: () => void
   onSelectSuggestion?: (prompt: string) => void
@@ -90,6 +91,7 @@ export function MessageTimeline({
   activeThreadId,
   runtimeConnection,
   runtimeError,
+  runtimeNotice,
   onRetryConnection,
   onOpenSettings,
   onSelectSuggestion,
@@ -133,7 +135,8 @@ export function MessageTimeline({
     blocks.length,
     blockScrollStamp(latestBlock),
     live.length,
-    liveReasoning.length
+    liveReasoning.length,
+    Boolean(runtimeNotice)
   ].join(':')
   const {
     visibleTurnCount,
@@ -322,6 +325,7 @@ export function MessageTimeline({
           />
         ) : null}
         {blocks.length === 0 && !live && !liveReasoning ? taskActivity : null}
+        {runtimeNotice}
         <div ref={endRef} aria-hidden className="h-px w-full shrink-0" />
       </div>
     </div>
