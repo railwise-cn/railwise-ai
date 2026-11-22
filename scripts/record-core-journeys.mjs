@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256 } from './verify-frozen-updater-evidence.mjs'
+import { validateWebPptFallbackProof, validateWebPptTurnIdentity } from './web-ppt-journey.mjs'
 
 const windowsWorkflow = '.github/workflows/windows-install-smoke.yml'
 const sha256 = /^[a-f0-9]{64}$/
@@ -23,8 +24,7 @@ function hostedProvenance(environment) {
 export function livePptJourney(observation, reportFile, acceptedOpenStatus) {
   if (observation?.status !== 'passed' || observation?.model !== 'live-model') return undefined
   assert.equal(observation.input, 'installed-chat-ui')
-  assert.equal(observation.sameThread, true)
-  assert.equal(observation.sameTurn, true)
+  validateWebPptTurnIdentity(observation)
   assert.equal(observation.source?.url, 'https://www.railwise.cn/')
   assert.equal(observation.source?.tool, 'web_fetch')
   assert.match(observation.source?.sha256, sha256)
@@ -108,13 +108,21 @@ export function windowsCoreJourneys(install, environment = process.env) {
     journeys.push(startupJourney('windows-startup-appearance.json'))
   }
   const ui = install.ui
-  if (ui?.status === 'passed' && ui.checks?.includes('installed-chat-web-ppt')) {
+  const webPptChecks = ui?.checks ?? []
+  if (ui?.status === 'passed' && webPptChecks.some(check =>
+    ['installed-chat-web-ppt', 'installed-chat-web-ppt-browser-fallback'].includes(check))) {
     assert.equal(ui.version, version)
     assert.equal(ui.sourceHead, sourceHead)
     assert.equal(ui.installedAsarSha256, installedAsarSha256)
     assert.equal(ui.packageUnchanged, true)
-    const ppt = livePptJourney(ui.webPpt, 'windows-ui-smoke.json', 'desktop-open-request-accepted')
-    if (ppt) journeys.push(ppt)
+    if (webPptChecks.includes('installed-chat-web-ppt-browser-fallback')) {
+      validateWebPptFallbackProof(ui.webPpt, ui.webPptBrowser)
+      journeys.push({ id: 'browserskill-fallback', method: 'real-browser-ui', status: 'passed',
+        evidence: 'windows-install-smoke.json records a denied direct fetch, a new Turn in the original task and chat, verified DOM readback through the pinned Chrome extension, and an editable PPTX opened from the original chat.' })
+    } else {
+      const ppt = livePptJourney(ui.webPpt, 'windows-ui-smoke.json', 'desktop-open-request-accepted')
+      if (ppt) journeys.push(ppt)
+    }
   }
   if (ui?.status === 'passed') {
     const checks = new Set(ui.checks ?? [])

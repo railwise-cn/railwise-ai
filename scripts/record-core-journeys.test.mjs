@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { livePptJourney, macCoreJourneys, recordHostedCoreJourneys, windowsCoreJourneys, windowsUpdaterCoreJourney } from './record-core-journeys.mjs'
 import { RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
+import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 const sourceHead = 'e'.repeat(40)
 const installerSha256 = 'a'.repeat(64)
@@ -38,6 +39,7 @@ test('live PPT receipt requires the original installed GUI conversation and open
   assert.equal(livePptJourney(ppt('handler-unavailable'), file, 'os-open-accepted'), undefined)
   assert.equal(livePptJourney({ ...ppt(), model: 'controlled-protocol' }, file, 'os-open-accepted'), undefined)
   assert.throws(() => livePptJourney({ ...ppt(), sameTurn: false }, file, 'os-open-accepted'))
+  assert.equal(livePptJourney({ ...ppt(), sameTurn: false, initialTurnId: 'first', completedTurnId: 'resumed' }, file, 'os-open-accepted').id, 'website-pptx')
   assert.throws(() => {
     const result = ppt()
     result.artifact.nativeEditableText = false
@@ -71,6 +73,43 @@ test('Windows receipt derives only assertions made against the unchanged install
   assert.deepEqual(windowsCoreJourneys(install).journeys.map(item => item.id), ['website-pptx'])
   install.ui.webPpt.model = 'controlled-protocol'
   assert.deepEqual(windowsCoreJourneys(install).journeys, [])
+})
+
+test('Windows records BrowserSkill fallback only with the real browser proof and a new Turn', () => {
+  const version = '0.5.11'
+  const url = 'http://127.0.0.1:32123/ppt-source'
+  const browserInstanceId = 'isolated-browser'
+  const install = { status: 'passed', platform: 'win32', arch: 'x64', productionTouched: false, version, sourceHead,
+    verification: { installerSha256, installedAsarSha256 }, installer: { sha256: installerSha256 },
+    target: { package: { asarSha256: installedAsarSha256 } },
+    provenance: { packageBuild: { ...build, packageSourceHead: sourceHead } },
+    ui: { status: 'passed', sourceHead, version, installedAsarSha256, packageUnchanged: true,
+      checks: ['installed-chat-web-ppt-browser-fallback'],
+      webPpt: { ...ppt('desktop-open-request-accepted'), model: 'controlled-protocol', sameTurn: false,
+        initialTurnId: 'first', completedTurnId: 'resumed', source: { url, tool: 'browser_get_html', bytes: 512, sha256: 'c'.repeat(64) },
+        browserRecovery: { taskId: 'original-task', initialTurnId: 'first', completedTurnId: 'resumed',
+          originalQuestionCount: 1, supplements: 1, directFetchBlock: 'policy_blocked', directFetchUrl: url,
+          browserInstanceId, sessionId: 'owned-session', sourceReadOnly: true, readOnlyOrigins: [new URL(url).origin],
+          toolNames: ['web_fetch', 'browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop'] } },
+      webPptBrowser: { browserInstanceId, isolatedTestCredentialStore: true, cliVersion: '0.5.0', cliSha256: '1'.repeat(64),
+        protocolVersion: '1.9', extensionId: 'a'.repeat(32),
+        extension: { version: browserSmokeDependency.extensionVersion, sha256: browserSmokeDependency.extensionSha256 },
+        browser: { version: browserSmokeDependency.chromeVersion, executableSha256: '2'.repeat(64) } } } }
+  const journeys = windowsCoreJourneys(install).journeys
+  assert.deepEqual(journeys.map(({ id, method }) => ({ id, method })), [{ id: 'browserskill-fallback', method: 'real-browser-ui' }])
+
+  const wrongExtension = structuredClone(install)
+  wrongExtension.ui.webPptBrowser.extension.sha256 = '3'.repeat(64)
+  assert.throws(() => windowsCoreJourneys(wrongExtension))
+  const sameTurn = structuredClone(install)
+  sameTurn.ui.webPpt.completedTurnId = 'first'
+  assert.throws(() => windowsCoreJourneys(sameTurn))
+  const wrongDirectFailure = structuredClone(install)
+  wrongDirectFailure.ui.webPpt.browserRecovery.directFetchBlock = 'fetch_failed'
+  assert.throws(() => windowsCoreJourneys(wrongDirectFailure))
+  const unopened = structuredClone(install)
+  unopened.ui.webPpt.open.status = 'handler-unavailable'
+  assert.throws(() => windowsCoreJourneys(unopened))
 })
 
 test('Windows receipt derives task, schedule, composer, responsive, marketplace and video journeys from exact UI assertions', () => {

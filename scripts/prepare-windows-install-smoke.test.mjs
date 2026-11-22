@@ -98,7 +98,7 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.equal(upgrade0510.default, false)
   assert.equal(overlay057.default, false)
   assert.equal(webPptJourney.default, 'off')
-  assert.deepEqual(webPptJourney.options, ['off', 'controlled', 'live'])
+  assert.deepEqual(webPptJourney.options, ['off', 'controlled', 'live', 'browser-fallback'])
   assert.equal(privateVideoEvaluation.default, false)
   assert.equal(macStartup.default, false)
   assert.equal(buildPrivateNext.default, true)
@@ -107,8 +107,10 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   const steps = workflow.jobs['windows-install'].steps
   assert.doesNotMatch(workflow.jobs['windows-install'].if, /inputs\.upgrade_0510_to_candidate|inputs\.overlay_057_to_candidate/)
-  assert.equal(steps.find(step => step.name === 'Install, inspect the Chinese UI and uninstall the temporary instance').env.RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE,
-    '${{ inputs.run_startup_appearance }}')
+  const installedUi = steps.find(step => step.name === 'Install, inspect the Chinese UI and uninstall the temporary instance').env
+  assert.equal(installedUi.RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE, '${{ inputs.run_startup_appearance }}')
+  assert.equal(installedUi.RAILWISE_WINDOWS_WEB_PPT_BROWSER_FALLBACK, "${{ inputs.web_ppt_journey == 'browser-fallback' }}")
+  assert.match(installedUi.RAILWISE_WINDOWS_WEB_PPT_SMOKE, /browser-fallback/)
   const download = steps.find(step => step.uses === 'actions/download-artifact@v4')
   assert.equal(download.with['artifact-ids'], '${{ steps.source.outputs.artifact_id }}')
   assert.equal(download.with['run-id'], '${{ inputs.package_run_id }}')

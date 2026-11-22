@@ -43,6 +43,8 @@ export type SkillPackageValidation = {
 }
 
 export type SkillPackageValidationOptions = {
+  /** Paths excluded from the trusted bundled payload, using a small glob syntax. */
+  excludedPaths?: string[]
   /**
    * Discovery-only mode for already-installed trusted plugin folders. Reference
    * assets may contain links or exceed the install limit; skip those entries
@@ -53,6 +55,41 @@ export type SkillPackageValidationOptions = {
   allowTrustedEntryLinks?: boolean
   /** Real path roots that an allowed entry link may target. */
   trustedEntryLinkRoots?: string[]
+}
+
+export function normalizeSkillPackageExclusions(value: unknown): string[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value) || value.length > 256) {
+    throw new Error('Bundled Skill exclusion list is invalid.')
+  }
+
+  return value.map((item) => {
+    if (typeof item !== 'string') throw new Error('Bundled Skill exclusion list is invalid.')
+    const pattern = item.trim()
+    const glob = pattern.endsWith('/') ? pattern.slice(0, -1) : pattern
+    if (!glob || glob.length > 512 || glob.startsWith('/') || glob.includes('\\') ||
+      /[()[\]{}!+|]/.test(glob) || glob.split('/').some((segment) => !segment || segment === '.' || segment === '..')) {
+      throw new Error('Bundled Skill exclusion list is invalid.')
+    }
+    const matcher = skillPathGlob(glob)
+    if (matcher.test('SKILL.md') || matcher.test('skill.json')) {
+      throw new Error('Bundled Skill exclusions cannot remove the entry file.')
+    }
+    return pattern
+  })
+}
+
+export function isSkillPackagePathExcluded(
+  relativePath: string,
+  isDirectory: boolean,
+  exclusions: readonly string[]
+): boolean {
+  const path = relativePath.replaceAll('\\', '/')
+  return exclusions.some((pattern) => {
+    const directoryOnly = pattern.endsWith('/')
+    if (directoryOnly !== isDirectory) return false
+    return skillPathGlob(directoryOnly ? pattern.slice(0, -1) : pattern).test(path)
+  })
 }
 
 function unsafe(message: string): never {
@@ -71,6 +108,7 @@ export async function validateSkillPackage(
   const trustedRoots = options.allowTrustedEntryLinks
     ? (await Promise.all((options.trustedEntryLinkRoots ?? []).map((root) => realpath(resolve(root)).catch(() => undefined)))).filter((root): root is string => Boolean(root))
     : []
+  const excludedPaths = normalizeSkillPackageExclusions(options.excludedPaths)
 
   let files = 0
   let totalBytes = 0
@@ -88,11 +126,12 @@ export async function validateSkillPackage(
       const absolute = resolve(current.path, entry.name)
       const rel = relative(rootPath, absolute)
       if (!rel || rel.startsWith('..') || rel.split(sep).includes('..')) unsafe('path escapes package root.')
+      const info = await lstat(absolute)
+      if (isSkillPackagePathExcluded(rel, info.isDirectory(), excludedPaths)) continue
       const collisionKey = rel.replaceAll('\\', '/').normalize('NFC').toLowerCase()
       if (collisionKeys.has(collisionKey)) unsafe(`path collision at ${rel}.`)
       collisionKeys.add(collisionKey)
 
-      const info = await lstat(absolute)
       const isEntryFile = rel === 'SKILL.md' || rel === 'skill.json'
       if (info.isSymbolicLink()) {
         if (options.allowTrustedEntryLinks && isEntryFile) {
@@ -138,4 +177,27 @@ function formatBytes(bytes: number): string {
   if (bytes % (1024 * 1024) === 0) return `${bytes / (1024 * 1024)} MiB`
   if (bytes % 1024 === 0) return `${bytes / 1024} KiB`
   return `${bytes} bytes`
+}
+
+function skillPathGlob(pattern: string): RegExp {
+  let expression = '^'
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index]!
+    if (character === '*' && pattern[index + 1] === '*') {
+      if (pattern[index + 2] === '/') {
+        expression += '(?:.*/)?'
+        index += 2
+      } else {
+        expression += '.*'
+        index += 1
+      }
+    } else if (character === '*') {
+      expression += '[^/]*'
+    } else if (character === '?') {
+      expression += '[^/]'
+    } else {
+      expression += character.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')
+    }
+  }
+  return new RegExp(`${expression}$`)
 }

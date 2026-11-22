@@ -528,14 +528,16 @@ describe('task commands before Turn allocation',()=>{
       prompt: '请提供官网网址。', questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] })
     expect(f.repository.get(started.task!.id)).toMatchObject({ status: 'waiting_user', activeTurnId: started.turn.turnId })
 
-    const answering = coordinator.command({ threadId: f.origin.id, idempotencyKey: 'answer-website', request: { prompt: 'www.railwise.cn' } })
+    const answering = coordinator.submitTaskUserInputAnswer(requestId, [
+      { id: 'website', label: '官网', value: 'www.railwise.cn' }
+    ])
     await vi.waitFor(() => expect(waitTurn).toHaveBeenCalledOnce())
     expect(f.repository.get(started.task!.id)?.status).toBe('paused')
     expect(f.runTurn).toHaveBeenCalledOnce()
     finishOldTurn()
     const result = await answering
 
-    expect(result).toMatchObject({ kind: 'input_queued', task: { id: started.task!.id } })
+    expect(result).toBe('submitted')
     expect(requiresBrowserScopeRefresh).toHaveBeenCalledWith(expect.objectContaining({ id: started.task!.id }), started.turn.turnId, 'www.railwise.cn')
     expect(f.repository.humanRequest(requestId)?.status).toBe('cancelled')
     await expect(answer).resolves.toEqual({ status: 'cancelled' })
@@ -550,6 +552,49 @@ describe('task commands before Turn allocation',()=>{
     expect(turns?.[1]?.items[0]).toMatchObject({ kind: 'user_message', displayText: '继续未完成任务' })
     expect(f.repository.get(started.task!.id)?.activeTurnId).toBe(turns?.[1]?.id)
     expect(f.runTurn).toHaveBeenCalledTimes(2)
+  })
+
+  it('resolves an ordinary open task answer in the waiting Turn without changing its source scope', async () => {
+    const f = await fixture()
+    const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
+    const requiresBrowserScopeRefresh = vi.fn(() => false)
+    const coordinator = new TaskCoordinator({ ...f, userInputGate, requiresBrowserScopeRefresh,
+      nowIso: () => new Date().toISOString() })
+    const started = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'ordinary-answer-task',
+      request: { prompt: '制作资料摘要' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const requestId = 'input-period'
+    const answer = userInputGate.request({ id: requestId, itemId: 'item-period', threadId: started.turn.threadId, turnId: started.turn.turnId,
+      prompt: '采用什么时间范围？', questions: [{ id: 'period', header: '时间范围', question: '采用什么时间范围？', options: [] }] })
+
+    await expect(coordinator.submitTaskUserInputAnswer(requestId, [
+      { id: 'period', label: '时间范围', value: '近一个月' }
+    ])).resolves.toBe('submitted')
+    await expect(answer).resolves.toEqual({ status: 'submitted', answers: [{ id: 'period', label: '时间范围', value: '近一个月' }] })
+    expect(requiresBrowserScopeRefresh).toHaveBeenCalledWith(expect.objectContaining({ id: started.task!.id }), started.turn.turnId, '近一个月')
+    expect(f.repository.get(started.task!.id)).toMatchObject({ status: 'running', activeTurnId: started.turn.turnId })
+    expect(f.runTurn).toHaveBeenCalledOnce()
+  })
+
+  it('rejects an open task answer after its task is paused', async () => {
+    const f = await fixture()
+    const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
+    const coordinator = new TaskCoordinator({ ...f, userInputGate, nowIso: () => new Date().toISOString() })
+    const started = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'stale-answer-task',
+      request: { prompt: '生成资料摘要' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const requestId = 'input-stale'
+    userInputGate.request({ id: requestId, itemId: 'item-stale', threadId: started.turn.threadId, turnId: started.turn.turnId,
+      prompt: '补充一个网址', questions: [{ id: 'url', header: '', question: '补充一个网址', options: [] }] })
+    const waiting = f.repository.get(started.task!.id)!
+    await coordinator.command({ threadId: f.origin.id, taskId: started.task!.id, intent: 'pause', idempotencyKey: 'pause-before-answer',
+      expectedRevision: waiting.revision, request: { prompt: '暂停' } })
+
+    await expect(coordinator.submitTaskUserInputAnswer(requestId, [
+      { id: 'url', label: '补充一个网址', value: 'www.railwise.cn' }
+    ])).resolves.toBe('stale')
+    expect(f.repository.get(started.task!.id)).toMatchObject({ status: 'paused', activeTurnId: started.turn.turnId })
+    expect(f.runTurn).toHaveBeenCalledOnce()
   })
 
   it('persists ambiguous ownership across multiple active tasks and keeps explicit decisions supported',async()=>{

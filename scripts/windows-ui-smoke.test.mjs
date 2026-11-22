@@ -19,7 +19,69 @@ import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWin
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
-import { createWebPptJourney, webPptJourneyPrompt } from './web-ppt-journey.mjs'
+import { createWebPptJourney, inspectWebPptFallback, startWebPptFallbackSource, webPptJourneyPrompt } from './web-ppt-journey.mjs'
+
+test('BrowserSkill PPT fixture serves a loopback source whose marker only appears after rendering', async t => {
+  const source = await startWebPptFallbackSource()
+  t.after(source.close)
+  const response = await fetch(source.url)
+  assert.equal(response.status, 200)
+  assert.match(response.headers.get('content-type'), /^text\/html/)
+  const html = await response.text()
+  assert.ok(html.includes('<main></main>'))
+  assert.ok(!html.includes(source.marker))
+  const payload = /atob\('([^']+)'\)/.exec(html)?.[1]
+  assert.equal(JSON.parse(Buffer.from(payload, 'base64').toString()).marker, source.marker)
+})
+
+test('BrowserSkill PPT fallback consumes the durable URL and requires a verified DOM read before writing', () => {
+  const fallback = { url: 'http://127.0.0.1:32123/ppt-source', marker: 'fixture-dom-marker' }
+  const title = '合成工程测量与安全监测资料'
+  const html = `<main><h1>${title}</h1><p>${fallback.marker}</p></main>`
+  const resultHash = createHash('sha256').update(html).digest('hex')
+  const evidence = { verified: true, contentRead: true, sourceUrl: fallback.url, resultHash }
+  const sessionId = 'owned-session'
+  const browserInstanceId = 'real-browser'
+  const read = { status: 'succeeded', provider: 'browser-skill', sourceUrl: fallback.url, readScope: 'document',
+    truncated: false, sessionId, evidence, html, resultHash }
+  const sourceCalls = [
+    ['web_fetch', { error: { code: 'policy_blocked' }, telemetry: { policy: 'blocked', url: fallback.url } }],
+    ['browser_session_start', { status: 'succeeded', sessionId, browserInstanceId }],
+    ['browser_navigate', { status: 'succeeded', sessionId, sourceUrl: fallback.url }],
+    ['browser_get_html', read],
+    ['browser_session_stop', { status: 'succeeded', sessionId, stopped: true }]
+  ]
+  const journey = createWebPptJourney({ workspace: '/owned/workspace', sidecar: '/unused/sidecar', parseToolOutput: JSON.parse, fallback })
+  const body = {
+    messages: [{ role: 'user', content: webPptJourneyPrompt }],
+    tools: ['request_user_input', 'write', ...sourceCalls.map(([name]) => name)].map(name => ({ function: { name } }))
+  }
+  assert.equal(journey.modelAction(body).tool_calls[0].function.name, 'request_user_input')
+  body.messages.push({ role: 'user', content: fallback.url })
+  for (const [name, output] of sourceCalls) {
+    const action = journey.modelAction(body).tool_calls[0].function
+    assert.equal(action.name, name)
+    if (name === 'web_fetch' || name === 'browser_navigate') assert.equal(JSON.parse(action.arguments).url, fallback.url)
+    body.messages.push({ role: 'tool', tool_call_id: `web-ppt-${name}`, content: JSON.stringify(output) })
+  }
+  assert.equal(journey.modelAction(body).tool_calls[0].function.name, 'write')
+
+  const task = { id: 'original-task' }
+  const completedTurn = { id: 'resumed-turn', status: 'completed', executionGrant: {
+    taskId: task.id, browserScope: { origins: [new URL(fallback.url).origin], interaction: 'observe', sourceReadOnly: true, browserInstanceId },
+    connectorIdentityFingerprints: { 'browser-skill': 'fingerprint' }
+  }, items: sourceCalls.map(([toolName, output]) => ({ kind: 'tool_result', callId: toolName, toolName, output, isError: toolName === 'web_fetch' })) }
+  const readback = { fallback, browserInstanceId, task, completedTurn,
+    initialTurn: { id: 'initial-turn', status: 'aborted', items: [{ kind: 'user_input' }] },
+    inputs: [{ kind: 'supplement', taskId: task.id, text: fallback.url }] }
+  const proof = inspectWebPptFallback(readback)
+  assert.equal(proof.source.sha256, resultHash)
+  assert.equal(proof.completedTurnId, completedTurn.id)
+  assert.throws(() => inspectWebPptFallback({ ...readback, browserInstanceId: 'other-browser' }))
+  assert.throws(() => inspectWebPptFallback({ ...readback, inputs: [...readback.inputs, ...readback.inputs] }))
+  body.messages.at(-2).content = JSON.stringify({ ...read, html: '<main></main>' })
+  assert.throws(() => journey.modelAction(body))
+})
 
 test('website-to-PPT asks in the selected conversation and fetches the answered bare host', () => {
   const journey = createWebPptJourney({ workspace: '/owned/workspace', sidecar: '/unused/sidecar', parseToolOutput: JSON.parse })
@@ -82,6 +144,9 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
   assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
   report.webPpt.sameTurn = false
   assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.initialTurnId = 'initial-turn'
+  report.webPpt.completedTurnId = 'resumed-turn'
+  assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
 })
 
 test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {

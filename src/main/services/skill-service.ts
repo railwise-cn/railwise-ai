@@ -26,6 +26,8 @@ import {
 } from './package-installation-service'
 import {
   BUNDLED_SKILL_LIMITS,
+  isSkillPackagePathExcluded,
+  normalizeSkillPackageExclusions,
   SKILL_PACKAGE_LIMITS,
   TRUSTED_SKILL_DISCOVERY_LIMITS,
   validateSkillPackage
@@ -61,6 +63,7 @@ export type GuiSkillRoot = {
 }
 
 type GithubSkillSourceMetadata = Extract<GuiSkillSource, { type: 'github' }> & {
+  excludedPaths?: string[]
   installedAt?: string
 }
 
@@ -281,8 +284,14 @@ export async function installBundledSkill(
       id: bundleId,
       autoUpdate: false
     }
+    const installExclusions = [...new Set([
+      ...(requestedSource.type === 'github' ? requestedSource.excludedPaths ?? [] : []),
+      '**/__pycache__/',
+      '**/*.pyc',
+      '**/*.pyo'
+    ])]
     await assertCanInstallIntoTarget(targetDir, requestedSource)
-    await validateSkillPackage(sourceDir, BUNDLED_SKILL_LIMITS)
+    await validateSkillPackage(sourceDir, BUNDLED_SKILL_LIMITS, { excludedPaths: installExclusions })
 
     await mkdir(root, { recursive: true })
     const tempDir = await mkdtemp(join(root, `.workwise-install-${skillName}-`))
@@ -290,10 +299,10 @@ export async function installBundledSkill(
       await cp(sourceDir, tempDir, {
         recursive: true,
         force: true,
-        filter: (sourcePath) => {
-          const normalized = sourcePath.replaceAll('\\', '/')
-          return !normalized.split('/').includes('__pycache__') &&
-            !/\.(?:pyc|pyo)$/i.test(normalized)
+        filter: async (sourcePath) => {
+          const relativePath = relative(sourceDir, sourcePath).replaceAll('\\', '/')
+          const info = await lstat(sourcePath)
+          return !isSkillPackagePathExcluded(relativePath, info.isDirectory(), installExclusions)
         }
       })
       await writeSkillSourceMetadata(tempDir, {
@@ -652,6 +661,9 @@ async function readSkillSourceMetadata(root: string): Promise<SkillSourceMetadat
       autoUpdate: false,
       ...(normalizeGithubIncludePaths(arrayStringValue(record.includePaths)).length
         ? { includePaths: normalizeGithubIncludePaths(arrayStringValue(record.includePaths)) }
+        : {}),
+      ...(normalizeSkillPackageExclusions(record.excludedPaths).length
+        ? { excludedPaths: normalizeSkillPackageExclusions(record.excludedPaths) }
         : {}),
       ...(normalizeBundledSkillOverlayId(stringValue(record.overlaySkillId))
         ? { overlaySkillId: normalizeBundledSkillOverlayId(stringValue(record.overlaySkillId)) }

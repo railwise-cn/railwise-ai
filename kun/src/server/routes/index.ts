@@ -618,7 +618,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
       inputId: ctx.params.id,
       request,
       gate: runtime.userInputGate,
-      events: runtime.events
+      events: runtime.events,
+      submitTaskUserInputAnswer: (inputId, answers) => runtime.taskCoordinator?.submitTaskUserInputAnswer(inputId, answers) ?? Promise.resolve('not_applicable')
     })
   })
   router.add('POST', '/v1/user-input/:id', async (request, ctx) => {
@@ -627,7 +628,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
       inputId: ctx.params.id,
       request,
       gate: runtime.userInputGate,
-      events: runtime.events
+      events: runtime.events,
+      submitTaskUserInputAnswer: (inputId, answers) => runtime.taskCoordinator?.submitTaskUserInputAnswer(inputId, answers) ?? Promise.resolve('not_applicable')
     })
   })
   router.add('POST', '/v1/sessions/:id/resume-thread', async (request, ctx) => {

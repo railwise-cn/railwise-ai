@@ -54,9 +54,9 @@ on:
         required: false
         default: false
       web_ppt_journey:
-        description: 'Run the website-to-PPTX journey in the installed client. Live mode requires the dedicated QA model credentials.'
+        description: 'Run the website-to-PPTX journey. Browser-fallback uses an isolated Windows Chrome extension. Live mode requires QA model credentials.'
         type: choice
-        options: ['off', controlled, live]
+        options: ['off', controlled, live, browser-fallback]
         default: 'off'
       run_published_gui_update:
         description: 'Install the exact released baseline and upgrade from the app sidebar over the live Stable feed on an ephemeral Windows runner'
@@ -162,10 +162,10 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
+    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true || inputs.web_ppt_journey == 'browser-fallback') && inputs.run_frozen_gui_update != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
-    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || ((inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') || inputs.run_composer_acceptance || inputs.run_docling_conversion) && 35 || (inputs.run_browser_execution || inputs.run_startup_appearance) && 25 || 15 }}
+    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || (contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey) || inputs.run_composer_acceptance || inputs.run_docling_conversion) && 35 || (inputs.run_browser_execution || inputs.run_startup_appearance) && 25 || 15 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -173,13 +173,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Reject mixed diagnostic and business acceptance modes
-        if: inputs.run_browser_startup_diagnostic && (inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live')
+        if: inputs.run_browser_startup_diagnostic && (inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey))
         run: throw 'Browser startup diagnostic is exclusive with task and browser execution'
       - name: Preserve the isolated cold marketplace profile
-        if: (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation) && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live')
+        if: (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation) && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey))
         run: throw 'Cold marketplace acceptance must use its own clean profile'
       - name: Preserve the isolated focused marketplace profile
-        if: inputs.run_docling_conversion && (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation || inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.run_startup_appearance || inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live')
+        if: inputs.run_docling_conversion && (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation || inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.run_startup_appearance || contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey))
         run: throw 'Focused marketplace acceptance must use its own clean profile'
       - name: Require the original package build ID
         if: ${{ inputs.package_run_id == '' }}
@@ -219,7 +219,8 @@ jobs:
           RAILWISE_WINDOWS_VIDEO_EVALUATION: ${{ inputs.run_private_video_evaluation }}
           RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE: ${{ inputs.run_startup_appearance }}
           RAILWISE_WINDOWS_COMPOSER_SMOKE: ${{ inputs.run_composer_acceptance }}
-          RAILWISE_WINDOWS_WEB_PPT_SMOKE: ${{ inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live' }}
+          RAILWISE_WINDOWS_WEB_PPT_SMOKE: ${{ contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey) }}
+          RAILWISE_WINDOWS_WEB_PPT_BROWSER_FALLBACK: ${{ inputs.web_ppt_journey == 'browser-fallback' }}
           RAILWISE_WINDOWS_WEB_PPT_LIVE: ${{ inputs.web_ppt_journey == 'live' }}
           RAILWISE_QA_MODEL_BASE_URL: ${{ inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL_BASE_URL || '' }}
           RAILWISE_QA_MODEL: ${{ inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL || '' }}
@@ -270,7 +271,7 @@ jobs:
           UPGRADE_058: ${{ inputs.upgrade_058_to_candidate }}
           UPGRADE_059: ${{ inputs.upgrade_059_to_candidate }}
           UPGRADE_0510: ${{ inputs.upgrade_0510_to_candidate }}
-          HAS_OTHER_CASE: ${{ inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation || inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live' }}
+          HAS_OTHER_CASE: ${{ inputs.run_composer_acceptance || inputs.run_published_gui_update || inputs.run_repaired_gui_update || inputs.run_repaired_marketplace_install || inputs.run_task_execution || inputs.run_browser_startup_diagnostic || inputs.run_browser_execution || inputs.run_mirror_acceptance || inputs.run_private_video_evaluation || contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey) }}
         run: |
           $selected = @(@($env:OVERLAY_BASELINE, $env:OVERLAY_0511, $env:UPGRADE_058, $env:UPGRADE_059, $env:UPGRADE_0510) | Where-Object { $_ -eq 'true' })
           $validSelection = $selected.Count -eq 1 -or ($selected.Count -eq 2 -and $env:OVERLAY_0511 -eq 'true' -and $env:UPGRADE_0510 -eq 'true')

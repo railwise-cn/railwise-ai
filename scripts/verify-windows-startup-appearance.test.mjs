@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
-import { validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
+import { macStartupPackageMode, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { observeStartupTargets, observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, waitForStartupCondition, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
@@ -163,8 +163,8 @@ test('selects the scoped startup runner without starting regular UI or task fixt
   await assert.rejects(dispatchWindowsSmokeEntry([...args, '--startup-appearance', '--task-smoke'], {}, driver), /exclusive/)
 })
 
-test('binds native Mac startup acceptance to a successful immutable release build', () => {
-  const source = { repository: 'railwise-cn/railwise-ai', workflow: '.github/workflows/release.yml', sourceHead: 'a'.repeat(40),
+test('binds native Mac startup acceptance to a successful immutable frozen release build', () => {
+  const source = { repository: 'railwise-cn/railwise-ai', workflow: '.github/workflows/release.yml', packageMode: 'frozen-public-identity', sourceHead: 'a'.repeat(40),
     driverHead: 'b'.repeat(40), runId: 100, runAttempt: 1, buildConclusion: 'success', artifactName: 'release-mac',
     artifactId: 200, artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
     changedFiles: ['scripts/run-mac-startup-appearance-smoke.mjs'] }
@@ -172,4 +172,14 @@ test('binds native Mac startup acceptance to a successful immutable release buil
   assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['src/main/splash-window.ts'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactExpired: true }))
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactName: 'release-win' }))
+})
+
+test('classifies an unfrozen macOS work-branch artifact as an isolated frontier candidate', () => {
+  const run = { event: 'workflow_dispatch', status: 'completed', conclusion: 'success', head_branch: 'codex/web-source-ppt-recovery' }
+  const build = { status: 'completed', conclusion: 'success', steps: [{ name: 'Record frozen public package identity', conclusion: 'skipped' }] }
+  assert.equal(macStartupPackageMode(run, build), 'frontier-candidate')
+  assert.throws(() => macStartupPackageMode({ ...run, head_branch: 'main' }, build), /isolated work branch/)
+  assert.throws(() => macStartupPackageMode({ ...run, status: 'in_progress' }, build), /completed/)
+  assert.throws(() => macStartupPackageMode(run, { ...build, steps: [] }), /identity receipt step/)
+  assert.throws(() => macStartupPackageMode(run, { ...build, steps: [{ name: 'Record frozen public package identity', conclusion: 'failure' }] }), /skipped freeze receipt/)
 })

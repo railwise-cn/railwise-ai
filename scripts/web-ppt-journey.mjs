@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { lstat, readFile, realpath } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { isAbsolute, join, relative, sep } from 'node:path'
+import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 export const webPptSourceHost = 'www.railwise.cn'
 export const webPptSourceUrl = `https://${webPptSourceHost}/`
@@ -17,6 +19,7 @@ const timeline = '.ds-message-timeline-content'
 const resultRegion = `${timeline} section[aria-label="任务"]`
 const literal = JSON.stringify
 const digest = value => createHash('sha256').update(value).digest('hex')
+const sha256 = /^[a-f0-9]{64}$/
 const specLock = [
   '<!-- ppt-master-schema: spec-lock/v1 -->', '# Execution Lock', '',
   '## canvas', '- viewBox: 0 0 1280 720', '- format: ppt169', '', '## colors',
@@ -25,9 +28,36 @@ const specLock = [
   '## pptx_structure', '- mode: flat', '', '## communication', '- primary_language: zh-CN', ''
 ].join('\n')
 
-function createSlide(title) {
+const browserTools = ['browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop']
+const fallbackTitle = '合成工程测量与安全监测资料'
+
+export async function startWebPptFallbackSource() {
+  const marker = `RAILWISE_PPT_DOM_${randomUUID()}`
+  const payload = Buffer.from(JSON.stringify({ title: fallbackTitle, marker })).toString('base64')
+  const server = createServer((request, response) => {
+    if (request.method !== 'GET' || request.url !== '/ppt-source') {
+      response.writeHead(404).end()
+      return
+    }
+    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+    response.end(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>BrowserSkill 合成验收</title></head>
+<body><main></main><script>
+const source = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('${payload}'), char => char.charCodeAt(0))));
+const title = document.createElement('h1');
+title.textContent = source.title;
+const body = document.createElement('p');
+body.textContent = source.marker;
+document.querySelector('main').append(title, body);
+</script></body></html>`)
+  })
+  await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
+  return { url: `http://127.0.0.1:${server.address().port}/ppt-source`, marker,
+    close: () => new Promise(done => { server.close(done); server.closeAllConnections() }) }
+}
+
+function createSlide(title, sourceUrl, marker) {
   const escape = value => value.replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[char])
-  const rows = [title, '官网公开资料', webPptSourceUrl].map((text, index) =>
+  const rows = [title, marker ?? '官网公开资料', sourceUrl].map((text, index) =>
     `<text x="80" y="${170 + index * 105}" fill="#142335" font-family="Arial" font-size="36">${escape(text)}</text>`)
   // Keep the generated write argument longer than the persisted display summary limit.
   const details = Array.from({ length: 22 }, (_, index) =>
@@ -48,7 +78,7 @@ function readRuntime(path) {
   })`
 }
 
-export async function submitWebPptJourney(cdp, { promptText = prompt, expectedQuestion = webPptQuestion } = {}) {
+export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPrompt, expectedQuestion = webPptQuestion, sourceAnswer = webPptSourceHost } = {}) {
   const priorThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.map(thread => thread.id)
   await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
   await cdp.fill(composer, '/ppt')
@@ -67,12 +97,12 @@ export async function submitWebPptJourney(cdp, { promptText = prompt, expectedQu
   const task = await cdp.wait(`${readRuntime('/v1/tasks?limit=100')}.then(tasks=>tasks.find(task=>task.originThreadId===${literal(thread.id)} && task.activeTurnId))`,
     'the active task from that conversation')
   assert.equal(task.threadId, thread.id, 'PPT execution must stay in the original conversation')
-  await cdp.fill(answerComposer, webPptSourceHost)
+  await cdp.fill(answerComposer, sourceAnswer)
   await cdp.click('button[aria-label="提交"]:not(:disabled)')
   return { prompt: promptText, threadId: thread.id, taskId: task.id, turnId: task.activeTurnId }
 }
 
-export async function verifyEditableWebPpt(path, artifact) {
+export async function verifyEditableWebPpt(path, artifact, { source = webPptSourceHost, marker } = {}) {
   const { default: JSZip } = await import('jszip')
   const info = await lstat(path)
   assert.ok(info.isFile() && !info.isSymbolicLink(), 'The artifact must be a regular PPTX file')
@@ -85,7 +115,8 @@ export async function verifyEditableWebPpt(path, artifact) {
   assert.match(slideXml, /工程测量/)
   assert.match(slideXml, /安全监测/)
   const links = await archive.file('ppt/slides/_rels/slide1.xml.rels')?.async('string')
-  assert.match(`${slideXml}\n${links ?? ''}`, /www\.railwise\.cn/)
+  assert.ok(`${slideXml}\n${links ?? ''}`.includes(source), 'The editable presentation must cite the actual source')
+  if (marker) assert.ok(slideXml.includes(marker), 'The editable slide must contain the rendered fixture marker')
   return { bytes: bytes.length, sha256: artifact.sha256, nativeEditableText: true }
 }
 
@@ -103,32 +134,168 @@ export async function revealArtifact(cdp, label = filename) {
   return selector
 }
 
-export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live = false }) {
+function readBrowserPptSource(result, fallback) {
+  assert.equal(result.status, 'succeeded')
+  assert.equal(result.provider, 'browser-skill')
+  assert.equal(result.sourceUrl, fallback.url)
+  assert.equal(result.readScope, 'document')
+  assert.equal(result.truncated, false)
+  assert.equal(result.evidence?.verified, true)
+  assert.equal(result.evidence?.contentRead, true)
+  assert.equal(result.evidence?.sourceUrl, fallback.url)
+  assert.equal(typeof result.html, 'string')
+  const hash = digest(result.html)
+  assert.equal(result.resultHash, hash)
+  assert.equal(result.evidence.resultHash, hash)
+  const body = /<main>\s*<h1>([^<]+)<\/h1>\s*<p>([^<]+)<\/p>\s*<\/main>/.exec(result.html)
+  assert.equal(body?.[1], fallbackTitle)
+  assert.equal(body?.[2], fallback.marker)
+  return { url: result.sourceUrl, title: body[1], marker: body[2], sha256: hash,
+    bytes: Buffer.byteLength(result.html), tool: 'browser_get_html' }
+}
+
+export function inspectWebPptFallback({ initialTurn, completedTurn, fallback, task, inputs, browserInstanceId }) {
+  assert.equal(initialTurn.status, 'aborted', 'The retired question Turn must stop before the resumed task reads the source')
+  assert.notEqual(completedTurn.id, initialTurn.id)
+  assert.equal(completedTurn.status, 'completed')
+  assert.ok(!initialTurn.executionGrant?.browserScope?.origins.includes(new URL(fallback.url).origin))
+  const grant = completedTurn.executionGrant
+  assert.equal(grant?.taskId, task.id)
+  assert.deepEqual(grant.browserScope?.origins, [new URL(fallback.url).origin])
+  assert.equal(grant.browserScope.interaction, 'observe')
+  assert.equal(grant.browserScope.sourceReadOnly, true)
+  assert.equal(grant.browserScope.browserInstanceId, browserInstanceId)
+  assert.ok(grant.connectorIdentityFingerprints?.['browser-skill'])
+  assert.equal(initialTurn.items.filter(item => item.kind === 'user_input').length, 1)
+  assert.ok(!completedTurn.items.some(item => item.kind === 'user_input' || item.kind === 'approval'))
+  const urls = inputs.filter(input => input.kind === 'supplement' && input.text === fallback.url)
+  assert.equal(urls.length, 1, 'The URL typed into the chat must be retained once on the original task')
+  assert.equal(urls[0].taskId, task.id)
+
+  const tools = completedTurn.items.filter(item => item.kind === 'tool_result' &&
+    (item.toolName === 'web_fetch' || item.toolName.startsWith('browser_')))
+  assert.deepEqual(tools.map(item => item.toolName), ['web_fetch', ...browserTools])
+  const [fetch, start, navigate, read, stop] = tools
+  assert.ok(new Set(tools.map(item => item.callId)).size === tools.length)
+  assert.equal(fetch.isError, true)
+  assert.equal(fetch.output?.error?.code, 'policy_blocked')
+  assert.equal(fetch.output.telemetry?.policy, 'blocked')
+  assert.equal(fetch.output.telemetry?.url, fallback.url)
+  for (const item of [start, navigate, read, stop]) {
+    assert.notEqual(item.isError, true)
+    assert.equal(item.output?.status, 'succeeded')
+    assert.equal(item.output.sessionId, start.output.sessionId)
+  }
+  assert.ok(start.output.sessionId)
+  assert.equal(start.output.browserInstanceId, browserInstanceId)
+  assert.equal(navigate.output.sourceUrl, fallback.url)
+  assert.equal(stop.output.stopped, true)
+  const source = readBrowserPptSource(read.output, fallback)
+  return { source, taskId: task.id, initialTurnId: initialTurn.id, completedTurnId: completedTurn.id,
+    originalQuestionCount: 1, supplements: urls.length, directFetchBlock: fetch.output.error.code, directFetchUrl: fetch.output.telemetry.url,
+    browserInstanceId, sessionId: start.output.sessionId, toolNames: tools.map(item => item.toolName),
+    readOnlyOrigins: grant.browserScope.origins, sourceReadOnly: true }
+}
+
+export function validateWebPptTurnIdentity(proof) {
+  assert.equal(proof.sameThread, true)
+  if (proof.sameTurn === true && !proof.initialTurnId && !proof.completedTurnId) return
+  assert.ok(proof.initialTurnId && proof.completedTurnId, 'Both execution Turn IDs are required')
+  assert.equal(proof.sameTurn, proof.initialTurnId === proof.completedTurnId)
+}
+
+export function validateWebPptFallbackProof(proof, browser) {
+  assert.equal(proof.status, 'passed')
+  assert.equal(proof.input, 'installed-chat-ui')
+  assert.equal(proof.model, 'controlled-protocol')
+  validateWebPptTurnIdentity(proof)
+  assert.equal(proof.sameTurn, false)
+  const recovery = proof.browserRecovery
+  assert.ok(recovery.taskId && recovery.sessionId && recovery.browserInstanceId)
+  assert.equal(recovery.initialTurnId, proof.initialTurnId)
+  assert.equal(recovery.completedTurnId, proof.completedTurnId)
+  assert.equal(recovery.originalQuestionCount, 1)
+  assert.equal(recovery.supplements, 1)
+  assert.equal(recovery.directFetchBlock, 'policy_blocked')
+  assert.equal(recovery.directFetchUrl, proof.source.url)
+  assert.deepEqual(recovery.toolNames, ['web_fetch', ...browserTools])
+  assert.equal(recovery.sourceReadOnly, true)
+  const source = new URL(proof.source.url)
+  assert.equal(source.protocol, 'http:')
+  assert.equal(source.hostname, '127.0.0.1')
+  assert.equal(source.pathname, '/ppt-source')
+  assert.deepEqual(recovery.readOnlyOrigins, [source.origin])
+  assert.equal(proof.source.tool, 'browser_get_html')
+  assert.match(proof.source.sha256, sha256)
+  assert.ok(Number.isSafeInteger(proof.source.bytes) && proof.source.bytes > 0)
+  assert.equal(browser.browserInstanceId, recovery.browserInstanceId)
+  assert.equal(browser.isolatedTestCredentialStore, true)
+  assert.equal(browser.cliVersion, '0.5.0')
+  assert.match(browser.cliSha256, sha256)
+  assert.equal(browser.protocolVersion, '1.9')
+  assert.match(browser.extensionId, /^[a-p]{32}$/)
+  assert.equal(browser.extension.version, browserSmokeDependency.extensionVersion)
+  assert.equal(browser.extension.sha256, browserSmokeDependency.extensionSha256)
+  assert.equal(browser.browser.version, browserSmokeDependency.chromeVersion)
+  assert.match(browser.browser.executableSha256, sha256)
+  assert.ok(proof.artifact.id)
+  assert.equal(proof.artifact.nativeEditableText, true)
+  assert.equal(proof.artifact.originalChatButtonClicked, true)
+  assert.match(proof.artifact.sha256, sha256)
+  assert.ok(Number.isSafeInteger(proof.artifact.bytes) && proof.artifact.bytes > 0)
+  assert.equal(proof.open.status, 'desktop-open-request-accepted')
+}
+
+export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live = false, fallback }) {
+  assert.ok(!live || !fallback, 'The real-browser fallback uses a controlled model')
   const observed = {}
   return {
     modelAction(body) {
       const { messages, tools = [] } = body
       if (!messages.some(message => message.role === 'user' && typeof message.content === 'string' && message.content.includes(webPptJourneyPrompt))) return undefined
-      const output = id => {
+      const output = (id, acceptError = false) => {
         const item = messages.find(message => message.role === 'tool' && message.tool_call_id === `web-ppt-${id}`)
         if (!item) return undefined
         const value = parseToolOutput(item.content)
-        assert.ok(value && !value.error && value.ok !== false, `The installed Runtime tool failed: ${id}`)
+        assert.ok(value && (acceptError || !value.error && value.ok !== false), `The installed Runtime tool failed: ${id}`)
         return value
       }
       const call = (name, args, id) => toolCall(tools, name, args, id)
-      const answer = output('request_user_input')
-      if (!answer) return call('request_user_input', { question: webPptQuestion })
-      assert.equal(answer.answers?.[0]?.value, webPptSourceHost, 'The exact bare URL must reach the waiting run')
-      const source = output('web_fetch')
-      if (!source) return call('web_fetch', { url: webPptSourceHost })
-      assert.equal(source.finalUrl, webPptSourceUrl)
-      assert.match(source.text, /工程测量/)
-      assert.match(source.text, /安全监测/)
-      assert.match(source.resultHash, /^[a-f0-9]{64}$/)
-      observed.source = { url: source.finalUrl, sha256: source.resultHash, bytes: source.byteCount, tool: 'web_fetch' }
+      const supplied = fallback?.url ?? webPptSourceHost
+      const sourceInSupplement = messages.some(message => message.role === 'user' &&
+        typeof message.content === 'string' && message.content.includes(supplied))
+      const answer = output('request_user_input', Boolean(fallback))
+      if (!answer && !sourceInSupplement) return call('request_user_input', { question: webPptQuestion })
+      if (!sourceInSupplement) assert.equal(answer.answers?.[0]?.value, supplied, 'The exact source address must reach the waiting run')
+      const direct = output('web_fetch', Boolean(fallback))
+      if (!direct) return call('web_fetch', { url: supplied })
+      let source
+      if (fallback) {
+        assert.equal(direct.error?.code, 'policy_blocked', 'The built-in reader must explicitly reject the isolated fixture')
+        assert.equal(direct.telemetry?.url, fallback.url)
+        const started = output('browser_session_start')
+        if (!started) return call('browser_session_start', {})
+        const sessionId = started.sessionId
+        assert.ok(sessionId)
+        const navigated = output('browser_navigate')
+        if (!navigated) return call('browser_navigate', { sessionId, url: fallback.url })
+        assert.equal(navigated.sourceUrl, fallback.url)
+        const read = output('browser_get_html')
+        if (!read) return call('browser_get_html', { sessionId })
+        source = readBrowserPptSource(read, fallback)
+        const stopped = output('browser_session_stop')
+        if (!stopped) return call('browser_session_stop', { sessionId })
+        assert.equal(stopped.stopped, true)
+      } else {
+        assert.equal(direct.finalUrl, webPptSourceUrl)
+        assert.match(direct.text, /工程测量/)
+        assert.match(direct.text, /安全监测/)
+        assert.match(direct.resultHash, /^[a-f0-9]{64}$/)
+        source = { url: direct.finalUrl, title: direct.title, sha256: direct.resultHash, bytes: direct.byteCount, tool: 'web_fetch' }
+      }
+      observed.source = { url: source.url, sha256: source.sha256, bytes: source.bytes, tool: source.tool }
       if (!output('spec-lock')) return call('write', { path: `${project}/spec_lock.md`, content: specLock }, 'spec-lock')
-      const slide = createSlide(source.title)
+      const slide = createSlide(source.title, source.url, source.marker)
       const written = output('slide')
       if (!written) return call('write', { path: `${project}/svg_output/slide_01.svg`, content: slide }, 'slide')
       assert.ok(slide.length > 1000)
@@ -146,25 +313,37 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       observed.complete = true
       return { content: '已根据睿威官网公开资料生成并核对演示文稿。' }
     },
-    async verify(cdp, { openArtifact } = {}) {
-      const journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion })
+    async verify(cdp, { openArtifact, browserInstanceId } = {}) {
+      const journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
+        sourceAnswer: fallback?.url ?? webPptSourceHost })
       const task = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)}.then(task=>
         ['completed','failed','stalled','cancelled'].includes(task.status) ? task : null)`, 'completion in the original conversation', live ? 480_000 : 180_000)
       assert.equal(task.status, 'completed', task.waitingReason ?? task.stalledReason)
-      assert.equal(task.activeTurnId, journey.turnId, 'The source answer must continue the waiting turn')
       assert.equal(task.threadId, journey.threadId)
+      assert.equal(task.id, journey.taskId)
       if (!live) assert.equal(observed.complete, true, 'The installed tool results must reach the controlled model')
       const saved = await cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(journey.threadId)}`))
-      const turn = saved.turns.find(item => item.id === journey.turnId)
-      assert.ok(turn?.activeSkillIds.includes('ppt-master'))
-      assert.deepEqual(turn.items.find(item => item.kind === 'user_message' && item.skillSelections?.length)?.skillSelections,
+      const initialTurn = saved.turns.find(item => item.id === journey.turnId)
+      const completedTurn = saved.turns.find(item => item.id === task.activeTurnId)
+      assert.ok(initialTurn?.activeSkillIds.includes('ppt-master'))
+      assert.ok(completedTurn, 'The original conversation must retain the completed Turn')
+      assert.deepEqual(initialTurn.items.find(item => item.kind === 'user_message' && item.skillSelections?.length)?.skillSelections,
         [{ id: 'ppt-master', name: 'PPT Master' }])
-      assert.equal(turn.items.filter(item => item.kind === 'tool_result' && item.toolName === 'request_user_input').length, 1)
+      const sameTurn = initialTurn.id === completedTurn.id
+      if (sameTurn) assert.equal(initialTurn.items.filter(item => item.kind === 'tool_result' && item.toolName === 'request_user_input').length, 1)
+      else assert.equal(initialTurn.status, 'aborted')
       let source = observed.source
+      let browserRecovery
+      if (fallback) {
+        const inputs = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}/inputs`))
+        const { source: browserSource, ...recovery } = inspectWebPptFallback({ initialTurn, completedTurn, fallback, task, inputs, browserInstanceId })
+        assert.deepEqual(source, { url: browserSource.url, sha256: browserSource.sha256, bytes: browserSource.bytes, tool: browserSource.tool })
+        browserRecovery = recovery
+      }
       if (live) {
-        const fetched = turn.items.find(item => item.kind === 'tool_result' && item.toolName === 'web_fetch' && !item.isError && item.output?.finalUrl === webPptSourceUrl)
+        const fetched = completedTurn.items.find(item => item.kind === 'tool_result' && item.toolName === 'web_fetch' && !item.isError && item.output?.finalUrl === webPptSourceUrl)
         const receipt = fetched?.output
-        assert.ok(receipt, 'The live model must read the public source in the waiting turn')
+        assert.ok(receipt, 'The live model must read the public source in the original task')
         assert.match(receipt.resultHash, /^[a-f0-9]{64}$/)
         assert.ok(receipt.byteCount > 0)
         source = { url: receipt.finalUrl, sha256: receipt.resultHash, bytes: receipt.byteCount, tool: 'web_fetch' }
@@ -174,12 +353,13 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const output = join(workspace, artifactPath)
       const fromWorkspace = relative(await realpath(workspace), await realpath(output))
       assert.ok(fromWorkspace && !isAbsolute(fromWorkspace) && fromWorkspace !== '..' && !fromWorkspace.startsWith(`..${sep}`))
-      const contents = await verifyEditableWebPpt(output, artifact)
+      const contents = await verifyEditableWebPpt(output, artifact, { source: fallback?.url, marker: fallback?.marker })
       const selector = await revealArtifact(cdp)
       await cdp.click(selector, filename)
       const open = openArtifact ? await openArtifact(cdp, { task, artifact, path: output }) : { status: 'ui-click-only' }
       return { status: 'passed', model: live ? 'live-model' : 'controlled-protocol', input: 'installed-chat-ui', source,
-        quality: observed.quality, sameThread: true, sameTurn: true, artifact: { id: artifact.id, ...contents, originalChatButtonClicked: true }, open }
+        quality: observed.quality, sameThread: true, sameTurn, initialTurnId: initialTurn.id, completedTurnId: completedTurn.id,
+        ...(browserRecovery ? { browserRecovery } : {}), artifact: { id: artifact.id, ...contents, originalChatButtonClicked: true }, open }
     }
   }
 }

@@ -16,11 +16,12 @@ const WIN = 'win32-x64'
 const MAC = 'darwin-arm64'
 const INTEL = 'darwin-x64'
 
-const desktopJourneys = [
-  'conversation-task', 'approval-resume', 'kun-ag-ui-recovery', 'website-pptx', 'browserskill-fallback',
-  'public-procurement-html', 'daily-schedule', 'composer-capabilities', 'pdf-attachments',
-  'responsive-layout', 'startup-branding', 'offline-spreadsheet'
+const windowsDesktopJourneys = [
+  'conversation-task', 'approval-resume', 'website-pptx', 'browserskill-fallback',
+  'daily-schedule', 'composer-capabilities', 'pdf-attachments', 'responsive-layout',
+  'startup-branding'
 ]
+const macDesktopJourneys = ['website-pptx', 'startup-branding', 'offline-spreadsheet']
 const specializedMethods = {
   'website-pptx': 'live-model-ui',
   'browserskill-fallback': 'real-browser-ui',
@@ -62,14 +63,14 @@ export function requiredCoreJourneys(version, { updater = false, changedPaths = 
   const firstRelease = version === '0.5.11'
   const fieldRequirements = requiredFieldJourneys(changedPaths)
   const windows = [
-    ...desktopJourneys, 'marketplace-mirror', 'video-shotcraft',
+    ...windowsDesktopJourneys, 'marketplace-mirror', 'video-shotcraft',
     ...(firstRelease || fieldRequirements.marketplace ? ['mainland-windows-install'] : []),
     ...(updater || firstRelease ? ['windows-updater-sidebar', 'windows-updater-settings'] : []),
     ...(firstRelease ? ['windows-legacy-overlay'] : [])
   ]
   return new Map([
     [WIN, windows],
-    [MAC, [...desktopJourneys, ...(firstRelease || fieldRequirements.egoBrowser ? ['ego-dadan-report'] : [])]],
+    [MAC, [...macDesktopJourneys, ...(firstRelease || fieldRequirements.egoBrowser ? ['ego-dadan-report'] : [])]],
     [INTEL, ['startup-branding', 'offline-spreadsheet']]
   ])
 }

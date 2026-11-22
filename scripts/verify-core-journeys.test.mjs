@@ -105,6 +105,15 @@ test('new stable release versions require the structured matrix and legacy versi
   assert.equal(requiresCoreJourneys('0.5.10'), false)
   for (const target of ['0.5.11', '0.5.20', '0.6.0', '1.0.0']) assert.equal(requiresCoreJourneys(target), true)
   assert.ok(requiredCoreJourneys(version).get('win32-x64').includes('windows-legacy-overlay'))
+  assert.ok(requiredCoreJourneys(version).get('win32-x64').includes('browserskill-fallback'))
+  assert.deepEqual(requiredCoreJourneys(version).get('darwin-arm64'), [
+    'website-pptx', 'startup-branding', 'offline-spreadsheet', 'ego-dadan-report'
+  ])
+  assert.ok(!requiredCoreJourneys(version).get('darwin-arm64').includes('browserskill-fallback'))
+  assert.ok(!requiredCoreJourneys(version).get('darwin-arm64').includes('kun-ag-ui-recovery'))
+  assert.ok(!requiredCoreJourneys(version).get('darwin-arm64').includes('public-procurement-html'))
+  assert.ok(!requiredCoreJourneys(version).get('win32-x64').includes('kun-ag-ui-recovery'))
+  assert.ok(!requiredCoreJourneys(version).get('win32-x64').includes('public-procurement-html'))
   assert.ok(!requiredCoreJourneys('0.5.12').get('win32-x64').includes('windows-updater-sidebar'))
   assert.ok(requiredCoreJourneys('0.5.12', { updater: true }).get('win32-x64').includes('windows-updater-sidebar'))
   assert.deepEqual(validateCoreJourneyReceipts(fixture(), options), [])
