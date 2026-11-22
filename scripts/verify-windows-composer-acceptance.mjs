@@ -116,9 +116,36 @@ async function verifyMixedAttachmentLayout(cdp, workspace, invalidPath) {
     assert.equal(layout.actionAtCenter, true, 'Attachments must leave the actual send button accessible')
   }
   const failedAction = `${attachmentItem}:has(.ds-chat-attachment-filename[title=${literal(invalidName)}]) ${removeAttachment}`
+  await cdp.evaluate(`window.__railwiseAttachmentRemovalClicks = []; document.addEventListener('click', event => {
+    const button = event.target.closest(${literal(removeAttachment)});
+    if (button) window.__railwiseAttachmentRemovalClicks.push({ name: button.getAttribute('aria-describedby'), row: button.closest('li')?.innerText });
+  }, true)`)
+  const beforeRemoval = await cdp.evaluate(`(() => {
+    const row = [...document.querySelectorAll(${literal(attachmentItem)})].find(item => item.querySelector('.ds-chat-attachment-filename')?.title === ${literal(invalidName)});
+    const button = row?.querySelector(${literal(removeAttachment)});
+    const bounds = button?.getBoundingClientRect();
+    const hit = bounds ? document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2) : null;
+    return { count: document.querySelectorAll(${literal(attachmentItem)}).length, row: row?.innerText,
+      buttonVisible: Boolean(bounds?.width && bounds?.height), buttonEnabled: Boolean(button && !button.disabled),
+      buttonReceivesPointer: Boolean(button && hit && button.contains(hit)) };
+  })()`)
+  assert.equal(beforeRemoval.count, files.length)
+  assert.equal(beforeRemoval.buttonVisible, true)
+  assert.equal(beforeRemoval.buttonEnabled, true)
+  assert.equal(beforeRemoval.buttonReceivesPointer, true)
   await cdp.click(failedAction)
-  await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${files.length - 1} &&
-    document.querySelector(${literal(composer)})?.value === ${literal(prompt)}`, 'only the damaged attachment removed, draft and other files retained')
+  try {
+    await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${files.length - 1} &&
+      document.querySelector(${literal(composer)})?.value === ${literal(prompt)}`, 'only the damaged attachment removed, draft and other files retained')
+  } catch (error) {
+    const afterRemoval = await cdp.evaluate(`(() => ({
+      count: document.querySelectorAll(${literal(attachmentItem)}).length,
+      damagedPresent: Boolean([...document.querySelectorAll(${literal(attachmentItem)})].find(item => item.querySelector('.ds-chat-attachment-filename')?.title === ${literal(invalidName)})),
+      draft: document.querySelector(${literal(composer)})?.value,
+      clickEvents: window.__railwiseAttachmentRemovalClicks
+    }))()`)
+    throw new Error(`${error instanceof Error ? error.message : String(error)}; removal snapshot: ${JSON.stringify({ before: beforeRemoval, after: afterRemoval })}`)
+  }
   const aliasAction = `${attachmentItem}:has(.ds-chat-attachment-filename[title=${literal(sameContentNames[1])}]) ${removeAttachment}`
   await cdp.click(aliasAction)
   await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${files.length - 2} &&

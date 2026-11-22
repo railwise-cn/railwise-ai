@@ -205,8 +205,7 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     await edit(0, 1, '撤销前')
     await save()
     await until('pre-undo value', async () => cellAt(await readWorkbook(originalWorkbookPath), 0, 1)?.v === '撤销前')
-    await clickCell(1, 1)
-    await clickCell(1, 1)
+    await clickCell(0, 1)
     await key('z', 'KeyZ', 90, 4)
     await save()
     await until('undo value removal', async () => {

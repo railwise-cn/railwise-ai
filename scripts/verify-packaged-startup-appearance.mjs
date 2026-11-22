@@ -231,11 +231,11 @@ export async function observeStartupTargets({ listTargets, connectCdp, needsScre
             splashCdp = await connectCdp(splash.webSocketDebuggerUrl)
             splashUrl = splash.webSocketDebuggerUrl
           }
-          const { phase, ...snapshot } = await splashCdp.evaluate(`(${observeSplash.toString()})()`, 500)
+          const { phase, ...snapshot } = await splashCdp.evaluate(`(${observeSplash.toString()})()`, 2_000)
           diagnostics.splashReadiness = phase
           if (phase === 'visible') {
             if (needsScreenshot) {
-              const capture = await splashCdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 2000)
+              const capture = await splashCdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 5_000)
               screenshot = Buffer.from(capture.data, 'base64')
             }
             observation = snapshot
