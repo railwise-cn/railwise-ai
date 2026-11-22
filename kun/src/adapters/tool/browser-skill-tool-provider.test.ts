@@ -1335,7 +1335,7 @@ describe('typed BrowserSkill production provider', () => {
   it('reads through an optional source scope without advertising or requesting interaction', async () => {
     const f = fixture()
     f.context.executionGrant!.browserScope = { ...f.context.executionGrant!.browserScope!, interaction: 'observe', sourceReadOnly: true }
-    f.context.awaitApproval = vi.fn(async () => 'allow')
+    f.context.awaitApproval = vi.fn(async () => 'allow' as const)
     const host = new LocalToolHost({ registry: new CapabilityRegistry([f.provider]) })
     const names = (await host.listTools(f.context)).map(item => item.name)
     expect(names).toContain('browser_get_html')
