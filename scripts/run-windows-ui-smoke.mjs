@@ -424,7 +424,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false, requireOriginChecklist = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false, requireOriginChecklist = false, requireSkillDraftScope = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -440,6 +440,12 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   if (requireOriginChecklist) {
     assert.ok(report.checks.includes('installed-delegated-steps-in-original-conversation'))
     validateWindowsOriginChecklist(report.originChecklist)
+    return true
+  }
+  if (requireSkillDraftScope) {
+    assert.ok(report.checks.includes('installed-workspace-skill-draft-preservation'))
+    assert.equal(report.skillDraftScope.status, 'passed')
+    assert.equal(report.skillDraftScope.rejectedStaleSkillPreservedDraft, true)
     return true
   }
   if (requireDoclingConversion) {
@@ -2895,13 +2901,13 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     if (originChecklist && originChecklistModel) {
       report.originChecklistAttempt = { phase: 'waiting-for-runtime', model: originChecklistModel.evidence }
       report.originChecklist = await verifyWindowsOriginChecklist(cdp, originChecklistModel, report.originChecklistAttempt, evidenceDir)
-    }
-    if (skillDraftScope) {
+      report.checks.push('installed-delegated-steps-in-original-conversation')
+    } else if (skillDraftScope) {
       const { verifyWindowsSkillDraftScope } = await import('./verify-windows-composer-acceptance.mjs')
       report.skillDraftScope = { phase: 'starting' }
       await verifyWindowsSkillDraftScope(cdp, workspace, report.skillDraftScope)
       assert.equal(report.skillDraftScope.status, 'passed')
-      report.checks.push('installed-delegated-steps-in-original-conversation')
+      report.checks.push('installed-workspace-skill-draft-preservation')
     } else if (video) {
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
       report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: true })
@@ -3550,7 +3556,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel?.observed) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion, requireOriginChecklist: originChecklist }); report.status = 'passed' } catch (error) {
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion, requireOriginChecklist: originChecklist, requireSkillDraftScope: skillDraftScope }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
