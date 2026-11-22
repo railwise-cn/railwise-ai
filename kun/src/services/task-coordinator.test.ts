@@ -8,17 +8,25 @@ import { FileThreadStore } from '../adapters/file/file-thread-store.js'
 import { FileSessionStore } from '../adapters/file/file-session-store.js'
 import { InMemoryEventBus } from '../adapters/in-memory-event-bus.js'
 import { PersistentUserInputGate } from '../adapters/persistent-human-gates.js'
+import { InMemoryApprovalGate } from '../adapters/in-memory-approval-gate.js'
+import { LocalToolHost, requestUserInputTool } from '../adapters/tool/local-tool-host.js'
 import { RuntimeEventRecorder } from './runtime-event-recorder.js'
 import { ThreadService } from './thread-service.js'
 import { TurnService } from './turn-service.js'
 import { TaskController } from './task-controller.js'
+import { TaskControlService } from './task-control-service.js'
 import { TaskCoordinator, classifyTaskInput } from './task-coordinator.js'
 import { TaskRunRepository } from './task-run-repository.js'
 import { SequentialIdGenerator } from '../ports/id-generator.js'
 import { InflightTracker } from '../loop/inflight-tracker.js'
 import { SteeringQueue } from '../loop/steering-queue.js'
 import { ContextCompactor } from '../loop/context-compactor.js'
+import { AgentLoop } from '../loop/agent-loop.js'
 import { makeUserItem } from '../domain/item.js'
+import { UsageService } from './usage-service.js'
+import { createImmutablePrefix } from '../cache/immutable-prefix.js'
+import type { ModelClient } from '../ports/model-client.js'
+import type { ToolHost } from '../ports/tool-host.js'
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import { defaultExternalTaskCapability } from './external-task-capability.js'
 import { workspacePermissionCapability } from './workspace-write-preflight.js'
@@ -32,14 +40,15 @@ async function fixture(persistent = false, nowIso = () => new Date().toISOString
   const threadStore=persistent ? new FileThreadStore({dataDir:root}) : new InMemoryThreadStore()
   const sessionStore=persistent ? new FileSessionStore({dataDir:root}) : new InMemorySessionStore()
   const bus=new InMemoryEventBus(),ids=new SequentialIdGenerator()
+  const inflight = new InflightTracker(), steering = new SteeringQueue(), compactor = new ContextCompactor()
   const events=new RuntimeEventRecorder({eventBus:bus,sessionStore,allocateSeq:id=>bus.allocateSeq(id),nowIso})
   const threads=new ThreadService({threadStore,sessionStore,events,ids,nowIso})
   const tasks=new TaskController({repository,threadStore,sessionStore,nowIso})
-  const turns=new TurnService({threadStore,sessionStore,events,ids,nowIso,inflight:new InflightTracker(),steering:new SteeringQueue(),compactor:new ContextCompactor(),tasks})
+  const turns=new TurnService({threadStore,sessionStore,events,ids,nowIso,inflight,steering,compactor,tasks})
   const runTurn=vi.fn()
   const coordinator=new TaskCoordinator({repository,threadStore,threads,turns,tasks,runTurn,nowIso})
   const origin=await threads.create({workspace:root,model:'fixture',mode:'agent'})
-  return {root,repository,threadStore,sessionStore,threads,tasks,turns,runTurn,coordinator,origin}
+  return {root,repository,threadStore,sessionStore,threads,tasks,turns,runTurn,coordinator,origin,events,inflight,steering,ids}
 }
 
 describe('task commands before Turn allocation',()=>{
@@ -557,6 +566,77 @@ describe('task commands before Turn allocation',()=>{
     expect(turns?.[1]?.items[0]).toMatchObject({ kind: 'user_message', displayText: '继续未完成任务' })
     expect(f.repository.get(started.task!.id)?.activeTurnId).toBe(turns?.[1]?.id)
     expect(f.runTurn).toHaveBeenCalledTimes(2)
+  })
+
+  it('waits for a live request_user_input Turn to abort before continuing the same task', async () => {
+    const f = await fixture()
+    const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
+    const model: ModelClient = {
+      provider: 'test', model: 'fixture-model',
+      async *stream() {
+        if (modelCalls++ === 0) {
+          yield { kind: 'tool_call_complete', callId: 'ask-website', toolName: 'request_user_input', arguments: { question: '请提供官网网址。' } }
+          yield { kind: 'completed', stopReason: 'tool_calls' }
+          return
+        }
+        yield { kind: 'assistant_text_delta', text: '已根据提供的网址完成资料整理。' }
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    }
+    let modelCalls = 0
+    const toolHost: ToolHost = new LocalToolHost({ tools: [requestUserInputTool] })
+    const loop = new AgentLoop({ threadStore: f.threadStore, sessionStore: f.sessionStore,
+      approvalGate: new InMemoryApprovalGate(), userInputGate, model, toolHost, usage: new UsageService(), events: f.events,
+      turns: f.turns, inflight: f.inflight, steering: f.steering,
+      compactor: new ContextCompactor(), prefix: createImmutablePrefix(), ids: f.ids,
+      nowIso: () => new Date().toISOString(), tasks: f.tasks })
+    const runPromises: Promise<unknown>[] = []
+    const runTurn = vi.fn((threadId: string, turnId: string) => {
+      f.tasks.beginAttempt(threadId, turnId)
+      const running = loop.runTurn(threadId, turnId)
+      runPromises.push(running)
+    })
+    const controls = new TaskControlService({ repository: f.repository, tasks: f.tasks, threads: f.threads, turns: f.turns,
+      runTurn, nowIso: () => new Date().toISOString() })
+    const resumeErrors: string[] = []
+    const mutate = controls.mutate.bind(controls)
+    vi.spyOn(controls, 'mutate').mockImplementation(async (...args) => {
+      try { return await mutate(...args) }
+      catch (error) { resumeErrors.push(`${(error as { code?: string }).code ?? 'unknown'}: ${String(error)}`); throw error }
+    })
+    const coordinator = new TaskCoordinator({ ...f, controls, runTurn, userInputGate,
+      requiresBrowserScopeRefresh: async (_task, _turnId, text) => text === 'www.railwise.cn',
+      waitTurn: (threadId, turnId) => loop.awaitTurnIdle(threadId, turnId), nowIso: () => new Date().toISOString() })
+
+    const started = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'live-website-task',
+      request: { prompt: '制作官网介绍 PPT' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const pendingQuestion = await vi.waitFor(() => {
+      const request = f.repository.humanRequests('question').find(item => item.turnId === started.turn.turnId)
+      expect(request?.status).toBe('pending')
+      expect(f.repository.get(started.task!.id)?.status).toBe('waiting_user')
+      return request
+    })
+    if (!pendingQuestion) throw new Error('expected persisted user question')
+    const input = userInputGate.get(pendingQuestion.id)!
+    const question = input.questions[0]!
+
+    const answerResult = await coordinator.submitTaskUserInputAnswer(pendingQuestion.id, [
+      { id: question.id, label: question.header, value: 'www.railwise.cn' }
+    ])
+    expect(answerResult).toBe('submitted')
+    await vi.waitFor(() => expect(runTurn).toHaveBeenCalledTimes(2))
+    await Promise.all(runPromises)
+    expect(resumeErrors).toEqual([])
+    expect(f.repository.operations(started.task!.id, 'tool').find(operation => operation.request?.toolName === 'request_user_input')?.status).toBe('failed')
+
+    const turns = (await f.threadStore.get(started.turn.threadId))?.turns
+    expect(turns).toHaveLength(2)
+    expect(turns?.[0]).toMatchObject({ id: started.turn.turnId, status: 'aborted', items: expect.arrayContaining([
+      expect.objectContaining({ kind: 'user_input', status: 'cancelled' })
+    ]) })
+    expect(f.repository.humanRequest(pendingQuestion.id)?.status).toBe('cancelled')
+    expect(f.repository.get(started.task!.id)?.activeTurnId).toBe(turns?.[1]?.id)
   })
 
   it('resolves an ordinary open task answer in the waiting Turn without changing its source scope', async () => {

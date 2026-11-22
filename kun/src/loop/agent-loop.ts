@@ -2246,7 +2246,17 @@ export class AgentLoop {
           }
           return result
         } catch (error) {
-          if (operation) this.opts.tasks?.finishToolOperation(operation.token, operation.key)
+          if (operation) {
+            const cancelledInput = input.context.abortSignal.aborted &&
+              ['request_user_input', 'user_input'].includes(input.call.toolName)
+            const knownCancellation: ToolHostResult | undefined = cancelledInput ? {
+              approved: true,
+              item: makeToolResultItem({ id: `item_${input.call.callId}`, threadId: input.threadId, turnId: input.turnId,
+                callId: input.call.callId, toolName: input.call.toolName,
+                output: { status: 'cancelled', code: 'user_input_cancelled' }, isError: true })
+            } : undefined
+            this.opts.tasks?.finishToolOperation(operation.token, operation.key, knownCancellation)
+          }
           if (input.context.abortSignal.aborted || !this.isRecoverableToolDispatchError(error)) {
             if (spanId) {
               this.opts.spanService?.finish(spanId, {

@@ -70,3 +70,11 @@ BrowserSkill 实装运行 `45056785005` 已通过精确安装来源、Windows �
 计划逐项审计还确认，现有准确制品旅程不覆盖所有列出的细节。受控 KUN 测试覆盖部分断流、去重、撤销和过期状态，但精确 UI 包尚未覆盖全部审批恢复边界。当前驱动没有目标生命周期和 `/plan` 模式实装旅程、40 MiB OCR/加密 PDF、文字与图片剪贴板、三档 Windows DPI、Mac Retina 对照、Windows Univer、内地普通网络市场安装及旧配置迁移回执。已登录大单网/Ego、真实生产模型和正式渠道读取需要现场条件或发布凭据。上述项目不能据相邻的单项测试标为通过。
 
 分支 `f74c8bff9912185014d7ef2f997c374d144ccb4f` 上的三端 `prepare_public_artifacts=true` 工作流 `45048183630` 在 Windows 的“Record frozen public package identity”步骤失败。根因是 `verify-reviewed-release-artifacts.mjs` 明确只允许 `refs/heads/main` 冻结可发布身份；该保护不得通过分支产物绕过。工作流按原设置没有发布。该 run 的 Mac 打包步骤在 Windows 失败后继续运行并被取消，未留下可验收的安装包。随后以 `candidate_only=true`、`prepare_public_artifacts=false` 启动隔离候选工作流 `45050824863`，Windows 构建已通过，Mac 双架构仍在签名打包。候选制品不可直接提升为正式版本。
+
+## 2026-11-23 BrowserSkill 续接修复复验
+
+Windows 候选验收运行 `45064571256` 使用 release run `45062552331` 的精确安装包，安装及应用启动通过。网页到 PPT 流程仍失败，记录状态为 task `paused`、旧 Turn `running`、`user_input` 项 `pending`、`request_user_input` 工具项 `aborted`。根因已在实际 `LocalToolHost` 和 `AgentLoop` 路径复现：暂停后中断 GUI 输入工具，AgentLoop 原本会因没有 Host 结果把已派发的本地 `request_user_input` 操作记为 `outcome_unknown`。`TaskControlService` 因存在未核实操作拒绝从 checkpoint 恢复，协调器又把 `outcome_unknown` 留作排队返回，令任务一直 paused。这个工具只等待用户输入，不会产生外部副作用。
+
+源码修复在 `AgentLoop.executeToolCall` 中把中断的 `request_user_input`/`user_input` 明确登记为取消结果，让原操作账本变为已处理的失败记录。新增集成回归使用真实 `LocalToolHost`、`AgentLoop`、`TurnService`、持久门禁和 `TaskCoordinator`，断言原请求取消、旧 Turn aborted、同一任务的新 Turn 自动启动。定向门禁/协调器测试 46 项通过；两个全量运行曾在并行负载下超时的 Ego/BrowserSkill readiness 文件已各自复跑通过，KUN 全量运行仍保留 2 项并行负载超时，且这两项单独运行均通过。ESLint、KUN TypeScript、生产构建及发布门禁 585 项通过，另有 1 项因宿主缺少 PowerShell 跳过。
+
+新修复尚未进入安装包。旧 BrowserSkill 实装结果不用于证明此修复。含该修复的源码候选构建和 Windows 精确安装包回归待执行。先前将 BrowserSkill 回退和三条 Windows 升级路径放在同一验收 run 的调用被验收脚本正确拒绝为互斥范围，后续分开运行升级与浏览器流程。Mac 双架构新候选签名包也待同一源码构建。真实模型凭据、已登录大单网/Ego、本地 OCR 和国内普通网络市场环境仍各自缺少实测证据，正式渠道仍是 0.5.10。
