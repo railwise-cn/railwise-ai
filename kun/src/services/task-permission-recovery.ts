@@ -3,9 +3,10 @@ import type { TaskApprovalGrant } from '../contracts/permissions.js'
 import type { TaskRun } from '../contracts/tasks.js'
 import type { TaskRunRepository } from './task-run-repository.js'
 import type { CapabilityPreflight } from '../contracts/harness.js'
+import { EGO_SITE_SIGN_IN_REQUIRED } from '../contracts/ego-browser.js'
 import { workspacePermissionCapability } from './workspace-write-preflight.js'
 
-export const EGO_PERMISSION_CODES = ['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid','ego_browser_finish_unconfirmed'] as const
+export const EGO_PERMISSION_CODES = [EGO_SITE_SIGN_IN_REQUIRED,'ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid','ego_browser_finish_unconfirmed'] as const
 const permissionCodes = new Set([...EGO_PERMISSION_CODES,'task_permission_expired', 'task_permission_revoked', 'task_permission_consumed', 'task_permission_blocked',
   'execution_grant_expired', 'execution_grant_revoked', 'execution_grant_scope', 'workspace_trust_changed', 'approval_policy_blocked',
   'sandbox_read_only', 'sandbox_write_blocked', 'workspace_path_blocked', 'network_scope_blocked',
@@ -22,7 +23,11 @@ export function taskPermissionCapability(failure:TaskPermissionFailure,task:Pick
   checkedAt=new Date().toISOString()):CapabilityPreflight {
   const {code}=failure
   let provider:CapabilityPreflight['provider'],resolution:NonNullable<CapabilityPreflight['resolution']>,summary:string
-  if((EGO_PERMISSION_CODES as readonly string[]).includes(code)) {
+  if (code === EGO_SITE_SIGN_IN_REQUIRED) {
+    provider = 'ego-browser'
+    resolution = { kind: 'retry', route: 'task/ego-browser-site-sign-in', label: '登录后继续' }
+    summary = '大单网要求重新登录。请在 Ego 中完成登录，再回到原对话继续。'
+  } else if((EGO_PERMISSION_CODES as readonly string[]).includes(code)) {
     provider='ego-browser'
     resolution={kind:'retry',route:'task/ego-browser-review',label:'查看当前任务并检查Ego连接'}
     summary='Ego只读连接、任务范围或用户控制状态需要核对。请处理后继续原任务；原TaskSpace与资料已保留，不会另建空间或重放业务操作。'
@@ -43,7 +48,7 @@ export function taskPermissionCapability(failure:TaskPermissionFailure,task:Pick
   } else return {...workspacePermissionCapability(code,failure.message),checkedAt}
   return {provider,status:code==='browser_binding_changed'?'needs_authorization':'blocked',errorCode:code,
     message:failure.message===code?summary:failure.message,credentialState:'unknown',networkState:'unknown',workspaceState:'unknown',
-    sandboxState:'allowed',approvalState:'required',action:resolution,resolution,checkedAt}
+    sandboxState:'allowed',approvalState:code===EGO_SITE_SIGN_IN_REQUIRED?'not_required':'required',action:resolution,resolution,checkedAt}
 }
 
 /** Recognize only the old pre-model expiry failure, using its immutable execution ledger.

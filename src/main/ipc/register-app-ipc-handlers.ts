@@ -429,23 +429,29 @@ export function buildAttachmentSections(attachmentId: string, text: string, docu
     return offset < 0 ? [] : [{ token: tokenOffset(offset), table: `table-${index + 1}`, page: table.page }]
   })
   const sections: Array<{ id: string; attachmentId: string; ordinal: number; text: string; tokenEstimate: number; provenance: { heading?: string; page?: number; table?: string; worksheet?: string; slide?: number }; createdAt: string }> = []; const createdAt = new Date().toISOString(); const target = 1200; const stride = 1050
-  for (let cursor = 0; cursor < tokens.length; cursor += stride) {
-    const chunk = tokens.slice(cursor, cursor + target); const sectionText = chunk.join(' '); if (!sectionText) break
+  let pageIndex = -1
+  for (let cursor = 0; cursor < tokens.length;) {
+    while (pageIndex + 1 < pageAnchors.length && pageAnchors[pageIndex + 1].token <= cursor) pageIndex += 1
+    const pageAnchor = pageAnchors[pageIndex]
+    const pageEnd = pageAnchors[pageIndex + 1]?.token ?? tokens.length
+    const chunkEnd = Math.min(cursor + target, pageEnd)
+    const chunk = tokens.slice(cursor, chunkEnd)
+    const sectionText = chunk.join(' ')
     const ordinal: number = sections.length
-    const activeAnchors = anchors.filter((item) => item.token <= cursor + target)
+    const activeAnchors = anchors.filter((item) => item.token <= chunkEnd &&
+      (pageAnchors.length === 0 || (item.token >= (pageAnchor?.token ?? 0) && item.token < pageEnd)))
     const headingAnchor = [...activeAnchors].reverse().find((item) => item.heading)
     const worksheetAnchor = [...activeAnchors].reverse().find((item) => item.worksheet)
     const slideAnchor = [...activeAnchors].reverse().find((item) => item.slide)
-    const table = tableAnchors.find((item) => item.token >= cursor && item.token < cursor + target)
-    const pageAnchor = [...pageAnchors].reverse().find((item) => item.token <= cursor)
-      ?? pageAnchors.find((item) => item.token < cursor + target)
+    const table = tableAnchors.find((item) => item.token >= cursor && item.token < chunkEnd)
+    const page = pageAnchor?.page ?? table?.page ?? headingAnchor?.page
     const provenance = {
       ...(headingAnchor?.heading ? { heading: headingAnchor.heading } : {}), ...(worksheetAnchor?.worksheet ? { worksheet: worksheetAnchor.worksheet } : {}),
       ...(slideAnchor?.slide ? { slide: slideAnchor.slide } : {}), ...(table?.table ? { table: table.table } : {}),
-      ...((table?.page ?? headingAnchor?.page ?? pageAnchor?.page) ? { page: table?.page ?? headingAnchor?.page ?? pageAnchor?.page } : {})
+      ...(page ? { page } : {})
     }
     sections.push({ id: `sec_${createHash('sha256').update(`${attachmentId}\0${ordinal}\0${sectionText}`).digest('hex').slice(0, 24)}`, attachmentId, ordinal, text: sectionText, tokenEstimate: chunk.length, provenance, createdAt })
-    if (cursor + target >= tokens.length) break
+    cursor = chunkEnd === pageEnd ? pageEnd : cursor + stride
   }
   return sections
 }
