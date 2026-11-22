@@ -53,6 +53,7 @@ export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
   const list = thread => `window.workwise.runtimeRequest('/v1/capabilities/callable','POST',${literal(literal({threadId:thread.id, mode:'agent', includeSkills:true}))})
     .then(result=>result.ok?JSON.parse(result.body).choices:null)`
   const chip = `(()=>{const c=document.querySelector('[data-composer-skill]');return c?{name:c.title,unavailable:c.innerText.includes('不可用')}:null})()`
+  const selectThread = label => cdp.click(`.ds-sidebar-shell [title=${literal(label)}] > button`)
   const draftContent = `document.querySelector(${literal(composer)})?.value`
   const attachment = observeAttachment('合成工作区草稿.pdf', 'true')
   await Promise.all([mkdir(folder, { recursive: true }), mkdir(alternate), writeFile(file, createChineseTextPdf())])
@@ -63,7 +64,9 @@ export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
   }
   await cdp.send('Page.reload', { ignoreCache: true })
   await cdp.wait('Boolean(window.workwise?.refreshSkills)', 'the owned refreshed workbench')
-  await cdp.click('.ds-sidebar-shell button', handles[0])
+  evidence.seededThreads = (await read('/v1/threads')).threads.filter(thread => handles.includes(thread.title)).map(({ id, title, workspace }) => ({ id, title, workspace }))
+  assert.equal(evidence.seededThreads.length, 2)
+  await selectThread(handles[0])
   const skill = await cdp.wait(`${list(threads[0])}.then(choices=>choices?.find(item=>item.kind==='skill'&&item.label.includes(${literal(name)})))`, 'the first workspace runtime skill')
   await cdp.fill(composer, '/railwise-scope-fixture')
   await cdp.click('[role="option"] .truncate', skill.label)
@@ -71,11 +74,11 @@ export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
   await chooseFiles(cdp, [file])
   await cdp.wait(attachment, 'the attached PDF in the original draft')
   evidence.phase = 'first-workspace-draft'
-  await cdp.click('.ds-sidebar-shell button', handles[1])
+  await selectThread(handles[1])
   await cdp.wait(`${list(threads[1])}.then(choices=>Boolean(choices)&&!choices.some(item=>item.id===${literal(skill.id)}))`, 'the second workspace runtime catalog to exclude the first workspace skill')
   await cdp.wait(`!(${chip})`, 'the first workspace skill to leave the active composer')
   evidence.workspaceSwitchExcludedSkill = true
-  await cdp.click('.ds-sidebar-shell button', handles[0])
+  await selectThread(handles[0])
   await cdp.wait(`${draftContent}===${literal(draft)}&&(${chip})?.name===${literal(skill.label)}&&${attachment}`, 'the original text, attachment and skill after returning to its workspace')
   evidence.workspaceReturnPreservedDraft = true
   await rename(entry, entry + '.disabled')
