@@ -76,11 +76,11 @@ try {
    clone.querySelectorAll('script,style,noscript,template,iframe,input,textarea,select,[contenteditable]').forEach(n=>n.remove());
    for(const n of [clone,...clone.querySelectorAll('*')]) for(const a of [...n.attributes]) if(!['href','title','datetime','role','aria-label'].includes(a.name)) n.removeAttribute(a.name);
    for(const a of clone.querySelectorAll('a[href]')) { try {const u=new URL(a.getAttribute('href'),sourceUrl); if(!['http:','https:'].includes(u.protocol)||u.username||u.password)a.removeAttribute('href');else a.setAttribute('href',u.href);} catch {a.removeAttribute('href');} }
-   // The subscription page can show a re-login modal outside an empty app root.
+   // The subscription page can show a re-login modal outside a visually empty app root.
    const url=new URL(sourceUrl);
    const appRoot=document.getElementById('app');
    const siteSignInRequired=url.origin==='https://dadan.vip' && url.hash.startsWith('#/subscribe/')
-     && !!appRoot && !appRoot.innerText?.trim() && !appRoot.textContent?.trim()
+     && !!appRoot && !appRoot.innerText?.trim()
      && [...clone.querySelectorAll('p,span,div')].some(node=>{
        const text=node.textContent?.replace(/\\s+/g,'').trim()??'';
        return text.length<=120 && /(?:账号|账户).{0,24}(?:其他|其它)设备.{0,24}请重新登录/.test(text);

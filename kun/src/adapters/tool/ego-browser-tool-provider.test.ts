@@ -143,6 +143,9 @@ it('runs the fixed TaskSpace SDK script and distinguishes exact selector matches
   const dadan={origins:['https://dadan.vip']}
   expect(await run({action:'observe',...dadan})).toMatchObject({ok:true,siteSignInRequired:true})
   expect(await run({action:'read',selector:'article',...dadan})).toMatchObject({ok:true,siteSignInRequired:true})
+  window.document.body.innerHTML='<div id="app"><div style="display: none">不可见的订阅页面内容</div></div><div role="dialog">'+reLogin+'</div>'
+  expect(window.document.getElementById('app')?.textContent).toBe('不可见的订阅页面内容')
+  expect(await run({action:'read',...dadan})).toMatchObject({ok:true,siteSignInRequired:true})
   window.document.body.innerHTML='<div id="app"></div><div hidden>'+reLogin+'</div><p>重新登录</p>'
   expect(await run({action:'read',...dadan})).toMatchObject({ok:true,siteSignInRequired:false})
   window.document.body.innerHTML='<div id="app"><article>已加载的测绘公告</article></div>'+reLogin
