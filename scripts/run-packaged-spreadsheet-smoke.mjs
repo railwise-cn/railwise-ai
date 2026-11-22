@@ -5,6 +5,7 @@ import { once } from 'node:events'
 import { createReadStream } from 'node:fs'
 import { mkdir, mkdtemp, open, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { createServer } from 'node:net'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { setTimeout as wait } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -157,6 +158,14 @@ async function until(label, callable, milliseconds = 25_000) {
   throw new Error('Timed out waiting for ' + label)
 }
 
+async function availablePort() {
+  const server = createServer().listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const { port } = server.address()
+  await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  return port
+}
+
 async function cdpConnect(url, report) {
   const ws = new WebSocket(url)
   await Promise.race([once(ws, 'open'), wait(10_000).then(() => { throw new Error('CDP connection timed out') })])
@@ -215,7 +224,7 @@ async function withOwnedApplication(install, root, report, evidenceDir, verify) 
   await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({
     schema: 'workwise.settings', version: 2, revision: 0, locale: 'zh', theme: 'light', workspaceRoot: workspace,
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
-    agents: { kun: { autoStart: false, dataDir: runtime, port: 58931 } }
+    agents: { kun: { autoStart: true, dataDir: runtime, port: await availablePort() } }
   }))
   const child = spawn(install.executable, [
     '--user-data-dir=' + profile, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1',
@@ -286,7 +295,11 @@ async function validateWorkbook(cdp, workspace, root, report, evidenceDir) {
   await ui('sized native spreadsheet canvas', workbookReady + ' && (' + grid + ')')
   report.firstOpenMs = Date.now() - start
   report.checks.push('native-create-and-render')
-  const save = () => clickButton('保存表格')
+  const save = async () => {
+    await ui('enabled workbook save', workbookReady)
+    await clickButton('保存表格')
+    await ui('workbook save completed', workbookReady)
+  }
   const filename = (await readdir(workspace)).find(name => name.endsWith('.rwsheet'))
   assert.ok(filename)
   const original = join(workspace, filename)
@@ -302,15 +315,22 @@ async function validateWorkbook(cdp, workspace, root, report, evidenceDir) {
     await send('Input.dispatchKeyEvent', { type: 'keyUp', ...event })
   }
   const clickCell = async (row, column, count = 1) => {
-    const canvas = await ui('visible canvas for cell selection', grid)
-    const point = { x: canvas.x + 68 + column * 79, y: canvas.y + 30 + row * 22, button: 'left' }
+    const point = await ui('cell available above the actual spreadsheet canvas', `[...document.querySelectorAll('canvas')].map(canvas=>{
+      const box=canvas.getBoundingClientRect();
+      if(box.width<=200||box.height<=150)return;
+      const section=canvas.closest('section');
+      const x=box.x+68+${column}*79,y=box.y+30+${row}*22;
+      if(section?.contains(document.elementFromPoint(x,y)))return {x,y};
+    }).find(Boolean)`)
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point })
     for (let clickCount = 1; clickCount <= count; clickCount++) {
-      await send('Input.dispatchMouseEvent', { type: 'mousePressed', clickCount, ...point })
-      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', clickCount, ...point })
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount, ...point })
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount, ...point })
     }
   }
   const edit = async (row, column, text) => {
     await clickCell(row, column, 2)
+    await ui('focused spreadsheet cell editor', `Boolean(document.activeElement?.isContentEditable || document.activeElement?.closest('[data-u-comp="editor"]'))`)
     await send('Input.insertText', { text })
     await key('Enter', 'Enter', 13)
   }
@@ -385,6 +405,10 @@ async function validateWorkbook(cdp, workspace, root, report, evidenceDir) {
   await ui('read-only Excel grid with both sheet names', 'document.body.innerText.includes("工程监测")&&document.body.innerText.includes("复核记录")&&document.body.innerText.includes("只读预览")&&document.body.innerText.includes("在系统应用打开")&&document.querySelectorAll("canvas").length>0')
   const xlsx = await evaluate('window.workwise.openSpreadsheet(' + JSON.stringify({ path: excel, workspaceRoot: workspace }) + ')')
   assert.equal(xlsx.kind, 'xlsx')
+  assert.deepEqual(xlsx.preview.sheets, [
+    { name: '工程监测', cells: [{ row: 3, column: 1, value: '点位001' }, { row: 3, column: 3, value: 12 }] },
+    { name: '复核记录', cells: [{ row: 1, column: 0, value: '已复核' }] },
+  ])
   report.excelOriginalSha256 = excelHash
   assert.equal(await sha256(excel), excelHash)
   report.checks.push('xlsx-read-only-multiple-sheets-original-unchanged')
