@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { psQuote } from './verify-windows-install-smoke.mjs'
 
@@ -36,6 +36,60 @@ async function chooseFiles(cdp, files) {
   } finally {
     await cdp.send('Page.setInterceptFileChooserDialog', { enabled: false })
   }
+}
+
+export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
+  const folder = join(workspace, '.agents', 'skills', 'railwise-scope-fixture')
+  const entry = join(folder, 'SKILL.md')
+  const alternate = join(workspace, 'other-workspace')
+  const file = join(workspace, '合成工作区草稿.pdf')
+  const name = 'railwise-scope-fixture'
+  const draft = '请核对附件中的合成测试内容。'
+  const handles = ['技能验收工作区甲', '技能验收工作区乙']
+  const read = (path, method = 'GET', body) => cdp.evaluate(`window.workwise.runtimeRequest(${literal(path)},${literal(method)},${literal(literal(body)) ?? 'undefined'}).then(result=>{
+    if(!result.ok)throw new Error('Synthetic scope fixture API returned '+result.status+': '+result.body);
+    return JSON.parse(result.body);
+  })`)
+  const list = thread => `window.workwise.runtimeRequest('/v1/capabilities/callable','POST',${literal(literal({threadId:thread.id, mode:'agent', includeSkills:true}))})
+    .then(result=>result.ok?JSON.parse(result.body).choices:null)`
+  const chip = `(()=>{const c=document.querySelector('[data-composer-skill]');return c?{name:c.title,unavailable:c.innerText.includes('不可用')}:null})()`
+  const draftContent = `document.querySelector(${literal(composer)})?.value`
+  const attachment = observeAttachment('合成工作区草稿.pdf', 'true')
+  await Promise.all([mkdir(folder, { recursive: true }), mkdir(alternate), writeFile(file, createChineseTextPdf())])
+  await writeFile(entry, '---\nname: railwise-scope-fixture\ndescription: Isolated RailWise acceptance fixture.\n---\nUse only synthetic QA content.\n')
+  const threads = []
+  for (const [index, dir] of [workspace, alternate].entries()) {
+    threads.push(await read('/v1/threads', 'POST', { workspace: dir, title: handles[index], mode: 'agent', model: 'windows-task-fixture' }))
+  }
+  await cdp.send('Page.reload', { ignoreCache: true })
+  await cdp.wait('Boolean(window.workwise?.refreshSkills)', 'the owned refreshed workbench')
+  await cdp.click('.ds-sidebar-shell button', handles[0])
+  const skill = await cdp.wait(`${list(threads[0])}.then(choices=>choices?.find(item=>item.kind==='skill'&&item.label.includes(${literal(name)})))`, 'the first workspace runtime skill')
+  await cdp.fill(composer, '/railwise-scope-fixture')
+  await cdp.click('[role="option"] .truncate', skill.label)
+  await cdp.fill(composer, draft)
+  await chooseFiles(cdp, [file])
+  await cdp.wait(attachment, 'the attached PDF in the original draft')
+  evidence.phase = 'first-workspace-draft'
+  await cdp.click('.ds-sidebar-shell button', handles[1])
+  await cdp.wait(`${list(threads[1])}.then(choices=>Boolean(choices)&&!choices.some(item=>item.id===${literal(skill.id)}))`, 'the second workspace runtime catalog to exclude the first workspace skill')
+  await cdp.wait(`!(${chip})`, 'the first workspace skill to leave the active composer')
+  evidence.workspaceSwitchExcludedSkill = true
+  await cdp.click('.ds-sidebar-shell button', handles[0])
+  await cdp.wait(`${draftContent}===${literal(draft)}&&(${chip})?.name===${literal(skill.label)}&&${attachment}`, 'the original text, attachment and skill after returning to its workspace')
+  evidence.workspaceReturnPreservedDraft = true
+  await rename(entry, entry + '.disabled')
+  await cdp.evaluate(`window.workwise.refreshSkills(${literal(workspace)})`)
+  await cdp.wait(`(${chip})?.unavailable===true`, 'the selected skill to become unavailable after refresh')
+  evidence.selectedSkillMarkedUnavailable = true
+  await cdp.click(sendButton)
+  await cdp.wait(`document.body.innerText.includes('选中的技能、插件或连接器在当前会话已不可用。')&&${draftContent}===${literal(draft)}&&${attachment}`, 'the stale send to preserve the draft and explain what to do')
+  assert.equal((await read('/v1/threads/' + threads[0].id)).turns.length, 0)
+  evidence.rejectedStaleSkillPreservedDraft = true
+  await cdp.click('[data-composer-skill] button')
+  await cdp.wait(`!(${chip})&&${draftContent}===${literal(draft)}&&${attachment}`, 'removing the unavailable chip without changing the draft or attachment')
+  evidence.status = 'passed'
+  evidence.phase = 'complete'
 }
 
 function observeAttachmentLayout(expectedName) {

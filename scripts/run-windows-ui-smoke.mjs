@@ -2894,6 +2894,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     if (originChecklistModel) {
       report.originChecklistAttempt = { phase: 'waiting-for-runtime', model: originChecklistModel.evidence }
       report.originChecklist = await verifyWindowsOriginChecklist(cdp, originChecklistModel, report.originChecklistAttempt, evidenceDir)
+      const { verifyWindowsSkillDraftScope } = await import('./verify-windows-composer-acceptance.mjs')
+      report.skillDraftScope = { phase: 'starting' }
+      await verifyWindowsSkillDraftScope(cdp, workspace, report.skillDraftScope)
       report.checks.push('installed-delegated-steps-in-original-conversation')
     } else if (video) {
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
