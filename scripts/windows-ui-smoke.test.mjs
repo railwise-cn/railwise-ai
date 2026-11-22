@@ -19,7 +19,7 @@ import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWin
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
-import { createWebPptJourney, inspectWebPptFallback, startWebPptFallbackSource, webPptJourneyPrompt } from './web-ppt-journey.mjs'
+import { createWebPptJourney, inspectWebPptFallback, startWebPptFallbackSource, validateWebPptTurnIdentity, webPptJourneyPrompt } from './web-ppt-journey.mjs'
 
 test('BrowserSkill PPT fixture serves a loopback source whose marker only appears after rendering', async t => {
   const source = await startWebPptFallbackSource()
@@ -66,17 +66,20 @@ test('BrowserSkill PPT fallback consumes the durable URL and requires a verified
   }
   assert.equal(journey.modelAction(body).tool_calls[0].function.name, 'write')
 
-  const task = { id: 'original-task' }
+  const task = { id: 'original-task', threadId: 'execution-thread', originThreadId: 'conversation-thread' }
   const completedTurn = { id: 'resumed-turn', status: 'completed', executionGrant: {
     taskId: task.id, browserScope: { origins: [new URL(fallback.url).origin], interaction: 'observe', sourceReadOnly: true, browserInstanceId },
     connectorIdentityFingerprints: { 'browser-skill': 'fingerprint' }
   }, items: sourceCalls.map(([toolName, output]) => ({ kind: 'tool_result', callId: toolName, toolName, output, isError: toolName === 'web_fetch' })) }
-  const readback = { fallback, browserInstanceId, task, completedTurn,
+  const readback = { fallback, browserInstanceId, task, conversationThreadId: 'conversation-thread', completedTurn,
     initialTurn: { id: 'initial-turn', status: 'aborted', items: [{ kind: 'user_input' }] },
     inputs: [{ kind: 'supplement', taskId: task.id, text: fallback.url }] }
   const proof = inspectWebPptFallback(readback)
   assert.equal(proof.source.sha256, resultHash)
   assert.equal(proof.completedTurnId, completedTurn.id)
+  assert.equal(proof.originThreadId, 'conversation-thread')
+  assert.equal(proof.executionThreadId, 'execution-thread')
+  assert.throws(() => inspectWebPptFallback({ ...readback, conversationThreadId: 'different-conversation' }))
   assert.throws(() => inspectWebPptFallback({ ...readback, browserInstanceId: 'other-browser' }))
   assert.throws(() => inspectWebPptFallback({ ...readback, inputs: [...readback.inputs, ...readback.inputs] }))
   body.messages.at(-2).content = JSON.stringify({ ...read, html: '<main></main>' })
@@ -129,7 +132,9 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
     locale: 'zh', theme: 'dark', workspaceRoot: windowsSmokeWorkspaceName, productionTouched: false,
     packageUnchanged: true, cleanExit: true, errors: [], checks: ['installed-chat-web-ppt'],
     webPpt: {
-      status: 'passed', model: 'controlled-protocol', input: 'installed-chat-ui', sameThread: true, sameTurn: true,
+      status: 'passed', model: 'controlled-protocol', input: 'installed-chat-ui', taskId: 'task-1',
+      conversationThreadId: 'conversation-1', originThreadId: 'conversation-1', executionThreadId: 'execution-1', sameConversation: true,
+      originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: true,
       source: { url: 'https://www.railwise.cn/', tool: 'web_fetch', sha256: '2'.repeat(64), bytes: 512 },
       artifact: { nativeEditableText: true, originalChatButtonClicked: true, sha256: '3'.repeat(64), bytes: 1024 },
       open: { status: 'handler-unavailable' }
@@ -147,6 +152,20 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
   report.webPpt.initialTurnId = 'initial-turn'
   report.webPpt.completedTurnId = 'resumed-turn'
   assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
+  report.webPpt.originThreadId = 'different-conversation'
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.originThreadId = report.webPpt.conversationThreadId
+  report.webPpt.originalConversation.artifactVisible = false
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+})
+
+test('website-to-PPT identity binds the task to the visible conversation while recording its worker thread separately', () => {
+  const proof = { taskId: 'task-1', conversationThreadId: 'chat-1', originThreadId: 'chat-1', executionThreadId: 'worker-1',
+    sameConversation: true, originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: false,
+    initialTurnId: 'turn-1', completedTurnId: 'turn-2' }
+  assert.equal(validateWebPptTurnIdentity(proof), undefined)
+  assert.throws(() => validateWebPptTurnIdentity({ ...proof, originThreadId: 'worker-1' }))
+  assert.throws(() => validateWebPptTurnIdentity({ ...proof, originalConversation: { ...proof.originalConversation, questionVisible: false } }))
 })
 
 test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {

@@ -54,3 +54,7 @@
 | 最新源码回归 | KUN 与主仓问题尚无完整发布构建。任务问题 DOM 测试 7/7、Windows UI/任务回执及启动驱动 173 项通过，Web/Node TypeScript 检查、四个文件 ESLint 通过。质量 workflow `45044144960` 通过，但它不包含后续任务答复修复。 | 必须对含任务答复修复的提交重新跑完整 Quality、生产构建及精确安装包实测。 |
 
 新源码候选仍缺 Windows 浏览器回退及任务补充后续接的安装包回执、Mac 表格失败诊断及通过回执、Windows 0.5.10/0.5.7 原地升级、Video Shotcraft 审批恢复和完整解码、真实模型网址到 PPT、现场大单网/Ego、Intel 和 Windows 表格、扫描 OCR、加密 PDF 与跨页引用。仓库没有配置 `RAILWISE_QA_MODEL_BASE_URL`、`RAILWISE_QA_MODEL` 或 `RAILWISE_QA_MODEL_API_KEY`，所以托管流程无法提供真实模型证明。
+
+BrowserSkill 回退失败运行 `45052647651` 的根因现已由原始 Windows 日志确认：检查器要求 `task.threadId` 等于聊天 ID；实测任务执行线程为 `thr_task_31b7ce6ff45aa4a294f2b7f1`，原对话线程为 `thr_j4x1bpxp`。任务有独立执行线程是 KUN 的正常结构，任务与用户对话的关联由 `originThreadId` 表示。修正后的驱动分别核对会话 ID、执行线程 ID、问题和成果在原对话正文可见，并从执行线程读取 Turn。定向 150 项驱动测试、ESLint 与差异检查通过。该修正尚未在候选安装包上实装，仍需同包重跑 BrowserSkill 网页回退及 PPTX 交付。
+
+分支 `f74c8bff9912185014d7ef2f997c374d144ccb4f` 上的三端 `prepare_public_artifacts=true` 工作流 `45048183630` 在 Windows 的“Record frozen public package identity”步骤失败。根因是 `verify-reviewed-release-artifacts.mjs` 明确只允许 `refs/heads/main` 冻结可发布身份；该保护不得通过分支产物绕过。工作流按原设置没有发布。该 run 的 Mac 打包步骤在 Windows 失败后继续运行并被取消，未留下可验收的安装包。随后以 `candidate_only=true`、`prepare_public_artifacts=false` 启动隔离候选工作流 `45050824863`，Windows 构建已通过，Mac 双架构仍在签名打包。候选制品不可直接提升为正式版本。

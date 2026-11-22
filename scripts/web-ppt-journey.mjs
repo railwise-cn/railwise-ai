@@ -96,10 +96,11 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
   const [thread] = newThreads
   const task = await cdp.wait(`${readRuntime('/v1/tasks?limit=100')}.then(tasks=>tasks.find(task=>task.originThreadId===${literal(thread.id)} && task.activeTurnId))`,
     'the active task from that conversation')
-  assert.equal(task.threadId, thread.id, 'PPT execution must stay in the original conversation')
+  assert.equal(task.originThreadId, thread.id, 'The task must remain attached to the original conversation')
+  assert.ok(task.threadId, 'KUN must assign an execution thread to the task')
   await cdp.fill(answerComposer, sourceAnswer)
   await cdp.click('button[aria-label="提交"]:not(:disabled)')
-  return { prompt: promptText, threadId: thread.id, taskId: task.id, turnId: task.activeTurnId }
+  return { prompt: promptText, conversationThreadId: thread.id, executionThreadId: task.threadId, taskId: task.id, turnId: task.activeTurnId }
 }
 
 export async function verifyEditableWebPpt(path, artifact, { source = webPptSourceHost, marker } = {}) {
@@ -154,7 +155,9 @@ function readBrowserPptSource(result, fallback) {
     bytes: Buffer.byteLength(result.html), tool: 'browser_get_html' }
 }
 
-export function inspectWebPptFallback({ initialTurn, completedTurn, fallback, task, inputs, browserInstanceId }) {
+export function inspectWebPptFallback({ initialTurn, completedTurn, fallback, task, inputs, browserInstanceId, conversationThreadId }) {
+  assert.equal(task.originThreadId, conversationThreadId, 'The same task must remain attached to the original conversation')
+  assert.ok(task.threadId, 'The task execution thread must be recorded separately from the conversation')
   assert.equal(initialTurn.status, 'aborted', 'The retired question Turn must stop before the resumed task reads the source')
   assert.notEqual(completedTurn.id, initialTurn.id)
   assert.equal(completedTurn.status, 'completed')
@@ -191,14 +194,19 @@ export function inspectWebPptFallback({ initialTurn, completedTurn, fallback, ta
   assert.equal(navigate.output.sourceUrl, fallback.url)
   assert.equal(stop.output.stopped, true)
   const source = readBrowserPptSource(read.output, fallback)
-  return { source, taskId: task.id, initialTurnId: initialTurn.id, completedTurnId: completedTurn.id,
+  return { source, taskId: task.id, originThreadId: task.originThreadId, executionThreadId: task.threadId,
+    initialTurnId: initialTurn.id, completedTurnId: completedTurn.id,
     originalQuestionCount: 1, supplements: urls.length, directFetchBlock: fetch.output.error.code, directFetchUrl: fetch.output.telemetry.url,
     browserInstanceId, sessionId: start.output.sessionId, toolNames: tools.map(item => item.toolName),
     readOnlyOrigins: grant.browserScope.origins, sourceReadOnly: true }
 }
 
 export function validateWebPptTurnIdentity(proof) {
-  assert.equal(proof.sameThread, true)
+  assert.equal(proof.sameConversation, true)
+  assert.ok(proof.taskId && proof.conversationThreadId && proof.executionThreadId)
+  assert.equal(proof.originThreadId, proof.conversationThreadId)
+  assert.equal(proof.originalConversation?.questionVisible, true)
+  assert.equal(proof.originalConversation?.artifactVisible, true)
   if (proof.sameTurn === true && !proof.initialTurnId && !proof.completedTurnId) return
   assert.ok(proof.initialTurnId && proof.completedTurnId, 'Both execution Turn IDs are required')
   assert.equal(proof.sameTurn, proof.initialTurnId === proof.completedTurnId)
@@ -212,6 +220,9 @@ export function validateWebPptFallbackProof(proof, browser) {
   assert.equal(proof.sameTurn, false)
   const recovery = proof.browserRecovery
   assert.ok(recovery.taskId && recovery.sessionId && recovery.browserInstanceId)
+  assert.equal(recovery.taskId, proof.taskId)
+  assert.equal(recovery.originThreadId, proof.conversationThreadId)
+  assert.equal(recovery.executionThreadId, proof.executionThreadId)
   assert.equal(recovery.initialTurnId, proof.initialTurnId)
   assert.equal(recovery.completedTurnId, proof.completedTurnId)
   assert.equal(recovery.originalQuestionCount, 1)
@@ -319,10 +330,11 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const task = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)}.then(task=>
         ['completed','failed','stalled','cancelled'].includes(task.status) ? task : null)`, 'completion in the original conversation', live ? 480_000 : 180_000)
       assert.equal(task.status, 'completed', task.waitingReason ?? task.stalledReason)
-      assert.equal(task.threadId, journey.threadId)
+      assert.equal(task.originThreadId, journey.conversationThreadId)
+      assert.equal(task.threadId, journey.executionThreadId)
       assert.equal(task.id, journey.taskId)
       if (!live) assert.equal(observed.complete, true, 'The installed tool results must reach the controlled model')
-      const saved = await cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(journey.threadId)}`))
+      const saved = await cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(journey.executionThreadId)}`))
       const initialTurn = saved.turns.find(item => item.id === journey.turnId)
       const completedTurn = saved.turns.find(item => item.id === task.activeTurnId)
       assert.ok(initialTurn?.activeSkillIds.includes('ppt-master'))
@@ -336,7 +348,8 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       let browserRecovery
       if (fallback) {
         const inputs = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}/inputs`))
-        const { source: browserSource, ...recovery } = inspectWebPptFallback({ initialTurn, completedTurn, fallback, task, inputs, browserInstanceId })
+        const { source: browserSource, ...recovery } = inspectWebPptFallback({ initialTurn, completedTurn, fallback, task, inputs, browserInstanceId,
+          conversationThreadId: journey.conversationThreadId })
         assert.deepEqual(source, { url: browserSource.url, sha256: browserSource.sha256, bytes: browserSource.bytes, tool: browserSource.tool })
         browserRecovery = recovery
       }
@@ -357,8 +370,15 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const selector = await revealArtifact(cdp)
       await cdp.click(selector, filename)
       const open = openArtifact ? await openArtifact(cdp, { task, artifact, path: output }) : { status: 'ui-click-only' }
+      const originalConversationText = await cdp.evaluate(`document.querySelector(${literal(timeline)})?.innerText ?? ''`)
+      assert.ok(originalConversationText.includes(live ? '网址' : webPptQuestion),
+        'The source question must remain visible in the original conversation body')
+      assert.ok(await cdp.evaluate(`Boolean(document.querySelector(${literal(selector)})?.getClientRects().length)`),
+        'The delivered PPTX must remain visible in the original conversation body')
       return { status: 'passed', model: live ? 'live-model' : 'controlled-protocol', input: 'installed-chat-ui', source,
-        quality: observed.quality, sameThread: true, sameTurn, initialTurnId: initialTurn.id, completedTurnId: completedTurn.id,
+        quality: observed.quality, taskId: task.id, conversationThreadId: journey.conversationThreadId,
+        originThreadId: task.originThreadId, executionThreadId: task.threadId, sameConversation: true,
+        originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn, initialTurnId: initialTurn.id, completedTurnId: completedTurn.id,
         ...(browserRecovery ? { browserRecovery } : {}), artifact: { id: artifact.id, ...contents, originalChatButtonClicked: true }, open }
     }
   }

@@ -118,7 +118,7 @@ export function windowsCoreJourneys(install, environment = process.env) {
     if (webPptChecks.includes('installed-chat-web-ppt-browser-fallback')) {
       validateWebPptFallbackProof(ui.webPpt, ui.webPptBrowser)
       journeys.push({ id: 'browserskill-fallback', method: 'real-browser-ui', status: 'passed',
-        evidence: 'windows-install-smoke.json records a denied direct fetch, a new Turn in the original task and chat, verified DOM readback through the pinned Chrome extension, and an editable PPTX opened from the original chat.' })
+        evidence: 'windows-install-smoke.json records the task origin bound to the original chat, a separate execution thread, a denied direct fetch, a verified DOM read through the pinned Chrome extension, and an editable PPTX opened from the original chat.' })
     } else {
       const ppt = livePptJourney(ui.webPpt, 'windows-ui-smoke.json', 'desktop-open-request-accepted')
       if (ppt) journeys.push(ppt)

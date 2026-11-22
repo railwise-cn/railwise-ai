@@ -16,7 +16,9 @@ const environment = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: RELEASE_REPOSIT
   GITHUB_SHA: sourceHead, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' }
 
 function ppt(open = 'os-open-accepted') {
-  return { status: 'passed', model: 'live-model', input: 'installed-chat-ui', sameThread: true, sameTurn: true,
+  return { status: 'passed', model: 'live-model', input: 'installed-chat-ui', taskId: 'task-1',
+    conversationThreadId: 'conversation-1', originThreadId: 'conversation-1', executionThreadId: 'execution-1', sameConversation: true,
+    originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: true,
     source: { url: 'https://www.railwise.cn/', tool: 'web_fetch', bytes: 1024, sha256: 'c'.repeat(64) },
     artifact: { id: 'file-1', nativeEditableText: true, originalChatButtonClicked: true, bytes: 4096, sha256: 'd'.repeat(64) },
     open: { status: open } }
@@ -87,7 +89,7 @@ test('Windows records BrowserSkill fallback only with the real browser proof and
       checks: ['installed-chat-web-ppt-browser-fallback'],
       webPpt: { ...ppt('desktop-open-request-accepted'), model: 'controlled-protocol', sameTurn: false,
         initialTurnId: 'first', completedTurnId: 'resumed', source: { url, tool: 'browser_get_html', bytes: 512, sha256: 'c'.repeat(64) },
-        browserRecovery: { taskId: 'original-task', initialTurnId: 'first', completedTurnId: 'resumed',
+        browserRecovery: { taskId: 'task-1', originThreadId: 'conversation-1', executionThreadId: 'execution-1', initialTurnId: 'first', completedTurnId: 'resumed',
           originalQuestionCount: 1, supplements: 1, directFetchBlock: 'policy_blocked', directFetchUrl: url,
           browserInstanceId, sessionId: 'owned-session', sourceReadOnly: true, readOnlyOrigins: [new URL(url).origin],
           toolNames: ['web_fetch', 'browser_session_start', 'browser_navigate', 'browser_get_html', 'browser_session_stop'] } },
