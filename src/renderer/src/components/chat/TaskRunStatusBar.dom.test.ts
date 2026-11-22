@@ -39,7 +39,8 @@ async function render(props: Partial<ComponentProps<typeof TaskRunStatusBar>> = 
   })
 }
 
-async function renderConversation(blocks: ChatBlock[], replyQuestionId?: string): Promise<void> {
+async function renderConversation(blocks: ChatBlock[], replyQuestionId?: string,
+  onComposerQuestionChange?: ComponentProps<typeof TaskRunStatusBar>['onComposerQuestionChange']): Promise<void> {
   const activeControls = activeConversationControls(blocks)
   await act(async () => {
     await refreshTaskState()
@@ -47,7 +48,8 @@ async function renderConversation(blocks: ChatBlock[], replyQuestionId?: string)
       createElement(MessageTimeline, { blocks, activeControls, replyQuestionId,
         activeThreadId: threadId, runtimeConnection: 'ready', liveReasoning: '', live: '',
         onRetryConnection: () => undefined, onOpenSettings: () => undefined,
-        taskActivity: createElement(TaskRunStatusBar, { threadId, runtimeReady: true, conversationControls: activeControls }) }),
+        taskActivity: createElement(TaskRunStatusBar, { threadId, runtimeReady: true, composerReplies: true,
+          conversationControls: activeControls, onComposerQuestionChange }) }),
       createElement('div', { className: 'ds-composer-shell' }, createElement('textarea'))
     ))
   })
@@ -137,6 +139,24 @@ describe('task actions in the original conversation', () => {
     attention = []
     await render({ composerReplies: true, onComposerQuestionChange })
     expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it('binds a task question to the composer when another conversation control is also open', async () => {
+    tasks = [run('worker-question', 'waiting_user', { activeTurnId: 'waiting-turn' })]
+    const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
+      threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [question] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const approval: ChatBlock = { kind: 'approval', id: 'approval-block', approvalId: 'approval-id', summary: '读取本地工作区', status: 'pending' }
+    const openQuestion: ChatBlock = { kind: 'user_input', id: 'question-block', requestId: 'worker-request', status: 'pending',
+      questions: [{ id: question.id, header: question.header, question: question.question, options: [] }] }
+    const onComposerQuestionChange = vi.fn()
+
+    await renderConversation([approval, openQuestion], undefined, onComposerQuestionChange)
+
+    expect(composerReplyQuestion(activeConversationControls([approval, openQuestion]))).toBeUndefined()
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
+      requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
   })
 
   it('continues the same durable run once and uses the existing composer and chooser', async () => {

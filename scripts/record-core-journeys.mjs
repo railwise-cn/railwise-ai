@@ -8,6 +8,16 @@ import { validateWebPptFallbackProof, validateWebPptTurnIdentity } from './web-p
 
 const windowsWorkflow = '.github/workflows/windows-install-smoke.yml'
 const sha256 = /^[a-f0-9]{64}$/
+const sha512Hex = /^[a-f0-9]{128}$/
+const sha512Base64 = /^[A-Za-z0-9+/]{86}==$/
+
+function isSha512Digest(value) {
+  if (typeof value !== 'string') return false
+  if (sha512Hex.test(value)) return true
+  if (!sha512Base64.test(value)) return false
+  const decoded = Buffer.from(value, 'base64')
+  return decoded.length === 64 && decoded.toString('base64') === value
+}
 
 function hostedProvenance(environment) {
   assert.equal(environment.GITHUB_ACTIONS, 'true')
@@ -204,7 +214,7 @@ export function windowsUpdaterCoreJourney(report, entry) {
     assert.equal(verification?.scope, 'isolated-candidate-acceptance')
     assert.equal(verification?.releaseApproval, false)
     assert.match(verification?.manifestSha256 ?? '', sha256)
-    assert.match(verification?.installerSha512 ?? '', /^[a-f0-9]{128}$/)
+    assert.ok(isSha512Digest(verification?.installerSha512), 'installer SHA-512 must be 64-byte hex or canonical Base64')
     assert.match(verification?.blockmapSha256 ?? '', sha256)
     if (entry === 'overlay') assert.equal(verification.feedRequests, null)
     else {

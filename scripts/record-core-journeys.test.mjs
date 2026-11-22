@@ -190,12 +190,17 @@ test('Windows updater receipt accepts an isolated candidate only with exact arti
     profilePreserved: true, workspaceFilePreserved: true, preferencesPreserved: true, threadPreserved: true,
     releaseHighlightsVisible: true, action: { method: 'trusted-pointer-on-sidebar', window: { pid: 321 } } }
   const targetVerification = { scope: 'isolated-candidate-acceptance', releaseApproval: false,
-    manifestSha256: 'a'.repeat(64), installerSha512: 'b'.repeat(128), blockmapSha256: 'c'.repeat(64),
+    manifestSha256: 'a'.repeat(64), installerSha512: Buffer.alloc(64, 0x5a).toString('base64'), blockmapSha256: 'c'.repeat(64),
     feedRequests: { manifest: 2, zip: 1, bytesServed: 100 } }
   const report = { status: 'passed', scope: 'private-isolated-windows-gui-upgrade', productionTouched: false,
     targetVerification, targetBuild: { ...build, packageSourceHead: sourceHead }, baseline: { package: { version: '0.5.10' } },
     privateTrust: { scope: 'ephemeral-github-hosted-windows-machine-root' }, steps: [after] }
   assert.equal(windowsUpdaterCoreJourney(report, 'sidebar').journeys[0].id, 'windows-updater-sidebar')
+  targetVerification.installerSha512 = 'b'.repeat(128)
+  assert.equal(windowsUpdaterCoreJourney(report, 'sidebar').journeys[0].id, 'windows-updater-sidebar')
+  targetVerification.installerSha512 = `${Buffer.alloc(64).toString('base64').slice(0, -3)}B==`
+  assert.throws(() => windowsUpdaterCoreJourney(report, 'sidebar'), /installer SHA-512/)
+  targetVerification.installerSha512 = Buffer.alloc(64, 0x5a).toString('base64')
   report.targetVerification.feedRequests.bytesServed = 0
   assert.throws(() => windowsUpdaterCoreJourney(report, 'sidebar'))
   report.targetVerification.feedRequests = null

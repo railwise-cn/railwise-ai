@@ -521,7 +521,7 @@ export function Workbench(): ReactElement {
   const conversationControls = useMemo(() => activeConversationControls(timelineBlocks), [timelineBlocks])
   const replyQuestion = route === 'chat' ? composerReplyQuestion(conversationControls) : undefined
   const [taskComposerQuestion, setTaskComposerQuestion] = useState<TaskComposerQuestion | null>(null)
-  const activeTaskComposerQuestion = route === 'chat' && mode === 'agent' && !replyQuestion &&
+  const activeTaskComposerQuestion = route === 'chat' && mode === 'agent' &&
     taskComposerQuestion?.threadId === activeThreadId ? taskComposerQuestion : undefined
   const composerActionsRef = useRef<ComposerActions>(null)
   const submittingQuestion = useRef<string | null>(null)
@@ -1780,7 +1780,8 @@ export function Workbench(): ReactElement {
       setError(t('taskComposerReplyTextOnly'))
       return
     }
-    if (replyQuestion && v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
+    if (replyQuestion && (!activeTaskComposerQuestion || replyQuestion.requestId !== activeTaskComposerQuestion.requestId) &&
+      v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
       if (submittingQuestion.current === replyQuestion.requestId) return
       submittingQuestion.current = replyQuestion.requestId
       const question = replyQuestion.questions[0]

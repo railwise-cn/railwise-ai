@@ -78,3 +78,9 @@ Windows 候选验收运行 `45064571256` 使用 release run `45062552331` 的精
 源码修复在 `AgentLoop.executeToolCall` 中把中断的 `request_user_input`/`user_input` 明确登记为取消结果，让原操作账本变为已处理的失败记录。新增集成回归使用真实 `LocalToolHost`、`AgentLoop`、`TurnService`、持久门禁和 `TaskCoordinator`，断言原请求取消、旧 Turn aborted、同一任务的新 Turn 自动启动。定向门禁/协调器测试 46 项通过；两个全量运行曾在并行负载下超时的 Ego/BrowserSkill readiness 文件已各自复跑通过，KUN 全量运行仍保留 2 项并行负载超时，且这两项单独运行均通过。ESLint、KUN TypeScript、生产构建及发布门禁 585 项通过，另有 1 项因宿主缺少 PowerShell 跳过。
 
 新修复尚未进入安装包。旧 BrowserSkill 实装结果不用于证明此修复。含该修复的源码候选构建和 Windows 精确安装包回归待执行。先前将 BrowserSkill 回退和三条 Windows 升级路径放在同一验收 run 的调用被验收脚本正确拒绝为互斥范围，后续分开运行升级与浏览器流程。Mac 双架构新候选签名包也待同一源码构建。真实模型凭据、已登录大单网/Ego、本地 OCR 和国内普通网络市场环境仍各自缺少实测证据，正式渠道仍是 0.5.10。
+
+Windows BrowserSkill 重跑 `45068852871` 使用修复 KUN 中断记账的候选包，旧 Turn 与新 Turn 续接路径已越过前一个 `outcome_unknown` 卡点。任务问题仍未答复，正文继续等待网址，答案则作为普通 supplement 被加入任务。根因确认在两处互相配合的 UI 条件：任务栏只在对话没有其他控制项时注册任务问题到 Composer；`isInline` 同时把该问题从任务卡隐藏。修复让唯一待处理的开放任务问题独立绑定到原对话 Composer，即使会话正文另有控制项也可以答复。若普通 `user_input` 控件与任务问题属于同一请求，发送时优先提交精确 task request。`TaskRunStatusBar.dom.test.ts` 的多控制项回归 8/8 通过。该 UI 修复仍未进入安装包，必须重建候选并分开重跑浏览器回退与升级旅程。
+
+同一批 Windows 0.5.10 双入口与 0.5.7 覆盖安装已完成 GUI 升级并启动目标版本；回执运行 `45068881905`、`45068914692` 在记录阶段失败，因为验收器将 `latest.yml` 的 SHA-512 Base64 字段误按十六进制格式校验。安装包本身仍按 SHA-512、blockmap、Artifact 和版本清单验证。现按 Windows 清单的 88 字符 Base64 格式校验该字段并增加拒绝错误编码的回归。该改动只涉及 QA 记录器，可复用同批安装包重跑升级矩阵。
+
+2026-11-23 源码复核：`TaskRunStatusBar.dom.test.ts` 8/8、KUN `task-coordinator.test.ts` 与 `task-coordinator-runtime.test.ts` 42/42、核心旅程回执与发布门禁测试 26/26 通过；稳定发布门禁 585 项通过、1 项因宿主没有 PowerShell 跳过。`npm run typecheck`、改动文件 ESLint、`git diff --check` 与本机 `NODE_OPTIONS=--max-old-space-size=6144 npm run build` 通过。回执校验现在接受 64 字节 SHA-512 的规范 Base64 和旧十六进制记录，并拒绝非规范 Base64。以上均为源码级结果，未证明当前未提交更改已进入安装包。下一步需为这些更改生成新的三端候选，重跑 Windows 0.5.10 双入口及 0.5.7 覆盖安装、macOS 双架构启动和表格，以及原对话补充网址后使用真实 BrowserSkill 完成网页到可编辑 PPTX 流程。真实模型端点、密钥、已登录大单网/Ego、Windows 国内网络与扫描 OCR 等现场验收继续标为待测。

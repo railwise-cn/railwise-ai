@@ -91,7 +91,7 @@ export function TaskRunStatusBar(props: Props): ReactElement | null {
   const current = primary ? [primary, ...otherActive] : []
   return <div className="min-w-0 border-l border-ds-border-muted pl-3 empty:hidden">
     {current.map(group => <ConversationTask key={group.root.id} {...props} {...presented} group={group} live={live}
-      composerReplies={props.composerReplies && current.length === 1 && conversationControls.length === 0}
+      composerReplies={props.composerReplies && current.length === 1}
       showTitle={current.length > 1} isPrimary={group === primary} />)}
   </div>
 }
@@ -105,6 +105,26 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   const { t } = useTranslation('common')
   const { current: task, members } = currentTaskBranch(group.all, group.root)
   const pending = pendingForBranch(members, live.attention, isPrimary)
+  const onlyAttention = pending.length === 1 ? pending[0] : undefined
+  const attentionKind = onlyAttention?.kind
+  const attentionId = onlyAttention?.requestId
+  const attentionTitle = onlyAttention?.title
+  const attentionQuestions = onlyAttention?.payload?.questions
+  const taskQuestion = useMemo(() => {
+    if (!composerReplies || task.status !== 'waiting_user' || !task.activeTurnId || attentionKind !== 'question' ||
+      !threadId || !attentionId || !Array.isArray(attentionQuestions) || attentionQuestions.length !== 1) return null
+    const value = attentionQuestions[0]
+    if (!value || typeof value !== 'object' || !('id' in value) || typeof value.id !== 'string') return null
+    const record = value as Record<string, unknown>
+    if (Array.isArray(record.options) && record.options.length > 0) return null
+    return { taskId: task.id, threadId, requestId: attentionId, questionId: value.id,
+      label: typeof record.label === 'string' ? record.label : typeof record.question === 'string' ? record.question : attentionTitle ?? '需要补充信息' }
+  }, [attentionId, attentionKind, attentionQuestions, attentionTitle, composerReplies, task.activeTurnId, task.id, task.status, threadId])
+  useEffect(() => {
+    if (!onComposerQuestionChange) return
+    onComposerQuestionChange(taskQuestion)
+    return () => onComposerQuestionChange(null)
+  }, [onComposerQuestionChange, taskQuestion])
   const isInline = (item: TaskAttentionV1): boolean => isInTimeline(item, { inlineRequests, inlineCapabilityCards })
   const remainingAttention = pending.filter(item => {
     if (isInline(item)) return false
