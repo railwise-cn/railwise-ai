@@ -20,6 +20,8 @@ const driverFiles = new Set([
   'scripts/verify-windows-cold-marketplace.mjs',
   'scripts/verify-windows-composer-acceptance.mjs',
   'scripts/verify-windows-video-evaluation.mjs',
+  'scripts/verify-packaged-startup-appearance.mjs',
+  'scripts/run-mac-offline-spreadsheet-journey.mjs',
   'scripts/prepare-browser-skill-smoke.mjs',
   'scripts/verify-windows-install-smoke.mjs',
   'scripts/verify-release-approval.mjs',

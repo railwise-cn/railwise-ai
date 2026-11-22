@@ -21,6 +21,7 @@ const acceptedDriverFiles = new Set([
   'scripts/run-mac-startup-appearance-smoke.mjs',
   'scripts/verify-windows-startup-appearance.test.mjs',
   'scripts/run-windows-ui-smoke.mjs',
+  'scripts/verify-windows-composer-acceptance.mjs',
   'scripts/verify-packaged-startup-appearance.mjs',
   'scripts/web-ppt-journey.mjs'
 ])
