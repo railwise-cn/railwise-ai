@@ -750,6 +750,9 @@ export function FloatingComposer({
   const canTogglePlanMode = canCompose && Boolean(onPlanCommand)
   const canOpenGoalPanel = !compact && canCompose && route !== 'claw'
   const canOpenSkillPicker = showIntentToolbar && canCompose && !agentSelectionApplying
+  const isUnavailableSkill = (reference: CallableCapabilityReference): boolean =>
+    reference.kind === 'skill' && !skillsLoading && !callableCapabilitiesError &&
+    !skillCommands.some(skill => skill.id === reference.id)
   const showPluginPicker = showIntentToolbar && Boolean(onSelectCapability || onManagePlugins)
   const canOpenComposerMenu = showComposerMenuButton && (
     (canPickAttachment && Boolean(onPickAttachments)) || canTogglePlanMode || canOpenGoalPanel || canOpenSkillPicker || showPluginPicker
@@ -2233,8 +2236,7 @@ export function FloatingComposer({
           {selectedCapabilities.length > 0 ? (
             <div role="group" aria-label={t('composerCapabilityDraft')} className="flex max-w-full flex-wrap items-center gap-2 px-1">
               {selectedCapabilities.map(reference => {
-                const unavailable = reference.kind === 'skill' && !skillsLoading && !callableCapabilitiesError &&
-                  !skillCommands.some(skill => skill.id === reference.id)
+                const unavailable = isUnavailableSkill(reference)
                 return (
                 <span key={capabilityKey(reference)} data-composer-skill={reference.kind === 'skill' ? '' : undefined} className="ds-no-drag inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-ds-border-muted bg-ds-card px-2 text-[12px] font-medium text-ds-muted" title={reference.label}>
                   {reference.kind === 'skill' ? <Sparkles className="h-3.5 w-3.5 shrink-0 text-ds-faint" aria-hidden /> : <Plug className="h-3.5 w-3.5 shrink-0 text-ds-faint" aria-hidden />}
@@ -2248,6 +2250,9 @@ export function FloatingComposer({
                 </span>
                 )
               })}
+              {selectedCapabilities.some(isUnavailableSkill) ? (
+                <p role="status" className="w-full min-w-0 break-words text-xs leading-5 text-ds-muted">{t('slashSkillUnavailable')}</p>
+              ) : null}
             </div>
           ) : null}
           {attachmentUploadEnabled ? (
