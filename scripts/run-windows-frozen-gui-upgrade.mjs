@@ -59,11 +59,13 @@ function requireHostedWindows(env) {
   'Only an ephemeral GitHub-hosted Windows x64 runner may use this acceptance driver')
 }
 
-export async function verifyIsolatedWindowsTarget(directory, source, version, { baselineVersion, environment = process.env }) {
-  assert.equal(baselineVersion, '0.5.9', 'The isolated candidate is only accepted after official 0.5.9')
-  assert.equal(version, '0.5.10', 'Use the exact 0.5.10 candidate installer')
+export async function verifyPrivateWindowsCandidateTarget(directory, source, version, { baselineVersion, environment = process.env }) {
+  const acceptedTargets = { '0.5.7': '0.5.11', '0.5.9': '0.5.10', '0.5.10': '0.5.11' }
+  assert.equal(acceptedTargets[baselineVersion], version, `The private candidate is not pinned to the ${baselineVersion} acceptance route`)
   assert.equal(environment.GITHUB_REPOSITORY, 'railwise-cn/railwise-ai')
   assert.equal(source.repository, environment.GITHUB_REPOSITORY)
+  assert.equal(source.artifactName, 'release-win')
+  assert.match(source.artifactDigest, /^sha256:[a-f0-9]{64}$/)
   validateWindowsSmokeSource(source, { packageSourceHead: source.packageSourceHead, driverSourceHead: environment.GITHUB_SHA })
   const ownedRelative = relative(await realpath(environment.RUNNER_TEMP), await realpath(directory))
   assert.ok(ownedRelative && !isAbsolute(ownedRelative) && !ownedRelative.startsWith(`..${sep}`) && ownedRelative !== '..',
@@ -89,6 +91,12 @@ export async function verifyIsolatedWindowsTarget(directory, source, version, { 
   } }
 }
 
+export async function verifyIsolatedWindowsTarget(directory, source, version, options = {}) {
+  assert.equal(options.baselineVersion, '0.5.9', 'The isolated candidate is only accepted after official 0.5.9')
+  assert.equal(version, '0.5.10', 'This compatibility route is pinned to the exact 0.5.10 candidate')
+  return verifyPrivateWindowsCandidateTarget(directory, source, version, options)
+}
+
 export function verifyInstalledIsolatedWindowsFeed(text) {
   const metadata = parse(text)
   assert.equal(metadata?.provider, 'generic', 'The installed isolated candidate must use the generic update provider')
@@ -103,8 +111,8 @@ async function verifiedTarget(directory, source, version, { runnerFixture = fals
     if (error.code === 'ENOENT') return null
     throw error
   })
-  if (!receipt && baselineVersion === '0.5.9') {
-    return verifyIsolatedWindowsTarget(directory, source, version, { baselineVersion })
+  if (!receipt && ['0.5.7', '0.5.10'].includes(baselineVersion) && version === '0.5.11') {
+    return verifyPrivateWindowsCandidateTarget(directory, source, version, { baselineVersion })
   }
   if (!runnerFixture) assert.ok(receipt, `Exact ${version} must have its immutable reviewed build receipt`)
   const installer = inspectInstaller(join(directory, identity.installerName), identity)

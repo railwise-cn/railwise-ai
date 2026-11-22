@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { assertPublishedWindowsUpgrade, legacyUpdaterReason, repairedScheduleSeed, sidebarUpgradeControlSelector, sidebarUpgradeSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
-import { createPrivateTrust, recordWindowsUpgradePhase, verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget } from './run-windows-frozen-gui-upgrade.mjs'
+import { createPrivateTrust, recordWindowsUpgradePhase, verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget, verifyPrivateWindowsCandidateTarget } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const installer = { url: 'RailWise-AI-0.5.7-win-x64.exe', size: 317686658, sha512: manifestDigest }
@@ -205,6 +205,37 @@ test('official 0.5.9 can test a checksummed isolated 0.5.10 without a public bui
   await writeManifest(metadata)
   await writeFile(file, Buffer.alloc(payload.length, 97))
   await assert.rejects(verifyIsolatedWindowsTarget(directory, source, version, opts), /Windows update SHA-512/)
+})
+
+test('official 0.5.7 and 0.5.10 can validate the exact downloaded 0.5.11 candidate without a public freeze receipt', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'railwise-private-0511-upgrade-test-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const source = { repository: 'railwise-cn/railwise-ai', packageSourceHead: 'a'.repeat(40), driverSourceHead: 'b'.repeat(40),
+    workflow: '.github/workflows/release.yml', windowsBuildConclusion: 'success', runId: 8123, runAttempt: 1,
+    artifactId: 927, artifactName: 'release-win', artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
+    changedFiles: ['scripts/run-windows-frozen-gui-upgrade.mjs'] }
+  for (const baselineVersion of ['0.5.7', '0.5.10']) {
+    const directory = join(root, baselineVersion)
+    await mkdir(directory)
+    const name = 'RailWise-AI-0.5.11-win-x64.exe'
+    const payload = Buffer.from(`candidate fixture for ${baselineVersion}`)
+    const sha512 = createHash('sha512').update(payload).digest('base64')
+    const metadata = { version: '0.5.11', path: name, sha512, files: [{ url: name, size: payload.length, sha512 }] }
+    await writeFile(join(directory, name), payload)
+    await writeFile(join(directory, `${name}.blockmap`), 'candidate blockmap')
+    await writeFile(join(directory, 'latest.yml'), JSON.stringify(metadata))
+    const target = await verifyPrivateWindowsCandidateTarget(directory, source, '0.5.11', {
+      baselineVersion, environment: { GITHUB_REPOSITORY: source.repository, GITHUB_SHA: source.driverSourceHead, RUNNER_TEMP: root }
+    })
+    assert.equal(target.isolated.scope, 'isolated-candidate-acceptance')
+    assert.equal(target.isolated.releaseApproval, false)
+    assert.equal(target.isolated.installerSha512, sha512)
+  }
+  const directory = join(root, '0.5.10')
+  const environment = { GITHUB_REPOSITORY: source.repository, GITHUB_SHA: source.driverSourceHead, RUNNER_TEMP: root }
+  await assert.rejects(verifyPrivateWindowsCandidateTarget(directory, source, '0.5.11', { baselineVersion: '0.5.9', environment }))
+  await assert.rejects(verifyPrivateWindowsCandidateTarget(directory, { ...source, artifactName: 'other' }, '0.5.11', { baselineVersion: '0.5.10', environment }))
+  await assert.rejects(verifyPrivateWindowsCandidateTarget(directory, { ...source, artifactDigest: 'missing' }, '0.5.11', { baselineVersion: '0.5.10', environment }))
 })
 
 test('only the exact isolated feed can pass installed target readback', () => {

@@ -57,6 +57,8 @@
 
 BrowserSkill 回退失败运行 `45052647651` 的根因现已由原始 Windows 日志确认：检查器要求 `task.threadId` 等于聊天 ID；实测任务执行线程为 `thr_task_31b7ce6ff45aa4a294f2b7f1`，原对话线程为 `thr_j4x1bpxp`。任务有独立执行线程是 KUN 的正常结构，任务与用户对话的关联由 `originThreadId` 表示。修正后的驱动分别核对会话 ID、执行线程 ID、问题和成果在原对话正文可见，并从执行线程读取 Turn。定向 150 项驱动测试、ESLint 与差异检查通过。该修正尚未在候选安装包上实装，仍需同包重跑 BrowserSkill 网页回退及 PPTX 交付。
 
-首次重跑运行 `45055146678` 与升级矩阵运行 `45055209546` 都在安装器启动前被拒绝。`prepare-windows-install-smoke.mjs` 的差异白名单遗漏了本轮验收台账，故把文档更新错误分类为应用源变化。现在只将精确的 `docs/qa/release-gates/v0.5.11/acceptance.md` 加入测试源白名单，其他 QA 文档仍被拒绝。相关工作流源码门禁、浏览器回退驱动和回执测试共 171 项通过。重跑仍待完成。
+首次重跑运行 `45055146678` 与升级矩阵运行 `45055209546` 都在安装器启动前被拒绝。`prepare-windows-install-smoke.mjs` 的差异白名单遗漏了本轮验收台账，故把文档更新错误分类为应用源变化。现在只将精确的 `docs/qa/release-gates/v0.5.11/acceptance.md` 加入测试源白名单，其他 QA 文档仍被拒绝。相关工作流源码门禁、浏览器回退驱动和回执测试共 171 项通过。
+
+第二次升级矩阵 `45055752779` 已进入 Windows runner，但升级脚本要求仅正式冻结构建才会生成的 `reviewed-build.json`，因此仍未安装。正式冻结只能从 `main` 生成，不能为分支候选绕开。已添加隔离候选专用验证，绑定原构建 run、`release-win` Artifact ID/摘要和驱动源码 SHA，逐项验证候选 `latest.yml`、安装包 SHA-512、准确版本、单一文件列表及 blockmap。只接受本轮固定的 0.5.10 原地升级或 0.5.7 覆盖安装到 0.5.11。此路径保留候选的 loopback update 源，正式冻结凭据校验不变。隔离候选和既有兼容路径专项测试 14/14、相关四组 Windows 驱动测试 184/184、ESLint 与差异检查通过。新源码尚未构建，以上验收均待重新运行。
 
 分支 `f74c8bff9912185014d7ef2f997c374d144ccb4f` 上的三端 `prepare_public_artifacts=true` 工作流 `45048183630` 在 Windows 的“Record frozen public package identity”步骤失败。根因是 `verify-reviewed-release-artifacts.mjs` 明确只允许 `refs/heads/main` 冻结可发布身份；该保护不得通过分支产物绕过。工作流按原设置没有发布。该 run 的 Mac 打包步骤在 Windows 失败后继续运行并被取消，未留下可验收的安装包。随后以 `candidate_only=true`、`prepare_public_artifacts=false` 启动隔离候选工作流 `45050824863`，Windows 构建已通过，Mac 双架构仍在签名打包。候选制品不可直接提升为正式版本。
