@@ -49,6 +49,11 @@ on:
         type: boolean
         required: false
         default: false
+      offline_spreadsheet_targets:
+        description: 'Native runners for exact-package offline spreadsheet verification.'
+        type: choice
+        options: [windows-and-intel, windows, intel, all]
+        default: windows-and-intel
       package_run_id:
         description: 'Same-repository release run containing the exact installer artifact to inspect'
         type: string
@@ -362,7 +367,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [windows-2022, macos-15-intel]
+        runner: ${{ fromJSON(inputs.offline_spreadsheet_targets == 'windows' && '["windows-2022"]' || inputs.offline_spreadsheet_targets == 'intel' && '["macos-15-intel"]' || inputs.offline_spreadsheet_targets == 'all' && '["windows-2022","macos-15-intel","macos-15"]' || '["windows-2022","macos-15-intel"]') }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -380,7 +385,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
-        run: node scripts/run-packaged-spreadsheet-smoke.mjs "$PACKAGE_RUN_ID" "$RUNNER_TEMP/exact-sheet-evidence" x64
+          EXACT_SHEET_ARCH: ${{ matrix.runner == 'macos-15' && 'arm64' || 'x64' }}
+        run: node scripts/run-packaged-spreadsheet-smoke.mjs "$PACKAGE_RUN_ID" "$RUNNER_TEMP/exact-sheet-evidence" "$EXACT_SHEET_ARCH"
       - name: Retain spreadsheet verification receipts
         if: always()
         uses: actions/upload-artifact@v4

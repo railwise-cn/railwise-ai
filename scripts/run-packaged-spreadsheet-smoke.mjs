@@ -86,9 +86,10 @@ async function downloadExactPackage(directory, source, report) {
   const { version } = source
   const metadataName = isWindows ? 'latest.yml' : 'latest-mac.yml'
   const fileName = isWindows ? `RailWise-AI-${version}-win-x64.exe` : `RailWise-AI-${version}-mac-${process.arch}.dmg`
-  const list = command('tar', ['-tf', archive]).split(/\r?\n/)
+  const tar = isWindows ? join(process.env.SystemRoot, 'System32', 'tar.exe') : '/usr/bin/tar'
+  const list = command(tar, ['-tf', archive]).split(/\r?\n/)
   for (const member of [fileName, metadataName]) assert.equal(list.filter(name => name === member).length, 1)
-  command('tar', ['-xf', archive, '-C', directory, fileName, metadataName])
+  command(tar, ['-xf', archive, '-C', directory, fileName, metadataName])
   const path = join(directory, fileName)
   const metadata = parse(await readFile(join(directory, metadataName), 'utf8'))
   assert.equal(metadata.version, version)
@@ -191,7 +192,7 @@ async function cdpConnect(url, report) {
   return { send, evaluate, close: () => ws.close() }
 }
 
-async function withOwnedApplication(install, root, report, verify) {
+async function withOwnedApplication(install, root, report, evidenceDir, verify) {
   const workspace = join(root, '工程测量验收')
   const profile = join(root, 'profile')
   const runtime = join(root, 'runtime')
@@ -244,6 +245,10 @@ async function withOwnedApplication(install, root, report, verify) {
     return await verify(cdp, workspace)
   } catch (error) {
     report.rendererEndState = await cdp?.evaluate('document.body.innerText.slice(-1200)').catch(() => undefined)
+    if (cdp) {
+      const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }).catch(() => undefined)
+      if (screenshot) await writeFile(join(evidenceDir, 'failed-spreadsheet.png'), Buffer.from(screenshot.data, 'base64'))
+    }
     throw error
   } finally {
     cdp?.close()
@@ -290,7 +295,7 @@ async function validateWorkbook(cdp, workspace, root, report, evidenceDir) {
     assert.equal(saved.version, 1)
     return saved.workbook
   }
-  const cell = (book, row, column) => book.sheets[book.sheetOrder[0]].cellData?.[row]?.[column]
+  const cell = (book, row, column) => book.sheets?.[book.sheetOrder?.[0]]?.cellData?.[row]?.[column]
   const key = async (key, code, windowsVirtualKeyCode, modifiers = 0) => {
     const event = { key, code, windowsVirtualKeyCode, modifiers }
     await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...event })
@@ -412,7 +417,7 @@ async function main([runId, evidenceDir, expectedArch]) {
     report.source = source
     const installer = await downloadExactPackage(join(root, 'package'), source, report)
     install = await findInstallation(installer, root, source, report)
-    await withOwnedApplication(install, root, report, (cdp, workspace) => validateWorkbook(cdp, workspace, root, report, evidenceDir))
+    await withOwnedApplication(install, root, report, evidenceDir, (cdp, workspace) => validateWorkbook(cdp, workspace, root, report, evidenceDir))
     assert.equal(await sha256(install.asar), report.installed.asarSha256)
     assert.equal(report.rendererExceptions, 0)
     assert.equal(report.blockedRendererRequests, 0)
