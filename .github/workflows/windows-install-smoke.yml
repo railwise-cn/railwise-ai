@@ -44,6 +44,11 @@ on:
         default: false
   workflow_dispatch:
     inputs:
+      run_offline_spreadsheet:
+        description: 'Install and exercise the exact offline spreadsheets on Windows x64 and Intel Mac.'
+        type: boolean
+        required: false
+        default: false
       package_run_id:
         description: 'Same-repository release run containing the exact installer artifact to inspect'
         type: string
@@ -147,7 +152,7 @@ permissions:
 
 jobs:
   windows-install:
-    if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.upgrade_059_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
+    if: ${{ inputs.run_offline_spreadsheet != true && (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true) && inputs.run_frozen_gui_update != true && inputs.upgrade_058_to_candidate != true && inputs.upgrade_059_to_candidate != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || (inputs.run_composer_acceptance || inputs.run_docling_conversion) && 35 || inputs.run_browser_execution && 25 || 15 }}
@@ -348,6 +353,42 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
           path: ${{ runner.temp }}/published-windows-gui-upgrade-evidence/
+
+  exact-offline-spreadsheet:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_offline_spreadsheet == true }}
+    name: Exact offline spreadsheets on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-2022, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - name: Install verification tools
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run checks through the installed application
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+        run: node scripts/run-packaged-spreadsheet-smoke.mjs "$PACKAGE_RUN_ID" "$RUNNER_TEMP/exact-sheet-evidence" x64
+      - name: Retain spreadsheet verification receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-spreadsheet-${{ matrix.runner }}
+          path: ${{ runner.temp }}/exact-sheet-evidence/
+          if-no-files-found: error
+          retention-days: 7
 
   exact-mac-startup-appearance:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_mac_startup_appearance == true }}
