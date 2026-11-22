@@ -353,7 +353,6 @@ if (!runningClawScheduleMcpServer && process.platform === 'win32') {
 
 let mainWindow: BrowserWindow | null = null
 let splashWindow: SplashWindowController | null = null
-let splashOpenedAt = 0
 let currentWindowAppearance: WindowAppearanceV1 = SOLID_WINDOW_APPEARANCE
 let currentWindowDark = false
 let store: JsonSettingsStore
@@ -1195,13 +1194,17 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
     if (options.suppressInitialShow) {
       splashWindow?.close()
       splashWindow = null
-      splashOpenedAt = 0
       return
     }
     if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isVisible()) return
-    const remainingSplashMs = splashWindow
-      ? splashRemainingVisibleMs(splashOpenedAt, Date.now())
-      : 0
+    if (splashWindow && !splashWindow.visibleAt) {
+      if (!deferredShowTimer) deferredShowTimer = setTimeout(() => {
+        deferredShowTimer = null
+        showWindow()
+      }, 25)
+      return
+    }
+    const remainingSplashMs = splashWindow ? splashRemainingVisibleMs(splashWindow.visibleAt, Date.now()) : 0
     if (remainingSplashMs > 0) {
       if (!deferredShowTimer) {
         deferredShowTimer = setTimeout(() => {
@@ -1218,7 +1221,6 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
     mainWindow.show()
     splashWindow?.close()
     splashWindow = null
-    splashOpenedAt = 0
   }
   mainWindow.on('close', (event) => {
     if (
@@ -1435,7 +1437,6 @@ app.whenReady().then(async () => {
   currentWindowDark = nativeTheme.shouldUseDarkColors
   const suppressInitialShow = shouldStartHidden(initial)
   if (!suppressInitialShow) {
-    splashOpenedAt = Date.now()
     splashWindow = createSplashWindow({
       appearance: currentWindowAppearance,
       dark: currentWindowDark,

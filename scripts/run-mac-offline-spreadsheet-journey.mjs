@@ -157,12 +157,6 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     await cdp.send('Network.setBlockedURLs', { urls: ['http://*', 'https://*'] })
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), version)
 
-    const newWorkbookButton = 'button[aria-label="新建表格"]'
-    if (!await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(newWorkbookButton)})?.getClientRects().length)`)) {
-      await click('新建会话')
-      await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(newWorkbookButton)})?.getClientRects().length)`, 'new conversation workbook controls')
-    }
-    const editableReady = '[...document.querySelectorAll("button")].some(button => button.textContent === "保存表格" && !button.disabled)'
     const click = async text => {
       try { await cdp.click('button', text) } catch (error) {
         report.lastClickFailure = {
@@ -185,6 +179,12 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
         throw error
       }
     }
+    const newWorkbookButton = 'button[aria-label="新建表格"]'
+    if (!await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(newWorkbookButton)})?.getClientRects().length)`)) {
+      await click('新建会话')
+      await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(newWorkbookButton)})?.getClientRects().length)`, 'new conversation workbook controls')
+    }
+    const editableReady = '[...document.querySelectorAll("button")].some(button => button.textContent === "保存表格" && !button.disabled)'
     const save = () => click('保存表格')
     const key = async (keyValue, code, windowsVirtualKeyCode, modifiers = 0) => {
       const event = { key: keyValue, code, windowsVirtualKeyCode, modifiers }

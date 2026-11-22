@@ -1,12 +1,40 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildSplashHtml,
+  createSplashWindow,
   SPLASH_MIN_VISIBLE_MS,
   splashProgressLabel,
   splashRemainingVisibleMs
 } from './splash-window'
 
-vi.mock('electron', () => ({ BrowserWindow: class BrowserWindow {} }))
+const { splashWindows } = vi.hoisted(() => ({ splashWindows: [] as Array<{ emit: (event: string) => void }> }))
+
+vi.mock('electron', () => ({ BrowserWindow: class BrowserWindow {
+  private listeners = new Map<string, Array<() => void>>()
+  webContents = { once: (event: string, listener: () => void) => this.addListener(`webContents:${event}`, listener),
+    isDestroyed: () => false, executeJavaScript: async () => undefined }
+  constructor() { splashWindows.push(this) }
+  once(event: string, listener: () => void): void { this.addListener(event, listener) }
+  on(event: string, listener: () => void): void { this.addListener(event, listener) }
+  loadURL(): Promise<void> { return Promise.resolve() }
+  show(): void {}
+  close(): void { this.emit('closed') }
+  isDestroyed(): boolean { return false }
+  private addListener(event: string, listener: () => void): void {
+    const values = this.listeners.get(event) ?? []
+    values.push(listener)
+    this.listeners.set(event, values)
+  }
+  emit(event: string): void { this.listeners.get(event)?.forEach(listener => listener()) }
+} }))
+
+const appearance = {
+  schema: 'workwise.window-appearance' as const,
+  version: 1 as const,
+  material: 'solid' as const,
+  transparencyEnabled: false,
+  reason: 'gpu-disabled' as const
+}
 
 describe('splash window document', () => {
   it('shows the brand and full Chinese subtitle above quiet, accessible progress', () => {
@@ -67,5 +95,14 @@ describe('splash window document', () => {
     expect(splashRemainingVisibleMs(1_000, 1_450)).toBe(750)
     expect(splashRemainingVisibleMs(1_000, 2_500)).toBe(0)
     expect(splashRemainingVisibleMs(0, 100)).toBe(0)
+  })
+
+  it('starts the minimum visible interval when the splash window is actually shown', () => {
+    const controller = createSplashWindow({ appearance, dark: false, locale: 'en' })
+    const browserWindow = splashWindows.at(-1)
+    expect(controller.visibleAt).toBe(0)
+    browserWindow?.emit('ready-to-show')
+    expect(controller.visibleAt).toBeGreaterThan(0)
+    expect(splashRemainingVisibleMs(controller.visibleAt, controller.visibleAt + 200)).toBe(1_000)
   })
 })

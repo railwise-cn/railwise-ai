@@ -181,9 +181,14 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
 
 export class SplashWindowController {
   readonly browserWindow: BrowserWindow
+  private shownAt = 0
   private loaded = false
   private closed = false
   private current: SplashProgress
+
+  get visibleAt(): number {
+    return this.shownAt
+  }
 
   constructor(private readonly options: SplashWindowOptions, initial: SplashProgress) {
     this.current = { ...initial, progress: clampProgress(initial.progress) }
@@ -209,7 +214,9 @@ export class SplashWindowController {
     })
 
     this.browserWindow.once('ready-to-show', () => {
-      if (!this.closed) this.browserWindow.show()
+      if (this.closed) return
+      this.browserWindow.show()
+      this.shownAt = Date.now()
     })
     this.browserWindow.webContents.once('did-finish-load', () => {
       this.loaded = true

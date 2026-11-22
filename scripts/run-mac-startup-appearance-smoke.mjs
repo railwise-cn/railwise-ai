@@ -186,6 +186,7 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
     report.offlineSpreadsheet = { status: spreadsheet.status, file: 'mac-offline-spreadsheet.json' }
   } catch (error) {
     report.error = error.message
+    if (error.diagnostics) report.startupDiagnostics = error.diagnostics
     throw error
   } finally {
     await writeFile(join(evidenceDir, 'mac-startup-appearance.json'), `${JSON.stringify(report, null, 2)}\n`)
