@@ -56,6 +56,8 @@ export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
   const selectThread = label => cdp.click(`.ds-sidebar-shell [title=${literal(label)}] > button`)
   const draftContent = `document.querySelector(${literal(composer)})?.value`
   const attachment = observeAttachment('合成工作区草稿.pdf', 'true')
+  const readyAttachment = observeAttachment('合成工作区草稿.pdf', `item.querySelector('[aria-label="在文件夹中显示原件"]') &&
+    !/正在上传|正在解析|读取失败/.test(item.querySelector('.ds-composer-attachment-meta')?.innerText ?? '')`)
   await Promise.all([mkdir(folder, { recursive: true }), mkdir(alternate), writeFile(file, createChineseTextPdf())])
   await writeFile(entry, '---\nname: railwise-scope-fixture\ndescription: Isolated RailWise acceptance fixture.\n---\nUse only synthetic QA content.\n')
   const threads = []
@@ -79,7 +81,7 @@ export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
   await cdp.click('[role="option"] .truncate', skill.label)
   await cdp.fill(composer, draft)
   await chooseFiles(cdp, [file])
-  await cdp.wait(attachment, 'the attached PDF in the original draft')
+  await cdp.wait(readyAttachment, 'the parsed PDF in the original draft')
   evidence.phase = 'first-workspace-draft'
   await selectThread(handles[1])
   await cdp.wait(`${list(threads[1])}.then(choices=>Boolean(choices)&&!choices.some(item=>item.id===${literal(skill.id)}))`, 'the second workspace runtime catalog to exclude the first workspace skill')
@@ -92,13 +94,16 @@ export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
   await cdp.evaluate(`window.workwise.refreshSkills(${literal(workspace)})`)
   await cdp.wait(`(${chip})?.unavailable===true`, 'the selected skill to become unavailable after refresh')
   evidence.selectedSkillMarkedUnavailable = true
+  await cdp.wait(readyAttachment, 'the parsed PDF before attempting to send with the disabled skill')
   await cdp.click(sendButton)
   const alerts = ['这个技能在当前会话已不可用。请移除技能标签，或输入 / 重新选择。', '选中的技能、插件或连接器在当前会话已不可用。请移除后重新选择。']
   const readDraft = `({text:${draftContent},attachmentPresent:${attachment},skill:${chip},alert:${literal(alerts)}.find(message=>document.body.innerText.includes(message))??null})`
   try {
     await cdp.wait(`(${readDraft}).alert`, 'the stale skill explanation')
   } finally {
-    evidence.afterStaleSend = await cdp.evaluate(readDraft)
+    evidence.afterStaleSend = await cdp.evaluate(`({...${readDraft},
+      attachmentStatus:document.querySelector('.ds-composer-attachment-meta')?.innerText,
+      visibleFeedback:document.body.innerText.split('\n').filter(line=>/技能|附件|解析|移除|不可用|再次|重试/.test(line)).slice(-30)})`)
     evidence.afterStaleSend.turnCount = (await read('/v1/threads/' + threads[0].id)).turns.length
   }
   assert.equal(evidence.afterStaleSend.text, draft)
