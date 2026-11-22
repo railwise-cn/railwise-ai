@@ -60,7 +60,11 @@ export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
   await writeFile(entry, '---\nname: railwise-scope-fixture\ndescription: Isolated RailWise acceptance fixture.\n---\nUse only synthetic QA content.\n')
   const threads = []
   for (const [index, dir] of [workspace, alternate].entries()) {
-    threads.push(await read('/v1/threads', 'POST', { workspace: dir, title: handles[index], mode: 'agent', model: 'windows-task-fixture' }))
+    const thread = await read('/v1/threads', 'POST', { workspace: dir, title: handles[index], mode: 'agent', model: 'windows-task-fixture' })
+    threads.push(thread)
+    await read(`/v1/threads/${thread.id}/turns`, 'POST', { prompt: `请回复合成验收会话${index + 1}已就绪。` })
+    await cdp.wait(`window.workwise.runtimeRequest(${literal(`/v1/threads/${thread.id}`)},'GET').then(result=>
+      result.ok&&JSON.parse(result.body).turns.some(turn=>turn.status==='completed'))`, 'a completed seed message in the synthetic conversation')
   }
   await cdp.send('Page.reload', { ignoreCache: true })
   await cdp.wait('Boolean(window.workwise?.refreshSkills)', 'the owned refreshed workbench')
@@ -87,7 +91,7 @@ export async function verifyWindowsSkillDraftScope(cdp, workspace, evidence) {
   evidence.selectedSkillMarkedUnavailable = true
   await cdp.click(sendButton)
   await cdp.wait(`document.body.innerText.includes('选中的技能、插件或连接器在当前会话已不可用。')&&${draftContent}===${literal(draft)}&&${attachment}`, 'the stale send to preserve the draft and explain what to do')
-  assert.equal((await read('/v1/threads/' + threads[0].id)).turns.length, 0)
+  assert.equal((await read('/v1/threads/' + threads[0].id)).turns.length, 1)
   evidence.rejectedStaleSkillPreservedDraft = true
   await cdp.click('[data-composer-skill] button')
   await cdp.wait(`!(${chip})&&${draftContent}===${literal(draft)}&&${attachment}`, 'removing the unavailable chip without changing the draft or attachment')
