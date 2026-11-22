@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "source": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflow": ".github/workflows/release.yml",
+    "runId": 44989484932,
+    "runAttempt": 1,
+    "sourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+    "driverHead": "6bcd2d532f9f5f0316b60028adab36583c41c178",
+    "buildConclusion": "success",
+    "artifactName": "release-mac",
+    "artifactId": 14742523969,
+    "artifactDigest": "sha256:1de55faf8cd7b5f640e4c47934c5e4e5e0d8f7368f0320e52e7f6a16e1df3aa3",
+    "artifactExpired": false,
+    "changedFiles": [
+      ".github/workflows/windows-install-smoke.yml",
+      "scripts/prepare-windows-install-smoke.test.mjs",
+      "scripts/run-mac-startup-appearance-smoke.mjs",
+      "scripts/verify-windows-startup-appearance.test.mjs"
+    ],
+    "classification": "isolated-unreviewed",
+    "publicReleaseApproved": false,
+    "buildHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+    "buildJob": "Build macOS",
+    "buildJobId": 137109693475
+  },
+  "arch": "arm64",
+  "version": "0.5.10",
+  "classification": "isolated-unreviewed",
+  "publicReleaseApproved": false,
+  "productionTouched": false,
+  "observations": [
+    {
+      "title": "RailWise AI",
+      "subtitle": "基于本地优先架构的智能协同工作台",
+      "subtitleLang": "zh-CN",
+      "theme": "light",
+      "locale": "en",
+      "viewport": {
+        "width": 360,
+        "height": 248,
+        "scale": 1
+      },
+      "versionVisible": false,
+      "progress": 18,
+      "status": "Preparing workspace",
+      "geometry": {
+        "logo": {
+          "left": 124.203125,
+          "top": 22.078125,
+          "right": 235.796875,
+          "bottom": 84.078125,
+          "width": 111.59375,
+          "height": 62
+        },
+        "title": {
+          "left": 122.484375,
+          "top": 93.984375,
+          "right": 237.5,
+          "bottom": 119.890625,
+          "width": 115.015625,
+          "height": 25.90625
+        },
+        "subtitle": {
+          "left": 76,
+          "top": 124.890625,
+          "right": 284,
+          "bottom": 143.078125,
+          "width": 208,
+          "height": 18.1875
+        },
+        "bar": {
+          "left": 50,
+          "top": 201.53125,
+          "right": 310,
+          "bottom": 203.53125,
+          "width": 260,
+          "height": 2
+        },
+        "status": {
+          "left": 50,
+          "top": 210.53125,
+          "right": 310,
+          "bottom": 225.921875,
+          "width": 260,
+          "height": 15.390625
+        },
+        "textLines": [
+          {
+            "left": 76,
+            "top": 123.890625,
+            "right": 284,
+            "bottom": 142.890625,
+            "width": 208,
+            "height": 19
+          }
+        ]
+      },
+      "workbenchTypography": {
+        "fontFamily": "\"RailWise UI\", system-ui, sans-serif",
+        "fontSize": "13px",
+        "lineHeight": "19.5px",
+        "devicePixelRatio": 1,
+        "window": {
+          "width": 1024,
+          "height": 684
+        },
+        "fonts": [
+          {
+            "familyName": "Noto Sans SC Thin",
+            "postScriptName": "NotoSansSC-Thin_Medium",
+            "isCustomFont": true,
+            "glyphCount": 10
+          }
+        ]
+      },
+      "workbenchOpened": true,
+      "processExit": {
+        "code": null,
+        "signal": "SIGTERM"
+      },
+      "captureAttempts": 1
+    },
+    {
+      "title": "RailWise AI",
+      "subtitle": "基于本地优先架构的智能协同工作台",
+      "subtitleLang": "zh-CN",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 360,
+        "height": 248,
+        "scale": 1
+      },
+      "versionVisible": false,
+      "progress": 82,
+      "status": "正在打开工作台",
+      "geometry": {
+        "logo": {
+          "left": 124.203125,
+          "top": 22.078125,
+          "right": 235.796875,
+          "bottom": 84.078125,
+          "width": 111.59375,
+          "height": 62
+        },
+        "title": {
+          "left": 122.484375,
+          "top": 93.984375,
+          "right": 237.5,
+          "bottom": 119.890625,
+          "width": 115.015625,
+          "height": 25.90625
+        },
+        "subtitle": {
+          "left": 76,
+          "top": 124.890625,
+          "right": 284,
+          "bottom": 143.078125,
+          "width": 208,
+          "height": 18.1875
+        },
+        "bar": {
+          "left": 50,
+          "top": 201.53125,
+          "right": 310,
+          "bottom": 203.53125,
+          "width": 260,
+          "height": 2
+        },
+        "status": {
+          "left": 50,
+          "top": 210.53125,
+          "right": 310,
+          "bottom": 225.921875,
+          "width": 260,
+          "height": 15.390625
+        },
+        "textLines": [
+          {
+            "left": 76,
+            "top": 123.890625,
+            "right": 284,
+            "bottom": 142.890625,
+            "width": 208,
+            "height": 19
+          }
+        ]
+      },
+      "workbenchTypography": {
+        "fontFamily": "\"RailWise UI\", system-ui, sans-serif",
+        "fontSize": "13px",
+        "lineHeight": "19.5px",
+        "devicePixelRatio": 1,
+        "window": {
+          "width": 1024,
+          "height": 684
+        },
+        "fonts": [
+          {
+            "familyName": "Noto Sans SC Thin",
+            "postScriptName": "NotoSansSC-Thin_Medium",
+            "isCustomFont": true,
+            "glyphCount": 4
+          }
+        ]
+      },
+      "workbenchOpened": true,
+      "processExit": {
+        "code": null,
+        "signal": "SIGTERM"
+      },
+      "captureAttempts": 2
+    }
+  ],
+  "transport": {
+    "artifactId": 14742523969,
+    "archiveDigest": "sha256:1de55faf8cd7b5f640e4c47934c5e4e5e0d8f7368f0320e52e7f6a16e1df3aa3",
+    "member": "RailWise-AI-0.5.10-mac-arm64.dmg"
+  },
+  "installer": {
+    "name": "RailWise-AI-0.5.10-mac-arm64.dmg",
+    "sha256": "31617441b3ef63b48d3de888524bae1a69df2bc9766f703a761030987707d2cb",
+    "size": 410503567
+  },
+  "installed": {
+    "bundleId": "com.wangjiawei508.workgpt",
+    "installedArch": "arm64",
+    "signature": "verified",
+    "notarization": "staple-verified",
+    "asarSha256": "5dbab511efd2dd49fd5185c3f7a65e13ad4ee57ef998a1244e99c8df52b10b85",
+    "developerId": "verified",
+    "gatekeeper": {
+      "assessment": "succeeded",
+      "enforcement": "enabled",
+      "statusCommandExitCode": 0
+    },
+    "updateChannel": "stable"
+  }
+}

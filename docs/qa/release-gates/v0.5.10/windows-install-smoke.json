@@ -1,0 +1,375 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "private-exact-package-install",
+  "platform": "win32",
+  "arch": "x64",
+  "version": "0.5.10",
+  "sourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+  "productionTouched": false,
+  "provenance": {
+    "sourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+    "packageSourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+    "driverSourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+    "runId": "44989484932",
+    "runAttempt": "1"
+  },
+  "runner": {
+    "os": "Windows",
+    "environment": "github-hosted",
+    "tempRoot": "D:\\a\\_temp"
+  },
+  "errors": [],
+  "cleanup": {
+    "attempted": true,
+    "registryAbsent": true,
+    "appExecutableAbsent": true,
+    "exitCode": 0,
+    "ownedInstanceVerified": true,
+    "shortcutsAbsent": true
+  },
+  "profileSentinels": [
+    {
+      "path": "C:\\Users\\runneradmin\\AppData\\Roaming\\RailWise AI\\railwise-install-smoke-8beca80fb31648bbb56bb58bd3167a78.txt",
+      "afterSha256": "29d1a28e2b6a0a77da4a249a6fba2da4d55fb522efac74ecd9a7930c6a89979c",
+      "beforeSha256": "29d1a28e2b6a0a77da4a249a6fba2da4d55fb522efac74ecd9a7930c6a89979c"
+    },
+    {
+      "path": "C:\\Users\\runneradmin\\AppData\\Roaming\\workwise\\railwise-install-smoke-8beca80fb31648bbb56bb58bd3167a78.txt",
+      "afterSha256": "29d1a28e2b6a0a77da4a249a6fba2da4d55fb522efac74ecd9a7930c6a89979c",
+      "beforeSha256": "29d1a28e2b6a0a77da4a249a6fba2da4d55fb522efac74ecd9a7930c6a89979c"
+    }
+  ],
+  "installer": {
+    "path": "D:\\a\\_temp\\exact-windows-packages\\RailWise-AI-0.5.10-win-x64.exe",
+    "name": "RailWise-AI-0.5.10-win-x64.exe",
+    "sha256": "c7066bfc375e200e8d8c70b01d54eb13bd1a8e7228b573a5db01740ed1cfa971",
+    "size": 328952222,
+    "versionInfo": {
+      "fileVersion": "0.5.10",
+      "productVersion": "0.5.10",
+      "productName": "RailWise AI"
+    },
+    "authenticode": {
+      "statusMessage": "The file D:\\a\\_temp\\exact-windows-packages\\RailWise-AI-0.5.10-win-x64.exe is not digitally signed. You cannot run this script on the current system. For more information about running scripts and setting execution policy, see about_Execution_Policies at https://go.microsoft.com/fwlink/?LinkID=135170",
+      "status": "NotSigned",
+      "signerThumbprint": null
+    }
+  },
+  "cleanScope": {
+    "shortcutsAbsent": true,
+    "registryAbsent": true,
+    "targetAbsent": true
+  },
+  "target": {
+    "executable": "D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\RailWise AI.exe",
+    "uninstaller": "D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\Uninstall RailWise AI.exe",
+    "versionInfo": {
+      "fileVersion": "0.5.10",
+      "productVersion": "0.5.10.0",
+      "productName": "RailWise AI"
+    },
+    "directory": "D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI",
+    "package": {
+      "name": "workwise",
+      "productName": "RailWise AI",
+      "version": "0.5.10",
+      "sourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+      "asarSha256": "a21152be422c74149eca75fd2795ab10ad6cdf91a1409e1c266b7c754dd7f1e5",
+      "asarSize": 514512836
+    },
+    "authenticode": {
+      "statusMessage": "The file D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\RailWise AI.exe is not digitally signed. You cannot run this script on the current system. For more information about running scripts and setting execution policy, see about_Execution_Policies at https://go.microsoft.com/fwlink/?LinkID=135170",
+      "status": "NotSigned",
+      "signerThumbprint": null
+    }
+  },
+  "install": {
+    "exitCode": 0
+  },
+  "registry": {
+    "uninstall": {
+      "values": {
+        "Readme": "https://github.com/railwise-cn/railwise-ai",
+        "UninstallString": "\"D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\Uninstall RailWise AI.exe\" /currentuser",
+        "DisplayVersion": "0.5.10",
+        "URLUpdateInfo": "https://github.com/railwise-cn/railwise-ai",
+        "QuietUninstallString": "\"D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\Uninstall RailWise AI.exe\" /currentuser /S",
+        "EstimatedSize": 1228672,
+        "HelpLink": "https://github.com/railwise-cn/railwise-ai",
+        "Comments": "AI workbench for engineering, infrastructure, and operations workflows",
+        "Publisher": "RailWise AI Contributors",
+        "DisplayName": "RailWise AI",
+        "URLInfoAbout": "https://github.com/railwise-cn/railwise-ai",
+        "DisplayIcon": "D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\RailWise AI.exe,0",
+        "NoModify": 1,
+        "NoRepair": 1
+      },
+      "hive": "CurrentUser",
+      "view": "Registry64",
+      "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\0daef81e-c00a-5e19-aa76-e6b9a68e0938"
+    },
+    "install": {
+      "values": {
+        "ShortcutName": "RailWise AI",
+        "InstallLocation": "D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI",
+        "KeepShortcuts": "true"
+      },
+      "hive": "CurrentUser",
+      "view": "Registry64",
+      "key": "Software\\0daef81e-c00a-5e19-aa76-e6b9a68e0938"
+    }
+  },
+  "shortcuts": [
+    {
+      "kind": "desktop",
+      "path": "C:\\Users\\runneradmin\\Desktop\\RailWise AI.lnk",
+      "name": "RailWise AI.lnk",
+      "scope": "current-user",
+      "target": "D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\RailWise AI.exe"
+    },
+    {
+      "kind": "start-menu",
+      "path": "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\RailWise AI.lnk",
+      "name": "RailWise AI.lnk",
+      "scope": "current-user",
+      "target": "D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\RailWise AI.exe"
+    }
+  ],
+  "ui": {
+    "schemaVersion": 1,
+    "status": "passed",
+    "scope": "private-exact-package-chinese-ui",
+    "platform": "win32",
+    "sourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+    "version": "0.5.10",
+    "provenance": {
+      "sourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+      "packageSourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+      "driverSourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+      "runId": "44989484932",
+      "runAttempt": "1"
+    },
+    "taskSmokeRequested": false,
+    "browserSmokeRequested": false,
+    "locale": "zh",
+    "theme": "dark",
+    "workspaceRoot": "D:\\a\\_temp\\railwise-windows-ui-GJj0CT\\中文 验收工作区",
+    "productionTouched": false,
+    "checks": [
+      "installed-chinese-renderer",
+      "skills-default-and-tab-order",
+      "packaged-skills-and-engineering-entries",
+      "autocad-fixed-upstream-entries",
+      "plugins-tab",
+      "connectors-tab",
+      "amap-zotero-actionable-setup",
+      "github-actionable-setup",
+      "no-update-control-hidden",
+      "offline-help-thirteen-chapters",
+      "personal-homepage-absent",
+      "offline-help-search-and-navigation",
+      "offline-help-images"
+    ],
+    "errors": [],
+    "installedAsarSha256": "a21152be422c74149eca75fd2795ab10ad6cdf91a1409e1c266b7c754dd7f1e5",
+    "profile": "D:\\a\\_temp\\railwise-windows-ui-GJj0CT\\profile",
+    "cleanExit": true,
+    "packageUnchanged": true,
+    "viewport": {
+      "width": 1024,
+      "height": 728,
+      "scale": 1
+    },
+    "tabs": [
+      "技能",
+      "插件",
+      "连接器"
+    ],
+    "resources": {
+      "defaultSkills": [
+        {
+          "id": "ppt-master",
+          "name": "PPT Master",
+          "root": "D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\resources\\app.asar.unpacked\\src\\asset\\skills\\ppt-master",
+          "entryPath": "D:\\a\\_temp\\railwise-install-8beca80fb31648bbb56bb58bd3167a78\\RailWise AI\\resources\\app.asar.unpacked\\src\\asset\\skills\\ppt-master\\SKILL.md",
+          "source": {
+            "type": "github",
+            "owner": "hugohe3",
+            "repo": "ppt-master",
+            "path": "skills/ppt-master",
+            "ref": "v6.8.0",
+            "installedSha": "5e8856be0da8e6bc85c4aa28acc614478f7b7137",
+            "overlaySkillId": "ppt-master",
+            "autoUpdate": false
+          },
+          "entryRelativePath": "resources/app.asar.unpacked/src/asset/skills/ppt-master/SKILL.md",
+          "entrySha256": "f724dd83bb1b2bd22ecc63fb946e52aa9454bf79cc5fe11ce923231165595c4f",
+          "entryRegisteredInAsar": true
+        },
+        {
+          "id": "tender-master",
+          "name": "Tender Master",
+          "root": "D:\\a\\_temp\\railwise-windows-ui-GJj0CT\\home\\.workwise\\skills\\tender-master",
+          "entryPath": "D:\\a\\_temp\\railwise-windows-ui-GJj0CT\\home\\.workwise\\skills\\tender-master\\SKILL.md",
+          "source": {
+            "type": "bundled",
+            "id": "tender-master",
+            "autoUpdate": false
+          },
+          "entrySha256": "79fefb450e34806d74afac061b3fdea5093abdd85b6a21eb7f6be44ad31d7820",
+          "entryRelativePath": "home/.workwise/skills/tender-master/SKILL.md",
+          "entryRegisteredInAsar": true,
+          "bundledCopySource": {
+            "id": "tender-master",
+            "entryRelativePath": "resources/app.asar.unpacked/src/asset/skills/tender-master/SKILL.md",
+            "entrySha256": "79fefb450e34806d74afac061b3fdea5093abdd85b6a21eb7f6be44ad31d7820",
+            "entryRegisteredInAsar": true,
+            "metadataVerified": true,
+            "ownedPathVerified": true
+          }
+        },
+        {
+          "id": "di-bao-monitoring",
+          "name": "Di Bao Monitoring",
+          "root": "D:\\a\\_temp\\railwise-windows-ui-GJj0CT\\home\\.codex\\skills\\di-bao-monitoring",
+          "entryPath": "D:\\a\\_temp\\railwise-windows-ui-GJj0CT\\home\\.codex\\skills\\di-bao-monitoring\\SKILL.md",
+          "entrySha256": "d9bf5b9befdc6844137e23f46e55536f9355120178d6178778e04330303a3606",
+          "entryRelativePath": "home/.codex/skills/di-bao-monitoring/SKILL.md",
+          "entryRegisteredInAsar": false,
+          "agentPackSource": {
+            "type": "bundled-agent-pack",
+            "id": "metro-monitoring-agent-pack",
+            "version": "1.2.34",
+            "component": "di-bao-monitoring",
+            "directory": "assets/skill/di-bao-monitoring",
+            "entryRelativePath": "resources/src/asset/agent-packs/metro-monitoring-agent-pack/assets/skill/di-bao-monitoring/SKILL.md",
+            "entrySha256": "d9bf5b9befdc6844137e23f46e55536f9355120178d6178778e04330303a3606",
+            "metadataVerified": true,
+            "installManifestVerified": true,
+            "ownedPathVerified": true
+          }
+        }
+      ],
+      "engineeringSkills": [
+        {
+          "name": "资料盘点与来源索引",
+          "installEnabled": true
+        },
+        {
+          "name": "监测质检与图表",
+          "installEnabled": true
+        },
+        {
+          "name": "工程文档差异审阅",
+          "installEnabled": true
+        },
+        {
+          "name": "会议纪要与待办",
+          "installEnabled": true
+        }
+      ],
+      "connectors": [
+        {
+          "id": "amap-maps",
+          "name": "高德地图",
+          "catalogSourceType": "built-in",
+          "sourceUrl": "https://developer.amap.com/api/mcp-server/gettingstarted",
+          "detailsReady": true
+        },
+        {
+          "id": "zotero-mcp",
+          "name": "Zotero 本机文献",
+          "catalogSourceType": "built-in",
+          "commit": "0.17.0",
+          "sourceUrl": "https://pypi.org/project/zotero-mcp-server/0.17.0/",
+          "archiveSha256": "80f1c67060176eeeb1473a790a3e973c828f9df2fb6cb9199e05e6d1d292c41f",
+          "detailsReady": true
+        }
+      ],
+      "cad": [
+        {
+          "id": "autocad-dwg-redraw",
+          "name": "AutoCAD DWG 重绘",
+          "catalogSourceType": "built-in",
+          "commit": "ed182ec5966caaaf1d82d6ad4015435a27a8a909",
+          "sourceUrl": "https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/ed182ec5966caaaf1d82d6ad4015435a27a8a909/skills/autocad-dwg-redraw",
+          "archiveSha256": "1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e",
+          "installEnabled": true,
+          "dependenciesVisible": true,
+          "licenseNoticeVisible": true,
+          "versionVisible": true,
+          "publisherVisible": true
+        },
+        {
+          "id": "autocad-image-redraw",
+          "name": "图片转 CAD 重绘",
+          "catalogSourceType": "built-in",
+          "commit": "ed182ec5966caaaf1d82d6ad4015435a27a8a909",
+          "sourceUrl": "https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/ed182ec5966caaaf1d82d6ad4015435a27a8a909/skills/autocad-image-redraw",
+          "archiveSha256": "1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e",
+          "installEnabled": true,
+          "dependenciesVisible": true,
+          "licenseNoticeVisible": true,
+          "versionVisible": true,
+          "publisherVisible": true
+        }
+      ],
+      "connectionsUnchanged": true
+    },
+    "updateChecks": {
+      "mode": "read-only-metadata",
+      "maxAttempts": 2,
+      "recheckDelayMs": 2000,
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "hasUpdate": false,
+          "currentVersion": "0.5.10",
+          "latestVersion": "0.5.9",
+          "category": "none",
+          "phase": "metadata-check"
+        }
+      ]
+    },
+    "update": {
+      "ok": true,
+      "hasUpdate": false,
+      "currentVersion": "0.5.10",
+      "latestVersion": "0.5.9",
+      "category": "none",
+      "phase": "metadata-check"
+    },
+    "helpOffline": true,
+    "chapters": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "installedProcessExit": {
+      "exitCode": 0,
+      "signal": null
+    }
+  },
+  "verification": {
+    "status": "passed",
+    "installerSha256": "c7066bfc375e200e8d8c70b01d54eb13bd1a8e7228b573a5db01740ed1cfa971",
+    "installedAsarSha256": "a21152be422c74149eca75fd2795ab10ad6cdf91a1409e1c266b7c754dd7f1e5",
+    "windowsSigning": "not-configured",
+    "signatureStatuses": {
+      "installer": "NotSigned",
+      "installedExecutable": "NotSigned"
+    }
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "status": "passed",
+  "sourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+  "version": "0.5.10",
+  "baseVersion": "0.5.9",
+  "arch": "arm64",
+  "updaterRun": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/release.yml",
+    "sourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+    "headRef": "refs/heads/codex/railwise-0510-acceptance-fixes",
+    "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/codex/railwise-0510-acceptance-fixes",
+    "workflowSha": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+    "runId": 44989484932,
+    "runAttempt": 1,
+    "artifact": {
+      "name": "exact-package-updater-44989484932",
+      "id": 14743031239,
+      "digest": "sha256:25a24f1cde98d4d1549f6674e0ec6e330141d666b759eef7d4b117cbef6f9a71"
+    }
+  },
+  "installer": "RailWise-AI-0.5.10-mac-arm64.dmg",
+  "installedAsarSha256": "5dbab511efd2dd49fd5185c3f7a65e13ad4ee57ef998a1244e99c8df52b10b85",
+  "dataReadback": {
+    "schemaVersion": 1,
+    "mode": "verify",
+    "status": "passed",
+    "projects": 1,
+    "networks": 1,
+    "adjustments": 1,
+    "monitoringDatasets": 1,
+    "sourceSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+    "serviceSource": "target-package",
+    "serviceIdentity": {
+      "schemaVersion": 1,
+      "packageVersion": "0.5.10",
+      "packageSourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+      "asarSha256": "5dbab511efd2dd49fd5185c3f7a65e13ad4ee57ef998a1244e99c8df52b10b85",
+      "layout": "asar-unpacked",
+      "serviceSourceHead": "822a8d748990432c0dbf87c3dea0e0538de849e0",
+      "serviceTreeSha256": "89ba35fcbec38b0b33f268ea0ee0649a9a502b374105045b85d2a193dcf89765",
+      "modules": [
+        {
+          "path": "dist/engineering/engineering-service.js",
+          "sha256": "8d09e03aa2ddbcf27e63e35971caff6fdfcee3fdcd2d73e790be2d58b367216f"
+        },
+        {
+          "path": "dist/engineering/survey-service.js",
+          "sha256": "1a57b2faef00cc1846c840d2f737ab95f0b43f9077500f47a7e3fa021bd8baff"
+        }
+      ],
+      "dependencies": [
+        {
+          "name": "better-sqlite3",
+          "path": "app.asar.unpacked/node_modules/better-sqlite3/package.json",
+          "sha256": "35f5841195912569932e7816ca09d03f6567a9c37a6668d4fdd450314d46e24b",
+          "treeSha256": "97ea33748f566ca12d17e2d1ee51de373fd6620795cc2990d18b15905e4ed25b"
+        },
+        {
+          "name": "jszip",
+          "path": "app.asar.unpacked/kun/node_modules/jszip/package.json",
+          "sha256": "83569b5b130b5ec27ae281ed80420ad364baf1bf64cb82e6ac8fb891e1b4ec4c",
+          "treeSha256": "f43a168df7bc5bc7cdb72d60918ceebc3f2590fd0390aafd446b469c3ff227fd"
+        },
+        {
+          "name": "pdfkit",
+          "path": "app.asar.unpacked/kun/node_modules/pdfkit/package.json",
+          "sha256": "a4a1151ae3f3fdac9c6e24feb68d30b33809377263bf5bab9d6e8aa36983736b",
+          "treeSha256": "fe6f576bf60f12e3f710bdcb9dc2ad7cde763ca82378acc426e2ff1647418dc0"
+        },
+        {
+          "name": "zod",
+          "path": "app.asar.unpacked/kun/node_modules/zod/package.json",
+          "sha256": "c2d190d9ee4e0bdb60332aaa2130a6a98d65ddb903fe1d29248b15de57832c45",
+          "treeSha256": "29cd82e0e6217d0b9470a23767f7f437d5ac089f94bdeaa3b1b0a6b48101e1b6"
+        },
+        {
+          "name": "better-sqlite3-native",
+          "path": "app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+          "sha256": "cec7b656a24758a9471e41032b8a54b6d629e3d36186390f64950ba196c96c23"
+        }
+      ]
+    },
+    "taskContinuity": {
+      "status": "passed",
+      "taskStates": [
+        "paused",
+        "waiting_user"
+      ],
+      "pendingInputs": 2,
+      "pendingQuestions": 1,
+      "drafts": 1,
+      "readableThreads": 2,
+      "preservedMessages": 2,
+      "draftSha256": "20b98f4c517d24ca720029805608e6823e3cc17d8e56dc8317d0cccca615ece2",
+      "baselineSha256": "3322d8c124e80ddbe36641deb5e4f1541c90d4fc86a396b8156ce046b4d90620",
+      "candidateReceiptStatus": "succeeded",
+      "scope": "Selected package TaskRunRepository and real document candidate tool, reopened in independent packaged Electron processes; no model request or external operation."
+    },
+    "scope": "Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official 0.5.9 Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary 0.5.9 schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution."
+  },
+  "configReferences": {
+    "status": "byte-preserved",
+    "kinds": [
+      "disabled MCP",
+      "plugin manifest reference",
+      "Skill text",
+      "inert credential reference"
+    ],
+    "scope": "Stored bytes only; updater acceptance exits before configuration activation. No real credential, plugin activation or complete catalog migration is certified."
+  },
+  "nativeStages": [
+    {
+      "name": "base_started",
+      "at": "2026-11-22T06:29:52.419Z"
+    },
+    {
+      "name": "update_available",
+      "at": "2026-11-22T06:29:53.607Z",
+      "detail": "0.5.10"
+    },
+    {
+      "name": "download_completed",
+      "at": "2026-11-22T06:30:28.162Z",
+      "detail": "1 artifact(s)"
+    },
+    {
+      "name": "install_requested",
+      "at": "2026-11-22T06:30:28.175Z"
+    },
+    {
+      "name": "target_relaunched",
+      "at": "2026-11-22T06:31:05.060Z",
+      "detail": "0.5.10"
+    },
+    {
+      "name": "user_data_preserved",
+      "at": "2026-11-22T06:31:05.061Z",
+      "detail": "0.5.9"
+    }
+  ],
+  "systemTrustModified": false,
+  "officialFeedsModified": false
+}
