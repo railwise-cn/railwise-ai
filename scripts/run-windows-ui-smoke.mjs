@@ -424,7 +424,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false, requireLocalOcr = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -437,6 +437,21 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
   assert.equal(report.errors.length, 0)
+  if (requireLocalOcr) {
+    assert.ok(report.checks.includes('installed-chinese-renderer'))
+    assert.ok(report.checks.includes('configured-local-ocr-scan-in-original-chat'))
+    const ocr = report.localOcr
+    assert.equal(ocr.status, 'passed')
+    assert.equal(ocr.recognition.platform, 'Windows')
+    assert.equal(ocr.recognition.imageOnly, true)
+    assert.deepEqual(ocr.indexedPages, [1, 2])
+    assert.equal(ocr.parser, 'unlimited-ocr-local')
+    assert.equal(ocr.originalRetained, true)
+    assert.equal(ocr.attachmentOnlySend, true)
+    assert.equal(ocr.modelObservedOcr, true)
+    assert.ok(ocr.threadId && ocr.turnId)
+    return true
+  }
   if (requireDoclingConversion) {
     assert.ok(report.checks.includes('installed-chinese-renderer'))
     assert.ok(report.checks.includes('cold-mirror-docling-backend-and-two-skill-calls'))
@@ -2634,19 +2649,22 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
   const video = videoEvaluation ? await import('./verify-windows-video-evaluation.mjs')
     .then(module => module.startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput)) : undefined
-  const composerModule = composerSmoke ? await import('./verify-windows-composer-acceptance.mjs') : undefined
-  const composerAcceptance = composerModule?.createComposerModelAcceptance()
+  const localOcr = process.env.RAILWISE_WINDOWS_LOCAL_OCR === 'true'
+  const composerModule = composerSmoke || localOcr ? await import('./verify-windows-composer-acceptance.mjs') : undefined
+  const composerAcceptance = composerSmoke ? composerModule.createComposerModelAcceptance() : undefined
+  const ocr = localOcr ? await composerModule.startWindowsOcrAcceptance({ ownedRoot: root, workspace }) : undefined
   const marketplaceModule = mirrorSmoke || doclingConversion ? await import('./verify-windows-cold-marketplace.mjs') : undefined
   const marketplaceAcceptance = marketplaceModule?.createMarketplaceModelAcceptance()
-  const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke ? await startWindowsTaskModelFixture({
+  const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke || ocr ? await startWindowsTaskModelFixture({
     browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke,
-    composerAcceptance: composerAcceptance ?? marketplaceAcceptance
+    composerAcceptance: ocr ?? composerAcceptance ?? marketplaceAcceptance
   }) : undefined)
   const model = video?.model ?? 'windows-task-fixture'
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
   await writeFile(settingsPath, JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: 'zh', theme: 'dark', workspaceRoot: workspace, uiFontScale: 'small',
+    ...(ocr ? { documents: { parsingMode: 'auto', unlimitedOcrServerUrl: ocr.baseUrl } } : {}),
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
     ...(taskModel ? { provider: { providers: [{ id: model, name: '本机验收协议模型', apiKey: 'synthetic-local-only', baseUrl: taskModel.baseUrl, endpointFormat: 'chat_completions', models: [model] }] } } : {}),
     agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'), ...(taskModel ? { providerId: model, model, approvalPolicy: 'auto', sandboxMode: 'read-only' } : {}) } } }))
@@ -2711,7 +2729,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
-    if (video) {
+    if (ocr) {
+      report.localOcr = ocr.evidence
+      report.localOcr = await ocr.verify(cdp)
+      report.checks.push('configured-local-ocr-scan-in-original-chat')
+    } else if (video) {
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
       report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: true })
       report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
@@ -3358,7 +3380,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel?.observed) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion }); report.status = 'passed' } catch (error) {
+    await ocr?.close()
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion, requireLocalOcr: localOcr }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
