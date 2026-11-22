@@ -178,9 +178,24 @@ if($ownedHandle -eq [IntPtr]::Zero -or $windowOwnerId -ne ${pid} -or -not [RailW
 ${bounds ? `[void][RailWiseSmokeWindow]::ShowWindow($ownedHandle,9)
 if(-not [RailWiseSmokeWindow]::SetWindowPos($ownedHandle,[IntPtr]::Zero,${bounds.left},${bounds.top},${bounds.width},${bounds.height},20)){throw 'Owned window resize failed'}
 ${bounds.windowState === 'maximized' ? '[void][RailWiseSmokeWindow]::ShowWindow($ownedHandle,3)' : ''}` : ''}
-$ownedRect=New-Object RailWiseSmokeWindow+Rect
-if(-not [RailWiseSmokeWindow]::GetWindowRect($ownedHandle,[ref]$ownedRect)){throw 'Owned window bounds unavailable'}
-@{ownerVerified=$true;left=$ownedRect.Left;top=$ownedRect.Top;width=$ownedRect.Right-$ownedRect.Left;height=$ownedRect.Bottom-$ownedRect.Top;windowState=$(if([RailWiseSmokeWindow]::IsZoomed($ownedHandle)){'maximized'}else{'normal'})}|ConvertTo-Json -Compress`
+$windowReadback=$null
+for($attempt=0;$attempt -lt 20 -and $null -eq $windowReadback;$attempt++){
+  $ownedProcess=Get-Process -Id ${pid}
+  $ownedHandle=$ownedProcess.MainWindowHandle
+  [uint32]$windowOwnerId=0
+  if($ownedHandle -ne [IntPtr]::Zero){
+    [void][RailWiseSmokeWindow]::GetWindowThreadProcessId($ownedHandle,[ref]$windowOwnerId)
+    if($windowOwnerId -eq ${pid} -and [RailWiseSmokeWindow]::IsWindowVisible($ownedHandle)){
+      $ownedRect=New-Object RailWiseSmokeWindow+Rect
+      if([RailWiseSmokeWindow]::GetWindowRect($ownedHandle,[ref]$ownedRect)){
+        $windowReadback=@{ownerVerified=$true;left=$ownedRect.Left;top=$ownedRect.Top;width=$ownedRect.Right-$ownedRect.Left;height=$ownedRect.Bottom-$ownedRect.Top;windowState=$(if([RailWiseSmokeWindow]::IsZoomed($ownedHandle)){'maximized'}else{'normal'})}
+      }
+    }
+  }
+  if($null -eq $windowReadback){Start-Sleep -Milliseconds 100}
+}
+if($null -eq $windowReadback){throw 'Owned window bounds unavailable after bounded main-window transition wait'}
+$windowReadback|ConvertTo-Json -Compress`
 }
 
 async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment, audit }) {
@@ -3367,6 +3382,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   } catch (error) {
     // The isolated live provider may include its request URL or payload in errors.
     report.errors.push(webPptLive ? 'Live model acceptance did not complete' : error instanceof Error ? error.message : String(error))
+    if (doclingConversion && marketplaceAcceptance?.diagnostics) {
+      report.skillExecutionDiagnostics = marketplaceAcceptance.diagnostics()
+    }
     if (error.browserBootstrap) report.browserBootstrap = error.browserBootstrap
     if (cdp && !webPptLive) {
       try {

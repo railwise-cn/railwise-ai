@@ -142,7 +142,7 @@ describe('task actions in the original conversation', () => {
   })
 
   it('binds a task question to the composer when another conversation control is also open', async () => {
-    tasks = [run('worker-question', 'waiting_user', { activeTurnId: 'waiting-turn' })]
+    tasks = [run('worker-question', 'paused', { activeTurnId: 'waiting-turn' })]
     const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
     attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
       threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
@@ -157,6 +157,19 @@ describe('task actions in the original conversation', () => {
     expect(composerReplyQuestion(activeConversationControls([approval, openQuestion]))).toBeUndefined()
     expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
       requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
+  })
+
+  it('does not bind a stale task question while the task is queued', async () => {
+    tasks = [run('worker-question', 'queued', { activeTurnId: 'queued-turn' })]
+    attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
+      threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [{ id: 'website', question: '请提供官网网址。', options: [] }] }, revision: 1,
+      createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const onComposerQuestionChange = vi.fn()
+
+    await render({ composerReplies: true, onComposerQuestionChange })
+
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
   })
 
   it('continues the same durable run once and uses the existing composer and chooser', async () => {

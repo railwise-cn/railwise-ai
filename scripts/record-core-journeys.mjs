@@ -219,8 +219,7 @@ export function windowsUpdaterCoreJourney(report, entry) {
     if (entry === 'overlay') assert.equal(verification.feedRequests, null)
     else {
       assert.ok(verification.feedRequests?.manifest >= 1)
-      assert.ok(verification.feedRequests?.zip >= 1)
-      assert.ok(verification.feedRequests?.bytesServed > 0)
+      assert.ok((verification.feedRequests?.installerBytes ?? verification.feedRequests?.bytesServed) > 0)
     }
   }
   const [after] = report.steps

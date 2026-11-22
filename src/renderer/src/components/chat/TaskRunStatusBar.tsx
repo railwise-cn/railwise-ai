@@ -111,7 +111,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   const attentionTitle = onlyAttention?.title
   const attentionQuestions = onlyAttention?.payload?.questions
   const taskQuestion = useMemo(() => {
-    if (!composerReplies || task.status !== 'waiting_user' || !task.activeTurnId || attentionKind !== 'question' ||
+    if (!composerReplies || !['waiting_user', 'paused'].includes(task.status) || !task.activeTurnId || attentionKind !== 'question' ||
       !threadId || !attentionId || !Array.isArray(attentionQuestions) || attentionQuestions.length !== 1) return null
     const value = attentionQuestions[0]
     if (!value || typeof value !== 'object' || !('id' in value) || typeof value.id !== 'string') return null

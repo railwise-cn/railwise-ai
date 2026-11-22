@@ -457,6 +457,9 @@ test('installed UI probes select the actual controlled menu and constrain native
   assert.match(script, /GetWindowThreadProcessId/)
   assert.match(script, /windowOwnerId -ne 7/)
   assert.match(script, /SetWindowPos/)
+  assert.match(script, /for\(\$attempt=0;\$attempt -lt 20/)
+  assert.match(script, /Get-Process -Id 7/)
+  assert.match(script, /main-window transition wait/)
   assert.doesNotMatch(script, /MainModule|runtimeRequest|Invoke-Expression|Start-Process/)
 })
 
@@ -758,17 +761,20 @@ test('marketplace synthetic turns require live instruction injection and scoped 
     ],
     tools: [{ function: { name: 'read_skill_resource' } }]
   }
-  assert.throws(() => fixture.modelAction({ ...request, messages: request.messages.slice(1) }), /inject the actual installed instructions/)
+  assert.equal(fixture.modelAction({ ...request, messages: request.messages.slice(1) }).content, '验收暂停：当前会话未加载 using-superpowers。')
+  assert.deepEqual(fixture.diagnostics(), [{ skillId: 'using-superpowers', stages: ['skill-injection-missing'], resourceVerified: false }])
   const first = fixture.modelAction(request)
   assert.deepEqual(first.tool_calls[0].function, {
     name: 'read_skill_resource', arguments: JSON.stringify({ skill_id: skill.id, path: 'SKILL.md' })
   })
   const readback = content => ({ ...request, messages: [...request.messages, { role: 'tool',
     tool_call_id: first.tool_calls[0].id, content }] })
-  assert.throws(() => fixture.modelAction(readback('missing actual file contents')), /actual reviewed skill file/)
+  assert.equal(fixture.modelAction(readback('missing actual file contents')).content, '验收暂停：当前会话无法读取 using-superpowers 的安装说明。')
   assert.equal(probe.resourceVerified, false)
   assert.deepEqual(fixture.modelAction(readback(JSON.stringify({ content: entry }))), { content: probe.reply })
   assert.equal(probe.resourceVerified, true)
+  assert.deepEqual(fixture.diagnostics(), [{ skillId: 'using-superpowers',
+    stages: ['skill-injection-missing', 'skill-resource-tool-available', 'skill-resource-content-mismatch', 'skill-resource-read'], resourceVerified: true }])
 })
 
 test('only the exact installed di-bao agent-pack component with matching packaged bytes is accepted', async () => {

@@ -84,3 +84,20 @@ Windows BrowserSkill 重跑 `45068852871` 使用修复 KUN 中断记账的候选
 同一批 Windows 0.5.10 双入口与 0.5.7 覆盖安装已完成 GUI 升级并启动目标版本；回执运行 `45068881905`、`45068914692` 在记录阶段失败，因为验收器将 `latest.yml` 的 SHA-512 Base64 字段误按十六进制格式校验。安装包本身仍按 SHA-512、blockmap、Artifact 和版本清单验证。现按 Windows 清单的 88 字符 Base64 格式校验该字段并增加拒绝错误编码的回归。该改动只涉及 QA 记录器，可复用同批安装包重跑升级矩阵。
 
 2026-11-23 源码复核：`TaskRunStatusBar.dom.test.ts` 8/8、KUN `task-coordinator.test.ts` 与 `task-coordinator-runtime.test.ts` 42/42、核心旅程回执与发布门禁测试 26/26 通过；稳定发布门禁 585 项通过、1 项因宿主没有 PowerShell 跳过。`npm run typecheck`、改动文件 ESLint、`git diff --check` 与本机 `NODE_OPTIONS=--max-old-space-size=6144 npm run build` 通过。回执校验现在接受 64 字节 SHA-512 的规范 Base64 和旧十六进制记录，并拒绝非规范 Base64。以上均为源码级结果，尚未证明提交 `e1ddd587` 已进入安装包。下一步需以该提交生成新的三端候选，重跑 Windows 0.5.10 双入口及 0.5.7 覆盖安装、macOS 双架构启动和表格，以及原对话补充网址后使用真实 BrowserSkill 完成网页到可编辑 PPTX 流程。真实模型端点、密钥、已登录大单网/Ego、Windows 国内网络与扫描 OCR 等现场验收继续标为待测。
+
+## 2026-11-23 最新精确候选实测
+
+候选 Release workflow `45072115774` 对提交 `79bcef84`，完成状态 success。Windows 安装包通过构建和运行时检查，Artifact `14774292782`（328,873,661 bytes）；Mac Apple Silicon/Intel 签名包 Artifact `14776155513`（1,662,830,382 bytes），候选身份、更新元数据及签名制品核验通过。Windows 安装器 SHA-256 为 `620868d23b831471e8252ca8357b4ade126631d087b42c81b156a53c905f2511`，安装后 ASAR SHA-256 为 `8b6476cce10c4d7249bbf3ddb49aba3a7e8ebf765f155c469d89b0e96ce4fe17`。该流程的 `candidate_only=true`，`prepare_public_artifacts=false`，正式发布工作跳过。以下 Windows 实装均绑定该 Release run 中同一个 Windows 安装包，不能证明之后的源码补丁已进入制品。
+
+| 实装流程 | 实际结果与修复 |
+| --- | --- |
+| 冷启动 | `45075680273` 安装后实际冷启动通过。中文启动界面验收和安装身份回执已生成。 |
+| 普通任务、HTML、每日计划 | `45075680863` 通过。任务在原对话正文显示完成状态和 HTML 文件名，成果哈希核对一致、能从对话预览。每日计划使用真实系统时钟触发独立到期任务，结果回到原对话且没有重新询问用户。任务列表和导航链接计数均为零，符合任务内容留在对话正文的要求。 |
+| 0.5.7 覆盖安装 | `45075680323` 的 0.5.7 → 0.5.11 安装器覆盖和原数据读回通过。 |
+| 0.5.10 左下角及设置页升级 | `45075680323` 两个入口均完成原地升级并启动 0.5.11，工作区、会话及偏好读回通过。回执脚本误把 Windows 安装器下载计数 `installerBytes` 当成 ZIP 下载 `zip`，所以 run 的总结果被记录步骤标成失败。修正后已对原始侧栏、设置及覆盖安装回执执行 `windowsUpdaterCoreJourney`，三条均成功，目标包和 ASAR 摘要一致。 |
+| BrowserSkill 网页回退 | `45075680357` 失败。截图和任务快照确认任务进入 `paused`，工具和开放问题仍 pending，原话被作为普通补充发送，问题没有作答。根因是输入框只为 `waiting_user` 状态的问题注册 Composer 请求 ID。现在唯一开放问题在任务处于 `waiting_user` 或 `paused` 且存在活动 Turn 时绑定到原会话输入框；排队状态的旧问题不绑定。多控制项、暂停和排队状态的定向 DOM 回归 9/9 通过。修复不在 `79bcef84` 安装包内，必须新建候选并验证真实 POST 使用原 request ID、旧 Turn 收尾后同任务自动新开 Turn。 |
+| 附件、PDF、技能和插件 | `45075680466` 在尚未进入附件操作前失败。验收驱动在启动画面切到主窗口的短暂阶段立即读取 OS 窗口边界，`GetWindowRect` 未就绪后被误判为 UI 失败。驱动现在只针对已验证应用 PID 重取窗口句柄，并最多等待两秒读取尺寸。窗口驱动和相邻回归已通过，须经新 workflow 源码检查后用精确安装包重跑附件流程。 |
+| Docling 和 Blender Skills | 单独 Docling 运行 `45075680440` 启动 Docling 并执行 CSV 转换，后续 Blender Director 回执失败。全量市场回执 `45075680662` 随后在同包成功验证 Docling 19 个工具、Superpowers 和 Blender Director 实际说明读取。失败运行驱动现增加经过脱敏的阶段码，保留后续诊断能力。 |
+| 全量冷缓存市场 | `45075680662` 通过。Superpowers 与 Blender Skills 均经市场安装，`/` 选择准确子技能，在当前对话确认注入说明并读取安装包的原始 `SKILL.md`。Docling 发现 19 个工具；Playwright MCP 通过 stdio 实际打开并读取 2 个页面。验收仍未覆盖国内普通网络 Windows。 |
+
+截至本段更新，`79bcef84` 候选的普通任务和计划、冷启动、全量冷缓存市场、0.5.7 覆盖安装及 0.5.10 两个 GUI 入口实装均通过。原升级报告已通过修正后的回执代码逐项读取。BrowserSkill 暴露出待进入新包的应用缺陷。附件验收被窗口驱动提前中止。应用修复及验收驱动补丁尚未构建和实装，Mac 双架构启动与离线表格实装仍在运行。真实模型所需的三个 Actions 配置项仍未检测到，正式渠道仍为 0.5.10，不能发布 0.5.11。

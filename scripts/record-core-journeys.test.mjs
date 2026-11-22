@@ -191,7 +191,7 @@ test('Windows updater receipt accepts an isolated candidate only with exact arti
     releaseHighlightsVisible: true, action: { method: 'trusted-pointer-on-sidebar', window: { pid: 321 } } }
   const targetVerification = { scope: 'isolated-candidate-acceptance', releaseApproval: false,
     manifestSha256: 'a'.repeat(64), installerSha512: Buffer.alloc(64, 0x5a).toString('base64'), blockmapSha256: 'c'.repeat(64),
-    feedRequests: { manifest: 2, zip: 1, bytesServed: 100 } }
+    feedRequests: { manifest: 2, installerBytes: 100 } }
   const report = { status: 'passed', scope: 'private-isolated-windows-gui-upgrade', productionTouched: false,
     targetVerification, targetBuild: { ...build, packageSourceHead: sourceHead }, baseline: { package: { version: '0.5.10' } },
     privateTrust: { scope: 'ephemeral-github-hosted-windows-machine-root' }, steps: [after] }
@@ -201,7 +201,7 @@ test('Windows updater receipt accepts an isolated candidate only with exact arti
   targetVerification.installerSha512 = `${Buffer.alloc(64).toString('base64').slice(0, -3)}B==`
   assert.throws(() => windowsUpdaterCoreJourney(report, 'sidebar'), /installer SHA-512/)
   targetVerification.installerSha512 = Buffer.alloc(64, 0x5a).toString('base64')
-  report.targetVerification.feedRequests.bytesServed = 0
+  report.targetVerification.feedRequests.installerBytes = 0
   assert.throws(() => windowsUpdaterCoreJourney(report, 'sidebar'))
   report.targetVerification.feedRequests = null
   after.action.method = 'exact-installer-overlay'
