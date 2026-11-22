@@ -52,7 +52,7 @@ on:
       offline_spreadsheet_targets:
         description: 'Native runners for exact-package offline spreadsheet verification.'
         type: choice
-        options: [windows-and-intel, windows, intel, all]
+        options: [windows-and-intel, windows, mac, intel, all]
         default: windows-and-intel
       package_run_id:
         description: 'Same-repository release run containing the exact installer artifact to inspect'
@@ -367,7 +367,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: ${{ fromJSON(inputs.offline_spreadsheet_targets == 'windows' && '["windows-2022"]' || inputs.offline_spreadsheet_targets == 'intel' && '["macos-15-intel"]' || inputs.offline_spreadsheet_targets == 'all' && '["windows-2022","macos-15-intel","macos-15"]' || '["windows-2022","macos-15-intel"]') }}
+        runner: ${{ fromJSON(inputs.offline_spreadsheet_targets == 'windows' && '["windows-2022"]' || inputs.offline_spreadsheet_targets == 'mac' && '["macos-15-intel","macos-15"]' || inputs.offline_spreadsheet_targets == 'intel' && '["macos-15-intel"]' || inputs.offline_spreadsheet_targets == 'all' && '["windows-2022","macos-15-intel","macos-15"]' || '["windows-2022","macos-15-intel"]') }}
     steps:
       - uses: actions/checkout@v7
         with:
