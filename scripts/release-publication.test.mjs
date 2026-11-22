@@ -44,7 +44,7 @@ test('one publication manifest projects current package names, website downloads
     const source = readdirSync(f.input).find(name => { const a = publication.parseArtifactName(name); const b = publication.parseArtifactName(file.name); return a && b && a.platform === b.platform && a.arch === b.arch && a.format === b.format && a.blockmap === b.blockmap })
     assert.deepEqual(readFileSync(join(f.input, source)), readFileSync(join(f.output, file.name)))
   }
-  const site = generator.productManifest(f.manifest, { capabilityStatus: { stable: ['Existing capability'] }, platforms: [] })
+  const site = generator.productManifest(f.manifest, { capabilityStatus: { stable: ['Existing capability'] }, platforms: [] }, '2026-11-09T01:00:00.000Z')
   assert.equal(site.releaseCommit, 'a'.repeat(40))
   assert.equal(site.version, f.version)
   assert.deepEqual(site.platforms.map(file => file.file), f.manifest.installers.map(file => file.name))
@@ -55,6 +55,39 @@ test('one publication manifest projects current package names, website downloads
   publication.copyPublicInstallers(f.output, github)
   assert.deepEqual(readdirSync(github).sort(), f.manifest.installers.map(file => file.name).sort())
   execFileSync(process.execPath, ['scripts/verify-release-assets.cjs', f.output], { stdio: 'pipe' })
+})
+
+test('product download data replaces old installer identity and preserves site copy', t => {
+  const f = fixture(t)
+  const mirrorVerifiedAt = '2026-11-09T01:00:00.000Z'
+  const previous = {
+    docs: { quickstart: 'https://kb.railwise.cn/products/workwise/quickstart/' },
+    platforms: f.manifest.installers.map(file => ({
+      id: file.id,
+      file: file.name.replace(f.version, '0.5.4'),
+      description: `Existing ${file.id} description`,
+      sizeBytes: 1,
+      url: '/old-installer',
+      downloadUrl: 'https://github.com/railwise-cn/railwise-ai/releases/download/v0.5.4/old-installer',
+      sha256: '0'.repeat(64),
+      mirrorSha256: '0'.repeat(64),
+      mirrorVerifiedAt: '2026-11-08T01:00:00.000Z'
+    }))
+  }
+  const site = generator.productManifest(f.manifest, previous, mirrorVerifiedAt)
+  assert.deepEqual(site.docs, previous.docs)
+  for (const [index, file] of f.manifest.installers.entries()) {
+    const installer = site.platforms[index]
+    assert.equal(installer.file, file.name)
+    assert.equal(installer.url, new URL(file.url).pathname)
+    assert.equal(installer.downloadUrl, `https://github.com/railwise-cn/railwise-ai/releases/download/${f.manifest.tag}/${file.name}`)
+    assert.equal(installer.sizeBytes, file.size)
+    assert.equal(installer.sha256, file.sha256)
+    assert.equal(installer.mirrorSha256, file.sha256)
+    assert.equal(installer.mirrorVerifiedAt, mirrorVerifiedAt)
+    assert.equal(installer.description, previous.platforms[index].description)
+  }
+  assert.throws(() => generator.productManifest(f.manifest, previous), /mirror verification time/)
 })
 
 test('legacy filenames are read without rewriting historical receipts or weakening namespace validation', t => {

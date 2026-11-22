@@ -266,10 +266,17 @@ test('a fresh legacy URL cannot mask stale canonical product content', async () 
   assert.equal(calls.filter((url) => url.endsWith('/products/railwise-ai/')).length, 2)
 })
 
-test('correct page cannot mask an old public manifest or wrong installer hash', async () => {
+test('correct page cannot mask an old public manifest or stale installer metadata', async () => {
+  const withStaleInstaller = (metadata) => ({
+    ...manifest,
+    platforms: manifest.platforms.map((platform, index) => index === 0 ? { ...platform, ...metadata } : platform)
+  })
   for (const bad of [
     { ...manifest, version: '0.5.0' },
-    { ...manifest, platforms: manifest.platforms.map((p, i) => i ? p : { ...p, sha256: '0'.repeat(64) }) }
+    withStaleInstaller({ sha256: '0'.repeat(64) }),
+    withStaleInstaller({ sizeBytes: 1 }),
+    withStaleInstaller({ downloadUrl: manifest.platforms[0].downloadUrl.replaceAll(manifest.version, '0.5.0') }),
+    withStaleInstaller({ mirrorSha256: '0'.repeat(64) })
   ]) {
     await assert.rejects(verifyProductPublication(manifest, { ...options, fetcher: async (url) =>
       String(url).includes('/data/') ? Response.json(bad) : goodResponse(url)
