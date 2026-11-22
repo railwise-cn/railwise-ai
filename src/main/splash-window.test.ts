@@ -3,7 +3,9 @@ import {
   buildSplashHtml,
   createSplashWindow,
   SPLASH_MIN_VISIBLE_MS,
+  SPLASH_READY_TIMEOUT_MS,
   splashProgressLabel,
+  splashReadyWaitRemainingMs,
   splashRemainingVisibleMs
 } from './splash-window'
 
@@ -92,6 +94,10 @@ describe('splash window document', () => {
 
   it('keeps a fast-starting splash visible long enough to be perceived', () => {
     expect(SPLASH_MIN_VISIBLE_MS).toBe(1_200)
+    expect(SPLASH_READY_TIMEOUT_MS).toBe(5_000)
+    expect(splashReadyWaitRemainingMs(1_000, 1_000)).toBe(5_000)
+    expect(splashReadyWaitRemainingMs(1_000, 5_999)).toBe(1)
+    expect(splashReadyWaitRemainingMs(1_000, 6_000)).toBe(0)
     expect(splashRemainingVisibleMs(1_000, 1_450)).toBe(750)
     expect(splashRemainingVisibleMs(1_000, 2_500)).toBe(0)
     expect(splashRemainingVisibleMs(0, 100)).toBe(0)

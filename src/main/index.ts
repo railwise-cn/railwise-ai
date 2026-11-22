@@ -151,6 +151,7 @@ import {
 import {
   createSplashWindow,
   splashRemainingVisibleMs,
+  splashReadyWaitRemainingMs,
   splashProgressLabel,
   type SplashWindowController
 } from './splash-window'
@@ -353,6 +354,7 @@ if (!runningClawScheduleMcpServer && process.platform === 'win32') {
 
 let mainWindow: BrowserWindow | null = null
 let splashWindow: SplashWindowController | null = null
+let splashCreatedAt = 0
 let currentWindowAppearance: WindowAppearanceV1 = SOLID_WINDOW_APPEARANCE
 let currentWindowDark = false
 let store: JsonSettingsStore
@@ -1194,15 +1196,22 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
     if (options.suppressInitialShow) {
       splashWindow?.close()
       splashWindow = null
+      splashCreatedAt = 0
       return
     }
     if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isVisible()) return
     if (splashWindow && !splashWindow.visibleAt) {
-      if (!deferredShowTimer) deferredShowTimer = setTimeout(() => {
-        deferredShowTimer = null
-        showWindow()
-      }, 25)
-      return
+      const remainingReadyWaitMs = splashReadyWaitRemainingMs(splashCreatedAt, Date.now())
+      if (remainingReadyWaitMs > 0) {
+        if (!deferredShowTimer) deferredShowTimer = setTimeout(() => {
+          deferredShowTimer = null
+          showWindow()
+        }, Math.min(25, remainingReadyWaitMs))
+        return
+      }
+      splashWindow.close()
+      splashWindow = null
+      splashCreatedAt = 0
     }
     const remainingSplashMs = splashWindow ? splashRemainingVisibleMs(splashWindow.visibleAt, Date.now()) : 0
     if (remainingSplashMs > 0) {
@@ -1221,6 +1230,7 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
     mainWindow.show()
     splashWindow?.close()
     splashWindow = null
+    splashCreatedAt = 0
   }
   mainWindow.on('close', (event) => {
     if (
@@ -1437,6 +1447,7 @@ app.whenReady().then(async () => {
   currentWindowDark = nativeTheme.shouldUseDarkColors
   const suppressInitialShow = shouldStartHidden(initial)
   if (!suppressInitialShow) {
+    splashCreatedAt = Date.now()
     splashWindow = createSplashWindow({
       appearance: currentWindowAppearance,
       dark: currentWindowDark,
@@ -1835,6 +1846,7 @@ app.whenReady().then(async () => {
   console.error('[workwise] startup failed:', error)
   splashWindow?.close()
   splashWindow = null
+  splashCreatedAt = 0
   if (!shouldShowStartupErrorDialog(candidateHeadless)) {
     isQuitting = true
     void stopManagedRuntimesForQuit()

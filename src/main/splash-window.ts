@@ -10,6 +10,11 @@ export type SplashProgress = {
 }
 
 export const SPLASH_MIN_VISIBLE_MS = 1_200
+export const SPLASH_READY_TIMEOUT_MS = 5_000
+
+export function splashReadyWaitRemainingMs(createdAt: number, now: number): number {
+  return Math.max(0, SPLASH_READY_TIMEOUT_MS - Math.max(0, now - createdAt))
+}
 
 export function splashRemainingVisibleMs(
   openedAt: number,
