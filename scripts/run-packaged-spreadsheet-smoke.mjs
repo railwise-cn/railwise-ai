@@ -51,7 +51,6 @@ async function prepareExactSource(runId) {
   assert.equal(run.repository.full_name, repository)
   assert.equal(run.head_repository.full_name, repository)
   assert.equal(run.event, 'workflow_dispatch')
-  assert.equal(run.conclusion, 'success')
   assert.match(run.head_sha, /^[a-f0-9]{40}$/)
   git('merge-base', '--is-ancestor', run.head_sha, 'HEAD')
   const files = git('diff', '--name-only', run.head_sha, 'HEAD').split('\n').filter(Boolean)
@@ -70,6 +69,7 @@ async function prepareExactSource(runId) {
   const version = JSON.parse(git('show', `${run.head_sha}:package.json`)).version
   assert.match(version, /^\d+\.\d+\.\d+$/)
   return { repository, version, runId: Number(runId), runAttempt: run.run_attempt, sourceHead: run.head_sha,
+    buildJobId: build.id, buildConclusion: build.conclusion,
     driverHead: git('rev-parse', 'HEAD'), changedFiles: files, artifactId: artifact.id, artifactDigest: artifact.digest, artifactName: name }
 }
 
@@ -403,6 +403,7 @@ async function validateWorkbook(cdp, workspace, root, report, evidenceDir) {
   report.checks.push('chinese-csv-import-export-leading-zero-two-sheets-save')
   await openWorkbook(excel)
   await ui('read-only Excel grid with both sheet names', 'document.body.innerText.includes("工程监测")&&document.body.innerText.includes("复核记录")&&document.body.innerText.includes("只读预览")&&document.body.innerText.includes("在系统应用打开")&&document.querySelectorAll("canvas").length>0')
+  assert.equal(await evaluate(workbookReady), false)
   const xlsx = await evaluate('window.workwise.openSpreadsheet(' + JSON.stringify({ path: excel, workspaceRoot: workspace }) + ')')
   assert.equal(xlsx.kind, 'xlsx')
   assert.deepEqual(xlsx.preview.sheets, [
