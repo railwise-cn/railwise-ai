@@ -183,6 +183,29 @@ test('Windows updater receipt requires exact handoff and recovers data for eithe
   assert.throws(() => windowsUpdaterCoreJourney(report, 'overlay'))
 })
 
+test('Windows updater receipt accepts an isolated candidate only with exact artifact and feed proof', () => {
+  const version = '0.5.11'
+  const after = { expectedVersion: version, expectedSource: sourceHead, installerSha256,
+    packageMetadata: { version, sourceHead, asarSha256: installedAsarSha256 },
+    profilePreserved: true, workspaceFilePreserved: true, preferencesPreserved: true, threadPreserved: true,
+    releaseHighlightsVisible: true, action: { method: 'trusted-pointer-on-sidebar', window: { pid: 321 } } }
+  const targetVerification = { scope: 'isolated-candidate-acceptance', releaseApproval: false,
+    manifestSha256: 'a'.repeat(64), installerSha512: 'b'.repeat(128), blockmapSha256: 'c'.repeat(64),
+    feedRequests: { manifest: 2, zip: 1, bytesServed: 100 } }
+  const report = { status: 'passed', scope: 'private-isolated-windows-gui-upgrade', productionTouched: false,
+    targetVerification, targetBuild: { ...build, packageSourceHead: sourceHead }, baseline: { package: { version: '0.5.10' } },
+    privateTrust: { scope: 'ephemeral-github-hosted-windows-machine-root' }, steps: [after] }
+  assert.equal(windowsUpdaterCoreJourney(report, 'sidebar').journeys[0].id, 'windows-updater-sidebar')
+  report.targetVerification.feedRequests.bytesServed = 0
+  assert.throws(() => windowsUpdaterCoreJourney(report, 'sidebar'))
+  report.targetVerification.feedRequests = null
+  after.action.method = 'exact-installer-overlay'
+  report.baseline.package.version = '0.5.7'
+  assert.equal(windowsUpdaterCoreJourney(report, 'overlay').journeys[0].id, 'windows-legacy-overlay')
+  report.targetVerification.releaseApproval = true
+  assert.throws(() => windowsUpdaterCoreJourney(report, 'overlay'))
+})
+
 test('receipt writer only accepts hosted workflows and creates an immutable output path', async t => {
   const root = await mkdtemp(join(tmpdir(), 'railwise-core-journeys-record-'))
   t.after(() => rm(root, { recursive: true, force: true }))

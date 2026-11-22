@@ -196,9 +196,23 @@ export function windowsCoreJourneys(install, environment = process.env) {
 export function windowsUpdaterCoreJourney(report, entry) {
   assert.ok(['sidebar', 'settings', 'overlay'].includes(entry))
   assert.equal(report.status, 'passed')
-  assert.equal(report.scope, 'private-frozen-windows-gui-upgrade')
+  assert.ok(['private-frozen-windows-gui-upgrade', 'private-isolated-windows-gui-upgrade'].includes(report.scope))
   assert.equal(report.productionTouched, false)
   assert.equal(report.steps.length, 1)
+  if (report.scope === 'private-isolated-windows-gui-upgrade') {
+    const verification = report.targetVerification
+    assert.equal(verification?.scope, 'isolated-candidate-acceptance')
+    assert.equal(verification?.releaseApproval, false)
+    assert.match(verification?.manifestSha256 ?? '', sha256)
+    assert.match(verification?.installerSha512 ?? '', /^[a-f0-9]{128}$/)
+    assert.match(verification?.blockmapSha256 ?? '', sha256)
+    if (entry === 'overlay') assert.equal(verification.feedRequests, null)
+    else {
+      assert.ok(verification.feedRequests?.manifest >= 1)
+      assert.ok(verification.feedRequests?.zip >= 1)
+      assert.ok(verification.feedRequests?.bytesServed > 0)
+    }
+  }
   const [after] = report.steps
   const version = after.packageMetadata.version
   const sourceHead = report.targetBuild.packageSourceHead
@@ -214,13 +228,13 @@ export function windowsUpdaterCoreJourney(report, entry) {
     assert.equal(report.baseline.package.version, '0.5.7')
   } else {
     assert.equal(report.baseline.package.version, '0.5.10')
-    assert.equal(report.privateTrust?.scope, 'ephemeral-github-hosted-windows-machine-root')
+    if (entry !== 'overlay') assert.equal(report.privateTrust?.scope, 'ephemeral-github-hosted-windows-machine-root')
     assert.ok(after.action.window)
   }
   return { version, sourceHead, platform: 'win32', arch: 'x64', installerSha256: after.installerSha256,
     installedAsarSha256: after.packageMetadata.asarSha256, buildRunId: Number(report.targetBuild.runId),
     buildRunAttempt: Number(report.targetBuild.runAttempt), journeys: [{ id, method: 'installed-ui', status: 'passed',
-      evidence: 'frozen-windows-update.json records the exact install action and settings, workspace, conversation and release-highlight readback.' }] }
+      evidence: 'frozen-windows-update.json records the exact install action and settings, workspace, conversation and release-highlight readback for the verified package.' }] }
 }
 
 export async function recordHostedCoreJourneys(directory, result, environment = process.env) {

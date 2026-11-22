@@ -142,4 +142,24 @@ describe('persistent human gates', () => {
     expect(repository.humanRequest('question-1')?.status).toBe('answered')
     repository.close()
   })
+
+  it('settles the exact pending tool question when a turn restart finds a stale task owner', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-question-restart-')); roots.push(root)
+    const repository = new TaskRunRepository(join(root, 'tasks.sqlite3'))
+    repository.create({ ...task(), activeTurnId: 'turn-1' })
+    const gate = new PersistentUserInputGate(repository, () => '2026-11-09T00:00:01Z')
+    const pending = gate.request({ id: 'question-restart', threadId: 'thread-gate', turnId: 'turn-1', itemId: 'item-question',
+      prompt: '请提供网址', questions: [{ id: 'url', header: '网址', question: '请提供网址', options: [] }] })
+    const retry = task()
+    repository.create({ ...retry, id: 'task-retry', activeTurnId: 'turn-2', retryOfTaskId: 'task-gate',
+      nodes: retry.nodes.map(node => ({ ...node, id: 'node-retry', taskId: 'task-retry' })),
+      createdAt: '2026-11-09T00:00:02Z', updatedAt: '2026-11-09T00:00:02Z' })
+    expect(repository.currentExecution('task-gate')?.id).toBe('task-retry')
+
+    expect(gate.resolveForTurnRestart('question-restart')).toBe(true)
+    await expect(pending).resolves.toEqual({ status: 'cancelled' })
+    expect(repository.humanRequest('question-restart')).toMatchObject({ status: 'cancelled' })
+    expect(repository.attention('question-restart')?.status).toBe('cancelled')
+    repository.close()
+  })
 })

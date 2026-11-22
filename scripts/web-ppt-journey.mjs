@@ -79,9 +79,10 @@ function readRuntime(path) {
 }
 
 async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
-  const [task, inputs, thread] = await Promise.all([
+  const [task, inputs, inbox, thread] = await Promise.all([
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/inputs`)),
+    cdp.evaluate(readRuntime('/v1/inbox')),
     cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(executionThreadId)}`))
   ])
   return {
@@ -90,6 +91,9 @@ async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
       blockCode: task.blockCode, revision: task.revision },
     inputs: inputs.map(input => ({ id: input.id, kind: input.kind, status: input.status, sourceId: input.sourceId,
       textLength: typeof input.text === 'string' ? input.text.length : undefined })),
+    attention: inbox.filter(item => item.taskId === taskId).map(item => ({ kind: item.kind, status: item.status,
+      requestId: item.requestId, payloadKind: item.payload?.kind, provider: item.payload?.capability?.provider,
+      errorCode: item.payload?.capability?.errorCode, resolutionRoute: item.payload?.capability?.resolution?.route ?? item.payload?.capability?.action?.route })),
     turns: thread.turns.map(turn => ({ id: turn.id, status: turn.status, itemKinds: turn.items.map(item => ({ kind: item.kind,
       toolName: item.toolName, requestId: item.requestId, status: item.status, isError: item.isError })) }))
   }

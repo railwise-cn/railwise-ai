@@ -517,27 +517,32 @@ describe('task commands before Turn allocation',()=>{
     const f = await fixture()
     const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
     const requiresBrowserScopeRefresh = vi.fn(async (_task, _turnId, text) => text === 'www.railwise.cn')
-    let finishOldTurn!: () => void
-    const waitTurn = vi.fn(() => new Promise<void>(resolve => { finishOldTurn = resolve }))
+    let answer!: ReturnType<typeof userInputGate.request>
+    let taskId = ''
+    let oldTurnWaitedForQuestion = false
+    const waitTurn = vi.fn(async () => {
+      await expect(answer).resolves.toEqual({ status: 'cancelled' })
+      oldTurnWaitedForQuestion = f.repository.humanRequest('input-website')?.status === 'cancelled' &&
+        f.repository.get(taskId)?.status === 'paused'
+    })
     const coordinator = new TaskCoordinator({ ...f, userInputGate, requiresBrowserScopeRefresh, waitTurn,
       nowIso: () => new Date().toISOString() })
     const started = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'website-task', request: { prompt: '制作官网介绍 PPT' } })
     if (started.kind !== 'task_started') throw new Error('expected task')
+    taskId = started.task!.id
     const requestId = 'input-website'
-    const answer = userInputGate.request({ id: requestId, itemId: 'item-website', threadId: started.turn.threadId, turnId: started.turn.turnId,
+    answer = userInputGate.request({ id: requestId, itemId: 'item-website', threadId: started.turn.threadId, turnId: started.turn.turnId,
       prompt: '请提供官网网址。', questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] })
     expect(f.repository.get(started.task!.id)).toMatchObject({ status: 'waiting_user', activeTurnId: started.turn.turnId })
 
     const answering = coordinator.submitTaskUserInputAnswer(requestId, [
       { id: 'website', label: '官网', value: 'www.railwise.cn' }
     ])
-    await vi.waitFor(() => expect(waitTurn).toHaveBeenCalledOnce())
-    expect(f.repository.get(started.task!.id)?.status).toBe('paused')
-    expect(f.runTurn).toHaveBeenCalledOnce()
-    finishOldTurn()
-    const result = await answering
-
-    expect(result).toBe('submitted')
+    await expect(answering).resolves.toBe('submitted')
+    expect(waitTurn).toHaveBeenCalledOnce()
+    expect(oldTurnWaitedForQuestion).toBe(true)
+    expect(f.repository.get(started.task!.id)).toMatchObject({ status: 'retrying', activeTurnId: expect.any(String) })
+    expect(f.runTurn).toHaveBeenCalledTimes(2)
     expect(requiresBrowserScopeRefresh).toHaveBeenCalledWith(expect.objectContaining({ id: started.task!.id }), started.turn.turnId, 'www.railwise.cn')
     expect(f.repository.humanRequest(requestId)?.status).toBe('cancelled')
     await expect(answer).resolves.toEqual({ status: 'cancelled' })

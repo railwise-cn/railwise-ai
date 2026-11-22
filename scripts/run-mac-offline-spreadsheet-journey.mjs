@@ -135,7 +135,7 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
       theme: 'light',
       workspaceRoot: workspace,
       appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
-      agents: { kun: { autoStart: false, dataDir: runtime, port: 58931 } }
+      agents: { kun: { autoStart: true, dataDir: runtime, port: 58931 } }
     }
     await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify(profileSettings))
     const environment = createCandidateEnvironment(process.env, root, profile, workspace)
@@ -157,6 +157,11 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     await cdp.send('Network.setBlockedURLs', { urls: ['http://*', 'https://*'] })
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), version)
 
+    const newWorkbookButton = 'button[aria-label="新建表格"]'
+    if (!await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(newWorkbookButton)})?.getClientRects().length)`)) {
+      await click('新建会话')
+      await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(newWorkbookButton)})?.getClientRects().length)`, 'new conversation workbook controls')
+    }
     const editableReady = '[...document.querySelectorAll("button")].some(button => button.textContent === "保存表格" && !button.disabled)'
     const click = async text => {
       try { await cdp.click('button', text) } catch (error) {
@@ -323,7 +328,22 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     report.status = 'failed'
     report.error = error instanceof Error ? error.message : String(error)
     report.launchTail = launchLog
-    if (cdp) report.rendererEndState = await cdp.evaluate('document.body.innerText.slice(-1400)', 1000).catch(() => undefined)
+    if (cdp) {
+      report.rendererEndState = await cdp.evaluate(`(() => ({
+        url: location.href,
+        title: document.title,
+        activeButtons: [...document.querySelectorAll('button')].filter(button => button.getClientRects().length).map(button => ({
+          text: button.textContent.trim().slice(0, 80), ariaLabel: button.getAttribute('aria-label'), disabled: button.disabled
+        })).slice(-80),
+        text: document.body.innerText.slice(-1400)
+      }))()`, 1000).catch(() => undefined)
+      const capture = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, 5000).catch(() => undefined)
+      if (capture?.data) {
+        const name = 'mac-offline-spreadsheet-failure.png'
+        await writeFile(join(evidenceDir, name), Buffer.from(capture.data, 'base64'))
+        report.failureScreenshot = name
+      }
+    }
     throw error
   } finally {
     cdp?.close()

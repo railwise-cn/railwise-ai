@@ -391,7 +391,7 @@ async function main(args) {
         installExactNsis(item.installer.path, installDirectory)
         return { method: 'exact-installer-overlay' }
       })
-      if (item.isolated) report.targetVerification.feedRequests = { ...feed.requests }
+      if (item.isolated) report.targetVerification.feedRequests = feed ? { ...feed.requests } : null
       running.cdp.close()
       await closeOwnedWindows(executable)
       if (!item.isolated) {
