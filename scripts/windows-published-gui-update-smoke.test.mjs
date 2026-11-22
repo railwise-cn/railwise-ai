@@ -70,6 +70,18 @@ test('the live 0.5.7 route is pinned to the exact reviewed 0.5.9 installer and r
   assert.throws(() => assertPublishedWindowsUpgrade({ ...report, baseline: { ...report.baseline, package: { ...report.baseline.package, version: '0.5.8' } } }))
 })
 
+test('the manual 0.5.7 overlay pins the exact accepted 0.5.10 archive bytes', async () => {
+  const scenario = 'released-057-to-0510-overlay'
+  const gate = JSON.parse(await readFile(new URL('../docs/qa/release-gates/v0.5.10.json', import.meta.url), 'utf8'))
+  const expected = gate.package.reviewedBuild.files.find(file => file.name === 'RailWise-AI-0.5.10-win-x64.exe')
+  const sha512 = 'u3TV6h/3ZywUB5h1xb5uQJBLPLnEn3o5f+2iSLBW4uEiM12+QldZ9DYIcYYuBXv9ShodMwtATqisJyuMSpegOQ=='
+  const file = { url: expected.name, size: expected.size, sha512 }
+  const targetManifest = { version: '0.5.10', path: file.url, sha512, files: [file] }
+  assert.equal(verifyPublishedWindowsManifest(targetManifest, scenario).reviewedSha256, expected.sha256)
+  assert.throws(() => verifyPublishedWindowsManifest({ ...targetManifest, version: '0.5.11' }, scenario))
+  assert.throws(() => verifyPublishedWindowsManifest({ ...targetManifest, files: [{ ...file, sha512: manifestDigest }] }, scenario))
+})
+
 test('a visible offer alone or an unexpected relaunch cannot pass the real updater smoke', () => {
   const installLocation = '/runner/owned-install'
   const executable = installLocation + '/RailWise AI.exe'
@@ -115,7 +127,7 @@ test('published Windows smoke is a separate opt-in job with read-only GitHub per
   const workflow = parse(await readFile(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   assert.equal(workflow.on.workflow_dispatch.inputs.run_published_gui_update.default, false)
   assert.deepEqual(workflow.on.workflow_dispatch.inputs.published_gui_upgrade_scenario.options,
-    ['released-056-to-057', 'released-057-to-059'])
+    ['released-056-to-057', 'released-057-to-059', 'released-057-to-0510-overlay'])
   assert.equal(workflow.on.workflow_dispatch.inputs.published_gui_upgrade_scenario.default, 'released-056-to-057')
   assert.equal(workflow.on.workflow_dispatch.inputs.published_gui_verify_overlay.default, false)
   assert.equal(workflow.on.workflow_call.inputs.package_run_id.required, true)

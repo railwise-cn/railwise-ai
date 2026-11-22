@@ -54,16 +54,17 @@ on:
         required: false
         default: false
       run_published_gui_update:
-        description: 'Install the exact released baseline and upgrade from the app sidebar over the live Stable feed on an ephemeral Windows runner'
+        description: 'Verify the selected published upgrade or manual overlay on an ephemeral Windows runner'
         type: boolean
         required: false
         default: false
       published_gui_upgrade_scenario:
-        description: 'Pinned official pair for the live Windows sidebar upgrade'
+        description: 'Pinned official pair for the Windows sidebar upgrade or manual overlay'
         type: choice
         options:
           - released-056-to-057
           - released-057-to-059
+          - released-057-to-0510-overlay
         default: released-056-to-057
       published_gui_verify_overlay:
         description: 'After a demonstrated 0.5.7 sidebar failure, separately verify in-place installation with a synthetic profile'
@@ -317,7 +318,7 @@ jobs:
 
   windows-published-gui-update:
     if: ${{ inputs.run_published_gui_update == true && inputs.run_frozen_gui_update != true }}
-    name: Released Windows sidebar upgrade (${{ inputs.published_gui_upgrade_scenario || 'released-056-to-057' }})
+    name: Released Windows upgrade or manual overlay (${{ inputs.published_gui_upgrade_scenario || 'released-056-to-057' }})
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -335,7 +336,7 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Verify the published GUI upgrade contract
         run: node --test scripts/windows-published-gui-update-smoke.test.mjs scripts/windows-install-smoke.test.mjs
-      - name: Install the released baseline and upgrade through the packaged UI
+      - name: Install the released baseline and exercise the selected upgrade path
         env:
           PUBLISHED_GUI_UPGRADE_SCENARIO: ${{ inputs.published_gui_upgrade_scenario || 'released-056-to-057' }}
           PUBLISHED_GUI_VERIFY_OVERLAY: ${{ inputs.published_gui_verify_overlay }}

@@ -28,6 +28,7 @@ const rootIdentity = installIdentity(baseVersion, baseSource)
 const pathEquals = (one, other) => resolve(one).toLowerCase() === resolve(other).toLowerCase()
 const hourMs = 60 * 60 * 1000
 const historicalScenario = 'released-056-to-057'
+const published0510Overlay = 'released-057-to-0510-overlay'
 const upgradeScenarios = Object.freeze({
   [historicalScenario]: {
     baseVersion, baseSource, baseline, targetVersion, target, targetAsar, targetInstallerSha512,
@@ -42,6 +43,19 @@ const upgradeScenarios = Object.freeze({
     target: {
       name: 'RailWise-AI-0.5.9-win-x64.exe', size: 320871735,
       sha256: '7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c'
+    }
+  },
+  [published0510Overlay]: {
+    baseVersion: '0.5.7', baseSource: reviewedBuild.sourceHead, baseline: target,
+    feed: retailLegacyFeed,
+    archiveFeed: new URL('../releases/v0.5.10/', retailLegacyFeed).href,
+    targetManifestSha256: '89b87425f523e4338c53cb4b1ea7d60a0dd92acbca3b5bfc4d9b579385af5b16',
+    targetVersion: '0.5.10', targetSource: '822a8d748990432c0dbf87c3dea0e0538de849e0',
+    targetAsar: 'a21152be422c74149eca75fd2795ab10ad6cdf91a1409e1c266b7c754dd7f1e5',
+    targetInstallerSha512: 'u3TV6h/3ZywUB5h1xb5uQJBLPLnEn3o5f+2iSLBW4uEiM12+QldZ9DYIcYYuBXv9ShodMwtATqisJyuMSpegOQ==',
+    target: {
+      name: 'RailWise-AI-0.5.10-win-x64.exe', size: 328952222,
+      sha256: 'c7066bfc375e200e8d8c70b01d54eb13bd1a8e7228b573a5db01740ed1cfa971'
     }
   }
 })
@@ -192,11 +206,11 @@ async function hashFile(path, algorithm, encoding) {
   return digest.digest(encoding)
 }
 
-async function downloadReleasedInstaller(directory, version, installer, { sha512, feed } = {}) {
+async function downloadReleasedInstaller(directory, version, installer, { sha512, feed, timeoutMs = 300_000 } = {}) {
   const url = feed ? new URL(installer.name, feed).href :
     `https://github.com/railwise-cn/railwise-ai/releases/download/v${version}/${installer.name}`
   const path = join(directory, installer.name)
-  const response = await fetch(url, { signal: AbortSignal.timeout(300_000) })
+  const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
   assert.ok(response.ok && response.body, `Released ${version} installer download returned HTTP ${response.status}`)
   await pipeline(Readable.fromWeb(response.body), createWriteStream(path, { flags: 'wx' }))
   const info = await lstat(path)
@@ -292,16 +306,19 @@ async function main(args) {
   const repaired = marketplace || (args.length === 1 && args[0] === '--repaired-baseline')
   assert.ok(!args.length || repaired, 'Unsupported Windows package smoke arguments')
   const scenario = process.env.PUBLISHED_GUI_UPGRADE_SCENARIO || historicalScenario
-  const verifyOverlay = process.env.PUBLISHED_GUI_VERIFY_OVERLAY === 'true'
+  const overlayOnly = scenario === published0510Overlay
+  const verifyOverlay = overlayOnly || process.env.PUBLISHED_GUI_VERIFY_OVERLAY === 'true'
   assert.ok(!repaired || scenario === historicalScenario, 'The newer published scenario requires the original retail baseline')
-  assert.ok(!verifyOverlay || scenario === 'released-057-to-059', 'The repair check requires the original 0.5.7 scenario')
   const selected = publishedScenario(scenario)
-  const { baseVersion, baseSource, targetVersion, targetSource, feed } = selected
+  const { baseVersion, baseSource, targetVersion, targetSource, feed, archiveFeed } = selected
+  assert.ok(!verifyOverlay || baseVersion === '0.5.7', 'The repair check requires the original 0.5.7 baseline')
   const rootIdentity = installIdentity(baseVersion, baseSource)
   const targetIdentity = installIdentity(targetVersion, targetSource)
   const evidenceDir = join(process.env.RUNNER_TEMP, 'published-windows-gui-upgrade-evidence')
   await mkdir(evidenceDir)
-  const scope = marketplace ? 'private-windows-npm-marketplace' : repaired ? 'private-repaired-windows-gui-upgrade' : 'published-windows-gui-upgrade'
+  const scope = overlayOnly ? 'published-windows-manual-overlay'
+    : marketplace ? 'private-windows-npm-marketplace'
+      : repaired ? 'private-repaired-windows-gui-upgrade' : 'published-windows-gui-upgrade'
   const report = { schemaVersion: 1, scope, status: 'running',
     provenance: { driverSourceHead: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT },
     scenario, baseVersion, targetVersion, phase: 'preflight', baseline: {},
@@ -327,11 +344,16 @@ async function main(args) {
       assert.equal(present, false, 'An existing RailWise profile was found')
     }
     if (!marketplace) {
-      const response = await fetch(new URL('latest.yml', feed), {
+      const manifestUrl = new URL('latest.yml', archiveFeed ?? feed)
+      const response = await fetch(manifestUrl, {
         cache: 'no-store', signal: AbortSignal.timeout(30_000)
       })
-      assert.ok(response.ok, `Current Stable feed returned HTTP ${response.status}`)
-      report.manifest = verifyPublishedWindowsManifest(parse(await response.text()), scenario)
+      assert.ok(response.ok, `Stable manifest returned HTTP ${response.status}`)
+      const manifestBytes = Buffer.from(await response.arrayBuffer())
+      const sha256 = createHash('sha256').update(manifestBytes).digest('hex')
+      if (archiveFeed) assert.equal(sha256, selected.targetManifestSha256)
+      report.manifest = { ...verifyPublishedWindowsManifest(parse(manifestBytes.toString('utf8')), scenario),
+        url: manifestUrl.href, sha256 }
     }
     const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'railwise-published-gui-upgrade-'))
     const directory = join(root, 'install')
@@ -349,7 +371,7 @@ async function main(args) {
     const appUpdate = parse(await readFile(join(directory, 'resources', 'app-update.yml'), 'utf8'))
     assert.equal(appUpdate.provider, 'generic')
     assert.match(appUpdate.url, /^https:\/\/www\.railwise\.cn\/downloads\/(?:railwise-ai|workwise)\/channels\/stable\/latest\/?$/)
-    if (scenario === 'released-057-to-059') assert.equal(appUpdate.url, feed)
+    if (baseVersion === '0.5.7') assert.equal(appUpdate.url, feed)
     report.baseline.packagedFeed = appUpdate.url
     report.phase = 'baseline-renderer'
     let cleanEnvironment = { ...process.env }
@@ -392,7 +414,7 @@ async function main(args) {
     await cdp.wait('Boolean(window.workwise?.getAppVersion && document.querySelector("button"))', 'baseline workbench')
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
     report.baseline.pid = child.pid
-    if (scenario === 'released-057-to-059') {
+    if (baseVersion === '0.5.7') {
       report.phase = 'baseline-owned-runtime'
       await save()
       const health = await cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads', 'GET').then(({ok, status}) => ({ok, status}))`, 90_000)
@@ -420,29 +442,31 @@ async function main(args) {
       report.phase = 'complete'
       return
     }
-    report.phase = 'automatic-offer'
     const control = sidebarUpgradeSelector(scenario)
-    const button = await cdp.wait(`(() => {
-      const element = document.querySelector(${JSON.stringify(control)})
-      if (!element || element.disabled || !element.getClientRects().length) return null
-      const box = element.getBoundingClientRect()
-      const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
-      return hit && element.contains(hit) ? { text: element.innerText, title: element.title } : null
-    })()`, 'a visible sidebar upgrade from the automatic updater check', 90_000)
-    const available = await cdp.evaluate('window.workwise.getGuiUpdateState()')
-    report.offer = { button, status: available.status, ...summarizeWindowsUpdateMetadata(available.info) }
-    assert.equal(available.status, 'available')
-    assert.equal(available.info?.currentVersion, baseVersion)
-    assert.equal(available.info?.latestVersion, targetVersion)
-    assert.equal(available.info?.channel, 'stable')
-    assert.equal(available.info?.manualOnly, false)
-    await capture(cdp, `windows-${baseVersion.replaceAll('.', '')}-sidebar-upgrade.png`)
-    await save()
+    if (!overlayOnly) {
+      report.phase = 'automatic-offer'
+      const button = await cdp.wait(`(() => {
+        const element = document.querySelector(${JSON.stringify(control)})
+        if (!element || element.disabled || !element.getClientRects().length) return null
+        const box = element.getBoundingClientRect()
+        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+        return hit && element.contains(hit) ? { text: element.innerText, title: element.title } : null
+      })()`, 'a visible sidebar upgrade from the automatic updater check', 90_000)
+      const available = await cdp.evaluate('window.workwise.getGuiUpdateState()')
+      report.offer = { button, status: available.status, ...summarizeWindowsUpdateMetadata(available.info), manualOnly: available.info?.manualOnly }
+      assert.equal(available.status, 'available')
+      assert.equal(available.info?.currentVersion, baseVersion)
+      assert.equal(available.info?.latestVersion, targetVersion)
+      assert.equal(available.info?.channel, 'stable')
+      assert.equal(available.info?.manualOnly, false)
+      await capture(cdp, `windows-${baseVersion.replaceAll('.', '')}-sidebar-upgrade.png`)
+      await save()
+    }
 
     // The clean baseline writes its schedule file before making the automatic
     // check. It identifies the normal Windows profile that NSIS will reopen.
-    const activeProfiles = []
-    for (const path of profiles) {
+    const activeProfiles = overlayOnly ? [profile] : []
+    for (const path of overlayOnly ? [] : profiles) {
       const schedule = await lstat(join(path, 'gui-update-schedule.json')).catch(error => {
         if (error.code !== 'ENOENT') throw error
       })
@@ -460,6 +484,8 @@ async function main(args) {
     report.profile = { directory: activeProfiles[0], sentinelSha256: await sha256(sentinel) }
     if (verifyOverlay) {
       assert.ok(pathEquals(activeProfiles[0], profile), 'The old application must use the seeded profile')
+      const workspaceFile = join(workspace, 'updater-continuity.txt')
+      await writeFile(workspaceFile, sentinelValue, { flag: 'wx' })
       const thread = await cdp.evaluate(`(async () => {
         const request = JSON.stringify({workspace: ${JSON.stringify(workspace)}, title: '升级验收会话', model: 'deepseek-flash', mode: 'agent'});
         const response = await window.workwise.runtimeRequest('/v1/threads','POST',request);
@@ -476,7 +502,8 @@ async function main(args) {
         recovery.registryBefore = ownedInstallState(directory, baseVersion)
         assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
         recovery.installer = await downloadReleasedInstaller(root, targetVersion, selected.target, {
-          sha512: selected.targetInstallerSha512, feed
+          sha512: selected.targetInstallerSha512, feed: archiveFeed ?? feed,
+          ...(overlayOnly ? { timeoutMs: 600_000 } : {})
         })
         recovery.installer.authenticode = authenticodeStatus(recovery.installer.path)
         await closeOwnedApp(executable)
@@ -498,18 +525,38 @@ async function main(args) {
         recovery.persistedSettings = { workspace: pathEquals(after.workspaceRoot, before.workspaceRoot),
           locale: after.locale === before.locale, theme: after.theme === before.theme }
         recovery.profilePreserved = await readFile(sentinel, 'utf8') === sentinelValue
+        recovery.workspaceFilePreserved = await readFile(workspaceFile, 'utf8') === sentinelValue
         recovery.threadPreserved = await cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads/${thread}','GET').then(response =>
           response.ok && JSON.parse(response.body).id === ${JSON.stringify(thread)})`)
         assert.deepEqual(recovery.persistedSettings, { workspace: true, locale: true, theme: true })
         assert.equal(recovery.profilePreserved, true)
+        assert.equal(recovery.workspaceFilePreserved, true)
         assert.equal(recovery.threadPreserved, true)
         await capture(cdp, 'windows-exact-installer-overlay.png')
       }
     }
 
+    if (overlayOnly) {
+      report.phase = 'manual-overlay'
+      report.action = { method: 'exact-official-installer-overlay', manualOnly: true, latestVersion: targetVersion }
+      const recovery = { method: report.action.method, status: 'running' }
+      report.overlayRecovery = recovery
+      await save()
+      try {
+        await recoverUsingExactInstaller(recovery)
+        recovery.status = 'passed'
+      } catch (error) {
+        recovery.status = 'failed'
+        throw error
+      }
+      report.status = 'passed'
+      report.phase = 'complete'
+      return
+    }
+
     report.phase = 'sidebar-upgrade'
     await cdp.click(control)
-    report.action = { method: 'trusted-pointer-on-sidebar', latestVersion: available.info.latestVersion, manualOnly: available.info.manualOnly }
+    report.action = { method: 'trusted-pointer-on-sidebar', latestVersion: report.offer.latestVersion, manualOnly: report.offer.manualOnly }
     await save()
     report.updaterStates = []
     const relaunched = await waitUntil(async () => {
@@ -549,7 +596,7 @@ async function main(args) {
       if (state && !report.lastUpdateState) report.lastUpdateState = { status: state.status, ...summarizeWindowsUpdateMetadata(state.info ?? state) }
       await capture(cdp, marketplace ? 'windows-marketplace-failure.png' : 'windows-published-upgrade-failure.png').catch(() => undefined)
     }
-    if (recoverUsingExactInstaller && report.action && (report.lastUpdateState?.status === 'error' || report.sidebarError)) {
+    if (!overlayOnly && recoverUsingExactInstaller && report.action && (report.lastUpdateState?.status === 'error' || report.sidebarError)) {
       const recovery = { method: 'exact-official-installer-overlay', status: 'running' }
       report.overlayRecovery = recovery
       await save()
