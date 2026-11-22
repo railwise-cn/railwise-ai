@@ -156,7 +156,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   const actions = task.presentation?.actions
   const verify = actions?.includes('verify') || pending.some(item => item.presentation?.actions.includes('verify'))
   const needsReview = pending.length > 0
-  const canReplyInComposer = isPrimary && composerReplies && task.status === 'waiting_user' && Boolean(task.activeTurnId) &&
+  const canReplyInComposer = isPrimary && composerReplies && ['waiting_user', 'paused'].includes(task.status) && Boolean(task.activeTurnId) &&
     (!task.presentation || task.presentation.reason === 'input_required') && pending.length === 1
   const canResume = !verify && (task.status === 'paused' || !needsReview && (actions?.includes('resume') ?? ['stalled', 'waiting_user'].includes(task.status)))
   const canRetry = !verify && !needsReview && (actions?.includes('retry') ?? task.status === 'failed')
