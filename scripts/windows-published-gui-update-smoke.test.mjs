@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { assertPublishedWindowsUpgrade, legacyUpdaterReason, repairedScheduleSeed, sidebarUpgradeControlSelector, sidebarUpgradeSelector, verifyPublishedWindowsManifest } from './run-windows-published-gui-update-smoke.mjs'
-import { createPrivateTrust, recordWindowsUpgradePhase, verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget, verifyPrivateWindowsCandidateTarget } from './run-windows-frozen-gui-upgrade.mjs'
+import { createPrivateTrust, recordWindowsUpgradePhase, releaseHighlightsStorageKey, verifyFrozenWindowsReadback, verifyInstalledIsolatedWindowsFeed, verifyIsolatedWindowsTarget, verifyPrivateWindowsCandidateTarget } from './run-windows-frozen-gui-upgrade.mjs'
 
 const manifestDigest = 'uMwIBK7dFby0e3J6Ln6ZOA31iFMUjW1zy6kRtKx95+PxPO0Vr2wECHvSBuE5CUtMQtlH5mIf6oY+Ras2FBv0tA=='
 const installer = { url: 'RailWise-AI-0.5.7-win-x64.exe', size: 317686658, sha512: manifestDigest }
@@ -243,6 +243,12 @@ test('only the exact isolated feed can pass installed target readback', () => {
     { provider: 'generic', url: 'https://127.0.0.1/' })
   assert.throws(() => verifyInstalledIsolatedWindowsFeed('provider: generic\nurl: https://www.railwise.cn/\n'))
   assert.throws(() => verifyInstalledIsolatedWindowsFeed('provider: github\nurl: https://127.0.0.1/\n'))
+})
+
+test('release-highlight first-launch readback is pinned to the upgrade target version', () => {
+  assert.equal(releaseHighlightsStorageKey('0.5.10'), 'railwise.release-highlights.0.5.10')
+  assert.equal(releaseHighlightsStorageKey('0.5.11'), 'railwise.release-highlights.0.5.11')
+  assert.throws(() => releaseHighlightsStorageKey('latest'))
 })
 
 test('frozen Windows acceptance pins the original artifact and builds the next installer inside its runner', async () => {

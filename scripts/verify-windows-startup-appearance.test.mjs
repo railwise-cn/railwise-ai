@@ -168,8 +168,12 @@ test('binds native Mac startup acceptance to a successful immutable frozen relea
     driverHead: 'b'.repeat(40), runId: 100, runAttempt: 1, buildConclusion: 'success', artifactName: 'release-mac',
     artifactId: 200, artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
     changedFiles: ['scripts/run-mac-startup-appearance-smoke.mjs', 'scripts/verify-windows-composer-acceptance.mjs',
-      'scripts/prepare-windows-install-smoke.mjs', 'scripts/prepare-windows-install-smoke.test.mjs'] }
+      'scripts/prepare-windows-install-smoke.mjs', 'scripts/prepare-windows-install-smoke.test.mjs',
+      'scripts/record-core-journeys.test.mjs', 'scripts/run-windows-frozen-gui-upgrade.mjs',
+      'scripts/windows-published-gui-update-smoke.test.mjs', 'scripts/windows-ui-smoke.test.mjs',
+      'docs/qa/release-gates/v0.5.11/acceptance.md'] }
   assert.equal(validateMacStartupArtifact(source), source)
+  assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['docs/qa/another-plan.md'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['src/main/splash-window.ts'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactExpired: true }))
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactName: 'release-win' }))

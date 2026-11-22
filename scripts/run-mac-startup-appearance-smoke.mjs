@@ -25,7 +25,13 @@ const acceptedDriverFiles = new Set([
   'scripts/prepare-windows-install-smoke.test.mjs',
   'scripts/verify-windows-composer-acceptance.mjs',
   'scripts/verify-packaged-startup-appearance.mjs',
-  'scripts/web-ppt-journey.mjs'
+  'scripts/web-ppt-journey.mjs',
+  'scripts/prepare-windows-install-smoke.test.mjs',
+  'scripts/record-core-journeys.test.mjs',
+  'scripts/run-windows-frozen-gui-upgrade.mjs',
+  'scripts/windows-published-gui-update-smoke.test.mjs',
+  'scripts/windows-ui-smoke.test.mjs',
+  'docs/qa/release-gates/v0.5.11/acceptance.md'
 ])
 const command = (file, args) => execFileSync(file, args, { encoding: 'utf8', timeout: 90_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const git = (...args) => command('git', args)

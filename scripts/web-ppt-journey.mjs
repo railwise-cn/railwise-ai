@@ -78,6 +78,23 @@ function readRuntime(path) {
   })`
 }
 
+async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
+  const [task, inputs, thread] = await Promise.all([
+    cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
+    cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/inputs`)),
+    cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(executionThreadId)}`))
+  ])
+  return {
+    task: { id: task.id, status: task.status, originThreadId: task.originThreadId, threadId: task.threadId,
+      activeTurnId: task.activeTurnId, waitingReason: task.waitingReason, stalledReason: task.stalledReason,
+      blockCode: task.blockCode, revision: task.revision },
+    inputs: inputs.map(input => ({ id: input.id, kind: input.kind, status: input.status, sourceId: input.sourceId,
+      textLength: typeof input.text === 'string' ? input.text.length : undefined })),
+    turns: thread.turns.map(turn => ({ id: turn.id, status: turn.status, itemKinds: turn.items.map(item => ({ kind: item.kind,
+      toolName: item.toolName, requestId: item.requestId, status: item.status, isError: item.isError })) }))
+  }
+}
+
 export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPrompt, expectedQuestion = webPptQuestion, sourceAnswer = webPptSourceHost } = {}) {
   const priorThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.map(thread => thread.id)
   await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
@@ -328,8 +345,12 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
         sourceAnswer: fallback?.url ?? webPptSourceHost })
       const task = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)}.then(task=>
-        ['completed','failed','stalled','cancelled'].includes(task.status) ? task : null)`, 'completion in the original conversation', live ? 480_000 : 180_000)
-      assert.equal(task.status, 'completed', task.waitingReason ?? task.stalledReason)
+        ['completed','failed','stalled','cancelled','waiting_user','paused'].includes(task.status) ? task : null)`,
+      'task completion or a visible request for input', live ? 480_000 : 180_000)
+      if (task.status !== 'completed') {
+        const diagnostics = await readWebPptTaskDiagnostics(cdp, journey.taskId, journey.executionThreadId)
+        throw new Error(`PPT task did not complete: ${JSON.stringify(diagnostics)}`)
+      }
       assert.equal(task.originThreadId, journey.conversationThreadId)
       assert.equal(task.threadId, journey.executionThreadId)
       assert.equal(task.id, journey.taskId)

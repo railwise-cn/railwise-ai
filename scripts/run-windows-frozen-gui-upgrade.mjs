@@ -104,6 +104,11 @@ export function verifyInstalledIsolatedWindowsFeed(text) {
   return { provider: metadata.provider, url: metadata.url }
 }
 
+export function releaseHighlightsStorageKey(version) {
+  assert.match(version, /^\d+\.\d+\.\d+$/)
+  return `railwise.release-highlights.${version}`
+}
+
 async function verifiedTarget(directory, source, version, { runnerFixture = false, baselineVersion } = {}) {
   const identity = installIdentity(version, source.packageSourceHead)
   const receiptPath = join(directory, 'reviewed-build.json')
@@ -370,7 +375,7 @@ async function main(args) {
     }
     running = await phase('launch-official-baseline', () => launchOwned(executable, root, feed?.url))
     assert.equal(await running.cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
-    if (target.isolated) assert.equal(await running.cdp.evaluate('localStorage.getItem("railwise.release-highlights.0.5.10")'), null)
+    if (target.isolated) assert.equal(await running.cdp.evaluate(`localStorage.getItem(${JSON.stringify(releaseHighlightsStorageKey(target.identity.version))})`), null)
     await running.cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(r=>r.ok)`, 'installed KUN service')
     thread = await running.cdp.evaluate(`(async()=>{
       const r=await window.workwise.runtimeRequest('/v1/threads','POST',JSON.stringify({workspace:${JSON.stringify(workspace)}, title:'升级验收会话', model:'deepseek-flash', mode:'agent'}));
@@ -415,7 +420,7 @@ async function main(args) {
         const announcement = await running.cdp.wait(`(() => {
           const visible = [...document.querySelectorAll('section')].some(section =>
             ['本版更新', 'What’s new'].includes(section.getAttribute('aria-label')) && section.textContent.includes(${JSON.stringify(item.identity.version)}));
-          const recorded = localStorage.getItem(${JSON.stringify(`railwise.release-highlights.${item.identity.version}`)}) === '1';
+          const recorded = localStorage.getItem(${JSON.stringify(releaseHighlightsStorageKey(item.identity.version))}) === '1';
           return visible || recorded ? {visible, recorded} : null;
         })()`,
           `the new ${item.identity.version} release highlights`
