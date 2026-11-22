@@ -84,7 +84,13 @@ test('accepts only the 0.5.7 and 0.5.9 historical Apple installer pins for this 
     const { pins } = resolveUpdaterBaseline(version,QA_MAC_BASELINES)
     assert.ok(pins.arm64.assetId > 0 && pins.x64.assetId > 0)
   }
-  assert.throws(() => resolveUpdaterBaseline('0.5.9'), /no valid .* installer pin/)
+  const official = resolveUpdaterBaseline('0.5.9').pins
+  const qa = resolveUpdaterBaseline('0.5.9',QA_MAC_BASELINES).pins
+  for (const arch of ['arm64', 'x64']) {
+    const { name, size, sha256 } = qa[arch]
+    assert.deepEqual(official[arch], { name, size, sha256 })
+  }
+  assert.throws(() => resolveUpdaterBaseline('0.5.6',QA_MAC_BASELINES), /no valid .* installer pin/)
 })
 
 test('archives select an explicit QA frontier or stable package mode; mixed metadata fails', () => {
