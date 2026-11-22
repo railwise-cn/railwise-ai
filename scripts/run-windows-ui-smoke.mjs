@@ -1029,7 +1029,7 @@ export function parseFixtureToolOutput(content) {
   try { return JSON.parse(content) } catch { return undefined }
 }
 
-const originChecklistPrompt = '请把这项合成校对工作分成两步，核对合成报告和复核表头。[RW-CUA-STEPS]'
+const originChecklistPrompt = '请把这项合成校对工作分成两步。先输出进展，然后核对合成报告和复核表头。[RW-CUA-STEPS]'
 const originChecklistDone = '合成校对的两条步骤均已完成。'
 const originChecklistItems = [
   { content: '核对合成报告', status: 'completed' },
@@ -1168,7 +1168,7 @@ async function verifyWindowsOriginChecklist(cdp, fixture, attempt, evidenceDir) 
   }
   assert.ok(admitted, 'The real send must create one new origin and its matching delegated worker task')
   const { task, origin: { id: originThreadId } } = admitted
-  Object.assign(attempt, { phase: 'worker-admitted', taskId: task.id, workerThreadId: task.threadId })
+  Object.assign(attempt, { phase: 'worker-admitted', taskId: task.id, workerThreadId: task.threadId, prompt: originChecklistPrompt })
   const workerSnapshot = async () => {
     const { todos } = await read('/v1/threads/' + encodeURIComponent(task.threadId) + '/todos')
     assert.equal(todos.threadId, task.threadId)
