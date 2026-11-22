@@ -4,7 +4,7 @@ import { LocalToolHost } from './local-tool-host.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import type { CurrentToolOperation, ToolHostContext } from '../../ports/tool-host.js'
-import { EGO_TOOLS, type EgoBrowserCapabilityConfig } from '../../contracts/ego-browser.js'
+import { EGO_SITE_SIGN_IN_REQUIRED as siteSignInRequired, EGO_TOOLS, type EgoBrowserCapabilityConfig } from '../../contracts/ego-browser.js'
 import { operationFingerprint, type TaskRunRepository } from '../../services/task-run-repository.js'
 import { currentEgoTaskSpaceBinding, validEgoDocumentEvidence, type EgoClosedSpaceReopenAuthorization } from '../../services/ego-browser-evidence.js'
 import { EGO_RESULT_MARKER, runEgoBrowserScript, type EgoBrowserCommandRunner } from '../../services/ego-browser-cli.js'
@@ -15,7 +15,7 @@ const failurePhases = ['navigation','snapshot','dom_read','selection','control']
 const safeFailurePhase = (value:unknown):string|undefined => typeof value==='string' && (failurePhases as readonly string[]).includes(value) ? value : undefined
 const sdkFailureCodes = ['ego_browser_grant_expired','ego_browser_user_control','ego_browser_task_space_ambiguous','ego_browser_task_space_missing','ego_browser_task_space_unconfirmed','ego_browser_origin_denied','ego_browser_page_changed','ego_browser_element_not_visible','ego_browser_selector_invalid','ego_browser_element_ambiguous','ego_browser_element_unsupported','ego_browser_protocol_invalid','ego_browser_observation_stale','ego_browser_read_failed']
 const safeSdkFailureCode = (code:unknown):string => typeof code==='string'&&sdkFailureCodes.includes(code)?code:'ego_browser_read_failed'
-const providerFailureCodes = [...sdkFailureCodes,'ego_browser_scope_required','ego_browser_waiting_user','ego_browser_host_operation_required','ego_browser_target_required','ego_browser_task_space_finished','ego_browser_finish_not_ready','ego_browser_finish_unconfirmed','ego_browser_page_limit','ego_browser_open_required','ego_browser_executable_changed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_aborted','ego_browser_unavailable','ego_browser_output_limit','execution_grant_scope']
+const providerFailureCodes = [...sdkFailureCodes,siteSignInRequired,'ego_browser_scope_required','ego_browser_waiting_user','ego_browser_host_operation_required','ego_browser_target_required','ego_browser_task_space_finished','ego_browser_finish_not_ready','ego_browser_finish_unconfirmed','ego_browser_page_limit','ego_browser_open_required','ego_browser_executable_changed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_aborted','ego_browser_unavailable','ego_browser_output_limit','execution_grant_scope']
 const safeProviderFailureCode = (code:unknown):string => typeof code==='string'&&providerFailureCodes.includes(code)?code:'ego_browser_read_failed'
 /** Only fixed enums cross the SDK boundary; native messages/stacks are never evidence. */
 function safeSdkDiagnostics(value: unknown): Record<string, unknown> {
@@ -72,14 +72,28 @@ try {
    const visibleClone=root=>{if(hidden(root))throw Object.assign(new Error(),{code:'ego_browser_element_not_visible'});const clone=root.cloneNode(true),originals=[root,...root.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];for(let i=1;i<originals.length;i++)if(hidden(originals[i]))copies[i].remove();return clone};
    const loadingObserved=[...document.querySelectorAll('[aria-busy="true"],[role="progressbar"]')].some(n=>!hidden(n));
    const clone=document.body?visibleClone(document.body):undefined;
-   if(!clone) return {sourceUrl,html:'',truncated:false,candidates:[]};
+   if(!clone) return {sourceUrl,html:'',truncated:false,candidates:[],loadingObserved,visibleText:false};
    clone.querySelectorAll('script,style,noscript,template,iframe,input,textarea,select,[contenteditable]').forEach(n=>n.remove());
    for(const n of [clone,...clone.querySelectorAll('*')]) for(const a of [...n.attributes]) if(!['href','title','datetime','role','aria-label'].includes(a.name)) n.removeAttribute(a.name);
    for(const a of clone.querySelectorAll('a[href]')) { try {const u=new URL(a.getAttribute('href'),sourceUrl); if(!['http:','https:'].includes(u.protocol)||u.username||u.password)a.removeAttribute('href');else a.setAttribute('href',u.href);} catch {a.removeAttribute('href');} }
+   // The subscription page can show a re-login modal outside a visually empty app root.
+   const url=new URL(sourceUrl);
+   const appRoot=document.getElementById('app');
+   const siteSignInRequired=url.origin==='https://dadan.vip' && url.hash.startsWith('#/subscribe/')
+     && !!appRoot && !appRoot.innerText?.trim()
+     && [...clone.querySelectorAll('p,span,div')].some(node=>{
+       const text=node.textContent?.replace(/\\s+/g,'').trim()??'';
+       return text.length<=120 && /(?:账号|账户).{0,24}(?:其他|其它)设备.{0,24}请重新登录/.test(text);
+     });
    const documentHtml=clone.outerHTML; let selection;
    if(argumentsSelection) { phase='selection'; let matches;try {matches=document.querySelectorAll(argumentsSelection);}catch(error){if(error?.name==='SyntaxError'||error?.name==='DOMException')return {readError:{version:1,code:'ego_browser_selector_invalid',failurePhase:phase}};throw error;} if(matches.length!==1)throw Object.assign(new Error(),{code:'ego_browser_element_ambiguous'}); if(matches[0].matches('script,style,noscript,template,iframe,input,textarea,select,[contenteditable]')||matches[0].closest('[contenteditable]'))throw Object.assign(new Error(),{code:'ego_browser_element_unsupported'}); const selected=visibleClone(matches[0]); selected.querySelectorAll('script,style,noscript,template,iframe,input,textarea,select,[contenteditable]').forEach(n=>n.remove()); for(const n of [selected,...selected.querySelectorAll('*')])for(const a of [...n.attributes])if(!['href','title','datetime','role','aria-label'].includes(a.name))n.removeAttribute(a.name); for(const a of [selected,...selected.querySelectorAll('a[href]')])if(a.matches('a[href]')) {try{const u=new URL(a.getAttribute('href'),sourceUrl);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)a.removeAttribute('href');else a.setAttribute('href',u.href)}catch{a.removeAttribute('href')}} selection={selector:argumentsSelection,matchedCount:1}; clone.replaceChildren(selected); }
    const raw=selection?clone.innerHTML:documentHtml, bytes=new TextEncoder().encode(raw), truncated=bytes.length>maxBytes;
-   return {sourceUrl,html:truncated?new TextDecoder().decode(bytes.slice(0,maxBytes)):raw,truncated,candidates,documentHtml,selection,loadingObserved,visibleText:(clone.textContent||'').trim().length>0};
+   // SVG metadata can fill textContent while the page still shows no text.
+   for(const node of clone.querySelectorAll('title,desc,metadata')){
+    if(node.namespaceURI==='http://www.w3.org/2000/svg')node.remove();
+   }
+   const visibleText=Boolean(clone.textContent?.trim());
+   return {sourceUrl,html:truncated?new TextDecoder().decode(bytes.slice(0,maxBytes)):raw,truncated,candidates,documentHtml,selection,loadingObserved,visibleText,siteSignInRequired};
    }catch(error){const code=error?.code;if(['ego_browser_element_ambiguous','ego_browser_element_not_visible','ego_browser_element_unsupported','ego_browser_page_changed'].includes(code))return {readError:{version:1,code,failurePhase:phase}};throw error;}
   },{maxBytes:p.maxBytes,selector,expectedReadSourceUrl:p.expectedReadSourceUrl});
   if(result && Object.prototype.hasOwnProperty.call(result,'readError')) {
@@ -91,19 +105,19 @@ try {
   }
   return result;
  };
- const settledRead=async()=>{let current=await read(undefined);for(let attempt=0;attempt<4&&(current.loadingObserved||!current.visibleText);attempt++){check();await new Promise(resolve=>setTimeout(resolve,500));check();current=await read(undefined)}return p.selector&&!current.loadingObserved&&current.visibleText?read(p.selector):current};
+ const settledRead=async()=>{let current=await read(undefined);for(let attempt=0;attempt<4&&!current.siteSignInRequired&&(current.loadingObserved||!current.visibleText);attempt++){check();await new Promise(resolve=>setTimeout(resolve,500));check();current=await read(undefined)}return p.selector&&!current.siteSignInRequired&&!current.loadingObserved&&current.visibleText?read(p.selector):current};
  if(p.action==='next') {
    check(); const before=await read(undefined);
    if(before.sourceUrl!==p.expectedSourceUrl || before.html!==p.expectedHtml || before.truncated || !before.candidates.some(x=>x.href===p.url&&x.label===p.label) || !allowed(p.url) || new URL(p.url).origin!==new URL(before.sourceUrl).origin) throw Object.assign(new Error(),{code:'ego_browser_observation_stale'});
    check(); failurePhase='navigation';sdkStage='navigation'; await page.goto(p.url,{timeout:25000});
  }
  failurePhase='control';sdkStage='control_check';check();sdkStage='initial_url'; const sourceUrl=await page.url(); if(!allowed(sourceUrl)) throw Object.assign(new Error(),{code:'ego_browser_origin_denied'});
- if(p.action==='observe'){failurePhase='snapshot';sdkStage='snapshot';}
- const snapshot=p.action==='observe'?await page.snapshot({scope:'full_page'}):undefined;
  const reading=await settledRead();
- if(p.selector && (reading.documentHtml!==p.expectedDocumentHtml || reading.sourceUrl!==p.expectedSourceUrl)){failurePhase='selection';throw Object.assign(new Error(),{code:'ego_browser_observation_stale'});}
+ if(p.selector && !reading.siteSignInRequired && (reading.documentHtml!==p.expectedDocumentHtml || reading.sourceUrl!==p.expectedSourceUrl)){failurePhase='selection';throw Object.assign(new Error(),{code:'ego_browser_observation_stale'});}
+ if(p.action==='observe'){check();failurePhase='snapshot';sdkStage='snapshot';}
+ const snapshot=p.action==='observe'?await page.snapshot({scope:'full_page'}):undefined;
  failurePhase='control';sdkStage='final_control';check();sdkStage='final_url';if(reading.sourceUrl!==await page.url())throw Object.assign(new Error(),{code:'ego_browser_page_changed'});
- if(p.action==='observe')emit({...identity,ok:true,sourceUrl:reading.sourceUrl,documentHtml:reading.documentHtml,loadingObserved:reading.loadingObserved,visibleText:reading.visibleText,snapshot:String(snapshot).slice(0,64000)});
+ if(p.action==='observe')emit({...identity,ok:true,sourceUrl:reading.sourceUrl,documentHtml:reading.documentHtml,loadingObserved:reading.loadingObserved,visibleText:reading.visibleText,siteSignInRequired:reading.siteSignInRequired,snapshot:String(snapshot).slice(0,64000)});
  else emit({...identity,ok:true,...reading});
 } catch(error) { const code=${JSON.stringify(sdkFailureCodes)}.includes(error?.code)?error.code:'ego_browser_read_failed';let identity={};try{if(task&&task.name===p.spaceName&&Number.isSafeInteger(task.spaceId)&&task.spaceId>0&&(!p.spaceId||task.spaceId===p.spaceId)&&['agent','user','inactive','unassigned','agentDelegatedToUser'].includes(task.ownership))identity={identityVerified:true,taskSpaceId:task.spaceId,spaceName:task.name,ownership:task.ownership,...(page?.label==='p1'?{pageHandleLabel:page.label}:{})};}catch{}emit({ok:false,code,failurePhase,...diagnostics(error),...identity}); }`
 }
@@ -389,7 +403,13 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
         currentSpaceId=result.taskSpaceId
         if (binding.status==='prepared') binding=repository.finishOperation(task.id,key,{status:'succeeded',result:{taskSpaceId:result.taskSpaceId,pageLabel:'p1',ownership:'agent'}},new Date(now()).toISOString())
         const sourceUrl=String(result.sourceUrl??'');assertGrantAllowsNetwork(sourceUrl,context)
-        if(!origins.includes(new URL(sourceUrl).origin))throw fail('ego_browser_origin_denied')
+        const observedUrl = new URL(sourceUrl)
+        if(!origins.includes(observedUrl.origin))throw fail('ego_browser_origin_denied')
+        if (result.siteSignInRequired === true && observedUrl.origin === 'https://dadan.vip' && observedUrl.hash.startsWith('#/subscribe/')) {
+          // Keep the observed navigation and the original Space, without sealing this page as subscription evidence.
+          repository.finishOperation(task.id,dispatchKey,{status:'succeeded',result:{sourceUrl,taskSpaceId:result.taskSpaceId,siteSignInRequired:true}},new Date(now()).toISOString())
+          throw fail(siteSignInRequired)
+        }
         if(name==='ego_browser_observe') {repository.finishOperation(task.id,dispatchKey,{status:'succeeded',result:{sourceUrl,taskSpaceId:result.taskSpaceId}},new Date(now()).toISOString());const observationKey='ego-observe:'+randomUUID();const observation=repository.beginOperation({ownerId:task.id,idempotencyKey:observationKey,kind:'ego_observation',request:{...request,taskSpaceId:result.taskSpaceId,...(args.selector?{selector:args.selector,contextReceiptId:params.contextReceiptId}:{})},nowIso:new Date(now()).toISOString()}).receipt;repository.finishOperation(task.id,observationKey,{status:'succeeded',result:{sourceUrl,taskSpaceId:result.taskSpaceId,documentHtml:result.documentHtml}},new Date(now()).toISOString());return {output:{status:'succeeded',provider:'ego-browser',...statusProof,sessionId:String(result.taskSpaceId),sourceUrl,snapshot:result.snapshot,loadingObserved:result.loadingObserved===true,emptyObserved:result.visibleText===false,observationId:observation.id}}}
         if(typeof result.html!=='string' || typeof result.truncated!=='boolean')throw fail('ego_browser_protocol_invalid')
         const resultHash=hash(result.html), readKey='ego-read:'+randomUUID()
@@ -414,8 +434,8 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
         failurePhase=safeFailurePhase(object(error).failurePhase)??failurePhase
         const originalCode=String(object(error).code??(error instanceof Error?error.message:''))
         const code=originalCode==='execution_grant_expired'?'ego_browser_grant_expired':safeProviderFailureCode(originalCode),taskId=context.executionGrant?.taskId
-        const message=code==='ego_browser_open_required'&&statusProof.spaceStatusReceiptId?'Ego元数据已确认原任务空间关闭。请调用ego_browser_open('+ (originalOpenUrl?JSON.stringify({url:originalOpenUrl}):'{url:任务最初授权的原始URL}') +')；工具将重新核验本轮授权与关闭状态后恢复原任务，不要改用其他URL或创建替代任务。':selectionErrors.has(code)?'读取选择未完成。普通读取请直接ego_browser_read({})，不传selector或旧observationId；仅确需局部内容时先ego_browser_observe，再使用恰好匹配一个可见元素的标准CSS和最新observationId。无需更换连接、TaskSpace或授权。':code==='ego_browser_observation_stale'||code==='ego_browser_page_changed'?'页面或观察已变化。请先ego_browser_read({})读取当前整页，不传selector或旧observationId；只有确需局部时再观察并重选。不要重放旧选择或重新open刷新。':code==='ego_browser_task_space_missing'||code==='ego_browser_task_space_ambiguous'?'原Ego任务空间尚未确认。已确定关闭的空间只能在你明确继续原任务并核验本次授权后重新建立；结果未知或仍存在的空间不会被替代。请检查原任务的Ego控制状态后继续。':'请检查当前任务的Ego连接、站点范围或用户控制状态后继续。'
-        if(taskId&&['ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid','ego_browser_finish_unconfirmed'].includes(code)) {const waitKey='ego-wait:'+context.turnId; if(!repository.operation(taskId,waitKey)) {const operation=invocation; if(operation){repository.beginOperation({ownerId:taskId,idempotencyKey:waitKey,kind:'ego_browser_wait',request:{taskId,turnId:context.turnId,code,hostOperationId:operation.operationId,callId:operation.callId,grantFingerprint:operation.executionGrantFingerprint,configurationFingerprint:identity,...(currentSpaceId?{taskSpaceId:currentSpaceId}:{})},nowIso:new Date(now()).toISOString()});repository.finishOperation(taskId,waitKey,{status:'succeeded',result:{code,message}},new Date(now()).toISOString())}}}
+        const message=code===siteSignInRequired?'大单网要求重新登录。请在 Ego 中完成登录，再回到原对话继续。':code==='ego_browser_open_required'&&statusProof.spaceStatusReceiptId?'Ego元数据已确认原任务空间关闭。请调用ego_browser_open('+ (originalOpenUrl?JSON.stringify({url:originalOpenUrl}):'{url:任务最初授权的原始URL}') +')；工具将重新核验本轮授权与关闭状态后恢复原任务，不要改用其他URL或创建替代任务。':selectionErrors.has(code)?'读取选择未完成。普通读取请直接ego_browser_read({})，不传selector或旧observationId；仅确需局部内容时先ego_browser_observe，再使用恰好匹配一个可见元素的标准CSS和最新observationId。无需更换连接、TaskSpace或授权。':code==='ego_browser_observation_stale'||code==='ego_browser_page_changed'?'页面或观察已变化。请先ego_browser_read({})读取当前整页，不传selector或旧observationId；只有确需局部时再观察并重选。不要重放旧选择或重新open刷新。':code==='ego_browser_task_space_missing'||code==='ego_browser_task_space_ambiguous'?'原Ego任务空间尚未确认。已确定关闭的空间只能在你明确继续原任务并核验本次授权后重新建立；结果未知或仍存在的空间不会被替代。请检查原任务的Ego控制状态后继续。':'请检查当前任务的Ego连接、站点范围或用户控制状态后继续。'
+        if(taskId&&[siteSignInRequired,'ego_browser_user_control','ego_browser_grant_expired','ego_browser_scope_required','ego_browser_executable_changed','ego_browser_task_space_unconfirmed','ego_browser_task_space_missing','ego_browser_task_space_ambiguous','ego_browser_origin_denied','ego_browser_read_failed','ego_browser_command_failed','ego_browser_command_timeout','ego_browser_protocol_invalid','ego_browser_finish_unconfirmed'].includes(code)) {const waitKey='ego-wait:'+context.turnId; if(!repository.operation(taskId,waitKey)) {const operation=invocation; if(operation){repository.beginOperation({ownerId:taskId,idempotencyKey:waitKey,kind:'ego_browser_wait',request:{taskId,turnId:context.turnId,code,hostOperationId:operation.operationId,callId:operation.callId,grantFingerprint:operation.executionGrantFingerprint,configurationFingerprint:identity,...(currentSpaceId?{taskSpaceId:currentSpaceId}:{})},nowIso:new Date(now()).toISOString()});repository.finishOperation(taskId,waitKey,{status:'succeeded',result:{code,message}},new Date(now()).toISOString())}}}
         return {isError:true,output:{status:'blocked',provider:'ego-browser',code,message,...statusProof,...failureDetails,...(failurePhase?{failurePhase}:{})}}}
     }
   })) }

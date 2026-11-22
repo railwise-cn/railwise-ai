@@ -9,13 +9,14 @@ import type { ToolHostContext } from '../src/ports/tool-host.js'
 import { buildEgoBrowserToolProvider } from '../src/adapters/tool/ego-browser-tool-provider.js'
 const config={state:'installed' as const,executablePath:'/controlled/ego-browser',executableHash:'a'.repeat(64),version:'0.6.3.14',revision:0}
 const date='2026-11-16T00:00:00.000Z', html='<body><article><h2>测绘监测项目</h2><time>2026-11-16</time></article><a href="https://feed.test/list?page=2">下一页</a></body>'
-export async function createEgoBrowserFixture(){
+export async function createEgoBrowserFixture(sourceUrl='https://feed.test/list'){
+ const origin=new URL(sourceUrl).origin
  const root=await mkdtemp(join(tmpdir(),'ego-browser-protocol-')),repo=new TaskRunRepository(join(root,'tasks.sqlite3'))
  const dispose=async()=>{repo.connection().close();await rm(root,{recursive:true,force:true})}
- const task:TaskRun={id:'task-feed',threadId:'thread-feed',workspaceRoot:'/controlled-workspace',goal:'使用Ego只读 https://feed.test/list 授权订阅列表汇总HTML',status:'running',agentId:'general',childTaskIds:[],acceptance:{kind:'files',requiredNodeKinds:['execute','verify','deliver'],requiresWebEvidence:true,webEvidenceBasis:'observed_feed',requireFinalResponse:true,requireActionableArtifactCard:true},budget:{maxAttempts:8,maxDurationMs:900000,version:2,maxExecutionMs:900000},attempts:1,replans:0,noProgressCount:0,nodes:[],artifacts:[],createdAt:date,updatedAt:date,revision:0,activeTurnId:'turn-feed'}
+ const task:TaskRun={id:'task-feed',threadId:'thread-feed',workspaceRoot:'/controlled-workspace',goal:'使用Ego只读 '+sourceUrl+' 授权订阅列表汇总HTML',status:'running',agentId:'general',childTaskIds:[],acceptance:{kind:'files',requiredNodeKinds:['execute','verify','deliver'],requiresWebEvidence:true,webEvidenceBasis:'observed_feed',requireFinalResponse:true,requireActionableArtifactCard:true},budget:{maxAttempts:8,maxDurationMs:900000,version:2,maxExecutionMs:900000},attempts:1,replans:0,noProgressCount:0,nodes:[],artifacts:[],createdAt:date,updatedAt:date,revision:0,activeTurnId:'turn-feed'}
  repo.create(task)
- let grant=ExecutionGrantSchema.parse({id:'grant-feed',taskId:task.id,threadId:task.threadId,turnId:task.activeTurnId,workspaceRoot:task.workspaceRoot,workspaceTrust:'read-only',agentTrust:'full-access',sandboxMode:'read-only',approvalPolicy:'auto',browserScope:{provider:'ego-browser',browserInstanceId:'ego-browser:'+config.executableHash,origins:['https://feed.test'],interaction:'observe',revision:0},connectorIdentityFingerprints:{'ego-browser':fp(config)},allowedToolNames:[...EGO_TOOLS],allowedProviderIds:['ego-browser'],networkAllowlist:['https://feed.test'],workspaceRevision:0,agentRevision:0,revision:0,idempotencyKey:'grant-feed',issuedAt:date,expiresAt:'2026-11-16T00:15:00.000Z'})
- let count=0,url='https://feed.test/list',ownership='agent',failCode:string|undefined,throwCommand=false,documentHtml=html,clock=Date.parse(date)+1000,expireDuringRun=false,finishReady=true
+ let grant=ExecutionGrantSchema.parse({id:'grant-feed',taskId:task.id,threadId:task.threadId,turnId:task.activeTurnId,workspaceRoot:task.workspaceRoot,workspaceTrust:'read-only',agentTrust:'full-access',sandboxMode:'read-only',approvalPolicy:'auto',browserScope:{provider:'ego-browser',browserInstanceId:'ego-browser:'+config.executableHash,origins:[origin],interaction:'observe',revision:0},connectorIdentityFingerprints:{'ego-browser':fp(config)},allowedToolNames:[...EGO_TOOLS],allowedProviderIds:['ego-browser'],networkAllowlist:[origin],workspaceRevision:0,agentRevision:0,revision:0,idempotencyKey:'grant-feed',issuedAt:date,expiresAt:'2026-11-16T00:15:00.000Z'})
+ let count=0,url=sourceUrl,siteSignInRequired=false,ownership='agent',failCode:string|undefined,throwCommand=false,documentHtml=html,clock=Date.parse(date)+1000,expireDuringRun=false,finishReady=true
  const calls:Array<Record<string,unknown>>=[]
  const run=async (_config:unknown,script:string)=>{
   const first=script.split('\n')[0]!
@@ -23,9 +24,10 @@ export async function createEgoBrowserFixture(){
   if(expireDuringRun)clock=Date.parse(grant.expiresAt!)
   if(throwCommand)throw new Error('ego_browser_command_timeout')
   if(!p.action)return {ok:true,taskSpaceId:7,spaceName:p.spaceName,finishResolved:true,keep:[]}
+  if(p.action==='space_status')return {ok:true,kind:'ego_space_status',version:1,taskSpaceId:7,spaceName:p.spaceName,idMatch:true,nameMatches:1,spaceStatus:'existing',identityMatches:true,ownership}
   if(p.action==='open'||p.action==='next')url=String(p.url)
   if(failCode)return {ok:false,code:failCode,taskSpaceId:7,spaceName:p.spaceName,ownership,pageLabel:'p1'}
-  return {ok:true,taskSpaceId:7,spaceName:p.spaceName,ownership,pageLabel:'p1',sourceUrl:url,html:p.selector?'<article><h2>测绘监测项目</h2><time>2026-11-16</time></article>':documentHtml,documentHtml,truncated:false,snapshot:'article 测绘监测项目',...(p.selector?{selection:{selector:p.selector,matchedCount:1}}:{}),candidates:[{href:'https://feed.test/list?page=2',label:'下一页'}]}
+  return {ok:true,taskSpaceId:7,spaceName:p.spaceName,ownership,pageLabel:'p1',sourceUrl:url,html:p.selector?'<article><h2>测绘监测项目</h2><time>2026-11-16</time></article>':documentHtml,documentHtml,siteSignInRequired,truncated:false,snapshot:'article 测绘监测项目',...(p.selector?{selection:{selector:p.selector,matchedCount:1}}:{}),candidates:[{href:'https://feed.test/list?page=2',label:'下一页'}]}
  }
  const provider=buildEgoBrowserToolProvider({config,repository:repo,run,now:()=>clock,canFinishReadiness:async()=>({ready:finishReady,reason:'受控测试成果尚未验证'})})
  const execute=async(name:typeof EGO_TOOLS[number],args:Record<string,unknown>={})=>{
@@ -36,5 +38,5 @@ export async function createEgoBrowserFixture(){
   repo.finishOperation(task.id,key,{status:result.isError?'failed':'succeeded',result:{approved:true,item:{id:'result-'+callId,kind:'tool_result',status:'completed',createdAt:date,finishedAt:date,threadId:task.threadId,turnId:grant.turnId,callId,toolName:name,isError:Boolean(result.isError),output:result.output}}},date)
   return result.output as Record<string,unknown>
  }
- return {repo,task,provider,calls,execute,dispose,grant:()=>grant,setGrant:(g:typeof grant)=>{grant=g},setOwnership:(s:string)=>{ownership=s},setFailure:(s:string|undefined)=>{failCode=s},setThrown:(value=true)=>{throwCommand=value},setHtml:(value:string)=>{documentHtml=value},setExpireDuringRun:()=>{expireDuringRun=true},setFinishReady:(ready:boolean)=>{finishReady=ready}}
+ return {repo,task,provider,calls,execute,dispose,grant:()=>grant,setGrant:(g:typeof grant)=>{grant=g},setOwnership:(s:string)=>{ownership=s},setFailure:(s:string|undefined)=>{failCode=s},setThrown:(value=true)=>{throwCommand=value},setHtml:(value:string)=>{documentHtml=value},setSiteSignInRequired:(value:boolean)=>{siteSignInRequired=value},setExpireDuringRun:()=>{expireDuringRun=true},setFinishReady:(ready:boolean)=>{finishReady=ready}}
 }

@@ -26,6 +26,7 @@ import { SequentialIdGenerator } from '../src/ports/id-generator.js'
 import { MAX_TERMINAL_TURN_IDS, TurnService } from '../src/services/turn-service.js'
 import type { TurnItem } from '../src/contracts/items.js'
 import type { ModelRequest, ModelStreamChunk } from '../src/ports/model-client.js'
+import type { TaskController } from '../src/services/task-controller.js'
 import {
   bootstrapThread,
   makeFakeModel,
@@ -635,6 +636,107 @@ describe('AgentLoop', () => {
       event.code === 'http_400'
     )).toBe(true)
     expect(events.some((event) => event.kind === 'turn_failed')).toBe(true)
+  })
+
+  it.each(['error-chunk', 'iterator-throw', 'missing-completion', 'unknown-operation'] as const)(
+    'persists an interrupted reply once and does not execute its proposed tool (%s)',
+    async (interruption) => {
+      let requests = 0
+      let unknownOperation = false
+      const recordAttemptFailure = vi.fn(() => ({ kind: 'continue' }))
+      const suspendUnknownToolOutcome = vi.fn()
+      const tasks = {
+        activeTask: () => undefined,
+        registerExecutionAbort: () => () => undefined,
+        pendingDeliveries: () => [],
+        tokenForTurn: () => undefined,
+        beginAttempt: () => undefined,
+        beginWork: () => undefined,
+        workBudget: () => undefined,
+        endRun: () => undefined,
+        suspendWebArtifactProgress: async () => null,
+        hasUnknownToolOutcome: () => unknownOperation,
+        suspendUnknownToolOutcome,
+        assessNonRetryableBlock: async () => null,
+        recordAttemptFailure
+      } as unknown as TaskController
+      const h = makeHarness({
+        provider: 'test',
+        model: 'test',
+        async *stream(): AsyncIterable<ModelStreamChunk> {
+          requests++
+          if (requests > 1) throw new Error('Interrupted requests must not be sent again')
+          yield { kind: 'assistant_text_delta', text: 'The received ' }
+          yield { kind: 'assistant_text_delta', text: 'part of the reply.' }
+          yield { kind: 'tool_call_complete', callId: 'pending_ls', toolName: 'ls', arguments: {} }
+          if (interruption === 'error-chunk') {
+            yield { kind: 'error', message: 'stream read failed', code: 'stream_read_error' }
+          }
+          if (interruption === 'iterator-throw') throw new Error('provider stream disconnected')
+          unknownOperation = interruption === 'unknown-operation'
+        }
+      }, { tasks })
+      await bootstrapThread(h)
+      const execute = vi.spyOn(h.toolHost, 'execute')
+
+      await expect(h.loop.runTurn(h.threadId, h.turnId)).resolves.toBe('failed')
+
+      const items = await h.sessionStore.loadItems(h.threadId)
+      const events = await h.sessionStore.loadEventsSince(h.threadId, 0)
+      expect(items.filter(item => item.kind === 'assistant_text')).toEqual([
+        expect.objectContaining({ text: 'The received part of the reply.', status: 'failed' })
+      ])
+      expect(items.find(item => item.kind === 'tool_call')).toMatchObject({ status: 'failed' })
+      expect(events.filter(event => event.kind === 'turn_failed')).toEqual([expect.objectContaining({
+        reason: unknownOperation ? 'blocked' : 'response_interrupted',
+        message: expect.stringContaining(unknownOperation ? 'outcome_unknown' : '已保留收到的部分回复')
+      })])
+      if (unknownOperation) {
+        expect(suspendUnknownToolOutcome).toHaveBeenCalledOnce()
+        expect(recordAttemptFailure).not.toHaveBeenCalled()
+      } else {
+        expect(recordAttemptFailure).toHaveBeenCalledOnce()
+        expect(recordAttemptFailure).toHaveBeenCalledWith(h.threadId, h.turnId, 'response_interrupted', expect.any(String))
+      }
+      expect(requests).toBe(1)
+      expect(execute).not.toHaveBeenCalled()
+    }
+  )
+
+  it('keeps the existing task retry path for a transient failure before model output', async () => {
+    let requests = 0
+    const recordAttemptFailure = vi.fn(() => ({ kind: 'continue' }))
+    const tasks = {
+      activeTask: () => undefined,
+      registerExecutionAbort: () => () => undefined,
+      pendingDeliveries: () => [],
+      tokenForTurn: () => undefined,
+      beginAttempt: () => undefined,
+      beginWork: () => undefined,
+      workBudget: () => undefined,
+      endRun: () => undefined,
+      suspendWebArtifactProgress: async () => null,
+      assessNonRetryableBlock: async () => null,
+      assessCandidate: async () => ({ kind: 'completed' }),
+      recordAttemptFailure
+    } as unknown as TaskController
+    const h = makeHarness({
+      provider: 'test',
+      model: 'test',
+      async *stream(): AsyncIterable<ModelStreamChunk> {
+        if (++requests === 1) throw new Error('connection refused before output')
+        yield { kind: 'assistant_text_delta', text: 'Completed after reconnecting.' }
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    }, { tasks })
+    await bootstrapThread(h)
+
+    await expect(h.loop.runTurn(h.threadId, h.turnId)).resolves.toBe('completed')
+
+    expect(requests).toBe(2)
+    expect(recordAttemptFailure).toHaveBeenCalledOnce()
+    expect(recordAttemptFailure).toHaveBeenCalledWith(h.threadId, h.turnId, 'turn_attempt_exception', 'connection refused before output')
+    expect((await h.sessionStore.loadItems(h.threadId)).filter(item => item.kind === 'assistant_text')).toHaveLength(1)
   })
 
   it('emits named pipeline lifecycle stages for a model request', async () => {

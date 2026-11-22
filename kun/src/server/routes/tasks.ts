@@ -1,3 +1,4 @@
+import { presentTaskRun, presentTaskAttention } from '../../services/task-user-presentation.js'
 import { OneOffScopeConfirmationSchema } from '../../contracts/browser-public-query-recovery.js'
 import { BrowserTaskBindingConfirmation, BrowserOperationConfirmation } from '../../contracts/browser-skill.js'
 import { browserReceiptProjection } from '../../services/browser-operation-verification.js'
@@ -41,7 +42,7 @@ async function isEngineeringExecutionTask(runtime: ServerRuntime, task: TaskRun)
 
 export function getTask(runtime: ServerRuntime, taskId: string): JsonResponse {
   const task = runtime.taskRepository?.get(taskId)
-  return task ? jsonResponse(task) : ERRORS.notFound(`task not found: ${taskId}`)
+  return task ? jsonResponse(presentTaskRun(task)) : ERRORS.notFound(`task not found: ${taskId}`)
 }
 
 export async function getTaskArtifactProof(runtime: ServerRuntime, taskId: string, artifactId: string): Promise<JsonResponse> {
@@ -243,7 +244,7 @@ export async function subscribeTaskSource(runtime: ServerRuntime, taskId: string
 }
 export function getTaskInbox(runtime: ServerRuntime, request: Request): JsonResponse {
   if (!runtime.taskRepository) return ERRORS.unavailable('task engine is unavailable')
-  return jsonResponse(runtime.taskRepository.inbox(new URL(request.url).searchParams.get('workspaceRoot') ?? undefined))
+  return jsonResponse(runtime.taskRepository.inbox(new URL(request.url).searchParams.get('workspaceRoot') ?? undefined).map(presentTaskAttention))
 }
 
 export async function appendTaskInput(runtime: ServerRuntime, taskId: string, request: Request): Promise<JsonResponse | Response> {

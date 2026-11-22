@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 
 const MAX_ANALYZED_PAGES = 500
 const MAX_PAGE_TEXT_BYTES = 64 * 1024
@@ -35,9 +37,15 @@ export async function analyzePdfDocument(
   // that work out of the desktop bootstrap so one missing cross-arch optional
   // package cannot prevent WorkWise itself from reaching app.whenReady().
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const pdfAssets = dirname(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'))
   if (signal?.aborted) throw cancelledError()
   const loadingTask = getDocument({
     data: new Uint8Array(bytes),
+    // PDF.js Node factories use fs, and require a literal trailing slash.
+    cMapUrl: `${join(pdfAssets, 'cmaps')}/`,
+    cMapPacked: true,
+    standardFontDataUrl: `${join(pdfAssets, 'standard_fonts')}/`,
+    useWorkerFetch: false,
     isEvalSupported: false,
     useSystemFonts: true,
     useWasm: false,

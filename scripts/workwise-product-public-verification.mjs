@@ -108,7 +108,9 @@ export async function verifyProductPublication(manifest, {
       }
       for (const expected of manifest.platforms) {
         const actual = live.platforms?.find((item) => item.file === expected.file)
-        if (actual?.url !== expected.url || actual?.sha256 !== expected.sha256) throw new Error(`Public installer metadata mismatch: ${expected.file}`)
+        for (const field of ['url', 'sha256', 'sizeBytes', 'downloadUrl', 'mirrorSha256']) {
+          if (actual?.[field] !== expected[field]) throw new Error(`Public installer metadata mismatch: ${expected.file} (${field})`)
+        }
       }
       verified = true
       break

@@ -3,7 +3,7 @@ import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, expect, it } from 'vitest'
-import { diagnoseEgoBrowser } from './managed-ego-browser-service'
+import { diagnoseEgoBrowser, egoBrowserCandidatePaths } from './managed-ego-browser-service'
 const clean:string[]=[]
 afterEach(async()=>{while(clean.length)await rm(clean.pop()!,{recursive:true,force:true})})
 it('discovers only the external CLI with exact executable hash/version, without a browser handshake',async()=>{
@@ -15,6 +15,32 @@ it('does not mistake the Skill guide version for the CLI protocol',async()=>{
  expect(await diagnoseEgoBrowser({candidates:[path],run:async()=> 'ego-browser usage guide v2.2.1'})).toMatchObject({state:'unsupported'})
 })
 it('reports unavailable CLI honestly and never installs or accesses profiles',async()=>{expect(await diagnoseEgoBrowser({candidates:[]})).toEqual({state:'not_installed',revision:0})})
+
+it('discovers the Windows onboarding installation and executable on absolute local PATH entries', () => {
+  const home = 'C:\\Users\\验收 User'
+  const active = home + '\\.local\\share\\ego\\active_version_dir'
+  expect(egoBrowserCandidatePaths('win32', home,
+    `${active};"C:\\Program Files\\Citro Labs\\ego lite";.;..\\workspace;D:relative;\\\\network\\share`)).toEqual([
+    active + '\\ego-browser.exe',
+    'C:\\Program Files\\Citro Labs\\ego lite\\ego-browser.exe'
+  ])
+})
+
+it('continues to the working executable when an earlier Windows install path is stale', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'ego-windows-path-')); clean.push(root)
+  const stale = join(root, 'old-ego-browser.exe')
+  const active = join(root, 'ego-browser.exe')
+  await writeFile(stale, 'old version')
+  await writeFile(active, 'active version')
+  const actualActive = await realpath(active)
+  expect(await diagnoseEgoBrowser({
+    candidates: [join(root, 'missing.exe'), stale, active],
+    run: async path => 'ego-browser ' + (path === actualActive ? '0.6.3.14' : '0.6.2.10')
+  })).toEqual({
+    state: 'installed', version: '0.6.3.14', executablePath: actualActive,
+    executableHash: createHash('sha256').update('active version').digest('hex'), revision: 0
+  })
+})
 
 // Real subprocess regression for the macOS/POSIX CLI channel contract. No Ego
 // executable, browser, website, profile or injected runner is used here.

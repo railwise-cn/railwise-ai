@@ -121,7 +121,7 @@ import { registerTaskDeliveryRoutes } from './task-delivery.js'
 export function buildRouter(runtime: ServerRuntime): Router {
   const router = new Router(request => {
     if (runtime.updateLifecycle?.isSuspended() && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
-      && new URL(request.url).pathname !== '/v1/runtime/update/prepare') {
+      && !['/v1/runtime/update/prepare', '/v1/runtime/update/cancel'].includes(new URL(request.url).pathname)) {
       return ERRORS.unavailable('应用正在准备升级，已停止接收新的执行。')
     }
     return undefined
@@ -340,6 +340,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('POST', '/v1/flows/test-node', async (request) => authorize(request, runtime) ? flowRoutes.testNode(runtime.flowService, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/flows/migrations/schedules', async (request) => authorize(request, runtime) ? flowRoutes.migrateSchedules(runtime.flowService, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/legacy-schedules', async (request) => authorize(request, runtime) ? flowRoutes.listLegacySchedules(runtime.flowService) : ERRORS.unauthorized())
+  router.add('GET', '/v1/task-schedules', async (request) => authorize(request, runtime) ? flowRoutes.listTaskSchedules(runtime.taskScheduleService) : ERRORS.unauthorized())
+  router.add('PATCH', '/v1/task-schedules/:id', async (request, ctx) => authorize(request, runtime) ? flowRoutes.toggleTaskSchedule(runtime.taskScheduleService, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/legacy-schedules', async (request) => authorize(request, runtime) ? flowRoutes.createLegacySchedule(runtime.flowService, request) : ERRORS.unauthorized())
   router.add('PUT', '/v1/legacy-schedules/:id', async (request, ctx) => authorize(request, runtime) ? flowRoutes.updateLegacySchedule(runtime.flowService, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/legacy-schedules/:id/run', async (request, ctx) => authorize(request, runtime) ? flowRoutes.runLegacySchedule(runtime.flowService, ctx.params.id) : ERRORS.unauthorized())
@@ -606,7 +608,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
       approvalId: ctx.params.id,
       request,
       gate: runtime.approvalGate,
-      events: runtime.events
+      events: runtime.events,
+      continueDetachedApproval: approval => runtime.taskControlService?.continueDetachedApproval(approval) ?? Promise.resolve()
     })
   })
   router.add('POST', '/v1/user-inputs/:id', async (request, ctx) => {

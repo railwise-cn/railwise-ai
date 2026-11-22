@@ -13,6 +13,7 @@ const driverFiles = new Set([
   'scripts/run-windows-frozen-gui-upgrade.mjs',
   'scripts/run-windows-published-gui-update-smoke.mjs',
   'scripts/run-windows-ui-smoke.mjs',
+  'scripts/windows-task-chat-ui.mjs',
   'scripts/verify-packaged-startup-appearance.mjs',
   'scripts/verify-windows-cold-marketplace.mjs',
   'scripts/verify-windows-composer-acceptance.mjs',

@@ -49,11 +49,11 @@ function persistBoolean(key: string, value: boolean): void {
 
 function readStoredRightPanelMode(): RightPanelMode {
   const raw = readBrowserStorageItem(RIGHT_PANEL_MODE_KEY)
-  return raw === 'todo' || raw === 'changes' || raw === 'browser' ? raw : null
+  return raw === 'changes' || raw === 'browser' ? raw : null
 }
 
 function persistRightPanelMode(mode: RightPanelMode): void {
-  if (mode === 'todo' || mode === 'changes' || mode === 'browser') {
+  if (mode === 'changes' || mode === 'browser') {
     writeBrowserStorageItem(RIGHT_PANEL_MODE_KEY, mode)
   } else {
     removeBrowserStorageItem(RIGHT_PANEL_MODE_KEY)
@@ -164,7 +164,7 @@ export function useWorkbenchLayout({
   }, [activeThreadId, rightPanelMode])
 
   useEffect(() => {
-    if (!latestAutoOpenDevPreviewUrl || !currentPreviewKey || (route !== 'chat' && route !== 'tasks')) return
+    if (!latestAutoOpenDevPreviewUrl || !currentPreviewKey || route !== 'chat') return
     if (dismissedPreviews.current.get(activeThreadId) === currentPreviewKey) return
     if (autoOpenedPreviewKeyRef.current === currentPreviewKey) return
     autoOpenedPreviewKeyRef.current = currentPreviewKey

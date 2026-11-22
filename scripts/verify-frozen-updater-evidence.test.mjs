@@ -97,7 +97,8 @@ test('an explicit protected-main updater baseline selects the exact trusted work
   assert.equal(verifyUpdaterEvidenceSource(f.run, f.api, '0.5.6'), f.run)
   assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api), /trusted native updater job/)
   assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api, '0.5.4'), /trusted native updater job/)
-  assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api, '0.5.9'), /no valid arm64 installer pin/)
+  assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api, '0.5.9'), /trusted native updater job/)
+  assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api, '0.5.8'), /no valid arm64 installer pin/)
   assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.6', '0.5.6'), /must be newer/)
   f.job.name = UPDATER_JOB
   assert.throws(() => verifyUpdaterEvidenceSource(f.run, f.api, '0.5.6'), /trusted native updater job/)

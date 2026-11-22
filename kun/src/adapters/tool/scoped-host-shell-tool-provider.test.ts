@@ -1,11 +1,14 @@
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { InMemoryThreadStore } from '../in-memory-thread-store.js'
 import { InMemorySessionStore } from '../in-memory-session-store.js'
 import { PersistentApprovalGate } from '../persistent-human-gates.js'
 import { createThreadRecord } from '../../domain/thread.js'
+import { makeAssistantTextItem } from '../../domain/item.js'
+import { verifiedShellDeliverablePaths } from '../../loop/turn-completion-guard.js'
+import { validateArtifactFile } from '../../services/artifact-validator.js'
 import { TaskController } from '../../services/task-controller.js'
 import { TaskRunRepository } from '../../services/task-run-repository.js'
 import { ExecutionGrantSchema } from '../../contracts/permissions.js'
@@ -13,6 +16,7 @@ import type { ToolHostContext } from '../../ports/tool-host.js'
 import { CapabilityRegistry } from './capability-registry.js'
 import { LocalToolHost } from './local-tool-host.js'
 import { createBashLocalTool, stopAllBashSessions } from './builtin-bash-tool.js'
+import { shellRuntimeInfo } from './builtin-tool-utils.js'
 import { buildScopedHostShellToolProviders } from './scoped-host-shell-tool-provider.js'
 import { HostShellVerificationService } from '../../services/host-shell-verification.js'
 import { getTaskOperationReceipts } from '../../server/routes/tasks.js'
@@ -57,13 +61,15 @@ async function fixture(prompt = '在工作区运行一次本地检查命令。')
       revision: 0, workspaceRevision: 0, agentRevision: 0, idempotencyKey: 'grant', issuedAt: nowIso() }) }
   const command = `"${process.execPath.replaceAll('"', '\\"')}" -e "process.stdout.write('approved-once')"`
   const args = { command, idempotency_key: 'one-command', ttl_seconds: 60, timeout_seconds: 10 }
+  const invoke = (callId: string, raw = args, activeContext = context) =>
+    host.execute({ callId, toolName: 'request_host_shell', arguments: raw }, activeContext)
   const run = async (callId: string, raw = args, decision: 'allow' | 'deny' = 'allow', activeContext = context) => {
-    const pending = host.execute({ callId, toolName: 'request_host_shell', arguments: raw }, activeContext)
+    const pending = invoke(callId, raw, activeContext)
     await vi.waitFor(() => expect(gate.pending()).toHaveLength(1))
     gate.decide(gate.pending()[0]!.id, decision)
     return pending
   }
-  return { root, repository, tasks, task, gate, abort, bashTool, execute, onAuthorized, providers, host, context, args, run, advance: (seconds: number) => { now = new Date(Date.parse(now) + seconds * 1000).toISOString() } }
+  return { root, repository, tasks, task, gate, abort, bashTool, execute, onAuthorized, providers, host, context, args, run, invoke, advance: (seconds: number) => { now = new Date(Date.parse(now) + seconds * 1000).toISOString() } }
 }
 
 describe('one-shot, explicitly reviewed host shell', () => {
@@ -83,12 +89,13 @@ describe('one-shot, explicitly reviewed host shell', () => {
     expect(f.onAuthorized).toHaveBeenCalledOnce()
     expect(f.context.executionGrant).toMatchObject({ workspaceTrust: 'workspace-write', sandboxMode: 'workspace-write', revision: 0 })
     expect(f.repository.operations(f.task.id, 'host_shell')).toMatchObject([{ status: 'succeeded', request: { workspaceRoot: f.root }, result: { authorization: { executionGrantId: 'grant', leaseRevision: f.tasks.tokenForTurn('turn')!.leaseRevision } } }])
-    const repeated = await f.run('repeat')
+    const repeated = await f.invoke('repeat')
     expect(repeated.item).toMatchObject({ output: { output: 'approved-once' } })
     expect(f.execute).toHaveBeenCalledOnce()
-    const conflicting = await f.run('conflict', { ...f.args, command: `${f.args.command} ` })
+    const conflicting = await f.invoke('conflict', { ...f.args, command: `${f.args.command} ` })
     expect(conflicting.item).toMatchObject({ isError: true, output: { code: 'idempotency_conflict' } })
     expect(f.execute).toHaveBeenCalledOnce()
+    expect(f.repository.humanRequests('approval', false)).toHaveLength(1)
   })
 
   it('rejects denial, fake approval, changed arguments and revoked grants before any side effect', async () => {
@@ -101,7 +108,7 @@ describe('one-shot, explicitly reviewed host shell', () => {
     changing.command += ' '
     f.gate.decide(f.gate.pending()[0]!.id, 'allow')
     await expect(pending).resolves.toMatchObject({ item: { isError: true, output: { code: 'approval_request_changed' } } })
-    const revokedContext = { ...f.context, validateExecutionGrant: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValue(new Error('revoked')) }
+    const revokedContext = { ...f.context, validateExecutionGrant: vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined).mockRejectedValue(new Error('revoked')) }
     const revoked = await f.run('revoked', f.args, 'allow', revokedContext)
     expect(revoked.item).toMatchObject({ isError: true })
     expect(f.execute).not.toHaveBeenCalled()
@@ -111,10 +118,11 @@ describe('one-shot, explicitly reviewed host shell', () => {
   it('blocks connector proxy commands and never advertises elevation for external tasks', async () => {
     const f = await fixture()
     for (const command of ['dws todo list', 'lark-cli task list', 'curl https://open.larksuite.com/api', 'curl https://oapi.dingtalk.com']) {
-      const result = await f.run(`proxy-${command.length}`, { ...f.args, command })
+      const result = await f.invoke(`proxy-${command.length}`, { ...f.args, command })
       expect(result.item).toMatchObject({ isError: true, output: { code: 'host_shell_connector_proxy_blocked' } })
     }
     expect(f.execute).not.toHaveBeenCalled()
+    expect(f.repository.humanRequests('approval', false)).toHaveLength(0)
     const external = await fixture('帮我处理钉钉待办。')
     expect((await external.host.listTools(external.context)).map(tool => tool.name)).not.toContain('request_host_shell')
     await expect(external.providers[0]!.tools[0]!.execute(external.args, external.context)).rejects.toMatchObject({ code: 'host_shell_scope_blocked' })
@@ -126,7 +134,8 @@ describe('one-shot, explicitly reviewed host shell', () => {
     const result = await f.run('unknown')
     expect(result.item).toMatchObject({ isError: true, output: { status: 'outcome_unknown' } })
     expect(f.repository.operations(f.task.id, 'host_shell')).toMatchObject([{ status: 'outcome_unknown' }])
-    expect((await f.run('unknown-repeat')).item).toMatchObject({ isError: true, output: { status: 'outcome_unknown' } })
+    expect((await f.invoke('unknown-repeat')).item).toMatchObject({ isError: true, output: { status: 'outcome_unknown' } })
+    expect(f.repository.humanRequests('approval', false)).toHaveLength(1)
     expect(f.execute).toHaveBeenCalledOnce()
     f.tasks.endRun('turn')
     const direct = f.providers[0]!.tools[0]!
@@ -178,6 +187,54 @@ describe('one-shot, explicitly reviewed host shell', () => {
 })
 
 describe('read-only host command outcome verification', () => {
+  it('registers a fresh MP4 from the exact reconciled command while refusing stale and out-of-scope claims', async () => {
+    const f = await fixture('请制作视频并保存为 fresh.mp4。')
+    const outside = await mkdtemp(join(tmpdir(), 'railwise-other-shell-'))
+    cleanup.push(() => rm(outside, { recursive: true, force: true }))
+    const video = await readFile(new URL('../../../../src/asset/img/web.mp4', import.meta.url))
+    const stale = join(f.root, 'stale.mp4')
+    const foreign = join(outside, 'foreign.mp4')
+    const candidate = join(f.root, 'fresh.mp4')
+    const recorder = join(f.root, 'video-fixture.cjs')
+    await writeFile(stale, video)
+    await utimes(stale, new Date(0), new Date(0))
+    await writeFile(recorder, `const fs = require('node:fs');
+      const timer = setInterval(() => {
+        if (!fs.existsSync('record-video')) return;
+        clearInterval(timer);
+        fs.copyFileSync('stale.mp4', 'fresh.mp4');
+        fs.copyFileSync('stale.mp4', ${JSON.stringify(foreign)});
+      }, 10);
+    `)
+    const argumentsForCommand = [process.execPath, recorder]
+    const powershell = ['pwsh', 'powershell'].includes(shellRuntimeInfo().name)
+    const command = powershell
+      ? `& ${argumentsForCommand.map(value => `'${value.replaceAll("'", "''")}'`).join(' ')}`
+      : argumentsForCommand.map(value => `"${value.replaceAll('"', '\\"')}"`).join(' ')
+    const running = await f.run('render', { ...f.args, command })
+    const receipt = f.repository.operations(f.task.id, 'host_shell')[0]!
+    expect(receipt.status).toBe('running')
+    expect(running.item).toMatchObject({ output: { status: 'running' } })
+    await writeFile(join(f.root, 'record-video'), '')
+    const verification = new HostShellVerificationService(f.repository, join(f.root, 'shell-output'), () => new Date().toISOString())
+    await vi.waitFor(async () => {
+      await verification.reconcile(f.task.id)
+      expect(f.repository.operation(f.task.id, receipt.idempotencyKey)?.status).toBe('succeeded')
+    }, { timeout: 4000 })
+    const { sessionId } = receipt.result as { sessionId: string }
+    const session = f.repository.getShellSession(sessionId)!
+    const recovered = await f.host.execute({ callId: 'poll-render', toolName: 'host_shell_session', arguments: {
+      session_id: sessionId, action: 'poll'
+    } }, f.context)
+    const claim = makeAssistantTextItem({ id: 'result', turnId: 'turn', threadId: 'thread', status: 'completed',
+      text: `已保存 \`fresh.mp4\`、\`stale.mp4\` 和 \`${relative(f.root, foreign)}\`。` })
+    expect(verifiedShellDeliverablePaths([claim, recovered.item], 'turn')).toEqual([candidate])
+    expect(verifiedShellDeliverablePaths([{ ...claim, turnId: 'next-turn' }, recovered.item], 'next-turn')).toEqual([])
+    expect(recovered.item).toMatchObject({ output: { cwd: f.root, started_at: session.startedAt, finished_at: session.finishedAt, exit_code: 0 } })
+    await expect(validateArtifactFile(candidate, 'mp4')).resolves.toMatchObject({ valid: true, format: 'mp4' })
+    expect(f.execute).toHaveBeenCalledOnce()
+  }, 10_000)
+
   it('recovers a lost response from the real session and settles both receipts without another command', async () => {
     const f = await fixture()
     await f.run('lost-response')

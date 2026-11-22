@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TaskProgressV1, TaskRunV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskProgressV1, TaskRunV1 } from '@shared/agent-workbench'
 import { createThreadRunActivity, projectTaskRunActivity } from './ag-ui-activity'
 import type { CoreRuntimeEventJson } from './runtime-contract'
 
@@ -36,7 +36,7 @@ describe('AG-UI activity projection', () => {
   })
 
   it('uses only the current leased task phase, task status and registered artifact count', () => {
-    const task = { id: 'task', status: 'running' } as TaskRunV1
+    const task = { id: 'task', status: 'running', revision: 1, activeTurnId: 'turn' } as TaskRunV1
     const sample: TaskProgressV1 = {
       taskId: 'task', taskRevision: 1, turnId: 'turn', sampledAt: '2026-11-18T00:00:00Z',
       executionId: 'execution', leaseRevision: 1, active: true, leaseExpiresAt: '2999-01-01', activity: { phase: 'verifying' }
@@ -45,4 +45,16 @@ describe('AG-UI activity projection', () => {
     expect(projectTaskRunActivity(task, { ...sample, leaseExpiresAt: '2001-01-01' }, 2)?.phase).toBeUndefined()
     expect(projectTaskRunActivity({ ...task, status: 'waiting_approval' }, undefined, 2)).toMatchObject({ status: 'waiting_approval', artifactCount: 2 })
   })
+  it('projects a durable approval and artifact references without carrying the command or duplicates', () => {
+    const task = { id: 'task', status: 'waiting_approval', revision: 2 } as TaskRunV1
+    const approval = { id: 'approval', taskId: task.id, status: 'pending', message: 'sha and command',
+      presentation: { reason: 'approval_host_shell', scope: 'host', actions: ['approve', 'deny'] } } as TaskAttentionV1
+    const artifact = { taskId: 'task', artifactId: 'report' }
+    const activity = projectTaskRunActivity(task, undefined, 1, [approval, approval], [artifact])
+    expect(activity).toMatchObject({
+      status: 'waiting_approval', attentionIds: ['approval'], artifacts: [artifact], presentation: approval.presentation
+    })
+    expect(JSON.stringify(activity)).not.toContain(approval.message)
+  })
+
 })

@@ -90,3 +90,22 @@ it('keeps projection scoped to readable groups and actual current Host/provider/
  expect(service.progress()).toEqual([])
  expect(repo.get(owner.id)).toEqual(owner)
 })
+
+
+it('serves the same typed approval presentation in a snapshot and replay while retaining exact audit text', async () => {
+  const repo = await fixture()
+  const service = new TaskViewService(repo)
+  const owner = task('approval-owner')
+  repo.create(owner)
+  const message = 'Technical audit detail: exact command and request fingerprint'
+  repo.saveHumanRequest({
+    id: 'pending-approval', kind: 'approval', threadId: owner.threadId, turnId: 'turn-1', message,
+    payload: { approval: { toolName: 'request_host_shell' } },
+    status: 'pending', createdAt: owner.createdAt, updatedAt: owner.updatedAt
+  })
+  const card = service.page({ filter: 'attention' }).attention[0]
+  const replay = service.changes(0).find(item => item.kind === 'attention_changed')?.payload
+  expect(card).toEqual(replay)
+  expect(card).toMatchObject({ message, presentation: { reason: 'approval_host_shell', scope: 'host', actions: ['approve', 'deny', 'open_thread'] } })
+  expect(repo.humanRequest('pending-approval')?.message).toBe(message)
+})

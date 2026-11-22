@@ -17,6 +17,7 @@ export function callableCapabilityCandidates(input: {
   mcp: McpToolProviderBuildResult
   context: ToolHostContext
   tools: readonly { name: string; providerId?: string }[]
+  includeSkills?: boolean
 }): CallableCapabilityCandidate[] {
   const { skills, mcp, context, tools } = input
   const toolNames = new Set(tools.map(tool => tool.name))
@@ -30,7 +31,10 @@ export function callableCapabilityCandidates(input: {
         !mcpProviders.has(id) || isTaskScheduleBridgeServer(server.id)) return []
     return [{ choice: { kind: 'connector' as const, id, label: server.id } }]
   })
-  return [...skills.callablePluginSkills(context.workspace, toolNames), ...connectors]
+  const selectedSkills = input.includeSkills
+    ? skills.callableSkills(context.workspace, toolNames).map(choice => ({ choice, skillId: choice.id }))
+    : []
+  return [...selectedSkills, ...skills.callablePluginSkills(context.workspace, toolNames), ...connectors]
     .sort((left, right) => left.choice.label.localeCompare(right.choice.label) || left.choice.id.localeCompare(right.choice.id))
 }
 

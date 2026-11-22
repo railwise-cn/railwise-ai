@@ -7,9 +7,10 @@ export function shouldStopServicesWhenAllWindowsClose(
 
 export function shouldCloseMainWindowToTray(
   closeToTray: boolean,
-  candidateMode = false
+  candidateMode = false,
+  quittingForUpdate = false
 ): boolean {
-  return closeToTray && !candidateMode
+  return closeToTray && !candidateMode && !quittingForUpdate
 }
 
 export function shouldShowStartupErrorDialog(candidateHeadless = false): boolean {

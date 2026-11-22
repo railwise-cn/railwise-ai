@@ -5,7 +5,7 @@ import {
   RunFinishedEventSchema,
   RunStartedEventSchema
 } from '@ag-ui/core/schemas'
-import { TASK_RUN_STATUSES, type TaskProgressV1, type TaskRunV1 } from '@shared/agent-workbench'
+import { TASK_RUN_STATUSES, type TaskAttentionV1, type TaskProgressV1, type TaskRunV1, type TaskUserPresentation } from '@shared/agent-workbench'
 import { z } from 'zod'
 import type { CoreRuntimeEventJson } from './runtime-contract'
 import { operationPhase } from './operation-phase'
@@ -18,10 +18,26 @@ const threadActivitySchema = z.object({
 })
 export type ThreadRunActivity = z.infer<typeof threadActivitySchema>
 
+const taskReason = z.enum([
+  'response_interrupted', 'outcome_unknown', 'execution_budget', 'input_required', 'approval_required',
+  'approval_host_shell', 'approval_browser', 'paused', 'retrying', 'execution_failed', 'stalled',
+  'queued', 'blocked', 'approval_expired', 'tool_repeated_failure'
+] satisfies TaskUserPresentation['reason'][])
+const taskAction = z.enum([
+  'answer', 'approve', 'deny', 'verify', 'resume', 'retry', 'supplement', 'extend_budget', 'open_thread'
+] satisfies TaskUserPresentation['actions'])
+const taskPresentationSchema = z.object({
+  reason: taskReason,
+  actions: z.array(taskAction),
+  scope: z.enum(['host', 'browser', 'unknown']).optional()
+})
 const taskActivitySchema = z.object({
   status: z.enum(TASK_RUN_STATUSES),
   phase: z.enum(['thinking', 'searching', 'reading', 'writing', 'verifying', 'working']).optional(),
-  artifactCount: z.number().int().nonnegative()
+  artifactCount: z.number().int().nonnegative(),
+  presentation: taskPresentationSchema.optional(),
+  attentionIds: z.array(z.string().min(1)).optional(),
+  artifacts: z.array(z.object({ taskId: z.string().min(1), artifactId: z.string().min(1) })).optional()
 })
 
 function activityContent<T>(messageId: string, activityType: string, content: Record<string, unknown>, schema: z.ZodType<T>): T | undefined {
@@ -108,8 +124,37 @@ export function createThreadRunActivity(threadId: string, sinceSeq: number) {
   return { apply, reset }
 }
 
-export function projectTaskRunActivity(task: TaskRunV1, sample: TaskProgressV1 | undefined, artifactCount: number) {
-  // The task store has already checked the current revision and lease sequence.
-  const phase = sample?.active && Date.parse(sample.leaseExpiresAt) > Date.now() ? sample.activity?.phase : undefined
-  return activityContent(`railwise:task:${task.id}`, 'railwise.task.v1', { status: task.status, phase, artifactCount }, taskActivitySchema)
+const waitingReasons = {
+  queued: 'queued',
+  retrying: 'retrying',
+  waiting_approval: 'approval_required',
+  waiting_user: 'input_required',
+  paused: 'paused',
+  stalled: 'stalled',
+  failed: 'execution_failed'
+} as const
+
+export function taskReasonKey(reason: TaskUserPresentation['reason']): string {
+  return `taskPresentation_${reason}`
+}
+
+export function projectTaskRunActivity(
+  task: TaskRunV1,
+  sample: TaskProgressV1 | undefined,
+  artifactCount: number,
+  attention: readonly TaskAttentionV1[] = [],
+  artifacts?: ReadonlyArray<{ taskId: string; artifactId: string }>
+) {
+  const currentSample = sample?.active && sample.taskId === task.id && sample.taskRevision === task.revision &&
+    sample.turnId === task.activeTurnId && ['running', 'retrying'].includes(task.status) && Date.parse(sample.leaseExpiresAt) > Date.now()
+      ? sample : undefined
+  const pending = attention.filter(item => item.status === 'pending')
+  const presentation = pending.find(item => item.taskId === task.id)?.presentation ?? task.presentation
+  const fallback = waitingReasons[task.status as keyof typeof waitingReasons]
+  return activityContent(`railwise:task:${task.id}`, 'railwise.task.v1', {
+    status: task.status, phase: currentSample?.activity?.phase, artifactCount,
+    ...(presentation ? { presentation } : fallback ? { presentation: { reason: fallback, actions: [] } } : {}),
+    ...(pending.length ? { attentionIds: [...new Set(pending.map(item => item.id))] } : {}),
+    ...(artifacts ? { artifacts } : {})
+  }, taskActivitySchema)
 }

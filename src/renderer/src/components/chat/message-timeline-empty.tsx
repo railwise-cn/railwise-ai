@@ -92,9 +92,6 @@ function RuntimeWakeHero({
     <div className="ds-runtime-wake-hero ds-no-drag px-6 pb-8 pt-12 text-center md:pt-16">
       <KunHeroStage />
 
-      <p className="text-[12px] font-semibold uppercase tracking-[0] text-accent">
-        {t('runtimeOfflineHeroKicker')}
-      </p>
       <h1 className="mt-2 max-w-[620px] text-[26px] font-semibold leading-tight tracking-[0] text-ds-ink md:text-[32px]">
         {title}
       </h1>

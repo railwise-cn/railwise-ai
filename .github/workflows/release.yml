@@ -1156,6 +1156,7 @@ jobs:
             --transport r2
 
       - name: Verify official immutable HTTPS downloads
+        id: verify_official_immutable
         run: |
           set -euo pipefail
           node ./scripts/deploy-website-release.mjs verify-public \
@@ -1164,6 +1165,7 @@ jobs:
             --channel stable \
             --release-prefix railwise-ai \
             --target release
+          printf 'verified_at=%s\n' "$(date -u +%FT%TZ)" >> "${GITHUB_OUTPUT}"
 
       - name: Upload website update channel artifact
         uses: actions/upload-artifact@v4
@@ -1317,24 +1319,26 @@ jobs:
 
       - name: Generate product download data from the publication manifest
         if: ${{ inputs.publish_product_page == true }}
+        env:
+          MIRROR_VERIFIED_AT: ${{ steps.verify_official_immutable.outputs.verified_at }}
         run: |
           set -euo pipefail
-          node scripts/generate-website-product-manifest.cjs website-release-assets/publication-manifest.json website/data/workwise-product.json
-          node scripts/deploy-workwise-product-page.mjs validate --source website --version "${RELEASE_VERSION}"
+          node scripts/generate-website-product-manifest.cjs website-release-assets/publication-manifest.json website/data/workwise-product.json "${MIRROR_VERIFIED_AT}"
+          node scripts/deploy-workwise-product-page.mjs validate --source website --version "${RELEASE_VERSION}" --mode manifest-only
 
       - name: Deploy the generated product download page
         id: product_page_deploy
         if: ${{ inputs.publish_product_page == true }}
-        run: node scripts/deploy-workwise-product-page.mjs deploy --source website --version "${RELEASE_VERSION}" --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        run: node scripts/deploy-workwise-product-page.mjs deploy --source website --version "${RELEASE_VERSION}" --mode manifest-only --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Verify the generated public product download page
         id: product_page_verify
         if: ${{ inputs.publish_product_page == true }}
-        run: node scripts/deploy-workwise-product-page.mjs verify-public --source website --version "${RELEASE_VERSION}"
+        run: node scripts/deploy-workwise-product-page.mjs verify-public --source website --version "${RELEASE_VERSION}" --mode manifest-only
 
       - name: Restore only the previous product page if its public verification fails
         if: ${{ always() && inputs.publish_product_page == true && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}
-        run: node scripts/deploy-workwise-product-page.mjs rollback --source website --version "${RELEASE_VERSION}" --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        run: node scripts/deploy-workwise-product-page.mjs rollback --source website --version "${RELEASE_VERSION}" --mode manifest-only --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Restore the previous official pointers if this promotion attempt fails
         if: ${{ always() && (failure() || cancelled()) && steps.capture_promotion.outcome == 'success' && steps.stable_promotion.outcome != 'skipped' }}

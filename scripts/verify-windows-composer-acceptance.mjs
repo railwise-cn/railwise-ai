@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
-import { readFile, writeFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { psQuote } from './run-windows-published-gui-update-smoke.mjs'
+import { psQuote } from './verify-windows-install-smoke.mjs'
 
 const literal = JSON.stringify
 const composer = 'textarea[placeholder="向智能体提问…"]:not(:disabled)'
@@ -14,9 +14,127 @@ const fontMap = '铁路合成验收'
 const textName = '中文文字样本.pdf'
 const scanName = '扫描宣传册.pdf'
 const invalidName = '损坏样本.pdf'
+const attachmentItem = '.ds-floating-composer .ds-composer-attachment-item'
+const attachmentPanel = '.ds-floating-composer .ds-composer-attachments'
 
-export function createChineseTextPdf() {
-  const glyphs = Array.from(fontMap)
+function observeAttachment(name, condition) {
+  return `(() => {
+    const item = [...document.querySelectorAll(${literal(attachmentItem)})].find(row => row.querySelector('.ds-chat-attachment-filename')?.title === ${literal(name)});
+    return Boolean(item && (${condition}));
+  })()`
+}
+
+async function chooseFiles(cdp, files) {
+  await cdp.click(addMenu)
+  await cdp.send('Page.setInterceptFileChooserDialog', { enabled: true })
+  try {
+    await cdp.click('button', '添加文件或图片')
+    const { root } = await cdp.send('DOM.getDocument')
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '.ds-floating-composer input[type="file"]' })
+    assert.ok(nodeId)
+    await cdp.send('DOM.setFileInputFiles', { nodeId, files })
+  } finally {
+    await cdp.send('Page.setInterceptFileChooserDialog', { enabled: false })
+  }
+}
+
+function observeAttachmentLayout(expectedName) {
+  const panel = document.querySelector('.ds-floating-composer .ds-composer-attachments')
+  const list = panel?.querySelector('ul')
+  const composer = panel?.closest('.ds-chat-composer')
+  const textarea = composer?.querySelector('textarea')
+  const send = composer?.querySelector('button[aria-label="发送"]')
+  if (!list || !textarea || !send || !panel || !composer) return null
+  const rect = (node) => {
+    const { top, right, bottom, left, width, height } = node.getBoundingClientRect()
+    return { top, right, bottom, left, width, height }
+  }
+  const visibleRows = [...list.children].filter(item => item.getClientRects().length)
+  const sendBounds = rect(send)
+  const filenames = [...list.querySelectorAll('.ds-chat-attachment-filename')]
+  const expectedFile = filenames.find(node => node.title === expectedName)
+  return {
+    expanded: panel.dataset.expanded === 'true', total: list.children.length, visibleRows: visibleRows.length,
+    listWidth: list.clientWidth, listScrollWidth: list.scrollWidth, listHeight: list.clientHeight, listScrollHeight: list.scrollHeight,
+    editor: rect(textarea), strip: rect(panel), composer: rect(composer), send: sendBounds, viewport: { width: innerWidth, height: innerHeight, devicePixelRatio },
+    actionAtCenter: send.contains(document.elementFromPoint(sendBounds.left + sendBounds.width / 2, sendBounds.top + sendBounds.height / 2)),
+    validSuffix: expectedFile?.querySelector('[aria-hidden]:last-child')?.textContent === '.pdf',
+    fileNames: filenames.map(node => node.title),
+    sameNameCount: filenames.filter(node => node.title === 'Attachment notes.txt').length,
+    thumbnailCount: [...list.querySelectorAll('.ds-composer-attachment-icon img')].filter(img => img.complete && img.naturalWidth > 0).length,
+    hiddenFailureSignaled: panel.querySelector('.ds-composer-attachment-toggle')?.textContent.includes('项需要处理')
+  }
+}
+
+async function verifyMixedAttachmentLayout(cdp, workspace, invalidPath) {
+  const filename = `${'合成工程现场监测成果复核资料'.repeat(5)}.pdf`
+  const directories = ['本期', '上期'].map(name => join(workspace, name))
+  await Promise.all(directories.map(directory => mkdir(directory)))
+  const documentPath = join(workspace, filename)
+  const imagePath = join(workspace, '合成示意图.png')
+  const sameContentNames = ['合成附件说明.txt', '合成复核附件.txt']
+  const textPaths = [
+    ...directories.map(directory => join(directory, 'Attachment notes.txt')),
+    join(workspace, `${'Long field inspection notes and approved revisions '.repeat(2)}.txt`),
+    ...sameContentNames.map(name => join(workspace, name))
+  ]
+  const files = [documentPath, textPaths[0], invalidPath, imagePath, ...textPaths.slice(1)]
+  const image = await readFile(new URL('../fixtures/markdown-workbench/assets/diagram.png', import.meta.url))
+  await Promise.all([writeFile(documentPath, createChineseTextPdf('工程附件布局验收')),
+    writeFile(imagePath, image),
+    ...textPaths.map((file, index) => writeFile(file, index >= textPaths.length - sameContentNames.length
+      ? '相同内容以两个不同名称上传，供布局验收。'
+      : `合成附件 ${index + 1}，供布局验收。`))])
+  const prompt = '保留这段输入，核对附件排版。'
+  await cdp.fill(composer, prompt)
+  await chooseFiles(cdp, files)
+  await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${files.length} &&
+    [...document.querySelectorAll(${literal(attachmentItem)})].filter(row => row.querySelector('[aria-label="在文件夹中显示原件"]')).length === ${files.length - 2} &&
+    [...document.querySelectorAll(${literal(attachmentItem)} + ' img')].some(img => img.complete && img.naturalWidth > 0) &&
+    ${observeAttachment(invalidName, "item.textContent.includes('读取失败')")}`, 'mixed attachment batch loaded with one damaged file', 120_000)
+  const expression = `(${observeAttachmentLayout.toString()})(${literal(filename)})`
+  const collapsed = await cdp.evaluate(expression)
+  assert.equal(collapsed.expanded, false)
+  assert.ok(collapsed.visibleRows > 0 && collapsed.visibleRows <= 2)
+  assert.equal(collapsed.validSuffix, true, 'The selected long PDF name and its extension must remain available')
+  assert.equal(collapsed.sameNameCount, 2, 'Two distinct files with the same name must remain separate')
+  for (const name of sameContentNames) {
+    assert.equal(collapsed.fileNames.filter(filename => filename === name).length, 1,
+      'Each file with the same bytes must retain its selected name')
+  }
+  assert.equal(collapsed.thumbnailCount, 1, 'The image must show a loaded thumbnail')
+  assert.equal(collapsed.hiddenFailureSignaled, true, 'The collapsed list must report the damaged attachment')
+  assert.ok(collapsed.listHeight <= 60)
+  const toggle = `${attachmentPanel} .ds-composer-attachment-toggle`
+  await cdp.click(toggle)
+  const expanded = await cdp.wait(`(() => {const value=${expression};return value?.expanded&&value})()`, 'expanded attachment list')
+  assert.equal(expanded.visibleRows, files.length)
+  assert.ok(expanded.listScrollHeight > expanded.listHeight, 'Expanded attachments must scroll inside the composer')
+  for (const layout of [collapsed, expanded]) {
+    assert.ok(layout.listScrollWidth <= layout.listWidth + 1, 'Attachment contents must fit the available width')
+    assert.ok(layout.strip.bottom <= layout.editor.top + 1 && layout.editor.bottom <= layout.send.top + 1)
+    assert.equal(layout.actionAtCenter, true, 'Attachments must leave the actual send button accessible')
+  }
+  const failedAction = `${attachmentItem}:has(.ds-chat-attachment-filename[title=${literal(invalidName)}]) ${removeAttachment}`
+  await cdp.click(failedAction)
+  await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${files.length - 1} &&
+    document.querySelector(${literal(composer)})?.value === ${literal(prompt)}`, 'only the damaged attachment removed, draft and other files retained')
+  const aliasAction = `${attachmentItem}:has(.ds-chat-attachment-filename[title=${literal(sameContentNames[1])}]) ${removeAttachment}`
+  await cdp.click(aliasAction)
+  await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${files.length - 2} &&
+    ${observeAttachment(sameContentNames[0], 'true')}`, 'removing a differently named copy leaves the original attached')
+  await key(cdp, 'Escape', 'Escape', 27)
+  // Clicking a removed row can leave focus on the page, so close the same panel control if needed.
+  if (await cdp.evaluate(`document.querySelector(${literal(toggle)})?.getAttribute('aria-expanded') === 'true'`)) await cdp.click(toggle)
+  for (let remaining = files.length - 2; remaining > 0; remaining -= 1) {
+    await cdp.click(`${attachmentItem} ${removeAttachment}`)
+    await cdp.wait(`document.querySelectorAll(${literal(attachmentItem)}).length === ${remaining - 1}`, 'the selected attachment removed')
+  }
+  return { collapsed, expanded, preservedDraft: true }
+}
+
+export function createChineseTextPdf(contentText = fontMap) {
+  const glyphs = Array.from(contentText)
   const map = [
     '/CIDInit /ProcSet findresource begin 12 dict begin begincmap',
     '/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def',
@@ -61,10 +179,82 @@ function expandScanPdf(bytes) {
   return Buffer.concat([bytes.subarray(0, position), padding, Buffer.from(trailer)])
 }
 
+function parseComposerToolResult(content) {
+  if (typeof content !== 'string') return undefined
+  if (content.startsWith('UNTRUSTED external web content follows.')) content = content.slice(content.indexOf('\n') + 1)
+  if (content.startsWith('Historical tool execution.')) {
+    const marker = '\n\nRecorded result:\n'
+    const offset = content.lastIndexOf(marker)
+    if (offset < 0) return undefined
+    content = content.slice(offset + marker.length)
+  }
+  try { return JSON.parse(content) } catch { return undefined }
+}
+
+function describeComposerResource(result) {
+  const error = typeof result?.error === 'string' ? result.error : result?.error?.message ?? result?.message
+  const category = [
+    [/scope|not authorized|permission|sandbox/i, 'scope-rejected'],
+    [/not found|does not exist|enoent/i, 'resource-not-found'],
+    [/invalid|must be|is required/i, 'argument-rejected']
+  ].find(([pattern]) => pattern.test(typeof error === 'string' ? error : ''))?.[1]
+  const keys = Object.keys(result ?? {}).filter(key => /^[a-z_]{1,32}$/i.test(key)).sort()
+  return `${category ?? 'unclassified'} keys=${keys.join(',')}`
+}
+
+function composerModelTool(id, name, args) {
+  return { tool_calls: [{ index: 0, id, type: 'function', function: { name, arguments: literal(args) } }] }
+}
+
+function readComposerWorkflow(body, messages, id, skillId, references) {
+  const tools = new Set(body.tools?.map(tool => tool.function?.name))
+  const results = new Map(messages.filter(item => item.role === 'tool').map(item => [item.tool_call_id, parseComposerToolResult(item.content)]))
+  if (!results.has(id)) {
+    assert.ok(tools.has('read_skill_resource'), 'The selected installed Skill must make its resource tool available')
+    return { action: composerModelTool(id, 'read_skill_resource', { skill_id: skillId, path: 'references/pipeline.md' }) }
+  }
+  const result = results.get(id)
+  const reference = result?.contextSpill
+  if (!reference) return { resource: result }
+  assert.ok(tools.has('read_task_context'), 'The spilled installed workflow must provide a scoped context tool')
+  const pin = references.get(id) ?? reference
+  // Later model requests can reproject the same immutable object in a new bundle.
+  // Continue reading the original bundle and verify its object identity and bytes.
+  assert.ok(pin.bundle_id && reference.bundle_id && pin.object_id && pin.object_id === reference.object_id &&
+    pin.sha256 === reference.sha256 && /^[a-f0-9]{64}$/.test(pin.sha256) && pin.totalBytes === reference.totalBytes &&
+    Number.isInteger(pin.totalBytes) && pin.totalBytes > 0 && pin.totalBytes <= 64 * 1024, 'Invalid installed skill context reference')
+  references.set(id, pin)
+  const parts = []
+  let offset = 0
+  for (let index = 0; index < 16; index++) {
+    const recallId = `${id}-recall-${index}`
+    if (!results.has(recallId)) return { action: composerModelTool(recallId, 'read_task_context', {
+      bundle_id: pin.bundle_id, object_id: pin.object_id, offset, max_bytes: 8192
+    }) }
+    const page = results.get(recallId)
+    assert.ok(page?.untrusted && page.bundleId === pin.bundle_id && page.objectId === pin.object_id && page.offset === offset &&
+      page.totalBytes === pin.totalBytes && page.sha256 === pin.sha256 && typeof page.text === 'string',
+    `Skill context recall returned an invalid page (${describeComposerResource(page)})`)
+    const bytes = Buffer.from(page.text, 'utf8')
+    assert.ok(bytes.length > 0 && bytes.length <= 8192)
+    parts.push(bytes)
+    offset += bytes.length
+    if (page.nextOffset === null) {
+      const content = Buffer.concat(parts)
+      assert.equal(content.length, pin.totalBytes)
+      assert.equal(createHash('sha256').update(content).digest('hex'), pin.sha256)
+      return { resource: parseComposerToolResult(content.toString('utf8')) }
+    }
+    assert.ok(page.nextOffset === offset && offset < pin.totalBytes, 'Skill context recall must advance the verified byte offset')
+  }
+  assert.fail('The installed Skill workflow exceeded the bounded recall pages')
+}
+
 export function createComposerModelAcceptance() {
   const observations = { skillRead: false, pluginRead: false, scanSent: false, chineseTextSent: false }
   const skillTurnMarker = `railwise-skill-check-${randomUUID()}`
   const pluginTurnMarker = `railwise-plugin-check-${randomUUID()}`
+  const workflowReferences = new Map()
   let skillId
   return {
     observations, skillTurnMarker, pluginTurnMarker,
@@ -81,15 +271,13 @@ export function createComposerModelAcceptance() {
           assert.ok(messages.some(item => typeof item.content === 'string' && item.content.includes('"kind":"plugin","id":"video-shotcraft"')))
         }
         const id = `composer-${selected}`
-        const readback = messages.find(item => item.role === 'tool' && item.tool_call_id === id)
-        if (readback) {
-          assert.ok(literal(readback.content).includes('remotion render'), 'Real installed plugin documentation must be read')
-          observations[selected] = true
-          return { content: selected === 'pluginRead' ? '插件读取验收通过' : '技能读取验收通过' }
-        }
-        assert.ok(body.tools?.some(item => item.function?.name === 'read_skill_resource'))
-        return { tool_calls: [{ index: 0, id, type: 'function',
-          function: { name: 'read_skill_resource', arguments: literal({ skill_id: skillId, path: 'references/pipeline.md' }) } }] }
+        const { resource, action } = readComposerWorkflow(body, messages, id, skillId, workflowReferences)
+        if (action) return action
+        assert.ok(resource?.skill_id === skillId && resource.path === 'references/pipeline.md' &&
+          typeof resource.content === 'string' && /remotion render/i.test(resource.content),
+        `The selected installed Skill workflow must be read (${describeComposerResource(resource)})`)
+        observations[selected] = true
+        return { content: selected === 'pluginRead' ? '插件读取验收通过' : '技能读取验收通过' }
       }
       if (text.includes('请根据附件中实际可读取的内容继续处理') || text.includes('Please use the content you can read')) {
         if (!observations.scanSent && history.includes(scanName)) {
@@ -119,7 +307,7 @@ async function continueAfterResponse(cdp, message) {
   await cdp.wait(`document.body.innerText.includes(${literal(message)}) && Boolean(document.querySelector(${literal(composer)}))`, message, 120_000)
 }
 
-export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptance }) {
+export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptance, onComposerReady }) {
   assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
   const files = { scan: join(workspace, scanName), text: join(workspace, textName), invalid: join(workspace, invalidName) }
   const scan = expandScanPdf(await readFile(new URL('../test/fixtures/document-quality/synthetic-image-only-scan.pdf', import.meta.url)))
@@ -129,30 +317,21 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
   await cdp.wait(`Boolean(document.querySelector(${literal(composer)}))`, 'the real chat composer')
   const threadId = await cdp.wait(`${threadList}.then(items=>items.find(item=>!${literal(previousThreads)}.includes(item.id))?.id)`, 'new owned conversation')
+  await onComposerReady?.()
   await cdp.click(composer)
   // Explorer's file clipboard format is set natively in the isolated runner.
   execFileSync('powershell.exe', ['-NoProfile', '-STA', '-Command',
     `Add-Type -AssemblyName System.Windows.Forms; $files = New-Object System.Collections.Specialized.StringCollection; [void]$files.Add(${psQuote(files.scan)}); [System.Windows.Forms.Clipboard]::SetFileDropList($files)`],
   { windowsHide: true, timeout: 15_000 })
   await key(cdp, 'v', 'KeyV', 86, 2)
-  await cdp.wait(`document.body.innerText.includes(${literal(scanName)}) && document.body.innerText.includes('未提取')`, 'native pasted scanned PDF marked as missing text', 120_000)
+  await cdp.wait(observeAttachment(scanName, "item.innerText.includes('文字提取受限') && item.querySelector('.ds-composer-attachment-meta')?.title.includes('未提取')"), 'native pasted scanned PDF marked as missing text', 120_000)
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '扫描 PDF 原件已送达')
 
   // The chooser button runs the normal application handler. CDP fills the
   // actual native file input instead of scripting the desktop file dialog.
-  await cdp.click(addMenu)
-  await cdp.send('Page.setInterceptFileChooserDialog', { enabled: true })
-  await cdp.click('button', '添加文件或图片')
-  const { root } = await cdp.send('DOM.getDocument')
-  const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: 'input[type="file"]' })
-  assert.ok(nodeId)
-  await cdp.send('DOM.setFileInputFiles', { nodeId, files: [files.text] })
-  await cdp.send('Page.setInterceptFileChooserDialog', { enabled: false })
-  await cdp.wait(`(() => {
-    const chip = [...document.querySelectorAll('.ds-floating-composer span')].find(item=>item.textContent.trim()===${literal(textName)})?.parentElement
-    return Boolean(chip && /已就绪|文字提取受限/.test(chip.innerText) && chip.querySelector('[aria-label="在文件夹中显示原件"]'))
-  })()`, 'text PDF loaded through the chooser', 120_000)
+  await chooseFiles(cdp, [files.text])
+  await cdp.wait(observeAttachment(textName, `item.querySelector('[aria-label="在文件夹中显示原件"]')`), 'text PDF loaded through the chooser', 120_000)
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '中文 PDF 文字已送达')
 
@@ -161,11 +340,9 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.send('Input.dispatchDragEvent', { type: 'dragEnter', ...drag })
   await cdp.send('Input.dispatchDragEvent', { type: 'dragOver', ...drag })
   await cdp.send('Input.dispatchDragEvent', { type: 'drop', ...drag })
-  await cdp.wait(`(() => {
-    const chip = [...document.querySelectorAll('.ds-floating-composer span')].find(item=>item.textContent.trim()===${literal(invalidName)})?.parentElement
-    return Boolean(chip && chip.innerText.includes('读取失败'))
-  })()`, 'damaged PDF feedback from the real drop', 120_000)
+  await cdp.wait(observeAttachment(invalidName, "item.innerText.includes('读取失败')"), 'damaged PDF feedback from the real drop', 120_000)
   await cdp.click(removeAttachment)
+  const attachmentLayout = await verifyMixedAttachmentLayout(cdp, workspace, files.invalid)
 
   const installed = await cdp.evaluate(`(async () => {
     const catalog = await window.workwise.listCatalogPackages()
@@ -186,10 +363,12 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.fill(composer, `${acceptance.skillTurnMarker} 请读取分镜流程说明。`)
   await cdp.click(addMenu)
   await cdp.click('button', '技能')
-  await cdp.click('[role="option"] .truncate', skill.name)
-  await cdp.wait(`document.querySelector(${literal(composer)})?.value.includes(${literal(`/skill:${skill.id}`)})`, 'the exact inserted skill ID in the existing draft')
+  await cdp.click('[role="option"] .truncate', 'Video Shotcraft')
+  await cdp.wait(`document.querySelector('[data-composer-skill]')?.textContent.includes('Video Shotcraft') &&
+    document.querySelector(${literal(composer)})?.value === ${literal(`${acceptance.skillTurnMarker} 请读取分镜流程说明。`)}`, 'the named skill and unchanged existing draft')
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '技能读取验收通过')
+  await cdp.wait(`Array.from(document.querySelectorAll('[data-loaded-skill]')).some(chip=>chip.textContent.includes('Video Shotcraft'))`, 'the named skill marked loaded after use')
 
   await cdp.fill(composer, `${acceptance.pluginTurnMarker} 请读取插件分镜说明。`)
   await cdp.click(addMenu)
@@ -198,6 +377,6 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   await cdp.click(sendButton)
   await continueAfterResponse(cdp, '插件读取验收通过')
   assert.deepEqual(acceptance.observations, { skillRead: true, pluginRead: true, scanSent: true, chineseTextSent: true })
-  return { status: 'passed', scanBytes: scan.length, nativeClipboard: true, chooser: true, drop: true,
+  return { status: 'passed', scanBytes: scan.length, nativeClipboard: true, chooser: true, drop: true, attachmentLayout,
     installedPlugin: { id: installed.packageId, sha256: installed.artifact.sha256 }, ...acceptance.observations }
 }

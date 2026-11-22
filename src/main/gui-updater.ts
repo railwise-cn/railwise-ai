@@ -1,5 +1,6 @@
 import productBrand from '../shared/product-brand.json'
 import { app, autoUpdater as nativeAutoUpdater, BrowserWindow } from 'electron'
+import type { EventEmitter } from 'node:events'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -15,7 +16,10 @@ import type {
 } from '../shared/gui-update'
 import { GUI_UPDATE_CHECK_INTERVAL_MS, nextGuiUpdateCheckDelay } from '../shared/gui-update-schedule'
 import { DEFAULT_GUI_UPDATE_CHANNEL, normalizeGuiUpdateChannel } from '../shared/gui-update'
+import { redactSecretText } from '../shared/secret-redaction'
 import { configurePrivateUpdaterTls } from './private-updater-tls'
+import { GuiUpdateRecoveryPendingError } from './gui-update-shutdown'
+import { logWarn } from './logger'
 import { WindowsGuiUpdater, WindowsUpdateCacheError } from './windows-gui-update'
 import {
   legacyDownloadUrl,
@@ -58,6 +62,7 @@ let configuredFeedUrl = ''
 let getSelectedChannel: (() => GuiUpdateChannel | Promise<GuiUpdateChannel>) | null = null
 let beforeInstallUpdate: (() => void | Promise<void>) | null = null
 let beforeInstallUpdatePromise: Promise<void> | null = null
+let afterInstallFailed: (() => void | Promise<void>) | null = null
 let backgroundCheckTimer: NodeJS.Timeout | null = null
 let backgroundCheckPromise: Promise<void> | null = null
 let lastBackgroundNotification: string | undefined
@@ -787,11 +792,14 @@ export function initializeGuiUpdater(
   windowGetter: () => BrowserWindow | null,
   channelGetter?: () => GuiUpdateChannel | Promise<GuiUpdateChannel>,
   beforeInstall?: () => void | Promise<void>,
-  updateAvailable?: (info: Extract<GuiUpdateInfo, { ok: true }>) => void
+  updateAvailable?: (info: Extract<GuiUpdateInfo, { ok: true }>) => void,
+  installFailed?: () => void | Promise<void>,
+  nativeInstallWillQuit?: () => void
 ): void {
   getMainWindow = windowGetter
   getSelectedChannel = channelGetter ?? null
   beforeInstallUpdate = beforeInstall ?? null
+  afterInstallFailed = installFailed ?? null
   onBackgroundUpdateAvailable = updateAvailable ?? null
   if (initialized) return
   initialized = true
@@ -861,6 +869,10 @@ export function initializeGuiUpdater(
   })
 
   autoUpdater.on('error', (error) => {
+    if (installationAttempt?.nativeDispatched) {
+      void reportGuiUpdateQuitFailure(error)
+      return
+    }
     const message = error instanceof Error ? error.message : String(error)
     emitGuiUpdateState({
       status: 'error',
@@ -871,6 +883,7 @@ export function initializeGuiUpdater(
   })
 
   nativeAutoUpdater?.on?.('before-quit-for-update', () => {
+    nativeInstallWillQuit?.()
     void runBeforeInstallUpdate().catch((error) => {
       console.warn('[workwise updater] failed to stop runtimes before update quit:', error)
     })
@@ -1015,28 +1028,63 @@ export async function downloadGuiUpdate(channel?: GuiUpdateChannel): Promise<Gui
   }
 }
 
-let installationPromise: Promise<GuiUpdateInstallResult> | undefined
+type InstallAttempt = {
+  result: Promise<GuiUpdateInstallResult>
+  failure?: Promise<GuiUpdateInstallResult>
+  nativeDispatched?: boolean
+  nativeDownloadListeners?: ReturnType<typeof nativeAutoUpdater.listeners>
+}
+let installationAttempt: InstallAttempt | undefined
 
 export function installGuiUpdate(): Promise<GuiUpdateInstallResult> {
-  if (!installationPromise) {
-    installationPromise = performGuiUpdateInstall().then(result => {
-      if (!result.ok) installationPromise = undefined
-      return result
-    })
+  if (!installationAttempt) {
+    const attempt: InstallAttempt = { result: Promise.resolve().then(() => performGuiUpdateInstall(attempt)) }
+    installationAttempt = attempt
   }
-  return installationPromise
+  return installationAttempt.failure ?? installationAttempt.result
 }
 
-async function performGuiUpdateInstall(): Promise<GuiUpdateInstallResult> {
-  try {
-    if (!downloaded) {
-      return {
-        ok: false,
+export async function reportGuiUpdateQuitFailure(error: unknown): Promise<void> {
+  if (installationAttempt?.nativeDispatched) await failInstall(installationAttempt, error)
+}
+
+function failInstall(attempt: InstallAttempt, error: unknown): Promise<GuiUpdateInstallResult> {
+  if (!attempt.failure) {
+    attempt.failure = Promise.resolve().then(async () => {
+      let message = error instanceof Error ? error.message : String(error)
+      logWarn('updater', 'Update installation stopped.', {
         currentVersion: app.getVersion(),
-        code: 'install_failed',
-        message: 'The update has not finished downloading yet.'
+        targetVersion: lastInfo?.latestVersion,
+        platform: process.platform,
+        reason: redactSecretText(message).slice(0, 1000)
+      })
+      const nativeEvents: EventEmitter | undefined = nativeAutoUpdater
+      for (const listener of attempt.nativeDownloadListeners ?? []) {
+        nativeEvents?.removeListener('update-downloaded', listener as (...args: unknown[]) => void)
       }
-    }
+      if (windowsUpdater && error instanceof WindowsUpdateCacheError) {
+        downloaded = false
+        downloadedFileHash = undefined
+        if (lastInfo) lastInfo = { ...lastInfo, downloaded: false }
+      }
+      try { await afterInstallFailed?.() } catch (recoveryError) {
+        if (recoveryError instanceof GuiUpdateRecoveryPendingError) {
+          message += ` ${recoveryError.message}`
+        } else {
+          console.error('[workwise updater] failed to recover Runtime after aborted install:', recoveryError)
+          message += ' The task service could not reopen. Quit and reopen the app to continue.'
+        }
+      }
+      emitGuiUpdateState({ status: 'error', info: lastInfo ?? undefined, message, code: 'install_failed' })
+      return { ok: false as const, currentVersion: app.getVersion(), code: 'install_failed' as const, message }
+    }).finally(() => { if (installationAttempt === attempt) installationAttempt = undefined })
+  }
+  return attempt.failure
+}
+
+async function performGuiUpdateInstall(attempt: InstallAttempt): Promise<GuiUpdateInstallResult> {
+  try {
+    if (!downloaded) throw new Error('The update has not finished downloading yet.')
     const installingInfo = lastInfo
     emitGuiUpdateState({ status: 'installing', info: installingInfo ?? undefined })
     await runBeforeInstallUpdate()
@@ -1044,23 +1092,19 @@ async function performGuiUpdateInstall(): Promise<GuiUpdateInstallResult> {
       await windowsUpdater.startVerifiedInstaller(() => downloaded && lastInfo === installingInfo)
       setImmediate(() => app.quit())
     } else {
-      autoUpdater.quitAndInstall(false, true)
+      attempt.nativeDispatched = true
+      const native = process.platform === 'darwin' ? nativeAutoUpdater : undefined
+      const previousListeners = new Set(native?.listeners('update-downloaded'))
+      try { autoUpdater.quitAndInstall(false, true) } finally {
+        // Squirrel can attach a persistent auto-quit callback. A failed attempt
+        // must not quit later when a retry downloads or stages another package.
+        attempt.nativeDownloadListeners = native?.listeners('update-downloaded').filter(listener => !previousListeners.has(listener))
+      }
+      if (attempt.failure) return await attempt.failure
     }
     return { ok: true }
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    if (windowsUpdater && e instanceof WindowsUpdateCacheError && lastState.status === 'installing') {
-      downloaded = false
-      downloadedFileHash = undefined
-      if (lastInfo) lastInfo = { ...lastInfo, downloaded: false }
-    }
-    emitGuiUpdateState({ status: 'error', info: lastInfo ?? undefined, message, code: 'install_failed' })
-    return {
-      ok: false,
-      currentVersion: app.getVersion(),
-      code: 'install_failed',
-      message
-    }
+    return await failInstall(attempt, e)
   }
 }
 

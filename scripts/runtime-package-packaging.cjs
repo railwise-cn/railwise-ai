@@ -4,14 +4,19 @@ const { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync }
 const { dirname, join, resolve } = require('node:path')
 
 const EXPLICIT_RUNTIME_PACKAGES = ['@modelcontextprotocol/sdk', 'zod-to-json-schema', 'bindings', 'file-uri-to-path']
-const OFFLINE_RENDERING_PACKAGES = ['katex', 'mermaid', 'markdown-it-footnote']
+const OFFLINE_RENDERING_PACKAGES = ['katex', 'mermaid', 'markdown-it-footnote', 'pdfjs-dist']
 const RUNTIME_ENTRY_ASSETS = [
   'node_modules/@modelcontextprotocol/sdk/dist/cjs/client/index.js',
   'node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js',
   'node_modules/zod-to-json-schema/dist/cjs/index.js',
   'node_modules/zod-to-json-schema/dist/esm/index.js',
   'node_modules/bindings/bindings.js',
-  'node_modules/file-uri-to-path/index.js'
+  'node_modules/file-uri-to-path/index.js',
+  'node_modules/pdfjs-dist/legacy/build/pdf.mjs',
+  'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+  'node_modules/pdfjs-dist/cmaps/UniGB-UCS2-H.bcmap',
+  'node_modules/pdfjs-dist/cmaps/Adobe-GB1-UCS2.bcmap',
+  'node_modules/pdfjs-dist/standard_fonts/FoxitSerif.pfb'
 ]
 const CANVAS_ROOTS = ['', 'pptx-vanilla-viewer/node_modules/', 'ooxml-ui/node_modules/']
 const CANVAS_NATIVE_TARGETS = {
@@ -171,7 +176,8 @@ function explicitRuntimePackageFiles() {
     ...CANVAS_ROOTS.map(prefix => runtimeFileSet(`${prefix}@napi-rs/canvas`, ['**/*'])),
     runtimeFileSet('katex', ['package.json', 'LICENSE', 'dist/**/*']),
     runtimeFileSet('mermaid', ['package.json', 'LICENSE']),
-    runtimeFileSet('markdown-it-footnote', ['package.json', 'LICENSE', 'index.mjs', 'dist/index.cjs.js'])
+    runtimeFileSet('markdown-it-footnote', ['package.json', 'LICENSE', 'index.mjs', 'dist/index.cjs.js']),
+    runtimeFileSet('pdfjs-dist', ['package.json', 'LICENSE', 'legacy/build/pdf.mjs', 'legacy/build/pdf.worker.mjs', 'cmaps/**/*', 'standard_fonts/**/*'])
   ]
 }
 

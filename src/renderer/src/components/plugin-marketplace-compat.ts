@@ -3,6 +3,7 @@ import type {
 } from '../agent/runtime-contract'
 import type { ManagedToolStatus, SkillListItem } from '@shared/workwise-api'
 import brand from '@shared/product-brand.json'
+import { marketplaceInstallCode } from '@shared/marketplace-install-errors'
 
 type JsonRecord = Record<string, unknown>
 
@@ -241,13 +242,17 @@ export function friendlyMarketplaceError(
   delivery?: 'builtin' | 'railwise' | 'external' | 'upstream'
 ): string {
   const normalized = message.trim()
-  if (/没有此插件的睿威官方镜像|mirror is not available for this platform/i.test(normalized)) {
+  const code = marketplaceInstallCode(normalized)
+  if (code === 'package-unavailable' || /没有此插件的睿威官方镜像|mirror is not available for this platform/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorMirrorMissing', 'This version has no RailWise package for this system. Check for an app update.')
   }
-  if (/RailWise marketplace archive failed.*verification/i.test(normalized)) {
+  if (code === 'bundled-package-damaged') {
+    return marketplaceText(t, 'pluginErrorBundledPackageDamaged', 'Reinstall RailWise AI to restore this offline package.')
+  }
+  if (code === 'verification-failed' || /RailWise marketplace archive failed.*verification/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorMirrorIntegrity', 'The RailWise download did not pass verification. Retry from the marketplace. Existing installations remain available.')
   }
-  if (delivery === 'railwise' && /marketplace download failed|fetch failed|network|ENOTFOUND|ECONNRESET|ETIMEDOUT|TimeoutError/i.test(normalized)) {
+  if (code === 'download-unavailable' || delivery === 'railwise' && /marketplace download failed|fetch failed|network|ENOTFOUND|ECONNRESET|ETIMEDOUT|TimeoutError/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorMirrorNetwork', 'The RailWise download is currently unreachable. Check access to www.railwise.cn and retry from the marketplace. Existing installations remain available.')
   }
   if (/Unsafe Skill package:.*file exceeds/i.test(normalized)) {
@@ -270,7 +275,7 @@ export function friendlyMarketplaceError(
     return marketplaceText(t, 'pluginErrorMissingWindowsNpm', 'Install Node.js with npm on Windows, restart the app and try this package again.')
   }
   if (/spawn EINVAL/i.test(normalized)) {
-    return marketplaceText(t, 'pluginErrorWindowsLauncher', 'Windows could not start a required installer command (EINVAL). Check the package requirements and try again.')
+    return marketplaceText(t, 'pluginErrorWindowsLauncher', 'Windows could not start the installer. Check the package requirements and try again.')
   }
   if (/GitHub archive|codeload\.github|raw\.githubusercontent|api\.github|npm (?:view|install)|pypi\.org|files\.pythonhosted/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorPackageNetwork', MARKETPLACE_TEXT_FALLBACKS.pluginErrorPackageNetwork)
@@ -278,7 +283,9 @@ export function friendlyMarketplaceError(
   if (/\bfetch failed\b|network|ENOTFOUND|ECONNRESET|ETIMEDOUT/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorNetwork', 'The download source could not be reached.')
   }
-  return normalized
+  if (code === 'review-expired') return marketplaceText(t, 'pluginErrorReviewExpired', 'Review the package again before installing it.')
+  if (code === 'refresh-failed') return marketplaceText(t, 'pluginErrorRefreshFailed', 'The package was saved. Refresh the marketplace to check whether it is ready.')
+  return marketplaceText(t, 'pluginErrorGeneric', 'The operation could not finish. Refresh the marketplace and try again.')
 }
 
 export function skillValidationWarning(root: string, message: string, t: (key: string) => string): string {

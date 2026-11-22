@@ -35,6 +35,7 @@ import type { TaskController } from '../../services/task-controller.js'
 import type { TaskRunRepository } from '../../services/task-run-repository.js'
 import type { RuntimeSpanService } from '../../services/runtime-span-service.js'
 import type { FlowRuntimeService } from '../../flow/service.js'
+import type { TaskScheduleService } from '../../services/task-schedule-service.js'
 import type { WorkspaceReferenceService } from '../../services/workspace-reference-service.js'
 import type { ExternalTaskPreflight } from '../../services/external-task-capability.js'
 import type { UiActionService } from '../../services/ui-action-service.js'
@@ -111,6 +112,7 @@ export type ServerRuntime = {
   attachmentStore?: AttachmentStore
   memoryStore?: MemoryStore
   flowService?: FlowRuntimeService
+  taskScheduleService?: TaskScheduleService
   engineeringService?: EngineeringService
   surveyCollaborationService?: SurveyCollaborationService
   engineeringContext?: EngineeringContextService

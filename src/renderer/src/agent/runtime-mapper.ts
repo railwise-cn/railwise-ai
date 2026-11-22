@@ -24,6 +24,7 @@ import type {
 import { terminalReasonForFailure } from '../store/terminal-notification-projection'
 import { safeMediaPreviewUrl } from '../lib/safe-media-preview-url'
 import { redactSecrets, redactSecretText } from '@shared/secret-redaction'
+import { isConversationReceiptItem } from '@shared/agent-workbench'
 import type { DesignCanvasCommandV1 } from '@shared/design-workspace'
 import type {
   CoreChildRuntimeMetadataJson,
@@ -270,6 +271,7 @@ function applyRuntimeDisclosureMeta(
     meta.displayText = displayText
   }
   if (attachmentIds) meta.attachmentIds = attachmentIds
+  if (item.skillSelections?.length) meta.skillSelections = item.skillSelections
   if (activeSkillIds) meta.activeSkillIds = activeSkillIds
   if (injectedMemoryIds) meta.injectedMemoryIds = injectedMemoryIds
   if (typeof item.skillInjectionBytes === 'number') {
@@ -1055,12 +1057,7 @@ function emitItem(
   sink: ThreadEventSink,
   child?: CoreChildRuntimeMetadataJson
 ): void {
-  // Coordinator messages are local conversation history. Older persisted
-  // records have the same exact IDs but predate conversationReceiptId.
-  const conversationReceipt = /^command_[a-f0-9]{32}$/.test(item.turnId) &&
-    (item.kind === 'user_message' && item.id === `item_${item.turnId}_user` ||
-      item.kind === 'assistant_text' && item.id === `item_${item.turnId}_receipt`)
-  if (conversationReceipt) {
+  if (isConversationReceiptItem(item)) {
     const block = chatBlockFromItem(item)
     if (block) sink.onConversationItem?.(block)
     return
@@ -1259,8 +1256,13 @@ export async function dispatchRuntimeEvent(
       }
       return
     }
-    case 'item_created':
     case 'item_updated':
+      if (event.item?.kind === 'user_message' && event.item.activeSkillIds?.length) {
+        sink.onUserMessage({ ...userMessageEventFromItem(event.item), metadataOnly: true })
+        return
+      }
+      // Fall through for the rest of the item lifecycle projections.
+    case 'item_created':
     case 'item_completed':
     case 'tool_call_started':
     case 'tool_call_finished':
@@ -1354,11 +1356,13 @@ export async function dispatchRuntimeEvent(
       })
       return
     case 'turn_failed': {
-      const payload = runtimeErrorFromEvent(event, 'RailWise AI Runtime turn failed')
-      sink.onRuntimeError?.(payload)
+      const responseInterrupted = event.reason === 'response_interrupted'
+      const payload = runtimeErrorFromEvent(responseInterrupted ? { ...event, code: event.reason } : event, 'RailWise AI Runtime turn failed')
+      // The interruption itself is already recorded as a runtime event.
+      if (!responseInterrupted) sink.onRuntimeError?.(payload)
       sink.onError(errorForRuntimeEvent(payload), {
         terminal: true,
-        terminalReason: event.reason === 'blocked' || event.reason === 'max_tokens' || event.reason === 'error'
+        terminalReason: event.reason === 'blocked' || event.reason === 'max_tokens' || event.reason === 'error' || event.reason === 'response_interrupted'
           ? event.reason
           : terminalReasonForFailure(payload.code, payload.message),
         threadId: event.threadId,

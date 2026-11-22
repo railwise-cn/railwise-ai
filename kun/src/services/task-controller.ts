@@ -1,4 +1,5 @@
 import { settleUnstartedOneOffRetry } from './one-off-public-query-recovery.js'
+import { EGO_SITE_SIGN_IN_REQUIRED } from '../contracts/ego-browser.js'
 import { oneOffChildBinding } from './one-off-public-query-proof.js'
 import type { BrowserPublicQueryRecoveryBinding } from '../contracts/browser-public-query-recovery.js'
 import { verifiedPublicQueryRecovery } from './browser-public-query-recovery-proof.js'
@@ -1192,6 +1193,7 @@ export class TaskController {
       createdAt: now
     })
       this.resolveCompletedWebEvidenceAttention(result)
+      this.enqueueConversationOutcome(result)
       return result
     })
     this.releaseExecutionLease(task.id)
@@ -1340,7 +1342,7 @@ export class TaskController {
       const result = this.waitForUser(task, capability.message, '', fingerprint, turnId)
       if (prior?.status === 'pending' && prior.payload?.fingerprint === fingerprint) return result
       this.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: task.originThreadId ?? task.threadId,
-        workspaceRoot: task.workspaceRoot, kind: 'blocked', title: '确认任务执行权限', message: capability.message, status: 'pending', revision: (prior?.revision ?? -1) + 1,
+        workspaceRoot: task.workspaceRoot, kind: 'blocked', title: code === EGO_SITE_SIGN_IN_REQUIRED ? '大单网需要重新登录' : '确认任务执行权限', message: capability.message, status: 'pending', revision: (prior?.revision ?? -1) + 1,
         createdAt: prior?.status === 'pending' ? prior.createdAt : now, updatedAt: now, payload: { kind: 'capability_required', capability, fingerprint, request: { prompt: task.goal } } })
       const commandId = createHash('sha256').update(`${task.id}:${fingerprint}`).digest('hex').slice(0, 32)
       this.repository.enqueueOutbox({ id: `command-message:${commandId}`, ownerId: task.originThreadId ?? task.threadId, kind: 'task_command_message', createdAt: now,
@@ -1407,9 +1409,27 @@ export class TaskController {
       return this.finish(task, code === 'operation_cancelled' ? 'cancelled' : 'failed', message)
     }
     if (code === 'web_access_exhausted' || code === 'max_tokens' || code === 'tool_storm_recovery_exhausted') {
-      return this.finish(task, 'failed', message)
+      return this.finish(task, 'failed', message, code === 'tool_storm_recovery_exhausted' ? 'tool_repeated_failure' : undefined)
     }
     if (hostShell.lastFailed) return this.waitForUser(task,'最后一次已授权命令没有执行成功。请先处理失败原因，再明确授权新的检查命令。', '', `host-shell-failed:${hostShell.lastFailed.id}`,turnId)
+    if (code === 'response_interrupted') {
+      const reason = message
+      const now = this.nowIso()
+      const next = this.updateExecution(task.id, task.revision, current => ({
+        ...current,
+        status: 'stalled',
+        blockCode: 'response_interrupted',
+        stalledReason: reason,
+        waitingReason: undefined,
+        executionMs: (current.executionMs ?? 0) + activeExecutionMs(current, now),
+        executionStartedAt: undefined,
+        updatedAt: now
+      }), { key: `response-interrupted:${turnId}`, kind: 'task_stalled', payload: { code, turnId }, createdAt: now })
+      this.saveCheckpoint(next, reason, `response-interrupted:${turnId}`)
+      this.spans?.finishTurn(next.id, turnId, { status: 'error', errorCode: code })
+      this.releaseExecutionLease(task.id)
+      return { kind: 'stalled', task: next, reason }
+    }
     if (hostShell.pending.length) return this.retry(task,'模型请求中断，但原命令仍有待核验回执。请只读轮询已有命令，不能重新执行。',`host-shell-pending:${hostShell.pending.map(operation => operation.id).join(',')}`,turnId)
     return this.retry(
       task,
@@ -1453,7 +1473,7 @@ export class TaskController {
   private stallUnknown(task: TaskRun, operationIds: string[]): Extract<TaskCandidateDecision,{kind:'stalled'}> {
     const reason = '操作已派发，但结果尚未核实。请先检查原执行回执，系统不会重复派发。'
     const now=this.nowIso()
-    const next=this.updateExecution(task.id,task.revision,current=>({...current,status:'stalled',waitingReason:undefined,stalledReason:reason,updatedAt:now}),{key:`unknown:${task.revision}`,kind:'task_stalled',payload:{operationIds},createdAt:now})
+    const next=this.updateExecution(task.id,task.revision,current=>({...current,status:'stalled',blockCode:'outcome_unknown',waitingReason:undefined,stalledReason:reason,updatedAt:now}),{key:`unknown:${task.revision}`,kind:'task_stalled',payload:{operationIds},createdAt:now})
     this.saveCheckpoint(next,reason,`unknown:${task.revision}`)
     this.repository.putAttention({id:`unknown_${task.id}`,ownerKind:'task',ownerId:task.id,taskId:task.id,threadId:task.originThreadId ?? task.threadId,kind:'blocked',title:'核实上次操作结果',message:reason,status:'pending',revision:0,createdAt:now,updatedAt:now,payload:{operationIds}})
     this.releaseExecutionLease(task.id)
@@ -1670,6 +1690,7 @@ export class TaskController {
           grant.data.taskId !== token.taskId || grant.data.turnId !== token.turnId) return false
       const now = this.nowIso()
       if (grant.data.expiresAt && Date.parse(grant.data.expiresAt) <= Date.parse(now)) return false
+      const hostCommandApproval = current.request?.providerId === 'scoped-host-shell' && approval.toolName === 'request_host_shell'
       const approvedRequests = this.repository.humanRequests('approval', false)
       for (const previous of this.repository.operations(token.taskId, 'tool')) {
         const output = (previous.result as ToolHostResult | undefined)?.item
@@ -1682,7 +1703,7 @@ export class TaskController {
             typeof originalRequestHash !== 'string' || !/^[a-f0-9]{64}$/.test(originalRequestHash)) continue
         const priorGrant = ExecutionGrantSchema.safeParse(previous.request.executionGrant)
         if (!priorGrant.success || priorGrant.data.taskId !== token.taskId ||
-            approvalAuthorityFingerprint(priorGrant.data) !== approvalAuthorityFingerprint(grant.data)) continue
+            approvalAuthorityFingerprint(priorGrant.data, hostCommandApproval) !== approvalAuthorityFingerprint(grant.data, hostCommandApproval)) continue
         const source = approvedRequests.find(request => {
           const original = request.payload.approval as ApprovalRequest | undefined
           const continuedFrom = request.payload.continuedFromApprovalId
@@ -1691,9 +1712,9 @@ export class TaskController {
           return request.status === 'answered' && (request.resolution as { decision?: string })?.decision === 'allow' &&
             request.threadId === approval.threadId &&
             request.turnId === previous.request?.turnId && original?.toolName === approval.toolName &&
-            (!approval.toolName.startsWith('browser_') || original.summary === approval.summary) &&
+            (!(hostCommandApproval || approval.toolName.startsWith('browser_')) || original.summary === approval.summary) &&
             (original.callId === previous.request?.callId || request.id === `appr_${previous.request?.callId}`) &&
-            (!original.requestHash || original.requestHash === originalRequestHash)
+            ((!hostCommandApproval && !original.requestHash) || original.requestHash === originalRequestHash)
         })
         if (!source) continue
         const transferKey = `approval-transfer:${source.id}`
@@ -1935,9 +1956,28 @@ export class TaskController {
           acceptance, completed: complete, artifacts: valid.map(artifact => ({ id: artifact.id, sha256: artifact.sha256, writerReceiptId: writes.get(artifact.absolutePath ?? resolve(task.workspaceRoot, artifact.relativePath))!.operationId })), preservedUsage: true, resumed: false }
       })
       const result = { task: checked, corrected: true, completed: complete, ...(reason ? { reason } : {}) }
+      if (complete) this.enqueueConversationOutcome(checked)
       this.repository.finishOperation(taskId, request.idempotencyKey, { status: 'succeeded', result }, now)
       return result
     })
+  }
+
+  private enqueueConversationOutcome(task: TaskRun): void {
+    this.enqueueConversationResponse(task, `task_result_${task.id}`, task.finalResponse?.trim() || '任务已完成。', task.finishedAt ?? task.updatedAt)
+  }
+
+  projectInterruptedResponse(threadId: string, turnId: string, text: string): void {
+    const task = this.repository.findByTurn(turnId)
+    if (task?.threadId !== threadId || !text.trim()) return
+    this.enqueueConversationResponse(task, `task_partial_${turnId}`, `响应中断，以下为已收到的部分回复。\n\n${text}`, this.nowIso())
+  }
+
+  private enqueueConversationResponse(task: TaskRun, commandId: string, assistantText: string, createdAt: string): void {
+    const threadId = task.originThreadId
+    if (!threadId || task.threadId === threadId || task.parentTaskId ||
+        (task as TaskRun & { visible?: boolean }).visible === false || task.visibility === 'internal') return
+    this.repository.enqueueOutbox({ id: `command-message:${commandId}`, ownerId: threadId, kind: 'task_command_message',
+      payload: { threadId, commandId, assistantText, createdAt }, createdAt })
   }
 
   /** Attach trusted readback evidence without overwriting the original unknown dispatch or resuming execution. */
@@ -2060,8 +2100,53 @@ export class TaskController {
 
   markInputDelivered(inputId: string): void { this.repository.markInputDelivered(inputId, this.nowIso()) }
 
-  appendInput(taskId: string, expectedRevision: number, idempotencyKey: string, text: string, kind: TaskInput['kind'] = 'supplement', sourceId?: string, references?:Pick<TaskInput,'attachmentIds'|'workspaceReferences'|'capabilityReferences'>) {
+  appendInput(taskId: string, expectedRevision: number, idempotencyKey: string, text: string, kind: TaskInput['kind'] = 'supplement', sourceId?: string, references?:Pick<TaskInput,'attachmentIds'|'workspaceReferences'|'capabilityReferences'|'skillSelections'>) {
     return this.repository.appendInput({ taskId, expectedRevision, idempotencyKey, text, kind, sourceId, ...references, nowIso: this.nowIso() })
+  }
+
+  prepareDetachedApprovalContinuation(task: TaskRun, approval: ApprovalRequest): boolean {
+    if (this.admissionSuspended || task.status !== 'waiting_approval' || task.authority?.revokedAt ||
+        task.parentTaskId || task.activeTurnId !== approval.turnId || task.threadId !== approval.threadId ||
+        this.repository.currentExecution(task.id)?.id !== task.id || this.attemptTokens.has(approval.turnId) ||
+        this.repository.inbox(task.workspaceRoot).some(item => item.taskId === task.id) ||
+        !approval.callId || !approval.requestHash) return false
+    const request = this.repository.humanRequest(approval.id)
+    if (request?.status !== 'answered' || (request.resolution as { decision?: string } | undefined)?.decision !== 'allow') return false
+    const attempt = this.repository.execution.latestAttempt(task.id)
+    if (!attempt || attempt.turnId !== approval.turnId) return false
+    const ownerExited = attempt.status === 'running' ? inspectProcess(attempt.process) === 'exited' : undefined
+    if (ownerExited === false) return false
+    const operation = this.repository.operation(task.id, `tool:${approval.turnId}:${approval.callId}`)
+    const grant = ExecutionGrantSchema.safeParse(operation?.request?.executionGrant)
+    if (!operation || !grant.success || grant.data.taskId !== task.id || grant.data.threadId !== approval.threadId ||
+        grant.data.turnId !== approval.turnId || operation.request?.dispatchTracking !== 'host-v1' ||
+        operation.request?.executionId !== attempt.executionId || operation.request?.toolName !== approval.toolName ||
+        operation.request?.approvalRequestHash !== approval.requestHash) return false
+    const item = (operation.result as ToolHostResult | undefined)?.item
+    const provedUndispatched = operation.status === 'prepared' || (operation.status === 'failed' &&
+      item?.kind === 'tool_result' && (item.output as { code?: string } | undefined)?.code === 'operation_not_dispatched')
+    if (!provedUndispatched) return false
+    // The normal resume path settles prepared Host calls and verifies all other
+    // receipts before starting a Turn. Only exact-operation transfer can use this approval.
+    return this.repository.transact(() => {
+      if (this.repository.get(task.id)?.revision !== task.revision) return false
+      const now = this.nowIso()
+      const admission = this.repository.getAdmissionLease(task.id)
+      if (admission && admission.expiresAt > now) return false
+      const lease = this.repository.getLease(task.id)
+      if (lease && lease.expiresAt > now) {
+        // A killed Runtime cannot release its lease. Reclaim only the lease
+        // whose exact persisted process and attempt have been proved dead.
+        if (lease.ownerId !== attempt.ownerId || !(ownerExited ?? inspectProcess(attempt.process) === 'exited') ||
+            !this.repository.releaseLease(task.id, lease.ownerId, lease.revision)) return false
+      }
+      if (ownerExited) {
+        const through = Math.min(Date.parse(now), Date.parse(lease?.expiresAt ?? task.updatedAt))
+        this.repository.execution.finishOrphanedWork(attempt.executionId, through)
+        this.repository.execution.finishAttempt(attempt.executionId, 'lost', now)
+      }
+      return true
+    })
   }
 
   prepareResume(taskId: string, expectedRevision: number, model?: string): TaskRun {
@@ -2079,6 +2164,7 @@ export class TaskController {
       status: 'retrying',
       ...(model ? { model } : {}),
       noProgressCount: 0,
+      blockCode: undefined,
       stalledReason: undefined,
       waitingReason: '用户要求从最近 checkpoint 继续。',
       nodes: current.nodes.map((node) => node.status === 'completed'
@@ -2147,7 +2233,7 @@ export class TaskController {
       const unknownShell = this.repository.listShellSessions(task.id).some(session => ['running', 'starting', 'outcome_unknown'].includes(session.status))
       const unknown = this.repository.unsettledOperations(task.id)
       if (unknown.length || unknownShell) {
-        return this.repository.update(task.id, task.revision, current => ({ ...current, status: 'stalled', waitingReason: undefined, stalledReason: '上次操作结果尚未确认，请先核实执行回执后继续。', updatedAt: now }), { key: `recovery-unknown:${task.revision}`, kind: 'task_stalled', payload: { operationIds: unknown.map(item => item.id) }, createdAt: now })
+        return this.repository.update(task.id, task.revision, current => ({ ...current, status: 'stalled', blockCode: 'outcome_unknown', waitingReason: undefined, stalledReason: '上次操作结果尚未确认，请先核实执行回执后继续。', updatedAt: now }), { key: `recovery-unknown:${task.revision}`, kind: 'task_stalled', payload: { operationIds: unknown.map(item => item.id) }, createdAt: now })
       }
       const hostShell = this.hostShellState(task)
       if (hostShell.lastFailed) {
@@ -2383,11 +2469,12 @@ export class TaskController {
     return { kind: 'waiting_user', task: next, reason }
   }
 
-  private finish(task: TaskRun, status: Extract<TaskRunStatus, 'failed' | 'cancelled'>, reason: string): Extract<TaskCandidateDecision, { kind: 'failed' }> {
+  private finish(task: TaskRun, status: Extract<TaskRunStatus, 'failed' | 'cancelled'>, reason: string, blockCode?: TaskRun['blockCode']): Extract<TaskCandidateDecision, { kind: 'failed' }> {
     const now = this.nowIso()
     const next = this.updateExecution(task.id, task.revision, (current) => ({
       ...current,
       status,
+      blockCode,
       authority: current.authority ? { ...current.authority, ...(status === 'cancelled' ? { revokedAt: now } : {}) } : undefined,
       executionMs: (current.executionMs ?? 0) + activeExecutionMs(current, now),
       executionStartedAt: undefined,
@@ -2656,8 +2743,14 @@ function activeExecutionMs(task: TaskRun, now: string): number {
 }
 
 /** Turn identity changes after restart; all reviewed authority and account bindings must agree. */
-function approvalAuthorityFingerprint(grant: ExecutionGrant): string {
+function approvalAuthorityFingerprint(grant: ExecutionGrant, hostCommandApproval: boolean): string {
   const { id: _id, turnId: _turnId, idempotencyKey: _idempotencyKey, issuedAt: _issuedAt, expiresAt: _expiresAt, ...authority } = grant
+  if (hostCommandApproval) {
+    // The desktop-only scheduler bridge rotates its identity every launch and
+    // cannot dispatch this one-command authority. Keep all other bindings.
+    const { 'mcp:gui_schedule': _guiScheduler, ...connectorIdentityFingerprints } = authority.connectorIdentityFingerprints ?? {}
+    return operationFingerprint({ ...authority, connectorIdentityFingerprints })
+  }
   return operationFingerprint(authority)
 }
 

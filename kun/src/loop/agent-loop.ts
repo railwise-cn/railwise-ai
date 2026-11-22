@@ -110,10 +110,30 @@ import {
   requiredFileExtensionsForPrompt
 } from './turn-completion-guard.js'
 
-function terminalReasonForAttemptCode(code: string): Extract<TurnTerminalReason, 'error' | 'blocked' | 'max_tokens'> {
+function terminalReasonForAttemptCode(code: string): Exclude<TurnTerminalReason, 'completed' | 'aborted'> {
   if (code === 'max_tokens') return 'max_tokens'
+  if (code === 'response_interrupted') return 'response_interrupted'
   if (code === 'budget_limited' || code === 'policy_blocked') return 'blocked'
   return 'error'
+}
+
+type InterruptedModelStep = { kind: 'response_interrupted'; message: string }
+
+async function* modelStreamWithInterruption(
+  model: ModelClient,
+  request: ModelRequest,
+  hasOutput: () => boolean
+): AsyncIterable<ModelStreamChunk> {
+  try {
+    yield* model.stream(request)
+  } catch (error) {
+    if (request.abortSignal.aborted || !hasOutput()) throw error
+    yield {
+      kind: 'error',
+      message: 'Model response stopped after it started streaming.',
+      code: runtimeErrorCode(error, 'model_stream_failed')
+    }
+  }
 }
 
 // Tool argument fragments are projected to usage as bounded character counts;
@@ -626,7 +646,7 @@ export class AgentLoop {
             })
             return 'failed'
           }
-        } else if (outcome.kind === 'retryable' && this.opts.tasks) {
+        } else if (this.opts.tasks && (outcome.kind === 'retryable' || (outcome.kind === 'failed' && outcome.code === 'response_interrupted'))) {
           const blocked = await this.opts.tasks.assessNonRetryableBlock?.(threadId, turnId)
           if (blocked?.kind === 'stalled') return await this.finishUnknownToolOutcome(threadId, turnId, 'outcome_unknown: 操作结果尚未核验，执行已停止。')
           if (blocked?.kind === 'waiting_user') {
@@ -639,13 +659,15 @@ export class AgentLoop {
             outcome.code,
             outcome.message
           )
-          if (decision?.kind === 'continue') continue
-          if (decision && decision.kind !== 'completed') {
+          if (decision?.kind === 'continue' && outcome.kind === 'retryable') continue
+          if (decision && decision.kind !== 'completed' && decision.kind !== 'continue') {
             await this.opts.turns.finishTurn({
               threadId,
               turnId,
               status: 'failed',
-              reason: terminalReasonForAttemptCode(outcome.code),
+              reason: decision.kind === 'stalled' && decision.task.blockCode === 'outcome_unknown'
+                ? 'blocked'
+                : terminalReasonForAttemptCode(outcome.code),
               error: decision.reason
             })
             return 'failed'
@@ -810,8 +832,8 @@ export class AgentLoop {
     const deliveries = this.opts.tasks?.pendingDeliveries(threadId, turnId) ?? []
     const durableIds = new Set(deliveries.map(entry => entry.input.id))
     const hints = this.opts.steering.drainEntries(turnId).filter(entry => !entry.inputId || !durableIds.has(entry.inputId))
-    const entries = [...deliveries.map(entry => ({ text: entry.input.text, inputId: entry.input.id, itemId: entry.delivery.messageItemId, approval: this.opts.tasks?.approvalForInput(entry.input), sourceId: entry.input.sourceId, attachmentIds:entry.input.attachmentIds,workspaceReferences:entry.input.workspaceReferences,capabilityReferences:entry.input.capabilityReferences })),
-      ...hints.filter(entry => !entry.inputId).map(entry => ({ ...entry, itemId: this.opts.ids.next('item_steered'), approval: undefined, sourceId: undefined, attachmentIds:undefined,workspaceReferences:undefined,capabilityReferences:undefined }))]
+    const entries = [...deliveries.map(entry => ({ text: entry.input.text, inputId: entry.input.id, itemId: entry.delivery.messageItemId, approval: this.opts.tasks?.approvalForInput(entry.input), sourceId: entry.input.sourceId, attachmentIds:entry.input.attachmentIds,workspaceReferences:entry.input.workspaceReferences,capabilityReferences:entry.input.capabilityReferences,skillSelections:entry.input.skillSelections })),
+      ...hints.filter(entry => !entry.inputId).map(entry => ({ ...entry, itemId: this.opts.ids.next('item_steered'), approval: undefined, sourceId: undefined, attachmentIds:undefined,workspaceReferences:undefined,capabilityReferences:undefined,skillSelections:undefined }))]
     if (!entries.length) return
     // Stable IDs bridge the JSONL/SQLite boundary. appendItem flushes before resolving.
     const persisted = await this.opts.sessionStore.loadItems(threadId)
@@ -821,7 +843,7 @@ export class AgentLoop {
       const base = { id: entry.itemId, turnId, threadId, createdAt: this.opts.nowIso(), finishedAt: this.opts.nowIso(), taskInputId: entry.inputId, sourceRequestId: entry.sourceId }
       const item: TurnItem = entry.approval
         ? { ...base, role: 'system', kind: 'approval', approvalId: entry.approval.id, toolName: entry.approval.toolName, status: entry.approval.status, summary: entry.approval.status === 'allowed' ? '已允许本次操作' : entry.approval.status === 'expired' ? '本次授权已过期' : '已拒绝本次操作' }
-        : { ...base, role: 'user', status: 'completed', kind: 'user_message', text: entry.text,attachmentIds:entry.attachmentIds,workspaceReferences:entry.workspaceReferences,capabilityReferences:entry.capabilityReferences }
+        : { ...base, role: 'user', status: 'completed', kind: 'user_message', text: entry.text,attachmentIds:entry.attachmentIds,workspaceReferences:entry.workspaceReferences,capabilityReferences:entry.capabilityReferences,skillSelections:entry.skillSelections }
       await this.opts.turns.applyItem(threadId, item)
       present.add(item.id)
     }
@@ -841,7 +863,7 @@ export class AgentLoop {
     turnId: string,
     signal: AbortSignal
   ): Promise<TaskAttemptOutcome | { kind: 'checkpoint_waiting' }> {
-    const executionSkills: { resolution?: SkillTurnResolution; pluginIds?: string } = {}
+    const executionSkills: { resolution?: SkillTurnResolution; selectionKey?: string } = {}
     for (let step = 0; ; step += 1) {
       if (signal.aborted) return { kind: 'cancelled', reason: 'operation_cancelled' }
       if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) {
@@ -878,6 +900,9 @@ export class AgentLoop {
       }
       await this.drainSteering(threadId, turnId, signal)
       const stepResult = await this.modelStep(threadId, turnId, signal, step, executionSkills)
+      if (typeof stepResult === 'object') {
+        return { kind: 'failed', code: stepResult.kind, message: stepResult.message }
+      }
       if (stepResult === 'checkpoint_waiting') return { kind: 'checkpoint_waiting' }
       if (stepResult === 'outcome_unknown') return { kind: 'waiting_user', message: 'outcome_unknown: 操作结果尚未核验，执行已停止。' }
       if (stepResult === 'stop') return { kind: 'candidate' }
@@ -924,8 +949,8 @@ export class AgentLoop {
     turnId: string,
     signal: AbortSignal,
     stepIndex: number,
-    executionSkills: { resolution?: SkillTurnResolution; pluginIds?: string }
-  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown' | 'checkpoint_waiting' | 'suppression_exhausted'> {
+    executionSkills: { resolution?: SkillTurnResolution; selectionKey?: string }
+  ): Promise<'continue' | 'stop' | 'blocked' | 'failed' | 'web_failed' | 'max_tokens' | 'aborted' | 'outcome_unknown' | 'checkpoint_waiting' | 'suppression_exhausted' | InterruptedModelStep> {
     if (shouldVerifyImmutablePrefix()) {
       verifyImmutablePrefix(this.opts.prefix)
     }
@@ -1026,20 +1051,23 @@ export class AgentLoop {
       turnId,
       turn?.prompt ?? ''
     )
-    const preferredSkillIds = continuationTurn?.activeSkillIds
-      ?? thread?.agentProfile?.preferredSkillIds
+    const preferredSkillIds = turn?.activeSkillIds.length
+      ? turn.activeSkillIds
+      : continuationTurn?.activeSkillIds ?? thread?.agentProfile?.preferredSkillIds
     const userMessage = turn?.items.find(item => item.kind === 'user_message')
     const requestedSkillId = requestedSlashSkill(userMessage?.displayText ?? turn?.prompt ?? '')
+    const selectedSkillIds = capabilityReferences.filter(reference => reference.kind === 'skill').map(reference => reference.id)
     const selectedPluginIds = capabilityReferences.filter(reference => reference.kind === 'plugin').map(reference => reference.id)
-    const pluginIds = JSON.stringify(selectedPluginIds)
-    if (executionSkills.pluginIds !== pluginIds) {
-      executionSkills.pluginIds = pluginIds
+    const selectionKey = JSON.stringify([selectedSkillIds, selectedPluginIds])
+    if (executionSkills.selectionKey !== selectionKey) {
+      executionSkills.selectionKey = selectionKey
       executionSkills.resolution = undefined
     }
     const skillResolution = executionSkills.resolution ??= this.opts.skillRuntime?.resolveTurn({
       prompt: turn?.prompt ?? '',
       workspace: thread?.workspace ?? '',
       requestedSkillId,
+      selectedSkillIds,
       selectionPrompt: userMessage?.displayText,
       selectedPluginIds,
       preferredSkillIds,
@@ -1183,6 +1211,12 @@ export class AgentLoop {
       if (executionGrant && !turn.executionGrant) await this.opts.onExecutionGrant?.(executionGrant)
     }
     if (toolCatalogDrift.kind === 'breaking') return 'stop'
+    for (const item of userItems) {
+      const activeIds = item.skillSelections?.filter(skill => skillResolution.activeSkillIds.includes(skill.id)).map(skill => skill.id) ?? []
+      if (activeIds.length && activeIds.some(id => !item.activeSkillIds?.includes(id))) {
+        await this.opts.turns.updateItem(threadId, item.id, { activeSkillIds: activeIds })
+      }
+    }
     const toolKinds = new Map(toolSpecs.map((tool) => [tool.name, tool.toolKind]))
     const createPlanSatisfied = planTurnActive
       ? hasSuccessfulCreatePlanResult(healed.items, turnId)
@@ -1211,6 +1245,8 @@ export class AgentLoop {
       historyItems: history.length
     })
     const occurrenceTask = this.opts.tasks?.activeTask(threadId)
+    // Exact Skill selections are already present in the resolved instructions.
+    const contextualCapabilities = capabilityReferences.filter(reference => reference.kind !== 'skill')
     const contextInstructions = [
       ...(executionGrant ? [executionGrantInstruction(executionGrant)] : []),
       ...(engineeringPolicy ? [engineeringPolicy.instruction] : []),
@@ -1219,10 +1255,15 @@ export class AgentLoop {
       ...(activeTodoInstruction ? [activeTodoInstruction] : []),
       ...memoryInstructions(memories),
       ...(attachments.documentManifests.length ? [documentAttachmentInstruction(attachments.documentManifests)] : []),
+      ...(occurrenceTask && stepIndex === 0 ? [
+        'Use the task’s explicitly attached documents and workspace references as primary inputs. Read them with the advertised scoped tools before attempting production. If a necessary file is missing or a scanned PDF has no usable text, ask the user to attach the specific file or a readable copy. Do not search the user profile or whole disk for material.',
+        'Check only the dependencies required by the active Skill. If a renderer or runtime is unavailable, state which dependency is missing and preserve the draft and source materials for continuation.',
+        'Resolve routine choices from the request and authorized sources. Ask a concise question only when an essential detail is missing, and continue the same work after the answer. Use the dedicated approval flow for operations that require authorization.'
+      ] : []),
       ...(attachments.evidence.length ? [attachmentEvidenceInstruction(attachments.evidence)] : []),
       ...(workspaceReferences.length ? [workspaceReferenceInstruction(workspaceReferences)] : []),
-      ...(capabilityReferences.length
-        ? [callableCapabilityInstruction(capabilityReferences, this.opts.callableCapabilities?.(toolContext, effectiveToolSpecs) ?? [])]
+      ...(contextualCapabilities.length
+        ? [callableCapabilityInstruction(contextualCapabilities, this.opts.callableCapabilities?.(toolContext, effectiveToolSpecs) ?? [])]
         : []),
       ...formatWorkspaceInstructions(workspaceInstructions),
       ...skillResolution.instructions,
@@ -1255,6 +1296,9 @@ export class AgentLoop {
       ...optionalInstruction(webSearchCapabilityInstruction(workflowPrompt, toolSpecs)),
       ...optionalInstruction(webFailureGuard?.recoveryInstruction()),
       ...(effectiveToolSpecs.some((tool) => tool.name === 'bash' || tool.name === 'request_host_shell') ? [shellRuntimeInstruction()] : []),
+      ...(effectiveToolSpecs.some((tool) => tool.name === 'request_host_shell') ? [
+        'Before requesting a host command, use listed, scoped document, file inspection, connector and task artifact tools for equivalent work. Read supplied material through those tools and ask for a specific missing file if needed. Do not search the user profile or request host-wide access for attached-file reads, workspace reads, connector operations or normal task deliverables. If a necessary command has no scoped alternative, propose only the exact operation and use the returned tool result or session to continue. Do not re-request an unchanged rejected or completed command.'
+      ] : []),
       ...(toolCatalogDriftMessage ? [toolCatalogDriftMessage] : [])
     ]
     await this.recordPipelineStage(threadId, turnId, 'input_remembered', {
@@ -1305,7 +1349,9 @@ export class AgentLoop {
     let textItemId = ''
     let reasoningItemId = ''
     const completedToolCalls: ToolCallLike[] = []
-    let stopReason: 'stop' | 'tool_calls' | 'length' | 'error' = 'stop'
+    let stopReason: Extract<ModelStreamChunk, { kind: 'completed' }>['stopReason'] | undefined
+    let observedToolCall = false
+    const hasModelOutput = (): boolean => Boolean(textAccumulator.value || reasoningAccumulator.value || observedToolCall)
     let modelErrorCode: string | undefined
     let inputTokens: number | undefined
     let outputTokens: number | undefined
@@ -1349,7 +1395,7 @@ export class AgentLoop {
       const remainingMs = this.opts.tasks?.workBudget(turnId)?.remainingMs
       if (remainingMs !== undefined) { workTimer = setTimeout(() => this.opts.turns.abortTurn(turnId, 'execution_budget_exhausted'), Math.max(1, remainingMs)); workTimer.unref?.() }
       if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) return 'outcome_unknown'
-      for await (const chunk of this.opts.model.stream(request)) {
+      modelChunks: for await (const chunk of modelStreamWithInterruption(this.opts.model, request, hasModelOutput)) {
         if (modelToken) this.opts.tasks?.assertToken(modelToken)
         if (signal.aborted) {
           if (modelSpanId) this.opts.spanService?.finish(modelSpanId, { status: 'cancelled' })
@@ -1391,6 +1437,7 @@ export class AgentLoop {
           })
           break
         case 'tool_call_delta':
+          observedToolCall = true
           if (chunk.argumentsDelta) {
             const characterCount = boundedUnicodeCharacterCount(
               chunk.argumentsDelta,
@@ -1409,6 +1456,7 @@ export class AgentLoop {
           }
           break
         case 'tool_call_complete': {
+          observedToolCall = true
           const provider = toolProviderMetadata.get(chunk.toolName)
           const toolKind = toolKinds.get(chunk.toolName)
           const repaired = repairDispatchToolArguments(chunk.arguments, {
@@ -1483,16 +1531,18 @@ export class AgentLoop {
           stopReason = chunk.stopReason
           break
         case 'error':
-          await this.opts.events.record({
-            kind: 'error',
-            threadId,
-            turnId,
-            message: chunk.message,
-            code: chunk.code
-          })
+          if (!hasModelOutput()) {
+            await this.opts.events.record({
+              kind: 'error',
+              threadId,
+              turnId,
+              message: chunk.message,
+              code: chunk.code
+            })
+          }
           modelErrorCode = chunk.code ?? 'model_stream_error'
           stopReason = 'error'
-          break
+          break modelChunks
         }
       }
     } catch (error) {
@@ -1511,6 +1561,11 @@ export class AgentLoop {
       finishWork?.()
       modelPermit?.release()
     }
+    if (!stopReason) {
+      modelErrorCode = 'model_stream_incomplete'
+      stopReason = 'error'
+    }
+    const interrupted = stopReason === 'error' && hasModelOutput()
     if (modelSpanId) {
       this.opts.spanService?.finish(modelSpanId, {
         status: stopReason === 'error' ? 'error' : 'ok',
@@ -1534,7 +1589,7 @@ export class AgentLoop {
           turnId,
           threadId,
           text: reasoningAccumulator.value,
-          status: 'completed'
+          status: interrupted ? 'failed' : 'completed'
         })
       )
     }
@@ -1547,10 +1602,18 @@ export class AgentLoop {
           turnId,
           threadId,
           text: textAccumulator.value,
-          status: 'completed',
-          uiBlocks: parseDshUiBlocks(textAccumulator.value)
+          status: interrupted ? 'failed' : 'completed',
+          ...(interrupted ? {} : { uiBlocks: parseDshUiBlocks(textAccumulator.value) })
         })
       )
+    }
+    if (interrupted) {
+      this.opts.tasks?.projectInterruptedResponse?.(threadId, turnId, textAccumulator.value)
+      if (this.opts.tasks?.hasUnknownToolOutcome?.(threadId, turnId)) return 'outcome_unknown'
+      const interruption = textAccumulator.value ? '模型响应中断，已保留收到的部分回复。' : '模型响应中断。'
+      const message = interruption + (activeTask ? '可以从原任务继续。' : '可以在当前会话继续。')
+      await this.opts.events.record({ kind: 'error', threadId, turnId, code: 'response_interrupted', message })
+      return { kind: 'response_interrupted', message }
     }
     if (stopReason === 'error') return 'failed'
     if (stopReason === 'length') return 'max_tokens'
@@ -2075,18 +2138,25 @@ export class AgentLoop {
       sandboxMode: input.sandboxMode,
       abortSignal: input.signal,
       awaitApproval: async (approval) => {
-        await this.opts.events.record({
-          kind: 'approval_requested',
-          threadId: approval.threadId,
-          turnId: approval.turnId,
-          approvalId: approval.id,
-          toolName: approval.toolName,
-          status: 'pending',
-          approvalPolicy: input.approvalPolicy,
-          sandboxMode: input.sandboxMode,
-          summary: approval.summary
-        })
-        return waitForApprovalDecision(() => this.opts.approvalGate.request(approval), input.signal)
+        return waitForApprovalDecision(async () => {
+          const existing = this.opts.approvalGate.get(approval.id)
+          const decision = this.opts.approvalGate.request(approval)
+          if (existing) return decision
+          // The client may respond immediately to this event. Make the request
+          // durable and register its waiter before publishing the event.
+          const [result] = await Promise.all([decision, this.opts.events.record({
+            kind: 'approval_requested',
+            threadId: approval.threadId,
+            turnId: approval.turnId,
+            approvalId: approval.id,
+            toolName: approval.toolName,
+            status: 'pending',
+            approvalPolicy: input.approvalPolicy,
+            sandboxMode: input.sandboxMode,
+            summary: approval.summary
+          })])
+          return result
+        }, input.signal)
       },
       ...(input.userInputDisabled
         ? {}

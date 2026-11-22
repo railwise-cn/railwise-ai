@@ -1,7 +1,10 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FlowNodeInspector, FlowWorkspaceView, RunDetailsPanel, ScheduleAuthoritySummary, createStarterFlowInput, flowPortCompatibility, flowRegistryAvailabilityLabel, flowStatusClass } from './FlowWorkspaceView'
+import i18n from '../../i18n'
+
+beforeEach(async () => { await i18n.changeLanguage('zh') })
 
 it('shows the stored recurring scope and lifetime with technical read scopes collapsed', () => {
   const html = renderToStaticMarkup(createElement(ScheduleAuthoritySummary, { value: {
@@ -27,7 +30,7 @@ describe('FlowNodeInspector', () => {
       allNodes: [node], registry: [], variables: { tender: {} }, onChange: vi.fn(), mockInput: '{}', onMockInput: vi.fn(), onTest: vi.fn(), busy: false
     }))
     expect(html).toContain('输入绑定')
-    expect(html).toContain('Flow 变量')
+    expect(html).toContain('流程变量')
     expect(html).toContain('节点输出')
     expect(html).toContain('提供商')
     expect(html).toContain('模型')
@@ -50,12 +53,15 @@ describe('RunDetailsPanel', () => {
         events: [{ id: 'ev_1', type: 'node_failed', nodeId: 'agent_1', payload: {}, createdAt: '2026-01-01T00:01:00Z' }]
       }, onAction: vi.fn(), busy: false
     }))
-    expect(html).toContain('从检查点恢复')
-    expect(html).toContain('从此节点重试')
+    expect(html).toContain('继续运行')
+    expect(html).toContain('重试此步骤')
     expect(html).toContain('批准')
     expect(html).toContain('拒绝')
+    expect(html).not.toContain('<details open')
+    expect(html).toContain('技术详情')
+    expect(html).toContain('等待审批')
     expect(html).toContain('timeout')
-    expect(html).toContain('事件记录 (1)')
+    expect(html).toContain('执行记录（1 项）')
   })
 })
 
@@ -89,24 +95,35 @@ describe('Flow workspace controls and typed connections', () => {
     expect(flowPortCompatibility('boolean', 'image')).toBeNull()
   })
 
-  it('keeps unavailable capabilities visible with their reason and configuration route', () => {
+  it('gives unavailable capabilities an action-oriented hint without showing internal routes', () => {
     expect(flowRegistryAvailabilityLabel({
       type: 'feishu_trigger', category: 'integration', label: 'Feishu', inputs: [], outputs: [], available: false,
       disabledReason: '尚未连接飞书', configurationRoute: 'settings/integrations/feishu'
-    })).toBe('尚未连接飞书；配置入口：settings/integrations/feishu')
+    }, i18n.getFixedT('zh', 'common'))).toBe('请在技能与连接器中检查连接或配置。')
   })
 
   it('renders the route-level draft, validation, export, publish, and run controls accessibly', () => {
     const html = renderToStaticMarkup(createElement(FlowWorkspaceView, {
       leftSidebarCollapsed: false, onToggleLeftSidebar: vi.fn(), filter: 'all'
     }))
-    expect(html).toContain('RailWise AI Flow')
-    expect(html).toContain('Preview')
+    expect(html).toContain('自动化流程')
+    expect(html).not.toContain('Preview')
     expect(html).toContain('保存')
-    expect(html).toContain('校验')
-    expect(html).toContain('脱敏导出')
+    expect(html).toContain('检查设置')
+    expect(html).toContain('安全导出')
     expect(html).toContain('发布')
     expect(html).toContain('运行')
-    expect(html).toContain('还没有 Flow')
+    expect(html).toContain('还没有自动化流程')
   })
+})
+
+it('shows scheduled workflow navigation in English without a preview badge', async () => {
+  await i18n.changeLanguage('en')
+  const html = renderToStaticMarkup(createElement(FlowWorkspaceView, {
+    leftSidebarCollapsed: false, onToggleLeftSidebar: vi.fn(), filter: 'scheduled'
+  }))
+  expect(html).toContain('Scheduled workflows')
+  expect(html).toContain('Choose a workflow')
+  expect(html).not.toContain('Preview')
+  expect(html).not.toContain('定时流程')
 })

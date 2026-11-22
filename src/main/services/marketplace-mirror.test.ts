@@ -1,13 +1,16 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MARKETPLACE_MIRROR_BASE, marketplaceMirrorPath, materializeMarketplaceMirror, mirrorRecordFor } from './marketplace-mirror'
 import { getOfficialMarketplaceCatalog } from './official-marketplace-catalog'
-import { marketplacePackageReviewSha256 } from './package-installation-service'
-import { materializeCatalogPackage } from './plugin-management-service'
+import { marketplacePackageReviewSha256, PackageInstallationService } from './package-installation-service'
+import { materializeCatalogPackage, PluginManagementService } from './plugin-management-service'
+import { SkillRuntime } from '../../../kun/src/skills/skill-runtime'
+import { declaredMarketplaceSkills, marketplaceSkillReadiness } from '../../shared/marketplace-skill-readiness'
+import { marketplacePackageSkillRoots } from './skill-service'
 
 const packageItem = getOfficialMarketplaceCatalog().find(item => item.id === 'video-shotcraft')!
 const temporary: string[] = []
@@ -58,6 +61,69 @@ describe('official marketplace mirror', () => {
     await expect(materializeMarketplaceMirror(packageItem, record, await target(), async () => new Response(new Uint8Array([main, duplicate][index++]!.bytes))))
       .rejects.toThrow('duplicate file')
   })
+
+  it.each([['win32', 'x64'], ['darwin', 'arm64'], ['darwin', 'x64']] as const)(
+    'uses the exact bundled Superpowers archive without network on %s %s',
+    async (platform, arch) => {
+      const item = getOfficialMarketplaceCatalog().find(entry => entry.id === 'superpowers')!
+      const record = mirrorRecordFor(item, undefined, platform, arch)!
+      const download = vi.fn<typeof fetch>(async () => { throw new Error('offline') })
+      const directory = await target()
+      await materializeMarketplaceMirror(item, record, directory, download)
+      expect(download).not.toHaveBeenCalled()
+      expect(await readFile(join(directory, 'LICENSE'), 'utf8')).toContain('MIT License')
+      const roots = await marketplacePackageSkillRoots(directory)
+      const skills = (await SkillRuntime.create({ enabled: true, roots, legacySkillMd: true })).diagnostics()
+      expect(skills.skills).toHaveLength(14)
+      expect(marketplaceSkillReadiness(skills, directory, declaredMarketplaceSkills(item.components, item)!)).toBe('loaded')
+      const oldItem = {
+        ...item, version: '44c9b2d6e889982ac18c27d05a19fefe335194e1',
+        components: item.components.map(component => ({ ...component, skillNames: ['superpowers'] }))
+      }
+      expect(marketplaceSkillReadiness(skills, directory, declaredMarketplaceSkills(oldItem.components, oldItem)!)).toBe('loaded')
+    }
+  )
+
+  it('keeps the previous reviewed Superpowers installation and workspace when applying the declaration upgrade', async () => {
+    const item = getOfficialMarketplaceCatalog().find(entry => entry.id === 'superpowers')!
+    const oldItem = {
+      ...item, version: '44c9b2d6e889982ac18c27d05a19fefe335194e1',
+      components: item.components.map(component => ({ ...component, skillNames: ['superpowers'] }))
+    }
+    const oldReview = marketplacePackageReviewSha256(oldItem)
+    expect(oldReview).toBe('757298cdb87136ab60f7213fccc2f5b74f4c42756664aa2b514be2bfd40a7e1a')
+    const record = mirrorRecordFor(item, undefined, 'win32', 'x64')!
+    const root = await target()
+    const workspace = join(root, 'workspace')
+    await mkdir(workspace, { recursive: true })
+    await writeFile(join(workspace, 'existing.md'), 'Existing user file')
+    const installations = new PackageInstallationService({ rootDirectory: join(root, 'plugin-data') })
+    const service = new PluginManagementService({
+      rootDirectory: join(root, 'imports'),
+      installationService: installations,
+      catalogMaterializer: (candidate, directory) => materializeMarketplaceMirror(candidate, {
+        ...record, reviewSha256: marketplacePackageReviewSha256(candidate)
+      }, directory, async () => { throw new Error('unexpected network') })
+    })
+    const before = await service.prepareCatalogPackage(oldItem)
+    const initial = await service.installPrepared({
+      preparedId: before.id, reviewSha256: before.reviewSha256, expectedCurrentVersion: null,
+      scope: 'workspace', workspaceRoot: workspace, permissions: [], idempotencyKey: 'before-declaration-upgrade'
+    })
+    const after = await service.prepareCatalogPackage(item)
+    const upgraded = await service.installPrepared({
+      preparedId: after.id, reviewSha256: after.reviewSha256, expectedCurrentVersion: initial.version,
+      scope: 'workspace', workspaceRoot: workspace, permissions: [], idempotencyKey: 'after-declaration-upgrade'
+    })
+    expect(upgraded).toMatchObject({
+      scope: 'workspace', workspaceRoot: await realpath(workspace),
+      rollback: { available: true, reviewSha256: before.reviewSha256, artifact: initial.artifact }
+    })
+    const reverted = await service.rollback({ packageId: item.id, expectedCurrentVersion: item.version, idempotencyKey: 'revert-declaration-upgrade' })
+    expect(reverted).toMatchObject({ version: oldItem.version, artifact: initial.artifact,
+      workspaceRoot: await realpath(workspace), reviewSha256: oldReview })
+    expect(await readFile(join(workspace, 'existing.md'), 'utf8')).toBe('Existing user file')
+  }, 30_000)
 
   it('uses no upstream fallback when the shipped lock lacks the package', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('unexpected upstream') }))

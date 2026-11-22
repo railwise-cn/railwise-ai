@@ -2056,6 +2056,49 @@ describe('DeepseekCompatModelClient', () => {
     expect(chunks.find((c) => c.kind === 'usage')).toBeDefined()
   })
 
+  it.each([
+    ['chat_completions', [{ choices: [{ delta: { content: 'partial' } }] }]],
+    ['responses', [{ type: 'response.output_text.delta', delta: 'partial' }]],
+    ['messages', [
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'partial' } },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' } }
+    ]]
+  ] as const)('reports premature EOF in a %s stream', async (endpointFormat, payloads) => {
+    const client = new DeepseekCompatModelClient({
+      baseUrl: 'https://example.com',
+      apiKey: 'k',
+      model: 'test-model',
+      endpointFormat,
+      fetchImpl: async () => new Response(sseStream([...payloads]), { headers: { 'content-type': 'text/event-stream' } })
+    })
+    const chunks: ModelStreamChunk[] = []
+    for await (const chunk of client.stream(buildRequest(new AbortController().signal))) chunks.push(chunk)
+
+    expect(chunks).toEqual([
+      { kind: 'assistant_text_delta', text: 'partial' },
+      { kind: 'error', code: 'model_stream_incomplete', message: expect.any(String) }
+    ])
+  })
+
+  it('accepts a Chat Completions finish reason over CRLF without a DONE sentinel', async () => {
+    const client = new DeepseekCompatModelClient({
+      baseUrl: 'https://example.com',
+      apiKey: 'k',
+      model: 'test-model',
+      fetchImpl: async () => new Response(
+        'data: {"choices":[{"delta":{"content":"complete"},"finish_reason":"stop"}]}\r\n\r\n',
+        { headers: { 'content-type': 'text/event-stream' } }
+      )
+    })
+    const chunks: ModelStreamChunk[] = []
+    for await (const chunk of client.stream(buildRequest(new AbortController().signal))) chunks.push(chunk)
+
+    expect(chunks).toEqual([
+      { kind: 'assistant_text_delta', text: 'complete' },
+      { kind: 'completed', stopReason: 'stop' }
+    ])
+  })
+
   it('normalizes cumulative text snapshots from compatible gateways', async () => {
     const frames = [
       'data: {"choices":[{"delta":{"content":"当前"}}]}\n\n',

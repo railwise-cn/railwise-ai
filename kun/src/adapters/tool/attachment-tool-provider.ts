@@ -19,7 +19,7 @@ export function buildAttachmentToolProviders(store: AttachmentStore | undefined)
             attachment_id: { type: 'string' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 20 }
           }, required: ['attachment_id'], additionalProperties: false
         },
-        policy: 'never',
+        policy: 'auto',
         execute: async (args, context) => {
           if (typeof args.attachment_id !== 'string') return { output: { error: 'attachment_id is required' }, isError: true }
           return { output: { untrusted: true, sections: await store.listSections(
@@ -35,7 +35,7 @@ export function buildAttachmentToolProviders(store: AttachmentStore | undefined)
             attachment_id: { type: 'string' }, query: { type: 'string', maxLength: 500 }, limit: { type: 'integer', minimum: 1, maximum: 20 }
           }, required: ['attachment_id', 'query'], additionalProperties: false
         },
-        policy: 'never',
+        policy: 'auto',
         execute: async (args, context) => {
           if (typeof args.attachment_id !== 'string' || typeof args.query !== 'string') {
             return { output: { error: 'attachment_id and query are required' }, isError: true }
@@ -52,7 +52,7 @@ export function buildAttachmentToolProviders(store: AttachmentStore | undefined)
           type: 'object', properties: { attachment_id: { type: 'string' }, section_id: { type: 'string' } },
           required: ['attachment_id', 'section_id'], additionalProperties: false
         },
-        policy: 'never',
+        policy: 'auto',
         execute: async (args, context) => {
           if (typeof args.attachment_id !== 'string' || typeof args.section_id !== 'string') {
             return { output: { error: 'attachment_id and section_id are required' }, isError: true }

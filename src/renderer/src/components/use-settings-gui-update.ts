@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { AppSettingsV1 } from '@shared/app-settings'
 import type { GuiUpdateChannel } from '@shared/gui-update'
+import { redactSecretText } from '@shared/secret-redaction'
 import { guiUpdateFailureMessage } from './settings-utils'
 import {
   checkGuiUpdate as checkUpdate,
@@ -38,6 +39,7 @@ export function useSettingsGuiUpdate({ category, channel, form, t }: {
     downloadGuiUpdate: () => downloadUpdate(form?.guiUpdate?.channel),
     guiUpdateDownloaded: state.status === 'downloaded' || Boolean(info?.ok && info.downloaded),
     guiUpdateError,
+    guiUpdateErrorDetail: guiUpdateError && info && !info.ok ? redactSecretText(info.message) : undefined,
     guiUpdateInfo: info,
     guiUpdateProgress: state.status === 'downloading' ? state.progress : null,
     installingGuiUpdate: state.status === 'installing' || activity === 'installing' || (activity === 'applying' && Boolean(info?.ok && info.downloaded)),

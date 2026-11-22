@@ -1,11 +1,13 @@
 import { type ReactElement } from 'react'
 import { Clock3, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import type { SkillSelections } from '@shared/callable-capabilities'
 
 export type QueuedComposerMessage = {
   id: string
   text: string
   displayText?: string
+  skillSelections?: SkillSelections
 }
 
 type Props = {
@@ -34,6 +36,7 @@ export function FloatingComposerQueuedMessages({ messages, onRemove }: Props): R
           >
             <span className="shrink-0 text-ds-faint">{index + 1}.</span>
             <span className="max-w-[360px] truncate">{message.displayText ?? message.text}</span>
+            {message.skillSelections?.length ? <span className="min-w-0 truncate text-[12px] text-ds-muted" title={message.skillSelections.map(skill => skill.name).join(', ')}>{message.skillSelections.map(skill => skill.name).join(', ')}</span> : null}
             <button
               type="button"
               onClick={() => onRemove(message.id)}

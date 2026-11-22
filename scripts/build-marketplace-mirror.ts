@@ -5,6 +5,9 @@ import { join, resolve } from 'node:path'
 import { deflateRawSync } from 'node:zlib'
 import JSZip from 'jszip'
 import type { MarketplacePackageV1 } from '../src/shared/marketplace'
+import { declaredMarketplaceSkills, marketplaceSkillReadiness } from '../src/shared/marketplace-skill-readiness'
+import { SkillRuntime } from '../kun/src/skills/skill-runtime'
+import { marketplacePackageSkillRoots } from '../src/main/services/skill-service'
 import { getOfficialMarketplaceCatalog } from '../src/main/services/official-marketplace-catalog'
 import { assertMirroredPackage, type MirroredPackage, type MirrorPart } from '../src/main/services/marketplace-mirror'
 import { inspectPackageDirectory, marketplacePackageReviewSha256, packageInstallLimitsFor } from '../src/main/services/package-installation-service'
@@ -20,6 +23,14 @@ async function preparePackage(item: MarketplacePackageV1, output: string, scratc
   await materializeCatalogUpstreamForMirror(item, directory)
   try {
     const tree = await inspectPackageDirectory(directory, packageInstallLimitsFor(item))
+    const names = declaredMarketplaceSkills(item.components, item)
+    if (names !== undefined) {
+      const roots = await marketplacePackageSkillRoots(directory)
+      const runtime = await SkillRuntime.create({ enabled: true, roots, legacySkillMd: true }, { discoveryWaitMs: 15_000 })
+      if (marketplaceSkillReadiness(runtime.diagnostics(), directory, names) !== 'loaded') {
+        throw new Error(`Package ${item.id} does not provide its declared callable skills: ${names.join(', ')}`)
+      }
+    }
     const parts: MirrorPart[] = []
     let zip = new JSZip()
     let size = 0

@@ -109,7 +109,7 @@ export function BrowserTaskBindingPanel({ taskId, onConfirmed }: { taskId: strin
   }
   const currentSnapshot = snapshot?.taskId === taskId ? snapshot : undefined
   const policyBlocked = currentSnapshot?.policyChangeBlocked === 'browser_unresolved_operation' || error?.unresolved
-  const openOriginalTask = () => { requestTaskDetail(taskId); useChatStore.getState().setRoute('tasks') }
+  const openOriginalTask = () => requestTaskDetail(taskId)
   return <div aria-busy={pending} className="mt-3 rounded-lg border border-ds-border bg-ds-panel p-3 text-xs">
     <p>{t('browserTaskBindingReview')}</p>
     {pending && !currentSnapshot ? <p role="status" className="mt-2">{t('browserTaskBindingLoading')}</p> : null}

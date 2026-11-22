@@ -51,7 +51,6 @@ type Props = {
   onScheduleOpen: () => void
   onFlowOpen: () => void
   onDesignOpen: () => void
-  onTasksOpen?: () => void
   onNewRequirement: () => void
   onOpenSettings: (section?: SettingsRouteSection) => void
   onToggleFocusMode: () => void
@@ -80,7 +79,6 @@ export function WriteSidebar({
   onScheduleOpen,
   onFlowOpen,
   onDesignOpen,
-  onTasksOpen,
   onNewRequirement,
   onOpenSettings,
   onToggleFocusMode,
@@ -333,7 +331,6 @@ export function WriteSidebar({
           onScheduleOpen={onScheduleOpen}
           onFlowOpen={onFlowOpen}
           onDesignOpen={onDesignOpen}
-          onTasksOpen={onTasksOpen}
         />
 
         <div className="mx-2 my-2 border-t border-[var(--ds-sidebar-divider)]" />

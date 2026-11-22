@@ -253,6 +253,7 @@ import { TaskArtifactPreviewService } from '../services/task-artifact-preview-se
 import { MarketplaceCatalogService } from '../services/marketplace-catalog-service'
 import { PluginManagementService } from '../services/plugin-management-service'
 import type { CatalogSourceV1, InstalledPackageV1 } from '../../shared/marketplace'
+import { MarketplaceInstallError } from '../../shared/marketplace-install-errors'
 import {
   declaredMarketplaceSkills,
   marketplaceSkillReadiness,
@@ -337,7 +338,12 @@ type RegisterAppIpcHandlersOptions = {
     payload: TurnCompleteNotificationPayload
   ) => Promise<SystemNotificationResult>
   getAppVersion: () => string
-  onGuiUpdatePrepared?: () => void
+  guiUpdateRuntime?: {
+    isPrepared: () => boolean
+    readSnapshot?: () => Promise<RuntimeRequestResult | undefined>
+    prepare: (confirmedSnapshotId?: string) => Promise<void>
+    recover: () => Promise<void>
+  }
   readGuiUpdateState: () => Promise<GuiUpdateState>
   loadGuiUpdaterModule: () => Promise<GuiUpdaterModule>
   resolveLogDirectory: () => string
@@ -363,10 +369,11 @@ function safeSaveAsFileName(input: string | undefined, fallback = 'generated-fil
 }
 
 async function collectGuiUpdateActiveWork(
-  runtimeRequest: RegisterAppIpcHandlersOptions['runtimeRequest']
+  readSnapshot: () => Promise<RuntimeRequestResult | undefined>
 ): Promise<GuiUpdateInstallPreflight> {
   try {
-    const response = await runtimeRequest('/v1/runtime/update', 'GET')
+    const response = await readSnapshot()
+    if (!response) return { ok: true, activeWork: [] }
     if (!response.ok) throw new Error(runtimeResponseMessage(response))
     return z.object({
       ok: z.literal(true),
@@ -422,23 +429,29 @@ export function buildAttachmentSections(attachmentId: string, text: string, docu
     return offset < 0 ? [] : [{ token: tokenOffset(offset), table: `table-${index + 1}`, page: table.page }]
   })
   const sections: Array<{ id: string; attachmentId: string; ordinal: number; text: string; tokenEstimate: number; provenance: { heading?: string; page?: number; table?: string; worksheet?: string; slide?: number }; createdAt: string }> = []; const createdAt = new Date().toISOString(); const target = 1200; const stride = 1050
-  for (let cursor = 0; cursor < tokens.length; cursor += stride) {
-    const chunk = tokens.slice(cursor, cursor + target); const sectionText = chunk.join(' '); if (!sectionText) break
+  let pageIndex = -1
+  for (let cursor = 0; cursor < tokens.length;) {
+    while (pageIndex + 1 < pageAnchors.length && pageAnchors[pageIndex + 1].token <= cursor) pageIndex += 1
+    const pageAnchor = pageAnchors[pageIndex]
+    const pageEnd = pageAnchors[pageIndex + 1]?.token ?? tokens.length
+    const chunkEnd = Math.min(cursor + target, pageEnd)
+    const chunk = tokens.slice(cursor, chunkEnd)
+    const sectionText = chunk.join(' ')
     const ordinal: number = sections.length
-    const activeAnchors = anchors.filter((item) => item.token <= cursor + target)
+    const activeAnchors = anchors.filter((item) => item.token <= chunkEnd &&
+      (pageAnchors.length === 0 || (item.token >= (pageAnchor?.token ?? 0) && item.token < pageEnd)))
     const headingAnchor = [...activeAnchors].reverse().find((item) => item.heading)
     const worksheetAnchor = [...activeAnchors].reverse().find((item) => item.worksheet)
     const slideAnchor = [...activeAnchors].reverse().find((item) => item.slide)
-    const table = tableAnchors.find((item) => item.token >= cursor && item.token < cursor + target)
-    const pageAnchor = [...pageAnchors].reverse().find((item) => item.token <= cursor)
-      ?? pageAnchors.find((item) => item.token < cursor + target)
+    const table = tableAnchors.find((item) => item.token >= cursor && item.token < chunkEnd)
+    const page = pageAnchor?.page ?? table?.page ?? headingAnchor?.page
     const provenance = {
       ...(headingAnchor?.heading ? { heading: headingAnchor.heading } : {}), ...(worksheetAnchor?.worksheet ? { worksheet: worksheetAnchor.worksheet } : {}),
       ...(slideAnchor?.slide ? { slide: slideAnchor.slide } : {}), ...(table?.table ? { table: table.table } : {}),
-      ...((table?.page ?? headingAnchor?.page ?? pageAnchor?.page) ? { page: table?.page ?? headingAnchor?.page ?? pageAnchor?.page } : {})
+      ...(page ? { page } : {})
     }
     sections.push({ id: `sec_${createHash('sha256').update(`${attachmentId}\0${ordinal}\0${sectionText}`).digest('hex').slice(0, 24)}`, attachmentId, ordinal, text: sectionText, tokenEstimate: chunk.length, provenance, createdAt })
-    if (cursor + target >= tokens.length) break
+    cursor = chunkEnd === pageEnd ? pageEnd : cursor + stride
   }
   return sections
 }
@@ -743,10 +756,17 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       ...(skills.status === 'rejected' && skillNames === undefined ? [skills.reason] : []),
       ...(mcp.status === 'rejected' ? [mcp.reason] : [])
     ]
-    if (errors.length === 1) throw errors[0]
-    if (errors.length > 1) throw new AggregateError(errors, '插件已保存，但技能与连接器均未能完成 Runtime 更新。请重试刷新。')
+    if (errors.length) {
+      throw new MarketplaceInstallError('refresh-failed', 'The package was saved, but its capabilities could not be refreshed.',
+        errors.length === 1 ? errors[0] : new AggregateError(errors))
+    }
     if (installed && skillNames !== undefined) {
-      const snapshot = skills.status === 'fulfilled' ? readMarketplaceSkillSnapshot(skills.value, 'state') : undefined
+      if (skills.status !== 'fulfilled') return 'unavailable'
+      const snapshot = installed.workspaceRoot
+        ? readMarketplaceSkillSnapshot(await runtimeRequest(
+          `/v1/skills?${new URLSearchParams({ scope: 'available', workspace: installed.workspaceRoot })}`, 'GET'
+        ).catch(() => undefined))
+        : readMarketplaceSkillSnapshot(skills.value, 'state')
       return marketplaceSkillReadiness(snapshot, installed.artifact.location, skillNames)
     }
   }
@@ -1168,7 +1188,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const entry = catalog.packages.find((candidate) =>
       candidate.sourceId === request.sourceId && candidate.package.id === request.packageId
     )
-    if (!entry) throw new Error('Catalog package was not found.')
+    if (!entry) throw new MarketplaceInstallError('package-unavailable', 'Catalog package was not found.')
     return pluginManagementService.prepareCatalogPackage(entry.package)
   })
   ipcMain.handle('plugin:cancel-import', async (_, payload: unknown) => {
@@ -1182,7 +1202,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const installed = await pluginManagementService.installPrepared(
       request,
       async (record, item) => {
-        skillNames = declaredMarketplaceSkills(item.components)
+        skillNames = declaredMarketplaceSkills(item.components, item)
         const applied = await activatePluginPackage({
           item,
           installed: record,
@@ -1203,7 +1223,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const installed = await pluginManagementService.rollback(
       request,
       async (record, item) => {
-        skillNames = declaredMarketplaceSkills(item.components)
+        skillNames = declaredMarketplaceSkills(item.components, item)
         const applied = await activatePluginPackage({
           item,
           installed: record,
@@ -2664,10 +2684,11 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       ).channel
     )
   })
-  let updatePrepared = false
   let installRequest: Promise<GuiUpdateInstallResult> | undefined
   ipcMain.handle('gui:update-install-preflight', async (): Promise<GuiUpdateInstallPreflight> =>
-    updatePrepared ? { ok: true, activeWork: [] } : collectGuiUpdateActiveWork(runtimeRequest)
+    options.guiUpdateRuntime?.isPrepared() ? { ok: true, activeWork: [] } : collectGuiUpdateActiveWork(
+      options.guiUpdateRuntime?.readSnapshot ?? (() => runtimeRequest('/v1/runtime/update', 'GET'))
+    )
   )
   ipcMain.handle('gui:update-install', async (_, payload: unknown): Promise<GuiUpdateInstallResult> => {
     const request = parseIpcPayload(
@@ -2683,18 +2704,20 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         if (!(state.info?.ok && state.info.downloaded) && state.status !== 'downloaded') {
           return { ok: false, currentVersion: getAppVersion(), code: 'install_failed', message: '更新包尚未下载完成。' }
         }
-        if (!updatePrepared) {
-          const prepared = await runtimeRequest('/v1/runtime/update/prepare', 'POST', JSON.stringify({
-            ...(request.confirmActiveWork && request.confirmedSnapshotId ? { confirmedSnapshotId: request.confirmedSnapshotId } : {})
-          }))
+        const confirmedSnapshotId = request.confirmActiveWork ? request.confirmedSnapshotId : undefined
+        if (options.guiUpdateRuntime) {
+          await options.guiUpdateRuntime.prepare(confirmedSnapshotId)
+        } else {
+          const prepared = await runtimeRequest('/v1/runtime/update/prepare', 'POST', JSON.stringify({ confirmedSnapshotId }))
           if (!prepared.ok) throw new Error(runtimeResponseMessage(prepared))
           const result = JSON.parse(prepared.body) as { ok?: unknown }
           if (result.ok !== true) throw new Error('Runtime 未确认安全停止，应用仍保持打开。')
-          updatePrepared = true
-          options.onGuiUpdatePrepared?.()
         }
         return await module.installGuiUpdate()
       } catch (error) {
+        await options.guiUpdateRuntime?.recover().catch(recoveryError => {
+          logError('updater', 'Could not release the Runtime update handoff.', recoveryError)
+        })
         return { ok: false, currentVersion: getAppVersion(), code: 'install_failed', message: error instanceof Error ? error.message : String(error) }
       }
     })().finally(() => { installRequest = undefined })

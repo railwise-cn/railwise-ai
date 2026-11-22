@@ -106,7 +106,8 @@ describe('managed DingTalk connection', () => {
   it('does not start authorization when installation fails or diagnostics are unknown', async () => {
     api.installManagedDingTalk.mockResolvedValue({ ok: false, message: '下载摘要不匹配，未安装' })
     await render(true)
-    expect(container.textContent).toContain('下载摘要不匹配')
+    expect(container.textContent).toContain('下载文件校验失败')
+    expect(container.textContent).not.toContain('下载摘要不匹配')
     expect(api.beginManagedDingTalkLogin).not.toHaveBeenCalled()
     expect(api.openExternal).not.toHaveBeenCalled()
   })

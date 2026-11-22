@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyDocumentLocale, applyUiFontScale } from './apply-theme'
 
@@ -41,6 +42,11 @@ describe('applyDocumentLocale', () => {
 })
 
 describe('applyUiFontScale', () => {
+  it('binds the saved scale to the application body', () => {
+    const baseShellStyles = readFileSync(new URL('../styles/base-shell.css', import.meta.url), 'utf8')
+    expect(baseShellStyles).toMatch(/\nbody\s*\{[^}]*zoom:\s*var\(--ds-ui-scale\)/)
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
   })

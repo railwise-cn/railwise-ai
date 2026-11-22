@@ -33,6 +33,14 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); document.body.style.zoom = ''; vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('measured workbench resize and navigation preferences', () => {
+  it('migrates the old checklist panel preference without reopening a separate panel', async () => {
+    window.localStorage.setItem('workwise.layout.rightPanelMode', 'todo')
+    await act(async () => root.render(createElement(Harness)))
+    expect(read().rightVisible).toBe(false)
+    await click('preview')
+    expect(read().rightVisible).toBe(true)
+  })
+
   it('preserves wide-window navigation preference while the compact drawer opens and closes', async () => {
     await act(async () => root.render(createElement(Harness)))
     expect(read().collapsed).toBe(false)

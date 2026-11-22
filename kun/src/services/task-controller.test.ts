@@ -138,44 +138,56 @@ describe('TaskController reliability boundaries', () => {
     } finally { repository.close() }
   })
 
-  it.each(['exact', 'unknown', 'missing_hash', 'arguments', 'provider', 'target', 'account', 'backend', 'workspace', 'scope', 'denied', 'forged_transfer'])('transfers an undispatched approval only for the exact reviewed operation (%s)', async variation => {
+  it.each(['exact', 'unknown', 'missing_hash', 'arguments', 'provider', 'target', 'account', 'backend', 'workspace', 'scope', 'denied', 'forged_transfer',
+    'host_gui_bridge_changed', 'host_command_changed', 'host_other_connector_changed', 'host_review_changed', 'file_gui_bridge_changed'])('transfers an undispatched approval only for the exact reviewed operation (%s)', async variation => {
     const { repository, controller, task, thread } = await fixture()
     try {
       controller.beginAttempt(thread.id, 'turn_reliability')
+      const host = variation.startsWith('host_')
+      const toolName = host ? 'request_host_shell' : 'write'
+      const providerId = host ? 'scoped-host-shell' : undefined
+      const connectorIdentityFingerprints = { dingtalk: 'a'.repeat(64), 'mcp:gui_schedule': '1'.repeat(64) }
       const grant = ExecutionGrantSchema.parse({ id: 'new-grant', taskId: task.id, threadId: thread.id, turnId: 'turn_reliability',
         workspaceRoot: thread.workspace, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', sandboxMode: 'workspace-write', approvalPolicy: 'on-request',
         workspaceRevision: 1, agentRevision: 1, revision: 1, idempotencyKey: 'new-grant', issuedAt: '2026-07-18T00:00:00.000Z',
-        expiresAt: '2026-07-18T00:15:00.000Z', connectorBackends: { dingtalk: 'dws' }, connectorIdentityFingerprints: { dingtalk: 'a'.repeat(64) } })
-      const current = controller.beginToolOperation('turn_reliability', { callId: 'new-call', toolName: 'write', arguments: { path: 'summary.md', content: 'reviewed' } }, grant)!
+        expiresAt: '2026-07-18T00:15:00.000Z', connectorBackends: { dingtalk: 'dws' }, connectorIdentityFingerprints })
+      const call = { callId: 'new-call', toolName, providerId, arguments: host
+        ? { command: 'printf fixture', idempotency_key: 'fixture' }
+        : { path: 'summary.md', content: 'reviewed' } }
+      const current = controller.beginToolOperation('turn_reliability', call, grant)!
       const request = repository.operation(task.id, current.key)!.request!
       const oldGrant = { ...grant, id: 'old-grant', turnId: 'previous-turn', idempotencyKey: 'old-grant',
         // Reauthorization uses a valid new Grant even if the interrupted Turn expired.
         expiresAt: '2026-07-17T23:59:00.000Z' }
       const oldRequest: Record<string, unknown> = { ...request, turnId: 'previous-turn', callId: 'old-call', executionGrant: oldGrant }
       if (variation === 'missing_hash') delete oldRequest.approvalRequestHash
-      if (variation === 'arguments') oldRequest.argumentsHash = 'changed'
+      if (variation === 'arguments' || variation === 'host_command_changed') oldRequest.argumentsHash = 'changed'
       if (variation === 'provider') oldRequest.providerId = 'different-provider'
       if (variation === 'target') oldRequest.target = 'different-target'
-      if (variation === 'account') oldGrant.connectorIdentityFingerprints = { dingtalk: 'b'.repeat(64) }
+      if (host || variation === 'file_gui_bridge_changed') oldGrant.connectorIdentityFingerprints = { ...connectorIdentityFingerprints, 'mcp:gui_schedule': '2'.repeat(64) }
+      if (variation === 'account' || variation === 'host_other_connector_changed') oldGrant.connectorIdentityFingerprints = { ...oldGrant.connectorIdentityFingerprints, dingtalk: 'b'.repeat(64) }
       if (variation === 'backend') oldGrant.connectorBackends = { dingtalk: 'openapi' }
       if (variation === 'workspace') oldGrant.workspaceRevision = 2
       if (variation === 'scope') oldRequest.scopeRevision = 2
       repository.beginOperation({ ownerId: task.id, idempotencyKey: 'old-operation', kind: 'tool', request: oldRequest, nowIso: '2026-07-17T23:30:00.000Z' })
       repository.finishOperation(task.id, 'old-operation', { status: variation === 'unknown' ? 'outcome_unknown' : 'failed', result: {
-        approved: false, item: makeToolResultItem({ id: 'old-result', threadId: thread.id, turnId: 'previous-turn', callId: 'old-call', toolName: 'write',
+        approved: false, item: makeToolResultItem({ id: 'old-result', threadId: thread.id, turnId: 'previous-turn', callId: 'old-call', toolName,
           isError: true, output: { code: 'operation_not_dispatched' } }) } }, '2026-07-17T23:31:00.000Z')
-      const oldApproval = createApprovalRequest({ id: 'appr_old-call', threadId: thread.id, turnId: 'previous-turn', toolName: 'write', summary: 'Write reviewed summary' })
+      const oldApproval = createApprovalRequest({ id: 'appr_old-call', threadId: thread.id, turnId: 'previous-turn', toolName,
+        ...(host ? { requestHash: request.approvalRequestHash as string } : {}),
+        summary: variation === 'host_review_changed' ? 'Changed review' : 'Exact review' })
       repository.saveHumanRequest({ id: oldApproval.id, kind: 'approval', threadId: thread.id, turnId: oldApproval.turnId,
         message: oldApproval.summary, payload: { approval: oldApproval, ...(variation === 'forged_transfer' ? { continuedFromApprovalId: 'unverified-parent' } : {}) }, status: 'answered', resolution: { decision: variation === 'denied' ? 'deny' : 'allow' },
         createdAt: '2026-07-17T23:30:00.000Z', updatedAt: '2026-07-18T00:00:00.000Z' })
-      const approval = createApprovalRequest({ id: 'new-approval', threadId: thread.id, turnId: 'turn_reliability', toolName: 'write', summary: 'Write reviewed summary',
+      const approval = createApprovalRequest({ id: 'new-approval', threadId: thread.id, turnId: 'turn_reliability', toolName, summary: 'Exact review',
         callId: 'new-call', requestHash: request.approvalRequestHash as string })
-      expect(controller.claimUndispatchedApproval(current.token, current.key, approval)).toBe(variation === 'exact')
-      expect(repository.operations(task.id, 'approval_transfer')).toHaveLength(variation === 'exact' ? 1 : 0)
+      const transferable = variation === 'exact' || variation === 'host_gui_bridge_changed'
+      expect(controller.claimUndispatchedApproval(current.token, current.key, approval)).toBe(transferable)
+      expect(repository.operations(task.id, 'approval_transfer')).toHaveLength(transferable ? 1 : 0)
       expect(repository.inbox(undefined, true)).toHaveLength(0)
-      if (variation === 'exact') {
+      if (transferable) {
         expect(controller.claimUndispatchedApproval(current.token, current.key, approval)).toBe(true)
-        const repeated = controller.beginToolOperation('turn_reliability', { callId: 'another-call', toolName: 'write', arguments: { path: 'summary.md', content: 'reviewed' } }, grant)!
+        const repeated = controller.beginToolOperation('turn_reliability', { ...call, callId: 'another-call' }, grant)!
         expect(controller.claimUndispatchedApproval(repeated.token, repeated.key, { ...approval, id: 'another-approval', callId: 'another-call' })).toBe(false)
         expect(repository.humanRequest(approval.id)?.payload.continuedFromApprovalId).toBe(oldApproval.id)
       }
@@ -570,6 +582,19 @@ describe('TaskController reliability boundaries', () => {
 
     expect(decision).toMatchObject({ kind: 'failed', task: { status: 'failed', attempts: 1 } })
     expect(repository.events(task.id).filter((event) => event.kind === 'attempt_retrying')).toHaveLength(0)
+    repository.close()
+  })
+
+  it('leaves an interrupted model response at a checkpoint of the same resumable task', async () => {
+    const { repository, controller, task } = await fixture('整理已上传的资料。')
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const decision = controller.recordAttemptFailure(task.threadId, 'turn_reliability', 'response_interrupted', '模型回复中断。')
+
+    expect(decision).toMatchObject({ kind: 'stalled', task: { id: task.id, status: 'stalled', blockCode: 'response_interrupted', attempts: 1 } })
+    expect(repository.events(task.id).filter(event => event.kind === 'attempt_retrying')).toHaveLength(0)
+    expect(repository.latestCheckpoint(task.id)?.resumeSummary).toBe('模型回复中断。')
+    const current = repository.get(task.id)!
+    expect(controller.prepareResume(current.id, current.revision)).toMatchObject({ id: task.id, status: 'retrying', blockCode: undefined })
     repository.close()
   })
 

@@ -3,6 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FlowWorkspaceView, createStarterFlowInput } from './FlowWorkspaceView'
+import i18n from '../../i18n'
 
 type Connection = { source: string; sourceHandle: string; target: string; targetHandle: string }
 const canvas = vi.hoisted(() => ({
@@ -16,7 +17,7 @@ vi.mock('@xyflow/react', async original => ({
     canvas.onNodesChange = props.onNodesChange
     canvas.onEdgesChange = props.onEdgesChange
     canvas.onConnect = props.onConnect
-    return createElement('div', { 'aria-label': 'Flow 画布' }, props.nodes.map(node => createElement('span', { key: node.id }, node.data.label)))
+    return createElement('div', { 'aria-label': '流程画布' }, props.nodes.map(node => createElement('span', { key: node.id }, node.data.label)))
   }
 }))
 
@@ -40,7 +41,8 @@ async function click(label: string): Promise<void> { await act(async () => butto
 function writes(): Request[] { return requests.filter(item => item.method === 'PUT') }
 function publishes(): Request[] { return requests.filter(item => item.path === '/v1/flows/publish') }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await i18n.changeLanguage('zh')
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   server = { ...createStarterFlowInput('flow-persistence'), revision: 1, createdAt: now, updatedAt: now }
   requests = []; rejectSave = false; saveBarrier = undefined
@@ -82,7 +84,10 @@ describe('Flow save and publish revision ownership', () => {
     expect(writes()).toHaveLength(1)
     expect(writes()[0].body?.expectedRevision).toBe(1)
     expect(publishes()).toHaveLength(0)
-    expect(container.textContent).toContain('Expected revision 1')
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('此流程已在另一处更新')
+    const technicalDetails = container.querySelector('details')
+    expect(technicalDetails?.open).toBe(false)
+    expect(technicalDetails?.textContent).toContain('Expected revision 1')
   })
 
   it('keeps the server revision when delayed geometry and selection callbacks arrive after save', async () => {

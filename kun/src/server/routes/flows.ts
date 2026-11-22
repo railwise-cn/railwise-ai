@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { FlowApiContractsV1, FlowDefinitionV1 } from '../../contracts/flow.js'
 import type { FlowRuntimeService } from '../../flow/service.js'
 import { FlowRevisionConflictError } from '../../flow/repository.js'
+import type { TaskScheduleService } from '../../services/task-schedule-service.js'
 import { RUNTIME_RESOURCE_LIMITS_V1 } from '../../contracts/resource-limits.js'
 import { readJsonBody } from '../read-json-body.js'
 import { jsonResponse, type JsonResponse } from '../response.js'
@@ -17,6 +18,7 @@ const LegacyScheduleTask = z.object({
   createdAt: z.string(), updatedAt: z.string(), lastRunAt: z.string(), nextRunAt: z.string(), lastStatus: z.string(), lastMessage: z.string(), lastThreadId: z.string()
 }).strict()
 const LegacyScheduleMigration = z.object({ tasks: z.array(LegacyScheduleTask).max(512) }).strict()
+const TaskScheduleToggle = z.object({ enabled: z.boolean(), expectedRevision: z.number().int().nonnegative() }).strict()
 
 export const flowRoutes = {
   list(service?: FlowRuntimeService): JsonResponse { return service ? jsonResponse({ flows: service.list(), registry: service.registry }) : ERRORS.unavailable('Flow Runtime is unavailable') },
@@ -41,6 +43,14 @@ export const flowRoutes = {
   async updateLegacySchedule(service: FlowRuntimeService | undefined, id: string, request: Request): Promise<JsonResponse> { if (!service) return ERRORS.unavailable('Flow Runtime is unavailable'); return parseAndRun(request, LegacyScheduleTask, (value) => jsonResponse({ task: service.updateLegacySchedule(id, value) })) },
   async runLegacySchedule(service: FlowRuntimeService | undefined, id: string): Promise<JsonResponse> { if (!service) return ERRORS.unavailable('Flow Runtime is unavailable'); try { return jsonResponse({ run: await service.runLegacySchedule(id) }, 202) } catch (error) { return flowError(error) } },
   archiveLegacySchedule(service: FlowRuntimeService | undefined, id: string): JsonResponse { if (!service) return ERRORS.unavailable('Flow Runtime is unavailable'); try { return service.archiveLegacySchedule(id) ? jsonResponse({ archived: true }) : ERRORS.notFound('Schedule task not found') } catch (error) { return flowError(error) } },
+  listTaskSchedules(service?: TaskScheduleService): JsonResponse {
+    return service ? jsonResponse({ schedules: service.listManagedPlans() }) : ERRORS.unavailable('Task schedules are unavailable')
+  },
+  async toggleTaskSchedule(service: TaskScheduleService | undefined, id: string, request: Request): Promise<JsonResponse> {
+    if (!service) return ERRORS.unavailable('Task schedules are unavailable')
+    return parseAndRun(request, TaskScheduleToggle, async ({ enabled, expectedRevision }) =>
+      jsonResponse({ schedule: await service.setManagedPlanEnabled(id, enabled, expectedRevision) }))
+  },
   export(service: FlowRuntimeService | undefined, id: string): JsonResponse { if (!service) return ERRORS.unavailable('Flow Runtime is unavailable'); try { return jsonResponse({ flow: service.exportRedacted(id) }) } catch (error) { return flowError(error) } }
 }
 

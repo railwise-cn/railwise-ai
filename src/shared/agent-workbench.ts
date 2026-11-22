@@ -1,3 +1,5 @@
+export { isConversationReceiptItem } from '../../kun/src/contracts/conversation-receipt.js'
+
 export const TASK_RUN_STATUSES = [
   'queued',
   'running',
@@ -188,7 +190,16 @@ export type TaskCheckpointV1 = {
   revision: number
 }
 
+export type TaskUserPresentation = {
+  reason: 'response_interrupted' | 'outcome_unknown' | 'approval_expired' | 'tool_repeated_failure' | 'execution_failed'
+    | 'execution_budget' | 'input_required' | 'approval_required' | 'approval_host_shell' | 'approval_browser'
+    | 'paused' | 'retrying' | 'stalled' | 'queued' | 'blocked'
+  actions: Array<'answer' | 'approve' | 'deny' | 'verify' | 'resume' | 'retry' | 'supplement' | 'extend_budget' | 'open_thread'>
+  scope?: 'host' | 'browser' | 'unknown'
+}
+
 export type TaskRunV1 = {
+  presentation?: TaskUserPresentation
   id: string
   threadId: string
   originThreadId?: string
@@ -266,6 +277,7 @@ export type TaskEventV1 = {
 }
 
 export type TaskAttentionV1 = {
+  presentation?: TaskUserPresentation
   id: string
   ownerKind: 'task' | 'flow'
   ownerId: string

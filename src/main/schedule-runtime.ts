@@ -183,12 +183,15 @@ export class ScheduleRuntime {
       if (!saved || typeof saved !== 'object' || Array.isArray(saved)) throw new Error('Runtime did not return the migrated schedule.')
       return saved as ScheduledTaskV1
     }
-    const saved = await this.deps.store.patch({
+    const saved = await this.deps.store.patchPrepared((current) => ({
       schedule: {
         enabled: true,
-        tasks: [...settings.schedule.tasks, normalizedTask]
+        tasks: [...current.schedule.tasks, {
+          ...task,
+          model: normalizeScheduleModelForProvider(task.model, getManagedRuntimeSettings(current).providerId)
+        }]
       }
-    })
+    }))
     this.sync(saved)
     return saved.schedule.tasks.find((item) => item.id === task.id) ?? normalizedTask
   }
@@ -237,34 +240,30 @@ export class ScheduleRuntime {
 
   async updateTaskById(taskId: string, patch: Partial<ScheduledTaskV1>): Promise<ScheduledTaskV1 | null> {
     const settings = await this.deps.store.load()
-    const task = (this.usesFlowCompatibility(settings) ? await this.listTasks() : settings.schedule.tasks).find((item) => item.id === taskId)
-    if (!task) return null
-    const now = new Date().toISOString()
     const shouldRecomputeNextRun =
       Object.prototype.hasOwnProperty.call(patch, 'enabled') || patch.schedule !== undefined
-    const nextTask: ScheduledTaskV1 = {
+    const update = (task: ScheduledTaskV1, current: AppSettingsV1): ScheduledTaskV1 => ({
       ...task,
       ...patch,
       model: normalizeScheduleModelForProvider(
         patch.model ?? task.model,
-        getManagedRuntimeSettings(settings).providerId
+        getManagedRuntimeSettings(current).providerId
       ),
       schedule: patch.schedule ? { ...task.schedule, ...patch.schedule } : task.schedule,
       ...(shouldRecomputeNextRun ? { nextRunAt: '' } : {}),
-      updatedAt: now
-    }
+      updatedAt: new Date().toISOString()
+    })
     if (this.usesFlowCompatibility(settings)) {
+      const task = (await this.listTasks()).find((item) => item.id === taskId)
+      if (!task) return null
+      const nextTask = update(task, settings)
       const result = await this.deps.runtimeRequest(settings, `/v1/legacy-schedules/${encodeURIComponent(taskId)}`, { method: 'PUT', body: JSON.stringify(nextTask) })
       if (!result.ok) throw new Error(runtimeErrorMessage(result, 'Failed to update migrated schedule.'))
       const parsed = parseJsonObject(result.body); return parsed?.task as ScheduledTaskV1 ?? nextTask
     }
-    const saved = await this.deps.store.patch({
-      schedule: {
-        tasks: settings.schedule.tasks.map((item) => (item.id === taskId ? nextTask : item))
-      }
-    })
+    const saved = await this.updateTask(taskId, update)
     this.sync(saved)
-    return saved.schedule.tasks.find((item) => item.id === taskId) ?? nextTask
+    return saved.schedule.tasks.find((item) => item.id === taskId) ?? null
   }
 
   async deleteTaskById(taskId: string): Promise<boolean> {
@@ -276,11 +275,11 @@ export class ScheduleRuntime {
       return result.ok
     }
     await appCancellationRegistry.cancel({ scope: 'schedule', id: taskId }, 'schedule_deleted')
-    const saved = await this.deps.store.patch({
+    const saved = await this.deps.store.patchPrepared((current) => ({
       schedule: {
-        tasks: settings.schedule.tasks.filter((item) => item.id !== taskId)
+        tasks: current.schedule.tasks.filter((item) => item.id !== taskId)
       }
-    })
+    }))
     this.sync(saved)
     return saved.schedule.tasks.every((item) => item.id !== taskId)
   }
@@ -420,42 +419,33 @@ export class ScheduleRuntime {
       this.syncPowerSaveBlocker(settings)
       return
     }
-    let changed = false
-    const now = new Date()
-    const tasks = settings.schedule.tasks.map((task) => {
-      if (task.lastStatus === 'waiting_user') return task
-      const wasInterrupted = task.lastStatus === 'running' && !this.runningTaskIds.has(task.id)
-      if (!task.enabled || task.schedule.kind === 'manual' || this.runningTaskIds.has(task.id)) {
-        if (!wasInterrupted) return task
-        changed = true
-        return {
-          ...task,
-          ...(task.schedule.kind === 'at' ? { enabled: false } : {}),
-          nextRunAt: task.schedule.kind === 'at' ? '' : task.nextRunAt,
-          lastStatus: 'error' as const,
-          lastMessage: 'Task was interrupted before completion.',
-          updatedAt: now.toISOString()
-        }
-      }
-      if (task.nextRunAt && !wasInterrupted) return task
-      changed = true
-      return {
-        ...task,
-        nextRunAt: computeScheduleNextRunAt(task, now),
-        ...(wasInterrupted
-          ? {
-              lastStatus: 'error' as const,
-              lastMessage: 'Task was interrupted before completion.',
-              updatedAt: now.toISOString()
-            }
-          : {})
-      }
-    })
-    if (!changed) {
+    const needsNextRun = (task: ScheduledTaskV1): boolean =>
+      task.lastStatus !== 'waiting_user' && !this.runningTaskIds.has(task.id) &&
+      (task.lastStatus === 'running' || (task.enabled && task.schedule.kind !== 'manual' && !task.nextRunAt))
+    if (!settings.schedule.tasks.some(needsNextRun)) {
       this.syncPowerSaveBlocker(settings)
       return
     }
-    const saved = await this.deps.store.patch({ schedule: { ...settings.schedule, tasks } })
+    const saved = await this.deps.store.patchPrepared((current) => {
+      if (!current.schedule.enabled || !current.schedule.tasks.some(needsNextRun)) return {}
+      const now = new Date()
+      return { schedule: { tasks: current.schedule.tasks.map((task) => {
+        if (!needsNextRun(task)) return task
+        const wasInterrupted = task.lastStatus === 'running'
+        const interruptedOnce = wasInterrupted && task.schedule.kind === 'at'
+        return {
+          ...task,
+          ...(interruptedOnce ? { enabled: false } : {}),
+          nextRunAt: interruptedOnce ? '' : task.enabled && task.schedule.kind !== 'manual'
+            ? computeScheduleNextRunAt(task, now) : task.nextRunAt,
+          ...(wasInterrupted ? {
+            lastStatus: 'error' as const,
+            lastMessage: 'Task was interrupted before completion.',
+            updatedAt: now.toISOString()
+          } : {})
+        }
+      }) } }
+    })
     this.syncPowerSaveBlocker(saved)
   }
 
@@ -463,36 +453,39 @@ export class ScheduleRuntime {
     taskId: string,
     updater: (task: ScheduledTaskV1, settings: AppSettingsV1) => ScheduledTaskV1
   ): Promise<AppSettingsV1> {
-    const settings = await this.deps.store.load()
-    const tasks = settings.schedule.tasks.map((task) => task.id === taskId ? updater(task, settings) : task)
-    const saved = await this.deps.store.patch({ schedule: { ...settings.schedule, tasks } })
+    const saved = await this.deps.store.patchPrepared((current) => ({
+      schedule: { tasks: current.schedule.tasks.map((task) => task.id === taskId ? updater(task, current) : task) }
+    }))
     this.syncPowerSaveBlocker(saved)
     return saved
   }
 
-  private async runTaskInternal(task: ScheduledTaskV1, scheduled: boolean): Promise<ScheduleRunResult> {
-    if (this.runningTaskIds.has(task.id)) {
+  private async runTaskInternal(requestedTask: ScheduledTaskV1, scheduled: boolean): Promise<ScheduleRunResult> {
+    const taskId = requestedTask.id
+    if (this.runningTaskIds.has(taskId)) {
       return { ok: false, message: 'Task is already running.' }
     }
-    if (scheduled && (!task.enabled || task.schedule.kind === 'manual')) {
-      return { ok: false, message: 'Task is not scheduled.' }
-    }
-    if (!task.prompt.trim()) {
-      return { ok: false, message: 'Task prompt is empty.' }
-    }
-
-    this.runningTaskIds.add(task.id)
-    await this.updateTask(task.id, (current) => ({
-      ...current,
-      lastStatus: 'running',
-      runtimeTaskId: undefined,
-      lastMessage: 'Running',
-      nextRunAt: '',
-      updatedAt: new Date().toISOString()
-    }))
-
+    this.runningTaskIds.add(taskId)
+    let admitted = false
     try {
-      const settings = await this.deps.store.load()
+      const settings = await this.updateTask(taskId, (current, latestSettings) => {
+        if (scheduled && (!latestSettings.schedule.enabled || !current.enabled || current.schedule.kind === 'manual' ||
+          current.nextRunAt !== requestedTask.nextRunAt || current.lastStatus === 'waiting_user')) {
+          throw new Error('The schedule changed before this run could start.')
+        }
+        if (!current.prompt.trim()) throw new Error('Task prompt is empty.')
+        return {
+          ...current,
+          lastStatus: 'running',
+          runtimeTaskId: undefined,
+          lastMessage: 'Running',
+          nextRunAt: '',
+          updatedAt: new Date().toISOString()
+        }
+      })
+      const task = settings.schedule.tasks.find((item) => item.id === taskId)
+      if (!task) throw new Error('Task not found.')
+      admitted = true
       const result = await this.runPrompt(settings, {
         prompt: task.prompt,
         title: scheduledThreadTitle(task.title),
@@ -506,7 +499,7 @@ export class ScheduleRuntime {
       if (!result.ok) {
         const finishedAt = new Date()
         const waiting = result.status === 'waiting_user'
-        await this.updateTask(task.id, (current) => ({
+        await this.updateTask(taskId, (current) => ({
           ...current,
           ...(!waiting && current.schedule.kind === 'at' ? { enabled: false } : {}),
           lastRunAt: finishedAt.toISOString(),
@@ -517,13 +510,13 @@ export class ScheduleRuntime {
           runtimeTaskId: waiting ? result.taskId : undefined,
           updatedAt: finishedAt.toISOString()
         }))
-        this.runningTaskIds.delete(task.id)
+        this.runningTaskIds.delete(taskId)
         return result
       }
 
       if (!result.turnId) throw new Error('Runtime did not start an executable turn.')
       const startedAt = new Date()
-      await this.updateTask(task.id, (current) => ({
+      await this.updateTask(taskId, (current) => ({
         ...current,
         lastRunAt: startedAt.toISOString(),
         nextRunAt: '',
@@ -534,7 +527,7 @@ export class ScheduleRuntime {
       }))
       if (result.turnId) {
         appCancellationRegistry.register(
-          { scope: 'schedule', id: task.id },
+          { scope: 'schedule', id: taskId },
           {
             parent: { scope: 'app', id: 'app' },
             cleanup: async () => {
@@ -547,20 +540,23 @@ export class ScheduleRuntime {
           }
         )
       }
-      void this.monitorTaskTurn(task.id, result.threadId, result.turnId)
+      void this.monitorTaskTurn(taskId, result.threadId, result.turnId)
       return result
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const finishedAt = new Date()
-      await this.updateTask(task.id, (current) => ({
-        ...current,
-        lastRunAt: finishedAt.toISOString(),
-        nextRunAt: computeScheduleNextRunAt(current, finishedAt),
-        lastStatus: 'error',
-        lastMessage: message,
-        updatedAt: finishedAt.toISOString()
-      }))
-      this.runningTaskIds.delete(task.id)
+      try {
+        if (admitted) await this.updateTask(taskId, (current) => ({
+          ...current,
+          lastRunAt: finishedAt.toISOString(),
+          nextRunAt: computeScheduleNextRunAt(current, finishedAt),
+          lastStatus: 'error',
+          lastMessage: message,
+          updatedAt: finishedAt.toISOString()
+        }))
+      } finally {
+        this.runningTaskIds.delete(taskId)
+      }
       return { ok: false, message }
     }
   }

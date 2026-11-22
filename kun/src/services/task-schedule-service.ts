@@ -4,19 +4,22 @@ import { createHash, randomUUID } from 'node:crypto'
 import { BrowserExecutionScope, browserVerificationPolicy, type BrowserCapabilityConfig } from '../contracts/browser-skill.js'
 import type { EgoBrowserCapabilityConfig } from '../contracts/ego-browser.js'
 import type { ExecutionGrant, ExecutionScope } from '../contracts/permissions.js'
-import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
+import type { OperationReceipt, TaskRun, TaskRunStatus } from '../contracts/tasks.js'
 import type { FlowDefinitionV1 } from '../contracts/flow.js'
-import { scheduleForRequirement, type ScheduleRequirement } from '../contracts/schedule.js'
+import { nextScheduleOccurrence, normalizeScheduleSpec, scheduleForRequirement, type ScheduleRequirement } from '../contracts/schedule.js'
 import type { ToolHostContext } from '../ports/tool-host.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import type { ThreadRecord } from '../contracts/threads.js'
+import type { AttachmentStore } from '../attachments/attachment-store.js'
 import { createApprovalRequest } from '../domain/approval.js'
 import { waitForApprovalDecision } from '../ports/approval-gate.js'
 import type { FlowRuntimeService } from '../flow/service.js'
+import { FlowRevisionConflictError } from '../flow/repository.js'
 import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
 import type { TaskController } from './task-controller.js'
 import type { TaskCoordinator } from './task-coordinator.js'
 import type { WorkspaceTrustReader } from './workspace-trust-reader.js'
+import { WorkspaceReferenceService } from './workspace-reference-service.js'
 import { taskPublicQueryAuthority, taskPublicQueryGrant, verifiedTaskPublicQueryAction, verifiedTaskPublicQueryDocumentNavigation } from './browser-public-query-authority.js'
 import { listApprovedBrowserScheduleActions } from './browser-schedule-action-authority.js'
 import { BrowserScheduleActionSchema, type BrowserScheduleAction, type BrowserScheduleBinding } from '../contracts/browser-schedule-actions.js'
@@ -25,6 +28,7 @@ import { verifiedTaskRetryLineage } from './task-retry-lineage.js'
 import { isTaskScheduleBridgeProvider, taskScheduleConnectorIdentities } from '../contracts/task-schedule-policy.js'
 
 type ThreadAuthority = Pick<ThreadRecord, 'workspace' | 'agentId' | 'agentRevision' | 'agentProfile' | 'approvalPolicy' | 'sandboxMode' | 'mode'>
+type ScheduledInputs = Pick<ThreadRecord['turns'][number], 'attachmentIds' | 'workspaceReferences' | 'capabilityReferences'>
 type RetiredBrowserActionEvidence = {
   dispatchReceiptId: string; toolReceiptId: string; retiredBindingReceiptId: string; currentBindingReceiptId: string; bindingLineageReceiptIds: string[]
   evidenceKind: 'historical_task_scope' | 'historical_exact_approval'; settlementReceiptId?: string
@@ -37,6 +41,7 @@ type ScheduledTaskAuthority = {
   model: string
   providerId?: string
   prompt: string
+  inputs?: ScheduledInputs
   webEvidenceBasis?: 'primary_document' | 'observed_feed'
   requirement: ScheduleRequirement
   grant: ExecutionGrant
@@ -47,6 +52,19 @@ type ScheduledTaskAuthority = {
   authorization: { kind: 'requested_schedule' | 'confirmed_scope' | 'confirmed_task_scope'; sourceScopeReceiptId?: string; expiresAt: null; until: 'disabled'; scopeHash: string; approvalId?: string; receiptKey?: string }
 }
 export type ScheduledTaskDispatch = { scheduleId: string; versionId: string; dueAt: string }
+type ManagedTaskSchedule = {
+  id: string
+  revision: number
+  title: string
+  enabled: boolean
+  originThreadId?: string
+  times?: string[]
+  timezone?: string
+  nextRunAt?: string
+  lastRunAt?: string
+  lastStatus?: TaskRunStatus
+  needsReview: boolean
+}
 const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 /** Read-only projection, including for sealed legacy plans. Never rewrite the
  * saved Grant, its authority hash, or historical approval/operation records.
@@ -61,6 +79,9 @@ function threadAuthority(thread: ThreadRecord): ThreadAuthority {
     approvalPolicy: thread.approvalPolicy, sandboxMode: thread.sandboxMode, mode: thread.mode }
 }
 function fail(message: string): never { throw Object.assign(new Error(message), { code: 'schedule_authority_changed' }) }
+function missingSource(): never {
+  throw Object.assign(new Error('定时计划暂时读不到原来选定的资料。请在原会话检查文件。更换输入资料时，请同时更新计划。'), { code: 'schedule_source_missing' })
+}
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const browserOutput = (receipt: OperationReceipt) => record(record(record(receipt.result).item).output)
 const validTimes = (...values: unknown[]): boolean => values.every(value => typeof value === 'string' && Number.isFinite(Date.parse(value)))
@@ -76,12 +97,132 @@ export class TaskScheduleService {
   constructor(private readonly deps: {
     flows: FlowRuntimeService; repository: TaskRunRepository; tasks: TaskController
     coordinator: TaskCoordinator; threads: ThreadStore; workspaceTrust: WorkspaceTrustReader
+    attachments?: Pick<AttachmentStore, 'resolveMetadataV2'>
     connectorIdentities(): Record<string, string>; browserState?(): BrowserCapabilityConfig; egoBrowserState?(): EgoBrowserCapabilityConfig; nowIso(): string
   }) {}
 
   canCreate(context: ToolHostContext): boolean {
     const task = this.deps.tasks.activeTask(context.threadId)
     return Boolean(task?.acceptance.schedule && !task.scheduledBy)
+  }
+
+  /** Desktop management returns display fields only. The sealed authorization stays in KUN. */
+  listManagedPlans() {
+    return this.deps.flows.list()
+      .filter(flow => flow.variables.taskSchedule && flow.variables.archived !== true)
+      .map(flow => this.managedPlan(flow))
+  }
+
+  async setManagedPlanEnabled(id: string, enabled: boolean, expectedRevision: number) {
+    const flow = this.deps.flows.get(id)
+    if (!flow || !flow.variables.taskSchedule || flow.variables.archived === true) {
+      throw new Error('Task schedule not found')
+    }
+    if (flow.revision !== expectedRevision) throw new FlowRevisionConflictError('Task schedule changed')
+    const plan = this.managedPlan(flow)
+    if (enabled && !plan.times) fail('计划需要在原对话重新核对。')
+    if (enabled && plan.enabled) return plan
+    if (enabled) {
+      const authority = this.authority(flow)
+      await this.validateAuthority(authority, undefined, undefined, this.recoveryForAuthority(authority))
+    }
+
+    return this.deps.flows.repository.transaction(() => {
+      const current = this.deps.flows.get(id)
+      if (!current || current.revision !== expectedRevision) throw new FlowRevisionConflictError('Task schedule changed')
+      const trigger = this.deps.flows.repository.getTriggerState(id, 'schedule')
+      if (!enabled && current.variables.enabled === false && trigger?.enabled !== true) return this.managedPlan(current)
+      const updated = this.deps.flows.update({
+        ...current, variables: { ...current.variables, enabled }
+      }, expectedRevision)
+      const node = updated.nodes.find(item => item.id === 'schedule')
+      if (trigger && node) {
+        const { nextRunAt: _previousRun, ...state } = trigger
+        // Older paused plans did not persist a cutoff. Retire their existing
+        // pending dates on the first resume in this management path as well.
+        const cutoffSet = typeof state.state.retiredDueThrough === 'string' && Number.isFinite(Date.parse(state.state.retiredDueThrough))
+        const stateData = enabled && cutoffSet ? state.state : {
+          ...state.state, retiredDueThrough: this.retiredDispatchCutoff(id, state.state.retiredDueThrough)
+        }
+        const cutoff = typeof stateData.retiredDueThrough === 'string' ? Date.parse(stateData.retiredDueThrough) : NaN
+        const now = Date.parse(this.deps.nowIso())
+        const nextRunAt = enabled ? nextScheduleOccurrence(node.config, new Date(Number.isFinite(cutoff) ? Math.max(now, cutoff) : now)) : undefined
+        this.deps.flows.repository.saveTriggerState({ ...state, state: stateData, enabled, ...(nextRunAt ? { nextRunAt } : {}) })
+      }
+      return this.managedPlan(updated)
+    })
+  }
+
+  private managedPlan(flow: FlowDefinitionV1): ManagedTaskSchedule {
+    const base = { id: flow.id, revision: flow.revision, title: flow.name }
+    const trigger = this.deps.flows.repository.getTriggerState(flow.id, 'schedule')
+    const node = flow.nodes.find(item => item.id === 'schedule' && item.type === 'schedule_trigger')
+    const enabled = trigger?.enabled === true && flow.variables.enabled !== false
+    let originThreadId: string | undefined
+    try {
+      const authority = this.authority(flow)
+      originThreadId = authority.originThreadId
+      const published = flow.publishedVersionId ? this.deps.flows.repository.getVersion(flow.publishedVersionId) : null
+      const publishedNode = published?.definition.nodes.find(item => item.id === 'schedule')
+      if (!trigger || !node || node.disabled || !publishedNode ||
+        fingerprint(node.config) !== fingerprint(publishedNode.config) ||
+        fingerprint(published?.definition.variables.taskSchedule) !== fingerprint(authority)) {
+        return { ...base, enabled, originThreadId, needsReview: true }
+      }
+      const schedule = normalizeScheduleSpec(node.config)
+      if (schedule.kind !== 'daily') return { ...base, enabled, originThreadId, needsReview: true }
+      const last = this.deps.repository.list({ scheduleId: flow.id, limit: 1 })[0]
+      const attention = this.deps.repository.attention(`schedule:${flow.id}`)
+      return { ...base, enabled, originThreadId, times: schedule.times, timezone: schedule.timezone,
+        nextRunAt: enabled ? trigger.nextRunAt : undefined, lastRunAt: trigger.lastRunAt, lastStatus: last?.status,
+        needsReview: attention?.status === 'pending' }
+    } catch {
+      return { ...base, enabled, originThreadId, needsReview: true }
+    }
+  }
+
+  private retiredDispatchCutoff(id: string, previous: unknown): string {
+    const pendingDue = this.deps.flows.repository.pendingOutbox('scheduled_task_dispatch')
+      .filter(item => item.ownerId === id)
+      .map(item => record(item.payload).dueAt)
+    const dates = [previous, ...pendingDue].filter((value): value is string => typeof value === 'string')
+      .map(value => Date.parse(value)).filter(Number.isFinite)
+    return new Date(Math.max(Date.parse(this.deps.nowIso()), ...dates)).toISOString()
+  }
+
+  private isRetiredDispatch(input: ScheduledTaskDispatch): boolean {
+    const state = this.deps.flows.repository.getTriggerState(input.scheduleId, 'schedule')?.state
+    return typeof state?.retiredDueThrough === 'string' && Date.parse(input.dueAt) <= Date.parse(state.retiredDueThrough)
+  }
+
+  private reconcileRetiredDispatch(input: ScheduledTaskDispatch, authority: ScheduledTaskAuthority): void {
+    const key = `schedule:${input.scheduleId}:${input.dueAt}`
+    const command = this.deps.repository.execution.commandReceipt(authority.originThreadId, key)
+    const attentionId = `schedule:${input.scheduleId}`
+    const attention = this.deps.repository.attention(attentionId)
+    const matchingAttention = attention?.ownerKind === 'flow' && attention.ownerId === input.scheduleId &&
+      attention.threadId === authority.originThreadId && attention.payload?.dueAt === input.dueAt &&
+      attention.payload?.versionId === input.versionId
+    if (command && command.result === undefined) {
+      if (!attention || matchingAttention && attention.payload?.reasonCode !== 'schedule_dispatch_needs_review') {
+        const now = this.deps.nowIso()
+        this.deps.repository.putAttention({ id: attentionId, ownerKind: 'flow', ownerId: input.scheduleId,
+          flowId: input.scheduleId, threadId: authority.originThreadId, workspaceRoot: authority.grant.workspaceRoot,
+          kind: 'blocked', title: '定时计划等待核对', message: '暂停前有一次执行结果尚未确认，请在原对话查看。系统不会自动重跑这次任务。',
+          status: 'pending', revision: (attention?.revision ?? -1) + 1, createdAt: attention?.createdAt ?? now,
+          updatedAt: now, payload: { ...input, reasonCode: 'schedule_dispatch_needs_review' } })
+      }
+      throw Object.assign(new Error('The earlier scheduled occurrence needs reconciliation'), { code: 'schedule_dispatch_needs_review' })
+    }
+    if (!command) {
+      // Record the decision separately. The original due event and submission receipt remain intact.
+      const receipt = this.deps.flows.repository.beginOperation(input.scheduleId, `paused:${key}`, input)
+      if (receipt.created) this.deps.flows.repository.finishOperation(input.scheduleId, `paused:${key}`, 'succeeded', { skippedBeforeAdmission: true })
+    }
+    if (matchingAttention && attention.status === 'pending') {
+      this.deps.repository.putAttention({ ...attention, status: 'answered', revision: attention.revision + 1,
+        updatedAt: this.deps.nowIso() })
+    }
   }
 
   async create(context: ToolHostContext) {
@@ -104,10 +245,15 @@ export class TaskScheduleService {
       connectorIdentityFingerprints: grant.connectorIdentityFingerprints, connectorBackends: grant.connectorBackends, browserScope: grant.browserScope,
       ...(permission?.scope ? { permissionScope: permission.scope } : {}), ...(grant.workspaceWriteException ? { workspaceWriteException: true } : {}),
       ...(browserActions.length || scopedSchedule ? { browserScheduleActions: browserActions } : {}) })
-    const scopeHash = fingerprint({ taskId: task.id, requirement: task.acceptance.schedule, scope, execution: threadAuthority(execution), origin: threadAuthority(origin) })
+    const turn = execution.turns.find(item => item.id === grant.turnId)
+    const inputs = turn && (turn.attachmentIds.length || turn.workspaceReferences?.length || turn.capabilityReferences?.length)
+      ? { attachmentIds: turn.attachmentIds, workspaceReferences: turn.workspaceReferences, capabilityReferences: turn.capabilityReferences }
+      : undefined
+    const scopeHash = fingerprint({ taskId: task.id, requirement: task.acceptance.schedule, scope, execution: threadAuthority(execution), origin: threadAuthority(origin), ...(inputs ? { inputs } : {}) })
     let authority: ScheduledTaskAuthority = {
       taskId: task.id, threadId: context.threadId, originThreadId: task.originThreadId ?? context.threadId,
       model: task.model ?? context.model?.id ?? 'auto', providerId: task.providerId, prompt: task.goal,
+      ...(inputs ? { inputs } : {}),
       ...(task.acceptance.webEvidenceBasis ? { webEvidenceBasis: task.acceptance.webEvidenceBasis } : {}), requirement: task.acceptance.schedule, grant,
       execution: threadAuthority(execution), origin: threadAuthority(origin), sourceAuthorityHash: fingerprint(task.authority ?? null), scope,
       authorization: { kind: scopedSchedule ? 'confirmed_task_scope' : 'requested_schedule', expiresAt: null, until: 'disabled', scopeHash,
@@ -128,6 +274,7 @@ export class TaskScheduleService {
       const previous = saved.scope.browserScheduleActions ?? []
       if (fingerprint(previous) === fingerprint(browserActions)) return this.snapshot(existing)
       if (browserActions.length <= previous.length || previous.some(action => !browserActions.some(candidate => fingerprint(candidate) === fingerprint(action)))) fail('已有浏览器动作范围已变化，请先核对原计划授权。')
+      if (fingerprint(saved.inputs ?? null) !== fingerprint(inputs ?? null)) fail('原计划选定的资料已变化，请在原会话核对后更新计划。')
       const { browserScheduleActions: _previousActions, ...previousScope } = taskScheduleScope(saved.scope)
       const { browserScheduleActions: _nextActions, ...nextScope } = scope
       if (fingerprint(previousScope) !== fingerprint(nextScope)) fail('重新保存浏览器动作不能扩大原计划的其他权限。')
@@ -315,10 +462,20 @@ export class TaskScheduleService {
 
   async dispatch(input: ScheduledTaskDispatch): Promise<void> {
     const current = this.deps.flows.get(input.scheduleId)
-    if (!current || current.variables.archived === true || current.variables.enabled === false) return
+    if (!current || current.variables.archived === true) return
+    const retired = this.isRetiredDispatch(input)
+    if (current.variables.enabled === false && !retired) return
     const version = this.deps.flows.repository.getVersion(input.versionId)
+    if (retired && version?.definition.id === input.scheduleId) {
+      return this.reconcileRetiredDispatch(input, this.authority(version.definition))
+    }
     if (!version || current.publishedVersionId !== input.versionId) fail('计划配置已变化，请核对待执行计划。')
     const authority = this.authority(version.definition)
+    const assertMayBegin = () => {
+      const latest = this.deps.flows.get(input.scheduleId)
+      if (this.isRetiredDispatch(input) || !latest || latest.variables.archived === true ||
+        latest.variables.enabled === false || latest.publishedVersionId !== input.versionId) fail('计划已暂停或配置已变化。')
+    }
     const attentionId = `schedule:${input.scheduleId}`
     const pending = this.deps.repository.attention(attentionId)
     // Legacy items did not store versionId. Only the original durable dispatch
@@ -333,10 +490,11 @@ export class TaskScheduleService {
     try {
       const recovery=this.recoveryForAuthority(authority)
       await this.validateAuthority(authority,undefined,undefined,recovery)
+      assertMayBegin()
       const result = await this.deps.coordinator.command({ threadId: authority.originThreadId, intent: 'new',
         idempotencyKey: `schedule:${input.scheduleId}:${input.dueAt}`,
-        request: { prompt: authority.prompt, model: authority.model, providerId: authority.providerId, mode: 'agent' }
-      }, { prepareExecutionThread: async thread => {
+        request: { prompt: authority.prompt, model: authority.model, providerId: authority.providerId, mode: 'agent', ...authority.inputs }
+      }, { source: 'scheduled-occurrence', assertMayBegin, prepareExecutionThread: async thread => {
         if (thread.workspace !== authority.execution.workspace) fail('周期执行工作区与原授权不一致。')
         const prepared = this.deps.repository.beginOperation({ ownerId: thread.id, idempotencyKey: 'scheduled-task-context', kind: 'scheduled_task_prepare',
           request: { ...input, authorityHash: fingerprint(authority) }, nowIso: this.deps.nowIso() })
@@ -366,7 +524,9 @@ export class TaskScheduleService {
         this.deps.repository.putAttention({ ...latest, status: 'answered', revision: latest.revision + 1, updatedAt: this.deps.nowIso() })
       })
     } catch (error) {
+      if (this.isRetiredDispatch(input)) return this.reconcileRetiredDispatch(input, authority)
       const now = this.deps.nowIso()
+      const missingInput = error instanceof Error && (error as Error & { code?: string }).code === 'schedule_source_missing'
       this.deps.repository.transact(() => {
         const previous = this.deps.repository.attention(attentionId), flow = this.deps.flows.get(input.scheduleId)
         if (!flow || flow.variables.archived === true || flow.variables.enabled === false || flow.publishedVersionId !== input.versionId ||
@@ -375,10 +535,16 @@ export class TaskScheduleService {
         const createdAt = previous?.status === 'pending' ? previous.createdAt
           : previousCreated !== undefined && Number.isFinite(previousCreated) && Date.parse(now) <= previousCreated ? new Date(previousCreated + 1).toISOString() : now
         this.deps.repository.putAttention({ id: attentionId, ownerKind: 'flow', ownerId: input.scheduleId,
-          flowId: input.scheduleId, threadId: authority.originThreadId, kind: 'blocked', title: '定时计划等待核对',
+          flowId: input.scheduleId, threadId: authority.originThreadId, ...(missingInput ? { workspaceRoot: authority.grant.workspaceRoot } : {}), kind: 'blocked', title: '定时计划等待核对',
           message: error instanceof Error ? error.message : String(error), status: 'pending', revision: (previous?.revision ?? -1) + 1,
           createdAt, updatedAt: Date.parse(now) < Date.parse(createdAt) ? createdAt : now,
-          payload: { scheduleId: input.scheduleId, versionId: input.versionId, dueAt: input.dueAt } })
+          payload: { scheduleId: input.scheduleId, versionId: input.versionId, dueAt: input.dueAt, ...(missingInput ? { reasonCode: 'schedule_source_missing' } : {}) } })
+        if (missingInput && error instanceof Error) {
+          const threadId = authority.originThreadId
+          const commandId = `schedule_source_${createHash('sha256').update(`${input.scheduleId}:${input.dueAt}`).digest('hex')}`
+          this.deps.repository.enqueueOutbox({ id: `command-message:${commandId}`, ownerId: threadId, kind: 'task_command_message',
+            payload: { threadId, commandId, assistantText: error.message, createdAt }, createdAt })
+        }
       })
       throw error
     }
@@ -773,6 +939,7 @@ export class TaskScheduleService {
       workspace.revision !== grant.workspaceRevision || workspace.level !== grant.workspaceTrust ||
       (execution.agentRevision ?? 0) !== grant.agentRevision || (execution.agentProfile?.trustLevel ?? 'full-access') !== grant.agentTrust ||
       execution.approvalPolicy !== grant.approvalPolicy) fail('原计划的工作区、Agent 或授权范围已变化，请核对后再执行。')
+    await this.validateInputs(authority)
     if ((source.authority?.taskApprovalGrant?.scope || grant.workspaceWriteException) && authority.authorization.kind !== 'confirmed_scope') fail('持续路径权限尚未确认。')
     const publicScope = grant.browserScope?.publicQueryAuthorization
     if (publicScope) {
@@ -793,6 +960,22 @@ export class TaskScheduleService {
     }
     this.validateConnectorBindings(authority)
     return browserHistory
+  }
+
+  private async validateInputs(authority: ScheduledTaskAuthority): Promise<void> {
+    const inputs = authority.inputs
+    if (!inputs) return
+    const workspace = authority.grant.workspaceRoot
+    const attachments = this.deps.attachments
+    if (inputs.attachmentIds.length && !attachments) missingSource()
+    try {
+      if (inputs.workspaceReferences?.length) await new WorkspaceReferenceService().validateReferences(workspace, inputs.workspaceReferences)
+      if (attachments) await Promise.all(inputs.attachmentIds.map(async id => {
+        for (const threadId of new Set([authority.originThreadId, authority.threadId])) {
+          await attachments.resolveMetadataV2(id, { threadId, workspace })
+        }
+      }))
+    } catch { missingSource() }
   }
 
   private recoveryForAuthority(authority: ScheduledTaskAuthority) {

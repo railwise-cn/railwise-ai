@@ -654,3 +654,9 @@ export function evaluateMarketplaceLicense(
   }
   return { disposition: 'external-only', license: normalized, reason: 'not-allowlisted' }
 }
+
+/** A shipped mirror archive still follows the official catalog install flow. */
+export function marketplaceHasBundledPayload(item: MarketplacePackageV1): boolean {
+  return item.source.catalogSourceId === 'workwise-official' &&
+    item.installation.mode === 'direct-mirror' && item.id === 'superpowers'
+}

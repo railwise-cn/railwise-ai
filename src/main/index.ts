@@ -75,6 +75,7 @@ import { getManagedRuntimeActualPort, resolveManagedRuntimeDataDir, setManagedDw
 import { getManagedBrowserSkillService } from './services/managed-browser-skill-service'
 import { disposeBrowserAfterRuntimeStop } from './runtime/browser-daemon-preservation'
 import { createConfirmedQuit, stopRuntimeAfterCleanup } from './runtime/confirmed-shutdown'
+import { readGuiUpdateRuntimeOwnership } from './runtime/gui-update-ownership'
 import { waitForRuntimeTurnsIdle } from './runtime/managed-runtime-idle'
 import { configureLogger, logError, logWarn, pruneOnStartup } from './logger'
 import { createClawRuntime, type ClawRuntime } from './claw-runtime'
@@ -361,12 +362,15 @@ let clawRuntime: ClawRuntime | null = null
 let scheduleRuntime: ScheduleRuntime | null = null
 let managedRuntimesStoppedForQuit = false
 let updateRuntimePrepared = false
+let updateRuntimeNeedsRecovery = false
+let updateRuntimePreparation: Promise<'owned' | 'idle'> | undefined
 let appBehavior: AppBehaviorConfigV1 = normalizeAppBehaviorSettings()
 let tray: Tray | null = null
 let currentLocale: AppSettingsV1['locale'] = 'en'
 let isQuitting = false
+let quittingForNativeUpdate = false
 
-function allowManagedRuntimeStart(): boolean { return !isQuitting && !updateRuntimePrepared }
+function allowManagedRuntimeStart(): boolean { return !isQuitting && !updateRuntimePreparation }
 let candidateServiceReservations: Awaited<ReturnType<typeof reserveCandidateServicePorts>> | null = null
 let gracefulShutdownPromise: Promise<void> | null = null
 let imCredentialService: ImCredentialService | null = null
@@ -467,7 +471,7 @@ function emitClawChannelActivity(payload: { channelId: string; threadId: string 
   mainWindow.webContents.send('claw:channel-activity', payload)
 }
 
-async function stopManagedRuntimes(requireCleanExit = false): Promise<void> {
+async function stopManagedRuntimes(): Promise<void> {
   if (managedRuntimesStoppedForQuit) return
   if (!gracefulShutdownPromise) {
     gracefulShutdownPromise = (async () => {
@@ -488,7 +492,7 @@ async function stopManagedRuntimes(requireCleanExit = false): Promise<void> {
           imDeliveryLedger?.close()
           imDeliveryLedger = null
         },
-        stopRuntime: () => managedRuntimeAdapter.stopAndWait(requireCleanExit ? { requireCleanExit: true, timeoutMs: 30_000 } : undefined),
+        stopRuntime: () => managedRuntimeAdapter.stopAndWait(),
         isRuntimeRunning: () => managedRuntimeAdapter.isChildRunning()
       })
       await candidateServiceReservations?.close()
@@ -502,16 +506,97 @@ async function stopManagedRuntimes(requireCleanExit = false): Promise<void> {
   managedRuntimesStoppedForQuit = true
 }
 
-const stopManagedRuntimesForUpdate = createGuiUpdateShutdown(async () => {
-  // Native updater and acceptance callers also pass through the Runtime fence.
-  if (!updateRuntimePrepared) {
-    const response = await runtimeRequest(await store.load(), '/v1/runtime/update/prepare', { method: 'POST', body: '{}' })
-    if (!response.ok || JSON.parse(response.body).ok !== true) throw new Error('运行任务尚未确认安全停止，请从升级按钮重新检查。')
-    updateRuntimePrepared = true
+function updateRuntimeOwnership() {
+  return readGuiUpdateRuntimeOwnership({
+    pendingStarts: [runtimeEnsurePromise, runtimeSettingsApplyPromise],
+    isOwnedChildRunning: () => managedRuntimeAdapter.isChildRunning(),
+    isConfiguredPortAvailable: async () => {
+      const port = candidateRuntimePaths ? 0 : getManagedRuntimeSettings(await store.load()).port
+      return (await managedRuntimeAdapter.reclaimPort(port)).ok
+    }
+  })
+}
+
+async function requireOwnedUpdateRuntime(): Promise<void> {
+  if (!managedRuntimeAdapter.isChildRunning()) throw new Error('任务服务连接已结束，请重新检查升级。')
+}
+
+async function readManagedRuntimeUpdateSnapshot() {
+  if (await updateRuntimeOwnership() === 'idle') return undefined
+  return runtimeRequestViaHost(await store.load(), '/v1/runtime/update', {}, requireOwnedUpdateRuntime)
+}
+
+async function prepareManagedRuntimeForUpdate(confirmedSnapshotId?: string): Promise<'owned' | 'idle'> {
+  if (stopManagedRuntimesForUpdate.isRecovering()) throw new Error('任务服务仍在恢复，请稍候再升级。')
+  if (isQuitting) throw new Error('应用正在退出，请重新打开后升级。')
+  if (!updateRuntimePreparation) {
+    // Fence new desktop admissions before waiting for previously admitted starts.
+    updateRuntimePreparation = Promise.resolve().then(async () => {
+      traceStartup('guiUpdate:runtimeOwnership:start')
+      const ownership = await updateRuntimeOwnership()
+      traceStartup(`guiUpdate:runtimeOwnership:${ownership}`)
+      if (ownership === 'owned') {
+        // A lost response can leave the Runtime fenced even before the desktop sees success.
+        updateRuntimeNeedsRecovery = true
+        const response = await runtimeRequestViaHost(await store.load(), '/v1/runtime/update/prepare', {
+          method: 'POST', body: JSON.stringify({ confirmedSnapshotId })
+        }, requireOwnedUpdateRuntime)
+        const result = JSON.parse(response.body) as { ok?: unknown; message?: string }
+        if (!response.ok || result.ok !== true) throw new Error(result.message ?? '运行任务尚未确认安全停止，请从升级按钮重新检查。')
+      }
+      updateRuntimePrepared = true
+      traceStartup('guiUpdate:runtimePreparation:complete')
+      return ownership
+    })
   }
-  await stopManagedRuntimes(true)
-  if (process.platform === 'win32') await disposeManagedBrowserForExit()
+  return await updateRuntimePreparation
+}
+
+const stopManagedRuntimesForUpdate = createGuiUpdateShutdown(async () => {
+  const ownership = await prepareManagedRuntimeForUpdate()
+  // Pause only the service whose storage must close before the handoff.
+  // The normal quit handler owns shutdown of schedules, IM and browser services.
+  await stopRuntimeAfterCleanup({
+    cleanup: async () => {
+      traceStartup('guiUpdate:desktopWritesAndStreams:start')
+      await stopAllRuntimeSse('application_update')
+      await drainSerializedWrites()
+      traceStartup('guiUpdate:desktopWritesAndStreams:complete')
+    },
+    stopRuntime: async () => {
+      if (ownership === 'idle') return
+      traceStartup('guiUpdate:runtimeExit:start')
+      await managedRuntimeAdapter.stopAndWait({ requireCleanExit: true, timeoutMs: 30_000 })
+      traceStartup('guiUpdate:runtimeExit:complete')
+    },
+    isRuntimeRunning: () => managedRuntimeAdapter.isChildRunning()
+  })
 })
+
+function recoverManagedRuntimeAfterUpdateFailure(): Promise<void> {
+  quittingForNativeUpdate = false
+  return stopManagedRuntimesForUpdate.recover(async () => {
+    if (!updateRuntimePreparation) return
+    await updateRuntimePreparation.catch(() => undefined)
+    if (isQuitting) return
+    const pendingShutdown = managedRuntimeAdapter.pendingShutdown()
+    if (pendingShutdown) await pendingShutdown
+    if (isQuitting) return
+    if (updateRuntimeNeedsRecovery && managedRuntimeAdapter.isChildRunning()) {
+      try {
+        // Use the already-owned child without calling ensureRuntime through the fence.
+        const response = await runtimeRequestViaHost(await store.load(), '/v1/runtime/update/cancel', { method: 'POST' }, requireOwnedUpdateRuntime)
+        if (!response.ok || JSON.parse(response.body).ok !== true) throw new Error('运行服务未确认恢复。')
+      } catch (error) {
+        if (managedRuntimeAdapter.isChildRunning()) throw error
+        // If the child exited during recovery the next request starts a fresh instance.
+      }
+    }
+    updateRuntimePrepared = false
+    updateRuntimeNeedsRecovery = false
+    updateRuntimePreparation = undefined
+  })
+}
 
 async function stopManagedRuntimesForQuit(): Promise<void> {
   await stopManagedRuntimes()
@@ -523,6 +608,11 @@ const requestConfirmedQuit = createConfirmedQuit({
   quit: () => app.quit(),
   onFailure: error => {
     isQuitting = false
+    if (quittingForNativeUpdate) {
+      void loadGuiUpdaterModule().then(module => module.reportGuiUpdateQuitFailure(error)).catch(recoveryError => {
+        console.error('[workwise updater] failed to recover after interrupted exit:', recoveryError)
+      })
+    }
     managedRuntimesStoppedForQuit = false
     gracefulShutdownPromise = null
     const runtimeRunning = managedRuntimeAdapter.isChildRunning()
@@ -555,7 +645,9 @@ async function loadGuiUpdaterModule(): Promise<GuiUpdaterModule> {
             () => mainWindow,
             async () => (await store.load()).guiUpdate.channel,
             stopManagedRuntimesForUpdate,
-            showGuiUpdateAvailableNotification
+            showGuiUpdateAvailableNotification,
+            recoverManagedRuntimeAfterUpdateFailure,
+            () => { quittingForNativeUpdate = true }
           )
           guiUpdaterInitialized = true
         }
@@ -806,7 +898,7 @@ type TurnCompleteNotificationPayload = {
   threadId?: string
   turnId?: string
   approvalId?: string
-  reason?: 'completed' | 'error' | 'aborted' | 'blocked' | 'max_tokens' | 'waiting_approval'
+  reason?: 'completed' | 'error' | 'aborted' | 'blocked' | 'max_tokens' | 'waiting_approval' | 'response_interrupted'
   activeThread?: boolean
   title?: string
   body?: string
@@ -818,6 +910,7 @@ async function showTurnCompleteNotification(
   const settings = await store.load()
   const visibilityAwarePayload = {
     ...payload,
+    reason: payload.reason === 'response_interrupted' ? 'error' as const : payload.reason,
     activeThread: isActiveThreadActuallyVisible(mainWindow, payload.activeThread)
   }
   if (!shouldShowTerminalNotification(settings.notifications, visibilityAwarePayload)) {
@@ -979,7 +1072,7 @@ function runtimeFingerprint(settings: AppSettingsV1): string {
 
 async function ensureRuntime(settings: AppSettingsV1): Promise<void> {
   if (isQuitting) throw new Error('应用正在退出，任务执行服务保持停止。')
-  if (updateRuntimePrepared) throw new Error('应用正在完成更新，Runtime 保持停止。')
+  if (updateRuntimePreparation) throw new Error('应用正在安装更新，任务服务暂时停止。')
   const fingerprint = runtimeFingerprint(settings)
   const pending = runtimeEnsurePromise
   if (pending) {
@@ -990,6 +1083,7 @@ async function ensureRuntime(settings: AppSettingsV1): Promise<void> {
     } catch {
       /* fall through to retry with the current settings */
     }
+    if (updateRuntimePreparation) throw new Error('应用正在安装更新，任务服务暂时停止。')
     if (runtimeEnsureFingerprint === fingerprint) return
   }
   const task = ensureRuntimeOnce(settings)
@@ -1001,7 +1095,8 @@ async function ensureRuntime(settings: AppSettingsV1): Promise<void> {
   })
   runtimeEnsurePromise = trackedTask
   runtimeEnsureFingerprint = fingerprint
-  return await trackedTask
+  await trackedTask
+  if (updateRuntimePreparation) throw new Error('应用正在安装更新，任务服务暂时停止。')
 }
 
 async function ensureRuntimeOnce(settings: AppSettingsV1): Promise<void> {
@@ -1128,7 +1223,7 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
   mainWindow.on('close', (event) => {
     if (
       isQuitting ||
-      !shouldCloseMainWindowToTray(appBehavior.closeToTray, Boolean(candidateRuntimePaths))
+      !shouldCloseMainWindowToTray(appBehavior.closeToTray, Boolean(candidateRuntimePaths), quittingForNativeUpdate)
     ) return
     event.preventDefault()
     mainWindow?.hide()
@@ -1589,7 +1684,12 @@ app.whenReady().then(async () => {
       const response = await runtimeRequest(settings, '/v1/connectors/browser-skill/refresh', { method: 'POST' })
       if (!response.ok) throw new Error('浏览器状态已保存，Runtime 刷新失败。')
     },
-    onGuiUpdatePrepared: () => { updateRuntimePrepared = true },
+    guiUpdateRuntime: {
+      isPrepared: () => updateRuntimePrepared,
+      readSnapshot: readManagedRuntimeUpdateSnapshot,
+      prepare: async (confirmedSnapshotId) => { await prepareManagedRuntimeForUpdate(confirmedSnapshotId) },
+      recover: recoverManagedRuntimeAfterUpdateFailure
+    },
     getMainWindow: () => mainWindow,
     applySettingsPatch,
     runtimeRequest: async (path, method, body) => {

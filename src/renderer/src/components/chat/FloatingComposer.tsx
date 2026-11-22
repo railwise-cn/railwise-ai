@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -10,7 +11,9 @@ import {
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
-  type ReactElement
+  type ReactElement,
+  type ReactNode,
+  type Ref
 } from 'react'
 import {
   Archive,
@@ -66,13 +69,11 @@ import {
   getGoalPanelDraftObjective,
   getSkillMentionAtCursor,
   getSlashQuery,
-  insertSkillCommandAtCursor,
   parseBtwCommand,
   parseCompactCommand,
   parseGoalCommand,
   parseReviewCommand,
   REVIEW_COMMAND_ALIASES,
-  replaceSkillMentionInInput,
   type SkillMentionContext,
   type SlashCommand,
   type SlashCommandId
@@ -86,6 +87,7 @@ import {
 } from '../../hooks/use-thread-usage'
 import { GitBranchPicker } from './GitBranchPicker'
 import { FloatingComposerAgentPicker } from './FloatingComposerAgentPicker'
+import { FloatingComposerAttachments } from './FloatingComposerAttachments'
 import {
   FloatingComposerModelPicker,
   type ComposerReasoningEffort
@@ -106,7 +108,11 @@ import { resolveUsageTokenDisplay } from '../../store/live-usage-projection'
 export type { ComposerFileReference } from '../../lib/composer-file-references'
 export type { ComposerExecutionSettings } from './FloatingComposerExecutionPicker'
 
+export type ComposerActions = { focus: () => void; pickAttachments: () => void }
+
 type Props = {
+  actionsRef?: Ref<ComposerActions>
+  replyingToQuestion?: boolean
   variant?: 'default' | 'compact'
   composerMinHeight?: number
   composerMaxHeight?: number
@@ -600,6 +606,8 @@ function moveComposerOption(current: number, options: ComposerCommand[], step: 1
 }
 
 export function FloatingComposer({
+  actionsRef,
+  replyingToQuestion = false,
   variant = 'default',
   composerMinHeight = 36,
   composerMaxHeight = 176,
@@ -734,9 +742,6 @@ export function FloatingComposer({
     (fileReferenceEnabled && fileReferences.length > 0)
   )
   const canPickAttachment = canCompose && attachmentUploadEnabled && !attachmentUploadBusy
-  const failedAttachment = attachments.find((item) => item.state === 'failed')
-  const hasImageOnlyPdf = attachments.some((item) => item.state === 'degraded' && item.degradationReasons?.includes('no_extractable_pdf_text'))
-  const attachmentProblem = attachmentUploadError || failedAttachment?.degradationReasons?.[0]
   const showIntentToolbar = !compact && route === 'chat'
   // Attachments must stay reachable outside the chat route (e.g. the Write
   // assistant panel), so any enabled attachment upload shows the "+" control
@@ -745,6 +750,9 @@ export function FloatingComposer({
   const canTogglePlanMode = canCompose && Boolean(onPlanCommand)
   const canOpenGoalPanel = !compact && canCompose && route !== 'claw'
   const canOpenSkillPicker = showIntentToolbar && canCompose && !agentSelectionApplying
+  const isUnavailableSkill = (reference: CallableCapabilityReference): boolean =>
+    reference.kind === 'skill' && !skillsLoading && !callableCapabilitiesError &&
+    !skillCommands.some(skill => skill.id === reference.id)
   const showPluginPicker = showIntentToolbar && Boolean(onSelectCapability || onManagePlugins)
   const canOpenComposerMenu = showComposerMenuButton && (
     (canPickAttachment && Boolean(onPickAttachments)) || canTogglePlanMode || canOpenGoalPanel || canOpenSkillPicker || showPluginPicker
@@ -814,6 +822,8 @@ export function FloatingComposer({
       ? t('workspaceRequiredToCreateThread')
       : goalPanelOpen && route !== 'claw'
         ? t('goalComposerPlaceholder')
+      : replyingToQuestion
+        ? t('userInputCustomPlaceholder')
       : busy
         ? t('composerQueuePlaceholder')
         : route === 'claw'
@@ -858,7 +868,6 @@ export function FloatingComposer({
           return left.name.localeCompare(right.name)
         })
         .map<SlashCommand>((skill) => {
-          const prompt = `/skill:${skill.id} `
           const scopeLabel = isProjectSkill(skill, effectiveWorkspaceRoot)
             ? t('slashSkillScopeProject')
             : t('slashSkillScopeGlobal')
@@ -874,10 +883,8 @@ export function FloatingComposer({
             description: skill.description?.trim() || t('slashSkillDescriptionFallback'),
             keywords: [skill.id, skill.name, scopeLabel, 'skill', '技能', ...triggers],
             icon: <Sparkles className="h-4 w-4" strokeWidth={1.9} />,
-            badge: prompt.trim(),
             scopeLabel,
-            skillPrompt: prompt,
-            disabled: !runtimeReady
+            disabled: !runtimeReady || !onSelectCapability
           }
         })
       commands.unshift(...dynamicSkillCommands)
@@ -970,13 +977,14 @@ export function FloatingComposer({
     route,
     runtimeReady,
     skillCommands,
+    onSelectCapability,
     t
   ])
 
   const capabilityCommands = useMemo<CapabilityCommand[]>(() => {
     if (callableCapabilitiesLoading || callableCapabilitiesError) return []
     const selected = new Set(selectedCapabilities.map(capabilityKey))
-    return callableCapabilities.map((capability) => ({
+    return callableCapabilities.filter(capability => capability.kind !== 'skill').map((capability) => ({
       id: `capability:${capabilityKey(capability)}`,
       kind: 'capability',
       capability,
@@ -1078,6 +1086,8 @@ export function FloatingComposer({
       ? t('slashCommandApply')
       : canSetGoalPanelDraft
       ? t('goalSetCurrentInput')
+    : replyingToQuestion
+      ? t('userInputSubmit')
     : busy
       ? t('queueMessage')
       : t('send')
@@ -1176,7 +1186,7 @@ export function FloatingComposer({
       if (event.key !== 'Escape' || event.defaultPrevented) return
       setComposerMenu(null)
       setGoalPanelOpen(false)
-      if (composerMenuOpen) composerMenuButtonRef.current?.focus({ preventScroll: true })
+      if (composerMenuOpen) draft.focusComposer()
     }
 
     window.addEventListener('pointerdown', onPointerDown)
@@ -1185,7 +1195,7 @@ export function FloatingComposer({
       window.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [composerMenuOpen, goalPanelOpen])
+  }, [composerMenuOpen, goalPanelOpen, draft.focusComposer])
 
   useLayoutEffect(() => {
     if (toolbarPicker) pickerSearchRef.current?.focus({ preventScroll: true })
@@ -1217,8 +1227,9 @@ export function FloatingComposer({
   const applySlashCommand = (commandId: SlashCommandId): void => {
     if (commandId.startsWith('skill:')) {
       const command = slashCommands.find((item) => item.id === commandId)
-      if (command?.skillPrompt && !command.disabled) {
-        setInput(command.skillPrompt)
+      if (command && !command.disabled) {
+        onSelectCapability?.({ kind: 'skill', id: commandId.slice('skill:'.length), label: command.title })
+        setInput('')
         draft.focusComposer()
       }
       return
@@ -1330,6 +1341,8 @@ export function FloatingComposer({
     draft.focusComposer()
   }
 
+  useImperativeHandle(actionsRef, () => ({ focus: draft.focusComposer, pickAttachments: handleAttachmentMenuClick }))
+
   const handlePlanToolbarClick = (): void => {
     if (!canTogglePlanMode) return
     setComposerMenu(null)
@@ -1356,15 +1369,16 @@ export function FloatingComposer({
     if (picker === 'plugins') onOpenCapabilities?.()
   }
 
-  const closeToolbarMenu = (): void => {
-    setComposerMenu(null)
-    composerMenuButtonRef.current?.focus({ preventScroll: true })
-  }
-
   const handleComposerMenuKeys = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape' || event.key === 'Tab') {
-      if (event.key === 'Escape') event.preventDefault()
-      closeToolbarMenu()
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setComposerMenu(null)
+      draft.focusComposer()
+      return
+    }
+    if (event.key === 'Tab') {
+      setComposerMenu(null)
+      composerMenuButtonRef.current?.focus({ preventScroll: true })
       return
     }
     const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)')]
@@ -1394,16 +1408,8 @@ export function FloatingComposer({
       onSelectCapability?.(command.capability)
       draft.focusComposer()
     } else if (command.kind === 'skill') {
-      const cursor = draft.textareaRef.current?.selectionStart ?? composerCursor
-      const next = insertSkillCommandAtCursor(input, cursor, command.id.slice('skill:'.length))
-      setInput(next.input)
-      window.requestAnimationFrame(() => {
-        const textarea = draft.textareaRef.current
-        if (!textarea) return
-        textarea.focus({ preventScroll: true })
-        textarea.setSelectionRange(next.cursor, next.cursor)
-        setComposerCursor(next.cursor)
-      })
+      onSelectCapability?.({ kind: 'skill', id: command.id.slice('skill:'.length), label: command.title })
+      draft.focusComposer()
     }
     setComposerMenu(null)
   }
@@ -1424,16 +1430,17 @@ export function FloatingComposer({
   }
 
   const applySkillMention = (skill: SkillCommand | null): void => {
-    if (!skill || !activeSkillMention) return
-    const next = replaceSkillMentionInInput(input, activeSkillMention, skill.id)
-    setInput(next.input)
+    if (!skill || !activeSkillMention || !onSelectCapability) return
+    onSelectCapability({ kind: 'skill', id: skill.id, label: skill.name })
+    const { start, end } = activeSkillMention
+    setInput(input.slice(0, start) + input.slice(end))
     setDismissedSkillMentionKey(null)
     window.requestAnimationFrame(() => {
       const textarea = draft.textareaRef.current
       if (!textarea) return
       textarea.focus()
-      textarea.setSelectionRange(next.cursor, next.cursor)
-      setComposerCursor(next.cursor)
+      textarea.setSelectionRange(start, start)
+      setComposerCursor(start)
     })
   }
 
@@ -1704,7 +1711,6 @@ export function FloatingComposer({
         messages={queuedMessages}
         onRemove={onRemoveQueuedMessage}
       />
-
       <div ref={suggestionAnchorRef} className="relative">
         {!compact && activeThreadGoal && slashQuery == null && !goalPanelOpen && !composerMenuOpen ? (
           <div className="pointer-events-none absolute inset-x-3 bottom-full z-20 mb-2 flex justify-center">
@@ -1905,9 +1911,9 @@ export function FloatingComposer({
                             {command.scopeLabel}
                           </span>
                         ) : null}
-                        <span className="max-w-[150px] truncate rounded-full border border-ds-border-muted px-2 py-0.5 text-[10.5px] font-semibold leading-4 text-ds-faint">
+                        {command.kind !== 'skill' ? <span className="max-w-[150px] truncate rounded-full border border-ds-border-muted px-2 py-0.5 text-[10.5px] font-semibold leading-4 text-ds-faint">
                           {command.badge ?? `/${command.id}`}
-                        </span>
+                        </span> : null}
                       </span>
                     </button>
                   )
@@ -1955,10 +1961,7 @@ export function FloatingComposer({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px] font-semibold leading-5 text-inherit">{skill.name}</span>
-                      <span className="mt-0.5 block truncate text-[12px] leading-4 text-ds-faint">{skill.description || skill.id}</span>
-                    </span>
-                    <span className="hidden max-w-[190px] shrink-0 truncate rounded-full border border-ds-border-muted px-2 py-0.5 text-[10.5px] font-semibold leading-4 text-ds-faint sm:block">
-                      @{skill.id}
+                      <span className="mt-0.5 block truncate text-[12px] leading-4 text-ds-faint">{skill.description || t('slashSkillDescriptionFallback')}</span>
                     </span>
                   </button>
                 )
@@ -2173,6 +2176,14 @@ export function FloatingComposer({
               </div>
             </div>
           ) : null}
+          {attachments.length > 0 || attachmentUploadError ? (
+            <FloatingComposerAttachments
+              attachments={attachments}
+              error={attachmentUploadError}
+              onRemove={onRemoveAttachment}
+              onRetry={onRetryAttachment}
+            />
+          ) : null}
           <textarea
             ref={draft.textareaRef}
             rows={1}
@@ -2224,83 +2235,23 @@ export function FloatingComposer({
           ) : null}
           {selectedCapabilities.length > 0 ? (
             <div role="group" aria-label={t('composerCapabilityDraft')} className="flex max-w-full flex-wrap items-center gap-2 px-1">
-              {selectedCapabilities.map(reference => (
-                <span key={capabilityKey(reference)} className="ds-no-drag inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-ds-border-muted bg-ds-card px-2 text-[12px] font-medium text-ds-muted" title={reference.label}>
-                  <Plug className="h-3.5 w-3.5 shrink-0 text-ds-faint" aria-hidden />
+              {selectedCapabilities.map(reference => {
+                const unavailable = isUnavailableSkill(reference)
+                return (
+                <span key={capabilityKey(reference)} data-composer-skill={reference.kind === 'skill' ? '' : undefined} className="ds-no-drag inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-ds-border-muted bg-ds-card px-2 text-[12px] font-medium text-ds-muted" title={reference.label}>
+                  {reference.kind === 'skill' ? <Sparkles className="h-3.5 w-3.5 shrink-0 text-ds-faint" aria-hidden /> : <Plug className="h-3.5 w-3.5 shrink-0 text-ds-faint" aria-hidden />}
                   <span className="min-w-0 max-w-48 truncate">{reference.label}</span>
+                  {unavailable ? <span className="shrink-0 text-ds-faint">{t('composerSkillUnavailableLabel')}</span> : null}
                   {onRemoveCapability ? (
                     <button type="button" onClick={() => { onRemoveCapability(reference); draft.focusComposer() }} className="shrink-0 rounded-full p-0.5 text-ds-faint hover:bg-ds-hover hover:text-ds-ink" aria-label={t('composerCapabilityRemove', { name: reference.label })}>
                       <X className="h-3 w-3" strokeWidth={2} />
                     </button>
                   ) : null}
                 </span>
-              ))}
-            </div>
-          ) : null}
-          {attachments.length > 0 || attachmentProblem ? (
-            <div className="flex flex-wrap items-center gap-2 px-1">
-              {attachments.map((attachment) => (
-                attachment.previewUrl ? (
-                  <span
-                    key={attachment.id}
-                    className="ds-no-drag relative block h-20 w-20 overflow-hidden rounded-lg border border-ds-border-muted bg-ds-card shadow-sm"
-                    title={attachment.name || attachment.id}
-                  >
-                    <img
-                      src={attachment.previewUrl}
-                      alt={attachment.name || attachment.id}
-                      className="h-full w-full object-cover"
-                    />
-                    {onRemoveAttachment ? (
-                      <button
-                        type="button"
-                        onClick={() => onRemoveAttachment(attachment.id)}
-                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-950 text-white shadow-sm transition hover:bg-zinc-800"
-                        aria-label={t('composerRemoveAttachment')}
-                        title={t('composerRemoveAttachment')}
-                      >
-                        <X className="h-3 w-3" strokeWidth={2.2} />
-                      </button>
-                    ) : null}
-                  </span>
-                ) : (
-                  <span
-                    key={attachment.id}
-                    className="ds-no-drag inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-ds-border-muted bg-ds-card/80 px-2 text-[12px] font-medium text-ds-muted"
-                    title={attachment.state === 'failed' ? attachment.degradationReasons?.[0] : attachment.managedPath ? t('composerAttachmentRevealOriginal') : undefined}
-                    onDoubleClick={() => { if (attachment.managedPath) void window.workwise.openChatAttachmentOriginal(attachment.managedPath) }}
-                  >
-                    {attachment.state === 'uploading' || attachment.state === 'parsing' ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-600" /> : <FileText className="h-3.5 w-3.5 shrink-0 text-ds-faint" strokeWidth={1.8} />}
-                    <span className="max-w-40 truncate">{attachment.name || attachment.id}</span>
-                    {typeof attachment.byteSize === 'number' ? <span className="shrink-0 text-[10px] text-ds-faint">{formatAttachmentBytes(attachment.byteSize)}</span> : null}
-                    {attachment.state ? <span className={`rounded px-1 py-0.5 text-[10px] ${attachment.state === 'ready' ? 'bg-green-100 text-green-700' : ['degraded', 'failed'].includes(attachment.state) ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{t(`composerAttachmentState.${attachment.state}`)}</span> : null}
-                    {typeof attachment.progress === 'number' && attachment.progress > 0 && attachment.progress < 1 ? <span className="shrink-0 text-[10px] tabular-nums text-blue-600">{Math.round(attachment.progress * 100)}%</span> : null}
-                    {onRemoveAttachment ? (
-                      <button
-                        type="button"
-                        onClick={() => onRemoveAttachment(attachment.id)}
-                        className="rounded-full p-0.5 text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
-                        aria-label={t('composerRemoveAttachment')}
-                        title={t('composerRemoveAttachment')}
-                      >
-                        <X className="h-3 w-3" strokeWidth={2} />
-                      </button>
-                    ) : null}
-                    {onRetryAttachment && attachment.localSourcePath && (attachment.state === 'failed' || attachment.state === 'cancelled') ? (
-                      <button type="button" onClick={() => onRetryAttachment(attachment.id)} className="rounded-full p-0.5 text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink" aria-label={t('composerAttachmentRetry')} title={t('composerAttachmentRetry')}>
-                        <RotateCcw className="h-3 w-3" strokeWidth={2} />
-                      </button>
-                    ) : null}
-                    {attachment.managedPath ? (
-                      <button type="button" onClick={() => void window.workwise.openChatAttachmentOriginal(attachment.managedPath!)} className="rounded px-1 text-[10px] text-blue-600 hover:bg-blue-50" aria-label={t('composerAttachmentRevealOriginal')} title={t('composerAttachmentRevealOriginal')}>{t('composerAttachmentReveal')}</button>
-                    ) : null}
-                  </span>
                 )
-              ))}
-              {attachmentProblem || hasImageOnlyPdf ? (
-                <span role="status" className="min-w-0 basis-full break-words text-[12px] text-ds-muted">
-                  {attachmentProblem || t('composerAttachmentImageOnlyPdf')}
-                </span>
+              })}
+              {selectedCapabilities.some(isUnavailableSkill) ? (
+                <p role="status" className="w-full min-w-0 break-words text-xs leading-5 text-ds-muted">{t('slashSkillUnavailable')}</p>
               ) : null}
             </div>
           ) : null}
@@ -2526,10 +2477,4 @@ export function FloatingComposer({
       )}
     </div>
   )
-}
-
-function formatAttachmentBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KiB`
-  return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MiB`
 }

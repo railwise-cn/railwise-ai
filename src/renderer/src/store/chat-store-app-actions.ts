@@ -106,7 +106,7 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
       return task
     },
 
-    setRoute: (route) => set({ route }),
+    setRoute: (route) => set({ route: route === 'tasks' ? 'chat' : route }),
 
     openWrite: async () => {
       set({ route: 'write' })

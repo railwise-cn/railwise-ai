@@ -4,6 +4,7 @@ import type { WorkspaceReference } from '../contracts/workspace-references.js'
 import type { DshUiBlock } from '../contracts/dsh-ui.js'
 import type { UiActionAudit } from '../contracts/ui-actions.js'
 import type { UiActionTurnItem } from '../contracts/items.js'
+import type { SkillSelections } from '../contracts/callable-capabilities.js'
 
 export type ItemEntity = TurnItem
 
@@ -15,6 +16,7 @@ export function makeUserItem(input: {
   displayText?: string
   attachmentIds?: string[]
   workspaceReferences?: WorkspaceReference[]
+  skillSelections?: SkillSelections
 }): TurnItem {
   const attachmentIds = input.attachmentIds?.filter((id) => id.trim().length > 0)
   const displayText = input.displayText?.trim()
@@ -30,6 +32,7 @@ export function makeUserItem(input: {
     text: input.text,
     ...(displayText && displayText !== input.text ? { displayText } : {}),
     ...(attachmentIds?.length ? { attachmentIds } : {}),
+    ...(input.skillSelections?.length ? { skillSelections: input.skillSelections } : {}),
     ...(input.workspaceReferences?.length
       ? { workspaceReferences: input.workspaceReferences.map((reference) => ({ ...reference })) }
       : {})

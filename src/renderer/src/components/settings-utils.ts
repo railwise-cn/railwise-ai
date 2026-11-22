@@ -1,3 +1,4 @@
+import { redactSecretText } from '@shared/secret-redaction'
 import {
   DEFAULT_GUI_UPDATE_CHANNEL,
   defaultManagedRuntimeSettings,
@@ -216,9 +217,9 @@ export function guiUpdateFailureMessage(
     case 'withdrawn':
       return t('guiUpdateErrWithdrawn')
     case 'download_failed':
-      return t('guiUpdateErrDownloadFailed', { message: info.message.trim() })
+      return t('guiUpdateDownloadRetryHint')
     case 'install_failed':
-      return t('guiUpdateErrInstallFailed', { message: info.message.trim() })
+      return t('guiUpdateInstallRetryHint')
     case 'github_repo_not_found':
       return t('guiUpdateErrRepoNotFound', { repo: info.repo?.trim() || 'owner/repo' })
     case 'github_forbidden':
@@ -228,6 +229,17 @@ export function guiUpdateFailureMessage(
     case 'no_stable_version':
       return t('guiUpdateErrNoStableVersion', { repo: info.repo?.trim() || '—' })
     default:
-      return info.message.trim() || t('guiUpdateCheckFailed')
+      return t('guiUpdateErrNetwork')
   }
+}
+
+export function guiUpdateNotice(raw: string, t: (key: string) => string, installing: boolean) {
+  const detail = redactSecretText(raw)
+  if (/^(?:Windows 未能启动安装器，更新包已保留。$|安全停止超时，更新包已保留。$|已下载的 Windows 安装包已丢失|更新渠道或安装包版本已变化|无法保存正在编辑的内容|以下工作暂时无法安全暂停|检查更新期间编辑内容已变化|编辑内容已变化)/.test(raw)) {
+    return { summary: detail }
+  }
+  const summary = /校验|checksum|signature|sha512/i.test(raw) ? t('guiUpdateErrSignatureInvalid')
+    : /下载|download/i.test(raw) && !installing ? t('guiUpdateDownloadRetryHint')
+    : installing ? t('guiUpdateInstallRetryHint') : t('guiUpdateErrNetwork')
+  return { summary, detail }
 }

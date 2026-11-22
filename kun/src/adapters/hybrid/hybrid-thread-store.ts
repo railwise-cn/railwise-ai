@@ -927,8 +927,12 @@ function hydrateThreadItems(
     return options.preserveExistingItemsWhenNoFileItems ? thread : stripThreadItemBodies(thread)
   }
   const itemsByTurn = new Map<string, TurnItem[]>()
+  const receiptTurnIds = new Set<string>()
   for (const item of items) {
-    if (isConversationReceiptItem(item)) continue
+    if (isConversationReceiptItem(item)) {
+      receiptTurnIds.add(item.turnId)
+      continue
+    }
     const list = itemsByTurn.get(item.turnId) ?? []
     list.push(item)
     itemsByTurn.set(item.turnId, list)
@@ -936,7 +940,7 @@ function hydrateThreadItems(
 
   // Earlier readers could have hydrated local receipts into metadata. Keep
   // their messages in JSONL while removing that execution-only projection.
-  const executionTurns = thread.turns.filter(turn => !/^command_[a-f0-9]{32}$/.test(turn.id))
+  const executionTurns = thread.turns.filter(turn => !receiptTurnIds.has(turn.id) && !/^command_[a-f0-9]{32}$/.test(turn.id))
   const knownTurnIds = new Set(executionTurns.map((turn) => turn.id))
   const turns = executionTurns.map((turn): Turn => {
     const turnItems = itemsByTurn.get(turn.id) ?? []

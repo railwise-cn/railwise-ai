@@ -34,6 +34,8 @@ describe('splash window document', () => {
     expect(html).toContain('正在载入扩展')
     expect(html).toContain('prefers-reduced-transparency: reduce')
     expect(html).toContain('forced-colors: active')
+    expect(html).toContain('font-src data:')
+    expect(html).toContain("font-family: 'RailWise UI'")
   })
 
   it('keeps the Chinese subtitle in the English dark splash and escapes phase labels', () => {

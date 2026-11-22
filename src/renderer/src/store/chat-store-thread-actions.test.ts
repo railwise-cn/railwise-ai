@@ -11,6 +11,7 @@ import type {
 import { defaultManagedRuntimeSettings, type WorkWiseSettingsV2 } from '@shared/app-settings'
 import { rendererRuntimeClient } from '../agent/runtime-client'
 import { DEEPSEEK_VISION_MODEL_ID } from '../lib/attachment-aware-model'
+import i18n from '../i18n'
 
 const registryMock = vi.hoisted(() => ({
   getProvider: vi.fn()
@@ -199,7 +200,7 @@ describe('chat-store-thread-actions queued messages', () => {
     })).resolves.toBe(false)
 
     expect(state.queuedMessages).toEqual([])
-    expect(state.error).toContain('settings unavailable')
+    expect(state.error).toBe(i18n.t('common:runtimeRequestFailed'))
   })
 
   it('routes the default empty composer selection as auto for a non-busy image send', async () => {

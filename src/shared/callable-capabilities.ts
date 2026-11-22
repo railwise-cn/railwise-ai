@@ -1,5 +1,6 @@
 export type {
   CallableCapabilityChoice,
   CallableCapabilityReference,
-  CallableCapabilityScope
+  CallableCapabilityScope,
+  SkillSelections
 } from '../../kun/src/contracts/callable-capabilities.js'

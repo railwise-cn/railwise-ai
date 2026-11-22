@@ -1,8 +1,4 @@
 /* A single desktop layout contract. Work surfaces stay opaque and readable. */
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
-}
-
 .ds-workbench-shell {
   --ds-stage-gradient: var(--ds-bg-canvas);
   --ds-topbar-bg: var(--ds-bg-canvas);
