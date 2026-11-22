@@ -986,6 +986,19 @@ export class TaskRunRepository {
     })
   }
 
+  cancelQuestionForTurnRestart(id: string, nowIso: string): DurableHumanRequest | null {
+    return this.transaction(() => {
+      const request = this.humanRequest(id)
+      if (!request || request.kind !== 'question') return null
+      if (request.status !== 'pending') return request
+      const next = { ...request, status: 'cancelled' as const, resolution: { status: 'cancelled' }, updatedAt: nowIso }
+      this.db.prepare('UPDATE human_requests SET data_json = ? WHERE id = ?').run(JSON.stringify(next), id)
+      const attention = this.attention(id)
+      if (attention?.status === 'pending') this.putAttention({ ...attention, status: 'cancelled', updatedAt: nowIso, revision: attention.revision + 1 })
+      return next
+    })
+  }
+
   private migrateDurable(sqlitePath: string, existingTasks: boolean): void {
     const version = this.db.pragma('user_version', { simple: true }) as number
     if (version >= 1) return

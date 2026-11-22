@@ -534,6 +534,7 @@ describe('task commands before Turn allocation',()=>{
     const supplements = f.repository.inputs(started.task!.id).filter(input => input.kind === 'supplement' && input.sourceId === undefined)
     expect(supplements).toHaveLength(1)
     expect(supplements[0]?.text).toBe('www.railwise.cn')
+    expect(f.repository.inputs(started.task!.id).filter(input => input.kind === 'user_answer')).toHaveLength(0)
     const turns = (await f.threadStore.get(started.turn.threadId))?.turns
     expect(turns).toHaveLength(2)
     expect(turns?.[0]).toMatchObject({ id: started.turn.turnId, status: 'aborted' })

@@ -122,8 +122,7 @@ export class PersistentUserInputGate implements UserInputGate {
     if (!saved || saved.kind !== 'question' || saved.status !== 'pending') return false
     const task = taskRequestOwner(this.repository, saved)
     if (task === null) return false
-    this.repository.resolveHumanRequest(id, { status: 'cancelled' }, 'cancelled', this.nowIso())
-    if (task) this.repository.acknowledgeOutbox(`human:${id}`, this.nowIso())
+    this.repository.cancelQuestionForTurnRestart(id, this.nowIso())
     const resolver = this.resolvers.get(id)
     if (resolver) {
       this.resolvers.delete(id)
