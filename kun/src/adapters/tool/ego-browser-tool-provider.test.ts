@@ -16,7 +16,7 @@ afterEach(async()=>{while(clean.length)await clean.pop()!()})
 const html='<body><article><h2>测绘监测项目</h2><time>2026-11-16</time></article><a href="https://feed.test/list?page=2">下一页</a></body>'
 const date='2026-11-16T00:00:00.000Z'
 const hash=(s:string)=>createHash('sha256').update(s).digest('hex')
-async function fixture(){const f=await createEgoBrowserFixture();clean.push(f.dispose);return f}
+async function fixture(sourceUrl?:string){const f=await createEgoBrowserFixture(sourceUrl);clean.push(f.dispose);return f}
 describe('Ego controlled read protocol; no external CLI/browser',()=>{
  it('preserves legacy absent-provider/config bytes',()=>{const legacy={browserInstanceId:'legacy',origins:['https://feed.test'],interaction:'observe' as const,revision:0};expect(BrowserExecutionScope.parse(legacy)).toEqual(legacy);expect(KunCapabilitiesConfig.parse({})).not.toHaveProperty('egoBrowser')})
  it('persists one server TaskSpace and sealed source reads',async()=>{
@@ -60,7 +60,35 @@ describe('Ego controlled read protocol; no external CLI/browser',()=>{
  })
  it('records a real in-flight expiry with its saved Host proof without reacquiring an expired closure',async()=>{const f=await fixture();f.setExpireDuringRun();expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({code:'ego_browser_grant_expired'});expect(f.calls).toHaveLength(1);expect(f.repo.operations(f.task.id,'ego_browser_wait')).toEqual([expect.objectContaining({status:'succeeded',request:expect.objectContaining({hostOperationId:expect.any(String),callId:'call-1',code:'ego_browser_grant_expired'})})])})
  it('never silently retries an uncertain first open',async()=>{const f=await fixture();f.setThrown();expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({code:'ego_browser_command_timeout'});expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({code:'ego_browser_waiting_user'});expect(f.calls).toHaveLength(1);f.setGrant({...f.grant(),id:'new-grant',turnId:'resumed'});f.setThrown(false);f.repo.update(f.task.id,0,t=>({...t,activeTurnId:'resumed'}));expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({status:'succeeded'});expect(f.calls).toHaveLength(2);expect(f.calls.at(-1)?.recoverExistingOnly).toBe(true)})
- it('routes hard failures to original Task while stale observations remain repairable',()=>{for(const code of EGO_PERMISSION_CODES){const failure=taskPermissionFailure({code});expect(failure).not.toBeNull();expect(taskPermissionCapability(failure!,{})).toMatchObject({provider:'ego-browser',resolution:{route:'task/ego-browser-review'}})}expect(taskPermissionFailure({code:'ego_browser_observation_stale'})).toBeNull()})
+ it('routes hard failures to original Task while stale observations remain repairable',()=>{for(const code of EGO_PERMISSION_CODES.filter(code=>code!=='ego_browser_site_sign_in_required')){const failure=taskPermissionFailure({code});expect(failure).not.toBeNull();expect(taskPermissionCapability(failure!,{})).toMatchObject({provider:'ego-browser',resolution:{route:'task/ego-browser-review'}})}expect(taskPermissionFailure({code:'ego_browser_observation_stale'})).toBeNull()})
+ it('waits for Dadan sign-in without evidence and reads the original space after the user resumes',async()=>{
+  const url='https://dadan.vip/#/subscribe/bidding', f=await fixture(url)
+  f.setSiteSignInRequired(true)
+  const opened=await f.execute('ego_browser_open',{url})
+  expect(opened).toMatchObject({status:'blocked',code:'ego_browser_site_sign_in_required',message:expect.stringContaining('大单网要求重新登录')})
+  expect(opened).not.toHaveProperty('evidence')
+  expect(opened).not.toHaveProperty('html')
+  expect(f.repo.operations(f.task.id,'ego_document_read')).toHaveLength(0)
+  expect(f.repo.operations(f.task.id,'ego_task_space')).toEqual([expect.objectContaining({status:'succeeded',result:expect.objectContaining({taskSpaceId:7})})])
+  expect(f.repo.operations(f.task.id,'ego_browser_wait')).toEqual([expect.objectContaining({status:'succeeded',request:expect.objectContaining({taskSpaceId:7,code:opened.code})})])
+  expect(await f.execute('ego_browser_read')).toMatchObject({code:'ego_browser_waiting_user'})
+  expect(f.calls).toHaveLength(1)
+  const failure=taskPermissionFailure({code:opened.code})
+  expect(taskPermissionCapability(failure!,{})).toMatchObject({provider:'ego-browser',resolution:{kind:'retry',route:'task/ego-browser-site-sign-in'}})
+
+  const resumedTurn='turn-after-site-sign-in'
+  f.setGrant({...f.grant(),id:'grant-after-site-sign-in',turnId:resumedTurn})
+  const current=f.repo.update(f.task.id,f.repo.get(f.task.id)!.revision,task=>({...task,activeTurnId:resumedTurn}))
+  f.setSiteSignInRequired(false)
+  const resumed=await f.execute('ego_browser_read')
+  expect(resumed).toMatchObject({status:'succeeded',taskSpaceId:7,sourceUrl:url,pagination:{navigationActionsUsed:1}})
+  expect(validEgoDocumentEvidence(f.repo,current,resumed,f.grant())).toBe(true)
+  expect(f.calls.map(call=>[call.action,call.spaceId])).toEqual([['open',undefined],['space_status',7],['read',7]])
+  expect(f.repo.operations(f.task.id,'ego_task_space')).toHaveLength(1)
+  expect(f.repo.operations(f.task.id,'ego_task_space_reopen')).toHaveLength(0)
+  expect(f.repo.operations(f.task.id,'ego_browser_wait')).toHaveLength(1)
+  expect(f.repo.operations(f.task.id,'ego_document_read')).toHaveLength(1)
+ })
  it('fixed scripts have exact-match read selectors and no model code/credential/business APIs',()=>{const s=egoReadScript({action:'read',selector:'article'});expect(s).toContain('querySelectorAll(argumentsSelection)');expect(s).toContain('matches.length!==1');for(const bad of ['page.fill(','page.click(','page.fetch(','page.cdp(','document.cookie','localStorage','claimTaskSpace','takeOverTaskSpace','newPage('])expect(s).not.toContain(bad)})
 })
 
@@ -108,7 +136,21 @@ it('runs the fixed TaskSpace SDK script and distinguishes exact selector matches
   expect(settled).toMatchObject({ok:true,visibleText:true,snapshot:'已加载的测绘公告'})
   window.document.body.innerHTML='<svg><title>图表</title><text>可见的读数</text></svg>'
   expect(await run({action:'read'})).toMatchObject({ok:true,visibleText:true})
-  task.ownership='user';expect(await run({action:'observe'})).toMatchObject({ok:false,code:'ego_browser_user_control'})
+  const reLogin='<p>您的账号已在其他设备登录，请重新登录</p>'
+  window.document.body.innerHTML='<div id="app"></div>'+reLogin
+  expect(await run({action:'read'})).toMatchObject({ok:true,siteSignInRequired:false})
+  window.happyDOM.setURL('https://dadan.vip/#/subscribe/bidding')
+  const dadan={origins:['https://dadan.vip']}
+  expect(await run({action:'observe',...dadan})).toMatchObject({ok:true,siteSignInRequired:true})
+  expect(await run({action:'read',selector:'article',...dadan})).toMatchObject({ok:true,siteSignInRequired:true})
+  window.document.body.innerHTML='<div id="app"><div style="display: none">不可见的订阅页面内容</div></div><div role="dialog">'+reLogin+'</div>'
+  expect(window.document.getElementById('app')?.textContent).toBe('不可见的订阅页面内容')
+  expect(await run({action:'read',...dadan})).toMatchObject({ok:true,siteSignInRequired:true})
+  window.document.body.innerHTML='<div id="app"></div><div hidden>'+reLogin+'</div><p>重新登录</p>'
+  expect(await run({action:'read',...dadan})).toMatchObject({ok:true,siteSignInRequired:false})
+  window.document.body.innerHTML='<div id="app"><article>已加载的测绘公告</article></div>'+reLogin
+  expect(await run({action:'read',...dadan})).toMatchObject({ok:true,siteSignInRequired:false})
+  task.ownership='user';expect(await run({action:'observe',...dadan})).toMatchObject({ok:false,code:'ego_browser_user_control'})
  }finally{globals.document=oldDocument;globals.location=oldLocation;await window.happyDOM.close()}
 })
 

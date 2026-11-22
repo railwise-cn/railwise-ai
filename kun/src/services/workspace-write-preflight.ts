@@ -9,10 +9,10 @@ import { containedArtifact } from './task-artifact-proof.js'
 /** A requested output filename alone is compatible with the managed task directory. */
 export function explicitWorkspaceWrite(text: string): { target?: string; edit: boolean } | null {
   if (/^(?:(?:请|帮我)\s*)?(?:如何|怎么|怎样|介绍|解释|how\s|what\s|explain\b)/i.test(text.trim())) return null
-  const saves = text.matchAll(/(?:保存|导出|输出|放置|写)(?:[^。！？\n]{0,12}?)(?:到|至|进|入)\s*|(?:save|write|export)\b[^.!?\n]{0,25}?\b(?:to|into)\s+/gi)
+  const saves = text.matchAll(/(?:保存|导出|输出|放置|写)(?:[^。！？\n]{0,12}?)([到至进入])\s*|(?:save|write|export)\b[^.!?\n]{0,25}?\b(?:to|into)\s+/gi)
   const edit = /(?:修改|编辑|覆盖|替换|更新)[^。！？\n]{0,35}(?:文件|工作区|当前目录|\.\w{1,8})|\b(?:edit|modify|overwrite|replace)\b[^.!?\n]{0,35}(?:file|workspace|\.\w{1,8})/i.exec(text)
-  const destinations = Array.from(saves, match => ({ text: text.slice(match.index + match[0].length), managedOutput: true }))
-  if (edit) destinations.push({ text: text.slice(edit.index).replace(/^(?:修改|编辑|覆盖|替换|更新|edit|modify|overwrite|replace)\s*/i, ''), managedOutput: false })
+  const destinations = Array.from(saves, match => ({ text: text.slice(match.index + match[0].length), managedOutput: true, ambiguousPreposition: match[1] === '进' || match[1] === '入' }))
+  if (edit) destinations.push({ text: text.slice(edit.index).replace(/^(?:修改|编辑|覆盖|替换|更新|edit|modify|overwrite|replace)\s*/i, ''), managedOutput: false, ambiguousPreposition: false })
   for (const destination of destinations) {
     const rawTarget = destination.text.trim()
     // A bare task reference needs a prose boundary; path suffixes and workspace qualifiers remain explicit.
@@ -22,6 +22,11 @@ export function explicitWorkspaceWrite(text: string): { target?: string; edit: b
     const quoted = /["'`“]([^"'`”\n]+)["'`”]/.exec(targetText)?.[1]
     const absolute = /(?:^|\s)((?:[A-Za-z]:[\\/]|\/)[^\s，。；！？"'`<>]+)/.exec(targetText)?.[1]
     const relative = /^(?:\.\.?[\\/])?[\w\p{L}.-]+(?:[\\/][\w\p{L}.-]+)*(?:\.[\w]+)?/u.exec(targetText)?.[0]
+    // “进” and “入” also occur inside words such as “进展” and “入门”.
+    if (destination.ambiguousPreposition && rawTarget === targetText &&
+      !/^(?:["'`“]|[\\/]|[A-Za-z]:[\\/])/.test(targetText) &&
+      !/^(?:工作区|项目目录|(?:[^，,。；;！？\n]+)?文件夹)(?=$|[中内下，,。；;！？\n]|\s)/u.test(targetText) &&
+      !(relative && /[\\/]|\.[\w]+$/.test(relative))) continue
     const target = quoted ?? absolute ?? relative
     if (target && /^(?:https?:|\/\/)/i.test(target)) continue
     return { ...(target && !/^(?:当前|本|工作区|目录|项目|the|this)$/i.test(target) ? { target } : {}), edit: Boolean(edit) }
