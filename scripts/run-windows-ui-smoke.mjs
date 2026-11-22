@@ -2815,7 +2815,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     .then(module => module.startWindowsVideoEvaluation(workspace, environment, parseFixtureToolOutput)) : undefined
   const composerModule = composerSmoke ? await import('./verify-windows-composer-acceptance.mjs') : undefined
   const composerAcceptance = composerModule?.createComposerModelAcceptance()
-  const originChecklistModel = originChecklist ? createWindowsOriginChecklistModel() : undefined
+  const skillDraftScope = process.env.RAILWISE_WINDOWS_SKILL_DRAFT_SCOPE === 'true'
+  const originChecklistModel = originChecklist || skillDraftScope ? createWindowsOriginChecklistModel() : undefined
   const marketplaceModule = mirrorSmoke || doclingConversion ? await import('./verify-windows-cold-marketplace.mjs') : undefined
   const marketplaceAcceptance = marketplaceModule?.createMarketplaceModelAcceptance()
   const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke || originChecklistModel ? await startWindowsTaskModelFixture({
@@ -2891,12 +2892,15 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
-    if (originChecklistModel) {
+    if (originChecklist && originChecklistModel) {
       report.originChecklistAttempt = { phase: 'waiting-for-runtime', model: originChecklistModel.evidence }
       report.originChecklist = await verifyWindowsOriginChecklist(cdp, originChecklistModel, report.originChecklistAttempt, evidenceDir)
+    }
+    if (skillDraftScope) {
       const { verifyWindowsSkillDraftScope } = await import('./verify-windows-composer-acceptance.mjs')
       report.skillDraftScope = { phase: 'starting' }
       await verifyWindowsSkillDraftScope(cdp, workspace, report.skillDraftScope)
+      assert.equal(report.skillDraftScope.status, 'passed')
       report.checks.push('installed-delegated-steps-in-original-conversation')
     } else if (video) {
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')

@@ -53,6 +53,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_skill_draft_scope:
+        description: 'Verify an unavailable workspace Skill and preservation of the unsent draft in the exact Windows package.'
+        type: boolean
+        required: false
+        default: false
       run_mac_startup_appearance:
         description: 'Run exact startup checks on signed Apple Silicon and Intel installers from the selected release build.'
         type: boolean
@@ -223,6 +228,7 @@ jobs:
           RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE: ${{ inputs.run_startup_appearance }}
           RAILWISE_WINDOWS_COMPOSER_SMOKE: ${{ inputs.run_composer_acceptance }}
           RAILWISE_WINDOWS_ORIGIN_CHECKLIST: ${{ inputs.run_origin_checklist }}
+          RAILWISE_WINDOWS_SKILL_DRAFT_SCOPE: ${{ inputs.run_skill_draft_scope }}
         run: |
           $packages = Join-Path $env:RUNNER_TEMP 'exact-windows-packages'
           $installers = @(Get-ChildItem -LiteralPath $packages -Filter '*.exe' -File)
