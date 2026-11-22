@@ -756,6 +756,23 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(container.textContent).toContain('Example request for arch-diagram-skill')
   })
 
+  it('explains Docling PDF conversion requirements before use', async () => {
+    const item = getOfficialMarketplaceCatalog().find((entry) => entry.id === 'docling-mcp')!
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({
+      packages: [{ key: `${SOURCE.id}:${item.id}`, sourceId: SOURCE.id, package: item, conflicted: false }],
+      conflicts: []
+    })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => exactButton('Connectors').click())
+    await act(async () => iconButton('View Docling MCP connection').click())
+    expect(container.textContent).toContain('set up Docling Serve')
+    expect(container.textContent).toContain('attach the file to your chat')
+    await act(async () => i18n.changeLanguage('zh'))
+    expect(container.textContent).toContain('请先配置 Docling Serve')
+    expect(window.workwise.prepareCatalogPlugin).not.toHaveBeenCalled()
+  })
+
   it('indexes large local Skill sets without flattening them into the default marketplace view', async () => {
     const indexedSkills = Array.from({ length: 200 }, (_, index): SkillListItem => ({
       id: `skill-${index}`,

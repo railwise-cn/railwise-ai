@@ -994,7 +994,7 @@ test('0.5.7 exact smoke binds the independently declared 0.5.6 baseline through 
     passed: () => {},
     missingDeclaration: f => { delete f.manifest.acceptance.updaterRoundTrip.baseVersion },
     mismatchedDeclaration: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = '0.5.4' },
-    unpinnedBaseline: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = '0.5.9' },
+    unpinnedBaseline: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = '0.5.5' },
     remoteBaseline: f => { f.manifest.acceptance.updaterRoundTrip.baseVersion = 'https://example.invalid/baseline.dmg' },
     machineBaseline: f => { f.machineReport.baseVersion = '0.5.4' },
     nativeBaseline: f => { f.nativeReport.baseVersion = '0.5.4' },
@@ -1018,7 +1018,8 @@ test('a protected-main frozen smoke binds the declared baseline and its exact ol
   const cases = [
     ['0.5.6', () => {}, undefined],
     [undefined, () => {}, /official baseline version mismatch/],
-    ['0.5.9', () => {}, /no valid arm64 installer pin/],
+    ['0.5.5', () => {}, /no valid arm64 installer pin/],
+    ['0.5.9', () => {}, /must be newer than the official baseline/],
     ['0.5.6', f => { f.machineReport.baselineAsset.sha256 = '0'.repeat(64) }, /pinned official installer mismatch/],
     ['0.5.6', f => { f.machineReport.dataSeed.serviceIdentity.packageVersion = '0.5.3' }, /dataSeed package version mismatch/],
     ['0.5.6', f => { f.nativeReport.baseVersion = '0.5.3' }, /native official baseline mismatch/],

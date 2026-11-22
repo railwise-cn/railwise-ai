@@ -1,6 +1,23 @@
 {
   "schemaVersion": 1,
   "versions": {
+    "0.5.9": {
+      "darwin-arm64": {
+        "name": "RailWise-AI-0.5.9-mac-Apple-Silicon.dmg",
+        "sha256": "0fb309df7c4f73fe74fa0e7b96d5bfc437a0f2c4e6f6023c2a15e4ac96324c66",
+        "size": 402395197
+      },
+      "darwin-x64": {
+        "name": "RailWise-AI-0.5.9-mac-Intel.dmg",
+        "sha256": "0f2d5c787d05596a3e7b5296a5ffa1a5276ad2ba7ed0c1bcf387b65738e03ce2",
+        "size": 411136357
+      },
+      "win32-x64": {
+        "name": "RailWise-AI-0.5.9-win-x64.exe",
+        "sha256": "7bc3fca6f7157e4f556a582e0133c69e2318390ced15ad2a1ce87160b153c55c",
+        "size": 320871735
+      }
+    },
     "0.5.6": {
       "darwin-arm64": {
         "name": "RailWise-AI-0.5.6-mac-Apple-Silicon.dmg",

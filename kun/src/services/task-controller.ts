@@ -1,4 +1,5 @@
 import { settleUnstartedOneOffRetry } from './one-off-public-query-recovery.js'
+import { EGO_SITE_SIGN_IN_REQUIRED } from '../contracts/ego-browser.js'
 import { oneOffChildBinding } from './one-off-public-query-proof.js'
 import type { BrowserPublicQueryRecoveryBinding } from '../contracts/browser-public-query-recovery.js'
 import { verifiedPublicQueryRecovery } from './browser-public-query-recovery-proof.js'
@@ -1341,7 +1342,7 @@ export class TaskController {
       const result = this.waitForUser(task, capability.message, '', fingerprint, turnId)
       if (prior?.status === 'pending' && prior.payload?.fingerprint === fingerprint) return result
       this.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id, threadId: task.originThreadId ?? task.threadId,
-        workspaceRoot: task.workspaceRoot, kind: 'blocked', title: '确认任务执行权限', message: capability.message, status: 'pending', revision: (prior?.revision ?? -1) + 1,
+        workspaceRoot: task.workspaceRoot, kind: 'blocked', title: code === EGO_SITE_SIGN_IN_REQUIRED ? '大单网需要重新登录' : '确认任务执行权限', message: capability.message, status: 'pending', revision: (prior?.revision ?? -1) + 1,
         createdAt: prior?.status === 'pending' ? prior.createdAt : now, updatedAt: now, payload: { kind: 'capability_required', capability, fingerprint, request: { prompt: task.goal } } })
       const commandId = createHash('sha256').update(`${task.id}:${fingerprint}`).digest('hex').slice(0, 32)
       this.repository.enqueueOutbox({ id: `command-message:${commandId}`, ownerId: task.originThreadId ?? task.threadId, kind: 'task_command_message', createdAt: now,

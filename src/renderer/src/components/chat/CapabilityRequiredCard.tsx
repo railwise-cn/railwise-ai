@@ -32,6 +32,12 @@ export function capabilityCardMatchesAttention(card: ExternalTaskCapabilityCard,
   return legacyRequestKey(capability) === legacyRequestKey(current)
 }
 
+function isEgoSiteSignInRequired(capability: ExternalTaskCapabilityCard['capability']): boolean {
+  const action = capability.resolution ?? capability.action
+  return capability.provider === 'ego-browser' && capability.errorCode === 'ego_browser_site_sign_in_required' &&
+    capability.status === 'blocked' && action?.kind === 'retry' && action.route === 'task/ego-browser-site-sign-in'
+}
+
 /** A capability failure is a durable waiting task, never a completed answer. */
 export function CapabilityRequiredCard({ card, workspaceRoot }: { card: ExternalTaskCapabilityCard; workspaceRoot?: string }): ReactElement {
   const { t, i18n } = useTranslation('common')
@@ -73,20 +79,23 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
   const connector = isBrowser ? 'browser-skill' : isLark ? 'lark' : isDingTalk ? 'dingtalk' : undefined
   const action = capability.resolution ?? capability.action
   const egoTaskReview = isEgo && ['blocked', 'needs_authorization'].includes(capability.status) && action?.route === 'task/ego-browser-review'
+  const egoSiteSignInRequired = isEgoSiteSignInRequired(capability)
   const scopeFallbackKey = capability.provider === 'workspace' ? 'capabilityScopeReviewRequired'
     : isEgo ? 'capabilityScopeRecheckOnResume' : 'capabilityScopeNotGranted'
-  const currentRequest = live.attention.some(item => capabilityCardMatchesAttention({ ...card, capability }, item))
+  const reviewedAttention = live.attention.find(item => capabilityCardMatchesAttention({ ...card, capability }, item))
   const stateKnown = checkedRequest === requestKey && live.ready && !live.error
   const ownerTask = live.tasks.find(task => task.id === card.taskId)
   const settled = settledCapability === card.capability || Boolean(stateKnown && (
     ownerTask?.status === 'completed' || ownerTask?.status === 'cancelled' ||
-    !currentRequest && (card.attentionId || ownerTask)))
-  const interactive = !settled && stateKnown && currentRequest
+    !reviewedAttention && (card.attentionId || ownerTask)))
+  const interactive = !settled && stateKnown && Boolean(reviewedAttention)
   const titleKey = interactive
-    ? ownerTask && !taskHasExecutionEvidence(ownerTask) ? 'capabilityRequiredTitle' : 'capabilityBlockedAfterProgressTitle'
+    ? egoSiteSignInRequired ? 'capabilityEgoSiteSignInTitle'
+      : ownerTask && !taskHasExecutionEvidence(ownerTask) ? 'capabilityRequiredTitle' : 'capabilityBlockedAfterProgressTitle'
     : settled ? 'capabilityHistoryTitle' : 'capabilityRecordTitle'
   const executionGrantExpired = isExecutionGrantExpiredCapability(capability)
-  const reviewedAttention = live.attention.find(item => capabilityCardMatchesAttention({ ...card, capability }, item))
+  const canResumeSiteSignIn = Boolean(card.attentionId) && reviewedAttention?.threadId === card.threadId &&
+    ownerTask?.status === 'waiting_user' && (ownerTask.originThreadId ?? ownerTask.threadId) === card.threadId
   // Only known task-authority blockers can combine a scope grant with execution.
   // Agent/configuration changes and browser effect reviews keep their own actions.
   const canGrantAndContinue = interactive && Boolean(card.attentionId) && reviewedAttention?.threadId === card.threadId && ownerTask?.status === 'waiting_user' &&
@@ -182,7 +191,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     if (expectedRevision !== undefined && (result.task && result.task.id !== card.taskId ||
       !['task_started', 'capability_required', 'attention_required', 'snapshot'].includes(result.kind) ||
       result.kind === 'task_started' && (!result.task || !result.turn?.turnId))) {
-      throw new Error(t('taskPermissionContinueUnavailable'))
+      throw new Error(t(egoSiteSignInRequired ? 'taskWorkspaceActionFailed' : 'taskPermissionContinueUnavailable'))
     }
     if (result.kind === 'task_started' && result.task && result.turn?.turnId) {
       foregroundTaskArtifactPreview(card.threadId, result.task.id)
@@ -190,17 +199,19 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     if (result.kind === 'capability_required' || result.kind === 'attention_required') {
       if (result.kind === 'capability_required') {
         setRechecked({ source: card.capability, capability: result.capability })
-        setMessage(isExecutionGrantExpiredCapability(result.capability)
+        setMessage(isEgoSiteSignInRequired(result.capability) ? t('capabilityEgoSiteSignInMessage')
+          : isExecutionGrantExpiredCapability(result.capability)
           ? t('capabilityExecutionGrantExpiredSummary') : presentMessage(result.message))
       } else {
         setMessage(presentMessage(result.message))
       }
     } else if (result.kind === 'snapshot' && expectedRevision !== undefined) {
       // Permission confirmation succeeded, but a snapshot is not a new execution.
-      setMessage(t('taskPermissionContinueNotStarted'))
+      setMessage(t(egoSiteSignInRequired ? 'capabilityStateChecked' : 'taskPermissionContinueNotStarted'))
     } else {
       setSettled(card.capability)
-      setMessage(result.kind === 'snapshot' ? t('capabilityStateChecked') : t('capabilityResumed'))
+      setMessage(result.kind === 'snapshot' ? t('capabilityStateChecked')
+        : t(egoSiteSignInRequired ? 'taskWorkspaceResumeSubmitted' : 'capabilityResumed'))
     }
     // Refresh only the original conversation. Never switch a user away from
     // another conversation while a delayed authorization finishes.
@@ -237,8 +248,9 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
     await refreshTaskState()
   }
   const displayedMessage = presentMessage(capability.message)
-  const capabilitySummary = executionGrantExpired ? t('capabilityExecutionGrantExpiredMessage') : displayedMessage
-  const snapshot = (<>
+  const capabilitySummary = egoSiteSignInRequired ? t('capabilityEgoSiteSignInMessage')
+    : executionGrantExpired ? t('capabilityExecutionGrantExpiredMessage') : displayedMessage
+  const snapshot = egoSiteSignInRequired ? <p className="mt-1">{capabilitySummary}</p> : (<>
       <p className="mt-1 whitespace-pre-wrap">{capabilitySummary}</p>
       {executionGrantExpired || displayedMessage !== capability.message
         ? <TechnicalDetails detail={[redactSecretText(capability.message), capability.errorCode].filter(Boolean).join('\n')} label={t('capabilityDiagnosticDetails')} />
@@ -270,17 +282,18 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       {isLark && interactive && action?.kind !== 'grant' ? <ManagedLarkConnection compact initialState={capability.status === 'not_installed' ? 'not_installed' : undefined} /> : null}
       {isDingTalk && interactive && action?.kind !== 'grant' ? <div className="mt-3"><ManagedDingTalkConnection /></div> : null}
       {isBrowser && interactive ? <ManagedBrowserSkillConnection onChanged={() => setBrowserBindingGeneration(value => value + 1)} /> : null}
-      {showBrowserBinding && interactive ? <BrowserTaskBindingPanel key={browserBindingGeneration} taskId={card.taskId} onConfirmed={setMessage} /> : null}
-      {showPermissions && interactive ? <TaskPermissionPanel key={continuationKey} taskId={card.taskId} autoLoad onContinue={canGrantAndContinue ? continueGrantedTask : undefined} onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
-      {showQueryRecovery && interactive && ownerTask ? <TaskPublicQueryRecoveryCard task={ownerTask} runtimeReady={stateKnown} onChanged={refreshTaskState} onNotice={setMessage} /> : null}
+      {showBrowserBinding && interactive && !egoSiteSignInRequired ? <BrowserTaskBindingPanel key={browserBindingGeneration} taskId={card.taskId} onConfirmed={setMessage} /> : null}
+      {showPermissions && interactive && !egoSiteSignInRequired ? <TaskPermissionPanel key={continuationKey} taskId={card.taskId} autoLoad onContinue={canGrantAndContinue ? continueGrantedTask : undefined} onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
+      {showQueryRecovery && interactive && !egoSiteSignInRequired && ownerTask ? <TaskPublicQueryRecoveryCard task={ownerTask} runtimeReady={stateKnown} onChanged={refreshTaskState} onNotice={setMessage} /> : null}
       {failure ? <div className="mt-3 text-xs"><p role="alert">{failure.summary}</p><TechnicalDetails detail={failure.detail} /></div> : null}
       {message && (!interactive || message !== capabilitySummary) ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {interactive ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
-        <button type="button" disabled={pending} onClick={configure}>{egoTaskReview ? t('capabilityViewTaskRecoveryOptions') : isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isDingTalk ? 'capabilityConfigureDingTalk' : 'capabilityOpenMarketplace')}</button>
-        <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
+        {!egoSiteSignInRequired ? <button type="button" disabled={pending} onClick={configure}>{egoTaskReview ? t('capabilityViewTaskRecoveryOptions') : isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isDingTalk ? 'capabilityConfigureDingTalk' : 'capabilityOpenMarketplace')}</button> : null}
+        {egoSiteSignInRequired ? <button type="button" disabled={pending || !canResumeSiteSignIn} onClick={() => void run(() => recheck(ownerTask?.revision, reviewedAttention?.revision))}>{t('capabilityEgoSiteSignInResume')}</button>
+          : <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>}
         <button type="button" disabled={pending} onClick={() => void run(decline)}>{t('capabilityDecline')}</button>
       </div> : <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
-        <button type="button" onClick={openConfiguration}>{t('capabilityViewConfiguration')}</button>
+        {!egoSiteSignInRequired ? <button type="button" onClick={openConfiguration}>{t('capabilityViewConfiguration')}</button> : null}
         {!stateKnown ? <button type="button" disabled={pending} onClick={() => void run(refreshTaskState)}>{t('capabilityRefreshTaskState')}</button> : null}
       </div>}
     </section>

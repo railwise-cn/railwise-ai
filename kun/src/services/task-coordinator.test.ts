@@ -169,9 +169,12 @@ describe('task commands before Turn allocation',()=>{
     expect(f.repository.inputs(waiting.task.id).at(-1)).toMatchObject({ kind: 'supplement', text: supplement })
   })
 
-  it.each(['current', 'stale-before-resume', 'changed-during-preflight', 'changed-before-turn'] as const)('binds one-click resume to the reviewed pending attention (%s)', async scenario => {
+  it.each(['current', 'dadan-login', 'stale-before-resume', 'changed-during-preflight', 'changed-before-turn'] as const)('binds one-click resume to the reviewed pending attention (%s)', async scenario => {
     const f = await fixture()
-    const blocker = workspacePermissionCapability('approval_policy_blocked', '请确认此任务的审批权限。')
+    const blocker = scenario === 'dadan-login'
+      ? { ...workspacePermissionCapability('approval_policy_blocked', '大单网需要重新登录。'),
+          provider: 'ego-browser' as const, errorCode: 'ego_browser_site_sign_in_required' }
+      : workspacePermissionCapability('approval_policy_blocked', '请确认此任务的审批权限。')
     let ready = false
     let replaceAttention = () => {}
     const coordinator = new TaskCoordinator({ ...f, nowIso: () => new Date().toISOString(), preflightExternalTask: async () => {
@@ -198,7 +201,7 @@ describe('task commands before Turn allocation',()=>{
       })
     }
     ready = true
-    if (scenario !== 'current') {
+    if (scenario !== 'current' && scenario !== 'dadan-login') {
       await expect(coordinator.command(exact)).rejects.toMatchObject({ code: 'stale_request' })
       expect(f.runTurn).not.toHaveBeenCalled()
       expect((await f.threads.get(waiting.task.threadId))?.turns).toHaveLength(0)
@@ -214,7 +217,9 @@ describe('task commands before Turn allocation',()=>{
     f.repository.connection().prepare('UPDATE task_command_receipts SET result_json=NULL WHERE owner_id=? AND command_key=?').run(f.origin.id, exact.idempotencyKey)
     expect(await coordinator.command(exact)).toMatchObject({ kind: 'task_started', task: { id: waiting.task.id } })
     expect(f.runTurn).toHaveBeenCalledOnce()
-    expect((await f.threads.get(waiting.task.threadId))?.turns).toHaveLength(1)
+    const turns = (await f.threads.get(waiting.task.threadId))?.turns
+    expect(turns).toHaveLength(1)
+    if (scenario === 'dadan-login') expect(turns?.[0]?.prompt).toContain('先调用 ego_browser_read({})')
   })
 
   it('admits the original ordinary-chat video request as a durable file and source task', async () => {

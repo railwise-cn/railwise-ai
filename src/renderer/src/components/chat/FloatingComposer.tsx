@@ -1183,7 +1183,7 @@ export function FloatingComposer({
       if (event.key !== 'Escape' || event.defaultPrevented) return
       setComposerMenu(null)
       setGoalPanelOpen(false)
-      if (composerMenuOpen) composerMenuButtonRef.current?.focus({ preventScroll: true })
+      if (composerMenuOpen) draft.focusComposer()
     }
 
     window.addEventListener('pointerdown', onPointerDown)
@@ -1192,7 +1192,7 @@ export function FloatingComposer({
       window.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [composerMenuOpen, goalPanelOpen])
+  }, [composerMenuOpen, goalPanelOpen, draft.focusComposer])
 
   useLayoutEffect(() => {
     if (toolbarPicker) pickerSearchRef.current?.focus({ preventScroll: true })
@@ -1366,15 +1366,16 @@ export function FloatingComposer({
     if (picker === 'plugins') onOpenCapabilities?.()
   }
 
-  const closeToolbarMenu = (): void => {
-    setComposerMenu(null)
-    composerMenuButtonRef.current?.focus({ preventScroll: true })
-  }
-
   const handleComposerMenuKeys = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape' || event.key === 'Tab') {
-      if (event.key === 'Escape') event.preventDefault()
-      closeToolbarMenu()
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setComposerMenu(null)
+      draft.focusComposer()
+      return
+    }
+    if (event.key === 'Tab') {
+      setComposerMenu(null)
+      composerMenuButtonRef.current?.focus({ preventScroll: true })
       return
     }
     const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)')]

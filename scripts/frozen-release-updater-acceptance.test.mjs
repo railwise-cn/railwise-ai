@@ -360,7 +360,7 @@ test('new smoke selects the exact official 0.5.4 installers while retaining hist
   assert.deepEqual(resolveUpdaterBaseline('0.5.3').pins, BASELINE_PINS)
   assert.equal(validateFrozenTargetVersion('0.5.5', baseline.version), '0.5.5')
   for (const target of ['0.5.4', '0.5.3']) assert.throws(() => validateFrozenTargetVersion(target, baseline.version))
-  for (const version of ['0.5.2', '0.5.9', 'v0.5.4']) assert.throws(() => resolveUpdaterBaseline(version))
+  for (const version of ['0.5.2', '0.5.8', 'v0.5.4']) assert.throws(() => resolveUpdaterBaseline(version))
   for (const patch of [{ name: 'RailWise-AI-0.5.4-win-x64.exe' }, { name: 'WorkWise-0.5.4-mac-Intel.dmg' }, { name: 'WorkWise-0.5.5-mac-Apple-Silicon.dmg' }, { sha256: 'not-a-hash' }, { size: 0 }]) {
     const manifest = { versions: { '0.5.4': { 'darwin-arm64': { ...baseline.pins.arm64, ...patch }, 'darwin-x64': baseline.pins.x64 } } }
     assert.throws(() => resolveUpdaterBaseline('0.5.4', manifest), /installer pin/)
@@ -375,13 +375,22 @@ test('0.5.6 baseline pins select official RailWise installers and reject arbitra
   })
   assert.equal(validateFrozenTargetVersion('0.5.7', baseline.version), '0.5.7')
   for (const target of ['0.5.6', '0.5.5']) assert.throws(() => validateFrozenTargetVersion(target, baseline.version))
-  for (const version of ['https://example.invalid/baseline.dmg', '../0.5.6', '0.5.6?source=other', '0.5.9']) {
+  for (const version of ['https://example.invalid/baseline.dmg', '../0.5.6', '0.5.6?source=other', '0.5.8']) {
     assert.throws(() => resolveUpdaterBaseline(version))
   }
   for (const name of ['https://example.invalid/RailWise-AI-0.5.6-mac-Apple-Silicon.dmg', '../RailWise-AI-0.5.6-mac-Apple-Silicon.dmg', 'RailWise-AI-0.5.7-mac-Apple-Silicon.dmg']) {
     const manifest = { versions: { '0.5.6': { 'darwin-arm64': { ...baseline.pins.arm64, name }, 'darwin-x64': baseline.pins.x64 } } }
     assert.throws(() => resolveUpdaterBaseline('0.5.6', manifest), /installer pin/)
   }
+})
+
+test('0.5.10 can exercise the official 0.5.9 macOS installers', () => {
+  const baseline = resolveUpdaterBaseline('0.5.9')
+  assert.deepEqual(baseline.pins, {
+    arm64: { name: 'RailWise-AI-0.5.9-mac-Apple-Silicon.dmg', size: 402395197, sha256: '0fb309df7c4f73fe74fa0e7b96d5bfc437a0f2c4e6f6023c2a15e4ac96324c66' },
+    x64: { name: 'RailWise-AI-0.5.9-mac-Intel.dmg', size: 411136357, sha256: '0f2d5c787d05596a3e7b5296a5ffa1a5276ad2ba7ed0c1bcf387b65738e03ce2' }
+  })
+  assert.equal(validateFrozenTargetVersion('0.5.10', baseline.version), '0.5.10')
 })
 
 test('private exact-package smoke accepts its release branch without authorizing reviewed-main provenance', () => {

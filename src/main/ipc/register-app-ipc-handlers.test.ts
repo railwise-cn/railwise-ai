@@ -700,6 +700,22 @@ describe('registerAppIpcHandlers', () => {
     expect(sections.some((section) => section.provenance.page === 999)).toBe(false)
   })
 
+  it('keeps short OCR pages separate so citations cannot point to the previous page', async () => {
+    const { buildAttachmentSections } = await import('./register-app-ipc-handlers')
+    const sections = buildAttachmentSections(
+      'att_ocr',
+      '<!-- page:1 -->\n\n第一页内容\n\n<!-- page:2 -->\n\n第二页内容',
+      { headings: [{ text: '第一页内容', page: 1 }], tables: [], sourceStructure: { pageCount: 2 } }
+    )
+
+    expect(sections.map(({ ordinal, text, provenance }) => ({
+      ordinal, text: text.replaceAll(' ', ''), provenance
+    }))).toEqual([
+      { ordinal: 0, text: '第一页内容', provenance: { heading: '第一页内容', page: 1 } },
+      { ordinal: 1, text: '第二页内容', provenance: { page: 2 } }
+    ])
+  })
+
   it('rejects invalid settings patches at the handler boundary', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const applySettingsPatch = vi.fn(async () => settings())

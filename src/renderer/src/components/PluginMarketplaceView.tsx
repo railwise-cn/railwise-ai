@@ -1989,6 +1989,13 @@ function DetailsDrawer({ entry, source, installed, skillRuntime, runtimeSkills, 
         </button> : null}
       </DetailSection> : null}
       {item.id === 'officecli' || item.id === 'markitdown' ? <div className="px-5"><ManagedDocumentTool id={item.id} /></div> : null}
+      {item.id === 'docling-mcp' && item.source.catalogSourceId === 'workwise-official' ? (
+        <DetailSection title={text('pluginUnifiedHowToUse', 'How to use')}>
+          <p className="text-[12px] leading-5 text-ds-muted">
+            {text('pluginDoclingPdfRequirements', 'Installation starts the connector. To convert PDFs with Docling, set up Docling Serve or a Docling installation with local conversion support first. To read PDF text, attach the file to your chat.')}
+          </p>
+        </DetailSection>
+      ) : null}
       {diagnostic ? <DetailSection title={text('pluginUpdateDiagnosis', 'Update diagnosis')}><p className="text-[13px] font-medium">{diagnosticLabel(diagnostic, text)}</p>{diagnostic.state === 'runtime-drift' ? <p className="mt-2 text-[12px] text-ds-muted">{text('pluginUpdateFullReason', 'Runtime or source verification changed. Install a verified new package version; metadata review cannot replace runtime validation.')}</p> : null}</DetailSection> : null}
       <DetailSection title={text('pluginUnifiedPackageInfo', 'Package')}>
         <DefinitionList values={[
