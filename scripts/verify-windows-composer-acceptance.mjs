@@ -466,6 +466,19 @@ export async function startWindowsOcrAcceptance({ ownedRoot, workspace }) {
       for (const line of expected.flat()) assert.ok(history.includes(normalizeOcrText(line)), 'Recognized text missing in the installed Runtime model request')
       assert.equal(evidence.recognition?.pages.length, 2)
       evidence.modelObservedOcr = true
+      const toolCallId = 'ocr-attachment-sections'
+      const reply = messages.find(item => item.role === 'tool' && item.tool_call_id === toolCallId)
+      if (!reply) {
+        assert.ok(body.tools.some(tool => tool.function?.name === 'list_attachment_sections'))
+        const manifest = messages.find(item => typeof item.content === 'string' && item.content.includes(`- ${ocrName} (`))
+        const attachmentId = manifest?.content.match(/合成扫描识别\.pdf \([^\n]*?, id=([^),\s]+)\)/)?.[1]
+        assert.ok(attachmentId, 'The scoped attachment ID must be available in the model manifest')
+        return composerModelTool(toolCallId, 'list_attachment_sections', { attachment_id: attachmentId })
+      }
+      const result = parseComposerToolResult(reply.content)
+      assert.equal(result?.untrusted, true)
+      assert.ok(result.sections.length > 0)
+      evidence.sections = result.sections
       return { content: ocrResponse }
     },
     async verify(cdp) {
@@ -486,19 +499,16 @@ export async function startWindowsOcrAcceptance({ ownedRoot, workspace }) {
       )`, 'the original conversation receives the completed attachment-only turn')
       assert.ok(turn.prompt.includes('请根据附件中实际可读取的内容继续处理'))
       const path = `/v1/attachments/${turn.attachmentIds[0]}`, scope = `?thread_id=${encodeURIComponent(threadId)}`
-      const [{ attachment, dataBase64 }, { sections }] = await Promise.all([
-        requestRuntime(cdp, `${path}/content${scope}`),
-        requestRuntime(cdp, `${path}/sections${scope}`)
-      ])
+      const { attachment, dataBase64 } = await requestRuntime(cdp, `${path}/content${scope}`)
       assert.equal(sha256(Buffer.from(dataBase64, 'base64')), inputSha256)
       assert.equal(attachment.state, 'ready')
       assert.equal(attachment.indexState, 'ready')
       assert.equal(attachment.sourceStructure.pageCount, 2)
       assert.equal(attachment.parser.engine, 'unlimited-ocr-local')
-      const indexedPages = sections.map(section => section.provenance.page)
+      const indexedPages = evidence.sections.map(section => section.provenance.page)
       assert.deepEqual(indexedPages, [1, 2])
       expected.forEach((lines, index) => lines.forEach(line => {
-        assert.ok(normalizeOcrText(sections[index].text).includes(normalizeOcrText(line)))
+        assert.ok(normalizeOcrText(evidence.sections[index].text).includes(normalizeOcrText(line)))
       }))
       return { ...evidence, status: 'passed', indexedPages, originalRetained: true, attachmentOnlySend: true,
         parser: attachment.parser.engine, threadId, turnId: turn.id }
