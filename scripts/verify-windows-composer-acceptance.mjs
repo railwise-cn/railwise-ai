@@ -498,7 +498,8 @@ export async function startWindowsOcrAcceptance({ ownedRoot, workspace }) {
         result.ok&&JSON.parse(result.body).turns.find(item=>item.attachmentIds?.length===1&&item.status==='completed')
       )`, 'the original conversation receives the completed attachment-only turn')
       assert.ok(turn.prompt.includes('请根据附件中实际可读取的内容继续处理'))
-      const path = `/v1/attachments/${turn.attachmentIds[0]}`, scope = `?thread_id=${encodeURIComponent(threadId)}`
+      const path = `/v1/attachments/${turn.attachmentIds[0]}`
+      const scope = `?${new URLSearchParams({ thread_id: threadId, workspace })}`
       const { attachment, dataBase64 } = await requestRuntime(cdp, `${path}/content${scope}`)
       assert.equal(sha256(Buffer.from(dataBase64, 'base64')), inputSha256)
       assert.equal(attachment.state, 'ready')
