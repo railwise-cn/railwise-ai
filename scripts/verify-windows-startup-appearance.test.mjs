@@ -167,7 +167,8 @@ test('binds native Mac startup acceptance to a successful immutable frozen relea
   const source = { repository: 'railwise-cn/railwise-ai', workflow: '.github/workflows/release.yml', packageMode: 'frozen-public-identity', sourceHead: 'a'.repeat(40),
     driverHead: 'b'.repeat(40), runId: 100, runAttempt: 1, buildConclusion: 'success', artifactName: 'release-mac',
     artifactId: 200, artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
-    changedFiles: ['scripts/run-mac-startup-appearance-smoke.mjs', 'scripts/verify-windows-composer-acceptance.mjs'] }
+    changedFiles: ['scripts/run-mac-startup-appearance-smoke.mjs', 'scripts/verify-windows-composer-acceptance.mjs',
+      'scripts/prepare-windows-install-smoke.mjs', 'scripts/prepare-windows-install-smoke.test.mjs'] }
   assert.equal(validateMacStartupArtifact(source), source)
   assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['src/main/splash-window.ts'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactExpired: true }))
