@@ -544,6 +544,38 @@ describe('capability waiting card', () => {
     expect(visibleText()).not.toContain(i18n.t('capabilityScopeRecheckOnResume', { ns: 'common' }))
   })
 
+  it.each(['zh', 'en'])('continues the original task after signing in to Dadan in %s', async language => {
+    await i18n.changeLanguage(language)
+    const signIn: ExternalTaskCapabilityCard = { ...card, capability: { provider: 'ego-browser', status: 'blocked',
+      errorCode: 'ego_browser_site_sign_in_required', message: '大单网要求重新登录。请在 Ego 中完成登录，再回到原对话继续。',
+      resolution: { kind: 'retry', route: 'task/ego-browser-site-sign-in', label: '登录后继续' } } }
+    const resume = i18n.t('common:capabilityEgoSiteSignInResume')
+    const cancel = i18n.t('common:capabilityDecline')
+    state.activeThreadId = 'another-conversation'
+    api.coordinateTaskCommand.mockResolvedValueOnce({ kind: 'task_started', task: { id: card.taskId },
+      turn: { threadId: 'hidden-execution', turnId: 'dadan-resumed' } })
+    await render(signIn)
+    expect(visibleText()).toContain(i18n.t('common:capabilityEgoSiteSignInTitle'))
+    expect(visibleText()).toContain(i18n.t('common:capabilityEgoSiteSignInMessage'))
+    expect([...container.querySelectorAll('button')].map(item => item.textContent)).toEqual([resume, cancel])
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+
+    await click(resume)
+
+    expect(api.coordinateTaskCommand).toHaveBeenCalledExactlyOnceWith({ threadId: card.threadId, taskId: card.taskId,
+      resolveAttentionId: card.attentionId, expectedRevision: tasks[0].revision, expectedAttentionRevision: inbox[0].revision,
+      intent: 'resume', idempotencyKey: expect.any(String), request: { prompt: card.prompt } })
+    expect(visibleText()).toContain(i18n.t('common:taskWorkspaceResumeSubmitted'))
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(api.confirmBrowserTaskBinding).not.toHaveBeenCalled()
+    expect(api.getTaskPermissions).not.toHaveBeenCalled()
+    expect(api.runtimeRequest).not.toHaveBeenCalled()
+    expect(state.setRoute).not.toHaveBeenCalled()
+    expect(state.openSettings).not.toHaveBeenCalled()
+    expect(state.openPlugins).not.toHaveBeenCalled()
+    expect(state.selectThread).not.toHaveBeenCalled()
+  })
+
   it.each(['install', 'connect'] as const)('preserves the existing Ego %s action without configuring BrowserSkill', async kind => {
     const label = kind === 'install' ? '查看 Ego 安装入口' : '连接 Ego 浏览器'
     await render({ ...card, capability: { provider: 'ego-browser', status: kind === 'install' ? 'not_installed' : 'needs_authorization',
