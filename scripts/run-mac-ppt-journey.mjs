@@ -99,7 +99,7 @@ async function stopInstalledProcess(child, cdp) {
 async function waitForNativeMacDocument(filename) {
   const deadline = Date.now() + 60_000
   const baseName = filename.replace(/\.pptx$/i, '')
-  let lastWindowTitles = []
+  let lastObservation = { processNames: [], windowTitles: [], systemEventsError: '' }
   while (Date.now() < deadline) {
     const result = spawnSync('/usr/bin/osascript', ['-e', `tell application "System Events"
       if exists process "LibreOffice" then
@@ -108,12 +108,16 @@ async function waitForNativeMacDocument(filename) {
         return ""
       end if
     end tell`], { encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] })
-    lastWindowTitles = result.status === 0 ? result.stdout.trim().split(', ').filter(Boolean) : []
-    const windowTitle = lastWindowTitles.find(title => title.includes(filename) || title.includes(baseName))
+    const processResult = spawnSync('/bin/ps', ['-axo', 'comm='], { encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    const processNames = processResult.status === 0 ? processResult.stdout.split(/\r?\n/).map(name => name.trim()).filter(Boolean)
+      .filter(name => /LibreOffice|soffice/i.test(name)) : []
+    const windowTitles = result.status === 0 ? result.stdout.trim().split(', ').filter(Boolean) : []
+    lastObservation = { processNames, windowTitles, systemEventsError: result.stderr?.trim().slice(0, 300) ?? '' }
+    const windowTitle = windowTitles.find(title => title.includes(filename) || title.includes(baseName))
     if (windowTitle) return { status: 'os-open-accepted', application: 'LibreOffice', windowTitle }
     await wait(250)
   }
-  throw new Error(`LibreOffice did not show ${filename}. Observed windows: ${lastWindowTitles.join(', ') || 'none'}`)
+  throw new Error(`LibreOffice did not show ${filename}. Observation: ${JSON.stringify(lastObservation)}`)
 }
 
 async function readNativeOpenResult(_cdp, { artifact }) {
@@ -157,6 +161,13 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
     const libreOffice = spawnSync('/Applications/LibreOffice.app/Contents/MacOS/soffice', ['--headless', '--terminate_after_init'],
       { cwd: root, env, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
     assert.equal(libreOffice.status, 0, libreOffice.error?.message ?? libreOffice.stderr ?? 'LibreOffice profile initialization failed')
+    const registerPptx = spawnSync('duti', ['-s', 'org.libreoffice.script', 'pptx', 'all'],
+      { cwd: root, env, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    assert.equal(registerPptx.status, 0, registerPptx.error?.message ?? registerPptx.stderr ?? 'PPTX handler registration failed')
+    const verifyPptx = spawnSync('duti', ['-x', 'pptx'],
+      { cwd: root, env, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    assert.equal(verifyPptx.status, 0)
+    assert.equal(verifyPptx.stdout.trim().split(/\r?\n/)[0], 'LibreOffice', 'The isolated HOME must resolve PPTX files to LibreOffice')
     receipt.nativeOpenerProfile = 'initialized-under-isolated-home'
     await recordStage('initialize-native-document-handler-under-isolated-profile')
     await writeFile(join(workwiseHome, 'workspace-trust.json'), JSON.stringify({ schema: 'workwise.workspace-trust', version: 1,
