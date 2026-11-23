@@ -462,6 +462,8 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.equal(spreadsheet.installedAsarSha256, report.installedAsarSha256)
     assert.equal(spreadsheet.installerSha256, report.installerSha256)
     assert.equal(spreadsheet.packageUnchanged, true)
+    assert.ok(report.checks.includes('offline-spreadsheet-ui-journey-isolated'))
+    return true
   }
   if (requireWebPptBrowserFallback) {
     assert.ok(report.checks.includes('installed-chat-web-ppt-browser-fallback'))
