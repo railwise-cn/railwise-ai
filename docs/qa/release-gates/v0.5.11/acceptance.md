@@ -228,4 +228,14 @@ Windows Docling 专项 `45164369592` 使用候选 `45115646587`，工具启动�
 
 当前源码只在 `waiting_user` 且没有其他不同的待答会话问题时绑定任务回答。暂停任务的问题在任务卡和时间线都改为只读说明，并指向现有「继续任务」操作；Workbench 从任务快照排除暂停任务的问题，再选择普通会话可答问题。KUN 对暂停态答复的拒绝规则保持不变。
 
-最终源码聚焦 UI/路由回归 24/24、全量 Vitest 5045 项通过且 14 项跳过、发布门禁 586 项通过且 1 项因宿主缺 PowerShell 跳过、OpenSpec 13/13、主仓与 KUN TypeScript 检查、修改文件 ESLint、差异检查及生产构建均通过。Vitest 中 DevBrowserPanel 的本地预览夹具会输出连接拒绝日志，测试进程仍以 0 退出且全部断言通过。此改动尚未进入候选安装包，也没有实装回执；合并源码后必须用新候选复验暂停后继续、镜像问题只读显示及普通会话问题仍可回答。真实模型官网 PPT 所需 Actions 模型配置目前仍未出现。正式渠道仍为 0.5.10。
+该修复合并前，源码聚焦 UI/路由回归 24/24、全量 Vitest 5045 项通过且 14 项跳过、发布门禁 586 项通过且 1 项因宿主缺 PowerShell 跳过、OpenSpec 13/13、主仓与 KUN TypeScript 检查、修改文件 ESLint、差异检查及生产构建均通过。Vitest 中 DevBrowserPanel 的本地预览夹具会输出连接拒绝日志，测试进程仍以 0 退出且全部断言通过。合并前的源码尚未进入候选包；候选构建和包体证据见后续记录。暂停后继续、镜像问题只读显示及普通会话问题仍可回答尚无安装包实装回执。真实模型官网 PPT 所需 Actions 模型配置目前仍未出现。正式渠道仍为 0.5.10。
+
+## 2026-11-23 合并候选与 Apple Silicon 包验签
+
+修复已合并到 `main`，提交 `cd2abcf0c9bf17a0c087d1cf2506530de576dc75`。最终提交的 GitHub Quality 两组 run 均通过，包含 OpenSpec、品牌边界、license、ESLint、主仓和 KUN 类型检查、全量主仓/KUN 测试、发布门禁、生产构建、Electron smoke 与 Windows 持久化检查。
+
+候选构建 `45183135008` 使用 `candidate_only=true`、`prepare_public_artifacts=true`、`publish_release=false`，来源为上述 `main` 提交。三端候选构建、PPT Master sidecar 往返验证、镜像锁覆盖、三客户端制品摘要校验以及 macOS 双架构签名/公证复核均通过。正式渠道未改变，候选未发布。
+
+从候选 artifact `candidate-installers-0.5.11-410` 选择性提取 Apple Silicon DMG。DMG 为 410,509,343 字节，SHA-256 `7dead1d1ef872e0159c654c83fc20989bffd91a8d9016650b4047847c583d686`，与同包 `SHA256SUMS.txt` 匹配。复制到隔离临时目录后，`codesign --verify --deep --strict`、Gatekeeper `spctl --assess` 和 `xcrun stapler validate` 均通过；系统报告 Developer ID 签名及已公证。Info.plist 与 ASAR 版本为 0.5.11，Bundle ID 为 `com.wangjiawei508.workgpt`，ASAR SHA-256 为 `2a13b5c628d5e394cf5f7c66c2e6d74930a4878800a92ba8d7da83ea1a22a30c`。候选清单中的 Intel DMG SHA-256 为 `c20409249dddc940cfcd4b26c45e789163d229ad31a397718825e6f02942a398`，Windows x64 EXE 为 `492b7a7027048f57c8124d5285ff0d3de932b0add0648f233e02978dfdee635e`。
+
+**实装 UI 验收仍未通过或未执行。** 本机已有多个正式 RailWise 窗口使用相同 Bundle ID。Computer Use 对临时路径启动返回超时，Finder 打开也复用已有窗口。为避免关闭用户当前窗口，没有通过强制退出正式应用来规避同 Bundle ID 冲突。因此这份已验签 DMG 的冷启动、暂停任务问题只读态、继续后答复及其他任务旅程尚无候选包实装证据。Windows EXE 也未在 Windows 设备安装。真实模型官网 PPT 所需 Actions 配置仍缺 `RAILWISE_QA_MODEL_BASE_URL`、`RAILWISE_QA_MODEL`、`RAILWISE_QA_MODEL_API_KEY`。正式渠道仍为 0.5.10，不能据此发布 0.5.11。
