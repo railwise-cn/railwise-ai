@@ -112,3 +112,15 @@ Windows BrowserSkill 重跑 `45068852871` 使用修复 KUN 中断记账的候选
 Windows 实装 `45084343092` 使用 `45082249126` 的精确安装包。失效回执确认输入框同时显示网址草稿和发送按钮，前端将其提交成普通补充；运行时 attention 列表为空，原 Turn 的用户输入仍 pending，`request_user_input` 工具已 aborted，任务停在“正在根据补充网址更新只读网页读取范围”。修复前候选不再用于 BrowserSkill 结论。新的 `composerReplyQuestion` 选择器、任务栏混合控件回归 16/16、类型检查、lint 均通过；新候选尚未生成。并行启动界面验收 `45084343835` 在 `release-mac` 制品上传前启动，Apple Silicon 与 Intel 都在“解析 macOS 安装包”阶段失败，尚未安装应用，必须待新候选包齐备后重跑 Mac 检查。
 
 同一候选的升级矩阵 `45084343320` 中，0.5.7 覆盖安装和 0.5.10 左下角升级均通过，版本、安装目录、ASAR、工作区、偏好和会话回读一致。设置页路径完成了原生安装阶段并检测到新窗口，但在后续 teardown 等待所有同路径进程退出时超时，阻断了版本与数据回读。候选安装器已下载完整，回执不表示设置页路径已验收通过。已将验收清理改为等待本次升级后启动的主窗口 PID，再以新包重跑并确认读回。
+
+Windows BrowserSkill 回退在候选 `ea0de273` 再次失败，实装 `45088487514` 绑定安装器 SHA-256 `ca46c525c9fd86b4aa69328c8510907e6601fde37db2c6714a05ba608dba01bb` 和 ASAR SHA-256 `8a558471e7420cb4a20405a91741a7796dfb5ca1c552e4f0cba128e2a3aa2461`。提交后运行状态仍是等待网址，URL 成为普通补充，原问题 pending，未开始新 Turn。继续复核发现 TaskRunStatusBar 与 TaskAttentionCard 同时更新同一个 Composer 问题状态，子卡随消息内联而卸载时可能清掉任务问题绑定；Workbench 又先处理不同 request ID 的普通问题，可能绕过任务专属回答接口。现收敛为任务栏单一绑定来源，任务回答优先使用精确请求 ID；验收在发送前核对 Composer request ID 与唯一待答事项一致，发送后核对同任务开启新 Turn。修复已在源码，尚未进入制品。
+
+## 2026-11-23 对话内补答回执修复
+
+提交 `0c0952f5` 让任务问题在唯一的任务栏状态源中绑定到原问题 ID；任务补答优先走 KUN 的 `/v1/user-inputs/{id}` 路径，普通对话问题仍走原消息输入路径。验收现在检查输入框绑定 ID 与待答事项一致、KUN 以 `user-input:{id}` 幂等键恰好保存一次补充、待答问题已结算、任务仍属于原对话。普通补答保留当前 Turn，浏览器只读范围扩展单独要求新 Turn。发布回执拒绝问题 ID 不匹配、重复输入、任务或对话错绑。另将锚定菜单测试改为等待实际关闭，避免固定 30 毫秒时延误判。
+
+源码级验证通过。`npm test` 在 Node `v26.13.0` 加 `--localstorage-file` 后为 5,038 通过、14 跳过；首次无该 Node 本地存储参数的运行有 3 个 DOM 测试文件失败，补参数后均通过。`npm run test:release-gate` 为 585 通过、1 跳过，缺少 PowerShell 的用例由宿主跳过。网站到 PPT、核心回执、启动、Windows 更新与 UI 验收驱动 183/183；任务问题和锚定菜单 DOM 用例 20/20；KUN 任务协调器与持久化输入门 46/46。类型检查、修改文件 ESLint、差异检查和生产构建通过。
+
+本机 KUN 运行时的受控模型旅程读取真实 `https://www.railwise.cn/` 首页正文 39,126 字节，调用内置 PPT Master 和原生质量检查，生成并解包校验可编辑 PPTX 13,116 字节。原始回执存于 [source-web-ppt-controlled-0c0952f5.json](../../evidence/v0.5.11/source-web-ppt-controlled-0c0952f5.json)，其 SHA-256 为 `de0e469b15bb80974dc292ff0263ea2166ff42e12c2803bf6700b1c4c6194322`。这是本机运行时及合成模型证据，不是安装包界面或真实模型验收。
+
+`0c0952f5` 尚未进入 GitHub Actions 的新质量运行或三端候选安装包。下一步需推送代码，重跑 Quality 和候选构建，再对同批包重跑 Windows BrowserSkill 与任务补答、附件/PDF/技能插件、0.5.7 覆盖和 0.5.10 两个升级入口，以及 Mac 双架构启动和表格。真实模型三个 Actions 配置项、已登录大单网/Ego、国内普通网络 Windows 与现场 OCR 仍待补实测。正式渠道仍为 0.5.10，此处没有发布验收结论。
