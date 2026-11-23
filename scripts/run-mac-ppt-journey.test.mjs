@@ -35,8 +35,9 @@ test('Mac PPT receipts retain the last chat journey stage when CDP stalls', asyn
     'verify-registered-editable-pptx',
     'open-pptx-through-system-application'
   ]) assert.ok(journey.includes(stage), `Missing journey checkpoint ${stage}`)
-  assert.match(runner, /soffice', \['--headless', '--terminate_after_init'\]/)
   assert.match(runner, /spawnSync\('duti', \['-s', 'org\.libreoffice\.script', 'pptx', 'all'\]/)
+  assert.doesNotMatch(runner, /soffice', \['--headless', '--terminate_after_init'\]/,
+    'The external app must first launch from the delivered-file open action')
   assert.match(runner, /get name of every window of process "LibreOffice"/)
   assert.match(runner, /get name of every window of process "LibreOffice"[\s\S]+?processNames/)
   const nativeOpenStart = runner.indexOf('async function readNativeOpenResult')

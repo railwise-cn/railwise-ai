@@ -158,9 +158,6 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
     assert.equal(env.HOME, join(root, 'home'))
     await Promise.all([profile, workspace, workwiseHome, evidenceDir].map(path => mkdir(path, { recursive: true, mode: 0o700 })))
     await recordStage('prepare-isolated-profile')
-    const libreOffice = spawnSync('/Applications/LibreOffice.app/Contents/MacOS/soffice', ['--headless', '--terminate_after_init'],
-      { cwd: root, env, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
-    assert.equal(libreOffice.status, 0, libreOffice.error?.message ?? libreOffice.stderr ?? 'LibreOffice profile initialization failed')
     const registerPptx = spawnSync('duti', ['-s', 'org.libreoffice.script', 'pptx', 'all'],
       { cwd: root, env, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] })
     assert.equal(registerPptx.status, 0, registerPptx.error?.message ?? registerPptx.stderr ?? 'PPTX handler registration failed')
@@ -168,8 +165,8 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
       { cwd: root, env, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] })
     assert.equal(verifyPptx.status, 0)
     assert.equal(verifyPptx.stdout.trim().split(/\r?\n/)[0], 'LibreOffice', 'The isolated HOME must resolve PPTX files to LibreOffice')
-    receipt.nativeOpenerProfile = 'initialized-under-isolated-home'
-    await recordStage('initialize-native-document-handler-under-isolated-profile')
+    receipt.nativeOpenerProfile = 'registered-under-isolated-home'
+    await recordStage('register-native-document-handler-under-isolated-profile')
     await writeFile(join(workwiseHome, 'workspace-trust.json'), JSON.stringify({ schema: 'workwise.workspace-trust', version: 1,
       workspaces: [{ level: 'workspace-write', canonicalRoot: workspace, revision: 1 }] }), { mode: 0o600 })
     await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
