@@ -451,7 +451,6 @@ jobs:
         run: |
           brew install --cask libreoffice
           brew install duti
-          /Applications/LibreOffice.app/Contents/MacOS/soffice --headless --terminate_after_init
           /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/LibreOffice.app
           duti -s org.libreoffice.script pptx all
           test "$(duti -x pptx | head -n 1)" = "LibreOffice"

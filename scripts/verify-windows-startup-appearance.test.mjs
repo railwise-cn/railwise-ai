@@ -204,7 +204,7 @@ test('provides an external PPTX handler only to the exact macOS artifact journey
   assert.match(job['timeout-minutes'], /inputs\.web_ppt_journey == 'controlled' && 40/)
   assert.equal(opener.if, "${{ matrix.arch == 'arm64' && (inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') }}")
   assert.match(opener.run, /brew install --cask libreoffice/)
-  assert.match(opener.run, /soffice --headless --terminate_after_init/)
+  assert.doesNotMatch(opener.run, /soffice --headless/)
   assert.match(opener.run, /duti -s org\.libreoffice\.script pptx all/)
   assert.match(opener.run, /LaunchServices\.framework\/Support\/lsregister -f \/Applications\/LibreOffice\.app/)
   assert.match(opener.run, /duti -x pptx/)
