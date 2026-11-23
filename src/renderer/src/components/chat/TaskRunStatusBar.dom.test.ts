@@ -237,6 +237,12 @@ describe('task actions in the original conversation', () => {
     expect(button('提交回答')).toBeUndefined()
     expect(button('继续任务')).toBeTruthy()
 
+    tasks = [{ ...tasks[0]!, revision: tasks[0]!.revision + 1 }]
+    api.listTaskInputs.mockResolvedValue([{ id: 'saved-answer', taskId: tasks[0]!.id, kind: 'supplement', text: 'https://example.test',
+      idempotencyKey: 'user-input:paused-request', createdAt: tasks[0]!.updatedAt }])
+    await render({ composerReplies: true, onComposerQuestionChange })
+    expect(container.querySelector('[aria-label="暂停前未回答的问题"]')).toBeNull()
+
     const secondPause = { ...tasks[0]!, activeTurnId: 'second-interrupted-turn' }
     tasks = [secondPause]
     api.runtimeRequest.mockRejectedValueOnce(new Error('temporary thread read failure'))

@@ -212,7 +212,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, conversationCon
       setAnsweredQuestions(history)
     }).catch(() => {})
     return () => { active = false }
-  }, [questionHistoryRequestId, questionHistoryText, runtimeReady, task.activeTurnId, task.id, task.status, task.threadId])
+  }, [questionHistoryRequestId, questionHistoryText, runtimeReady, task.activeTurnId, task.id, task.revision, task.status, task.threadId])
   const isInline = (item: TaskAttentionV1): boolean => isInTimeline(item, { inlineRequests, inlineCapabilityCards })
   const remainingAttention = pending.filter(item => {
     if (isInline(item)) return false
