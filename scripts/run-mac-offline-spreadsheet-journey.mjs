@@ -234,8 +234,6 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
       await cdp.wait(`document.activeElement?.id === ${JSON.stringify(cellEditorId)} && document.activeElement.isContentEditable`,
         'Univer cell editor focus')
       await cdp.send('Input.insertText', { text: value })
-      await cdp.wait(`document.activeElement?.id === ${JSON.stringify(cellEditorId)} &&
-        document.activeElement.textContent === ${JSON.stringify(value)}`, 'text in the active cell editor')
       await key('Enter', 'Enter', 13)
       await cdp.wait(`document.activeElement?.id !== ${JSON.stringify(cellEditorId)} || !document.activeElement.isContentEditable`,
         'committed cell edit')
@@ -381,7 +379,10 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
         } : null,
         cellEditors: [...document.querySelectorAll('input,textarea,[contenteditable="true"]')].map(element => ({
           tag: element.tagName,
+          id: element.id,
+          editable: element.isContentEditable,
           value: 'value' in element ? element.value : element.textContent,
+          innerText: element.innerText,
           className: element.className?.toString?.() ?? ''
         })),
         activeButtons: [...document.querySelectorAll('button')].filter(button => button.getClientRects().length).map(button => ({

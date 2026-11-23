@@ -100,7 +100,9 @@ async function readNativeOpenResult(cdp, { task, artifact }) {
   const result = artifact.absolutePath || artifact.storage === 'task'
     ? await cdp.evaluate(`window.workwise.openTaskArtifact(${JSON.stringify({ taskId: task.id, artifactId: artifact.id })})`)
     : await cdp.evaluate(`window.workwise.openWorkspaceFile(${JSON.stringify({ workspaceRoot: task.workspaceRoot, path: artifact.relativePath })})`)
-  assert.equal(result?.ok, true, 'The operating system must accept opening the registered PPTX')
+  if (result?.ok !== true) {
+    throw new Error(`The operating system could not open the registered PPTX: ${result?.message ?? 'No error detail returned.'}`)
+  }
   return { status: 'os-open-accepted' }
 }
 
