@@ -20,7 +20,10 @@ function replyTrace(sameTurn = true) {
   const firstTurn = 'turn-1'
   return {
     before: { ui: { taskQuestionRequestId: requestId }, task: { activeTurnId: firstTurn },
-      attention: [{ requestId, kind: 'question', status: 'pending', questionCount: 1, textQuestion: true }] },
+      attention: [{ requestId, kind: 'question', status: 'pending', questionCount: 1, textQuestion: true,
+        questionId: 'website', questionLabel: '请提供官网网址。' }] },
+    userInputRequest: { path: `/v1/user-inputs/${requestId}`, method: 'POST', questionId: 'website',
+      label: '请提供官网网址。', answerLength: 15, answerMatchesExpected: true },
     after: { task: { id: 'task-1', originThreadId: 'conversation-1', activeTurnId: sameTurn ? firstTurn : 'turn-2' },
       inputs: [{ kind: 'supplement', idempotencyKey: `user-input:${requestId}` }], attention: [] }
   }

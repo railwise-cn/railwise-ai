@@ -130,7 +130,10 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
   const requestId = 'question-1'
   const replyTrace = sameTurn => ({
     before: { ui: { taskQuestionRequestId: requestId }, task: { activeTurnId: 'turn-1' },
-      attention: [{ requestId, kind: 'question', status: 'pending', questionCount: 1, textQuestion: true }] },
+      attention: [{ requestId, kind: 'question', status: 'pending', questionCount: 1, textQuestion: true,
+        questionId: 'website', questionLabel: '请提供官网网址。' }] },
+    userInputRequest: { path: `/v1/user-inputs/${requestId}`, method: 'POST', questionId: 'website',
+      label: '请提供官网网址。', answerLength: 15, answerMatchesExpected: true },
     after: { task: { id: 'task-1', originThreadId: 'conversation-1', activeTurnId: sameTurn ? 'turn-1' : 'turn-2' },
       inputs: [{ kind: 'supplement', idempotencyKey: `user-input:${requestId}` }], attention: [] }
   })
@@ -172,7 +175,10 @@ test('website-to-PPT identity binds the task to the visible conversation while r
     sameConversation: true, originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: false,
     initialTurnId: 'turn-1', completedTurnId: 'turn-2', replyTrace: {
       before: { ui: { taskQuestionRequestId: 'question-1' }, task: { activeTurnId: 'turn-1' },
-        attention: [{ requestId: 'question-1', kind: 'question', status: 'pending', questionCount: 1, textQuestion: true }] },
+        attention: [{ requestId: 'question-1', kind: 'question', status: 'pending', questionCount: 1, textQuestion: true,
+          questionId: 'website', questionLabel: '请提供官网网址。' }] },
+      userInputRequest: { path: '/v1/user-inputs/question-1', method: 'POST', questionId: 'website',
+        label: '请提供官网网址。', answerLength: 15, answerMatchesExpected: true },
       after: { task: { id: 'task-1', originThreadId: 'chat-1', activeTurnId: 'turn-2' },
         inputs: [{ kind: 'supplement', idempotencyKey: 'user-input:question-1' }],
         attention: [] }
@@ -180,6 +186,10 @@ test('website-to-PPT identity binds the task to the visible conversation while r
   assert.equal(validateWebPptTurnIdentity(proof), undefined)
   assert.throws(() => validateWebPptTurnIdentity({ ...proof, originThreadId: 'worker-1' }))
   assert.throws(() => validateWebPptTurnIdentity({ ...proof, originalConversation: { ...proof.originalConversation, questionVisible: false } }))
+  assert.throws(() => validateWebPptTurnIdentity({ ...proof, replyTrace: { ...proof.replyTrace,
+    userInputRequest: { ...proof.replyTrace.userInputRequest, path: '/v1/tasks/wrong/inputs' } } }))
+  assert.throws(() => validateWebPptTurnIdentity({ ...proof, replyTrace: { ...proof.replyTrace,
+    userInputRequest: { ...proof.replyTrace.userInputRequest, answerMatchesExpected: false } } }))
 })
 
 test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {
