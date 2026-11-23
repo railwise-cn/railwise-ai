@@ -437,6 +437,7 @@ jobs:
         run: |
           brew install --cask libreoffice
           brew install duti
+          /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/LibreOffice.app
           duti -s org.libreoffice.script pptx all
           test "$(duti -x pptx | head -n 1)" = "LibreOffice"
       - name: Inspect the signed installed application and real startup surfaces

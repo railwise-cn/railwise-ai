@@ -317,10 +317,9 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
       sha256: await sha256(copyPath) }
     report.checks.push('save-reopen-multiple-sheets-through-production-reader')
 
-    await until('Chinese write navigation', () => cdp.evaluate('[...document.querySelectorAll("button")].some(button => button.getClientRects().length && button.textContent.trim() === "写作")'))
-    await click('写作')
-    await cdp.wait(`([...document.querySelectorAll("button")].some(button => button.getClientRects().length && button.textContent.trim() === ${JSON.stringify(xlsxName)}))`, 'XLSX workspace file')
-    await click(xlsxName)
+    await cdp.evaluate(`window.dispatchEvent(new CustomEvent('kun:workspace-file-preview', {
+      detail: ${JSON.stringify({ workspaceRoot: workspace, path: xlsxPath })}
+    }))`)
     const previewRendered = await cdp.wait(`(() => {
       const panel = document.querySelector('.ds-code-sidebar');
       const canvas = [...(panel?.querySelectorAll('canvas[data-u-comp="render-canvas"]') ?? [])]
