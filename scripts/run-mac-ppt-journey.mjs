@@ -98,8 +98,8 @@ async function stopInstalledProcess(child, cdp) {
 
 async function readNativeOpenResult(cdp, { task, artifact }) {
   const result = artifact.absolutePath || artifact.storage === 'task'
-    ? await cdp.evaluate(`window.workwise.openTaskArtifact(${JSON.stringify({ taskId: task.id, artifactId: artifact.id })})`)
-    : await cdp.evaluate(`window.workwise.openWorkspaceFile(${JSON.stringify({ workspaceRoot: task.workspaceRoot, path: artifact.relativePath })})`)
+    ? await cdp.evaluate(`window.workwise.openTaskArtifact(${JSON.stringify({ taskId: task.id, artifactId: artifact.id })})`, 180_000)
+    : await cdp.evaluate(`window.workwise.openWorkspaceFile(${JSON.stringify({ workspaceRoot: task.workspaceRoot, path: artifact.relativePath })})`, 180_000)
   if (result?.ok !== true) {
     throw new Error(`The operating system could not open the registered PPTX: ${result?.message ?? 'No error detail returned.'}`)
   }

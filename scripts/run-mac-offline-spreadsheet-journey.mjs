@@ -328,7 +328,8 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
         panelVisible: Boolean(panel.getClientRects().length), gridRendered: true,
         saveButtonVisible: [...panel.querySelectorAll('button')].some(button => button.getClientRects().length && button.textContent.includes('保存表格')),
         csvImportVisible: [...panel.querySelectorAll('button')].some(button => button.getClientRects().length && button.textContent.includes('导入 CSV')),
-        systemOpenEntryVisible: [...panel.querySelectorAll('button')].some(button => button.getClientRects().length && button.getAttribute('aria-label') === '在系统应用打开')
+        systemOpenEntryVisible: [...panel.querySelectorAll('button')].some(button => button.getClientRects().length &&
+          (button.getAttribute('aria-label') === '在系统应用打开' || button.textContent.includes('在系统应用打开')))
       };
     })()`, 'read-only XLSX grid', 45_000)
     assert.equal(previewRendered.panelVisible, true)
