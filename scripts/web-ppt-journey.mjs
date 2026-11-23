@@ -99,7 +99,36 @@ async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
   }
 }
 
-export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPrompt, expectedQuestion = webPptQuestion, sourceAnswer = webPptSourceHost } = {}) {
+async function readWebPptReplyState(cdp, taskId, executionThreadId) {
+  const [ui, task, inputs, inbox, thread] = await Promise.all([
+    cdp.evaluate(`({
+      answerComposerVisible: Boolean(document.querySelector(${literal(answerComposer)})?.getClientRects().length),
+      composerPlaceholder: document.querySelector('.ds-chat-composer-dock textarea')?.placeholder,
+      replyHintVisible: document.querySelector(${literal(timeline)})?.innerText.includes('在下方输入框直接回复') ?? false,
+      submitButtonVisible: [...document.querySelectorAll('button')].some(button =>
+        button.getClientRects().length && button.getAttribute('aria-label') === '提交')
+    })`),
+    cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
+    cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/inputs`)),
+    cdp.evaluate(readRuntime('/v1/inbox')),
+    cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(executionThreadId)}`))
+  ])
+  return {
+    ui,
+    task: { status: task.status, activeTurnId: task.activeTurnId, presentationReason: task.presentation?.reason },
+    inputs: inputs.map(input => ({ kind: input.kind, status: input.status, sourceId: input.sourceId,
+      textLength: typeof input.text === 'string' ? input.text.length : undefined })),
+    attention: inbox.filter(item => item.taskId === taskId).map(item => ({ kind: item.kind, status: item.status,
+      requestId: item.requestId, questionCount: Array.isArray(item.payload?.questions) ? item.payload.questions.length : 0,
+      textQuestion: Array.isArray(item.payload?.questions) && item.payload.questions.every(question =>
+        !Array.isArray(question?.options) || question.options.length === 0) })),
+    turns: thread.turns.map(turn => ({ id: turn.id, status: turn.status,
+      pendingInputs: turn.items.filter(item => item.kind === 'user_input' && item.status === 'pending').map(item => item.requestId) }))
+  }
+}
+
+export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPrompt, expectedQuestion = webPptQuestion,
+  sourceAnswer = webPptSourceHost, requireNewTurn = false } = {}) {
   const priorThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.map(thread => thread.id)
   await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
   await cdp.fill(composer, '/ppt')
@@ -119,9 +148,26 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
     'the active task from that conversation')
   assert.equal(task.originThreadId, thread.id, 'The task must remain attached to the original conversation')
   assert.ok(task.threadId, 'KUN must assign an execution thread to the task')
-  await cdp.fill(answerComposer, sourceAnswer)
-  await cdp.click('button[aria-label="提交"]:not(:disabled)')
-  return { prompt: promptText, conversationThreadId: thread.id, executionThreadId: task.threadId, taskId: task.id, turnId: task.activeTurnId }
+  const replyBefore = await readWebPptReplyState(cdp, task.id, task.threadId)
+  const replyTrace = { before: replyBefore }
+  try {
+    assert.ok(replyBefore.ui.answerComposerVisible && replyBefore.ui.replyHintVisible && replyBefore.ui.submitButtonVisible,
+      `The task question was not bound to the original chat composer: ${JSON.stringify(replyBefore)}`)
+    await cdp.fill(answerComposer, sourceAnswer)
+    await cdp.click('button[aria-label="提交"]:not(:disabled)')
+    if (requireNewTurn) {
+      await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(task.id)}`)}.then(task=>
+        task.activeTurnId && task.activeTurnId !== ${literal(task.activeTurnId)} ? task : null)`,
+      'the same task to resume in a new Turn after expanding its read-only browser scope', 45_000)
+    }
+    replyTrace.after = await readWebPptReplyState(cdp, task.id, task.threadId)
+  } catch (error) {
+    replyTrace.after = await readWebPptReplyState(cdp, task.id, task.threadId).catch(() => undefined)
+    if (error && typeof error === 'object') error.webPptDiagnostics = replyTrace
+    throw error
+  }
+  return { prompt: promptText, conversationThreadId: thread.id, executionThreadId: task.threadId,
+    taskId: task.id, turnId: task.activeTurnId, replyTrace }
 }
 
 export async function verifyEditableWebPpt(path, artifact, { source = webPptSourceHost, marker } = {}) {
@@ -347,7 +393,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
     },
     async verify(cdp, { openArtifact, browserInstanceId } = {}) {
       const journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
-        sourceAnswer: fallback?.url ?? webPptSourceHost })
+        sourceAnswer: fallback?.url ?? webPptSourceHost, requireNewTurn: Boolean(fallback) })
       const task = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)}.then(task=>
         ['completed','failed','stalled','cancelled','waiting_user','paused'].includes(task.status) ? task : null)`,
       'task completion or a visible request for input', live ? 480_000 : 180_000)

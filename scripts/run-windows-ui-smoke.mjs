@@ -3382,6 +3382,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   } catch (error) {
     // The isolated live provider may include its request URL or payload in errors.
     report.errors.push(webPptLive ? 'Live model acceptance did not complete' : error instanceof Error ? error.message : String(error))
+    if (error.webPptDiagnostics) report.webPptDiagnostics = error.webPptDiagnostics
     if (doclingConversion && marketplaceAcceptance?.diagnostics) {
       report.skillExecutionDiagnostics = marketplaceAcceptance.diagnostics()
     }
