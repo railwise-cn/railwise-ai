@@ -1114,11 +1114,13 @@ function CopyFeedbackButton({
 function UserInputBubble({
   block,
   nested = false,
-  replyInComposer = false
+  replyInComposer = false,
+  taskPausedQuestion = false
 }: {
   block: Extract<ChatBlock, { kind: 'user_input' }>
   nested?: boolean
   replyInComposer?: boolean
+  taskPausedQuestion?: boolean
 }): ReactElement {
   const { t } = useTranslation('common')
   const resolveUserInput = useChatStore((s) => s.resolveUserInput)
@@ -1157,6 +1159,13 @@ function UserInputBubble({
   const cancel = (): void => {
     if (!pending) return
     void resolveUserInput(block.id, { kind: 'cancel' })
+  }
+
+  if (taskPausedQuestion && pending && block.questions[0]) {
+    return <div role="status" className="min-w-0 rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2 text-ds-ink">
+      <p className="break-words text-[13px] font-medium">{block.questions[0].question}</p>
+      <p className="text-xs text-ds-muted">{t('taskQuestionPausedReplyHint')}</p>
+    </div>
   }
 
   if (replyInComposer && pending && block.questions[0]) {
@@ -1481,7 +1490,7 @@ function formatMessageDateTime(input: string, locale: string): string {
   }).format(date)
 }
 
-export function MessageBubble({ block, nested = false, professionalSurface = false, language, replyInComposer = false }: { block: ChatBlock; nested?: boolean; professionalSurface?: boolean; language?: string; replyInComposer?: boolean }): ReactElement {
+export function MessageBubble({ block, nested = false, professionalSurface = false, language, replyInComposer = false, taskPausedQuestion = false }: { block: ChatBlock; nested?: boolean; professionalSurface?: boolean; language?: string; replyInComposer?: boolean; taskPausedQuestion?: boolean }): ReactElement {
   const { t, i18n } = useTranslation('common')
   const activeThreadId = useChatStore((s) => s.activeThreadId)
   const hideRuntimeBlock = professionalSurface && block.kind !== 'assistant' && block.kind !== 'user'
@@ -1556,7 +1565,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
     return <ToolEntry key={block.id} block={block} />
   }
   if (block.kind === 'user_input') {
-    return <UserInputBubble block={block} nested={nested} replyInComposer={replyInComposer} />
+    return <UserInputBubble block={block} nested={nested} replyInComposer={replyInComposer} taskPausedQuestion={taskPausedQuestion} />
   }
   if (block.kind === 'approval') {
     return <ApprovalBubble block={block} />

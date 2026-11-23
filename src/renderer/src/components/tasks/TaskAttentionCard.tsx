@@ -27,7 +27,7 @@ function attentionQuestions(item: TaskAttentionV1): Question[] {
   })
 }
 
-export function TaskAttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow, replyInComposer, onComposerQuestionChange }: { item: TaskAttentionV1; ownerTask?: TaskRunV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: (notice?: string) => void; onOpenThread?: (id: string) => void; onOpenFlow?: (flowId?: string, flowRunId?: string) => void; replyInComposer?: boolean; onComposerQuestionChange?: (question: TaskComposerQuestion | null) => void }): ReactElement {
+export function TaskAttentionCard({ item, ownerTask, conversationThreadId, workspaceRoot, onResolved, onOpenThread, onOpenFlow, replyInComposer, questionPaused = false, onComposerQuestionChange }: { item: TaskAttentionV1; ownerTask?: TaskRunV1; conversationThreadId?: string; workspaceRoot?: string; onResolved: (notice?: string) => void; onOpenThread?: (id: string) => void; onOpenFlow?: (flowId?: string, flowRunId?: string) => void; replyInComposer?: boolean; questionPaused?: boolean; onComposerQuestionChange?: (question: TaskComposerQuestion | null) => void }): ReactElement {
   const { t } = useTranslation('common')
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -45,6 +45,10 @@ export function TaskAttentionCard({ item, ownerTask, conversationThreadId, works
       questionId: composerQuestionId, label: composerQuestionLabel })
     return () => onComposerQuestionChange(null)
   }, [composerQuestion, composerQuestionId, composerQuestionLabel, conversationThreadId, item.requestId, item.taskId, onComposerQuestionChange])
+  if (questionPaused && item.kind === 'question' && questions.length) return <div className="min-w-0 py-1.5 text-ds-ink">
+    {questions.map(question => <p key={question.id} className="break-words text-[13px] font-medium">{question.label}</p>)}
+    <p role="status" className="text-xs text-ds-muted">{t('taskQuestionPausedReplyHint')}</p>
+  </div>
   const capability = item.payload?.capability
   const originalRequest = item.payload?.request
   const capabilityCard: ExternalTaskCapabilityCard | null = item.payload?.kind === 'capability_required' && item.taskId &&

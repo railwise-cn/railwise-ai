@@ -1,4 +1,4 @@
-import { refreshTaskState, requestTaskDetail, takeRequestedTask, updateTaskNavigation } from '../store/task-live-store'
+import { refreshTaskState, requestTaskDetail, takeRequestedTask, updateTaskNavigation, usePausedTaskQuestionRequestIds } from '../store/task-live-store'
 import { findTaskOriginConversation } from '../lib/task-conversation-navigation'
 import { listenToForegroundTask, useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
 import type { ReactElement } from 'react'
@@ -519,7 +519,8 @@ export function Workbench(): ReactElement {
   const timelineBlocks = blocks
   const chatOwnsTaskControls = route === 'chat' || route === 'claw'
   const conversationControls = useMemo(() => activeConversationControls(timelineBlocks), [timelineBlocks])
-  const replyQuestion = route === 'chat' ? composerReplyQuestion(conversationControls) : undefined
+  const pausedTaskQuestionRequestIds = usePausedTaskQuestionRequestIds(activeThreadId)
+  const replyQuestion = route === 'chat' ? composerReplyQuestion(conversationControls, pausedTaskQuestionRequestIds) : undefined
   const [taskComposerQuestion, setTaskComposerQuestion] = useState<TaskComposerQuestion | null>(null)
   const activeTaskComposerQuestion = route === 'chat' && mode === 'agent' &&
     taskComposerQuestion?.threadId === activeThreadId ? taskComposerQuestion : undefined
@@ -2626,6 +2627,7 @@ export function Workbench(): ReactElement {
               blocks={timelineBlocks}
               activeControls={chatOwnsTaskControls ? conversationControls : undefined}
               replyQuestionId={replyQuestion?.id}
+              pausedTaskQuestionRequestIds={pausedTaskQuestionRequestIds}
               taskActivity={chatOwnsTaskControls && activeThreadId ? <>
                 <TaskRunStatusBar
                   threadId={activeThreadId}

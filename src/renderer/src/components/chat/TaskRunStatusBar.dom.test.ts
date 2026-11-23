@@ -42,12 +42,13 @@ async function render(props: Partial<ComponentProps<typeof TaskRunStatusBar>> = 
 }
 
 async function renderConversation(blocks: ChatBlock[], replyQuestionId?: string,
-  onComposerQuestionChange?: ComponentProps<typeof TaskRunStatusBar>['onComposerQuestionChange']): Promise<void> {
+  onComposerQuestionChange?: ComponentProps<typeof TaskRunStatusBar>['onComposerQuestionChange'],
+  pausedTaskQuestionRequestIds?: ReadonlySet<string>): Promise<void> {
   const activeControls = activeConversationControls(blocks)
   await act(async () => {
     await refreshTaskState()
     root.render(createElement('div', null,
-      createElement(MessageTimeline, { blocks, activeControls, replyQuestionId,
+      createElement(MessageTimeline, { blocks, activeControls, replyQuestionId, pausedTaskQuestionRequestIds,
         activeThreadId: threadId, runtimeConnection: 'ready', liveReasoning: '', live: '',
         onRetryConnection: () => undefined, onOpenSettings: () => undefined,
         taskActivity: createElement(TaskRunStatusBar, { threadId, runtimeReady: true, composerReplies: true,
@@ -144,8 +145,8 @@ describe('task actions in the original conversation', () => {
     expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
   })
 
-  it('binds a task question to the composer when another conversation control is also open', async () => {
-    tasks = [run('worker-question', 'paused', { activeTurnId: 'waiting-turn' })]
+  it('binds the matching waiting task question when an approval is also open', async () => {
+    tasks = [run('worker-question', 'waiting_user', { activeTurnId: 'waiting-turn' })]
     const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
     attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
       threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
@@ -160,6 +161,61 @@ describe('task actions in the original conversation', () => {
     expect(composerReplyQuestion(activeConversationControls([approval, openQuestion]))).toEqual(openQuestion)
     expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
       requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
+  })
+
+  it('does not bind a task question when a different conversation question is pending', async () => {
+    tasks = [run('worker-question', 'waiting_user', { activeTurnId: 'waiting-turn' })]
+    const taskQuestion = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
+      threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [taskQuestion] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const taskBlock: ChatBlock = { kind: 'user_input', id: 'task-block', requestId: 'worker-request', status: 'pending', questions: [taskQuestion] }
+    const ordinaryBlock: ChatBlock = { kind: 'user_input', id: 'ordinary-block', requestId: 'ordinary-request', status: 'pending',
+      questions: [{ id: 'period', header: '时间范围', question: '请提供时间范围。', options: [] }] }
+    const onComposerQuestionChange = vi.fn()
+
+    await renderConversation([taskBlock, ordinaryBlock], undefined, onComposerQuestionChange)
+
+    expect(composerReplyQuestion(activeConversationControls([taskBlock, ordinaryBlock]))).toBeUndefined()
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it('keeps a paused mirrored task question read-only and offers task continuation', async () => {
+    tasks = [run('paused-question', 'paused', { activeTurnId: 'waiting-turn' })]
+    const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'paused-attention', requestId: 'paused-request', taskId: 'paused-question', ownerId: 'paused-question', ownerKind: 'task',
+      threadId: 'worker-paused-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [question] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const mirrored: ChatBlock = { kind: 'user_input', id: 'paused-question-block', requestId: 'paused-request', status: 'pending',
+      questions: [{ id: question.id, header: question.header, question: question.question, options: [] }] }
+    const onComposerQuestionChange = vi.fn()
+
+    await renderConversation([mirrored], undefined, onComposerQuestionChange, new Set(['paused-request']))
+
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
+    expect(container.textContent).toContain('请提供官网网址。')
+    expect(container.textContent).toContain('请先继续任务，再在对话中回答。')
+    expect(container.querySelectorAll('textarea')).toHaveLength(1)
+    expect(container.querySelector('.ds-message-timeline-content textarea')).toBeNull()
+    expect(button('提交回答')).toBeUndefined()
+    expect(button('继续任务')).toBeTruthy()
+  })
+
+  it('keeps a paused task-only question read-only', async () => {
+    tasks = [run('paused-only-question', 'paused', { activeTurnId: 'waiting-turn' })]
+    const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'paused-only-attention', requestId: 'paused-only-request', taskId: 'paused-only-question', ownerId: 'paused-only-question', ownerKind: 'task',
+      threadId: 'worker-paused-only-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [question] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const onComposerQuestionChange = vi.fn()
+
+    await render({ composerReplies: true, onComposerQuestionChange })
+
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
+    expect(container.textContent).toContain('请先继续任务，再在对话中回答。')
+    expect(container.querySelector('textarea')).toBeNull()
+    expect(button('提交回答')).toBeUndefined()
+    expect(button('继续任务')).toBeTruthy()
   })
 
   it('keeps the task question bound when its transcript control becomes inline', async () => {

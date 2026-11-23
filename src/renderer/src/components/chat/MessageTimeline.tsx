@@ -36,6 +36,7 @@ type Props = {
   blocks: ChatBlock[]
   activeControls?: readonly ChatBlock[]
   replyQuestionId?: string
+  pausedTaskQuestionRequestIds?: ReadonlySet<string>
   taskActivity?: ReactNode
   liveReasoning: string
   live: string
@@ -85,6 +86,7 @@ export function MessageTimeline({
   blocks,
   activeControls,
   replyQuestionId,
+  pausedTaskQuestionRequestIds,
   taskActivity,
   liveReasoning,
   live,
@@ -170,7 +172,8 @@ export function MessageTimeline({
     return visibleProcessBlocksForMode(activeControls.filter(block => isPendingProcessControl(block) && !shown.has(block.id)), viewMode)
   }, [activeControls, hiddenTurnCount, viewMode, visibleTurns])
   const latestTaskActivity = pendingControlsOutsidePage.length ? <>
-    {pendingControlsOutsidePage.map(block => <MessageBubble key={block.id} block={block} nested replyInComposer={block.id === replyQuestionId} />)}
+    {pendingControlsOutsidePage.map(block => <MessageBubble key={block.id} block={block} nested replyInComposer={block.id === replyQuestionId}
+      taskPausedQuestion={block.kind === 'user_input' && pausedTaskQuestionRequestIds?.has(block.requestId)} />)}
     {taskActivity}
   </> : taskActivity
   const forkedFromTitle = activeThread?.forkedFromTitle?.trim() ?? ''
@@ -255,6 +258,7 @@ export function MessageTimeline({
                 turn={turn}
                 activeControlIds={activeControlIds}
                 replyQuestionId={replyQuestionId}
+                pausedTaskQuestionRequestIds={pausedTaskQuestionRequestIds}
                 taskActivity={isLatestTurn ? latestTaskActivity : undefined}
                 professionalSurface={professionalSurface}
                 isProcessing={(busy && isLatestTurn) || turnPending || hasLiveStream}
@@ -336,6 +340,7 @@ function MessageTurn({
   turn,
   activeControlIds,
   replyQuestionId,
+  pausedTaskQuestionRequestIds,
   taskActivity,
   isProcessing,
   runActivity,
@@ -356,6 +361,7 @@ function MessageTurn({
   turn: Turn
   activeControlIds?: ReadonlySet<string>
   replyQuestionId?: string
+  pausedTaskQuestionRequestIds?: ReadonlySet<string>
   taskActivity?: ReactNode
   isProcessing: boolean
   runActivity?: ThreadRunActivity
@@ -472,7 +478,8 @@ function MessageTurn({
 
       {orderedMessages.map(block => (
         <MessageBubble key={block.id} block={block} nested={isInlineProcessControl(block)}
-          professionalSurface={professionalSurface} replyInComposer={block.id === replyQuestionId} />
+          professionalSurface={professionalSurface} replyInComposer={block.id === replyQuestionId}
+          taskPausedQuestion={block.kind === 'user_input' && pausedTaskQuestionRequestIds?.has(block.requestId)} />
       ))}
 
       <GeneratedFilesPanel
@@ -534,6 +541,7 @@ const MemoMessageTurn = memo(MessageTurn, (prev, next) => (
   sameTurnContent(prev.turn, next.turn) &&
   prev.activeControlIds === next.activeControlIds &&
   prev.replyQuestionId === next.replyQuestionId &&
+  prev.pausedTaskQuestionRequestIds === next.pausedTaskQuestionRequestIds &&
   prev.taskActivity === next.taskActivity &&
   prev.isProcessing === next.isProcessing &&
   prev.runActivity === next.runActivity &&

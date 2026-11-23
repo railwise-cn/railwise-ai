@@ -6,6 +6,14 @@ export type TaskFilter = 'ongoing' | 'attention' | 'completed' | 'all'
 const TERMINAL = new Set(['completed', 'failed', 'cancelled'])
 const ATTENTION = new Set(['waiting_user', 'waiting_approval', 'stalled', 'failed'])
 
+export function pausedTaskQuestionRequestIds(tasks: readonly TaskRunV1[], attention: readonly TaskAttentionV1[], threadId: string | null): Set<string> {
+  if (!threadId) return new Set()
+  const pausedTaskIds = new Set(tasks.filter(task => task.status === 'paused' &&
+    (task.originThreadId ?? task.threadId) === threadId).map(task => task.id))
+  return new Set(attention.flatMap(item => item.kind === 'question' && item.status === 'pending' && item.requestId &&
+    item.taskId && pausedTaskIds.has(item.taskId) ? [item.requestId] : []))
+}
+
 export type TaskWorkspaceTaskGroup = {
   root: TaskRunV1
   children: TaskRunV1[]

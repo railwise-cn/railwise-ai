@@ -104,9 +104,9 @@ export function activeConversationControls(blocks: readonly ChatBlock[]): ChatBl
   return [...new Set([...pending, latestCapability, latestIntent].filter(block => block !== undefined))]
 }
 
-export function composerReplyQuestion(controls: readonly ChatBlock[]): Extract<ChatBlock, { kind: 'user_input' }> | undefined {
+export function composerReplyQuestion(controls: readonly ChatBlock[], excludedRequestIds?: ReadonlySet<string>): Extract<ChatBlock, { kind: 'user_input' }> | undefined {
   const questions = controls.filter((block): block is Extract<ChatBlock, { kind: 'user_input' }> =>
-    block.kind === 'user_input' && block.status === 'pending')
+    block.kind === 'user_input' && block.status === 'pending' && !excludedRequestIds?.has(block.requestId))
   const block = questions.length === 1 ? questions[0] : undefined
   if (block?.kind === 'user_input' && block.status === 'pending' && block.questions.length === 1 && block.questions[0].options.length === 0) return block
   return undefined

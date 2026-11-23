@@ -119,7 +119,7 @@ export function TaskRunStatusBar(props: Props): ReactElement | null {
   </div>
 }
 
-function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilityCards, inlineRequests, composerReplies, visibleMessageIds, onSupplement, onPickAttachments, onComposerQuestionChange, onOpenArtifact, showTitle, isPrimary }: Props & {
+function ConversationTask({ group, live, threadId, runtimeReady, conversationControls = EMPTY_CONTROLS, inlineCapabilityCards, inlineRequests, composerReplies, visibleMessageIds, onSupplement, onPickAttachments, onComposerQuestionChange, onOpenArtifact, showTitle, isPrimary }: Props & {
   group: TaskWorkspaceTaskGroup
   live: ReturnType<typeof useTaskState>
   showTitle: boolean
@@ -141,18 +141,20 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     ? (typeof questionForHistory.label === 'string' ? questionForHistory.label
       : typeof questionForHistory.question === 'string' ? questionForHistory.question : onlyAttention?.message)
     : undefined
+  const hasUnrelatedConversationQuestion = conversationControls.some(block =>
+    block.kind === 'user_input' && block.status === 'pending' && block.requestId !== attentionId)
   const [answeredQuestions, setAnsweredQuestions] = useState<AnsweredTaskQuestion[]>([])
   const questionHistoryLoadKey = useRef('')
   const taskQuestion = useMemo(() => {
-    if (!composerReplies || !['waiting_user', 'paused'].includes(task.status) || !task.activeTurnId || attentionKind !== 'question' ||
-      !threadId || !attentionId || !Array.isArray(attentionQuestions) || attentionQuestions.length !== 1) return null
+    if (!composerReplies || task.status !== 'waiting_user' || !task.activeTurnId || attentionKind !== 'question' ||
+      !threadId || !attentionId || hasUnrelatedConversationQuestion || !Array.isArray(attentionQuestions) || attentionQuestions.length !== 1) return null
     const value = attentionQuestions[0]
     if (!value || typeof value !== 'object' || !('id' in value) || typeof value.id !== 'string') return null
     const record = value as Record<string, unknown>
     if (Array.isArray(record.options) && record.options.length > 0) return null
     return { taskId: task.id, threadId, requestId: attentionId, questionId: value.id,
       label: typeof record.label === 'string' ? record.label : typeof record.question === 'string' ? record.question : attentionTitle ?? '需要补充信息' }
-  }, [attentionId, attentionKind, attentionQuestions, attentionTitle, composerReplies, task.activeTurnId, task.id, task.status, threadId])
+  }, [attentionId, attentionKind, attentionQuestions, attentionTitle, composerReplies, hasUnrelatedConversationQuestion, task.activeTurnId, task.id, task.status, threadId])
   useEffect(() => {
     if (!onComposerQuestionChange) return
     onComposerQuestionChange(taskQuestion)
@@ -216,8 +218,8 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   const actions = task.presentation?.actions
   const verify = actions?.includes('verify') || pending.some(item => item.presentation?.actions.includes('verify'))
   const needsReview = pending.length > 0
-  const canReplyInComposer = isPrimary && composerReplies && ['waiting_user', 'paused'].includes(task.status) && Boolean(task.activeTurnId) &&
-    (!task.presentation || task.presentation.reason === 'input_required') && pending.length === 1
+  const canReplyInComposer = isPrimary && composerReplies && task.status === 'waiting_user' && Boolean(task.activeTurnId) &&
+    !hasUnrelatedConversationQuestion && (!task.presentation || task.presentation.reason === 'input_required') && pending.length === 1
   const canResume = !verify && (task.status === 'paused' || !needsReview && (actions?.includes('resume') ?? ['stalled', 'waiting_user'].includes(task.status)))
   const canRetry = !verify && !needsReview && (actions?.includes('retry') ?? task.status === 'failed')
   const canSupplement = !verify && !(pending.some(item => item.kind === 'question' || item.kind === 'approval')) &&
@@ -327,7 +329,8 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     </div> : null}
     {remainingAttention.length || resultsOpen || verifyOpen || legacyWorkerResponse ? <div className="space-y-1 pb-1">
       {remainingAttention.map(item => <TaskAttentionCard key={`${item.id}:${item.revision}`} item={item} ownerTask={members.find(owner => owner.id === item.taskId)}
-        conversationThreadId={threadId ?? undefined} onResolved={onResolved} replyInComposer={canReplyInComposer} />)}
+        conversationThreadId={threadId ?? undefined} onResolved={onResolved} replyInComposer={canReplyInComposer}
+        questionPaused={task.status === 'paused' && item.kind === 'question'} />)}
       {resultsOpen ? <ul className="space-y-1" aria-label={t('taskRunArtifacts')}>{artifacts.map(({ task: owner, artifact }) => <li key={`${owner.id}:${artifact.id}`} className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
         <button type="button" onClick={() => void openArtifact(owner, artifact)} className="inline-flex min-w-0 items-center gap-1.5 text-left text-accent hover:underline">
           <FileText className="h-3.5 w-3.5 shrink-0" /><span className="break-all">{artifact.relativePath.split(/[\\/]/).at(-1)}</span>

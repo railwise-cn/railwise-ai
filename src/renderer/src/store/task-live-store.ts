@@ -1,6 +1,6 @@
-import { useCallback, useSyncExternalStore } from 'react'
+import { useCallback, useRef, useSyncExternalStore } from 'react'
 import type { TaskRunV1, TaskAttentionV1, TaskChangeEvent, TaskProgressV1 } from '@shared/agent-workbench'
-import type { TaskFilter } from '@shared/task-workspace-projection'
+import { pausedTaskQuestionRequestIds, type TaskFilter } from '@shared/task-workspace-projection'
 import { taskArtifactSourceEvidenceState } from '@shared/task-artifact-source-evidence'
 import i18n from '../i18n'
 import { taskReasonKey } from '../agent/ag-ui-activity'
@@ -178,6 +178,23 @@ export function useTaskState(enabled = true): State {
     return () => { listeners.delete(listener); release() }
   }, [enabled])
   return useSyncExternalStore(subscribe, getTaskState)
+}
+
+export function usePausedTaskQuestionRequestIds(threadId: string | null): ReadonlySet<string> {
+  const snapshot = useRef<{ threadId: string | null; tasks: State['tasks']; attention: State['attention']; requestIds: ReadonlySet<string> } | null>(null)
+  const subscribe = useCallback((listener: () => void) => {
+    listeners.add(listener)
+    return () => { listeners.delete(listener) }
+  }, [])
+  const getSnapshot = useCallback(() => {
+    const current = state
+    const cached = snapshot.current
+    if (cached && cached.threadId === threadId && cached.tasks === current.tasks && cached.attention === current.attention) return cached.requestIds
+    const requestIds = pausedTaskQuestionRequestIds(current.tasks, current.attention, threadId)
+    snapshot.current = { threadId, tasks: current.tasks, attention: current.attention, requestIds }
+    return requestIds
+  }, [threadId])
+  return useSyncExternalStore(subscribe, getSnapshot)
 }
 /** Reset only after all subscribers unmount; prevents pending test IPC from crossing cases. */
 export function resetTaskStateForTests(): void {

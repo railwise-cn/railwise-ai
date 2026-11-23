@@ -2658,6 +2658,7 @@
   "approvalFailed": "请求失败",
   "userInputTitle": "需要你的输入",
   "userInputReplyInComposer": "在下方输入框直接回复。",
+  "taskQuestionPausedReplyHint": "请先继续任务，再在对话中回答。",
   "userInputPending": "等待你选择…",
   "userInputSubmitted": "已提交",
   "userInputCancelled": "已取消",

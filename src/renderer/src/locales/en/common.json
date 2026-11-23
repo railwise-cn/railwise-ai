@@ -2659,6 +2659,7 @@
   "approvalFailed": "Request failed",
   "userInputTitle": "Input required",
   "userInputReplyInComposer": "Reply in the message box below.",
+  "taskQuestionPausedReplyHint": "Continue the task before replying in the conversation.",
   "userInputPending": "Waiting for your answer…",
   "userInputSubmitted": "Submitted",
   "userInputCancelled": "Cancelled",
