@@ -100,4 +100,5 @@ test('Windows workbook journey keeps the expected production interactions in the
   const uiSource = await readFile(fileURLToPath(new URL('./run-windows-ui-smoke.mjs', import.meta.url)), 'utf8')
   assert.match(uiSource, /Network\.setBlockedURLs/)
   assert.match(uiSource, /offline:\s*true/)
+  assert.match(uiSource, /else if \(spreadsheetSmoke\) \{[\s\S]+?offline-spreadsheet-ui-journey-isolated/)
 })

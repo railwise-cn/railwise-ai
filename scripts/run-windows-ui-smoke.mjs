@@ -2845,6 +2845,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         workspace, environment, ownedRoot: root, focused: true, acceptance: marketplaceAcceptance
       })
       report.checks.push('cold-mirror-docling-backend-and-two-skill-calls')
+    } else if (spreadsheetSmoke) {
+      report.checks.push('offline-spreadsheet-ui-journey-isolated')
     } else await verifyFullWorkbench()
 
     async function verifyFullWorkbench() {
