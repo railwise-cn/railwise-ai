@@ -78,7 +78,8 @@ function pausedQuestionFromThread(thread: unknown, turnId: string | undefined, i
   const answeredRequestIds = new Set(inputs.filter(isTaskQuestionAnswer)
     .map(input => input.idempotencyKey.slice('user-input:'.length)))
   const item = [...turn.items].reverse().find(value => value && typeof value === 'object' && 'kind' in value && value.kind === 'user_input' &&
-    'status' in value && value.status === 'cancelled' && 'inputId' in value && typeof value.inputId === 'string' && !answeredRequestIds.has(value.inputId) &&
+    'status' in value && (value.status === 'pending' || value.status === 'cancelled') &&
+    'inputId' in value && typeof value.inputId === 'string' && !answeredRequestIds.has(value.inputId) &&
     'questions' in value && Array.isArray(value.questions))
   if (!item || typeof item !== 'object' || !('inputId' in item) || typeof item.inputId !== 'string' || !('questions' in item)) return null
   const questions = item.questions.flatMap((question: unknown) => {

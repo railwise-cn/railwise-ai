@@ -218,12 +218,12 @@ describe('task actions in the original conversation', () => {
     expect(button('继续任务')).toBeTruthy()
   })
 
-  it('shows the cancelled question from the interrupted turn as read-only while a task is paused', async () => {
+  it.each(['pending', 'cancelled'] as const)('keeps a %s question read-only while the task is paused', async status => {
     tasks = [run('paused-cancelled-question', 'paused', { activeTurnId: 'interrupted-turn' })]
     attention = []
     const onComposerQuestionChange = vi.fn()
     api.runtimeRequest.mockResolvedValue({ ok: true, body: JSON.stringify({ turns: [{ id: 'interrupted-turn', items: [{
-      kind: 'user_input', inputId: 'paused-request', status: 'cancelled', questions: [{ id: 'website', header: '官网',
+      kind: 'user_input', inputId: 'paused-request', status, questions: [{ id: 'website', header: '官网',
         question: '请提供官网网址。', options: [] }]
     }] }] }) })
     await render({ composerReplies: true, onComposerQuestionChange })
