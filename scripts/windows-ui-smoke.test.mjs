@@ -124,6 +124,12 @@ test('website-to-PPT stops after a failed source fetch instead of creating an un
   assert.throws(() => journey.modelAction(body), /The installed Runtime tool failed: web_fetch/)
 })
 
+test('the original task question submits through its exact user-input endpoint', () => {
+  const source = readFileSync(new URL('../src/renderer/src/components/Workbench.tsx', import.meta.url), 'utf8')
+  assert.match(source, /window\.workwise\.runtimeRequest\(\s*`\/v1\/user-inputs\/\$\{encodeURIComponent\(activeTaskComposerQuestion\.requestId\)\}`,\s*'POST'/s)
+  assert.match(source, /answers:\s*\[\{\s*id:\s*activeTaskComposerQuestion\.questionId,\s*label:\s*activeTaskComposerQuestion\.label,\s*value:\s*v\s*\}\]/s)
+})
+
 test('website-to-PPT report matches its requested model and verifies a desktop-open response for the live gate', () => {
   const sourceHead = '1'.repeat(40)
   const version = '0.5.11'
@@ -132,8 +138,8 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
     before: { ui: { taskQuestionRequestId: requestId }, task: { activeTurnId: 'turn-1' },
       attention: [{ requestId, kind: 'question', status: 'pending', questionCount: 1, textQuestion: true,
         questionId: 'website', questionLabel: '请提供官网网址。' }] },
-    userInputRequest: { path: `/v1/user-inputs/${requestId}`, method: 'POST', questionId: 'website',
-      label: '请提供官网网址。', answerLength: 15, answerMatchesExpected: true },
+    answerReceipt: { idempotencyKey: `user-input:${requestId}`, count: 1, questionId: 'website',
+      answerLength: 15, answerMatchesExpected: true },
     after: { task: { id: 'task-1', originThreadId: 'conversation-1', activeTurnId: sameTurn ? 'turn-1' : 'turn-2' },
       inputs: [{ kind: 'supplement', idempotencyKey: `user-input:${requestId}` }], attention: [] }
   })
@@ -177,8 +183,8 @@ test('website-to-PPT identity binds the task to the visible conversation while r
       before: { ui: { taskQuestionRequestId: 'question-1' }, task: { activeTurnId: 'turn-1' },
         attention: [{ requestId: 'question-1', kind: 'question', status: 'pending', questionCount: 1, textQuestion: true,
           questionId: 'website', questionLabel: '请提供官网网址。' }] },
-      userInputRequest: { path: '/v1/user-inputs/question-1', method: 'POST', questionId: 'website',
-        label: '请提供官网网址。', answerLength: 15, answerMatchesExpected: true },
+      answerReceipt: { idempotencyKey: 'user-input:question-1', count: 1, questionId: 'website',
+        answerLength: 15, answerMatchesExpected: true },
       after: { task: { id: 'task-1', originThreadId: 'chat-1', activeTurnId: 'turn-2' },
         inputs: [{ kind: 'supplement', idempotencyKey: 'user-input:question-1' }],
         attention: [] }
@@ -187,9 +193,9 @@ test('website-to-PPT identity binds the task to the visible conversation while r
   assert.throws(() => validateWebPptTurnIdentity({ ...proof, originThreadId: 'worker-1' }))
   assert.throws(() => validateWebPptTurnIdentity({ ...proof, originalConversation: { ...proof.originalConversation, questionVisible: false } }))
   assert.throws(() => validateWebPptTurnIdentity({ ...proof, replyTrace: { ...proof.replyTrace,
-    userInputRequest: { ...proof.replyTrace.userInputRequest, path: '/v1/tasks/wrong/inputs' } } }))
+    answerReceipt: { ...proof.replyTrace.answerReceipt, idempotencyKey: 'task-input:wrong' } } }))
   assert.throws(() => validateWebPptTurnIdentity({ ...proof, replyTrace: { ...proof.replyTrace,
-    userInputRequest: { ...proof.replyTrace.userInputRequest, answerMatchesExpected: false } } }))
+    answerReceipt: { ...proof.replyTrace.answerReceipt, answerMatchesExpected: false } } }))
 })
 
 test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {

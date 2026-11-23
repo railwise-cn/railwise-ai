@@ -82,70 +82,6 @@ function conversationTextProbe() {
   return `Array.from(document.querySelectorAll(${literal(timeline)})).map(node=>node.innerText).join('\\n')`
 }
 
-async function observeTaskUserInputRequest(cdp, requestId, sourceAnswer) {
-  await cdp.send('Debugger.enable')
-  const runtimeRequest = await cdp.send('Runtime.evaluate', {
-    expression: 'window.workwise.runtimeRequest', returnByValue: false
-  })
-  const objectId = runtimeRequest.result?.objectId
-  assert.ok(objectId, 'The installed runtime request bridge must be observable')
-  const expectedPath = `/v1/user-inputs/${encodeURIComponent(requestId)}`
-  let resolveRequest
-  let rejectRequest
-  const observed = new Promise((resolve, reject) => { resolveRequest = resolve; rejectRequest = reject })
-  void observed.catch(() => undefined)
-  const unsubscribe = cdp.onEvent('Debugger.paused', event => {
-    void (async () => {
-      try {
-        const frame = event.callFrames?.[0]
-        if (!frame) return
-        const args = await cdp.send('Debugger.evaluateOnCallFrame', {
-          callFrameId: frame.callFrameId,
-          expression: '[arguments[0], arguments[1], arguments[2]]',
-          returnByValue: true
-        })
-        const [path, method, body] = args.result?.value ?? []
-        if (path === expectedPath && method === 'POST') {
-          const request = JSON.parse(body)
-          const answer = Array.isArray(request.answers) ? request.answers[0] : undefined
-          resolveRequest({ path, method, questionId: answer?.id, label: answer?.label,
-            answerLength: typeof answer?.value === 'string' ? answer.value.length : 0,
-            answerMatchesExpected: answer?.value === sourceAnswer })
-        }
-      } catch (error) {
-        rejectRequest(error)
-      } finally {
-        await cdp.send('Debugger.resume').catch(() => undefined)
-      }
-    })()
-  })
-  let breakpointId
-  try {
-    ({ breakpointId } = await cdp.send('Debugger.setBreakpointOnFunctionCall', { objectId }))
-  } catch (error) {
-    unsubscribe()
-    await cdp.send('Debugger.disable').catch(() => undefined)
-    throw error
-  }
-  return {
-    wait: async (timeout = 15_000) => {
-      let timer
-      try {
-        return await Promise.race([observed, new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error('Task answer did not call its request-id endpoint')), timeout)
-        })])
-      } finally {
-        clearTimeout(timer)
-      }
-    },
-    close: async () => {
-      unsubscribe()
-      await cdp.send('Debugger.removeBreakpoint', { breakpointId }).catch(() => undefined)
-      await cdp.send('Debugger.disable').catch(() => undefined)
-    }
-  }
-}
-
 async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
   const [task, inputs, inbox, thread] = await Promise.all([
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
@@ -229,23 +165,20 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
       `The task question was not bound to the original chat composer: ${JSON.stringify(replyBefore)}`)
     const requestId = pendingQuestion.requestId
     const originalTurnId = task.activeTurnId
-    const requestProbe = await observeTaskUserInputRequest(cdp, requestId, sourceAnswer)
-    try {
-      await cdp.fill(answerComposer, sourceAnswer)
-      await cdp.click('button[aria-label="提交"]:not(:disabled)')
-      const observedRequest = await requestProbe.wait()
-      assert.equal(observedRequest.questionId, pendingQuestion.questionId)
-      assert.equal(observedRequest.label, pendingQuestion.questionLabel)
-      assert.equal(observedRequest.answerMatchesExpected, true)
-      assert.ok(observedRequest.answerLength > 0)
-      replyTrace.userInputRequest = observedRequest
-    } finally {
-      await requestProbe.close()
-    }
     const answerKey = `user-input:${requestId}`
-    await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(task.id)}/inputs`)}.then(inputs=>
-      inputs.filter(input=>input.kind==='supplement' && input.idempotencyKey===${literal(answerKey)}))`,
-    'KUN to persist the answer against the exact pending question', 45_000)
+    await cdp.fill(answerComposer, sourceAnswer)
+    await cdp.click('button[aria-label="提交"]:not(:disabled)')
+    const answerReceipt = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(task.id)}/inputs`)}.then(inputs=>{
+      const answers=inputs.filter(input=>input.kind==='supplement' && input.idempotencyKey===${literal(answerKey)});
+      if(answers.length!==1)return null;
+      const answer=answers[0];
+      return {idempotencyKey:answer.idempotencyKey,count:answers.length,questionId:${literal(pendingQuestion.questionId)},
+        answerLength:typeof answer.text==='string'?answer.text.length:0,answerMatchesExpected:answer.text===${literal(sourceAnswer)}};
+    })`, 'KUN to persist the exact request-id answer once', 45_000)
+    assert.equal(answerReceipt.questionId, pendingQuestion.questionId)
+    assert.equal(answerReceipt.answerMatchesExpected, true)
+    assert.ok(answerReceipt.answerLength > 0)
+    replyTrace.answerReceipt = answerReceipt
     await cdp.wait(`${readRuntime('/v1/inbox')}.then(items=>
       !items.some(item=>item.requestId===${literal(requestId)} && item.status==='pending'))`,
     'KUN to resolve the exact pending question', 45_000)
@@ -384,13 +317,11 @@ export function validateWebPptTurnIdentity(proof) {
   assert.equal(replyTrace.before.ui.taskQuestionRequestId, requestId)
   assert.ok(questions[0].questionId)
   assert.equal(typeof questions[0].questionLabel, 'string')
-  assert.equal(replyTrace.userInputRequest?.path, `/v1/user-inputs/${encodeURIComponent(requestId)}`,
-    'The composer must submit to the exact pending user-input request')
-  assert.equal(replyTrace.userInputRequest?.method, 'POST')
-  assert.equal(replyTrace.userInputRequest?.questionId, questions[0].questionId)
-  assert.equal(replyTrace.userInputRequest?.label, questions[0].questionLabel)
-  assert.equal(replyTrace.userInputRequest?.answerMatchesExpected, true)
-  assert.ok(replyTrace.userInputRequest?.answerLength > 0)
+  assert.equal(replyTrace.answerReceipt?.idempotencyKey, `user-input:${requestId}`)
+  assert.equal(replyTrace.answerReceipt?.count, 1)
+  assert.equal(replyTrace.answerReceipt?.questionId, questions[0].questionId)
+  assert.equal(replyTrace.answerReceipt?.answerMatchesExpected, true)
+  assert.ok(replyTrace.answerReceipt?.answerLength > 0)
   const answers = replyTrace.after.inputs.filter(input => input.kind === 'supplement' && input.idempotencyKey === `user-input:${requestId}`)
   assert.equal(answers.length, 1, 'The exact question answer must be persisted once by KUN')
   assert.equal(replyTrace.after.task.id, proof.taskId)
