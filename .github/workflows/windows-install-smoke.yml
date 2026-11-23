@@ -437,7 +437,7 @@ jobs:
         run: |
           brew install --cask libreoffice
           brew install duti
-          duti -s org.libreoffice.script org.openxmlformats.presentationml.presentation all
+          duti -s org.libreoffice.script pptx all
           test "$(duti -x pptx | head -n 1)" = "LibreOffice"
       - name: Inspect the signed installed application and real startup surfaces
         env:
