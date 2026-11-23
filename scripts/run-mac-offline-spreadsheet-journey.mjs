@@ -218,7 +218,7 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     const clickCell = async (row, column, count = 1) => {
       canvas = await cdp.wait(`[...document.querySelectorAll('.ds-code-sidebar canvas[data-u-comp="render-canvas"]')]
         .map(canvas => canvas.getBoundingClientRect().toJSON()).find(box => box.width > 200 && box.height > 150)`, 'workbook grid canvas')
-      const point = { x: canvas.x + 68 + column * 79, y: canvas.y + 30 + row * 22 }
+      const point = { x: canvas.x + 83 + column * 79, y: canvas.y + 59 + row * 22 }
       const hit = await cdp.evaluate(`(() => {
         const element = document.elementFromPoint(${point.x}, ${point.y})
         return element ? { tag: element.tagName, component: element.getAttribute('data-u-comp'), className: element.className?.toString?.() ?? '' } : null
