@@ -284,7 +284,11 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
         const result = artifact.absolutePath || artifact.storage === 'task'
           ? await window.workwise.openTaskArtifact({ taskId: owner.id, artifactId: artifact.id })
           : await window.workwise.openWorkspaceFile({ workspaceRoot: owner.workspaceRoot, path: artifact.relativePath })
-        if (!result.ok) setMessage(result.message?.trim() || t('taskWorkspaceActionFailed'))
+        if (!result.ok) {
+          const message = result.message?.trim()
+          const safeMessage = message ? redactRuntimeText(message) : ''
+          setMessage(safeMessage || t('taskWorkspaceActionFailed'))
+        }
       }
     } catch { setMessage(t('taskWorkspaceActionFailed')) }
   }

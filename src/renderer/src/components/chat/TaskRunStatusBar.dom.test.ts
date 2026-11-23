@@ -282,7 +282,7 @@ describe('task actions in the original conversation', () => {
   })
 
   it('shows the reason returned when a task artifact cannot be opened', async () => {
-    const reason = '成果已变化或授权证据无法核验，请在任务中重新审阅。'
+    const reason = '无法打开 /Users/alice/Downloads/website.pptx。Bearer sensitive-token-123456'
     tasks = [run('presentation', 'completed', {
       artifacts: [{ id: 'ppt-artifact', storage: 'task', relativePath: 'website.pptx', absolutePath: '/project/website.pptx',
         authorizedRoot: '/project', executionGrantId: 'grant-ppt', validation: 'valid', createdAt: '2026-11-20T08:00:00Z' }]
@@ -294,7 +294,8 @@ describe('task actions in the original conversation', () => {
     await act(async () => button('website.pptx')!.click())
 
     expect(api.openTaskArtifact).toHaveBeenCalledExactlyOnceWith({ taskId: 'presentation', artifactId: 'ppt-artifact' })
-    expect(container.textContent).toContain(reason)
+    expect(container.textContent).toContain('无法打开 ~/Downloads/website.pptx。Bearer [REDACTED]')
+    expect(container.textContent).not.toContain('sensitive-token-123456')
   })
 
   it('shows the delegated worker steps in the original message flow through completion without mutation controls', async () => {
