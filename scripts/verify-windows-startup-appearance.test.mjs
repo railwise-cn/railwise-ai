@@ -171,6 +171,9 @@ test('binds native Mac startup acceptance to a successful immutable frozen relea
     artifactId: 200, artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
     changedFiles: ['scripts/run-mac-startup-appearance-smoke.mjs', 'scripts/verify-windows-composer-acceptance.mjs',
       'scripts/prepare-windows-install-smoke.mjs', 'scripts/prepare-windows-install-smoke.test.mjs',
+      'scripts/run-windows-offline-spreadsheet-journey.mjs', 'scripts/run-windows-offline-spreadsheet-journey.test.mjs',
+      'scripts/verify-core-journeys.mjs', 'scripts/verify-core-journeys.test.mjs',
+      'scripts/run-windows-install-smoke.ps1', 'scripts/verify-windows-install-smoke.mjs',
       'scripts/record-core-journeys.test.mjs', 'scripts/run-windows-frozen-gui-upgrade.mjs',
       'scripts/windows-published-gui-update-smoke.test.mjs', 'scripts/windows-ui-smoke.test.mjs',
       'docs/qa/release-gates/v0.5.11/acceptance.md'] }

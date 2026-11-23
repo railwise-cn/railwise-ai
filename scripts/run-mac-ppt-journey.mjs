@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { mkdir, mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises'
@@ -96,14 +96,30 @@ async function stopInstalledProcess(child, cdp) {
   assert.ok(child.exitCode !== null || child.signalCode !== null, 'The owned Mac acceptance process did not exit')
 }
 
-async function readNativeOpenResult(cdp, { task, artifact }) {
-  const result = artifact.absolutePath || artifact.storage === 'task'
-    ? await cdp.evaluate(`window.workwise.openTaskArtifact(${JSON.stringify({ taskId: task.id, artifactId: artifact.id })})`, 180_000)
-    : await cdp.evaluate(`window.workwise.openWorkspaceFile(${JSON.stringify({ workspaceRoot: task.workspaceRoot, path: artifact.relativePath })})`, 180_000)
-  if (result?.ok !== true) {
-    throw new Error(`The operating system could not open the registered PPTX: ${result?.message ?? 'No error detail returned.'}`)
+async function waitForNativeMacDocument(filename) {
+  const deadline = Date.now() + 60_000
+  const baseName = filename.replace(/\.pptx$/i, '')
+  let lastWindowTitles = []
+  while (Date.now() < deadline) {
+    const result = spawnSync('/usr/bin/osascript', ['-e', `tell application "System Events"
+      if exists process "LibreOffice" then
+        get name of every window of process "LibreOffice"
+      else
+        return ""
+      end if
+    end tell`], { encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    lastWindowTitles = result.status === 0 ? result.stdout.trim().split(', ').filter(Boolean) : []
+    const windowTitle = lastWindowTitles.find(title => title.includes(filename) || title.includes(baseName))
+    if (windowTitle) return { status: 'os-open-accepted', application: 'LibreOffice', windowTitle }
+    await wait(250)
   }
-  return { status: 'os-open-accepted' }
+  throw new Error(`LibreOffice did not show ${filename}. Observed windows: ${lastWindowTitles.join(', ') || 'none'}`)
+}
+
+async function readNativeOpenResult(_cdp, { artifact }) {
+  const filename = artifact.relativePath.split(/[\\/]/).at(-1)
+  assert.ok(filename)
+  return waitForNativeMacDocument(filename)
 }
 
 export async function runInstalledMacPptJourney({ executable, temporary, evidenceDir, version, installedAsarSha256,
@@ -138,6 +154,11 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
     assert.equal(env.HOME, join(root, 'home'))
     await Promise.all([profile, workspace, workwiseHome, evidenceDir].map(path => mkdir(path, { recursive: true, mode: 0o700 })))
     await recordStage('prepare-isolated-profile')
+    const libreOffice = spawnSync('/Applications/LibreOffice.app/Contents/MacOS/soffice', ['--headless', '--terminate_after_init'],
+      { cwd: root, env, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    assert.equal(libreOffice.status, 0, libreOffice.error?.message ?? libreOffice.stderr ?? 'LibreOffice profile initialization failed')
+    receipt.nativeOpenerProfile = 'initialized-under-isolated-home'
+    await recordStage('initialize-native-document-handler-under-isolated-profile')
     await writeFile(join(workwiseHome, 'workspace-trust.json'), JSON.stringify({ schema: 'workwise.workspace-trust', version: 1,
       workspaces: [{ level: 'workspace-write', canonicalRoot: workspace, revision: 1 }] }), { mode: 0o600 })
     await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,

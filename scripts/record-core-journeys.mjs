@@ -119,6 +119,42 @@ export function windowsCoreJourneys(install, environment = process.env) {
   }
   const ui = install.ui
   const webPptChecks = ui?.checks ?? []
+  const spreadsheet = ui?.offlineSpreadsheet
+  if (spreadsheet?.status === 'passed') {
+    assert.equal(ui?.status, 'passed')
+    assert.equal(spreadsheet.platform, platform)
+    assert.equal(spreadsheet.arch, arch)
+    assert.equal(spreadsheet.version, version)
+    assert.equal(spreadsheet.sourceHead, sourceHead)
+    assert.equal(spreadsheet.installerSha256, installerSha256)
+    assert.equal(spreadsheet.installedAsarSha256, installedAsarSha256)
+    assert.equal(spreadsheet.execution, 'installed-ui')
+    assert.equal(spreadsheet.packageUnchanged, true)
+    assert.equal(spreadsheet.networkIsolation?.rendererOffline, true)
+    for (const check of ['new-local-rwsheet', 'formula-calculation-saved', 'undo-restores-prior-cell-value',
+      'external-save-conflict-preserves-original-and-saves-copy',
+      'utf8-chinese-csv-import-export-preserves-leading-zero-and-decimal',
+      'save-reopen-multiple-sheets-through-production-reader',
+      'xlsx-read-only-preview-preserves-sheet-names-positions-and-source-bytes']) {
+      assert.ok(spreadsheet.checks?.includes(check), `Missing installed Windows spreadsheet check: ${check}`)
+    }
+    assert.equal(spreadsheet.formula?.expression, '=SUM(4,5)')
+    assert.equal(spreadsheet.formula.value, 9)
+    assert.equal(spreadsheet.undo?.restoredPreviousValue, true)
+    assert.equal(spreadsheet.conflict?.originalPreserved, true)
+    assert.equal(spreadsheet.conflict?.copyPreservedUnsavedEdit, true)
+    assert.equal(spreadsheet.csv?.preservesLeadingZeroAndPrecision, true)
+    assert.equal(spreadsheet.savedWorkbook?.sheetCount, 2)
+    assert.equal(spreadsheet.savedWorkbook?.reopenedThroughProductionReader, true)
+    assert.equal(spreadsheet.savedWorkbook?.reopenedInVisibleGrid, true)
+    assert.equal(spreadsheet.savedWorkbook?.formulaValueAfterReopen, 9)
+    assert.deepEqual(spreadsheet.xlsxPreview?.sheetNames, ['监测点', '记录'])
+    assert.equal(spreadsheet.xlsxPreview?.renderedReadOnlyGrid, true)
+    assert.equal(spreadsheet.xlsxPreview?.editingControlsHidden, true)
+    assert.equal(spreadsheet.xlsxPreview?.systemOpenEntryVisible, true)
+    journeys.push({ id: 'offline-spreadsheet', method: 'installed-ui', status: 'passed',
+      evidence: 'windows-install-smoke.json records an offline formula, undo, conflict-safe save, Chinese CSV and read-only XLSX preview against the exact installed package.' })
+  }
   if (ui?.status === 'passed' && webPptChecks.some(check =>
     ['installed-chat-web-ppt', 'installed-chat-web-ppt-browser-fallback'].includes(check))) {
     assert.equal(ui.version, version)

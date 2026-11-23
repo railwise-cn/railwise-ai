@@ -106,6 +106,7 @@ test('new stable release versions require the structured matrix and legacy versi
   for (const target of ['0.5.11', '0.5.20', '0.6.0', '1.0.0']) assert.equal(requiresCoreJourneys(target), true)
   assert.ok(requiredCoreJourneys(version).get('win32-x64').includes('windows-legacy-overlay'))
   assert.ok(requiredCoreJourneys(version).get('win32-x64').includes('browserskill-fallback'))
+  assert.ok(requiredCoreJourneys(version).get('win32-x64').includes('offline-spreadsheet'))
   assert.deepEqual(requiredCoreJourneys(version).get('darwin-arm64'), [
     'website-pptx', 'startup-branding', 'offline-spreadsheet', 'ego-dadan-report'
   ])
@@ -146,6 +147,10 @@ test('later releases require field journeys only for related production changes'
 
 test('core receipts reject stale, incomplete, failed and simulated results', async t => {
   const mutations = [
+    ['missing Windows offline spreadsheet', reports => {
+      const windows = reports.find(record => record.receipt.platform === 'win32')
+      windows.receipt.journeys = windows.receipt.journeys.filter(journey => journey.id !== 'offline-spreadsheet')
+    }, /missing required journeys.*offline-spreadsheet/],
     ['omitted platform', reports => reports.pop(), /missing required journeys.*darwin-x64/],
     ['old build', ([record]) => { record.receipt.buildRunId-- }, /build run ID/],
     ['old attempt', ([record]) => { record.receipt.buildRunAttempt++ }, /build run attempt/],

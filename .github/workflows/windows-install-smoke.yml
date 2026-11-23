@@ -42,6 +42,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_windows_spreadsheet:
+        description: 'Run the exact installed Windows package through the offline Univer workbook and XLSX preview journey.'
+        type: boolean
+        required: false
+        default: false
   workflow_dispatch:
     inputs:
       package_run_id:
@@ -110,6 +115,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_windows_spreadsheet:
+        description: 'Run the exact installed Windows package through the offline Univer workbook and XLSX preview journey.'
+        type: boolean
+        required: false
+        default: false
       build_private_next:
         description: 'In the frozen update test only, build a temporary 0.5.9 NSIS fixture from this exact source, exercise the next native upgrade and discard the fixture.'
         type: boolean
@@ -165,7 +175,7 @@ jobs:
     if: ${{ (inputs.run_mac_startup_appearance != true || inputs.run_startup_appearance == true || inputs.web_ppt_journey == 'browser-fallback') && inputs.run_frozen_gui_update != true && inputs.run_published_gui_update != true && inputs.run_repaired_gui_update != true && inputs.run_repaired_marketplace_install != true }}
     name: ${{ inputs.run_browser_startup_diagnostic && 'Diagnose the existing package browser startup only' || 'Install and inspect the existing Windows package' }}
     runs-on: windows-2022
-    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || (contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey) || inputs.run_composer_acceptance || inputs.run_docling_conversion) && 35 || (inputs.run_browser_execution || inputs.run_startup_appearance) && 25 || 15 }}
+    timeout-minutes: ${{ inputs.run_private_video_evaluation && 75 || inputs.run_mirror_acceptance && 65 || (contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey) || inputs.run_composer_acceptance || inputs.run_docling_conversion || inputs.run_windows_spreadsheet) && 35 || (inputs.run_browser_execution || inputs.run_startup_appearance) && 25 || 15 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -175,6 +185,9 @@ jobs:
       - name: Reject mixed diagnostic and business acceptance modes
         if: inputs.run_browser_startup_diagnostic && (inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey))
         run: throw 'Browser startup diagnostic is exclusive with task and browser execution'
+      - name: Keep the Windows spreadsheet acceptance isolated
+        if: inputs.run_windows_spreadsheet && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || inputs.run_startup_appearance || inputs.run_mirror_acceptance || inputs.run_docling_conversion || inputs.run_private_video_evaluation || contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey))
+        run: throw 'Windows spreadsheet acceptance uses its own clean installed application profile'
       - name: Preserve the isolated cold marketplace profile
         if: (inputs.run_mirror_acceptance || inputs.run_private_video_evaluation) && (inputs.run_browser_startup_diagnostic || inputs.run_task_execution || inputs.run_browser_execution || inputs.run_composer_acceptance || contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey))
         run: throw 'Cold marketplace acceptance must use its own clean profile'
@@ -191,7 +204,7 @@ jobs:
       - name: Install verification tools
         run: npm ci --ignore-scripts
       - name: Verify Windows acceptance contracts and PowerShell syntax
-        run: node --test scripts/windows-install-smoke.test.mjs scripts/windows-ui-smoke.test.mjs scripts/prepare-windows-install-smoke.test.mjs scripts/prepare-browser-skill-smoke.test.mjs
+        run: node --test scripts/windows-install-smoke.test.mjs scripts/windows-ui-smoke.test.mjs scripts/run-windows-offline-spreadsheet-journey.test.mjs scripts/prepare-windows-install-smoke.test.mjs scripts/prepare-browser-skill-smoke.test.mjs
       - name: Verify the original build and unchanged application source
         id: source
         env:
@@ -222,6 +235,7 @@ jobs:
           RAILWISE_WINDOWS_WEB_PPT_SMOKE: ${{ contains(fromJSON('["controlled","live","browser-fallback"]'), inputs.web_ppt_journey) }}
           RAILWISE_WINDOWS_WEB_PPT_BROWSER_FALLBACK: ${{ inputs.web_ppt_journey == 'browser-fallback' }}
           RAILWISE_WINDOWS_WEB_PPT_LIVE: ${{ inputs.web_ppt_journey == 'live' }}
+          RAILWISE_WINDOWS_SPREADSHEET_SMOKE: ${{ inputs.run_windows_spreadsheet }}
           RAILWISE_QA_MODEL_BASE_URL: ${{ inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL_BASE_URL || '' }}
           RAILWISE_QA_MODEL: ${{ inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL || '' }}
           RAILWISE_QA_MODEL_API_KEY: ${{ inputs.web_ppt_journey == 'live' && secrets.RAILWISE_QA_MODEL_API_KEY || '' }}

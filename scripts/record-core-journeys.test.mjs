@@ -174,6 +174,43 @@ test('Windows receipt derives task, schedule, composer, responsive, marketplace 
   assert.deepEqual(windowsCoreJourneys(videoInstall).journeys.map(item => item.id).sort(), ['approval-resume', 'video-shotcraft'])
 })
 
+test('Windows receipt records offline spreadsheet only when exact workbook and XLSX checks pass', () => {
+  const version = '0.5.11'
+  const spreadsheet = {
+    status: 'passed', platform: 'win32', arch: 'x64', version, sourceHead,
+    buildRunId: build.runId, buildRunAttempt: build.runAttempt,
+    installerSha256, installedAsarSha256, execution: 'installed-ui', packageUnchanged: true,
+    networkIsolation: { rendererOffline: true },
+    checks: ['new-local-rwsheet', 'formula-calculation-saved', 'undo-restores-prior-cell-value',
+      'external-save-conflict-preserves-original-and-saves-copy',
+      'utf8-chinese-csv-import-export-preserves-leading-zero-and-decimal',
+      'save-reopen-multiple-sheets-through-production-reader',
+      'xlsx-read-only-preview-preserves-sheet-names-positions-and-source-bytes'],
+    formula: { expression: '=SUM(4,5)', value: 9 },
+    undo: { shortcut: 'Ctrl+Z', restoredPreviousValue: true },
+    conflict: { originalPreserved: true, copyPreservedUnsavedEdit: true },
+    csv: { preservesLeadingZeroAndPrecision: true },
+    savedWorkbook: { sheetCount: 2, reopenedThroughProductionReader: true,
+      reopenedInVisibleGrid: true, formulaValueAfterReopen: 9 },
+    xlsxPreview: { sheetNames: ['监测点', '记录'], renderedReadOnlyGrid: true,
+      editingControlsHidden: true, systemOpenEntryVisible: true }
+  }
+  const install = { status: 'passed', platform: 'win32', arch: 'x64', productionTouched: false, version, sourceHead,
+    verification: { installerSha256, installedAsarSha256 }, installer: { sha256: installerSha256 },
+    target: { package: { asarSha256: installedAsarSha256 } },
+    provenance: { packageBuild: { ...build, packageSourceHead: sourceHead } },
+    ui: { status: 'passed', version, sourceHead, installedAsarSha256, installerSha256, packageUnchanged: true,
+      checks: ['offline-spreadsheet-exact-package'], offlineSpreadsheet: spreadsheet } }
+
+  assert.deepEqual(windowsCoreJourneys(install).journeys.map(item => item.id), ['offline-spreadsheet'])
+  const wrongInstaller = structuredClone(install)
+  wrongInstaller.ui.offlineSpreadsheet.installerSha256 = 'f'.repeat(64)
+  assert.throws(() => windowsCoreJourneys(wrongInstaller))
+  const missingCheck = structuredClone(install)
+  missingCheck.ui.offlineSpreadsheet.checks.pop()
+  assert.throws(() => windowsCoreJourneys(missingCheck), /Missing installed Windows spreadsheet check/)
+})
+
 test('Windows receipt includes startup branding only after exact installed bilingual startup readback', () => {
   const version = '0.5.11'
   const install = { status: 'passed', platform: 'win32', arch: 'x64', productionTouched: false, version, sourceHead,

@@ -35,4 +35,10 @@ test('Mac PPT receipts retain the last chat journey stage when CDP stalls', asyn
     'verify-registered-editable-pptx',
     'open-pptx-through-system-application'
   ]) assert.ok(journey.includes(stage), `Missing journey checkpoint ${stage}`)
+  assert.match(runner, /soffice', \['--headless', '--terminate_after_init'\]/)
+  assert.match(runner, /get name of every window of process "LibreOffice"/)
+  const nativeOpenStart = runner.indexOf('async function readNativeOpenResult')
+  const nativeOpenEnd = runner.indexOf('\n}\n\nexport async function runInstalledMacPptJourney', nativeOpenStart)
+  const nativeOpenObserver = runner.slice(nativeOpenStart, nativeOpenEnd)
+  assert.doesNotMatch(nativeOpenObserver, /cdp\.evaluate\(/, 'The observer must not invoke the same open IPC a second time')
 })

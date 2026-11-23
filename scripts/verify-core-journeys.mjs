@@ -18,7 +18,7 @@ const INTEL = 'darwin-x64'
 
 const windowsDesktopJourneys = [
   'conversation-task', 'approval-resume', 'website-pptx', 'browserskill-fallback',
-  'daily-schedule', 'composer-capabilities', 'pdf-attachments', 'responsive-layout',
+  'daily-schedule', 'composer-capabilities', 'pdf-attachments', 'offline-spreadsheet', 'responsive-layout',
   'startup-branding'
 ]
 const macDesktopJourneys = ['website-pptx', 'startup-branding', 'offline-spreadsheet']

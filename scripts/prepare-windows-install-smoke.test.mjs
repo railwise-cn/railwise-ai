@@ -37,7 +37,9 @@ test('only the exact undistributed execution QA and opt-in live test are allowed
   for (const file of ['docs/qa/general-execution-delivery-2026-11-13.md', 'docs/qa/release-gates/v0.5.11/acceptance.md',
     'kun/tests/browser-skill-live.test.ts', 'kun/tests/local-html-acceptance-runtime.test.ts',
     'scripts/verify-packaged-startup-appearance.mjs', 'scripts/run-mac-offline-spreadsheet-journey.mjs',
-    'scripts/run-mac-startup-appearance-smoke.mjs', 'scripts/run-mac-ppt-journey.mjs']) {
+    'scripts/run-mac-startup-appearance-smoke.mjs', 'scripts/run-mac-ppt-journey.mjs',
+    'scripts/run-windows-offline-spreadsheet-journey.mjs', 'scripts/run-windows-offline-spreadsheet-journey.test.mjs',
+    'scripts/verify-core-journeys.mjs', 'scripts/verify-core-journeys.test.mjs']) {
     assert.doesNotThrow(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }))
   }
   for (const file of ['docs/qa/another-execution-change.md', 'kun/tests/browser-skill-live.ts', 'kun/tests/local-html-acceptance-runtime.ts',
