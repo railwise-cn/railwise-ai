@@ -1780,25 +1780,6 @@ export function Workbench(): ReactElement {
       setError(t('taskComposerReplyTextOnly'))
       return
     }
-    if (replyQuestion && (!activeTaskComposerQuestion || replyQuestion.requestId !== activeTaskComposerQuestion.requestId) &&
-      v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
-      if (submittingQuestion.current === replyQuestion.requestId) return
-      submittingQuestion.current = replyQuestion.requestId
-      const question = replyQuestion.questions[0]
-      try {
-        await useChatStore.getState().resolveUserInput(replyQuestion.id, {
-          kind: 'submit', answers: [{ id: question.id, label: question.header || question.question, value: v }]
-        })
-        const state = useChatStore.getState()
-        if (state.activeThreadId === activeThreadId &&
-            state.blocks.some(block => block.id === replyQuestion.id && block.kind === 'user_input' && block.status === 'submitted')) {
-          setComposerDrafts(drafts => drafts[composerScope] === input ? setWorkbenchComposerDraft(drafts, composerScope, '') : drafts)
-        }
-      } finally {
-        if (submittingQuestion.current === replyQuestion.requestId) submittingQuestion.current = null
-      }
-      return
-    }
     if (activeTaskComposerQuestion && v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
       if (submittingQuestion.current === activeTaskComposerQuestion.requestId) return
       submittingQuestion.current = activeTaskComposerQuestion.requestId
@@ -1826,6 +1807,24 @@ export function Workbench(): ReactElement {
         setError(t('taskWorkspaceActionFailed'))
       } finally {
         if (submittingQuestion.current === activeTaskComposerQuestion.requestId) submittingQuestion.current = null
+      }
+      return
+    }
+    if (replyQuestion && v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
+      if (submittingQuestion.current === replyQuestion.requestId) return
+      submittingQuestion.current = replyQuestion.requestId
+      const question = replyQuestion.questions[0]
+      try {
+        await useChatStore.getState().resolveUserInput(replyQuestion.id, {
+          kind: 'submit', answers: [{ id: question.id, label: question.header || question.question, value: v }]
+        })
+        const state = useChatStore.getState()
+        if (state.activeThreadId === activeThreadId &&
+            state.blocks.some(block => block.id === replyQuestion.id && block.kind === 'user_input' && block.status === 'submitted')) {
+          setComposerDrafts(drafts => drafts[composerScope] === input ? setWorkbenchComposerDraft(drafts, composerScope, '') : drafts)
+        }
+      } finally {
+        if (submittingQuestion.current === replyQuestion.requestId) submittingQuestion.current = null
       }
       return
     }
@@ -2669,7 +2668,8 @@ export function Workbench(): ReactElement {
                 ) : null
               }
             />
-            <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8">
+            <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8"
+              data-task-question-request-id={activeTaskComposerQuestion?.requestId}>
               <FloatingComposer
                 actionsRef={composerActionsRef}
                 replyingToQuestion={Boolean(replyQuestion || activeTaskComposerQuestion)}

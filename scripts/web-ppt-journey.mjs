@@ -104,6 +104,7 @@ async function readWebPptReplyState(cdp, taskId, executionThreadId) {
     cdp.evaluate(`({
       answerComposerVisible: Boolean(document.querySelector(${literal(answerComposer)})?.getClientRects().length),
       composerPlaceholder: document.querySelector('.ds-chat-composer-dock textarea')?.placeholder,
+      taskQuestionRequestId: document.querySelector('.ds-chat-composer-dock')?.getAttribute('data-task-question-request-id'),
       replyHintVisible: document.querySelector(${literal(timeline)})?.innerText.includes('在下方输入框直接回复') ?? false,
       submitButtonVisible: [...document.querySelectorAll('button')].some(button =>
         button.getClientRects().length && button.getAttribute('aria-label') === '提交')
@@ -115,8 +116,9 @@ async function readWebPptReplyState(cdp, taskId, executionThreadId) {
   ])
   return {
     ui,
-    task: { status: task.status, activeTurnId: task.activeTurnId, presentationReason: task.presentation?.reason },
-    inputs: inputs.map(input => ({ kind: input.kind, status: input.status, sourceId: input.sourceId,
+    task: { id: task.id, originThreadId: task.originThreadId, status: task.status,
+      activeTurnId: task.activeTurnId, presentationReason: task.presentation?.reason },
+    inputs: inputs.map(input => ({ kind: input.kind, idempotencyKey: input.idempotencyKey, status: input.status, sourceId: input.sourceId,
       textLength: typeof input.text === 'string' ? input.text.length : undefined })),
     attention: inbox.filter(item => item.taskId === taskId).map(item => ({ kind: item.kind, status: item.status,
       requestId: item.requestId, questionCount: Array.isArray(item.payload?.questions) ? item.payload.questions.length : 0,
@@ -151,16 +153,33 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
   const replyBefore = await readWebPptReplyState(cdp, task.id, task.threadId)
   const replyTrace = { before: replyBefore }
   try {
-    assert.ok(replyBefore.ui.answerComposerVisible && replyBefore.ui.replyHintVisible && replyBefore.ui.submitButtonVisible,
+    const pendingQuestion = replyBefore.attention.find(item => item.status === 'pending' && item.kind === 'question' && item.textQuestion && item.questionCount === 1)
+    assert.ok(replyBefore.ui.answerComposerVisible && replyBefore.ui.replyHintVisible && replyBefore.ui.submitButtonVisible &&
+      typeof pendingQuestion?.requestId === 'string' && replyBefore.ui.taskQuestionRequestId === pendingQuestion.requestId,
       `The task question was not bound to the original chat composer: ${JSON.stringify(replyBefore)}`)
+    const requestId = pendingQuestion.requestId
+    const originalTurnId = task.activeTurnId
     await cdp.fill(answerComposer, sourceAnswer)
     await cdp.click('button[aria-label="提交"]:not(:disabled)')
+    const answerKey = `user-input:${requestId}`
+    await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(task.id)}/inputs`)}.then(inputs=>
+      inputs.filter(input=>input.kind==='supplement' && input.idempotencyKey===${literal(answerKey)}))`,
+    'KUN to persist the answer against the exact pending question', 45_000)
+    await cdp.wait(`${readRuntime('/v1/inbox')}.then(items=>
+      items.find(item=>item.requestId===${literal(requestId)} && item.status!=='pending'))`,
+    'KUN to resolve the exact pending question', 45_000)
     if (requireNewTurn) {
       await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(task.id)}`)}.then(task=>
-        task.activeTurnId && task.activeTurnId !== ${literal(task.activeTurnId)} ? task : null)`,
-      'the same task to resume in a new Turn after expanding its read-only browser scope', 45_000)
+        task.id===${literal(task.id)} && task.originThreadId===${literal(thread.id)} && task.activeTurnId &&
+        task.activeTurnId!==${literal(originalTurnId)} ? task : null)`,
+      'the same task in the original conversation to resume in a new Turn', 45_000)
     }
     replyTrace.after = await readWebPptReplyState(cdp, task.id, task.threadId)
+    const acceptedAnswers = replyTrace.after.inputs.filter(input => input.kind === 'supplement' && input.idempotencyKey === answerKey)
+    assert.equal(acceptedAnswers.length, 1, 'KUN must record exactly one answer for the original task question')
+    assert.equal(replyTrace.after.task.id, task.id)
+    assert.equal(replyTrace.after.task.originThreadId, thread.id)
+    assert.equal(replyTrace.after.task.activeTurnId !== originalTurnId, requireNewTurn)
   } catch (error) {
     replyTrace.after = await readWebPptReplyState(cdp, task.id, task.threadId).catch(() => undefined)
     if (error && typeof error === 'object') error.webPptDiagnostics = replyTrace
@@ -274,6 +293,20 @@ export function validateWebPptTurnIdentity(proof) {
   assert.equal(proof.originThreadId, proof.conversationThreadId)
   assert.equal(proof.originalConversation?.questionVisible, true)
   assert.equal(proof.originalConversation?.artifactVisible, true)
+  const replyTrace = proof.replyTrace
+  assert.ok(replyTrace?.before && replyTrace?.after, 'The installed UI must record the original task question and its KUN receipt')
+  const questions = replyTrace.before.attention.filter(item => item.status === 'pending' && item.kind === 'question' &&
+    item.textQuestion && item.questionCount === 1)
+  assert.equal(questions.length, 1, 'Exactly one open text question must be bound to the composer')
+  const requestId = questions[0].requestId
+  assert.ok(requestId)
+  assert.equal(replyTrace.before.ui.taskQuestionRequestId, requestId)
+  const answers = replyTrace.after.inputs.filter(input => input.kind === 'supplement' && input.idempotencyKey === `user-input:${requestId}`)
+  assert.equal(answers.length, 1, 'The exact question answer must be persisted once by KUN')
+  assert.equal(replyTrace.after.task.id, proof.taskId)
+  assert.equal(replyTrace.after.task.originThreadId, proof.conversationThreadId)
+  assert.ok(replyTrace.after.attention.some(item => item.requestId === requestId && item.status !== 'pending'))
+  assert.equal(replyTrace.after.task.activeTurnId === replyTrace.before.task.activeTurnId, proof.sameTurn)
   if (proof.sameTurn === true && !proof.initialTurnId && !proof.completedTurnId) return
   assert.ok(proof.initialTurnId && proof.completedTurnId, 'Both execution Turn IDs are required')
   assert.equal(proof.sameTurn, proof.initialTurnId === proof.completedTurnId)
@@ -450,7 +483,8 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
         quality: observed.quality, taskId: task.id, conversationThreadId: journey.conversationThreadId,
         originThreadId: task.originThreadId, executionThreadId: task.threadId, sameConversation: true,
         originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn, initialTurnId: initialTurn.id, completedTurnId: completedTurn.id,
-        ...(browserRecovery ? { browserRecovery } : {}), artifact: { id: artifact.id, ...contents, originalChatButtonClicked: true }, open }
+        replyTrace: journey.replyTrace, ...(browserRecovery ? { browserRecovery } : {}),
+        artifact: { id: artifact.id, ...contents, originalChatButtonClicked: true }, open }
     }
   }
 }

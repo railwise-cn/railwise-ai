@@ -159,6 +159,23 @@ describe('task actions in the original conversation', () => {
       requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
   })
 
+  it('keeps the task question bound when its transcript control becomes inline', async () => {
+    tasks = [run('worker-question', 'waiting_user', { activeTurnId: 'waiting-turn' })]
+    const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
+      threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [question] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const onComposerQuestionChange = vi.fn()
+
+    await render({ composerReplies: true, onComposerQuestionChange })
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
+      requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
+
+    await render({ composerReplies: true, inlineRequests: ['worker-request'], onComposerQuestionChange })
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
+      requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
+  })
+
   it('does not bind a stale task question while the task is queued', async () => {
     tasks = [run('worker-question', 'queued', { activeTurnId: 'queued-turn' })]
     attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',

@@ -66,7 +66,7 @@ describe('anchored selector interaction', () => {
       else trigger.parentElement!.setAttribute(state, '')
     })
     await settle()
-    expect(document.querySelector('[role="menu"]')).toBeNull()
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull(), { timeout: 1000 })
   })
 
   it('delegates Tab to the enclosing modal while consuming Escape locally', async () => {

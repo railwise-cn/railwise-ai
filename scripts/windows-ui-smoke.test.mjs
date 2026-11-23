@@ -127,6 +127,14 @@ test('website-to-PPT stops after a failed source fetch instead of creating an un
 test('website-to-PPT report matches its requested model and verifies a desktop-open response for the live gate', () => {
   const sourceHead = '1'.repeat(40)
   const version = '0.5.11'
+  const requestId = 'question-1'
+  const replyTrace = sameTurn => ({
+    before: { ui: { taskQuestionRequestId: requestId }, task: { activeTurnId: 'turn-1' },
+      attention: [{ requestId, kind: 'question', status: 'pending', questionCount: 1, textQuestion: true }] },
+    after: { task: { id: 'task-1', originThreadId: 'conversation-1', activeTurnId: sameTurn ? 'turn-1' : 'turn-2' },
+      inputs: [{ kind: 'supplement', idempotencyKey: `user-input:${requestId}` }],
+      attention: [{ requestId, status: sameTurn ? 'answered' : 'cancelled' }] }
+  })
   const report = {
     schemaVersion: 1, scope: 'private-exact-package-chinese-ui', platform: 'win32', sourceHead, version,
     locale: 'zh', theme: 'dark', workspaceRoot: windowsSmokeWorkspaceName, productionTouched: false,
@@ -134,7 +142,7 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
     webPpt: {
       status: 'passed', model: 'controlled-protocol', input: 'installed-chat-ui', taskId: 'task-1',
       conversationThreadId: 'conversation-1', originThreadId: 'conversation-1', executionThreadId: 'execution-1', sameConversation: true,
-      originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: true,
+      originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: true, replyTrace: replyTrace(true),
       source: { url: 'https://www.railwise.cn/', tool: 'web_fetch', sha256: '2'.repeat(64), bytes: 512 },
       artifact: { nativeEditableText: true, originalChatButtonClicked: true, sha256: '3'.repeat(64), bytes: 1024 },
       open: { status: 'handler-unavailable' }
@@ -148,6 +156,7 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
   report.webPpt.open.status = 'desktop-open-request-accepted'
   assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
   report.webPpt.sameTurn = false
+  report.webPpt.replyTrace = replyTrace(false)
   assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
   report.webPpt.initialTurnId = 'initial-turn'
   report.webPpt.completedTurnId = 'resumed-turn'
@@ -162,7 +171,13 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
 test('website-to-PPT identity binds the task to the visible conversation while recording its worker thread separately', () => {
   const proof = { taskId: 'task-1', conversationThreadId: 'chat-1', originThreadId: 'chat-1', executionThreadId: 'worker-1',
     sameConversation: true, originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: false,
-    initialTurnId: 'turn-1', completedTurnId: 'turn-2' }
+    initialTurnId: 'turn-1', completedTurnId: 'turn-2', replyTrace: {
+      before: { ui: { taskQuestionRequestId: 'question-1' }, task: { activeTurnId: 'turn-1' },
+        attention: [{ requestId: 'question-1', kind: 'question', status: 'pending', questionCount: 1, textQuestion: true }] },
+      after: { task: { id: 'task-1', originThreadId: 'chat-1', activeTurnId: 'turn-2' },
+        inputs: [{ kind: 'supplement', idempotencyKey: 'user-input:question-1' }],
+        attention: [{ requestId: 'question-1', status: 'cancelled' }] }
+    } }
   assert.equal(validateWebPptTurnIdentity(proof), undefined)
   assert.throws(() => validateWebPptTurnIdentity({ ...proof, originThreadId: 'worker-1' }))
   assert.throws(() => validateWebPptTurnIdentity({ ...proof, originalConversation: { ...proof.originalConversation, questionVisible: false } }))

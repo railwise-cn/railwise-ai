@@ -15,10 +15,22 @@ const environment = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: RELEASE_REPOSIT
   GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@refs/heads/main`,
   GITHUB_SHA: sourceHead, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' }
 
+function replyTrace(sameTurn = true) {
+  const requestId = 'question-1'
+  const firstTurn = 'turn-1'
+  return {
+    before: { ui: { taskQuestionRequestId: requestId }, task: { activeTurnId: firstTurn },
+      attention: [{ requestId, kind: 'question', status: 'pending', questionCount: 1, textQuestion: true }] },
+    after: { task: { id: 'task-1', originThreadId: 'conversation-1', activeTurnId: sameTurn ? firstTurn : 'turn-2' },
+      inputs: [{ kind: 'supplement', idempotencyKey: `user-input:${requestId}` }],
+      attention: [{ requestId, status: sameTurn ? 'answered' : 'cancelled' }] }
+  }
+}
+
 function ppt(open = 'os-open-accepted') {
   return { status: 'passed', model: 'live-model', input: 'installed-chat-ui', taskId: 'task-1',
     conversationThreadId: 'conversation-1', originThreadId: 'conversation-1', executionThreadId: 'execution-1', sameConversation: true,
-    originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: true,
+    originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: true, replyTrace: replyTrace(),
     source: { url: 'https://www.railwise.cn/', tool: 'web_fetch', bytes: 1024, sha256: 'c'.repeat(64) },
     artifact: { id: 'file-1', nativeEditableText: true, originalChatButtonClicked: true, bytes: 4096, sha256: 'd'.repeat(64) },
     open: { status: open } }
@@ -40,8 +52,18 @@ test('live PPT receipt requires the original installed GUI conversation and open
   assert.equal(livePptJourney(ppt(), file, 'os-open-accepted').id, 'website-pptx')
   assert.equal(livePptJourney(ppt('handler-unavailable'), file, 'os-open-accepted'), undefined)
   assert.equal(livePptJourney({ ...ppt(), model: 'controlled-protocol' }, file, 'os-open-accepted'), undefined)
-  assert.throws(() => livePptJourney({ ...ppt(), sameTurn: false }, file, 'os-open-accepted'))
-  assert.equal(livePptJourney({ ...ppt(), sameTurn: false, initialTurnId: 'first', completedTurnId: 'resumed' }, file, 'os-open-accepted').id, 'website-pptx')
+  assert.throws(() => livePptJourney({ ...ppt(), sameTurn: false, replyTrace: replyTrace(false) }, file, 'os-open-accepted'))
+  assert.equal(livePptJourney({ ...ppt(), sameTurn: false, replyTrace: replyTrace(false), initialTurnId: 'first', completedTurnId: 'resumed' }, file, 'os-open-accepted').id, 'website-pptx')
+  assert.throws(() => livePptJourney({ ...ppt(), replyTrace: { ...replyTrace(), after: { ...replyTrace().after, inputs: [] } } }, file, 'os-open-accepted'))
+  const wrongComposerRequest = structuredClone(ppt())
+  wrongComposerRequest.replyTrace.before.ui.taskQuestionRequestId = 'different-question'
+  assert.throws(() => livePptJourney(wrongComposerRequest, file, 'os-open-accepted'))
+  const duplicateAnswer = structuredClone(ppt())
+  duplicateAnswer.replyTrace.after.inputs.push({ kind: 'supplement', idempotencyKey: 'user-input:question-1' })
+  assert.throws(() => livePptJourney(duplicateAnswer, file, 'os-open-accepted'))
+  const wrongTask = structuredClone(ppt())
+  wrongTask.replyTrace.after.task.id = 'different-task'
+  assert.throws(() => livePptJourney(wrongTask, file, 'os-open-accepted'))
   assert.throws(() => {
     const result = ppt()
     result.artifact.nativeEditableText = false
@@ -87,7 +109,7 @@ test('Windows records BrowserSkill fallback only with the real browser proof and
     provenance: { packageBuild: { ...build, packageSourceHead: sourceHead } },
     ui: { status: 'passed', sourceHead, version, installedAsarSha256, packageUnchanged: true,
       checks: ['installed-chat-web-ppt-browser-fallback'],
-      webPpt: { ...ppt('desktop-open-request-accepted'), model: 'controlled-protocol', sameTurn: false,
+      webPpt: { ...ppt('desktop-open-request-accepted'), model: 'controlled-protocol', sameTurn: false, replyTrace: replyTrace(false),
         initialTurnId: 'first', completedTurnId: 'resumed', source: { url, tool: 'browser_get_html', bytes: 512, sha256: 'c'.repeat(64) },
         browserRecovery: { taskId: 'task-1', originThreadId: 'conversation-1', executionThreadId: 'execution-1', initialTurnId: 'first', completedTurnId: 'resumed',
           originalQuestionCount: 1, supplements: 1, directFetchBlock: 'policy_blocked', directFetchUrl: url,

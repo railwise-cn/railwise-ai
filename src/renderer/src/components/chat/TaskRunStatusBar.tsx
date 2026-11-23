@@ -257,8 +257,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     </div>
     {remainingAttention.length || resultsOpen || verifyOpen || legacyWorkerResponse ? <div className="space-y-1 pb-1">
       {remainingAttention.map(item => <TaskAttentionCard key={`${item.id}:${item.revision}`} item={item} ownerTask={members.find(owner => owner.id === item.taskId)}
-        conversationThreadId={threadId ?? undefined} onResolved={onResolved} replyInComposer={canReplyInComposer}
-        onComposerQuestionChange={canReplyInComposer ? onComposerQuestionChange : undefined} />)}
+        conversationThreadId={threadId ?? undefined} onResolved={onResolved} replyInComposer={canReplyInComposer} />)}
       {resultsOpen ? <ul className="space-y-1" aria-label={t('taskRunArtifacts')}>{artifacts.map(({ task: owner, artifact }) => <li key={`${owner.id}:${artifact.id}`} className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
         <button type="button" onClick={() => void openArtifact(owner, artifact)} className="inline-flex min-w-0 items-center gap-1.5 text-left text-accent hover:underline">
           <FileText className="h-3.5 w-3.5 shrink-0" /><span className="break-all">{artifact.relativePath.split(/[\\/]/).at(-1)}</span>
