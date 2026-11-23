@@ -110,6 +110,16 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
   const attentionId = onlyAttention?.requestId
   const attentionTitle = onlyAttention?.title
   const attentionQuestions = onlyAttention?.payload?.questions
+  const questionForHistory = isPrimary && onlyAttention?.kind === 'question' && Array.isArray(attentionQuestions) && attentionQuestions.length === 1
+    ? attentionQuestions[0] as Record<string, unknown> : undefined
+  const questionHistoryRequestId = typeof onlyAttention?.requestId === 'string' && questionForHistory &&
+    (!Array.isArray(questionForHistory.options) || questionForHistory.options.length === 0) ? onlyAttention.requestId : undefined
+  const questionHistoryText = questionForHistory
+    ? (typeof questionForHistory.label === 'string' ? questionForHistory.label
+      : typeof questionForHistory.question === 'string' ? questionForHistory.question : onlyAttention?.message)
+    : undefined
+  const [answeredQuestions, setAnsweredQuestions] = useState<Array<{ requestId: string; question: string; answer?: string }>>([])
+  const questionHistoryTaskId = useRef('')
   const taskQuestion = useMemo(() => {
     if (!composerReplies || !['waiting_user', 'paused'].includes(task.status) || !task.activeTurnId || attentionKind !== 'question' ||
       !threadId || !attentionId || !Array.isArray(attentionQuestions) || attentionQuestions.length !== 1) return null
@@ -125,6 +135,30 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     onComposerQuestionChange(taskQuestion)
     return () => onComposerQuestionChange(null)
   }, [onComposerQuestionChange, taskQuestion])
+  useEffect(() => {
+    if (questionHistoryRequestId && questionHistoryText) {
+      questionHistoryTaskId.current = task.id
+      setAnsweredQuestions(current => current.some(item => item.requestId === questionHistoryRequestId)
+        ? current.map(item => item.requestId === questionHistoryRequestId ? { ...item, question: questionHistoryText } : item)
+        : [...current, { requestId: questionHistoryRequestId, question: questionHistoryText }])
+    }
+    if (!runtimeReady || (questionHistoryTaskId.current !== task.id && !questionHistoryRequestId)) return
+    let active = true
+    void window.workwise.listTaskInputs(task.id).then(inputs => {
+      if (!active) return
+      setAnsweredQuestions(current => {
+        let changed = false
+        const next = current.map(item => {
+          const answer = inputs.find(input => input.kind === 'supplement' && input.idempotencyKey === `user-input:${item.requestId}`)?.text
+          if (answer === undefined || answer === item.answer) return item
+          changed = true
+          return { ...item, answer }
+        })
+        return changed ? next : current
+      })
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [questionHistoryRequestId, questionHistoryText, runtimeReady, task.id, task.revision])
   const isInline = (item: TaskAttentionV1): boolean => isInTimeline(item, { inlineRequests, inlineCapabilityCards })
   const remainingAttention = pending.filter(item => {
     if (isInline(item)) return false
@@ -255,6 +289,12 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
       {running ? <button type="button" disabled={disabled} onClick={() => void run('pause')} className={taskButtonClass}>{t('taskWorkspacePause')}</button> : null}
       {!TERMINAL_STATUSES.has(task.status) ? <button type="button" disabled={disabled} onClick={() => void run('cancel')} className={taskButtonClass}>{t('taskRunCancel')}</button> : null}
     </div>
+    {answeredQuestions.some(item => item.answer !== undefined) ? <div aria-label={t('taskRunQuestionHistory')} className="space-y-0.5 pb-1 text-xs text-ds-muted">
+      {answeredQuestions.filter(item => item.answer !== undefined).map(item => <div key={item.requestId} className="min-w-0 break-words">
+        <p><span className="font-medium">{t('taskRunQuestionLabel')}</span> {item.question}</p>
+        <p><span className="font-medium">{t('taskRunAnswerLabel')}</span> {item.answer}</p>
+      </div>)}
+    </div> : null}
     {remainingAttention.length || resultsOpen || verifyOpen || legacyWorkerResponse ? <div className="space-y-1 pb-1">
       {remainingAttention.map(item => <TaskAttentionCard key={`${item.id}:${item.revision}`} item={item} ownerTask={members.find(owner => owner.id === item.taskId)}
         conversationThreadId={threadId ?? undefined} onResolved={onResolved} replyInComposer={canReplyInComposer} />)}

@@ -2,7 +2,7 @@
 import { act, createElement, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskInputV1, TaskRunV1 } from '@shared/agent-workbench'
 import type { ChatBlock } from '../../agent/types'
 import { TaskRunStatusBar } from './TaskRunStatusBar'
 import { MessageTimeline } from './MessageTimeline'
@@ -28,6 +28,7 @@ const api = {
   startTaskSse: vi.fn(async () => undefined), stopSse: vi.fn(async () => undefined),
   onSseEvent: vi.fn(() => () => undefined), onSseEnd: vi.fn(() => () => undefined), onSseError: vi.fn(() => () => undefined),
   notifyTask: vi.fn(async () => undefined), resumeTask: vi.fn(), retryTask: vi.fn(), pauseTask: vi.fn(),
+  listTaskInputs: vi.fn(async (): Promise<TaskInputV1[]> => []),
   runtimeRequest: vi.fn(async (_path: string, _method?: string, _body?: string) => ({ ok: true, body: '{}' })),
   openTaskArtifact: vi.fn(async () => ({ ok: true })), openWorkspaceFile: vi.fn(async () => ({ ok: true }))
 }
@@ -62,6 +63,7 @@ function button(label: string): HTMLButtonElement | undefined {
 beforeEach(async () => {
   vi.clearAllMocks()
   api.runtimeRequest.mockResolvedValue({ ok: true, body: '{}' })
+  api.listTaskInputs.mockResolvedValue([])
   resetTaskStateForTests()
   tasks = []; attention = []
   await i18n.changeLanguage('zh')
@@ -174,6 +176,28 @@ describe('task actions in the original conversation', () => {
     await render({ composerReplies: true, inlineRequests: ['worker-request'], onComposerQuestionChange })
     expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
       requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
+  })
+
+  it('keeps the answered source question and reply in the original conversation', async () => {
+    const task = run('website-presentation', 'waiting_user', { activeTurnId: 'waiting-turn' })
+    tasks = [task]
+    attention = [{ id: 'website-question', requestId: 'website-request', taskId: task.id, ownerId: task.id, ownerKind: 'task',
+      threadId: task.threadId, kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] },
+      revision: 1, createdAt: task.createdAt, updatedAt: task.updatedAt }]
+    await render({ composerReplies: true })
+
+    tasks = [{ ...task, status: 'completed', activeTurnId: 'resumed-turn', revision: task.revision + 1,
+      artifacts: [{ id: 'presentation', relativePath: 'website.pptx', validation: 'valid', createdAt: task.updatedAt }] }]
+    attention = []
+    api.listTaskInputs.mockResolvedValue([{ id: 'answer', taskId: task.id, kind: 'supplement', text: 'https://www.railwise.cn',
+      idempotencyKey: 'user-input:website-request', createdAt: task.updatedAt }])
+    await render({ composerReplies: true })
+
+    const history = container.querySelector('[aria-label="补充记录"]')
+    expect(history?.textContent).toContain('请提供官网网址。')
+    expect(history?.textContent).toContain('https://www.railwise.cn')
+    expect(history?.closest('[aria-label="任务"]')).not.toBeNull()
   })
 
   it('does not bind a stale task question while the task is queued', async () => {
