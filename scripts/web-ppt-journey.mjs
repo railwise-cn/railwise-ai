@@ -136,8 +136,10 @@ async function readWebPptReplyState(cdp, taskId, executionThreadId) {
 }
 
 export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPrompt, expectedQuestion = webPptQuestion,
-  sourceAnswer = webPptSourceHost, requireNewTurn = false } = {}) {
+  sourceAnswer = webPptSourceHost, requireNewTurn = false, onStage } = {}) {
+  await onStage?.('read-prior-conversations')
   const priorThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.map(thread => thread.id)
+  await onStage?.('create-conversation-and-select-ppt-master')
   await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
   await cdp.fill(composer, '/ppt')
   await cdp.click('[role="option"] .truncate', 'PPT Master')
@@ -147,6 +149,7 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
   const questionCheck = expectedQuestion instanceof RegExp
     ? `new RegExp(${literal(expectedQuestion.source)},${literal(expectedQuestion.flags)}).test(${conversationTextProbe()})`
     : `${conversationTextProbe()}.includes(${literal(expectedQuestion)})`
+  await onStage?.('wait-for-source-question-in-original-conversation')
   await cdp.wait(`Boolean(document.querySelector(${literal(answerComposer)}) &&
     (${questionCheck}))`, 'the source question in the original conversation', 120_000)
   const newThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.filter(thread => !priorThreads.includes(thread.id))
@@ -166,6 +169,7 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
     const requestId = pendingQuestion.requestId
     const originalTurnId = task.activeTurnId
     const answerKey = `user-input:${requestId}`
+    await onStage?.('submit-website-address-in-original-conversation')
     await cdp.fill(answerComposer, sourceAnswer)
     await cdp.click('button[aria-label="提交"]:not(:disabled)')
     const answerReceipt = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(task.id)}/inputs`)}.then(inputs=>{
@@ -179,6 +183,7 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
     assert.equal(answerReceipt.answerMatchesExpected, true)
     assert.ok(answerReceipt.answerLength > 0)
     replyTrace.answerReceipt = answerReceipt
+    await onStage?.('verify-question-settlement-and-task-resume')
     await cdp.wait(`${readRuntime('/v1/inbox')}.then(items=>
       !items.some(item=>item.requestId===${literal(requestId)} && item.status==='pending'))`,
     'KUN to resolve the exact pending question', 45_000)
@@ -446,9 +451,11 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       observed.complete = true
       return { content: '已根据睿威官网公开资料生成并核对演示文稿。' }
     },
-    async verify(cdp, { openArtifact, browserInstanceId } = {}) {
+    async verify(cdp, { openArtifact, browserInstanceId, onStage } = {}) {
+      await onStage?.('start-original-conversation-journey')
       const journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
-        sourceAnswer: fallback?.url ?? webPptSourceHost, requireNewTurn: Boolean(fallback) })
+        sourceAnswer: fallback?.url ?? webPptSourceHost, requireNewTurn: Boolean(fallback), onStage })
+      await onStage?.('wait-for-original-task-completion')
       const task = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)}.then(task=>
         ['completed','failed','stalled','cancelled','waiting_user','paused'].includes(task.status) ? task : null)`,
       'task completion or a visible request for input', live ? 480_000 : 180_000)
@@ -460,6 +467,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       assert.equal(task.threadId, journey.executionThreadId)
       assert.equal(task.id, journey.taskId)
       if (!live) assert.equal(observed.complete, true, 'The installed tool results must reach the controlled model')
+      await onStage?.('verify-saved-task-and-source-read')
       const saved = await cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(journey.executionThreadId)}`))
       const initialTurn = saved.turns.find(item => item.id === journey.turnId)
       const completedTurn = saved.turns.find(item => item.id === task.activeTurnId)
@@ -487,6 +495,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
         assert.ok(receipt.byteCount > 0)
         source = { url: receipt.finalUrl, sha256: receipt.resultHash, bytes: receipt.byteCount, tool: 'web_fetch' }
       }
+      await onStage?.('verify-registered-editable-pptx')
       const artifact = task.artifacts.find(item => item.relativePath.replaceAll('\\', '/') === artifactPath)
       assert.equal(artifact?.validation, 'valid')
       const output = join(workspace, artifactPath)
@@ -495,7 +504,9 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const contents = await verifyEditableWebPpt(output, artifact, { source: fallback?.url, marker: fallback?.marker })
       const selector = await revealArtifact(cdp)
       await cdp.click(selector, filename)
+      await onStage?.('open-pptx-through-system-application')
       const open = openArtifact ? await openArtifact(cdp, { task, artifact, path: output }) : { status: 'ui-click-only' }
+      await onStage?.('verify-original-question-and-deliverable-remain-visible')
       await cdp.wait(`${conversationTextProbe()}.includes(${literal(live ? '网址' : webPptQuestion)})`,
         'the answered source question restored in the original conversation', 15_000)
       const originalConversationText = await cdp.evaluate(conversationTextProbe())

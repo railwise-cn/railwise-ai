@@ -117,6 +117,13 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
   const workspace = join(root, 'workspace')
   const workwiseHome = join(root, 'home', '.workwise')
   let fixture, child, cdp, failure
+  const receiptPath = join(evidenceDir, `mac-ppt-journey-${mode}.json`)
+  const recordStage = async stage => {
+    receipt.lastStage = stage
+    receipt.stageHistory ??= []
+    receipt.stageHistory.push({ stage, at: new Date().toISOString() })
+    await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 })
+  }
   try {
     const driver = await import('./web-ppt-journey.mjs')
     const resources = join(dirname(executable), '..', 'Resources')
@@ -130,6 +137,7 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
     const env = environmentForRoot(environment, root)
     assert.equal(env.HOME, join(root, 'home'))
     await Promise.all([profile, workspace, workwiseHome, evidenceDir].map(path => mkdir(path, { recursive: true, mode: 0o700 })))
+    await recordStage('prepare-isolated-profile')
     await writeFile(join(workwiseHome, 'workspace-trust.json'), JSON.stringify({ schema: 'workwise.workspace-trust', version: 1,
       workspaces: [{ level: 'workspace-write', canonicalRoot: workspace, revision: 1 }] }), { mode: 0o600 })
     await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
@@ -146,13 +154,16 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
     await cdp.wait(installedChineseWorkbenchReadyExpression(), 'the visible installed Chinese workbench')
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), version)
     assert.equal(await cdp.evaluate('window.workwise.getSettings().then(settings => settings.workspaceRoot)'), workspace)
-    receipt.observation = await journey.verify(cdp, { openArtifact: readNativeOpenResult })
+    await recordStage('verify-original-chat-task-and-deliverable')
+    receipt.observation = await journey.verify(cdp, { openArtifact: readNativeOpenResult, onStage: recordStage })
     assert.equal(await shaFile(asar), installedAsarSha256)
     receipt.status = 'passed'
   } catch (error) {
     failure = error
     if (error.code === 'live-model-unconfigured') receipt.status = 'blocked'
     receipt.reason = mode === 'controlled' || error.code === 'live-model-unconfigured' ? error.message : 'Live journey failed. Inspect the restricted runner session.'
+    receipt.error = { name: error.name, message: receipt.reason, stage: receipt.lastStage,
+      ...(error.webPptDiagnostics ? { webPptDiagnostics: error.webPptDiagnostics } : {}) }
   } finally {
     try {
       await stopInstalledProcess(child, cdp)
@@ -166,7 +177,7 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
     await rm(root, { recursive: true, force: true })
     receipt.finishedAt = new Date().toISOString()
     await mkdir(evidenceDir, { recursive: true })
-    await writeFile(join(evidenceDir, `mac-ppt-journey-${mode}.json`), `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 })
+    await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 })
   }
   if (failure) throw new Error(receipt.reason ?? 'Mac PPT journey cleanup failed')
   return receipt
