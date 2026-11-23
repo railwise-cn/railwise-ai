@@ -59,6 +59,11 @@ async function waitForInstalledPage(port, child) {
   throw new Error('The installed application did not expose its workbench')
 }
 
+export function installedChineseWorkbenchReadyExpression() {
+  return `document.readyState !== 'loading' && Boolean(window.workwise?.getAppVersion &&
+    document.visibilityState === 'visible' && document.body?.innerText.includes('技能与连接器'))`
+}
+
 // The shared driver enters text through Chromium input. macOS selects all with Command.
 function macKeyboard(cdp) {
   return { ...cdp, fill: async (selector, text) => {
@@ -136,7 +141,7 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
       '--lang=zh-CN', '--force-dark-mode'], { cwd: root, env, stdio: 'ignore' })
     await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
     cdp = macKeyboard(await waitForInstalledPage(port, child))
-    await cdp.wait(`Boolean(window.workwise?.getAppVersion && document.visibilityState === 'visible' && document.body.innerText.includes('技能与连接器'))`, 'the visible installed Chinese workbench')
+    await cdp.wait(installedChineseWorkbenchReadyExpression(), 'the visible installed Chinese workbench')
     assert.equal(await cdp.evaluate('window.workwise.getAppVersion()'), version)
     assert.equal(await cdp.evaluate('window.workwise.getSettings().then(settings => settings.workspaceRoot)'), workspace)
     receipt.observation = await journey.verify(cdp, { openArtifact: readNativeOpenResult })

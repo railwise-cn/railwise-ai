@@ -18,3 +18,15 @@ test('Mac workbook journey selects the enabled sidebar conversation button befor
   assert.ok(navigationReady < newConversation)
   assert.ok(!journey.includes("await click('新建会话')"))
 })
+
+test('Mac workbook journey clicks the rendered Univer grid instead of utility canvases', async () => {
+  const source = await readFile(sourcePath, 'utf8')
+  const journey = source.slice(source.indexOf('export async function runInstalledMacOfflineSpreadsheetJourney'))
+
+  assert.match(journey, /\.ds-code-sidebar canvas\[data-u-comp="render-canvas"\]/)
+  assert.match(journey, /Univer cell editor focus/)
+  assert.match(journey, /text in the active cell editor/)
+  assert.match(journey, /committed cell edit/)
+  assert.match(journey, /workbookAtFailure/)
+  assert.match(journey, /gridCanvases:/)
+})

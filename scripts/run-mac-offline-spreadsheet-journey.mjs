@@ -121,6 +121,7 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
   let child
   let cdp
   let launchLog = ''
+  let originalWorkbookPath
 
   try {
     await Promise.all([workspace, profile, runtime, home, cache, logs, downloads, evidenceDir]
@@ -206,15 +207,23 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     const cellAt = (workbook, row, column) => workbook.sheets?.[workbook.sheetOrder?.[0]]?.cellData?.[row]?.[column]
 
     await click('新建表格')
-    await cdp.wait(`${editableReady} && [...document.querySelectorAll("canvas")].some(canvas => canvas.clientWidth > 200 && canvas.clientHeight > 150)`, 'editable workbook')
+    await cdp.wait(`${editableReady} && [...document.querySelectorAll('.ds-code-sidebar canvas[data-u-comp="render-canvas"]')]
+      .some(canvas => canvas.clientWidth > 200 && canvas.clientHeight > 150)`, 'editable workbook')
     report.checks.push('new-local-rwsheet')
     const filename = (await readdir(workspace)).find(name => name.endsWith('.rwsheet'))
     assert.ok(filename, 'New workbook must be saved in the isolated workspace')
-    const originalWorkbookPath = join(workspace, filename)
+    originalWorkbookPath = join(workspace, filename)
     let canvas
+    const cellEditorId = '__editor___INTERNAL_EDITOR__DOCS_NORMAL'
     const clickCell = async (row, column, count = 1) => {
-      canvas = await cdp.wait('[...document.querySelectorAll("canvas")].map(canvas => canvas.getBoundingClientRect().toJSON()).find(box => box.width > 200 && box.height > 150)', 'workbook grid canvas')
+      canvas = await cdp.wait(`[...document.querySelectorAll('.ds-code-sidebar canvas[data-u-comp="render-canvas"]')]
+        .map(canvas => canvas.getBoundingClientRect().toJSON()).find(box => box.width > 200 && box.height > 150)`, 'workbook grid canvas')
       const point = { x: canvas.x + 68 + column * 79, y: canvas.y + 30 + row * 22 }
+      const hit = await cdp.evaluate(`(() => {
+        const element = document.elementFromPoint(${point.x}, ${point.y})
+        return element ? { tag: element.tagName, component: element.getAttribute('data-u-comp'), className: element.className?.toString?.() ?? '' } : null
+      })()`)
+      report.lastCellInteraction = { row, column, canvas, point, hit }
       for (let clickCount = 1; clickCount <= count; clickCount++) {
         await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount, ...point })
         await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount, ...point })
@@ -222,16 +231,30 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     }
     const edit = async (row, column, value) => {
       await clickCell(row, column, 2)
+      await cdp.wait(`document.activeElement?.id === ${JSON.stringify(cellEditorId)} && document.activeElement.isContentEditable`,
+        'Univer cell editor focus')
       await cdp.send('Input.insertText', { text: value })
+      await cdp.wait(`document.activeElement?.id === ${JSON.stringify(cellEditorId)} &&
+        document.activeElement.textContent === ${JSON.stringify(value)}`, 'text in the active cell editor')
       await key('Enter', 'Enter', 13)
+      await cdp.wait(`document.activeElement?.id !== ${JSON.stringify(cellEditorId)} || !document.activeElement.isContentEditable`,
+        'committed cell edit')
     }
 
     await edit(0, 0, '=SUM(4,5)')
     await save()
-    const formula = await until('saved calculated formula', async () => {
+    let formula = await until('saved formula expression', async () => {
       const cell = cellAt(await readWorkbook(originalWorkbookPath), 0, 0)
-      return cell?.f === '=SUM(4,5)' && cell.v === 9 ? cell : null
+      return cell?.f === '=SUM(4,5)' ? cell : null
     })
+    if (formula.v !== 9) {
+      await wait(250)
+      await save()
+      formula = await until('calculated formula result after one save retry', async () => {
+        const cell = cellAt(await readWorkbook(originalWorkbookPath), 0, 0)
+        return cell?.f === '=SUM(4,5)' && cell.v === 9 ? cell : null
+      })
+    }
     report.formula = { expression: formula.f, value: formula.v }
     report.checks.push('formula-calculation-saved')
 
@@ -304,7 +327,8 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     await click(xlsxName)
     const previewRendered = await cdp.wait(`(() => {
       const panel = document.querySelector('.ds-code-sidebar');
-      const canvas = [...(panel?.querySelectorAll('canvas') ?? [])].find(item => item.getClientRects().length && item.clientWidth > 200 && item.clientHeight > 150);
+      const canvas = [...(panel?.querySelectorAll('canvas[data-u-comp="render-canvas"]') ?? [])]
+        .find(item => item.getClientRects().length && item.clientWidth > 200 && item.clientHeight > 150);
       return panel?.innerText.includes('只读预览') && canvas && {
         panelVisible: Boolean(panel.getClientRects().length), gridRendered: true,
         saveButtonVisible: [...panel.querySelectorAll('button')].some(button => button.getClientRects().length && button.textContent.includes('保存表格')),
@@ -336,9 +360,30 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     report.error = error instanceof Error ? error.message : String(error)
     report.launchTail = launchLog
     if (cdp) {
+      if (originalWorkbookPath) {
+        report.workbookAtFailure = await readFile(originalWorkbookPath, 'utf8')
+          .then(contents => JSON.parse(contents))
+          .catch(error => ({ readError: error instanceof Error ? error.message : String(error) }))
+      }
       report.rendererEndState = await cdp.evaluate(`(() => ({
         url: location.href,
         title: document.title,
+        gridCanvases: [...document.querySelectorAll('.ds-code-sidebar canvas')].map(canvas => ({
+          component: canvas.dataset.uComp ?? null,
+          rect: canvas.getBoundingClientRect().toJSON(),
+          pointerEvents: getComputedStyle(canvas).pointerEvents,
+          className: canvas.className
+        })),
+        activeElement: document.activeElement ? {
+          tag: document.activeElement.tagName,
+          component: document.activeElement.getAttribute('data-u-comp'),
+          className: document.activeElement.className?.toString?.() ?? ''
+        } : null,
+        cellEditors: [...document.querySelectorAll('input,textarea,[contenteditable="true"]')].map(element => ({
+          tag: element.tagName,
+          value: 'value' in element ? element.value : element.textContent,
+          className: element.className?.toString?.() ?? ''
+        })),
         activeButtons: [...document.querySelectorAll('button')].filter(button => button.getClientRects().length).map(button => ({
           text: button.textContent.trim().slice(0, 80), ariaLabel: button.getAttribute('aria-label'), disabled: button.disabled
         })).slice(-80),

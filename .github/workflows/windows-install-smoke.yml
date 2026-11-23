@@ -417,7 +417,7 @@ jobs:
       - name: Install verification tools
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify startup acceptance contracts
-        run: node --test scripts/verify-windows-startup-appearance.test.mjs
+        run: node --test scripts/verify-windows-startup-appearance.test.mjs scripts/run-mac-ppt-journey.test.mjs scripts/run-mac-offline-spreadsheet-journey.test.mjs
       - name: Resolve the immutable macOS release artifact
         id: source
         env:
@@ -455,6 +455,7 @@ jobs:
             ${{ runner.temp }}/exact-mac-evidence/mac-offline-spreadsheet.json
             ${{ runner.temp }}/exact-mac-evidence/core-journeys.json
             ${{ runner.temp }}/exact-mac-evidence/mac-ppt-journey-*.json
+            ${{ runner.temp }}/exact-mac-evidence/mac-offline-spreadsheet-*.png
             ${{ runner.temp }}/exact-mac-evidence/mac-startup-*.png
 
   windows-repaired-gui-update:
