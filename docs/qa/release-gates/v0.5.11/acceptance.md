@@ -246,4 +246,4 @@ Windows Docling 专项 `45164369592` 使用候选 `45115646587`，工具启动�
 
 隔离的 macOS Apple Silicon 源码预览记录在 `/private/tmp/railwise-conversation-trust-jfNCrE/task-report.json`，源码提交为 `fb0d9daf95b67835cbd746d8dbd3edb4e36f9ea2`，渲染包 SHA-256 为 `2925303dba2d78c56d6c850c1824d1a6807ac135e7e02c646aa1b1e7dda7bd11`。空配置冷启动创建 `default_workspace` 并读回 `workspace-write/workwise-created`。界面内暂停后原问题仍显示、输入框解除旧请求绑定；在原对话继续、答复及单次批准后，同一任务完成。回执确认一条答案记录、一次文件写入调用和实际文件内容。该源预览不等于签名候选安装包验收，暂停后的应用重启恢复未测。
 
-本次聚焦界面测试 17/17，工作区首次初始化、KUN 用户输入恢复及权限相关聚焦测试 141 项通过，主仓与 KUN 类型检查、ESLint、生产构建及隔离 UI 流程通过。提交 `ddc8813b` 与 `fb0d9daf` 的 GitHub Quality CI 通过。当前仍须用下一批精确 macOS 与 Windows 安装包复验；真实模型官网到 PPT、Windows 安装包实装和旧版原地升级、付费登录站点及现场网络流程仍未形成这批源码的制品回执。正式渠道仍为 0.5.10。
+本次聚焦界面测试 17/17，工作区首次初始化、KUN 用户输入恢复及权限相关聚焦测试 141 项通过，主仓与 KUN 类型检查、ESLint、生产构建及隔离 UI 流程通过。最终修订前源码 `0d6f428a` 的 GitHub Quality CI run `45278698866` attempt 2 三项必需检查均通过。该源码检查之后只更新了本台账记录。当前仍须用下一批精确 macOS 与 Windows 安装包复验；真实模型官网到 PPT、Windows 安装包实装和旧版原地升级、付费登录站点及现场网络流程仍未形成这批源码的制品回执。正式渠道仍为 0.5.10。
