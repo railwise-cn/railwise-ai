@@ -121,6 +121,6 @@ Windows BrowserSkill 回退在候选 `ea0de273` 再次失败，实装 `450884875
 
 源码级验证通过。`npm test` 在 Node `v26.13.0` 加 `--localstorage-file` 后为 5,038 通过、14 跳过；首次无该 Node 本地存储参数的运行有 3 个 DOM 测试文件失败，补参数后均通过。`npm run test:release-gate` 为 585 通过、1 跳过，缺少 PowerShell 的用例由宿主跳过。网站到 PPT、核心回执、启动、Windows 更新与 UI 验收驱动 183/183；任务问题和锚定菜单 DOM 用例 20/20；KUN 任务协调器与持久化输入门 46/46。类型检查、修改文件 ESLint、差异检查和生产构建通过。
 
-本机 KUN 运行时的受控模型旅程读取真实 `https://www.railwise.cn/` 首页正文 39,126 字节，调用内置 PPT Master 和原生质量检查，生成并解包校验可编辑 PPTX 13,116 字节。原始回执存于 [source-web-ppt-controlled-0c0952f5.json](../../evidence/v0.5.11/source-web-ppt-controlled-0c0952f5.json)，其 SHA-256 为 `de0e469b15bb80974dc292ff0263ea2166ff42e12c2803bf6700b1c4c6194322`。这是本机运行时及合成模型证据，不是安装包界面或真实模型验收。
+本机 KUN 运行时的受控模型旅程读取真实 `https://www.railwise.cn/` 首页正文 39,126 字节，调用内置 PPT Master 和原生质量检查，生成并解包校验可编辑 PPTX 13,116 字节。回执存于 [source-web-ppt-controlled-0c0952f5.json](../../evidence/v0.5.11/source-web-ppt-controlled-0c0952f5.json)，本机临时绝对路径已替换为仓库相对路径，来源和成品摘要保持原值。该文件 SHA-256 为 `deaa1efe7f5ea4609ddfee40310f7115eba1b09722ffe4c253da1a0af71ff411`。这是本机运行时及合成模型证据，不是安装包界面或真实模型验收。
 
 `0c0952f5` 尚未进入 GitHub Actions 的新质量运行或三端候选安装包。下一步需推送代码，重跑 Quality 和候选构建，再对同批包重跑 Windows BrowserSkill 与任务补答、附件/PDF/技能插件、0.5.7 覆盖和 0.5.10 两个升级入口，以及 Mac 双架构启动和表格。真实模型三个 Actions 配置项、已登录大单网/Ego、国内普通网络 Windows 与现场 OCR 仍待补实测。正式渠道仍为 0.5.10，此处没有发布验收结论。
