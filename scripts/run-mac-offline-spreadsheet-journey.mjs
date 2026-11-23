@@ -66,6 +66,25 @@ function createCandidateEnvironment(environment, root, profile, workspace) {
   }
 }
 
+export function spreadsheetCellAddress(row, column) {
+  let columnNumber = column + 1
+  let columnName = ''
+  while (columnNumber > 0) {
+    const remainder = (columnNumber - 1) % 26
+    columnName = String.fromCharCode(65 + remainder) + columnName
+    columnNumber = Math.floor((columnNumber - 1) / 26)
+  }
+  return `${columnName}${row + 1}`
+}
+
+export function parseSpreadsheetCellAddress(address) {
+  const match = /^([A-Z]+)(\d+)$/i.exec(address.trim())
+  if (!match || Number(match[2]) < 1) return null
+  let column = 0
+  for (const character of match[1].toUpperCase()) column = column * 26 + character.charCodeAt(0) - 64
+  return { row: Number(match[2]) - 1, column: column - 1 }
+}
+
 async function findRendererSocket(profile, log, expectedUrl) {
   const portFromLog = log.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1]
   const portFromProfile = await readFile(join(profile, 'DevToolsActivePort'), 'utf8')
@@ -205,6 +224,9 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
       return file.workbook
     })
     const cellAt = (workbook, row, column) => workbook.sheets?.[workbook.sheetOrder?.[0]]?.cellData?.[row]?.[column]
+    const cellAddressAttempts = []
+    let rowPixelCorrection = 0
+    let columnPixelCorrection = 0
 
     await click('新建表格')
     await cdp.wait(`${editableReady} && [...document.querySelectorAll('.ds-code-sidebar canvas[data-u-comp="render-canvas"]')]
@@ -223,7 +245,7 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
             .find(item=>item.getClientRects().length&&item.clientWidth>200&&item.clientHeight>150);
           if(!canvas)return null;
           const box=canvas.getBoundingClientRect().toJSON();
-          const point={x:box.x+83+${column}*79,y:box.y+59+${row}*22};
+          const point={x:box.x+83+${column}*79+${columnPixelCorrection},y:box.y+59+${row}*22+${rowPixelCorrection}};
           const element=document.elementFromPoint(point.x,point.y);
           const hit=element?{tag:element.tagName,component:element.getAttribute('data-u-comp'),className:element.className?.toString?.()??''}:null;
           return {box,point,hit,ready:Boolean(element===canvas&&hit?.component==='render-canvas')};
@@ -242,33 +264,59 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
       }
     }
     const edit = async (row, column, value) => {
-      await clickCell(row, column, 2)
-      await cdp.wait(`document.activeElement?.id === ${JSON.stringify(cellEditorId)} && document.activeElement.isContentEditable`,
-        'Univer cell editor focus')
-      await cdp.send('Input.insertText', { text: value })
-      await key('Enter', 'Enter', 13)
+      const expectedAddress = spreadsheetCellAddress(row, column)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await clickCell(row, column, 2)
+        await cdp.wait(`document.activeElement?.id === ${JSON.stringify(cellEditorId)} && document.activeElement.isContentEditable`,
+          'Univer cell editor focus')
+        let address = await cdp.evaluate('document.querySelector(\'[data-u-comp="sheet-cell-editor-address"]\')?.textContent?.trim() ?? null')
+        if (!address) {
+          const point = report.lastCellInteraction.point
+          await cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: point.x, y: point.y, deltaX: 1, deltaY: 0 })
+          try {
+            address = await cdp.wait('document.querySelector(\'[data-u-comp="sheet-cell-editor-address"]\')?.textContent?.trim() || null',
+              'selected cell address', 3000)
+          } finally {
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: point.x, y: point.y, deltaX: -1, deltaY: 0 })
+          }
+        }
+        const actualCell = parseSpreadsheetCellAddress(address)
+        const attemptEvidence = { expectedAddress, address, point: report.lastCellInteraction.point, rowPixelCorrection, columnPixelCorrection }
+        cellAddressAttempts.push(attemptEvidence)
+        report.cellAddressAttempts = cellAddressAttempts
+        if (address === expectedAddress) {
+          await cdp.send('Input.insertText', { text: value })
+          await key('Enter', 'Enter', 13)
+          return
+        }
+        await key('Escape', 'Escape', 27)
+        if (!actualCell) throw new Error(`Univer did not expose a valid selected cell address. Expected ${expectedAddress}, received ${address}`)
+        rowPixelCorrection += (row - actualCell.row) * 22
+        columnPixelCorrection += (column - actualCell.column) * 79
+      }
+      throw new Error(`Univer cell selection did not reach ${expectedAddress}. Attempts: ${JSON.stringify(cellAddressAttempts)}`)
     }
 
     await edit(0, 0, '=SUM(4,5)')
     await save()
-    let formula = await until('saved formula expression', async () => {
+    let formula = await until('saved formula expression in A1', async () => {
       const cell = cellAt(await readWorkbook(originalWorkbookPath), 0, 0)
       return cell?.f === '=SUM(4,5)' ? cell : null
     })
     if (formula.v !== 9) {
       await wait(250)
       await save()
-      formula = await until('calculated formula result after one save retry', async () => {
+      formula = await until('calculated formula result in A1 after one save retry', async () => {
         const cell = cellAt(await readWorkbook(originalWorkbookPath), 0, 0)
         return cell?.f === '=SUM(4,5)' && cell.v === 9 ? cell : null
       })
     }
-    report.formula = { expression: formula.f, value: formula.v }
+    report.formula = { expression: formula.f, value: formula.v, address: 'A1' }
     report.checks.push('formula-calculation-saved')
 
     await edit(0, 1, '撤销前')
     await save()
-    await until('pre-undo value', async () => cellAt(await readWorkbook(originalWorkbookPath), 0, 1)?.v === '撤销前')
+    await until('pre-undo value in B1', async () => cellAt(await readWorkbook(originalWorkbookPath), 0, 1)?.v === '撤销前')
     await clickCell(0, 1)
     await key('z', 'KeyZ', 90, 4)
     await save()

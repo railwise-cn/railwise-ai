@@ -284,7 +284,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
         const result = artifact.absolutePath || artifact.storage === 'task'
           ? await window.workwise.openTaskArtifact({ taskId: owner.id, artifactId: artifact.id })
           : await window.workwise.openWorkspaceFile({ workspaceRoot: owner.workspaceRoot, path: artifact.relativePath })
-        if (!result.ok) setMessage(t('taskWorkspaceActionFailed'))
+        if (!result.ok) setMessage(result.message?.trim() || t('taskWorkspaceActionFailed'))
       }
     } catch { setMessage(t('taskWorkspaceActionFailed')) }
   }

@@ -205,3 +205,19 @@ Windows 安装验收新增独立 `run_windows_spreadsheet` 路径，下载指定
 Windows 实装 `45150932776` 已通过。安装器 SHA-256 为 `098fcc85396c35f48fa30fe3d9a41499e21aa431dcd601d10bfef889b24e914e`，安装后 ASAR SHA-256 为 `2b63f6e3f81bfba805a7fe864875b7db5ea357fffd7f16cd63b7851b70d26244`。实装验证公式 `=SUM(4,5)` 得 9、Ctrl+Z、冲突另存、中文 CSV、双工作表保存后在可见网格重开并读回公式、Excel 只读网格及原文件摘要。UI、安装与核心回执的摘要依次为 `2f47948568034f4ba0b5320149e5280417aa1f2bb3afdfee889eeb64932ed5f5`、`44c58f2d1d964b7516f60748c34699af8f43ec367a2ae9106afc7f4a23474cab`、`705da8abc5a76d419244b2b5e45d601f9029a6e135e4568b85ce25ca545eab0f`。第一次运行的表格检查已全部通过，失败的是表格后多余的通用导航流程；隔离专用旅程后复测通过。XLSX 系统应用入口目前仅验证可见，没有点击 Office/LibreOffice；首次打开耗时未记录。
 
 Mac PPT 受控旅程在 `45150552625` 到达外部打开阶段。原验收流程先用 headless LibreOffice 预热，再从成果卡调用系统打开；回执观察到 LibreOffice 进程存在却没有窗口。headless 预热已移除，PPTX 关联仍在隔离 HOME 下注册，更新后的精确候选复跑为 `45152019866`，结果待回执。真实模型三项 Actions 配置仍未存在；`gh secret list` 中没有 `RAILWISE_QA_MODEL_API_KEY`，Actions variables 中也没有 `RAILWISE_QA_MODEL_BASE_URL` 或 `RAILWISE_QA_MODEL`。当前正式渠道仍为 0.5.10，没有发布。
+
+## 2026-11-23 最新验收进展
+
+对 0.5.11 精确候选 `45115646587` 的 Mac 双架构实装 `45158416825` 未通过。Apple Silicon 到达成果打开阶段；回执中原对话任务、网页读取、可编辑 PPTX 检查均已完成，但没有观察到 LibreOffice 进程或目标文档窗口。随后运行的 Intel 流程在公式保存阶段失败，公式落在第二行。两个结果都绑定原候选安装包，不能作为通过回执。
+
+Intel 表格坐标偏移的原因是 `ed8862bf` 将点击位置由网格 `y + 30` 移到 `y + 59`，比一行 22 像素多 29 像素。Apple Silicon 回执原本声明点击 A1，实际保存公式在 A2。验收驱动现在通过 Univer 的单元格地址组件核对界面选区，必要时根据真实选中单元格校准点击偏移，并继续严格校验 A1/B1、撤销和冲突另存位置。地址解析与坐标映射测试 3/3 通过，修改文件 ESLint、差异检查、主仓/KUN 类型检查通过。新驱动还未随新候选包实装验证。
+
+Mac PPT 打开阶段的诊断也已加强。驱动记录 PPTX 默认应用、LibreOffice/soffice 进程、前台应用窗口和原对话中显示的错误原因；验收不会重复触发打开动作。驱动移除了在应用临时 HOME 中调用 `duti -s` 的步骤，避免误将 HOME 当作系统 LaunchServices 隔离。诊断测试 3/3 通过。`45158416825` 使用旧诊断脚本失败，具体系统打开原因仍待新驱动对同一候选复测。
+
+成果卡还发现真实错误原因被渲染层丢弃，只显示通用失败文案。现改为展示主进程返回的可读原因，并新增任务成果打开失败 DOM 回归。该项修改了应用 UI，必须包含在下一候选包及同包验收中。
+
+Windows Docling 专项 `45164369592` 使用候选 `45115646587`，工具启动、冷缓存镜像 CSV 后端、中文内容保留以及两个技能调用通过。回执明确表示实际文档转换依赖 Docling 服务或本机扩展，因此 **没有证明 PDF/DOCX 转换**。
+
+本机验证结果为 `npm run openspec:validate` 13/13、release gate 586 项通过且 1 项因缺 PowerShell 跳过、全量 Vitest 5040 项通过且 14 项跳过、主仓与 KUN 类型检查、生产构建和修改文件 ESLint 通过。全量 Vitest 需要通过 `NODE_OPTIONS=--localstorage-file=...` 提供 Node 本地存储文件；不带该参数的运行有 3 个 DOM 文件因宿主环境缺失 `localStorage` 失败。本机生产构建和测试不等于安装包验收。新增应用改动及最新验收驱动仍需进入 Quality CI 和下一批精确候选。
+
+尚未关闭的发布阻塞包括 Mac 双架构 Univer 修正驱动实装、Mac PPT 系统应用打开、真实模型官网 PPT、Ego 登录后的原 Space 与大单网只读流程、国内普通网络 Windows 安装以及 Docling 实际文档转换。Ego 页当前提示账号已在其他设备登录，现场只读核查已暂停并交还原 Space，等待用户重新登录。稳定渠道仍为 0.5.10，本轮未发布。

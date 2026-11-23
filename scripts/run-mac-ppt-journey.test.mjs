@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
-import { installedChineseWorkbenchReadyExpression } from './run-mac-ppt-journey.mjs'
+import { installedChineseWorkbenchReadyExpression, parseMacWindowObservation } from './run-mac-ppt-journey.mjs'
 
 const expression = installedChineseWorkbenchReadyExpression()
 const runnerSourcePath = fileURLToPath(new URL('./run-mac-ppt-journey.mjs', import.meta.url))
@@ -35,13 +35,32 @@ test('Mac PPT receipts retain the last chat journey stage when CDP stalls', asyn
     'verify-registered-editable-pptx',
     'open-pptx-through-system-application'
   ]) assert.ok(journey.includes(stage), `Missing journey checkpoint ${stage}`)
-  assert.match(runner, /spawnSync\('duti', \['-s', 'org\.libreoffice\.script', 'pptx', 'all'\]/)
+  assert.match(runner, /spawnSync\('duti', \['-x', 'pptx'\][\s\S]+?env: process\.env/)
+  assert.match(runner, /every application process/)
+  assert.match(runner, /windows of appProcess/)
+  assert.match(runner, /renderer\.visibleFailure/)
+  assert.match(runner, /defaultHandler, processes, windows: system\.windows, frontmostProcess: system\.frontmostProcess/)
   assert.doesNotMatch(runner, /soffice', \['--headless', '--terminate_after_init'\]/,
     'The external app must first launch from the delivered-file open action')
-  assert.match(runner, /get name of every window of process "LibreOffice"/)
-  assert.match(runner, /get name of every window of process "LibreOffice"[\s\S]+?processNames/)
-  const nativeOpenStart = runner.indexOf('async function readNativeOpenResult')
-  const nativeOpenEnd = runner.indexOf('\n}\n\nexport async function runInstalledMacPptJourney', nativeOpenStart)
+  const nativeOpenStart = runner.indexOf('async function waitForNativeMacDocument')
+  const nativeOpenEnd = runner.indexOf('\n}\n\nasync function readNativeOpenResult', nativeOpenStart)
   const nativeOpenObserver = runner.slice(nativeOpenStart, nativeOpenEnd)
-  assert.doesNotMatch(nativeOpenObserver, /cdp\.evaluate\(/, 'The observer must not invoke the same open IPC a second time')
+  assert.match(nativeOpenObserver, /readArtifactOpenFailure\(cdp\)/, 'The observer should read visible failure state after the original UI click')
+  assert.doesNotMatch(nativeOpenObserver, /openTaskArtifact\(|openWorkspaceFile\(/,
+    'The observer must not invoke the same open IPC a second time')
+})
+
+test('Mac document-window observations retain the app and title for every visible app window', () => {
+  assert.deepEqual(parseMacWindowObservation([
+    'FRONTMOST|LibreOffice',
+    'WINDOW|RailWise AI|RailWise AI',
+    'WINDOW|LibreOffice|website.pptx - LibreOffice',
+    ''
+  ].join('\n')), {
+    frontmostProcess: 'LibreOffice',
+    windows: [
+      { processName: 'RailWise AI', title: 'RailWise AI' },
+      { processName: 'LibreOffice', title: 'website.pptx - LibreOffice' }
+    ]
+  })
 })

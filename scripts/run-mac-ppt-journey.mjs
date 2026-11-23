@@ -96,34 +96,104 @@ async function stopInstalledProcess(child, cdp) {
   assert.ok(child.exitCode !== null || child.signalCode !== null, 'The owned Mac acceptance process did not exit')
 }
 
-async function waitForNativeMacDocument(filename) {
-  const deadline = Date.now() + 60_000
-  const baseName = filename.replace(/\.pptx$/i, '')
-  let lastObservation = { processNames: [], windowTitles: [], systemEventsError: '' }
-  while (Date.now() < deadline) {
-    const result = spawnSync('/usr/bin/osascript', ['-e', `tell application "System Events"
-      if exists process "LibreOffice" then
-        get name of every window of process "LibreOffice"
-      else
-        return ""
-      end if
-    end tell`], { encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] })
-    const processResult = spawnSync('/bin/ps', ['-axo', 'comm='], { encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] })
-    const processNames = processResult.status === 0 ? processResult.stdout.split(/\r?\n/).map(name => name.trim()).filter(Boolean)
-      .filter(name => /LibreOffice|soffice/i.test(name)) : []
-    const windowTitles = result.status === 0 ? result.stdout.trim().split(', ').filter(Boolean) : []
-    lastObservation = { processNames, windowTitles, systemEventsError: result.stderr?.trim().slice(0, 300) ?? '' }
-    const windowTitle = windowTitles.find(title => title.includes(filename) || title.includes(baseName))
-    if (windowTitle) return { status: 'os-open-accepted', application: 'LibreOffice', windowTitle }
-    await wait(250)
+export function parseMacWindowObservation(output) {
+  const windows = []
+  let frontmostProcess = ''
+  for (const line of output.split(/\r?\n/)) {
+    if (line.startsWith('FRONTMOST|')) frontmostProcess = line.slice('FRONTMOST|'.length)
+    else if (line.startsWith('WINDOW|')) {
+      const [, processName = '', ...titleParts] = line.split('|')
+      const title = titleParts.join('|')
+      if (processName && title) windows.push({ processName, title })
+    }
   }
-  throw new Error(`LibreOffice did not show ${filename}. Observation: ${JSON.stringify(lastObservation)}`)
+  return { frontmostProcess, windows }
 }
 
-async function readNativeOpenResult(_cdp, { artifact }) {
+function readMacWindowObservation() {
+  const script = `set outputLines to {}
+tell application "System Events"
+  try
+    set frontmostApp to name of first application process whose frontmost is true
+  on error
+    set frontmostApp to ""
+  end try
+  set end of outputLines to "FRONTMOST|" & frontmostApp
+  repeat with appProcess in every application process
+    try
+      if background only of appProcess is false then
+        set appName to name of appProcess
+        repeat with appWindow in windows of appProcess
+          try
+            set end of outputLines to "WINDOW|" & appName & "|" & name of appWindow
+          end try
+        end repeat
+      end if
+    end try
+  end repeat
+end tell
+set previousDelimiters to AppleScript's text item delimiters
+set AppleScript's text item delimiters to linefeed
+set outputText to outputLines as text
+set AppleScript's text item delimiters to previousDelimiters
+outputText`
+  const result = spawnSync('/usr/bin/osascript', ['-e', script], {
+    encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe']
+  })
+  return {
+    ...(result.status === 0 ? parseMacWindowObservation(result.stdout) : { frontmostProcess: '', windows: [] }),
+    error: result.status === 0 ? '' : result.stderr?.trim().slice(0, 300) || result.error?.message || `osascript exited ${result.status}`
+  }
+}
+
+function readPptxDefaultHandler() {
+  const result = spawnSync('duti', ['-x', 'pptx'], { encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] })
+  if (result.status !== 0) return { status: 'unavailable', error: result.stderr?.trim().slice(0, 300) || result.error?.message || `duti exited ${result.status}` }
+  return { status: 'resolved', lines: result.stdout.trim().split(/\r?\n/).filter(Boolean).slice(0, 3) }
+}
+
+async function readArtifactOpenFailure(cdp) {
+  return cdp.evaluate(`(() => {
+    const text = document.querySelector('.ds-workbench-shell main')?.innerText ?? '';
+    const message = text.includes('操作未完成，请重试。') ? 'localized-action-failure'
+      : text.includes('The action did not complete. Try again.') ? 'localized-action-failure' : null;
+    return {
+      artifactVisible: text.includes('website.pptx'),
+      visibleFailure: message,
+      workbenchVisible: Boolean(document.querySelector('.ds-workbench-shell main')?.getClientRects().length)
+    };
+  })()`)
+}
+
+async function waitForNativeMacDocument(cdp, filename) {
+  const deadline = Date.now() + 60_000
+  const baseName = filename.replace(/\.pptx$/i, '')
+  const defaultHandler = readPptxDefaultHandler()
+  let lastObservation = { defaultHandler, processes: [], windows: [], frontmostProcess: '', systemEventsError: '', renderer: null }
+  while (Date.now() < deadline) {
+    const system = readMacWindowObservation()
+    const processResult = spawnSync('/bin/ps', ['-axo', 'comm='], { encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    const processes = processResult.status === 0 ? processResult.stdout.split(/\r?\n/).map(name => name.trim()).filter(Boolean)
+      .filter(name => /LibreOffice|soffice/i.test(name)) : []
+    const renderer = await readArtifactOpenFailure(cdp).catch(error => ({ statusReadError: error.message }))
+    lastObservation = { defaultHandler, processes, windows: system.windows, frontmostProcess: system.frontmostProcess,
+      systemEventsError: system.error, renderer }
+    const documentWindow = system.windows.find(window => window.title.includes(filename) || window.title.includes(baseName))
+    if (documentWindow) return { status: 'os-open-accepted', application: documentWindow.processName, windowTitle: documentWindow.title,
+      defaultHandler, observation: lastObservation }
+    if (renderer.visibleFailure) {
+      throw Object.assign(new Error(`The installed app showed an artifact-open failure for ${filename}`), { webPptDiagnostics: lastObservation })
+    }
+    await wait(500)
+  }
+  throw Object.assign(new Error(`The system did not show ${filename} in a document window. Observation: ${JSON.stringify(lastObservation)}`),
+    { webPptDiagnostics: lastObservation })
+}
+
+async function readNativeOpenResult(cdp, { artifact }) {
   const filename = artifact.relativePath.split(/[\\/]/).at(-1)
   assert.ok(filename)
-  return waitForNativeMacDocument(filename)
+  return waitForNativeMacDocument(cdp, filename)
 }
 
 export async function runInstalledMacPptJourney({ executable, temporary, evidenceDir, version, installedAsarSha256,
@@ -158,14 +228,11 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
     assert.equal(env.HOME, join(root, 'home'))
     await Promise.all([profile, workspace, workwiseHome, evidenceDir].map(path => mkdir(path, { recursive: true, mode: 0o700 })))
     await recordStage('prepare-isolated-profile')
-    const registerPptx = spawnSync('duti', ['-s', 'org.libreoffice.script', 'pptx', 'all'],
-      { cwd: root, env, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] })
-    assert.equal(registerPptx.status, 0, registerPptx.error?.message ?? registerPptx.stderr ?? 'PPTX handler registration failed')
     const verifyPptx = spawnSync('duti', ['-x', 'pptx'],
-      { cwd: root, env, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] })
+      { cwd: root, env: process.env, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] })
     assert.equal(verifyPptx.status, 0)
-    assert.equal(verifyPptx.stdout.trim().split(/\r?\n/)[0], 'LibreOffice', 'The isolated HOME must resolve PPTX files to LibreOffice')
-    receipt.nativeOpenerProfile = 'registered-under-isolated-home'
+    assert.equal(verifyPptx.stdout.trim().split(/\r?\n/)[0], 'LibreOffice', 'The runner default must resolve PPTX files to LibreOffice')
+    receipt.nativeOpener = { profile: 'ephemeral-runner-default', handler: verifyPptx.stdout.trim().split(/\r?\n/).slice(0, 3) }
     await recordStage('register-native-document-handler-under-isolated-profile')
     await writeFile(join(workwiseHome, 'workspace-trust.json'), JSON.stringify({ schema: 'workwise.workspace-trust', version: 1,
       workspaces: [{ level: 'workspace-write', canonicalRoot: workspace, revision: 1 }] }), { mode: 0o600 })

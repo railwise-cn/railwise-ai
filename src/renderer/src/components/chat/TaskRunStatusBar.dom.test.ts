@@ -30,7 +30,8 @@ const api = {
   notifyTask: vi.fn(async () => undefined), resumeTask: vi.fn(), retryTask: vi.fn(), pauseTask: vi.fn(),
   listTaskInputs: vi.fn(async (): Promise<TaskInputV1[]> => []),
   runtimeRequest: vi.fn(async (_path: string, _method?: string, _body?: string) => ({ ok: true, body: '{}' })),
-  openTaskArtifact: vi.fn(async () => ({ ok: true })), openWorkspaceFile: vi.fn(async () => ({ ok: true }))
+  openTaskArtifact: vi.fn(async (): Promise<{ ok: true } | { ok: false; message: string }> => ({ ok: true })),
+  openWorkspaceFile: vi.fn(async (): Promise<{ ok: boolean; message?: string }> => ({ ok: true }))
 }
 
 async function render(props: Partial<ComponentProps<typeof TaskRunStatusBar>> = {}): Promise<void> {
@@ -278,6 +279,22 @@ describe('task actions in the original conversation', () => {
     await render({ visibleMessageIds: new Set(['item_command_task_result_video_receipt']) })
     expect(container.textContent).not.toContain('影片已生成并验证。')
     expect(button('output.mp4')).toBeTruthy()
+  })
+
+  it('shows the reason returned when a task artifact cannot be opened', async () => {
+    const reason = '成果已变化或授权证据无法核验，请在任务中重新审阅。'
+    tasks = [run('presentation', 'completed', {
+      artifacts: [{ id: 'ppt-artifact', storage: 'task', relativePath: 'website.pptx', absolutePath: '/project/website.pptx',
+        authorizedRoot: '/project', executionGrantId: 'grant-ppt', validation: 'valid', createdAt: '2026-11-20T08:00:00Z' }]
+    })]
+    api.openTaskArtifact.mockResolvedValue({ ok: false, message: reason })
+
+    await render()
+    await act(async () => button('1 个成果')!.click())
+    await act(async () => button('website.pptx')!.click())
+
+    expect(api.openTaskArtifact).toHaveBeenCalledExactlyOnceWith({ taskId: 'presentation', artifactId: 'ppt-artifact' })
+    expect(container.textContent).toContain(reason)
   })
 
   it('shows the delegated worker steps in the original message flow through completion without mutation controls', async () => {
