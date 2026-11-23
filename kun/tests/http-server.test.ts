@@ -1432,6 +1432,30 @@ describe('HTTP server', () => {
     expect(events.filter((event) => event.kind === 'user_input_resolved')).toHaveLength(2)
   })
 
+  it('routes open task answers through the coordinator without duplicating the Turn resolution event', async () => {
+    const h = buildHarness()
+    const pending = h.userInputGate.request({
+      id: 'in_task', threadId: 'thr_task', turnId: 'turn_task', itemId: 'item_task', prompt: '请提供网址。',
+      questions: [{ id: 'url', header: '网址', question: '请提供网址。', options: [] }]
+    })
+    const submitTaskUserInputAnswer = vi.fn(async (inputId: string, answers: { id: string; label: string; value: string }[]) => {
+      expect(h.userInputGate.resolve(inputId, { status: 'submitted', answers })).toBe(true)
+      return 'submitted' as const
+    })
+    h.runtime.taskCoordinator = { submitTaskUserInputAnswer } as never
+
+    const response = await dispatchRequest(h.router, new Request('http://localhost/v1/user-inputs/in_task', {
+      method: 'POST', headers: { authorization: 'Bearer tok-1', 'content-type': 'application/json' },
+      body: JSON.stringify({ answers: [{ id: 'url', label: '网址', value: 'www.railwise.cn' }] })
+    }))
+
+    expect(response.status).toBe(200)
+    expect(submitTaskUserInputAnswer).toHaveBeenCalledWith('in_task', [{ id: 'url', label: '网址', value: 'www.railwise.cn' }])
+    await expect(pending).resolves.toEqual({ status: 'submitted', answers: [{ id: 'url', label: '网址', value: 'www.railwise.cn' }] })
+    const events = await h.sessionStore.loadEventsSince('thr_task', 0)
+    expect(events.filter(event => event.kind === 'user_input_resolved')).toHaveLength(0)
+  })
+
   it('forks a thread with copied history and lineage metadata', async () => {
     const h = buildHarness()
     await h.threadService.create(

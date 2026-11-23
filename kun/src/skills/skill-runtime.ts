@@ -3,7 +3,7 @@ import { lstat, open, readdir, readFile, realpath, stat } from 'node:fs/promises
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { z } from 'zod'
 import type { SkillsCapabilityConfig } from '../contracts/capabilities.js'
-import type { CallableCapabilityChoice } from '../contracts/callable-capabilities.js'
+import { canonicalSkillDisplayName, type CallableCapabilityChoice } from '../contracts/callable-capabilities.js'
 import { isLocalHtmlCreativeRequest, requiresWebSourceEvidence } from '../contracts/task-source-intent.js'
 import type { SkillResourceScope } from '../ports/tool-host.js'
 
@@ -838,9 +838,10 @@ function unavailableSlashSkill(id: string): Error {
 
 function skillDisplayName(skill: LoadedSkill): string {
   if (/^[a-f0-9]{32,}$/i.test(skill.name)) return 'Skill'
-  return /^[a-z0-9]+(?:[-_][a-z0-9]+)+$/.test(skill.name)
+  const label = /^[a-z0-9]+(?:[-_][a-z0-9]+)+$/.test(skill.name)
     ? skill.name.split(/[-_]/).map(word => word[0].toUpperCase() + word.slice(1)).join(' ')
     : skill.name
+  return canonicalSkillDisplayName(label)
 }
 
 function explicitSkillMention(skill: LoadedSkill, prompt: string): string | undefined {

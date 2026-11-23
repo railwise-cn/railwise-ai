@@ -920,8 +920,8 @@ describe('WorkWise Runtime extension metadata mapping', () => {
       text: 'look at this',
       displayText: 'Inspect attached image',
       attachmentIds: ['att_1'],
-      activeSkillIds: ['skill_review'],
-      skillSelections: [{ id: 'skill_review', name: 'Review Skill' }],
+      activeSkillIds: ['skill_review', 'ppt-master'],
+      skillSelections: [{ id: 'skill_review', name: 'Review Skill' }, { id: 'ppt-master', name: 'Ppt Master' }],
       injectedMemoryIds: ['mem_1'],
       skillInjectionBytes: 128
     })
@@ -930,8 +930,8 @@ describe('WorkWise Runtime extension metadata mapping', () => {
       meta: {
         displayText: 'Inspect attached image',
         attachmentIds: ['att_1'],
-        activeSkillIds: ['skill_review'],
-        skillSelections: [{ id: 'skill_review', name: 'Review Skill' }],
+        activeSkillIds: ['skill_review', 'ppt-master'],
+        skillSelections: [{ id: 'skill_review', name: 'Review Skill' }, { id: 'ppt-master', name: 'PPT Master' }],
         injectedMemoryIds: ['mem_1'],
         skillInjectionBytes: 128
       }

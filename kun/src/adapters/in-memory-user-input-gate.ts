@@ -39,6 +39,10 @@ export class InMemoryUserInputGate implements UserInputGate {
     return true
   }
 
+  resolveForTurnRestart(inputId: string): boolean {
+    return this.resolve(inputId, { status: 'cancelled' })
+  }
+
   pending(threadId?: string): UserInputRequest[] {
     return [...this.requests.values()].filter(
       (request) => !threadId || request.threadId === threadId

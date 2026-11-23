@@ -2,7 +2,7 @@
 import { act, createElement, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskInputV1, TaskRunV1 } from '@shared/agent-workbench'
 import type { ChatBlock } from '../../agent/types'
 import { TaskRunStatusBar } from './TaskRunStatusBar'
 import { MessageTimeline } from './MessageTimeline'
@@ -28,8 +28,10 @@ const api = {
   startTaskSse: vi.fn(async () => undefined), stopSse: vi.fn(async () => undefined),
   onSseEvent: vi.fn(() => () => undefined), onSseEnd: vi.fn(() => () => undefined), onSseError: vi.fn(() => () => undefined),
   notifyTask: vi.fn(async () => undefined), resumeTask: vi.fn(), retryTask: vi.fn(), pauseTask: vi.fn(),
+  listTaskInputs: vi.fn(async (): Promise<TaskInputV1[]> => []),
   runtimeRequest: vi.fn(async (_path: string, _method?: string, _body?: string) => ({ ok: true, body: '{}' })),
-  openTaskArtifact: vi.fn(async () => ({ ok: true })), openWorkspaceFile: vi.fn(async () => ({ ok: true }))
+  openTaskArtifact: vi.fn(async (): Promise<{ ok: true } | { ok: false; message: string }> => ({ ok: true })),
+  openWorkspaceFile: vi.fn(async (): Promise<{ ok: boolean; message?: string }> => ({ ok: true }))
 }
 
 async function render(props: Partial<ComponentProps<typeof TaskRunStatusBar>> = {}): Promise<void> {
@@ -39,15 +41,18 @@ async function render(props: Partial<ComponentProps<typeof TaskRunStatusBar>> = 
   })
 }
 
-async function renderConversation(blocks: ChatBlock[], replyQuestionId?: string): Promise<void> {
+async function renderConversation(blocks: ChatBlock[], replyQuestionId?: string,
+  onComposerQuestionChange?: ComponentProps<typeof TaskRunStatusBar>['onComposerQuestionChange'],
+  pausedTaskQuestionRequestIds?: ReadonlySet<string>): Promise<void> {
   const activeControls = activeConversationControls(blocks)
   await act(async () => {
     await refreshTaskState()
     root.render(createElement('div', null,
-      createElement(MessageTimeline, { blocks, activeControls, replyQuestionId,
+      createElement(MessageTimeline, { blocks, activeControls, replyQuestionId, pausedTaskQuestionRequestIds,
         activeThreadId: threadId, runtimeConnection: 'ready', liveReasoning: '', live: '',
         onRetryConnection: () => undefined, onOpenSettings: () => undefined,
-        taskActivity: createElement(TaskRunStatusBar, { threadId, runtimeReady: true, conversationControls: activeControls }) }),
+        taskActivity: createElement(TaskRunStatusBar, { threadId, runtimeReady: true, composerReplies: true,
+          conversationControls: activeControls, onComposerQuestionChange }) }),
       createElement('div', { className: 'ds-composer-shell' }, createElement('textarea'))
     ))
   })
@@ -60,6 +65,7 @@ function button(label: string): HTMLButtonElement | undefined {
 beforeEach(async () => {
   vi.clearAllMocks()
   api.runtimeRequest.mockResolvedValue({ ok: true, body: '{}' })
+  api.listTaskInputs.mockResolvedValue([])
   resetTaskStateForTests()
   tasks = []; attention = []
   await i18n.changeLanguage('zh')
@@ -128,9 +134,149 @@ describe('task actions in the original conversation', () => {
     attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
       threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供资料名称', status: 'pending',
       payload: { questions: open.questions }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
-    await render({ composerReplies: true })
+    const onComposerQuestionChange = vi.fn()
+    await render({ composerReplies: true, onComposerQuestionChange })
     expect(container.textContent).toContain('在下方输入框直接回复')
     expect(container.querySelector('textarea')).toBeNull()
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
+      requestId: 'worker-request', questionId: 'document', label: '请提供资料名称' })
+    attention = []
+    await render({ composerReplies: true, onComposerQuestionChange })
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it('binds the matching waiting task question when an approval is also open', async () => {
+    tasks = [run('worker-question', 'waiting_user', { activeTurnId: 'waiting-turn' })]
+    const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
+      threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [question] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const approval: ChatBlock = { kind: 'approval', id: 'approval-block', approvalId: 'approval-id', summary: '读取本地工作区', status: 'pending' }
+    const openQuestion: ChatBlock = { kind: 'user_input', id: 'question-block', requestId: 'worker-request', status: 'pending',
+      questions: [{ id: question.id, header: question.header, question: question.question, options: [] }] }
+    const onComposerQuestionChange = vi.fn()
+
+    await renderConversation([approval, openQuestion], undefined, onComposerQuestionChange)
+
+    expect(composerReplyQuestion(activeConversationControls([approval, openQuestion]))).toEqual(openQuestion)
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
+      requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
+  })
+
+  it('does not bind a task question when a different conversation question is pending', async () => {
+    tasks = [run('worker-question', 'waiting_user', { activeTurnId: 'waiting-turn' })]
+    const taskQuestion = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
+      threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [taskQuestion] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const taskBlock: ChatBlock = { kind: 'user_input', id: 'task-block', requestId: 'worker-request', status: 'pending', questions: [taskQuestion] }
+    const ordinaryBlock: ChatBlock = { kind: 'user_input', id: 'ordinary-block', requestId: 'ordinary-request', status: 'pending',
+      questions: [{ id: 'period', header: '时间范围', question: '请提供时间范围。', options: [] }] }
+    const onComposerQuestionChange = vi.fn()
+
+    await renderConversation([taskBlock, ordinaryBlock], undefined, onComposerQuestionChange)
+
+    expect(composerReplyQuestion(activeConversationControls([taskBlock, ordinaryBlock]))).toBeUndefined()
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it('keeps a paused mirrored task question read-only and offers task continuation', async () => {
+    tasks = [run('paused-question', 'paused', { activeTurnId: 'waiting-turn' })]
+    const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'paused-attention', requestId: 'paused-request', taskId: 'paused-question', ownerId: 'paused-question', ownerKind: 'task',
+      threadId: 'worker-paused-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [question] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const mirrored: ChatBlock = { kind: 'user_input', id: 'paused-question-block', requestId: 'paused-request', status: 'pending',
+      questions: [{ id: question.id, header: question.header, question: question.question, options: [] }] }
+    const onComposerQuestionChange = vi.fn()
+
+    await renderConversation([mirrored], undefined, onComposerQuestionChange, new Set(['paused-request']))
+
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
+    expect(container.textContent).toContain('请提供官网网址。')
+    expect(container.textContent).toContain('请先继续任务，再在对话中回答。')
+    expect(container.querySelectorAll('textarea')).toHaveLength(1)
+    expect(container.querySelector('.ds-message-timeline-content textarea')).toBeNull()
+    expect(button('提交回答')).toBeUndefined()
+    expect(button('继续任务')).toBeTruthy()
+  })
+
+  it('keeps a paused task-only question read-only', async () => {
+    tasks = [run('paused-only-question', 'paused', { activeTurnId: 'waiting-turn' })]
+    const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'paused-only-attention', requestId: 'paused-only-request', taskId: 'paused-only-question', ownerId: 'paused-only-question', ownerKind: 'task',
+      threadId: 'worker-paused-only-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [question] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const onComposerQuestionChange = vi.fn()
+
+    await render({ composerReplies: true, onComposerQuestionChange })
+
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
+    expect(container.textContent).toContain('请先继续任务，再在对话中回答。')
+    expect(container.querySelector('textarea')).toBeNull()
+    expect(button('提交回答')).toBeUndefined()
+    expect(button('继续任务')).toBeTruthy()
+  })
+
+  it('keeps the task question bound when its transcript control becomes inline', async () => {
+    tasks = [run('worker-question', 'waiting_user', { activeTurnId: 'waiting-turn' })]
+    const question = { id: 'website', header: '官网', question: '请提供官网网址。', options: [] }
+    attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
+      threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [question] }, revision: 1, createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const onComposerQuestionChange = vi.fn()
+
+    await render({ composerReplies: true, onComposerQuestionChange })
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
+      requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
+
+    await render({ composerReplies: true, inlineRequests: ['worker-request'], onComposerQuestionChange })
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
+      requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
+  })
+
+  it('keeps the answered source question and reply in the original conversation', async () => {
+    const task = run('website-presentation', 'waiting_user', { activeTurnId: 'waiting-turn' })
+    tasks = [task]
+    attention = [{ id: 'website-question', requestId: 'website-request', taskId: task.id, ownerId: task.id, ownerKind: 'task',
+      threadId: task.threadId, kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] },
+      revision: 1, createdAt: task.createdAt, updatedAt: task.updatedAt }]
+    await render({ composerReplies: true })
+
+    tasks = [{ ...task, status: 'completed', activeTurnId: 'resumed-turn', revision: task.revision + 1,
+      artifacts: [{ id: 'presentation', relativePath: 'website.pptx', validation: 'valid', createdAt: task.updatedAt }] }]
+    attention = []
+    api.listTaskInputs.mockResolvedValue([{ id: 'answer', taskId: task.id, kind: 'supplement', text: 'https://www.railwise.cn',
+      idempotencyKey: 'user-input:website-request', createdAt: task.updatedAt }])
+    api.runtimeRequest.mockResolvedValue({ ok: true, body: JSON.stringify({ turns: [{ items: [{ kind: 'user_input', inputId: 'website-request',
+      questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] }] }] }) })
+    await render({ composerReplies: true })
+
+    const history = container.querySelector('[aria-label="补充记录"]')
+    expect(history?.textContent).toContain('请提供官网网址。')
+    expect(history?.textContent).toContain('https://www.railwise.cn')
+    expect(history?.closest('[aria-label="任务"]')).not.toBeNull()
+
+    await act(async () => root.render(null))
+    await render({ composerReplies: true })
+    const reopenedHistory = container.querySelector('[aria-label="补充记录"]')
+    expect(reopenedHistory?.textContent).toContain('请提供官网网址。')
+    expect(reopenedHistory?.textContent).toContain('https://www.railwise.cn')
+    expect(api.runtimeRequest).toHaveBeenCalledWith(`/v1/threads/${encodeURIComponent(task.threadId)}`, 'GET')
+  })
+
+  it('does not bind a stale task question while the task is queued', async () => {
+    tasks = [run('worker-question', 'queued', { activeTurnId: 'queued-turn' })]
+    attention = [{ id: 'worker-attention', requestId: 'worker-request', taskId: 'worker-question', ownerId: 'worker-question', ownerKind: 'task',
+      threadId: 'worker-worker-question', kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [{ id: 'website', question: '请提供官网网址。', options: [] }] }, revision: 1,
+      createdAt: tasks[0].createdAt, updatedAt: tasks[0].updatedAt }]
+    const onComposerQuestionChange = vi.fn()
+
+    await render({ composerReplies: true, onComposerQuestionChange })
+
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
   })
 
   it('continues the same durable run once and uses the existing composer and chooser', async () => {
@@ -189,6 +335,23 @@ describe('task actions in the original conversation', () => {
     await render({ visibleMessageIds: new Set(['item_command_task_result_video_receipt']) })
     expect(container.textContent).not.toContain('影片已生成并验证。')
     expect(button('output.mp4')).toBeTruthy()
+  })
+
+  it('shows the reason returned when a task artifact cannot be opened', async () => {
+    const reason = '无法打开 /Users/alice/Downloads/website.pptx。Bearer sensitive-token-123456'
+    tasks = [run('presentation', 'completed', {
+      artifacts: [{ id: 'ppt-artifact', storage: 'task', relativePath: 'website.pptx', absolutePath: '/project/website.pptx',
+        authorizedRoot: '/project', executionGrantId: 'grant-ppt', validation: 'valid', createdAt: '2026-11-20T08:00:00Z' }]
+    })]
+    api.openTaskArtifact.mockResolvedValue({ ok: false, message: reason })
+
+    await render()
+    await act(async () => button('1 个成果')!.click())
+    await act(async () => button('website.pptx')!.click())
+
+    expect(api.openTaskArtifact).toHaveBeenCalledExactlyOnceWith({ taskId: 'presentation', artifactId: 'ppt-artifact' })
+    expect(container.textContent).toContain('无法打开 ~/Downloads/website.pptx。Bearer [REDACTED]')
+    expect(container.textContent).not.toContain('sensitive-token-123456')
   })
 
   it('shows the delegated worker steps in the original message flow through completion without mutation controls', async () => {

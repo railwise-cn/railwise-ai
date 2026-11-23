@@ -10,7 +10,7 @@ import type {
   UserInputAnswer
 } from './types'
 import { getManagedRuntimeSettings } from '@shared/app-settings'
-import type { CallableCapabilityChoice, CallableCapabilityScope } from '@shared/callable-capabilities'
+import { canonicalSkillDisplayName, type CallableCapabilityChoice, type CallableCapabilityScope } from '@shared/callable-capabilities'
 import {
   RUNTIME_ATTACHMENT_DIAGNOSTICS_PATH,
   RUNTIME_ATTACHMENTS_PATH,
@@ -614,7 +614,9 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
     const result = readRuntimeJson<{ choices: CallableCapabilityChoice[] }>(
       response.body, 'runtime returned an invalid callable capabilities response'
     )
-    return result.choices
+    return result.choices.map(choice => choice.kind === 'connector'
+      ? choice
+      : { ...choice, label: canonicalSkillDisplayName(choice.label) })
   }
 
   async uploadAttachment(input: {

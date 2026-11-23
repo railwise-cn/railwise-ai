@@ -26,6 +26,16 @@ function fixture(versions: { cli?: string; daemon?: string; extension?: string; 
 describe('Browser task authority rebinding', () => {
   const literalRequest = '使用broswer-skill，帮我去政采云、阳光采购平台等平台去获取一些招标信息，我们主要是做工程测量、工程监测类的业务，所以需要找的是这一类招标信息，并以html形式将获取到的信息给我汇报，每天执行两次，早上九点前一次，下午五点前一次。'
 
+  it('offers website fallback only for supplied, already configured origins, without changing task authority', () => {
+    const f = fixture()
+    const before = f.repository.get('task')
+    expect(f.runtime.sourceReadScope(['继续未完成任务', '制作 PPT', 'https://example.com/about', 'https://outside.example/about'])).toEqual({
+      browserInstanceId: f.config.browserInstanceId, origins: ['https://example.com'], interaction: 'observe', sourceReadOnly: true, revision: 3
+    })
+    expect(f.runtime.sourceReadScope(['https://outside.example/about'])).toBeUndefined()
+    expect(f.repository.get('task')).toEqual(before)
+  })
+
   it.each([{ cli: '0.4.0' }, { daemon: '1.7' }, { extension: '1.7' }, { daemon: '1.8' }, { extension: '1.8' }, { cli: '' }, { daemon: '' }, { extension: '' }])('keeps strict bindings available but never offers target interaction for incompatible dependencies %j', versions => {
     const f = fixture(versions)
     f.repository.update('task', 0, task => ({ ...task, goal: literalRequest, authority: undefined }))

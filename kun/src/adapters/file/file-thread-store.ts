@@ -2,8 +2,9 @@ import { mkdir, readFile, readdir, rm, stat, truncate } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import type { ThreadStore, ThreadStoreListOptions } from '../../ports/thread-store.js'
 import type { ThreadRecord, ThreadSummary } from '../../contracts/threads.js'
-import { isConversationReceiptItem, type TurnItem } from '../../contracts/items.js'
+import { isConversationReceiptItem, MAX_TOOL_ARGUMENT_SUMMARY_LENGTH, type TurnItem } from '../../contracts/items.js'
 import { toConversationThreadSummary } from '../../domain/thread.js'
+import { sanitizeTurnItemForPersistence } from '../../security/tool-persistence-security.js'
 import { atomicWriteFile } from './atomic-write.js'
 
 /**
@@ -48,7 +49,16 @@ export class FileThreadStore implements ThreadStore {
   async get(threadId: string): Promise<ThreadRecord | null> {
     try {
       const raw = await readFile(this.threadFilePath(threadId), 'utf-8')
-      return JSON.parse(raw) as ThreadRecord
+      const thread = JSON.parse(raw) as ThreadRecord
+      // A 0.5.10 turn could save this item before rejecting its event.
+      for (const turn of thread.turns ?? []) {
+        for (const [index, item] of (turn.items ?? []).entries()) {
+          if (item.kind === 'tool_call' && (item.argumentSummary?.length ?? 0) > MAX_TOOL_ARGUMENT_SUMMARY_LENGTH) {
+            turn.items[index] = sanitizeTurnItemForPersistence(item)
+          }
+        }
+      }
+      return thread
     } catch {
       return null
     }

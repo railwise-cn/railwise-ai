@@ -540,6 +540,10 @@ export class AgentLoop {
 
   async awaitIdle(): Promise<void> { await Promise.allSettled([...this.activeRuns.values()]) }
 
+  async awaitTurnIdle(threadId: string, turnId: string): Promise<void> {
+    await this.activeRuns.get(`${threadId}:${turnId}`)?.catch(() => undefined)
+  }
+
   private async executeRunTurn(threadId: string, turnId: string): Promise<'completed' | 'failed' | 'aborted'> {
     const signal = this.opts.turns.getAbortController(turnId)
     if (!signal) {
@@ -1294,6 +1298,7 @@ export class AgentLoop {
         + 'Do not replay mutations, reset guards, fabricate evidence or weaken verification. Existing unknown outcomes and all execution budgets remain binding.'
       ] : []),
       ...optionalInstruction(webSearchCapabilityInstruction(workflowPrompt, toolSpecs)),
+      ...optionalInstruction(webSourceToolInstruction(effectiveToolSpecs)),
       ...optionalInstruction(webFailureGuard?.recoveryInstruction()),
       ...(effectiveToolSpecs.some((tool) => tool.name === 'bash' || tool.name === 'request_host_shell') ? [shellRuntimeInstruction()] : []),
       ...(effectiveToolSpecs.some((tool) => tool.name === 'request_host_shell') ? [
@@ -2241,7 +2246,17 @@ export class AgentLoop {
           }
           return result
         } catch (error) {
-          if (operation) this.opts.tasks?.finishToolOperation(operation.token, operation.key)
+          if (operation) {
+            const cancelledInput = input.context.abortSignal.aborted &&
+              ['request_user_input', 'user_input'].includes(input.call.toolName)
+            const knownCancellation: ToolHostResult | undefined = cancelledInput ? {
+              approved: true,
+              item: makeToolResultItem({ id: `item_${input.call.callId}`, threadId: input.threadId, turnId: input.turnId,
+                callId: input.call.callId, toolName: input.call.toolName,
+                output: { status: 'cancelled', code: 'user_input_cancelled' }, isError: true })
+            } : undefined
+            this.opts.tasks?.finishToolOperation(operation.token, operation.key, knownCancellation)
+          }
           if (input.context.abortSignal.aborted || !this.isRecoverableToolDispatchError(error)) {
             if (spanId) {
               this.opts.spanService?.finish(spanId, {
@@ -3127,6 +3142,16 @@ export function webSearchCapabilityInstruction(
 
 function isWebToolName(name: string): boolean {
   return name === 'web_search' || name === 'web_fetch'
+}
+
+function webSourceToolInstruction(tools: readonly ModelToolSpec[]): string | undefined {
+  const names = new Set(tools.map(tool => tool.name))
+  if (!names.has('web_fetch')) return undefined
+  const directRead = 'For public website source material supplied for a document or presentation, use web_fetch with the user’s actual address, including a continuation reply, unless the user selected a specific browser. Reuse the returned source URL and content in the deliverable.'
+  if (['browser_session_start', 'browser_navigate', 'browser_get_html'].every(name => names.has(name))) {
+    return `${directRead} If direct reading fails or the page requires rendering, use the connected BrowserSkill read tools: browser_session_start({}), browser_navigate with its actual sessionId and the authorized HTTPS URL, then browser_get_html with that sessionId. Do not invent browser globals or use shell/JavaScript to drive a browser. Keep access restrictions in force.`
+  }
+  return `${directRead} Use only the tools advertised in this turn. Do not invent browser globals, terminal commands for an unconnected browser, or a claim that a browser has opened. If the website still cannot be read, explain the source-specific limitation and continue work supported by other verified material.`
 }
 
 function attachmentRequestPipelineDetails(input: {

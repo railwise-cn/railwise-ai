@@ -110,6 +110,40 @@ describe('Web tool provider', () => {
     }
   })
 
+  it('reads a supplied www address over HTTPS and applies domain policy before dispatch', async () => {
+    const config = KunCapabilitiesConfig.parse({
+      web: { enabled: true, fetchEnabled: true, allowDomains: ['example.test'], denyDomains: ['www.denied.example.test'] }
+    })
+    const provider = new DeterministicWebProvider({
+      pages: {
+        'https://www.example.test/about': {
+          url: 'https://www.example.test/about',
+          finalUrl: 'https://www.example.test/about',
+          text: 'Company source text'
+        }
+      }
+    })
+    const fetch = vi.spyOn(provider, 'fetch')
+    const host = new LocalToolHost({
+      registry: new CapabilityRegistry(buildWebToolProviders(config.web, { provider }).providers)
+    })
+
+    const result = await host.execute({
+      callId: 'call_www', toolName: 'web_fetch', arguments: { url: 'www.example.test/about' }
+    }, buildContext())
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false, output: {
+      finalUrl: 'https://www.example.test/about', text: 'Company source text'
+    } })
+
+    for (const url of ['www.denied.example.test', 'www.example.test@other.example.test', '/about']) {
+      const blocked = await host.execute({
+        callId: `blocked_${url}`, toolName: 'web_fetch', arguments: { url }
+      }, buildContext())
+      expect(blocked.item).toMatchObject({ kind: 'tool_result', isError: true, output: { error: { code: 'policy_blocked' } } })
+    }
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('returns payload_too_large instead of truncating oversized responses', async () => {
     const config = KunCapabilitiesConfig.parse({
       web: {

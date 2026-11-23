@@ -1,0 +1,29 @@
+{
+  "scope": "Local runtime HTTP integration with a synthetic model and a real public page and PPT Master sidecar",
+  "pathRedaction": "Repository-relative paths replace local temporary absolute paths.",
+  "stages": [
+    "skill selected, source question in original conversation",
+    "fixture invoked the bundled native final SVG quality check",
+    "source supplied in chat, public homepage text returned, original task completed, editable PPTX read back"
+  ],
+  "sourceUrl": "https://www.railwise.cn/",
+  "dist": "kun/dist",
+  "platform": "darwin",
+  "arch": "arm64",
+  "source": {
+    "title": "RailWise 睿威 · 工程测量、安全监测与自研软件",
+    "bytes": 39126,
+    "resultHash": "c2808130064c33a143abf84bb5728b79aaf6127c22962e21c4dbcb1371c681ad",
+    "readTool": "web_fetch"
+  },
+  "slideInput": {
+    "length": 1755,
+    "sha256": "4545c1ed8015534916cd854048829cecdb2f40a8d26bea3d3608029472a8d0e9"
+  },
+  "artifact": {
+    "path": "workspace/deck/website.pptx",
+    "bytes": 13116,
+    "sha256": "5dc32418a110dc07a50b25bed4f29ab5274a850f01bb2a12905c30dad72ce18a"
+  },
+  "passed": true
+}

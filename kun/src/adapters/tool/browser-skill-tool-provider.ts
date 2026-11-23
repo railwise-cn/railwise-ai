@@ -98,6 +98,9 @@ export function buildBrowserSkillToolProvider(options: {
     const config = options.config()
     const scope = context.executionGrant?.browserScope
     if (!context.executionGrant?.taskId || !scope) return { code: 'browser_scope_required', message: '请确认当前任务的浏览器与站点范围。' }
+    if (scope.sourceReadOnly && (interaction || action === 'request_interaction')) {
+      return { code: 'browser_interaction_scope_required', message: '当前来源只读范围不包含网页操作。' }
+    }
     const task = options.repository.get(context.executionGrant.taskId)
     const policy = browserVerificationPolicy(scope.verificationPolicy)
     if (task?.authority?.browserScope && browserVerificationPolicy(task.authority.browserScope.verificationPolicy) !== policy ||

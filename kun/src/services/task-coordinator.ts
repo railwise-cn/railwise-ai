@@ -5,9 +5,9 @@ import { TaskCommandSchema } from '../contracts/execution.js'
 import type { TaskInput, TaskRun } from '../contracts/tasks.js'
 import type { ThreadRecord } from '../contracts/threads.js'
 import type { ThreadStore } from '../ports/thread-store.js'
-import type { UserInputGate } from '../ports/user-input-gate.js'
+import type { UserInputAnswer, UserInputGate } from '../ports/user-input-gate.js'
 import type { TaskRunRepository } from './task-run-repository.js'
-import { operationFingerprint } from './task-run-repository.js'
+import { operationFingerprint, TaskRevisionConflictError } from './task-run-repository.js'
 import { StartTurnRequest } from '../contracts/turns.js'
 import type { ThreadService } from './thread-service.js'
 import type { TurnService } from './turn-service.js'
@@ -36,7 +36,7 @@ export class TaskCoordinator {
   private readonly pending = new Map<string, Promise<TaskCommandResult>>()
   private flushingMessages?: Promise<void>
   private readonly controls:TaskControlService
-  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; userInputGate?: UserInputGate; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
+  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; userInputGate?: UserInputGate; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; requiresBrowserScopeRefresh?: (task: TaskRun, turnId: string, text: string) => boolean | Promise<boolean>; waitTurn?: (threadId: string, turnId: string) => Promise<void>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
   async command(raw: TaskCommand, options: TaskCommandDispatchOptions = {}): Promise<TaskCommandResult> {
     const command = TaskCommandSchema.parse(raw)
     const queueKey = `${command.threadId}:${command.idempotencyKey}`
@@ -45,6 +45,39 @@ export class TaskCoordinator {
     const promise = this.execute(command, options)
     this.pending.set(queueKey,promise)
     try { return await promise } finally { this.pending.delete(queueKey) }
+  }
+  async submitTaskUserInputAnswer(inputId: string, answers: UserInputAnswer[]): Promise<'not_applicable' | 'submitted' | 'stale'> {
+    const saved = this.deps.repository.humanRequest(inputId)
+    const request = this.deps.userInputGate?.get(inputId)
+    const attention = this.deps.repository.attention(inputId)
+    if (!saved || saved.kind !== 'question' || !attention?.taskId || !request) return 'not_applicable'
+
+    const task = this.deps.repository.get(attention.taskId)
+    if (!task || saved.status !== 'pending' || task.status !== 'waiting_user' ||
+      task.threadId !== request.threadId || task.activeTurnId !== request.turnId) return 'stale'
+    if (request.questions.length !== 1 || request.questions[0]!.options.length > 0) return 'not_applicable'
+
+    const answer = answers.length === 1 ? answers[0] : undefined
+    if (!answer || answer.id !== request.questions[0]!.id || !answer.value.trim()) return 'stale'
+
+    try {
+      const result = await this.command({
+        threadId: task.originThreadId ?? task.threadId,
+        taskId: task.id,
+        expectedRevision: task.revision,
+        intent: 'supplement',
+        idempotencyKey: `user-input:${inputId}`,
+        request: { prompt: answer.value, displayText: answer.value, model: task.model }
+      })
+      return result.kind === 'input_queued' && result.task?.id === task.id ? 'submitted' : 'stale'
+    } catch (error) {
+      const code = (error as { code?: string }).code
+      if (error instanceof TaskRevisionConflictError ||
+        ['stale_request', 'invalid_state', 'outcome_unknown', 'scope_conflict', 'idempotency_conflict'].includes(code ?? '')) {
+        return 'stale'
+      }
+      throw error
+    }
   }
   private resolveTask(threadId:string, taskId?:string):TaskRun|null {
     if(taskId) return this.deps.repository.currentExecution(taskId)
@@ -290,9 +323,30 @@ export class TaskCoordinator {
     const attention = pending.length === 1 && pending[0]?.kind === 'question' ? pending[0] : undefined
     const request = attention?.requestId ? userInputGate?.get(attention.requestId) : undefined
     const question = request?.questions.length === 1 ? request.questions[0] : undefined
-    if (request?.turnId === task.activeTurnId && question && question.options.length === 0 &&
-        userInputGate?.resolve(request.id, { status: 'submitted', answers: [{ id: question.id, label: question.header || question.question, value: input.text }] })) {
-      return { ...queued, task: repository.get(task.id) ?? task }
+    if (request?.turnId === task.activeTurnId && question && question.options.length === 0) {
+      if (await this.deps.requiresBrowserScopeRefresh?.(task, request.turnId, input.text)) {
+        const current = repository.get(task.id) ?? task
+        const paused = this.deps.tasks.pauseTask(current.id, current.revision, '正在根据补充网址更新只读网页读取范围。')
+        userInputGate?.resolveForTurnRestart(request.id)
+        await this.deps.turns.interruptTurn({ threadId: task.threadId, turnId: request.turnId })
+        await this.deps.waitTurn?.(task.threadId, request.turnId)
+        const ready = repository.get(task.id) ?? paused
+        try {
+          const resumed = await this.controls.mutate(task.id, 'resume', {
+            expectedRevision: ready.revision, idempotencyKey: `supplement-browser-scope:${input.id}`, model: command.request.model
+          })
+          if (resumed.capability) return { kind: 'capability_required', task: resumed.task,
+            attentionId: `capability_${task.id}`, capability: resumed.capability, message: resumed.capability.message,
+            ...(resumed.receipt ? { receipt: resumed.receipt } : {}) }
+          return { ...queued, task: resumed.task }
+        } catch (error) {
+          if (!['stale_request', 'invalid_state', 'outcome_unknown'].includes((error as { code?: string }).code ?? '')) throw error
+          return { ...queued, task: repository.get(task.id) ?? ready }
+        }
+      }
+      if (userInputGate?.resolve(request.id, { status: 'submitted', answers: [{ id: question.id, label: question.header || question.question, value: input.text }] })) {
+        return { ...queued, task: repository.get(task.id) ?? task }
+      }
     }
     if (pending.length) return queued
     const turn = (await threadStore.get(task.threadId))?.turns.find(item => item.id === task.activeTurnId)

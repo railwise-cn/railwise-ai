@@ -12,6 +12,7 @@ export function RuntimeBanner({
   onRetryConnection,
   runtimeReady,
   stageInsetClass,
+  inConversation = false,
   t
 }: {
   message: string
@@ -23,6 +24,7 @@ export function RuntimeBanner({
   onRetryConnection: () => void
   runtimeReady: boolean
   stageInsetClass: string
+  inConversation?: boolean
   t: (key: string) => string
 }): ReactElement {
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -38,6 +40,10 @@ export function RuntimeBanner({
     cleanedLogPath ? `${t('runtimeErrorLogPath')}: ${cleanedLogPath}` : ''
   ].filter(Boolean).join('\n\n')
   const hasDetail = detailText.trim().length > 0
+  const textTone = inConversation ? 'text-ds-muted' : 'text-amber-950 dark:text-amber-100'
+  const detailActionTone = inConversation
+    ? 'text-ds-muted hover:bg-ds-hover'
+    : 'text-amber-900/80 hover:bg-amber-50/70 dark:text-amber-100 dark:hover:bg-amber-900/30'
 
   const copyDetails = async (): Promise<void> => {
     if (!hasDetail || !navigator?.clipboard?.writeText) return
@@ -58,17 +64,20 @@ export function RuntimeBanner({
   }
 
   return (
-    <div className="ds-no-drag shrink-0 border-b border-amber-200/70 bg-[rgba(255,248,235,0.82)] backdrop-blur-lg dark:border-amber-800/50 dark:bg-amber-950/35">
+    <div className={inConversation
+      ? 'ds-no-drag shrink-0 rounded-lg border border-ds-border bg-ds-card'
+      : 'ds-no-drag shrink-0 border-b border-amber-200/70 bg-[rgba(255,248,235,0.82)] backdrop-blur-lg dark:border-amber-800/50 dark:bg-amber-950/35'}>
       <div className={`${stageInsetClass} flex w-full min-w-0 flex-col gap-2 py-3`}>
         <div className="flex w-full min-w-0 items-start justify-between gap-3">
-          <p className="min-w-0 flex-1 text-[14px] leading-6 text-amber-950 dark:text-amber-100">
+          <p role="status" className={`min-w-0 flex-1 break-words text-[14px] leading-6 ${textTone}`}>
             {message}
           </p>
           <div className="flex shrink-0 items-center gap-2">
             {hasDetail ? (
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-medium text-amber-900/80 transition hover:bg-amber-50/70 dark:text-amber-100 dark:hover:bg-amber-900/30"
+                aria-expanded={detailsOpen}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-medium transition ${detailActionTone}`}
                 onClick={() => setDetailsOpen((value) => !value)}
               >
                 {detailsOpen ? (
@@ -100,15 +109,15 @@ export function RuntimeBanner({
           </div>
         </div>
         {cleanedLogPath && detailsOpen ? (
-          <div className="flex min-w-0 flex-wrap items-center gap-2 text-[12px] leading-5 text-amber-900/80 dark:text-amber-100/85">
+          <div className={`flex min-w-0 flex-wrap items-center gap-2 text-[12px] leading-5 ${textTone}`}>
             <span className="font-medium">{t('runtimeErrorLogPath')}</span>
-            <code className="min-w-0 max-w-full break-all rounded-md bg-white/70 px-2 py-0.5 font-mono text-[12px] text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">
+            <code className={`min-w-0 max-w-full break-all rounded-md px-2 py-0.5 font-mono text-[12px] ${textTone}`}>
               {cleanedLogPath}
             </code>
             {onOpenLogDir ? (
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-medium text-amber-900/85 transition hover:bg-amber-50/70 dark:text-amber-100 dark:hover:bg-amber-900/30"
+                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-medium transition ${detailActionTone}`}
                 onClick={() => void openLogDir()}
               >
                 <FolderOpen className="h-3.5 w-3.5" strokeWidth={2} />
@@ -116,26 +125,26 @@ export function RuntimeBanner({
               </button>
             ) : null}
             {logOpenError ? (
-              <span className="text-red-700 dark:text-red-300">{logOpenError}</span>
+              <span className={textTone}>{logOpenError}</span>
             ) : null}
           </div>
         ) : null}
         {hasDetail && detailsOpen ? (
-          <div className="rounded-lg border border-amber-300/60 bg-white/70 p-3 dark:border-amber-800/50 dark:bg-amber-950/25">
+          <div className={inConversation ? 'border-t border-ds-border pt-2' : 'rounded-lg border border-amber-300/60 bg-white/70 p-3 dark:border-amber-800/50 dark:bg-amber-950/25'}>
             <div className="mb-2 flex items-center justify-between gap-3">
-              <span className="text-[12px] font-semibold text-amber-950 dark:text-amber-100">
+              <span className={`text-[12px] font-semibold ${textTone}`}>
                 {t('runtimeErrorTechnicalDetails')}
               </span>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-amber-900/80 transition hover:bg-amber-100/70 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium transition ${detailActionTone}`}
                 onClick={() => void copyDetails()}
               >
                 <Copy className="h-3.5 w-3.5" strokeWidth={2} />
                 {copied ? t('copySuccess') : t('copyDetails')}
               </button>
             </div>
-            <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-amber-950 dark:text-amber-100">
+            <pre className={`max-h-52 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-5 ${textTone}`}>
               {detailText}
             </pre>
           </div>

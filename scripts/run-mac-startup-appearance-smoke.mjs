@@ -7,19 +7,58 @@ import { createRequire } from 'node:module'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { connectCdp } from './run-windows-ui-smoke.mjs'
-import { observeInstalledStartup } from './verify-packaged-startup-appearance.mjs'
+import { observeStartupWithCaptureRetry } from './verify-packaged-startup-appearance.mjs'
+import { macCoreJourneys, recordHostedCoreJourneys } from './record-core-journeys.mjs'
 import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
+import { reportSha256 } from './verify-frozen-updater-evidence.mjs'
 
 const require = createRequire(import.meta.url)
 const acceptedDriverFiles = new Set([
   '.github/workflows/windows-install-smoke.yml',
+  'scripts/run-mac-ppt-journey.mjs',
+  'scripts/run-mac-ppt-journey.test.mjs',
+  'scripts/run-mac-offline-spreadsheet-journey.mjs',
+  'scripts/run-mac-offline-spreadsheet-journey.test.mjs',
+  'scripts/record-core-journeys.mjs',
   'scripts/run-mac-startup-appearance-smoke.mjs',
+  'scripts/verify-windows-startup-appearance.test.mjs',
   'scripts/run-windows-ui-smoke.mjs',
-  'scripts/verify-packaged-startup-appearance.mjs'
+  'scripts/prepare-windows-install-smoke.mjs',
+  'scripts/prepare-windows-install-smoke.test.mjs',
+  'scripts/verify-windows-composer-acceptance.mjs',
+  'scripts/run-windows-offline-spreadsheet-journey.mjs',
+  'scripts/run-windows-offline-spreadsheet-journey.test.mjs',
+  'scripts/run-windows-install-smoke.ps1',
+  'scripts/verify-windows-install-smoke.mjs',
+  'scripts/verify-core-journeys.mjs',
+  'scripts/verify-core-journeys.test.mjs',
+  'scripts/verify-packaged-startup-appearance.mjs',
+  'scripts/web-ppt-journey.mjs',
+  'scripts/prepare-windows-install-smoke.test.mjs',
+  'scripts/record-core-journeys.test.mjs',
+  'scripts/run-windows-frozen-gui-upgrade.mjs',
+  'scripts/windows-published-gui-update-smoke.test.mjs',
+  'scripts/windows-ui-smoke.test.mjs',
+  'docs/qa/release-gates/v0.5.11/acceptance.md'
 ])
 const command = (file, args) => execFileSync(file, args, { encoding: 'utf8', timeout: 90_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const git = (...args) => command('git', args)
 const json = (path) => readFile(path, 'utf8').then(JSON.parse)
+const api = suffix => JSON.parse(command('gh', ['api', `repos/${RELEASE_REPOSITORY}/${suffix}`]))
+
+export function macStartupPackageMode(run, build) {
+  assert.equal(run.event, 'workflow_dispatch')
+  assert.equal(run.status, 'completed')
+  assert.equal(run.conclusion, 'success')
+  assert.equal(build?.status, 'completed')
+  assert.equal(build?.conclusion, 'success')
+  const receipts = (build.steps ?? []).filter(step => step.name === 'Record frozen public package identity')
+  assert.equal(receipts.length, 1, 'Expected one package identity receipt step')
+  if (receipts[0].conclusion === 'success') return 'frozen-public-identity'
+  assert.equal(receipts[0].conclusion, 'skipped', 'Only a skipped freeze receipt may use QA candidate mode')
+  assert.match(run.head_branch ?? '', /^codex\//, 'An unfrozen public-identity package must come from an isolated work branch')
+  return 'frontier-candidate'
+}
 
 async function sha256(file) {
   const hash = createHash('sha256')
@@ -30,6 +69,7 @@ async function sha256(file) {
 export function validateMacStartupArtifact(source) {
   assert.equal(source.repository, RELEASE_REPOSITORY)
   assert.equal(source.workflow, RELEASE_WORKFLOW)
+  assert.ok(['frozen-public-identity', 'frontier-candidate'].includes(source.packageMode))
   for (const sha of [source.sourceHead, source.driverHead]) assert.match(sha, /^[a-f0-9]{40}$/)
   for (const number of [source.runId, source.runAttempt, source.artifactId]) assert.match(String(number), /^[1-9]\d*$/)
   assert.equal(source.buildConclusion, 'success')
@@ -44,7 +84,6 @@ async function prepare(buildRunId, sourceFile) {
   assert.match(buildRunId, /^[1-9]\d*$/)
   const repository = process.env.GITHUB_REPOSITORY
   assert.equal(repository, RELEASE_REPOSITORY)
-  const api = (suffix) => JSON.parse(command('gh', ['api', `repos/${repository}/${suffix}`]))
   const run = api(`actions/runs/${buildRunId}`)
   assert.equal(run.repository.full_name, repository)
   assert.equal(run.head_repository.full_name, repository)
@@ -54,11 +93,13 @@ async function prepare(buildRunId, sourceFile) {
   git('merge-base', '--is-ancestor', run.head_sha, driverHead)
   const jobs = api(`actions/runs/${buildRunId}/attempts/${run.run_attempt}/jobs?per_page=100`)
   const build = jobs.jobs.find(job => job.name === 'Build macOS')
+  const packageMode = macStartupPackageMode(run, build)
   const artifacts = api(`actions/runs/${buildRunId}/artifacts?per_page=100`)
   const [artifact, duplicate] = artifacts.artifacts.filter(item => item.name === 'release-mac' && !item.expired)
   assert.ok(artifact && !duplicate, 'Expected one immutable macOS release artifact')
   assert.equal(artifact.workflow_run.head_sha, run.head_sha)
-  const source = validateMacStartupArtifact({ repository, workflow: run.path, runId: Number(buildRunId), runAttempt: run.run_attempt,
+  if (artifact.workflow_run.run_attempt !== undefined) assert.equal(artifact.workflow_run.run_attempt, run.run_attempt)
+  const source = validateMacStartupArtifact({ repository, workflow: run.path, packageMode, runId: Number(buildRunId), runAttempt: run.run_attempt,
     sourceHead: run.head_sha, driverHead, buildConclusion: build?.conclusion, artifactName: artifact.name, artifactId: artifact.id,
     artifactDigest: artifact.digest, artifactExpired: artifact.expired,
     changedFiles: git('diff', '--name-only', run.head_sha, driverHead).split('\n').filter(Boolean) })
@@ -75,18 +116,20 @@ function isolatedMacEnvironment(environment, root) {
 async function verify(directory, sourceFile, evidenceDir, temporary) {
   const source = validateMacStartupArtifact(await json(sourceFile))
   assert.equal(source.driverHead, process.env.GITHUB_SHA)
-  const receipt = await json(join(directory, 'reviewed-build.json'))
-  for (const name of ['runId', 'runAttempt', 'sourceHead']) assert.equal(receipt[name], source[name])
   const { version } = await json(new URL('../package.json', import.meta.url))
   assert.match(version, /^\d+\.\d+\.\d+$/)
-  assert.equal(receipt.version, version)
   const name = `RailWise-AI-${version}-mac-${process.arch}.dmg`
   const installer = join(directory, name)
   const digest = await sha256(installer)
   const size = (await stat(installer)).size
-  const record = receipt.files.find(file => file.name === name)
-  assert.equal(digest, record?.sha256)
-  assert.equal(size, record.size)
+  if (source.packageMode === 'frozen-public-identity') {
+    const receipt = await json(join(directory, 'reviewed-build.json'))
+    for (const key of ['runId', 'runAttempt', 'sourceHead']) assert.equal(receipt[key], source[key])
+    assert.equal(receipt.version, version)
+    const record = receipt.files.find(file => file.name === name)
+    assert.equal(digest, record?.sha256)
+    assert.equal(size, record.size)
+  }
   const root = await mkdtemp(join(temporary, 'railwise-mac-startup-'))
   const mountPoint = join(root, 'mounted')
   const install = join(root, 'RailWise AI.app')
@@ -109,23 +152,62 @@ async function verify(directory, sourceFile, evidenceDir, temporary) {
   assert.equal(packaged.productName, PUBLIC_IDENTITY.productName)
   assert.equal(packaged.version, version)
   assert.equal(packaged.buildProvenance?.sourceHead, source.sourceHead)
+  if (source.packageMode === 'frontier-candidate') {
+    const update = require('yaml').parse(await readFile(join(install, 'Contents', 'Resources', 'app-update.yml'), 'utf8'))
+    assert.equal(packaged.updateChannel, 'frontier')
+    assert.equal(update.provider, 'generic')
+    assert.equal(update.url, 'https://127.0.0.1/')
+  } else assert.equal(packaged.updateChannel, 'stable')
   const installedAsarSha256 = await sha256(path)
-  const report = { schemaVersion: 1, status: 'failed', source, arch: process.arch, version,
+  const report = { schemaVersion: 1, status: 'failed', source, packageMode: source.packageMode, arch: process.arch, version,
     installer: { name, sha256: digest, size }, installed: { bundleId: info.CFBundleIdentifier, installedArch,
       signature: 'verified', notarization: 'staple-verified', asarSha256: installedAsarSha256 }, observations: [] }
+  let live
   try {
-    for (const expected of [{ locale: 'en', htmlLang: 'en', theme: 'light' }, { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark' }]) {
-      report.observations.push(await observeInstalledStartup({ executable, version, evidenceDir, temporary }, expected,
-        { connectCdp, environmentForRoot: isolatedMacEnvironment }))
+    for (const expected of [
+      { locale: 'en', htmlLang: 'en', theme: 'light' },
+      { locale: 'zh', htmlLang: 'zh-CN', theme: 'dark', screenshotName: 'mac-startup-zh-dark.png' }
+    ]) {
+      const observation = await observeStartupWithCaptureRetry({ executable, version, evidenceDir, temporary }, expected,
+        { connectCdp, environmentForRoot: isolatedMacEnvironment })
+      if (expected.screenshotName) {
+        const screenshotPath = join(evidenceDir, expected.screenshotName)
+        observation.screenshot = { name: expected.screenshotName, sha256: await sha256(screenshotPath), size: (await stat(screenshotPath)).size }
+      }
+      report.observations.push(observation)
     }
+    const journey = process.env.RAILWISE_MAC_PPT_JOURNEY || 'off'
+    assert.ok(['off', 'controlled', 'live', 'both'].includes(journey), 'Invalid Mac PPT journey mode')
+    if (journey !== 'off') {
+      const { runInstalledMacPptJourney } = await import('./run-mac-ppt-journey.mjs')
+      for (const mode of journey === 'both' ? ['controlled', 'live'] : [journey]) {
+        const result = await runInstalledMacPptJourney({ executable, temporary, evidenceDir, version, installedAsarSha256,
+          installer: report.installer, source, mode, environmentForRoot: isolatedMacEnvironment })
+        if (mode === 'live') live = result
+      }
+    }
+    const { runInstalledMacOfflineSpreadsheetJourney } = await import('./run-mac-offline-spreadsheet-journey.mjs')
+    const spreadsheet = await runInstalledMacOfflineSpreadsheetJourney({ executable, temporary, evidenceDir, version,
+      installedAsarSha256, installer: report.installer, source })
     assert.equal(await sha256(path), installedAsarSha256)
     report.status = 'passed'
+    report.offlineSpreadsheet = { status: spreadsheet.status, file: 'mac-offline-spreadsheet.json' }
   } catch (error) {
     report.error = error.message
+    if (error.diagnostics) report.startupDiagnostics = error.diagnostics
     throw error
   } finally {
     await writeFile(join(evidenceDir, 'mac-startup-appearance.json'), `${JSON.stringify(report, null, 2)}\n`)
   }
+  const spreadsheet = await json(join(evidenceDir, 'mac-offline-spreadsheet.json'))
+  const result = macCoreJourneys(report, live, spreadsheet)
+  for (const item of result.journeys) {
+    const file = item.id === 'startup-branding' ? 'mac-startup-appearance.json'
+      : item.id === 'offline-spreadsheet' ? 'mac-offline-spreadsheet.json' : 'mac-ppt-journey-live.json'
+    item.proofFile = file
+    item.proofSha256 = reportSha256(await readFile(join(evidenceDir, file)))
+  }
+  await recordHostedCoreJourneys(evidenceDir, result)
 }
 
 async function main([mode, directory, source, evidenceDir, arch]) {

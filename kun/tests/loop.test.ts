@@ -25,6 +25,8 @@ import { SteeringQueue } from '../src/loop/steering-queue.js'
 import { SequentialIdGenerator } from '../src/ports/id-generator.js'
 import { MAX_TERMINAL_TURN_IDS, TurnService } from '../src/services/turn-service.js'
 import type { TurnItem } from '../src/contracts/items.js'
+import { TurnSchema } from '../src/contracts/turns.js'
+import { buildToolArgumentSummary } from '../src/security/tool-persistence-security.js'
 import type { ModelRequest, ModelStreamChunk } from '../src/ports/model-client.js'
 import type { TaskController } from '../src/services/task-controller.js'
 import {
@@ -1246,6 +1248,51 @@ describe('AgentLoop', () => {
     expect(nextTurnCall?.kind === 'tool_call' ? nextTurnCall.argumentSummary : '')
       .toContain('Message content: omitted (18 chars)')
     expect(JSON.stringify(await h.sessionStore.loadItems(h.threadId))).not.toContain('active-turn-secret')
+  })
+
+  it('keeps long approval details out of tool summaries and continues the approved turn', async () => {
+    const toolName = 'request_host_shell'
+    const command = `example-command ${'argument'.repeat(115)}`
+    const args = { command, idempotency_key: 'long-review' }
+    const execute = vi.fn(async () => ({ output: { ok: true } }))
+    const h = makeHarness({
+      provider: 'long-approval-test',
+      model: 'long-approval-test',
+      async *stream(request: ModelRequest): AsyncIterable<ModelStreamChunk> {
+        if (!request.history.some((item) => item.kind === 'tool_result')) {
+          yield { kind: 'tool_call_complete', callId: 'long-review', toolName, arguments: args }
+          yield { kind: 'completed', stopReason: 'tool_calls' }
+          return
+        }
+        yield { kind: 'assistant_text_delta', text: 'Review completed.' }
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    }, {
+      tools: [LocalToolHost.defineTool({
+        name: toolName,
+        description: 'A test tool that records its arguments without running a command.',
+        inputSchema: { type: 'object', additionalProperties: true },
+        requireExplicitApproval: true,
+        execute
+      })]
+    })
+    await bootstrapThread(h)
+
+    const run = h.loop.runTurn(h.threadId, h.turnId)
+    try {
+      await expect.poll(() => h.approvalGate.pending(h.threadId)[0]?.summary, { timeout: 1_000 })
+        .toContain(`Command (JSON): ${JSON.stringify(command)}`)
+      const pending = h.approvalGate.pending(h.threadId)[0]!
+      expect(h.approvalGate.decide(pending.id, 'allow')).toBe(true)
+    } finally {
+      h.approvalGate.expireTurn(h.turnId)
+    }
+    await expect(run).resolves.toBe('completed')
+    expect(execute).toHaveBeenCalledExactlyOnceWith(args, expect.any(Object), expect.any(Function))
+    const events = await h.sessionStore.loadEventsSince(h.threadId, 0)
+    const toolEvent = events.find((event) => 'item' in event && event.item.kind === 'tool_call')
+    expect(toolEvent).toMatchObject({ item: { arguments: {}, argumentSummary: `Run ${toolName}\nParameters: omitted from persisted history` } })
+    expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'turn_completed' })]))
   })
 
 	  it('suppresses repeated identical tool calls within a turn', async () => {
@@ -3270,9 +3317,10 @@ describe('FileSessionStore', () => {
   })
 
   it.each([
-    ['aborted', 'aborted'],
-    ['failed', 'failed']
-  ] as const)('finalizes open turn items in messages.jsonl when a turn is %s', async (finalStatus, expectedToolStatus) => {
+    { finalStatus: 'aborted', legacyLongSummary: false },
+    { finalStatus: 'failed', legacyLongSummary: false },
+    { finalStatus: 'aborted', legacyLongSummary: true }
+  ] as const)('finalizes open turn items ($finalStatus, legacy long summary: $legacyLongSummary)', async ({ finalStatus, legacyLongSummary }) => {
     const nowIso = () => '2026-06-05T00:00:00.000Z'
     const threadId = `thr_finalize_${finalStatus}`
     const threadStore = new FileThreadStore({ dataDir, now: () => new Date(nowIso()) })
@@ -3301,17 +3349,26 @@ describe('FileSessionStore', () => {
       threadId,
       request: { prompt: 'run a tool' }
     })
-    await turns.applyItem(
+    const toolName = legacyLongSummary ? 'request_host_shell' : 'echo'
+    const longSummary = buildToolArgumentSummary({ toolName, workspace: '/tmp', arguments: { command: `example-command ${'arg'.repeat(320)}` } })
+    const call = makeToolCallItem({
+      id: 'item_tool_open',
+      turnId,
       threadId,
-      makeToolCallItem({
-        id: 'item_tool_open',
-        turnId,
-        threadId,
-        callId: 'call_open',
-        toolName: 'echo',
-        arguments: { text: 'hi' }
-      })
-    )
+      callId: 'call_open',
+      toolName,
+      arguments: legacyLongSummary ? {} : { text: 'hi' },
+      ...(legacyLongSummary ? { argumentSummary: longSummary } : {})
+    })
+    if (legacyLongSummary) {
+      const thread = (await threadStore.get(threadId))!
+      thread.turns[0]!.items.push(call)
+      await threadStore.upsert(thread)
+      await appendFile(join(dataDir, 'threads', threadId, 'messages.jsonl'), `${JSON.stringify(call)}\n`)
+      expect(TurnSchema.safeParse(await turns.getTurn(threadId, turnId)).success).toBe(true)
+    } else {
+      await turns.applyItem(threadId, call)
+    }
     await turns.applyItem(
       threadId,
       makeToolResultItem({
@@ -3346,15 +3403,19 @@ describe('FileSessionStore', () => {
       })
     )
 
-    if (finalStatus === 'aborted') {
+    if (legacyLongSummary) {
+      await turns.finishTurn({ threadId, turnId, status: 'aborted' })
+      await expect(turns.startTurn({ threadId, request: { prompt: 'continue the original request' } }))
+        .resolves.toMatchObject({ threadId, turnId: expect.not.stringMatching(`^${turnId}$`) })
+    } else if (finalStatus === 'aborted') {
       await turns.interruptTurn({ threadId, turnId })
     } else {
       await turns.finishTurn({ threadId, turnId, status: 'failed', error: 'boom' })
     }
 
     const latestById = new Map((await sessionStore.loadItems(threadId)).map((item) => [item.id, item]))
-    expect(latestById.get('item_tool_open')?.status).toBe(expectedToolStatus)
-    expect(latestById.get('item_result_open')?.status).toBe(expectedToolStatus)
+    expect(latestById.get('item_tool_open')?.status).toBe(finalStatus)
+    expect(latestById.get('item_result_open')?.status).toBe(finalStatus)
     expect(latestById.get('item_approval_open')?.status).toBe('expired')
     expect(latestById.get('item_input_open')?.status).toBe('cancelled')
     expect(
@@ -3369,9 +3430,9 @@ describe('FileSessionStore', () => {
       .split('\n')
       .map((line) => JSON.parse(line) as TurnItem)
     expect(messageLines.filter((item) => item.id === 'item_tool_open').map((item) => item.status))
-      .toEqual(['pending', expectedToolStatus])
+      .toEqual(['pending', finalStatus])
     expect(messageLines.filter((item) => item.id === 'item_result_open').map((item) => item.status))
-      .toEqual(['running', expectedToolStatus])
+      .toEqual(['running', finalStatus])
   })
 
   it('survives a malformed JSONL line', async () => {

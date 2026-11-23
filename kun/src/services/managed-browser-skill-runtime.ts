@@ -144,6 +144,16 @@ export class ManagedBrowserSkillRuntime {
     } : {}) }
   }
 
+  /** Optional browser fallback for supplied sources within the connector's existing site settings. */
+  sourceReadScope(sources: readonly string[]): BrowserExecutionScope | undefined {
+    const config = this.config
+    if (!config.enabled || config.state !== 'ready' || !config.browserInstanceId) return undefined
+    const supplied = new Set(sources.flatMap(text => browserTaskOrigins(text, { includeBareWww: true })))
+    const origins = config.origins.filter(origin => supplied.has(origin))
+    if (!origins.length) return undefined
+    return { browserInstanceId: config.browserInstanceId, origins, interaction: 'observe', sourceReadOnly: true, revision: config.revision }
+  }
+
   /** A current scope review is not authority and does not modify an unknown old binding. */
   oneOffScopeReview(task:TaskRun,ceiling:ExecutionGrant,environmentHash:string,tools:readonly string[],providers:readonly string[],networkOrigins?:string[]):OneOffScopeReview {
     const config=this.config,browser=config.browsers.find(b=>b.id===config.browserInstanceId&&b.connected)

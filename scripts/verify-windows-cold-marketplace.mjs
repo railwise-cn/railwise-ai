@@ -109,7 +109,7 @@ export function createMarketplaceModelAcceptance() {
       const body = entry.replace(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---\s*/, '')
       const excerpt = body.match(/[a-z][a-z ]{28,64}/i)?.[0].trim()
       assert.ok(excerpt, `Expected an instruction excerpt in the installed ${skill.id} entry`)
-      const probe = { marker, excerpt, skill, reply: `已核验技能 ${skill.id}`, resourceVerified: false }
+      const probe = { marker, excerpt, skill, reply: `已核验技能 ${skill.id}`, resourceVerified: false, stages: [] }
       probes.set(marker, probe)
       return probe
     },
@@ -119,19 +119,33 @@ export function createMarketplaceModelAcceptance() {
       const probe = [...probes.values()].find(item => lastUser.includes(item.marker))
       if (!probe) return null
       const header = `Active Skill: ${probe.skill.name} (${probe.skill.id})`
-      assert.ok(messages.some(message => message.role === 'system' &&
-        literal(message.content).includes(header) && literal(message.content).includes(probe.excerpt)),
-      `KUN must inject the actual installed instructions for ${probe.skill.id}`)
+      const injected = messages.some(message => message.role === 'system' &&
+        literal(message.content).includes(header) && literal(message.content).includes(probe.excerpt))
+      if (!injected) {
+        probe.stages.push('skill-injection-missing')
+        return { content: `验收暂停：当前会话未加载 ${probe.skill.name}。` }
+      }
       const callId = `${probe.skill.id}-market-read`
       const readback = messages.find(item => item.role === 'tool' && item.tool_call_id === callId)
       if (readback) {
-        assert.ok(literal(readback.content).includes(probe.excerpt), 'KUN must read the actual reviewed skill file through its scoped resource tool')
+        if (!literal(readback.content).includes(probe.excerpt)) {
+          probe.stages.push('skill-resource-content-mismatch')
+          return { content: `验收暂停：当前会话无法读取 ${probe.skill.name} 的安装说明。` }
+        }
+        probe.stages.push('skill-resource-read')
         probe.resourceVerified = true
         return { content: probe.reply }
       }
-      assert.ok(body.tools?.some(item => item.function?.name === 'read_skill_resource'))
+      if (!body.tools?.some(item => item.function?.name === 'read_skill_resource')) {
+        probe.stages.push('skill-resource-tool-unavailable')
+        return { content: `验收暂停：当前会话未提供读取 ${probe.skill.name} 说明的工具。` }
+      }
+      probe.stages.push('skill-resource-tool-available')
       return { tool_calls: [{ index: 0, id: callId, type: 'function',
         function: { name: 'read_skill_resource', arguments: literal({ skill_id: probe.skill.id, path: 'SKILL.md' }) } }] }
+    },
+    diagnostics() {
+      return [...probes.values()].map(probe => ({ skillId: probe.skill.id, stages: [...probe.stages], resourceVerified: probe.resourceVerified }))
     }
   }
 }

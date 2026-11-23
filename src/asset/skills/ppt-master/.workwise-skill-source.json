@@ -57,12 +57,12 @@
     "references/ai-image-comparison/**/*.png",
     "references/ai-image-comparison/**/*.json",
     "templates/icons/**/*.svg",
-    "projects/*",
-    "examples/*/images",
-    "examples/*/svg_final",
-    "examples/*/exports",
-    "examples/*/sources",
-    "**/backup",
+    "projects/*/",
+    "examples/*/images/",
+    "examples/*/svg_final/",
+    "examples/*/exports/",
+    "examples/*/sources/",
+    "**/backup/",
     "**/*.pptx"
   ],
   "bundleInventory": {

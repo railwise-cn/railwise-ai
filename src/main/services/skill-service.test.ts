@@ -541,6 +541,7 @@ describe('skill-service', () => {
     expect(existsSync(join(installedRoot, 'templates', 'icons', 'README.md'))).toBe(true)
     expect(existsSync(join(installedRoot, 'templates', 'icons', 'app-window.svg'))).toBe(false)
     expect(existsSync(join(installedRoot, 'projects', 'README.md'))).toBe(true)
+    expect(existsSync(join(installedRoot, 'projects', 'ppt169_kubernetes_blueprint_2026'))).toBe(false)
     expect(existsSync(join(installedRoot, 'examples', 'README.md'))).toBe(true)
     // 精选轻量示例：只保留设计规格、锁文件与 svg_output，排除 images/svg_final/exports/sources。
     expect(existsSync(join(

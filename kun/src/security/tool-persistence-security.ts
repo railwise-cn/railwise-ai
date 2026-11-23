@@ -1,11 +1,10 @@
 import { isAbsolute, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import type { RuntimeEvent } from '../contracts/events.js'
-import type { TurnItem } from '../contracts/items.js'
+import { MAX_TOOL_ARGUMENT_SUMMARY_LENGTH, type TurnItem } from '../contracts/items.js'
 import { redactSecrets, redactSecretText } from '../config/secret-redaction.js'
 import { sanitizeBrowserApprovalSummary } from './browser-approval-summary.js'
 
-const MAX_ARGUMENT_SUMMARY_CHARS = 1_000
 const MAX_TOOL_NAME_CHARS = 120
 const MAX_SAFE_PATH_CHARS = 320
 const SENSITIVE_OUTPUT_KEY = /^(?:arguments?|args?|authorization|cookie|cookies|headers?|request_?body|prompt|recipient|recipient_?id|chat_?id|channel_?id|conversation_?id|message_?body)$/i
@@ -167,13 +166,17 @@ export function buildToolArgumentSummary(input: {
 
 export function sanitizeTurnItemForPersistence(item: TurnItem): TurnItem {
   if (item.kind === 'tool_call') {
+    const omittedSummary = `Run ${safeToolName(item.toolName)}\nParameters: omitted from persisted history`
     const argumentSummary = Object.keys(item.arguments).length > 0
       ? buildToolArgumentSummary({ toolName: item.toolName, arguments: item.arguments })
-      : normalizeArgumentSummary(item.toolName, item.argumentSummary)
+      : item.argumentSummary === omittedSummary
+        ? omittedSummary
+        : normalizeArgumentSummary(item.toolName, item.argumentSummary)
     return {
       ...item,
       arguments: {},
-      argumentSummary
+      // Exact approval details can exceed the history contract and stay on the approval item.
+      argumentSummary: argumentSummary.length <= MAX_TOOL_ARGUMENT_SUMMARY_LENGTH ? argumentSummary : omittedSummary
     }
   }
   if (item.kind === 'tool_result') {
@@ -448,7 +451,7 @@ function largestTextLength(args: Record<string, unknown>, keys: readonly string[
 }
 
 function boundSummary(lines: string[]): string {
-  return clip(lines.join('\n'), MAX_ARGUMENT_SUMMARY_CHARS)
+  return clip(lines.join('\n'), MAX_TOOL_ARGUMENT_SUMMARY_LENGTH)
 }
 
 function clip(value: string, maxChars: number): string {

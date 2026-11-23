@@ -13,6 +13,7 @@ import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency, preparePinnedBrowserStartupCli, browserStartupDependency } from './prepare-browser-skill-smoke.mjs'
 import { observeWorkbenchTypography, runWindowsStartupAppearanceSmoke } from './verify-packaged-startup-appearance.mjs'
 import { revealWindowsChatTaskArtifact, validateWindowsTaskChatLayout, windowsTaskChatLayoutExpression } from './windows-task-chat-ui.mjs'
+import { createWebPptJourney, startWebPptFallbackSource, validateWebPptFallbackProof, validateWebPptTurnIdentity } from './web-ppt-journey.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 const windowsDueTaskResult = '本次 HTML 报告已保存并核验，可在原会话查看。'
@@ -177,9 +178,24 @@ if($ownedHandle -eq [IntPtr]::Zero -or $windowOwnerId -ne ${pid} -or -not [RailW
 ${bounds ? `[void][RailWiseSmokeWindow]::ShowWindow($ownedHandle,9)
 if(-not [RailWiseSmokeWindow]::SetWindowPos($ownedHandle,[IntPtr]::Zero,${bounds.left},${bounds.top},${bounds.width},${bounds.height},20)){throw 'Owned window resize failed'}
 ${bounds.windowState === 'maximized' ? '[void][RailWiseSmokeWindow]::ShowWindow($ownedHandle,3)' : ''}` : ''}
-$ownedRect=New-Object RailWiseSmokeWindow+Rect
-if(-not [RailWiseSmokeWindow]::GetWindowRect($ownedHandle,[ref]$ownedRect)){throw 'Owned window bounds unavailable'}
-@{ownerVerified=$true;left=$ownedRect.Left;top=$ownedRect.Top;width=$ownedRect.Right-$ownedRect.Left;height=$ownedRect.Bottom-$ownedRect.Top;windowState=$(if([RailWiseSmokeWindow]::IsZoomed($ownedHandle)){'maximized'}else{'normal'})}|ConvertTo-Json -Compress`
+$windowReadback=$null
+for($attempt=0;$attempt -lt 20 -and $null -eq $windowReadback;$attempt++){
+  $ownedProcess=Get-Process -Id ${pid}
+  $ownedHandle=$ownedProcess.MainWindowHandle
+  [uint32]$windowOwnerId=0
+  if($ownedHandle -ne [IntPtr]::Zero){
+    [void][RailWiseSmokeWindow]::GetWindowThreadProcessId($ownedHandle,[ref]$windowOwnerId)
+    if($windowOwnerId -eq ${pid} -and [RailWiseSmokeWindow]::IsWindowVisible($ownedHandle)){
+      $ownedRect=New-Object RailWiseSmokeWindow+Rect
+      if([RailWiseSmokeWindow]::GetWindowRect($ownedHandle,[ref]$ownedRect)){
+        $windowReadback=@{ownerVerified=$true;left=$ownedRect.Left;top=$ownedRect.Top;width=$ownedRect.Right-$ownedRect.Left;height=$ownedRect.Bottom-$ownedRect.Top;windowState=$(if([RailWiseSmokeWindow]::IsZoomed($ownedHandle)){'maximized'}else{'normal'})}
+      }
+    }
+  }
+  if($null -eq $windowReadback){Start-Sleep -Milliseconds 100}
+}
+if($null -eq $windowReadback){throw 'Owned window bounds unavailable after bounded main-window transition wait'}
+$windowReadback|ConvertTo-Json -Compress`
 }
 
 async function runWindowsAdaptiveComposerAcceptance(cdp, { pid, environment, audit }) {
@@ -424,7 +440,7 @@ export function windowsUiEnvironment(environment, root) {
     LOCALAPPDATA: join(home, 'AppData', 'Local'), WORKWISE_TOOLS_ROOT: join(home, '.workwise', 'tools'), BSK_HOME: join(home, '.bsk') }
 }
 
-export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false } = {}) {
+export function validateWindowsUiReport(report, identity, { requireTaskExecution = false, requireBrowserExecution = false, requireVideoEvaluation = false, requireDoclingConversion = false, requireWebPpt = false, requireLiveWebPpt = false, requireWebPptBrowserFallback = false, requireSpreadsheet = false } = {}) {
   assert.equal(report.schemaVersion, 1)
   assert.equal(report.scope, 'private-exact-package-chinese-ui')
   assert.equal(report.platform, 'win32')
@@ -437,6 +453,41 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
   assert.equal(report.packageUnchanged, true)
   assert.equal(report.cleanExit, true)
   assert.equal(report.errors.length, 0)
+  if (requireSpreadsheet) {
+    assert.ok(report.checks.includes('offline-spreadsheet-exact-package'))
+    const spreadsheet = report.offlineSpreadsheet
+    assert.equal(spreadsheet.status, 'passed')
+    assert.equal(spreadsheet.version, identity.version)
+    assert.equal(spreadsheet.sourceHead, identity.sourceHead)
+    assert.equal(spreadsheet.installedAsarSha256, report.installedAsarSha256)
+    assert.equal(spreadsheet.installerSha256, report.installerSha256)
+    assert.equal(spreadsheet.packageUnchanged, true)
+    assert.ok(report.checks.includes('offline-spreadsheet-ui-journey-isolated'))
+    return true
+  }
+  if (requireWebPptBrowserFallback) {
+    assert.ok(report.checks.includes('installed-chat-web-ppt-browser-fallback'))
+    validateWebPptFallbackProof(report.webPpt, report.webPptBrowser)
+    return true
+  }
+  if (requireWebPpt) {
+    assert.ok(report.checks.includes('installed-chat-web-ppt'))
+    const proof = report.webPpt
+    assert.equal(proof.status, 'passed')
+    assert.equal(proof.input, 'installed-chat-ui')
+    assert.equal(proof.model, requireLiveWebPpt ? 'live-model' : 'controlled-protocol')
+    assert.equal(proof.source.url, 'https://www.railwise.cn/')
+    assert.equal(proof.source.tool, 'web_fetch')
+    assert.match(proof.source.sha256, /^[a-f0-9]{64}$/)
+    assert.ok(proof.source.bytes > 0)
+    validateWebPptTurnIdentity(proof)
+    assert.equal(proof.artifact.nativeEditableText, true)
+    assert.equal(proof.artifact.originalChatButtonClicked, true)
+    assert.match(proof.artifact.sha256, /^[a-f0-9]{64}$/)
+    assert.ok(proof.artifact.bytes > 0)
+    if (requireLiveWebPpt) assert.equal(proof.open.status, 'desktop-open-request-accepted')
+    return true
+  }
   if (requireDoclingConversion) {
     assert.ok(report.checks.includes('installed-chinese-renderer'))
     assert.ok(report.checks.includes('cold-mirror-docling-backend-and-two-skill-calls'))
@@ -645,14 +696,14 @@ export function validateWindowsTaskEvidence(evidence) {
   assert.equal(evidence.preview.automatic, true)
   assert.equal(evidence.preview.contentVerified, true)
   assert.equal(evidence.preview.manualEntryVerified, true)
-  if (evidence.preview.layout?.surface === 'original-chat') {
-    validateWindowsTaskChatLayout(evidence.preview.layout)
-    validateWindowsTaskChatLayout(evidence.dueOccurrence.originalChat)
-    assert.equal(evidence.dueOccurrence.noRepeatedUserRequest, true)
-    assert.equal(evidence.dueOccurrence.resultInOriginChat, true)
-    assert.equal(evidence.dueOccurrence.durableOriginReceipt, true)
-    assert.equal(evidence.schedule.dedicatedEntryOpened, true)
-  } else validateWindowsTaskPreviewLayout(evidence.preview.layout)
+  const conversation = validateWindowsTaskChatLayout(evidence.preview.layout)
+  validateWindowsTaskChatLayout(evidence.dueOccurrence.originalChat)
+  const artifactName = evidence.artifact.relativePath?.split(/[\\/]/).at(-1)
+  assert.ok(artifactName && conversation.artifactNames.includes(artifactName), 'The task result must be listed in the original conversation')
+  assert.equal(evidence.dueOccurrence.noRepeatedUserRequest, true)
+  assert.equal(evidence.dueOccurrence.resultInOriginChat, true)
+  assert.equal(evidence.dueOccurrence.durableOriginReceipt, true)
+  assert.equal(evidence.schedule.dedicatedEntryOpened, true)
   assert.equal(evidence.dueOccurrence.clock, 'real')
   assert.equal(evidence.dueOccurrence.status, 'completed')
   assert.equal(evidence.dueOccurrence.independentTask, true)
@@ -2614,10 +2665,14 @@ export async function runInstalledWindowsPermissionAcceptance({ executable, evid
   }
 }
 
-export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true', doclingConversion = process.env.RAILWISE_WINDOWS_DOCLING_CONVERSION === 'true' }) {
+export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir, taskSmoke = process.env.RAILWISE_WINDOWS_TASK_SMOKE === 'true', browserSmoke = process.env.RAILWISE_WINDOWS_BROWSER_SMOKE === 'true', mirrorSmoke = process.env.RAILWISE_WINDOWS_MIRROR_SMOKE === 'true', videoEvaluation = process.env.RAILWISE_WINDOWS_VIDEO_EVALUATION === 'true', composerSmoke = process.env.RAILWISE_WINDOWS_COMPOSER_SMOKE === 'true', doclingConversion = process.env.RAILWISE_WINDOWS_DOCLING_CONVERSION === 'true', webPptSmoke = process.env.RAILWISE_WINDOWS_WEB_PPT_SMOKE === 'true', webPptLive = process.env.RAILWISE_WINDOWS_WEB_PPT_LIVE === 'true', webPptBrowserFallback = process.env.RAILWISE_WINDOWS_WEB_PPT_BROWSER_FALLBACK === 'true', spreadsheetSmoke = process.env.RAILWISE_WINDOWS_SPREADSHEET_SMOKE === 'true', installerSha256 }) {
   taskSmoke ||= browserSmoke
   assert.ok(!(videoEvaluation && taskSmoke), 'Use the evaluation fixture only for the synthetic render')
   assert.ok(!doclingConversion || !(taskSmoke || mirrorSmoke || videoEvaluation || composerSmoke), 'Use a clean profile for focused marketplace acceptance')
+  assert.ok(!webPptSmoke || !(taskSmoke || mirrorSmoke || videoEvaluation || composerSmoke || doclingConversion), 'Use a clean profile for the website-to-PPT acceptance')
+  assert.ok(!spreadsheetSmoke || !(taskSmoke || browserSmoke || mirrorSmoke || videoEvaluation || composerSmoke || doclingConversion || webPptSmoke), 'Use a clean profile for offline spreadsheet acceptance')
+  assert.ok(!webPptLive || webPptSmoke, 'Live model mode requires the website-to-PPT acceptance')
+  assert.ok(!webPptBrowserFallback || webPptSmoke && !webPptLive, 'BrowserSkill fallback requires the controlled website-to-PPT acceptance')
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
   }
@@ -2630,6 +2685,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const root = await mkdtemp(join(temporary, 'railwise-windows-ui-'))
   const profile = join(root, 'profile')
   const workspace = join(root, windowsSmokeWorkspaceName)
+  const dataDir = join(root, 'runtime')
   const environment = windowsUiEnvironment(process.env, root)
   await Promise.all([profile, workspace, evidenceDir, environment.USERPROFILE, environment.APPDATA, environment.LOCALAPPDATA, environment.WORKWISE_TOOLS_ROOT].map(path => mkdir(path, { recursive: true })))
   const video = videoEvaluation ? await import('./verify-windows-video-evaluation.mjs')
@@ -2638,21 +2694,42 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   const composerAcceptance = composerModule?.createComposerModelAcceptance()
   const marketplaceModule = mirrorSmoke || doclingConversion ? await import('./verify-windows-cold-marketplace.mjs') : undefined
   const marketplaceAcceptance = marketplaceModule?.createMarketplaceModelAcceptance()
-  const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke ? await startWindowsTaskModelFixture({
+  const fallbackSource = webPptBrowserFallback ? await startWebPptFallbackSource() : undefined
+  if (fallbackSource) {
+    await mkdir(dataDir, { recursive: true })
+    await writeFile(join(dataDir, 'config.json'), JSON.stringify({ capabilities: { web: {
+      enabled: true, fetchEnabled: true, denyDomains: [new URL(fallbackSource.url).hostname]
+    } } }), { flag: 'wx' })
+  }
+  const webPpt = webPptSmoke ? createWebPptJourney({
+    workspace, live: webPptLive, fallback: fallbackSource, parseToolOutput: parseFixtureToolOutput,
+    sidecar: join(dirname(executable), 'resources', 'app.asar.unpacked', 'sidecars', 'markitdown', 'workwise-markitdown.exe')
+  }) : undefined
+  const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke || (webPpt && !webPptLive) ? await startWindowsTaskModelFixture({
     browser: browserSmoke, postPlanQuery: browserSmoke, documentLinkClick: browserSmoke,
-    composerAcceptance: composerAcceptance ?? marketplaceAcceptance
+    composerAcceptance: composerAcceptance ?? marketplaceAcceptance ?? webPpt
   }) : undefined)
-  const model = video?.model ?? 'windows-task-fixture'
+  const model = webPptLive ? process.env.RAILWISE_QA_MODEL?.trim() : video?.model ?? 'windows-task-fixture'
+  const providerId = webPptLive ? 'railwise-qa-live-model' : model
+  const apiKey = webPptLive ? process.env.RAILWISE_QA_MODEL_API_KEY?.trim() : 'synthetic-local-only'
+  const baseUrl = webPptLive ? process.env.RAILWISE_QA_MODEL_BASE_URL?.trim() : taskModel?.baseUrl
+  if (webPptLive) {
+    assert.ok(model && apiKey && URL.canParse(baseUrl), 'Live PPT acceptance requires an isolated QA model name, API key and HTTPS endpoint')
+    const endpoint = new URL(baseUrl)
+    assert.ok(endpoint.protocol === 'https:' && !endpoint.username && !endpoint.password && !endpoint.search && !endpoint.hash,
+      'The live QA model endpoint must be HTTPS and free of embedded credentials')
+  }
+  const configuredModel = Boolean(taskModel || webPptLive)
   const mainInspectorPort = browserSmoke ? await availablePort() : undefined
   const settingsPath = join(profile, 'workwise-settings.json')
   await writeFile(settingsPath, JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
     locale: 'zh', theme: 'dark', workspaceRoot: workspace, uiFontScale: 'small',
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
-    ...(taskModel ? { provider: { providers: [{ id: model, name: '本机验收协议模型', apiKey: 'synthetic-local-only', baseUrl: taskModel.baseUrl, endpointFormat: 'chat_completions', models: [model] }] } } : {}),
-    agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime'), ...(taskModel ? { providerId: model, model, approvalPolicy: 'auto', sandboxMode: 'read-only' } : {}) } } }))
+    ...(configuredModel ? { provider: { providers: [{ id: providerId, name: webPptLive ? '隔离验收模型' : '本机验收协议模型', apiKey, baseUrl, endpointFormat: 'chat_completions', models: [model] }] } } : {}),
+    agents: { kun: { autoStart: true, port: await availablePort(), dataDir, ...(configuredModel ? { providerId, model, approvalPolicy: 'auto', sandboxMode: webPpt ? 'workspace-write' : 'read-only' } : {}) } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
     sourceHead, version, provenance, taskSmokeRequested: taskSmoke, browserSmokeRequested: browserSmoke, locale: 'zh', theme: 'dark', workspaceRoot: workspace, productionTouched: false, checks: [], errors: [],
-    installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
+    ...(spreadsheetSmoke ? { installerSha256 } : {}), installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
   // Electron's supported --user-data-dir overrides chrome::DIR_USER_DATA
   // before application startup. The installed EXE/ASAR and public identity
   // are used unchanged; candidate mode and updater overrides are absent.
@@ -2711,7 +2788,56 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.viewport = await cdp.evaluate('({width:innerWidth,height:innerHeight,scale:devicePixelRatio})')
     report.checks.push('installed-chinese-renderer')
 
-    if (video) {
+    if (spreadsheetSmoke) {
+      assert.match(installerSha256 ?? '', /^[a-f0-9]{64}$/, 'The verified installer SHA-256 is required')
+      const { validateWindowsSpreadsheetCandidate } = await import('./run-windows-offline-spreadsheet-journey.mjs')
+      validateWindowsSpreadsheetCandidate({ version, sourceHead, buildRunId: provenance.packageBuild?.runId,
+        buildRunAttempt: provenance.packageBuild?.runAttempt, installerSha256, installedAsarSha256: before.asarSha256 })
+      await cdp.send('Network.enable')
+      await cdp.send('Network.setBlockedURLs', { urls: ['http://*', 'https://*'] })
+      await cdp.send('Network.emulateNetworkConditions', {
+        offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1
+      })
+      const { runWindowsOfflineSpreadsheetJourney } = await import('./run-windows-offline-spreadsheet-journey.mjs')
+      report.offlineSpreadsheet = await runWindowsOfflineSpreadsheetJourney({
+        cdp,
+        workspace,
+        evidenceDir,
+        version,
+        sourceHead,
+        buildRunId: provenance.packageBuild?.runId,
+        buildRunAttempt: provenance.packageBuild?.runAttempt,
+        installerSha256,
+        installedAsarSha256: before.asarSha256,
+        asarPath: join(dirname(executable), 'resources', 'app.asar')
+      })
+      report.checks.push('offline-spreadsheet-exact-package')
+    }
+
+    if (webPpt) {
+      // Use the owned workspace only and keep the normal runtime trust checks enabled.
+      const trust = await cdp.evaluate(`window.workwise.getWorkspaceTrust(${JSON.stringify(workspace)})`)
+      if (trust.level !== 'workspace-write') {
+        await cdp.evaluate(`window.workwise.setWorkspaceTrust(${JSON.stringify({
+          workspaceRoot: workspace, level: 'workspace-write', expectedRevision: trust.revision, confirmed: true, idempotencyKey: randomUUID()
+        })})`)
+      }
+      if (fallbackSource) {
+        realBrowser = await startRealBrowserSmoke({ cdp, root, environment, fixtureUrl: fallbackSource.url })
+        report.webPptBrowser = realBrowser.evidence
+        await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/tools','GET').then(response=>{
+          if(!response.ok)return false;
+          return JSON.parse(response.body).providers.some(provider=>provider.id==='browser-skill'&&provider.enabled&&provider.available);
+        })`, 'the installed Runtime to receive the selected BrowserSkill binding')
+      }
+      report.webPpt = await webPpt.verify(cdp, { browserInstanceId: realBrowser?.evidence.browserInstanceId, openArtifact: async (driver, { task, artifact }) => {
+        const opened = await driver.evaluate(artifact.absolutePath || artifact.storage === 'task'
+          ? `window.workwise.openTaskArtifact(${JSON.stringify({ taskId: task.id, artifactId: artifact.id })})`
+          : `window.workwise.openWorkspaceFile(${JSON.stringify({ workspaceRoot: workspace, path: artifact.relativePath })})`)
+        return { status: opened?.ok ? 'desktop-open-request-accepted' : 'handler-unavailable' }
+      } })
+      report.checks.push(fallbackSource ? 'installed-chat-web-ppt-browser-fallback' : 'installed-chat-web-ppt')
+    } else if (video) {
       const { verifyWindowsColdMarketplace } = await import('./verify-windows-cold-marketplace.mjs')
       report.marketplace = await verifyWindowsColdMarketplace(cdp, { workspace, environment, ownedRoot: root, videoOnly: true })
       report.marketplace.videoShotcraft.render = await video.verify(cdp, report.marketplace.videoShotcraft.runtimeSkillId)
@@ -2721,6 +2847,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         workspace, environment, ownedRoot: root, focused: true, acceptance: marketplaceAcceptance
       })
       report.checks.push('cold-mirror-docling-backend-and-two-skill-calls')
+    } else if (spreadsheetSmoke) {
+      report.checks.push('offline-spreadsheet-ui-journey-isolated')
     } else await verifyFullWorkbench()
 
     async function verifyFullWorkbench() {
@@ -3057,7 +3185,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       assert.deepEqual(schedule.schedule.times, ['08:30', '16:30'])
       assert.equal(schedule.schedule.timezone, 'Asia/Shanghai')
       report.taskExecution = { model: 'local-protocol-fixture', status: task.status, taskId: task.id,
-        artifact: { format: artifact.format, validation: artifact.validation, sizeBytes: bytes.length, sha256: artifact.sha256,
+        artifact: { format: artifact.format, validation: artifact.validation, relativePath: artifact.relativePath, sizeBytes: bytes.length, sha256: artifact.sha256,
           byteHashMatches: createHash('sha256').update(bytes).digest('hex') === artifact.sha256 },
         schedule: { ...schedule.schedule, id: schedule.id, enabled: schedule.enabled, nextRunAt: schedule.nextRunAt, readBackFromTool: true },
         browserSkill: { status: 'not_exercised', reason: 'A real connected BrowserSkill extension requires a separate installed-browser session.' } }
@@ -3293,9 +3421,14 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     }
     }
   } catch (error) {
-    report.errors.push(error instanceof Error ? error.message : String(error))
+    // The isolated live provider may include its request URL or payload in errors.
+    report.errors.push(webPptLive ? 'Live model acceptance did not complete' : error instanceof Error ? error.message : String(error))
+    if (error.webPptDiagnostics) report.webPptDiagnostics = error.webPptDiagnostics
+    if (doclingConversion && marketplaceAcceptance?.diagnostics) {
+      report.skillExecutionDiagnostics = marketplaceAcceptance.diagnostics()
+    }
     if (error.browserBootstrap) report.browserBootstrap = error.browserBootstrap
-    if (cdp) {
+    if (cdp && !webPptLive) {
       try {
         const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
         await writeFile(join(evidenceDir, 'windows-ui-failure.png'), Buffer.from(screenshot.data, 'base64'))
@@ -3358,7 +3491,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.packageUnchanged = inspectInstalledPackage(dirname(executable), identity).asarSha256 === before.asarSha256
     if (taskModel?.observed) report.modelFixture = { protocol: 'local-model-fixture', requests: taskModel.observed.requests, failure: taskModel.observed.failure }
     await taskModel?.close()
-    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion }); report.status = 'passed' } catch (error) {
+    await fallbackSource?.close()
+    try { validateWindowsUiReport(report, identity, { requireTaskExecution: taskSmoke, requireBrowserExecution: browserSmoke, requireVideoEvaluation: videoEvaluation, requireDoclingConversion: doclingConversion, requireWebPpt: webPptSmoke, requireLiveWebPpt: webPptLive, requireWebPptBrowserFallback: webPptBrowserFallback, requireSpreadsheet: spreadsheetSmoke }); report.status = 'passed' } catch (error) {
       report.status = 'failed'
       if (!report.errors.length) report.errors.push(error.message)
     }
@@ -3652,19 +3786,24 @@ export async function dispatchWindowsSmokeEntry(args, environment = process.env,
   const [executable, version, sourceHead, evidenceDir, flag] = args
   const diagnostic = args.includes('--browser-startup-diagnostic') || environment.RAILWISE_WINDOWS_BROWSER_STARTUP_DIAGNOSTIC === 'true'
   const startupAppearance = args.includes('--startup-appearance') || environment.RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE === 'true'
+  const spreadsheetSmoke = args.includes('--offline-spreadsheet') || environment.RAILWISE_WINDOWS_SPREADSHEET_SMOKE === 'true'
   if (startupAppearance) {
     assert.ok(!diagnostic && environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&
       environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_VIDEO_EVALUATION !== 'true' &&
+      environment.RAILWISE_WINDOWS_WEB_PPT_SMOKE !== 'true' && !spreadsheetSmoke &&
       !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup appearance is exclusive with browser, task and marketplace acceptance')
     return runStartupAppearance({ executable, version, sourceHead, evidenceDir }, { connectCdp, windowsUiEnvironment, windowsOwnedWindowScript })
   }
   if (diagnostic) {
     assert.ok(environment.RAILWISE_WINDOWS_TASK_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_BROWSER_SMOKE !== 'true' &&
       environment.RAILWISE_WINDOWS_MIRROR_SMOKE !== 'true' && environment.RAILWISE_WINDOWS_VIDEO_EVALUATION !== 'true' &&
+      environment.RAILWISE_WINDOWS_WEB_PPT_SMOKE !== 'true' && !spreadsheetSmoke &&
       !args.includes('--task-smoke') && !args.includes('--browser-smoke'), 'Startup diagnostic is exclusive with task/browser execution')
     return runDiagnostic({ executable, version, sourceHead, evidenceDir })
   }
-  return runUi({ executable, version, sourceHead, evidenceDir, ...(flag === '--task-smoke' ? { taskSmoke: true } : {}), ...(flag === '--browser-smoke' ? { browserSmoke: true } : {}) })
+  const installerSha256 = args[5]
+  return runUi({ executable, version, sourceHead, evidenceDir, spreadsheetSmoke, installerSha256,
+    ...(flag === '--task-smoke' ? { taskSmoke: true } : {}), ...(flag === '--browser-smoke' ? { browserSmoke: true } : {}) })
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { jsonResponse, type JsonResponse } from '../response.js'
 import { readJsonBody } from '../read-json-body.js'
 import { ERRORS } from './runtime-error.js'
-import type { UserInputGate } from '../../ports/user-input-gate.js'
+import type { UserInputAnswer, UserInputGate } from '../../ports/user-input-gate.js'
 import type { RuntimeEventRecorder } from '../../services/runtime-event-recorder.js'
 
 const UserInputAnswerSchema = z.object({
@@ -21,6 +21,7 @@ export async function resolveUserInput(input: {
   request: Request
   gate: UserInputGate
   events: RuntimeEventRecorder
+  submitTaskUserInputAnswer?: (inputId: string, answers: UserInputAnswer[]) => Promise<'not_applicable' | 'submitted' | 'stale'>
 }): Promise<JsonResponse | Response> {
   const body = await readJsonBody(input.request)
   if (!body.ok) return body.response
@@ -35,6 +36,13 @@ export async function resolveUserInput(input: {
   const resolution = parsed.data.cancelled
     ? { status: 'cancelled' as const }
     : { status: 'submitted' as const, answers: parsed.data.answers ?? [] }
+  if (resolution.status === 'submitted') {
+    const taskAnswer = await input.submitTaskUserInputAnswer?.(input.inputId, resolution.answers)
+    if (taskAnswer === 'stale') return ERRORS.conflict('这条任务问题已失效，请回到原对话查看最新进度。')
+    if (taskAnswer === 'submitted') {
+      return jsonResponse({ inputId: input.inputId, status: resolution.status, answers: resolution.answers })
+    }
+  }
   const ok = input.gate.resolve(input.inputId, resolution)
   if (!ok) {
     return ERRORS.conflict(`user input already resolved: ${input.inputId}`)

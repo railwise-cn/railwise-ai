@@ -25,6 +25,7 @@ import { terminalReasonForFailure } from '../store/terminal-notification-project
 import { safeMediaPreviewUrl } from '../lib/safe-media-preview-url'
 import { redactSecrets, redactSecretText } from '@shared/secret-redaction'
 import { isConversationReceiptItem } from '@shared/agent-workbench'
+import { canonicalSkillDisplayName } from '@shared/callable-capabilities'
 import type { DesignCanvasCommandV1 } from '@shared/design-workspace'
 import type {
   CoreChildRuntimeMetadataJson,
@@ -271,7 +272,12 @@ function applyRuntimeDisclosureMeta(
     meta.displayText = displayText
   }
   if (attachmentIds) meta.attachmentIds = attachmentIds
-  if (item.skillSelections?.length) meta.skillSelections = item.skillSelections
+  if (item.skillSelections?.length) {
+    meta.skillSelections = item.skillSelections.map(skill => ({
+      ...skill,
+      name: canonicalSkillDisplayName(skill.name)
+    }))
+  }
   if (activeSkillIds) meta.activeSkillIds = activeSkillIds
   if (injectedMemoryIds) meta.injectedMemoryIds = injectedMemoryIds
   if (typeof item.skillInjectionBytes === 'number') {

@@ -161,6 +161,58 @@ The compatibility `packageName` remains `workwise` for the existing bundle and u
 }
 ```
 
+## Schema 2 core journeys
+
+The example above documents the legacy schema 1 format. Stable versions for
+which `scripts/verify-core-journeys.mjs` returns `requiresCoreJourneys(version)`
+must use `schemaVersion: 2`. Schema 2 also requires the `checks` section and
+version-bound `acceptance.installedPackage` evidence. Releases with visual
+changes require `acceptance.packagedUI`.
+
+The core journey receipt extension is shaped as follows. Values must come from
+the exact installed-package acceptance run; these placeholders are not release
+evidence.
+
+```json
+{
+  "acceptance": {
+    "coreJourneys": {
+      "status": "passed",
+      "receipts": [
+        {
+          "path": "docs/qa/release-gates/vX.Y.Z/core-journeys-windows.json",
+          "workflowRun": {
+            "repository": "railwise-cn/railwise-ai",
+            "workflowPath": ".github/workflows/windows-install-smoke.yml",
+            "sourceHead": "40-character acceptance-driver commit",
+            "runId": 123,
+            "runAttempt": 1,
+            "jobName": "Install and inspect the existing Windows package",
+            "artifact": {
+              "id": 456,
+              "name": "exact-package-windows-install-123",
+              "digest": "sha256:64-character immutable artifact digest",
+              "reportPath": "exact-windows-evidence/core-journeys.json"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Every receipt records the installed platform and architecture, candidate
+version, package source and run, installer SHA-256, installed `app.asar`
+SHA-256, and passed journeys with raw proof hashes. The release verifier checks
+that each journey is required for the version and changed production paths,
+that no journey is missing, failed, duplicated, simulated, or tied to an older
+package, and that hosted reports match their immutable Actions artifact bytes
+and successful workflow attempt. Field receipts are reserved for the explicit
+authenticated Ego and mainland Windows runs. The 0.5.11 matrix and current
+results are recorded in
+[`v0.5.11/acceptance.md`](v0.5.11/acceptance.md).
+
 `package.reviewedBuild` is required. Its two artifact IDs must be distinct and
 identify unexpired immutable Actions artifacts from the same successful run and
 attempt. The file list must contain exactly the eight files above with actual

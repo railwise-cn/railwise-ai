@@ -8,6 +8,7 @@ import { parse } from 'yaml'
 import { PUBLIC_IDENTITY } from './verify-reviewed-release-artifacts.mjs'
 import publication from './release-publication.cjs'
 import { validateWindowsSmokeSource } from './prepare-windows-install-smoke.mjs'
+import { validateWindowsOfflineSpreadsheetReport } from './run-windows-offline-spreadsheet-journey.mjs'
 
 export const psQuote = value => "'" + value.replaceAll("'", "''") + "'"
 
@@ -146,6 +147,19 @@ export function validateInstallReport(report, identity) {
   equal(metadata?.name, identity.packageName, 'ASAR legacy package name')
   hash(metadata.asarSha256, 'installed ASAR')
   if (!Number.isSafeInteger(metadata.asarSize) || metadata.asarSize < 1) fail('installed ASAR size is missing')
+  if (report.ui?.offlineSpreadsheet !== undefined) {
+    equal(report.ui.status, 'passed', 'installed Windows spreadsheet UI status')
+    validateWindowsOfflineSpreadsheetReport(report.ui.offlineSpreadsheet, {
+      version: identity.version,
+      sourceHead: identity.sourceHead,
+      installerSha256: installer.sha256,
+      installedAsarSha256: metadata.asarSha256,
+      ...(report.provenance.packageBuild ? {
+        buildRunId: report.provenance.packageBuild.runId,
+        buildRunAttempt: report.provenance.packageBuild.runAttempt
+      } : {})
+    })
+  }
   for (const [name, key] of [['install', identity.installRegistryKey], ['uninstall', identity.uninstallRegistryKey]]) {
     const entry = report.registry?.[name]
     equal(entry?.hive, 'CurrentUser', `${name} registry hive`)

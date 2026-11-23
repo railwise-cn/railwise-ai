@@ -59,11 +59,13 @@ function requireHostedWindows(env) {
   'Only an ephemeral GitHub-hosted Windows x64 runner may use this acceptance driver')
 }
 
-export async function verifyIsolatedWindowsTarget(directory, source, version, { baselineVersion, environment = process.env }) {
-  assert.equal(baselineVersion, '0.5.9', 'The isolated candidate is only accepted after official 0.5.9')
-  assert.equal(version, '0.5.10', 'Use the exact 0.5.10 candidate installer')
+export async function verifyPrivateWindowsCandidateTarget(directory, source, version, { baselineVersion, environment = process.env }) {
+  const acceptedTargets = { '0.5.7': '0.5.11', '0.5.9': '0.5.10', '0.5.10': '0.5.11' }
+  assert.equal(acceptedTargets[baselineVersion], version, `The private candidate is not pinned to the ${baselineVersion} acceptance route`)
   assert.equal(environment.GITHUB_REPOSITORY, 'railwise-cn/railwise-ai')
   assert.equal(source.repository, environment.GITHUB_REPOSITORY)
+  assert.equal(source.artifactName, 'release-win')
+  assert.match(source.artifactDigest, /^sha256:[a-f0-9]{64}$/)
   validateWindowsSmokeSource(source, { packageSourceHead: source.packageSourceHead, driverSourceHead: environment.GITHUB_SHA })
   const ownedRelative = relative(await realpath(environment.RUNNER_TEMP), await realpath(directory))
   assert.ok(ownedRelative && !isAbsolute(ownedRelative) && !ownedRelative.startsWith(`..${sep}`) && ownedRelative !== '..',
@@ -89,11 +91,22 @@ export async function verifyIsolatedWindowsTarget(directory, source, version, { 
   } }
 }
 
+export async function verifyIsolatedWindowsTarget(directory, source, version, options = {}) {
+  assert.equal(options.baselineVersion, '0.5.9', 'The isolated candidate is only accepted after official 0.5.9')
+  assert.equal(version, '0.5.10', 'This compatibility route is pinned to the exact 0.5.10 candidate')
+  return verifyPrivateWindowsCandidateTarget(directory, source, version, options)
+}
+
 export function verifyInstalledIsolatedWindowsFeed(text) {
   const metadata = parse(text)
   assert.equal(metadata?.provider, 'generic', 'The installed isolated candidate must use the generic update provider')
   assert.equal(metadata.url, 'https://127.0.0.1/', 'The installed isolated candidate must retain the packaged loopback feed')
   return { provider: metadata.provider, url: metadata.url }
+}
+
+export function releaseHighlightsStorageKey(version) {
+  assert.match(version, /^\d+\.\d+\.\d+$/)
+  return `railwise.release-highlights.${version}`
 }
 
 async function verifiedTarget(directory, source, version, { runnerFixture = false, baselineVersion } = {}) {
@@ -103,8 +116,8 @@ async function verifiedTarget(directory, source, version, { runnerFixture = fals
     if (error.code === 'ENOENT') return null
     throw error
   })
-  if (!receipt && baselineVersion === '0.5.9') {
-    return verifyIsolatedWindowsTarget(directory, source, version, { baselineVersion })
+  if (!receipt && ['0.5.7', '0.5.10'].includes(baselineVersion) && version === '0.5.11') {
+    return verifyPrivateWindowsCandidateTarget(directory, source, version, { baselineVersion })
   }
   if (!runnerFixture) assert.ok(receipt, `Exact ${version} must have its immutable reviewed build receipt`)
   const installer = inspectInstaller(join(directory, identity.installerName), identity)
@@ -133,7 +146,7 @@ async function verifiedTarget(directory, source, version, { runnerFixture = fals
 }
 
 async function officialBaseline(root, version) {
-  assert.ok(['0.5.7', '0.5.8', '0.5.9'].includes(version))
+  assert.ok(['0.5.7', '0.5.8', '0.5.9', '0.5.10'].includes(version))
   const gate = JSON.parse(execFileSync('git', ['show', `v${version}:docs/qa/release-gates/v${version}.json`], { encoding: 'utf8' }))
   const build = gate.package.reviewedBuild
   const identity = installIdentity(version, build.sourceHead)
@@ -242,15 +255,23 @@ async function launchOwned(executable, cwd, feedUrl) {
   } catch (error) { child.kill(); throw error }
 }
 
-async function closeOwnedWindows(executable) {
-  for (const { pid } of windowsForExecutable(executable)) powershell(`
+function ownedProcessIsRunning(executable, pid) {
+  return powershell(`
+    $process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
+    if ($process -and $process.Path -eq ${psQuote(executable)}) { '1' } else { '0' }
+  `) === '1'
+}
+
+async function closeOwnedWindows(executable, ownerPid) {
+  const windows = windowsForExecutable(executable).filter(window => ownerPid === undefined || window.pid === ownerPid)
+  for (const { pid } of windows) powershell(`
     $process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
     if ($process.Path -eq ${psQuote(executable)} -and $process.MainWindowHandle -ne 0) { $null = $process.CloseMainWindow() }
   `)
-  await waitUntil(() => powershell(`
-    $running = @(Get-Process -ErrorAction SilentlyContinue | Where-Object Path -eq ${psQuote(executable)})
-    $running.Count
-  `) === '0', 'the owned RailWise process to exit', 60_000)
+  // Electron helper processes share the executable path; an updater relaunch is owned by its main window PID.
+  await waitUntil(() => ownerPid === undefined
+    ? windowsForExecutable(executable).length === 0
+    : !ownedProcessIsRunning(executable, ownerPid), 'the owned RailWise process to exit', 60_000)
 }
 
 async function clickLabeledButton(cdp, labels, action, timeout = 90_000) {
@@ -304,14 +325,17 @@ async function exerciseGuiUpgrade({ running, target, feed, executable, allowLega
 
 async function main(args) {
   requireHostedWindows(process.env)
+  const overlay = args[3] === 'overlay'
   const currentReleaseMode = args.length === 4 || args.length === 5
   const entry = currentReleaseMode ? args[3] : 'sidebar'
-  const baseVersion = currentReleaseMode ? args[4] ?? '0.5.8' : '0.5.7'
-  const versions = { '0.5.7': '0.5.8', '0.5.8': '0.5.9', '0.5.9': '0.5.10' }
-  const targetVersion = versions[baseVersion]
-  if (currentReleaseMode) {
+  const baseVersion = overlay ? '0.5.7' : currentReleaseMode ? args[4] ?? '0.5.8' : '0.5.7'
+  const versions = { '0.5.7': '0.5.8', '0.5.8': '0.5.9', '0.5.9': '0.5.10', '0.5.10': '0.5.11' }
+  const targetVersion = overlay ? '0.5.11' : versions[baseVersion]
+  if (overlay) {
+    assert.equal(args.length, 4, 'The overlay uses the exact candidate and official 0.5.7')
+  } else if (currentReleaseMode) {
     assert.ok(['sidebar', 'settings'].includes(entry))
-    assert.ok(['0.5.8', '0.5.9'].includes(baseVersion))
+    assert.ok(['0.5.8', '0.5.9', '0.5.10'].includes(baseVersion))
   }
   if (currentReleaseMode) args = args.slice(0, 3)
   assert.ok(args.length === 3 || args.length === 6, 'Pass exact package directory, provenance JSON, evidence directory, and optional private next package directory, provenance and version')
@@ -335,6 +359,8 @@ async function main(args) {
   const sentinel = randomUUID()
   const sentinelFile = join(profile, 'railwise-updater-fixture.txt')
   await writeFile(sentinelFile, sentinel, { flag: 'wx' })
+  const workspaceFile = join(workspace, 'acceptance.txt')
+  await writeFile(workspaceFile, sentinel, { flag: 'wx' })
   await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify(settings), { flag: 'wx' })
   const seedSchedule = version => writeFile(join(profile, 'gui-update-schedule.json'), JSON.stringify({ appVersion: version, lastCheckedAt: new Date(Date.now() - oneHour).toISOString() }))
 
@@ -350,12 +376,14 @@ async function main(args) {
     report.baseline.package = inspectInstalledPackage(installDirectory, baseline.identity)
     report.baseline.registry = ownedInstallState(installDirectory, baseVersion)
     await seedSchedule(baseVersion)
-    trust = await phase('prepare-private-https-trust', () => createPrivateTrust(root))
-    report.privateTrust = { scope: trust.scope, thumbprint: trust.thumbprint }
-    feed = await phase('start-private-https-feed', () => openPrivateFeed(trust, target))
-    running = await phase('launch-official-baseline', () => launchOwned(executable, root, feed.url))
+    if (!overlay) {
+      trust = await phase('prepare-private-https-trust', () => createPrivateTrust(root))
+      report.privateTrust = { scope: trust.scope, thumbprint: trust.thumbprint }
+      feed = await phase('start-private-https-feed', () => openPrivateFeed(trust, target))
+    }
+    running = await phase('launch-official-baseline', () => launchOwned(executable, root, feed?.url))
     assert.equal(await running.cdp.evaluate('window.workwise.getAppVersion()'), baseVersion)
-    if (target.isolated) assert.equal(await running.cdp.evaluate('localStorage.getItem("railwise.release-highlights.0.5.10")'), null)
+    if (target.isolated) assert.equal(await running.cdp.evaluate(`localStorage.getItem(${JSON.stringify(releaseHighlightsStorageKey(target.identity.version))})`), null)
     await running.cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/info','GET').then(r=>r.ok)`, 'installed KUN service')
     thread = await running.cdp.evaluate(`(async()=>{
       const r=await window.workwise.runtimeRequest('/v1/threads','POST',JSON.stringify({workspace:${JSON.stringify(workspace)}, title:'升级验收会话', model:'deepseek-flash', mode:'agent'}));
@@ -364,13 +392,20 @@ async function main(args) {
     assert.ok(/^[A-Za-z0-9_-]+$/.test(thread), 'Real KUN conversation identity required')
     for (const [index, item] of [target, next].entries()) {
       if (!item) break
-      const action = await phase(`upgrade-${item.identity.version}-${entry}`, () => exerciseGuiUpgrade({ running,
-        target: { ...item, installDirectory }, executable, feed, allowLegacyFallback: !currentReleaseMode && index === 0, entry }))
-      if (item.isolated) report.targetVerification.feedRequests = { ...feed.requests }
+      const action = await phase(`upgrade-${item.identity.version}-${entry}`, async () => {
+        if (!overlay) return exerciseGuiUpgrade({ running,
+          target: { ...item, installDirectory }, executable, feed, allowLegacyFallback: !currentReleaseMode && index === 0, entry })
+        await closeOwnedWindows(executable)
+        installExactNsis(item.installer.path, installDirectory)
+        return { method: 'exact-installer-overlay' }
+      })
+      report.steps.push({ expectedVersion: item.identity.version, action, readbackStatus: 'pending' })
+      await save()
+      if (item.isolated) report.targetVerification.feedRequests = feed ? { ...feed.requests } : null
       running.cdp.close()
-      await closeOwnedWindows(executable)
+      await closeOwnedWindows(executable, action.window?.pid)
       if (!item.isolated) {
-        await feed.close()
+        await feed?.close()
         feed = index === 0 && next ? await openPrivateFeed(trust, next) : null
       }
       await seedSchedule(item.identity.version)
@@ -380,28 +415,30 @@ async function main(args) {
       const actual = { expectedVersion: item.identity.version, expectedSource: item.identity.sourceHead, installerSha256: item.installer.sha256,
         registry: ownedInstallState(installDirectory, item.identity.version), packageMetadata: inspectInstalledPackage(installDirectory, item.identity),
         profilePreserved: (await readFile(sentinelFile, 'utf8')) === sentinel && samePath(await running.cdp.evaluate('window.workwise.getSettings().then(s=>s.workspaceRoot)'), workspace),
+        workspaceFilePreserved: (await readFile(workspaceFile, 'utf8')) === sentinel,
+        preferencesPreserved: await running.cdp.evaluate('window.workwise.getSettings().then(s=>s.locale==="zh"&&s.theme==="light")'),
         threadPreserved: await running.cdp.evaluate(`window.workwise.runtimeRequest('/v1/threads/${thread}','GET').then(r=>r.ok&&JSON.parse(r.body).id===${JSON.stringify(thread)})`) }
       verifyFrozenWindowsReadback(actual, item)
+      assert.equal(actual.workspaceFilePreserved, true)
+      assert.equal(actual.preferencesPreserved, true)
       if (item.isolated) {
         actual.packagedFeed = verifyInstalledIsolatedWindowsFeed(await readFile(join(installDirectory, 'resources', 'app-update.yml'), 'utf8'))
-        actual.preferencesPreserved = await running.cdp.evaluate('window.workwise.getSettings().then(s=>s.locale==="zh"&&s.theme==="light")')
-        assert.equal(actual.preferencesPreserved, true)
       }
-      if (item.identity.version === '0.5.10') {
-        // The NSIS handoff can open the first upgraded window before CDP is
-        // available. On reconnect retain its one-time announcement readback.
+      if (['0.5.10', '0.5.11'].includes(item.identity.version)) {
         const announcement = await running.cdp.wait(`(() => {
           const visible = [...document.querySelectorAll('section')].some(section =>
-            ['本版更新', 'What’s new'].includes(section.getAttribute('aria-label')) && section.textContent.includes('0.5.10'));
-          const recorded = localStorage.getItem('railwise.release-highlights.0.5.10') === '1';
-          return visible || recorded ? {visible, recorded} : null;
+            ['本版更新', 'What’s new'].includes(section.getAttribute('aria-label')) && section.textContent.includes(${JSON.stringify(item.identity.version)}));
+          const dismissed = localStorage.getItem(${JSON.stringify(releaseHighlightsStorageKey(item.identity.version))}) === '1';
+          return visible ? {visible, dismissed} : null;
         })()`,
-          'the new 0.5.10 release highlights'
+          `the visible ${item.identity.version} release highlights`
         )
         actual.releaseHighlightsVisible = announcement.visible
-        actual.releaseHighlightsFirstLaunchRecorded = announcement.recorded
+        actual.releaseHighlightsDismissalRecorded = announcement.dismissed
+        assert.equal(announcement.visible, true)
+        assert.equal(announcement.dismissed, false, 'The acceptance flow must not dismiss first-launch highlights')
       }
-      report.steps.push({ ...actual, action })
+      report.steps[report.steps.length - 1] = { ...actual, action, readbackStatus: 'passed' }
       await save()
     }
     report.status = currentReleaseMode || next ? 'passed' : 'overlay-verified-next-upgrade-pending'

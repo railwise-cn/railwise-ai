@@ -2,7 +2,12 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { TRUSTED_SKILL_DISCOVERY_LIMITS, validateSkillPackage } from './skill-package-security'
+import {
+  BUNDLED_SKILL_LIMITS,
+  normalizeSkillPackageExclusions,
+  TRUSTED_SKILL_DISCOVERY_LIMITS,
+  validateSkillPackage
+} from './skill-package-security'
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
@@ -18,6 +23,24 @@ describe('Skill package security', () => {
     const dir = await root()
     await writeFile(join(dir, 'SKILL.md'), '# Safe')
     await expect(validateSkillPackage(dir)).resolves.toEqual({ files: 1, totalBytes: 6 })
+  })
+
+  it('omits trusted bundle exclusions before enforcing the installed package limit', async () => {
+    const dir = await root()
+    await writeFile(join(dir, 'SKILL.md'), '# Safe')
+    await mkdir(join(dir, 'projects', 'draft'), { recursive: true })
+    await writeFile(join(dir, 'projects', 'draft', 'deck.pptx'), Buffer.alloc(9 * 1024 * 1024))
+    await mkdir(join(dir, 'examples', 'sample', 'images'), { recursive: true })
+    await writeFile(join(dir, 'examples', 'sample', 'images', 'slide.png'), Buffer.alloc(9 * 1024 * 1024))
+
+    await expect(validateSkillPackage(dir, BUNDLED_SKILL_LIMITS, {
+      excludedPaths: normalizeSkillPackageExclusions(['projects/*/', 'examples/*/images/', '**/*.pptx'])
+    })).resolves.toEqual({ files: 1, totalBytes: 6 })
+  })
+
+  it('rejects exclusions that escape the package or hide the skill entry', () => {
+    expect(() => normalizeSkillPackageExclusions(['../outside'])).toThrow(/exclusion list is invalid/)
+    expect(() => normalizeSkillPackageExclusions(['**/*.md'])).toThrow(/cannot remove the entry file/)
   })
 
   it('rejects links, submodules, special depth, and oversized files', async () => {

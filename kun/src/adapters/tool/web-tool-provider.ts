@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import type { KunCapabilitiesConfig, WebCapabilityConfig } from '../../contracts/capabilities.js'
+import { parseWebSourceAddress } from '../../contracts/task-source-intent.js'
 import type { WebFetchResult, WebProvider, WebSearchResult } from '../../ports/web-provider.js'
 import { sourceIdFor, UnavailableWebProvider } from '../../ports/web-provider.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
@@ -116,7 +117,7 @@ function diagnosticProviderId(
 function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
   return LocalToolHost.defineTool({
     name: 'web_fetch',
-    description: 'Fetch an allowed HTTP or HTTPS URL and return extracted text with source metadata.',
+    description: 'Fetch an allowed HTTP or HTTPS page and return extracted text with source metadata. A pasted www address defaults to HTTPS. Read-only; no browser setup is needed.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -149,8 +150,8 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
           url: policy.url.href,
           maxBytes,
           timeoutMs,
-          signal: context.abortSignal
-          ,allowedOrigins: context.executionGrant?.networkAllowlist
+          signal: context.abortSignal,
+          allowedOrigins: context.executionGrant?.networkAllowlist
         })
         return {
           output: fetchOutput(result, telemetry({
@@ -328,13 +329,14 @@ function searchOutput(
 function validateUrlPolicy(rawUrl: string, config: WebCapabilityConfig): { ok: true; url: URL } | { ok: false; reason: string } {
   let url: URL
   try {
-    url = new URL(rawUrl)
+    url = parseWebSourceAddress(rawUrl)
   } catch {
     return { ok: false, reason: 'URL must be absolute' }
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     return { ok: false, reason: 'only http and https URLs are allowed' }
   }
+  if (url.username || url.password) return { ok: false, reason: 'URL credentials are not allowed' }
   const hostname = url.hostname.toLowerCase()
   if (config.denyDomains.some((domain) => domainMatches(hostname, domain))) {
     return { ok: false, reason: `domain is denied: ${hostname}` }

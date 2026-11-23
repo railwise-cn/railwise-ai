@@ -1,4 +1,5 @@
 import type { ToolCallLike } from '../ports/tool-host.js'
+import { parseWebSourceAddress } from '../contracts/task-source-intent.js'
 
 export type WebToolFailureGuardOptions = { threshold?: number }
 const WEB_TOOL_NAMES = new Set(['web_fetch', 'web_search'])
@@ -32,6 +33,14 @@ export class WebToolFailureGuard {
   }
 
   observe(call: ToolCallLike, isError: boolean, output?: unknown): void {
+    const record = output && typeof output === 'object' ? output as Record<string, unknown> : {}
+    if (call.toolName === 'browser_get_html' && call.providerId === 'browser-skill') {
+      const evidence = record.evidence && typeof record.evidence === 'object' ? record.evidence as Record<string, unknown> : {}
+      if (!isError && record.status === 'succeeded' && record.truncated !== true && evidence.verified === true && evidence.contentRead === true) {
+        this.successfulResult = true
+      }
+      return
+    }
     if (!isWebToolCall(call)) return
     const key = sourceKey(call)
     if (!isError) {
@@ -40,7 +49,6 @@ export class WebToolFailureGuard {
       this.blocked.delete(key)
       return
     }
-    const record = output && typeof output === 'object' ? output as Record<string, unknown> : {}
     const error = record.error && typeof record.error === 'object' ? record.error as Record<string, unknown> : {}
     const code = String(record.code ?? error.code ?? '')
     const hardFailure = /(?:blocked|denied|forbidden|unavailable|invalid_url|private_address)/i.test(code)
@@ -54,7 +62,7 @@ function isWebToolCall(call: ToolCallLike): boolean { return WEB_TOOL_NAMES.has(
 
 function sourceKey(call: ToolCallLike): string {
   if (call.toolName === 'web_fetch') {
-    try { return `${call.toolName}:${new URL(String(call.arguments.url)).origin}` } catch { return `${call.toolName}:invalid-url` }
+    try { return `${call.toolName}:${parseWebSourceAddress(String(call.arguments.url)).origin}` } catch { return `${call.toolName}:invalid-url` }
   }
   return call.toolName
 }

@@ -19,6 +19,184 @@ import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWin
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
+import { createWebPptJourney, inspectWebPptFallback, startWebPptFallbackSource, validateWebPptTurnIdentity, webPptJourneyPrompt } from './web-ppt-journey.mjs'
+
+test('BrowserSkill PPT fixture serves a loopback source whose marker only appears after rendering', async t => {
+  const source = await startWebPptFallbackSource()
+  t.after(source.close)
+  const response = await fetch(source.url)
+  assert.equal(response.status, 200)
+  assert.match(response.headers.get('content-type'), /^text\/html/)
+  const html = await response.text()
+  assert.ok(html.includes('<main></main>'))
+  assert.ok(!html.includes(source.marker))
+  const payload = /atob\('([^']+)'\)/.exec(html)?.[1]
+  assert.equal(JSON.parse(Buffer.from(payload, 'base64').toString()).marker, source.marker)
+})
+
+test('BrowserSkill PPT fallback consumes the durable URL and requires a verified DOM read before writing', () => {
+  const fallback = { url: 'http://127.0.0.1:32123/ppt-source', marker: 'fixture-dom-marker' }
+  const title = '合成工程测量与安全监测资料'
+  const html = `<main><h1>${title}</h1><p>${fallback.marker}</p></main>`
+  const resultHash = createHash('sha256').update(html).digest('hex')
+  const evidence = { verified: true, contentRead: true, sourceUrl: fallback.url, resultHash }
+  const sessionId = 'owned-session'
+  const browserInstanceId = 'real-browser'
+  const read = { status: 'succeeded', provider: 'browser-skill', sourceUrl: fallback.url, readScope: 'document',
+    truncated: false, sessionId, evidence, html, resultHash }
+  const sourceCalls = [
+    ['web_fetch', { error: { code: 'policy_blocked' }, telemetry: { policy: 'blocked', url: fallback.url } }],
+    ['browser_session_start', { status: 'succeeded', sessionId, browserInstanceId }],
+    ['browser_navigate', { status: 'succeeded', sessionId, sourceUrl: fallback.url }],
+    ['browser_get_html', read],
+    ['browser_session_stop', { status: 'succeeded', sessionId, stopped: true }]
+  ]
+  const journey = createWebPptJourney({ workspace: '/owned/workspace', sidecar: '/unused/sidecar', parseToolOutput: JSON.parse, fallback })
+  const body = {
+    messages: [{ role: 'user', content: webPptJourneyPrompt }],
+    tools: ['request_user_input', 'write', ...sourceCalls.map(([name]) => name)].map(name => ({ function: { name } }))
+  }
+  assert.equal(journey.modelAction(body).tool_calls[0].function.name, 'request_user_input')
+  body.messages.push({ role: 'user', content: fallback.url })
+  for (const [name, output] of sourceCalls) {
+    const action = journey.modelAction(body).tool_calls[0].function
+    assert.equal(action.name, name)
+    if (name === 'web_fetch' || name === 'browser_navigate') assert.equal(JSON.parse(action.arguments).url, fallback.url)
+    body.messages.push({ role: 'tool', tool_call_id: `web-ppt-${name}`, content: JSON.stringify(output) })
+  }
+  assert.equal(journey.modelAction(body).tool_calls[0].function.name, 'write')
+
+  const task = { id: 'original-task', threadId: 'execution-thread', originThreadId: 'conversation-thread' }
+  const completedTurn = { id: 'resumed-turn', status: 'completed', executionGrant: {
+    taskId: task.id, browserScope: { origins: [new URL(fallback.url).origin], interaction: 'observe', sourceReadOnly: true, browserInstanceId },
+    connectorIdentityFingerprints: { 'browser-skill': 'fingerprint' }
+  }, items: sourceCalls.map(([toolName, output]) => ({ kind: 'tool_result', callId: toolName, toolName, output, isError: toolName === 'web_fetch' })) }
+  const readback = { fallback, browserInstanceId, task, conversationThreadId: 'conversation-thread', completedTurn,
+    initialTurn: { id: 'initial-turn', status: 'aborted', items: [{ kind: 'user_input' }] },
+    inputs: [{ kind: 'supplement', taskId: task.id, text: fallback.url }] }
+  const proof = inspectWebPptFallback(readback)
+  assert.equal(proof.source.sha256, resultHash)
+  assert.equal(proof.completedTurnId, completedTurn.id)
+  assert.equal(proof.originThreadId, 'conversation-thread')
+  assert.equal(proof.executionThreadId, 'execution-thread')
+  assert.throws(() => inspectWebPptFallback({ ...readback, conversationThreadId: 'different-conversation' }))
+  assert.throws(() => inspectWebPptFallback({ ...readback, browserInstanceId: 'other-browser' }))
+  assert.throws(() => inspectWebPptFallback({ ...readback, inputs: [...readback.inputs, ...readback.inputs] }))
+  body.messages.at(-2).content = JSON.stringify({ ...read, html: '<main></main>' })
+  assert.throws(() => journey.modelAction(body))
+})
+
+test('website-to-PPT asks in the selected conversation and fetches the answered bare host', () => {
+  const journey = createWebPptJourney({ workspace: '/owned/workspace', sidecar: '/unused/sidecar', parseToolOutput: JSON.parse })
+  const body = {
+    messages: [{ role: 'user', content: webPptJourneyPrompt }],
+    tools: ['request_user_input', 'web_fetch', 'write', 'ppt_master_export'].map(name => ({ function: { name } }))
+  }
+  const response = journey.modelAction(body)
+  assert.equal(response.tool_calls[0].function.name, 'request_user_input')
+  assert.deepEqual(JSON.parse(response.tool_calls[0].function.arguments), { question: '请提供制作 PPT 所需的官网网址。' })
+
+  body.messages.push({ role: 'tool', tool_call_id: 'web-ppt-request_user_input', content: JSON.stringify({ answers: [{ value: 'www.railwise.cn' }] }) })
+  const fetch = journey.modelAction(body)
+  assert.equal(fetch.tool_calls[0].function.name, 'web_fetch')
+  assert.deepEqual(JSON.parse(fetch.tool_calls[0].function.arguments), { url: 'www.railwise.cn' })
+
+  body.messages.push({ role: 'tool', tool_call_id: 'web-ppt-web_fetch', content: JSON.stringify({
+    finalUrl: 'https://www.railwise.cn/', text: '工程测量与安全监测资料', title: '睿威科技', resultHash: 'a'.repeat(64), byteCount: 512
+  }) })
+  const write = journey.modelAction(body)
+  assert.equal(write.tool_calls[0].function.name, 'write')
+  const args = JSON.parse(write.tool_calls[0].function.arguments)
+  assert.equal(args.path, 'deck/spec_lock.md')
+  assert.match(args.content, /spec-lock\/v1/)
+})
+
+test('website-to-PPT stops after a failed source fetch instead of creating an unverified deck', () => {
+  const journey = createWebPptJourney({ workspace: '/owned/workspace', sidecar: '/unused/sidecar', parseToolOutput: JSON.parse })
+  const body = {
+    messages: [{ role: 'user', content: webPptJourneyPrompt }],
+    tools: ['request_user_input', 'web_fetch', 'write', 'ppt_master_export'].map(name => ({ function: { name } }))
+  }
+  journey.modelAction(body)
+  body.messages.push({ role: 'tool', tool_call_id: 'web-ppt-request_user_input', content: JSON.stringify({ answers: [{ value: 'www.railwise.cn' }] }) })
+  journey.modelAction(body)
+  body.messages.push({ role: 'tool', tool_call_id: 'web-ppt-web_fetch', content: JSON.stringify({ error: 'source unavailable' }) })
+  assert.throws(() => journey.modelAction(body), /The installed Runtime tool failed: web_fetch/)
+})
+
+test('the original task question submits through its exact user-input endpoint', () => {
+  const source = readFileSync(new URL('../src/renderer/src/components/Workbench.tsx', import.meta.url), 'utf8')
+  assert.match(source, /window\.workwise\.runtimeRequest\(\s*`\/v1\/user-inputs\/\$\{encodeURIComponent\(activeTaskComposerQuestion\.requestId\)\}`,\s*'POST'/s)
+  assert.match(source, /answers:\s*\[\{\s*id:\s*activeTaskComposerQuestion\.questionId,\s*label:\s*activeTaskComposerQuestion\.label,\s*value:\s*v\s*\}\]/s)
+})
+
+test('website-to-PPT report matches its requested model and verifies a desktop-open response for the live gate', () => {
+  const sourceHead = '1'.repeat(40)
+  const version = '0.5.11'
+  const requestId = 'question-1'
+  const replyTrace = sameTurn => ({
+    before: { ui: { taskQuestionRequestId: requestId }, task: { activeTurnId: 'turn-1' },
+      attention: [{ requestId, kind: 'question', status: 'pending', questionCount: 1, textQuestion: true,
+        questionId: 'website', questionLabel: '请提供官网网址。' }] },
+    answerReceipt: { idempotencyKey: `user-input:${requestId}`, count: 1, questionId: 'website',
+      answerLength: 15, answerMatchesExpected: true },
+    after: { task: { id: 'task-1', originThreadId: 'conversation-1', activeTurnId: sameTurn ? 'turn-1' : 'turn-2' },
+      inputs: [{ kind: 'supplement', idempotencyKey: `user-input:${requestId}` }], attention: [] }
+  })
+  const report = {
+    schemaVersion: 1, scope: 'private-exact-package-chinese-ui', platform: 'win32', sourceHead, version,
+    locale: 'zh', theme: 'dark', workspaceRoot: windowsSmokeWorkspaceName, productionTouched: false,
+    packageUnchanged: true, cleanExit: true, errors: [], checks: ['installed-chat-web-ppt'],
+    webPpt: {
+      status: 'passed', model: 'controlled-protocol', input: 'installed-chat-ui', taskId: 'task-1',
+      conversationThreadId: 'conversation-1', originThreadId: 'conversation-1', executionThreadId: 'execution-1', sameConversation: true,
+      originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: true, replyTrace: replyTrace(true),
+      source: { url: 'https://www.railwise.cn/', tool: 'web_fetch', sha256: '2'.repeat(64), bytes: 512 },
+      artifact: { nativeEditableText: true, originalChatButtonClicked: true, sha256: '3'.repeat(64), bytes: 1024 },
+      open: { status: 'handler-unavailable' }
+    }
+  }
+  const identity = { version, sourceHead }
+  assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true }), true)
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.model = 'live-model'
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.open.status = 'desktop-open-request-accepted'
+  assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
+  report.webPpt.sameTurn = false
+  report.webPpt.replyTrace = replyTrace(false)
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.initialTurnId = 'initial-turn'
+  report.webPpt.completedTurnId = 'resumed-turn'
+  assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
+  report.webPpt.originThreadId = 'different-conversation'
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.originThreadId = report.webPpt.conversationThreadId
+  report.webPpt.originalConversation.artifactVisible = false
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+})
+
+test('website-to-PPT identity binds the task to the visible conversation while recording its worker thread separately', () => {
+  const proof = { taskId: 'task-1', conversationThreadId: 'chat-1', originThreadId: 'chat-1', executionThreadId: 'worker-1',
+    sameConversation: true, originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: false,
+    initialTurnId: 'turn-1', completedTurnId: 'turn-2', replyTrace: {
+      before: { ui: { taskQuestionRequestId: 'question-1' }, task: { activeTurnId: 'turn-1' },
+        attention: [{ requestId: 'question-1', kind: 'question', status: 'pending', questionCount: 1, textQuestion: true,
+          questionId: 'website', questionLabel: '请提供官网网址。' }] },
+      answerReceipt: { idempotencyKey: 'user-input:question-1', count: 1, questionId: 'website',
+        answerLength: 15, answerMatchesExpected: true },
+      after: { task: { id: 'task-1', originThreadId: 'chat-1', activeTurnId: 'turn-2' },
+        inputs: [{ kind: 'supplement', idempotencyKey: 'user-input:question-1' }],
+        attention: [] }
+    } }
+  assert.equal(validateWebPptTurnIdentity(proof), undefined)
+  assert.throws(() => validateWebPptTurnIdentity({ ...proof, originThreadId: 'worker-1' }))
+  assert.throws(() => validateWebPptTurnIdentity({ ...proof, originalConversation: { ...proof.originalConversation, questionVisible: false } }))
+  assert.throws(() => validateWebPptTurnIdentity({ ...proof, replyTrace: { ...proof.replyTrace,
+    answerReceipt: { ...proof.replyTrace.answerReceipt, idempotencyKey: 'task-input:wrong' } } }))
+  assert.throws(() => validateWebPptTurnIdentity({ ...proof, replyTrace: { ...proof.replyTrace,
+    answerReceipt: { ...proof.replyTrace.answerReceipt, answerMatchesExpected: false } } }))
+})
 
 test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {
   for (const state of ['open', 'collapsed']) {
@@ -96,7 +274,8 @@ test('the private video fixture reconstructs and hashes authorized UTF-8 Skill c
 
 test('the exact private video scope requires the real skill, document, recovery, approval and artifact', () => {
   const evidence = report()
-  const taskChat = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
+  const taskChat = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0,
+    statusLabel: '任务已完成', activityLabels: ['任务已完成'], artifactNames: ['成果.html'], width: 410, overflow: 0 }
   evidence.checks = ['installed-chinese-renderer', 'installed-video-skill-protocol-render-registered-and-decoded']
   delete evidence.resources
   evidence.marketplace = {
@@ -308,6 +487,9 @@ test('installed UI probes select the actual controlled menu and constrain native
   assert.match(script, /GetWindowThreadProcessId/)
   assert.match(script, /windowOwnerId -ne 7/)
   assert.match(script, /SetWindowPos/)
+  assert.match(script, /for\(\$attempt=0;\$attempt -lt 20/)
+  assert.match(script, /Get-Process -Id 7/)
+  assert.match(script, /main-window transition wait/)
   assert.doesNotMatch(script, /MainModule|runtimeRequest|Invoke-Expression|Start-Process/)
 })
 
@@ -425,11 +607,15 @@ function report() {
     update: { ok: true, hasUpdate: false }, helpOffline: true,
     taskSmokeRequested: true,
     permissionRuntime: permissionRuntimeEvidence(),
-    taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', sha256: 'a'.repeat(64), byteHashMatches: true },
-      schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true },
+    taskExecution: { model: 'local-protocol-fixture', status: 'completed', artifact: { format: 'html', validation: 'valid', relativePath: '成果.html', sha256: 'a'.repeat(64), byteHashMatches: true },
+      schedule: { times: ['08:30', '16:30'], timezone: 'Asia/Shanghai', enabled: true, nextRunAt: '2026-11-14T00:30:00Z', readBackFromTool: true, dedicatedEntryOpened: true },
       preview: { automatic: true, contentVerified: true, manualEntryVerified: true,
-        layout: { coordinateUnit: 'viewport-css-px', scale: 1, workspace: { width: 560 }, workspaceInlineSize: 560, readableWidth: 400, availableWidth: 520, stackThresholdPx: 704, details: { width: 520, x: 20, y: 300, bottom: 800 }, list: { width: 520, x: 20, y: 20, bottom: 280 }, overflow: { workspace: 0, columns: 0, details: 0 } } },
+        layout: { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0,
+          taskWorkbenchLinks: 0, statusLabel: '任务已完成', activityLabels: ['任务已完成'], artifactNames: ['成果.html'], width: 560, overflow: 0 } },
       dueOccurrence: { clock: 'real', status: 'completed', independentTask: true, independentArtifact: true, byteHashMatches: true,
+        originalChat: { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0,
+          taskWorkbenchLinks: 0, statusLabel: '任务已完成', activityLabels: ['任务已完成'], artifactNames: ['成果.html'], width: 560, overflow: 0 },
+        noRepeatedUserRequest: true, resultInOriginChat: true, durableOriginReceipt: true,
         dueAt: '2026-11-13T00:00:00Z', createdAt: '2026-11-13T00:00:10Z' } },
     resources: {
       defaultSkills: ['ppt-master', 'tender-master', 'di-bao-monitoring'].map(id => ({
@@ -605,17 +791,20 @@ test('marketplace synthetic turns require live instruction injection and scoped 
     ],
     tools: [{ function: { name: 'read_skill_resource' } }]
   }
-  assert.throws(() => fixture.modelAction({ ...request, messages: request.messages.slice(1) }), /inject the actual installed instructions/)
+  assert.equal(fixture.modelAction({ ...request, messages: request.messages.slice(1) }).content, '验收暂停：当前会话未加载 using-superpowers。')
+  assert.deepEqual(fixture.diagnostics(), [{ skillId: 'using-superpowers', stages: ['skill-injection-missing'], resourceVerified: false }])
   const first = fixture.modelAction(request)
   assert.deepEqual(first.tool_calls[0].function, {
     name: 'read_skill_resource', arguments: JSON.stringify({ skill_id: skill.id, path: 'SKILL.md' })
   })
   const readback = content => ({ ...request, messages: [...request.messages, { role: 'tool',
     tool_call_id: first.tool_calls[0].id, content }] })
-  assert.throws(() => fixture.modelAction(readback('missing actual file contents')), /actual reviewed skill file/)
+  assert.equal(fixture.modelAction(readback('missing actual file contents')).content, '验收暂停：当前会话无法读取 using-superpowers 的安装说明。')
   assert.equal(probe.resourceVerified, false)
   assert.deepEqual(fixture.modelAction(readback(JSON.stringify({ content: entry }))), { content: probe.reply })
   assert.equal(probe.resourceVerified, true)
+  assert.deepEqual(fixture.diagnostics(), [{ skillId: 'using-superpowers',
+    stages: ['skill-injection-missing', 'skill-resource-tool-available', 'skill-resource-content-mismatch', 'skill-resource-read'], resourceVerified: true }])
 })
 
 test('only the exact installed di-bao agent-pack component with matching packaged bytes is accepted', async () => {
@@ -774,12 +963,22 @@ for (const [name, change] of [
 test('the scheduled original-chat result must survive reopening the conversation', () => {
   const evidence = report().taskExecution
   const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0,
-    taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 410, overflow: 0 }
+    taskNavigationCount: 0, taskWorkbenchLinks: 0, statusLabel: '任务已完成', activityLabels: ['任务已完成'],
+    artifactNames: ['成果.html'], width: 410, overflow: 0 }
   evidence.preview.layout = layout
   evidence.schedule.dedicatedEntryOpened = true
-  Object.assign(evidence.dueOccurrence, { originalChat: layout, noRepeatedUserRequest: true, resultInOriginChat: true })
+  Object.assign(evidence.dueOccurrence, { originalChat: layout, noRepeatedUserRequest: true, resultInOriginChat: true, durableOriginReceipt: false })
   assert.throws(() => validateWindowsTaskEvidence(evidence))
   evidence.dueOccurrence.durableOriginReceipt = true
+  validateWindowsTaskEvidence(evidence)
+})
+
+test('task acceptance requires visible status and deliverables in the original conversation', () => {
+  const evidence = report().taskExecution
+  evidence.schedule.dedicatedEntryOpened = true
+  assert.throws(() => validateWindowsTaskEvidence({ ...evidence, preview: { ...evidence.preview, layout: { ...evidence.preview.layout, surface: 'task-workspace' } } }))
+  assert.throws(() => validateWindowsTaskEvidence({ ...evidence, preview: { ...evidence.preview, layout: { ...evidence.preview.layout, statusLabel: '' } } }))
+  assert.throws(() => validateWindowsTaskEvidence({ ...evidence, preview: { ...evidence.preview, layout: { ...evidence.preview.layout, artifactNames: [] } } }))
   validateWindowsTaskEvidence(evidence)
 })
 
@@ -1357,7 +1556,8 @@ test('browser recovery keeps the exact original task at zero Turns and model req
   const strictBinding = structuredClone(evidence); delete strictBinding.confirmed.binding.verificationPolicy
   assert.throws(() => validateWindowsBrowserRecoveryEvidence(strictBinding, binding.browserInstanceId))
   const inChat = structuredClone(evidence)
-  const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0, width: 420, overflow: 0 }
+  const layout = { surface: 'original-chat', originalPrompt: true, taskListCount: 0, taskNavigationCount: 0, taskWorkbenchLinks: 0,
+    statusLabel: '正在打开网页', activityLabels: ['正在推进任务', '正在打开网页'], artifactNames: [], width: 420, overflow: 0 }
   inChat.originalChat = { initial: layout, confirmed: layout, resumed: layout }
   inChat.beforeConfiguration = initial
   inChat.blockedResume = initial
@@ -1652,7 +1852,9 @@ test('binding POST audit observes actual Node fetch path/status, proves transpor
 })
 
 test('manual-preview layout keeps task details readable and stacks narrow containers using the actual rem threshold', () => {
-  const valid = report().taskExecution.preview.layout
+  const valid = { coordinateUnit: 'viewport-css-px', scale: 1, workspace: { width: 560 }, workspaceInlineSize: 560,
+    readableWidth: 400, availableWidth: 520, stackThresholdPx: 704, details: { width: 520, x: 20, y: 300, bottom: 800 },
+    list: { width: 520, x: 20, y: 20, bottom: 280 }, overflow: { workspace: 0, columns: 0, details: 0 } }
   assert.equal(validateWindowsTaskPreviewLayout(valid), true)
   const smallFont = { ...structuredClone(valid), workspace: { width: 630 }, workspaceInlineSize: 630, stackThresholdPx: 616,
     details: { width: 410, x: 220, y: 20, bottom: 600 }, list: { ...valid.list, width: 180 } }
@@ -2339,7 +2541,7 @@ async function manualPreviewChatFixture(run, { initialPreview = false, newPrevie
         const reveal=()=>{events.push('reveal-chat-results');setResults(true);if(${JSON.stringify(newPreviewOnReveal)})Promise.resolve().then(()=>{events.push('late-preview-projection');setReady(value=>value+1)})};
         return h('div',{className:'ds-workbench-shell',ref:layout.shellRef,'data-active-overlay':layout.activeOverlay??''},
           layout.activeOverlay?h('button',{'aria-label':'返回当前任务',id:'backdrop',onClick:layout.closeDevPreview}):null,
-          h('main',{inert:layout.activeOverlay?true:undefined},h('div',{className:'ds-chat-composer-dock'},
+          h('main',{inert:layout.activeOverlay?true:undefined},h('div',{className:'ds-message-timeline-content'},
             h('section',{'aria-label':'任务'},h('button',{id:'reveal','aria-expanded':results,onClick:reveal},'1 个成果'),
               results?h('ul',{'aria-label':'成果'},h('li',null,h('button',{id:'artifact',onClick:artifact},'每日网页报告.html'))):null))),
           layout.rightPanelVisible?h('aside',{id:'workbench-inspector'},h('button',{'aria-label':'收起右侧栏',id:'collapse',onClick:()=>{events.push('collapse-panel');layout.closeDevPreview()}}),h('webview'),ready?h('div',{id:'workspace-preview-ready'}):null):null);

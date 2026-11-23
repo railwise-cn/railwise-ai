@@ -117,6 +117,19 @@ export class PersistentUserInputGate implements UserInputGate {
     this.flush()
     return true
   }
+  resolveForTurnRestart(id: string): boolean {
+    const saved = this.repository.humanRequest(id)
+    if (!saved || saved.kind !== 'question' || saved.status !== 'pending') return false
+    // Restart cancels this exact pending request. Settle its live tool call even
+    // if the task owner has already become stale.
+    this.repository.cancelQuestionForTurnRestart(id, this.nowIso())
+    const resolver = this.resolvers.get(id)
+    if (resolver) {
+      this.resolvers.delete(id)
+      resolver.resolve({ status: 'cancelled' })
+    }
+    return true
+  }
   pending(threadId?: string): UserInputRequest[] {
     return this.repository.humanRequests('question').filter(item => !threadId || item.threadId === threadId).map(item => item.payload.input as UserInputRequest)
   }

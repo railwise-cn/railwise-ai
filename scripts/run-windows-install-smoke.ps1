@@ -184,6 +184,11 @@ try {
     if ($diagnostic.applicationLaunched -ne $false -or $diagnostic.permissionWorkerLaunched -ne $false -or $diagnostic.browserLaunched -ne $false -or $diagnostic.productionTouched -ne $false -or $diagnostic.packageUnchanged -ne $true -or $diagnostic.modelCalls -ne 0 -or $diagnostic.tasksCreated -ne 0 -or $diagnostic.grantsCreated -ne 0) { throw 'Diagnostic entered an application or business execution path' }
     if ($diagnostic.identityModule.source -ne 'exact-installed-extra-resource' -or $diagnostic.identityModule.entry -ne 'app.asar.unpacked/kun/dist/services/process-identity.js' -or $diagnostic.identityModule.asarSha256 -ne $report.target.package.asarSha256 -or $diagnostic.identityModule.pinSource -ne 'same-source-signed-Mac245' -or $diagnostic.identityModule.bytes -ne 3430 -or $diagnostic.identityModule.sha256 -ne '112ccee06a9e75ef68a3912a4b316606364dd36dd77404d3958a6d092be8f3ad' -or $diagnostic.identityModule.sha256 -ne $diagnostic.identityModule.importedSha256) { throw 'Diagnostic identity probe provenance mismatch' }
 
+  } elseif ($env:RAILWISE_WINDOWS_SPREADSHEET_SMOKE -eq 'true') {
+    & node $uiScript $executable $Version $SourceHead $EvidenceDir '--offline-spreadsheet' $report.installer.sha256
+    if ($LASTEXITCODE -ne 0) { throw "Installed offline spreadsheet smoke failed ($LASTEXITCODE)" }
+    $report.ui = Get-Content -LiteralPath (Join-Path $EvidenceDir 'windows-ui-smoke.json') -Raw | ConvertFrom-Json
+    if ($report.ui.status -ne 'passed' -or $report.ui.offlineSpreadsheet.status -ne 'passed') { throw 'Installed Windows spreadsheet evidence is incomplete' }
   } else {
     & node $uiScript $executable $Version $SourceHead $EvidenceDir
     if ($LASTEXITCODE -ne 0) { throw "Installed Chinese UI smoke failed ($LASTEXITCODE)" }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
+import { pausedTaskQuestionRequestIds } from '@shared/task-workspace-projection'
 import type { ChatBlock } from '../../agent/types'
 import {
+  composerReplyQuestion,
   redactRuntimeText,
   deriveSemanticProgress,
   visibleProcessBlocksForMode
@@ -32,6 +35,42 @@ const blocks: ChatBlock[] = [
 ]
 
 describe('conversation visibility', () => {
+  it('keeps one free-text question answerable when other controls remain visible', () => {
+    const question: ChatBlock = { kind: 'user_input', id: 'question', requestId: 'question-request', status: 'pending',
+      questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] }
+    const approval: ChatBlock = { kind: 'approval', id: 'approval', approvalId: 'approval-request',
+      summary: '读取浏览器页面', status: 'pending' }
+
+    expect(composerReplyQuestion([approval, question])).toBe(question)
+    expect(composerReplyQuestion([question, { ...question, id: 'second', requestId: 'second-request' }])).toBeUndefined()
+    expect(composerReplyQuestion([approval, { ...question, questions: [{ ...question.questions[0]!, options: [{ label: '官网 A', description: '' }] }] }]))
+      .toBeUndefined()
+  })
+
+  it('keeps a different conversation question available when a paused task question is excluded', () => {
+    const pausedTaskQuestion: ChatBlock = { kind: 'user_input', id: 'paused-task', requestId: 'paused-task-request', status: 'pending',
+      questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] }
+    const ordinaryQuestion: ChatBlock = { kind: 'user_input', id: 'ordinary', requestId: 'ordinary-request', status: 'pending',
+      questions: [{ id: 'period', header: '时间范围', question: '请提供时间范围。', options: [] }] }
+
+    expect(composerReplyQuestion([pausedTaskQuestion, ordinaryQuestion], new Set(['paused-task-request'])))
+      .toBe(ordinaryQuestion)
+  })
+
+  it('excludes only pending questions owned by paused tasks in the active conversation', () => {
+    const task = { id: 'paused-task', status: 'paused', threadId: 'worker-thread', originThreadId: 'active-thread' } as TaskRunV1
+    const otherTask = { id: 'waiting-task', status: 'waiting_user', threadId: 'active-thread' } as TaskRunV1
+    const attention = [
+      { id: 'paused', ownerKind: 'task', ownerId: 'paused-task', taskId: 'paused-task', kind: 'question', status: 'pending', requestId: 'paused-request' },
+      { id: 'answered', ownerKind: 'task', ownerId: 'paused-task', taskId: 'paused-task', kind: 'question', status: 'answered', requestId: 'answered-request' },
+      { id: 'other', ownerKind: 'task', ownerId: 'waiting-task', taskId: 'waiting-task', kind: 'question', status: 'pending', requestId: 'other-request' }
+    ] as TaskAttentionV1[]
+
+    expect(pausedTaskQuestionRequestIds([task, otherTask], attention, 'active-thread'))
+      .toEqual(new Set(['paused-request']))
+    expect(pausedTaskQuestionRequestIds([task], attention, null)).toEqual(new Set())
+  })
+
   it('never exposes private reasoning in any display mode', () => {
     for (const mode of ['concise', 'standard', 'developer'] as const) {
       expect(visibleProcessBlocksForMode(blocks, mode).some((block) => block.kind === 'reasoning'))

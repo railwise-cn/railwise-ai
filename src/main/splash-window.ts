@@ -10,6 +10,11 @@ export type SplashProgress = {
 }
 
 export const SPLASH_MIN_VISIBLE_MS = 1_200
+export const SPLASH_READY_TIMEOUT_MS = 5_000
+
+export function splashReadyWaitRemainingMs(createdAt: number, now: number): number {
+  return Math.max(0, SPLASH_READY_TIMEOUT_MS - Math.max(0, now - createdAt))
+}
 
 export function splashRemainingVisibleMs(
   openedAt: number,
@@ -181,9 +186,14 @@ export function buildSplashHtml(options: SplashWindowOptions, initial: SplashPro
 
 export class SplashWindowController {
   readonly browserWindow: BrowserWindow
+  private shownAt = 0
   private loaded = false
   private closed = false
   private current: SplashProgress
+
+  get visibleAt(): number {
+    return this.shownAt
+  }
 
   constructor(private readonly options: SplashWindowOptions, initial: SplashProgress) {
     this.current = { ...initial, progress: clampProgress(initial.progress) }
@@ -209,7 +219,9 @@ export class SplashWindowController {
     })
 
     this.browserWindow.once('ready-to-show', () => {
-      if (!this.closed) this.browserWindow.show()
+      if (this.closed) return
+      this.browserWindow.show()
+      this.shownAt = Date.now()
     })
     this.browserWindow.webContents.once('did-finish-load', () => {
       this.loaded = true

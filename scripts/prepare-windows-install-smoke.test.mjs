@@ -34,7 +34,12 @@ for (const file of ['src/renderer/src/components/HelpReader.tsx', 'kun/package.j
 }
 
 test('only the exact undistributed execution QA and opt-in live test are allowed', () => {
-  for (const file of ['docs/qa/general-execution-delivery-2026-11-13.md', 'kun/tests/browser-skill-live.test.ts', 'kun/tests/local-html-acceptance-runtime.test.ts']) {
+  for (const file of ['docs/qa/general-execution-delivery-2026-11-13.md', 'docs/qa/release-gates/v0.5.11/acceptance.md',
+    'kun/tests/browser-skill-live.test.ts', 'kun/tests/local-html-acceptance-runtime.test.ts',
+    'scripts/verify-packaged-startup-appearance.mjs', 'scripts/run-mac-offline-spreadsheet-journey.mjs',
+    'scripts/run-mac-startup-appearance-smoke.mjs', 'scripts/run-mac-ppt-journey.mjs',
+    'scripts/run-windows-offline-spreadsheet-journey.mjs', 'scripts/run-windows-offline-spreadsheet-journey.test.mjs',
+    'scripts/verify-core-journeys.mjs', 'scripts/verify-core-journeys.test.mjs']) {
     assert.doesNotThrow(() => validateWindowsSmokeSource({ ...source(), changedFiles: [file] }))
   }
   for (const file of ['docs/qa/another-execution-change.md', 'kun/tests/browser-skill-live.ts', 'kun/tests/local-html-acceptance-runtime.ts',
@@ -81,6 +86,7 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   const { run_published_gui_update: publishedUpdate, run_repaired_gui_update: repairedUpdate,
     published_gui_upgrade_scenario: publishedScenario, published_gui_verify_overlay: publishedOverlay,
     run_frozen_gui_update: frozenUpdate, upgrade_058_to_candidate: currentUpgrade, upgrade_059_to_candidate: nextUpgrade, build_private_next: buildPrivateNext,
+    upgrade_0510_to_candidate: upgrade0510, overlay_057_to_candidate: overlay057, web_ppt_journey: webPptJourney,
     run_repaired_marketplace_install: marketplaceInstall, run_private_video_evaluation: privateVideoEvaluation,
     run_mac_startup_appearance: macStartup,
     package_run_id: packageRun, ...inspectionInputs } = workflow.on.workflow_dispatch.inputs
@@ -94,6 +100,10 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.equal(frozenUpdate.default, false)
   assert.equal(currentUpgrade.default, false)
   assert.equal(nextUpgrade.default, false)
+  assert.equal(upgrade0510.default, false)
+  assert.equal(overlay057.default, false)
+  assert.equal(webPptJourney.default, 'off')
+  assert.deepEqual(webPptJourney.options, ['off', 'controlled', 'live', 'browser-fallback'])
   assert.equal(privateVideoEvaluation.default, false)
   assert.equal(macStartup.default, false)
   assert.equal(buildPrivateNext.default, true)
@@ -101,6 +111,11 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.deepEqual(workflow.on.workflow_call.inputs, { package_run_id: { ...packageRun, required: true }, ...inspectionInputs })
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   const steps = workflow.jobs['windows-install'].steps
+  assert.doesNotMatch(workflow.jobs['windows-install'].if, /inputs\.upgrade_0510_to_candidate|inputs\.overlay_057_to_candidate/)
+  const installedUi = steps.find(step => step.name === 'Install, inspect the Chinese UI and uninstall the temporary instance').env
+  assert.equal(installedUi.RAILWISE_WINDOWS_STARTUP_APPEARANCE_SMOKE, '${{ inputs.run_startup_appearance }}')
+  assert.equal(installedUi.RAILWISE_WINDOWS_WEB_PPT_BROWSER_FALLBACK, "${{ inputs.web_ppt_journey == 'browser-fallback' }}")
+  assert.match(installedUi.RAILWISE_WINDOWS_WEB_PPT_SMOKE, /browser-fallback/)
   const download = steps.find(step => step.uses === 'actions/download-artifact@v4')
   assert.equal(download.with['artifact-ids'], '${{ steps.source.outputs.artifact_id }}')
   assert.equal(download.with['run-id'], '${{ inputs.package_run_id }}')
@@ -108,6 +123,14 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.match(commands, /prepare-windows-install-smoke/)
   assert.match(commands, /run-windows-install-smoke\.ps1/)
   assert.doesNotMatch(commands, /dist:|publish-r2|gh release|deploy-/)
+  const frozen = workflow.jobs['windows-frozen-gui-update']
+  assert.match(frozen.strategy.matrix.entry, /\["overlay","sidebar","settings"\]/)
+  const mixedMode = frozen.steps.find(step => step.name === 'Validate exclusive acceptance scope')
+  assert.doesNotMatch(mixedMode.env.HAS_OTHER_CASE, /run_startup_appearance/)
+  assert.match(mixedMode.run, /OVERLAY_0511 -eq 'true' -and \$env:UPGRADE_0510 -eq 'true'/)
+  const invoke = frozen.steps.find(step => step.name === 'Exercise native update or the exact overlay fallback and reopen the existing conversation')
+  assert.match(invoke.env.CANDIDATE_UPGRADE_BASELINE, /matrix\.entry != 'overlay'/)
+  assert.match(invoke.run, /CANDIDATE_UPGRADE_BASELINE/)
 })
 
 test('existing Windows package routing excludes every other release action and has independent concurrency', () => {

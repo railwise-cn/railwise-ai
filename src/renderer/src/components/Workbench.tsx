@@ -1,4 +1,4 @@
-import { requestTaskDetail, takeRequestedTask, updateTaskNavigation } from '../store/task-live-store'
+import { refreshTaskState, requestTaskDetail, takeRequestedTask, updateTaskNavigation, usePausedTaskQuestionRequestIds } from '../store/task-live-store'
 import { findTaskOriginConversation } from '../lib/task-conversation-navigation'
 import { listenToForegroundTask, useTaskArtifactPreview } from '../lib/use-task-artifact-preview'
 import type { ReactElement } from 'react'
@@ -38,6 +38,7 @@ import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { MessageTimeline } from './chat/MessageTimeline'
 import { activeConversationControls, composerReplyQuestion } from './chat/conversation-visibility'
 import { TaskRunStatusBar } from './chat/TaskRunStatusBar'
+import type { TaskComposerQuestion } from './tasks/TaskAttentionCard'
 import { ConversationChecklist } from './chat/ConversationChecklist'
 import {
   FloatingComposer,
@@ -518,7 +519,11 @@ export function Workbench(): ReactElement {
   const timelineBlocks = blocks
   const chatOwnsTaskControls = route === 'chat' || route === 'claw'
   const conversationControls = useMemo(() => activeConversationControls(timelineBlocks), [timelineBlocks])
-  const replyQuestion = route === 'chat' ? composerReplyQuestion(conversationControls) : undefined
+  const pausedTaskQuestionRequestIds = usePausedTaskQuestionRequestIds(activeThreadId)
+  const replyQuestion = route === 'chat' ? composerReplyQuestion(conversationControls, pausedTaskQuestionRequestIds) : undefined
+  const [taskComposerQuestion, setTaskComposerQuestion] = useState<TaskComposerQuestion | null>(null)
+  const activeTaskComposerQuestion = route === 'chat' && mode === 'agent' &&
+    taskComposerQuestion?.threadId === activeThreadId ? taskComposerQuestion : undefined
   const composerActionsRef = useRef<ComposerActions>(null)
   const submittingQuestion = useRef<string | null>(null)
   const timelineMessageIds = useMemo(() => new Set(timelineBlocks.map(block => block.id)), [timelineBlocks])
@@ -1772,6 +1777,40 @@ export function Workbench(): ReactElement {
       void handleGuiPlanCommand(planCommand.kind === 'create' ? planCommand.request : undefined)
       return
     }
+    if (activeTaskComposerQuestion && v && (attachmentIds.length || fileReferences.length || capabilityReferences.length)) {
+      setError(t('taskComposerReplyTextOnly'))
+      return
+    }
+    if (activeTaskComposerQuestion && v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
+      if (submittingQuestion.current === activeTaskComposerQuestion.requestId) return
+      submittingQuestion.current = activeTaskComposerQuestion.requestId
+      try {
+        const result = await window.workwise.runtimeRequest(
+          `/v1/user-inputs/${encodeURIComponent(activeTaskComposerQuestion.requestId)}`,
+          'POST',
+          JSON.stringify({ answers: [{ id: activeTaskComposerQuestion.questionId, label: activeTaskComposerQuestion.label, value: v }] })
+        )
+        if ([404, 409, 410].includes(result.status)) {
+          setError(t('taskWorkspaceDecisionRefresh'))
+          await refreshTaskState()
+          return
+        }
+        if (!result.ok) {
+          setError(t('taskWorkspaceActionFailed'))
+          return
+        }
+        if (useChatStore.getState().activeThreadId === activeTaskComposerQuestion.threadId) {
+          setComposerDrafts(drafts => drafts[composerScope] === input ? setWorkbenchComposerDraft(drafts, composerScope, '') : drafts)
+        }
+        setTaskComposerQuestion(current => current?.requestId === activeTaskComposerQuestion.requestId ? null : current)
+        await refreshTaskState()
+      } catch {
+        setError(t('taskWorkspaceActionFailed'))
+      } finally {
+        if (submittingQuestion.current === activeTaskComposerQuestion.requestId) submittingQuestion.current = null
+      }
+      return
+    }
     if (replyQuestion && v && !attachmentIds.length && !fileReferences.length && !capabilityReferences.length) {
       if (submittingQuestion.current === replyQuestion.requestId) return
       submittingQuestion.current = replyQuestion.requestId
@@ -2162,13 +2201,14 @@ export function Workbench(): ReactElement {
     void createWriteThread(writeWorkspaceRoot, writeState.activeFilePath)
   }
 
-  const renderRuntimeBanner = (message: string, detail?: string | null): ReactElement => (
+  const renderRuntimeBanner = (message: string, detail?: string | null, inConversation = false): ReactElement => (
     <RuntimeBanner
       message={message}
       detail={detail}
       logPath={runtimeLogPath || null}
       runtimeReady={runtimeConnection === 'ready'}
-      stageInsetClass={stageInsetClass}
+      stageInsetClass={inConversation ? 'px-3.5' : stageInsetClass}
+      inConversation={inConversation}
       t={t}
       onOpenLogDir={
         typeof window !== 'undefined' && typeof window.workwise?.openLogDir === 'function'
@@ -2179,6 +2219,8 @@ export function Workbench(): ReactElement {
       onRetryConnection={() => void probeRuntime('user')}
     />
   )
+  const showConversationError = chatOwnsTaskControls && Boolean(activeThreadId) &&
+    runtimeConnection === 'ready' && !activeSddDraft
 
   const writeRuntimeBannerMessage = runtimeConnection !== 'ready'
     ? (error?.trim() || t('writeRuntimeUnavailable'))
@@ -2527,7 +2569,7 @@ export function Workbench(): ReactElement {
           </>
         ) : (
           <>
-        {error && !(runtimeConnection !== 'ready' && !activeThreadId) ? renderRuntimeBanner(error, runtimeErrorDetail) : null}
+        {error && !showConversationError && !(runtimeConnection !== 'ready' && !activeThreadId) ? renderRuntimeBanner(error, runtimeErrorDetail) : null}
 
         <div className="flex min-h-0 flex-1">
           <div className={`flex min-h-0 min-w-0 flex-1 ${activeSddDraft ? '' : stageInsetClass}`}>
@@ -2585,12 +2627,14 @@ export function Workbench(): ReactElement {
               blocks={timelineBlocks}
               activeControls={chatOwnsTaskControls ? conversationControls : undefined}
               replyQuestionId={replyQuestion?.id}
+              pausedTaskQuestionRequestIds={pausedTaskQuestionRequestIds}
               taskActivity={chatOwnsTaskControls && activeThreadId ? <>
                 <TaskRunStatusBar
                   threadId={activeThreadId}
                   runtimeReady={runtimeConnection === 'ready'}
                   conversationControls={conversationControls}
                   composerReplies={route === 'chat' && mode === 'agent'}
+                  onComposerQuestionChange={setTaskComposerQuestion}
                   visibleMessageIds={timelineMessageIds}
                   linkedTask={linkedTask ?? undefined}
                   onSupplement={() => composerActionsRef.current?.focus()}
@@ -2603,7 +2647,8 @@ export function Workbench(): ReactElement {
               live={timelineLiveAssistant}
               activeThreadId={activeThreadId}
               runtimeConnection={runtimeConnection}
-              runtimeError={error}
+              runtimeError={showConversationError ? null : error}
+              runtimeNotice={error && showConversationError ? renderRuntimeBanner(error, runtimeErrorDetail, true) : undefined}
               onRetryConnection={() => void probeRuntime('user')}
               onOpenSettings={() => openSettings('agents')}
               onSelectSuggestion={(text) => setInput(text)}
@@ -2625,10 +2670,11 @@ export function Workbench(): ReactElement {
                 ) : null
               }
             />
-            <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8">
+            <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8"
+              data-task-question-request-id={activeTaskComposerQuestion?.requestId}>
               <FloatingComposer
                 actionsRef={composerActionsRef}
-                replyingToQuestion={Boolean(replyQuestion)}
+                replyingToQuestion={Boolean(replyQuestion || activeTaskComposerQuestion)}
                 input={input}
                 setInput={setInput}
                 mode={mode}

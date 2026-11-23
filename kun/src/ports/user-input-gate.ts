@@ -33,6 +33,7 @@ export interface UserInputGate {
   request(input: UserInputRequest): Promise<UserInputResolution>
   get(inputId: string): UserInputRequest | undefined
   resolve(inputId: string, resolution: UserInputResolution): boolean
+  resolveForTurnRestart(inputId: string): boolean
   pending(threadId?: string): UserInputRequest[]
   reset(): void
 }

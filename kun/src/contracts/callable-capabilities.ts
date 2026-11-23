@@ -15,6 +15,10 @@ export type CallableCapabilityChoice = CallableCapabilityReference & { label: st
 export const SkillSelectionsSchema = z.array(z.object({ id: exactId, name: z.string().min(1) })).max(8)
 export type SkillSelections = z.infer<typeof SkillSelectionsSchema>
 
+export function canonicalSkillDisplayName(name: string): string {
+  return /^ppt[-_ ]master$/i.test(name) ? 'PPT Master' : name
+}
+
 export const CallableCapabilityScopeSchema = z.object({
   threadId: exactId.optional(),
   workspace: z.string().max(4096).optional(),

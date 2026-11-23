@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { parse } from 'yaml'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
-import { validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
+import { macStartupPackageMode, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { observeStartupTargets, observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, waitForStartupCondition, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
 
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
@@ -163,13 +165,47 @@ test('selects the scoped startup runner without starting regular UI or task fixt
   await assert.rejects(dispatchWindowsSmokeEntry([...args, '--startup-appearance', '--task-smoke'], {}, driver), /exclusive/)
 })
 
-test('binds native Mac startup acceptance to a successful immutable release build', () => {
-  const source = { repository: 'railwise-cn/railwise-ai', workflow: '.github/workflows/release.yml', sourceHead: 'a'.repeat(40),
+test('binds native Mac startup acceptance to a successful immutable frozen release build', () => {
+  const source = { repository: 'railwise-cn/railwise-ai', workflow: '.github/workflows/release.yml', packageMode: 'frozen-public-identity', sourceHead: 'a'.repeat(40),
     driverHead: 'b'.repeat(40), runId: 100, runAttempt: 1, buildConclusion: 'success', artifactName: 'release-mac',
     artifactId: 200, artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
-    changedFiles: ['scripts/run-mac-startup-appearance-smoke.mjs'] }
+    changedFiles: ['scripts/run-mac-startup-appearance-smoke.mjs', 'scripts/verify-windows-composer-acceptance.mjs',
+      'scripts/prepare-windows-install-smoke.mjs', 'scripts/prepare-windows-install-smoke.test.mjs',
+      'scripts/run-windows-offline-spreadsheet-journey.mjs', 'scripts/run-windows-offline-spreadsheet-journey.test.mjs',
+      'scripts/verify-core-journeys.mjs', 'scripts/verify-core-journeys.test.mjs',
+      'scripts/run-windows-install-smoke.ps1', 'scripts/verify-windows-install-smoke.mjs',
+      'scripts/record-core-journeys.test.mjs', 'scripts/run-windows-frozen-gui-upgrade.mjs',
+      'scripts/windows-published-gui-update-smoke.test.mjs', 'scripts/windows-ui-smoke.test.mjs',
+      'docs/qa/release-gates/v0.5.11/acceptance.md'] }
   assert.equal(validateMacStartupArtifact(source), source)
+  assert.equal(validateMacStartupArtifact({ ...source, changedFiles: ['scripts/run-mac-offline-spreadsheet-journey.test.mjs'] }).changedFiles[0],
+    'scripts/run-mac-offline-spreadsheet-journey.test.mjs')
+  assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['docs/qa/another-plan.md'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['src/main/splash-window.ts'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactExpired: true }))
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactName: 'release-win' }))
+})
+
+test('classifies an unfrozen macOS work-branch artifact as an isolated frontier candidate', () => {
+  const run = { event: 'workflow_dispatch', status: 'completed', conclusion: 'success', head_branch: 'codex/web-source-ppt-recovery' }
+  const build = { status: 'completed', conclusion: 'success', steps: [{ name: 'Record frozen public package identity', conclusion: 'skipped' }] }
+  assert.equal(macStartupPackageMode(run, build), 'frontier-candidate')
+  assert.throws(() => macStartupPackageMode({ ...run, head_branch: 'main' }, build), /isolated work branch/)
+  assert.throws(() => macStartupPackageMode({ ...run, status: 'in_progress' }, build), /completed/)
+  assert.throws(() => macStartupPackageMode(run, { ...build, steps: [] }), /identity receipt step/)
+  assert.throws(() => macStartupPackageMode(run, { ...build, steps: [{ name: 'Record frozen public package identity', conclusion: 'failure' }] }), /skipped freeze receipt/)
+})
+
+test('provides an external PPTX handler only to the exact macOS artifact journey', () => {
+  const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
+  const job = workflow.jobs['exact-mac-startup-appearance']
+  const opener = job.steps.find(step => step.name === 'Register a native PPTX handler for the installed-artifact smoke')
+
+  assert.match(job['timeout-minutes'], /inputs\.web_ppt_journey == 'controlled' && 40/)
+  assert.equal(opener.if, "${{ matrix.arch == 'arm64' && (inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') }}")
+  assert.match(opener.run, /brew install --cask libreoffice/)
+  assert.doesNotMatch(opener.run, /soffice --headless/)
+  assert.match(opener.run, /duti -s org\.libreoffice\.script pptx all/)
+  assert.match(opener.run, /LaunchServices\.framework\/Support\/lsregister -f \/Applications\/LibreOffice\.app/)
+  assert.match(opener.run, /duti -x pptx/)
 })

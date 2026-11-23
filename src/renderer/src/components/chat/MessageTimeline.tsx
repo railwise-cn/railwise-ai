@@ -36,12 +36,14 @@ type Props = {
   blocks: ChatBlock[]
   activeControls?: readonly ChatBlock[]
   replyQuestionId?: string
+  pausedTaskQuestionRequestIds?: ReadonlySet<string>
   taskActivity?: ReactNode
   liveReasoning: string
   live: string
   activeThreadId: string | null
   runtimeConnection: RuntimeConnectionStatus
   runtimeError?: string | null
+  runtimeNotice?: ReactNode
   onRetryConnection: () => void
   onOpenSettings: () => void
   onSelectSuggestion?: (prompt: string) => void
@@ -84,12 +86,14 @@ export function MessageTimeline({
   blocks,
   activeControls,
   replyQuestionId,
+  pausedTaskQuestionRequestIds,
   taskActivity,
   liveReasoning,
   live,
   activeThreadId,
   runtimeConnection,
   runtimeError,
+  runtimeNotice,
   onRetryConnection,
   onOpenSettings,
   onSelectSuggestion,
@@ -133,7 +137,8 @@ export function MessageTimeline({
     blocks.length,
     blockScrollStamp(latestBlock),
     live.length,
-    liveReasoning.length
+    liveReasoning.length,
+    Boolean(runtimeNotice)
   ].join(':')
   const {
     visibleTurnCount,
@@ -167,7 +172,8 @@ export function MessageTimeline({
     return visibleProcessBlocksForMode(activeControls.filter(block => isPendingProcessControl(block) && !shown.has(block.id)), viewMode)
   }, [activeControls, hiddenTurnCount, viewMode, visibleTurns])
   const latestTaskActivity = pendingControlsOutsidePage.length ? <>
-    {pendingControlsOutsidePage.map(block => <MessageBubble key={block.id} block={block} nested replyInComposer={block.id === replyQuestionId} />)}
+    {pendingControlsOutsidePage.map(block => <MessageBubble key={block.id} block={block} nested replyInComposer={block.id === replyQuestionId}
+      taskPausedQuestion={block.kind === 'user_input' && pausedTaskQuestionRequestIds?.has(block.requestId)} />)}
     {taskActivity}
   </> : taskActivity
   const forkedFromTitle = activeThread?.forkedFromTitle?.trim() ?? ''
@@ -252,6 +258,7 @@ export function MessageTimeline({
                 turn={turn}
                 activeControlIds={activeControlIds}
                 replyQuestionId={replyQuestionId}
+                pausedTaskQuestionRequestIds={pausedTaskQuestionRequestIds}
                 taskActivity={isLatestTurn ? latestTaskActivity : undefined}
                 professionalSurface={professionalSurface}
                 isProcessing={(busy && isLatestTurn) || turnPending || hasLiveStream}
@@ -322,6 +329,7 @@ export function MessageTimeline({
           />
         ) : null}
         {blocks.length === 0 && !live && !liveReasoning ? taskActivity : null}
+        {runtimeNotice}
         <div ref={endRef} aria-hidden className="h-px w-full shrink-0" />
       </div>
     </div>
@@ -332,6 +340,7 @@ function MessageTurn({
   turn,
   activeControlIds,
   replyQuestionId,
+  pausedTaskQuestionRequestIds,
   taskActivity,
   isProcessing,
   runActivity,
@@ -352,6 +361,7 @@ function MessageTurn({
   turn: Turn
   activeControlIds?: ReadonlySet<string>
   replyQuestionId?: string
+  pausedTaskQuestionRequestIds?: ReadonlySet<string>
   taskActivity?: ReactNode
   isProcessing: boolean
   runActivity?: ThreadRunActivity
@@ -468,7 +478,8 @@ function MessageTurn({
 
       {orderedMessages.map(block => (
         <MessageBubble key={block.id} block={block} nested={isInlineProcessControl(block)}
-          professionalSurface={professionalSurface} replyInComposer={block.id === replyQuestionId} />
+          professionalSurface={professionalSurface} replyInComposer={block.id === replyQuestionId}
+          taskPausedQuestion={block.kind === 'user_input' && pausedTaskQuestionRequestIds?.has(block.requestId)} />
       ))}
 
       <GeneratedFilesPanel
@@ -530,6 +541,7 @@ const MemoMessageTurn = memo(MessageTurn, (prev, next) => (
   sameTurnContent(prev.turn, next.turn) &&
   prev.activeControlIds === next.activeControlIds &&
   prev.replyQuestionId === next.replyQuestionId &&
+  prev.pausedTaskQuestionRequestIds === next.pausedTaskQuestionRequestIds &&
   prev.taskActivity === next.taskActivity &&
   prev.isProcessing === next.isProcessing &&
   prev.runActivity === next.runActivity &&
