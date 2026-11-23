@@ -23,6 +23,8 @@ test('Mac workbook journey clicks the rendered Univer grid instead of utility ca
   const source = await readFile(sourcePath, 'utf8')
   const journey = source.slice(source.indexOf('export async function runInstalledMacOfflineSpreadsheetJourney'))
 
+  assert.match(source, /B4" t="s"><v>1<\/v>/)
+  assert.match(source, /<si><t>点位<\/t><\/si><si><t>001<\/t><\/si>/)
   assert.match(journey, /\.ds-code-sidebar canvas\[data-u-comp="render-canvas"\]/)
   assert.match(journey, /Univer cell editor focus/)
   assert.match(journey, /formula expression/)

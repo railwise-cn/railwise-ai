@@ -33,9 +33,9 @@ async function createXlsxFixture(path) {
   const zip = new JSZip()
   zip.file('xl/workbook.xml', '<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="监测点" r:id="s1"/><sheet name="记录" r:id="s2"/></sheets></workbook>')
   zip.file('xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="s1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="s2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>')
-  zip.file('xl/worksheets/sheet1.xml', '<worksheet><sheetData><row r="4"><c r="B4" t="s"><v>0</v></c><c r="D4"><v>12</v></c></row></sheetData></worksheet>')
+  zip.file('xl/worksheets/sheet1.xml', '<worksheet><sheetData><row r="4"><c r="B4" t="s"><v>1</v></c><c r="D4"><v>12</v></c></row></sheetData></worksheet>')
   zip.file('xl/worksheets/sheet2.xml', '<worksheet><sheetData><row r="2"><c r="A2" t="inlineStr"><is><t>地铁</t></is></c></row></sheetData></worksheet>')
-  zip.file('xl/sharedStrings.xml', '<sst><si><r><t>点位</t></r><r><t>001</t></r></si></sst>')
+  zip.file('xl/sharedStrings.xml', '<sst><si><t>点位</t></si><si><t>001</t></si></sst>')
   await writeFile(path, await zip.generateAsync({ type: 'nodebuffer' }), { flag: 'wx' })
 }
 
