@@ -241,6 +241,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, conversationCon
   }, [runtimeReady, workerThreadId, task.revision, sample?.sampledAt])
   const activity = projectTaskRunActivity(task, sample, artifacts.length, pending, artifacts.map(entry => ({ taskId: entry.task.id, artifactId: entry.artifact.id })))
   const running = ACTIVE_STATUSES.has(task.status)
+  const canPause = running || task.status === 'waiting_user' && Boolean(task.activeTurnId)
   const actions = task.presentation?.actions
   const verify = actions?.includes('verify') || pending.some(item => item.presentation?.actions.includes('verify'))
   const needsReview = pending.length > 0
@@ -346,7 +347,7 @@ function ConversationTask({ group, live, threadId, runtimeReady, conversationCon
       {canSupplement && onSupplement ? <button type="button" disabled={disabled} onClick={onSupplement} className={taskButtonClass}>{t('taskWorkspaceSupplement')}</button> : null}
       {canPickSource && onPickAttachments ? <button type="button" disabled={disabled} onClick={onPickAttachments} className={taskButtonClass}>{t('taskWorkspaceAttachmentPick')}</button> : null}
       {verify ? <button type="button" aria-expanded={verifyOpen} onClick={() => setVerifyOpen(open => !open)} className={taskButtonClass}>{t('taskEffectVerifyResult')}</button> : null}
-      {running ? <button type="button" disabled={disabled} onClick={() => void run('pause')} className={taskButtonClass}>{t('taskWorkspacePause')}</button> : null}
+      {canPause ? <button type="button" disabled={disabled} onClick={() => void run('pause')} className={taskButtonClass}>{t('taskWorkspacePause')}</button> : null}
       {!TERMINAL_STATUSES.has(task.status) ? <button type="button" disabled={disabled} onClick={() => void run('cancel')} className={taskButtonClass}>{t('taskRunCancel')}</button> : null}
     </div>
     {pausedQuestionToShow ? <div aria-label={t('taskRunPausedQuestionTitle')} className="min-w-0 space-y-0.5 pb-1 text-xs text-ds-muted">

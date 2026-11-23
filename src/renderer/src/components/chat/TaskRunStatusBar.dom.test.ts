@@ -138,6 +138,7 @@ describe('task actions in the original conversation', () => {
     await render({ composerReplies: true, onComposerQuestionChange })
     expect(container.textContent).toContain('在下方输入框直接回复')
     expect(container.querySelector('textarea')).toBeNull()
+    expect(button('暂停')).toBeTruthy()
     expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
       requestId: 'worker-request', questionId: 'document', label: '请提供资料名称' })
     attention = []
