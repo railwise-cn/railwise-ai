@@ -78,6 +78,10 @@ function readRuntime(path) {
   })`
 }
 
+function conversationTextProbe() {
+  return `Array.from(document.querySelectorAll(${literal(timeline)})).map(node=>node.innerText).join('\\n')`
+}
+
 async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
   const [task, inputs, inbox, thread] = await Promise.all([
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
@@ -105,7 +109,7 @@ async function readWebPptReplyState(cdp, taskId, executionThreadId) {
       answerComposerVisible: Boolean(document.querySelector(${literal(answerComposer)})?.getClientRects().length),
       composerPlaceholder: document.querySelector('.ds-chat-composer-dock textarea')?.placeholder,
       taskQuestionRequestId: document.querySelector('.ds-chat-composer-dock')?.getAttribute('data-task-question-request-id'),
-      replyHintVisible: String(document.querySelector(${literal(timeline)})?.innerText ?? '').includes('在下方输入框直接回复'),
+      replyHintVisible: ${conversationTextProbe()}.includes('在下方输入框直接回复'),
       submitButtonVisible: [...document.querySelectorAll('button')].some(button =>
         button.getClientRects().length && button.getAttribute('aria-label') === '提交')
     })`),
@@ -139,8 +143,8 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
   await cdp.fill(composer, promptText)
   await cdp.click('button[aria-label="发送"]:not(:disabled)')
   const questionCheck = expectedQuestion instanceof RegExp
-    ? `new RegExp(${literal(expectedQuestion.source)},${literal(expectedQuestion.flags)}).test(document.querySelector(${literal(timeline)})?.innerText ?? '')`
-    : `String(document.querySelector(${literal(timeline)})?.innerText ?? '').includes(${literal(expectedQuestion)})`
+    ? `new RegExp(${literal(expectedQuestion.source)},${literal(expectedQuestion.flags)}).test(${conversationTextProbe()})`
+    : `${conversationTextProbe()}.includes(${literal(expectedQuestion)})`
   await cdp.wait(`Boolean(document.querySelector(${literal(answerComposer)}) &&
     (${questionCheck}))`, 'the source question in the original conversation', 120_000)
   const newThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.filter(thread => !priorThreads.includes(thread.id))
@@ -475,7 +479,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const selector = await revealArtifact(cdp)
       await cdp.click(selector, filename)
       const open = openArtifact ? await openArtifact(cdp, { task, artifact, path: output }) : { status: 'ui-click-only' }
-      const originalConversationText = await cdp.evaluate(`document.querySelector(${literal(timeline)})?.innerText ?? ''`)
+      const originalConversationText = await cdp.evaluate(conversationTextProbe())
       assert.ok(originalConversationText.includes(live ? '网址' : webPptQuestion),
         'The source question must remain visible in the original conversation body')
       assert.ok(await cdp.evaluate(`Boolean(document.querySelector(${literal(selector)})?.getClientRects().length)`),
