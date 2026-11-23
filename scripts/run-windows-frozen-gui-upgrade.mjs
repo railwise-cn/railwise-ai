@@ -255,15 +255,23 @@ async function launchOwned(executable, cwd, feedUrl) {
   } catch (error) { child.kill(); throw error }
 }
 
-async function closeOwnedWindows(executable) {
-  for (const { pid } of windowsForExecutable(executable)) powershell(`
+function ownedProcessIsRunning(executable, pid) {
+  return powershell(`
+    $process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
+    if ($process -and $process.Path -eq ${psQuote(executable)}) { '1' } else { '0' }
+  `) === '1'
+}
+
+async function closeOwnedWindows(executable, ownerPid) {
+  const windows = windowsForExecutable(executable).filter(window => ownerPid === undefined || window.pid === ownerPid)
+  for (const { pid } of windows) powershell(`
     $process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
     if ($process.Path -eq ${psQuote(executable)} -and $process.MainWindowHandle -ne 0) { $null = $process.CloseMainWindow() }
   `)
-  await waitUntil(() => powershell(`
-    $running = @(Get-Process -ErrorAction SilentlyContinue | Where-Object Path -eq ${psQuote(executable)})
-    $running.Count
-  `) === '0', 'the owned RailWise process to exit', 60_000)
+  // Electron helper processes share the executable path; an updater relaunch is owned by its main window PID.
+  await waitUntil(() => ownerPid === undefined
+    ? windowsForExecutable(executable).length === 0
+    : !ownedProcessIsRunning(executable, ownerPid), 'the owned RailWise process to exit', 60_000)
 }
 
 async function clickLabeledButton(cdp, labels, action, timeout = 90_000) {
@@ -391,9 +399,11 @@ async function main(args) {
         installExactNsis(item.installer.path, installDirectory)
         return { method: 'exact-installer-overlay' }
       })
+      report.steps.push({ expectedVersion: item.identity.version, action, readbackStatus: 'pending' })
+      await save()
       if (item.isolated) report.targetVerification.feedRequests = feed ? { ...feed.requests } : null
       running.cdp.close()
-      await closeOwnedWindows(executable)
+      await closeOwnedWindows(executable, action.window?.pid)
       if (!item.isolated) {
         await feed?.close()
         feed = index === 0 && next ? await openPrivateFeed(trust, next) : null
@@ -428,7 +438,7 @@ async function main(args) {
         actual.releaseHighlightsVisible = announcement.visible
         actual.releaseHighlightsFirstLaunchRecorded = announcement.recorded
       }
-      report.steps.push({ ...actual, action })
+      report.steps[report.steps.length - 1] = { ...actual, action, readbackStatus: 'passed' }
       await save()
     }
     report.status = currentReleaseMode || next ? 'passed' : 'overlay-verified-next-upgrade-pending'

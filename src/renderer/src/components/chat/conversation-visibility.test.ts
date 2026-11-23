@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatBlock } from '../../agent/types'
 import {
+  composerReplyQuestion,
   redactRuntimeText,
   deriveSemanticProgress,
   visibleProcessBlocksForMode
@@ -32,6 +33,18 @@ const blocks: ChatBlock[] = [
 ]
 
 describe('conversation visibility', () => {
+  it('keeps one free-text question answerable when other controls remain visible', () => {
+    const question: ChatBlock = { kind: 'user_input', id: 'question', requestId: 'question-request', status: 'pending',
+      questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] }
+    const approval: ChatBlock = { kind: 'approval', id: 'approval', approvalId: 'approval-request',
+      summary: '读取浏览器页面', status: 'pending' }
+
+    expect(composerReplyQuestion([approval, question])).toBe(question)
+    expect(composerReplyQuestion([question, { ...question, id: 'second', requestId: 'second-request' }])).toBeUndefined()
+    expect(composerReplyQuestion([approval, { ...question, questions: [{ ...question.questions[0]!, options: [{ label: '官网 A', description: '' }] }] }]))
+      .toBeUndefined()
+  })
+
   it('never exposes private reasoning in any display mode', () => {
     for (const mode of ['concise', 'standard', 'developer'] as const) {
       expect(visibleProcessBlocksForMode(blocks, mode).some((block) => block.kind === 'reasoning'))

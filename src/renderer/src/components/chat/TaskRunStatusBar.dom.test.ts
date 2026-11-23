@@ -154,7 +154,7 @@ describe('task actions in the original conversation', () => {
 
     await renderConversation([approval, openQuestion], undefined, onComposerQuestionChange)
 
-    expect(composerReplyQuestion(activeConversationControls([approval, openQuestion]))).toBeUndefined()
+    expect(composerReplyQuestion(activeConversationControls([approval, openQuestion]))).toEqual(openQuestion)
     expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: 'worker-question', threadId,
       requestId: 'worker-request', questionId: 'website', label: '请提供官网网址。' })
   })
