@@ -233,7 +233,7 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
     assert.equal(verifyPptx.status, 0)
     assert.equal(verifyPptx.stdout.trim().split(/\r?\n/)[0], 'LibreOffice', 'The runner default must resolve PPTX files to LibreOffice')
     receipt.nativeOpener = { profile: 'ephemeral-runner-default', handler: verifyPptx.stdout.trim().split(/\r?\n/).slice(0, 3) }
-    await recordStage('register-native-document-handler-under-isolated-profile')
+    await recordStage('verify-native-document-handler-on-ephemeral-runner')
     await writeFile(join(workwiseHome, 'workspace-trust.json'), JSON.stringify({ schema: 'workwise.workspace-trust', version: 1,
       workspaces: [{ level: 'workspace-write', canonicalRoot: workspace, revision: 1 }] }), { mode: 0o600 })
     await writeFile(join(profile, 'workwise-settings.json'), JSON.stringify({ schema: 'workwise.settings', version: 2, revision: 0,
