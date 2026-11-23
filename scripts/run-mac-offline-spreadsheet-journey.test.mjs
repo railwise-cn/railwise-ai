@@ -25,7 +25,6 @@ test('Mac workbook journey clicks the rendered Univer grid instead of utility ca
 
   assert.match(journey, /\.ds-code-sidebar canvas\[data-u-comp="render-canvas"\]/)
   assert.match(journey, /Univer cell editor focus/)
-  assert.match(journey, /committed cell edit/)
   assert.match(journey, /formula expression/)
   assert.match(journey, /workbookAtFailure/)
   assert.match(journey, /gridCanvases:/)

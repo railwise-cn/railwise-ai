@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { parse } from 'yaml'
 import { dispatchWindowsSmokeEntry } from './run-windows-ui-smoke.mjs'
 import { macStartupPackageMode, validateMacStartupArtifact } from './run-mac-startup-appearance-smoke.mjs'
 import { observeStartupTargets, observeWorkbenchTypography, validateNarrowWorkbenchComposer, validateStartupAppearance, waitForStartupCondition, windowsStartupCases } from './verify-packaged-startup-appearance.mjs'
@@ -189,4 +191,16 @@ test('classifies an unfrozen macOS work-branch artifact as an isolated frontier 
   assert.throws(() => macStartupPackageMode({ ...run, status: 'in_progress' }, build), /completed/)
   assert.throws(() => macStartupPackageMode(run, { ...build, steps: [] }), /identity receipt step/)
   assert.throws(() => macStartupPackageMode(run, { ...build, steps: [{ name: 'Record frozen public package identity', conclusion: 'failure' }] }), /skipped freeze receipt/)
+})
+
+test('provides an external PPTX handler only to the exact macOS artifact journey', () => {
+  const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
+  const job = workflow.jobs['exact-mac-startup-appearance']
+  const opener = job.steps.find(step => step.name === 'Register a native PPTX handler for the installed-artifact smoke')
+
+  assert.match(job['timeout-minutes'], /inputs\.web_ppt_journey == 'controlled' && 40/)
+  assert.equal(opener.if, "${{ matrix.arch == 'arm64' && (inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') }}")
+  assert.match(opener.run, /brew install --cask libreoffice/)
+  assert.match(opener.run, /duti -s org\.libreoffice\.script org\.openxmlformats\.presentationml\.presentation all/)
+  assert.match(opener.run, /duti -x pptx/)
 })

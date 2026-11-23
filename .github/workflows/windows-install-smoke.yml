@@ -393,7 +393,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_mac_startup_appearance == true }}
     name: Exact startup appearance on macOS ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ inputs.web_ppt_journey == 'live' && 35 || 20 }}
+    timeout-minutes: ${{ inputs.web_ppt_journey == 'live' && 45 || inputs.web_ppt_journey == 'controlled' && 40 || 25 }}
     strategy:
       fail-fast: false
       matrix:
@@ -432,6 +432,13 @@ jobs:
           github-token: ${{ github.token }}
           merge-multiple: true
           path: ${{ runner.temp }}/exact-mac-packages
+      - name: Register a native PPTX handler for the installed-artifact smoke
+        if: ${{ matrix.arch == 'arm64' && (inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') }}
+        run: |
+          brew install --cask libreoffice
+          brew install duti
+          duti -s org.libreoffice.script org.openxmlformats.presentationml.presentation all
+          test "$(duti -x pptx | head -n 1)" = "LibreOffice"
       - name: Inspect the signed installed application and real startup surfaces
         env:
           RAILWISE_MAC_PPT_JOURNEY: ${{ matrix.arch == 'arm64' && (inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') && inputs.web_ppt_journey || '' }}

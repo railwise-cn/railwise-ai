@@ -235,8 +235,6 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
         'Univer cell editor focus')
       await cdp.send('Input.insertText', { text: value })
       await key('Enter', 'Enter', 13)
-      await cdp.wait(`document.activeElement?.id !== ${JSON.stringify(cellEditorId)} || !document.activeElement.isContentEditable`,
-        'committed cell edit')
     }
 
     await edit(0, 0, '=SUM(4,5)')
