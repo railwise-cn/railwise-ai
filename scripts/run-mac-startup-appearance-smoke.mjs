@@ -17,6 +17,7 @@ const acceptedDriverFiles = new Set([
   '.github/workflows/windows-install-smoke.yml',
   'scripts/run-mac-ppt-journey.mjs',
   'scripts/run-mac-offline-spreadsheet-journey.mjs',
+  'scripts/run-mac-offline-spreadsheet-journey.test.mjs',
   'scripts/record-core-journeys.mjs',
   'scripts/run-mac-startup-appearance-smoke.mjs',
   'scripts/verify-windows-startup-appearance.test.mjs',

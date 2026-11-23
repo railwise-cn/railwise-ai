@@ -173,6 +173,8 @@ test('binds native Mac startup acceptance to a successful immutable frozen relea
       'scripts/windows-published-gui-update-smoke.test.mjs', 'scripts/windows-ui-smoke.test.mjs',
       'docs/qa/release-gates/v0.5.11/acceptance.md'] }
   assert.equal(validateMacStartupArtifact(source), source)
+  assert.equal(validateMacStartupArtifact({ ...source, changedFiles: ['scripts/run-mac-offline-spreadsheet-journey.test.mjs'] }).changedFiles[0],
+    'scripts/run-mac-offline-spreadsheet-journey.test.mjs')
   assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['docs/qa/another-plan.md'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, changedFiles: ['src/main/splash-window.ts'] }), /Application source differs/)
   assert.throws(() => validateMacStartupArtifact({ ...source, artifactExpired: true }))
