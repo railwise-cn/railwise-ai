@@ -105,7 +105,7 @@ async function readWebPptReplyState(cdp, taskId, executionThreadId) {
       answerComposerVisible: Boolean(document.querySelector(${literal(answerComposer)})?.getClientRects().length),
       composerPlaceholder: document.querySelector('.ds-chat-composer-dock textarea')?.placeholder,
       taskQuestionRequestId: document.querySelector('.ds-chat-composer-dock')?.getAttribute('data-task-question-request-id'),
-      replyHintVisible: document.querySelector(${literal(timeline)})?.innerText.includes('在下方输入框直接回复') ?? false,
+      replyHintVisible: String(document.querySelector(${literal(timeline)})?.innerText ?? '').includes('在下方输入框直接回复'),
       submitButtonVisible: [...document.querySelectorAll('button')].some(button =>
         button.getClientRects().length && button.getAttribute('aria-label') === '提交')
     })`),
@@ -140,7 +140,7 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
   await cdp.click('button[aria-label="发送"]:not(:disabled)')
   const questionCheck = expectedQuestion instanceof RegExp
     ? `new RegExp(${literal(expectedQuestion.source)},${literal(expectedQuestion.flags)}).test(document.querySelector(${literal(timeline)})?.innerText ?? '')`
-    : `document.querySelector(${literal(timeline)})?.innerText.includes(${literal(expectedQuestion)})`
+    : `String(document.querySelector(${literal(timeline)})?.innerText ?? '').includes(${literal(expectedQuestion)})`
   await cdp.wait(`Boolean(document.querySelector(${literal(answerComposer)}) &&
     (${questionCheck}))`, 'the source question in the original conversation', 120_000)
   const newThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.filter(thread => !priorThreads.includes(thread.id))
@@ -166,7 +166,7 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
       inputs.filter(input=>input.kind==='supplement' && input.idempotencyKey===${literal(answerKey)}))`,
     'KUN to persist the answer against the exact pending question', 45_000)
     await cdp.wait(`${readRuntime('/v1/inbox')}.then(items=>
-      items.find(item=>item.requestId===${literal(requestId)} && item.status!=='pending'))`,
+      !items.some(item=>item.requestId===${literal(requestId)} && item.status==='pending'))`,
     'KUN to resolve the exact pending question', 45_000)
     if (requireNewTurn) {
       await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(task.id)}`)}.then(task=>
@@ -305,7 +305,8 @@ export function validateWebPptTurnIdentity(proof) {
   assert.equal(answers.length, 1, 'The exact question answer must be persisted once by KUN')
   assert.equal(replyTrace.after.task.id, proof.taskId)
   assert.equal(replyTrace.after.task.originThreadId, proof.conversationThreadId)
-  assert.ok(replyTrace.after.attention.some(item => item.requestId === requestId && item.status !== 'pending'))
+  assert.ok(!replyTrace.after.attention.some(item => item.requestId === requestId && item.status === 'pending'),
+    'The exact answered question must be absent from the pending inbox')
   assert.equal(replyTrace.after.task.activeTurnId === replyTrace.before.task.activeTurnId, proof.sameTurn)
   if (proof.sameTurn === true && !proof.initialTurnId && !proof.completedTurnId) return
   assert.ok(proof.initialTurnId && proof.completedTurnId, 'Both execution Turn IDs are required')

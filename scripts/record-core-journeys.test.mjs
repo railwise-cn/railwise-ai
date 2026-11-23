@@ -22,8 +22,7 @@ function replyTrace(sameTurn = true) {
     before: { ui: { taskQuestionRequestId: requestId }, task: { activeTurnId: firstTurn },
       attention: [{ requestId, kind: 'question', status: 'pending', questionCount: 1, textQuestion: true }] },
     after: { task: { id: 'task-1', originThreadId: 'conversation-1', activeTurnId: sameTurn ? firstTurn : 'turn-2' },
-      inputs: [{ kind: 'supplement', idempotencyKey: `user-input:${requestId}` }],
-      attention: [{ requestId, status: sameTurn ? 'answered' : 'cancelled' }] }
+      inputs: [{ kind: 'supplement', idempotencyKey: `user-input:${requestId}` }], attention: [] }
   }
 }
 
@@ -64,6 +63,9 @@ test('live PPT receipt requires the original installed GUI conversation and open
   const wrongTask = structuredClone(ppt())
   wrongTask.replyTrace.after.task.id = 'different-task'
   assert.throws(() => livePptJourney(wrongTask, file, 'os-open-accepted'))
+  const questionStillPending = structuredClone(ppt())
+  questionStillPending.replyTrace.after.attention.push({ requestId: 'question-1', status: 'pending' })
+  assert.throws(() => livePptJourney(questionStillPending, file, 'os-open-accepted'), /pending inbox/)
   assert.throws(() => {
     const result = ppt()
     result.artifact.nativeEditableText = false

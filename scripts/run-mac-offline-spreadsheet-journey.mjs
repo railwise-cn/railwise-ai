@@ -180,8 +180,15 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
       }
     }
     const newWorkbookButton = 'button[aria-label="新建表格"]'
-    if (!await cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(newWorkbookButton)})?.getClientRects().length)`)) {
-      await click('新建会话')
+    const navigationReady = await cdp.wait(`(() => {
+      const workbook = document.querySelector(${JSON.stringify(newWorkbookButton)})
+      const newConversation = document.querySelector('button[aria-label="新建会话"]')
+      if (workbook?.getClientRects().length) return 'workbook'
+      if (newConversation?.getClientRects().length && !newConversation.disabled) return 'new-conversation'
+      return null
+    })()`, 'workbook navigation controls', 30_000)
+    if (navigationReady === 'new-conversation') {
+      await cdp.click('button[aria-label="新建会话"]', '新建会话')
       await cdp.wait(`Boolean(document.querySelector(${JSON.stringify(newWorkbookButton)})?.getClientRects().length)`, 'new conversation workbook controls')
     }
     const editableReady = '[...document.querySelectorAll("button")].some(button => button.textContent === "保存表格" && !button.disabled)'
