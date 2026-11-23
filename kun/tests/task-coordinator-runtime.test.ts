@@ -93,6 +93,70 @@ describe('production task coordinator and durable Worker delivery',()=>{
     expect((await runtime.threadService.get(started.turn.threadId))?.turns).toHaveLength(2)
   },15_000)
 
+  it('re-asks a cancelled user question after pausing before accepting an answer', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-task-paused-question-'))
+    cleanup.push(() => rm(root, { recursive: true, force: true }))
+    const requests: Record<string, unknown>[] = []
+    const server = createServer(async (request, response) => {
+      if (request.method === 'GET') {
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ data: [{ id: 'fixture', object: 'model' }] }))
+        return
+      }
+      let raw = ''
+      for await (const data of request) raw += data.toString()
+      requests.push(JSON.parse(raw) as Record<string, unknown>)
+      const call = requests.length <= 2
+      const delta = call ? { tool_calls: [{ index: 0, id: `ask-${requests.length}`, type: 'function', function: {
+        name: 'request_user_input', arguments: JSON.stringify({ prompt: '需要补充信息', questions: [
+          { header: '官网', id: 'website_url', question: '请提供官网网址。', options: [] }
+        ] })
+      } }] } : { content: '已根据提供的网址完成合成摘要。' }
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(`data: ${JSON.stringify({ id: `reply_${requests.length}`, choices: [{ index: 0, delta, finish_reason: call ? 'tool_calls' : 'stop' }] })}\n\ndata: [DONE]\n\n`)
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    cleanup.push(() => new Promise<void>((resolve, reject) => {
+      server.close(error => error ? reject(error) : resolve())
+      server.closeAllConnections()
+    }))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('listener unavailable')
+    const runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: join(root, 'state'), runtimeToken: 'fixture',
+      baseUrl: `http://127.0.0.1:${address.port}/v1`, apiKey: '', endpointFormat: 'chat_completions', model: 'fixture',
+      approvalPolicy: 'auto', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false,
+      storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({}) })
+    cleanup.push(async () => runtime.shutdown?.())
+    const origin = await runtime.threadService.create({ workspace: root, model: 'fixture', mode: 'agent' })
+    const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'start-question-task',
+      request: { prompt: '请向我询问网址，等我补充后继续并回复测试完成。', reasoningEffort: 'off', taskVisibility: 'task', taskOriginThreadId: origin.id } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    expect(started.task?.acceptance.kind).toBe('answer')
+    await vi.waitFor(() => expect(runtime.taskRepository!.get(started.task!.id)?.status).toBe('waiting_user'))
+    const firstQuestion = runtime.taskRepository!.humanRequests('question').find(item => item.turnId === started.turn.turnId)
+    expect(firstQuestion?.status).toBe('pending')
+
+    const paused = await runtime.taskCoordinator!.command({ threadId: origin.id, taskId: started.task!.id,
+      expectedRevision: runtime.taskRepository!.get(started.task!.id)!.revision, intent: 'pause', idempotencyKey: 'pause-question-task',
+      request: { prompt: '暂停任务' } })
+    expect(paused).toMatchObject({ kind: 'task_updated', action: 'pause', task: { status: 'paused' } })
+    expect(runtime.taskRepository!.humanRequests('question', false).find(item => item.id === firstQuestion!.id)?.status).toBe('cancelled')
+
+    const resumed = await runtime.taskCoordinator!.command({ threadId: origin.id, taskId: started.task!.id,
+      expectedRevision: runtime.taskRepository!.get(started.task!.id)!.revision, intent: 'resume', idempotencyKey: 'resume-question-task', request: { prompt: '继续任务' } })
+    if (resumed.kind !== 'task_started') throw new Error('expected resumed task')
+    await vi.waitFor(() => expect(runtime.taskRepository!.humanRequests('question').filter(item => item.id !== firstQuestion!.id)).toHaveLength(1))
+    const secondQuestion = runtime.taskRepository!.humanRequests('question').find(item => item.id !== firstQuestion!.id)
+    expect(secondQuestion?.status).toBe('pending')
+    expect(JSON.stringify(requests[1])).toContain('Re-ask the outstanding question')
+
+    await expect(runtime.taskCoordinator!.submitTaskUserInputAnswer(secondQuestion!.id, [
+      { id: 'website_url', label: '官网', value: 'https://example.test' }
+    ])).resolves.toBe('submitted')
+    await vi.waitFor(() => expect(runtime.taskRepository!.get(started.task!.id)?.status).toBe('completed'))
+    expect(requests).toHaveLength(3)
+  }, 15_000)
+
   it.each(['file', 'hybrid'] as const)('delivers a supplementary file to the original worker and reopens its reply with %s storage', async backend => {
     const root=await mkdtemp(join(tmpdir(),'railwise-task-production-'))
     cleanup.push(()=>rm(root,{recursive:true,force:true}))

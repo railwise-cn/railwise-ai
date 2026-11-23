@@ -28,7 +28,7 @@ const api = {
   startTaskSse: vi.fn(async () => undefined), stopSse: vi.fn(async () => undefined),
   onSseEvent: vi.fn(() => () => undefined), onSseEnd: vi.fn(() => () => undefined), onSseError: vi.fn(() => () => undefined),
   notifyTask: vi.fn(async () => undefined), resumeTask: vi.fn(), retryTask: vi.fn(), pauseTask: vi.fn(),
-  listTaskInputs: vi.fn(async (): Promise<TaskInputV1[]> => []),
+  listTaskInputs: vi.fn(async (_taskId: string): Promise<TaskInputV1[]> => []),
   runtimeRequest: vi.fn(async (_path: string, _method?: string, _body?: string) => ({ ok: true, body: '{}' })),
   openTaskArtifact: vi.fn(async (): Promise<{ ok: true } | { ok: false; message: string }> => ({ ok: true })),
   openWorkspaceFile: vi.fn(async (): Promise<{ ok: boolean; message?: string }> => ({ ok: true }))
@@ -194,7 +194,7 @@ describe('task actions in the original conversation', () => {
 
     expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
     expect(container.textContent).toContain('请提供官网网址。')
-    expect(container.textContent).toContain('请先继续任务，再在对话中回答。')
+    expect(container.textContent).toContain('继续任务后，系统会重新询问并在对话中接收回答。')
     expect(container.querySelectorAll('textarea')).toHaveLength(1)
     expect(container.querySelector('.ds-message-timeline-content textarea')).toBeNull()
     expect(button('提交回答')).toBeUndefined()
@@ -212,10 +212,68 @@ describe('task actions in the original conversation', () => {
     await render({ composerReplies: true, onComposerQuestionChange })
 
     expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
-    expect(container.textContent).toContain('请先继续任务，再在对话中回答。')
+    expect(container.textContent).toContain('继续任务后，系统会重新询问并在对话中接收回答。')
     expect(container.querySelector('textarea')).toBeNull()
     expect(button('提交回答')).toBeUndefined()
     expect(button('继续任务')).toBeTruthy()
+  })
+
+  it('shows the cancelled question from the interrupted turn as read-only while a task is paused', async () => {
+    tasks = [run('paused-cancelled-question', 'paused', { activeTurnId: 'interrupted-turn' })]
+    attention = []
+    const onComposerQuestionChange = vi.fn()
+    api.runtimeRequest.mockResolvedValue({ ok: true, body: JSON.stringify({ turns: [{ id: 'interrupted-turn', items: [{
+      kind: 'user_input', inputId: 'paused-request', status: 'cancelled', questions: [{ id: 'website', header: '官网',
+        question: '请提供官网网址。', options: [] }]
+    }] }] }) })
+    await render({ composerReplies: true, onComposerQuestionChange })
+
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
+    expect(container.textContent).toContain('暂停前未回答的问题')
+    expect(container.textContent).toContain('请提供官网网址。')
+    expect(container.textContent).toContain('继续任务后，系统会重新询问并在对话中接收回答。')
+    expect(container.querySelector('textarea')).toBeNull()
+    expect(button('提交回答')).toBeUndefined()
+    expect(button('继续任务')).toBeTruthy()
+
+    const secondPause = { ...tasks[0]!, activeTurnId: 'second-interrupted-turn' }
+    tasks = [secondPause]
+    api.runtimeRequest.mockRejectedValueOnce(new Error('temporary thread read failure'))
+    await render({ composerReplies: true, onComposerQuestionChange })
+    expect(container.querySelector('[aria-label="暂停前未回答的问题"]')).toBeNull()
+
+    const resumedTask = { ...secondPause, status: 'waiting_user' as const, activeTurnId: 'resumed-turn' }
+    tasks = [resumedTask]
+    attention = [{ id: 'resumed-attention', requestId: 'resumed-request', taskId: resumedTask.id, ownerId: resumedTask.id, ownerKind: 'task',
+      threadId: resumedTask.threadId, kind: 'question', title: '需要补充信息', message: '请提供官网网址。', status: 'pending',
+      payload: { questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] }, revision: 2,
+      createdAt: resumedTask.createdAt, updatedAt: resumedTask.updatedAt }]
+    api.runtimeRequest.mockResolvedValue({ ok: true, body: JSON.stringify({ turns: [{ id: 'interrupted-turn', items: [{
+      kind: 'user_input', inputId: 'paused-request', status: 'cancelled', questions: [{ id: 'website', header: '官网',
+        question: '请提供官网网址。', options: [] }]
+    }] }, { id: 'resumed-turn', items: [{ kind: 'user_input', inputId: 'resumed-request', status: 'pending', questions: [{
+      id: 'website', header: '官网', question: '请提供官网网址。', options: []
+    }] }] }] }) })
+    await render({ composerReplies: true, onComposerQuestionChange })
+
+    expect(container.querySelector('[aria-label="暂停前未回答的问题"]')).toBeNull()
+    expect(container.querySelector('textarea')).toBeNull()
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith({ taskId: resumedTask.id, threadId,
+      requestId: 'resumed-request', questionId: 'website', label: '请提供官网网址。' })
+
+    const answeredWhileResuming = { ...resumedTask, status: 'paused' as const, activeTurnId: 'resumed-turn' }
+    tasks = [answeredWhileResuming]
+    attention = []
+    api.listTaskInputs.mockResolvedValue([{ id: 'saved-answer', taskId: resumedTask.id, kind: 'supplement', text: 'www.railwise.cn',
+      idempotencyKey: 'user-input:paused-request', createdAt: resumedTask.updatedAt }])
+    api.runtimeRequest.mockResolvedValue({ ok: true, body: JSON.stringify({ turns: [{ id: 'resumed-turn', items: [{
+      kind: 'user_input', inputId: 'paused-request', status: 'cancelled', questions: [{ id: 'website', header: '官网',
+        question: '请提供官网网址。', options: [] }]
+    }] }] }) })
+    await render({ composerReplies: true, onComposerQuestionChange })
+    expect(container.querySelector('[aria-label="暂停前未回答的问题"]')).toBeNull()
+    expect(container.querySelector('[aria-label="补充记录"]')?.textContent).toContain('www.railwise.cn')
+    expect(onComposerQuestionChange).toHaveBeenLastCalledWith(null)
   })
 
   it('keeps the task question bound when its transcript control becomes inline', async () => {
@@ -244,14 +302,16 @@ describe('task actions in the original conversation', () => {
       revision: 1, createdAt: task.createdAt, updatedAt: task.updatedAt }]
     await render({ composerReplies: true })
 
-    tasks = [{ ...task, status: 'completed', activeTurnId: 'resumed-turn', revision: task.revision + 1,
-      artifacts: [{ id: 'presentation', relativePath: 'website.pptx', validation: 'valid', createdAt: task.updatedAt }] }]
+    tasks = [{ ...task, status: 'completed', activeTurnId: 'resumed-turn', revision: task.revision + 1, artifacts: [] }]
     attention = []
-    api.listTaskInputs.mockResolvedValue([{ id: 'answer', taskId: task.id, kind: 'supplement', text: 'https://www.railwise.cn',
-      idempotencyKey: 'user-input:website-request', createdAt: task.updatedAt }])
-    api.runtimeRequest.mockResolvedValue({ ok: true, body: JSON.stringify({ turns: [{ items: [{ kind: 'user_input', inputId: 'website-request',
-      questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] }] }] }) })
-    await render({ composerReplies: true })
+    const savedAnswer = { id: 'answer', taskId: task.id, kind: 'supplement' as const, text: 'https://www.railwise.cn',
+      idempotencyKey: 'user-input:website-request', createdAt: task.updatedAt }
+    api.listTaskInputs.mockImplementation(async taskId => taskId === task.id ? [savedAnswer] : [])
+    api.runtimeRequest.mockImplementation(async path => ({ ok: true, body: JSON.stringify(path.endsWith(task.threadId)
+      ? { turns: [{ items: [{ kind: 'user_input', inputId: 'website-request', questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] }] }] }
+      : {}) }))
+    const historyProps = { composerReplies: true, visibleMessageIds: new Set([`item_command_task_result_${task.id}_receipt`]) }
+    await render(historyProps)
 
     const history = container.querySelector('[aria-label="补充记录"]')
     expect(history?.textContent).toContain('请提供官网网址。')
@@ -259,11 +319,18 @@ describe('task actions in the original conversation', () => {
     expect(history?.closest('[aria-label="任务"]')).not.toBeNull()
 
     await act(async () => root.render(null))
-    await render({ composerReplies: true })
+    await render(historyProps)
     const reopenedHistory = container.querySelector('[aria-label="补充记录"]')
     expect(reopenedHistory?.textContent).toContain('请提供官网网址。')
     expect(reopenedHistory?.textContent).toContain('https://www.railwise.cn')
     expect(api.runtimeRequest).toHaveBeenCalledWith(`/v1/threads/${encodeURIComponent(task.threadId)}`, 'GET')
+
+    tasks = [{ ...task, status: 'completed', activeTurnId: 'resumed-turn', revision: task.revision + 1, artifacts: [] },
+      run('newer-task', 'running', { updatedAt: '2026-11-20T09:00:00Z' })]
+    await render(historyProps)
+    const previousTaskHistory = container.querySelector('[aria-label="补充记录"]')
+    expect(previousTaskHistory?.textContent).toContain('请提供官网网址。')
+    expect(previousTaskHistory?.textContent).toContain('https://www.railwise.cn')
   })
 
   it('does not bind a stale task question while the task is queued', async () => {

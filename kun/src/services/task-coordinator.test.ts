@@ -563,6 +563,7 @@ describe('task commands before Turn allocation',()=>{
     expect(turns).toHaveLength(2)
     expect(turns?.[0]).toMatchObject({ id: started.turn.turnId, status: 'aborted' })
     expect(turns?.[1]).toMatchObject({ status: 'running', prompt: expect.stringContaining('Continue the persisted task') })
+    expect(turns?.[1]?.prompt).not.toContain('Re-ask the outstanding question')
     expect(turns?.[1]?.items[0]).toMatchObject({ kind: 'user_message', displayText: '继续未完成任务' })
     expect(f.repository.get(started.task!.id)?.activeTurnId).toBe(turns?.[1]?.id)
     expect(f.runTurn).toHaveBeenCalledTimes(2)
@@ -635,6 +636,7 @@ describe('task commands before Turn allocation',()=>{
     expect(turns?.[0]).toMatchObject({ id: started.turn.turnId, status: 'aborted', items: expect.arrayContaining([
       expect.objectContaining({ kind: 'user_input', status: 'cancelled' })
     ]) })
+    expect(turns?.[1]?.prompt).not.toContain('Re-ask the outstanding question')
     expect(f.repository.humanRequest(pendingQuestion.id)?.status).toBe('cancelled')
     expect(f.repository.get(started.task!.id)?.activeTurnId).toBe(turns?.[1]?.id)
   })

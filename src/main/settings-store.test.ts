@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -9,6 +9,7 @@ import {
   defaultModelProviderSettings
 } from '../shared/app-settings'
 import { DEFAULT_GUI_UPDATE_CHANNEL } from '../shared/gui-update'
+import { FileWorkspaceTrustReader } from '../../kun/src/services/workspace-trust-reader'
 import {
   JsonSettingsStore,
   LegacySettingsSourceConflictError,
@@ -70,6 +71,31 @@ describe('JsonSettingsStore', () => {
     expect(loaded.workspaceRoot).toBe(join(workwiseHome, 'default_workspace'))
     expect(loaded.write.defaultWorkspaceRoot).toBe(join(workwiseHome, 'write_workspace'))
     expect(loaded.write.activeWorkspaceRoot).toBe(join(workwiseHome, 'write_workspace'))
+    await expect(new FileWorkspaceTrustReader(join(workwiseHome, 'workspace-trust.json')).get(loaded.workspaceRoot))
+      .resolves.toMatchObject({ level: 'workspace-write', revision: 1 })
+    const manifest = JSON.parse(await readFile(join(workwiseHome, 'workspace-trust.json'), 'utf8'))
+    expect(manifest.workspaces).toEqual([{ canonicalRoot: await realpath(loaded.workspaceRoot),
+      level: 'workspace-write', source: 'workwise-created', revision: 1 }])
+    expect(loaded.agents.kun.approvalPolicy).toBe('auto')
+  })
+
+  it.each(['existing-directory', 'linked-directory', 'saved-profile'] as const)('does not bootstrap trust for %s', async variation => {
+    const userDataDir = await mkdtemp(join(tmpdir(), 'railwise-default-preserve-'))
+    try {
+      const workwiseHome = join(userDataDir, '.workwise')
+      const workspace = join(workwiseHome, 'default_workspace')
+      await mkdir(workwiseHome)
+      if (variation === 'linked-directory') {
+        const external = join(userDataDir, 'external')
+        await mkdir(external)
+        await symlink(external, workspace, process.platform === 'win32' ? 'junction' : 'dir')
+      } else if (variation === 'existing-directory') await mkdir(workspace)
+      else await writeIsolatedSettings(userDataDir)
+      await new JsonSettingsStore(userDataDir, { workwiseHome }).load()
+      await expect(new FileWorkspaceTrustReader(join(workwiseHome, 'workspace-trust.json')).get(workspace))
+        .resolves.toMatchObject({ level: 'read-only', revision: 0 })
+      await expect(stat(join(workwiseHome, 'workspace-trust.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally { await rm(userDataDir, { recursive: true, force: true }) }
   })
 
   it('serializes concurrent patches and rejects stale revisions without changing state', async () => {

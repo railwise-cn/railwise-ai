@@ -236,8 +236,8 @@ jobs:
           RAILWISE_WINDOWS_WEB_PPT_BROWSER_FALLBACK: ${{ inputs.web_ppt_journey == 'browser-fallback' }}
           RAILWISE_WINDOWS_WEB_PPT_LIVE: ${{ inputs.web_ppt_journey == 'live' }}
           RAILWISE_WINDOWS_SPREADSHEET_SMOKE: ${{ inputs.run_windows_spreadsheet }}
-          RAILWISE_QA_MODEL_BASE_URL: ${{ inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL_BASE_URL || '' }}
-          RAILWISE_QA_MODEL: ${{ inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL || '' }}
+          RAILWISE_QA_MODEL_BASE_URL: ${{ inputs.web_ppt_journey == 'live' && (secrets.RAILWISE_QA_MODEL_BASE_URL || vars.RAILWISE_QA_MODEL_BASE_URL) || '' }}
+          RAILWISE_QA_MODEL: ${{ inputs.web_ppt_journey == 'live' && (secrets.RAILWISE_QA_MODEL || vars.RAILWISE_QA_MODEL) || '' }}
           RAILWISE_QA_MODEL_API_KEY: ${{ inputs.web_ppt_journey == 'live' && secrets.RAILWISE_QA_MODEL_API_KEY || '' }}
         run: |
           $packages = Join-Path $env:RUNNER_TEMP 'exact-windows-packages'
@@ -457,8 +457,8 @@ jobs:
       - name: Inspect the signed installed application and real startup surfaces
         env:
           RAILWISE_MAC_PPT_JOURNEY: ${{ matrix.arch == 'arm64' && (inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') && inputs.web_ppt_journey || '' }}
-          RAILWISE_QA_MODEL_BASE_URL: ${{ matrix.arch == 'arm64' && inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL_BASE_URL || '' }}
-          RAILWISE_QA_MODEL: ${{ matrix.arch == 'arm64' && inputs.web_ppt_journey == 'live' && vars.RAILWISE_QA_MODEL || '' }}
+          RAILWISE_QA_MODEL_BASE_URL: ${{ matrix.arch == 'arm64' && inputs.web_ppt_journey == 'live' && (secrets.RAILWISE_QA_MODEL_BASE_URL || vars.RAILWISE_QA_MODEL_BASE_URL) || '' }}
+          RAILWISE_QA_MODEL: ${{ matrix.arch == 'arm64' && inputs.web_ppt_journey == 'live' && (secrets.RAILWISE_QA_MODEL || vars.RAILWISE_QA_MODEL) || '' }}
           RAILWISE_QA_MODEL_API_KEY: ${{ matrix.arch == 'arm64' && inputs.web_ppt_journey == 'live' && secrets.RAILWISE_QA_MODEL_API_KEY || '' }}
         run: >-
           node scripts/run-mac-startup-appearance-smoke.mjs --run

@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
-import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { lstat, mkdir, readFile, realpath } from 'node:fs/promises'
+import { basename, dirname, join, resolve } from 'node:path'
+import { defaultWorkspaceTrustManifestPath } from '../../../kun/src/services/workspace-trust-reader'
 import type { SandboxMode } from '../../shared/app-settings'
 import type { WorkspaceTrustLevel, WorkspaceTrustV1 } from '../../shared/agent-workbench'
-import { atomicWriteFile, readRecoveredFile, runSerialized } from './durable-file'
+import { atomicWriteFile, readRecoveredFile, recoverAtomicFile, runSerialized } from './durable-file'
 import { canonicalizeContainmentRoot } from './canonical-containment'
 
 const TRUST_ORDER: WorkspaceTrustLevel[] = [
@@ -84,8 +85,57 @@ function normalizeManifest(value: unknown): TrustManifestV1 {
 export class WorkspaceTrustService {
   private readonly manifestPath: string
 
-  constructor(manifestPath = join(homedir(), '.workwise', 'workspace-trust.json')) {
+  constructor(manifestPath = defaultWorkspaceTrustManifestPath()) {
     this.manifestPath = resolve(manifestPath)
+  }
+
+  /** Only a fresh settings profile may call this for its managed default. */
+  async initializeDefaultWorkspace(workwiseHome: string, workspaceRoot: string): Promise<void> {
+    const home = resolve(workwiseHome)
+    const root = resolve(workspaceRoot)
+    if (root !== join(home, 'default_workspace') || this.manifestPath !== join(home, 'workspace-trust.json')) return
+    await mkdir(home, { recursive: true })
+    const homeInfo = await lstat(home)
+    if (!homeInfo.isDirectory() || homeInfo.isSymbolicLink()) return
+    const canonicalHome = await canonicalizeContainmentRoot(home)
+    if (canonicalHome !== join(await realpath(dirname(home)), basename(home))) return
+    try {
+      // Nonrecursive mkdir is the ownership claim. EEXIST never grants trust.
+      await mkdir(root)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') return
+      throw error
+    }
+    const created = await lstat(root)
+    const canonicalRoot = join(canonicalHome, 'default_workspace')
+    const stillOwned = async (): Promise<void> => {
+      const info = await lstat(root)
+      const parent = await lstat(home)
+      if (!info.isDirectory() || info.isSymbolicLink() || info.dev !== created.dev || info.ino !== created.ino ||
+          !parent.isDirectory() || parent.isSymbolicLink() || parent.dev !== homeInfo.dev || parent.ino !== homeInfo.ino ||
+          await realpath(root) !== canonicalRoot) throw new Error('Managed default workspace changed during initialization.')
+    }
+    await runSerialized(`workspace-trust:${this.manifestPath}`, async () => {
+      let manifest: TrustManifestV1
+      try {
+        await recoverAtomicFile(this.manifestPath)
+        if ((await lstat(this.manifestPath)).isSymbolicLink()) return
+        const raw = JSON.parse(await readFile(this.manifestPath, 'utf8')) as Partial<TrustManifestV1> | null
+        if (!raw || raw.schema !== 'workwise.workspace-trust' || raw.version !== 1 || !Array.isArray(raw.workspaces)) return
+        manifest = normalizeManifest(raw)
+      } catch (error) {
+        if (error instanceof SyntaxError) return
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+        manifest = emptyManifest()
+      }
+      // A user may already have saved even a restrictive rule for this path.
+      if (manifest.workspaces.some(entry => process.platform === 'win32'
+        ? resolve(entry.canonicalRoot).toLowerCase() === canonicalRoot.toLowerCase() : resolve(entry.canonicalRoot) === canonicalRoot)) return
+      await stillOwned()
+      await atomicWriteFile(this.manifestPath, `${JSON.stringify({ ...manifest, revision: manifest.revision + 1,
+        workspaces: [...manifest.workspaces, { canonicalRoot, level: 'workspace-write', source: 'workwise-created', revision: 1 }]
+      }, null, 2)}\n`, { beforeReplace: stillOwned })
+    })
   }
 
   async get(
