@@ -239,3 +239,11 @@ Windows Docling 专项 `45164369592` 使用候选 `45115646587`，工具启动�
 从候选 artifact `candidate-installers-0.5.11-410` 选择性提取 Apple Silicon DMG。DMG 为 410,509,343 字节，SHA-256 `7dead1d1ef872e0159c654c83fc20989bffd91a8d9016650b4047847c583d686`，与同包 `SHA256SUMS.txt` 匹配。复制到隔离临时目录后，`codesign --verify --deep --strict`、Gatekeeper `spctl --assess` 和 `xcrun stapler validate` 均通过；系统报告 Developer ID 签名及已公证。Info.plist 与 ASAR 版本为 0.5.11，Bundle ID 为 `com.wangjiawei508.workgpt`，ASAR SHA-256 为 `2a13b5c628d5e394cf5f7c66c2e6d74930a4878800a92ba8d7da83ea1a22a30c`。候选清单中的 Intel DMG SHA-256 为 `c20409249dddc940cfcd4b26c45e789163d229ad31a397718825e6f02942a398`，Windows x64 EXE 为 `492b7a7027048f57c8124d5285ff0d3de932b0add0648f233e02978dfdee635e`。
 
 **实装 UI 验收仍未通过或未执行。** 本机已有多个正式 RailWise 窗口使用相同 Bundle ID。Computer Use 对临时路径启动返回超时，Finder 打开也复用已有窗口。为避免关闭用户当前窗口，没有通过强制退出正式应用来规避同 Bundle ID 冲突。因此这份已验签 DMG 的冷启动、暂停任务问题只读态、继续后答复及其他任务旅程尚无候选包实装证据。Windows EXE 也未在 Windows 设备安装。真实模型官网 PPT 所需 Actions 配置仍缺 `RAILWISE_QA_MODEL_BASE_URL`、`RAILWISE_QA_MODEL`、`RAILWISE_QA_MODEL_API_KEY`。正式渠道仍为 0.5.10，不能据此发布 0.5.11。
+
+## 2026-11-24 原对话续接与首次运行授权修复
+
+根因与修复：首次运行创建的默认工作区之前没有对应的工作区信任记录，内置 PPT 导出器因此遇到持续的权限拦截。现在只有设置文件不存在、应用亲自创建其受管默认目录时才将该目录登记为 `workspace-write`。既有目录、符号链接、已保存配置和显式限制保持原值。Electron 与 KUN 读取同一份信任清单。任务暂停与输入竞态也已复现，KUN 会先将问题记为取消，晚到的状态更新造成一次性读取看不到原问题。暂停卡现在也接纳该中间态作为只读显示；继续后重新询问未答问题，已经保存的答案不重复询问。等待用户回复时，对话正文显示「暂停」操作。
+
+隔离的 macOS Apple Silicon 源码预览回执保留在本机临时验收目录，未纳入版本库。测试源码提交为 `fb0d9daf95b67835cbd746d8dbd3edb4e36f9ea2`，渲染包 SHA-256 为 `2925303dba2d78c56d6c850c1824d1a6807ac135e7e02c646aa1b1e7dda7bd11`。空配置冷启动创建 `default_workspace` 并读回 `workspace-write/workwise-created`。界面内暂停后原问题仍显示、输入框解除旧请求绑定；在原对话继续、答复及单次批准后，同一任务完成。回执确认一条答案记录、一次文件写入调用和实际文件内容。该源预览不等于签名候选安装包验收，暂停后的应用重启恢复未测。
+
+本次聚焦界面测试 17/17，工作区首次初始化、KUN 用户输入恢复及权限相关聚焦测试 141 项通过，主仓与 KUN 类型检查、ESLint、生产构建及隔离 UI 流程通过。最终修订前源码 `0d6f428a` 的 GitHub Quality CI run `45278698866` attempt 2 三项必需检查均通过。该源码检查之后只更新了本台账记录。当前仍须用下一批精确 macOS 与 Windows 安装包复验；真实模型官网到 PPT、Windows 安装包实装和旧版原地升级、付费登录站点及现场网络流程仍未形成这批源码的制品回执。正式渠道仍为 0.5.10。

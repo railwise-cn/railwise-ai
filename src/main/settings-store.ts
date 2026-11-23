@@ -2,6 +2,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { LEGACY_USER_DATA_DIR_NAMES, isRecognizedSettingsText } from './legacy-data-migration'
+import { WorkspaceTrustService } from './services/workspace-trust-service'
 import {
   atomicWriteFile,
   backupFileIfPresent,
@@ -348,8 +349,12 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === 'object' && error !== null
 }
 
-async function loadDefaultSettings(workwiseHome: string): Promise<WorkWiseSettingsV2> {
+async function loadDefaultSettings(workwiseHome: string, firstInitialization = false): Promise<WorkWiseSettingsV2> {
   const defaults = normalizeStoredSettings(defaultSettings(workwiseHome), workwiseHome)
+  if (firstInitialization) {
+    await new WorkspaceTrustService(join(workwiseHome, 'workspace-trust.json'))
+      .initializeDefaultWorkspace(workwiseHome, defaults.workspaceRoot)
+  }
   await ensureWorkspaceRootExists(defaults.workspaceRoot)
   await ensureWriteWorkspaceRootsExist(defaults)
   await ensureClawChannelWorkspaceRootsExist(defaults)
@@ -504,7 +509,7 @@ export class JsonSettingsStore {
     try {
       const loaded = await readSettingsFileWithCompatibility(this.path)
       if (!loaded) {
-        const defaults = await loadDefaultSettings(this.workwiseHome)
+        const defaults = await loadDefaultSettings(this.workwiseHome, true)
         await mkdir(dirname(this.path), { recursive: true })
         await atomicWriteFile(this.path, serializeSettingsForDisk(defaults, this.workwiseHome))
         this.cache = defaults

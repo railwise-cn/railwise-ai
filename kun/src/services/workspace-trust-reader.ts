@@ -1,15 +1,43 @@
 import { readFile, realpath } from 'node:fs/promises'
+import { existsSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { WorkspaceTrustLevelSchema, type WorkspaceTrustLevel } from '../contracts/permissions.js'
 
 export type WorkspaceTrustSnapshot = { canonicalRoot: string; level: WorkspaceTrustLevel; revision: number }
 export interface WorkspaceTrustReader { get(workspaceRoot: string): Promise<WorkspaceTrustSnapshot> }
 
+/** Electron and its managed child must use the same isolated trust manifest. */
+export function defaultWorkspaceTrustManifestPath(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.WORKWISE_CANDIDATE !== '1') return join(homedir(), '.workwise', 'workspace-trust.json')
+  const root = env.WORKWISE_CANDIDATE_ROOT?.trim()
+  const home = env.WORKWISE_CANDIDATE_HOME?.trim() || (root && join(root, 'home'))
+  const canonical = (path: string): string => {
+    let ancestor = resolve(path)
+    while (!existsSync(ancestor)) {
+      const parent = dirname(ancestor)
+      if (parent === ancestor) throw new Error('Candidate workspace trust path cannot be resolved.')
+      ancestor = parent
+    }
+    return resolve(realpathSync(ancestor), relative(ancestor, resolve(path)))
+  }
+  const contained = (parent: string, child: string): boolean => {
+    const tail = relative(parent, child)
+    return tail !== '' && tail !== '..' && !tail.startsWith(`..${sep}`) && !isAbsolute(tail)
+  }
+  if (!root || !home || !isAbsolute(root) || !isAbsolute(home) ||
+      !contained(resolve(root), resolve(home)) || !contained(canonical(root), canonical(home))) {
+    throw new Error('Candidate workspace trust must stay inside its isolated root.')
+  }
+  const manifest = join(resolve(home), '.workwise', 'workspace-trust.json')
+  if (!contained(canonical(root), canonical(manifest))) throw new Error('Candidate workspace trust must stay inside its isolated root.')
+  return manifest
+}
+
 /** Reads the same versioned manifest written by Electron WorkspaceTrustService.
  * Reads are deliberately uncached: revocation must reach already-running Turns. */
 export class FileWorkspaceTrustReader implements WorkspaceTrustReader {
-  constructor(private readonly manifestPath = join(homedir(), '.workwise', 'workspace-trust.json')) {}
+  constructor(private readonly manifestPath = defaultWorkspaceTrustManifestPath()) {}
 
   async get(workspaceRoot: string): Promise<WorkspaceTrustSnapshot> {
     if (!workspaceRoot.trim()) return { canonicalRoot: '', level: 'read-only', revision: 0 }
