@@ -23,10 +23,18 @@ it.each(['0.5.9', '0.5.10', '0.5.11'])('presents the %s highlights once and supp
     getAppVersion.mockResolvedValue(version)
     await act(async () => root.render(createElement(ReleaseHighlights, { key: 'first' })))
     expect(container.textContent).toContain(`本版更新 · ${version}`)
+    expect(storage.has(`railwise.release-highlights.${version}`)).toBe(false)
+
+    await act(async () => root.render(null))
+    await act(async () => root.render(createElement(ReleaseHighlights, { key: 'remounted' })))
+    expect(container.textContent).toContain(`本版更新 · ${version}`)
+    expect(storage.has(`railwise.release-highlights.${version}`)).toBe(false)
+
     await act(async () => container.querySelector('button')?.click())
     expect(openExternal).toHaveBeenCalledWith('https://www.railwise.cn/products/railwise-ai/#download')
     await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="关闭本版更新"]')?.click())
     expect(container.textContent).toBe('')
+    expect(storage.get(`railwise.release-highlights.${version}`)).toBe('1')
     await act(async () => root.render(createElement(ReleaseHighlights, { key: 'later' })))
     expect(container.textContent).toBe('')
   } finally {

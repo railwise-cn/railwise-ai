@@ -229,7 +229,8 @@ export function windowsUpdaterCoreJourney(report, entry) {
   assert.equal(after.packageMetadata.sourceHead, sourceHead)
   assert.equal(after.expectedSource, sourceHead)
   for (const key of ['profilePreserved', 'workspaceFilePreserved', 'preferencesPreserved', 'threadPreserved']) assert.equal(after[key], true)
-  assert.ok(after.releaseHighlightsVisible === true || after.releaseHighlightsFirstLaunchRecorded === true)
+  assert.equal(after.releaseHighlightsVisible, true, 'The installed app must visibly show the release highlights')
+  assert.equal(after.releaseHighlightsDismissalRecorded, false, 'The acceptance flow must leave the first-launch highlights open')
   const id = entry === 'overlay' ? 'windows-legacy-overlay' : `windows-updater-${entry}`
   const method = { sidebar: 'trusted-pointer-on-sidebar', settings: 'trusted-pointer-in-settings', overlay: 'exact-installer-overlay' }[entry]
   assert.equal(after.action.method, method)

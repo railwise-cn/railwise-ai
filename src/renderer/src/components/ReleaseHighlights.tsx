@@ -34,7 +34,6 @@ export function ReleaseHighlights() {
       const seenKey = `railwise.release-highlights.${version}`
       try {
         if (localStorage.getItem(seenKey)) return
-        localStorage.setItem(seenKey, '1')
       } catch {
         // Some isolated desktop sessions cannot persist storage.
       }
@@ -49,6 +48,14 @@ export function ReleaseHighlights() {
   const description = releaseHighlights[releaseVersion][chinese ? 'zh' : 'en']
   const details = chinese ? '查看更新说明' : 'Release notes'
   const dismiss = chinese ? '关闭本版更新' : 'Dismiss release highlights'
+  const dismissHighlights = (): void => {
+    try {
+      localStorage.setItem(`railwise.release-highlights.${releaseVersion}`, '1')
+    } catch {
+      // The current session can still dismiss the announcement.
+    }
+    setReleaseVersion(undefined)
+  }
   return (
     <section aria-label={title} className="ds-no-drag mx-3 mt-3 flex shrink-0 items-start gap-3 rounded-lg border border-ds-border bg-ds-card px-3 py-2.5 text-sm text-ds-ink">
       <ArrowUpCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-ds-muted" />
@@ -57,7 +64,7 @@ export function ReleaseHighlights() {
         <p className="mt-0.5 text-ds-muted">{description}</p>
         <button type="button" className="mt-1 underline underline-offset-2" onClick={() => void window.workwise.openExternal(detailsUrl)}>{details}</button>
       </div>
-      <button type="button" className="shrink-0 rounded-md p-1 text-ds-muted hover:bg-ds-main focus-visible:ring-2" aria-label={dismiss} onClick={() => setReleaseVersion(undefined)}>
+      <button type="button" className="shrink-0 rounded-md p-1 text-ds-muted hover:bg-ds-main focus-visible:ring-2" aria-label={dismiss} onClick={dismissHighlights}>
         <X aria-hidden="true" className="size-4" />
       </button>
     </section>

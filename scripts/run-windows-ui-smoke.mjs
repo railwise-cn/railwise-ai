@@ -2113,15 +2113,8 @@ export async function connectCdp(url) {
   })
   let sequence = 0
   const pending = new Map()
-  const eventHandlers = new Map()
   socket.addEventListener('message', event => {
     const message = JSON.parse(event.data)
-    if (typeof message.method === 'string') {
-      for (const handler of eventHandlers.get(message.method) ?? []) {
-        try { handler(message.params) } catch { /* CDP event observers own their failures. */ }
-      }
-      return
-    }
     const entry = pending.get(message.id)
     if (!entry) return
     pending.delete(message.id)
@@ -2139,15 +2132,6 @@ export async function connectCdp(url) {
     pending.set(id, { done, reject, timer, method })
     socket.send(JSON.stringify({ id, method, params }))
   })
-  const onEvent = (method, handler) => {
-    const handlers = eventHandlers.get(method) ?? new Set()
-    handlers.add(handler)
-    eventHandlers.set(method, handlers)
-    return () => {
-      handlers.delete(handler)
-      if (handlers.size === 0) eventHandlers.delete(method)
-    }
-  }
   const evaluate = async (expression, timeout) => {
     const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, timeout)
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text)
@@ -2178,7 +2162,7 @@ export async function connectCdp(url) {
     if (text) await send('Input.insertText', { text })
     await wait(`document.querySelector(${JSON.stringify(selector)})?.value === ${JSON.stringify(text)}`, 'the typed resource query')
   }
-  return { send, onEvent, evaluate, wait, click, fill, close: () => socket.close() }
+  return { send, evaluate, wait, click, fill, close: () => socket.close() }
 }
 
 const browserDiagnosticBudgetMs = 20_000

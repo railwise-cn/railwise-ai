@@ -425,18 +425,18 @@ async function main(args) {
         actual.packagedFeed = verifyInstalledIsolatedWindowsFeed(await readFile(join(installDirectory, 'resources', 'app-update.yml'), 'utf8'))
       }
       if (['0.5.10', '0.5.11'].includes(item.identity.version)) {
-        // The NSIS handoff can open the first upgraded window before CDP is
-        // available. On reconnect retain its one-time announcement readback.
         const announcement = await running.cdp.wait(`(() => {
           const visible = [...document.querySelectorAll('section')].some(section =>
             ['本版更新', 'What’s new'].includes(section.getAttribute('aria-label')) && section.textContent.includes(${JSON.stringify(item.identity.version)}));
-          const recorded = localStorage.getItem(${JSON.stringify(releaseHighlightsStorageKey(item.identity.version))}) === '1';
-          return visible || recorded ? {visible, recorded} : null;
+          const dismissed = localStorage.getItem(${JSON.stringify(releaseHighlightsStorageKey(item.identity.version))}) === '1';
+          return visible ? {visible, dismissed} : null;
         })()`,
-          `the new ${item.identity.version} release highlights`
+          `the visible ${item.identity.version} release highlights`
         )
         actual.releaseHighlightsVisible = announcement.visible
-        actual.releaseHighlightsFirstLaunchRecorded = announcement.recorded
+        actual.releaseHighlightsDismissalRecorded = announcement.dismissed
+        assert.equal(announcement.visible, true)
+        assert.equal(announcement.dismissed, false, 'The acceptance flow must not dismiss first-launch highlights')
       }
       report.steps[report.steps.length - 1] = { ...actual, action, readbackStatus: 'passed' }
       await save()

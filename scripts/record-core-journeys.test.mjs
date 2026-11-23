@@ -197,12 +197,19 @@ test('Windows updater receipt requires exact handoff and recovers data for eithe
   const after = { expectedVersion: version, expectedSource: sourceHead, installerSha256,
     packageMetadata: { version, sourceHead, asarSha256: installedAsarSha256 },
     profilePreserved: true, workspaceFilePreserved: true, preferencesPreserved: true, threadPreserved: true,
-    releaseHighlightsVisible: true, action: { method: 'trusted-pointer-on-sidebar', window: { pid: 321 } } }
+    releaseHighlightsVisible: true, releaseHighlightsDismissalRecorded: false,
+    action: { method: 'trusted-pointer-on-sidebar', window: { pid: 321 } } }
   const report = { status: 'passed', scope: 'private-frozen-windows-gui-upgrade', productionTouched: false,
     targetBuild: { ...build, packageSourceHead: sourceHead }, baseline: { package: { version: '0.5.10' } },
     privateTrust: { scope: 'ephemeral-github-hosted-windows-machine-root' }, steps: [after] }
   assert.equal(windowsUpdaterCoreJourney(report, 'sidebar').journeys[0].id, 'windows-updater-sidebar')
   assert.throws(() => windowsUpdaterCoreJourney(report, 'settings'))
+  const hiddenAnnouncement = structuredClone(after)
+  hiddenAnnouncement.releaseHighlightsVisible = false
+  hiddenAnnouncement.releaseHighlightsDismissalRecorded = true
+  report.steps = [hiddenAnnouncement]
+  assert.throws(() => windowsUpdaterCoreJourney(report, 'sidebar'), /release highlights/)
+  report.steps = [after]
   after.action.method = 'exact-installer-overlay'
   report.baseline.package.version = '0.5.7'
   assert.equal(windowsUpdaterCoreJourney(report, 'overlay').journeys[0].id, 'windows-legacy-overlay')
@@ -215,7 +222,8 @@ test('Windows updater receipt accepts an isolated candidate only with exact arti
   const after = { expectedVersion: version, expectedSource: sourceHead, installerSha256,
     packageMetadata: { version, sourceHead, asarSha256: installedAsarSha256 },
     profilePreserved: true, workspaceFilePreserved: true, preferencesPreserved: true, threadPreserved: true,
-    releaseHighlightsVisible: true, action: { method: 'trusted-pointer-on-sidebar', window: { pid: 321 } } }
+    releaseHighlightsVisible: true, releaseHighlightsDismissalRecorded: false,
+    action: { method: 'trusted-pointer-on-sidebar', window: { pid: 321 } } }
   const targetVerification = { scope: 'isolated-candidate-acceptance', releaseApproval: false,
     manifestSha256: 'a'.repeat(64), installerSha512: Buffer.alloc(64, 0x5a).toString('base64'), blockmapSha256: 'c'.repeat(64),
     feedRequests: { manifest: 2, installerBytes: 100 } }
