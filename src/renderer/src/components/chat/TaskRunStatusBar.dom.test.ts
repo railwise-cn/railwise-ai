@@ -192,12 +192,21 @@ describe('task actions in the original conversation', () => {
     attention = []
     api.listTaskInputs.mockResolvedValue([{ id: 'answer', taskId: task.id, kind: 'supplement', text: 'https://www.railwise.cn',
       idempotencyKey: 'user-input:website-request', createdAt: task.updatedAt }])
+    api.runtimeRequest.mockResolvedValue({ ok: true, body: JSON.stringify({ turns: [{ items: [{ kind: 'user_input', inputId: 'website-request',
+      questions: [{ id: 'website', header: '官网', question: '请提供官网网址。', options: [] }] }] }] }) })
     await render({ composerReplies: true })
 
     const history = container.querySelector('[aria-label="补充记录"]')
     expect(history?.textContent).toContain('请提供官网网址。')
     expect(history?.textContent).toContain('https://www.railwise.cn')
     expect(history?.closest('[aria-label="任务"]')).not.toBeNull()
+
+    await act(async () => root.render(null))
+    await render({ composerReplies: true })
+    const reopenedHistory = container.querySelector('[aria-label="补充记录"]')
+    expect(reopenedHistory?.textContent).toContain('请提供官网网址。')
+    expect(reopenedHistory?.textContent).toContain('https://www.railwise.cn')
+    expect(api.runtimeRequest).toHaveBeenCalledWith(`/v1/threads/${encodeURIComponent(task.threadId)}`, 'GET')
   })
 
   it('does not bind a stale task question while the task is queued', async () => {

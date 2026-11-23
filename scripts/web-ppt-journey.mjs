@@ -479,6 +479,8 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const selector = await revealArtifact(cdp)
       await cdp.click(selector, filename)
       const open = openArtifact ? await openArtifact(cdp, { task, artifact, path: output }) : { status: 'ui-click-only' }
+      await cdp.wait(`${conversationTextProbe()}.includes(${literal(live ? '网址' : webPptQuestion)})`,
+        'the answered source question restored in the original conversation', 15_000)
       const originalConversationText = await cdp.evaluate(conversationTextProbe())
       assert.ok(originalConversationText.includes(live ? '网址' : webPptQuestion),
         'The source question must remain visible in the original conversation body')

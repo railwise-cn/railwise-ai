@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { AlertTriangle, CheckCircle2, FileText, Loader2, PauseCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { TaskAttentionV1, TaskOperationReceiptV1, TaskRunStatus, TaskRunV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskInputV1, TaskOperationReceiptV1, TaskRunStatus, TaskRunV1 } from '@shared/agent-workbench'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { currentTaskBranch } from '@shared/task-projection'
 import { groupWorkspaceTasks, taskGroupArtifacts, type TaskWorkspaceTaskGroup } from '@shared/task-workspace-projection'
@@ -42,6 +42,29 @@ const ACTIVE_STATUSES = new Set<TaskRunStatus>(['queued', 'running', 'retrying']
 const TERMINAL_STATUSES = new Set<TaskRunStatus>(['completed', 'failed', 'cancelled'])
 const EMPTY_CONTROLS: readonly ChatBlock[] = []
 const taskButtonClass = 'max-w-full rounded-md border border-ds-border px-2.5 py-1.5 text-left text-xs font-medium hover:bg-ds-hover disabled:opacity-50'
+
+type AnsweredTaskQuestion = { requestId: string; question: string; answer: string }
+
+function answeredQuestionsFromThread(thread: unknown, inputs: TaskInputV1[]): AnsweredTaskQuestion[] {
+  if (!thread || typeof thread !== 'object' || !('turns' in thread) || !Array.isArray(thread.turns)) return []
+  const answers = new Map(inputs.filter(input => input.kind === 'supplement' && input.idempotencyKey.startsWith('user-input:'))
+    .map(input => [input.idempotencyKey.slice('user-input:'.length), input.text]))
+  const result: AnsweredTaskQuestion[] = []
+  for (const turn of thread.turns) {
+    if (!turn || typeof turn !== 'object' || !('items' in turn) || !Array.isArray(turn.items)) continue
+    for (const item of turn.items) {
+      if (!item || typeof item !== 'object' || !('kind' in item) || item.kind !== 'user_input' ||
+        !('inputId' in item) || typeof item.inputId !== 'string' || !('questions' in item) || !Array.isArray(item.questions) || item.questions.length !== 1) continue
+      const question = item.questions[0]
+      if (!question || typeof question !== 'object' || !('question' in question) || typeof question.question !== 'string' ||
+        !('options' in question) || !Array.isArray(question.options) || question.options.length > 0) continue
+      const answer = answers.get(item.inputId)
+      if (answer === undefined) continue
+      result.push({ requestId: item.inputId, question: question.question, answer })
+    }
+  }
+  return result
+}
 
 export function taskProgress(task: TaskRunV1): { completed: number; total: number } {
   return { completed: task.nodes.filter((node) => node.status === 'completed').length, total: task.nodes.length }
@@ -118,8 +141,8 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     ? (typeof questionForHistory.label === 'string' ? questionForHistory.label
       : typeof questionForHistory.question === 'string' ? questionForHistory.question : onlyAttention?.message)
     : undefined
-  const [answeredQuestions, setAnsweredQuestions] = useState<Array<{ requestId: string; question: string; answer?: string }>>([])
-  const questionHistoryTaskId = useRef('')
+  const [answeredQuestions, setAnsweredQuestions] = useState<AnsweredTaskQuestion[]>([])
+  const questionHistoryLoadKey = useRef('')
   const taskQuestion = useMemo(() => {
     if (!composerReplies || !['waiting_user', 'paused'].includes(task.status) || !task.activeTurnId || attentionKind !== 'question' ||
       !threadId || !attentionId || !Array.isArray(attentionQuestions) || attentionQuestions.length !== 1) return null
@@ -136,29 +159,32 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
     return () => onComposerQuestionChange(null)
   }, [onComposerQuestionChange, taskQuestion])
   useEffect(() => {
-    if (questionHistoryRequestId && questionHistoryText) {
-      questionHistoryTaskId.current = task.id
-      setAnsweredQuestions(current => current.some(item => item.requestId === questionHistoryRequestId)
-        ? current.map(item => item.requestId === questionHistoryRequestId ? { ...item, question: questionHistoryText } : item)
-        : [...current, { requestId: questionHistoryRequestId, question: questionHistoryText }])
-    }
-    if (!runtimeReady || (questionHistoryTaskId.current !== task.id && !questionHistoryRequestId)) return
+    if (!runtimeReady || !task.threadId || typeof window.workwise?.runtimeRequest !== 'function' ||
+      typeof window.workwise.listTaskInputs !== 'function') return
+    const loadKey = [task.id, task.threadId, task.activeTurnId ?? '', task.status, questionHistoryRequestId ?? ''].join(':')
+    if (questionHistoryLoadKey.current === loadKey) return
+    questionHistoryLoadKey.current = loadKey
     let active = true
-    void window.workwise.listTaskInputs(task.id).then(inputs => {
+    void Promise.all([
+      window.workwise.runtimeRequest(`/v1/threads/${encodeURIComponent(task.threadId)}`, 'GET'),
+      window.workwise.listTaskInputs(task.id)
+    ]).then(([threadResponse, inputs]) => {
       if (!active) return
-      setAnsweredQuestions(current => {
-        let changed = false
-        const next = current.map(item => {
-          const answer = inputs.find(input => input.kind === 'supplement' && input.idempotencyKey === `user-input:${item.requestId}`)?.text
-          if (answer === undefined || answer === item.answer) return item
-          changed = true
-          return { ...item, answer }
-        })
-        return changed ? next : current
-      })
-    }).catch(() => undefined)
+      const history = threadResponse.ok
+        ? answeredQuestionsFromThread(JSON.parse(threadResponse.body), inputs)
+        : []
+      if (questionHistoryRequestId && questionHistoryText) {
+        const answer = inputs.find(input => input.kind === 'supplement' && input.idempotencyKey === `user-input:${questionHistoryRequestId}`)?.text
+        if (answer !== undefined && !history.some(item => item.requestId === questionHistoryRequestId)) {
+          history.push({ requestId: questionHistoryRequestId, question: questionHistoryText, answer })
+        }
+      }
+      setAnsweredQuestions(history)
+    }).catch(() => {
+      if (questionHistoryLoadKey.current === loadKey) questionHistoryLoadKey.current = ''
+    })
     return () => { active = false }
-  }, [questionHistoryRequestId, questionHistoryText, runtimeReady, task.id, task.revision])
+  }, [questionHistoryRequestId, questionHistoryText, runtimeReady, task.activeTurnId, task.id, task.status, task.threadId])
   const isInline = (item: TaskAttentionV1): boolean => isInTimeline(item, { inlineRequests, inlineCapabilityCards })
   const remainingAttention = pending.filter(item => {
     if (isInline(item)) return false
@@ -289,8 +315,8 @@ function ConversationTask({ group, live, threadId, runtimeReady, inlineCapabilit
       {running ? <button type="button" disabled={disabled} onClick={() => void run('pause')} className={taskButtonClass}>{t('taskWorkspacePause')}</button> : null}
       {!TERMINAL_STATUSES.has(task.status) ? <button type="button" disabled={disabled} onClick={() => void run('cancel')} className={taskButtonClass}>{t('taskRunCancel')}</button> : null}
     </div>
-    {answeredQuestions.some(item => item.answer !== undefined) ? <div aria-label={t('taskRunQuestionHistory')} className="space-y-0.5 pb-1 text-xs text-ds-muted">
-      {answeredQuestions.filter(item => item.answer !== undefined).map(item => <div key={item.requestId} className="min-w-0 break-words">
+    {answeredQuestions.length > 0 ? <div aria-label={t('taskRunQuestionHistory')} className="space-y-0.5 pb-1 text-xs text-ds-muted">
+      {answeredQuestions.map(item => <div key={item.requestId} className="min-w-0 break-words">
         <p><span className="font-medium">{t('taskRunQuestionLabel')}</span> {item.question}</p>
         <p><span className="font-medium">{t('taskRunAnswerLabel')}</span> {item.answer}</p>
       </div>)}
