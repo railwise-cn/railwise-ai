@@ -216,14 +216,26 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     let canvas
     const cellEditorId = '__editor___INTERNAL_EDITOR__DOCS_NORMAL'
     const clickCell = async (row, column, count = 1) => {
-      canvas = await cdp.wait(`[...document.querySelectorAll('.ds-code-sidebar canvas[data-u-comp="render-canvas"]')]
-        .map(canvas => canvas.getBoundingClientRect().toJSON()).find(box => box.width > 200 && box.height > 150)`, 'workbook grid canvas')
-      const point = { x: canvas.x + 83 + column * 79, y: canvas.y + 59 + row * 22 }
-      const hit = await cdp.evaluate(`(() => {
-        const element = document.elementFromPoint(${point.x}, ${point.y})
-        return element ? { tag: element.tagName, component: element.getAttribute('data-u-comp'), className: element.className?.toString?.() ?? '' } : null
-      })()`)
-      report.lastCellInteraction = { row, column, canvas, point, hit }
+      let previous
+      const interaction = await until('stable visible workbook cell', async () => {
+        const current = await cdp.evaluate(`(() => {
+          const canvas=[...document.querySelectorAll('.ds-code-sidebar canvas[data-u-comp="render-canvas"]')]
+            .find(item=>item.getClientRects().length&&item.clientWidth>200&&item.clientHeight>150);
+          if(!canvas)return null;
+          const box=canvas.getBoundingClientRect().toJSON();
+          const point={x:box.x+83+${column}*79,y:box.y+59+${row}*22};
+          const element=document.elementFromPoint(point.x,point.y);
+          const hit=element?{tag:element.tagName,component:element.getAttribute('data-u-comp'),className:element.className?.toString?.()??''}:null;
+          return {box,point,hit,ready:Boolean(element===canvas&&hit?.component==='render-canvas')};
+        })()`)
+        if (!current?.ready) { previous = undefined; return null }
+        if (previous && ['x', 'y', 'width', 'height'].every(key => previous.box[key] === current.box[key])) return current
+        previous = current
+        return null
+      })
+      canvas = interaction.box
+      const point = interaction.point
+      report.lastCellInteraction = { row, column, canvas, point, hit: interaction.hit }
       for (let clickCount = 1; clickCount <= count; clickCount++) {
         await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount, ...point })
         await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount, ...point })
