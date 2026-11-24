@@ -62,6 +62,13 @@ test('new-conversation PPT entry accepts its workspace-specific placeholder', as
   assert.doesNotMatch(journey, /const composer = '[^']*placeholder="向智能体提问/)
 })
 
+test('incomplete PPT tasks retain only the sanitized runtime diagnostics', async () => {
+  const journey = await readFile(journeySourcePath, 'utf8')
+  assert.match(journey, /readWebPptTaskDiagnostics\(cdp, journey\.taskId, journey\.executionThreadId\)[\s\S]*?webPptDiagnostics: diagnostics/)
+  assert.match(journey, /task: \{ id: task\.id, status: task\.status, originThreadId: task\.originThreadId/)
+  assert.doesNotMatch(journey, /toolCallArguments|requestHeaders|apiKey|messages: thread\.turns/)
+})
+
 test('Mac document-window observations retain the app and title for every visible app window', () => {
   assert.deepEqual(parseMacWindowObservation([
     'FRONTMOST|LibreOffice',

@@ -466,7 +466,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       'task completion or a visible request for input', live ? 480_000 : 180_000)
       if (task.status !== 'completed') {
         const diagnostics = await readWebPptTaskDiagnostics(cdp, journey.taskId, journey.executionThreadId)
-        throw new Error(`PPT task did not complete: ${JSON.stringify(diagnostics)}`)
+        throw Object.assign(new Error('PPT task did not complete'), { webPptDiagnostics: diagnostics })
       }
       assert.equal(task.originThreadId, journey.conversationThreadId)
       assert.equal(task.threadId, journey.executionThreadId)
