@@ -184,3 +184,27 @@ test('marketplace staging accepts only verified native bundle bytes matching the
     await assert.rejects(loadMarketplaceArtifacts({ ...lock, packages: [] }, directory), /Invalid or empty/)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+test('marketplace staging skips unselected rebuild bytes without accepting a different review', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'marketplace-stage-selected-test-'))
+  try {
+    const platform = 'win32', arch = 'x64'
+    const build = join(directory, `marketplace-mirror-${platform}-${arch}`)
+    await mkdir(build)
+    const selected = { packageId: 'playwright', reviewSha256: 'f'.repeat(64), platform, arch, parts: [{ sha256: file.sha256, size: file.size }] }
+    const unchanged = { ...selected, packageId: 'unchanged', parts: [{ sha256: 'a'.repeat(64), size: 99 }] }
+    const lock = { version: 1, packages: [selected, unchanged] }
+    const generated = { version: 1, packages: [selected, { ...unchanged, parts: [{ sha256: 'b'.repeat(64), size: 100 }] }] }
+    const sourceLock = join(build, 'marketplace-lock.json')
+    await writeFile(sourceLock, JSON.stringify(generated))
+    await writeFile(join(build, `${file.sha256}.zip`), bytes)
+    const result = await loadMarketplaceArtifacts(lock, directory)
+    assert.equal(result.files.length, 1)
+    assert.equal(result.files[0].sha256, file.sha256)
+    // No unselected payload needs to exist locally, and it cannot reach staging.
+    assert.equal(result.sources.size, 1)
+    generated.packages[1].reviewSha256 = 'c'.repeat(64)
+    await writeFile(sourceLock, JSON.stringify(generated))
+    await assert.rejects(loadMarketplaceArtifacts(lock, directory), /does not match the committed lock/)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})

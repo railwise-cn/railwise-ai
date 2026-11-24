@@ -131,25 +131,25 @@
     },
     {
       "packageId": "docling-mcp",
-      "reviewSha256": "ffa9c850d1c8abc39cca84f724ab5833592995b24ed2bd4baf9afa38c2026c70",
+      "reviewSha256": "8c91c03f0792bf6ec1329149661f535a6f32712cb99dd685341ae857827f091f",
       "platform": "darwin",
       "arch": "arm64",
       "parts": [
         {
-          "sha256": "a8b9a98f1114314e8bc1381a1a0f82194a46736918469fcab52e5a231184e01c",
-          "size": 17310168
+          "sha256": "31a2155dc958c76709a6c456eda9d19ed4bc81c0b2565ef5bcbd2b03115752fd",
+          "size": 18029867
         },
         {
-          "sha256": "5d1dfacd73b4080cb387e65f3801c4fd15139be6627972b66cdf5089ce9263f8",
-          "size": 15100001
+          "sha256": "1ba2284fd58e5511f6e46b278476caafaa49eaff115e02d0fe06404015a90470",
+          "size": 15454658
         },
         {
-          "sha256": "037b532f8e5d5dbb87a33771f5f13d6b4a5a862f7cf0889e992f2263b8df3c52",
-          "size": 8527836
+          "sha256": "f0088df54b91eee3737ea9f7de32d40f19e1a929145cbd060bde72c68ffcb82a",
+          "size": 9516314
         },
         {
-          "sha256": "1f02e1cc53183973bc221b020902c6800742ea9f403fc028aef1cdd8ca87b4a2",
-          "size": 1022213
+          "sha256": "cf4ff41a1dbc95b6abe95cc8242f661018d9df7714bdc2c659c25d64bc3b2d0c",
+          "size": 2035512
         }
       ]
     },
@@ -263,25 +263,25 @@
     },
     {
       "packageId": "playwright-cli-skills",
-      "reviewSha256": "87913bdffceed564bca36cce02d7b0730a7f00b5b7f6eb9dfaa0c5fd5517f618",
+      "reviewSha256": "1af7f162f98247831bd89dc513fb86b405e9391951d4d63d37961afc0692d9d9",
       "platform": "darwin",
       "arch": "arm64",
       "parts": [
         {
-          "sha256": "a2341e738347b766716fafb78b50dbe84c2a01f3e0738d8283c868513e0c90bf",
-          "size": 4274439
+          "sha256": "7dbd91f6a8021bff9c119bde8596a10618ec31a1bfe4255d3a46b1ecfe7b1447",
+          "size": 4337751
         }
       ]
     },
     {
       "packageId": "playwright-mcp",
-      "reviewSha256": "557f89a99f416b8742d1d2255d14525b3f6e60a9de00abeb3c274793f9697644",
+      "reviewSha256": "a67f4deae543dc83d9eaed91554f2c78d3e1725186df4e856b5f1310d87b50b7",
       "platform": "darwin",
       "arch": "arm64",
       "parts": [
         {
-          "sha256": "c4d3461e875fe3b26e2a7a75851a913195d9f9e7118823a1ce58a04829a2677c",
-          "size": 4238838
+          "sha256": "0df8a0a762352705974554d38676681bf3cfa446aceba25c65a7fff1aca469a8",
+          "size": 4292335
         }
       ]
     },
@@ -319,13 +319,13 @@
     },
     {
       "packageId": "superpowers",
-      "reviewSha256": "f65a56ea8d796994dcb02a9b0ca3955938f816e52410124167eb8b4d2b084e2c",
+      "reviewSha256": "6fe17bde83bd861a3b29fdb2bd05b3e19dfeacac6510a6a427e89538bf3761e5",
       "platform": "darwin",
       "arch": "arm64",
       "parts": [
         {
-          "sha256": "06fd394b354b1010e88d36a16c7f232954a109574061bc7fda6f01c4943f6b25",
-          "size": 147252
+          "sha256": "2adbbe2409aff31492b1e3b8c933b02fe2a158269e657123441f3f38615e5229",
+          "size": 192606
         }
       ]
     },
@@ -343,13 +343,13 @@
     },
     {
       "packageId": "video-shotcraft",
-      "reviewSha256": "e52072beda606da50549af2a2e5311ef480f79e1a6bd6708fda0fe10d82b9dd0",
+      "reviewSha256": "e36a2e0cc78c47dc41a84766ef84a54c7837dd420be56f7dc6e82d4bb3fac601",
       "platform": "darwin",
       "arch": "arm64",
       "parts": [
         {
-          "sha256": "23d79ab2871094262721fb2aa2ea8647aaa3b45e5d757b1ea69465a5ce80dfcc",
-          "size": 3040181
+          "sha256": "d0515f9e64d7d7f8e1fc4705e8ffce0f235f6e2e45cfb2903ae88f41998049f9",
+          "size": 3058997
         }
       ]
     },
@@ -483,25 +483,25 @@
     },
     {
       "packageId": "docling-mcp",
-      "reviewSha256": "ffa9c850d1c8abc39cca84f724ab5833592995b24ed2bd4baf9afa38c2026c70",
+      "reviewSha256": "8c91c03f0792bf6ec1329149661f535a6f32712cb99dd685341ae857827f091f",
       "platform": "darwin",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "5cc8d2b25c94a3221a11c3a7e61db7730b56a4c1d81f33c1479e7bb4e24be1a5",
-          "size": 16383079
+          "sha256": "42894736878d15e5c527f6ab0464df811f8de1737f59a333192c1b435e75d9fc",
+          "size": 17043156
         },
         {
-          "sha256": "d895816955e24478bda63221b6f8b8209864ecaf5e0eab85668029e3b953ded1",
-          "size": 15887270
+          "sha256": "8c38ea7ece252b105ab13d9841cdda9140c043e15810494d44b4e4d6dcca977d",
+          "size": 15824865
         },
         {
-          "sha256": "eefef882b16843c38119758a915dd1cc5273562632d73dac3a7fcd80ae283fc2",
-          "size": 10437269
+          "sha256": "df27903e26da8a37195952a2c00e437b3d44bbd6e9d4f8e8df2f9ee3d1717a9c",
+          "size": 12441746
         },
         {
-          "sha256": "b70f093218bc9cef3125bec1eb0aa2ff3a6918b9845601fa1a8255ccbf2fe10e",
-          "size": 1774029
+          "sha256": "b99d2177c98e3bc689ae13e01d724bb9fcf95cc5169dc99afdf1efe8eae46e5f",
+          "size": 2403093
         }
       ]
     },
@@ -627,25 +627,25 @@
     },
     {
       "packageId": "playwright-cli-skills",
-      "reviewSha256": "87913bdffceed564bca36cce02d7b0730a7f00b5b7f6eb9dfaa0c5fd5517f618",
+      "reviewSha256": "1af7f162f98247831bd89dc513fb86b405e9391951d4d63d37961afc0692d9d9",
       "platform": "darwin",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "a2341e738347b766716fafb78b50dbe84c2a01f3e0738d8283c868513e0c90bf",
-          "size": 4274439
+          "sha256": "7dbd91f6a8021bff9c119bde8596a10618ec31a1bfe4255d3a46b1ecfe7b1447",
+          "size": 4337751
         }
       ]
     },
     {
       "packageId": "playwright-mcp",
-      "reviewSha256": "557f89a99f416b8742d1d2255d14525b3f6e60a9de00abeb3c274793f9697644",
+      "reviewSha256": "a67f4deae543dc83d9eaed91554f2c78d3e1725186df4e856b5f1310d87b50b7",
       "platform": "darwin",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "c4d3461e875fe3b26e2a7a75851a913195d9f9e7118823a1ce58a04829a2677c",
-          "size": 4238838
+          "sha256": "0df8a0a762352705974554d38676681bf3cfa446aceba25c65a7fff1aca469a8",
+          "size": 4292335
         }
       ]
     },
@@ -683,13 +683,13 @@
     },
     {
       "packageId": "superpowers",
-      "reviewSha256": "f65a56ea8d796994dcb02a9b0ca3955938f816e52410124167eb8b4d2b084e2c",
+      "reviewSha256": "6fe17bde83bd861a3b29fdb2bd05b3e19dfeacac6510a6a427e89538bf3761e5",
       "platform": "darwin",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "06fd394b354b1010e88d36a16c7f232954a109574061bc7fda6f01c4943f6b25",
-          "size": 147252
+          "sha256": "2adbbe2409aff31492b1e3b8c933b02fe2a158269e657123441f3f38615e5229",
+          "size": 192606
         }
       ]
     },
@@ -707,13 +707,13 @@
     },
     {
       "packageId": "video-shotcraft",
-      "reviewSha256": "e52072beda606da50549af2a2e5311ef480f79e1a6bd6708fda0fe10d82b9dd0",
+      "reviewSha256": "e36a2e0cc78c47dc41a84766ef84a54c7837dd420be56f7dc6e82d4bb3fac601",
       "platform": "darwin",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "23d79ab2871094262721fb2aa2ea8647aaa3b45e5d757b1ea69465a5ce80dfcc",
-          "size": 3040181
+          "sha256": "d0515f9e64d7d7f8e1fc4705e8ffce0f235f6e2e45cfb2903ae88f41998049f9",
+          "size": 3058997
         }
       ]
     },
@@ -847,25 +847,25 @@
     },
     {
       "packageId": "docling-mcp",
-      "reviewSha256": "ffa9c850d1c8abc39cca84f724ab5833592995b24ed2bd4baf9afa38c2026c70",
+      "reviewSha256": "8c91c03f0792bf6ec1329149661f535a6f32712cb99dd685341ae857827f091f",
       "platform": "win32",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "81bf7c19d90b1eecd5694a07ee8e8415e57444e6271164f7ef62d721034bb27d",
-          "size": 20804091
+          "sha256": "5e62f9b051d5a01b17b25042be47f6da39ebfc4d7faec849b1be34bd32bfb067",
+          "size": 20981655
         },
         {
-          "sha256": "5c35d9aeb941e36eafe493dbc5bf1f34770ee1854c6f3f1f3a2ff023c3234e65",
-          "size": 15090414
+          "sha256": "ceddab1867fd0b25b0766d14b1b0e72617a9dbc2fe2e4e24b7ab0faee576333e",
+          "size": 14804054
         },
         {
-          "sha256": "e2b662456a8a2a57601b051ab7bf56bfb472540a9c6520c2961498cf099ccefc",
-          "size": 11096668
+          "sha256": "9f098e49d4f2bd5dc9df295309fb9cece53e58d46e34d7b384644709c50deefc",
+          "size": 13464762
         },
         {
-          "sha256": "21c4eb1ae6177e0457add53dad647a4af3479cdd82edc1e724badeedf8bf5ef9",
-          "size": 6497681
+          "sha256": "e126b89c934d445e5bf3d698ac795c59b1b569c5b02b4ef1d8417e8f12059db7",
+          "size": 6703442
         }
       ]
     },
@@ -991,25 +991,25 @@
     },
     {
       "packageId": "playwright-cli-skills",
-      "reviewSha256": "87913bdffceed564bca36cce02d7b0730a7f00b5b7f6eb9dfaa0c5fd5517f618",
+      "reviewSha256": "1af7f162f98247831bd89dc513fb86b405e9391951d4d63d37961afc0692d9d9",
       "platform": "win32",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "898fe3aaaf0a182733f6ab1032dd8d059f0b317abb06494dc6f01cb198cbae81",
-          "size": 4251667
+          "sha256": "d6b5ed2fc03eaef7106b3f24945c79c2973490cb0591016ef75e5ea2b811d1e7",
+          "size": 4337751
         }
       ]
     },
     {
       "packageId": "playwright-mcp",
-      "reviewSha256": "557f89a99f416b8742d1d2255d14525b3f6e60a9de00abeb3c274793f9697644",
+      "reviewSha256": "a67f4deae543dc83d9eaed91554f2c78d3e1725186df4e856b5f1310d87b50b7",
       "platform": "win32",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "34ec7d50edb87cbb068a4ee167f9ddb92882ca1fed758c4ebbc8943bbabab71e",
-          "size": 4216070
+          "sha256": "d724bbf2c67586c87d0b0df8fd93909211354e0f53295d77a65a25c2451a9bdd",
+          "size": 4292335
         }
       ]
     },
@@ -1051,13 +1051,13 @@
     },
     {
       "packageId": "superpowers",
-      "reviewSha256": "f65a56ea8d796994dcb02a9b0ca3955938f816e52410124167eb8b4d2b084e2c",
+      "reviewSha256": "6fe17bde83bd861a3b29fdb2bd05b3e19dfeacac6510a6a427e89538bf3761e5",
       "platform": "win32",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "87c4c56e1cd9d4472517fe8e2d0628b8421951e2a5c929ddf8ff4e5aeb2bfeaa",
-          "size": 147368
+          "sha256": "c3178fcf05ec169f52c3b080921bdce5c4560ffc051e0cc8c77f31a8074a232b",
+          "size": 192785
         }
       ]
     },
@@ -1079,13 +1079,13 @@
     },
     {
       "packageId": "video-shotcraft",
-      "reviewSha256": "e52072beda606da50549af2a2e5311ef480f79e1a6bd6708fda0fe10d82b9dd0",
+      "reviewSha256": "e36a2e0cc78c47dc41a84766ef84a54c7837dd420be56f7dc6e82d4bb3fac601",
       "platform": "win32",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "23afe1ac1aa8eac204f368539fb327ba4420fc5135fa0dbf042d9dc20551e9f5",
-          "size": 3053191
+          "sha256": "ed306dfc2703884070be6abdea5936c6169438c84667b7ac4f0143b56465afd4",
+          "size": 3072074
         }
       ]
     }
