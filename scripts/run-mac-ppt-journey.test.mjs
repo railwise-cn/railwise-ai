@@ -64,10 +64,14 @@ test('new-conversation PPT entry accepts its workspace-specific placeholder', as
 
 test('incomplete PPT tasks retain only the sanitized runtime diagnostics', async () => {
   const journey = await readFile(journeySourcePath, 'utf8')
+  const admissionDiagnostics = journey.slice(journey.indexOf('async function readWebPptAdmissionDiagnostics'),
+    journey.indexOf('\n}\n\nasync function readWebPptReplyState'))
   assert.match(journey, /readWebPptTaskDiagnostics\(cdp, journey\.taskId, journey\.executionThreadId\)[\s\S]*?webPptDiagnostics: diagnostics/)
   assert.match(journey, /catch \{[\s\S]*?Timed out waiting for the original task state/)
-  assert.match(journey, /task: \{ id: task\.id, status: task\.status, originThreadId: task\.originThreadId/)
-  assert.doesNotMatch(journey, /toolCallArguments|requestHeaders|apiKey|messages: thread\.turns/)
+  assert.match(journey, /readWebPptAdmissionDiagnostics\(cdp, priorThreads\)[\s\S]*?Timed out waiting for the source question/)
+  assert.match(admissionDiagnostics, /activeSkillIds: turn\.activeSkillIds, items: turn\.items\.map\(item => \(\{ kind: item\.kind, toolName: item\.toolName/)
+  assert.match(admissionDiagnostics, /activeTurnId: task\.activeTurnId, threadId: task\.threadId/)
+  assert.doesNotMatch(admissionDiagnostics, /toolCallArguments|requestHeaders|apiKey|item\.content|prompt|arguments/)
 })
 
 test('Mac document-window observations retain the app and title for every visible app window', () => {

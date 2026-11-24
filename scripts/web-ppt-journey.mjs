@@ -103,6 +103,29 @@ async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
   }
 }
 
+async function readWebPptAdmissionDiagnostics(cdp, priorThreadIds) {
+  const [threadList, tasks, inbox] = await Promise.all([
+    cdp.evaluate(readRuntime('/v1/threads')),
+    cdp.evaluate(readRuntime('/v1/tasks?limit=100')),
+    cdp.evaluate(readRuntime('/v1/inbox'))
+  ])
+  const newThreads = threadList.threads.filter(thread => !priorThreadIds.includes(thread.id))
+  const threads = await Promise.all(newThreads.map(thread => cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(thread.id)}`))))
+  const threadIds = new Set(newThreads.map(thread => thread.id))
+  const taskIds = new Set(tasks.filter(task => threadIds.has(task.originThreadId)).map(task => task.id))
+  return {
+    threads: threads.map(thread => ({ id: thread.id, turns: thread.turns.map(turn => ({ id: turn.id, status: turn.status,
+      activeSkillIds: turn.activeSkillIds, items: turn.items.map(item => ({ kind: item.kind, toolName: item.toolName,
+        status: item.status, isError: item.isError })) })) })),
+    tasks: tasks.filter(task => taskIds.has(task.id)).map(task => ({ id: task.id, status: task.status,
+      activeTurnId: task.activeTurnId, threadId: task.threadId, waitingReason: task.waitingReason,
+      stalledReason: task.stalledReason, blockCode: task.blockCode, revision: task.revision })),
+    attention: inbox.filter(item => taskIds.has(item.taskId)).map(item => ({ kind: item.kind, status: item.status,
+      requestId: item.requestId, errorCode: item.payload?.capability?.errorCode,
+      resolutionRoute: item.payload?.capability?.resolution?.route ?? item.payload?.capability?.action?.route }))
+  }
+}
+
 async function readWebPptReplyState(cdp, taskId, executionThreadId) {
   const [ui, task, inputs, inbox, thread] = await Promise.all([
     cdp.evaluate(`({
@@ -155,8 +178,13 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
     ? `new RegExp(${literal(expectedQuestion.source)},${literal(expectedQuestion.flags)}).test(${conversationTextProbe()})`
     : `${conversationTextProbe()}.includes(${literal(expectedQuestion)})`
   await onStage?.('wait-for-source-question-in-original-conversation')
-  await cdp.wait(`Boolean(document.querySelector(${literal(answerComposer)}) &&
-    (${questionCheck}))`, 'the source question in the original conversation', 120_000)
+  try {
+    await cdp.wait(`Boolean(document.querySelector(${literal(answerComposer)}) &&
+      (${questionCheck}))`, 'the source question in the original conversation', 120_000)
+  } catch {
+    const diagnostics = await readWebPptAdmissionDiagnostics(cdp, priorThreads).catch(() => undefined)
+    throw Object.assign(new Error('Timed out waiting for the source question'), { webPptDiagnostics: diagnostics })
+  }
   const newThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.filter(thread => !priorThreads.includes(thread.id))
   assert.equal(newThreads.length, 1, 'Selecting PPT Master must create only one conversation')
   const [thread] = newThreads
