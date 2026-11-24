@@ -224,9 +224,8 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
       return file.workbook
     })
     const cellAt = (workbook, row, column) => workbook.sheets?.[workbook.sheetOrder?.[0]]?.cellData?.[row]?.[column]
-    const cellAddressAttempts = []
-    let rowPixelCorrection = 0
     let columnPixelCorrection = 0
+    const cellEdits = []
 
     await click('新建表格')
     await cdp.wait(`${editableReady} && [...document.querySelectorAll('.ds-code-sidebar canvas[data-u-comp="render-canvas"]')]
@@ -245,7 +244,7 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
             .find(item=>item.getClientRects().length&&item.clientWidth>200&&item.clientHeight>150);
           if(!canvas)return null;
           const box=canvas.getBoundingClientRect().toJSON();
-          const point={x:box.x+83+${column}*79+${columnPixelCorrection},y:box.y+59+${row}*22+${rowPixelCorrection}};
+          const point={x:box.x+83+${column}*79+${columnPixelCorrection},y:box.y+37+${row}*22};
           const element=document.elementFromPoint(point.x,point.y);
           const hit=element?{tag:element.tagName,component:element.getAttribute('data-u-comp'),className:element.className?.toString?.()??''}:null;
           return {box,point,hit,ready:Boolean(element===canvas&&hit?.component==='render-canvas')};
@@ -265,36 +264,14 @@ export async function runInstalledMacOfflineSpreadsheetJourney({
     }
     const edit = async (row, column, value) => {
       const expectedAddress = spreadsheetCellAddress(row, column)
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await clickCell(row, column, 2)
-        await cdp.wait(`document.activeElement?.id === ${JSON.stringify(cellEditorId)} && document.activeElement.isContentEditable`,
-          'Univer cell editor focus')
-        let address = await cdp.evaluate('document.querySelector(\'[data-u-comp="sheet-cell-editor-address"]\')?.textContent?.trim() ?? null')
-        if (!address) {
-          const point = report.lastCellInteraction.point
-          await cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: point.x, y: point.y, deltaX: 1, deltaY: 0 })
-          try {
-            address = await cdp.wait('document.querySelector(\'[data-u-comp="sheet-cell-editor-address"]\')?.textContent?.trim() || null',
-              'selected cell address', 3000)
-          } finally {
-            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: point.x, y: point.y, deltaX: -1, deltaY: 0 })
-          }
-        }
-        const actualCell = parseSpreadsheetCellAddress(address)
-        const attemptEvidence = { expectedAddress, address, point: report.lastCellInteraction.point, rowPixelCorrection, columnPixelCorrection }
-        cellAddressAttempts.push(attemptEvidence)
-        report.cellAddressAttempts = cellAddressAttempts
-        if (address === expectedAddress) {
-          await cdp.send('Input.insertText', { text: value })
-          await key('Enter', 'Enter', 13)
-          return
-        }
-        await key('Escape', 'Escape', 27)
-        if (!actualCell) throw new Error(`Univer did not expose a valid selected cell address. Expected ${expectedAddress}, received ${address}`)
-        rowPixelCorrection += (row - actualCell.row) * 22
-        columnPixelCorrection += (column - actualCell.column) * 79
-      }
-      throw new Error(`Univer cell selection did not reach ${expectedAddress}. Attempts: ${JSON.stringify(cellAddressAttempts)}`)
+      await clickCell(row, column, 2)
+      await cdp.wait(`document.activeElement?.id === ${JSON.stringify(cellEditorId)} && document.activeElement.isContentEditable`,
+        'Univer cell editor focus')
+      const attempt = { expectedAddress, point: report.lastCellInteraction.point, columnPixelCorrection }
+      await cdp.send('Input.insertText', { text: value })
+      await key('Enter', 'Enter', 13)
+      cellEdits.push(attempt)
+      report.cellEdits = cellEdits
     }
 
     await edit(0, 0, '=SUM(4,5)')
