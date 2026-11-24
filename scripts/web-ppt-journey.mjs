@@ -461,9 +461,15 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
         sourceAnswer: fallback?.url ?? webPptSourceHost, requireNewTurn: Boolean(fallback), onStage })
       await onStage?.('wait-for-original-task-completion')
-      const task = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)}.then(task=>
-        ['completed','failed','stalled','cancelled','waiting_user','paused'].includes(task.status) ? task : null)`,
-      'task completion or a visible request for input', live ? 480_000 : 180_000)
+      let task
+      try {
+        task = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)}.then(task=>
+          ['completed','failed','stalled','cancelled','waiting_user','paused'].includes(task.status) ? task : null)`,
+        'task completion or a visible request for input', live ? 480_000 : 180_000)
+      } catch {
+        const diagnostics = await readWebPptTaskDiagnostics(cdp, journey.taskId, journey.executionThreadId)
+        throw Object.assign(new Error('Timed out waiting for the original task state'), { webPptDiagnostics: diagnostics })
+      }
       if (task.status !== 'completed') {
         const diagnostics = await readWebPptTaskDiagnostics(cdp, journey.taskId, journey.executionThreadId)
         throw Object.assign(new Error('PPT task did not complete'), { webPptDiagnostics: diagnostics })
