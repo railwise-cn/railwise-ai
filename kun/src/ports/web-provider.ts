@@ -11,6 +11,7 @@ export type WebFetchRequest = {
   timeoutMs: number
   signal: AbortSignal
   allowedOrigins?: string[]
+  allowedUrls?: string[]
 }
 
 export type WebFetchResult = WebSource & {
@@ -26,6 +27,8 @@ export type WebSearchRequest = {
   limit: number
   timeoutMs: number
   signal: AbortSignal
+  allowedOrigins?: string[]
+  denyDomains?: readonly string[]
 }
 
 export type WebSearchResult = WebSource & {
@@ -36,12 +39,93 @@ export type WebSearchResult = WebSource & {
 
 export interface WebProvider {
   readonly id: string
+  /** Exact network origins contacted to perform search, separate from result URLs. */
+  readonly searchOrigins?: readonly string[]
   fetch?(request: WebFetchRequest): Promise<WebFetchResult>
   search?(request: WebSearchRequest): Promise<WebSearchResult[]>
+  supportsQuery?(query: string): boolean
+  canSearchWithin?(allowedOrigins?: readonly string[], denyDomains?: readonly string[]): boolean
+}
+
+/** Search sources run in order until one returns usable results. */
+export class FallbackWebSearchProvider implements WebProvider {
+  readonly id: string
+  readonly searchOrigins: readonly string[]
+
+  constructor(private readonly providers: readonly WebProvider[]) {
+    this.id = providers.map(provider => provider.id).join('+') || 'unavailable'
+    this.searchOrigins = [...new Set(providers.flatMap(provider => provider.searchOrigins ?? []))]
+  }
+
+  canSearchWithin(allowedOrigins?: readonly string[], denyDomains?: readonly string[]): boolean {
+    return this.providers.some(provider => provider.search && providerAllowedByOrigins(provider, allowedOrigins) &&
+      !providerDeniedByDomains(provider, denyDomains))
+  }
+
+  async search(request: WebSearchRequest): Promise<WebSearchResult[]> {
+    if (request.signal.aborted) throw request.signal.reason ?? new Error('Web search was cancelled.')
+    let lastError: unknown
+    const matchingProviders = this.providers.filter(provider => provider.supportsQuery?.(request.query))
+    const orderedProviders = matchingProviders.length
+      ? [...matchingProviders, ...this.providers.filter(provider => !matchingProviders.includes(provider))]
+      : this.providers
+    const providers = orderedProviders.filter((provider): provider is WebProvider & { search: NonNullable<WebProvider['search']> } =>
+      Boolean(provider.search) && providerAllowedByOrigins(provider, request.allowedOrigins) &&
+      !providerDeniedByDomains(provider, request.denyDomains))
+    if (providers.length === 0) throw new Error('No web search provider is within the task network scope.')
+    const deadline = Date.now() + Math.max(1, request.timeoutMs)
+    for (let index = 0; index < providers.length; index += 1) {
+      if (request.signal.aborted) throw request.signal.reason ?? new Error('Web search was cancelled.')
+      const provider = providers[index]!
+      const remainingMs = deadline - Date.now()
+      if (remainingMs <= 0) break
+      const providersRemaining = providers.length - index
+      const providerTimeoutMs = Math.max(1, Math.floor(remainingMs / providersRemaining))
+      const controller = new AbortController()
+      const abortFromRequest = (): void => controller.abort(request.signal.reason)
+      request.signal.addEventListener('abort', abortFromRequest, { once: true })
+      const timeout = setTimeout(() => controller.abort(new Error('Web search provider timed out.')), providerTimeoutMs)
+      const aborted = new Promise<never>((_resolve, reject) => {
+        controller.signal.addEventListener('abort', () => reject(controller.signal.reason ?? new Error('Web search provider aborted.')), { once: true })
+      })
+      try {
+        const results = await Promise.race([
+          provider.search({ ...request, timeoutMs: providerTimeoutMs, signal: controller.signal }),
+          aborted
+        ])
+        if (results.length) return results.slice(0, request.limit)
+      } catch (error) {
+        if (request.signal.aborted) throw request.signal.reason ?? error
+        lastError = error
+      } finally {
+        clearTimeout(timeout)
+        request.signal.removeEventListener('abort', abortFromRequest)
+      }
+    }
+    if (lastError) throw lastError
+    return []
+  }
+}
+
+function providerAllowedByOrigins(provider: WebProvider, allowedOrigins?: readonly string[]): boolean {
+  if (!allowedOrigins || allowedOrigins.includes('*')) return true
+  const requiredOrigins = provider.searchOrigins
+  return Boolean(requiredOrigins?.length && requiredOrigins.every(origin => allowedOrigins.includes(origin)))
+}
+
+function providerDeniedByDomains(provider: WebProvider, denyDomains?: readonly string[]): boolean {
+  return Boolean(denyDomains?.length && (provider.searchOrigins ?? []).some(origin => {
+    const hostname = new URL(origin).hostname.toLowerCase()
+    return denyDomains.some(domain => {
+      const normalized = domain.trim().toLowerCase().replace(/^\./, '')
+      return Boolean(normalized) && (hostname === normalized || hostname.endsWith(`.${normalized}`))
+    })
+  }))
 }
 
 export class UnavailableWebProvider implements WebProvider {
   readonly id: string
+  readonly searchOrigins: readonly string[] = []
 
   constructor(id = 'unavailable') {
     this.id = id

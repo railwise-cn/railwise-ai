@@ -398,6 +398,7 @@ export type CoreTurnItemJson = {
   output?: unknown
   isError?: boolean
   approvalId?: string
+  requestHash?: string
   inputId?: string
   prompt?: string
   questions?: Array<{
@@ -571,6 +572,7 @@ export type CoreRuntimeEventJson = {
   itemId?: string
   item?: CoreTurnItemJson
   approvalId?: string
+  requestHash?: string
   approvalPolicy?: string
   sandboxMode?: string
   toolName?: string

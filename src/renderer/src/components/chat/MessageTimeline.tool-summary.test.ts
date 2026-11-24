@@ -8,6 +8,7 @@ import { MessageTimeline, summarizeToolBlock } from './MessageTimeline'
 import { GeneratedFilesPanel, MessageBubble } from './message-timeline-bubbles'
 import { ProcessSectionRow } from './message-timeline-process'
 import { resolveTimelineWorkspaceRoot } from './use-timeline-stores'
+import { normalizeConversationSources, sourcesForAssistantMessages } from './ConversationSources'
 
 const labels: Record<string, string> = {
   toolActionCommand: 'Ran command',
@@ -351,7 +352,7 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     }
   })
 
-  it('renders attachment, Skill, memory, web source, and child-agent chips in bubbles', () => {
+  it('renders attachment, Skill, memory, and child-agent chips in tool bubbles', () => {
     const block: ToolBlock = toolBlock({
       summary: 'web_search: docs',
       meta: {
@@ -378,8 +379,7 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     expect(html).toContain('Memories 1')
     expect(html).toContain('Child agent')
     expect(html).toContain('research')
-    expect(html).toContain('Sources 1')
-    expect(html).toContain('https://example.com/kun')
+    expect(html).not.toContain('Sources 1')
   })
 
   it('renders the same runtime metadata on process timeline rows', () => {
@@ -417,6 +417,65 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     expect(html).toContain('Child agent')
     expect(html).toContain('research')
     expect(html).toContain('Sources 1')
+  })
+
+  it('associates real tool-result sources with the next assistant answer only', () => {
+    const blocks: ChatBlock[] = [
+      { kind: 'tool', id: 'search-1', summary: 'web_search', status: 'success', meta: { toolName: 'web_search', sources: [{ sourceId: 'web_search_railwise', title: 'RailWise', url: 'https://railwise.cn/news' }] } },
+      { kind: 'assistant', id: 'answer-1', text: 'First answer' },
+      { kind: 'assistant', id: 'answer-2', text: 'Second answer' },
+      { kind: 'tool', id: 'search-2', summary: 'web_fetch', status: 'success', meta: { toolName: 'web_fetch', sources: [{ sourceId: 'web_fetch_docs', title: 'Docs', url: 'https://docs.example.com' }] } }
+    ]
+
+    const associated = sourcesForAssistantMessages(blocks)
+    expect(associated.byAssistantId.get('answer-1')).toEqual([
+      { title: 'RailWise', url: 'https://railwise.cn/news', domain: 'railwise.cn', kind: 'search', sourceId: 'web_search_railwise' }
+    ])
+    expect(associated.byAssistantId.has('answer-2')).toBe(false)
+    expect(associated.pendingSources).toEqual([
+      { title: 'Docs', url: 'https://docs.example.com/', domain: 'docs.example.com', kind: 'fetch', sourceId: 'web_fetch_docs' }
+    ])
+
+    const mismatched = sourcesForAssistantMessages([
+      { kind: 'tool', id: 'wrong-source', summary: 'web_search', status: 'success', meta: { toolName: 'web_search', sources: [{ sourceId: 'web_fetch_mismatch', title: 'Wrong kind', url: 'https://example.com' }] } },
+      { kind: 'assistant', id: 'wrong-answer', text: 'Not sourced' }
+    ])
+    expect(mismatched.byAssistantId.has('wrong-answer')).toBe(false)
+  })
+
+  it('marks duplicate search results as read when a matching fetch result exists', () => {
+    expect(normalizeConversationSources([
+      { sourceId: 'web_search_example', title: 'Search result', url: 'https://example.com/page#search' },
+      { sourceId: 'web_fetch_example', title: 'Read page', url: 'https://example.com/page#section' }
+    ])).toEqual([
+      { sourceId: 'web_fetch_example', title: 'Read page', url: 'https://example.com/page#section', domain: 'example.com', kind: 'fetch' }
+    ])
+  })
+
+  it('renders readable, deduplicated, safe citations with a show-all control', () => {
+    const sources = normalizeConversationSources([
+      { sourceId: 'web_search_news', title: 'RailWise news', url: 'https://www.railwise.cn/news#latest' },
+      { sourceId: 'web_search_duplicate', title: 'Duplicate', url: 'https://www.railwise.cn/news#other' },
+      { sourceId: 'web_search_search', title: 'Search guide', url: 'https://docs.example.com/search' },
+      { sourceId: 'web_fetch_fetch', title: 'Fetch guide', url: 'https://docs.example.com/fetch' },
+      { sourceId: 'web_fetch_release', title: 'Release notes', url: 'https://github.com/railwise-cn/railwise-ai/releases' },
+      { title: 'Unsafe', url: 'javascript:alert(1)' }
+    ])
+    const html = renderToStaticMarkup(createElement(MessageBubble, {
+      block: { kind: 'assistant', id: 'answer', text: 'Here is the answer.' },
+      sources
+    }))
+
+    expect(html).toContain('Web sources')
+    expect(html).toContain('href="https://www.railwise.cn/news#latest"')
+    expect(html).toContain('railwise.cn')
+    expect(html).toContain('Show all 4 sources')
+    expect(html).toContain('Search result')
+    expect(html).toContain('Page read')
+    expect(html.match(/<li/g)).toHaveLength(3)
+    expect(html).not.toContain('javascript:')
+    expect(html).toContain('rel="noopener noreferrer"')
+    expect(html).toContain('target="_blank"')
   })
 
   it('keeps running tool calls collapsed and neutral', () => {

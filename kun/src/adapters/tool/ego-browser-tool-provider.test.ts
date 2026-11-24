@@ -51,6 +51,28 @@ describe('Ego controlled read protocol; no external CLI/browser',()=>{
   expect(f.calls).toHaveLength(10);expect(await f.execute('ego_browser_next_page',{observationId:out.observationId,targetId:(out.nextPages as Array<{targetId:string}>)[0]!.targetId})).toMatchObject({code:'ego_browser_page_limit'});expect(f.calls).toHaveLength(10)
  })
  it('does not open a model-invented same-origin business URL',async()=>{const f=await fixture();expect(await f.execute('ego_browser_open',{url:'https://feed.test/logout'})).toMatchObject({code:'ego_browser_target_required'});expect(f.calls).toHaveLength(0);expect(f.repo.operations(f.task.id,'ego_task_space')).toHaveLength(0)})
+ it.each([
+  ['supplement', 'https://feed.test/list'],
+  ['user_answer', JSON.stringify({ resolution: { answers: [{ id: 'source', label: 'Source website', value: 'https://feed.test/list' }] } })]
+ ] as const)('opens the exact URL supplied in a follow-up %s answer',async(kind,text)=>{
+  const f=await fixture()
+  const current=f.repo.get(f.task.id)!
+  const task=f.repo.update(f.task.id,current.revision,value=>({...value,goal:'使用Ego只读访问用户补充的网址并制作HTML'}))
+  f.repo.appendInput({taskId:f.task.id,expectedRevision:task.revision,idempotencyKey:`source-answer-${kind}`,kind,text,nowIso:date})
+  expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({status:'succeeded',sourceUrl:'https://feed.test/list'})
+  expect(f.calls).toHaveLength(1)
+ })
+ it('opens only the Yuanbao public-search endpoint when its origin is explicitly in the current grant',async()=>{
+  const f=await fixture(),grant=f.grant()
+  const origins=[...grant.browserScope!.origins,'https://so.qq.com']
+  f.setGrant({...grant,browserScope:{...grant.browserScope!,origins},networkAllowlist:origins})
+  expect(await f.execute('ego_browser_open',{url:'https://so.qq.com/isearch?query=RailWise%20AI'})).toMatchObject({status:'succeeded',sourceUrl:'https://so.qq.com/isearch?query=RailWise%20AI'})
+  const next=await fixture()
+  const nextGrant=next.grant(),nextOrigins=[...nextGrant.browserScope!.origins,'https://so.qq.com']
+  next.setGrant({...nextGrant,browserScope:{...nextGrant.browserScope!,origins:nextOrigins},networkAllowlist:nextOrigins})
+  expect(await next.execute('ego_browser_open',{url:'https://so.qq.com/logout'})).toMatchObject({code:'ego_browser_target_required'})
+  expect(next.calls).toHaveLength(0)
+ })
  it('rejects model JS/spaceId and exposes no click/form tools',async()=>{const f=await fixture();expect(f.provider.tools.map(t=>t.name)).toEqual(EGO_TOOLS);expect(await f.execute('ego_browser_open',{url:'https://feed.test/list',spaceId:999,code:'fetch("evil")'})).toMatchObject({status:'blocked'});expect(f.calls).toHaveLength(0)})
  it.each(['expired','scope','identity'] as const)('blocks %s before CLI',async boundary=>{const f=await fixture(),g=f.grant();f.setGrant(boundary==='expired'?{...g,expiresAt:date}:boundary==='identity'?{...g,connectorIdentityFingerprints:{'ego-browser':'b'.repeat(64)}}:{...g,browserScope:{...g.browserScope!,provider:undefined}});expect(await f.execute('ego_browser_open',{url:'https://feed.test/list'})).toMatchObject({status:'blocked'});expect(f.calls).toHaveLength(0)})
  it('records takeover without changing Task and resumes same Space only in a new user Turn',async()=>{

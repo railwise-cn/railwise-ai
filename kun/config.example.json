@@ -108,10 +108,10 @@
       "servers": {}
     },
     "web": {
-      "enabled": false,
-      "fetchEnabled": false,
-      "searchEnabled": false,
-      "provider": "deepseek-responses",
+      "enabled": true,
+      "fetchEnabled": true,
+      "searchEnabled": true,
+      "provider": "yuanbao-opensearch",
       "allowDomains": [],
       "denyDomains": []
     },

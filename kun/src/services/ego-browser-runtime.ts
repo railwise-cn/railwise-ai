@@ -2,7 +2,7 @@ import type { ToolHostContext } from '../ports/tool-host.js'
 import type { ThreadRecord } from '../contracts/threads.js'
 import type { CapabilityPreflight } from '../contracts/harness.js'
 import type { BrowserExecutionScope } from '../contracts/browser-skill.js'
-import { browserTaskOrigins } from '../contracts/browser-skill.js'
+import { browserTaskOrigins, isBrowserTask } from '../contracts/browser-skill.js'
 import type { ExecutionScope } from '../contracts/permissions.js'
 import { EgoBrowserCapabilityConfig, EGO_TOOLS, isEgoBrowserTask } from '../contracts/ego-browser.js'
 import { buildEgoBrowserToolProvider } from '../adapters/tool/ego-browser-tool-provider.js'
@@ -11,14 +11,18 @@ import type { EgoClosedSpaceReopenAuthorization } from './ego-browser-evidence.j
 /** One connector inside the existing KUN process, with task-scoped selection. */
 export class EgoBrowserRuntime {
   private readonly config: EgoBrowserCapabilityConfig
-  constructor(private readonly options: {config?: EgoBrowserCapabilityConfig;repository:TaskRunRepository;canFinishReadiness?:(context:ToolHostContext,hostOperationId:string)=>Promise<{ready:boolean;reason?:string}>;canReopenClosedSpace?:(context:ToolHostContext,hostOperationId:string,bindingReceiptId:string)=>Promise<EgoClosedSpaceReopenAuthorization|null>}) { this.config=EgoBrowserCapabilityConfig.parse(options.config??{state:'not_installed',revision:0}) }
+  constructor(private readonly options: {config?: EgoBrowserCapabilityConfig;repository:TaskRunRepository;userSourceUrls?:(taskId:string)=>readonly string[];canFinishReadiness?:(context:ToolHostContext,hostOperationId:string)=>Promise<{ready:boolean;reason?:string}>;canReopenClosedSpace?:(context:ToolHostContext,hostOperationId:string,bindingReceiptId:string)=>Promise<EgoClosedSpaceReopenAuthorization|null>}) { this.config=EgoBrowserCapabilityConfig.parse(options.config??{state:'not_installed',revision:0}) }
   state():EgoBrowserCapabilityConfig {return structuredClone(this.config)}
   selected(text:string,scope?:BrowserExecutionScope):boolean { return scope?.provider==='ego-browser'||!scope&&isEgoBrowserTask(text) }
-  provider() {return buildEgoBrowserToolProvider({config:this.config,repository:this.options.repository,canFinishReadiness:this.options.canFinishReadiness,canReopenClosedSpace:this.options.canReopenClosedSpace})}
+  selectsForPublicRead(text:string,scope:BrowserExecutionScope|undefined,hasUserSource:boolean):boolean {
+    if(this.selected(text,scope))return true
+    return !scope&&hasUserSource&&!isBrowserTask(text)&&this.config.state==='installed'&&Boolean(this.config.executableHash)
+  }
+  provider() {return buildEgoBrowserToolProvider({config:this.config,repository:this.options.repository,userSourceUrls:this.options.userSourceUrls,canFinishReadiness:this.options.canFinishReadiness,canReopenClosedSpace:this.options.canReopenClosedSpace})}
   fingerprint() {return operationFingerprint(this.config)}
   scope(text:string,inherited?:BrowserExecutionScope,networkOrigins?:readonly string[]):ExecutionScope {
     const origins=inherited?.origins??[...new Set([...browserTaskOrigins(text),...(networkOrigins??[]).filter(v=>v!=='*')])]
-    return {allowedToolNames:[...EGO_TOOLS,'publish_artifact','read_artifact','verify_web_artifact','read_task_context','request_user_input','user_input','schedule_task','list_schedules','todo'],networkAllowlist:origins,connectorScopes:[],externalTargets:[],...(origins.length&&this.config.executableHash?{browserScope:inherited??{provider:'ego-browser' as const,browserInstanceId:'ego-browser:'+this.config.executableHash,origins,interaction:'observe' as const,revision:this.config.revision},connectorIdentityFingerprints:{'ego-browser':this.fingerprint()}}:{})}
+    return {allowedToolNames:[...EGO_TOOLS,'web_search','web_fetch','publish_artifact','read_artifact','verify_web_artifact','read_task_context','request_user_input','user_input','schedule_task','list_schedules','todo'],networkAllowlist:origins,connectorScopes:[],externalTargets:[],...(origins.length&&this.config.executableHash?{browserScope:inherited??{provider:'ego-browser' as const,browserInstanceId:'ego-browser:'+this.config.executableHash,origins,interaction:'observe' as const,revision:this.config.revision},connectorIdentityFingerprints:{'ego-browser':this.fingerprint()}}:{})}
   }
   async preflight(text:string,thread?:ThreadRecord,scope?:BrowserExecutionScope):Promise<CapabilityPreflight|null> {
     if(!this.selected(text,scope))return null

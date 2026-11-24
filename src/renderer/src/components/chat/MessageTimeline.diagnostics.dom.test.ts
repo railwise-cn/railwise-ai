@@ -201,7 +201,7 @@ describe('conversation execution details', () => {
 
   it('keeps approval decisions and approval errors available outside the execution history', async () => {
     const approval: ChatBlock = {
-      kind: 'approval', id: 'approval', approvalId: 'approval-request', status: 'pending', summary: 'Allow access to the workspace?'
+      kind: 'approval', id: 'approval', approvalId: 'approval-request', requestHash: 'request-hash-one', status: 'pending', summary: 'Allow access to the workspace?'
     }
     const render = async (block: ChatBlock): Promise<void> => {
       await act(async () => root.render(createElement(MessageTimeline, {
@@ -211,6 +211,11 @@ describe('conversation execution details', () => {
     }
 
     await render(approval)
+    const exactApproval = container.querySelector<HTMLElement>(
+      '[data-approval-id="approval-request"][data-request-hash="request-hash-one"]'
+    )
+    expect(exactApproval).toBeTruthy()
+    expect(exactApproval?.querySelector('button')?.textContent).toContain('Allow')
     expect(control('Allow')).toBeTruthy()
     expect(control('Deny')).toBeTruthy()
     expect(control('Execution details').getAttribute('aria-expanded')).toBe('false')
@@ -218,6 +223,27 @@ describe('conversation execution details', () => {
     expect(container.textContent).toContain('Workspace access could not be approved.')
     expect(container.textContent).not.toContain('Command stderr')
     expect(control('Execution details').getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('keeps approval selectors exact when multiple requests are present', async () => {
+    const approvals: ChatBlock[] = [
+      { kind: 'approval', id: 'approval-a', approvalId: 'approval-a', requestHash: 'hash-a', status: 'pending', summary: 'Read file A' },
+      { kind: 'approval', id: 'approval-b', approvalId: 'approval-b', requestHash: 'hash-b', status: 'pending', summary: 'Write file B' }
+    ]
+    await act(async () => root.render(createElement(MessageTimeline, {
+      blocks: approvals,
+      activeThreadId: 'thread-test', runtimeConnection: 'ready', liveReasoning: '', live: '',
+      onRetryConnection: () => undefined, onOpenSettings: () => undefined
+    })))
+
+    const cardA = container.querySelector<HTMLElement>('[data-approval-id="approval-a"][data-request-hash="hash-a"]')
+    const cardB = container.querySelector<HTMLElement>('[data-approval-id="approval-b"][data-request-hash="hash-b"]')
+    expect(container.querySelectorAll('[data-approval-id="approval-a"][data-request-hash="hash-a"]')).toHaveLength(1)
+    expect(container.querySelectorAll('[data-approval-id="approval-b"][data-request-hash="hash-b"]')).toHaveLength(1)
+    expect(cardA?.querySelectorAll('button')).toHaveLength(2)
+    expect(cardB?.querySelectorAll('button')).toHaveLength(2)
+    expect(cardA?.querySelector('[data-request-hash="hash-b"]')).toBeNull()
+    expect(cardB?.querySelector('[data-request-hash="hash-a"]')).toBeNull()
   })
 
   it('keeps the standalone command bubble collapsed and neutral on expansion', async () => {

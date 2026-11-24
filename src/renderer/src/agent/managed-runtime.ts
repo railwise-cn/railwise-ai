@@ -906,6 +906,7 @@ export class WorkWiseRuntimeProvider implements AgentProvider {
     }
     sink.onApproval({
       approvalId,
+      ...(event.requestHash ? { requestHash: event.requestHash } : {}),
       threadId: event.threadId,
       turnId: event.turnId,
       summary: event.summary ?? 'Approval required',

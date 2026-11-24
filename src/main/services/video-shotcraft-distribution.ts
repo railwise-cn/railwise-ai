@@ -3,7 +3,7 @@ import { extname, join } from 'node:path'
 import type { MarketplacePackageV1 } from '../../shared/marketplace'
 import { inspectPackageDirectory, packageInstallLimitsFor } from './package-installation-service'
 
-export const VIDEO_SHOTCRAFT_COMMIT = '1266a3ec4831289c4d893d42dd5102723658039a'
+export const VIDEO_SHOTCRAFT_COMMIT = '59f3e9b9e936ff2bce0e18446226d770a3f2f61f'
 export const VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION = `${VIDEO_SHOTCRAFT_COMMIT}-railwise.1`
 export const VIDEO_SHOTCRAFT_DISTRIBUTION_RECEIPT = 'railwise-distribution.json'
 export const VIDEO_SHOTCRAFT_DISTRIBUTION_NOTICE = 'RAILWISE-DISTRIBUTION.md'

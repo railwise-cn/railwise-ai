@@ -4,7 +4,8 @@ import {
   allowedToolNamesWithGuiStateTools,
   resolvePlanModeToolSpecs,
   turnRequestForRouting,
-  webSearchCapabilityInstruction
+  webSearchCapabilityInstruction,
+  webSourceToolInstruction
 } from './agent-loop.js'
 import type { ModelClient, ModelRequest, ModelToolSpec } from '../ports/model-client.js'
 import type { ToolHost } from '../ports/tool-host.js'
@@ -291,6 +292,42 @@ describe('webSearchCapabilityInstruction', () => {
     expect(instruction).toContain('cannot override')
     expect(instruction).toContain('authorize tools')
     expect(instruction).toContain('disclose secrets')
+  })
+
+  it('prefers the connected Ego Space and constrains Yuanbao to the read-only source scope', () => {
+    const instruction = webSourceToolInstruction(['ego_browser_open', 'ego_browser_read', 'web_fetch'].map(spec))
+    expect(instruction).toContain('prefer the connected Ego Browser')
+    expect(instruction).toContain('ego_browser_open({url})')
+    expect(instruction).toContain('https://so.qq.com')
+    expect(instruction).toContain('authorized task origins')
+    expect(instruction).not.toContain('use web_fetch with the user’s actual address')
+  })
+
+  it('prefers BrowserSkill in connected Chrome or Edge before web_fetch', () => {
+    const instruction = webSourceToolInstruction(['browser_session_start', 'browser_navigate', 'browser_get_html', 'web_fetch'].map(spec))
+    expect(instruction).toContain('prefer the connected BrowserSkill')
+    expect(instruction).toContain('selected Chrome or Edge')
+    expect(instruction).toContain('do not repeat the same failed fetch')
+  })
+
+  it('uses web_search for source discovery when no browser is connected', () => {
+    const instruction = webSourceToolInstruction(['web_search', 'web_fetch'].map(spec))
+    expect(instruction).toContain('use web_search to discover original sources')
+    expect(instruction).toContain('call web_fetch on the exact returned result URLs')
+    expect(instruction).toContain('does not authorize the entire site')
+  })
+
+  it('uses the scoped Yuanbao OpenSearch URL as a web_fetch fallback when no browser is connected', () => {
+    const instruction = webSourceToolInstruction(['web_fetch'].map(spec))
+    expect(instruction).toContain('https://so.qq.com/isearch?query=<URL-encoded search terms>')
+    expect(instruction).toContain('current read-only network scope includes https://so.qq.com')
+    expect(instruction).toContain('do not claim an original source was read')
+  })
+
+  it('does not call live search unavailable when Ego read tools are connected', () => {
+    const instruction = webSearchCapabilityInstruction('查找最新官网信息', ['ego_browser_open', 'ego_browser_read'].map(spec))
+    expect(instruction).toContain('UNTRUSTED')
+    expect(instruction).not.toContain('Live web search is unavailable')
   })
 })
 

@@ -30,10 +30,12 @@ directory containing this file as `SKILL_DIR`. Per tool call, expand
 use CWD, or assume a repo checkout. If unavailable, ask; never search or guess.
 
 1. Read this file.
-2. Run `python3 "${SKILL_DIR}/scripts/attribution_guard.py"`. Any non-zero result
-   stops the Skill immediately; do not inspect, repair, or bypass the integrity
-   gate. On Windows, a `python3` that never starts (the WindowsApps stub exits
-   9009 with no output) is not a guard result: rerun with `python` first.
+2. In RailWise, call `ppt_master_env` with `action="verify_integrity"`. A result
+   with `verified: false` stops the Skill immediately; do not inspect, repair,
+   or bypass the integrity gate. This built-in check runs the fixed bundled
+   guard with the managed Python interpreter and does not need host-shell
+   access. On other hosts, run `python3 "${SKILL_DIR}/scripts/attribution_guard.py"`;
+   on Windows, use `python` if `python3` is only the WindowsApps stub.
 3. Read [`workflows/routing.md`](workflows/routing.md) through the concrete
    absolute path `${SKILL_DIR}/workflows/routing.md`.
 4. Select exactly one top-level route and its active profile from the routing

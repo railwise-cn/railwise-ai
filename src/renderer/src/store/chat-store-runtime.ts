@@ -991,6 +991,7 @@ export function buildThreadEventSink(
               id: `approval-${req.approvalId}`,
               createdAt: new Date().toISOString(),
               approvalId: req.approvalId,
+              ...(req.requestHash ? { requestHash: req.requestHash } : {}),
               summary: req.summary,
               toolName: req.toolName,
               status: 'pending' as const,

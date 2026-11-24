@@ -786,7 +786,7 @@ describe('syncManagedRuntimeConfig', () => {
       enabled: true,
       fetchEnabled: true,
       searchEnabled: true,
-      provider: 'deepseek-responses'
+      provider: 'deepseek-responses+yuanbao-opensearch'
     })
     expect(parsed.capabilities.mcp.search).toMatchObject({ enabled: false, mode: 'auto' })
     expect(parsed.capabilities.imageGen).toEqual({
@@ -1472,7 +1472,7 @@ describe('syncManagedRuntimeConfig', () => {
     })
   })
 
-  it('does not enable DeepSeek Responses search for a third-party provider', async () => {
+  it('keeps model-independent web search available for a third-party provider', async () => {
     if (!tempRoot) throw new Error('temp root not initialized')
     const module = await import('./managed-runtime-process')
 
@@ -1483,7 +1483,15 @@ describe('syncManagedRuntimeConfig', () => {
     })
 
     const parsed = JSON.parse(readFileSync(join(tempRoot, 'config.json'), 'utf8')) as any
-    expect(parsed.capabilities.web.searchEnabled).not.toBe(true)
-    expect(parsed.capabilities.web.provider).not.toBe('deepseek-responses')
+    expect(parsed.capabilities.web.searchEnabled).toBe(true)
+    expect(parsed.capabilities.web.provider).toBe('yuanbao-opensearch')
+  })
+
+  it('uses Yuanbao search for the general DeepSeek Flash chat model', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const module = await import('./managed-runtime-process')
+    await module.syncManagedRuntimeConfig(tempRoot, { ...defaultManagedRuntimeSettings(), model: 'deepseek-flash' })
+    const parsed = JSON.parse(readFileSync(join(tempRoot, 'config.json'), 'utf8')) as any
+    expect(parsed.capabilities.web).toMatchObject({ enabled: true, fetchEnabled: true, searchEnabled: true, provider: 'yuanbao-opensearch' })
   })
 })

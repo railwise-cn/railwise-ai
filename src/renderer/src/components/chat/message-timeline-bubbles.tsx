@@ -30,6 +30,7 @@ import { ModelMetaTag, WritePromptMetaDisclosure } from './message-timeline-card
 import { readNumber, formatDuration } from './message-timeline-tools'
 import { redactRuntimeText } from './conversation-visibility'
 import { engineeringProfessionalAnswerText, engineeringProfessionalUserSurfaceText } from '../engineering/engineering-professional-text'
+import { ConversationSources, type ConversationSource } from './ConversationSources'
 
 const COPY_FEEDBACK_RESET_MS = 1600
 
@@ -952,20 +953,6 @@ function ToolAttachmentPreviews({
   return <MediaAttachmentGallery media={attachments} variant="tool" />
 }
 
-function metaSources(meta: Record<string, unknown> | undefined): Array<{ title?: string; url?: string }> {
-  const value = meta?.sources
-  if (!Array.isArray(value)) return []
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== 'object') return null
-      const raw = entry as Record<string, unknown>
-      const title = typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : undefined
-      const url = typeof raw.url === 'string' && raw.url.trim() ? raw.url.trim() : undefined
-      return title || url ? { ...(title ? { title } : {}), ...(url ? { url } : {}) } : null
-    })
-    .filter((entry): entry is { title?: string; url?: string } => entry !== null)
-}
-
 function RuntimeMetaChips({
   meta,
   align = 'left',
@@ -981,7 +968,6 @@ function RuntimeMetaChips({
   const attachmentIds = metaStringArray(meta, 'attachmentIds')
   const activeSkillIds = professionalSurface ? [] : metaStringArray(meta, 'activeSkillIds')
   const injectedMemoryIds = professionalSurface ? [] : metaStringArray(meta, 'injectedMemoryIds')
-  const sources = metaSources(meta)
   const child = meta?.child && typeof meta.child === 'object' ? meta.child as Record<string, unknown> : null
   const childLabel =
     !professionalSurface && typeof child?.childLabel === 'string' && child.childLabel.trim()
@@ -991,7 +977,6 @@ function RuntimeMetaChips({
     (hideAttachments || attachmentIds.length === 0) &&
     activeSkillIds.length === 0 &&
     injectedMemoryIds.length === 0 &&
-    sources.length === 0 &&
     !childLabel
   ) {
     return null
@@ -1019,24 +1004,6 @@ function RuntimeMetaChips({
           {t('toolChildAgent')} <span className="max-w-28 truncate font-mono text-ds-muted">{childLabel}</span>
         </span>
       ) : null}
-      {sources.slice(0, 4).map((source, index) =>
-        source.url ? (
-          <a
-            key={`${source.url}-${index}`}
-            href={source.url}
-            target="_blank"
-            rel="noreferrer"
-            className={chipClass}
-            title={source.url}
-          >
-            {t('toolSources')} {index + 1}
-          </a>
-        ) : (
-          <span key={`${source.title}-${index}`} className={chipClass} title={source.title}>
-            {t('toolSources')} {index + 1}
-          </span>
-        )
-      )}
     </div>
   )
 }
@@ -1490,7 +1457,7 @@ function formatMessageDateTime(input: string, locale: string): string {
   }).format(date)
 }
 
-export function MessageBubble({ block, nested = false, professionalSurface = false, language, replyInComposer = false, taskPausedQuestion = false }: { block: ChatBlock; nested?: boolean; professionalSurface?: boolean; language?: string; replyInComposer?: boolean; taskPausedQuestion?: boolean }): ReactElement {
+export function MessageBubble({ block, nested = false, professionalSurface = false, language, replyInComposer = false, taskPausedQuestion = false, sources }: { block: ChatBlock; nested?: boolean; professionalSurface?: boolean; language?: string; replyInComposer?: boolean; taskPausedQuestion?: boolean; sources?: ConversationSource[] }): ReactElement {
   const { t, i18n } = useTranslation('common')
   const activeThreadId = useChatStore((s) => s.activeThreadId)
   const hideRuntimeBlock = professionalSurface && block.kind !== 'assistant' && block.kind !== 'user'
@@ -1537,6 +1504,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
               messageId={block.id}
             />
           ) : null}
+          {!professionalSurface && sources?.length ? <ConversationSources sources={sources} /> : null}
           {!professionalSurface && dshUiProjection?.diagnostics.map((diagnostic, index) => (
             <div key={`${diagnostic.code}:${diagnostic.blockId ?? index}`} role="status" className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
               {t(`dshUiDiagnostic_${diagnostic.code}`, { blockId: diagnostic.blockId ?? '' })}
@@ -1626,7 +1594,11 @@ function ApprovalBubble({ block }: { block: Extract<ChatBlock, { kind: 'approval
     }
   }
   return (
-    <div className="min-w-0 rounded-2xl border border-ds-border bg-ds-card px-4 py-3 text-ds-ink">
+    <div
+      data-approval-id={block.approvalId}
+      data-request-hash={block.requestHash}
+      className="min-w-0 rounded-2xl border border-ds-border bg-ds-card px-4 py-3 text-ds-ink"
+    >
       <div className="text-[13px] font-semibold">{t('approvalTitle')}</div>
       <ApprovalOperationDetails summary={block.summary} toolName={block.toolName} />
       {block.errorMessage ? <p role="status" className="mt-2 text-xs text-ds-muted">{block.errorMessage}</p> : null}

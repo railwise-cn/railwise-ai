@@ -698,6 +698,14 @@ describe('approval mapping', () => {
     expect(chatBlockFromItem({id:'user',threadId:'task-thread',turnId:'turn',role:'user',kind:'user_message',status:'completed',text:'请保留这条正常输入',createdAt:'2026-11-13T00:00:00Z'})).toMatchObject({kind:'user',text:'请保留这条正常输入'})
   })
 
+  it('preserves the exact approval request hash for history cards', () => {
+    expect(chatBlockFromItem({
+      id: 'approval-item', threadId: 'thread', turnId: 'turn', role: 'tool', kind: 'approval',
+      status: 'pending', approvalId: 'approval-exact', requestHash: 'request-hash-exact', toolName: 'write',
+      summary: 'Write one file', createdAt: '2026-11-25T00:00:00Z'
+    })).toMatchObject({ kind: 'approval', approvalId: 'approval-exact', requestHash: 'request-hash-exact' })
+  })
+
   it('does not emit duplicate approval cards from generic item events', async () => {
     let called = false
     const sink: ThreadEventSink = {
@@ -1024,7 +1032,7 @@ describe('WorkWise Runtime extension metadata mapping', () => {
             query: 'kun mcp',
             sources: [
               {
-                sourceId: 'src_1',
+                sourceId: 'web_search_src_1',
                 title: 'Docs',
                 url: 'https://example.com/docs',
                 retrievedAt: '2024-01-01T00:00:00.000Z'
@@ -1042,6 +1050,85 @@ describe('WorkWise Runtime extension metadata mapping', () => {
         sources: [{ title: 'Docs', url: 'https://example.com/docs' }]
       }
     })
+  })
+})
+
+describe('web source receipt mapping', () => {
+  const baseItem: CoreTurnItemJson = {
+    id: 'item_web_result',
+    turnId: 'turn_web',
+    threadId: 'thread_web',
+    role: 'tool',
+    status: 'completed',
+    createdAt: '2026-11-25T00:00:00.000Z',
+    kind: 'tool_result',
+    toolName: 'web_search',
+    output: { sources: [] }
+  }
+
+  function mappedSources(item: CoreTurnItemJson): unknown {
+    const block = chatBlockFromItem(item)
+    return block?.kind === 'tool' ? block.meta?.sources : undefined
+  }
+
+  it('accepts only source receipts whose prefix matches the web tool result', () => {
+    expect(mappedSources({
+      ...baseItem,
+      output: {
+        sources: [
+          { sourceId: 'web_search_valid', title: 'Search result', url: 'https://example.com/search' },
+          { sourceId: 'web_fetch_wrong_kind', title: 'Wrong kind', url: 'https://example.com/fetch' },
+          { sourceId: 'legacy_id', title: 'Unclassified', url: 'https://example.com/legacy' }
+        ],
+        citations: [{ sourceId: 'web_search_citation', title: 'Citation result', url: 'https://example.com/citation' }]
+      }
+    })).toEqual([
+      { sourceId: 'web_search_valid', title: 'Search result', url: 'https://example.com/search' },
+      { sourceId: 'web_search_citation', title: 'Citation result', url: 'https://example.com/citation' }
+    ])
+
+    expect(mappedSources({
+      ...baseItem,
+      toolName: 'web_fetch',
+      output: {
+        sources: [
+          { sourceId: 'web_fetch_valid', title: 'Fetched page', url: 'https://example.com/page' },
+          { sourceId: 'web_search_wrong_kind', title: 'Search result', url: 'https://example.com/search' }
+        ]
+      }
+    })).toEqual([
+      { sourceId: 'web_fetch_valid', title: 'Fetched page', url: 'https://example.com/page' }
+    ])
+  })
+
+  it('ignores citations in tool-call arguments and sources from unrelated tool results', () => {
+    const call = {
+      ...baseItem,
+      id: 'item_web_call',
+      kind: 'tool_call',
+      arguments: { sources: [{ sourceId: 'web_search_unverified', url: 'https://example.com/call' }] }
+    } as CoreTurnItemJson
+    const unrelatedResult = {
+      ...baseItem,
+      toolName: 'external_plugin',
+      output: { citations: [{ sourceId: 'web_search_spoofed', url: 'https://example.com/plugin' }] }
+    }
+
+    expect(mappedSources(call)).toBeUndefined()
+    expect(mappedSources(unrelatedResult)).toBeUndefined()
+  })
+
+  it('does not surface incomplete or failed web results as verified citations', () => {
+    expect(mappedSources({
+      ...baseItem,
+      status: 'failed',
+      output: { sources: [{ sourceId: 'web_search_partial', url: 'https://example.com/partial' }] }
+    })).toBeUndefined()
+    expect(mappedSources({
+      ...baseItem,
+      isError: true,
+      output: { sources: [{ sourceId: 'web_search_error', url: 'https://example.com/error' }] }
+    })).toBeUndefined()
   })
 })
 

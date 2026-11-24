@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { isAbsolute, join, relative, sep } from 'node:path'
+import { isAbsolute, join, relative, sep, win32 } from 'node:path'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 
 export const webPptSourceHost = 'www.railwise.cn'
@@ -105,6 +105,126 @@ async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
       itemKinds: turn.items.map(item => ({ kind: item.kind, toolName: item.toolName, requestId: item.requestId,
         status: item.status, isError: item.isError })) }))
   }
+}
+
+export function inspectLiveWebPptSourceRead(completedTurn, expectedUrl, browserInstanceId) {
+  const results = completedTurn.items.filter(item => item.kind === 'tool_result' && !item.isError)
+  const webFetch = results.find(item => item.toolName === 'web_fetch' && item.output?.finalUrl === expectedUrl)
+  if (webFetch) {
+    const receipt = webFetch.output
+    assert.equal(typeof receipt.text, 'string')
+    assert.ok(receipt.text.includes('工程测量') && receipt.text.includes('安全监测'))
+    assert.match(receipt.resultHash, /^[a-f0-9]{64}$/)
+    assert.ok(receipt.byteCount > 0)
+    return { source: { url: receipt.finalUrl, sha256: receipt.resultHash, bytes: receipt.byteCount, tool: 'web_fetch' }, provider: 'fetch' }
+  }
+
+  const reads = [
+    { toolName: 'ego_browser_read', provider: 'ego-browser' },
+    { toolName: 'browser_get_html', provider: 'browser-skill' }
+  ]
+  for (const read of reads) {
+    const item = results.find(candidate => candidate.toolName === read.toolName && candidate.output?.sourceUrl === expectedUrl)
+    if (!item) continue
+    const output = item.output
+    assert.equal(output.status, 'succeeded')
+    assert.equal(output.readScope, 'document')
+    assert.equal(typeof output.html, 'string')
+    assert.ok(output.html.includes('工程测量') && output.html.includes('安全监测'))
+    const resultHash = digest(output.html)
+    assert.equal(output.resultHash, resultHash)
+    assert.equal(output.evidence?.verified, true)
+    assert.equal(output.evidence?.contentRead, true)
+    if (read.provider === 'browser-skill') {
+      assert.equal(output.evidence?.sourceUrl, expectedUrl)
+      assert.ok(completedTurn.executionGrant?.connectorIdentityFingerprints?.['browser-skill'])
+      assert.ok(completedTurn.executionGrant?.browserScope?.origins.includes(new URL(expectedUrl).origin))
+      if (browserInstanceId) assert.equal(completedTurn.executionGrant.browserScope.browserInstanceId, browserInstanceId)
+    } else {
+      assert.ok(output.taskSpaceId > 0)
+      assert.equal(completedTurn.executionGrant?.browserScope?.provider, 'ego-browser')
+      assert.ok(completedTurn.executionGrant?.browserScope?.origins.includes(new URL(expectedUrl).origin))
+    }
+    return { source: { url: expectedUrl, sha256: resultHash, bytes: Buffer.byteLength(output.html), tool: read.provider },
+      provider: read.provider, ...(read.provider === 'ego-browser' ? { taskSpaceId: output.taskSpaceId } : {}) }
+  }
+  assert.fail('The live model must read the official website through an available, verified source tool')
+}
+
+export function inspectLiveWebPptApproval(attention, { taskId, workspace, skillGuardPath, platform = process.platform }) {
+  assert.ok(attention && attention.kind === 'approval' && attention.status === 'pending')
+  assert.equal(attention.taskId, taskId, 'The approval must belong to this exact task')
+  const approval = attention.payload?.approval
+  assert.ok(approval && approval.id === attention.requestId && approval.status === 'pending')
+  assert.match(approval.requestHash ?? '', sha256)
+  assert.ok(approval.callId)
+
+  if (approval.toolName === 'web_fetch') {
+    assert.equal(approval.summary, `Read public web page\nOrigin: https://${webPptSourceHost}\nEffect: Read page content only.`)
+    return { id: approval.id, tool: approval.toolName, scope: 'read-only-public-origin', origin: `https://${webPptSourceHost}`,
+      requestHash: approval.requestHash }
+  }
+
+  assert.equal(approval.toolName, 'request_host_shell', 'Unexpected tool approvals must never be accepted by this journey')
+  assert.ok(workspace && skillGuardPath, 'The isolated workspace and installed integrity-check path are required')
+  const lines = approval.summary.split(/\r?\n/)
+  const field = name => lines.find(line => line.startsWith(`${name}: `))?.slice(name.length + 2)
+  assert.equal(lines[0], 'Run request_host_shell')
+  assert.equal(lines[1], 'Authority: Full host access for this exact command only; workspace trust remains unchanged')
+  const reviewedWorkspace = JSON.parse(field('Workspace (JSON)') ?? 'null')
+  const command = JSON.parse(field('Command (JSON)') ?? 'null')
+  assert.equal(reviewedWorkspace, workspace, 'The host command must be confined to the isolated acceptance workspace')
+  const pathApi = platform === 'win32' ? win32 : { normalize: value => value }
+  const commandPath = /^(?:&\s*)?(?:python3?|py)\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^\s]+))$/i.exec(command ?? '')
+  assert.ok(commandPath, 'Only a single Python invocation with one quoted script path is eligible')
+  const executable = commandPath[1] ?? commandPath[2] ?? commandPath[3]
+  assert.equal(pathApi.normalize(executable), pathApi.normalize(skillGuardPath), 'Only the packaged PPT Master attribution guard is eligible')
+  assert.equal(field('Workspace SHA256'), digest(workspace))
+  assert.equal(field('Command SHA256'), digest(command))
+  assert.equal(field('Request SHA256'), approval.requestHash)
+  assert.ok(Number(field('Lifetime seconds')) >= 1 && Number(field('Lifetime seconds')) <= 300)
+  assert.ok(Number(field('Timeout seconds')) >= 1 && Number(field('Timeout seconds')) <= Number(field('Lifetime seconds')))
+  assert.equal(field('Session'), 'Read output or stop only; no stdin writes, connector proxy or automatic replay')
+  return { id: approval.id, tool: approval.toolName, scope: 'single-integrity-check-command',
+    commandSha256: field('Command SHA256'), workspaceSha256: field('Workspace SHA256'), requestHash: approval.requestHash }
+}
+
+async function resolveLiveWebPptApproval(cdp, taskId, { workspace, skillGuardPath, onStage }) {
+  const pending = await cdp.evaluate(`${readRuntime('/v1/inbox')}.then(items=>items.filter(item=>item.taskId===${literal(taskId)} && item.kind==='approval' && item.status==='pending'))`)
+  assert.equal(pending.length, 1, 'Only one exact approval may be pending for the isolated website-to-PPT task')
+  const receipt = inspectLiveWebPptApproval(pending[0], { taskId, workspace, skillGuardPath })
+  const stage = receipt.tool === 'web_fetch' ? 'approve-read-only-official-site' : 'approve-packaged-attribution-check'
+  await onStage?.(stage)
+  const button = 'section[aria-label="任务"] button'
+  await cdp.wait(`(() => {const buttons=[...document.querySelectorAll(${literal(button)})].filter(node=>
+    node.getClientRects().length && !node.disabled && node.textContent.trim()==='允许此操作');return buttons.length===1;})()`,
+    'the single visible approval control for the isolated task', 30_000)
+  await cdp.click(button, '允许此操作')
+  await cdp.wait(`${readRuntime('/v1/tasks/' + encodeURIComponent(taskId) + '/inputs')}.then(inputs=>{
+    const rows=inputs.filter(input=>input.kind==='approval_resolution' && input.sourceId===${literal(receipt.id)});
+    return rows.length===1 && rows[0].resolution?.decision==='allow' ? true : null;
+  })`, 'the exact approval decision to be recorded once', 30_000)
+  return { ...receipt, decision: 'allow', method: 'installed-task-card' }
+}
+
+async function waitForWebPptTask(cdp, taskId, options) {
+  const deadline = Date.now() + options.timeoutMs
+  const resolutions = []
+  const visited = new Set()
+  while (Date.now() < deadline) {
+    const task = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`))
+    if (['completed', 'failed', 'stalled', 'cancelled', 'waiting_user', 'paused'].includes(task.status)) return { task, resolutions }
+    if (task.status === 'waiting_approval') {
+      assert.equal(options.live, true, 'Controlled journeys do not approve real task requests')
+      const receipt = await resolveLiveWebPptApproval(cdp, taskId, options)
+      assert.ok(!visited.has(receipt.id), 'An approval may be resolved only once')
+      visited.add(receipt.id)
+      resolutions.push(receipt)
+      continue
+    }
+    await new Promise(resolve => setTimeout(resolve, 200))
+  }
+  throw new Error('Timed out waiting for the original task state')
 }
 
 async function readWebPptAdmissionDiagnostics(cdp, priorThreadIds) {
@@ -432,7 +552,7 @@ export function validateWebPptFallbackProof(proof, browser) {
   assert.equal(proof.open.status, 'desktop-open-request-accepted')
 }
 
-export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live = false, fallback }) {
+export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live = false, fallback, skillGuardPath }) {
   assert.ok(!live || !fallback, 'The real-browser fallback uses a controlled model')
   const observed = {}
   return {
@@ -504,14 +624,15 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
         sourceAnswer: fallback?.url ?? webPptSourceHost, requireNewTurn: Boolean(fallback), onStage })
       await onStage?.('wait-for-original-task-completion')
-      let task
+      let task, approvals = []
       try {
-        task = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)}.then(task=>
-          ['completed','failed','stalled','cancelled','waiting_user','paused'].includes(task.status) ? task : null)`,
-        'task completion or a visible request for input', live ? 480_000 : 180_000)
+        const waited = await waitForWebPptTask(cdp, journey.taskId, { live, workspace, skillGuardPath, onStage,
+          timeoutMs: live ? 480_000 : 180_000 })
+        task = waited.task
+        approvals = waited.resolutions
       } catch {
         const diagnostics = await readWebPptTaskDiagnostics(cdp, journey.taskId, journey.executionThreadId)
-        throw Object.assign(new Error('Timed out waiting for the original task state'), { webPptDiagnostics: diagnostics })
+        throw Object.assign(new Error('Timed out or blocked waiting for the original task state'), { webPptDiagnostics: diagnostics })
       }
       if (task.status !== 'completed') {
         const diagnostics = await readWebPptTaskDiagnostics(cdp, journey.taskId, journey.executionThreadId)
@@ -542,12 +663,11 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
         browserRecovery = recovery
       }
       if (live) {
-        const fetched = completedTurn.items.find(item => item.kind === 'tool_result' && item.toolName === 'web_fetch' && !item.isError && item.output?.finalUrl === webPptSourceUrl)
-        const receipt = fetched?.output
-        assert.ok(receipt, 'The live model must read the public source in the original task')
-        assert.match(receipt.resultHash, /^[a-f0-9]{64}$/)
-        assert.ok(receipt.byteCount > 0)
-        source = { url: receipt.finalUrl, sha256: receipt.resultHash, bytes: receipt.byteCount, tool: 'web_fetch' }
+        const sourceRead = inspectLiveWebPptSourceRead(completedTurn, webPptSourceUrl, browserInstanceId)
+        if (browserInstanceId) assert.equal(sourceRead.provider, 'browser-skill', 'A connected Chrome BrowserSkill must be used before web_fetch')
+        source = sourceRead.source
+        observed.sourceProvider = sourceRead.provider
+        if (sourceRead.taskSpaceId) observed.egoTaskSpaceId = sourceRead.taskSpaceId
       }
       await onStage?.('verify-registered-editable-pptx')
       const artifact = task.artifacts.find(item => item.relativePath.replaceAll('\\', '/') === artifactPath)
@@ -571,6 +691,9 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       return { status: 'passed', model: live ? 'live-model' : 'controlled-protocol', input: 'installed-chat-ui', source,
         quality: observed.quality, taskId: task.id, conversationThreadId: journey.conversationThreadId,
         originThreadId: task.originThreadId, executionThreadId: task.threadId, sameConversation: true,
+        ...(observed.sourceProvider ? { sourceProvider: observed.sourceProvider } : {}),
+        ...(observed.egoTaskSpaceId ? { egoTaskSpaceId: observed.egoTaskSpaceId } : {}),
+        ...(approvals.length ? { approvals } : {}),
         originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn, initialTurnId: initialTurn.id, completedTurnId: completedTurn.id,
         replyTrace: journey.replyTrace, ...(browserRecovery ? { browserRecovery } : {}),
         artifact: { id: artifact.id, ...contents, originalChatButtonClicked: true }, open }

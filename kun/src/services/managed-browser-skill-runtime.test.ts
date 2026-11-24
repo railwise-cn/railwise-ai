@@ -9,13 +9,14 @@ import { TaskRunRepository, operationFingerprint } from './task-run-repository.j
 import { ManagedBrowserSkillRuntime } from './managed-browser-skill-runtime.js'
 const cleanups: (() => void)[] = []
 afterEach(() => cleanups.splice(0).forEach(fn => fn()))
-function fixture(versions: { cli?: string; daemon?: string; extension?: string; liveDaemon?: string; liveExtension?: string } = {}) {
+function fixture(versions: { cli?: string; daemon?: string; extension?: string; liveDaemon?: string; liveExtension?: string } = {},
+  origins: string[] = ['https://example.com', 'https://new.example']) {
   const root = mkdtempSync(join(tmpdir(), 'browser-binding-'))
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite'))
   cleanups.push(() => { repository.close(); rmSync(root, { recursive: true, force: true }) })
   const daemonProtocol = versions.daemon ?? '1.9', extensionProtocol = versions.extension ?? '1.9'
   const config = BrowserCapabilityConfig.parse({ enabled: true, state: 'ready', version: versions.cli ?? '0.5.0', daemonProtocolVersion: daemonProtocol,
-    browserInstanceId: 'browser-new', revision: 3, origins: ['https://example.com', 'https://new.example'], interaction: 'interact',
+    browserInstanceId: 'browser-new', revision: 3, origins, interaction: 'interact',
     browsers: [{ id: 'browser-new', name: 'Chrome', label: 'Test', extensionVersion: '0.5.0', protocolVersion: extensionProtocol, connected: true, versionSkew: false }] })
   const old = { browserInstanceId: 'browser-old', revision: 1, origins: ['https://example.com'], interaction: 'observe' as const }
   repository.create(TaskRunSchema.parse({ id: 'task', threadId: 'thread', childTaskIds: [], workspaceRoot: root, goal: '浏览器 https://example.com', status: 'waiting_user', agentId: 'default', acceptance: { kind: 'answer', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: false }, budget: { maxAttempts: 3, maxDurationMs: 600000 }, attempts: 0, replans: 0, noProgressCount: 0, nodes: [], artifacts: [], revision: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), authority: { source: 'user', workspaceRoot: root, grantedAt: new Date().toISOString(), browserScope: old } }))
@@ -34,6 +35,49 @@ describe('Browser task authority rebinding', () => {
     })
     expect(f.runtime.sourceReadScope(['https://outside.example/about'])).toBeUndefined()
     expect(f.repository.get('task')).toEqual(before)
+  })
+
+  it('includes a direct follow-up URL in the browser binding review before minting an expanded grant', () => {
+    const f = fixture({}, ['https://example.com', 'https://new.example', 'https://followup.example'])
+    const task = f.repository.update('task', 0, current => ({ ...current,
+      acceptance: { ...current.acceptance, requiresWebEvidence: true, requiredSourceOrigins: ['https://example.com'] },
+      authority: { ...current.authority!, browserScope: { ...f.old, browserInstanceId: f.config.browserInstanceId!, revision: f.config.revision } }
+    }))
+    f.repository.appendInput({ taskId: task.id, expectedRevision: task.revision, idempotencyKey: 'follow-up-site',
+      kind: 'supplement', text: 'https://followup.example/report', nowIso: new Date().toISOString() })
+    const snapshot = f.runtime.bindingSnapshot(task.id)
+    expect(snapshot.origins).toEqual(['https://example.com', 'https://followup.example'])
+    expect(f.repository.get(task.id)?.authority?.browserScope?.origins).toEqual(['https://example.com'])
+    const result = f.runtime.confirmBinding(task.id, { confirmed: true, expectedTaskRevision: snapshot.taskRevision,
+      expectedBrowserRevision: snapshot.browserRevision, browserInstanceId: snapshot.browserInstanceId, origins: snapshot.origins,
+      idempotencyKey: 'review-followup-site' })
+    expect(result.resumed).toBe(false)
+    expect(f.repository.get(task.id)?.authority?.browserScope?.origins).toEqual(['https://example.com', 'https://followup.example'])
+  })
+
+  it('requires browser scope review before a resumed task reads a newly supplied site', async () => {
+    const f = fixture({}, ['https://example.com', 'https://new.example', 'https://followup.example'])
+    const task = f.repository.update('task', 0, current => ({ ...current,
+      acceptance: { ...current.acceptance, requiresWebEvidence: true, requiredSourceOrigins: ['https://example.com'] },
+      authority: { ...current.authority!, browserScope: { ...f.old, browserInstanceId: f.config.browserInstanceId!, revision: f.config.revision } }
+    }))
+    f.repository.appendInput({ taskId: task.id, expectedRevision: task.revision, idempotencyKey: 'new-site-answer',
+      kind: 'user_answer', sourceId: 'question-1', text: JSON.stringify({
+        request: 'Which site should I read?', resolution: { status: 'submitted', answers: [{ id: 'site', label: 'Site', value: 'https://followup.example/report' }] }
+      }), nowIso: new Date().toISOString() })
+    const capability = await f.runtime.preflight('Continue the same report', { id: 'thread', workspace: f.repository.get('task')!.workspaceRoot } as ThreadRecord)
+    expect(capability).toMatchObject({ status: 'needs_authorization', errorCode: 'browser_followup_origin_scope_required', resolution: {
+      kind: 'grant', route: 'task/browser-binding'
+    } })
+  })
+
+  it('limits a browser-only source read to the exact user-supplied origin when no global allowlist is configured', () => {
+    const f = fixture({}, [])
+    expect(f.runtime.sourceReadScope(['https://public.example/path'])).toEqual({
+      browserInstanceId: f.config.browserInstanceId, origins: ['https://public.example'], interaction: 'observe',
+      sourceReadOnly: true, revision: 3
+    })
+    expect(f.runtime.sourceReadScope(['the web page is unavailable'])).toBeUndefined()
   })
 
   it.each([{ cli: '0.4.0' }, { daemon: '1.7' }, { extension: '1.7' }, { daemon: '1.8' }, { extension: '1.8' }, { cli: '' }, { daemon: '' }, { extension: '' }])('keeps strict bindings available but never offers target interaction for incompatible dependencies %j', versions => {
