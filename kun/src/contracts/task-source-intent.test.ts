@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest'
 import { browserTaskOrigins, isBrowserTask } from './browser-skill.js'
-import { isLocalHtmlCreativeRequest, requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames } from './task-source-intent.js'
+import { explicitWebSourceOrigin, taskReadOnlySourceOrigins, isLocalHtmlCreativeRequest, requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames } from './task-source-intent.js'
+
+const credentialedSource = new URL('https://example.test/path')
+credentialedSource.username = 'fixture-user'
+credentialedSource.password = 'fixture-password'
 
 it.each([
   '创建独立 HTML 文件，用 SVG 绘制鹈鹕骑车动画，所有素材内联，打开浏览器即可查看。',
@@ -41,6 +45,28 @@ it('keeps explicit URL behavior and excludes host lookalikes from bare source ta
   expect(browserTaskOrigins(prompt, { includeBareWww: true })).toEqual(['https://example.test', 'https://www.full.test', 'https://www.railwise.cn'])
   expect(requiresWebSourceEvidence('查找 www.railwise.cn 的公开信息。')).toBe(true)
   expect(requiresWebSourceEvidence('制作本地 HTML 动画，不要去官网上查找资料。 www.railwise.cn')).toBe(false)
+})
+
+it.each([
+  ['www.railwise.cn', 'https://www.railwise.cn'],
+  [' https://example.test/reports?month=1 ', 'https://example.test'],
+  ['http://example.test/path', 'http://example.test'],
+  [credentialedSource.href, undefined],
+  ['example.test and then https://other.test', undefined],
+  ['hello@example.test', undefined],
+  ['file:///tmp/report.pdf', undefined],
+  ['http://127.0.0.1:3000', 'http://127.0.0.1:3000']
+])('limits direct source answers to one URL origin: %s', (answer, expected) => {
+  expect(explicitWebSourceOrigin(answer)).toBe(expected)
+})
+
+it('grants read-only network scope only to the task sources the user supplied', () => {
+  expect(taskReadOnlySourceOrigins({ requiresWebEvidence: false, requiredSourceOrigins: ['https://contract.example'] },
+    ['https://answer.example'])).toEqual([])
+  expect(taskReadOnlySourceOrigins({ requiresWebEvidence: true, requiredSourceOrigins: ['https://contract.example'] },
+    ['www.railwise.cn', 'https://answer.example/path?query=hidden', 'see also https://other.example'])).toEqual([
+    'https://contract.example', 'https://www.railwise.cn', 'https://answer.example'
+  ])
 })
 
 it('keeps an explicit BrowserSkill connection request while not turning local rendering into source research', () => {

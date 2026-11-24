@@ -139,6 +139,7 @@ import { ManagedDwsRuntime } from '../services/managed-dws-runtime.js'
 import { EgoBrowserRuntime } from '../services/ego-browser-runtime.js'
 import { ManagedBrowserSkillRuntime } from '../services/managed-browser-skill-runtime.js'
 import { isBrowserTask } from '../contracts/browser-skill.js'
+import { taskReadOnlySourceOrigins } from '../contracts/task-source-intent.js'
 import { externalTaskIntent } from '../services/external-task-capability.js'
 import { contextualExternalTaskPreflight } from '../services/contextual-external-task-preflight.js'
 import { workspaceWritePreflight,workspacePermissionCapability } from '../services/workspace-write-preflight.js'
@@ -841,6 +842,10 @@ export async function createKunServeRuntime(
       ? intent.provider === 'lark' ? 'lark-cli' : intent.provider === 'dingtalk' ? 'dingtalk' : undefined
       : undefined
     const task = taskController.activeTask(threadId)
+    const taskSourceOrigins = task
+      ? taskReadOnlySourceOrigins(task.acceptance,
+          taskController.taskInputs(task.id).filter(input => input.kind === 'user_answer').map(input => input.text))
+      : []
     const accepted = task?.activeTurnId === turnId ? task.acceptance.effect : undefined
     const effects = accepted?.requiredEffects ?? (accepted?.target
       ? [{ provider: accepted.provider, operation: accepted.operation, target: accepted.target }] : [])
@@ -860,7 +865,7 @@ export async function createKunServeRuntime(
       .filter(providerId => providerId !== 'browser-skill' || (browserTask || browserFallback) && !egoTask)
       .filter(providerId => providerId !== 'ego-browser' || egoTask)
       .filter(providerId => !egoTask || ['builtin','ego-browser','managed-artifacts','document-delivery','task-schedule','todo'].includes(providerId))
-    let providerScope: ExecutionScope = { networkAllowlist: ['*'], connectorScopes: [], externalTargets: [] }
+    let providerScope: ExecutionScope = { networkAllowlist: taskSourceOrigins.length ? taskSourceOrigins : ['*'], connectorScopes: [], externalTargets: [] }
     if (selectedProviderId === 'lark-cli') providerScope = larkRuntime.scope(externalTargets)
     else if (selectedProviderId === 'dingtalk') providerScope = useDws() ? dwsRuntime.scope(externalTargets) : dingtalkRuntime.scope(externalTargets)
     else if (browserTask && turn) {

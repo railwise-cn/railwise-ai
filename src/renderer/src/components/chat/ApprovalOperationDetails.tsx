@@ -15,6 +15,18 @@ export function ApprovalOperationDetails({ summary, toolName, presentation }: {
   if (browserApprovalFields(summary)) return <BrowserApprovalDetails summary={summary} />
   const isHost = presentation?.scope === 'host' || toolName === 'request_host_shell' || summary.startsWith('Run request_host_shell\n')
   const reason = isHost ? 'approval_host_shell' : presentation?.reason ?? 'approval_required'
+  const webFetchOrigin = toolName === 'web_fetch'
+    ? /^Read public web page\r?\nOrigin: (https?:\/\/[^/\s?#]+)\r?\nEffect: Read page content only\.$/.exec(summary)?.[1]
+    : undefined
+  if (webFetchOrigin) return <div className="mt-2 text-xs leading-relaxed">
+    <p className="font-medium">{t('approvalWebFetchTitle')}</p>
+    <dl className="mt-2 flex flex-wrap gap-x-2 text-ds-muted">
+      <dt>{t('approvalWebFetchOrigin')}</dt>
+      <dd className="min-w-0 break-all">{webFetchOrigin}</dd>
+    </dl>
+    <p className="mt-2">{t('approvalWebFetchImpact')}</p>
+    <TechnicalDetails detail={redactRuntimeText(summary)} label={t('approvalScopeDetails')} />
+  </div>
   const fileSummary = isHost ? null : /^Run (write|edit)\r?\nTarget: <workspace>\/([^\r\n]+)(?:\r?\n|$)/.exec(summary)
   const action = fileSummary?.[1]
   const target = fileSummary?.[2]

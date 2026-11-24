@@ -22,6 +22,31 @@ export function parseWebSourceAddress(value: string): URL {
   return new URL(host && bareWwwHost.test(host) && host.length <= 253 ? `https://${address}` : address)
 }
 
+/** Accept only a single URL the user supplied as a direct task answer. */
+export function explicitWebSourceOrigin(value: string): string | undefined {
+  const address = value.trim()
+  if (!address || /\s/.test(address)) return undefined
+  try {
+    const url = parseWebSourceAddress(address)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || !url.hostname) return undefined
+    return url.origin
+  } catch {
+    return undefined
+  }
+}
+
+/** A task's explicit deliverable contract and direct URL answers define read-only sources. */
+export function taskReadOnlySourceOrigins(
+  acceptance: { requiresWebEvidence?: boolean; requiredSourceOrigins?: readonly string[] },
+  userAnswers: readonly string[]
+): string[] {
+  if (!acceptance.requiresWebEvidence) return []
+  return [...new Set([
+    ...(acceptance.requiredSourceOrigins ?? []),
+    ...userAnswers.map(explicitWebSourceOrigin).filter((origin): origin is string => Boolean(origin))
+  ])]
+}
+
 function asksForExternalRead(text: string): boolean {
   // Explicit local inputs and prohibitions are not requests to fetch a website.
   const request = text.replace(/(?:无需|不需要|不要|禁止|不必)(?:(?:从|在|去)(?:互联网|网上|网站|网页|官网)上?)?(?:联网|采集|抓取|爬取|检索|搜索|查询|查找|查阅|读取|获取|访问)(?:网页|网站|官网|平台|外部(?:资料|数据|来源)|互联网|网上)?/g, '')

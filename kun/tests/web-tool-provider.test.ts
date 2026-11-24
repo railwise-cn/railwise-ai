@@ -10,6 +10,7 @@ import { modelCapabilitiesForModel } from '../src/loop/model-context-profile.js'
 import { DeterministicWebProvider } from '../src/ports/web-provider.js'
 import type { ToolHostContext } from '../src/ports/tool-host.js'
 import { SafeWebFetchError } from '../src/network/safe-web-fetch.js'
+import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
 
 function buildContext(): ToolHostContext {
   return {
@@ -20,6 +21,22 @@ function buildContext(): ToolHostContext {
     approvalPolicy: 'auto',
     abortSignal: new AbortController().signal,
     awaitApproval: async () => 'allow'
+  }
+}
+
+function buildTaskWebContext(networkAllowlist: string[], awaitApproval: ToolHostContext['awaitApproval']): ToolHostContext {
+  return {
+    ...buildContext(),
+    approvalPolicy: 'on-request',
+    awaitApproval,
+    executionGrant: ExecutionGrantSchema.parse({
+      id: 'grant-task-source', taskId: 'task-1', threadId: 'thr_1', turnId: 'turn_1',
+      workspaceRoot: '/tmp/project', workspaceTrust: 'workspace-write', agentTrust: 'workspace-write',
+      approvalPolicy: 'on-request', sandboxMode: 'workspace-write', pathAllowlist: ['/tmp/project'],
+      readPathAllowlist: ['/tmp/project'], writePathAllowlist: ['/tmp/project'], networkAllowlist,
+      connectorScopes: [], externalTargets: [], workspaceRevision: 0, agentRevision: 0,
+      revision: 0, idempotencyKey: 'grant-task-source', issuedAt: '2026-06-03T00:00:00.000Z'
+    })
   }
 }
 
@@ -392,6 +409,75 @@ describe('Web tool provider', () => {
       arguments: { query: '今天 AI 行业重要资讯', timeout_ms: 999_999 }
     }, buildContext())
     expect(receivedTimeoutMs).toBe(120_000)
+  })
+
+  it('does not interrupt a task for a read-only fetch within its exact user-approved source origin', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, fetchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://docs.example.test'], approval)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      provider: deterministicProvider()
+    }).providers) })
+
+    const result = await host.execute({ callId: 'scoped-fetch', toolName: 'web_fetch',
+      arguments: { url: 'https://docs.example.test/page' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(approval).not.toHaveBeenCalled()
+  })
+
+  it('blocks other sites before approval when they fall outside the exact task scope', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, fetchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://docs.example.test'], approval)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      provider: deterministicProvider()
+    }).providers) })
+
+    const result = await host.execute({ callId: 'other-site', toolName: 'web_fetch',
+      arguments: { url: 'https://other.example.test/page' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: true, output: { code: 'network_scope_blocked' } })
+    expect(approval).not.toHaveBeenCalled()
+  })
+
+  it('still asks before a public fetch when the task has only a wildcard network grant', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, fetchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['*'], approval)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      provider: deterministicProvider()
+    }).providers) })
+
+    const result = await host.execute({ callId: 'wildcard-fetch', toolName: 'web_fetch',
+      arguments: { url: 'https://docs.example.test/page' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(approval).toHaveBeenCalledOnce()
+  })
+
+  it('does not extend a source-site grant to broad web search', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://docs.example.test'], approval)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      searchProvider: deterministicProvider()
+    }).providers) })
+
+    const result = await host.execute({ callId: 'broad-search', toolName: 'web_search',
+      arguments: { query: 'RailWise public documentation' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(approval).toHaveBeenCalledOnce()
+  })
+
+  it('summarizes a pending fetch with only its site origin', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, fetchEnabled: true } })
+    const registry = new CapabilityRegistry(buildWebToolProviders(config.web, { provider: deterministicProvider() }).providers)
+    const tool = registry.resolveTool('web_fetch', buildContext()).tool
+
+    await expect(tool.approvalSummary?.({ url: 'https://docs.example.test/private/path?token=hidden' }, buildContext()))
+      .resolves.toBe('Read public web page\nOrigin: https://docs.example.test\nEffect: Read page content only.')
   })
 
   it('reports web availability in the runtime capability manifest', () => {
