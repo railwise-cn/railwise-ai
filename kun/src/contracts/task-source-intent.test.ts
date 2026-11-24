@@ -2,6 +2,10 @@ import { expect, it } from 'vitest'
 import { browserTaskOrigins, isBrowserTask } from './browser-skill.js'
 import { explicitWebSourceOrigin, taskReadOnlySourceOrigins, isLocalHtmlCreativeRequest, requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames } from './task-source-intent.js'
 
+const credentialedSource = new URL('https://example.test/path')
+credentialedSource.username = 'fixture-user'
+credentialedSource.password = 'fixture-password'
+
 it.each([
   '创建独立 HTML 文件，用 SVG 绘制鹈鹕骑车动画，所有素材内联，打开浏览器即可查看。',
   'Build a standalone HTML SVG animation and open it in Chrome to view the result.',
@@ -47,7 +51,7 @@ it.each([
   ['www.railwise.cn', 'https://www.railwise.cn'],
   [' https://example.test/reports?month=1 ', 'https://example.test'],
   ['http://example.test/path', 'http://example.test'],
-  ['https://user:password@example.test/path', undefined],
+  [credentialedSource.href, undefined],
   ['example.test and then https://other.test', undefined],
   ['hello@example.test', undefined],
   ['file:///tmp/report.pdf', undefined],
