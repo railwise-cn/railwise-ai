@@ -13,7 +13,7 @@ export const webPptJourneyPrompt = '请用所选技能制作单页可编辑演�
 const project = 'deck'
 const filename = 'website.pptx'
 const artifactPath = `${project}/${filename}`
-const composer = '.ds-chat-composer-dock textarea[placeholder="向智能体提问…"]:not(:disabled)'
+const composer = '.ds-chat-composer-dock textarea:not(:disabled)'
 const answerComposer = '.ds-chat-composer-dock textarea[placeholder="输入你的回答…"]:not(:disabled)'
 const timeline = '.ds-message-timeline-content'
 const resultRegion = `${timeline} section[aria-label="任务"]`
@@ -139,12 +139,17 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
   sourceAnswer = webPptSourceHost, requireNewTurn = false, onStage } = {}) {
   await onStage?.('read-prior-conversations')
   const priorThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.map(thread => thread.id)
-  await onStage?.('create-conversation-and-select-ppt-master')
+  await onStage?.('create-new-conversation')
   await cdp.click('.ds-sidebar-shell button.w-full', '新建会话')
+  await onStage?.('enter-ppt-master-search')
   await cdp.fill(composer, '/ppt')
+  await onStage?.('select-ppt-master')
   await cdp.click('[role="option"] .truncate', 'PPT Master')
+  await onStage?.('verify-ppt-master-selection')
   await cdp.wait(`Array.from(document.querySelectorAll('[data-composer-skill]')).some(chip=>chip.textContent.includes('PPT Master'))`, 'the selected PPT Master skill')
+  await onStage?.('enter-ppt-task-prompt')
   await cdp.fill(composer, promptText)
+  await onStage?.('send-ppt-task-prompt')
   await cdp.click('button[aria-label="发送"]:not(:disabled)')
   const questionCheck = expectedQuestion instanceof RegExp
     ? `new RegExp(${literal(expectedQuestion.source)},${literal(expectedQuestion.flags)}).test(${conversationTextProbe()})`

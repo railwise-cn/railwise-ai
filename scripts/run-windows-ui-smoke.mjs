@@ -2830,7 +2830,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           return JSON.parse(response.body).providers.some(provider=>provider.id==='browser-skill'&&provider.enabled&&provider.available);
         })`, 'the installed Runtime to receive the selected BrowserSkill binding')
       }
-      report.webPpt = await webPpt.verify(cdp, { browserInstanceId: realBrowser?.evidence.browserInstanceId, openArtifact: async (driver, { task, artifact }) => {
+      report.webPpt = await webPpt.verify(cdp, { browserInstanceId: realBrowser?.evidence.browserInstanceId,
+        onStage: stage => { report.webPptStage = stage },
+        openArtifact: async (driver, { task, artifact }) => {
         const opened = await driver.evaluate(artifact.absolutePath || artifact.storage === 'task'
           ? `window.workwise.openTaskArtifact(${JSON.stringify({ taskId: task.id, artifactId: artifact.id })})`
           : `window.workwise.openWorkspaceFile(${JSON.stringify({ workspaceRoot: workspace, path: artifact.relativePath })})`)

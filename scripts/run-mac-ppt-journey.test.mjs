@@ -29,6 +29,12 @@ test('Mac PPT receipts retain the last chat journey stage when CDP stalls', asyn
   assert.match(runner, /receipt\.stageHistory\.push\(\{ stage, at: new Date\(\)\.toISOString\(\) \}\)/)
   assert.match(runner, /stage: receipt\.lastStage/)
   for (const stage of [
+    'create-new-conversation',
+    'enter-ppt-master-search',
+    'select-ppt-master',
+    'verify-ppt-master-selection',
+    'enter-ppt-task-prompt',
+    'send-ppt-task-prompt',
     'wait-for-source-question-in-original-conversation',
     'submit-website-address-in-original-conversation',
     'wait-for-original-task-completion',
@@ -48,6 +54,12 @@ test('Mac PPT receipts retain the last chat journey stage when CDP stalls', asyn
   assert.match(nativeOpenObserver, /readArtifactOpenFailure\(cdp\)/, 'The observer should read visible failure state after the original UI click')
   assert.doesNotMatch(nativeOpenObserver, /openTaskArtifact\(|openWorkspaceFile\(/,
     'The observer must not invoke the same open IPC a second time')
+})
+
+test('new-conversation PPT entry accepts its workspace-specific placeholder', async () => {
+  const journey = await readFile(journeySourcePath, 'utf8')
+  assert.ok(journey.includes("const composer = '.ds-chat-composer-dock textarea:not(:disabled)'"))
+  assert.doesNotMatch(journey, /const composer = '[^']*placeholder="向智能体提问/)
 })
 
 test('Mac document-window observations retain the app and title for every visible app window', () => {
