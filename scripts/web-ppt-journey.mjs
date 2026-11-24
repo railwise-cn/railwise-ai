@@ -112,11 +112,18 @@ async function readWebPptAdmissionDiagnostics(cdp, priorThreadIds) {
   const newThreads = threadList.threads.filter(thread => !priorThreadIds.includes(thread.id))
   const threads = await Promise.all(newThreads.map(thread => cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(thread.id)}`))))
   const threadIds = new Set(newThreads.map(thread => thread.id))
-  const taskIds = new Set(tasks.filter(task => threadIds.has(task.originThreadId)).map(task => task.id))
+  const newTasks = tasks.filter(task => threadIds.has(task.originThreadId))
+  const taskIds = new Set(newTasks.map(task => task.id))
+  const executionThreadIds = [...new Set(newTasks.map(task => task.threadId).filter(threadId => !threadIds.has(threadId)))]
+  const executionThreads = await Promise.all(executionThreadIds.map(threadId =>
+    cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(threadId)}`))))
   return {
     threads: threads.map(thread => ({ id: thread.id, turns: thread.turns.map(turn => ({ id: turn.id, status: turn.status,
       activeSkillIds: turn.activeSkillIds, items: turn.items.map(item => ({ kind: item.kind, toolName: item.toolName,
         status: item.status, isError: item.isError })) })) })),
+    executionThreads: executionThreads.map(thread => ({ id: thread.id, turns: thread.turns.map(turn => ({ id: turn.id,
+      status: turn.status, activeSkillIds: turn.activeSkillIds, items: turn.items.map(item => ({ kind: item.kind,
+        toolName: item.toolName, status: item.status, isError: item.isError })) })) })),
     tasks: tasks.filter(task => taskIds.has(task.id)).map(task => ({ id: task.id, status: task.status,
       activeTurnId: task.activeTurnId, threadId: task.threadId, waitingReason: task.waitingReason,
       stalledReason: task.stalledReason, blockCode: task.blockCode, revision: task.revision })),
