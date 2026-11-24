@@ -247,3 +247,29 @@ Windows Docling 专项 `45164369592` 使用候选 `45115646587`，工具启动�
 隔离的 macOS Apple Silicon 源码预览回执保留在本机临时验收目录，未纳入版本库。测试源码提交为 `fb0d9daf95b67835cbd746d8dbd3edb4e36f9ea2`，渲染包 SHA-256 为 `2925303dba2d78c56d6c850c1824d1a6807ac135e7e02c646aa1b1e7dda7bd11`。空配置冷启动创建 `default_workspace` 并读回 `workspace-write/workwise-created`。界面内暂停后原问题仍显示、输入框解除旧请求绑定；在原对话继续、答复及单次批准后，同一任务完成。回执确认一条答案记录、一次文件写入调用和实际文件内容。该源预览不等于签名候选安装包验收，暂停后的应用重启恢复未测。
 
 本次聚焦界面测试 17/17，工作区首次初始化、KUN 用户输入恢复及权限相关聚焦测试 141 项通过，主仓与 KUN 类型检查、ESLint、生产构建及隔离 UI 流程通过。最终修订前源码 `0d6f428a` 的 GitHub Quality CI run `45278698866` attempt 2 三项必需检查均通过。该源码检查之后只更新了本台账记录。当前仍须用下一批精确 macOS 与 Windows 安装包复验；真实模型官网到 PPT、Windows 安装包实装和旧版原地升级、付费登录站点及现场网络流程仍未形成这批源码的制品回执。正式渠道仍为 0.5.10。
+
+## 2026-11-24 精确候选实装复验
+
+应用修复合入提交为 `bf61f10d95a23bbe6c7c8f98d54b718e6a33f049`。Release workflow `45286904679` 仅构建候选，`candidate_only=true`、`prepare_public_artifacts=true`、`publish_release=false`。Windows x64 构建、macOS 两架构、三端候选身份和更新元数据核对通过；GitHub Release、Stable 更新源和官网发布均跳过。
+
+Windows 精确安装包来自该 run，版本 `0.5.11`，安装器 SHA-256 `21b559a958f8e810c37ba20961de5819d6ece83cc3e4e2bd2e37063143600709`，安装后 ASAR SHA-256 `a605ebb36f89d822836fa23feba6e730d646fb88202e11a319e816c851147c9d`。此候选 EXE 的 Authenticode 状态为 `NotSigned`。macOS Apple Silicon DMG SHA-256 `a4171d87e02faa8097419b9dde3084e95dc89d41b21dbe0588269643332b5b19`，Intel DMG SHA-256 `1f07503fdeccfb26ca80f1a8a8841d80377f580986cabbb5f85a6ac8ca38a4df`。两架构在 workflow `45308995334` 的精确安装、代码签名、notarization staple、启动和离线表格检查均通过。启动截图和原始 JSON 回执保留在该 Actions run 的两个 `exact-mac-startup-appearance-*` artifacts。
+
+已通过的精确安装包流程如下。
+
+- Windows 对话任务与浏览器 `45296531733`。实际安装包中任务在原会话完成，HTML 经过文件摘要校验、自动预览及手动预览，计划结果回到原对话。浏览器技能安装并在任务中热加载，读取两个受控来源、核对来源回执，并生成 HTML。
+- Windows 附件、技能与插件 `45296578338`。文件选择、拖放和系统剪贴板导入均实际执行。8 个混合附件折叠为 2 行、展开后保留草稿，损坏项提示通过；包括 40 MiB 合成扫描 PDF、中文 PDF、损坏 PDF、图片、中英文长名和同名文件。扫描与文字 PDF 均实际发送。Video Shotcraft 技能和插件入口实际调用。
+- Windows 冷缓存市场 `45296663378`。阻断 GitHub、npm、PyPI 等上游主机后，Superpowers 从内置包离线安装并调用，Blender Skills 经睿威镜像安装并调用；Docling 发现 19 个工具，镜像 CSV 后端保留中文内容。回执不证明 Docling 对 PDF/DOCX 的完整转换，也不证明 Blender Skills 可以断网安装。
+- Windows 网址到 PPT 浏览器回退 `45296747874`。直接网页读取被策略阻断后，隔离 Chrome 与 BrowserSkill 扩展读取受控来源，生成原生可编辑 PPTX，成果按钮在原会话内点击。
+- Windows 启动画面 `45296792601`。浅色英文和深色中文启动均显示完整中文全称且隐藏版本行；100%、125%、150% 缩放读回通过，窄工作区宽度无水平溢出，首次打开显示「本版更新」。
+- Windows 离线 Univer `45296837530`。公式计算、撤销、外部修改冲突另存、中文 CSV 保留前导零和精度、多工作表保存重开及 XLSX 只读预览全部通过。
+- Windows Video Shotcraft `45296910991`。在私有协议夹具和合成素材上通过中断后原任务恢复、审批、技能资源读取、视频登记、原对话打开及 MP4 24 帧解码。该私有非商用评估不分发 Remotion，不能替代用户真实素材/模型验收。
+- Windows 更新 `45297023133`。从正式 0.5.10 设置页和侧栏分别升级到同一候选，从正式 0.5.7 覆盖安装到同一候选，三项均通过并读回原有资料。
+- macOS Apple Silicon 与 Intel 表格 `45308995334`。原失败是驱动将首个点击点设在 `y + 59`，相对 22 像素行距多偏一行，并依赖未显示的单元格地址标签。驱动修复后，在同一批签名 DMG 上两架构均通过公式 `=SUM(4,5)` 得值 9、撤销、冲突另存、中文 CSV、多工作表保存重开及 XLSX 只读预览。该 run 的驱动源码来自主分支提交 `afe5f902c05ae5a572a21577e915960a935d3ea4`，应用 DMG 与先前候选字节一致。
+
+**仍待完成的验收与发布条件**
+
+- 真实模型官网到 PPTX 未运行。仓库 Actions 当前没有 `RAILWISE_QA_MODEL_BASE_URL`、`RAILWISE_QA_MODEL` 或 `RAILWISE_QA_MODEL_API_KEY`。Windows 浏览器回退和 Video Shotcraft 结果来自受控/合成夹具，不是实时模型验收。Mac 上从成果打开目标系统应用也没有本轮回执。
+- 任务续接和单次批准的隔离源码预览通过，精确 Windows 包也通过任务、浏览器和 Video 流程；但新候选安装包对“等待开放式回答时点击暂停、重启后原问题仍在正文、继续后回答并只批准一次”的单独回执尚缺。Mac 源码预览通过该流程，不能代替包验收。
+- Windows 专项实际任务和计划任务使用受控协议，验证了原会话、HTML 成果、真实系统时钟回执及原会话记录；国内普通网络的实体 Windows 和此前遇到问题的用户电脑仍待现场环境复测。
+- 大单网与 Ego 的原登录空间/会话未重新登录核验。Docling MCP 已启动并执行本地 CSV 后端，完整 PDF/DOCX Docling 转换需要另外配置 Docling Serve 或本地转换环境。加密 PDF、OCR 与跨页引用未验。
+- 2026-11-20 与更早记录中当时未验证的内容见历史条目。正式 Stable 渠道仍是 `0.5.10`，`0.5.11` 仅为私有候选。此前记录的 Windows 候选 Authenticode 为 `NotSigned`，公开发布前仍需按正式分发签名要求确认适用制品。
