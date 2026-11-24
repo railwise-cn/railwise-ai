@@ -118,6 +118,34 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
   return LocalToolHost.defineTool({
     name: 'web_fetch',
     description: 'Fetch an allowed HTTP or HTTPS page and return extracted text with source metadata. A pasted www address defaults to HTTPS. Read-only; no browser setup is needed.',
+    approvalSummary: async args => {
+      const address = pickString(args.url)
+      if (!address) return 'Read public web page\nOrigin: unavailable\nEffect: Read page content only.'
+      try {
+        const url = parseWebSourceAddress(address)
+        return `Read public web page\nOrigin: ${url.origin}\nEffect: Read page content only.`
+      } catch {
+        return 'Read public web page\nOrigin: unavailable\nEffect: Read page content only.'
+      }
+    },
+    hasScopedApproval: async (args, context) => {
+      const grant = context.executionGrant
+      const address = pickString(args.url)
+      if (!grant?.taskId || !address || grant.networkAllowlist.includes('*')) return false
+      try {
+        const url = parseWebSourceAddress(address)
+        return grant.networkAllowlist.includes(url.origin)
+      } catch {
+        return false
+      }
+    },
+    validateArguments: (args, context) => {
+      const address = pickString(args.url)
+      if (!address) return
+      let url: URL
+      try { url = parseWebSourceAddress(address) } catch { return }
+      assertGrantAllowsNetwork(url.href, context)
+    },
     inputSchema: {
       type: 'object',
       properties: {

@@ -49,3 +49,20 @@ describe('file approval details', () => {
     } finally { await act(async () => root.unmount()) }
   })
 })
+
+describe('public webpage approval details', () => {
+  it('shows the exact site and read-only impact without displaying a URL path or query', async () => {
+    await i18n.changeLanguage('zh')
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+    const element = document.createElement('div')
+    const root = createRoot(element)
+    const summary = 'Read public web page\nOrigin: https://www.railwise.cn\nEffect: Read page content only.'
+    try {
+      await act(async () => root.render(createElement(ApprovalOperationDetails, { summary, toolName: 'web_fetch' })))
+      expect(element.textContent).toContain('读取公开网页')
+      expect(element.textContent).toContain('www.railwise.cn')
+      expect(element.textContent).toContain('只读取页面内容，不会提交表单或更改网站数据。')
+      expect(element.querySelector('details')?.open).toBe(false)
+    } finally { await act(async () => root.unmount()) }
+  })
+})
