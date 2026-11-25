@@ -1,6 +1,6 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = require('node:fs')
+const { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
 const { minimatch } = require('minimatch')
@@ -39,6 +39,19 @@ test('main and managed-runtime filters exclude browser artifacts and logs while 
     assert.equal(excluded(`node_modules/${relative}`, config.files), false)
     assert.equal(excluded(relative, managed), false)
   }
+})
+
+test('packaged Univer resources include the MIT license text for both icon packages', () => {
+  const univerRoot = join(__dirname, '../src/asset/builtin-integrations/univer')
+  const bundledLicense = readFileSync(join(univerRoot, 'LICENSE-DreamNum-MIT'))
+  for (const name of ['icons', 'icons-svg']) {
+    assert.deepEqual(bundledLicense, readFileSync(join(__dirname, `../node_modules/@univerjs/${name}/LICENSE`)))
+  }
+  assert.match(readFileSync(join(univerRoot, 'NOTICE.txt'), 'utf8'), /LICENSE-DreamNum-MIT/)
+  const resources = config.extraResources.find((resource) => resource.from === 'src/asset/builtin-integrations')
+  assert.ok(resources, 'Univer license files must be copied as packaged extra resources')
+  assert.equal(resources.to, 'third-party/builtin-integrations')
+  assert.ok(resources.filter.includes('**/*'))
 })
 
 test('package gate detects artifacts in the real ASAR and managed dependency layouts', async () => {

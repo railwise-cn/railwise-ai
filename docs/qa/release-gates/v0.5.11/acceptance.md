@@ -294,4 +294,4 @@ Video Shotcraft 镜像现固定到 `226813b3e2e6a0a346358210bfa0d83b24b3a8d3`，
 
 Univer 上游在 `2026-11-25 11:49 UTC` 发布 `v1.6.2`（Apache-2.0），包含工作表/范围保护绕过修复、Excel 粘贴保留换行、排序和取值修复。本分支将 `@univerjs/presets`、`@univerjs/preset-sheets-core` 与全部锁定的 Univer 运行依赖更新至 `1.6.2`，并同步随包 NOTICE。依赖差异仅涉及 Univer 组件及其上游删除的四个传递依赖。
 
-本机验证：工作表组件测试 `2/2`；Windows/macOS 表格验收驱动测试 `7/7`；`npm run test:release-gate` 为 `589` 通过、`1` 项因本机缺少 PowerShell 跳过；许可证核对、类型检查和生产构建通过。这些源码结果不替代新候选包的安装和表格实测。Release run `45613679212` 使用旧锁定版本 `1.6.1`，不纳入本轮验收；它的 Windows 精确安装步骤在下载 EXE 前取消，不能算作安装通过。新提交仍需构建同一批 Windows x64、macOS Apple Silicon 和 Intel 包，再运行相应安装和 Univer 表格旅程。
+本机验证：完整 Vitest 为 `5117` 通过、`14` 跳过；工作表组件测试 `2/2`；Windows/macOS 表格验收驱动测试 `7/7`；`npm run test:release-gate` 为 `589` 通过、`1` 项因本机缺少 PowerShell 跳过；许可证核对、类型检查和生产构建通过。补充许可检查确认 `@univerjs/icons` 与 `@univerjs/icons-svg` 的 MIT 文件随 builtin integration extra resources 打包，来源字节一致并有测试覆盖。这些源码结果不替代新候选包的安装和表格实测。旧 Release run `45613679212` 使用锁定版本 `1.6.1`，且 Windows 精确安装步骤在下载 EXE 前取消，已停止并不纳入本轮验收。新提交仍需构建同一批 Windows x64、macOS Apple Silicon 和 Intel 包，再运行相应安装和 Univer 表格旅程。
