@@ -11,6 +11,7 @@ __pycache__/
 
 ### Local 0.3.0 document-engine builds and private QA fixtures
 build/markitdown-venv/
+build/markitdown-*-venv*/
 build/sidecars/
 artifacts/qa/0.3.0-markitdown/
 
