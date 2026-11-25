@@ -8,6 +8,22 @@ const cleanup: (() => Promise<unknown>)[] = []
 afterEach(async () => { while (cleanup.length) await cleanup.pop()!() })
 
 describe('BrowserSkill production Runtime admission and Skill reload', () => {
+  it('lets a public website task proceed when BrowserSkill appears only as an optional fallback', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'browser-optional-fallback-runtime-'))
+    cleanup.push(() => rm(root, { recursive: true, force: true }))
+    const runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: join(root, 'state'), configPath: join(root, 'config.json'),
+      runtimeToken: 'synthetic', baseUrl: 'http://127.0.0.1:1/v1', apiKey: '', model: 'synthetic', endpointFormat: 'chat_completions',
+      approvalPolicy: 'on-request', sandboxMode: 'read-only', tokenEconomyMode: false, insecure: false,
+      storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({ skills: { enabled: true, roots: [], revision: 0 } }) })
+    cleanup.push(async () => runtime.shutdown?.())
+    const origin = await runtime.threadService.create({ workspace: root, mode: 'agent', model: 'synthetic' })
+    const started = await runtime.taskCoordinator!.command({ threadId: origin.id, idempotencyKey: 'public-source-optional-browser-fallback',
+      request: { prompt: '请先问我官网网址，再用官网资料制作 PPT。网页读取失败时不要重复请求；如有已连接的浏览器技能则用它读取，否则说明原因并停止。' } })
+    if (started.kind !== 'task_started') throw new Error(`Expected the task to start, got ${started.kind}`)
+    expect(started.task?.status).not.toBe('waiting_user')
+    expect((await runtime.threadService.get(started.turn.threadId))?.turns).toHaveLength(1)
+  })
+
   it('persists a missing-connector task before any Turn and acknowledges new Skill roots in the same Runtime', async () => {
     const root = await mkdtemp(join(tmpdir(), 'browser-production-runtime-'))
     cleanup.push(() => rm(root, { recursive: true, force: true }))

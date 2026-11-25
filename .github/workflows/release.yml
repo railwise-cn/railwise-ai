@@ -912,7 +912,7 @@ jobs:
 
   exact-package-windows-install-smoke:
     name: Private exact-package Windows install smoke
-    if: ${{ inputs.stage_dependency_mirror != true && !cancelled() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-windows.result == 'success' && inputs.existing_windows_package_run_id == '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && !cancelled() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && (inputs.candidate_only != true || inputs.prepare_public_artifacts == true) && needs.prepare.result == 'success' && needs.build-windows.result == 'success' && inputs.existing_windows_package_run_id == '' }}
     runs-on: windows-2022
     timeout-minutes: 15
     needs: [prepare, build-windows]
@@ -961,7 +961,7 @@ jobs:
 
   exact-package-updater-smoke:
     name: Private exact-package updater smoke
-    if: ${{ inputs.stage_dependency_mirror != true && !cancelled() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-macos.result == 'success' && inputs.existing_windows_package_run_id == '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && !cancelled() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && (inputs.candidate_only != true || inputs.prepare_public_artifacts == true) && needs.prepare.result == 'success' && needs.build-macos.result == 'success' && inputs.existing_windows_package_run_id == '' }}
     runs-on: macos-15
     timeout-minutes: 65
     needs: [prepare, build-macos]

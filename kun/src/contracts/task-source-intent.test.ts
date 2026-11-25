@@ -109,6 +109,14 @@ it('keeps an explicit BrowserSkill connection request while not turning local re
   expect(requiredLocalHtmlFileNames('Create HTML and save as "reports/view.html".')).toEqual(['reports/view.html'])
 })
 
+it('does not require BrowserSkill for an optional fallback in a public website task', () => {
+  const prompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和安全监测资料制作，并在演示文稿内列出来源。网页读取失败时不要重复相同请求；如有已连接的浏览器技能则用它读取，否则说明具体原因并停止。'
+  expect(isBrowserTask(prompt)).toBe(false)
+  expect(isBrowserTask('网页读取失败时，如有已连接的浏览器技能则用它，否则说明原因并停止，然后请使用 BrowserSkill 读取用户提供的网址。')).toBe(true)
+  expect(isBrowserTask('请使用 BrowserSkill 读取 https://www.railwise.cn 的官网资料。')).toBe(true)
+  expect(isBrowserTask('请用已连接的浏览器读取 https://www.railwise.cn 的官网资料。')).toBe(true)
+})
+
 it.each([
   '读取我已订阅的大单网每天更新的招标列表 https://feed.example.test/#/subscribe/bidding，筛选工程测量、测绘、监测，汇总HTML。',
   '读取订阅列表 https://feed.example.test/，只整理列表摘要，不需要打开公告正文。',
