@@ -685,7 +685,7 @@ export class AgentLoop {
               'turn_total_timeout',
               '任务已达到总时长上限。'
             )
-          } else {
+          } else if (reason !== 'task_pause') {
             this.opts.tasks.cancel(threadId, reason)
           }
         }
@@ -713,7 +713,7 @@ export class AgentLoop {
         const reason = typeof signal.reason === 'string' ? signal.reason : 'operation_cancelled'
         const timedOut = reason === 'turn_total_timeout'
         if (timedOut) this.opts.tasks?.recordAttemptFailure(threadId, turnId, 'turn_total_timeout', '任务已达到总时长上限。')
-        else this.opts.tasks?.cancel(threadId, reason)
+        else if (reason !== 'task_pause') this.opts.tasks?.cancel(threadId, reason)
         const status = timedOut ? 'failed' : 'aborted'
         await this.opts.turns.finishTurn({ threadId, turnId, status })
         return status
