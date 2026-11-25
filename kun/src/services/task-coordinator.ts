@@ -24,6 +24,8 @@ import { promptRequiresFileDeliverable } from '../loop/turn-completion-guard.js'
 export type TaskCommandDispatchOptions = {
   /** Internal recurrence dispatch does not represent a new user message. */
   source?: 'scheduled-occurrence'
+  /** Internal task-question answer verified against its pending request. */
+  taskUserInputAnswerRequestId?: string
   /** Recheck the source immediately before creating its durable command receipt. */
   assertMayBegin?: () => void
   /** Server-only preparation of a durable recurrence context before capability admission. */
@@ -53,12 +55,21 @@ export class TaskCoordinator {
     if (!saved || saved.kind !== 'question' || !attention?.taskId || !request) return 'not_applicable'
 
     const task = this.deps.repository.get(attention.taskId)
-    if (!task || saved.status !== 'pending' || task.status !== 'waiting_user' ||
-      task.threadId !== request.threadId || task.activeTurnId !== request.turnId) return 'stale'
+    if (!task || task.threadId !== request.threadId) return 'stale'
     if (request.questions.length !== 1 || request.questions[0]!.options.length > 0) return 'not_applicable'
 
     const answer = answers.length === 1 ? answers[0] : undefined
     if (!answer || answer.id !== request.questions[0]!.id || !answer.value.trim()) return 'stale'
+    const answerText = answer.value.trim()
+    const idempotencyKey = `user-input:${inputId}`
+    const existing = this.deps.repository.inputs(task.id).filter(input => input.idempotencyKey === idempotencyKey)
+    if (existing.length) {
+      return existing.length === 1 && existing[0]!.kind === 'supplement' && existing[0]!.text === answerText
+        ? 'submitted'
+        : 'stale'
+    }
+    if (saved.status !== 'pending' || attention.status !== 'pending' || task.status !== 'waiting_user' ||
+      task.activeTurnId !== request.turnId) return 'stale'
 
     try {
       const result = await this.command({
@@ -66,15 +77,20 @@ export class TaskCoordinator {
         taskId: task.id,
         expectedRevision: task.revision,
         intent: 'supplement',
-        idempotencyKey: `user-input:${inputId}`,
-        request: { prompt: answer.value, displayText: answer.value, model: task.model }
-      })
-      return result.kind === 'input_queued' && result.task?.id === task.id ? 'submitted' : 'stale'
+        idempotencyKey,
+        request: { prompt: answerText, displayText: answerText, model: task.model }
+      }, { taskUserInputAnswerRequestId: inputId })
+      const persisted = this.deps.repository.inputs(task.id).filter(input => input.kind === 'supplement' &&
+        input.idempotencyKey === idempotencyKey && input.text === answerText)
+      return result.task?.id === task.id && persisted.length === 1 ? 'submitted' : 'stale'
     } catch (error) {
       const code = (error as { code?: string }).code
       if (error instanceof TaskRevisionConflictError ||
         ['stale_request', 'invalid_state', 'outcome_unknown', 'scope_conflict', 'idempotency_conflict'].includes(code ?? '')) {
-        return 'stale'
+        const persisted = this.deps.repository.inputs(task.id).filter(input => input.idempotencyKey === idempotencyKey)
+        return persisted.length === 1 && persisted[0]!.kind === 'supplement' && persisted[0]!.text === answerText
+          ? 'submitted'
+          : 'stale'
       }
       throw error
     }
@@ -88,6 +104,19 @@ export class TaskCoordinator {
     if(!origin) throw Object.assign(new Error('thread not found'),{code:'not_found'})
     const task = this.resolveTask(command.threadId,command.taskId)
     if(task && task.workspaceRoot !== origin.workspace) throw Object.assign(new Error('task belongs to another workspace'),{code:'scope_conflict'})
+    if (options.taskUserInputAnswerRequestId) {
+      const requestId = options.taskUserInputAnswerRequestId
+      const request = this.deps.userInputGate?.get(requestId)
+      const humanRequest = this.deps.repository.humanRequest(requestId)
+      const attention = this.deps.repository.attention(requestId)
+      if (!task || command.intent !== 'supplement' || command.taskId !== task.id ||
+        command.idempotencyKey !== `user-input:${requestId}` || task.status !== 'waiting_user' ||
+        !task.activeTurnId || request?.threadId !== task.threadId || request.turnId !== task.activeTurnId ||
+        humanRequest?.status !== 'pending' || attention?.status !== 'pending' || attention.taskId !== task.id ||
+        request.questions.length !== 1 || request.questions[0]!.options.length > 0 || !command.request.prompt.trim()) {
+        throw Object.assign(new Error('原任务问题已变化，请在当前对话重新查看。'), { code: 'stale_request' })
+      }
+    }
     const attachmentLabel = /^(?:已附加图片|attached images?)[。.!！\s]*$/i.test(command.request.displayText?.trim() ?? '')
     const userText = attachmentLabel && command.request.attachmentIds?.length ? command.request.prompt : command.request.displayText ?? command.request.prompt
     let intent = command.intent === 'auto' ? classifyTaskInput(userText,Boolean(task)) : command.intent
@@ -187,7 +216,14 @@ export class TaskCoordinator {
         const unresolvedEffect = task.acceptance.requiresExternalEffects && !task.acceptance.effect
         const priorBinding = this.deps.repository.inputs(task.id).find(input => input.sourceId === 'provider-selection' && input.idempotencyKey === command.idempotencyKey)
         const supplementText = unresolvedEffect || priorBinding ? `${task.goal}\n${userText}` : userText
-        const capability = this.deps.preflightExternalTask ? await this.deps.preflightExternalTask(supplementText, executionThread) : preflightExternalTask(supplementText)
+        const answerNeedsBrowserRefresh = Boolean(options.taskUserInputAnswerRequestId && task.status === 'waiting_user' &&
+          task.activeTurnId && await this.deps.requiresBrowserScopeRefresh?.(task, task.activeTurnId, userText))
+        const capability = this.deps.preflightExternalTask
+          ? await this.deps.preflightExternalTask(supplementText, executionThread, task)
+          : preflightExternalTask(supplementText)
+        const browserScopeNeedsReview = answerNeedsBrowserRefresh && capability?.provider === 'browser-skill' &&
+          capability.status === 'needs_authorization' &&
+          ['browser_task_scope_required', 'browser_followup_origin_scope_required'].includes(capability.errorCode ?? '')
         if (capability?.provider === 'workspace' && capability.status !== 'available') {
           await this.validateReferences(command, origin.workspace, task.threadId)
           const saved = this.deps.tasks.appendInput(task.id, command.expectedRevision ?? task.revision, command.idempotencyKey, userText, 'supplement', undefined,
@@ -234,7 +270,7 @@ export class TaskCoordinator {
           : undefined
         const providerId = capability?.provider === 'lark' ? 'lark-cli' : capability?.provider === 'dingtalk' ? 'dingtalk' : undefined
         const outsideActiveGrant = providerId && task.status === 'running' && !activeTurn?.executionGrant?.allowedProviderIds?.includes(providerId)
-        if (capability && (capability.status !== 'available' || providerChanged || outsideActiveGrant)) {
+        if (capability && !browserScopeNeedsReview && (capability.status !== 'available' || providerChanged || outsideActiveGrant)) {
           const attentionId = `capability_${task.id}_${createHash('sha256').update(command.idempotencyKey).digest('hex').slice(0,12)}`
           const now = this.deps.nowIso()
           const message = `${capability.status !== 'available' ? capability.message : '此补充引入了原任务之外的外部平台操作。'} 请为这条请求新建独立任务，保留原任务及其权限范围。`
