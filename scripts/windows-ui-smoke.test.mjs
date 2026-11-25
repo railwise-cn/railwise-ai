@@ -20,6 +20,22 @@ import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEv
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
 import { createWebPptJourney, inspectWebPptFallback, startWebPptFallbackSource, validateWebPptTurnIdentity, webPptJourneyPrompt } from './web-ppt-journey.mjs'
+import { reviewedPermissionDecisions } from './verify-windows-composer-acceptance.mjs'
+
+test('Video Shotcraft UI acceptance validates reviewed permission declarations before install', () => {
+  const noPermissions = { id: 'video-shotcraft', permissions: [] }
+  assert.deepEqual(reviewedPermissionDecisions(noPermissions, noPermissions), [])
+  assert.deepEqual(reviewedPermissionDecisions(
+    { id: 'video-shotcraft', permissions: [{ id: 'process.execute' }] },
+    { id: 'video-shotcraft', permissions: [{ id: 'process.execute' }] }
+  ), [{ permissionId: 'process.execute', decision: 'denied' }])
+  assert.throws(() => reviewedPermissionDecisions(noPermissions, { id: 'video-shotcraft' }), /Prepared package did not include a permission review list/)
+  assert.throws(() => reviewedPermissionDecisions(noPermissions, { id: 'video-shotcraft', permissions: [{ id: '' }] }), /invalid permission declaration/)
+  assert.throws(() => reviewedPermissionDecisions(
+    { id: 'video-shotcraft', permissions: [] },
+    { id: 'video-shotcraft', permissions: [{ id: 'process.execute' }] }
+  ), /must match the catalog package/)
+})
 
 test('Docling marketplace acceptance requires real MCP PDF and DOCX conversion evidence', () => {
   const documents = ['pdf', 'docx'].map(format => ({ format, documentKey: `${format}-fixture-key`, extractedMarker: true,

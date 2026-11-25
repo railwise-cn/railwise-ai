@@ -588,6 +588,7 @@ describe('official marketplace catalog', () => {
       })
       expect(item.license).toBe(license)
       expect(item.licenseEvidence).toHaveLength(1)
+      expect(item.permissions).toEqual([])
       expect(item.licenseEvidence[0]).toMatchObject({
         license,
         path: 'LICENSE',
