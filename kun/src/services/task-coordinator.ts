@@ -219,7 +219,8 @@ export class TaskCoordinator {
         const answerNeedsBrowserRefresh = Boolean(options.taskUserInputAnswerRequestId && task.status === 'waiting_user' &&
           task.activeTurnId && await this.deps.requiresBrowserScopeRefresh?.(task, task.activeTurnId, userText))
         const capability = this.deps.preflightExternalTask
-          ? await this.deps.preflightExternalTask(supplementText, executionThread, task)
+          ? await this.deps.preflightExternalTask(supplementText, executionThread,
+            options.taskUserInputAnswerRequestId ? task : undefined)
           : preflightExternalTask(supplementText)
         const browserScopeNeedsReview = answerNeedsBrowserRefresh && capability?.provider === 'browser-skill' &&
           capability.status === 'needs_authorization' &&
