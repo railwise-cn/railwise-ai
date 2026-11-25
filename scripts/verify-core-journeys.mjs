@@ -66,7 +66,7 @@ export function requiredCoreJourneys(version, { updater = false, changedPaths = 
     ...windowsDesktopJourneys, 'marketplace-mirror', 'video-shotcraft',
     ...(firstRelease || fieldRequirements.marketplace ? ['mainland-windows-install'] : []),
     ...(updater || firstRelease ? ['windows-updater-sidebar', 'windows-updater-settings'] : []),
-    ...(firstRelease ? ['windows-legacy-overlay'] : [])
+    ...(firstRelease ? ['windows-legacy-overlay', 'pause-restart-recovery'] : [])
   ]
   return new Map([
     [WIN, windows],

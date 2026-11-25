@@ -104,6 +104,41 @@ test('Windows receipt derives only assertions made against the unchanged install
   assert.deepEqual(windowsCoreJourneys(install).journeys, [])
 })
 
+test('Windows emits pause/restart recovery only from the exact installed package and unique conversation receipts', () => {
+  const version = '0.5.11'
+  const install = { status: 'passed', platform: 'win32', arch: 'x64', productionTouched: false, version, sourceHead,
+    verification: { installerSha256, installedAsarSha256 }, installer: { sha256: installerSha256 },
+    target: { package: { asarSha256: installedAsarSha256 } },
+    provenance: { packageBuild: { ...build, packageSourceHead: sourceHead } },
+    ui: { status: 'passed', sourceHead, version, installedAsarSha256, packageUnchanged: true,
+      checks: ['installed-chat-task-pause-restart-recovery'],
+      webPpt: { taskId: 'task-1', conversationThreadId: 'conversation-1', restartRecovery: {
+        status: 'passed', exactPackageVersion: version, installedAsarSha256,
+        appClosedNormally: true, appRestarted: true, sameProfile: true, sameRuntimeDataDir: true,
+        beforeRestart: { taskId: 'task-1', threadId: 'conversation-1', taskStatus: 'paused' },
+        afterRestart: { taskId: 'task-1', threadId: 'conversation-1', taskStatus: 'paused',
+          resumedQuestionRequestId: 'question-2', oldQuestionStillVisible: true, resumedQuestionVisible: true,
+          originalChat: { surface: 'original-chat' } },
+        answerReceiptCount: 1, answerReceiptRequestId: 'question-2', answeredQuestionRequestCount: 1,
+        approvalCardCount: 1, approvalResolutionCount: 1, approvalResolutionDuplicateCount: 0,
+        approvalResolutionRequestIds: ['approval-1'], approvalCount: 1,
+        approvals: [{ id: 'approval-1', method: 'installed-task-card', decision: 'allow' }]
+      } } } }
+  assert.deepEqual(windowsCoreJourneys(install).journeys.map(item => item.id), ['pause-restart-recovery'])
+
+  for (const mutate of [
+    proof => { proof.ui.webPpt.restartRecovery.appRestarted = false },
+    proof => { proof.ui.webPpt.restartRecovery.answerReceiptCount = 2 },
+    proof => { proof.ui.webPpt.restartRecovery.approvalResolutionCount = 2 },
+    proof => { proof.ui.webPpt.restartRecovery.approvalResolutionDuplicateCount = 1 },
+    proof => { proof.ui.webPpt.restartRecovery.approvals[0].method = 'automatic' }
+  ]) {
+    const invalid = structuredClone(install)
+    mutate(invalid)
+    assert.throws(() => windowsCoreJourneys(invalid))
+  }
+})
+
 test('Windows records BrowserSkill fallback only with the real browser proof and a new Turn', () => {
   const version = '0.5.11'
   const url = 'http://127.0.0.1:32123/ppt-source'

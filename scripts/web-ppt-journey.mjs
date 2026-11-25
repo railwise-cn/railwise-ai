@@ -237,7 +237,10 @@ async function waitForWebPptTask(cdp, taskId, options) {
     const task = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`))
     if (['completed', 'failed', 'stalled', 'cancelled', 'waiting_user', 'paused'].includes(task.status)) return { task, resolutions }
     if (task.status === 'waiting_approval') {
-      assert.equal(options.live, true, 'Controlled journeys do not approve real task requests')
+      const pending = await cdp.evaluate(`${readRuntime('/v1/inbox')}.then(items=>items.filter(item=>item.taskId===${literal(taskId)}&&item.kind==='approval'&&item.status==='pending'))`)
+      assert.equal(pending.length, 1, 'The task may have only one real approval pending at once')
+      assert.ok(options.live || options.allowControlledHostShell && pending[0].payload?.approval?.toolName === 'request_host_shell',
+        'Only the controlled PPT attribution check may request one exact host approval')
       const receipt = await resolveLiveWebPptApproval(cdp, taskId, { ...options, reviewedScopes })
       assert.ok(!visited.has(receipt.id), 'An approval may be resolved only once')
       visited.add(receipt.id)
@@ -317,7 +320,7 @@ async function readWebPptReplyState(cdp, taskId, executionThreadId) {
 }
 
 export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPrompt, expectedQuestion = webPptQuestion,
-  sourceAnswer = webPptSourceHost, requireNewTurn = false, onStage } = {}) {
+  sourceAnswer = webPptSourceHost, requireNewTurn = false, stopAtQuestion = false, onStage } = {}) {
   await onStage?.('read-prior-conversations')
   const priorThreads = (await cdp.evaluate(readRuntime('/v1/threads'))).threads.map(thread => thread.id)
   await onStage?.('create-new-conversation')
@@ -352,6 +355,14 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
   assert.ok(task.threadId, 'KUN must assign an execution thread to the task')
   const replyBefore = await readWebPptReplyState(cdp, task.id, task.threadId)
   const replyTrace = { before: replyBefore }
+  if (stopAtQuestion) {
+    const pendingQuestion = replyBefore.attention.find(item => item.status === 'pending' && item.kind === 'question' && item.textQuestion && item.questionCount === 1)
+    assert.ok(replyBefore.ui.answerComposerVisible && replyBefore.ui.replyHintVisible && replyBefore.ui.submitButtonVisible &&
+      typeof pendingQuestion?.requestId === 'string' && replyBefore.ui.taskQuestionRequestId === pendingQuestion.requestId,
+      `The task question was not bound to the original chat composer: ${JSON.stringify(replyBefore)}`)
+    return { prompt: promptText, conversationThreadId: thread.id, executionThreadId: task.threadId,
+      taskId: task.id, turnId: task.activeTurnId, replyTrace, pendingQuestion }
+  }
   try {
     const pendingQuestion = replyBefore.attention.find(item => item.status === 'pending' && item.kind === 'question' && item.textQuestion && item.questionCount === 1)
     assert.ok(replyBefore.ui.answerComposerVisible && replyBefore.ui.replyHintVisible && replyBefore.ui.submitButtonVisible &&
@@ -397,6 +408,49 @@ export async function submitWebPptJourney(cdp, { promptText = webPptJourneyPromp
   }
   return { prompt: promptText, conversationThreadId: thread.id, executionThreadId: task.threadId,
     taskId: task.id, turnId: task.activeTurnId, replyTrace }
+}
+
+/** Answer the one open text question after an explicit task resume. */
+export async function answerWebPptQuestion(cdp, journey, { sourceAnswer = webPptSourceHost, requireNewTurn = false, onStage } = {}) {
+  const task = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`))
+  assert.equal(task.originThreadId, journey.conversationThreadId)
+  assert.equal(task.threadId, journey.executionThreadId)
+  const replyBefore = await readWebPptReplyState(cdp, journey.taskId, journey.executionThreadId)
+  const pendingQuestion = replyBefore.attention.find(item => item.status === 'pending' && item.kind === 'question' && item.textQuestion && item.questionCount === 1)
+  assert.ok(replyBefore.ui.answerComposerVisible && replyBefore.ui.replyHintVisible && replyBefore.ui.submitButtonVisible &&
+    typeof pendingQuestion?.requestId === 'string' && replyBefore.ui.taskQuestionRequestId === pendingQuestion.requestId,
+    `The resumed task question was not bound to the original chat composer: ${JSON.stringify(replyBefore)}`)
+  const requestId = pendingQuestion.requestId
+  const originalTurnId = task.activeTurnId
+  const answerKey = `user-input:${requestId}`
+  await onStage?.('submit-website-address-after-restart')
+  await cdp.fill(answerComposer, sourceAnswer)
+  await cdp.click('button[aria-label="提交"]:not(:disabled)')
+  const answerReceipt = await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}/inputs`)}.then(inputs=>{
+    const answers=inputs.filter(input=>input.kind==='supplement' && input.idempotencyKey===${literal(answerKey)});
+    if(answers.length!==1)return null;
+    const answer=answers[0];
+    return {idempotencyKey:answer.idempotencyKey,count:answers.length,questionId:${literal(pendingQuestion.questionId)},
+      answerLength:typeof answer.text==='string'?answer.text.length:0,answerMatchesExpected:answer.text===${literal(sourceAnswer)}};
+  })`, 'KUN to persist the post-restart request-id answer once', 45_000)
+  assert.equal(answerReceipt.questionId, pendingQuestion.questionId)
+  assert.equal(answerReceipt.answerMatchesExpected, true)
+  assert.ok(answerReceipt.answerLength > 0)
+  await onStage?.('verify-post-restart-question-settlement')
+  await cdp.wait(`${readRuntime('/v1/inbox')}.then(items=>!items.some(item=>item.requestId===${literal(requestId)} && item.status==='pending'))`,
+    'KUN to resolve the post-restart question', 45_000)
+  if (requireNewTurn) {
+    await cdp.wait(`${readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)}.then(task=>task.activeTurnId && task.activeTurnId!==${literal(originalTurnId)} ? task : null)`,
+      'the same task to resume in a new Turn after restart', 45_000)
+  }
+  const replyAfter = await readWebPptReplyState(cdp, journey.taskId, journey.executionThreadId)
+  const acceptedAnswers = replyAfter.inputs.filter(input => input.kind === 'supplement' && input.idempotencyKey === answerKey)
+  assert.equal(acceptedAnswers.length, 1, 'KUN must record exactly one post-restart answer for the task question')
+  assert.equal(replyAfter.task.originThreadId, journey.conversationThreadId)
+  assert.equal(replyAfter.task.activeTurnId !== originalTurnId, requireNewTurn)
+  return { ...journey, replyTrace: {
+    before: replyBefore, answerReceipt, after: replyAfter
+  } }
 }
 
 export async function verifyEditableWebPpt(path, artifact, { source = webPptSourceHost, marker } = {}) {
@@ -575,7 +629,7 @@ export function validateWebPptFallbackProof(proof, browser) {
   assert.equal(proof.open.status, 'desktop-open-request-accepted')
 }
 
-export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live = false, fallback, skillGuardPath }) {
+export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live = false, fallback, skillGuardPath, pauseAndRestart = false }) {
   assert.ok(!live || !fallback, 'The real-browser fallback uses a controlled model')
   const observed = {}
   return {
@@ -623,6 +677,15 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
         source = { url: direct.finalUrl, title: direct.title, sha256: direct.resultHash, bytes: direct.byteCount, tool: 'web_fetch' }
       }
       observed.source = { url: source.url, sha256: source.sha256, bytes: source.bytes, tool: source.tool }
+      if (pauseAndRestart) {
+        const guard = output('ppt-master-attribution-guard', true)
+        if (!guard) return call('request_host_shell', {
+          command: `py "${skillGuardPath}"`, timeout_seconds: 20, ttl_seconds: 120, idempotency_key: 'ppt-master-attribution-guard'
+        }, 'ppt-master-attribution-guard')
+        assert.notEqual(guard.isError, true, 'The installed attribution check must succeed after its one approval')
+        assert.notEqual(guard.code, 'outcome_unknown', 'The approved command result must be verified')
+        observed.approval = { scope: 'single-installed-skill-integrity-check', status: 'verified' }
+      }
       if (!output('spec-lock')) return call('write', { path: `${project}/spec_lock.md`, content: specLock }, 'spec-lock')
       const slide = createSlide(source.title, source.url, source.marker)
       const written = output('slide')
@@ -642,14 +705,31 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       observed.complete = true
       return { content: '已根据睿威官网公开资料生成并核对演示文稿。' }
     },
-    async verify(cdp, { openArtifact, browserInstanceId, onStage } = {}) {
+    async verify(cdp, { openArtifact, browserInstanceId, onStage, pauseAndRestart } = {}) {
       await onStage?.('start-original-conversation-journey')
-      const journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
-        sourceAnswer: fallback?.url ?? webPptSourceHost, requireNewTurn: Boolean(fallback), onStage })
+      let journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
+        sourceAnswer: fallback?.url ?? webPptSourceHost, requireNewTurn: Boolean(fallback),
+        stopAtQuestion: Boolean(pauseAndRestart), onStage })
+      let restartRecovery
+      if (pauseAndRestart) {
+        const restarted = await pauseAndRestart({ journey, task: await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)) })
+        assert.ok(restarted?.cdp, 'The owned application must expose a renderer after restart')
+        cdp = restarted.cdp
+        journey = await answerWebPptQuestion(cdp, journey, {
+          sourceAnswer: fallback?.url ?? webPptSourceHost,
+          requireNewTurn: Boolean(fallback || pauseAndRestart), onStage
+        })
+        restartRecovery = restarted.evidence
+        restartRecovery.answerReceiptCount = journey.replyTrace.answerReceipt?.count ?? 0
+        restartRecovery.answerReceiptRequestId = journey.replyTrace.answerReceipt?.idempotencyKey?.slice('user-input:'.length)
+        const inputs = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}/inputs`))
+        restartRecovery.answeredQuestionRequestCount = inputs.filter(input => input.kind === 'supplement' &&
+          input.idempotencyKey === `user-input:${restartRecovery.afterRestart.resumedQuestionRequestId}`).length
+      }
       await onStage?.('wait-for-original-task-completion')
       let task, approvals = []
       try {
-        const waited = await waitForWebPptTask(cdp, journey.taskId, { live, workspace, skillGuardPath, onStage,
+        const waited = await waitForWebPptTask(cdp, journey.taskId, { live, allowControlledHostShell: Boolean(pauseAndRestart), workspace, skillGuardPath, onStage,
           timeoutMs: live ? 480_000 : 180_000 })
         task = waited.task
         approvals = waited.resolutions
@@ -660,6 +740,23 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       if (task.status !== 'completed') {
         const diagnostics = await readWebPptTaskDiagnostics(cdp, journey.taskId, journey.executionThreadId)
         throw Object.assign(new Error('PPT task did not complete'), { webPptDiagnostics: diagnostics })
+      }
+      if (restartRecovery) {
+        const inputs = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}/inputs`))
+        const approvalInputs = inputs.filter(input => input.kind === 'approval_resolution')
+        const approvalIds = approvals.map(approval => approval.id)
+        const approvalInputIds = approvalInputs.map(input => input.sourceId)
+        assert.deepEqual(approvalInputIds, approvalIds, 'Every task approval must have exactly one matching durable UI decision')
+        assert.deepEqual(approvalInputs.map(input => input.id), approvals.map(approval => approval.inputId),
+          'The visible approval card and durable decision must resolve to the same TaskInput')
+        restartRecovery.approvals = approvals
+        restartRecovery.approvalCount = approvals.length
+        restartRecovery.approvalCardCount = approvals.filter(approval => approval.method === 'installed-task-card').length
+        restartRecovery.approvalResolutionCount = approvalInputs.length
+        restartRecovery.approvalResolutionRequestIds = approvalInputIds
+        const resolutionsByRequest = new Map()
+        for (const input of approvalInputs) resolutionsByRequest.set(input.sourceId, (resolutionsByRequest.get(input.sourceId) ?? 0) + 1)
+        restartRecovery.approvalResolutionDuplicateCount = [...resolutionsByRequest.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0)
       }
       assert.equal(task.originThreadId, journey.conversationThreadId)
       assert.equal(task.threadId, journey.executionThreadId)
@@ -718,6 +815,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
         ...(observed.egoTaskSpaceId ? { egoTaskSpaceId: observed.egoTaskSpaceId } : {}),
         ...(approvals.length ? { approvals } : {}),
         originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn, initialTurnId: initialTurn.id, completedTurnId: completedTurn.id,
+        ...(restartRecovery ? { restartRecovery } : {}),
         replyTrace: journey.replyTrace, ...(browserRecovery ? { browserRecovery } : {}),
         artifact: { id: artifact.id, ...contents, originalChatButtonClicked: true }, open }
     }
