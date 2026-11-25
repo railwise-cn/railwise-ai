@@ -71,8 +71,9 @@ export type BrowserCapabilityConfig = z.infer<typeof BrowserCapabilityConfig>
 
 export function isBrowserTask(text: string): boolean {
   if (/^(?:如何|怎么|怎样|什么是|介绍|解释|how\s+to\b|what\s+is\b)/i.test(text.trim())) return false
-  if (isLocalHtmlCreativeRequest(text) && !/(?:browser|broswer|browse)[-_ ]?skill/i.test(text)) return false
-  return /(?:browser|broswer|browse)[-_ ]?skill|浏览器|网页.*(?:点击|填写|填表|操作|截图|提取|打开)|(?:点击|填写|填表|操作|截图|提取).*网页|\b(?:chrome|edge)\b/i.test(text)
+  const requiredBrowserText = text.replace(/(?:如有|如果|若|if|when)\s*[^。；;\n]{0,160}?(?:browser|broswer|browse|浏览器)[^。；;\n]{0,160}?(?:否则|不然|otherwise)[^。；;\n]*/gi, ' ')
+  if (isLocalHtmlCreativeRequest(requiredBrowserText) && !/(?:browser|broswer|browse)[-_ ]?skill/i.test(requiredBrowserText)) return false
+  return /(?:browser|broswer|browse)[-_ ]?skill|浏览器|网页.*(?:点击|填写|填表|操作|截图|提取|打开)|(?:点击|填写|填表|操作|截图|提取).*网页|\b(?:chrome|edge)\b/i.test(requiredBrowserText)
 }
 
 /** Bare hosts are evidence targets only. Browser scope callers retain URL-only behavior. */

@@ -295,3 +295,11 @@ Video Shotcraft 镜像现固定到 `226813b3e2e6a0a346358210bfa0d83b24b3a8d3`，
 Univer 上游在 `2026-11-25 11:49 UTC` 发布 `v1.6.2`（Apache-2.0），包含工作表/范围保护绕过修复、Excel 粘贴保留换行、排序和取值修复。本分支将 `@univerjs/presets`、`@univerjs/preset-sheets-core` 与全部锁定的 Univer 运行依赖更新至 `1.6.2`，并同步随包 NOTICE。依赖差异仅涉及 Univer 组件及其上游删除的四个传递依赖。
 
 本机验证：完整 Vitest 为 `5117` 通过、`14` 跳过；工作表组件测试 `2/2`；Windows/macOS 表格验收驱动测试 `7/7`；`npm run test:release-gate` 为 `591` 通过、`1` 项因本机缺少 PowerShell 跳过；许可证核对、类型检查和生产构建通过。`afterPack` 现在会要求 macOS 与 Windows 实际 Resources 目录包含四份 Univer/RxJS 许可和 NOTICE，且逐字节匹配来源；正反测试覆盖缺失和改写。首次跨平台 CI 发现 Windows 自动换行转换和 macOS 打包测试夹具未包含新许可资源，已通过 `.gitattributes` 固定 LF 并补齐夹具；完整测试现已通过，修正后的源码还需新的 Quality CI 与候选包验证。源码验证不替代新候选包的安装和表格实测。旧 Release run `45613679212` 使用锁定版本 `1.6.1`，且 Windows 精确安装步骤在下载 EXE 前取消，已停止并不纳入本轮验收。新提交仍需构建同一批 Windows x64、macOS Apple Silicon 和 Intel 包，再运行相应安装和 Univer 表格旅程。
+
+## 2026-11-25 UTC BrowserSkill 网页任务根因
+
+精确 Windows 候选验收 `45655050040` 使用 Release 构建 `45651308510` 的 0.5.11 安装包，SHA-256 `5dbee2292af741229f17d9e09655ad104d9c763229eb894aad3e2c20e4df224b`，安装后 ASAR `9c2d4377257d38253abd588c3613402d937a8ecdd0361307d885ef7725a093bb`。真实模型网页到 PPT 流程在首次模型调用前失败：原对话执行线程无消息，任务为 `waiting_user`，阻塞原因为 `browser_disabled`，且等待启用 BrowserSkill。根因是 `isBrowserTask()` 将“如有已连接的浏览器技能则用它读取，否则说明原因并停止”中的可选回退当成必需 BrowserSkill，从而在 `web_fetch` 有机会运行前触发能力预检。
+
+修复在当前工作区：能力预检分类时忽略明确条件式的浏览器回退，但保留明确浏览器调用请求；网页读取指令先尝试用户提供的精确 URL，之后只尝试本轮由运行时准入的只读 Ego/BrowserSkill 工具，真实返回未就绪时继续其他路径；没有 `web_search` 时不指示模型调用它。对应 KUN 全量测试曾运行至 `5,518` 项通过、`24` 项跳过，唯一失败是过时的文案断言；更新断言后受影响的三组测试 `65/65`、KUN 类型检查、应用类型检查、改动文件 ESLint、KUN 编译及本机生产构建通过。全量 KUN 套件未在断言修正后重跑。
+
+Release run `45651308510` 的精确 Windows 安装检查及 macOS 原地升级 smoke 均通过，但构建源码为 `19dff5a4808eb6f14691e6ce677d5a37f19927f9`，不包含本节修复；Windows 真实模型回执也绑定该旧包。不得将这些结果计为修复后的最终候选通过。本机 Ego Lite 在独立 Space `14` 打开已登录的大单网订阅页并读取到内容；这只验证本机 Ego 登录态，不等于 RailWise 精确候选的 Ego 调用、回到同一 Space 续接或字段核验。正式渠道仍为 `0.5.10`，尚未发布 `0.5.11`。

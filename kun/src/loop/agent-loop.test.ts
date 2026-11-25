@@ -294,34 +294,43 @@ describe('webSearchCapabilityInstruction', () => {
     expect(instruction).toContain('disclose secrets')
   })
 
-  it('prefers the connected Ego Space and constrains Yuanbao to the read-only source scope', () => {
+  it('tries direct reading before Ego and keeps the browser/search fallback scoped', () => {
     const instruction = webSourceToolInstruction(['ego_browser_open', 'ego_browser_read', 'web_fetch'].map(spec))
-    expect(instruction).toContain('prefer the connected Ego Browser')
+    expect(instruction).toContain('first call web_fetch once with the exact URL supplied by the user')
     expect(instruction).toContain('ego_browser_open({url})')
+    expect(instruction).toContain('listed Ego Browser tools are runtime-admitted for this task')
     expect(instruction).toContain('https://so.qq.com')
     expect(instruction).toContain('authorized task origins')
-    expect(instruction).not.toContain('use web_fetch with the user’s actual address')
+    expect(instruction).not.toContain('only when the current task explicitly confirms')
   })
 
-  it('prefers BrowserSkill in connected Chrome or Edge before web_fetch', () => {
+  it('tries direct reading before BrowserSkill and skips a disabled browser path', () => {
     const instruction = webSourceToolInstruction(['browser_session_start', 'browser_navigate', 'browser_get_html', 'web_fetch'].map(spec))
-    expect(instruction).toContain('prefer the connected BrowserSkill')
-    expect(instruction).toContain('selected Chrome or Edge')
-    expect(instruction).toContain('do not repeat the same failed fetch')
+    expect(instruction).toContain('first call web_fetch once with the exact URL supplied by the user')
+    expect(instruction).toContain('listed BrowserSkill tools are runtime-admitted for this task')
+    expect(instruction).toContain('browser_disabled or not-ready response means skip that path and continue with the next available read-only path')
+    expect(instruction).not.toContain('Never invoke a browser tool based only on its presence in the tool list')
   })
 
-  it('uses web_search for source discovery when no browser is connected', () => {
+  it('tries a supplied URL directly before search-based source discovery', () => {
     const instruction = webSourceToolInstruction(['web_search', 'web_fetch'].map(spec))
-    expect(instruction).toContain('use web_search to discover original sources')
-    expect(instruction).toContain('call web_fetch on the exact returned result URLs')
-    expect(instruction).toContain('does not authorize the entire site')
+    expect(instruction).toContain('first call web_fetch once with the exact URL supplied by the user')
+    expect(instruction).toContain('If no URL was supplied, use web_search to discover an original source')
+    expect(instruction).toContain('verify only exact returned result URLs with web_fetch')
+    expect(instruction).toContain('does not authorize the whole site')
   })
 
   it('uses the scoped Yuanbao OpenSearch URL as a web_fetch fallback when no browser is connected', () => {
     const instruction = webSourceToolInstruction(['web_fetch'].map(spec))
     expect(instruction).toContain('https://so.qq.com/isearch?query=<URL-encoded search terms>')
-    expect(instruction).toContain('current read-only network scope includes https://so.qq.com')
-    expect(instruction).toContain('do not claim an original source was read')
+    expect(instruction).toContain('current read-only scope includes https://so.qq.com')
+    expect(instruction).toContain('claim an original page was read only after a tool actually returned that page')
+  })
+
+  it('does not instruct search when only a direct reader is available and no source URL was supplied', () => {
+    const instruction = webSourceToolInstruction(['web_fetch'].map(spec))
+    expect(instruction).toContain('ask the user for an exact source URL')
+    expect(instruction).not.toContain('use web_search to discover an original source')
   })
 
   it('does not call live search unavailable when Ego read tools are connected', () => {
