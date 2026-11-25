@@ -233,6 +233,24 @@ function composerModelTool(id, name, args) {
   return { tool_calls: [{ index: 0, id, type: 'function', function: { name, arguments: literal(args) } }] }
 }
 
+export function reviewedPermissionDecisions(catalogPackage, preparedPackage) {
+  const readPermissions = (value, label) => {
+    if (!value || !Array.isArray(value.permissions)) {
+      throw new Error(`${label} did not include a permission review list.`)
+    }
+    if (value.permissions.some(permission => !permission || typeof permission.id !== 'string' || !permission.id.trim())) {
+      throw new Error(`${label} contains an invalid permission declaration.`)
+    }
+    return value.permissions
+  }
+  const catalogPermissions = readPermissions(catalogPackage, 'Catalog package')
+  const preparedPermissions = readPermissions(preparedPackage, 'Prepared package')
+  const catalogIds = catalogPermissions.map(permission => permission.id)
+  const preparedIds = preparedPermissions.map(permission => permission.id)
+  assert.deepEqual(preparedIds, catalogIds, 'Prepared package permissions must match the catalog package reviewed by the user')
+  return preparedPermissions.map(permission => ({ permissionId: permission.id, decision: 'denied' }))
+}
+
 function readComposerWorkflow(body, messages, id, skillId, references) {
   const tools = new Set(body.tools?.map(tool => tool.function?.name))
   const results = new Map(messages.filter(item => item.role === 'tool').map(item => [item.tool_call_id, parseComposerToolResult(item.content)]))
@@ -374,10 +392,12 @@ export async function verifyWindowsComposerAcceptance(cdp, { workspace, acceptan
   const installed = await cdp.evaluate(`(async () => {
     const catalog = await window.workwise.listCatalogPackages()
     const entry = catalog.packages.find(item => item.package.id === 'video-shotcraft')
+    if (!entry) throw new Error('Video Shotcraft was not present in the installed application catalog.')
     const prepared = await window.workwise.prepareCatalogPlugin({sourceId:entry.sourceId,packageId:entry.package.id})
+    const permissionDecisions = (${reviewedPermissionDecisions.toString()})(entry.package, prepared?.package)
     return await window.workwise.installPreparedPlugin({
       preparedId:prepared.id,reviewSha256:prepared.reviewSha256,expectedCurrentVersion:null,scope:'user',
-      permissions:prepared.package.permissions.map(item=>({permissionId:item.id,decision:'denied'})),
+      permissions:permissionDecisions,
       idempotencyKey: ${literal(randomUUID())}
     })
   })()`, 360_000)

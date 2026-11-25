@@ -247,6 +247,7 @@ describe('electron-builder WorkWise packaging', () => {
         to: 'app.asar.unpacked/kun/runtime-deps',
         filter: expect.arrayContaining([
           'zod/**/*',
+          'parse5/**/*',
           'pdfkit/**/*',
           'fontkit/**/*',
           '@modelcontextprotocol/sdk/**/*'

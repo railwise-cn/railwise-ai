@@ -3600,14 +3600,12 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           activeMenus: Array.from(document.querySelectorAll('[role="menu"]')).map(menu => menu.getAttribute('aria-label')),
           headings: Array.from(document.querySelectorAll('h1,h2,h3')).map(heading => heading.textContent.trim())
         })`)
-        if (taskSmoke) {
-          report.runtimeFailure = await cdp.evaluate(`(async()=>{
-            const read=async path=>{const response=await window.workwise.runtimeRequest(path,'GET');return {status:response.status,ok:response.ok,body:JSON.parse(response.body)}};
-            const info=await read('/v1/runtime/info');const tools=await read('/v1/runtime/tools');
-            return {info:{status:info.status,ok:info.ok,pid:info.body.pid,port:info.body.port,startedAt:info.body.startedAt},
-              tools:{status:tools.status,ok:tools.ok,mcpServers:tools.body.mcpServers,skills:tools.body.skills}};
-          })()`)
-        }
+        report.runtimeFailure = await cdp.evaluate(`(async()=>{
+          const read=async path=>{const response=await window.workwise.runtimeRequest(path,'GET');return {status:response.status,ok:response.ok,body:JSON.parse(response.body)}};
+          const info=await read('/v1/runtime/info');const tools=await read('/v1/runtime/tools');
+          return {info:{status:info.status,ok:info.ok,pid:info.body.pid,port:info.body.port,startedAt:info.body.startedAt},
+            tools:{status:tools.status,ok:tools.ok,mcpServers:tools.body.mcpServers,skills:tools.body.skills}};
+        })()`)
       } catch { /* Preserve the original UI failure if its renderer has closed. */ }
     }
     if (taskSmoke) {
@@ -3625,8 +3623,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         }
         try { report[key].store = await readWindowsTaskFailureStore(root, taskId) } catch { report[key].storeReadUnavailable = true }
       }
-      try { report.failureLogs = await readWindowsFailureLogs(profile, output) } catch { report.failureLogs = { readUnavailable: true } }
     }
+    try { report.failureLogs = await readWindowsFailureLogs(profile, output) } catch { report.failureLogs = { readUnavailable: true } }
   } finally {
     await stopBindingPostAudit?.()
     mainCdp?.close()

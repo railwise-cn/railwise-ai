@@ -184,6 +184,13 @@ async function startPinnedDoclingServe({ workspace, ownedRoot }) {
   const artifactsPath = join(ownedRoot, 'docling-artifacts')
   const environment = {
     ...process.env,
+    // Docling Serve uses Rich during startup. GitHub-hosted Windows runners
+    // can expose cp1252 pipes, which makes an otherwise healthy service exit
+    // when a status line contains a non-ASCII glyph. Force the child Python
+    // process to use UTF-8 so readiness reflects the service, not the runner
+    // console code page.
+    PYTHONUTF8: '1',
+    PYTHONIOENCODING: 'utf-8',
     UVICORN_HOST: '127.0.0.1',
     UVICORN_PORT: String(port),
     DOCLING_SERVE_ENABLE_UI: 'false',

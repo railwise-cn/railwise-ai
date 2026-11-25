@@ -20,6 +20,22 @@ import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEv
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
 import { createWebPptJourney, inspectWebPptFallback, startWebPptFallbackSource, validateWebPptTurnIdentity, webPptJourneyPrompt } from './web-ppt-journey.mjs'
+import { reviewedPermissionDecisions } from './verify-windows-composer-acceptance.mjs'
+
+test('Video Shotcraft UI acceptance validates reviewed permission declarations before install', () => {
+  const noPermissions = { id: 'video-shotcraft', permissions: [] }
+  assert.deepEqual(reviewedPermissionDecisions(noPermissions, noPermissions), [])
+  assert.deepEqual(reviewedPermissionDecisions(
+    { id: 'video-shotcraft', permissions: [{ id: 'process.execute' }] },
+    { id: 'video-shotcraft', permissions: [{ id: 'process.execute' }] }
+  ), [{ permissionId: 'process.execute', decision: 'denied' }])
+  assert.throws(() => reviewedPermissionDecisions(noPermissions, { id: 'video-shotcraft' }), /Prepared package did not include a permission review list/)
+  assert.throws(() => reviewedPermissionDecisions(noPermissions, { id: 'video-shotcraft', permissions: [{ id: '' }] }), /invalid permission declaration/)
+  assert.throws(() => reviewedPermissionDecisions(
+    { id: 'video-shotcraft', permissions: [] },
+    { id: 'video-shotcraft', permissions: [{ id: 'process.execute' }] }
+  ), /must match the catalog package/)
+})
 
 test('Docling marketplace acceptance requires real MCP PDF and DOCX conversion evidence', () => {
   const documents = ['pdf', 'docx'].map(format => ({ format, documentKey: `${format}-fixture-key`, extractedMarker: true,
@@ -41,6 +57,9 @@ test('Docling marketplace acceptance requires real MCP PDF and DOCX conversion e
   const workflow = readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8')
   assert.match(workflow, /docling-serve==1\.39\.0/)
   assert.match(workflow, /RAILWISE_DOCLING_SERVE_PYTHON=/)
+  const verifier = readFileSync(new URL('./verify-windows-cold-marketplace.mjs', import.meta.url), 'utf8')
+  assert.match(verifier, /PYTHONUTF8:\s*'1'/)
+  assert.match(verifier, /PYTHONIOENCODING:\s*'utf-8'/)
 })
 
 test('BrowserSkill PPT fixture serves a loopback source whose marker only appears after rendering', async t => {
@@ -2315,6 +2334,17 @@ test('failure logs export only timestamps, stream, exception names and codes, ne
   assert.equal(logs.entries[0].exception, 'TypeError')
   assert.deepEqual(logs.entries[0].codes, ['browser_context_stale'])
   assert.doesNotMatch(JSON.stringify(logs), /private|Authorization|Bearer|headers|cookie|https|body/)
+})
+
+test('all failed Windows UI journeys collect sanitized runtime state and logs, including web-only runs', () => {
+  const source = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+  const catchStart = source.indexOf('  } catch (error) {', source.indexOf('export async function runWindowsUiSmoke'))
+  const finallyStart = source.indexOf('  } finally {', catchStart)
+  assert.ok(catchStart >= 0 && finallyStart > catchStart)
+  const failurePath = source.slice(catchStart, finallyStart)
+  assert.match(failurePath, /report\.runtimeFailure = await cdp\.evaluate/)
+  assert.match(failurePath, /report\.failureLogs = await readWindowsFailureLogs\(profile, output\)/)
+  assert.ok(failurePath.indexOf('report.failureLogs =') > failurePath.lastIndexOf('if (taskSmoke)'))
 })
 
 test('manual preview failure permits later diagnostics while keeping the complete acceptance failed', async () => {

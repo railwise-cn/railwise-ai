@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process')
 const REQUIRED_PATHS = [
   'kun/package-lock.json',
   'kun/node_modules/diff/package.json',
+  'kun/node_modules/parse5/package.json',
   'kun/node_modules/zod/package.json',
   'kun/node_modules/@modelcontextprotocol/sdk/package.json'
 ]
