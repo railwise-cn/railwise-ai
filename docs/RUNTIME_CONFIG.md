@@ -104,7 +104,7 @@ GUI 启动 WorkWise Agent Runtime 时会按下面的顺序合并配置。
 
 DeepSeek 的通用 Chat Completions 与 Responses 请求使用稳定基础地址 `https://api.deepseek.com`。`https://api.deepseek.com/beta` 仅用于 FIM 和前缀续写等 beta 接口；WorkWise Write 的 FIM 路径会单独选择该地址，不应把整个 Agent Runtime 配置到 beta 地址。
 
-GUI 管理的官方 DeepSeek V4.1 Flash 及显式选择 Pro 的 Runtime 会自动启用 `deepseek-responses` 搜索 provider。普通对话仍使用 Chat Completions；只有本地 `web_search` 工具通过 `/v1/responses` 调用官方服务端搜索。第三方兼容 provider 不会被自动开启或改写。
+GUI 管理的官方 DeepSeek V4.1 Flash 及显式选择 Pro 的 Runtime 会优先使用 `deepseek-responses`，并以 `yuanbao-opensearch` 作为搜索回退。普通对话仍使用 Chat Completions；只有本地 `web_search` 工具通过 `/v1/responses` 调用官方服务端搜索。第三方兼容 provider 不会被自动开启或改写。服务端搜索没有有效引用或超时时，Runtime 在同一总时限内切换到 Yuanbao。
 
 ```json
 {
@@ -180,6 +180,30 @@ WorkWise Agent Runtime 默认使用 DeepSeek V4.1 Flash（`deepseek-flash`），
 ```
 
 也就是说，默认的 V4.1 Flash 使用 1M 上下文并报告 384K 最大输出能力，正常情况下接近 `980k` input tokens 才触发上下文压缩；接近 `990k` 时进入更强的压缩策略。
+
+## 网页搜索与读取
+
+桌面 Runtime 默认启用 `web_search` 与 `web_fetch`。搜索使用符合配置的 DeepSeek Responses provider，并回退到 Yuanbao OpenSearch。`yuanbao-opensearch` 直接读取 Yuanbao 当前的服务端 HTML 页面，现阶段没有公开的稳定开发 API，因此页面标记变化时搜索解析可能需要更新。搜索词会发送给实际使用的搜索服务，结果标题、摘要和链接都是未核实线索。
+
+`web_fetch` 用受限 HTTP(S) 客户端读取实际来源正文，检查 DNS 公网地址、重定向、站点策略、当前任务网络范围和响应大小。搜索结果只为当前任务与执行轮次提供精确链接授权，仍以任务原有网络范围和管理员站点策略为准。JavaScript 渲染页面应切换到已连接的 Ego 或 BrowserSkill；工具只有实际返回页面正文后才能声称来源已读。扫描 PDF 需通过对话附件解析，不支持把搜索摘要当作正文证据。
+
+```json
+{
+  "capabilities": {
+    "web": {
+      "enabled": true,
+      "fetchEnabled": true,
+      "searchEnabled": true,
+      "provider": "deepseek-responses+yuanbao-opensearch",
+      "allowDomains": [],
+      "denyDomains": [],
+      "maxFetchBytes": 1048576
+    }
+  }
+}
+```
+
+完整本机 Shell 与网页读取是不同权限。受限任务中的任意主机命令仍需逐条明确授权，因为当前 Runtime 没有可在 Windows、macOS 和 Linux 一致执行的操作系统级工作区命令沙箱。普通文件操作优先使用受工作区范围约束的文件工具；不能把批准任意 Shell 命令改成任务级免确认。
 
 ## 全局压缩配置写在哪里
 

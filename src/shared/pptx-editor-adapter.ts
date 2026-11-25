@@ -29,8 +29,8 @@ export type PptxEditorAdapter = {
 export const PPTX_EDITOR_SOURCE = Object.freeze({
   name: 'pptx-vanilla-viewer',
   repository: 'https://github.com/ChristopherVR/ooxml',
-  ref: 'd8f80c291c1f9ecc23278c4b2ac8674915d30828',
-  version: '3.61.0',
+  ref: '9ff78cf6a7c65dbeabb84a89a1099af4258decc7',
+  version: '3.80.0',
   license: 'Apache-2.0',
   integration: 'local-vanilla-dom'
 } as const)

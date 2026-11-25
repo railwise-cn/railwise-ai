@@ -295,7 +295,7 @@ function upsertApprovalFromEvent(
   const existing = projection.items.find((item) => item.kind === 'approval' && item.approvalId === event.approvalId)
   const status = event.status
   const item: TurnItem = existing?.kind === 'approval'
-    ? { ...existing, status, ...(status !== 'pending' ? { finishedAt: event.timestamp } : {}) }
+    ? { ...existing, status, ...(event.requestHash ? { requestHash: event.requestHash } : {}), ...(status !== 'pending' ? { finishedAt: event.timestamp } : {}) }
     : {
         id: event.itemId ?? `item_${event.approvalId}`,
         turnId: event.turnId,
@@ -304,6 +304,7 @@ function upsertApprovalFromEvent(
         createdAt: event.timestamp,
         kind: 'approval',
         approvalId: event.approvalId,
+        ...(event.requestHash ? { requestHash: event.requestHash } : {}),
         toolName: event.toolName,
         summary: event.summary ?? '',
         status,

@@ -229,6 +229,8 @@ describe('electron-builder WorkWise packaging', () => {
     expect(builderConfig.files).not.toEqual(expect.arrayContaining([
       '!**/node_modules/openclaw/**/*'
     ]))
+    expect(require.resolve('openclaw/plugin-sdk/config-mutation').replaceAll('\\', '/')).toContain('vendor/openclaw-shim/plugin-sdk/config-mutation.js')
+    expect(require.resolve('openclaw/plugin-sdk/temp-path').replaceAll('\\', '/')).toContain('vendor/openclaw-shim/plugin-sdk/temp-path.js')
     expect(builderConfig.extraResources).toEqual(expect.arrayContaining([
       expect.objectContaining({
         from: 'kun',

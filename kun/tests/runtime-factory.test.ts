@@ -8,6 +8,7 @@ import { createThreadRecord } from '../src/domain/thread.js'
 import { UsageService } from '../src/services/usage-service.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
 import { createKunServeRuntime, seedUsageCarryover } from '../src/server/runtime-factory.js'
+import * as safeWebFetchModule from '../src/network/safe-web-fetch.js'
 import type { UsageSnapshot } from '../src/contracts/usage.js'
 import type { SessionStore } from '../src/ports/session-store.js'
 
@@ -228,7 +229,7 @@ describe('runtime factory official Responses search wiring', () => {
         approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' },
         capabilities: KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true, fetchEnabled: false } })
       })
-      expect((await runtime.toolDiagnostics?.())?.webProviders).toEqual([expect.objectContaining({ searchAvailable: true, provider: 'deepseek-responses' })])
+      expect((await runtime.toolDiagnostics?.())?.webProviders).toEqual([expect.objectContaining({ searchAvailable: true, provider: 'deepseek-responses+yuanbao-opensearch+github-repository-search' })])
       expect((await runtime.toolHost!.listTools()).some(tool => tool.name === 'web_search')).toBe(true)
       const result = await runtime.toolHost!.execute({ callId: 'search-default-model', toolName: 'web_search', arguments: { query: '工程测量规范', limit: 1 } }, {
         threadId: 'search-thread', turnId: 'search-turn', workspace: dataDir, approvalPolicy: 'on-request', sandboxMode: 'workspace-write',
@@ -245,6 +246,107 @@ describe('runtime factory official Responses search wiring', () => {
       await runtime?.shutdown?.(); vi.unstubAllGlobals(); await rm(dataDir, { recursive: true, force: true })
     }
   })
+  it('accepts the desktop-managed combined provider ID and registers web_search', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'kun-runtime-search-combined-'))
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ output: [{ type: 'message', status: 'completed', content: [{
+      type: 'output_text', text: 'Synthetic cited search result', annotations: [{ type: 'url_citation', url: 'https://example.com/source', title: 'Source' }]
+    }] }] }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchImpl)
+    let runtime: Awaited<ReturnType<typeof createKunServeRuntime>> | undefined
+    try {
+      runtime = await createKunServeRuntime({
+        host: '127.0.0.1', port: 0, dataDir, runtimeToken: 'test-token', apiKey: 'synthetic-search-key', baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash',
+        approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' },
+        capabilities: KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true, fetchEnabled: false, provider: 'deepseek-responses+yuanbao-opensearch' } })
+      })
+      expect((await runtime.toolDiagnostics?.())?.webProviders).toEqual([expect.objectContaining({
+        searchAvailable: true, provider: 'deepseek-responses+yuanbao-opensearch+github-repository-search'
+      })])
+      expect((await runtime.toolHost!.listTools()).map(tool => tool.name)).toContain('web_search')
+      const result = await runtime.toolHost!.execute({ callId: 'combined-provider-search', toolName: 'web_search',
+        arguments: { query: 'RailWise public products', limit: 1 } }, {
+        threadId: 'combined-search-thread', turnId: 'combined-search-turn', workspace: dataDir,
+        approvalPolicy: 'on-request', sandboxMode: 'workspace-write', abortSignal: new AbortController().signal,
+        awaitApproval: async () => 'allow'
+      })
+      expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+      expect(JSON.stringify(result.item)).toContain('https://example.com/source')
+      expect(fetchImpl).toHaveBeenCalledOnce()
+    } finally {
+      await runtime?.shutdown?.(); vi.unstubAllGlobals(); await rm(dataDir, { recursive: true, force: true })
+    }
+  })
+  it('falls back from failed DeepSeek search to Yuanbao and preserves source citations', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'kun-runtime-search-yuanbao-fallback-'))
+    const deepSeekFetch = vi.fn(async () => new Response('DeepSeek search unavailable', { status: 502 }))
+    const yuanbaoHtml = `<article class="result-card">
+      <a data-log='{"linkid":"title"}' href="https://docs.example.test/railwise-source">RailWise source</a>
+      <a data-log='{"linkid":"summary"}' href="https://docs.example.test/railwise-source">Source content returned by the fallback.</a>
+    </article>`
+    const yuanbaoFetch = vi.spyOn(safeWebFetchModule, 'safeWebFetch').mockResolvedValue({
+      finalUrl: 'https://so.qq.com/isearch?query=RailWise%20source',
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      body: Buffer.from(yuanbaoHtml),
+      redirects: 0
+    })
+    vi.stubGlobal('fetch', deepSeekFetch)
+    let runtime: Awaited<ReturnType<typeof createKunServeRuntime>> | undefined
+    try {
+      runtime = await createKunServeRuntime({
+        host: '127.0.0.1', port: 0, dataDir, runtimeToken: 'test-token', apiKey: 'synthetic-search-key',
+        baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash',
+        approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' },
+        capabilities: KunCapabilitiesConfig.parse({ web: {
+          enabled: true, searchEnabled: true, fetchEnabled: false,
+          provider: 'deepseek-responses+yuanbao-opensearch+github-repository-search'
+        } })
+      })
+
+      const result = await runtime.toolHost!.execute({
+        callId: 'deepseek-yuanbao-fallback', toolName: 'web_search',
+        arguments: { query: 'RailWise source', limit: 3 }
+      }, {
+        threadId: 'fallback-search-thread', turnId: 'fallback-search-turn', workspace: dataDir,
+        approvalPolicy: 'on-request', sandboxMode: 'workspace-write', abortSignal: new AbortController().signal,
+        awaitApproval: async () => 'allow'
+      })
+
+      expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+      if (result.item.kind === 'tool_result') {
+        expect(result.item.output).toMatchObject({
+          provider: 'deepseek-responses+yuanbao-opensearch+github-repository-search',
+          results: [{
+            url: 'https://docs.example.test/railwise-source',
+            title: 'RailWise source',
+            snippet: 'Source content returned by the fallback.',
+            provider: 'yuanbao-opensearch',
+            rank: 1
+          }],
+          sources: [{
+            sourceId: expect.stringMatching(/^web_search_/),
+            url: 'https://docs.example.test/railwise-source',
+            title: 'RailWise source',
+            retrievedAt: expect.any(String)
+          }],
+          citations: [{
+            url: 'https://docs.example.test/railwise-source',
+            title: 'RailWise source'
+          }],
+          telemetry: { provider: 'deepseek-responses+yuanbao-opensearch+github-repository-search', resultCount: 1 }
+        })
+        const output = result.item.output as { sources: unknown[]; citations: unknown[] }
+        expect(output.citations).toEqual(output.sources)
+      }
+      expect(deepSeekFetch).toHaveBeenCalledOnce()
+      expect(yuanbaoFetch).toHaveBeenCalledOnce()
+    } finally {
+      await runtime?.shutdown?.()
+      yuanbaoFetch.mockRestore()
+      vi.unstubAllGlobals()
+      await rm(dataDir, { recursive: true, force: true })
+    }
+  })
   it.each([
     { baseUrl: 'https://api.deepseek.com', apiKey: 'synthetic-key', model: 'deepseek-flash' },
     { baseUrl: 'https://third-party.example/v1', apiKey: 'synthetic-key', model: 'deepseek-flash' },
@@ -252,7 +354,7 @@ describe('runtime factory official Responses search wiring', () => {
     { baseUrl: 'https://api.deepseek.com', apiKey: ' ', model: 'deepseek-flash' },
     { baseUrl: 'https://api.deepseek.com', apiKey: 'synthetic-key', model: 'deepseek-pro' },
     { baseUrl: 'https://api.deepseek.com', apiKey: 'synthetic-key', model: 'deepseek-chat' }
-  ])('keeps official search unavailable for unsupported factory settings: $baseUrl / $model', async config => {
+  ])('uses Yuanbao search when the model cannot use the official DeepSeek search endpoint: $baseUrl / $model', async config => {
     const dataDir = await mkdtemp(join(tmpdir(), 'kun-runtime-search-rejected-'))
     const fetchImpl = vi.fn(); vi.stubGlobal('fetch', fetchImpl)
     let runtime: Awaited<ReturnType<typeof createKunServeRuntime>> | undefined
@@ -262,11 +364,32 @@ describe('runtime factory official Responses search wiring', () => {
         approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' },
         capabilities: KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true, fetchEnabled: false } })
       })
-      expect((await runtime.toolDiagnostics?.())?.webProviders).toEqual([expect.objectContaining({ searchAvailable: false })])
-      expect((await runtime.toolHost!.listTools()).map(tool => tool.name)).not.toContain('web_search')
+      expect((await runtime.toolDiagnostics?.())?.webProviders).toEqual([expect.objectContaining({
+        searchAvailable: true, provider: 'yuanbao-opensearch+github-repository-search'
+      })])
+      expect((await runtime.toolHost!.listTools()).map(tool => tool.name)).toContain('web_search')
       expect(fetchImpl).not.toHaveBeenCalled()
     } finally {
       await runtime?.shutdown?.(); vi.unstubAllGlobals(); await rm(dataDir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not silently replace an explicitly configured custom web-search provider', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'kun-runtime-custom-search-'))
+    let runtime: Awaited<ReturnType<typeof createKunServeRuntime>> | undefined
+    try {
+      runtime = await createKunServeRuntime({
+        host: '127.0.0.1', port: 0, dataDir, runtimeToken: 'test-token', apiKey: '',
+        baseUrl: 'https://third-party.example/v1', model: 'custom-chat',
+        approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' },
+        capabilities: KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true, fetchEnabled: false, provider: 'custom-search' } })
+      })
+      expect((await runtime.toolDiagnostics?.())?.webProviders).toEqual([expect.objectContaining({
+        searchAvailable: false, provider: 'custom-search'
+      })])
+      expect((await runtime.toolHost!.listTools()).map(tool => tool.name)).not.toContain('web_search')
+    } finally {
+      await runtime?.shutdown?.(); await rm(dataDir, { recursive: true, force: true })
     }
   })
 })

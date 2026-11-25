@@ -1,6 +1,6 @@
 {
 	"name": "mtx-decompressor",
-	"version": "1.8.0",
+	"version": "1.9.0",
 	"description": "MicroType Express (MTX) font decompressor — extracts TTF/OTF from compressed EOT containers.",
 	"homepage": "https://github.com/ChristopherVR/mtx-decompressor",
 	"bugs": {
@@ -22,22 +22,33 @@
 	"types": "dist/index.d.ts",
 	"exports": {
 		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.mjs",
-			"require": "./dist/index.js"
+			"import": {
+				"types": "./dist/index.d.mts",
+				"default": "./dist/index.mjs"
+			},
+			"require": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			}
 		}
 	},
 	"scripts": {
-		"build": "tsup",
-		"dev": "tsup --watch",
+		"build": "tsdown --config-loader native",
+		"dev": "tsdown --config-loader native --watch",
 		"typecheck": "tsc --noEmit --pretty",
 		"test": "vitest run --passWithNoTests",
 		"test:watch": "vitest",
-		"pack": "bun run build && bun pm pack"
+		"pack": "bun run build && bun pm pack",
+		"docs:dev": "vitepress dev docs",
+		"docs:build": "vitepress build docs",
+		"docs:preview": "vitepress preview docs"
 	},
 	"devDependencies": {
-		"tsup": "^8.5.1",
-		"typescript": "^6.0.3",
-		"vitest": "^5.0.1"
+		"@types/node": "^26.6.4",
+		"tsdown": "^0.23.0",
+		"typescript": "^7.0.2",
+		"vitepress": "^1.6.4",
+		"vitest": "^5.0.3",
+		"vue": "^3.5.43"
 	}
 }

@@ -4,8 +4,8 @@ import { isAbsolute, join, relative, sep } from 'node:path'
 
 const packageId = 'playwright-mcp'
 const packageName = '@playwright/mcp'
-const packageVersion = '0.0.79'
-const integrity = 'sha512-VpqD4a3vFyGQMY9sh3UJiO6wjcurggkljKfAyCHL0QWGY5m6Ehr3MNsAAHPDHO//n13g0PCjpHatAOiulrqdZQ=='
+const packageVersion = '0.0.86'
+const integrity = 'sha512-4SL9OSINmik3+EObCYJIxH8BkhcqqGU6CM8XIgztW015iBVR9WR6Q0xF180Ery+xuEVyyK5r6nC2bOg3zjgCoA=='
 const serverId = `${packageId}-server`
 const modal = 'div.fixed.inset-0.z-50:has(header > h2)'
 const literal = JSON.stringify

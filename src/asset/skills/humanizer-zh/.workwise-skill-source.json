@@ -4,5 +4,19 @@
   "repo": "Humanizer-zh",
   "path": "",
   "ref": "main",
-  "autoUpdate": false
+  "autoUpdate": false,
+  "installedSha": "f4518a8eab97b8bfebc66a89d34320a89bef6930",
+  "upstreamPath": "",
+  "upstreamVersion": "2026-09-23",
+  "upstreamSource": "https://github.com/op7418/Humanizer-zh/tree/f4518a8eab97b8bfebc66a89d34320a89bef6930",
+  "verifiedUpstreamSha256": {
+    "SKILL.md": "95627fd4437d886f98032ccc62d79136e6310f1fc04e354bb86431795ff206df",
+    "LICENSE": "aa00e74769e1b9d8e7fa7094dbfcca9b129a0ded6dce1cf4da050b99146d2fa7"
+  },
+  "workwiseOverlays": [
+    "README.md",
+    "references/upstream.md",
+    ".workwise-skill-source.json"
+  ],
+  "sourceIdentityNote": "Legacy path/ref are retained for installed-source matching. installedSha and upstreamPath record the exact audited upstream snapshot; automatic third-party updates remain disabled."
 }

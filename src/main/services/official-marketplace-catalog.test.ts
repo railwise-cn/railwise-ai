@@ -11,12 +11,12 @@ import {
 
 const PINNED_NPM_COMPONENTS = {
   '@playwright/mcp': {
-    version: '0.0.79',
-    integrity: 'sha512-VpqD4a3vFyGQMY9sh3UJiO6wjcurggkljKfAyCHL0QWGY5m6Ehr3MNsAAHPDHO//n13g0PCjpHatAOiulrqdZQ=='
+    version: '0.0.86',
+    integrity: 'sha512-4SL9OSINmik3+EObCYJIxH8BkhcqqGU6CM8XIgztW015iBVR9WR6Q0xF180Ery+xuEVyyK5r6nC2bOg3zjgCoA=='
   },
   '@playwright/cli': {
-    version: '0.1.18',
-    integrity: 'sha512-ggNfYYH+GsZTGUiBEL8f6N5j0seYEUE52v+fIWqK/A36QG36cL0EJ79qWTXYO2uZMUU7vm+jk3x0fKCPL6UuIw=='
+    version: '0.1.25',
+    integrity: 'sha512-v1qjq3/ssK2lf9z/+Cu0gHGXm2uDgAQwq5fWPCBM1SxkJqcB0FOyvbbsTrpPn4j4WJey8bLTYT4tEB8o4FbwBw=='
   },
   '@upstash/context7-mcp': {
     version: '4.0.0',
@@ -51,8 +51,8 @@ const PINNED_NPM_COMPONENTS = {
 const PINNED_WHEEL_COMPONENTS = {
   'zotero-mcp-server': { version: ZOTERO_PACKAGE.version, sha256: ZOTERO_PACKAGE.sha256, executable: 'zotero-mcp' },
   'docling-mcp': {
-    version: '3.0.0',
-    sha256: '595da70b9de2265f1f14e575fad65ff4213c5c7e2dbb255184d606505fa49f23',
+    version: '3.5.1',
+    sha256: '44f658e319263350c3847c2afa40d085da49bbbeed6e9ba56b9a2308fc925ea6',
     executable: 'docling-mcp-server'
   },
   'mcp-server-fetch': {
@@ -390,18 +390,18 @@ describe('official marketplace catalog', () => {
     })
 
     expect(docling).toMatchObject({
-      version: '3.0.0',
+      version: '3.5.1',
       license: 'MIT',
       publisher: { id: 'docling-project', verified: true },
       source: {
         kind: 'pypi',
-        location: 'https://pypi.org/project/docling-mcp/3.0.0/',
+        location: 'https://pypi.org/project/docling-mcp/3.5.1/',
         packageName: 'docling-mcp',
-        version: '3.0.0',
-        resolvedRef: '3.0.0',
+        version: '3.5.1',
+        resolvedRef: '3.5.1',
         digest: {
           algorithm: 'sha256',
-          value: '595da70b9de2265f1f14e575fad65ff4213c5c7e2dbb255184d606505fa49f23'
+          value: '44f658e319263350c3847c2afa40d085da49bbbeed6e9ba56b9a2308fc925ea6'
         }
       },
       installation: { mode: 'direct-mirror' },
@@ -414,8 +414,9 @@ describe('official marketplace catalog', () => {
     expect(docling.components[0]?.runtime).toMatchObject({
       kind: 'uv',
       packageName: 'docling-mcp',
-      version: '3.0.0',
-      executable: 'docling-mcp-server'
+      version: '3.5.1',
+      executable: 'docling-mcp-server',
+      args: ['--transport', 'stdio']
     })
   })
 
@@ -482,7 +483,7 @@ describe('official marketplace catalog', () => {
     expect(component?.runtime).toMatchObject({
       kind: 'npm',
       packageName: '@playwright/mcp',
-      version: '0.0.79',
+      version: '0.0.86',
       executable: 'playwright-mcp'
     })
   })
@@ -509,15 +510,20 @@ describe('official marketplace catalog', () => {
         subpath: 'skills/chart-visualization'
       }
     })
-    expect(superpowers.version).toBe('44c9b2d6e889982ac18c27d05a19fefe335194e1-railwise.1')
-    expect(superpowers.components[0]).toMatchObject({ skillNames: ['using-superpowers'] })
+    expect(superpowers.version).toBe('22f0b463e7a5e579904dd6211a520321035526f7-railwise.1')
+    expect(superpowers.components[0]).toMatchObject({ skillNames: [
+      'brainstorming', 'diagnosing-superpowers', 'dispatching-parallel-agents', 'executing-plans',
+      'finishing-a-development-branch', 'receiving-code-review', 'requesting-code-review',
+      'subagent-driven-development', 'systematic-debugging', 'test-driven-development',
+      'using-git-worktrees', 'using-superpowers', 'verification-before-completion', 'writing-plans', 'writing-skills'
+    ] })
     expect(superpowers.source).toMatchObject({
       kind: 'github',
-      resolvedRef: '44c9b2d6e889982ac18c27d05a19fefe335194e1'
+      resolvedRef: '22f0b463e7a5e579904dd6211a520321035526f7'
     })
     expect(superpowers.components[0]?.runtime).toMatchObject({
       kind: 'github',
-      resolvedCommit: '44c9b2d6e889982ac18c27d05a19fefe335194e1'
+      resolvedCommit: '22f0b463e7a5e579904dd6211a520321035526f7'
     })
   })
 
@@ -562,7 +568,7 @@ describe('official marketplace catalog', () => {
     const expected = new Map([
       ['browser-skill', ['361da1d75798b99b358dfb434b8ce1921fb90d9e', 'MIT', 'crates/bsk-cli/skill']],
       ['blender-skills', ['8f778d2405a214b508d4c7d80742be8e43acdd52', 'MIT', '.claude/skills']],
-      ['video-shotcraft', ['1266a3ec4831289c4d893d42dd5102723658039a', 'Apache-2.0', undefined]],
+      ['video-shotcraft', ['59f3e9b9e936ff2bce0e18446226d770a3f2f61f', 'Apache-2.0', undefined]],
       ['diagram-design', ['0cf73c3fcc56667ad91a9a04c439ac6ccfabc9d1', 'MIT', undefined]],
       ['arch-diagram-skill', ['879ca7fa503a64ab46b5bc77d2062ded32fadc84', 'MIT', 'skills/arch-diagram']]
     ] as const)

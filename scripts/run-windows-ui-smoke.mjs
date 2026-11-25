@@ -13,7 +13,7 @@ import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from
 import { prepareBrowserSkillSmoke, launchBrowserSkillSmoke, browserSmokeDependency, preparePinnedBrowserStartupCli, browserStartupDependency } from './prepare-browser-skill-smoke.mjs'
 import { observeWorkbenchTypography, runWindowsStartupAppearanceSmoke } from './verify-packaged-startup-appearance.mjs'
 import { revealWindowsChatTaskArtifact, validateWindowsTaskChatLayout, windowsTaskChatLayoutExpression } from './windows-task-chat-ui.mjs'
-import { createWebPptJourney, startWebPptFallbackSource, validateWebPptFallbackProof, validateWebPptTurnIdentity } from './web-ppt-journey.mjs'
+import { createWebPptJourney, startWebPptFallbackSource, validateWebPptFallbackProof, validateWebPptTurnIdentity, webPptSourceUrl } from './web-ppt-journey.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 const windowsDueTaskResult = '本次 HTML 报告已保存并核验，可在原会话查看。'
@@ -477,9 +477,17 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.equal(proof.input, 'installed-chat-ui')
     assert.equal(proof.model, requireLiveWebPpt ? 'live-model' : 'controlled-protocol')
     assert.equal(proof.source.url, 'https://www.railwise.cn/')
-    assert.equal(proof.source.tool, 'web_fetch')
+    assert.ok(['web_fetch', 'browser-skill', 'ego-browser'].includes(proof.source.tool))
     assert.match(proof.source.sha256, /^[a-f0-9]{64}$/)
     assert.ok(proof.source.bytes > 0)
+    if (requireLiveWebPpt) {
+      assert.ok(['fetch', 'browser-skill', 'ego-browser'].includes(proof.sourceProvider), 'The live journey must identify the verified source provider')
+      if (proof.sourceProvider === 'browser-skill') {
+        assert.equal(proof.source.tool, 'browser-skill')
+        assert.ok(report.webPptBrowser?.browserInstanceId, 'A browser read must be bound to the isolated connected Chrome')
+      } else if (proof.sourceProvider === 'fetch') assert.equal(proof.source.tool, 'web_fetch')
+      else assert.equal(proof.source.tool, 'ego-browser')
+    }
     validateWebPptTurnIdentity(proof)
     assert.equal(proof.artifact.nativeEditableText, true)
     assert.equal(proof.artifact.originalChatButtonClicked, true)
@@ -2295,7 +2303,7 @@ export async function observeWindowsBrowserConnect({ connect, diagnose, readStat
   }
 }
 
-async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
+async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl, interaction = 'interact', extraOrigins = [] }) {
   const prepared = await prepareBrowserSkillSmoke(join(root, 'browser-dependencies'))
   const profile = join(root, 'browser-profile')
   await mkdir(profile, { recursive: true })
@@ -2340,8 +2348,9 @@ async function startRealBrowserSmoke({ cdp, root, environment, fixtureUrl }) {
     assert.equal(connected.length, 1, `Expected one real isolated extension connection (${diagnosis?.status.state})`)
     assert.equal(connected[0].extensionVersion, browserSmokeDependency.extensionVersion)
     assert.equal(connected[0].protocolVersion, '1.9')
+    const origins = [...new Set([new URL(fixtureUrl).origin, ...extraOrigins])]
     const configured = await cdp.evaluate(`window.workwise.configureBrowserSkill(${JSON.stringify({ enabled: true, expectedRevision: diagnosis.status.revision,
-      browserInstanceId: connected[0].id, origins: [new URL(fixtureUrl).origin], interaction: 'interact' })})`)
+      browserInstanceId: connected[0].id, origins, interaction })})`)
     assert.equal(configured.ok, true, configured.message)
     assert.equal(configured.status.state, 'ready')
     const selected = configured.status.browsers.find(item => item.id === connected[0].id)
@@ -2703,6 +2712,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   }
   const webPpt = webPptSmoke ? createWebPptJourney({
     workspace, live: webPptLive, fallback: fallbackSource, parseToolOutput: parseFixtureToolOutput,
+    skillGuardPath: join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', 'ppt-master', 'scripts', 'attribution_guard.py'),
     sidecar: join(dirname(executable), 'resources', 'app.asar.unpacked', 'sidecars', 'markitdown', 'workwise-markitdown.exe')
   }) : undefined
   const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke || (webPpt && !webPptLive) ? await startWindowsTaskModelFixture({
@@ -2830,7 +2840,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           return JSON.parse(response.body).providers.some(provider=>provider.id==='browser-skill'&&provider.enabled&&provider.available);
         })`, 'the installed Runtime to receive the selected BrowserSkill binding')
       }
-      report.webPpt = await webPpt.verify(cdp, { browserInstanceId: realBrowser?.evidence.browserInstanceId, openArtifact: async (driver, { task, artifact }) => {
+      report.webPpt = await webPpt.verify(cdp, { browserInstanceId: realBrowser?.evidence.browserInstanceId,
+        onStage: stage => { report.webPptStage = stage },
+        openArtifact: async (driver, { task, artifact }) => {
         const opened = await driver.evaluate(artifact.absolutePath || artifact.storage === 'task'
           ? `window.workwise.openTaskArtifact(${JSON.stringify({ taskId: task.id, artifactId: artifact.id })})`
           : `window.workwise.openWorkspaceFile(${JSON.stringify({ workspaceRoot: workspace, path: artifact.relativePath })})`)

@@ -1029,7 +1029,7 @@ def _registry_ids(
     if not isinstance(source, str) or not (root / source).is_file():
         raise AuditError(f"Registry has missing source: {source}")
 
-    if kind == "structured_markdown":
+    if kind in {"structured_markdown", "numbered_markdown"}:
         pattern = config.get("entry_pattern")
         if not isinstance(pattern, str):
             raise AuditError(f"Registry {config.get('name')} needs entry_pattern")

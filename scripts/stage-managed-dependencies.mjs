@@ -102,9 +102,13 @@ export async function loadMarketplaceArtifacts(lock, directory) {
     for (const key of expected) {
       const committed = locked.get(key)
       const generated = records.get(key)
-      if (!generated || JSON.stringify(generated) !== JSON.stringify(committed)) {
+      if (!generated || generated.reviewSha256 !== committed.reviewSha256) {
         throw new Error(`Marketplace artifact does not match the committed lock: ${key}`)
       }
+      // A native rebuild can change dependency or ZIP bytes without changing the
+      // reviewed package. Publish only the exact shards selected in this commit;
+      // all other packages retain their already-published immutable payloads.
+      if (JSON.stringify(generated.parts) !== JSON.stringify(committed.parts)) continue
       for (const part of committed.parts) {
         const file = { id: `marketplace-${part.sha256}`, ...part, mirrorPath: `marketplace/1/${part.sha256}/payload.zip` }
         const source = join(sourceDirectory, `${part.sha256}.zip`)

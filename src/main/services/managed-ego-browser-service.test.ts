@@ -10,6 +10,10 @@ it('discovers only the external CLI with exact executable hash/version, without 
  const root=await mkdtemp(join(tmpdir(),'ego-discovery-'));clean.push(root);const path=join(root,'ego-browser');await writeFile(path,'controlled fixture, never executable')
  expect(await diagnoseEgoBrowser({candidates:[path],run:async actual=>{expect(actual).toBe(await realpath(path));return 'ego-browser 0.6.3.14\nChromium 156.0.8078.96'}})).toMatchObject({state:'installed',version:'0.6.3.14',executablePath:await realpath(path),executableHash:expect.stringMatching(/^[a-f0-9]{64}$/)})
 })
+it('accepts newer builds in the audited Ego CLI protocol series',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'ego-newer-build-'));clean.push(root);const path=join(root,'ego-browser');await writeFile(path,'controlled fixture')
+ expect(await diagnoseEgoBrowser({candidates:[path],run:async()=> 'ego-browser 0.6.3.17\nChromium 156.0.8078.96'})).toMatchObject({state:'installed',version:'0.6.3.17'})
+})
 it('does not mistake the Skill guide version for the CLI protocol',async()=>{
  const root=await mkdtemp(join(tmpdir(),'ego-version-'));clean.push(root);const path=join(root,'ego-browser');await writeFile(path,'fixture')
  expect(await diagnoseEgoBrowser({candidates:[path],run:async()=> 'ego-browser usage guide v2.2.1'})).toMatchObject({state:'unsupported'})

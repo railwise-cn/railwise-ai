@@ -17,7 +17,10 @@ export const escapeWriteHtml = (value: string): string => value.replaceAll('&', 
 export function renderWriteMath(source: string, display: boolean): string {
   if (source.length > WRITE_MATH_MAX_LENGTH) return `<code class="write-math-error" role="status">${escapeWriteHtml(source)}</code>`
   try {
-    return katex.renderToString(source, { ...writeMathOptions, displayMode: display, macros: {} })
+    const html = katex.renderToString(source, { ...writeMathOptions, displayMode: display, macros: {} })
+    return html.includes('class="katex-error"')
+      ? `<code class="write-math-error" role="status">${escapeWriteHtml(source)}</code>`
+      : html
   } catch {
     return `<code class="write-math-error" role="status">${escapeWriteHtml(source)}</code>`
   }

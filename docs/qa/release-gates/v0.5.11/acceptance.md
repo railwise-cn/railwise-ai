@@ -266,10 +266,18 @@ Windows 精确安装包来自该 run，版本 `0.5.11`，安装器 SHA-256 `21b5
 - Windows 更新 `45297023133`。从正式 0.5.10 设置页和侧栏分别升级到同一候选，从正式 0.5.7 覆盖安装到同一候选，三项均通过并读回原有资料。
 - macOS Apple Silicon 与 Intel 表格 `45308995334`。原失败是驱动将首个点击点设在 `y + 59`，相对 22 像素行距多偏一行，并依赖未显示的单元格地址标签。驱动修复后，在同一批签名 DMG 上两架构均通过公式 `=SUM(4,5)` 得值 9、撤销、冲突另存、中文 CSV、多工作表保存重开及 XLSX 只读预览。该 run 的驱动源码来自主分支提交 `afe5f902c05ae5a572a21577e915960a935d3ea4`，应用 DMG 与先前候选字节一致。
 
+## 2026-11-25 最新上游与实装状态
+
+上游版本核查：Univer 最新 `1.6.1`（Apache-2.0），本分支的 Sheets 依赖与随包 NOTICE 均已提升至该版；最终候选仍需重验表格。AG-UI 的 npm 核心包仍为 `1.0.5`（MIT）；上游 11 月 21 日发布没有产生新的 `@ag-ui/core` 版本。BrowserSkill CLI 和扩展仍为 `0.5.0`。Playwright MCP/CLI 最新为 `0.0.86`/`0.1.25`（Apache-2.0）；Docling MCP 最新为 `3.5.1`（MIT）。它们的目录版本和启动参数已更新，但离线镜像锁及重建后的 Windows、macOS 安装包尚未通过验证。Superpowers 最新 `v7.0.2`（MIT），比当前 pin 多一项可发现技能；Video Shotcraft 最新 commit `59f3e9b9e936ff2bce0e18446226d770a3f2f61f`（Apache-2.0），相对当前 pin 有 27 个提交且触及已筛选分发目录；两者尚未更新到镜像。Blender Skills 最新提交只改 README，RailWise 只分发的 `.claude/skills` 子目录无变化，因此保留现有 pin。PPT Master `6.10.0` 含不适用于整包发行的 AGPL PyMuPDF 路径且有 KUN 不兼容改动，不做整包替换。PDF.js `6.5.438` 为跨主版本升级；MarkItDown `0.1.9` 需要重建 sidecar，均不作为未经兼容验收的替换。KUN 上游 `0.4.6` 使用 PolyForm Noncommercial，不直接并入 RailWise MIT 运行时。Ego Lite 桌面端不随 RailWise 安装包分发；本机 `ego-browser upgrade` 已报告最新，CLI 为 `0.6.3.17`，RailWise 当前支持已审计 `0.6.3` 协议系列的构建号 14 及以上。
+
+QA 模型凭据随后已配置在仓库 Actions secrets/variables 中。精确 0.5.11 候选的 Windows 实装 `45373293407` 和 Mac Apple Silicon 实装 `45373293596` 均确实启用了实时 DeepSeek 流程；Windows 报告“Live model acceptance did not complete”。Mac 原始回执绑定构建 `45357920557` 的候选包与安装后 ASAR，任务已收取网址答复，但随后进入 `waiting_approval`，等待对 `https://www.railwise.cn` 的只读网页读取批准。验收驱动没有处理这张审批卡，故超时退出；它没有证明网页读取或 PPTX 交付通过，也不能归因于凭据缺失。该回执的下一步是修复/验证一次有界审批后原任务续接，并用更新后的精确候选重跑。
+
 **仍待完成的验收与发布条件**
 
-- 真实模型官网到 PPTX 未运行。仓库 Actions 当前没有 `RAILWISE_QA_MODEL_BASE_URL`、`RAILWISE_QA_MODEL` 或 `RAILWISE_QA_MODEL_API_KEY`。Windows 浏览器回退和 Video Shotcraft 结果来自受控/合成夹具，不是实时模型验收。Mac 上从成果打开目标系统应用也没有本轮回执。
+- 真实模型官网到 PPTX 尚无成功回执。`RAILWISE_QA_MODEL_BASE_URL`、`RAILWISE_QA_MODEL` 和 `RAILWISE_QA_MODEL_API_KEY` 已配置为仓库 Actions variable/secret；此前 Mac 实装实际到达 `waiting_approval`，验收驱动未处理原对话中的只读网页读取审批，因此超时失败。Windows 实装也未完成。需修复审批卡的稳定定位与受限批准流程，再用新构建候选执行真实模型旅程。受控/合成结果不替代此回执。
 - 任务续接和单次批准的隔离源码预览通过，精确 Windows 包也通过任务、浏览器和 Video 流程；但新候选安装包对“等待开放式回答时点击暂停、重启后原问题仍在正文、继续后回答并只批准一次”的单独回执尚缺。Mac 源码预览通过该流程，不能代替包验收。
 - Windows 专项实际任务和计划任务使用受控协议，验证了原会话、HTML 成果、真实系统时钟回执及原会话记录；国内普通网络的实体 Windows 和此前遇到问题的用户电脑仍待现场环境复测。
 - 大单网与 Ego 的原登录空间/会话未重新登录核验。Docling MCP 已启动并执行本地 CSV 后端，完整 PDF/DOCX Docling 转换需要另外配置 Docling Serve 或本地转换环境。加密 PDF、OCR 与跨页引用未验。
 - 2026-11-20 与更早记录中当时未验证的内容见历史条目。正式 Stable 渠道仍是 `0.5.10`，`0.5.11` 仅为私有候选。此前记录的 Windows 候选 Authenticode 为 `NotSigned`，公开发布前仍需按正式分发签名要求确认适用制品。
+
+截至本次记录，上游依赖版本变更尚未全部进入离线包与安装包；本节中的未通过/待测事项都仍是发布阻塞。正式渠道没有改变。

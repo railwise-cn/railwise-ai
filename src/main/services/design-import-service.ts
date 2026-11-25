@@ -230,7 +230,7 @@ function createNativeOnlyPptxDocument(
     pages,
     pptx: {
       editorBackend: 'pptx-vanilla-viewer',
-      editorVersion: '3.61.0',
+      editorVersion: '3.80.0',
       source: { sha256: sourceSha256, bytes: sourceBytes, cachedFilename: 'source.pptx' },
       importReport: nativeReport,
       editorModel: {
@@ -858,7 +858,7 @@ export async function importPptxToDesign(
       documentKind: 'pptx',
       pptx: {
         editorBackend: 'pptx-vanilla-viewer',
-        editorVersion: '3.61.0',
+        editorVersion: '3.80.0',
         importReport: nativeInspection.report,
         source: {
           sha256: sourceSha256,

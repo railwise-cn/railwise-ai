@@ -139,6 +139,7 @@ export type UiActionEvent = z.infer<typeof UiActionEvent>
 export const ApprovalEvent = RuntimeEventBase.extend({
   kind: z.enum(['approval_requested', 'approval_resolved']),
   approvalId: z.string().min(1),
+  requestHash: z.string().min(1).max(128).optional(),
   toolName: z.string().min(1),
   status: z.enum(['pending', 'allowed', 'denied', 'expired']),
   approvalPolicy: ApprovalPolicySchema.optional(),

@@ -16,6 +16,19 @@ function body(...chunks: string[]): AsyncIterable<Uint8Array> {
 }
 
 describe('safeWebFetch', () => {
+  it('does not start DNS or transport work when the caller has already cancelled', async () => {
+    const controller = new AbortController()
+    controller.abort('cancelled')
+    const lookup = vi.fn(async () => [{ address: '93.184.216.34', family: 4 }])
+    const transport = vi.fn(async () => ({ status: 200, headers: {}, body: body('must not fetch') }))
+
+    await expect(safeWebFetch('https://example.com', {}, controller.signal, { lookup, transport }))
+      .rejects.toMatchObject({ code: 'fetch_failed' })
+
+    expect(lookup).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalled()
+  })
+
   it('checks the task origin scope before following a public redirect', async () => {
     const seen: string[] = []
     await expect(safeWebFetch('https://example.com/start', { allowedOrigins: ['https://example.com'] }, undefined, {
@@ -24,6 +37,23 @@ describe('safeWebFetch', () => {
     })).rejects.toMatchObject({ code: 'redirect_blocked' })
     expect(seen).toEqual(['https://example.com'])
     expect(() => validateSafeWebUrl('http://example.com', { allowedOrigins: ['https://example.com'] })).toThrow()
+  })
+  it('allows one exact search-result URL without allowing the rest of that site or its redirect target', async () => {
+    const source = 'https://results.example.test/notices/1'
+    const lookup = async () => [{ address: '93.184.216.34', family: 4 }]
+    const fetched = await safeWebFetch(source, { allowedOrigins: ['https://so.qq.com'], allowedUrls: [source] }, undefined, {
+      lookup,
+      transport: async () => ({ status: 200, headers: { 'content-type': 'text/plain' }, body: body('official result') })
+    })
+    expect(fetched.body.toString()).toBe('official result')
+    await expect(safeWebFetch('https://results.example.test/notices/2', {
+      allowedOrigins: ['https://so.qq.com'], allowedUrls: [source]
+    }, undefined, { lookup, transport: async () => ({ status: 200, headers: {}, body: body('should not read') }) }))
+      .rejects.toMatchObject({ code: 'redirect_blocked' })
+    await expect(safeWebFetch(source, { allowedOrigins: ['https://so.qq.com'], allowedUrls: [source] }, undefined, {
+      lookup,
+      transport: async () => ({ status: 302, headers: { location: 'https://results.example.test/notices/2' }, body: body() })
+    })).rejects.toMatchObject({ code: 'redirect_blocked' })
   })
   it('rejects private, special, and IPv4-mapped addresses', () => {
     for (const address of [

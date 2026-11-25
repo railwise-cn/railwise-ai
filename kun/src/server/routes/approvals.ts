@@ -58,6 +58,7 @@ export async function decideApproval(input: {
     turnId: approval.turnId,
     itemId: undefined,
     approvalId: input.approvalId,
+    requestHash: approval.requestHash,
     toolName: approval.toolName,
     status: expired ? 'expired' : response.status,
     summary: approval.summary

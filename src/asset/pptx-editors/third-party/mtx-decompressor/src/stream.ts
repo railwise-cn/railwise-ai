@@ -37,10 +37,10 @@ export class Stream {
 		if (this.reserved >= n) {
 			return;
 		}
-		const newBuf = new Uint8Array(n);
+		const newBuf = new Uint8Array(Math.max(n, this.reserved * 2));
 		newBuf.set(this.buf.subarray(0, this.size));
 		this.buf = newBuf;
-		this.reserved = n;
+		this.reserved = newBuf.length;
 	}
 
 	/**

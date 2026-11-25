@@ -152,6 +152,7 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
       conversationThreadId: 'conversation-1', originThreadId: 'conversation-1', executionThreadId: 'execution-1', sameConversation: true,
       originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: true, replyTrace: replyTrace(true),
       source: { url: 'https://www.railwise.cn/', tool: 'web_fetch', sha256: '2'.repeat(64), bytes: 512 },
+      sourceProvider: 'fetch',
       artifact: { nativeEditableText: true, originalChatButtonClicked: true, sha256: '3'.repeat(64), bytes: 1024 },
       open: { status: 'handler-unavailable' }
     }
@@ -162,6 +163,11 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
   report.webPpt.model = 'live-model'
   assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
   report.webPpt.open.status = 'desktop-open-request-accepted'
+  assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
+  report.webPpt.sourceProvider = 'browser-skill'
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.source.tool = 'browser-skill'
+  report.webPptBrowser = { browserInstanceId: 'isolated-live-browser' }
   assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
   report.webPpt.sameTurn = false
   report.webPpt.replyTrace = replyTrace(false)

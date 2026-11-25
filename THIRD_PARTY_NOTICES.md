@@ -5,7 +5,7 @@
 ## Microsoft MarkItDown
 
 WorkWise includes a locally packaged helper built from Microsoft MarkItDown
-v0.1.4, commit `932084c88679aeda901c2903a151f3ed82f86081`. MarkItDown is distributed
+v0.1.9, commit `21d9c1d01ecc12538dab19811fd247ef2f96ef60`. MarkItDown is distributed
 under the MIT License. WorkWise enables only the PDF, DOCX, PPTX, and XLSX
 format extras and does not distribute the `markitdown-ocr` plugin.
 
@@ -13,7 +13,7 @@ Source: https://github.com/microsoft/markitdown
 
 ## Mozilla PDF.js
 
-WorkWise includes PDF.js (`pdfjs-dist` 5.4.624) for bounded local PDF page
+WorkWise includes PDF.js (`pdfjs-dist` 6.5.438) for bounded local PDF page
 inspection, text search, page mapping, and safe preview rendering. PDF.js is
 distributed under the Apache License 2.0.
 

@@ -3,10 +3,12 @@ import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import type { KunCapabilitiesConfig, WebCapabilityConfig } from '../../contracts/capabilities.js'
 import { parseWebSourceAddress } from '../../contracts/task-source-intent.js'
 import type { WebFetchResult, WebProvider, WebSearchResult } from '../../ports/web-provider.js'
+import type { ToolHostContext } from '../../ports/tool-host.js'
 import { sourceIdFor, UnavailableWebProvider } from '../../ports/web-provider.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { LocalToolHost } from './local-tool-host.js'
 import { SafeWebFetchError, safeWebFetch } from '../../network/safe-web-fetch.js'
+import { extractReadableHtml } from '../../network/web-html-content.js'
 
 const DEFAULT_WEB_TIMEOUT_MS = 15_000
 const DEFAULT_DEEPSEEK_RESPONSES_SEARCH_TIMEOUT_MS = 90_000
@@ -40,6 +42,7 @@ export type WebToolProviderOptions = {
   provider?: WebProvider
   fetchProvider?: WebProvider
   searchProvider?: WebProvider
+  searchResultUrls?: (taskId: string, turnId: string) => readonly string[]
   nowIso?: () => string
 }
 
@@ -64,7 +67,7 @@ export function buildWebToolProviders(
   const searchProvider = options.searchProvider ?? fallbackProvider
   const tools = []
   if (web.fetchEnabled && fetchProvider.fetch) {
-    tools.push(createFetchTool(web, fetchProvider))
+    tools.push(createFetchTool(web, fetchProvider, options.searchResultUrls))
   }
   if (web.searchEnabled && searchProvider.search) {
     tools.push(createSearchTool(web, searchProvider))
@@ -114,7 +117,24 @@ function diagnosticProviderId(
   return config.searchEnabled ? searchProvider.id : fetchProvider.id
 }
 
-function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
+function createFetchTool(
+  config: WebCapabilityConfig,
+  provider: WebProvider,
+  searchResultUrls?: WebToolProviderOptions['searchResultUrls']
+) {
+  const exactSearchResultUrl = (address: string, context: ToolHostContext): string | undefined => {
+    const taskId = context.executionGrant?.taskId
+    if (!taskId) return undefined
+    let url: URL
+    try { url = parseWebSourceAddress(address) } catch { return undefined }
+    return searchResultUrls?.(taskId, context.turnId).find(candidate => {
+      try { return new URL(candidate).href === url.href } catch { return false }
+    })
+  }
+  const authorizedByGrant = (url: URL, context: ToolHostContext): boolean => {
+    const origins = context.executionGrant?.networkAllowlist ?? []
+    return origins.includes('*') || origins.includes(url.origin)
+  }
   return LocalToolHost.defineTool({
     name: 'web_fetch',
     description: 'Fetch an allowed HTTP or HTTPS page and return extracted text with source metadata. A pasted www address defaults to HTTPS. Read-only; no browser setup is needed.',
@@ -134,7 +154,7 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
       if (!grant?.taskId || !address || grant.networkAllowlist.includes('*')) return false
       try {
         const url = parseWebSourceAddress(address)
-        return grant.networkAllowlist.includes(url.origin)
+        return grant.networkAllowlist.includes(url.origin) || Boolean(exactSearchResultUrl(address, context))
       } catch {
         return false
       }
@@ -144,7 +164,7 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
       if (!address) return
       let url: URL
       try { url = parseWebSourceAddress(address) } catch { return }
-      assertGrantAllowsNetwork(url.href, context)
+      if (!authorizedByGrant(url, context) && !exactSearchResultUrl(address, context)) assertGrantAllowsNetwork(url.href, context)
     },
     inputSchema: {
       type: 'object',
@@ -163,7 +183,8 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
       if (!rawUrl) return toolError('invalid_url', 'url is required')
       const policy = validateUrlPolicy(rawUrl, config)
       if (!policy.ok) return toolError('policy_blocked', policy.reason, telemetry({ startedAt, policy: 'blocked', url: rawUrl }))
-      assertGrantAllowsNetwork(policy.url.href, context)
+      const authorizedSearchUrl = exactSearchResultUrl(rawUrl, context)
+      if (!authorizedByGrant(policy.url, context) && !authorizedSearchUrl) assertGrantAllowsNetwork(policy.url.href, context)
       if (!provider.fetch) return toolError('provider_unavailable', 'web fetch provider is unavailable')
       const maxBytesCap = config.maxFetchBytes ?? DEFAULT_WEB_MAX_BYTES
       const maxBytes = boundedInt(
@@ -179,7 +200,8 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
           maxBytes,
           timeoutMs,
           signal: context.abortSignal,
-          allowedOrigins: context.executionGrant?.networkAllowlist
+          allowedOrigins: context.executionGrant?.networkAllowlist,
+          ...(authorizedSearchUrl ? { allowedUrls: [authorizedSearchUrl] } : {})
         })
         return {
           output: fetchOutput(result, telemetry({
@@ -206,7 +228,23 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
 function createSearchTool(config: WebCapabilityConfig, provider: WebProvider) {
   return LocalToolHost.defineTool({
     name: 'web_search',
-    description: 'Search the web through the configured provider and return ranked results with source metadata.',
+    description: 'Search public web results through the configured provider. Returns untrusted titles, snippets, exact source URLs and ranks. A successful search result authorizes fetching only its exact URL in the same task and Turn; it does not authorize the site origin or other URLs. Redirects are allowed only when their destination is independently covered by the task network scope.',
+    hasScopedApproval: async (_args, context) => {
+      const grant = context.executionGrant
+      if (!grant?.taskId) return false
+      return provider.canSearchWithin
+        ? provider.canSearchWithin(grant.networkAllowlist, config.denyDomains)
+        : providerHasScopedSearchApproval(provider, grant.networkAllowlist, config.denyDomains)
+    },
+    validateArguments: (args, context) => {
+      const query = pickString(args.query)
+      if (!query || query.length > 512) throw new Error('Search query must be between 1 and 512 characters.')
+      if (context.executionGrant && (provider.canSearchWithin
+        ? !provider.canSearchWithin(context.executionGrant.networkAllowlist, config.denyDomains)
+        : provider.searchOrigins?.length && !providerHasScopedSearchApproval(provider, context.executionGrant.networkAllowlist, config.denyDomains))) {
+        throw Object.assign(new Error('No configured search provider is allowed by the task network scope.'), { code: 'network_scope_blocked' })
+      }
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -224,7 +262,7 @@ function createSearchTool(config: WebCapabilityConfig, provider: WebProvider) {
       if (!query) return toolError('invalid_query', 'query is required')
       if (!provider.search) return toolError('provider_unavailable', 'web search provider is unavailable')
       const limit = boundedInt(args.limit, DEFAULT_SEARCH_LIMIT, 1, MAX_SEARCH_LIMIT)
-      const deepSeekResponses = provider.id === 'deepseek-responses'
+      const deepSeekResponses = provider.id.split('+').includes('deepseek-responses')
       const defaultTimeoutMs = deepSeekResponses
         ? DEFAULT_DEEPSEEK_RESPONSES_SEARCH_TIMEOUT_MS
         : DEFAULT_WEB_TIMEOUT_MS
@@ -237,7 +275,9 @@ function createSearchTool(config: WebCapabilityConfig, provider: WebProvider) {
           query,
           limit,
           timeoutMs,
-          signal: context.abortSignal
+          signal: context.abortSignal,
+          allowedOrigins: context.executionGrant?.networkAllowlist,
+          denyDomains: config.denyDomains
         })
         return {
           output: searchOutput(query, provider.id, results, telemetry({
@@ -260,6 +300,22 @@ function createSearchTool(config: WebCapabilityConfig, provider: WebProvider) {
   })
 }
 
+function providerHasScopedSearchApproval(
+  provider: WebProvider,
+  allowedOrigins: readonly string[],
+  denyDomains: readonly string[]
+): boolean {
+  const origins = provider.searchOrigins
+  if (!origins?.length) return false
+  return origins.every(origin => {
+    const url = new URL(origin)
+    const hostname = url.hostname.toLowerCase()
+    const originAllowed = allowedOrigins.includes('*') || allowedOrigins.includes(url.origin)
+    const domainDenied = denyDomains.some(domain => domainMatches(hostname, domain))
+    return originAllowed && !domainDenied
+  })
+}
+
 class FetchWebProvider implements WebProvider {
   readonly id = 'fetch'
   private readonly nowIso: () => string
@@ -277,21 +333,34 @@ class FetchWebProvider implements WebProvider {
     timeoutMs: number
     signal: AbortSignal
     allowedOrigins?: string[]
+    allowedUrls?: string[]
   }): Promise<WebFetchResult> {
     const response = await safeWebFetch(request.url, {
       allowDomains: this.policy.allowDomains,
       allowedOrigins: request.allowedOrigins,
+      allowedUrls: request.allowedUrls,
       denyDomains: this.policy.denyDomains,
       maxBytes: request.maxBytes,
       totalTimeoutMs: Math.min(request.timeoutMs, DEFAULT_WEB_TIMEOUT_MS)
     }, request.signal)
     const contentType = response.headers['content-type']
+    if (contentType?.toLowerCase().includes('application/pdf')) {
+      throw new SafeWebFetchError('invalid_response', 'PDF content needs a document reader. Use the browser or add the PDF to the conversation for parsing.')
+    }
+    if (contentType && !/^(?:text\/|application\/(?:json|xml|xhtml\+xml))/i.test(contentType)) {
+      throw new SafeWebFetchError('invalid_response', 'The response is not a readable text or HTML page.')
+    }
     const declared = contentType?.match(/charset\s*=\s*["']?([a-zA-Z0-9_-]+)/i)?.[1]
       ?? response.body.subarray(0, 4096).toString('latin1').match(/<meta[^>]+charset\s*=\s*["']?([a-zA-Z0-9_-]+)/i)?.[1]
     let raw: string
     try { raw = new TextDecoder(declared ?? 'utf-8').decode(response.body) }
     catch { throw new SafeWebFetchError('invalid_response', 'The page declares an unsupported text encoding.') }
-    const extracted = extractReadableText(raw, contentType)
+    const extracted = contentType?.toLowerCase().includes('html')
+      ? extractReadableHtml(raw, response.finalUrl)
+      : { text: normalizeWhitespace(raw) }
+    if (!extracted.text) {
+      throw new SafeWebFetchError('invalid_response', 'The page returned no readable text. Use an authorized browser for pages that require JavaScript.')
+    }
     return {
       sourceId: sourceIdFor('fetch', response.finalUrl),
       url: request.url,
@@ -378,34 +447,6 @@ function validateUrlPolicy(rawUrl: string, config: WebCapabilityConfig): { ok: t
 function domainMatches(hostname: string, domain: string): boolean {
   const normalized = domain.toLowerCase().replace(/^\./, '')
   return hostname === normalized || hostname.endsWith(`.${normalized}`)
-}
-
-function extractReadableText(raw: string, contentType: string | undefined): { title?: string; text: string } {
-  if (!contentType?.toLowerCase().includes('html')) {
-    return { text: normalizeWhitespace(raw) }
-  }
-  const title = raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
-  const withoutScripts = raw
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-  const text = withoutScripts
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
-  return {
-    ...(title ? { title: normalizeWhitespace(decodeHtmlEntities(title)) } : {}),
-    text: normalizeWhitespace(decodeHtmlEntities(text))
-  }
-}
-
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
 }
 
 function normalizeWhitespace(value: string): string {

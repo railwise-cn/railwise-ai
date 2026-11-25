@@ -8,6 +8,8 @@ A zero-dependency TypeScript library that decompresses **MicroType Express (MTX)
 
 MTX is a font compression format developed by Monotype, used inside EOT containers commonly found in older web pages and embedded in Microsoft Office documents. This library parses the EOT container, extracts the compressed data, and reconstructs a standard `.ttf` file usable with standard font APIs (e.g. the `FontFace` API). It has no dependencies and works in both the browser and Node.js.
 
+A font whose outlines are a `CFF ` or `CFF2` table (a `.otf`) is rebuilt with the `OTTO` sfnt signature rather than the TrueType one, so strict rasterisers such as Apple's CoreText (Safari) accept it.
+
 <samp>**[▶️ Live demo](https://christophervr.github.io/mtx-decompressor/)** · **[📦 npm](https://www.npmjs.com/package/mtx-decompressor)**</samp>
 
 ---
@@ -33,7 +35,7 @@ import { eotToTtf } from 'mtx-decompressor';
 
 const eotBytes: Uint8Array = /* the raw bytes of a .eot file */;
 const ttfBytes = eotToTtf(eotBytes);
-// => Uint8Array containing a valid TrueType font
+// => Uint8Array containing a valid sfnt font (TrueType, or OpenType/CFF)
 ```
 
 `eotToTtf` parses the EOT header, locates the embedded font data, and applies
@@ -65,12 +67,22 @@ apart.
 
 ### `eotToTtf(eotBytes, options?)`
 
-Parse a raw EOT container and return the reconstructed TrueType binary. Handles
+Parse a raw EOT container and return the reconstructed sfnt font binary (TrueType, or OpenType/CFF with an `OTTO` signature when the outlines are CFF). Handles
 header parsing, font-data extraction, and the container's compression/encryption
 flags. Throws `EotError` on a corrupt or truncated container.
 
 Pass `{ onWarn: (message) => console.warn(message) }` to receive diagnostics
-for recovered header-version mismatches and other non-fatal diagnostics.
+for recovered header-version mismatches and other non-fatal diagnostics, or
+`onWarning` to receive `{ code, message }` objects (`code` is an `EotErrorCode`
+such as `WarnBadVersion`, `WarnNotSfnt`, `WarnMaxpVersion` or `WarnMissingTable`).
+
+Input may be a `Uint8Array`, `ArrayBuffer` or any typed-array view. `options.maxOutputBytes`
+(default 128 MiB) caps the reconstructed font size to guard against decompression
+bombs; it also bounds the intermediate LZCOMP streams as they are decoded. In browsers, `eotToTtfAsync(blobOrFile)` accepts a `Blob`/`File` directly.
+
+Any failure surfaces as an `EotError` (with the original error as `cause` when the
+failure was unexpected). The library uses no Node-only APIs (enforced by a test) and
+is exercised on the current Node LTS in CI.
 
 ### `inspectEotProtection(eotBytes)`
 
@@ -101,7 +113,7 @@ permissions allow editing.
 
 ### `decompressMtx(fontData, options?)`
 
-Decompress an MTX-compressed font into a TrueType binary.
+Decompress an MTX-compressed font into an sfnt font binary (TrueType, or OpenType/CFF with an `OTTO` signature when the outlines are CFF).
 
 | Parameter            | Type                         | Description                                                                   |
 | -------------------- | ---------------------------- | ----------------------------------------------------------------------------- |
@@ -109,15 +121,18 @@ Decompress an MTX-compressed font into a TrueType binary.
 | `options.encrypted`  | `boolean` (default: `false`) | If `true`, XOR-decrypt with key `0x50` before decompression                   |
 | `options.compressed` | `boolean` (default: `true`)  | If `false`, skip decompression and return the (possibly decrypted) data as-is |
 | `options.onWarn`     | `(message: string) => void`  | Optional hook called for each non-fatal diagnostic; the font is still produced |
-| **Returns**          | `Uint8Array`                 | A valid TrueType (.ttf) font binary                                           |
+| `options.onWarning`  | `(w: EotWarning) => void`    | Same diagnostics with a machine-readable `code`                                |
+| `options.maxOutputBytes` | `number` (default 128 MiB) | Reject fonts that would reconstruct larger than this                         |
+| **Returns**          | `Uint8Array`                 | A valid sfnt font binary (.ttf, or .otf for CFF)                                     |
 
 ### `decompressEotFont(fontData, compressed, encrypted)`
 
-Convenience wrapper around `decompressMtx` taking explicit boolean parameters; returns a TrueType binary.
+Convenience wrapper around `decompressMtx` taking explicit boolean parameters; returns an sfnt font binary (TrueType or OpenType/CFF).
 
-### `unpackMtx(data, size)`
+### `unpackMtx(data, size, maxOutputBytes?)`
 
 Low-level: unpack an MTX blob into three LZCOMP-decompressed streams. Returns `{ streams: Uint8Array[], sizes: number[] }`.
+The optional `maxOutputBytes` caps the combined size of the three streams; it is enforced while decoding, before oversized buffers are allocated.
 
 The exported `SFNTContainer` and `SFNTTable` types describe the reconstructed font tables. `EotError` / `EotErrorCode` provide machine-discriminable error handling.
 

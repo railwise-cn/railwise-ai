@@ -5,6 +5,7 @@ import { TaskRunRepository, operationFingerprint as fp } from '../src/services/t
 import type { TaskRun } from '../src/contracts/tasks.js'
 import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
 import { EGO_TOOLS } from '../src/contracts/ego-browser.js'
+import { taskReadOnlySourceUrls } from '../src/contracts/task-source-intent.js'
 import type { ToolHostContext } from '../src/ports/tool-host.js'
 import { buildEgoBrowserToolProvider } from '../src/adapters/tool/ego-browser-tool-provider.js'
 const config={state:'installed' as const,executablePath:'/controlled/ego-browser',executableHash:'a'.repeat(64),version:'0.6.3.14',revision:0}
@@ -29,7 +30,9 @@ export async function createEgoBrowserFixture(sourceUrl='https://feed.test/list'
   if(failCode)return {ok:false,code:failCode,taskSpaceId:7,spaceName:p.spaceName,ownership,pageLabel:'p1'}
   return {ok:true,taskSpaceId:7,spaceName:p.spaceName,ownership,pageLabel:'p1',sourceUrl:url,html:p.selector?'<article><h2>测绘监测项目</h2><time>2026-11-16</time></article>':documentHtml,documentHtml,siteSignInRequired,truncated:false,snapshot:'article 测绘监测项目',...(p.selector?{selection:{selector:p.selector,matchedCount:1}}:{}),candidates:[{href:'https://feed.test/list?page=2',label:'下一页'}]}
  }
- const provider=buildEgoBrowserToolProvider({config,repository:repo,run,now:()=>clock,canFinishReadiness:async()=>({ready:finishReady,reason:'受控测试成果尚未验证'})})
+ const provider=buildEgoBrowserToolProvider({config,repository:repo,run,now:()=>clock,
+  userSourceUrls:taskId=>{const current=repo.get(taskId);return current?taskReadOnlySourceUrls(current.acceptance,repo.inputs(taskId)):[]},
+  canFinishReadiness:async()=>({ready:finishReady,reason:'受控测试成果尚未验证'})})
  const execute=async(name:typeof EGO_TOOLS[number],args:Record<string,unknown>={})=>{
   const callId='call-'+(++count),key='tool:'+grant.turnId+':'+callId,request={providerId:'ego-browser',toolName:name,callId,turnId:grant.turnId,argumentsHash:fp(args),executionGrant:grant}
   const host=repo.beginOperation({ownerId:task.id,idempotencyKey:key,kind:'tool',request,nowIso:date}).receipt

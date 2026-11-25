@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 import { browserTaskOrigins, isBrowserTask } from './browser-skill.js'
-import { explicitWebSourceOrigin, taskReadOnlySourceOrigins, isLocalHtmlCreativeRequest, requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames } from './task-source-intent.js'
+import { explicitWebSourceOrigin, explicitWebSourceUrl, taskReadOnlySourceOrigins, taskReadOnlySourceUrls, taskUserProvidedSourceUrls, isLocalHtmlCreativeRequest, requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames } from './task-source-intent.js'
+import type { TaskInput } from './tasks.js'
 
 const credentialedSource = new URL('https://example.test/path')
 credentialedSource.username = 'fixture-user'
@@ -61,12 +62,39 @@ it.each([
 })
 
 it('grants read-only network scope only to the task sources the user supplied', () => {
+  const inputs: Array<Pick<TaskInput, 'kind' | 'sourceId' | 'text'>> = [
+    { kind: 'supplement', text: 'www.railwise.cn' },
+    { kind: 'supplement', text: 'https://answer.example/path?query=hidden' },
+    { kind: 'supplement', text: 'see also https://other.example' },
+    { kind: 'supplement', sourceId: 'source-event-1', text: 'https://ignored.example' },
+    { kind: 'user_answer', sourceId: 'request-1', text: JSON.stringify({
+      request: 'What source should I use?',
+      resolution: { status: 'submitted', answers: [{ id: 'source', label: 'Source', value: 'https://answered.example/path' }] }
+    }) }
+  ]
   expect(taskReadOnlySourceOrigins({ requiresWebEvidence: false, requiredSourceOrigins: ['https://contract.example'] },
-    ['https://answer.example'])).toEqual([])
+    inputs)).toEqual([])
   expect(taskReadOnlySourceOrigins({ requiresWebEvidence: true, requiredSourceOrigins: ['https://contract.example'] },
-    ['www.railwise.cn', 'https://answer.example/path?query=hidden', 'see also https://other.example'])).toEqual([
-    'https://contract.example', 'https://www.railwise.cn', 'https://answer.example'
+    inputs)).toEqual([
+      'https://contract.example', 'https://www.railwise.cn', 'https://answer.example', 'https://answered.example'
   ])
+  expect(taskReadOnlySourceUrls({ requiresWebEvidence: true }, inputs)).toEqual([
+    'https://www.railwise.cn/', 'https://answer.example/path?query=hidden', 'https://answered.example/path'
+  ])
+  expect(taskReadOnlySourceUrls({ requiresWebEvidence: false }, inputs)).toEqual([])
+  expect(taskUserProvidedSourceUrls('Create a report', inputs)).toEqual([
+    'https://www.railwise.cn/', 'https://answer.example/path?query=hidden', 'https://other.example/', 'https://answered.example/path'
+  ])
+})
+
+it('normalizes a direct website answer to an exact URL while rejecting surrounding instructions', () => {
+  expect(explicitWebSourceUrl('www.railwise.cn')).toBe('https://www.railwise.cn/')
+  expect(explicitWebSourceUrl('https://railwise.cn/about?from=chat')).toBe('https://railwise.cn/about?from=chat')
+  expect(explicitWebSourceUrl('Use this website https://railwise.cn')).toBeUndefined()
+  const credentialUrl = new URL('https://railwise.cn/')
+  credentialUrl.username = 'qa-user'
+  credentialUrl.password = 'test-only'
+  expect(explicitWebSourceUrl(credentialUrl.toString())).toBeUndefined()
 })
 
 it('keeps an explicit BrowserSkill connection request while not turning local rendering into source research', () => {

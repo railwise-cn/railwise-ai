@@ -3,7 +3,7 @@ const { join, resolve, sep } = require('node:path')
 const asar = require('@electron/asar')
 const { validateMermaidInputs, VERSIONS, sha256 } = require('./build-markdown-rendering.cjs')
 
-const PACKAGES = { katex: '0.16.46', mermaid: '11.16.1', 'markdown-it-footnote': '4.0.0' }
+const PACKAGES = { katex: '0.19.1', mermaid: '11.16.1', 'markdown-it-footnote': '4.0.0' }
 const ASSETS = [
   'node_modules/katex/dist/katex.min.css',
   'node_modules/katex/dist/katex.js',

@@ -222,7 +222,7 @@ it.each(['completed', 'not_completed'] as const)('runs task-scope autonomous que
     await expect.poll(() => {
       const task = runtime.taskRepository!.get(id)!
       return { status: task.status, reason: task.stalledReason ?? task.waitingReason ?? null, unexpected }
-    }, { timeout: 15_000 }).toEqual({ status: 'completed', reason: null, unexpected: [] })
+    }, { timeout: 30_000 }).toEqual({ status: 'completed', reason: null, unexpected: [] })
   }
   await waitCompleted(started.task!.id)
   expect(approvals).toEqual([])

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -199,6 +199,57 @@ describe('ppt_master built-in tool', () => {
       exists: false,
       installCommand: expect.stringContaining('python3 -m venv')
     })
+  })
+
+  it.skipIf(process.platform === 'win32')('runs only the fixed bundled attribution guard without asking for shell access', async () => {
+    const skillRoot = join(workspace, 'skill')
+    const guardPath = join(skillRoot, 'scripts', 'attribution_guard.py')
+    const pythonPath = join(workspace, 'managed-python')
+    await mkdir(join(skillRoot, 'scripts'), { recursive: true })
+    await writeFile(guardPath, '# fixed attribution guard marker\n', 'utf8')
+    await writeFile(pythonPath, `#!/usr/bin/env node
+const fs = require('node:fs')
+const path = require('node:path')
+const script = process.argv[2]
+if (process.argv.length !== 3 || path.resolve(script) !== path.resolve(process.cwd(), 'scripts/attribution_guard.py')) process.exit(2)
+if (!fs.readFileSync(script, 'utf8').includes('fixed attribution guard marker')) process.exit(3)
+`, 'utf8')
+    await chmod(pythonPath, 0o755)
+
+    const tool = createPptMasterEnvLocalTool({ pythonPath, skillRoot })
+    const host = new LocalToolHost({ tools: [tool] })
+    const result = await host.execute(
+      { callId: 'call_ppt_integrity', toolName: 'ppt_master_env', arguments: { action: 'verify_integrity' } },
+      buildContext(workspace)
+    )
+
+    expect(result.item.kind).toBe('tool_result')
+    if (result.item.kind !== 'tool_result') throw new Error('expected tool_result')
+    expect(result.item.isError).not.toBe(true)
+    expect(result.item.output).toEqual({ verified: true, skillId: 'ppt-master' })
+    expect(tool.inputSchema).toMatchObject({ additionalProperties: false, properties: { action: { enum: ['inspect', 'verify_integrity'] } } })
+  })
+
+  it('rejects an attribution guard that resolves outside the bundled skill directory', async () => {
+    const skillRoot = join(workspace, 'skill')
+    const guardPath = join(skillRoot, 'scripts', 'attribution_guard.py')
+    const outsideDirectory = join(workspace, 'outside-scripts')
+    await mkdir(skillRoot, { recursive: true })
+    await mkdir(outsideDirectory, { recursive: true })
+    await writeFile(join(outsideDirectory, 'attribution_guard.py'), '# outside guard\n', 'utf8')
+    await symlink(outsideDirectory, join(skillRoot, 'scripts'), 'dir')
+
+    const tool = createPptMasterEnvLocalTool({ pythonPath: join(workspace, 'unused-python'), skillRoot })
+    const host = new LocalToolHost({ tools: [tool] })
+    const result = await host.execute(
+      { callId: 'call_ppt_integrity_escape', toolName: 'ppt_master_env', arguments: { action: 'verify_integrity' } },
+      buildContext(workspace)
+    )
+
+    expect(result.item.kind).toBe('tool_result')
+    if (result.item.kind !== 'tool_result') throw new Error('expected tool_result')
+    expect(result.item.isError).toBe(true)
+    expect(result.item.output).toMatchObject({ verified: false, reason: 'integrity_guard_outside_skill' })
   })
 
   it('rejects output paths that escape the workspace', async () => {

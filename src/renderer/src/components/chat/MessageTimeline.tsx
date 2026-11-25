@@ -10,6 +10,7 @@ import { useTimelineScroll } from './use-timeline-scroll'
 import { deriveTurnSections } from './derive-turn-sections'
 import { MessageTimelineEmptyHero, ThreadForkBanner, ThreadForkPoint } from './message-timeline-empty'
 import { GeneratedFilesPanel, MessageBubble } from './message-timeline-bubbles'
+import { sourcesForAssistantMessages } from './ConversationSources'
 import { ReviewPlanCard, ReviewSummaryCard, TurnChangeSummary, WorkMetaRow } from './message-timeline-cards'
 import { ProcessSectionRow, groupProcessSections } from './message-timeline-process'
 import { AnimatedWorkLogo } from './AnimatedWorkLogo'
@@ -428,6 +429,10 @@ function MessageTurn({
   }
   orderedMessages.push(...visibleMessages.values())
   const showingPendingControl = shownInlineControls.some(isPendingProcessControl)
+  const conversationSources = useMemo(
+    () => sourcesForAssistantMessages(turn.blocks),
+    [turn.blocks]
+  )
   const restoredWaiting = inlineControls.some(block => block.kind === 'approval' && block.status === 'pending') ? 'waiting_approval'
     : inlineControls.some(block => block.kind === 'user_input' && block.status === 'pending') ? 'waiting_user' : undefined
   const semanticProgress = useMemo(
@@ -479,6 +484,9 @@ function MessageTurn({
       {orderedMessages.map(block => (
         <MessageBubble key={block.id} block={block} nested={isInlineProcessControl(block)}
           professionalSurface={professionalSurface} replyInComposer={block.id === replyQuestionId}
+          sources={block.kind === 'assistant' && !professionalSurface
+            ? conversationSources.byAssistantId.get(block.id) ?? (block.id === 'live-assistant' ? conversationSources.pendingSources : undefined)
+            : undefined}
           taskPausedQuestion={block.kind === 'user_input' && pausedTaskQuestionRequestIds?.has(block.requestId)} />
       ))}
 

@@ -29,6 +29,12 @@ test('Mac PPT receipts retain the last chat journey stage when CDP stalls', asyn
   assert.match(runner, /receipt\.stageHistory\.push\(\{ stage, at: new Date\(\)\.toISOString\(\) \}\)/)
   assert.match(runner, /stage: receipt\.lastStage/)
   for (const stage of [
+    'create-new-conversation',
+    'enter-ppt-master-search',
+    'select-ppt-master',
+    'verify-ppt-master-selection',
+    'enter-ppt-task-prompt',
+    'send-ppt-task-prompt',
     'wait-for-source-question-in-original-conversation',
     'submit-website-address-in-original-conversation',
     'wait-for-original-task-completion',
@@ -48,6 +54,25 @@ test('Mac PPT receipts retain the last chat journey stage when CDP stalls', asyn
   assert.match(nativeOpenObserver, /readArtifactOpenFailure\(cdp\)/, 'The observer should read visible failure state after the original UI click')
   assert.doesNotMatch(nativeOpenObserver, /openTaskArtifact\(|openWorkspaceFile\(/,
     'The observer must not invoke the same open IPC a second time')
+})
+
+test('new-conversation PPT entry accepts its workspace-specific placeholder', async () => {
+  const journey = await readFile(journeySourcePath, 'utf8')
+  assert.ok(journey.includes("const composer = '.ds-chat-composer-dock textarea:not(:disabled)'"))
+  assert.doesNotMatch(journey, /const composer = '[^']*placeholder="向智能体提问/)
+})
+
+test('incomplete PPT tasks retain only the sanitized runtime diagnostics', async () => {
+  const journey = await readFile(journeySourcePath, 'utf8')
+  const admissionDiagnostics = journey.slice(journey.indexOf('async function readWebPptAdmissionDiagnostics'),
+    journey.indexOf('\n}\n\nasync function readWebPptReplyState'))
+  assert.match(journey, /readWebPptTaskDiagnostics\(cdp, journey\.taskId, journey\.executionThreadId\)[\s\S]*?webPptDiagnostics: diagnostics/)
+  assert.match(journey, /catch \{[\s\S]*?Timed out or blocked waiting for the original task state/)
+  assert.match(journey, /readWebPptAdmissionDiagnostics\(cdp, priorThreads\)[\s\S]*?Timed out waiting for the source question/)
+  assert.match(admissionDiagnostics, /activeSkillIds: turn\.activeSkillIds, items: turn\.items\.map\(item => \(\{ kind: item\.kind, toolName: item\.toolName/)
+  assert.match(admissionDiagnostics, /executionThreads: executionThreads\.map\(thread => \(\{ id: thread\.id, turns: thread\.turns/)
+  assert.match(admissionDiagnostics, /activeTurnId: task\.activeTurnId, threadId: task\.threadId/)
+  assert.doesNotMatch(admissionDiagnostics, /toolCallArguments|requestHeaders|apiKey|item\.content|prompt|arguments/)
 })
 
 test('Mac document-window observations retain the app and title for every visible app window', () => {
