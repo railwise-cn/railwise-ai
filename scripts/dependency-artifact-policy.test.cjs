@@ -6,6 +6,7 @@ const { join } = require('node:path')
 const { minimatch } = require('minimatch')
 const asar = require('@electron/asar')
 const config = require('../electron-builder.cjs')
+const afterPack = require('./after-pack.cjs')
 const { archiveDependencyArtifacts, verifyBundledDependencyArtifacts } = require('./dependency-artifact-policy.cjs')
 
 function excluded(path, filters) {
@@ -52,6 +53,26 @@ test('packaged Univer resources include the MIT license text for both icon packa
   assert.ok(resources, 'Univer license files must be copied as packaged extra resources')
   assert.equal(resources.to, 'third-party/builtin-integrations')
   assert.ok(resources.filter.includes('**/*'))
+})
+
+test('afterPack requires byte-identical Univer license resources on macOS and Windows', () => {
+  const root = mkdtempSync(join(tmpdir(), 'workwise-univer-licenses-'))
+  try {
+    for (const platform of ['darwin', 'win32']) {
+      const appOutDir = join(root, platform)
+      const context = { appOutDir, electronPlatformName: platform, packager: { appInfo: { productFilename: 'RailWise AI' } } }
+      const resources = afterPack._internals.packedResourcesDir(context)
+      const source = join(__dirname, '../src/asset/builtin-integrations/univer')
+      const target = join(resources, 'third-party/builtin-integrations/univer')
+      mkdirSync(target, { recursive: true })
+      for (const name of ['LICENSE-DreamNum-MIT', 'LICENSE-RxJS', 'LICENSE-Univer', 'NOTICE.txt']) {
+        writeFileSync(join(target, name), readFileSync(join(source, name)))
+      }
+      assert.deepEqual(afterPack._internals.validateBundledUniverLicenseResources(context), { files: 4 })
+      writeFileSync(join(target, 'LICENSE-DreamNum-MIT'), 'altered license')
+      assert.throws(() => afterPack._internals.validateBundledUniverLicenseResources(context), /differs from source/)
+    }
+  } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
 test('package gate detects artifacts in the real ASAR and managed dependency layouts', async () => {
