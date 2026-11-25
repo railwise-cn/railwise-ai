@@ -481,9 +481,12 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
     assert.match(proof.source.sha256, /^[a-f0-9]{64}$/)
     assert.ok(proof.source.bytes > 0)
     if (requireLiveWebPpt) {
-      assert.ok(report.webPptBrowser?.browserInstanceId, 'The live Windows journey must connect its isolated Chrome BrowserSkill')
-      assert.equal(proof.source.tool, 'browser-skill', 'The connected browser must read the site before web_fetch')
-      assert.equal(proof.sourceProvider, 'browser-skill')
+      assert.ok(['fetch', 'browser-skill', 'ego-browser'].includes(proof.sourceProvider), 'The live journey must identify the verified source provider')
+      if (proof.sourceProvider === 'browser-skill') {
+        assert.equal(proof.source.tool, 'browser-skill')
+        assert.ok(report.webPptBrowser?.browserInstanceId, 'A browser read must be bound to the isolated connected Chrome')
+      } else if (proof.sourceProvider === 'fetch') assert.equal(proof.source.tool, 'web_fetch')
+      else assert.equal(proof.source.tool, 'ego-browser')
     }
     validateWebPptTurnIdentity(proof)
     assert.equal(proof.artifact.nativeEditableText, true)
@@ -2709,6 +2712,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   }
   const webPpt = webPptSmoke ? createWebPptJourney({
     workspace, live: webPptLive, fallback: fallbackSource, parseToolOutput: parseFixtureToolOutput,
+    skillGuardPath: join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', 'ppt-master', 'scripts', 'attribution_guard.py'),
     sidecar: join(dirname(executable), 'resources', 'app.asar.unpacked', 'sidecars', 'markitdown', 'workwise-markitdown.exe')
   }) : undefined
   const taskModel = video ?? (taskSmoke || marketplaceModule || composerSmoke || (webPpt && !webPptLive) ? await startWindowsTaskModelFixture({
@@ -2830,14 +2834,6 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
       }
       if (fallbackSource) {
         realBrowser = await startRealBrowserSmoke({ cdp, root, environment, fixtureUrl: fallbackSource.url })
-        report.webPptBrowser = realBrowser.evidence
-        await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/tools','GET').then(response=>{
-          if(!response.ok)return false;
-          return JSON.parse(response.body).providers.some(provider=>provider.id==='browser-skill'&&provider.enabled&&provider.available);
-        })`, 'the installed Runtime to receive the selected BrowserSkill binding')
-      } else if (webPptLive) {
-        realBrowser = await startRealBrowserSmoke({ cdp, root, environment, fixtureUrl: webPptSourceUrl,
-          interaction: 'observe', extraOrigins: ['https://so.qq.com'] })
         report.webPptBrowser = realBrowser.evidence
         await cdp.wait(`window.workwise.runtimeRequest('/v1/runtime/tools','GET').then(response=>{
           if(!response.ok)return false;

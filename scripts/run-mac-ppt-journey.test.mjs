@@ -67,7 +67,7 @@ test('incomplete PPT tasks retain only the sanitized runtime diagnostics', async
   const admissionDiagnostics = journey.slice(journey.indexOf('async function readWebPptAdmissionDiagnostics'),
     journey.indexOf('\n}\n\nasync function readWebPptReplyState'))
   assert.match(journey, /readWebPptTaskDiagnostics\(cdp, journey\.taskId, journey\.executionThreadId\)[\s\S]*?webPptDiagnostics: diagnostics/)
-  assert.match(journey, /catch \{[\s\S]*?Timed out waiting for the original task state/)
+  assert.match(journey, /catch \{[\s\S]*?Timed out or blocked waiting for the original task state/)
   assert.match(journey, /readWebPptAdmissionDiagnostics\(cdp, priorThreads\)[\s\S]*?Timed out waiting for the source question/)
   assert.match(admissionDiagnostics, /activeSkillIds: turn\.activeSkillIds, items: turn\.items\.map\(item => \(\{ kind: item\.kind, toolName: item\.toolName/)
   assert.match(admissionDiagnostics, /executionThreads: executionThreads\.map\(thread => \(\{ id: thread\.id, turns: thread\.turns/)

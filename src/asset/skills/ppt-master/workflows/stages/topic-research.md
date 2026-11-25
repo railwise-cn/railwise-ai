@@ -49,7 +49,7 @@ Default bundles only genuinely missing scope or research-boundary decisions into
 
 ## Step 2: Gather factual sources
 
-Use the web search and fetch tools available in the research context; fetch with `--no-images` so no companion image directory is imported as content. An isolated worker without web tools returns `blocked: web-tools-unavailable`. With no usable search/fetch context, pause and ask the user for authoritative URLs covering the gaps, then fetch each with:
+Use the web search and fetch tools available in the research context; fetch with `--no-images` so no companion image directory is imported as content. Search results are leads, not evidence: open a page and verify its contents before using it. If direct reading fails, try the connected Ego or BrowserSkill session, record only content actually read, and avoid repeating the same failed fetch. An isolated worker without web tools returns `blocked: web-tools-unavailable`. With no usable search/fetch context, pause and ask the user for authoritative URLs covering the gaps, then fetch each with:
 
 ```bash
 python3 ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL> -o projects/<research_slug>_web_sources/<source_slug>.md --no-images

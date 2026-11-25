@@ -9,7 +9,7 @@ import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 export const webPptSourceHost = 'www.railwise.cn'
 export const webPptSourceUrl = `https://${webPptSourceHost}/`
 export const webPptQuestion = '请提供制作 PPT 所需的官网网址。'
-export const webPptJourneyPrompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和安全监测资料制作，并在演示文稿内列出来源。'
+export const webPptJourneyPrompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和安全监测资料制作，并在演示文稿内列出来源。网页读取失败时不要重复相同请求；如有已连接的浏览器技能则用它读取，否则说明具体原因并停止。'
 const project = 'deck'
 const filename = 'website.pptx'
 const artifactPath = `${project}/${filename}`
@@ -189,10 +189,27 @@ export function inspectLiveWebPptApproval(attention, { taskId, workspace, skillG
     commandSha256: field('Command SHA256'), workspaceSha256: field('Workspace SHA256'), requestHash: approval.requestHash }
 }
 
-async function resolveLiveWebPptApproval(cdp, taskId, { workspace, skillGuardPath, onStage }) {
+export function inspectLiveWebPptApprovalResolution(inputs, attention) {
+  assert.ok(Array.isArray(inputs), 'The actual task inputs API must return an array')
+  const rows = inputs.filter(input => input.kind === 'approval_resolution' && input.sourceId === attention.requestId)
+  assert.ok(rows.length <= 1, 'The reviewed approval must have at most one durable decision')
+  if (!rows.length) return undefined
+  assert.equal(rows[0].taskId, attention.taskId)
+  // TaskInput stores the durable human-gate envelope in text, not a top-level
+  // resolution property. Bind the read-back to the exact request the UI showed.
+  const saved = JSON.parse(rows[0].text)
+  assert.equal(saved.request, attention.payload.approval.summary)
+  assert.equal(saved.resolution?.decision, 'allow')
+  return { status: 'allowed', inputId: rows[0].id }
+}
+
+async function resolveLiveWebPptApproval(cdp, taskId, { workspace, skillGuardPath, onStage, reviewedScopes }) {
+  await onStage?.('review-pending-task-approval')
   const pending = await cdp.evaluate(`${readRuntime('/v1/inbox')}.then(items=>items.filter(item=>item.taskId===${literal(taskId)} && item.kind==='approval' && item.status==='pending'))`)
   assert.equal(pending.length, 1, 'Only one exact approval may be pending for the isolated website-to-PPT task')
   const receipt = inspectLiveWebPptApproval(pending[0], { taskId, workspace, skillGuardPath })
+  assert.ok(!reviewedScopes.has(receipt.scope), 'The same bounded action must not require repeated approval')
+  reviewedScopes.add(receipt.scope)
   const stage = receipt.tool === 'web_fetch' ? 'approve-read-only-official-site' : 'approve-packaged-attribution-check'
   await onStage?.(stage)
   const button = 'section[aria-label="任务"] button'
@@ -200,26 +217,32 @@ async function resolveLiveWebPptApproval(cdp, taskId, { workspace, skillGuardPat
     node.getClientRects().length && !node.disabled && node.textContent.trim()==='允许此操作');return buttons.length===1;})()`,
     'the single visible approval control for the isolated task', 30_000)
   await cdp.click(button, '允许此操作')
-  await cdp.wait(`${readRuntime('/v1/tasks/' + encodeURIComponent(taskId) + '/inputs')}.then(inputs=>{
-    const rows=inputs.filter(input=>input.kind==='approval_resolution' && input.sourceId===${literal(receipt.id)});
-    return rows.length===1 && rows[0].resolution?.decision==='allow' ? true : null;
-  })`, 'the exact approval decision to be recorded once', 30_000)
-  return { ...receipt, decision: 'allow', method: 'installed-task-card' }
+  await onStage?.('verify-single-durable-approval-decision')
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const inputs = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/inputs`))
+    const resolution = inspectLiveWebPptApprovalResolution(inputs, pending[0])
+    if (resolution) return { ...receipt, decision: 'allow', method: 'installed-task-card', inputId: resolution.inputId }
+    await new Promise(resolve => setTimeout(resolve, 200))
+  }
+  throw new Error('The reviewed approval did not produce one durable decision')
 }
 
 async function waitForWebPptTask(cdp, taskId, options) {
   const deadline = Date.now() + options.timeoutMs
   const resolutions = []
   const visited = new Set()
+  const reviewedScopes = new Set()
   while (Date.now() < deadline) {
     const task = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`))
     if (['completed', 'failed', 'stalled', 'cancelled', 'waiting_user', 'paused'].includes(task.status)) return { task, resolutions }
     if (task.status === 'waiting_approval') {
       assert.equal(options.live, true, 'Controlled journeys do not approve real task requests')
-      const receipt = await resolveLiveWebPptApproval(cdp, taskId, options)
+      const receipt = await resolveLiveWebPptApproval(cdp, taskId, { ...options, reviewedScopes })
       assert.ok(!visited.has(receipt.id), 'An approval may be resolved only once')
       visited.add(receipt.id)
       resolutions.push(receipt)
+      await options.onStage?.('wait-for-original-task-completion-after-approval')
       continue
     }
     await new Promise(resolve => setTimeout(resolve, 200))

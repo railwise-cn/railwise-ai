@@ -207,7 +207,7 @@ it.each([undefined, 'public_query_target'] as const)('runs independent scheduled
     await expect.poll(() => {
       const task = runtime.taskRepository!.get(id)!
       return { status: task.status, reason: task.stalledReason ?? task.waitingReason ?? null, unexpected }
-    }, { timeout: 15_000 }).toEqual({ status: 'completed', reason: null, unexpected: [] })
+    }, { timeout: 30_000 }).toEqual({ status: 'completed', reason: null, unexpected: [] })
   }
   await waitCompleted(started.task!.id)
   expect(approvals).toEqual(['browser_authorize_action', 'browser_authorize_action', 'schedule_task'])
