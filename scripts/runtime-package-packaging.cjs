@@ -142,6 +142,10 @@ function canvasCallerPackageName(path) {
   return first.startsWith('@') ? `${first}/${segments[nodeModulesIndex + 2] || ''}` : first
 }
 
+function normalizeAsarPath(path) {
+  return path.replaceAll('\\', '/').replace(/^\/+/, '')
+}
+
 function hasCanvasRuntimeDependency(metadata) {
   return Boolean(metadata.optionalDependencies?.[CANVAS_PACKAGE] || metadata.peerDependencies?.[CANVAS_PACKAGE])
 }
@@ -158,7 +162,7 @@ function packagedCanvasCallerManifests(packagePaths, read, lock) {
   const callers = []
   const found = new Set()
   for (const rawPath of packagePaths) {
-    const path = rawPath.replace(/^\/+/, '').replaceAll('\\', '/')
+    const path = normalizeAsarPath(rawPath)
     if (!path.startsWith('node_modules/') || !path.endsWith('/package.json')) continue
     const metadata = JSON.parse(read(path).toString('utf8'))
     if (!hasCanvasRuntimeDependency(metadata)) continue
@@ -177,7 +181,7 @@ function canvasSmokeScript(resourcesDirectory, callers, root = resolve(__dirname
   if (!Array.isArray(callers) || callers.length === 0) throw new Error('Packaged Canvas caller paths are required.')
   const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'))
   const canvasVersion = canvasLockEntry(lock, CANVAS_PACKAGE).version
-  const normalizedCallers = callers.map(path => path.replace(/^\/+/, '').replaceAll('\\', '/'))
+  const normalizedCallers = callers.map(normalizeAsarPath)
   return `
     const canvasRequire = require('node:module').createRequire
     const canvasJoin = require('node:path').join

@@ -143,6 +143,11 @@ test('canvas caller discovery reads hoisted manifests from an actual ASAR archiv
   const callers = packagedCanvasCallerManifests(asar.listPackage(archive),
     path => asar.extractFile(archive, join(...path.split('/'))), lock)
   assert.deepEqual(callers, ['node_modules/emf-converter/package.json'])
+
+  const windowsPaths = asar.listPackage(archive).map(path => `\\${path.replaceAll('/', '\\')}`)
+  const windowsCallers = packagedCanvasCallerManifests(windowsPaths,
+    path => asar.extractFile(archive, join(...path.split('/'))), lock)
+  assert.deepEqual(windowsCallers, ['node_modules/emf-converter/package.json'])
 })
 
 test('packaged canvas smoke rejects missing or unlocked caller packages', () => {
