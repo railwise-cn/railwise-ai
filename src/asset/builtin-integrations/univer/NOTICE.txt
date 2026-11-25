@@ -1,7 +1,7 @@
-RailWise AI includes the Univer Sheets open-source SDK, version 1.6.1.
+RailWise AI includes the Univer Sheets open-source SDK, version 1.6.2.
 Copyright 2023-present DreamNum Co., Ltd.
 Univer is licensed under the Apache License, Version 2.0.
-Source: https://github.com/dream-num/univer/tree/v1.6.1
+Source: https://github.com/dream-num/univer/tree/v1.6.2
 The RailWise workspace integration is maintained separately from Univer.
 
 Univer depends on RxJS 7.8.2, licensed under the Apache License, Version 2.0.

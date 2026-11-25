@@ -15,7 +15,7 @@
 
 ## 内置组件与技能更新
 
-- Univer Sheets 固定为 `1.6.1`，AG-UI 核心协议固定为 `1.0.5`。PPTX 预览器升级到 `3.80.0`，连同其 MPL-2.0 字体解压组件 `mtx-decompressor 1.9.0` 一并校验来源和许可证。KaTeX 升级到 `0.19.1`，微信适配器升级到 `2.4.10`。
+- Univer Sheets 固定为 `1.6.2`，AG-UI 核心协议固定为 `1.0.5`。PPTX 预览器升级到 `3.80.0`，连同其 MPL-2.0 字体解压组件 `mtx-decompressor 1.9.0` 一并校验来源和许可证。KaTeX 升级到 `0.19.1`，微信适配器升级到 `2.4.10`。
 - 本地文档提取更新到 MarkItDown `0.1.9`，覆盖 PDF、DOCX、PPTX 和 XLSX。PDF.js 更新到 `6.5.438`，用于 PDF 预览和文字搜索。
 - 网页与文档工具更新到 BrowserSkill CLI/扩展 `0.5.0`、Playwright MCP `0.0.86`、Playwright CLI `0.1.25`、Docling MCP `3.5.1`。Superpowers 使用 MIT `v7.0.2`；Video Shotcraft 更新到上游提交 `226813b3e2e6a0a346358210bfa0d83b24b3a8d3`，分发包保留 Apache-2.0 代码及署名记录，不包含上游演示媒体或赞助图片。Humanizer-zh 和「说人话」分别按已审计的 MIT 来源快照更新。
 - i18next、Hono 和 `@hono/node-server` 分别固定到 `26.7.2`、`4.13.21` 和 `2.1.11`，修复已知生产依赖中危项；保持现有 React 绑定兼容范围。
