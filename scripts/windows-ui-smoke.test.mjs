@@ -2336,6 +2336,17 @@ test('failure logs export only timestamps, stream, exception names and codes, ne
   assert.doesNotMatch(JSON.stringify(logs), /private|Authorization|Bearer|headers|cookie|https|body/)
 })
 
+test('all failed Windows UI journeys collect sanitized runtime state and logs, including web-only runs', () => {
+  const source = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+  const catchStart = source.indexOf('  } catch (error) {', source.indexOf('export async function runWindowsUiSmoke'))
+  const finallyStart = source.indexOf('  } finally {', catchStart)
+  assert.ok(catchStart >= 0 && finallyStart > catchStart)
+  const failurePath = source.slice(catchStart, finallyStart)
+  assert.match(failurePath, /report\.runtimeFailure = await cdp\.evaluate/)
+  assert.match(failurePath, /report\.failureLogs = await readWindowsFailureLogs\(profile, output\)/)
+  assert.ok(failurePath.indexOf('report.failureLogs =') > failurePath.lastIndexOf('if (taskSmoke)'))
+})
+
 test('manual preview failure permits later diagnostics while keeping the complete acceptance failed', async () => {
   const evidence = report()
   const observations = []
