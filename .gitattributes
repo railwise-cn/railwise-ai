@@ -2,5 +2,6 @@
 
 # Provenance hashes cover exact bytes, including the license and generated manifests.
 LICENSE text eol=lf
+src/asset/builtin-integrations/univer/** text eol=lf
 src/asset/agent-packs/metro-monitoring-agent-pack/** text=auto eol=lf
 kun/src/engineering/specialist-skill-provenance.generated.ts text eol=lf

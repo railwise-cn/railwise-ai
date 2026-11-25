@@ -89,6 +89,10 @@ describe.skipIf(process.platform === 'win32')('macOS PNG resource signing exclus
     }
     f.put('app.asar.unpacked/node_modules/better-sqlite3/package.json', Buffer.from('{}'))
     f.put('app.asar.unpacked/sidecars/markitdown/workwise-markitdown', machO, 0o755)
+    const univerSource = join(process.cwd(), 'src/asset/builtin-integrations/univer')
+    for (const name of ['LICENSE-DreamNum-MIT', 'LICENSE-RxJS', 'LICENSE-Univer', 'NOTICE.txt']) {
+      f.put(`third-party/builtin-integrations/univer/${name}`, readFileSync(join(univerSource, name)))
+    }
     const logo = f.put('app.asar.unpacked/sidecars/markitdown/_internal/ppt-master/templates/brands/中国电信/images/logo.png')
     const before = { ...f.options }
     await hook(f.context)
