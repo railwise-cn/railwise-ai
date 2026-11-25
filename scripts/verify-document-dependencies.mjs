@@ -7,18 +7,22 @@ const lock = JSON.parse(readFileSync(resolve(root, 'package-lock.json'), 'utf8')
 const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 const notices = readFileSync(resolve(root, 'sidecars/markitdown/THIRD_PARTY_NOTICES.md'), 'utf8')
 
-assert(requirements.includes('932084c88679aeda901c2903a151f3ed82f86081'), 'MarkItDown must use the audited upstream commit.')
+assert(requirements.includes('21d9c1d01ecc12538dab19811fd247ef2f96ef60'), 'MarkItDown must use the audited v0.1.9 upstream commit.')
 assert(/markitdown\[pdf,docx,pptx,xlsx\]/i.test(requirements), 'Only the required MarkItDown format extras may be installed.')
 assert(!/(?:markitdown-ocr|pymupdf|\bfitz\b|agpl)/i.test(requirements), 'MarkItDown OCR, PyMuPDF, Fitz, and AGPL dependencies are forbidden.')
-assert(lock.packages?.['node_modules/pdfjs-dist']?.version === '5.4.624', 'PDF.js must remain pinned to the audited Electron-compatible version.')
+assert(packageJson.dependencies['pdfjs-dist'] === '6.5.438' && lock.packages?.['node_modules/pdfjs-dist']?.version === '6.5.438', 'PDF.js must use the reviewed version.')
 assert(lock.packages?.['node_modules/pdfjs-dist']?.license === 'Apache-2.0', 'PDF.js license metadata must be Apache-2.0.')
+assert(packageJson.dependencies['@napi-rs/canvas'] === '1.1.0' && lock.packages?.['node_modules/@napi-rs/canvas']?.version === '1.1.0', 'PDF.js and PPTX must share the reviewed Canvas version.')
+assert(!Object.keys(lock.packages).some((name) => name.endsWith('/node_modules/@napi-rs/canvas')), 'Canvas must resolve from the application root.')
 const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies }
-for (const [name, version] of [['katex', '0.16.46'], ['mermaid', '11.16.1'], ['markdown-it-footnote', '4.0.0']]) {
+for (const [name, version] of [['katex', '0.19.1'], ['mermaid', '11.16.1'], ['markdown-it-footnote', '4.0.0']]) {
   assert(packageJson.dependencies[name] === version, `${name} must remain pinned to the reviewed document-rendering version.`)
   assert(lock.packages?.[`node_modules/${name}`]?.version === version, `${name} lockfile version must match its reviewed pin.`)
   assert(lock.packages?.[`node_modules/${name}`]?.license === 'MIT', `${name} must retain MIT license metadata.`)
 }
 assert(packageJson.overrides?.dompurify === '3.4.17', 'Offline Mermaid must use the reviewed DOMPurify override.')
+assert(packageJson.overrides?.katex === '$katex', 'All KaTeX consumers must use the reviewed root version.')
+assert(!Object.keys(lock.packages).some((name) => name.endsWith('/node_modules/katex') && name !== 'node_modules/katex'), 'Unreviewed nested KaTeX copies must not remain in the document dependency graph.')
 assert(lock.packages?.['node_modules/dompurify']?.version === '3.4.17', 'DOMPurify lockfile version must match the reviewed browser bundle.')
 assert(lock.packages?.['node_modules/dompurify']?.license === '(MPL-2.0 OR Apache-2.0)', 'DOMPurify must retain its Apache-2.0 license alternative.')
 const markdownNotices = readFileSync(resolve(root, 'src/asset/markdown-rendering/NOTICE.md'), 'utf8')

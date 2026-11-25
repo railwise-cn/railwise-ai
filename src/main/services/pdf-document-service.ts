@@ -46,7 +46,6 @@ export async function analyzePdfDocument(
     cMapPacked: true,
     standardFontDataUrl: `${join(pdfAssets, 'standard_fonts')}/`,
     useWorkerFetch: false,
-    isEvalSupported: false,
     useSystemFonts: true,
     useWasm: false,
     stopAtErrors: true,

@@ -7,7 +7,7 @@
  * @see http://www.w3.org/Submission/MTX/
  */
 
-import { EotError, EotErrorCode } from './errors';
+import { EotError, EotErrorCode, emitWarning, type EotWarning } from './errors';
 import { Stream } from './stream';
 import { TRIPLET_ENCODINGS } from './triplet-encodings';
 import { decodeHdmx } from './hdmx';
@@ -35,6 +35,12 @@ export interface SFNTTable {
 export interface SFNTContainer {
 	tables: SFNTTable[];
 	/**
+	 * sfnt version written to the offset table: `0x00010000` (TrueType
+	 * outlines), `0x4f54544f` ('OTTO', CFF outlines) or `0x74727565` ('true').
+	 * Defaults to `0x00010000` when absent.
+	 */
+	scalarType?: number;
+	/**
 	 * Legacy diagnostic field. Supported metric tables are now reconstructed
 	 * rather than dropped, so this field is no longer populated.
 	 */
@@ -48,6 +54,8 @@ export interface ParseCTFOptions {
 	 * Lets callers surface warnings without the library writing to `console`.
 	 */
 	onWarn?: (message: string) => void;
+	/** Structured variant of {@link onWarn}. */
+	onWarning?: (warning: EotWarning) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,8 +239,11 @@ function decodePushInstructions(sIn: Stream, sOut: Stream, pushCount: number): v
 		return;
 	}
 
-	// Accumulator for decoded push values (matches C: data[] array)
-	const data: number[] = [];
+	// Hop codes only ever look two values back, so track the last two decoded
+	// values (C keeps the whole data[] array) plus how many have been decoded.
+	let decoded = 0;
+	let last = 0;
+	let secondLast = 0;
 	let remaining = pushCount;
 
 	// Current run state for flushing PUSHB/PUSHW instructions
@@ -271,7 +282,9 @@ function decodePushInstructions(sIn: Stream, sOut: Stream, pushCount: number): v
 
 	/** Add a single value to the run, flushing on type change or overflow. */
 	function put(v: number): void {
-		data.push(v);
+		secondLast = last;
+		last = v;
+		decoded++;
 		const needsShort = v < 0 || v > 255;
 		if (runValues.length > 0 && needsShort !== isShort) {
 			flush();
@@ -291,18 +304,18 @@ function decodePushInstructions(sIn: Stream, sOut: Stream, pushCount: number): v
 
 		if (code === 0xfb) {
 			// hop3: A B 0xFB C → A B A C A
-			// A is data[dataIndex - 2] (the value 2 back in decoded output).
+			// A is the value 2 back in the decoded output.
 			// 0xFB is unambiguously a hop marker here; if the surrounding data
 			// can't satisfy the expansion the stream is corrupt (libeot returns
 			// EOT_CORRUPT_HOPCODE_DATA rather than treating 0xFB as a literal).
-			if (remaining < 3 || data.length < 2) {
+			if (remaining < 3 || decoded < 2) {
 				throw new EotError(
 					EotErrorCode.CorruptHopcodeData,
-					`corrupt hop3 (0xFB) push data: remaining=${remaining}, decoded=${data.length}`,
+					`corrupt hop3 (0xFB) push data: remaining=${remaining}, decoded=${decoded}`,
 				);
 			}
 			sIn.readU8(); // consume the 0xFB
-			const prev = data[data.length - 2];
+			const prev = secondLast;
 			put(prev);
 			const val = read255Short(sIn);
 			put(val);
@@ -310,14 +323,14 @@ function decodePushInstructions(sIn: Stream, sOut: Stream, pushCount: number): v
 			remaining -= 3;
 		} else if (code === 0xfc) {
 			// hop4: A B 0xFC C D → A B A C A D A
-			if (remaining < 5 || data.length < 2) {
+			if (remaining < 5 || decoded < 2) {
 				throw new EotError(
 					EotErrorCode.CorruptHopcodeData,
-					`corrupt hop4 (0xFC) push data: remaining=${remaining}, decoded=${data.length}`,
+					`corrupt hop4 (0xFC) push data: remaining=${remaining}, decoded=${decoded}`,
 				);
 			}
 			sIn.readU8(); // consume the 0xFC
-			const prev = data[data.length - 2];
+			const prev = secondLast;
 			put(prev);
 			const c = read255Short(sIn);
 			put(c);
@@ -456,31 +469,48 @@ function decodeSimpleGlyph(
 	// --- Read per-point flag bytes from the glyph stream -------------------
 	// Per the W3C MTX spec and the libeot reference (parseCTF.c), flags
 	// are read in a first pass, then coordinate data in a second pass.
-	const flagBytes = new Uint8Array(totalPoints);
-	for (let i = 0; i < totalPoints; i++) {
-		flagBytes[i] = sGlyph.readU8();
+	// Each point needs at least one flag byte, so a larger count is corrupt (and
+	// would otherwise drive multi-gigabyte allocations from a tiny input).
+	if (totalPoints > 0xffff || totalPoints > sGlyph.size - sGlyph.pos) {
+		throw new EotError(EotErrorCode.CorruptFile, `glyph declares implausible point count ${totalPoints}`);
 	}
+	const flagBytes = sGlyph.buf.subarray(sGlyph.pos, sGlyph.pos + totalPoints);
+	sGlyph.pos += totalPoints;
 
 	// --- Decode coordinate deltas using triplet encodings ------------------
 	const xDeltas = new Int16Array(totalPoints);
 	const yDeltas = new Int16Array(totalPoints);
-	const onCurve = new Uint8Array(totalPoints);
 
 	let cumulativeX = 0;
 	let cumulativeY = 0;
 
+	// Triplet payloads are read straight from the glyph buffer. Every encoding
+	// satisfies `xBits + yBits == 8 * (byteCount - 1)`, so a point's X and Y
+	// fields always fill whole bytes: read them as one big-endian integer and
+	// split it, leaving the stream byte-aligned (equivalent to two `readNBits`).
+	const gBuf = sGlyph.buf;
+	const gSize = sGlyph.size;
+	let gPos = sGlyph.pos;
+
 	for (let i = 0; i < totalPoints; i++) {
-		const flag = flagBytes[i];
-		onCurve[i] = flag & 0x80 ? 0 : 1; // C reference: !(flags[i] & 0x80)
+		const enc = TRIPLET_ENCODINGS[flagBytes[i] & 0x7f];
+		const n = enc.byteCount - 1;
+		if (gPos + n > gSize) {
+			sGlyph.pos = gPos;
+			throw new EotError(EotErrorCode.InsufficientBytes, 'Stream: not enough data for bit read');
+		}
+		// Up to 4 bytes (16-bit X + 16-bit Y); `>>>` treats a value that
+		// overflowed into the int32 sign bit as unsigned.
+		let raw = 0;
+		for (let k = 0; k < n; k++) {
+			raw = (raw << 8) | gBuf[gPos++];
+		}
+		const yBits = enc.yBits;
+		const rawX = raw >>> yBits;
+		const rawY = raw & ((1 << yBits) - 1);
 
-		const enc = TRIPLET_ENCODINGS[flag & 0x7f];
-
-		// Read raw X and Y bit-fields directly from the glyph stream.
-		// `xBits + yBits == 8 * (byteCount - 1)` for every triplet entry, so
-		// the stream remains byte-aligned after both reads — no temporary
-		// allocation needed (was: per-point Uint8Array + Stream, perf hot path).
-		let dx = sGlyph.readNBits(enc.xBits) + enc.deltaX;
-		let dy = sGlyph.readNBits(enc.yBits) + enc.deltaY;
+		let dx = rawX + enc.deltaX;
+		let dy = rawY + enc.deltaY;
 
 		// Apply sign
 		if (enc.xSign !== 0) {
@@ -518,6 +548,7 @@ function decodeSimpleGlyph(
 			}
 		}
 	}
+	sGlyph.pos = gPos;
 
 	// --- Hinting instructions ----------------------------------------------
 	// Reserve space to write instructionLength (U16) later
@@ -531,6 +562,9 @@ function decodeSimpleGlyph(
 	// Copy raw hinting code from stream[2]
 	const codeSize = read255UShort(sGlyph);
 	if (codeSize > 0) {
+		// maxp limits are frequently understated in real fonts, so never rely on
+		// the per-glyph reservation made by the caller.
+		out.reserve(out.pos + codeSize);
 		streams[2].copyTo(out, codeSize);
 	}
 
@@ -541,36 +575,45 @@ function decodeSimpleGlyph(
 	out.writeU16(unpackedCodeSize);
 	out.seekAbsolute(savedPos);
 
-	// --- Write TrueType flag bytes -----------------------------------------
+	// --- Write TrueType flags, then X and Y coordinates --------------------
+	// Worst case is 1 flag byte + 2 bytes per axis per point. Reserve once and
+	// write straight into the buffer instead of per-byte Stream calls.
+	out.reserve(out.pos + 5 * totalPoints);
+	const oBuf = out.buf;
+	let o = out.pos;
+
 	for (let i = 0; i < totalPoints; i++) {
-		const f = makeGlyphFlags(xDeltas[i], yDeltas[i], onCurve[i] !== 0, i === 0);
-		out.writeU8(f);
+		const onCurve = (flagBytes[i] & 0x80) === 0; // C reference: !(flags[i] & 0x80)
+		oBuf[o++] = makeGlyphFlags(xDeltas[i], yDeltas[i], onCurve, i === 0);
 	}
 
-	// --- Write X coordinates -----------------------------------------------
 	for (let i = 0; i < totalPoints; i++) {
 		const x = xDeltas[i];
 		if (i === 0 || x !== 0) {
-			const absX = Math.abs(x);
-			if (absX < 256) {
-				out.writeU8(absX);
+			if (x > -256 && x < 256) {
+				oBuf[o++] = x < 0 ? -x : x;
 			} else {
-				out.writeS16(x);
+				oBuf[o++] = (x >> 8) & 0xff;
+				oBuf[o++] = x & 0xff;
 			}
 		}
 	}
 
-	// --- Write Y coordinates -----------------------------------------------
 	for (let i = 0; i < totalPoints; i++) {
 		const y = yDeltas[i];
 		if (i === 0 || y !== 0) {
-			const absY = Math.abs(y);
-			if (absY < 256) {
-				out.writeU8(absY);
+			if (y > -256 && y < 256) {
+				oBuf[o++] = y < 0 ? -y : y;
 			} else {
-				out.writeS16(y);
+				oBuf[o++] = (y >> 8) & 0xff;
+				oBuf[o++] = y & 0xff;
 			}
 		}
+	}
+
+	out.pos = o;
+	if (o > out.size) {
+		out.size = o;
 	}
 
 	// --- Write bbox if it was computed -------------------------------------
@@ -624,6 +667,7 @@ function decodeCompositeGlyph(streams: Stream[], out: Stream): void {
 		} else {
 			argBytes = 2; // two S8 values packed into 2 bytes
 		}
+		out.reserve(out.pos + argBytes + 8);
 		sGlyph.copyTo(out, argBytes);
 
 		// Determine the number of transformation bytes
@@ -653,6 +697,7 @@ function decodeCompositeGlyph(streams: Stream[], out: Stream): void {
 		// Copy raw hinting code from stream[2]
 		const codeSize = read255UShort(sGlyph);
 		if (codeSize > 0) {
+			out.reserve(out.pos + codeSize);
 			streams[2].copyTo(out, codeSize);
 		}
 
@@ -744,8 +789,16 @@ function populateGlyfAndLoca(
 		4 * maxpData.maxComponentElements * 6 + // composite components
 		256; // safety margin
 
+	// Initial reservation sized from the input actually present rather than
+	// from `numGlyphs` alone (a hostile maxp could otherwise force a large
+	// up-front allocation); the stream grows on demand if this falls short.
 	const outStream = new Stream(null, 0);
-	outStream.reserve(numGlyphs * 256); // rough initial reservation
+	outStream.reserve(
+		Math.min(
+			numGlyphs * 256,
+			2 * (streams[0].size - streams[0].pos) + 4 * streams[1].size + streams[2].size + 2 * numGlyphs + 256,
+		),
+	);
 
 	// Collect byte offsets first. A short loca can only represent offsets up
 	// to 131070 bytes (stored as offset / 2), so its format may need promotion
@@ -786,10 +839,11 @@ function populateGlyfAndLoca(
 	}
 
 	// Store results
-	glyf.buf = outStream.toUint8Array();
+	// Hand out views of the streams' buffers instead of copying them.
+	glyf.buf = outStream.buf.subarray(0, outStream.size);
 	glyf.bufSize = glyf.buf.length;
 
-	loca.buf = locaStream.toUint8Array();
+	loca.buf = locaStream.buf.subarray(0, locaStream.size);
 	loca.bufSize = loca.buf.length;
 }
 
@@ -808,7 +862,18 @@ interface HeadData {
  *
  * `indexToLocFormat` is at byte offset 50 within the `head` table.
  */
-function parseHead(table: SFNTTable): HeadData {
+function parseHead(table: SFNTTable, hasGlyf: boolean): HeadData {
+	// `indexToLocFormat` only matters when glyf/loca are rebuilt. A CFF-outline
+	// font has no loca, so a bad value there must not reject the font.
+	if (!hasGlyf) {
+		return { indexToLocFormat: 0, table };
+	}
+	if (table.bufSize < 54 || table.buf.length < 54) {
+		throw new EotError(
+			EotErrorCode.MalformedHeadTable,
+			`head table too small: ${table.bufSize} bytes (need 54)`,
+		);
+	}
 	const s = new Stream(table.buf, table.bufSize);
 	s.seekAbsolute(50);
 	const indexToLocFormat = s.readS16();
@@ -888,6 +953,23 @@ function parseMaxp(table: SFNTTable): MaxpData {
 // parseCTF — main entry point
 // ---------------------------------------------------------------------------
 
+const SFNT_TRUETYPE = 0x00010000;
+const SFNT_OTTO = 0x4f54544f;
+const SFNT_TRUE = 0x74727565;
+
+/**
+ * The sfnt version for the rebuilt font. It follows the outlines actually
+ * present rather than trusting the header alone: a font whose outlines are a
+ * CFF table must say 'OTTO', or strict rasterisers (Apple CoreText) reject
+ * it, and one with `glyf` outlines must not say 'OTTO'.
+ */
+function resolveScalarType(header: number, cffOutlines: boolean): number {
+	if (cffOutlines) {
+		return SFNT_OTTO;
+	}
+	return header === SFNT_TRUE ? SFNT_TRUE : SFNT_TRUETYPE;
+}
+
 /**
  * Parse a CTF (Compact TrueType Font) container from the three LZCOMP-
  * decompressed streams and produce an `SFNTContainer` that can be
@@ -903,7 +985,7 @@ export function parseCTF(streams: Stream[], options?: ParseCTFOptions): SFNTCont
 	const s0 = streams[0];
 
 	// --- Read SFNT offset (header) table -----------------------------------
-	const _scalarType = s0.readU32();
+	const headerScalarType = s0.readU32();
 	const numTables = s0.readU16();
 	const _searchRange = s0.readU16();
 	const _entrySelector = s0.readU16();
@@ -976,11 +1058,7 @@ export function parseCTF(streams: Stream[], options?: ParseCTFOptions): SFNTCont
 		if (table.bufSize > s0.size - table.offset) {
 			throw new EotError(EotErrorCode.InsufficientBytes, `truncated ${table.tag} table`);
 		}
-		const buf = new Uint8Array(table.bufSize);
-		for (let b = 0; b < table.bufSize; b++) {
-			buf[b] = s0.readU8();
-		}
-		table.buf = buf;
+		table.buf = s0.buf.slice(table.offset, table.offset + table.bufSize);
 
 		// For the `head` table, zero out bytes 8–11 (checksumAdjustment).
 		// Guard the length first: JS silently ignores out-of-range typed-array
@@ -1016,8 +1094,35 @@ export function parseCTF(streams: Stream[], options?: ParseCTFOptions): SFNTCont
 	}
 
 	// --- Parse head and maxp for glyph decoding parameters -----------------
-	const headData: HeadData = parseHead(tables[headIdx]);
+	const headData: HeadData = parseHead(tables[headIdx], glyfIdx >= 0);
 	const maxpData: MaxpData = parseMaxp(tables[maxpIdx]);
+
+	// --- Non-fatal sanity warnings -----------------------------------------
+	const maxpVersion = new DataView(
+		tables[maxpIdx].buf.buffer,
+		tables[maxpIdx].buf.byteOffset,
+		tables[maxpIdx].buf.byteLength,
+	).getUint32(0);
+	// A CFF-flavoured OpenType font keeps its outlines in a raw `CFF `/`CFF2`
+	// table and legitimately carries maxp 0.5.
+	const hasCff = tables.some((t) => t.tag === 'CFF ' || t.tag === 'CFF2');
+	const cffOutlines = hasCff && glyfIdx < 0;
+	if (maxpVersion !== 0x00010000 && !cffOutlines) {
+		emitWarning(
+			options,
+			EotErrorCode.WarnMaxpVersion,
+			`maxp version 0x${maxpVersion.toString(16)} is not 1.0; MTX carries TrueType outlines, glyph limits were not read`,
+		);
+	}
+	for (const tag of ['hhea', 'cmap', 'post', 'name', 'OS/2']) {
+		if (!tables.some((t) => t.tag === tag)) {
+			emitWarning(
+				options,
+				EotErrorCode.WarnMissingTable,
+				`CTF font has no ${tag} table; the reconstructed font may be unusable in some renderers`,
+			);
+		}
+	}
 
 	// Metric tables use their own LSB-first prediction-error encoding. Decode
 	// after loading all dependencies, regardless of table-directory order.
@@ -1065,5 +1170,5 @@ export function parseCTF(streams: Stream[], options?: ParseCTFOptions): SFNTCont
 		populateGlyfAndLoca(tables[glyfIdx], tables[locaIdx], headData, maxpData, streams);
 	}
 
-	return { tables };
+	return { tables, scalarType: resolveScalarType(headerScalarType, cffOutlines) };
 }

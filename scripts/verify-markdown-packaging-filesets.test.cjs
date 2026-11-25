@@ -66,14 +66,13 @@ test('collection gate rejects upstream Mermaid code and dependency developer art
 function canvasFixture(platform, arch) {
   const lock = { packages: {} }
   const files = new Map()
-  for (const name of canvasRuntimePackages(platform, arch)) {
-    const packageName = name.slice(name.lastIndexOf('@napi-rs/'))
-    const version = name.includes('/node_modules/') ? '1.1.0' : '0.1.100'
+  for (const packageName of canvasRuntimePackages(platform, arch)) {
+    const version = '1.1.0'
     const native = packageName !== '@napi-rs/canvas'
     const main = native ? `${CANVAS_NATIVE_TARGETS[`${platform}-${arch}`]}.node` : 'index.js'
     const metadata = { name: packageName, version, license: 'MIT', main,
       ...(native ? {} : { optionalDependencies: { [`@napi-rs/${CANVAS_NATIVE_TARGETS[`${platform}-${arch}`]}`]: version } }) }
-    const base = `node_modules/${name}`
+    const base = `node_modules/${packageName}`
     lock.packages[base] = { version, license: 'MIT', integrity: `sha512-${Buffer.alloc(64).toString('base64')}`,
       resolved: `https://registry.npmjs.org/${packageName}/-/${packageName.slice('@napi-rs/'.length)}-${version}.tgz` }
     files.set(`${base}/package.json`, Buffer.from(JSON.stringify(metadata)))
@@ -84,20 +83,21 @@ function canvasFixture(platform, arch) {
   return { lock, files, read }
 }
 
-test('canvas FileSets retain root and both PPT peer versions at their original runtime paths', () => {
-  for (const name of canvasRuntimePackages().filter(name => name.endsWith('/canvas'))) {
-    const path = `node_modules/${name}`
-    const sets = config.files.filter(entry => typeof entry === 'object' && entry.from === path)
-    assert.equal(sets.length, 1)
-    assert.equal(sets[0].to, path)
-    assert(sets[0].filter.includes('**/*'))
-  }
+test('canvas FileSets ship one shared loader and check resolution from the packaged callers', () => {
+  const path = 'node_modules/@napi-rs/canvas'
+  const sets = config.files.filter(entry => typeof entry === 'object' && entry.from.endsWith(path))
+  assert.equal(sets.length, 1)
+  assert.equal(sets[0].from, path)
+  assert.equal(sets[0].to, path)
+  assert(sets[0].filter.includes('**/*'))
   const smoke = canvasSmokeScript('/packaged/Resources')
-  assert(smoke.includes('node_modules/pptx-vanilla-viewer/package.json'))
-  assert(smoke.includes('node_modules/ooxml-ui/package.json'))
+  assert(smoke.includes('node_modules/pdfjs-dist/package.json'))
+  assert(smoke.includes('/ooxml-core/package.json'))
+  assert(smoke.includes('/emf-converter/package.json'))
   assert(smoke.includes('createCanvas(8, 8)'))
-  assert(smoke.includes('"version":"0.1.100"'))
-  assert(smoke.includes('"version":"1.1.0"'))
+  assert(smoke.includes('loadCanvas.resolve'))
+  assert(smoke.includes('"1.1.0"'))
+  assert(smoke.includes('CALLERS=5'))
 })
 
 test('canvas native FileSets select the build target architecture without an environment override', () => {
@@ -124,13 +124,15 @@ test('canvas native FileSets select the build target architecture without an env
   }
 })
 
-test('canvas package verification covers target bindings and rejects root-version fallback', () => {
+test('canvas package verification covers target bindings and rejects a mismatched version', () => {
   for (const target of Object.keys(CANVAS_NATIVE_TARGETS)) {
     const [platform, arch] = target.split('-')
     const fixture = canvasFixture(platform, arch)
-    assert.equal(verifyCanvasRuntimePackages(fixture.read, fixture.lock, platform, arch).packages, 6)
-    const nested = 'node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas/package.json'
-    fixture.files.set(nested, fixture.files.get('node_modules/@napi-rs/canvas/package.json'))
+    assert.equal(verifyCanvasRuntimePackages(fixture.read, fixture.lock, platform, arch).packages, 2)
+    const root = 'node_modules/@napi-rs/canvas/package.json'
+    const incompatible = JSON.parse(fixture.files.get(root).toString('utf8'))
+    incompatible.version = '0.1.100'
+    fixture.files.set(root, Buffer.from(JSON.stringify(incompatible)))
     assert.throws(() => verifyCanvasRuntimePackages(fixture.read, fixture.lock, platform, arch), /identity mismatch/)
   }
   assert.throws(() => canvasRuntimePackages('linux', 'riscv64'), /Unsupported target/)
@@ -163,8 +165,8 @@ test('missing host or cross-architecture canvas packages restore only exact inte
   writeFileSync(join(root, 'package-lock.json'), JSON.stringify(fixture.lock))
   let downloads = 0
   const report = await ensureCanvasRuntimePackages(root, 'darwin', 'x64', async url => { downloads++; return archives.get(url) })
-  assert.equal(report.packages, 6)
-  assert.equal(downloads, 4)
+  assert.equal(report.packages, 2)
+  assert.equal(downloads, 2)
   await ensureCanvasRuntimePackages(root, 'darwin', 'x64', async () => { throw new Error('Existing packages must not download.') })
   const corrupted = join(root, 'corrupted')
   mkdirSync(corrupted)
@@ -172,7 +174,7 @@ test('missing host or cross-architecture canvas packages restore only exact inte
   await assert.rejects(ensureCanvasRuntimePackages(corrupted, 'darwin', 'x64', async () => Buffer.from('changed')), /integrity mismatch/)
 })
 
-test('packaged canvas verification rejects an ASAR with the nested peer packages omitted', async t => {
+test('packaged canvas verification rejects an ASAR without the target binding', async t => {
   const root = mkdtempSync(join(tmpdir(), 'railwise-canvas-asar-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const fixture = canvasFixture('win32', 'x64')
@@ -186,8 +188,8 @@ test('packaged canvas verification rejects an ASAR with the nested peer packages
   writeFileSync(join(root, 'package-lock.json'), JSON.stringify(fixture.lock))
   const asar = require('@electron/asar')
   await asar.createPackage(source, join(resources, 'app.asar'))
-  assert.equal(verifyPackagedCanvas(resources, 'win32', 'x64', root).packages, 6)
-  rmSync(join(source, 'node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas'), { recursive: true })
+  assert.equal(verifyPackagedCanvas(resources, 'win32', 'x64', root).packages, 2)
+  rmSync(join(source, 'node_modules/@napi-rs/canvas-win32-x64-msvc'), { recursive: true })
   await asar.createPackage(source, join(resources, 'app.asar'))
   assert.throws(() => verifyPackagedCanvas(resources, 'win32', 'x64', root), /not found|ENOENT/)
 })

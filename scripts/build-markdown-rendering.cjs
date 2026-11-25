@@ -3,7 +3,7 @@ const { createHash } = require('node:crypto')
 const { mkdirSync, readFileSync, writeFileSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 
-const VERSIONS = { mermaid: '11.16.1', dompurify: '3.4.17', katex: '0.16.46' }
+const VERSIONS = { mermaid: '11.16.1', dompurify: '3.4.17', katex: '0.19.1' }
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 
 function validateMermaidInputs(inputs) {
@@ -28,6 +28,7 @@ async function buildMarkdownRendering(root = resolve(__dirname, '..'), output = 
   const result = await build({
     absWorkingDir: root,
     stdin: { contents: "export { default } from './node_modules/mermaid/dist/mermaid.core.mjs'", resolveDir: root, sourcefile: 'offline-mermaid-entry.js' },
+    alias: { katex: './node_modules/katex' },
     bundle: true, write: false, metafile: true, platform: 'browser', target: 'chrome140',
     format: 'iife', globalName: 'railwiseMermaid', minify: true, legalComments: 'eof',
     footer: { js: ';var mermaid=railwiseMermaid.default;' }, logLevel: 'warning'

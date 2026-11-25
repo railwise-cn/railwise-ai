@@ -141,7 +141,7 @@ src/asset/skills/ppt-master/.workwise-skill-source.json
 
 ## 7. PPTX 专用工作区与导入
 
-PPTX 文档使用 `PptxEditorAdapter` 作为稳定边界，当前挂载固定版本的 `pptx-vanilla-viewer`（Apache-2.0，仓库 `ChristopherVR/ooxml`，提交 `d8f80c291c1f9ecc23278c4b2ac8674915d30828`）。PPTist 的 AGPL-3.0 来源记录保留为暂停状态，不进入安装包。自由画布文档不会进入该路径。
+PPTX 文档使用 `PptxEditorAdapter` 作为稳定边界，当前挂载固定版本的 `pptx-vanilla-viewer`（Apache-2.0，仓库 `ChristopherVR/ooxml`，提交 `9ff78cf6a7c65dbeabb84a89a1099af4258decc7`）。PPTist 的 AGPL-3.0 来源记录保留为暂停状态，不进入安装包。自由画布文档不会进入该路径。
 
 编辑器来源、npm SRI、制品摘要和许可证入口记录在 `src/asset/pptx-editors/pptx-vanilla-viewer-source.json`。主包同时保留上游 `LICENSE`、`NOTICE`，以及 NOTICE 中单独许可的 MPL-2.0 `mtx-decompressor` 的源码/许可证材料；不能把整个依赖树描述为单一许可证。
 
