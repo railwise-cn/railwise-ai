@@ -204,21 +204,44 @@ export class TaskControlService {
     let preparedRetryId:string|undefined
     let retryHistory = ''
     let preparedResume:{previous:TaskRun;revision:number}|undefined
+    const taskAtControl = current
     try {
       if(action==='retry')this.deps.assertRetryContext?.(current)
       if(action==='pause'||action==='cancel') {
         const reason=data.reason ?? (action==='pause'?'用户暂停了任务。':'用户取消了任务。')
+        let interruptionError: unknown
+        const activeTurnId = taskAtControl.activeTurnId
+        const finishTurnBeforePause = action === 'pause' && Boolean(activeTurnId) && repository.humanRequests('question', true).some(request => request.turnId === activeTurnId)
+        // Finish the active Turn before exposing the paused state. Otherwise a
+        // client that observes `paused` can read the old user question while
+        // its durable item is still pending, which breaks restart/resume.
+        if (finishTurnBeforePause) {
+          try {
+            await turns.interruptTurn({ threadId: taskAtControl.threadId, turnId: activeTurnId!, preserveTask: true, reason: 'task_pause' })
+          } catch (error) {
+            // Commit the paused state even when the in-process interruption
+            // temporarily fails. The idempotent replay below retries that
+            // exact Turn without dispatching a new task.
+            interruptionError = error
+          }
+          // The interrupted AgentLoop may persist its terminal bookkeeping
+          // before returning. Refresh the revision before committing pause.
+          current = repository.get(taskAtControl.id) ?? current
+        }
         const result=repository.transact(()=>{
           if(action==='cancel'&&['completed','failed'].includes(current!.status))throw Object.assign(new Error(`task cannot be cancelled from ${current!.status}`),{code:'invalid_state'})
           const next=action==='pause' ? current!.status==='paused'?current!:tasks.pauseTask(current!.id,current!.revision,reason) : current!.status==='cancelled'?current!:tasks.cancelTask(current!.id,current!.revision,reason)
           repository.finishOperation(taskId,data.idempotencyKey,{status:'succeeded',result:next},nowIso())
           return {task:next}
         })
-        if(action==='pause'&&result.task.activeTurnId)await turns.interruptTurn({threadId:result.task.threadId,turnId:result.task.activeTurnId})
+        // The pause path interrupted the active Turn before committing the
+        // paused task. Keep the cancellation idempotent on replay below.
+        if(action==='pause'&&result.task.activeTurnId&&!finishTurnBeforePause)await turns.interruptTurn({threadId:result.task.threadId,turnId:result.task.activeTurnId})
         if(action==='cancel') {
           this.deps.cancelChildRuns?.(result.task.threadId,reason)
           if(result.task.activeTurnId)await turns.interruptTurn({threadId:result.task.threadId,turnId:result.task.activeTurnId})
         }
+        if (interruptionError) throw interruptionError
         return result
       }
       const turnKey=`task:${taskId}:${action}:${data.idempotencyKey}`

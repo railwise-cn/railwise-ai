@@ -638,11 +638,11 @@ export class TurnService {
     })
   }
 
-  async interruptTurn(input: { threadId: string; turnId: string; discard?: boolean }): Promise<{ status: TurnStatus }> {
+  async interruptTurn(input: { threadId: string; turnId: string; discard?: boolean; preserveTask?: boolean; reason?: string }): Promise<{ status: TurnStatus }> {
     if (!this.rememberTerminalTurn(input.turnId)) return { status: 'aborted' }
     try {
       const controller = this.inflightTurns.get(input.turnId)
-      if (controller) controller.abort('operation_cancelled')
+      if (controller) controller.abort(input.reason ?? 'operation_cancelled')
       this.deps.approvalGate?.expireTurn(input.turnId, 'operation_cancelled')
       for (const pending of this.deps.userInputGate?.pending(input.threadId) ?? []) {
         if (pending.turnId === input.turnId) {
@@ -652,7 +652,7 @@ export class TurnService {
       this.deps.steering.clear(input.turnId)
       this.inflightTurns.delete(input.turnId)
       this.deps.inflight.end(input.turnId)
-      this.deps.tasks?.cancel(input.threadId, '用户取消了任务。')
+      if (!input.preserveTask) this.deps.tasks?.cancel(input.threadId, '用户取消了任务。')
       await this.deps.events.record({
         kind: 'turn_aborted',
         threadId: input.threadId,
