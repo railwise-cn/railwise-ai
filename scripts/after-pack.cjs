@@ -29,6 +29,7 @@ const MANAGED_RUNTIME_REQUIRED_PATHS = [
   'kun/package-lock.json',
   'kun/node_modules/zod/package.json',
   'kun/node_modules/diff/package.json',
+  'kun/node_modules/parse5/package.json',
   'kun/node_modules/pptxgenjs/package.json',
   'kun/node_modules/@modelcontextprotocol/sdk/package.json',
   'src/asset/skills/ppt-master/scripts/svg_to_pptx.py'

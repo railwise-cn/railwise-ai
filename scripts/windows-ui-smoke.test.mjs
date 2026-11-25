@@ -41,6 +41,9 @@ test('Docling marketplace acceptance requires real MCP PDF and DOCX conversion e
   const workflow = readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8')
   assert.match(workflow, /docling-serve==1\.39\.0/)
   assert.match(workflow, /RAILWISE_DOCLING_SERVE_PYTHON=/)
+  const verifier = readFileSync(new URL('./verify-windows-cold-marketplace.mjs', import.meta.url), 'utf8')
+  assert.match(verifier, /PYTHONUTF8:\s*'1'/)
+  assert.match(verifier, /PYTHONIOENCODING:\s*'utf-8'/)
 })
 
 test('BrowserSkill PPT fixture serves a loopback source whose marker only appears after rendering', async t => {
