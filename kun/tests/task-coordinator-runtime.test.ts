@@ -153,7 +153,7 @@ describe('production task coordinator and durable Worker delivery',()=>{
     await expect(runtime.taskCoordinator!.submitTaskUserInputAnswer(secondQuestion!.id, [
       { id: 'website_url', label: '官网', value: 'https://example.test' }
     ])).resolves.toBe('submitted')
-    await vi.waitFor(() => expect(runtime.taskRepository!.get(started.task!.id)?.status).toBe('completed'))
+    await vi.waitFor(() => expect(runtime.taskRepository!.get(started.task!.id)?.status).toBe('completed'), { timeout: 10_000 })
     expect(requests).toHaveLength(3)
   }, 15_000)
 

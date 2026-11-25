@@ -569,6 +569,106 @@ describe('task commands before Turn allocation',()=>{
     expect(f.runTurn).toHaveBeenCalledTimes(2)
   })
 
+  it('saves an open answer before a missing BrowserSkill selection blocks the same task', async () => {
+    const f = await fixture()
+    const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
+    const browserNeedsSelection = {
+      provider: 'browser-skill' as const,
+      status: 'needs_authorization' as const,
+      message: '请选择一个已连接的浏览器后继续原任务。',
+      errorCode: 'browser_task_scope_required',
+      credentialState: 'missing' as const,
+      networkState: 'unknown' as const,
+      workspaceState: 'unknown' as const,
+      sandboxState: 'allowed' as const,
+      approvalState: 'not_required' as const,
+      action: { kind: 'connect' as const, route: 'settings/browser', label: '选择浏览器' },
+      resolution: { kind: 'connect' as const, route: 'settings/browser', label: '选择浏览器' },
+      checkedAt: new Date().toISOString()
+    }
+    let taskId = ''
+    const answerInputCountsAtPreflight: number[] = []
+    const preflightExternalTask = vi.fn(async (text: string) => {
+      if (!text.includes('www.railwise.cn')) return null
+      answerInputCountsAtPreflight.push(f.repository.inputs(taskId).filter(input =>
+        input.kind === 'supplement' && input.idempotencyKey === `user-input:${requestId}` && input.text === 'www.railwise.cn').length)
+      return browserNeedsSelection
+    })
+    const requiresBrowserScopeRefresh = vi.fn(async (_task, _turnId, text) => text === 'www.railwise.cn')
+    const coordinator = new TaskCoordinator({ ...f, userInputGate, preflightExternalTask,
+      requiresBrowserScopeRefresh, nowIso: () => new Date().toISOString() })
+    const started = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'website-answer-without-browser',
+      request: { prompt: '制作官网介绍 PPT' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const requestId = 'input-website-without-browser'
+    taskId = started.task!.id
+    userInputGate.request({ id: requestId, itemId: 'item-website-without-browser', threadId: started.turn.threadId,
+      turnId: started.turn.turnId, prompt: '请提供官网网址。', questions: [{ id: 'website', header: '官网',
+        question: '请提供官网网址。', options: [] }] })
+
+    await expect(Promise.all([
+      coordinator.submitTaskUserInputAnswer(requestId, [
+        { id: 'website', label: '官网', value: 'www.railwise.cn' }
+      ]),
+      coordinator.submitTaskUserInputAnswer(requestId, [
+        { id: 'website', label: '官网', value: 'www.railwise.cn' }
+      ])
+    ])).resolves.toEqual(['submitted', 'submitted'])
+
+    const inputs = f.repository.inputs(started.task!.id).filter(input =>
+      input.kind === 'supplement' && input.idempotencyKey === `user-input:${requestId}`)
+    expect(inputs).toHaveLength(1)
+    expect(inputs[0]?.text).toBe('www.railwise.cn')
+    expect(f.repository.get(started.task!.id)).toMatchObject({ id: started.task!.id, originThreadId: f.origin.id, status: 'paused' })
+    expect(f.repository.attention(`capability_${started.task!.id}`)).toMatchObject({
+      taskId: started.task!.id, threadId: f.origin.id, payload: { kind: 'capability_required', capability: { provider: 'browser-skill', errorCode: 'browser_task_scope_required' } }
+    })
+    expect(f.repository.attention(`input_intent_${started.task!.id}`)).toBeNull()
+    expect(preflightExternalTask).toHaveBeenCalledWith('www.railwise.cn', expect.any(Object), expect.objectContaining({ id: started.task!.id }))
+    expect(answerInputCountsAtPreflight).toContain(0)
+    expect(answerInputCountsAtPreflight).toContain(1)
+
+    await expect(coordinator.submitTaskUserInputAnswer(requestId, [
+      { id: 'website', label: '官网', value: 'www.railwise.cn' }
+    ])).resolves.toBe('submitted')
+    await expect(coordinator.submitTaskUserInputAnswer(requestId, [
+      { id: 'website', label: '官网', value: 'https://different.example' }
+    ])).resolves.toBe('stale')
+    expect(f.repository.inputs(started.task!.id).filter(input => input.idempotencyKey === `user-input:${requestId}`)).toHaveLength(1)
+  })
+
+  it('keeps other capability preflights active for task answers that add a browser URL and a connector action', async () => {
+    const f = await fixture()
+    const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
+    const mixedAnswer = 'www.railwise.cn；然后通过钉钉发送消息'
+    const preflightExternalTask = vi.fn(async (text: string) => text.includes('钉钉')
+      ? defaultExternalTaskCapability('dingtalk')
+      : null)
+    const requiresBrowserScopeRefresh = vi.fn(async (_task, _turnId, text) => text.includes('www.railwise.cn'))
+    const coordinator = new TaskCoordinator({ ...f, userInputGate, preflightExternalTask,
+      requiresBrowserScopeRefresh, nowIso: () => new Date().toISOString() })
+    const started = await coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'mixed-answer-without-browser',
+      request: { prompt: '制作官网介绍 PPT' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const requestId = 'input-website-with-connector-action'
+    userInputGate.request({ id: requestId, itemId: 'item-website-with-connector-action', threadId: started.turn.threadId,
+      turnId: started.turn.turnId, prompt: '请提供官网网址。', questions: [{ id: 'website', header: '官网',
+        question: '请提供官网网址。', options: [] }] })
+
+    await expect(coordinator.submitTaskUserInputAnswer(requestId, [
+      { id: 'website', label: '官网', value: mixedAnswer }
+    ])).resolves.toBe('stale')
+
+    expect(preflightExternalTask).toHaveBeenCalledWith(mixedAnswer, expect.any(Object), expect.objectContaining({ id: started.task!.id }))
+    expect(f.repository.inputs(started.task!.id).filter(input => input.idempotencyKey === `user-input:${requestId}`)).toHaveLength(0)
+    expect(f.repository.get(started.task!.id)).toMatchObject({ status: 'waiting_user', activeTurnId: started.turn.turnId })
+    expect(f.repository.inbox(f.root)).toContainEqual(expect.objectContaining({
+      taskId: started.task!.id, payload: expect.objectContaining({ kind: 'task_input_intent',
+        capability: expect.objectContaining({ provider: 'dingtalk', errorCode: 'connector_unavailable' }) })
+    }))
+    expect(f.runTurn).toHaveBeenCalledOnce()
+  })
+
   it('waits for a live request_user_input Turn to abort before continuing the same task', async () => {
     const f = await fixture()
     const userInputGate = new PersistentUserInputGate(f.repository, () => new Date().toISOString())
