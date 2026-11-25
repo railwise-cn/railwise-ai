@@ -8,7 +8,7 @@ const config = require('../electron-builder.cjs')
 const { PACKAGES, ASSETS } = require('./verify-packaged-markdown-rendering.cjs')
 const { markdownPackageFileSets, verifyCollectedMarkdownFiles } = require('./verify-markdown-packaging-filesets.cjs')
 const { EXPLICIT_RUNTIME_PACKAGES, OFFLINE_RENDERING_PACKAGES, RUNTIME_ENTRY_ASSETS } = require('./runtime-package-packaging.cjs')
-const { CANVAS_NATIVE_TARGETS, canvasRuntimePackages, canvasNativePackageFiles, canvasLockEntry, verifyCanvasRuntimePackages, ensureCanvasRuntimePackages, verifyPackagedCanvas, canvasSmokeScript } = require('./runtime-package-packaging.cjs')
+const { CANVAS_NATIVE_TARGETS, canvasRuntimePackages, canvasNativePackageFiles, canvasLockEntry, verifyCanvasRuntimePackages, ensureCanvasRuntimePackages, verifyPackagedCanvas, canvasCallerPackageName, packagedCanvasCallerManifests, canvasSmokeScript } = require('./runtime-package-packaging.cjs')
 
 function collectedFixture() {
   const root = resolve('/runtime-source')
@@ -83,21 +83,92 @@ function canvasFixture(platform, arch) {
   return { lock, files, read }
 }
 
-test('canvas FileSets ship one shared loader and check resolution from the packaged callers', () => {
+test('canvas smoke discovers the actual packaged callers after dependency hoisting', () => {
   const path = 'node_modules/@napi-rs/canvas'
   const sets = config.files.filter(entry => typeof entry === 'object' && entry.from.endsWith(path))
   assert.equal(sets.length, 1)
   assert.equal(sets[0].from, path)
   assert.equal(sets[0].to, path)
   assert(sets[0].filter.includes('**/*'))
-  const smoke = canvasSmokeScript('/packaged/Resources')
+
+  const lock = require('../package-lock.json')
+  const callers = Object.entries(lock.packages)
+    .filter(([packagePath, entry]) => packagePath && (entry.optionalDependencies?.['@napi-rs/canvas'] || entry.peerDependencies?.['@napi-rs/canvas']))
+  const packageFiles = new Map()
+  const archivePaths = []
+  callers.forEach(([packagePath, entry]) => {
+    const packageName = canvasCallerPackageName(packagePath)
+    const actualPackagePath = packagePath.startsWith('node_modules/ooxml-ui/node_modules/')
+      ? `node_modules/${packageName}`
+      : packagePath
+    const actualManifestPath = `${actualPackagePath}/package.json`
+    const metadata = { name: packageName, version: entry.version,
+      ...(entry.optionalDependencies?.['@napi-rs/canvas'] ? { optionalDependencies: { '@napi-rs/canvas': entry.optionalDependencies['@napi-rs/canvas'] } } : {}),
+      ...(entry.peerDependencies?.['@napi-rs/canvas'] ? { peerDependencies: { '@napi-rs/canvas': entry.peerDependencies['@napi-rs/canvas'] } } : {}) }
+    packageFiles.set(actualManifestPath, Buffer.from(JSON.stringify(metadata)))
+    archivePaths.push(`/${actualManifestPath}`)
+  })
+  const packagedCallers = packagedCanvasCallerManifests(archivePaths,
+    path => packageFiles.get(path), lock)
+  assert.equal(packagedCallers.length, 5)
+  assert(packagedCallers.includes('node_modules/emf-converter/package.json'))
+  assert(!packagedCallers.includes('node_modules/ooxml-ui/node_modules/emf-converter/package.json'))
+
+  const smoke = canvasSmokeScript('/packaged/Resources', packagedCallers)
   assert(smoke.includes('node_modules/pdfjs-dist/package.json'))
-  assert(smoke.includes('/ooxml-core/package.json'))
-  assert(smoke.includes('/emf-converter/package.json'))
+  assert(smoke.includes('node_modules/ooxml-ui/node_modules/ooxml-core/package.json') || smoke.includes('node_modules/ooxml-core/package.json'))
+  assert(smoke.includes('node_modules/pptx-vanilla-viewer/node_modules/emf-converter/package.json'))
   assert(smoke.includes('createCanvas(8, 8)'))
   assert(smoke.includes('loadCanvas.resolve'))
   assert(smoke.includes('"1.1.0"'))
   assert(smoke.includes('CALLERS=5'))
+  assert.throws(() => canvasSmokeScript('/packaged/Resources'), /caller paths are required/)
+})
+
+test('canvas caller discovery reads hoisted manifests from an actual ASAR archive', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'railwise-canvas-callers-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const source = join(root, 'source')
+  const manifestPath = join(source, 'node_modules', 'emf-converter', 'package.json')
+  mkdirSync(join(source, 'node_modules', 'emf-converter'), { recursive: true })
+  writeFileSync(manifestPath, JSON.stringify({ name: 'emf-converter', version: '4.28.1',
+    optionalDependencies: { '@napi-rs/canvas': '1.1.0' } }))
+  const archive = join(root, 'app.asar')
+  const asar = require('@electron/asar')
+  await asar.createPackage(source, archive)
+  const lock = { packages: { 'node_modules/ooxml-ui/node_modules/emf-converter': {
+    version: '4.28.1', optionalDependencies: { '@napi-rs/canvas': '1.1.0' }
+  } } }
+
+  const callers = packagedCanvasCallerManifests(asar.listPackage(archive),
+    path => asar.extractFile(archive, join(...path.split('/'))), lock)
+  assert.deepEqual(callers, ['node_modules/emf-converter/package.json'])
+
+  const windowsPaths = asar.listPackage(archive).map(path => `\\${path.replaceAll('/', '\\')}`)
+  const windowsCallers = packagedCanvasCallerManifests(windowsPaths,
+    path => asar.extractFile(archive, join(...path.split('/'))), lock)
+  assert.deepEqual(windowsCallers, ['node_modules/emf-converter/package.json'])
+})
+
+test('packaged canvas smoke rejects missing or unlocked caller packages', () => {
+  const lock = require('../package-lock.json')
+  const callers = Object.entries(lock.packages)
+    .filter(([packagePath, entry]) => packagePath && (entry.optionalDependencies?.['@napi-rs/canvas'] || entry.peerDependencies?.['@napi-rs/canvas']))
+  const packageFiles = new Map()
+  const archivePaths = callers.map(([packagePath, entry]) => {
+    const packageName = canvasCallerPackageName(packagePath)
+    const manifestPath = `${packagePath}/package.json`
+    packageFiles.set(manifestPath, Buffer.from(JSON.stringify({ name: packageName, version: entry.version,
+      optionalDependencies: entry.optionalDependencies, peerDependencies: entry.peerDependencies })))
+    return `/${manifestPath}`
+  })
+  const read = path => packageFiles.get(path)
+
+  assert.throws(() => packagedCanvasCallerManifests(archivePaths.slice(1), read, lock), /Missing packaged Canvas caller/)
+  const unlockedPaths = [...archivePaths, '/node_modules/unreviewed/package.json']
+  packageFiles.set('node_modules/unreviewed/package.json', Buffer.from(JSON.stringify({ name: 'unreviewed', version: '1.0.0',
+    peerDependencies: { '@napi-rs/canvas': '^1.1.0' } })))
+  assert.throws(() => packagedCanvasCallerManifests(unlockedPaths, read, lock), /not in the lockfile/)
 })
 
 test('canvas native FileSets select the build target architecture without an environment override', () => {

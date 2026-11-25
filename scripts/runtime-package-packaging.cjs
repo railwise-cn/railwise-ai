@@ -134,18 +134,60 @@ function verifyPackagedCanvas(resourcesDirectory, platform, arch, root = resolve
   return verifyCanvasRuntimePackages(path => asar.extractFile(archive, join(...path.split('/'))), lock, platform, arch)
 }
 
-function canvasSmokeScript(resourcesDirectory, root = resolve(__dirname, '..')) {
+function canvasCallerPackageName(path) {
+  const segments = path.replace(/^\/+/, '').split('/')
+  const nodeModulesIndex = segments.lastIndexOf('node_modules')
+  if (nodeModulesIndex < 0 || nodeModulesIndex + 1 >= segments.length) return ''
+  const first = segments[nodeModulesIndex + 1]
+  return first.startsWith('@') ? `${first}/${segments[nodeModulesIndex + 2] || ''}` : first
+}
+
+function normalizeAsarPath(path) {
+  return path.replaceAll('\\', '/').replace(/^\/+/, '')
+}
+
+function hasCanvasRuntimeDependency(metadata) {
+  return Boolean(metadata.optionalDependencies?.[CANVAS_PACKAGE] || metadata.peerDependencies?.[CANVAS_PACKAGE])
+}
+
+function packagedCanvasCallerManifests(packagePaths, read, lock) {
+  const lockCallers = Object.entries(lock.packages || {})
+    .filter(([path, entry]) => path && (entry.optionalDependencies?.[CANVAS_PACKAGE] || entry.peerDependencies?.[CANVAS_PACKAGE]))
+    .map(([path, entry]) => `${canvasCallerPackageName(path)}@${entry.version}`)
+  const expected = new Set(lockCallers)
+  if (lockCallers.some(identity => /^@\d/.test(identity)) || expected.size === 0) {
+    throw new Error('The lockfile has no valid packaged Canvas callers.')
+  }
+
+  const callers = []
+  const found = new Set()
+  for (const rawPath of packagePaths) {
+    const path = normalizeAsarPath(rawPath)
+    if (!path.startsWith('node_modules/') || !path.endsWith('/package.json')) continue
+    const metadata = JSON.parse(read(path).toString('utf8'))
+    if (!hasCanvasRuntimeDependency(metadata)) continue
+    const identity = `${metadata.name}@${metadata.version}`
+    if (!expected.has(identity)) throw new Error(`[canvas-packaging] Packaged Canvas caller is not in the lockfile: ${identity}.`)
+    callers.push(path)
+    found.add(identity)
+  }
+
+  const missing = [...expected].filter(identity => !found.has(identity))
+  if (missing.length) throw new Error(`[canvas-packaging] Missing packaged Canvas caller(s): ${missing.join(', ')}.`)
+  return callers.sort()
+}
+
+function canvasSmokeScript(resourcesDirectory, callers, root = resolve(__dirname, '..')) {
+  if (!Array.isArray(callers) || callers.length === 0) throw new Error('Packaged Canvas caller paths are required.')
   const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'))
   const canvasVersion = canvasLockEntry(lock, CANVAS_PACKAGE).version
-  const callers = Object.entries(lock.packages)
-    .filter(([path, entry]) => path && (entry.optionalDependencies?.[CANVAS_PACKAGE] || entry.peerDependencies?.[CANVAS_PACKAGE]))
-    .map(([path]) => `${path}/package.json`)
+  const normalizedCallers = callers.map(normalizeAsarPath)
   return `
     const canvasRequire = require('node:module').createRequire
     const canvasJoin = require('node:path').join
     const canvasArchive = ${JSON.stringify(join(resourcesDirectory, 'app.asar'))}
     const canvasManifest = canvasJoin(canvasArchive, 'node_modules', ${JSON.stringify(CANVAS_PACKAGE)}, 'package.json')
-    for (const caller of ${JSON.stringify(callers)}) {
+    for (const caller of ${JSON.stringify(normalizedCallers)}) {
       const callerManifest = canvasJoin(canvasArchive, caller)
       if (!require('node:fs').existsSync(callerManifest)) {
         throw new Error('Missing packaged Canvas caller ' + caller)
@@ -165,7 +207,7 @@ function canvasSmokeScript(resourcesDirectory, root = resolve(__dirname, '..')) 
         throw new Error('Packaged canvas could not render PNG for ' + caller)
       }
     }
-    console.log('RAILWISE_PACKAGED_CANVAS_OK CALLERS=${callers.length}')
+    console.log('RAILWISE_PACKAGED_CANVAS_OK CALLERS=${normalizedCallers.length}')
   `
 }
 
@@ -183,5 +225,5 @@ function explicitRuntimePackageFiles() {
 module.exports = {
   explicitRuntimePackageFiles, EXPLICIT_RUNTIME_PACKAGES, OFFLINE_RENDERING_PACKAGES, RUNTIME_ENTRY_ASSETS,
   CANVAS_NATIVE_TARGETS, canvasRuntimePackages, canvasNativePackageFiles, canvasLockEntry, ensureCanvasRuntimePackages,
-  verifyCanvasRuntimePackages, verifyPackagedCanvas, canvasSmokeScript
+  verifyCanvasRuntimePackages, verifyPackagedCanvas, canvasCallerPackageName, packagedCanvasCallerManifests, canvasSmokeScript
 }

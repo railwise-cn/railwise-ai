@@ -11,6 +11,7 @@ import {
   validatePythonDependencyLock,
   ZOTERO_BIBTEX_BUILD
 } from './pypi-package-materializer'
+import { readCatalogLicenseEvidence } from './package-license-evidence'
 
 const roots: string[] = []
 
@@ -27,6 +28,42 @@ async function tempRoot(): Promise<string> {
 
 function body(bytes: Buffer): ArrayBuffer {
   return Uint8Array.from(bytes).buffer
+}
+
+function responseAt(url: string, value: BodyInit, status = 200): Response {
+  const response = new Response(value, { status })
+  Object.defineProperty(response, 'url', { value: url })
+  return response
+}
+
+function githubLicensePackage(license: Buffer): { item: MarketplacePackageV1; apiUrl: string; rawUrl: string } {
+  const packageItem = item('a'.repeat(64))
+  const commit = 'b'.repeat(40)
+  const source = {
+    id: 'fixture-license-source',
+    catalogSourceId: 'workwise-official',
+    kind: 'github' as const,
+    location: 'https://github.com/example/fixture',
+    owner: 'example',
+    repository: 'fixture',
+    defaultBranch: 'main',
+    requestedRef: commit,
+    resolvedRef: commit
+  }
+  packageItem.sources.push(source)
+  packageItem.licenseEvidence = [{
+    license: 'MIT',
+    sourceId: source.id,
+    path: 'LICENSE',
+    sha256: createHash('sha256').update(license).digest('hex'),
+    includeInInstall: true,
+    required: true
+  }]
+  return {
+    item: packageItem,
+    apiUrl: `https://api.github.com/repos/example/fixture/contents/LICENSE?ref=${commit}`,
+    rawUrl: `https://raw.githubusercontent.com/example/fixture/${commit}/LICENSE`
+  }
 }
 
 async function wheel(): Promise<Buffer> {
@@ -94,6 +131,58 @@ function item(digest: string): MarketplacePackageV1 {
 }
 
 describe('materializePypiPackage', () => {
+  it('falls back to the same immutable raw GitHub source when the license API is unavailable', async () => {
+    const license = Buffer.from('MIT License from immutable source\n')
+    const { item: packageItem, apiUrl, rawUrl } = githubLicensePackage(license)
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input)
+      return url === apiUrl
+        ? responseAt(url, 'Forbidden', 403)
+        : responseAt(url, license, 200)
+    })
+
+    await expect(readCatalogLicenseEvidence(packageItem, fetchMock as typeof fetch)).resolves.toEqual(license)
+    expect(fetchMock).toHaveBeenNthCalledWith(1, apiUrl, expect.objectContaining({ redirect: 'error' }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, rawUrl, expect.objectContaining({ redirect: 'error' }))
+  })
+
+  it('rejects raw license bytes whose SHA-256 differs from the catalog evidence', async () => {
+    const { item: packageItem, apiUrl } = githubLicensePackage(Buffer.from('reviewed license\n'))
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      return responseAt(url, url === apiUrl ? 'Forbidden' : 'unreviewed license\n', url === apiUrl ? 403 : 200)
+    })
+
+    await expect(readCatalogLicenseEvidence(packageItem, fetchMock as typeof fetch))
+      .rejects.toThrow('do not match the reviewed size or SHA-256')
+  })
+
+  it('fails closed when both the GitHub license API and pinned raw source are unavailable', async () => {
+    const { item: packageItem, apiUrl } = githubLicensePackage(Buffer.from('reviewed license\n'))
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      return responseAt(url, 'Not found', url === apiUrl ? 403 : 404)
+    })
+
+    await expect(readCatalogLicenseEvidence(packageItem, fetchMock as typeof fetch))
+      .rejects.toThrow('Catalog license evidence request failed (403, raw 404).')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects raw responses that do not retain the exact pinned source URL', async () => {
+    const license = Buffer.from('MIT License from immutable source\n')
+    const { item: packageItem, apiUrl, rawUrl } = githubLicensePackage(license)
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      return url === apiUrl
+        ? responseAt(url, 'Forbidden', 403)
+        : responseAt(rawUrl.replace('/' + 'b'.repeat(40) + '/', '/' + 'c'.repeat(40) + '/'), license, 200)
+    })
+
+    await expect(readCatalogLicenseEvidence(packageItem, fetchMock as typeof fetch))
+      .rejects.toThrow('Catalog license evidence URL does not match its pinned source.')
+  })
+
   it('fetches missing wheel license evidence from an immutable GitHub commit', async () => {
     const root = await tempRoot()
     const packageItem = item('a'.repeat(64))

@@ -1,8 +1,8 @@
 const { execFileSync } = require('node:child_process')
-const { existsSync, readdirSync } = require('node:fs')
+const { existsSync, readFileSync, readdirSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 const productBrand = require('../src/shared/product-brand.json')
-const { canvasSmokeScript } = require('./runtime-package-packaging.cjs')
+const { canvasSmokeScript, packagedCanvasCallerManifests } = require('./runtime-package-packaging.cjs')
 
 const root = resolve(process.argv[2] || 'dist')
 const target = process.argv[3]
@@ -11,7 +11,7 @@ if (target !== 'mac' && target !== 'win') {
   throw new Error('usage: verify-packaged-runtime-native.cjs DIST_DIR mac|win')
 }
 
-function sqliteSmokeScript(modulePath) {
+function sqliteSmokeScript(modulePath, resourcesDirectory, callers) {
   return [
     `const Database = require(${JSON.stringify(modulePath)})`,
     `const database = new Database(':memory:')`,
@@ -19,14 +19,25 @@ function sqliteSmokeScript(modulePath) {
     `if (database.prepare('SELECT value FROM qa').get().value !== 1) process.exit(71)`,
     `database.close()`,
     `console.log('WORKWISE_PACKAGED_SQLITE_OK ABI=' + process.versions.modules)`,
-    canvasSmokeScript(resolve(modulePath, '../../..'))
+    canvasSmokeScript(resourcesDirectory, callers)
   ].join(';')
 }
 
 function smoke(executable, modulePath) {
   if (!existsSync(executable)) throw new Error(`Packaged executable is missing: ${executable}`)
   if (!existsSync(modulePath)) throw new Error(`Packaged better-sqlite3 is missing: ${modulePath}`)
-  return execFileSync(executable, ['-e', sqliteSmokeScript(modulePath)], {
+  const resourcesDirectory = resolve(modulePath, '../../..')
+  const archive = join(resourcesDirectory, 'app.asar')
+  if (!existsSync(archive)) throw new Error(`Packaged application archive is missing: ${archive}`)
+  const asar = require('@electron/asar')
+  asar.uncache(archive)
+  const lock = JSON.parse(readFileSync(join(__dirname, '..', 'package-lock.json'), 'utf8'))
+  const callerPaths = packagedCanvasCallerManifests(
+    asar.listPackage(archive),
+    path => asar.extractFile(archive, join(...path.split('/'))),
+    lock
+  )
+  return execFileSync(executable, ['-e', sqliteSmokeScript(modulePath, resourcesDirectory, callerPaths)], {
     encoding: 'utf8',
     env: {
       ...process.env,

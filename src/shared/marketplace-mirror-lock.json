@@ -343,13 +343,13 @@
     },
     {
       "packageId": "video-shotcraft",
-      "reviewSha256": "e36a2e0cc78c47dc41a84766ef84a54c7837dd420be56f7dc6e82d4bb3fac601",
+      "reviewSha256": "72ee2e260daa89f37d1daed0047d341c7b94bd231f984d4a498148ce0ab2c88e",
       "platform": "darwin",
       "arch": "arm64",
       "parts": [
         {
-          "sha256": "d0515f9e64d7d7f8e1fc4705e8ffce0f235f6e2e45cfb2903ae88f41998049f9",
-          "size": 3058997
+          "sha256": "85b5f42fd16fd53533ce973f770caafdf73573443db852888d40c11064a4a6e5",
+          "size": 3054774
         }
       ]
     },
@@ -707,13 +707,13 @@
     },
     {
       "packageId": "video-shotcraft",
-      "reviewSha256": "e36a2e0cc78c47dc41a84766ef84a54c7837dd420be56f7dc6e82d4bb3fac601",
+      "reviewSha256": "72ee2e260daa89f37d1daed0047d341c7b94bd231f984d4a498148ce0ab2c88e",
       "platform": "darwin",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "d0515f9e64d7d7f8e1fc4705e8ffce0f235f6e2e45cfb2903ae88f41998049f9",
-          "size": 3058997
+          "sha256": "85b5f42fd16fd53533ce973f770caafdf73573443db852888d40c11064a4a6e5",
+          "size": 3054774
         }
       ]
     },
@@ -1079,13 +1079,13 @@
     },
     {
       "packageId": "video-shotcraft",
-      "reviewSha256": "e36a2e0cc78c47dc41a84766ef84a54c7837dd420be56f7dc6e82d4bb3fac601",
+      "reviewSha256": "72ee2e260daa89f37d1daed0047d341c7b94bd231f984d4a498148ce0ab2c88e",
       "platform": "win32",
       "arch": "x64",
       "parts": [
         {
-          "sha256": "ed306dfc2703884070be6abdea5936c6169438c84667b7ac4f0143b56465afd4",
-          "size": 3072074
+          "sha256": "3fae5608c3ec2f19de4ea99b9967574fe0beac45eb35977cb5ff8ef66a636ff0",
+          "size": 3067600
         }
       ]
     }
