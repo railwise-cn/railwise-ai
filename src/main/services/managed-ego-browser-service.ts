@@ -6,6 +6,14 @@ import { join, win32 } from 'node:path'
 import { promisify } from 'node:util'
 import { EgoBrowserCapabilityConfig } from '../../../kun/src/contracts/ego-browser'
 const execute = promisify(execFile)
+const EGO_BROWSER_CLI_SERIES = '0.6.3.'
+const MINIMUM_EGO_BROWSER_CLI_BUILD = 14
+
+function isSupportedEgoBrowserCliVersion(version: string | undefined): version is string {
+  if (!version?.startsWith(EGO_BROWSER_CLI_SERIES)) return false
+  const build = Number(version.slice(EGO_BROWSER_CLI_SERIES.length))
+  return Number.isSafeInteger(build) && build >= MINIMUM_EGO_BROWSER_CLI_BUILD
+}
 
 export function egoBrowserCandidatePaths(platform = process.platform, home = homedir(), path = process.env.PATH ?? process.env.Path ?? ''): string[] {
   if (platform !== 'win32') return [join(home, '.local', 'bin', 'ego-browser')]
@@ -34,8 +42,8 @@ export async function diagnoseEgoBrowser(deps: { candidates?: string[]; run?: (p
         return [result.stdout, result.stderr].join('\n')
       }))(executablePath)
       const version = /\bego-browser\s*v?(\d+\.\d+\.\d+\.\d+)\b/.exec(output)?.[1]
-      // This is the supported target CLI protocol, not the independently versioned guide.
-      if (version === '0.6.3.14') return { state: 'installed', executablePath, executableHash, version, revision: 0 }
+      // The four-part CLI build version is separate from the skill guide version.
+      if (isSupportedEgoBrowserCliVersion(version)) return { state: 'installed', executablePath, executableHash, version, revision: 0 }
       unsupported ??= { state: 'unsupported', executablePath, executableHash, version, revision: 0 }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') probeFailed = true

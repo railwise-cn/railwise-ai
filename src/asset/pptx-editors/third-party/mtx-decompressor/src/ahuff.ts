@@ -14,23 +14,7 @@
  * then optionally pre-biased depending on the symbol range.
  */
 import { BitIO } from './bitio';
-
-/** A single node in the adaptive Huffman tree. */
-interface AHuffNode {
-	/** Parent index (0 for the super-root sentinel). */
-	up: number;
-	/** Left child index (0 for leaves). */
-	left: number;
-	/** Right child index (0 for leaves). */
-	right: number;
-	/**
-	 * Symbol code for leaves (>= 0), or -1 for internal nodes.
-	 * A non-negative value signals "this is a leaf".
-	 */
-	code: number;
-	/** Cumulative weight used to maintain the sibling property. */
-	weight: number;
-}
+import { EotError, EotErrorCode } from './errors';
 
 /**
  * Return the number of bits required to represent the non-negative integer `x`.
@@ -50,9 +34,21 @@ function bitsUsed(x: number): number {
 export class AHuff {
 	private bio: BitIO;
 	private range: number;
-	private tree: AHuffNode[];
+	// Tree stored as parallel typed arrays (1-indexed, index 0 unused):
+	//   up     parent index (position-specific, never swapped)
+	//   child  child indices, interleaved: child[2a] is the left (bit 0) and
+	//          child[2a + 1] the right (bit 1) child of node a; -1 for leaves.
+	//          Interleaving lets readSymbol index by the decoded bit instead of
+	//          branching on it — compressed bits are close to random, so a
+	//          `bit ? right : left` branch mispredicts about half the time.
+	//   code   symbol for leaves (>= 0), -1 for internal nodes
+	//   weight cumulative weight maintaining the sibling property
+	private up: Int32Array;
+	private child: Int32Array;
+	private code: Int32Array;
+	private weight: Int32Array;
 	/** Maps symbol value -> current tree index of its leaf node. */
-	private symbolIndex: number[];
+	private symbolIndex: Int32Array;
 
 	/** Number of bits that encode a "full-size" symbol (ceil(log2(range))). */
 	private bitCount: number;
@@ -78,40 +74,34 @@ export class AHuff {
 
 		const treeSize = 2 * range; // indices 0 .. 2*range-1
 
-		// Allocate the tree array (index 0 is unused sentinel) ---------------
-		this.tree = Array.from<AHuffNode>({ length: treeSize });
-		for (let i = 0; i < treeSize; i++) {
-			this.tree[i] = { up: 0, left: 0, right: 0, code: -1, weight: 0 };
-		}
+		// Allocate the tree (index 0 is an unused sentinel) ------------------
+		const up = (this.up = new Int32Array(treeSize));
+		const child = (this.child = new Int32Array(2 * treeSize));
+		const code = (this.code = new Int32Array(treeSize).fill(-1));
+		this.weight = new Int32Array(treeSize);
 
-		// Build parent pointers and set initial weight = 1 for all non-root
-		// nodes (matching the C code which initializes weight=1 for i in 2..limit-1)
+		// Parent pointers; weight = 1 for all non-root nodes (matching the C code
+		// which initializes weight=1 for i in 2..limit-1)
 		for (let i = 2; i < treeSize; i++) {
-			this.tree[i].up = i >> 1;
-			this.tree[i].weight = 1;
+			up[i] = i >> 1;
+			this.weight[i] = 1;
 		}
 
 		// Internal nodes (1 .. range-1): set children, code = -1
 		for (let i = 1; i < range; i++) {
-			this.tree[i].left = 2 * i;
-			this.tree[i].right = 2 * i + 1;
-			this.tree[i].code = -1;
+			child[2 * i] = 2 * i;
+			child[2 * i + 1] = 2 * i + 1;
 		}
 
-		// Leaf nodes (range .. 2*range-1): code = symbol index
-		// C code sets left=-1, right=-1 for leaves (distinguishes from
-		// internal nodes which have left/right >= 0 in SwapNodes)
+		// Leaf nodes (range .. 2*range-1): code = symbol index. The C code sets
+		// left=-1, right=-1 for leaves.
+		this.symbolIndex = new Int32Array(range);
 		for (let i = 0; i < range; i++) {
 			const leafIdx = range + i;
-			this.tree[leafIdx].code = i;
-			this.tree[leafIdx].left = -1;
-			this.tree[leafIdx].right = -1;
-		}
-
-		// Build symbolIndex: symbol i -> leaf index (range + i)
-		this.symbolIndex = Array.from<number>({ length: range });
-		for (let i = 0; i < range; i++) {
-			this.symbolIndex[i] = range + i;
+			code[leafIdx] = i;
+			child[2 * leafIdx] = -1;
+			child[2 * leafIdx + 1] = -1;
+			this.symbolIndex[i] = leafIdx;
 		}
 
 		// Compute internal node weights bottom-up ----------------------------
@@ -158,14 +148,40 @@ export class AHuff {
 	 * tree weights and return the symbol code.
 	 */
 	readSymbol(): number {
+		const bio = this.bio;
+		const code = this.code;
+		const child = this.child;
 		let a = AHuff.ROOT;
 		let symbol: number;
 
+		// Bit reads are inlined (equivalent to `bio.nextBit()`) with the reader
+		// state held in locals and written back once: this loop dominates
+		// decompression time.
+		const data = bio.data;
+		const size = bio.size;
+		let index = bio.index;
+		let byte = bio.bitBuffer;
+		let count = bio.bitCount;
+
 		// Traverse tree from ROOT to leaf (matches C do-while)
 		do {
-			a = this.bio.inputBit() ? this.tree[a].right : this.tree[a].left;
-			symbol = this.tree[a].code;
+			if (count === 0) {
+				if (index >= size) {
+					bio.index = index;
+					bio.bitBuffer = byte;
+					bio.bitCount = 0;
+					throw new EotError(EotErrorCode.InsufficientBytes, 'BitIO: end of data');
+				}
+				byte = data[index++];
+				count = 8;
+			}
+			a = child[(a << 1) | ((byte >> --count) & 1)];
+			symbol = code[a];
 		} while (symbol < 0);
+
+		bio.index = index;
+		bio.bitBuffer = byte;
+		bio.bitCount = count;
 
 		// Update adaptive weights for the decoded leaf
 		this.updateWeight(a);
@@ -178,34 +194,27 @@ export class AHuff {
 	// --------------------------------------------------------------------
 
 	/**
-	 * Increment the weight of node `a` and propagate up to ROOT,
-	 * swapping nodes as necessary to maintain the sibling property
-	 * (nodes in non-increasing weight order by index).
-	 *
-	 * Algorithm:
-	 *   For each node from `a` up to (but not including) ROOT:
-	 *     1. Look at the predecessor (a-1).
-	 *     2. If it has the same weight, scan backwards to find the first
-	 *        node with that weight.
-	 *     3. Swap `a` with that first node (unless it is ROOT or `a`'s
-	 *        own parent) to restore ordering.
-	 *     4. Increment `a`'s weight.
-	 *     5. Move to `a`'s parent.
-	 *   Finally increment ROOT's weight.
+	 * Increment the weight of node `a` and propagate up to ROOT, swapping
+	 * nodes as necessary to maintain the sibling property (nodes in
+	 * non-increasing weight order by index). For each node below ROOT: if its
+	 * predecessor has the same weight, scan back to the first node with that
+	 * weight and swap with it (unless that is ROOT), then bump the weight and
+	 * move to the parent. Finally ROOT's weight is incremented.
 	 */
 	private updateWeight(a: number): void {
-		const tree = this.tree;
+		const weight = this.weight;
+		const up = this.up;
 
-		for (; a !== AHuff.ROOT; a = tree[a].up) {
-			const weightA = tree[a].weight;
+		for (; a !== AHuff.ROOT; a = up[a]) {
+			const weightA = weight[a];
 			let b = a - 1;
 
-			// C reference: scan backward while tree[b].weight == weightA,
-			// then b++ to land on the first node with that weight.
-			if (tree[b].weight === weightA) {
+			// C reference: scan backward while weight[b] == weightA, then b++ to
+			// land on the first node with that weight.
+			if (weight[b] === weightA) {
 				do {
 					b--;
-				} while (tree[b].weight === weightA);
+				} while (weight[b] === weightA);
 				b++;
 				if (b > AHuff.ROOT) {
 					this.swapNodes(a, b);
@@ -213,60 +222,51 @@ export class AHuff {
 				}
 			}
 
-			tree[a].weight = weightA + 1;
+			weight[a] = weightA + 1;
 		}
 
 		// Increment ROOT weight
-		tree[AHuff.ROOT].weight++;
+		weight[AHuff.ROOT]++;
 	}
 
 	/**
-	 * Swap two nodes in the tree while keeping the parent linkage
-	 * consistent.
-	 *
-	 * What gets swapped: left, right, code, weight — everything that
-	 * defines the *content* of the node.  The `up` pointer stays with
-	 * the position (the parent still points here).
-	 *
-	 * After the content swap we must:
-	 *   1. Fix children's `up` pointers (they now live under the other
-	 *      position).
-	 *   2. Fix `symbolIndex` for leaves so we can still find them by
-	 *      symbol value.
+	 * Swap the content (children, code, weight) of two nodes. The `up`
+	 * pointer stays with the position, so afterwards the children of each
+	 * swapped internal node get their parent pointer fixed, and leaves get
+	 * their `symbolIndex` entry updated.
 	 */
 	private swapNodes(a: number, b: number): void {
-		const tree = this.tree;
+		const { child, code, weight, up } = this;
+		const a2 = a << 1;
+		const b2 = b << 1;
 
-		// Save parent pointers (these are position-specific, not content)
-		const upa = tree[a].up;
-		const upb = tree[b].up;
+		let t = child[a2];
+		child[a2] = child[b2];
+		child[b2] = t;
+		t = child[a2 + 1];
+		child[a2 + 1] = child[b2 + 1];
+		child[b2 + 1] = t;
+		t = code[a];
+		code[a] = code[b];
+		code[b] = t;
+		t = weight[a];
+		weight[a] = weight[b];
+		weight[b] = t;
 
-		// Swap the entire node content (matches C: tNode = tree[a]; tree[a] = tree[b]; tree[b] = tNode)
-		const tmp = tree[a];
-		tree[a] = tree[b];
-		tree[b] = tmp;
-
-		// Restore parent pointers to their original positions
-		tree[a].up = upa;
-		tree[b].up = upb;
-
-		// Fix children's up-pointers and symbolIndex -------------------------
-		let code = tree[a].code;
-		if (code < 0) {
-			// Internal node: fix children's parent pointers
-			tree[tree[a].left].up = a;
-			tree[tree[a].right].up = a;
+		let c = code[a];
+		if (c < 0) {
+			up[child[a2]] = a;
+			up[child[a2 + 1]] = a;
 		} else {
-			// Leaf node: fix symbolIndex
-			this.symbolIndex[code] = a;
+			this.symbolIndex[c] = a;
 		}
 
-		code = tree[b].code;
-		if (code < 0) {
-			tree[tree[b].left].up = b;
-			tree[tree[b].right].up = b;
+		c = code[b];
+		if (c < 0) {
+			up[child[b2]] = b;
+			up[child[b2 + 1]] = b;
 		} else {
-			this.symbolIndex[code] = b;
+			this.symbolIndex[c] = b;
 		}
 	}
 
@@ -277,12 +277,10 @@ export class AHuff {
 	 * weight(internal) = weight(left) + weight(right)
 	 */
 	private initWeight(a: number): number {
-		const node = this.tree[a];
-		if (node.code >= 0) {
+		if (this.code[a] >= 0) {
 			// Leaf — weight is already 1
-			return node.weight;
+			return this.weight[a];
 		}
-		node.weight = this.initWeight(node.left) + this.initWeight(node.right);
-		return node.weight;
+		return (this.weight[a] = this.initWeight(this.child[2 * a]) + this.initWeight(this.child[2 * a + 1]));
 	}
 }

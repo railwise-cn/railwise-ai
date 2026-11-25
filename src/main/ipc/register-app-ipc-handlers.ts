@@ -2540,7 +2540,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         pptx: {
           ...(imported.document.pptx ?? {}),
           editorBackend: 'pptx-vanilla-viewer' as const,
-          editorVersion: '3.61.0',
+          editorVersion: '3.80.0',
           source: {
             bytes: source.byteSize,
             sha256: source.sha256,

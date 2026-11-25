@@ -267,6 +267,7 @@ export class LocalToolHost implements ToolHost {
           turnId: context.turnId,
           threadId: context.threadId,
           approvalId,
+          requestHash: approval.requestHash,
           toolName: activeCall.toolName,
           summary: approval.summary
         })
@@ -440,6 +441,9 @@ export class LocalToolHost implements ToolHost {
     if (['write', 'edit'].includes(tool.name) && tool.toolKind === 'file_change' &&
       (grant?.taskPermissionId || grant?.scheduleScopeHash) && grant.writePathAllowlist?.length &&
       this.registry.resolveTool(call.toolName, context, call.providerId).provider.kind === 'built-in') return false
+    const provider = this.registry.resolveTool(call.toolName, context, call.providerId).provider
+    if (provider.id === 'web' && ['web_fetch', 'web_search'].includes(tool.name) &&
+      await tool.hasScopedApproval?.(call.arguments, context)) return false
     switch (approvalPolicy) {
       case 'auto':
         return false

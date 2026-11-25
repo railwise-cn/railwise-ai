@@ -8,6 +8,7 @@ import { EGO_SITE_SIGN_IN_REQUIRED as siteSignInRequired, EGO_TOOLS, type EgoBro
 import { operationFingerprint, type TaskRunRepository } from '../../services/task-run-repository.js'
 import { currentEgoTaskSpaceBinding, validEgoDocumentEvidence, type EgoClosedSpaceReopenAuthorization } from '../../services/ego-browser-evidence.js'
 import { EGO_RESULT_MARKER, runEgoBrowserScript, type EgoBrowserCommandRunner } from '../../services/ego-browser-cli.js'
+import { taskReadOnlySourceUrls } from '../../contracts/task-source-intent.js'
 const object = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
 const hash = (v: string) => createHash('sha256').update(v).digest('hex')
 const fail = (code: string) => Object.assign(new Error(code), { code })
@@ -168,7 +169,14 @@ function spaceStatusVerdict(status:Record<string,unknown>,spaceId:unknown,spaceN
   return 'agent'
 }
 
-export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabilityConfig; repository: TaskRunRepository; run?: EgoBrowserCommandRunner; now?: () => number; canFinishReadiness?: (context:ToolHostContext,hostOperationId:string)=>Promise<{ready:boolean;reason?:string}>; canReopenClosedSpace?: (context:ToolHostContext,hostOperationId:string,priorBindingReceiptId:string)=>Promise<EgoClosedSpaceReopenAuthorization|null> }): CapabilityToolProvider {
+function isYuanbaoSearchAddress(url: URL): boolean {
+  const entries = [...url.searchParams.entries()]
+  return url.protocol === 'https:' && url.origin === 'https://so.qq.com' && url.pathname === '/isearch' &&
+    !url.hash && entries.length === 1 && entries[0]?.[0] === 'query' &&
+    Boolean(entries[0][1].trim()) && entries[0][1].length <= 512
+}
+
+export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabilityConfig; repository: TaskRunRepository; run?: EgoBrowserCommandRunner; now?: () => number; userSourceUrls?: (taskId: string) => readonly string[]; canFinishReadiness?: (context:ToolHostContext,hostOperationId:string)=>Promise<{ready:boolean;reason?:string}>; canReopenClosedSpace?: (context:ToolHostContext,hostOperationId:string,priorBindingReceiptId:string)=>Promise<EgoClosedSpaceReopenAuthorization|null> }): CapabilityToolProvider {
   const config = options.config, repository = options.repository, run = options.run ?? runEgoBrowserScript
   const identity = operationFingerprint(config), now = options.now ?? Date.now
   const guard = async (context: ToolHostContext) => {
@@ -271,7 +279,9 @@ export function buildEgoBrowserToolProvider(options: { config: EgoBrowserCapabil
         }
         if(name==='ego_browser_open') {
           const target=new URL(String(args.url)), goalUrls=[...task.goal.matchAll(/https?:\/\/[^\s<>"'`）)，。]+/gi)].flatMap(match=>{try{const u=new URL(match[0]);return u.username||u.password?[]:[u.href]}catch{return []}})
-          if(target.username||target.password||!goalUrls.includes(target.href))throw fail('ego_browser_target_required')
+          const userSourceUrls=options.userSourceUrls?.(task.id) ?? taskReadOnlySourceUrls(task.acceptance, repository.inputs(task.id))
+          const scopedYuanbaoSearch=task.acceptance.requiresWebEvidence===true&&grant.browserScope!.origins.includes(target.origin)&&isYuanbaoSearchAddress(target)
+          if(target.username||target.password||![...goalUrls,...userSourceUrls].includes(target.href)&&!scopedYuanbaoSearch)throw fail('ego_browser_target_required')
           assertGrantAllowsNetwork(target.href,context);if(!grant.browserScope!.origins.includes(target.origin))throw fail('ego_browser_origin_denied')
         }
         if(name==='ego_browser_open'&&originalBinding?.status==='succeeded'&&options.canReopenClosedSpace) {

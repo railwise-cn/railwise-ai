@@ -4,6 +4,7 @@ const {
   cpSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   renameSync,
   rmSync,
   statSync
@@ -29,6 +30,7 @@ const MANAGED_RUNTIME_REQUIRED_PATHS = [
   'kun/package-lock.json',
   'kun/node_modules/zod/package.json',
   'kun/node_modules/diff/package.json',
+  'kun/node_modules/parse5/package.json',
   'kun/node_modules/pptxgenjs/package.json',
   'kun/node_modules/@modelcontextprotocol/sdk/package.json',
   'src/asset/skills/ppt-master/scripts/svg_to_pptx.py'
@@ -83,6 +85,21 @@ function validateBundledKunRuntime(context) {
     join(root, 'node_modules', 'better-sqlite3', 'package.json'),
     'root better-sqlite3 dependency'
   )
+}
+
+function validateBundledUniverLicenseResources(context) {
+  const sourceRoot = join(__dirname, '..', 'src', 'asset', 'builtin-integrations', 'univer')
+  const targetRoot = join(packedResourcesDir(context), 'third-party', 'builtin-integrations', 'univer')
+  const files = ['LICENSE-DreamNum-MIT', 'LICENSE-RxJS', 'LICENSE-Univer', 'NOTICE.txt']
+  for (const name of files) {
+    const source = join(sourceRoot, name)
+    const target = join(targetRoot, name)
+    assertExists(target, `packaged Univer license resource ${name}`)
+    if (!readFileSync(target).equals(readFileSync(source))) {
+      throw new Error(`[after-pack] Packaged Univer license resource differs from source: ${name}`)
+    }
+  }
+  return { files: files.length }
 }
 
 function ensureBundledMarkItDownExecutable(context) {
@@ -215,6 +232,8 @@ async function afterPack(context) {
   ensureBundledMarkItDownExecutable(context)
   validateBundledMarkItDownSidecar(context)
   copyBundledMarkdownConverters(context)
+  const univerLicenses = validateBundledUniverLicenseResources(context)
+  console.log(`[after-pack] Univer license resources verified: ${univerLicenses.files} files.`)
   const integrity = verifyAsarArchive(
     join(packedResourcesDir(context), 'app.asar'),
     join(__dirname, '..', 'out'),
@@ -246,6 +265,7 @@ module.exports._internals = {
   validateBundledKunRuntime,
   ensureBundledMarkItDownExecutable,
   validateBundledMarkItDownSidecar,
+  validateBundledUniverLicenseResources,
   copyBundledMarkdownConverters,
   verifyCandidateSourceTree,
   converterDirNameForContext,

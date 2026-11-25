@@ -4,15 +4,24 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MARKETPLACE_MIRROR_BASE, marketplaceMirrorPath, materializeMarketplaceMirror, mirrorRecordFor } from './marketplace-mirror'
+import { MARKETPLACE_MIRROR_BASE, marketplaceMirrorPath, materializeMarketplaceMirror, mirrorRecordFor, type MirroredPackage } from './marketplace-mirror'
 import { getOfficialMarketplaceCatalog } from './official-marketplace-catalog'
 import { marketplacePackageReviewSha256, PackageInstallationService } from './package-installation-service'
 import { materializeCatalogPackage, PluginManagementService } from './plugin-management-service'
+import type { MarketplacePackageV1 } from '../../shared/marketplace'
 import { SkillRuntime } from '../../../kun/src/skills/skill-runtime'
 import { declaredMarketplaceSkills, marketplaceSkillReadiness } from '../../shared/marketplace-skill-readiness'
 import { marketplacePackageSkillRoots } from './skill-service'
 
 const packageItem = getOfficialMarketplaceCatalog().find(item => item.id === 'video-shotcraft')!
+const SUPERPOWERS_PREVIOUS_COMMIT = '44c9b2d6e889982ac18c27d05a19fefe335194e1'
+const SUPERPOWERS_PREVIOUS_WINDOWS_MIRROR: MirroredPackage = {
+  packageId: 'superpowers',
+  reviewSha256: 'f65a56ea8d796994dcb02a9b0ca3955938f816e52410124167eb8b4d2b084e2c',
+  platform: 'win32',
+  arch: 'x64',
+  parts: [{ sha256: '87c4c56e1cd9d4472517fe8e2d0628b8421951e2a5c929ddf8ff4e5aeb2bfeaa', size: 147368 }]
+}
 const temporary: string[] = []
 afterEach(async () => {
   vi.unstubAllGlobals()
@@ -28,6 +37,29 @@ async function target() {
 async function archive(path: string, content: string) {
   const bytes = await new JSZip().file(path, content).generateAsync({ type: 'nodebuffer' })
   return { bytes, part: { sha256: createHash('sha256').update(bytes).digest('hex'), size: bytes.length } }
+}
+
+function previousSuperpowersItem(item: MarketplacePackageV1): MarketplacePackageV1 {
+  return {
+    ...item,
+    version: `${SUPERPOWERS_PREVIOUS_COMMIT}-railwise.1`,
+    source: { ...item.source, resolvedRef: SUPERPOWERS_PREVIOUS_COMMIT },
+    sources: item.sources.map(source => ({ ...source, resolvedRef: SUPERPOWERS_PREVIOUS_COMMIT })),
+    components: item.components.map(component => {
+      if (component.id !== 'superpowers-skills' || component.type !== 'skill' || component.runtime.kind !== 'github') return component
+      return {
+        ...component,
+        skillNames: ['using-superpowers'],
+        runtime: { ...component.runtime, resolvedCommit: SUPERPOWERS_PREVIOUS_COMMIT }
+      }
+    })
+  }
+}
+
+async function installedSkillIds(directory: string): Promise<string[]> {
+  const roots = await marketplacePackageSkillRoots(directory)
+  const diagnostics = (await SkillRuntime.create({ enabled: true, roots, legacySkillMd: true })).diagnostics()
+  return diagnostics.skills.map(skill => skill.id).sort()
 }
 
 describe('official marketplace mirror', () => {
@@ -74,24 +106,18 @@ describe('official marketplace mirror', () => {
       expect(await readFile(join(directory, 'LICENSE'), 'utf8')).toContain('MIT License')
       const roots = await marketplacePackageSkillRoots(directory)
       const skills = (await SkillRuntime.create({ enabled: true, roots, legacySkillMd: true })).diagnostics()
-      expect(skills.skills).toHaveLength(14)
+      expect(skills.skills).toHaveLength(15)
       expect(marketplaceSkillReadiness(skills, directory, declaredMarketplaceSkills(item.components, item)!)).toBe('loaded')
-      const oldItem = {
-        ...item, version: '44c9b2d6e889982ac18c27d05a19fefe335194e1',
-        components: item.components.map(component => ({ ...component, skillNames: ['superpowers'] }))
-      }
+      const oldItem = previousSuperpowersItem(item)
       expect(marketplaceSkillReadiness(skills, directory, declaredMarketplaceSkills(oldItem.components, oldItem)!)).toBe('loaded')
     }
   )
 
-  it('keeps the previous reviewed Superpowers installation and workspace when applying the declaration upgrade', async () => {
+  it('upgrades the actual previous Superpowers archive and restores its skills and workspace on rollback', async () => {
     const item = getOfficialMarketplaceCatalog().find(entry => entry.id === 'superpowers')!
-    const oldItem = {
-      ...item, version: '44c9b2d6e889982ac18c27d05a19fefe335194e1',
-      components: item.components.map(component => ({ ...component, skillNames: ['superpowers'] }))
-    }
+    const oldItem = previousSuperpowersItem(item)
     const oldReview = marketplacePackageReviewSha256(oldItem)
-    expect(oldReview).toBe('757298cdb87136ab60f7213fccc2f5b74f4c42756664aa2b514be2bfd40a7e1a')
+    expect(oldReview).toBe(SUPERPOWERS_PREVIOUS_WINDOWS_MIRROR.reviewSha256)
     const record = mirrorRecordFor(item, undefined, 'win32', 'x64')!
     const root = await target()
     const workspace = join(root, 'workspace')
@@ -101,15 +127,18 @@ describe('official marketplace mirror', () => {
     const service = new PluginManagementService({
       rootDirectory: join(root, 'imports'),
       installationService: installations,
-      catalogMaterializer: (candidate, directory) => materializeMarketplaceMirror(candidate, {
-        ...record, reviewSha256: marketplacePackageReviewSha256(candidate)
-      }, directory, async () => { throw new Error('unexpected network') })
+      catalogMaterializer: (candidate, directory) => materializeMarketplaceMirror(candidate,
+        candidate.version === oldItem.version ? SUPERPOWERS_PREVIOUS_WINDOWS_MIRROR : record,
+        directory, async () => { throw new Error('unexpected network') })
     })
     const before = await service.prepareCatalogPackage(oldItem)
     const initial = await service.installPrepared({
       preparedId: before.id, reviewSha256: before.reviewSha256, expectedCurrentVersion: null,
       scope: 'workspace', workspaceRoot: workspace, permissions: [], idempotencyKey: 'before-declaration-upgrade'
     })
+    const previousSkillIds = await installedSkillIds(initial.artifact.location)
+    expect(previousSkillIds).toHaveLength(14)
+    expect(previousSkillIds).not.toContain('diagnosing-superpowers')
     const after = await service.prepareCatalogPackage(item)
     const upgraded = await service.installPrepared({
       preparedId: after.id, reviewSha256: after.reviewSha256, expectedCurrentVersion: initial.version,
@@ -117,11 +146,18 @@ describe('official marketplace mirror', () => {
     })
     expect(upgraded).toMatchObject({
       scope: 'workspace', workspaceRoot: await realpath(workspace),
-      rollback: { available: true, reviewSha256: before.reviewSha256, artifact: initial.artifact }
+      permissions: initial.permissions, updatePolicy: initial.updatePolicy,
+      rollback: { available: true, reviewSha256: before.reviewSha256, artifact: initial.artifact,
+        permissions: initial.permissions, updatePolicy: initial.updatePolicy }
     })
+    expect(upgraded.artifact.sha256).not.toBe(initial.artifact.sha256)
+    const upgradedSkillIds = await installedSkillIds(upgraded.artifact.location)
+    expect(upgradedSkillIds).toEqual([...previousSkillIds, 'diagnosing-superpowers'].sort())
     const reverted = await service.rollback({ packageId: item.id, expectedCurrentVersion: item.version, idempotencyKey: 'revert-declaration-upgrade' })
     expect(reverted).toMatchObject({ version: oldItem.version, artifact: initial.artifact,
-      workspaceRoot: await realpath(workspace), reviewSha256: oldReview })
+      scope: 'workspace', workspaceRoot: await realpath(workspace), reviewSha256: oldReview,
+      permissions: initial.permissions, updatePolicy: initial.updatePolicy })
+    expect(await installedSkillIds(reverted.artifact.location)).toEqual(previousSkillIds)
     expect(await readFile(join(workspace, 'existing.md'), 'utf8')).toBe('Existing user file')
   }, 30_000)
 

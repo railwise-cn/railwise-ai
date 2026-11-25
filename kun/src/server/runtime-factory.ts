@@ -50,10 +50,13 @@ import { buildSkillResourceToolProvider } from '../adapters/tool/skill-resource-
 import { buildFlowToolProviders } from '../adapters/tool/flow-tool-provider.js'
 import { buildDelegationToolProviders } from '../adapters/tool/delegation-tool-provider.js'
 import { buildWebToolProviders } from '../adapters/tool/web-tool-provider.js'
+import { FallbackWebSearchProvider, UnavailableWebProvider } from '../ports/web-provider.js'
+import { GithubRepositorySearchProvider } from '../adapters/tool/github-repository-search-provider.js'
 import {
   DeepSeekResponsesWebProvider,
   isDeepSeekResponsesWebSearchConfig
 } from '../adapters/tool/deepseek-responses-web-provider.js'
+import { YuanbaoWebSearchProvider } from '../adapters/tool/yuanbao-web-search-provider.js'
 import { buildImageGenToolProviders } from '../adapters/tool/image-gen-tool-provider.js'
 import { buildPptMasterToolProviders } from '../adapters/tool/ppt-master-tool-provider.js'
 import { buildDesignToolProviders } from '../adapters/tool/design-tool-provider.js'
@@ -139,6 +142,8 @@ import { ManagedDwsRuntime } from '../services/managed-dws-runtime.js'
 import { EgoBrowserRuntime } from '../services/ego-browser-runtime.js'
 import { ManagedBrowserSkillRuntime } from '../services/managed-browser-skill-runtime.js'
 import { isBrowserTask } from '../contracts/browser-skill.js'
+import { taskReadOnlySourceOrigins, taskReadOnlySourceUrls, taskUserProvidedSourceUrls } from '../contracts/task-source-intent.js'
+import { verifiedWebSearchResultUrls } from '../services/web-search-result-authority.js'
 import { externalTaskIntent } from '../services/external-task-capability.js'
 import { contextualExternalTaskPreflight } from '../services/contextual-external-task-preflight.js'
 import { workspaceWritePreflight,workspacePermissionCapability } from '../services/workspace-write-preflight.js'
@@ -396,8 +401,29 @@ export async function createKunServeRuntime(
         nowIso
       })
     : undefined
+  const yuanbaoWebSearch = new YuanbaoWebSearchProvider({
+    denyDomains: options.capabilities?.web?.denyDomains,
+    nowIso
+  })
+  const githubRepositorySearch = new GithubRepositorySearchProvider({ nowIso })
+  const requestedWebSearchProvider = options.capabilities?.web?.provider
+  const requestedSearchProviderIds = requestedWebSearchProvider
+    ? requestedWebSearchProvider.split('+').filter(Boolean)
+    : ['deepseek-responses', 'yuanbao-opensearch']
+  const supportedSearchProviderIds = new Set(['deepseek-responses', 'yuanbao-opensearch', 'github-repository-search'])
+  const allowsBuiltInWebSearch = requestedSearchProviderIds.length > 0 &&
+    requestedSearchProviderIds.every(providerId => supportedSearchProviderIds.has(providerId))
+  const searchProviders = allowsBuiltInWebSearch ? [
+    ...(requestedSearchProviderIds.includes('deepseek-responses') && deepSeekWebSearch ? [deepSeekWebSearch] : []),
+    ...(requestedSearchProviderIds.includes('yuanbao-opensearch') ? [yuanbaoWebSearch] : []),
+    githubRepositorySearch
+  ] : []
+  const webSearch = searchProviders.length
+    ? new FallbackWebSearchProvider(searchProviders)
+    : new UnavailableWebProvider(requestedWebSearchProvider ?? 'unavailable')
   const webProviders = buildWebToolProviders(options.capabilities?.web, {
-    ...(deepSeekWebSearch ? { searchProvider: deepSeekWebSearch } : {}),
+    searchProvider: webSearch,
+    searchResultUrls: (taskId, turnId) => verifiedWebSearchResultUrls(taskRepository.operations(taskId, 'tool'), taskId, turnId),
     nowIso
   })
   const skillRuntime = await traceRuntimeStartupPhase('skills', () =>
@@ -549,6 +575,10 @@ export async function createKunServeRuntime(
   dingtalkRuntime.setApply(provider => applyDingTalkProvider({ provider }))
   const useDws=()=>Boolean(dwsRuntime.toolProvider())
   const egoRuntime = new EgoBrowserRuntime({config:options.capabilities?.egoBrowser,repository:taskRepository,
+    userSourceUrls: taskId => {
+      const task = taskRepository.get(taskId)
+      return task ? taskReadOnlySourceUrls(task.acceptance, taskController.taskInputs(taskId)) : []
+    },
     canFinishReadiness:(context,hostOperationId)=>taskController.egoFinishReadiness(context.executionGrant!.taskId!,context.turnId,hostOperationId),
     canReopenClosedSpace:(context,hostOperationId,bindingReceiptId)=>taskController.egoTaskSpaceReopenAuthorization(context.executionGrant!.taskId!,context.turnId,hostOperationId,bindingReceiptId)})
   const browserRuntime = new ManagedBrowserSkillRuntime({ config: options.capabilities?.browserSkill,
@@ -841,16 +871,45 @@ export async function createKunServeRuntime(
       ? intent.provider === 'lark' ? 'lark-cli' : intent.provider === 'dingtalk' ? 'dingtalk' : undefined
       : undefined
     const task = taskController.activeTask(threadId)
+    const taskSourceOrigins = task
+      ? taskReadOnlySourceOrigins(task.acceptance, taskController.taskInputs(task.id))
+      : []
+    const permissionNetworkOrigins = restriction.permissionScope?.networkOrigins
+    const permittedTaskSourceOrigins = taskSourceOrigins.filter(origin => !permissionNetworkOrigins ||
+      permissionNetworkOrigins.includes('*') || permissionNetworkOrigins.includes(origin))
+    const searchOrigins = webSearch.searchOrigins ?? []
+    const allowedSearchOrigins = searchOrigins.filter(origin => {
+      const permissionAllowsOrigin = !permissionNetworkOrigins || permissionNetworkOrigins.includes('*') || permissionNetworkOrigins.includes(origin)
+      const inheritedAllowsOrigin = !task?.authority?.browserScope || task.authority.browserScope.origins.includes(origin)
+      const browserAllowsOrigin = !browserRuntime.state().origins.length || browserRuntime.state().origins.includes(origin)
+      return permissionAllowsOrigin && inheritedAllowsOrigin && browserAllowsOrigin
+    })
+    const yuanbaoOrigin = 'https://so.qq.com'
+    const permissionAllowsYuanbao = allowedSearchOrigins.includes(yuanbaoOrigin)
+    const browserConfiguration = browserRuntime.state()
+    const inheritedBrowserScope = task?.authority?.browserScope
+    const inheritedAllowsYuanbao = !inheritedBrowserScope || inheritedBrowserScope.origins.includes(yuanbaoOrigin)
+    const browserAllowsYuanbao = !browserConfiguration.origins.length || browserConfiguration.origins.includes(yuanbaoOrigin)
+    const yuanbaoFallbackAllowed = Boolean(task?.acceptance.requiresWebEvidence && permittedTaskSourceOrigins.length &&
+      (!permissionNetworkOrigins || permissionNetworkOrigins.includes('*') || permissionNetworkOrigins.includes(yuanbaoOrigin)) &&
+      inheritedAllowsYuanbao && (egoRuntime.state().state === 'installed' || browserConfiguration.state !== 'ready' || browserAllowsYuanbao))
+    const taskNetworkOrigins = [...new Set([
+      ...permittedTaskSourceOrigins,
+      ...(task?.acceptance.requiresWebEvidence && options.capabilities?.web?.searchEnabled
+        ? allowedSearchOrigins.filter(origin => origin !== yuanbaoOrigin ||
+          yuanbaoFallbackAllowed || !permittedTaskSourceOrigins.length && permissionAllowsYuanbao)
+        : [])
+    ])]
     const accepted = task?.activeTurnId === turnId ? task.acceptance.effect : undefined
     const effects = accepted?.requiredEffects ?? (accepted?.target
       ? [{ provider: accepted.provider, operation: accepted.operation, target: accepted.target }] : [])
     const externalTargets = effects.map(effect => externalTargetGrantKey(effect.provider, effect.operation, effect.target))
-    const egoTask=Boolean(turn&&egoRuntime.selected(turn.prompt,task?.authority?.browserScope))
+    const egoTask = Boolean(turn && egoRuntime.selectsForPublicRead(turn.prompt, task?.authority?.browserScope,
+      Boolean(task?.acceptance.requiresWebEvidence && permittedTaskSourceOrigins.length)))
     const browserTask = Boolean(turn && (egoTask || isBrowserTask(turn.prompt) || task?.authority?.browserScope))
+    const userSourceUrls = task ? taskUserProvidedSourceUrls(task.goal, taskController.taskInputs(task.id)) : []
     const browserFallback = turn && task?.activeTurnId === turnId && !browserTask && !selectedProviderId && !task.scheduledBy
-      ? browserRuntime.sourceReadScope([task.goal, ...taskController.taskInputs(task.id)
-        .filter(input => input.kind === 'supplement' && input.sourceId === undefined)
-        .map(input => input.text)])
+      ? browserRuntime.sourceReadScope(userSourceUrls)
       : undefined
     const externalProviderIds = new Set(['lark-cli', 'dingtalk'])
     const allowedProviderIds = toolHost.diagnostics()
@@ -859,12 +918,33 @@ export async function createKunServeRuntime(
       .filter(providerId => !externalProviderIds.has(providerId) || providerId === selectedProviderId)
       .filter(providerId => providerId !== 'browser-skill' || (browserTask || browserFallback) && !egoTask)
       .filter(providerId => providerId !== 'ego-browser' || egoTask)
-      .filter(providerId => !egoTask || ['builtin','ego-browser','managed-artifacts','document-delivery','task-schedule','todo'].includes(providerId))
-    let providerScope: ExecutionScope = { networkAllowlist: ['*'], connectorScopes: [], externalTargets: [] }
+      .filter(providerId => !egoTask || ['builtin','web','ego-browser','managed-artifacts','document-delivery','task-schedule','todo'].includes(providerId))
+    let providerScope: ExecutionScope = {
+      networkAllowlist: taskSourceOrigins.length ? taskNetworkOrigins : ['*'], connectorScopes: [], externalTargets: []
+    }
     if (selectedProviderId === 'lark-cli') providerScope = larkRuntime.scope(externalTargets)
     else if (selectedProviderId === 'dingtalk') providerScope = useDws() ? dwsRuntime.scope(externalTargets) : dingtalkRuntime.scope(externalTargets)
     else if (browserTask && turn) {
-      providerScope = egoTask ? egoRuntime.scope(turn.prompt,task?.authority?.browserScope,restriction.permissionScope?.networkOrigins) : browserRuntime.scope(turn.prompt, task?.authority?.browserScope, restriction.permissionScope?.networkOrigins)
+      const egoSourceScope = egoTask && !task?.authority?.browserScope && permittedTaskSourceOrigins.length && egoRuntime.state().executableHash
+        ? { provider: 'ego-browser' as const, browserInstanceId: `ego-browser:${egoRuntime.state().executableHash}`,
+          origins: taskNetworkOrigins, interaction: 'observe' as const, sourceReadOnly: true as const, revision: egoRuntime.state().revision }
+        : task?.authority?.browserScope
+      if (egoTask) {
+        const egoScope = egoRuntime.scope(turn.prompt, egoSourceScope, taskNetworkOrigins)
+        const webFallbackTools = task?.acceptance.requiresWebEvidence && permittedTaskSourceOrigins.length
+          ? [
+            ...(options.capabilities?.web?.searchEnabled ? ['web_search'] : []),
+            ...(options.capabilities?.web?.fetchEnabled ? ['web_fetch'] : [])
+          ]
+          : []
+        providerScope = webFallbackTools.length
+          ? { ...egoScope, networkAllowlist: taskNetworkOrigins, allowedToolNames: [...(egoScope.allowedToolNames ?? []), ...webFallbackTools] }
+          : { ...egoScope, networkAllowlist: taskNetworkOrigins }
+      } else {
+        const browserScope = browserRuntime.scope(turn.prompt, task?.authority?.browserScope,
+          taskNetworkOrigins.length ? taskNetworkOrigins : restriction.permissionScope?.networkOrigins)
+        providerScope = { ...browserScope, networkAllowlist: taskNetworkOrigins.length ? taskNetworkOrigins : browserScope.networkAllowlist }
+      }
       if (task && providerScope.browserScope && !task.authority?.browserScope) {
         taskRepository.update(task.id, task.revision, current => ({ ...current, authority: { ...current.authority!, browserScope: providerScope.browserScope } }))
       }
@@ -981,19 +1061,25 @@ export async function createKunServeRuntime(
   const taskControlService=new TaskControlService({publicQueryRecovery,validateRecoveryExecution,preflightRecoveryTask:(text,thread,binding)=>externalTaskIntent(text)?.kind==='external_task'?Promise.resolve(workspacePermissionCapability('public_query_recovery_read_only','重新检索仅允许公开查询与本机成果，不能执行外部业务写入。')):browserRuntime.preflight(text,thread,publicQueryRecovery.reviewedBrowserScope(binding),undefined,binding.mode==='task_reauthorization'?publicQueryRecovery.reviewedBrowserScope(binding):undefined),validateRecoveryPermission:threadId=>taskPermissionService.executionRestriction(threadId),repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>{void browserRuntime.stopThread(threadId);return delegationRuntime?.abortParent(threadId,reason)},preflightExternalTask:externalPreflight,validateTaskPermission:(threadId,sourceTaskId)=>taskExecutionRestriction(threadId,undefined,sourceTaskId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),validateRetryLocalSchedule:(task,receipt,recovery)=>taskScheduleService?.validateRetryLocalSchedule(task,receipt,recovery) ?? Promise.resolve(false),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
   const taskCoordinator = new TaskCoordinator({ preflightExternalTask:externalPreflight, controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore, userInputGate,
     waitTurn: (threadId, turnId) => loop.awaitTurnIdle(threadId, turnId),
-    async requiresBrowserScopeRefresh(task, turnId) {
+    async requiresBrowserScopeRefresh(task, turnId, text) {
       const turn = (await threadStore.get(task.threadId))?.turns.find(item => item.id === turnId)
       if (!turn) return false
-      const sources = [task.goal, ...taskController.taskInputs(task.id)
-        .filter(input => input.kind === 'supplement' && input.sourceId === undefined)
-        .map(input => input.text)]
+      const existing = turn.executionGrant?.browserScope
+      if (existing?.origins.some(origin => taskUserProvidedSourceUrls(task.goal, [
+        ...taskController.taskInputs(task.id), { kind: 'supplement' as const, text, sourceId: undefined }
+      ]).some(url => {
+        try { return new URL(url).origin === origin } catch { return false }
+      }))) return false
+      if (!existing && options.capabilities?.egoBrowser?.state === 'installed' && task.acceptance.requiresWebEvidence) return false
+      const sources = taskUserProvidedSourceUrls(task.goal, [
+        ...taskController.taskInputs(task.id), { kind: 'supplement' as const, text, sourceId: undefined }
+      ])
       const requestedScope = browserRuntime.sourceReadScope(sources)
       if (!requestedScope) return false
-      const grant = turn.executionGrant
-      return !grant?.allowedProviderIds?.includes('browser-skill') ||
-        requestedScope.origins.some(origin => !grant.browserScope?.origins.includes(origin)) ||
-        grant.browserScope?.interaction !== 'observe' || grant.browserScope.sourceReadOnly !== true ||
-        grant.connectorIdentityFingerprints?.['browser-skill'] !== browserRuntime.identityFingerprint()
+      return !turn.executionGrant?.allowedProviderIds?.includes('browser-skill') ||
+        requestedScope.origins.some(origin => !existing?.origins.includes(origin)) ||
+        existing?.interaction !== 'observe' || existing.sourceReadOnly !== true ||
+        turn.executionGrant?.connectorIdentityFingerprints?.['browser-skill'] !== browserRuntime.identityFingerprint()
     },
     async classifyIntent(text, task) {
       const abort = new AbortController()

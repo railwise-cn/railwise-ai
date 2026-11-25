@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, win32 } from 'node:path'
 import JSZip from 'jszip'
@@ -143,8 +143,22 @@ async function doclingFixture() {
     wheel: { sha256: runtime.install.digest.value }
   }))
   const command = await realpath(pythonPath)
-  const args = ['-I', await realpath(launcher), await realpath(sitePackages), runtime.packageName, runtime.executable]
-  return { item, installed, component, command, args, pythonRoot }
+  const args = ['-I', await realpath(launcher), await realpath(sitePackages), runtime.packageName, runtime.executable, ...runtime.args]
+  const legacyArgs = ['-I', await realpath(launcher), await realpath(sitePackages), runtime.packageName, runtime.executable]
+  return { item, installed, component, command, args, legacyArgs, pythonRoot }
+}
+
+async function convertDoclingFixtureToLegacy(installed: InstalledPackageV1) {
+  const wheelSha256 = '595da70b9de2265f1f14e575fad65ff4213c5c7e2dbb255184d606505fa49f23'
+  const lockPath = join(installed.artifact.location, 'requirements.lock')
+  const lock = `docling-mcp==3.0.0 --hash=sha256:${wheelSha256}\n`
+  const metadataPath = join(installed.artifact.location, 'workwise-python-runtime.json')
+  const metadata = JSON.parse(await readFile(metadataPath, 'utf8'))
+  metadata.packageVersion = '3.0.0'
+  metadata.lockSha256 = createHash('sha256').update(lock).digest('hex')
+  metadata.wheel.sha256 = wheelSha256
+  await writeFile(lockPath, lock)
+  await writeFile(metadataPath, JSON.stringify(metadata))
 }
 
 describe('activatePluginPackage', () => {
@@ -447,7 +461,7 @@ describe('activatePluginPackage', () => {
     }))
   })
 
-  it('activates the official Docling 3.0.0 package on stdio', async () => {
+  it('activates the current official Docling package on stdio', async () => {
     const { item, installed, component, command, args, pythonRoot } = await doclingFixture()
     const save = vi.fn(async ({ config }) => ({ ...config, revision: 1 }))
 
@@ -471,27 +485,32 @@ describe('activatePluginPackage', () => {
         id: component.id,
         transport: 'stdio',
         command,
-        args: [...args, '--transport', 'stdio'],
+        args,
         enabled: true
       })
     }))
   })
 
   it('allows extra startup time only for verified official Docling launches and fixes the legacy argv', async () => {
-    const { installed, component, command, args, pythonRoot } = await doclingFixture()
+    const { installed, component, command, args, legacyArgs, pythonRoot } = await doclingFixture()
     const server: McpServerConfigV2 = {
       id: component.id, name: component.name, scope: 'global', transport: 'stdio',
       command, args, source: 'managed-tool', timeoutMs: 30_000, toolPolicy: {}, enabled: true, revision: 1
     }
     const options = { installed: { get: vi.fn().mockResolvedValue(installed) }, pythonRoot, platform: 'darwin' as const }
-    const projected = { args: [...args, '--transport', 'stdio'], startupTimeoutMs: 40_000 }
+    const projected = { args, startupTimeoutMs: 40_000 }
 
     await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args: projected.args }, options)).resolves.toEqual(projected)
-    await expect(verifiedOfficialDoclingStdioLaunch(server, options)).resolves.toBeUndefined()
-    // Review digest in the shipped 0.5.7 and the first 0.5.8 candidate.
-    installed.reviewSha256 = '18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99'
     await expect(verifiedOfficialDoclingStdioLaunch(server, options)).resolves.toEqual(projected)
-    expect(server.args).toEqual(args)
+    // Review digest in the shipped 0.5.7 and the first 0.5.8 candidate.
+    installed.version = '3.0.0'
+    installed.reviewSha256 = '18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99'
+    await convertDoclingFixtureToLegacy(installed)
+    const legacyServer = { ...server, args: legacyArgs }
+    await expect(verifiedOfficialDoclingStdioLaunch(legacyServer, options)).resolves.toEqual({
+      args: [...legacyArgs, '--transport', 'stdio'], startupTimeoutMs: 40_000
+    })
+    expect(legacyServer.args).toEqual(legacyArgs)
     await expect(verifiedOfficialDoclingStdioLaunch({ ...server, source: 'user' }, options)).resolves.toBeUndefined()
     await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args: [...args, '--transport', 'streamable-http'] }, options)).resolves.toBeUndefined()
     await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args: [args[0], 'other-launcher.py', ...args.slice(2)] }, options)).resolves.toBeUndefined()
@@ -500,8 +519,8 @@ describe('activatePluginPackage', () => {
   })
 
   it('initializes only the verified Windows Docling pywin32 paths and preserves the saved launch', async () => {
-    const { installed, component, command, args, pythonRoot } = await doclingFixture()
-    const savedArgs = [...args, '--transport', 'stdio']
+    const { installed, component, command, args, legacyArgs, pythonRoot } = await doclingFixture()
+    const savedArgs = [...args]
     const server: McpServerConfigV2 = {
       id: component.id, name: component.name, scope: 'global', transport: 'stdio',
       command, args: savedArgs, source: 'managed-tool', timeoutMs: 30_000, toolPolicy: {}, enabled: true, revision: 1
@@ -522,12 +541,14 @@ describe('activatePluginPackage', () => {
     expect(launch?.args[2]).not.toContain('addsitedir')
     expect(launch?.args.slice(3, 5)).toEqual(savedArgs.slice(1, 3).map(path => win32.toNamespacedPath(path)))
     expect(launch?.args.slice(5)).toEqual(savedArgs.slice(3))
-    expect(server.args).toEqual([...args, '--transport', 'stdio'])
+    expect(server.args).toEqual(args)
 
     await expect(verifiedOfficialDoclingStdioLaunch({ ...server, source: 'user' }, options)).resolves.toBeUndefined()
     await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args: [...args, '--transport', 'streamable-http'] }, options)).resolves.toBeUndefined()
+    installed.version = '3.0.0'
     installed.reviewSha256 = '18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99'
-    await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args }, options)).resolves.toEqual(launch)
+    await convertDoclingFixtureToLegacy(installed)
+    await expect(verifiedOfficialDoclingStdioLaunch({ ...server, args: legacyArgs }, options)).resolves.toEqual(launch)
   })
 
   it('activates MCPB uv packages only through the pinned managed runtime', async () => {

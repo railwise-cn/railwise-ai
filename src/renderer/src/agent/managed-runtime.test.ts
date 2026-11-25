@@ -1091,6 +1091,7 @@ describe('WorkWiseRuntimeProvider', () => {
                   kind: 'approval_requested',
                   seq: 6,
                   approvalId: `appr_${policy}`,
+                  requestHash: 'request-hash-live',
                   summary: `${policy} approval`
                 },
                 { kind: 'turn_completed', seq: 7 }
@@ -1104,6 +1105,7 @@ describe('WorkWiseRuntimeProvider', () => {
       await provider.subscribeThreadEvents('thr_1', 0, sink, ac.signal)
       expect(sink.onApproval).toHaveBeenCalledWith({
         approvalId: `appr_${policy}`,
+        requestHash: 'request-hash-live',
         summary: `${policy} approval`,
         toolName: undefined
       })

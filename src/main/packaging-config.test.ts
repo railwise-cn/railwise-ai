@@ -229,6 +229,8 @@ describe('electron-builder WorkWise packaging', () => {
     expect(builderConfig.files).not.toEqual(expect.arrayContaining([
       '!**/node_modules/openclaw/**/*'
     ]))
+    expect(require.resolve('openclaw/plugin-sdk/config-mutation').replaceAll('\\', '/')).toContain('vendor/openclaw-shim/plugin-sdk/config-mutation.js')
+    expect(require.resolve('openclaw/plugin-sdk/temp-path').replaceAll('\\', '/')).toContain('vendor/openclaw-shim/plugin-sdk/temp-path.js')
     expect(builderConfig.extraResources).toEqual(expect.arrayContaining([
       expect.objectContaining({
         from: 'kun',
@@ -245,6 +247,7 @@ describe('electron-builder WorkWise packaging', () => {
         to: 'app.asar.unpacked/kun/runtime-deps',
         filter: expect.arrayContaining([
           'zod/**/*',
+          'parse5/**/*',
           'pdfkit/**/*',
           'fontkit/**/*',
           '@modelcontextprotocol/sdk/**/*'

@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { parseCTF } from './ctf-parser';
 import { EotError, EotErrorCode } from './errors';
 import { Stream } from './stream';
+import { TRIPLET_ENCODINGS } from './triplet-encodings';
 import { dumpContainer } from './sfnt-builder';
 
 /** Minimal 54-byte `head` table (indexToLocFormat lives at offset 50). */
@@ -88,19 +89,25 @@ function withRequiredTables(
  *
  * This is a helper for constructing test inputs for parseCTF.
  */
-function buildMinimalCTFStream0(inputTables: { tag: string; data: Uint8Array }[]): Stream {
-	return buildRawCTFStream0(withRequiredTables(inputTables));
+function buildMinimalCTFStream0(
+	inputTables: { tag: string; data: Uint8Array }[],
+	scalarType = 0x00010000,
+): Stream {
+	return buildRawCTFStream0(withRequiredTables(inputTables), scalarType);
 }
 
 /**
  * Build a CTF stream[0] from exactly the given tables, with no injection of
  * required structural tables. Use this to exercise the missing-table guards.
  */
-function buildRawCTFStream0(tables: { tag: string; data: Uint8Array }[]): Stream {
+function buildRawCTFStream0(
+	tables: { tag: string; data: Uint8Array }[],
+	scalarType = 0x00010000,
+): Stream {
 	const s = new Stream(null, 0);
 
 	// --- SFNT offset table (12 bytes) ---
-	s.writeU32(0x00010000); // scalarType (TrueType)
+	s.writeU32(scalarType); // scalarType (TrueType unless a test says otherwise)
 	s.writeU16(tables.length); // numTables
 	s.writeU16(0); // searchRange (not validated by parser)
 	s.writeU16(0); // entrySelector
@@ -191,7 +198,8 @@ describe('parseCTF', () => {
 		expect(name.buf).toStrictEqual(new Uint8Array([0xaa, 0xbb]));
 
 		expect(container.droppedTables).toBeUndefined();
-		expect(warnings).toHaveLength(0);
+		// Only the expected "missing recommended table" notices for this minimal font.
+		expect(warnings.filter((m) => !/has no (hhea|cmap|post|name|OS\/2) table/.test(m))).toHaveLength(0);
 	});
 
 	it('reconstructs compressed VDMX records', () => {
@@ -305,7 +313,10 @@ describe('parseCTF', () => {
 	it('rejects an invalid head indexToLocFormat', () => {
 		const head = minimalHead();
 		head[51] = 2;
-		const s0 = buildMinimalCTFStream0([{ tag: 'head', data: head }]);
+		const s0 = buildMinimalCTFStream0([
+			{ tag: 'glyf', data: new Uint8Array(0) },
+			{ tag: 'head', data: head },
+		]);
 		expect(() => parseCTF([s0, new Stream(null, 0), new Stream(null, 0)])).toThrow(
 			/malformed head table|invalid head indexToLocFormat/i,
 		);
@@ -407,5 +418,144 @@ describe('parseCTF', () => {
 			expect(e).toBeInstanceOf(EotError);
 			expect((e as EotError).code).toBe(EotErrorCode.MalformedHeadTable);
 		}
+	});
+
+	// -----------------------------------------------------------------------
+	// sfnt version (CFF-flavoured OpenType)
+	// -----------------------------------------------------------------------
+	describe('sfnt version', () => {
+		const OTTO = 0x4f54544f;
+		/** maxp version 0.5, the only maxp a CFF-outline font carries. */
+		const maxp05 = new Uint8Array([0x00, 0x00, 0x50, 0x00, 0x00, 0x00]);
+		const cff = new Uint8Array([1, 0, 4, 1]);
+		const leadingTag = (font: Uint8Array) =>
+			((font[0] << 24) | (font[1] << 16) | (font[2] << 8) | font[3]) >>> 0;
+		const parse = (tables: { tag: string; data: Uint8Array }[], scalarType: number) => {
+			const warnings: string[] = [];
+			const container = parseCTF(
+				[buildMinimalCTFStream0(tables, scalarType), new Stream(null, 0), new Stream(null, 0)],
+				{ onWarn: (m) => warnings.push(m) },
+			);
+			return { container, warnings };
+		};
+
+		for (const header of [OTTO, 0x00010000]) {
+			it(`writes OTTO for CFF outlines when the CTF header says 0x${header.toString(16)}`, () => {
+				const { container, warnings } = parse(
+					[
+						{ tag: 'CFF ', data: cff },
+						{ tag: 'maxp', data: maxp05 },
+					],
+					header,
+				);
+				expect(container.scalarType).toBe(OTTO);
+				const font = dumpContainer(container);
+				expect(leadingTag(font)).toBe(OTTO);
+				expect(container.tables.some((t) => t.tag === 'glyf' || t.tag === 'loca')).toBe(false);
+				expect(warnings.some((m) => m.includes('maxp version'))).toBe(false);
+			});
+		}
+
+		it('keeps TrueType for glyf outlines even when the header claims OTTO', () => {
+			const { container } = parse([{ tag: 'glyf', data: new Uint8Array(0) }], OTTO);
+			expect(leadingTag(dumpContainer(container))).toBe(0x00010000);
+		});
+
+		it('keeps an Apple true header for glyf outlines', () => {
+			const { container } = parse([{ tag: 'glyf', data: new Uint8Array(0) }], 0x74727565);
+			expect(leadingTag(dumpContainer(container))).toBe(0x74727565);
+		});
+
+		it('still warns about a non-1.0 maxp when the font has TrueType outlines', () => {
+			const { warnings } = parse(
+				[
+					{ tag: 'glyf', data: new Uint8Array(0) },
+					{ tag: 'maxp', data: maxp05 },
+				],
+				0x00010000,
+			);
+			expect(warnings.some((m) => m.includes('maxp version'))).toBe(true);
+		});
+	});
+});
+describe('parseCTF robustness', () => {
+	const empty = () => new Stream(null, 0);
+
+	/** One simple glyph with a single point and `codeSize` bytes of hinting code. */
+	function glyphWithCode(codeSize: number): Uint8Array {
+		const g = new Stream(null, 0);
+		g.writeS16(1); // one contour
+		g.writeU8(0); // pointsInContour (+1 implicit point)
+		g.writeU8(0); // flag byte -> triplet encoding 0
+		for (let i = 0; i < TRIPLET_ENCODINGS[0].byteCount - 1; i++) g.writeU8(0);
+		g.writeU8(0); // pushCount
+		g.writeU8(253); // codeSize as a U16
+		g.writeU16(codeSize);
+		return g.toUint8Array();
+	}
+
+	it('decodes glyph instructions larger than maxp.maxSizeOfInstructions', () => {
+		const codeSize = 5000;
+		const maxp = minimalMaxp();
+		maxp[5] = 1; // numGlyphs = 1; every other limit stays 0
+		const code = new Uint8Array(codeSize).fill(0x2b);
+		const container = parseCTF([
+			buildMinimalCTFStream0([
+				{ tag: 'glyf', data: glyphWithCode(codeSize) },
+				{ tag: 'maxp', data: maxp },
+			]),
+			empty(),
+			new Stream(code, code.length),
+		]);
+		const glyf = container.tables.find((t) => t.tag === 'glyf')!;
+		expect(glyf.bufSize).toBeGreaterThan(codeSize);
+		expect(() => dumpContainer(container)).not.toThrow();
+	});
+
+	it('accepts a CFF-outline font whose head.indexToLocFormat is not 0 or 1', () => {
+		const head = minimalHead();
+		head[51] = 7;
+		const container = parseCTF([
+			buildMinimalCTFStream0([
+				{ tag: 'CFF ', data: new Uint8Array([1, 0, 4, 1]) },
+				{ tag: 'head', data: head },
+			]),
+			empty(),
+			empty(),
+		]);
+		expect(container.scalarType).toBe(0x4f54544f);
+	});
+
+	it('still rejects a bad indexToLocFormat when glyf outlines are present', () => {
+		const head = minimalHead();
+		head[51] = 7;
+		expect(() =>
+			parseCTF([
+				buildMinimalCTFStream0([
+					{ tag: 'glyf', data: new Uint8Array(0) },
+					{ tag: 'head', data: head },
+				]),
+				empty(),
+				empty(),
+			]),
+		).toThrow(expect.objectContaining({ code: EotErrorCode.MalformedHeadTable }));
+	});
+
+	it('reports MalformedHeadTable for a truncated head table with glyf outlines', () => {
+		expect(() =>
+			parseCTF([
+				buildMinimalCTFStream0([
+					{ tag: 'glyf', data: new Uint8Array(0) },
+					{ tag: 'head', data: new Uint8Array(20) },
+				]),
+				empty(),
+				empty(),
+			]),
+		).toThrow(expect.objectContaining({ code: EotErrorCode.MalformedHeadTable }));
+	});
+
+	it('keeps the TrueType signature for a font with no outline table at all', () => {
+		const container = parseCTF([buildMinimalCTFStream0([]), empty(), empty()]);
+		expect(container.scalarType).toBe(0x00010000);
 	});
 });

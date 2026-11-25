@@ -1,8 +1,9 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { homedir } from 'node:os'
+import { promisify } from 'node:util'
 import JSZip from 'jszip'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import { defineLocalTool } from './local-tool-definition.js'
@@ -11,6 +12,7 @@ import type { LocalTool } from './local-tool-host.js'
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000
 const MAX_PROTOCOL_BYTES = 2 * 1024 * 1024
 const MAX_ERROR_BYTES = 64 * 1024
+const executeFile = promisify(execFile)
 
 export type PptMasterSpawnResult = {
   ok: boolean
@@ -593,6 +595,7 @@ export const builtinPptToolInternals = {
 
 export type PptMasterEnvLocalToolOptions = {
   pythonPath?: string
+  skillRoot?: string
 }
 
 export function createPptMasterEnvLocalTool(
@@ -607,17 +610,59 @@ export function createPptMasterEnvLocalTool(
       'ppt-master-python',
       process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'
     )
-  const skillRoot = process.env.WORKWISE_PPT_MASTER_ROOT?.trim() || join(process.cwd(), 'src', 'asset', 'skills', 'ppt-master')
+  const skillRoot = options.skillRoot?.trim() || process.env.WORKWISE_PPT_MASTER_ROOT?.trim() || join(process.cwd(), 'src', 'asset', 'skills', 'ppt-master')
   const requirementsPath = join(skillRoot, 'requirements.txt')
   const venvRoot = dirname(dirname(managedPython))
   return defineLocalTool({
     name: 'ppt_master_env',
     description:
-      'Return the managed PPT Master Python interpreter and its requirements file for full-access runs. In full-access workspaces, use this interpreter to run the upstream PPT Master Python tools (project_manager.py, svg_quality_checker.py, analyze_images.py, etc.) instead of a random system Python. If exists is false, create the environment once with the returned installCommand, then call this tool again to confirm.',
-    inputSchema: { type: 'object', properties: {} },
+      'Inspect the managed PPT Master runtime or verify the bundled Skill attribution and integrity gates. The integrity check runs the fixed bundled script with the managed interpreter and does not access the user workspace. Use action="verify_integrity" before executing PPT Master instructions; do not run the attribution check through a host shell.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['inspect', 'verify_integrity'] }
+      },
+      additionalProperties: false
+    },
     policy: 'auto',
-    execute: async () => {
+    execute: async (args) => {
       const exists = existsSync(managedPython)
+      const action = typeof args.action === 'string' ? args.action : 'inspect'
+      if (action === 'verify_integrity') {
+        try {
+          const skillRootPath = await realpath(skillRoot)
+          const guardPath = join(skillRootPath, 'scripts', 'attribution_guard.py')
+          const guardInfo = await lstat(guardPath)
+          if (!guardInfo.isFile()) throw new Error('integrity_guard_unavailable')
+          const resolvedGuardPath = await realpath(guardPath)
+          const guardRelativePath = relative(skillRootPath, resolvedGuardPath)
+          if (!guardRelativePath || guardRelativePath.startsWith('..') || isAbsolute(guardRelativePath)) {
+            throw new Error('integrity_guard_outside_skill')
+          }
+          const integrityPython = exists ? managedPython : process.platform === 'win32' ? 'python' : 'python3'
+          await executeFile(integrityPython, [resolvedGuardPath], {
+            cwd: skillRootPath,
+            shell: false,
+            windowsHide: true,
+            timeout: 10_000,
+            maxBuffer: 16 * 1024
+          })
+          return { output: { verified: true, skillId: 'ppt-master' } }
+        } catch (error) {
+          const code = error instanceof Error && 'code' in error ? String(error.code) : ''
+          return {
+            output: {
+              verified: false,
+              skillId: 'ppt-master',
+              reason: code === 'ENOENT' && !exists ? 'managed_python_unavailable' : code === 'ENOENT' ? 'integrity_guard_unavailable' :
+                error instanceof Error && ['managed_python_unavailable', 'integrity_guard_unavailable', 'integrity_guard_outside_skill'].includes(error.message)
+                  ? error.message
+                  : 'integrity_check_failed'
+            },
+            isError: true
+          }
+        }
+      }
       const installCommand = exists
         ? null
         : [

@@ -1,5 +1,11 @@
 # WorkWise Delivery Rules
 
+## Working-tree handoff
+
+- Keep one canonical integration checkout for the active release. Reuse it after independent work is integrated; do not create a new worktree for every test run.
+- Commit coherent source changes separately from build output and local evidence. At handoff, record the active branch, uncommitted changes, validation status, and remaining work.
+- Before retiring a worktree, preserve unique commits, unstaged and staged edits, untracked sources, and needed ignored evidence. Archive finished worktrees after integration; never treat an archived snapshot as a tested release.
+
 ## Release checks
 
 - The current maintainer may review, merge, and publish in single-maintainer mode.

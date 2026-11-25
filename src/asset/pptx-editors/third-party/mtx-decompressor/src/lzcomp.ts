@@ -55,6 +55,9 @@ const MAX_OUT_LEN = (1 << 24) - 1; // 16 MiB - 1 (24-bit field maximum)
  */
 const MAX_OUT = 64 * 1024 * 1024; // 64 MiB
 
+/** Message prefix of the error raised when output would exceed the budget. */
+export const OUTPUT_BUDGET_EXCEEDED = 'LZCOMP output exceeds maximum size budget';
+
 // ---------------------------------------------------------------------------
 // RLE state constants
 // ---------------------------------------------------------------------------
@@ -141,7 +144,7 @@ function initializeModel(window: Uint8Array): void {
  *                          ranges for the subsequent distance decode.
  * @returns The decoded match length (>= LEN_MIN).
  */
-function decodeLength(lenEcoder: AHuff, symbol: number, numDistRangesOut: number[]): number {
+function decodeLength(lenEcoder: AHuff, symbol: number): number {
 	const mask = 1 << BIT_RANGE; // 4  — the continuation / stop bit
 	let firstTime = true;
 	let value = 0;
@@ -160,9 +163,9 @@ function decodeLength(lenEcoder: AHuff, symbol: number, numDistRangesOut: number
 			bits = symbol - 256;
 			firstTime = false;
 
-			// The high part of the first chunk encodes which distance range to use.
-			numDistRangesOut[0] = Math.floor(bits / (1 << LEN_WIDTH)) + 1;
-			bits %= 1 << LEN_WIDTH;
+			// The high part of the first chunk encodes the distance-range count
+			// (derived at the call site); keep only the low part here.
+			bits &= (1 << LEN_WIDTH) - 1;
 		} else {
 			bits = lenEcoder.readSymbol();
 		}
@@ -215,10 +218,19 @@ function decodeDistance(distEcoder: AHuff, numDistRanges: number): number {
  * @param version  MTX version flag.  When version !== 1 a leading bit
  *                 indicates whether run-length encoding is used on the
  *                 output.
+ * @param maxOut   Optional output budget in bytes. Both the declared length
+ *                 and RLE-expanded output are rejected once they exceed it,
+ *                 before the corresponding buffers are allocated or grown.
  * @returns The decompressed byte array.
  */
-export function lzcompDecompress(data: Uint8Array, size: number, version: number): Uint8Array {
+export function lzcompDecompress(
+	data: Uint8Array,
+	size: number,
+	version: number,
+	maxOut: number = MAX_OUT,
+): Uint8Array {
 	const bio = new BitIO(data, 0, size);
+	const outCap = Math.min(MAX_OUT, maxOut);
 
 	// --- Run-length flag ---------------------------------------------------
 	let usingRunLength: boolean;
@@ -240,6 +252,9 @@ export function lzcompDecompress(data: Uint8Array, size: number, version: number
 	if (outLen > MAX_OUT_LEN) {
 		throw new EotError(EotErrorCode.MtxError, `LZCOMP outLen ${outLen} exceeds maximum (${MAX_OUT_LEN})`);
 	}
+	if (outLen > outCap) {
+		throw new EotError(EotErrorCode.MtxError, `${OUTPUT_BUDGET_EXCEEDED} (outLen ${outLen} > ${outCap})`);
+	}
 
 	// --- Compute distance-range parameters ---------------------------------
 	const { DUP2, DUP4, DUP6, NUM_SYMS } = setDistRange(outLen);
@@ -255,37 +270,78 @@ export function lzcompDecompress(data: Uint8Array, size: number, version: number
 	// Base offset into the window for decompressed data.
 	const base = PRELOAD_SIZE;
 
+	// --- Fast path: no run-length decoding ---------------------------------
+	// The window already holds the output byte-for-byte, so decode straight
+	// into it; no separate output buffer is needed.
+	if (!usingRunLength) {
+		let p = 0;
+		while (p < outLen) {
+			const symbol = symEcoder.readSymbol();
+			if (symbol < 256) {
+				win[base + p++] = symbol;
+			} else if (symbol === DUP2) {
+				win[base + p] = win[base + p - 2];
+				p++;
+			} else if (symbol === DUP4) {
+				win[base + p] = win[base + p - 4];
+				p++;
+			} else if (symbol === DUP6) {
+				win[base + p] = win[base + p - 6];
+				p++;
+			} else {
+				let length = decodeLength(lenEcoder, symbol);
+				const distance = decodeDistance(distEcoder, ((symbol - 256) >>> LEN_WIDTH) + 1);
+				if (distance >= MAX_2BYTE_DIST) {
+					length++;
+				}
+				if (!(length >= 0) || length > outLen - p) {
+					throw new EotError(EotErrorCode.MtxError, 'LZCOMP match length exceeds declared output size');
+				}
+				// Byte-by-byte on purpose: overlapping copies must replicate.
+				let src = base + p - distance - length + 1;
+				if (src < 0) {
+					throw new EotError(EotErrorCode.MtxError, 'LZCOMP match reaches before the start of the window');
+				}
+				let dst = base + p;
+				for (const end = dst + length; dst < end; ) {
+					win[dst++] = win[src++];
+				}
+				p += length;
+			}
+		}
+		// The window is the output: return a view rather than copying it (the
+		// 7 KiB preload prefix it retains is negligible).
+		return win.subarray(base, base + outLen);
+	}
+
 	// --- Output buffer (may grow if RLE expands data) ----------------------
-	let outBufSize = outLen;
-	let outBuf = new Uint8Array(outBufSize);
+	let outBuf = new Uint8Array(outLen);
 	let outIdx = 0;
+
+	/**
+	 * Make room for `extra` more output bytes. Grows geometrically, but never
+	 * past the budget, and only fails when the bytes actually needed exceed it.
+	 */
+	const ensureOut = (extra: number): void => {
+		const needed = outIdx + extra;
+		if (needed <= outBuf.length) {
+			return;
+		}
+		if (needed > outCap) {
+			throw new EotError(EotErrorCode.MtxError, OUTPUT_BUDGET_EXCEEDED);
+		}
+		const tmp = new Uint8Array(Math.min(outCap, Math.max(needed, outBuf.length + (outBuf.length >>> 1) + 16)));
+		tmp.set(outBuf.subarray(0, outIdx));
+		outBuf = tmp;
+	};
 
 	// --- RLE decoder state -------------------------------------------------
 	let rleState = RLE_INITIAL;
 	let rleEscape = 0;
 	let rleCount = 0;
 
-	/**
-	 * Emit a single decompressed byte, optionally passing it through the
-	 * inline run-length decoder before writing to the output buffer.
-	 */
+	/** Emit a single decompressed byte through the inline run-length decoder. */
 	const emitByte = (byte: number): void => {
-		if (!usingRunLength) {
-			// Fast path: no RLE, just append.
-			if (outIdx >= outBufSize) {
-				outBufSize += outBufSize >>> 1;
-				if (outBufSize > MAX_OUT) {
-					throw new EotError(EotErrorCode.MtxError, 'LZCOMP output exceeds maximum size budget');
-				}
-				const tmp = new Uint8Array(outBufSize);
-				tmp.set(outBuf);
-				outBuf = tmp;
-			}
-			outBuf[outIdx++] = byte;
-			return;
-		}
-
-		// RLE state machine
 		switch (rleState) {
 			case RLE_INITIAL:
 				// The very first byte is the escape sentinel.
@@ -297,15 +353,7 @@ export function lzcompDecompress(data: Uint8Array, size: number, version: number
 				if (byte === rleEscape) {
 					rleState = RLE_SEEN_ESCAPE;
 				} else {
-					if (outIdx >= outBufSize) {
-						outBufSize += outBufSize >>> 1;
-						if (outBufSize > MAX_OUT) {
-							throw new EotError(EotErrorCode.MtxError, 'LZCOMP output exceeds maximum size budget');
-						}
-						const tmp = new Uint8Array(outBufSize);
-						tmp.set(outBuf);
-						outBuf = tmp;
-					}
+					ensureOut(1);
 					outBuf[outIdx++] = byte;
 				}
 				break;
@@ -314,15 +362,7 @@ export function lzcompDecompress(data: Uint8Array, size: number, version: number
 				rleCount = byte;
 				if (rleCount === 0) {
 					// Escaped escape: emit the escape byte itself.
-					if (outIdx >= outBufSize) {
-						outBufSize += outBufSize >>> 1;
-						if (outBufSize > MAX_OUT) {
-							throw new EotError(EotErrorCode.MtxError, 'LZCOMP output exceeds maximum size budget');
-						}
-						const tmp = new Uint8Array(outBufSize);
-						tmp.set(outBuf);
-						outBuf = tmp;
-					}
+					ensureOut(1);
 					outBuf[outIdx++] = rleEscape;
 					rleState = RLE_NORMAL;
 				} else {
@@ -332,25 +372,16 @@ export function lzcompDecompress(data: Uint8Array, size: number, version: number
 
 			case RLE_NEED_BYTE: {
 				// Emit `rleCount` copies of `byte`.
-				if (outIdx + rleCount > outBufSize) {
-					outBufSize = outIdx + rleCount + (outBufSize >>> 1);
-					if (outBufSize > MAX_OUT) {
-						throw new EotError(EotErrorCode.MtxError, 'LZCOMP output exceeds maximum size budget');
-					}
-					const tmp = new Uint8Array(outBufSize);
-					tmp.set(outBuf);
-					outBuf = tmp;
-				}
-				for (let i = 0; i < rleCount; i++) {
-					outBuf[outIdx++] = byte;
-				}
+				ensureOut(rleCount);
+				outBuf.fill(byte, outIdx, outIdx + rleCount);
+				outIdx += rleCount;
 				rleState = RLE_NORMAL;
 				break;
 			}
 		}
 	};
 
-	// --- Main decode loop --------------------------------------------------
+	// --- Main decode loop (run-length path) --------------------------------
 	// `pos` is hoisted so the post-loop bounds check can inspect its final
 	// value: the copy branch advances `pos` without re-testing the loop
 	// condition, so a corrupt stream can drive it past `outLen`.
@@ -374,16 +405,21 @@ export function lzcompDecompress(data: Uint8Array, size: number, version: number
 			value = win[base + pos - 6];
 		} else {
 			// ---- Copy item (back-reference) ----
-			const numDistRangesRef = [0];
-			let length = decodeLength(lenEcoder, symbol, numDistRangesRef);
-			const distance = decodeDistance(distEcoder, numDistRangesRef[0]);
+			let length = decodeLength(lenEcoder, symbol);
+			const distance = decodeDistance(distEcoder, ((symbol - 256) >>> LEN_WIDTH) + 1);
 
 			// Long distances add one extra byte to the match length.
 			if (distance >= MAX_2BYTE_DIST) {
 				length++;
 			}
 
+			if (!(length >= 0) || length > outLen - pos) {
+				throw new EotError(EotErrorCode.MtxError, 'LZCOMP match length exceeds declared output size');
+			}
 			const start = base + pos - distance - length + 1;
+			if (start < 0) {
+				throw new EotError(EotErrorCode.MtxError, 'LZCOMP match reaches before the start of the window');
+			}
 			for (let j = 0; j < length; j++) {
 				value = win[start + j];
 				win[base + pos] = value;
@@ -407,6 +443,12 @@ export function lzcompDecompress(data: Uint8Array, size: number, version: number
 			EotErrorCode.MtxError,
 			`LZCOMP decode overran output: pos=${pos}, expected=${outLen}`,
 		);
+	}
+
+	// The RLE stream must end on a complete token; a dangling escape means the
+	// output was cut short.
+	if (rleState === RLE_SEEN_ESCAPE || rleState === RLE_NEED_BYTE) {
+		throw new EotError(EotErrorCode.MtxError, 'LZCOMP run-length data ends inside an escape sequence');
 	}
 
 	return outBuf.subarray(0, outIdx);

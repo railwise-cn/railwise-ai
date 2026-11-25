@@ -19,7 +19,7 @@ from typing import Any
 from markitdown import MarkItDown
 
 
-ENGINE_VERSION = "markitdown-v0.1.4-workwise-1"
+ENGINE_VERSION = "markitdown-v0.1.9-workwise-1"
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx"}
 MAX_INPUT_BYTES = 200 * 1024 * 1024
 PPT_MASTER_MAX_REQUEST_PATH = 4096

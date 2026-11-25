@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createWriteMarkdownIt, renderWriteMath, WRITE_MATH_MAX_LENGTH } from './write-advanced-markdown'
+import { createWriteMarkdownIt, renderWriteMath, writeMathOptions, WRITE_MATH_MAX_LENGTH } from './write-advanced-markdown'
 import { sanitizeWriteMermaidSvg, validateWriteMermaidSource } from './write-mermaid-policy'
 
 describe('shared advanced Markdown semantics', () => {
@@ -38,6 +38,32 @@ describe('shared advanced Markdown semantics', () => {
     const bounded = renderWriteMath('<script>' + 'x'.repeat(WRITE_MATH_MAX_LENGTH), true)
     expect(bounded).toContain('write-math-error')
     expect(bounded).not.toContain('<script>')
+  })
+
+  it('keeps untrusted math inert when Object.prototype contains KaTeX setting names', () => {
+    const keys = ['trust', 'default', 'processor'] as const
+    const original = new Map(keys.map((key) => [key, Object.getOwnPropertyDescriptor(Object.prototype, key)]))
+    try {
+      Object.defineProperty(Object.prototype, 'trust', { configurable: true, value: true })
+      Object.defineProperty(Object.prototype, 'default', { configurable: true, value: true })
+      Object.defineProperty(Object.prototype, 'processor', { configurable: true, value: () => true })
+      const html = renderWriteMath('\\href{javascript:alert(1)}{unsafe}', false)
+      expect(html).not.toMatch(/<(?:a|img)\b/)
+      expect(html).not.toMatch(/\s(?:href|src)=/)
+      expect(writeMathOptions.trust).toBe(false)
+    } finally {
+      for (const key of keys) {
+        const descriptor = original.get(key)
+        if (descriptor) Object.defineProperty(Object.prototype, key, descriptor)
+        else Reflect.deleteProperty(Object.prototype, key)
+      }
+    }
+  })
+
+  it('uses the explicit source fallback for unsupported symbols under strict error handling', () => {
+    const html = renderWriteMath('\\char"10FFFF', true)
+    expect(html).toContain('write-math-error')
+    expect(html).not.toContain('<math')
   })
 
   it('leaves Mermaid source inert until the isolated diagram renderer runs', () => {

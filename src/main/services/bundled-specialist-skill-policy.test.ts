@@ -1,4 +1,5 @@
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -29,6 +30,63 @@ function bundledSymbolicLinks(root: string): string[] {
 }
 
 describe('bundled specialist Skill source policy', () => {
+  it('pins the reviewed Humanizer-zh and Shuorenhua revisions with retained MIT notices', () => {
+    const pins = [
+      {
+        id: 'humanizer-zh',
+        sha: 'f4518a8eab97b8bfebc66a89d34320a89bef6930',
+        version: '2026-09-23',
+        files: {
+          'SKILL.md': '95627fd4437d886f98032ccc62d79136e6310f1fc04e354bb86431795ff206df',
+          'LICENSE': 'aa00e74769e1b9d8e7fa7094dbfcca9b129a0ded6dce1cf4da050b99146d2fa7'
+        }
+      },
+      {
+        id: 'shuorenhua',
+        sha: '709acdd71ea841186b6bcd75f8f40849474ea4ba',
+        version: 'v2.7.1',
+        files: {
+          'references/editing-guide.md': 'cdf10ae3c26d77ec0a69258af0d29179af1db3b09d4b0a3a20dee9a8e4fbb7bf',
+          'references/examples.md': '5acdcb3625996727774475b943194fe669a7af18191b0ec956fcbb323975c6c1',
+          'references/revision.md': '7becb59459517490cf61fb088d33827abeec685201ee7c34c7c3ccf3aabd6616',
+          'LICENSE': 'd26eebf6104e9770ca097771022767da18fc07ca73a542469d2748b2e3186878'
+        }
+      }
+    ]
+
+    for (const pin of pins) {
+      const skillRoot = resolve(bundledRoot, pin.id)
+      const source = JSON.parse(readFileSync(resolve(skillRoot, '.workwise-skill-source.json'), 'utf8')) as {
+        installedSha?: string
+        upstreamVersion?: string
+        autoUpdate?: boolean
+        workwiseOverlays?: string[]
+        verifiedUpstreamSha256?: Record<string, string>
+      }
+      expect(source).toMatchObject({
+        installedSha: pin.sha,
+        upstreamVersion: pin.version,
+        autoUpdate: false
+      })
+
+      for (const [path, expectedHash] of Object.entries(pin.files)) {
+        const actualHash = createHash('sha256').update(readFileSync(resolve(skillRoot, path))).digest('hex')
+        expect(actualHash, `${pin.id}/${path}`).toBe(expectedHash)
+        expect(source.verifiedUpstreamSha256?.[path], `${pin.id}/${path} provenance`)
+          .toBe(expectedHash)
+      }
+      expect(readFileSync(resolve(skillRoot, 'LICENSE'), 'utf8')).toContain('MIT License')
+
+      if (pin.id === 'shuorenhua') {
+        expect(source.workwiseOverlays).toContain('SKILL.md')
+        expect(readFileSync(resolve(skillRoot, 'SKILL.md'), 'utf8'))
+          .toContain('有歧义的原文在修订稿正文中保持原样')
+        expect(readFileSync(resolve(skillRoot, 'references/revision.md'), 'utf8'))
+          .toContain('港台书面语、方言习惯用法不算语病')
+      }
+    }
+  })
+
   it('bundles the audited MIT document illustrator with its exact upstream revision', () => {
     const skillRoot = resolve(bundledRoot, 'document-illustrator')
     expect(existsSync(resolve(skillRoot, 'SKILL.md'))).toBe(true)

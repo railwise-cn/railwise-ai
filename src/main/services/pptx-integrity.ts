@@ -145,7 +145,7 @@ export async function inspectPptxPackage(input: Uint8Array): Promise<PptxPackage
   const report: PptxImportReport = {
     sourceSha256: hash(bytes), sourceBytes: bytes.length,
     sourceSlideCount: slideParts.length, importedSlideCount: slideParts.length,
-    backend: 'pptx-vanilla-viewer', backendVersion: '3.61.0', status: 'complete',
+    backend: 'pptx-vanilla-viewer', backendVersion: '3.80.0', status: 'complete',
     pages: [], objects: [], warnings: [], errors: [], generatedAt: Date.now()
   }
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {

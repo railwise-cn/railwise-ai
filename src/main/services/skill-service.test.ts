@@ -425,6 +425,67 @@ describe('skill-service', () => {
     }))
   })
 
+  it.each([
+    {
+      id: 'humanizer-zh',
+      owner: 'op7418',
+      repo: 'Humanizer-zh',
+      sha: 'f4518a8eab97b8bfebc66a89d34320a89bef6930',
+      references: ['references/upstream.md']
+    },
+    {
+      id: 'shuorenhua',
+      owner: 'MrGeDiao',
+      repo: 'shuorenhua',
+      sha: '709acdd71ea841186b6bcd75f8f40849474ea4ba',
+      references: [
+        'references/editing-guide.md',
+        'references/examples.md',
+        'references/revision.md',
+        'references/upstream.md'
+      ]
+    }
+  ])('updates the existing managed $id installation with its pinned rules and references', async (skill) => {
+    const workspaceRoot = join(tempRoot, `workspace-bundled-${skill.id}`)
+    const skillInstallRoot = join(workspaceRoot, '.agents', 'skills')
+    const installedRoot = join(skillInstallRoot, skill.id)
+    const legacySource = {
+      type: 'github', owner: skill.owner, repo: skill.repo,
+      path: '', ref: 'main', autoUpdate: false
+    }
+    await mkdir(installedRoot, { recursive: true })
+    await writeFile(join(installedRoot, 'SKILL.md'), '# Earlier managed snapshot\n')
+    await writeFile(join(installedRoot, '.workwise-skill-source.json'), JSON.stringify(legacySource))
+
+    const installed = await installBundledSkill(skillInstallRoot, { id: skill.id })
+
+    expect(installed.ok).toBe(true)
+    if (!installed.ok) return
+    const rules = await readFile(join(installedRoot, 'SKILL.md'), 'utf8')
+    expect(rules).toContain(`name: ${skill.id}`)
+    expect(rules).not.toContain('# Earlier managed snapshot')
+    for (const path of skill.references) {
+      expect((await readFile(join(installedRoot, path), 'utf8')).trim().length).toBeGreaterThan(0)
+    }
+    expect(await readFile(join(installedRoot, 'LICENSE'), 'utf8')).toContain('MIT License')
+    const source = JSON.parse(await readFile(join(installedRoot, '.workwise-skill-source.json'), 'utf8'))
+    expect(source).toMatchObject({ ...legacySource, installedSha: skill.sha })
+    if (skill.id === 'shuorenhua') {
+      expect(rules).toContain('有歧义的原文在修订稿正文中保持原样')
+      expect(await readFile(join(installedRoot, 'references', 'revision.md'), 'utf8'))
+        .toContain('港台书面语、方言习惯用法不算语病')
+    }
+
+    const result = await listGuiSkills(createSettings(workspaceRoot), workspaceRoot)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.skills).toContainEqual(expect.objectContaining({
+      id: skill.id,
+      scope: 'project',
+      source: expect.objectContaining({ ...legacySource, installedSha: skill.sha })
+    }))
+  })
+
   it('installs the audited MIT document illustrator without third-party credential scripts', async () => {
     const workspaceRoot = join(tempRoot, 'workspace-bundled-document-illustrator')
     const skillInstallRoot = join(workspaceRoot, '.agents', 'skills')

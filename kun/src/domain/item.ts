@@ -167,6 +167,7 @@ export function makeApprovalItem(input: {
   turnId: string
   threadId: string
   approvalId: string
+  requestHash?: string
   toolName: string
   summary: string
 }): TurnItem {
@@ -178,6 +179,7 @@ export function makeApprovalItem(input: {
     createdAt: new Date().toISOString(),
     kind: 'approval',
     approvalId: input.approvalId,
+    ...(input.requestHash ? { requestHash: input.requestHash } : {}),
     toolName: input.toolName,
     summary: input.summary,
     status: 'pending'

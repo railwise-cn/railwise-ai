@@ -1,6 +1,11 @@
 import { expect, it } from 'vitest'
 import { browserTaskOrigins, isBrowserTask } from './browser-skill.js'
-import { isLocalHtmlCreativeRequest, requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames } from './task-source-intent.js'
+import { explicitWebSourceOrigin, explicitWebSourceUrl, taskReadOnlySourceOrigins, taskReadOnlySourceUrls, taskUserProvidedSourceUrls, isLocalHtmlCreativeRequest, requiresWebSourceEvidence, legacyLocalArtifactSourceMismatch, requiredLocalHtmlFileNames } from './task-source-intent.js'
+import type { TaskInput } from './tasks.js'
+
+const credentialedSource = new URL('https://example.test/path')
+credentialedSource.username = 'fixture-user'
+credentialedSource.password = 'fixture-password'
 
 it.each([
   '创建独立 HTML 文件，用 SVG 绘制鹈鹕骑车动画，所有素材内联，打开浏览器即可查看。',
@@ -41,6 +46,55 @@ it('keeps explicit URL behavior and excludes host lookalikes from bare source ta
   expect(browserTaskOrigins(prompt, { includeBareWww: true })).toEqual(['https://example.test', 'https://www.full.test', 'https://www.railwise.cn'])
   expect(requiresWebSourceEvidence('查找 www.railwise.cn 的公开信息。')).toBe(true)
   expect(requiresWebSourceEvidence('制作本地 HTML 动画，不要去官网上查找资料。 www.railwise.cn')).toBe(false)
+})
+
+it.each([
+  ['www.railwise.cn', 'https://www.railwise.cn'],
+  [' https://example.test/reports?month=1 ', 'https://example.test'],
+  ['http://example.test/path', 'http://example.test'],
+  [credentialedSource.href, undefined],
+  ['example.test and then https://other.test', undefined],
+  ['hello@example.test', undefined],
+  ['file:///tmp/report.pdf', undefined],
+  ['http://127.0.0.1:3000', 'http://127.0.0.1:3000']
+])('limits direct source answers to one URL origin: %s', (answer, expected) => {
+  expect(explicitWebSourceOrigin(answer)).toBe(expected)
+})
+
+it('grants read-only network scope only to the task sources the user supplied', () => {
+  const inputs: Array<Pick<TaskInput, 'kind' | 'sourceId' | 'text'>> = [
+    { kind: 'supplement', text: 'www.railwise.cn' },
+    { kind: 'supplement', text: 'https://answer.example/path?query=hidden' },
+    { kind: 'supplement', text: 'see also https://other.example' },
+    { kind: 'supplement', sourceId: 'source-event-1', text: 'https://ignored.example' },
+    { kind: 'user_answer', sourceId: 'request-1', text: JSON.stringify({
+      request: 'What source should I use?',
+      resolution: { status: 'submitted', answers: [{ id: 'source', label: 'Source', value: 'https://answered.example/path' }] }
+    }) }
+  ]
+  expect(taskReadOnlySourceOrigins({ requiresWebEvidence: false, requiredSourceOrigins: ['https://contract.example'] },
+    inputs)).toEqual([])
+  expect(taskReadOnlySourceOrigins({ requiresWebEvidence: true, requiredSourceOrigins: ['https://contract.example'] },
+    inputs)).toEqual([
+      'https://contract.example', 'https://www.railwise.cn', 'https://answer.example', 'https://answered.example'
+  ])
+  expect(taskReadOnlySourceUrls({ requiresWebEvidence: true }, inputs)).toEqual([
+    'https://www.railwise.cn/', 'https://answer.example/path?query=hidden', 'https://answered.example/path'
+  ])
+  expect(taskReadOnlySourceUrls({ requiresWebEvidence: false }, inputs)).toEqual([])
+  expect(taskUserProvidedSourceUrls('Create a report', inputs)).toEqual([
+    'https://www.railwise.cn/', 'https://answer.example/path?query=hidden', 'https://other.example/', 'https://answered.example/path'
+  ])
+})
+
+it('normalizes a direct website answer to an exact URL while rejecting surrounding instructions', () => {
+  expect(explicitWebSourceUrl('www.railwise.cn')).toBe('https://www.railwise.cn/')
+  expect(explicitWebSourceUrl('https://railwise.cn/about?from=chat')).toBe('https://railwise.cn/about?from=chat')
+  expect(explicitWebSourceUrl('Use this website https://railwise.cn')).toBeUndefined()
+  const credentialUrl = new URL('https://railwise.cn/')
+  credentialUrl.username = 'qa-user'
+  credentialUrl.password = 'test-only'
+  expect(explicitWebSourceUrl(credentialUrl.toString())).toBeUndefined()
 })
 
 it('keeps an explicit BrowserSkill connection request while not turning local rendering into source research', () => {

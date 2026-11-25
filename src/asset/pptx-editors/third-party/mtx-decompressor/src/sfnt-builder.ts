@@ -34,7 +34,7 @@ function maxPow2(n: number): number {
  * Write the 12-byte SFNT offset (header) table.
  *
  * Layout (all big-endian):
- *   scalarType   U32  — 0x00010000 for TrueType
+ *   scalarType   U32  — 0x00010000 for TrueType, 'OTTO' for CFF outlines
  *   numTables    U16
  *   searchRange  U16
  *   entrySelector U16
@@ -46,7 +46,7 @@ function writeOffsetTable(ctr: SFNTContainer, out: Stream): void {
 	const entrySelector = lgFloor(numTables);
 	const rangeShift = numTables * 16 - searchRange;
 
-	out.writeU32(0x00010000); // scalarType
+	out.writeU32(ctr.scalarType ?? 0x00010000); // scalarType
 	out.writeU16(numTables);
 	out.writeU16(searchRange);
 	out.writeU16(entrySelector);
@@ -89,32 +89,32 @@ function writeTableDirectory(ctr: SFNTContainer, out: Stream): void {
 function writeTableCheckingSum(table: SFNTTable, out: Stream): void {
 	table.offset = out.pos;
 
-	let checksum = 0;
 	const data = table.buf;
 	const len = table.bufSize;
-	const fullWords = Math.floor(len / 4);
-	const remainder = len % 4;
+	const padded = (len + 3) & ~3;
 
-	for (let i = 0; i < fullWords; i++) {
-		const off = i * 4;
-		// The head checksum is defined with checksumAdjustment treated as zero.
-		const isAdjustmentWord = table.tag === 'head' && off === 8;
-		const word = isAdjustmentWord ? 0 :
-			((data[off] << 24) | (data[off + 1] << 16) | (data[off + 2] << 8) | data[off + 3]) >>> 0;
-		checksum = (checksum + word) >>> 0;
-		out.writeU32(word);
+	// Bulk-copy the table, zero its padding, then checksum the copy in place
+	// (the output buffer is pre-sized by getRequiredSize, so no growth checks
+	// are needed per word).
+	const buf = out.buf;
+	const start = out.pos;
+	buf.set(data.subarray(0, len), start);
+	buf.fill(0, start + len, start + padded);
+	// The head checksum is defined with checksumAdjustment treated as zero.
+	if (table.tag === 'head') {
+		buf.fill(0, start + 8, start + 12);
 	}
 
-	if (remainder > 0) {
-		let word = 0;
-		for (let j = 0; j < remainder; j++) {
-			word |= data[fullWords * 4 + j] << (24 - j * 8);
-		}
-		word >>>= 0;
+	let checksum = 0;
+	for (let off = start, end = start + padded; off < end; off += 4) {
+		const word = ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0;
 		checksum = (checksum + word) >>> 0;
-		out.writeU32(word);
 	}
 
+	out.pos = start + padded;
+	if (out.pos > out.size) {
+		out.size = out.pos;
+	}
 	table.checksum = checksum;
 }
 
@@ -167,9 +167,16 @@ function getRequiredSize(ctr: SFNTContainer): number {
  *     `checksumAdjustment` field.
  *  7. Return the assembled bytes.
  */
-export function dumpContainer(ctr: SFNTContainer): Uint8Array {
+export function dumpContainer(ctr: SFNTContainer, options?: { maxOutputBytes?: number }): Uint8Array {
 	validateTables(ctr);
 	const requiredSize = getRequiredSize(ctr);
+	const maxOutputBytes = options?.maxOutputBytes;
+	if (maxOutputBytes !== undefined && requiredSize > maxOutputBytes) {
+		throw new EotError(
+			EotErrorCode.MtxError,
+			`reconstructed font (${requiredSize} bytes) exceeds maxOutputBytes (${maxOutputBytes})`,
+		);
+	}
 	const out = new Stream(new Uint8Array(requiredSize), 0);
 
 	// --- 1. Offset table ---------------------------------------------------

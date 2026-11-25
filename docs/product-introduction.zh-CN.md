@@ -65,7 +65,7 @@ XY 标准误差椭圆半轴采用单位马氏半径，不代表 95% 等置信区
 
 2026-09-20，经编译后的产品适配器使用 DeepSeek 官方服务完成了真实对话、JSON 精确输出、声明函数名与参数返回及合成图片识别检查。函数检查没有执行工具，视觉检查使用合成图形；这组网络检查不替代安装包内的完整咨询、证据追问、修改建议、审批、工具执行和视觉流程验收。
 
-V4.1 官方 Responses API 忽略内置 `web_search`；两次搜索请求虽返回 HTTP 200，但无搜索调用和有效引用，不能计为搜索成功。当前源码已撤回该内置搜索资格。搜索需另行配置浏览器或 MCP 等工具，无可用工具时应明确报告不可用。见[真实服务检查与搜索能力纠正](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-v41-live-20260920/README.md)。
+同日的真实服务检查确认 V4.1 官方 Responses API 返回 HTTP 200 时仍可能没有搜索调用或有效引用，因此不能把 HTTP 成功当作搜索成功。当前 Runtime 为公开资料搜索提供 `web_search`，并在适用的官方 DeepSeek provider 后回退到 Yuanbao OpenSearch；普通 HTTP 页面由 `web_fetch` 读取正文，JavaScript 页面需要连接 Ego 或 BrowserSkill。Yuanbao 适配依赖其当前 HTML 页面结构，尚不等于稳定搜索 API。搜索词会发送到搜索服务，结果摘要不是来源正文。实际安装包、国内 Windows 网络、已登录浏览器及实时模型完整流程需按对应版本验收。历史服务检查见[真实服务检查与搜索能力纠正](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-v41-live-20260920/README.md)。
 
 - 首次配置提供 DeepSeek API Key 和可选服务地址；模型配置供对话、写作和其他 Agent 共用。API Key、可用模型、额度与计费由服务商及账户决定。
 - 模型目录配置 100 万 token 上下文与最高 384K 输出，并接入思考模式、工具调用、上下文压缩、缓存统计、JSON 和 Responses 路径。实际能力和限制以服务端为准。

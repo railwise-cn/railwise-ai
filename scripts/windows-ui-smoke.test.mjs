@@ -11,8 +11,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { windowsUiClickExpression, windowsManualArtifactTargetExpression, clickWindowsChatManualArtifact, readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
-import { createMarketplaceModelAcceptance } from './verify-windows-cold-marketplace.mjs'
+import { windowsUiClickExpression, windowsManualArtifactTargetExpression, clickWindowsChatManualArtifact, readonlyConnectorSetupExpression, validateDefaultSkillSources, verifyInstalledAgentPackSkill, verifyInstalledBundledSkillCopy, buildWindowsSmokeSettings, validateWindowsUiReport, validateWindowsTaskEvidence, validateWindowsBrowserEvidence, validateWindowsPermissionRuntimeEvidence, runInstalledWindowsPermissionAcceptance, installedPermissionWorker, startWindowsTaskModelFixture, summarizeWindowsTaskFailure, collectWindowsTaskFailure, readWindowsTaskFailureStore, summarizeWindowsFailureLogs, inspectWindowsManualPreview, windowsUiEnvironment, validateWindowsFixtureQueryHtml, reviewWindowsFixtureApproval, windowsFixtureApprovalUiExpression, windowsFixturePendingApprovals, windowsFixtureApprovalResolution, windowsSmokeWorkspaceName, inspectWindowsBrowserRecoveryState, windowsBrowserBindingUiExpression, validateWindowsBrowserRecoveryEvidence, windowsTaskPreviewLayoutExpression, validateWindowsTaskPreviewLayout, validateWindowsScheduledQueryEvidence, inspectWindowsQueryThread } from './run-windows-ui-smoke.mjs'
+import { createMarketplaceModelAcceptance, validateDoclingConversionEvidence } from './verify-windows-cold-marketplace.mjs'
 import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 import { openWindowsTaskConversation, clickWindowsBrowserBinding, selectWindowsBrowserPolicy, selectWindowsPublicQueryAuthorization, windowsBindingPostAudit, inspectWindowsBrowserPolicy, inspectWindowsTaskScopeAction, windowsTaskPrompt, windowsFixtureNativeExpectations } from './run-windows-ui-smoke.mjs'
 import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWindowsBrowserFailureProcesses, sanitizeWindowsBrowserProcessQuery, readWindowsBrowserOwnedState, buildWindowsFixtureWebReport, validateWindowsFixtureReportHtml, windowsFixtureVerificationInputHash, inspectWindowsWebArtifactVerification, inspectWindowsPersistedWebArtifact, windowsTaskArtifactPreviewExpression } from './run-windows-ui-smoke.mjs'
@@ -20,6 +20,47 @@ import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEv
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
 import { createWebPptJourney, inspectWebPptFallback, startWebPptFallbackSource, validateWebPptTurnIdentity, webPptJourneyPrompt } from './web-ppt-journey.mjs'
+import { reviewedPermissionDecisions } from './verify-windows-composer-acceptance.mjs'
+
+test('Video Shotcraft UI acceptance validates reviewed permission declarations before install', () => {
+  const noPermissions = { id: 'video-shotcraft', permissions: [] }
+  assert.deepEqual(reviewedPermissionDecisions(noPermissions, noPermissions), [])
+  assert.deepEqual(reviewedPermissionDecisions(
+    { id: 'video-shotcraft', permissions: [{ id: 'process.execute' }] },
+    { id: 'video-shotcraft', permissions: [{ id: 'process.execute' }] }
+  ), [{ permissionId: 'process.execute', decision: 'denied' }])
+  assert.throws(() => reviewedPermissionDecisions(noPermissions, { id: 'video-shotcraft' }), /Prepared package did not include a permission review list/)
+  assert.throws(() => reviewedPermissionDecisions(noPermissions, { id: 'video-shotcraft', permissions: [{ id: '' }] }), /invalid permission declaration/)
+  assert.throws(() => reviewedPermissionDecisions(
+    { id: 'video-shotcraft', permissions: [] },
+    { id: 'video-shotcraft', permissions: [{ id: 'process.execute' }] }
+  ), /must match the catalog package/)
+})
+
+test('Docling marketplace acceptance requires real MCP PDF and DOCX conversion evidence', () => {
+  const documents = ['pdf', 'docx'].map(format => ({ format, documentKey: `${format}-fixture-key`, extractedMarker: true,
+    sourceSha256: 'a'.repeat(64), markerSha256: 'b'.repeat(64), markdownSha256: 'c'.repeat(64) }))
+  const docling = { toolsDiscovered: 2, conversion: {
+    method: 'installed-mcp-stdio-to-pinned-docling-serve',
+    service: { package: 'docling-serve', version: '1.39.0', dependencySetSha256: 'd'.repeat(64) },
+    mcp: { packageVersion: '3.5.1', artifactSha256: 'e'.repeat(64),
+      conversionTool: 'convert_document_into_docling_document', markdownTool: 'export_docling_document_to_markdown' },
+    documents
+  } }
+  assert.equal(validateDoclingConversionEvidence(docling, 'e'.repeat(64)), true)
+  assert.throws(() => validateDoclingConversionEvidence({ ...docling, conversion: { ...docling.conversion,
+    documents: documents.filter(item => item.format === 'pdf') } }, 'e'.repeat(64)))
+  assert.throws(() => validateDoclingConversionEvidence({ ...docling, conversion: { ...docling.conversion,
+    service: { ...docling.conversion.service, version: 'latest' } } }, 'e'.repeat(64)))
+  assert.throws(() => validateDoclingConversionEvidence(docling, 'f'.repeat(64)))
+
+  const workflow = readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8')
+  assert.match(workflow, /docling-serve==1\.39\.0/)
+  assert.match(workflow, /RAILWISE_DOCLING_SERVE_PYTHON=/)
+  const verifier = readFileSync(new URL('./verify-windows-cold-marketplace.mjs', import.meta.url), 'utf8')
+  assert.match(verifier, /PYTHONUTF8:\s*'1'/)
+  assert.match(verifier, /PYTHONIOENCODING:\s*'utf-8'/)
+})
 
 test('BrowserSkill PPT fixture serves a loopback source whose marker only appears after rendering', async t => {
   const source = await startWebPptFallbackSource()
@@ -130,6 +171,15 @@ test('the original task question submits through its exact user-input endpoint',
   assert.match(source, /answers:\s*\[\{\s*id:\s*activeTaskComposerQuestion\.questionId,\s*label:\s*activeTaskComposerQuestion\.label,\s*value:\s*v\s*\}\]/s)
 })
 
+test('the isolated pause/restart task acceptance requires a visible on-request approval policy', () => {
+  const common = { workspace: 'D:\\acceptance\\workspace', dataDir: 'D:\\acceptance\\runtime', port: 43123,
+    configuredModel: true, providerId: 'fixture', model: 'fixture', apiKey: 'synthetic-local-only',
+    baseUrl: 'http://127.0.0.1:43124/v1', webPpt: true }
+  assert.equal(buildWindowsSmokeSettings({ ...common, pauseRestartSmoke: true }).agents.kun.approvalPolicy, 'on-request')
+  assert.equal(buildWindowsSmokeSettings({ ...common, pauseRestartSmoke: false }).agents.kun.approvalPolicy, 'auto')
+  assert.throws(() => buildWindowsSmokeSettings({ ...common, webPpt: false, pauseRestartSmoke: true }), /requires the website-to-PPT journey/)
+})
+
 test('website-to-PPT report matches its requested model and verifies a desktop-open response for the live gate', () => {
   const sourceHead = '1'.repeat(40)
   const version = '0.5.11'
@@ -152,6 +202,7 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
       conversationThreadId: 'conversation-1', originThreadId: 'conversation-1', executionThreadId: 'execution-1', sameConversation: true,
       originalConversation: { questionVisible: true, artifactVisible: true }, sameTurn: true, replyTrace: replyTrace(true),
       source: { url: 'https://www.railwise.cn/', tool: 'web_fetch', sha256: '2'.repeat(64), bytes: 512 },
+      sourceProvider: 'fetch',
       artifact: { nativeEditableText: true, originalChatButtonClicked: true, sha256: '3'.repeat(64), bytes: 1024 },
       open: { status: 'handler-unavailable' }
     }
@@ -162,6 +213,11 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
   report.webPpt.model = 'live-model'
   assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
   report.webPpt.open.status = 'desktop-open-request-accepted'
+  assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
+  report.webPpt.sourceProvider = 'browser-skill'
+  assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+  report.webPpt.source.tool = 'browser-skill'
+  report.webPptBrowser = { browserInstanceId: 'isolated-live-browser' }
   assert.equal(validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }), true)
   report.webPpt.sameTurn = false
   report.webPpt.replyTrace = replyTrace(false)
@@ -174,6 +230,35 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
   report.webPpt.originThreadId = report.webPpt.conversationThreadId
   report.webPpt.originalConversation.artifactVisible = false
   assert.throws(() => validateWindowsUiReport(report, identity, { requireWebPpt: true, requireLiveWebPpt: true }))
+
+  report.webPpt.model = 'controlled-protocol'
+  report.webPpt.originalConversation.artifactVisible = true
+  report.installedAsarSha256 = '4'.repeat(64)
+  report.checks.push('installed-chat-task-pause-restart-recovery')
+  report.webPpt.restartRecovery = {
+    status: 'passed', exactPackageVersion: version, installedAsarSha256: report.installedAsarSha256,
+    appClosedNormally: true, appRestarted: true, sameProfile: true, sameRuntimeDataDir: true,
+    beforeRestart: { taskId: 'task-1', threadId: 'conversation-1', taskStatus: 'paused', questionVisible: true },
+    afterRestart: { taskId: 'task-1', threadId: 'conversation-1', taskStatus: 'paused', oldQuestionStillRecorded: true,
+      oldQuestionStillVisible: true, resumedQuestionVisible: true, resumedQuestionRequestId: 'question-2', originalChat: { surface: 'original-chat' } },
+    answerReceiptCount: 1, answerReceiptRequestId: 'question-2', answeredQuestionRequestCount: 1,
+    approvalCardCount: 1, approvalResolutionDuplicateCount: 0, approvalResolutionCount: 1,
+    approvalResolutionRequestIds: ['approval-1'], approvalCount: 1,
+    approvals: [{ id: 'approval-1', tool: 'request_host_shell', decision: 'allow', method: 'installed-task-card' }]
+  }
+  const pauseOptions = { requireWebPpt: true, requirePauseRestartRecovery: true }
+  assert.equal(validateWindowsUiReport(report, identity, pauseOptions), true)
+  for (const mutate of [
+    proof => { proof.webPpt.restartRecovery.approvalCardCount = 0 },
+    proof => { proof.webPpt.restartRecovery.approvalResolutionCount = 0 },
+    proof => { proof.webPpt.restartRecovery.approvalResolutionRequestIds = ['unrelated-request'] },
+    proof => { proof.webPpt.restartRecovery.approvalResolutionDuplicateCount = 1 },
+    proof => { proof.webPpt.restartRecovery.approvals[0].method = 'automatic' }
+  ]) {
+    const invalid = structuredClone(report)
+    mutate(invalid)
+    assert.throws(() => validateWindowsUiReport(invalid, identity, pauseOptions))
+  }
 })
 
 test('website-to-PPT identity binds the task to the visible conversation while recording its worker thread separately', () => {
@@ -2249,6 +2334,17 @@ test('failure logs export only timestamps, stream, exception names and codes, ne
   assert.equal(logs.entries[0].exception, 'TypeError')
   assert.deepEqual(logs.entries[0].codes, ['browser_context_stale'])
   assert.doesNotMatch(JSON.stringify(logs), /private|Authorization|Bearer|headers|cookie|https|body/)
+})
+
+test('all failed Windows UI journeys collect sanitized runtime state and logs, including web-only runs', () => {
+  const source = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+  const catchStart = source.indexOf('  } catch (error) {', source.indexOf('export async function runWindowsUiSmoke'))
+  const finallyStart = source.indexOf('  } finally {', catchStart)
+  assert.ok(catchStart >= 0 && finallyStart > catchStart)
+  const failurePath = source.slice(catchStart, finallyStart)
+  assert.match(failurePath, /report\.runtimeFailure = await cdp\.evaluate/)
+  assert.match(failurePath, /report\.failureLogs = await readWindowsFailureLogs\(profile, output\)/)
+  assert.ok(failurePath.indexOf('report.failureLogs =') > failurePath.lastIndexOf('if (taskSmoke)'))
 })
 
 test('manual preview failure permits later diagnostics while keeping the complete acceptance failed', async () => {

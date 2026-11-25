@@ -25,7 +25,7 @@ import { evaluateMarketplaceLicense } from '../../shared/marketplace'
 import { VIDEO_SHOTCRAFT_COMMIT, VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION } from './video-shotcraft-distribution'
 
 const OFFICIAL_CATALOG_SOURCE_ID = 'workwise-official'
-const SUPERPOWERS_COMMIT = '44c9b2d6e889982ac18c27d05a19fefe335194e1'
+const SUPERPOWERS_COMMIT = '22f0b463e7a5e579904dd6211a520321035526f7'
 const BLENDER_SKILLS_COMMIT = '8f778d2405a214b508d4c7d80742be8e43acdd52'
 const GIT_DISTRIBUTION_VERSIONS: Readonly<Record<string, string>> = {
   'video-shotcraft': VIDEO_SHOTCRAFT_DISTRIBUTION_VERSION,
@@ -322,14 +322,14 @@ type WheelArtifact = {
 const NPM_ARTIFACTS = {
   playwrightMcp: {
     packageName: '@playwright/mcp',
-    version: '0.0.79',
-    integrity: 'sha512-VpqD4a3vFyGQMY9sh3UJiO6wjcurggkljKfAyCHL0QWGY5m6Ehr3MNsAAHPDHO//n13g0PCjpHatAOiulrqdZQ==',
+    version: '0.0.86',
+    integrity: 'sha512-4SL9OSINmik3+EObCYJIxH8BkhcqqGU6CM8XIgztW015iBVR9WR6Q0xF180Ery+xuEVyyK5r6nC2bOg3zjgCoA==',
     executable: 'playwright-mcp'
   },
   playwrightCli: {
     packageName: '@playwright/cli',
-    version: '0.1.18',
-    integrity: 'sha512-ggNfYYH+GsZTGUiBEL8f6N5j0seYEUE52v+fIWqK/A36QG36cL0EJ79qWTXYO2uZMUU7vm+jk3x0fKCPL6UuIw==',
+    version: '0.1.25',
+    integrity: 'sha512-v1qjq3/ssK2lf9z/+Cu0gHGXm2uDgAQwq5fWPCBM1SxkJqcB0FOyvbbsTrpPn4j4WJey8bLTYT4tEB8o4FbwBw==',
     executable: 'playwright-cli'
   },
   context7: {
@@ -385,10 +385,10 @@ const WHEEL_ARTIFACTS = {
   },
   docling: {
     packageName: 'docling-mcp',
-    version: '3.0.0',
-    sha256: '595da70b9de2265f1f14e575fad65ff4213c5c7e2dbb255184d606505fa49f23',
+    version: '3.5.1',
+    sha256: '44f658e319263350c3847c2afa40d085da49bbbeed6e9ba56b9a2308fc925ea6',
     executable: 'docling-mcp-server',
-    // The 3.0.0 CLI defaults to Streamable HTTP. The managed runtime expects stdio.
+    // Newer Docling MCP releases default to Streamable HTTP. The managed runtime expects stdio.
     args: ['--transport', 'stdio']
   },
   fetch: {
@@ -768,7 +768,23 @@ const officialPackages: MarketplacePackageV1[] = [
       id: 'superpowers-skills',
       name: 'Superpowers Skills',
       type: 'skill',
-      skillNames: ['using-superpowers'],
+      skillNames: [
+        'brainstorming',
+        'diagnosing-superpowers',
+        'dispatching-parallel-agents',
+        'executing-plans',
+        'finishing-a-development-branch',
+        'receiving-code-review',
+        'requesting-code-review',
+        'subagent-driven-development',
+        'systematic-debugging',
+        'test-driven-development',
+        'using-git-worktrees',
+        'using-superpowers',
+        'verification-before-completion',
+        'writing-plans',
+        'writing-skills'
+      ],
       runtime: {
         kind: 'github',
         repository: 'https://github.com/obra/superpowers',

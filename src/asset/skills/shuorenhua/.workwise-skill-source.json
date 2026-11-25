@@ -4,5 +4,23 @@
   "repo": "shuorenhua",
   "path": "",
   "ref": "main",
-  "autoUpdate": false
+  "autoUpdate": false,
+  "installedSha": "709acdd71ea841186b6bcd75f8f40849474ea4ba",
+  "upstreamPath": "skills/shuorenhua",
+  "upstreamVersion": "v2.7.1",
+  "upstreamSource": "https://github.com/MrGeDiao/shuorenhua/tree/709acdd71ea841186b6bcd75f8f40849474ea4ba/skills/shuorenhua",
+  "verifiedUpstreamSha256": {
+    "SKILL.md": "77ee3abea23a5ad4a376c38b8ee6137462c3d855e77be41c10f5539313f73615",
+    "references/editing-guide.md": "cdf10ae3c26d77ec0a69258af0d29179af1db3b09d4b0a3a20dee9a8e4fbb7bf",
+    "references/examples.md": "5acdcb3625996727774475b943194fe669a7af18191b0ec956fcbb323975c6c1",
+    "references/revision.md": "7becb59459517490cf61fb088d33827abeec685201ee7c34c7c3ccf3aabd6616",
+    "LICENSE": "d26eebf6104e9770ca097771022767da18fc07ca73a542469d2748b2e3186878"
+  },
+  "workwiseOverlays": [
+    "README.md",
+    "references/upstream.md",
+    ".workwise-skill-source.json",
+    "SKILL.md"
+  ],
+  "sourceIdentityNote": "Legacy path/ref are retained for installed-source matching. installedSha and upstreamPath record the exact audited upstream snapshot; automatic third-party updates remain disabled."
 }

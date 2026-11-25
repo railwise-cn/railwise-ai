@@ -8,8 +8,10 @@ import {
 } from '../src/contracts/capabilities.js'
 import { modelCapabilitiesForModel } from '../src/loop/model-context-profile.js'
 import { DeterministicWebProvider } from '../src/ports/web-provider.js'
+import { FallbackWebSearchProvider } from '../src/ports/web-provider.js'
 import type { ToolHostContext } from '../src/ports/tool-host.js'
 import { SafeWebFetchError } from '../src/network/safe-web-fetch.js'
+import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
 
 function buildContext(): ToolHostContext {
   return {
@@ -20,6 +22,22 @@ function buildContext(): ToolHostContext {
     approvalPolicy: 'auto',
     abortSignal: new AbortController().signal,
     awaitApproval: async () => 'allow'
+  }
+}
+
+function buildTaskWebContext(networkAllowlist: string[], awaitApproval: ToolHostContext['awaitApproval']): ToolHostContext {
+  return {
+    ...buildContext(),
+    approvalPolicy: 'on-request',
+    awaitApproval,
+    executionGrant: ExecutionGrantSchema.parse({
+      id: 'grant-task-source', taskId: 'task-1', threadId: 'thr_1', turnId: 'turn_1',
+      workspaceRoot: '/tmp/project', workspaceTrust: 'workspace-write', agentTrust: 'workspace-write',
+      approvalPolicy: 'on-request', sandboxMode: 'workspace-write', pathAllowlist: ['/tmp/project'],
+      readPathAllowlist: ['/tmp/project'], writePathAllowlist: ['/tmp/project'], networkAllowlist,
+      connectorScopes: [], externalTargets: [], workspaceRevision: 0, agentRevision: 0,
+      revision: 0, idempotencyKey: 'grant-task-source', issuedAt: '2026-06-03T00:00:00.000Z'
+    })
   }
 }
 
@@ -60,6 +78,18 @@ describe('Web tool provider', () => {
     expect(built.providers).toEqual([])
     expect(built.fetchAvailable).toBe(false)
     expect(built.searchAvailable).toBe(false)
+  })
+
+  it('documents exact search-result URL access without widening origin or redirect scope', () => {
+    const config = KunCapabilitiesConfig.parse({
+      web: { enabled: true, searchEnabled: true, provider: 'test-search' }
+    })
+    const built = buildWebToolProviders(config.web, { provider: deterministicProvider() })
+    const tool = new CapabilityRegistry(built.providers).resolveTool('web_search', buildContext()).tool
+
+    expect(tool.description).toContain('A successful search result authorizes fetching only its exact URL in the same task and Turn')
+    expect(tool.description).toContain('it does not authorize the site origin or other URLs')
+    expect(tool.description).toContain('Redirects are allowed only when their destination is independently covered by the task network scope')
   })
 
   it('fetches allowed URLs with source metadata and telemetry', async () => {
@@ -142,6 +172,42 @@ describe('Web tool provider', () => {
       expect(blocked.item).toMatchObject({ kind: 'tool_result', isError: true, output: { error: { code: 'policy_blocked' } } })
     }
     expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses the exact task source scope without prompting and blocks other origins', async () => {
+    const config = KunCapabilitiesConfig.parse({
+      web: { enabled: true, fetchEnabled: true, allowDomains: ['railwise.cn', 'other.example.test'] }
+    })
+    const provider = new DeterministicWebProvider({
+      pages: {
+        'https://www.railwise.cn/': {
+          url: 'https://www.railwise.cn/', finalUrl: 'https://www.railwise.cn/', text: 'RailWise public source'
+        },
+        'https://other.example.test/': {
+          url: 'https://other.example.test/', finalUrl: 'https://other.example.test/', text: 'Out-of-scope source'
+        }
+      }
+    })
+    const awaitApproval = vi.fn(async () => 'allow' as const)
+    const host = new LocalToolHost({
+      registry: new CapabilityRegistry(buildWebToolProviders(config.web, { provider }).providers)
+    })
+    const context = buildTaskWebContext(['https://www.railwise.cn'], awaitApproval)
+
+    const allowed = await host.execute({
+      callId: 'call_task_source', toolName: 'web_fetch', arguments: { url: 'https://www.railwise.cn/' }
+    }, context)
+    expect(allowed.item).toMatchObject({ kind: 'tool_result', isError: false, output: { text: 'RailWise public source' } })
+    expect(awaitApproval).not.toHaveBeenCalled()
+
+    const blocked = await host.execute({
+      callId: 'call_other_source', toolName: 'web_fetch', arguments: { url: 'https://other.example.test/' }
+    }, context)
+    expect(blocked.item).toMatchObject({ kind: 'tool_result', isError: true })
+    if (blocked.item.kind === 'tool_result') {
+      expect(JSON.stringify(blocked.item.output)).toContain('outside the execution grant')
+    }
+    expect(awaitApproval).not.toHaveBeenCalled()
   })
 
   it('returns payload_too_large instead of truncating oversized responses', async () => {
@@ -392,6 +458,252 @@ describe('Web tool provider', () => {
       arguments: { query: '今天 AI 行业重要资讯', timeout_ms: 999_999 }
     }, buildContext())
     expect(receivedTimeoutMs).toBe(120_000)
+  })
+
+  it('does not interrupt a task for a read-only fetch within its exact user-approved source origin', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, fetchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://docs.example.test'], approval)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      provider: deterministicProvider()
+    }).providers) })
+
+    const result = await host.execute({ callId: 'scoped-fetch', toolName: 'web_fetch',
+      arguments: { url: 'https://docs.example.test/page' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(approval).not.toHaveBeenCalled()
+  })
+
+  it('blocks other sites before approval when they fall outside the exact task scope', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, fetchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://docs.example.test'], approval)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      provider: deterministicProvider()
+    }).providers) })
+
+    const result = await host.execute({ callId: 'other-site', toolName: 'web_fetch',
+      arguments: { url: 'https://other.example.test/page' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: true, output: { code: 'network_scope_blocked' } })
+    expect(approval).not.toHaveBeenCalled()
+  })
+
+  it('still asks before a public fetch when the task has only a wildcard network grant', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, fetchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['*'], approval)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      provider: deterministicProvider()
+    }).providers) })
+
+    const result = await host.execute({ callId: 'wildcard-fetch', toolName: 'web_fetch',
+      arguments: { url: 'https://docs.example.test/page' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(approval).toHaveBeenCalledOnce()
+  })
+
+  it('does not extend a source-site grant to broad web search', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://docs.example.test'], approval)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      searchProvider: deterministicProvider()
+    }).providers) })
+
+    const result = await host.execute({ callId: 'broad-search', toolName: 'web_search',
+      arguments: { query: 'RailWise public documentation' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(approval).toHaveBeenCalledOnce()
+  })
+
+  it('uses structured Yuanbao result URLs without asking again when its search origin is in the reviewed grant', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://docs.example.test', 'https://so.qq.com'], approval)
+    const deterministic = deterministicProvider()
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      searchProvider: {
+        id: 'yuanbao-opensearch',
+        searchOrigins: ['https://so.qq.com'],
+        fetch: deterministic.fetch.bind(deterministic),
+        search: deterministic.search.bind(deterministic)
+      }
+    }).providers) })
+
+    const result = await host.execute({ callId: 'scoped-search', toolName: 'web_search',
+      arguments: { query: 'kun web' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(approval).not.toHaveBeenCalled()
+    if (result.item.kind === 'tool_result') {
+      expect(result.item.output).toMatchObject({ results: [{ url: 'https://docs.example.test/page', title: 'Kun Web Docs' }] })
+    }
+  })
+
+  it('skips an out-of-scope DeepSeek backend and uses the approved Yuanbao fallback without prompting', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://docs.example.test', 'https://so.qq.com'], approval)
+    const deepSeek = {
+      id: 'deepseek-responses',
+      searchOrigins: ['https://api.deepseek.com'],
+      search: vi.fn(async () => { throw new Error('must not send query outside the grant') })
+    }
+    const yuanbao = {
+      id: 'yuanbao-opensearch',
+      searchOrigins: ['https://so.qq.com'],
+      search: vi.fn(async () => [{ sourceId: 'web_search_test', url: 'https://docs.example.test/page',
+        title: 'Source', snippet: 'Search result', retrievedAt: 'now', provider: 'yuanbao-opensearch', rank: 1 }])
+    }
+    const combined = new FallbackWebSearchProvider([deepSeek, yuanbao])
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      searchProvider: combined
+    }).providers) })
+
+    const result = await host.execute({ callId: 'scoped-backend-fallback', toolName: 'web_search',
+      arguments: { query: 'RailWise public documentation' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(deepSeek.search).not.toHaveBeenCalled()
+    expect(yuanbao.search).toHaveBeenCalledOnce()
+    expect(approval).not.toHaveBeenCalled()
+  })
+
+  it('blocks a DeepSeek-only search before approval when only the Yuanbao origin is authorized', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://so.qq.com'], approval)
+    const provider = {
+      id: 'deepseek-responses',
+      searchOrigins: ['https://api.deepseek.com'],
+      search: vi.fn(async () => [])
+    }
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      searchProvider: provider
+    }).providers) })
+
+    const result = await host.execute({ callId: 'blocked-search-backend', toolName: 'web_search',
+      arguments: { query: 'RailWise public documentation' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: true, output: { code: 'network_scope_blocked' } })
+    expect(provider.search).not.toHaveBeenCalled()
+    expect(approval).not.toHaveBeenCalled()
+  })
+
+  it('routes explicit repository searches to GitHub before general web search', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true } })
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://api.github.com', 'https://so.qq.com'], approval)
+    const general = {
+      id: 'yuanbao-opensearch', searchOrigins: ['https://so.qq.com'],
+      search: vi.fn(async () => [])
+    }
+    const github = {
+      id: 'github-repository-search', searchOrigins: ['https://api.github.com'],
+      supportsQuery: vi.fn((query: string) => /github|repository|repo/i.test(query)),
+      search: vi.fn(async () => [{ sourceId: 'web_search_github', url: 'https://github.com/railwise-cn/railwise-ai',
+        title: 'railwise-cn/railwise-ai', snippet: 'MIT | TypeScript', retrievedAt: 'now', provider: 'github-repository-search', rank: 1 }])
+    }
+    const combined = new FallbackWebSearchProvider([general, github])
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      searchProvider: combined
+    }).providers) })
+
+    const result = await host.execute({ callId: 'github-source-search', toolName: 'web_search',
+      arguments: { query: 'Find GitHub repositories for railwise' } }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(github.search).toHaveBeenCalledOnce()
+    expect(general.search).not.toHaveBeenCalled()
+    expect(approval).not.toHaveBeenCalled()
+  })
+
+  it('falls back to Yuanbao when the model provider search fails and preserves result links', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true } })
+    const primary = { id: 'deepseek-responses', search: async () => { throw new Error('search provider unavailable') } }
+    const combined = new FallbackWebSearchProvider([primary, deterministicProvider()])
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      searchProvider: combined
+    }).providers) })
+    const result = await host.execute({ callId: 'fallback-search', toolName: 'web_search',
+      arguments: { query: 'kun web' } }, buildContext())
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    if (result.item.kind === 'tool_result') expect(result.item.output).toMatchObject({
+      provider: 'deepseek-responses+test-search', results: [{ url: 'https://docs.example.test/page' }]
+    })
+  })
+
+  it('reserves a bounded share of the total search deadline for each fallback provider', async () => {
+    const startedAt = Date.now()
+    const primary = {
+      id: 'slow-search',
+      search: (_request: { signal: AbortSignal }) => new Promise<never>((_resolve, reject) => {
+        _request.signal.addEventListener('abort', () => reject(_request.signal.reason), { once: true })
+      })
+    }
+    const fallback = {
+      ...deterministicProvider(),
+      search: vi.fn(async (request: { timeoutMs: number; signal: AbortSignal }) => {
+        expect(request.timeoutMs).toBeGreaterThan(0)
+        expect(request.signal.aborted).toBe(false)
+        return [{ sourceId: 'result', url: 'https://docs.example.test/page', title: 'Result', snippet: 'Fallback', retrievedAt: 'now', provider: 'fallback', rank: 1 }]
+      })
+    }
+    const combined = new FallbackWebSearchProvider([primary, fallback])
+
+    const results = await combined.search({ query: 'test', limit: 3, timeoutMs: 80, signal: new AbortController().signal })
+
+    expect(results).toHaveLength(1)
+    expect(fallback.search).toHaveBeenCalledOnce()
+    expect(Date.now() - startedAt).toBeLessThan(150)
+  })
+
+  it('does not start a provider when the caller has already cancelled the search', async () => {
+    const controller = new AbortController()
+    controller.abort('turn cancelled')
+    const provider = { id: 'never-started', search: vi.fn(async () => []) }
+
+    await expect(new FallbackWebSearchProvider([provider]).search({
+      query: 'test', limit: 1, timeoutMs: 100, signal: controller.signal
+    })).rejects.toBe('turn cancelled')
+
+    expect(provider.search).not.toHaveBeenCalled()
+  })
+
+  it('fetches one exact URL returned by the current task search receipt without widening its origin grant', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, fetchEnabled: true } })
+    const provider = deterministicProvider()
+    const fetch = vi.spyOn(provider, 'fetch')
+    const approval = vi.fn(async () => 'allow' as const)
+    const context = buildTaskWebContext(['https://so.qq.com'], approval)
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(buildWebToolProviders(config.web, {
+      provider,
+      searchResultUrls: () => ['https://docs.example.test/page']
+    }).providers) })
+    const result = await host.execute({ callId: 'fetch-search-result', toolName: 'web_fetch',
+      arguments: { url: 'https://docs.example.test/page' } }, context)
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(approval).not.toHaveBeenCalled()
+    expect(fetch).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://docs.example.test/page', allowedOrigins: ['https://so.qq.com'], allowedUrls: ['https://docs.example.test/page']
+    }))
+
+    const outOfReceipt = await host.execute({ callId: 'fetch-other-result', toolName: 'web_fetch',
+      arguments: { url: 'https://docs.example.test/other' } }, context)
+    expect(outOfReceipt.item).toMatchObject({ kind: 'tool_result', isError: true, output: { code: 'network_scope_blocked' } })
+  })
+
+  it('summarizes a pending fetch with only its site origin', async () => {
+    const config = KunCapabilitiesConfig.parse({ web: { enabled: true, fetchEnabled: true } })
+    const registry = new CapabilityRegistry(buildWebToolProviders(config.web, { provider: deterministicProvider() }).providers)
+    const tool = registry.resolveTool('web_fetch', buildContext()).tool
+
+    await expect(tool.approvalSummary?.({ url: 'https://docs.example.test/private/path?token=hidden' }, buildContext()))
+      .resolves.toBe('Read public web page\nOrigin: https://docs.example.test\nEffect: Read page content only.')
   })
 
   it('reports web availability in the runtime capability manifest', () => {

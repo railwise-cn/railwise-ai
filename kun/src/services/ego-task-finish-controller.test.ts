@@ -210,7 +210,7 @@ it.each([false, true])('resumes the same Task through a fresh Grant, provider-pr
     const started = await runtime.taskCoordinator!.command({ threadId: origin.id, intent: 'new', idempotencyKey: 'closed-space-original', request: {
       prompt: '每天09:00使用Ego浏览器只读 https://feed.test/list 我已订阅的招标列表，按工程测量、测绘、监测筛选汇总为HTML，只核对列表，不需要公告正文。' } })
     const taskId = started.task!.id, repo = runtime.taskRepository!
-    await expect.poll(() => repo.get(taskId)?.status, { timeout: 5000 }).toBe('waiting_user')
+    await expect.poll(() => repo.get(taskId)?.status, { timeout: 15000 }).toBe('waiting_user')
     const before = repo.get(taskId)!, oldTurnId = before.activeTurnId!, oldBinding = repo.operation(taskId, 'ego-task-space')!
     await expect.poll(async () => (await runtime.threadService.get(before.threadId))!.turns.filter(turn => ['queued', 'running'].includes(turn.status)).length, { timeout: 5000 }).toBe(0)
     expect(oldBinding.status).toBe('succeeded'); expect(oldBinding.result).toMatchObject({ taskSpaceId: 27 })

@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
-import { lstat, readFile, realpath, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { isAbsolute, join, relative, sep, win32 } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { Document, Packer, Paragraph, TextRun } from 'docx'
+
+const DOCLING_SERVE_VERSION = '1.39.0'
+const DOCLING_MCP_VERSION = '3.5.1'
+const DOCLING_CONVERSION_TOOL = 'convert_document_into_docling_document'
+const DOCLING_MARKDOWN_TOOL = 'export_docling_document_to_markdown'
 
 const blockedHosts = [
   'github.com', 'api.github.com', 'codeload.github.com', 'raw.githubusercontent.com',
@@ -98,7 +104,233 @@ print(source._backend.convert().export_to_markdown())
     { cwd: workspace, env: environment, encoding: 'utf8', timeout: 30_000, windowsHide: true, maxBuffer: 64_000 })
   for (const text of ['项目', '值', marker, '42']) assert.ok(markdown.includes(text), 'The verified Docling backend must preserve the synthetic CSV contents')
   return { method: 'direct-mirrored-csv-backend', fixture: 'synthetic-utf8-csv', preservedChineseCells: true,
-    documentConversionTool: 'requires-configured-docling-serve-or-local-extra', artifactSha256: installed.artifact.sha256 }
+    artifactSha256: installed.artifact.sha256 }
+}
+
+function escapePdfText(value) {
+  return value.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)')
+}
+
+function makeTextPdf(text) {
+  const content = `BT /F1 18 Tf 72 720 Td (${escapePdfText(text)}) Tj ET\n`
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${Buffer.byteLength(content, 'ascii')} >>\nstream\n${content}endstream`
+  ]
+  let document = '%PDF-1.4\n'
+  const offsets = [0]
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(document, 'ascii'))
+    document += `${index + 1} 0 obj\n${object}\nendobj\n`
+  }
+  const xrefOffset = Buffer.byteLength(document, 'ascii')
+  document += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (const offset of offsets.slice(1)) document += `${String(offset).padStart(10, '0')} 00000 n \n`
+  document += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+  return Buffer.from(document, 'ascii')
+}
+
+async function createDoclingConversionFixtures(workspace) {
+  const nonce = randomUUID()
+  const fixtures = [
+    { format: 'pdf', marker: `RailWise-PDF-${nonce}`, path: join(workspace, `Docling-${nonce}.pdf`) },
+    { format: 'docx', marker: `RailWise-DOCX-${nonce}`, path: join(workspace, `Docling-${nonce}.docx`) }
+  ]
+  await writeFile(fixtures[0].path, makeTextPdf(fixtures[0].marker), { flag: 'wx' })
+  const word = new Document({ sections: [{ children: [new Paragraph({ children: [new TextRun(fixtures[1].marker)] })] }] })
+  await writeFile(fixtures[1].path, await Packer.toBuffer(word), { flag: 'wx' })
+  return fixtures
+}
+
+async function waitForDoclingServe(child, url, getSpawnError) {
+  const deadline = Date.now() + 300_000
+  let lastError
+  while (Date.now() < deadline) {
+    if (getSpawnError()) throw new Error(`Docling Serve could not start: ${getSpawnError().message}`)
+    if (child.exitCode !== null) throw new Error(`Docling Serve exited before readiness (code ${child.exitCode})`)
+    try {
+      const response = await fetch(`${url}/ready`, { signal: AbortSignal.timeout(3_000) })
+      if (response.ok && (await response.json()).status === 'ok') return
+      lastError = new Error(`Docling Serve readiness probe returned HTTP ${response.status}`)
+    } catch (error) {
+      lastError = error
+    }
+    await new Promise(resolve => setTimeout(resolve, 1_000))
+  }
+  throw new Error(`Docling Serve did not become ready: ${lastError?.message ?? 'timeout'}`)
+}
+
+async function startPinnedDoclingServe({ workspace, ownedRoot }) {
+  const python = process.env.RAILWISE_DOCLING_SERVE_PYTHON
+  assert.ok(python, 'The isolated pinned Docling Serve Python environment must be configured by the Windows workflow')
+  const pythonPath = await realpath(python)
+  assert.ok(containment(await realpath(process.env.RUNNER_TEMP), pythonPath), 'Docling Serve must run from its isolated runner-temp environment')
+  const identity = JSON.parse(execFileSync(pythonPath, ['-c',
+    "import importlib.metadata as m, json, platform; print(json.dumps({'python': platform.python_version(), 'serve': m.version('docling-serve'), 'docling': m.version('docling-slim')}))"],
+  { cwd: workspace, encoding: 'utf8', timeout: 30_000, windowsHide: true }))
+  assert.equal(identity.serve, DOCLING_SERVE_VERSION)
+  assert.ok(identity.docling)
+  const packageFreeze = execFileSync(pythonPath, ['-m', 'pip', 'freeze'],
+    { cwd: workspace, encoding: 'utf8', timeout: 30_000, windowsHide: true })
+  const dependencySetSha256 = createHash('sha256').update(packageFreeze).digest('hex')
+  const probe = createServer()
+  await new Promise((ready, reject) => { probe.on('error', reject); probe.listen(0, '127.0.0.1', ready) })
+  const port = probe.address().port
+  await new Promise(done => probe.close(done))
+  const serviceUrl = `http://127.0.0.1:${port}`
+  const artifactsPath = join(ownedRoot, 'docling-artifacts')
+  const environment = {
+    ...process.env,
+    // Docling Serve uses Rich during startup. GitHub-hosted Windows runners
+    // can expose cp1252 pipes, which makes an otherwise healthy service exit
+    // when a status line contains a non-ASCII glyph. Force the child Python
+    // process to use UTF-8 so readiness reflects the service, not the runner
+    // console code page.
+    PYTHONUTF8: '1',
+    PYTHONIOENCODING: 'utf-8',
+    UVICORN_HOST: '127.0.0.1',
+    UVICORN_PORT: String(port),
+    DOCLING_SERVE_ENABLE_UI: 'false',
+    DOCLING_SERVE_ARTIFACTS_PATH: artifactsPath,
+    HF_HOME: join(ownedRoot, 'docling-model-cache'),
+    HF_HUB_DISABLE_TELEMETRY: '1'
+  }
+  await mkdir(artifactsPath, { recursive: true })
+  const child = spawn(pythonPath, ['-m', 'docling_serve', 'run', '--host', '127.0.0.1', '--port', String(port)], {
+    cwd: workspace, env: environment, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true
+  })
+  let logs = ''
+  let spawnError
+  const append = chunk => { logs = `${logs}${chunk}`.slice(-12_000) }
+  child.on('error', error => { spawnError = error; append(error.message) })
+  child.stdout.on('data', append)
+  child.stderr.on('data', append)
+  try {
+    await waitForDoclingServe(child, serviceUrl, () => spawnError)
+  } catch (error) {
+    await new Promise(resolve => {
+      const timeout = setTimeout(() => { child.kill('SIGKILL'); resolve() }, 10_000)
+      child.once('close', () => { clearTimeout(timeout); resolve() })
+      child.kill()
+    })
+    throw new Error(`${error.message}\n${logs}`)
+  }
+  return {
+    serviceUrl,
+    identity: { package: 'docling-serve', version: identity.serve, doclingVersion: identity.docling,
+      pythonVersion: identity.python, dependencySetSha256 },
+    child,
+    get logs() { return logs },
+    async stop() {
+      if (child.exitCode !== null) return
+      await new Promise(resolve => {
+        const timeout = setTimeout(() => { child.kill('SIGKILL'); resolve() }, 10_000)
+        child.once('close', () => { clearTimeout(timeout); resolve() })
+        child.kill()
+      })
+    }
+  }
+}
+
+function findStructuredField(value, field, seen = new Set()) {
+  if (typeof value === 'string') {
+    try { return findStructuredField(JSON.parse(value), field, seen) } catch { return undefined }
+  }
+  if (!value || typeof value !== 'object' || seen.has(value)) return undefined
+  seen.add(value)
+  if (Object.hasOwn(value, field) && value[field] !== undefined) return value[field]
+  for (const child of Object.values(value)) {
+    const found = findStructuredField(child, field, seen)
+    if (found !== undefined) return found
+  }
+  return undefined
+}
+
+async function invokeInstalledDoclingConversion(cdp, { workspace, environment, ownedRoot, service }) {
+  const server = await cdp.evaluate(`window.workwise.listMcpServers(${literal(workspace)}).then(all=>all.find(row=>row.id==='docling-mcp-server'))`)
+  const installed = await cdp.evaluate("window.workwise.listInstalledPlugins().then(all=>all.find(row=>row.packageId==='docling-mcp'))")
+  assert.equal(server?.source, 'managed-tool')
+  assert.equal(server?.transport, 'stdio')
+  assert.deepEqual(server.args.slice(3), ['docling-mcp', 'docling-mcp-server', '--transport', 'stdio'])
+  assert.equal(installed.version, DOCLING_MCP_VERSION)
+  const command = await realpath(server.command)
+  const artifact = await realpath(installed.artifact.location)
+  const sitePackages = await realpath(server.args[2])
+  assert.ok(containment(await realpath(ownedRoot), command))
+  assert.ok(containment(artifact, sitePackages))
+
+  const fixtures = await createDoclingConversionFixtures(workspace)
+  const client = new Client({ name: 'railwise-installed-docling-conversion-acceptance', version: '1.0.0' })
+  const env = Object.fromEntries(Object.entries({ ...process.env, ...environment,
+    DOCLING_MCP_CONVERSION_MODE: 'remote',
+    DOCLING_MCP_SERVICE_URL: service.serviceUrl,
+    DOCLING_MCP_SERVICE_TIMEOUT: '600',
+    DOCLING_MCP_SERVICE_MAX_RETRIES: '0',
+    DOCLING_MCP_DO_OCR: 'false'
+  }).filter(([, value]) => typeof value === 'string'))
+  const transport = new StdioClientTransport({ command: server.command, args: server.args, cwd: workspace, env, stderr: 'pipe' })
+  transport.stderr?.resume()
+  try {
+    await client.connect(transport)
+    const discovered = await client.listTools()
+    const available = new Set(discovered.tools.map(item => item.name))
+    assert.ok(available.has(DOCLING_CONVERSION_TOOL), 'Installed Docling MCP must expose its document conversion tool')
+    assert.ok(available.has(DOCLING_MARKDOWN_TOOL), 'Installed Docling MCP must expose its Markdown export tool')
+    const documents = []
+    for (const fixture of fixtures) {
+      const converted = await client.callTool({ name: DOCLING_CONVERSION_TOOL, arguments: { source: fixture.path } }, undefined, { timeout: 600_000 })
+      assert.equal(Boolean(converted.isError), false, `Docling MCP conversion failed for ${fixture.format}: ${JSON.stringify(converted.content).slice(0, 1_500)}`)
+      const convertedPayload = converted.structuredContent ?? converted.content
+      const convertedText = JSON.stringify(convertedPayload)
+      const documentKey = findStructuredField(convertedPayload, 'document_key')
+        ?? /(?:["']?document_key["']?\s*[:=]\s*["'])([^"']+)["']/.exec(convertedText)?.[1]
+      assert.equal(typeof documentKey, 'string', `Docling MCP did not return a document cache key for ${fixture.format}`)
+      const exported = await client.callTool({ name: DOCLING_MARKDOWN_TOOL,
+        arguments: { document_key: documentKey, max_size: 20_000 } }, undefined, { timeout: 120_000 })
+      assert.equal(Boolean(exported.isError), false, `Docling MCP Markdown export failed for ${fixture.format}`)
+      const markdown = findStructuredField(exported.structuredContent ?? exported.content, 'markdown')
+        ?? (typeof exported.content?.[0]?.text === 'string' ? exported.content[0].text : '')
+      assert.equal(typeof markdown, 'string')
+      assert.ok(markdown.includes(fixture.marker), `The converted ${fixture.format} Markdown must preserve its unique source text`)
+      const source = await readFile(fixture.path)
+      documents.push({ format: fixture.format, sourceSha256: createHash('sha256').update(source).digest('hex'),
+        documentKey, markerSha256: createHash('sha256').update(fixture.marker).digest('hex'),
+        extractedMarker: true, markdownSha256: createHash('sha256').update(markdown).digest('hex') })
+    }
+    return {
+      method: 'installed-mcp-stdio-to-pinned-docling-serve',
+      service: { ...service.identity, endpoint: service.serviceUrl },
+      mcp: { packageVersion: installed.version, artifactSha256: installed.artifact.sha256,
+        toolsDiscovered: discovered.tools.length, conversionTool: DOCLING_CONVERSION_TOOL, markdownTool: DOCLING_MARKDOWN_TOOL },
+      documents
+    }
+  } finally {
+    await client.close()
+  }
+}
+
+export function validateDoclingConversionEvidence(docling, expectedArtifactSha256) {
+  assert.ok(docling?.toolsDiscovered > 0)
+  assert.equal(docling.conversion?.method, 'installed-mcp-stdio-to-pinned-docling-serve')
+  assert.equal(docling.conversion?.service?.package, 'docling-serve')
+  assert.equal(docling.conversion?.service?.version, DOCLING_SERVE_VERSION)
+  assert.match(docling.conversion?.service?.dependencySetSha256 ?? '', /^[a-f0-9]{64}$/)
+  assert.equal(docling.conversion?.mcp?.packageVersion, DOCLING_MCP_VERSION)
+  assert.equal(docling.conversion?.mcp?.artifactSha256, expectedArtifactSha256)
+  assert.equal(docling.conversion?.mcp?.conversionTool, DOCLING_CONVERSION_TOOL)
+  assert.equal(docling.conversion?.mcp?.markdownTool, DOCLING_MARKDOWN_TOOL)
+  assert.deepEqual(docling.conversion?.documents?.map(item => item.format).sort(), ['docx', 'pdf'])
+  for (const document of docling.conversion.documents) {
+    assert.equal(document.extractedMarker, true)
+    assert.match(document.documentKey, /^[A-Za-z0-9:._-]+$/)
+    assert.match(document.sourceSha256, /^[a-f0-9]{64}$/)
+    assert.match(document.markerSha256, /^[a-f0-9]{64}$/)
+    assert.match(document.markdownSha256, /^[a-f0-9]{64}$/)
+  }
+  return true
 }
 
 export function createMarketplaceModelAcceptance() {
@@ -227,7 +459,9 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
   const onlyIds = videoOnly ? ['video-shotcraft'] : focused ? focusedIds : null
   const selection = onlyIds ? new Map(onlyIds.map(id => [id, expected.get(id)])) : expected
 
-  return withPublicUpstreamsBlocked(async () => {
+  const doclingService = focused ? await startPinnedDoclingServe({ workspace, ownedRoot }) : undefined
+  try {
+    return await withPublicUpstreamsBlocked(async () => {
     const catalog = (await cdp.evaluate('window.workwise.listCatalogPackages()')).packages
     const initial = await cdp.evaluate('window.workwise.listInstalledPlugins()')
     const reports = []
@@ -295,6 +529,7 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
     if (focused) {
       evidence.scope = 'docling-and-two-installed-skills'
       docling.csvBackend = await verifyInstalledDoclingCsvBackend(cdp, { workspace, environment, ownedRoot })
+      docling.conversion = await invokeInstalledDoclingConversion(cdp, { workspace, environment, ownedRoot, service: doclingService })
     } else {
       await cdp.wait(getRuntimeServer('playwright-mcp-server'), 'the installed Playwright MCP in KUN', 90_000)
       const server = await cdp.evaluate(`window.workwise.listMcpServers(${literal(workspace)}).then(all=>all.find(row=>row.id==='playwright-mcp-server'))`)
@@ -318,5 +553,8 @@ export async function verifyWindowsColdMarketplace(cdp, { workspace, environment
 
     return { ...evidence, docling,
       superpowers: { ...superpowersExecution, offline: true }, blender: blenderExecution }
-  })
+    })
+  } finally {
+    await doclingService?.stop()
+  }
 }

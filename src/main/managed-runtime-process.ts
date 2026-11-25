@@ -894,7 +894,7 @@ export async function syncManagedRuntimeConfig(
     runtime.baseUrl &&
     runtime.model &&
     isOfficialDeepSeekBaseUrl(runtime.baseUrl) &&
-    /^deepseek-(?:flash|v4-(?:pro|flash))$/i.test(runtime.model)
+    /^deepseek-v4-(?:pro|flash)$/i.test(runtime.model)
   )
   const next = {
     serve: {
@@ -924,12 +924,11 @@ export async function syncManagedRuntimeConfig(
         ...web,
         enabled: web.enabled === false ? false : true,
         fetchEnabled: web.fetchEnabled === false ? false : true,
-        ...(managedDeepSeekSearch
-          ? {
-              searchEnabled: true,
-              provider: 'deepseek-responses'
-            }
-          : {})
+        searchEnabled: web.searchEnabled === false ? false : true,
+        ...(web.searchEnabled === false ? {} : {
+          provider: managedDeepSeekSearch ? 'deepseek-responses+yuanbao-opensearch'
+            : web.provider && web.provider !== 'deepseek-responses' ? web.provider : 'yuanbao-opensearch'
+        })
       },
       skills: skillCapability,
       imageGen: imageGenConfigForRuntime(runtime.imageGeneration, imageGen),

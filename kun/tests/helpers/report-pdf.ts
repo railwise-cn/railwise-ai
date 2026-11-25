@@ -2,7 +2,8 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 /** Parse the visible text, rather than searching compressed PDF bytes. */
 export async function readReportPdf(bytes: Uint8Array): Promise<{ text: string; pageCount: number; pages: string[] }> {
-  const document = await getDocument({ data: Uint8Array.from(bytes), useSystemFonts: false, isEvalSupported: false }).promise
+  const loadingTask = getDocument({ data: Uint8Array.from(bytes), useSystemFonts: false })
+  const document = await loadingTask.promise
   try {
     const pages: string[] = []
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
@@ -11,5 +12,5 @@ export async function readReportPdf(bytes: Uint8Array): Promise<{ text: string; 
       pages.push(content.items.map((item) => 'str' in item ? item.str : '').join(''))
     }
     return { text: pages.join('\n'), pageCount: document.numPages, pages }
-  } finally { await document.destroy() }
+  } finally { await loadingTask.destroy() }
 }

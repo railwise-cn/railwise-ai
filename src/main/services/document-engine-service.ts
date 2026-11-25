@@ -26,7 +26,7 @@ import {
 import JSZip from 'jszip'
 import { z } from 'zod'
 
-const MARKITDOWN_ENGINE_VERSION = 'markitdown-v0.1.4-workwise-1'
+const MARKITDOWN_ENGINE_VERSION = 'markitdown-v0.1.9-workwise-1'
 const DOCUMENT_RESULT_CACHE_REVISION = 'document-result-v2'
 const MAX_DOCUMENT_BYTES = 200 * 1024 * 1024
 const MAX_PROTOCOL_BYTES = 16 * 1024 * 1024

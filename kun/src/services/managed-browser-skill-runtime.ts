@@ -5,6 +5,7 @@ import { retryBrowserScope } from './browser-public-query-authority.js'
 import type { TaskRun } from '../contracts/tasks.js'
 import { createHash } from 'node:crypto'
 import { BrowserCapabilityConfig, browserTaskOrigins, browserVerificationPolicy, isBrowserTask, isPublicBrowserQuery, type BrowserExecutionScope, type BrowserTaskBindingConfirmation, type BrowserTaskBindingSnapshot, type BrowserVerificationPolicy, type BrowserPublicQueryAuthorization, type BrowserPublicQueryDuration } from '../contracts/browser-skill.js'
+import { taskUserProvidedSourceUrls } from '../contracts/task-source-intent.js'
 import type { CapabilityPreflight } from '../contracts/harness.js'
 import type { ExecutionScope } from '../contracts/permissions.js'
 import { scheduleForRequirement } from '../contracts/schedule.js'
@@ -98,6 +99,15 @@ export class ManagedBrowserSkillRuntime {
         message: '当前浏览器连接未通过实时核验。请重新检查扩展和浏览器连接，然后继续原任务。' }
     }
     const bound = freshScope ?? currentTask?.authority?.browserScope ?? scheduledBrowserScope ?? inheritedRetry
+    const directSourceOrigins = currentTask && currentTask.acceptance.requiresWebEvidence
+      ? taskUserProvidedSourceUrls(currentTask.goal, this.options.repository.inputs(currentTask.id)).map(url => new URL(url).origin)
+      : []
+    const missingSourceOrigins = bound ? directSourceOrigins.filter(origin => !bound.origins.includes(origin)) : []
+    if (currentTask && missingSourceOrigins.length && ['paused', 'waiting_user', 'stalled'].includes(currentTask.status)) {
+      const confirmation = { kind: 'grant' as const, route: 'task/browser-binding', label: '确认补充网址的浏览器范围' }
+      return { ...base, status: 'needs_authorization', action: confirmation, resolution: confirmation, errorCode: 'browser_followup_origin_scope_required',
+        message: '补充的网址属于新的站点。请在原任务中审阅并确认站点范围后继续。' }
+    }
     const requiresNativeRead = bound?.publicQueryAuthorization || bound?.interaction === 'interact' && browserVerificationPolicy(bound.verificationPolicy) === 'public_query_target' || !bound && isPublicBrowserQuery(text)
     if (browserVerificationPolicy(bound?.verificationPolicy) === 'public_query_target' && !targetPolicySupported || requiresNativeRead && !nativeReadSupported) {
       const upgrade = { kind: 'install' as const, route: 'marketplace', label: '升级 CLI 并更新或重新连接扩展' }
@@ -149,7 +159,7 @@ export class ManagedBrowserSkillRuntime {
     const config = this.config
     if (!config.enabled || config.state !== 'ready' || !config.browserInstanceId) return undefined
     const supplied = new Set(sources.flatMap(text => browserTaskOrigins(text, { includeBareWww: true })))
-    const origins = config.origins.filter(origin => supplied.has(origin))
+    const origins = config.origins.length ? config.origins.filter(origin => supplied.has(origin)) : [...supplied]
     if (!origins.length) return undefined
     return { browserInstanceId: config.browserInstanceId, origins, interaction: 'observe', sourceReadOnly: true, revision: config.revision }
   }
@@ -178,11 +188,16 @@ export class ManagedBrowserSkillRuntime {
     const previous = task.authority?.browserScope
     const parent = task.parentTaskId ? this.options.repository.get(task.parentTaskId) : undefined
     const parentScope = parent?.authority?.browserScope
-    const requestedOrigins = browserTaskOrigins(task.goal)
+    const requestedOrigins = [...new Set([
+      ...browserTaskOrigins(task.goal),
+      ...taskUserProvidedSourceUrls(task.goal, this.options.repository.inputs(task.id)).map(url => new URL(url).origin)
+    ])]
     // A previously unbound task reviews the explicitly configured sites here.
     // Existing task authority always retains its original origin boundary.
     const fallbackOrigins = task.parentTaskId ? parentScope?.origins ?? [] : config.origins
-    const taskOrigins = previous?.origins ?? (requestedOrigins.length ? requestedOrigins : fallbackOrigins)
+    const taskOrigins = previous
+      ? [...new Set([...previous.origins, ...requestedOrigins])]
+      : requestedOrigins.length ? requestedOrigins : fallbackOrigins
     const origins = taskOrigins.filter(origin => !config.origins.length || config.origins.includes(origin))
     if (!origins.length) throw new Error('browser_original_origins_not_allowed')
     if (task.parentTaskId && (!parentScope || parent?.authority?.revokedAt ||

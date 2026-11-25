@@ -98,9 +98,9 @@ function PdfJsPreview({ result, onRequestAccuratePdf }: {
     const base64 = result.dataUrl.slice(result.dataUrl.indexOf(',') + 1)
     const binary = atob(base64)
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
-    const task = getDocument({ data: bytes, isEvalSupported: false, useWasm: false, maxImageSize: 20_000_000 })
+    const task = getDocument({ data: bytes, useWasm: false, maxImageSize: 20_000_000 })
     void task.promise.then((document) => {
-      if (cancelled) return document.destroy()
+      if (cancelled) return undefined
       documentRef.current = document
       setLoading(false)
       return undefined

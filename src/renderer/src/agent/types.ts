@@ -278,6 +278,7 @@ export type ChatBlock =
       id: string
       createdAt?: string
       approvalId: string
+      requestHash?: string
       summary: string
       toolName?: string
       status: 'pending' | 'allowed' | 'denied' | 'expired' | 'error'
@@ -297,6 +298,7 @@ export type ChatBlock =
 
 export type ApprovalRequestPayload = {
   approvalId: string
+  requestHash?: string
   threadId?: string
   turnId?: string
   summary: string

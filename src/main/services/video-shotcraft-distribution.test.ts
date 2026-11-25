@@ -18,11 +18,14 @@ const item = getOfficialMarketplaceCatalog().find(candidate => candidate.id === 
 const upstream = {
   'LICENSE': 'Apache License, Version 2.0\n',
   'NOTICE': 'Original upstream notice.\n',
+  'README.md': '<img src="./assets/readme/sponsors/openlux.png" alt="OpenLux logo">\n',
+  'README_CN.md': 'OpenLux 赞助说明。\n',
   'SKILL.md': '---\nname: video-shotcraft\n---\n\nOriginal skill body.\n',
   'template/package.json': '{"dependencies":{"remotion":"4.0.484"}}\n',
   'references/pipeline.md': 'Original workflow.\n',
   'assets/audio/ATTRIBUTION.md': 'Music attribution.\n',
-  'assets/readme/sponsors/ATTRIBUTION.md': 'Trademark attribution.\n',
+  'assets/readme/sponsors/ATTRIBUTION.md': 'Trademark attribution.\nOpenLux logo and trademark are not covered by Apache-2.0.\n',
+  'assets/readme/sponsors/openlux.png': 'Sponsor image filtered from the skill package.',
   'references/shots/ATTRIBUTION.md': 'Shot attribution.\n',
   'template/public/audio/ATTRIBUTION.md': 'SFX attribution.\n',
   'demos/animated-text.tsx': 'export const Frame = () => <div>Hello</div>\n',
@@ -52,6 +55,10 @@ describe('official Video Shotcraft distribution', () => {
     const read = (path: keyof typeof upstream) => readFile(join(root, path), 'utf8')
     await expect(read('LICENSE')).resolves.toBe(upstream.LICENSE)
     await expect(read('NOTICE')).resolves.toBe(upstream.NOTICE)
+    await expect(read('README.md')).resolves.toContain('openlux.png')
+    await expect(read('README_CN.md')).resolves.toContain('OpenLux 赞助说明')
+    await expect(readFile(join(root, 'assets/readme/sponsors/ATTRIBUTION.md'), 'utf8'))
+      .resolves.toContain('OpenLux logo and trademark are not covered by Apache-2.0.')
     await expect(read('demos/animated-text.tsx')).resolves.toBe(upstream['demos/animated-text.tsx'])
     await expect(read('template/public/audio/ATTRIBUTION.md')).resolves.toBe(upstream['template/public/audio/ATTRIBUTION.md'])
     const skill = await read('SKILL.md')
@@ -66,6 +73,7 @@ describe('official Video Shotcraft distribution', () => {
       modified: ['SKILL.md'],
       excludedFiles: [
         'assets/audio/bgm/raw-beat.mp3',
+        'assets/readme/sponsors/openlux.png',
         'assets/readme/sponsors/trademark.svg',
         'demos/preview.mp4',
         'gallery/index.html',

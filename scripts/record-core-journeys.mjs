@@ -170,6 +170,41 @@ export function windowsCoreJourneys(install, environment = process.env) {
       if (ppt) journeys.push(ppt)
     }
   }
+  if (ui?.status === 'passed' && webPptChecks.includes('installed-chat-task-pause-restart-recovery')) {
+    assert.equal(ui.version, version)
+    assert.equal(ui.sourceHead, sourceHead)
+    assert.equal(ui.installedAsarSha256, installedAsarSha256)
+    assert.equal(ui.packageUnchanged, true)
+    const recovery = ui.webPpt?.restartRecovery
+    assert.equal(recovery?.status, 'passed')
+    assert.equal(recovery?.exactPackageVersion, version)
+    assert.equal(recovery?.installedAsarSha256, installedAsarSha256)
+    assert.equal(recovery?.appClosedNormally, true)
+    assert.equal(recovery?.appRestarted, true)
+    assert.equal(recovery?.sameProfile, true)
+    assert.equal(recovery?.sameRuntimeDataDir, true)
+    assert.equal(recovery?.beforeRestart?.taskStatus, 'paused')
+    assert.equal(recovery?.beforeRestart?.taskId, ui.webPpt.taskId)
+    assert.equal(recovery?.beforeRestart?.threadId, ui.webPpt.conversationThreadId)
+    assert.equal(recovery?.afterRestart?.taskStatus, 'paused')
+    assert.equal(recovery?.afterRestart?.taskId, ui.webPpt.taskId)
+    assert.equal(recovery?.afterRestart?.threadId, ui.webPpt.conversationThreadId)
+    assert.equal(recovery?.afterRestart?.oldQuestionStillVisible, true)
+    assert.equal(recovery?.afterRestart?.resumedQuestionVisible, true)
+    assert.equal(recovery?.afterRestart?.originalChat?.surface, 'original-chat')
+    assert.equal(recovery?.answerReceiptCount, 1)
+    assert.equal(recovery?.answerReceiptRequestId, recovery.afterRestart.resumedQuestionRequestId)
+    assert.equal(recovery?.answeredQuestionRequestCount, 1)
+    assert.equal(recovery?.approvalCardCount, 1)
+    assert.equal(recovery?.approvalResolutionCount, 1)
+    assert.equal(recovery?.approvalResolutionDuplicateCount, 0)
+    assert.equal(recovery?.approvalCount, 1)
+    assert.deepEqual(recovery?.approvalResolutionRequestIds, [recovery.approvals?.[0]?.id])
+    assert.equal(recovery?.approvals?.[0]?.method, 'installed-task-card')
+    assert.equal(recovery?.approvals?.[0]?.decision, 'allow')
+    journeys.push({ id: 'pause-restart-recovery', method: 'installed-ui', status: 'passed',
+      evidence: 'windows-ui-smoke.json records the exact installed application pausing an open question, restarting with the same profile, answering in the original conversation and resolving one visible approval once.' })
+  }
   if (ui?.status === 'passed') {
     const checks = new Set(ui.checks ?? [])
     const task = ui.taskExecution

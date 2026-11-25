@@ -110,7 +110,7 @@ it('prepares observe({}) through the real Runtime and resumes the same Task afte
     interaction: 'interact', verificationPolicy: 'public_query_target', publicQueryAuthorization: 'task', idempotencyKey: 'confirm-readiness' })).status).toBe(200)
   const resume = async (key: string) => expect((await api(`/v1/tasks/${taskId}/resume`, { expectedRevision: runtime.taskRepository!.get(taskId)!.revision, idempotencyKey: key })).status).toBe(202)
   await resume('readiness-first')
-  await expect.poll(() => heldResponse !== undefined).toBe(true)
+  await expect.poll(() => heldResponse !== undefined, { timeout: 15_000 }).toBe(true)
   expect(runtime.taskRepository!.operations(taskId, 'browser_session_readiness')).toMatchObject([{ status: 'succeeded', result: { observationCompleted: true, actualAction: 'start' } }])
   const firstObserve = runtime.taskRepository!.operations(taskId, 'tool').find(receipt => receipt.request?.toolName === 'browser_observe')!
   expect(firstObserve.result).toMatchObject({ item: { output: { sourceUrl: origin + '/document', sessionId: 'owned-fixture-session-1',

@@ -247,3 +247,51 @@ Windows Docling 专项 `45164369592` 使用候选 `45115646587`，工具启动�
 隔离的 macOS Apple Silicon 源码预览回执保留在本机临时验收目录，未纳入版本库。测试源码提交为 `fb0d9daf95b67835cbd746d8dbd3edb4e36f9ea2`，渲染包 SHA-256 为 `2925303dba2d78c56d6c850c1824d1a6807ac135e7e02c646aa1b1e7dda7bd11`。空配置冷启动创建 `default_workspace` 并读回 `workspace-write/workwise-created`。界面内暂停后原问题仍显示、输入框解除旧请求绑定；在原对话继续、答复及单次批准后，同一任务完成。回执确认一条答案记录、一次文件写入调用和实际文件内容。该源预览不等于签名候选安装包验收，暂停后的应用重启恢复未测。
 
 本次聚焦界面测试 17/17，工作区首次初始化、KUN 用户输入恢复及权限相关聚焦测试 141 项通过，主仓与 KUN 类型检查、ESLint、生产构建及隔离 UI 流程通过。最终修订前源码 `0d6f428a` 的 GitHub Quality CI run `45278698866` attempt 2 三项必需检查均通过。该源码检查之后只更新了本台账记录。当前仍须用下一批精确 macOS 与 Windows 安装包复验；真实模型官网到 PPT、Windows 安装包实装和旧版原地升级、付费登录站点及现场网络流程仍未形成这批源码的制品回执。正式渠道仍为 0.5.10。
+
+## 2026-11-24 精确候选实装复验
+
+应用修复合入提交为 `bf61f10d95a23bbe6c7c8f98d54b718e6a33f049`。Release workflow `45286904679` 仅构建候选，`candidate_only=true`、`prepare_public_artifacts=true`、`publish_release=false`。Windows x64 构建、macOS 两架构、三端候选身份和更新元数据核对通过；GitHub Release、Stable 更新源和官网发布均跳过。
+
+Windows 精确安装包来自该 run，版本 `0.5.11`，安装器 SHA-256 `21b559a958f8e810c37ba20961de5819d6ece83cc3e4e2bd2e37063143600709`，安装后 ASAR SHA-256 `a605ebb36f89d822836fa23feba6e730d646fb88202e11a319e816c851147c9d`。此候选 EXE 的 Authenticode 状态为 `NotSigned`。macOS Apple Silicon DMG SHA-256 `a4171d87e02faa8097419b9dde3084e95dc89d41b21dbe0588269643332b5b19`，Intel DMG SHA-256 `1f07503fdeccfb26ca80f1a8a8841d80377f580986cabbb5f85a6ac8ca38a4df`。两架构在 workflow `45308995334` 的精确安装、代码签名、notarization staple、启动和离线表格检查均通过。启动截图和原始 JSON 回执保留在该 Actions run 的两个 `exact-mac-startup-appearance-*` artifacts。
+
+已通过的精确安装包流程如下。
+
+- Windows 对话任务与浏览器 `45296531733`。实际安装包中任务在原会话完成，HTML 经过文件摘要校验、自动预览及手动预览，计划结果回到原对话。浏览器技能安装并在任务中热加载，读取两个受控来源、核对来源回执，并生成 HTML。
+- Windows 附件、技能与插件 `45296578338`。文件选择、拖放和系统剪贴板导入均实际执行。8 个混合附件折叠为 2 行、展开后保留草稿，损坏项提示通过；包括 40 MiB 合成扫描 PDF、中文 PDF、损坏 PDF、图片、中英文长名和同名文件。扫描与文字 PDF 均实际发送。Video Shotcraft 技能和插件入口实际调用。
+- Windows 冷缓存市场 `45296663378`。阻断 GitHub、npm、PyPI 等上游主机后，Superpowers 从内置包离线安装并调用，Blender Skills 经睿威镜像安装并调用；Docling 发现 19 个工具，镜像 CSV 后端保留中文内容。回执不证明 Docling 对 PDF/DOCX 的完整转换，也不证明 Blender Skills 可以断网安装。
+- Windows 网址到 PPT 浏览器回退 `45296747874`。直接网页读取被策略阻断后，隔离 Chrome 与 BrowserSkill 扩展读取受控来源，生成原生可编辑 PPTX，成果按钮在原会话内点击。
+- Windows 启动画面 `45296792601`。浅色英文和深色中文启动均显示完整中文全称且隐藏版本行；100%、125%、150% 缩放读回通过，窄工作区宽度无水平溢出，首次打开显示「本版更新」。
+- Windows 离线 Univer `45296837530`。公式计算、撤销、外部修改冲突另存、中文 CSV 保留前导零和精度、多工作表保存重开及 XLSX 只读预览全部通过。
+- Windows Video Shotcraft `45296910991`。在私有协议夹具和合成素材上通过中断后原任务恢复、审批、技能资源读取、视频登记、原对话打开及 MP4 24 帧解码。该私有非商用评估不分发 Remotion，不能替代用户真实素材/模型验收。
+- Windows 更新 `45297023133`。从正式 0.5.10 设置页和侧栏分别升级到同一候选，从正式 0.5.7 覆盖安装到同一候选，三项均通过并读回原有资料。
+- macOS Apple Silicon 与 Intel 表格 `45308995334`。原失败是驱动将首个点击点设在 `y + 59`，相对 22 像素行距多偏一行，并依赖未显示的单元格地址标签。驱动修复后，在同一批签名 DMG 上两架构均通过公式 `=SUM(4,5)` 得值 9、撤销、冲突另存、中文 CSV、多工作表保存重开及 XLSX 只读预览。该 run 的驱动源码来自主分支提交 `afe5f902c05ae5a572a21577e915960a935d3ea4`，应用 DMG 与先前候选字节一致。
+
+## 2026-11-25 最新上游与实装状态
+
+版本快照截至 2026-11-25 11:48 UTC：当时 Univer 最新 `1.6.1`（Apache-2.0）。11:49 UTC 上游发布 `1.6.2` 后，旧候选版本随即过时，详见下方刷新记录。AG-UI 的 npm 核心包仍为 `1.0.5`（MIT）；上游 11 月 21 日发布没有产生新的 `@ag-ui/core` 版本。BrowserSkill CLI 和扩展仍为 `0.5.0`。Playwright MCP/CLI 最新为 `0.0.86`/`0.1.25`（Apache-2.0）；Docling MCP 最新为 `3.5.1`（MIT）。它们的目录版本和启动参数已更新，但离线镜像锁及重建后的 Windows、macOS 安装包尚未通过验证。Superpowers `v7.0.2`（MIT）已固定到 release tag 对应的 commit `22f0b463e7a5e579904dd6211a520321035526f7`，catalog 列出 15 个 skill，现有三平台锁条目通过目录校验。Video Shotcraft 已从审计过的 `59f3e9b9e936ff2bce0e18446226d770a3f2f61f` 前进到 11 月 25 日已验证签名的上游 HEAD `226813b3e2e6a0a346358210bfa0d83b24b3a8d3`。完整 diff 仅增加 5 份 README 的 OpenLux 赞助与推荐链接文案、更新赞助归属说明、增加一张赞助 PNG；Apache-2.0 LICENSE 的 Git blob SHA `71ffb8bd20fc152507c1b3dd48f2890bef493ca6` 未变。当前过滤保留 README 和归属文本、排除赞助 PNG；新文本含上游赞助链接及价格宣传。已从与旧锁摘要、大小逐字节匹配的 Mac/Windows 旧镜像重建新分发包：通过 GitHub API 对照固定 commit tree blob SHA 获取新版文档、LICENSE 和 Skill；只应用完整审计 diff 中的文档变化，PNG 路径列入分发回执并从 ZIP 排除。两平台 ZIP 的 Apache LICENSE 字节均匹配上游 SHA-256 `b2ce9877a55547ada9b870150664d1468ff777e67cc9888806a73927d31c5771`，ZIP 完整性校验通过；Mac arm64/x64 共用 `85b5f42fd16fd53533ce973f770caafdf73573443db852888d40c11064a4a6e5`（3,054,774 bytes），Windows x64 使用 `3fae5608c3ec2f19de4ea99b9967574fe0beac45eb35977cb5ff8ef66a636ff0`（3,067,600 bytes）；package review SHA-256 为 `72ee2e260daa89f37d1daed0047d341c7b94bd231f984d4a498148ce0ab2c88e`。这记录的是目标平台归档生成与内容核验，不代表本轮已在真实 Windows 安装包上实装验收。Blender Skills 最新提交只改 README，RailWise 只分发的 `.claude/skills` 子目录无变化，因此保留现有 pin。PPT Master `6.10.0` 含不适用于整包发行的 AGPL PyMuPDF 路径且有 KUN 不兼容改动，不做整包替换。PDF.js `6.5.438` 为跨主版本升级；MarkItDown `0.1.9` 需要重建 sidecar，均不作为未经兼容验收的替换。KUN 上游 `0.4.6` 使用 PolyForm Noncommercial，不直接并入 RailWise MIT 运行时。Ego Lite 桌面端不随 RailWise 安装包分发；本机 `ego-browser upgrade` 已报告最新，CLI 为 `0.6.3.17`，RailWise 当前支持已审计 `0.6.3` 协议系列的构建号 14 及以上。
+
+QA 模型凭据随后已配置在仓库 Actions secrets/variables 中。精确 0.5.11 候选的 Windows 实装 `45373293407` 和 Mac Apple Silicon 实装 `45373293596` 均确实启用了实时 DeepSeek 流程；Windows 报告“Live model acceptance did not complete”。Mac 原始回执绑定构建 `45357920557` 的候选包与安装后 ASAR，任务已收取网址答复，但随后进入 `waiting_approval`，等待对 `https://www.railwise.cn` 的只读网页读取批准。验收驱动没有处理这张审批卡，故超时退出；它没有证明网页读取或 PPTX 交付通过，也不能归因于凭据缺失。该回执的下一步是修复/验证一次有界审批后原任务续接，并用更新后的精确候选重跑。
+
+**仍待完成的验收与发布条件**
+
+- 真实模型官网到 PPTX 尚无成功回执。`RAILWISE_QA_MODEL_BASE_URL`、`RAILWISE_QA_MODEL` 和 `RAILWISE_QA_MODEL_API_KEY` 已配置为仓库 Actions variable/secret；此前 Mac 实装实际到达 `waiting_approval`，验收驱动未处理原对话中的只读网页读取审批，因此超时失败。Windows 实装也未完成。需修复审批卡的稳定定位与受限批准流程，再用新构建候选执行真实模型旅程。受控/合成结果不替代此回执。
+- 任务续接和单次批准的隔离源码预览通过，精确 Windows 包也通过任务、浏览器和 Video 流程；但新候选安装包对“等待开放式回答时点击暂停、重启后原问题仍在正文、继续后回答并只批准一次”的单独回执尚缺。Mac 源码预览通过该流程，不能代替包验收。
+- Windows 专项实际任务和计划任务使用受控协议，验证了原会话、HTML 成果、真实系统时钟回执及原会话记录；国内普通网络的实体 Windows 和此前遇到问题的用户电脑仍待现场环境复测。
+- 大单网与 Ego 的原登录空间/会话未重新登录核验。Docling MCP 已启动并执行本地 CSV 后端，完整 PDF/DOCX Docling 转换需要另外配置 Docling Serve 或本地转换环境。加密 PDF、OCR 与跨页引用未验。
+- 2026-11-20 与更早记录中当时未验证的内容见历史条目。正式 Stable 渠道仍是 `0.5.10`，`0.5.11` 仅为私有候选。此前记录的 Windows 候选 Authenticode 为 `NotSigned`，公开发布前仍需按正式分发签名要求确认适用制品。
+
+截至本次记录，上游依赖版本变更尚未全部进入离线包与安装包；本节中的未通过/待测事项都仍是发布阻塞。正式渠道没有改变。
+
+## 2026-11-25 验收驱动补齐
+
+本轮新增两条隔离的 Windows 精确安装包验收入口：`run_task_pause_restart` 从原对话提交 PPT 任务，在首次开放问题处暂停、正常关闭并以同一配置重启应用，然后在同一对话继续、回答原问题、对唯一的 PPT Master 归属核验审批点一次允许，并校验只有一条持久化答案和一条审批决定；`run_docling_conversion` 在隔离的 Python 3.11 环境安装固定版 Docling Serve `1.39.0`，再通过安装包中精确版本 `3.5.1` 的 Docling MCP stdio 工具转换合成 PDF/DOCX，读取 Markdown 并核对各自唯一标记。回执校验绑定安装 ASAR 摘要和转换服务依赖集摘要。两项分别需要独立的新候选包实装运行；目前仅有脚本/门禁测试，没有据此宣称运行旅程已通过。
+
+Video Shotcraft 镜像现固定到 `226813b3e2e6a0a346358210bfa0d83b24b3a8d3`，本地归档重建、Apache-2.0 许可证字节、三平台 63 个锁项和对应测试均已验证。更新后的归档仍须随当前源码构建新候选，并以精确候选复跑市场与技能调用。当前 PR #120 的 GitHub Quality 检查所用提交为 `c5d92fd0`，不包含本节这些新增改动；Windows 专项与 Electron smoke 已通过，Quality 主作业已通过测试并进入生产构建，最终状态需以最新 PR 检查为准。
+
+本机 Ego Lite CLI 可用；本轮在新建独立 Space 中打开已登录的大单网订阅页并读取到页面内容。这只证明本机 Ego 会话与来源可用，不证明 RailWise 精确候选调用 Ego、登录中断后在同一 Space 恢复，或完成大单网的去重与字段核验。大陆普通网络实体 Windows、原 Mac 升级失败的当次日志仍需现场设备/日志。正式渠道仍为 `0.5.10`，尚未发布 `0.5.11`。
+
+## 2026-11-25 Univer 1.6.2 刷新
+
+Univer 上游在 `2026-11-25 11:49 UTC` 发布 `v1.6.2`（Apache-2.0），包含工作表/范围保护绕过修复、Excel 粘贴保留换行、排序和取值修复。本分支将 `@univerjs/presets`、`@univerjs/preset-sheets-core` 与全部锁定的 Univer 运行依赖更新至 `1.6.2`，并同步随包 NOTICE。依赖差异仅涉及 Univer 组件及其上游删除的四个传递依赖。
+
+本机验证：完整 Vitest 为 `5117` 通过、`14` 跳过；工作表组件测试 `2/2`；Windows/macOS 表格验收驱动测试 `7/7`；`npm run test:release-gate` 为 `591` 通过、`1` 项因本机缺少 PowerShell 跳过；许可证核对、类型检查和生产构建通过。`afterPack` 现在会要求 macOS 与 Windows 实际 Resources 目录包含四份 Univer/RxJS 许可和 NOTICE，且逐字节匹配来源；正反测试覆盖缺失和改写。首次跨平台 CI 发现 Windows 自动换行转换和 macOS 打包测试夹具未包含新许可资源，已通过 `.gitattributes` 固定 LF 并补齐夹具；完整测试现已通过，修正后的源码还需新的 Quality CI 与候选包验证。源码验证不替代新候选包的安装和表格实测。旧 Release run `45613679212` 使用锁定版本 `1.6.1`，且 Windows 精确安装步骤在下载 EXE 前取消，已停止并不纳入本轮验收。新提交仍需构建同一批 Windows x64、macOS Apple Silicon 和 Intel 包，再运行相应安装和 Univer 表格旅程。

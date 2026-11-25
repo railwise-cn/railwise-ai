@@ -25,8 +25,9 @@ import { inspectPackageDirectory, marketplacePackageReviewSha256, PackageInstall
 const MAX_PACKAGE_JSON_BYTES = 1024 * 1024
 const MAX_RUNTIME_METADATA_BYTES = 1024 * 1024
 const SHA256 = /^[0-9a-f]{64}$/i
-// Official Docling 3.0.0 review before the transport argument was explicit.
+// Preserve the first reviewed release for installations created before the current pin.
 const LEGACY_DOCLING_REVIEW_SHA256 = '18b946ed1f56344e58d168890fae10d1fdeaff8ee6dd763c34a5c1cd30414f99'
+const LEGACY_DOCLING_VERSION = '3.0.0'
 // The Docling Windows wheel set pins pywin32 312. Its required .pth
 // initialization is skipped when the isolated launcher adds site-packages.
 const DOCLING_PYWIN32_PATHS = ['win32', 'win32/lib', 'pythonwin']
@@ -330,15 +331,15 @@ export async function verifiedOfficialDoclingStdioLaunch(
       server.transport !== 'stdio' || server.cwd || !server.command || !isAbsolute(server.command) ||
       args?.[0] !== '-I' || (args.length !== 5 && args.length !== 7)) return undefined
 
-  const item = getOfficialMarketplaceCatalog().find(entry => entry.id === 'docling-mcp' && entry.version === '3.0.0')
+  const item = getOfficialMarketplaceCatalog().find(entry => entry.id === 'docling-mcp')
   const component = item?.components.find(entry => entry.id === server.id)
   if (!item || component?.type !== 'mcp' || component.runtime.kind !== 'uv') return undefined
   const runtime = component.runtime
   try {
     const installed = await (options.installed ?? new PackageInstallationService()).get(item.id)
     const workspace = server.scope === 'workspace' ? server.workspaceRoot : undefined
-    const legacy = installed?.reviewSha256 === LEGACY_DOCLING_REVIEW_SHA256
-    if (!installed || installed.version !== item.version ||
+    const legacy = installed?.version === LEGACY_DOCLING_VERSION && installed.reviewSha256 === LEGACY_DOCLING_REVIEW_SHA256
+    if (!installed || (!legacy && installed.version !== item.version) ||
         installed.source.catalogSourceId !== 'workwise-official' || installed.source.id !== item.source.id ||
         (!legacy && installed.reviewSha256 !== marketplacePackageReviewSha256(item)) ||
         (installed.scope === 'workspace') !== (server.scope === 'workspace') ||
@@ -348,7 +349,8 @@ export async function verifiedOfficialDoclingStdioLaunch(
     const pythonRoot = await realpath(options.pythonRoot ?? join(defaultManagedUvRoot(), 'python'))
     if (command !== server.command || !isCanonicalPathContained(pythonRoot, command)) return undefined
     const launch = await pythonLaunch(
-      installed.artifact.location, runtime.packageName, runtime.version, runtime.install.digest.value,
+      installed.artifact.location, runtime.packageName, installed.version,
+      legacy ? '595da70b9de2265f1f14e575fad65ff4213c5c7e2dbb255184d606505fa49f23' : runtime.install.digest.value,
       runtime.executable, legacy ? [] : runtime.args, workspace, {
         ensure: async () => ({ pythonPath: command, uvVersion: MANAGED_UV_VERSION, pythonVersion: MANAGED_PYTHON_VERSION })
       }

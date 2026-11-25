@@ -287,8 +287,21 @@ function applyRuntimeDisclosureMeta(
 }
 
 function extractToolSources(item: CoreTurnItemJson): Array<Record<string, string>> | undefined {
+  if (item.kind !== 'tool_result' || item.isError || item.status !== 'completed') return undefined
+  const expectedPrefix = item.toolName === 'web_search'
+    ? 'web_search_'
+    : item.toolName === 'web_fetch'
+      ? 'web_fetch_'
+      : undefined
+  if (!expectedPrefix) return undefined
+
   const payload = payloadFor(item)
-  return normalizeWebSources(payload.sources) ?? normalizeWebSources(payload.citations)
+  const sources = [
+    ...(normalizeWebSources(payload.sources) ?? []),
+    ...(normalizeWebSources(payload.citations) ?? [])
+  ]
+  const matchingSources = sources?.filter(source => source.sourceId?.startsWith(expectedPrefix))
+  return matchingSources?.length ? matchingSources : undefined
 }
 
 type ToolAttachmentReference = {
@@ -778,6 +791,7 @@ function approvalBlockFromItem(item: CoreTurnItemJson, child?: CoreChildRuntimeM
     id: item.id,
     createdAt: itemCreatedAt(item),
     approvalId: item.approvalId ?? item.id,
+    ...(item.requestHash ? { requestHash: item.requestHash } : {}),
     summary: item.summary?.trim() || 'Approval required',
     toolName: item.toolName,
     status:

@@ -28,6 +28,7 @@ type DeepSeekSearchPayload = {
 /** Uses DeepSeek's server-side Responses web_search without changing the chat model protocol. */
 export class DeepSeekResponsesWebProvider implements WebProvider {
   readonly id = 'deepseek-responses'
+  readonly searchOrigins = ['https://api.deepseek.com']
   private readonly fetchImpl: typeof fetch
   private readonly nowIso: () => string
 
@@ -39,6 +40,13 @@ export class DeepSeekResponsesWebProvider implements WebProvider {
   async search(request: WebSearchRequest): Promise<WebSearchResult[]> {
     if (!isDeepSeekResponsesWebSearchConfig(this.options)) {
       throw new Error('DeepSeek Responses web search is unavailable for this provider or model.')
+    }
+    if (request.allowedOrigins && !request.allowedOrigins.includes('*') &&
+      !request.allowedOrigins.includes(this.searchOrigins[0]!)) {
+      throw new Error('DeepSeek Responses search is outside the task network scope.')
+    }
+    if (request.denyDomains?.some(domain => matchesDomain('api.deepseek.com', domain))) {
+      throw new Error('DeepSeek Responses search is blocked by the configured web domain policy.')
     }
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(request.timeoutMs)])
     const response = await this.fetchImpl(deepSeekResponsesUrl(this.options.baseUrl), {
@@ -274,4 +282,9 @@ function objectArrayValue(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
     ? value.map(objectValue).filter((record) => Object.keys(record).length > 0)
     : []
+}
+
+function matchesDomain(hostname: string, domain: string): boolean {
+  const normalized = domain.trim().toLowerCase().replace(/^\./, '')
+  return Boolean(normalized) && (hostname === normalized || hostname.endsWith(`.${normalized}`))
 }

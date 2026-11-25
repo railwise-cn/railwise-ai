@@ -1,3 +1,5 @@
+import type { TaskInput } from './tasks.js'
+
 /** Browser-neutral source intent. Rendering a local file is not external research. */
 export const TASK_SOURCE_INFERENCE_VERSION = 1
 
@@ -20,6 +22,81 @@ export function parseWebSourceAddress(value: string): URL {
   const address = value.trim()
   const host = address.match(/^(www\.[a-z0-9.-]+)(?=[/?#]|$)/i)?.[1]
   return new URL(host && bareWwwHost.test(host) && host.length <= 253 ? `https://${address}` : address)
+}
+
+/** Accept one complete user-provided HTTP(S) address without embedded credentials. */
+export function explicitWebSourceUrl(value: string): string | undefined {
+  const address = value.trim()
+  if (!address || /\s/.test(address)) return undefined
+  try {
+    const url = parseWebSourceAddress(address)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || !url.hostname) return undefined
+    return url.href
+  } catch {
+    return undefined
+  }
+}
+
+/** Accept only a single URL the user supplied as a direct task answer. */
+export function explicitWebSourceOrigin(value: string): string | undefined {
+  const address = explicitWebSourceUrl(value)
+  return address ? new URL(address).origin : undefined
+}
+
+function userProvidedSourceAnswers(inputs: readonly Pick<TaskInput, 'kind' | 'sourceId' | 'text'>[]): string[] {
+  return inputs.flatMap(input => {
+    if (input.kind === 'supplement') return input.sourceId === undefined ? [input.text] : []
+    if (input.kind !== 'user_answer') return []
+    if (explicitWebSourceUrl(input.text)) return [input.text]
+    try {
+      const parsed = JSON.parse(input.text) as { resolution?: { answers?: unknown } }
+      if (!Array.isArray(parsed.resolution?.answers)) return []
+      return parsed.resolution.answers.flatMap(answer => {
+        if (!answer || typeof answer !== 'object' || !('value' in answer) || typeof answer.value !== 'string') return []
+        return [answer.value]
+      })
+    } catch {
+      return []
+    }
+  })
+}
+
+/** Collect URLs from the task and direct user replies for candidate browser review. */
+export function taskUserProvidedSourceUrls(
+  goal: string,
+  inputs: readonly Pick<TaskInput, 'kind' | 'sourceId' | 'text'>[]
+): string[] {
+  return [...new Set([goal, ...userProvidedSourceAnswers(inputs)].flatMap(text => {
+    const direct = explicitWebSourceUrl(text)
+    if (direct) return [direct]
+    const urls = [...text.matchAll(/https?:\/\/[^\s<>"'`）)，。]+/gi)]
+      .map(match => explicitWebSourceUrl(match[0]))
+      .filter((url): url is string => Boolean(url))
+    return urls
+  }))]
+}
+
+/** Exact HTTP(S) URLs from direct user answers, for read-only source access. */
+export function taskReadOnlySourceUrls(
+  acceptance: { requiresWebEvidence?: boolean },
+  inputs: readonly Pick<TaskInput, 'kind' | 'sourceId' | 'text'>[]
+): string[] {
+  if (!acceptance.requiresWebEvidence) return []
+  return [...new Set(userProvidedSourceAnswers(inputs)
+    .map(explicitWebSourceUrl)
+    .filter((url): url is string => Boolean(url)))]
+}
+
+/** A task's explicit deliverable contract and direct URL answers define read-only sources. */
+export function taskReadOnlySourceOrigins(
+  acceptance: { requiresWebEvidence?: boolean; requiredSourceOrigins?: readonly string[] },
+  inputs: readonly Pick<TaskInput, 'kind' | 'sourceId' | 'text'>[]
+): string[] {
+  if (!acceptance.requiresWebEvidence) return []
+  return [...new Set([
+    ...(acceptance.requiredSourceOrigins ?? []),
+    ...userProvidedSourceAnswers(inputs).map(explicitWebSourceOrigin).filter((origin): origin is string => Boolean(origin))
+  ])]
 }
 
 function asksForExternalRead(text: string): boolean {
