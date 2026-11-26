@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, safeWebPptErrorCode, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
+import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, safeWebPptErrorCode, safeWebPptRuntimeSpans, safeWebPptRuntimeSummary, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 
@@ -97,4 +97,23 @@ test('PPT failure diagnostics retain error codes while excluding error messages 
   assert.equal(safeWebPptErrorCode({ kind: 'tool_result', isError: true, output: { code: 'web_fetch_failed', error: 'private response text' } }), 'web_fetch_failed')
   assert.equal(safeWebPptErrorCode({ kind: 'tool_result', isError: false, output: { code: 'ok' } }), undefined)
   assert.equal(safeWebPptErrorCode({ kind: 'error', code: 'private response text' }), undefined)
+})
+
+test('PPT runtime diagnostics retain safe span fields and omit names, model and attributes', () => {
+  assert.deepEqual(safeWebPptRuntimeSpans([{
+    kind: 'model', status: 'error', errorCode: 'model_stream_incomplete', retryCount: 2,
+    durationMs: 1200, inputTokens: 500, outputTokens: 40, name: 'private request', model: 'private model',
+    attributes: { prompt: 'private response', requestUrl: 'https://private.example' }
+  }, {
+    kind: 'tool', status: 'error', errorCode: 'Authorization: secret-value', retryCount: 1,
+    attributes: { command: 'private command' }
+  }]), [
+    { kind: 'model', status: 'error', errorCode: 'model_stream_incomplete', retryCount: 2,
+      durationMs: 1200, inputTokens: 500, outputTokens: 40 },
+    { kind: 'tool', status: 'error', retryCount: 1 }
+  ])
+  assert.deepEqual(safeWebPptRuntimeSpans(undefined), [])
+  assert.deepEqual(safeWebPptRuntimeSummary({ total: 4, running: 0, errors: 1, retries: 2, durationMs: 900,
+    prompt: 'private response', model: 'private model' }), { total: 4, running: 0, errors: 1, retries: 2, durationMs: 900 })
+  assert.equal(safeWebPptRuntimeSummary(undefined), undefined)
 })

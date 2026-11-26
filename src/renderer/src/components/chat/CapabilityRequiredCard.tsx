@@ -101,7 +101,8 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
   const canGrantAndContinue = interactive && Boolean(card.attentionId) && reviewedAttention?.threadId === card.threadId && ownerTask?.status === 'waiting_user' &&
     (ownerTask.originThreadId ?? ownerTask.threadId) === card.threadId &&
     ownerTask.presentation?.reason !== 'outcome_unknown' && action?.kind === 'grant' &&
-    ['workspace', 'lark', 'feishu', 'dingtalk'].includes(capability.provider) && capability.errorCode === 'approval_policy_blocked'
+    ['workspace', 'lark', 'feishu', 'dingtalk'].includes(capability.provider) &&
+    ['approval_policy_blocked', 'workspace_path_blocked'].includes(capability.errorCode ?? '')
   const openConfiguration = (): void => {
     if (isEgo) openPlugins()
     else if (connector) openPlugins(undefined, connector)
@@ -283,7 +284,7 @@ export function CapabilityRequiredCard({ card, workspaceRoot }: { card: External
       {isDingTalk && interactive && action?.kind !== 'grant' ? <div className="mt-3"><ManagedDingTalkConnection /></div> : null}
       {isBrowser && interactive ? <ManagedBrowserSkillConnection onChanged={() => setBrowserBindingGeneration(value => value + 1)} /> : null}
       {showBrowserBinding && interactive && !egoSiteSignInRequired ? <BrowserTaskBindingPanel key={browserBindingGeneration} taskId={card.taskId} onConfirmed={setMessage} /> : null}
-      {showPermissions && interactive && !egoSiteSignInRequired ? <TaskPermissionPanel key={continuationKey} taskId={card.taskId} autoLoad onContinue={canGrantAndContinue ? continueGrantedTask : undefined} onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
+      {showPermissions && interactive && !egoSiteSignInRequired ? <TaskPermissionPanel key={continuationKey} taskId={card.taskId} autoLoad workspaceWriteRequired={capability.provider === 'workspace' && capability.errorCode === 'workspace_path_blocked'} onContinue={canGrantAndContinue ? continueGrantedTask : undefined} onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
       {showQueryRecovery && interactive && !egoSiteSignInRequired && ownerTask ? <TaskPublicQueryRecoveryCard task={ownerTask} runtimeReady={stateKnown} onChanged={refreshTaskState} onNotice={setMessage} /> : null}
       {failure ? <div className="mt-3 text-xs"><p role="alert">{failure.summary}</p><TechnicalDetails detail={failure.detail} /></div> : null}
       {message && (!interactive || message !== capabilitySummary) ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}

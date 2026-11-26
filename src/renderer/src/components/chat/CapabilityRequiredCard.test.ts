@@ -668,6 +668,45 @@ describe('capability waiting card', () => {
     expect(container.textContent).not.toContain('点击“继续原任务”执行')
   })
 
+  it('authorizes the current workspace write path and continues the original blocked task', async () => {
+    tasks[0]!.revision = 4
+    const permissions = { ...await api.getTaskPermissions() as TaskPermissionSnapshotV1,
+      workspaceTrust: 'read-only' as const, sandboxMode: 'workspace-write' as const,
+      agentTrust: 'workspace-write' as const, canWritePaths: true, approvalPolicy: 'on-request' as const }
+    api.getTaskPermissions.mockResolvedValue(permissions)
+    const confirmation = await confirmedPermission()
+    confirmation.permission.canWritePaths = true
+    confirmation.permission.workspaceTrust = 'read-only'
+    confirmation.permission.sandboxMode = 'workspace-write'
+    confirmation.permission.agentTrust = 'workspace-write'
+    confirmation.permission.grant!.scope = { readPaths: ['/workspace/project'], writePaths: ['/workspace/project'] }
+    api.confirmTaskPermissions.mockImplementationOnce(async () => {
+      tasks = [confirmation.task]; watermark++
+      return confirmation
+    })
+    api.coordinateTaskCommand.mockResolvedValueOnce({ kind: 'task_started', task: confirmation.task,
+      turn: { threadId: 'hidden-execution', turnId: 'continued-turn' } })
+    const blocked: ExternalTaskCapabilityCard = { ...card, capability: { provider: 'workspace', status: 'blocked',
+      errorCode: 'workspace_path_blocked', message: '保存成果需要本工作区的写入范围。',
+      executionContext: { workspaceRoot: '/workspace/project', workspaceTrust: 'read-only', agentTrust: 'workspace-write',
+        sandboxMode: 'workspace-write', approvalPolicy: 'on-request' },
+      resolution: { kind: 'grant', route: 'task-permissions', label: '确认当前任务权限' } } }
+    await render(blocked)
+    await click('确认当前任务权限')
+    expect(container.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('/workspace/project')
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    expect(api.confirmTaskPermissions).toHaveBeenCalledOnce()
+    expect(api.confirmTaskPermissions).toHaveBeenCalledWith('task-original', expect.objectContaining({
+      scope: { readPaths: ['/workspace/project'], writePaths: ['/workspace/project'] }
+    }))
+    expect(api.coordinateTaskCommand).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      threadId: card.threadId, taskId: card.taskId, resolveAttentionId: card.attentionId,
+      intent: 'resume', expectedRevision: 5, request: { prompt: card.prompt }
+    }))
+    expect(container.textContent).not.toContain('点击“继续原任务”执行')
+  })
+
   it('does not continue when the permission reply does not verify an active task grant', async () => {
     await render(policyCard)
     await click('调整任务审批策略')

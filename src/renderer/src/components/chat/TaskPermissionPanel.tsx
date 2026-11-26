@@ -4,7 +4,7 @@ import type { AgentProfileV1, TaskPermissionSnapshotV1, TaskRunV1 } from '@share
 import { runtimeTaskPermissionsPath, runtimeThreadPath } from '@shared/runtime-endpoints'
 
 /** Explicit task-scoped confirmation. Reading this panel never changes authority or resumes work. */
-export function TaskPermissionPanel({ taskId, onConfirmed, onContinue, autoLoad = false, revision }: { taskId: string; onConfirmed: (message: string) => void; onContinue?: (task: TaskRunV1, permission: TaskPermissionSnapshotV1) => Promise<void>; autoLoad?: boolean; revision?: number }): ReactElement {
+export function TaskPermissionPanel({ taskId, onConfirmed, onContinue, autoLoad = false, revision, workspaceWriteRequired = false }: { taskId: string; onConfirmed: (message: string) => void; onContinue?: (task: TaskRunV1, permission: TaskPermissionSnapshotV1) => Promise<void>; autoLoad?: boolean; revision?: number; workspaceWriteRequired?: boolean }): ReactElement {
   const { t } = useTranslation('common')
   const [snapshot, setSnapshot] = useState<TaskPermissionSnapshotV1 | null>(null)
   const [task, setTask] = useState<TaskRunV1 | null>(null)
@@ -20,7 +20,8 @@ export function TaskPermissionPanel({ taskId, onConfirmed, onContinue, autoLoad 
   const loadGeneration = useRef(0)
   const terminal = Boolean(task && (['completed', 'cancelled'].includes(task.status) || task.status === 'failed' && snapshot?.recoveryEligible !== true))
   const expired = Boolean(snapshot?.grant && (snapshot.grant.status === 'expired' || Date.parse(snapshot.grant.expiresAt) <= Date.now()))
-  const continueAfterGrant = Boolean(onContinue && task?.status === 'waiting_user' && reviewGrantIsCurrent(snapshot))
+  const canGrantWorkspaceWrite = !workspaceWriteRequired || Boolean(snapshot?.canWritePaths && snapshot.workspaceRoot)
+  const continueAfterGrant = Boolean(onContinue && task?.status === 'waiting_user' && reviewGrantIsCurrent(snapshot) && canGrantWorkspaceWrite)
   const run = async (operation: () => Promise<void>): Promise<void> => {
     if (pending) return
     setPending(true); setError('')
@@ -37,6 +38,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, onContinue, autoLoad 
     setScopeFields({ readPaths: (scope?.readPaths ?? (permission.workspaceRoot ? [permission.workspaceRoot] : [])).join('\n'),
       writePaths: permission.sandboxMode === 'read-only' && !permission.canWritePaths ? '' : (scope?.writePaths ?? (permission.workspaceRoot ? [permission.workspaceRoot] : [])).join('\n'),
       networkOrigins: scope?.networkOrigins?.join('\n') ?? '', providerIds: scope?.providerIds?.join('\n') ?? '', externalTargets: scope?.externalTargets?.join('\n') ?? '' })
+    setEditScope(workspaceWriteRequired && permission.canWritePaths === true && Boolean(permission.workspaceRoot))
     const [agents, thread] = await Promise.all([
       window.workwise.listAgentProfiles(permission.workspaceRoot),
       window.workwise.runtimeRequest(runtimeThreadPath(current.threadId), 'GET')
@@ -49,15 +51,15 @@ export function TaskPermissionPanel({ taskId, onConfirmed, onContinue, autoLoad 
   useEffect(() => {
     if (autoLoad) void run(load)
     return () => { loadGeneration.current++ }
-  }, [taskId, revision, autoLoad])
+  }, [taskId, revision, autoLoad, workspaceWriteRequired])
   const allow = async (): Promise<void> => {
-    if (terminal || !snapshot || !confirmed || !snapshot.canConfirm) return
+    if (terminal || !snapshot || !confirmed || !snapshot.canConfirm || !canGrantWorkspaceWrite) return
     const generation = loadGeneration.current
     const continuation = continueAfterGrant && reviewGrantIsCurrent(snapshot) ? onContinue : undefined
     const result: {task?: TaskRunV1; permission: TaskPermissionSnapshotV1; resumed?: boolean} = await window.workwise.confirmTaskPermissions(taskId, {
       expectedRevision: snapshot.taskRevision, scopeHash: snapshot.scopeHash, confirmed: true,
       approvalPolicy: 'on-request', ttlSeconds: 900, idempotencyKey: crypto.randomUUID(), duration,
-      ...(editScope ? { scope: {
+      ...(editScope || workspaceWriteRequired ? { scope: {
         readPaths: lines(scopeFields.readPaths), writePaths: lines(scopeFields.writePaths),
         ...(scopeFields.networkOrigins.trim() ? { networkOrigins: lines(scopeFields.networkOrigins) } : {}),
         ...(scopeFields.providerIds.trim() ? { providerIds: lines(scopeFields.providerIds) } : {}),
@@ -135,18 +137,19 @@ export function TaskPermissionPanel({ taskId, onConfirmed, onContinue, autoLoad 
       {snapshot.grant?.scope ? <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1"><dt>{t('taskPermissionScopeRead')}</dt><dd className="break-all">{snapshot.grant.scope.readPaths?.join(', ') || '—'}</dd><dt>{t('taskPermissionScopeWrite')}</dt><dd className="break-all">{snapshot.grant.scope.writePaths?.join(', ') || '—'}</dd></dl> : null}
       {snapshot.grant?.status === 'active' && !expired ? <button type="button" disabled={pending} onClick={() => void run(revoke)} className="rounded-md border border-ds-border px-3 py-1.5">{t('taskPermissionRevoke')}</button> : null}
       {snapshot.reason ? <p className="text-ds-muted">{snapshot.reason}</p> : null}
+      {workspaceWriteRequired && !canGrantWorkspaceWrite ? <p role="status" className="text-ds-muted">{t('taskPermissionWriteUnavailable')}</p> : null}
       <label className="flex items-start gap-2"><input type="checkbox" checked={confirmed} disabled={pending} onChange={event => setConfirmed(event.target.checked)} /><span>{t('taskPermissionConfirmScope')}</span></label>
       {snapshot.canConfirm ? <div className="space-y-2">
         <label className="block">{t('taskPermissionDuration')}<select value={duration} onChange={event => { setDuration(event.target.value as 'task'|'next_operation'); setConfirmed(false) }} className="ml-2 rounded border border-ds-border bg-ds-main p-1">
           <option value="task">{t('taskPermissionDurationTask')}</option><option value="next_operation">{t('taskPermissionDurationOnce')}</option>
         </select></label>
-        <button type="button" onClick={() => { setEditScope(!editScope); setConfirmed(false) }} className="text-accent">{t('taskPermissionScopeEdit')}</button>
-        {editScope ? <div className="space-y-2"><p className="text-ds-muted">{t('taskPermissionScopeHint')}</p>{([
+        {!workspaceWriteRequired ? <button type="button" onClick={() => { setEditScope(!editScope); setConfirmed(false) }} className="text-accent">{t('taskPermissionScopeEdit')}</button> : null}
+        {editScope || workspaceWriteRequired ? <div className="space-y-2"><p className="text-ds-muted">{t('taskPermissionScopeHint')}</p>{([
           ['readPaths', 'taskPermissionScopeRead'], ['writePaths', 'taskPermissionScopeWrite'], ['networkOrigins', 'taskPermissionScopeNetwork'],
           ['providerIds', 'taskPermissionScopeProviders'], ['externalTargets', 'taskPermissionTargets']
         ] as const).map(([field, label]) => <label key={field} className="block">{t(label)}<textarea rows={2} value={scopeFields[field]} disabled={field === 'writePaths' && snapshot.sandboxMode === 'read-only' && !snapshot.canWritePaths} onChange={event => { setScopeFields(current => ({ ...current, [field]: event.target.value })); setConfirmed(false) }} className="mt-1 block w-full rounded border border-ds-border bg-ds-main p-2" /></label>)}</div> : null}
       </div> : null}
-      <button type="button" disabled={pending || !confirmed || !snapshot.canConfirm} onClick={() => void run(allow)} className="rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t(continueAfterGrant ? 'taskPermissionAllowAndContinue' : expired ? 'taskPermissionRenew' : 'taskPermissionAllow')}</button>
+      <button type="button" disabled={pending || !confirmed || !snapshot.canConfirm || !canGrantWorkspaceWrite || workspaceWriteRequired && lines(scopeFields.writePaths).length === 0} onClick={() => void run(allow)} className="rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t(continueAfterGrant ? 'taskPermissionAllowAndContinue' : expired ? 'taskPermissionRenew' : 'taskPermissionAllow')}</button>
       {profiles.length && task && ['waiting_user', 'stalled', 'paused'].includes(task.status) ? <div className="flex flex-wrap gap-2">
         <select aria-label={t('taskPermissionSelectAgent')} value={agentId} disabled={pending} onChange={event => setAgentId(event.target.value)} className="max-w-full rounded border border-ds-border bg-ds-main p-1">
           <option value="">{t('taskPermissionSelectAgent')}</option>{profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}

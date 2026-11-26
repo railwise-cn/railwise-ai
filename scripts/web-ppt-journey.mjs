@@ -88,12 +88,35 @@ export function safeWebPptErrorCode(item) {
   return typeof candidate === 'string' && /^[a-z][a-z0-9_:-]{0,79}$/i.test(candidate) ? candidate : undefined
 }
 
+export function safeWebPptRuntimeSpans(spans) {
+  if (!Array.isArray(spans)) return []
+  return spans.map(span => ({
+    kind: span.kind,
+    status: span.status,
+    ...(safeWebPptErrorCode({ kind: 'error', code: span.errorCode })
+      ? { errorCode: span.errorCode }
+      : {}),
+    ...(Number.isFinite(span.retryCount) ? { retryCount: span.retryCount } : {}),
+    ...(Number.isFinite(span.durationMs) ? { durationMs: span.durationMs } : {}),
+    ...(Number.isFinite(span.inputTokens) ? { inputTokens: span.inputTokens } : {}),
+    ...(Number.isFinite(span.outputTokens) ? { outputTokens: span.outputTokens } : {})
+  }))
+}
+
+export function safeWebPptRuntimeSummary(summary) {
+  if (!summary || typeof summary !== 'object') return undefined
+  return Object.fromEntries(['total', 'running', 'errors', 'retries', 'durationMs']
+    .filter(key => Number.isFinite(summary[key]))
+    .map(key => [key, summary[key]]))
+}
+
 async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
-  const [task, inputs, inbox, thread] = await Promise.all([
+  const [task, inputs, inbox, thread, runtimeDiagnostics] = await Promise.all([
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/inputs`)),
     cdp.evaluate(readRuntime('/v1/inbox')),
-    cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(executionThreadId)}`))
+    cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(executionThreadId)}`)),
+    cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/diagnostics`))
   ])
   return {
     task: { id: task.id, status: task.status, originThreadId: task.originThreadId, threadId: task.threadId,
@@ -104,6 +127,10 @@ async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
     attention: inbox.filter(item => item.taskId === taskId).map(item => ({ kind: item.kind, status: item.status,
       requestId: item.requestId, payloadKind: item.payload?.kind, provider: item.payload?.capability?.provider,
       errorCode: item.payload?.capability?.errorCode, resolutionRoute: item.payload?.capability?.resolution?.route ?? item.payload?.capability?.action?.route })),
+    runtime: {
+      summary: safeWebPptRuntimeSummary(runtimeDiagnostics.summary),
+      spans: safeWebPptRuntimeSpans(runtimeDiagnostics.spans)
+    },
     turns: thread.turns.map(turn => ({ id: turn.id, status: turn.status,
       ...(turn.executionGrant ? { executionGrant: { taskId: turn.executionGrant.taskId,
         approvalPolicy: turn.executionGrant.approvalPolicy, networkAllowlist: turn.executionGrant.networkAllowlist,
