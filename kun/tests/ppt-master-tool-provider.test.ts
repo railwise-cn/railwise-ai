@@ -1,9 +1,10 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CapabilityRegistry } from '../src/adapters/tool/capability-registry.js'
 import { LocalToolHost } from '../src/adapters/tool/local-tool-host.js'
+import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
 import {
   buildPptMasterToolProviders,
   type PptMasterExportRunner
@@ -15,7 +16,7 @@ describe('PPT Master export tool provider', () => {
   let skillRoot = ''
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'ppt-master-tool-'))
+    root = await realpath(await mkdtemp(join(tmpdir(), 'ppt-master-tool-')))
     workspace = join(root, 'workspace')
     skillRoot = join(root, 'bundled-ppt-master')
     await mkdir(join(workspace, 'deck', 'svg_output'), { recursive: true })
@@ -121,6 +122,37 @@ describe('PPT Master export tool provider', () => {
     expect(unsafeResult.item).toMatchObject({ kind: 'tool_result', isError: true })
     expect(JSON.stringify(unsafeResult.item)).toContain('external resource reference')
     expect(runner).not.toHaveBeenCalled()
+  })
+
+  it('enforces the task write grant on the PPTX output path', async () => {
+    const runner = vi.fn<PptMasterExportRunner>(async ({ outputPath }) => {
+      await writeFile(outputPath, 'pptx-bytes', 'utf8')
+    })
+    const built = buildPptMasterToolProviders({ skillRoot, runner })
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(built.providers) })
+    const context = {
+      threadId: 'thread_1', turnId: 'turn_1', workspace, activeSkillIds: ['ppt-master'],
+      approvalPolicy: 'auto' as const, sandboxMode: 'workspace-write' as const,
+      abortSignal: new AbortController().signal, awaitApproval: async () => 'allow' as const,
+      executionGrant: ExecutionGrantSchema.parse({
+        id: 'grant_1', taskId: 'task_1', threadId: 'thread_1', turnId: 'turn_1', workspaceRoot: workspace,
+        workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', approvalPolicy: 'auto', sandboxMode: 'workspace-write',
+        pathAllowlist: [join(workspace, 'deck')], readPathAllowlist: [workspace], writePathAllowlist: [join(workspace, 'deck')],
+        networkAllowlist: [], connectorScopes: [], externalTargets: [], workspaceRevision: 1, agentRevision: 0,
+        revision: 1, idempotencyKey: 'grant_1', issuedAt: new Date().toISOString()
+      })
+    }
+
+    const denied = await host.execute({ callId: 'outside', toolName: 'ppt_master_export',
+      arguments: { project_path: 'deck', output_path: 'outside.pptx' } }, context)
+    expect(denied.item).toMatchObject({ kind: 'tool_result', isError: true, output: { code: 'workspace_path_blocked' } })
+    expect(runner).not.toHaveBeenCalled()
+
+    const accepted = await host.execute({ callId: 'inside', toolName: 'ppt_master_export',
+      arguments: { project_path: 'deck', output_path: 'deck/result.pptx' } }, context)
+    expect(accepted.item).toMatchObject({ kind: 'tool_result', isError: false, output: { ok: true,
+      generatedFiles: [{ relativePath: 'deck/result.pptx', sha256: expect.stringMatching(/^[a-f0-9]{64}$/) }] } })
+    expect(runner).toHaveBeenCalledTimes(1)
   })
 
   it('uses the portable exporter when Python is unavailable', async () => {
