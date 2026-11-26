@@ -283,6 +283,14 @@ test('website-to-PPT identity binds the task to the visible conversation while r
     answerReceipt: { ...proof.replyTrace.answerReceipt, answerMatchesExpected: false } } }))
 })
 
+test('pause recovery reads cancelled question state from the worker thread and visibility from the original conversation', () => {
+  const source = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
+  assert.match(source, /const persistedExecutionThread = await cdp\.evaluate\([^\n]*journey\.executionThreadId/)
+  assert.match(source, /persistedExecutionThread\.turns\.some\(turn => turn\.id === beforeRestart\.activeTurnId/)
+  assert.match(source, /const persistedThread = await cdp\.evaluate\([^\n]*journey\.conversationThreadId/)
+  assert.match(source, /暂停前未回答的问题/)
+})
+
 test('Windows help acceptance opens the real compact disclosure before asserting the visible outline', async () => {
   for (const state of ['open', 'collapsed']) {
     const actions = []
