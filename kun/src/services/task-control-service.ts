@@ -222,13 +222,7 @@ export class TaskControlService {
             // be unwinding and persisting its terminal state. Wait for that
             // write to finish before correcting the durable question item.
             await this.deps.waitTurn?.(taskAtControl.threadId, activeTurnId!)
-            const interruptedThread = await threads.get(taskAtControl.threadId)
-            const interruptedTurn = interruptedThread?.turns.find(turn => turn.id === activeTurnId)
-            for (const item of interruptedTurn?.items ?? []) {
-              if (item.kind === 'user_input' && item.status !== 'cancelled') {
-                await turns.updateItem(taskAtControl.threadId, item.id, { status: 'cancelled', finishedAt: nowIso() })
-              }
-            }
+            await this.cancelOpenUserInputItems(taskAtControl.threadId, activeTurnId!)
           } catch (error) {
             // Commit the paused state even when the in-process interruption
             // temporarily fails. The idempotent replay below retries that
@@ -247,7 +241,11 @@ export class TaskControlService {
         })
         // The pause path interrupted the active Turn before committing the
         // paused task. Keep the cancellation idempotent on replay below.
-        if(action==='pause'&&result.task.activeTurnId&&!finishTurnBeforePause)await turns.interruptTurn({threadId:result.task.threadId,turnId:result.task.activeTurnId})
+        if(action==='pause'&&result.task.activeTurnId&&!finishTurnBeforePause) {
+          await turns.interruptTurn({threadId:result.task.threadId,turnId:result.task.activeTurnId,preserveTask:true,reason:'task_pause'})
+          await this.deps.waitTurn?.(result.task.threadId, result.task.activeTurnId)
+          await this.cancelOpenUserInputItems(result.task.threadId, result.task.activeTurnId)
+        }
         if(action==='cancel') {
           this.deps.cancelChildRuns?.(result.task.threadId,reason)
           if(result.task.activeTurnId)await turns.interruptTurn({threadId:result.task.threadId,turnId:result.task.activeTurnId})
@@ -354,6 +352,16 @@ export class TaskControlService {
       const receipt=repository.operation(taskId,data.idempotencyKey)
       if(receipt&&receipt.status!=='succeeded')repository.finishOperation(taskId,data.idempotencyKey,{status:'failed',error:error instanceof Error?error.message:String(error)},nowIso())
       throw error
+    }
+  }
+
+  private async cancelOpenUserInputItems(threadId: string, turnId: string): Promise<void> {
+    const interruptedThread = await this.deps.threads.get(threadId)
+    const interruptedTurn = interruptedThread?.turns.find(turn => turn.id === turnId)
+    for (const item of interruptedTurn?.items ?? []) {
+      if (item.kind === 'user_input' && item.status !== 'cancelled') {
+        await this.deps.turns.updateItem(threadId, item.id, { status: 'cancelled', finishedAt: this.deps.nowIso() })
+      }
     }
   }
 
