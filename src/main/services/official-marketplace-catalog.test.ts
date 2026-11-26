@@ -568,7 +568,7 @@ describe('official marketplace catalog', () => {
     const expected = new Map([
       ['browser-skill', ['361da1d75798b99b358dfb434b8ce1921fb90d9e', 'MIT', 'crates/bsk-cli/skill']],
       ['blender-skills', ['8f778d2405a214b508d4c7d80742be8e43acdd52', 'MIT', '.claude/skills']],
-      ['video-shotcraft', ['226813b3e2e6a0a346358210bfa0d83b24b3a8d3', 'Apache-2.0', undefined]],
+      ['video-shotcraft', ['1152363da5c824b32dba6d8a2ef7f935b677e445', 'Apache-2.0', undefined]],
       ['diagram-design', ['0cf73c3fcc56667ad91a9a04c439ac6ccfabc9d1', 'MIT', undefined]],
       ['arch-diagram-skill', ['879ca7fa503a64ab46b5bc77d2062ded32fadc84', 'MIT', 'skills/arch-diagram']]
     ] as const)
