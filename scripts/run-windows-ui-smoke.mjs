@@ -522,6 +522,9 @@ export function validateWindowsUiReport(report, identity, { requireTaskExecution
       assert.equal(recovery?.afterRestart?.taskId, proof.taskId)
       assert.equal(recovery?.afterRestart?.threadId, proof.conversationThreadId)
       assert.equal(recovery?.afterRestart?.taskStatus, 'paused')
+      assert.ok(recovery?.afterRestart?.resumedTurnId)
+      assert.notEqual(recovery.afterRestart.resumedTurnId, recovery.beforeRestart.activeTurnId)
+      assert.equal(recovery.afterRestart.answerTurnId, recovery.afterRestart.resumedTurnId)
       assert.equal(recovery?.afterRestart?.oldQuestionStillRecorded, true)
       assert.equal(recovery?.afterRestart?.oldQuestionStillVisible, true)
       assert.equal(recovery?.afterRestart?.resumedQuestionVisible, true)
@@ -2982,12 +2985,18 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           assert.notEqual(resumedRequest.requestId, originalQuestion.requestId, 'Continuation must create one fresh request for the cancelled question')
           await cdp.wait(`(()=>{const composer=document.querySelector(${JSON.stringify('.ds-chat-composer-dock textarea[placeholder="输入你的回答…"]:not(:disabled)')});return Boolean(composer&&document.querySelector('.ds-chat-composer-dock')?.getAttribute('data-task-question-request-id')===${JSON.stringify(resumedRequest.requestId)})})()`,
             'the reissued question to be bound to the original conversation composer', 30_000)
+          const resumedTask = await cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/tasks/${encodeURIComponent(journey.taskId)}`)},'GET').then(response=>JSON.parse(response.body))`)
+          assert.equal(resumedTask.id, journey.taskId)
+          assert.equal(resumedTask.originThreadId, journey.conversationThreadId)
+          assert.ok(resumedTask.activeTurnId && resumedTask.activeTurnId !== beforeRestart.activeTurnId,
+            'Continuing the paused task must create a new Turn before asking the resumed question')
           const reissuedThread = await cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/threads/${encodeURIComponent(journey.executionThreadId)}`)},'GET').then(response=>JSON.parse(response.body))`)
           const activeQuestion = reissuedThread.turns.flatMap(turn => turn.items).find(item => item.kind === 'user_input' && item.inputId === resumedRequest.requestId)
           assert.ok(activeQuestion?.status === 'pending' || activeQuestion?.status === 'completed')
           const evidence = { status: 'passed', exactPackageVersion: version, installedAsarSha256: before.asarSha256,
             appClosedNormally: true, appRestarted: true, sameProfile: true, sameRuntimeDataDir: true,
             beforeRestart, afterRestart: { taskId: persistedTask.id, threadId: persistedThread.id, taskStatus: persistedTask.status,
+              resumedTurnId: resumedTask.activeTurnId,
               oldQuestionStillRecorded: true, oldQuestionStillVisible: true, resumedQuestionRequestId: resumedRequest.requestId,
               resumedQuestionVisible: true, originalChat: restoredLayout }, answerReceiptCount: 0, approvalResolutionDuplicateCount: 0 }
           return { cdp, evidence }

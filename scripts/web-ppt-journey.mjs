@@ -160,7 +160,10 @@ export function inspectLiveWebPptApproval(attention, { taskId, workspace, skillG
   assert.ok(approval.callId)
 
   if (approval.toolName === 'web_fetch') {
-    assert.equal(approval.summary, `Read public web page\nOrigin: https://${webPptSourceHost}\nEffect: Read page content only.`)
+    const origin = `https://${webPptSourceHost}`
+    const englishSummary = `Read public web page\nOrigin: ${origin}\nEffect: Read page content only.`
+    const chineseSummary = `读取公开网页\n网站：${origin}\n范围：仅当前任务\n影响：只读取网页内容，不会登录、填写或提交数据。`
+    assert.ok([englishSummary, chineseSummary].includes(approval.summary), 'Only the exact public-origin read-only approval may be accepted')
     return { id: approval.id, tool: approval.toolName, scope: 'read-only-public-origin', origin: `https://${webPptSourceHost}`,
       requestHash: approval.requestHash }
   }
@@ -453,6 +456,14 @@ export async function answerWebPptQuestion(cdp, journey, { sourceAnswer = webPpt
   } }
 }
 
+export function validatePostRestartTurnFlow({ originalTurnId, resumedTurnId, answerTurnId }) {
+  assert.ok(typeof originalTurnId === 'string' && originalTurnId.length > 0)
+  assert.ok(typeof resumedTurnId === 'string' && resumedTurnId.length > 0)
+  assert.ok(resumedTurnId !== originalTurnId, 'Continuing a paused task must start a new Turn')
+  assert.equal(answerTurnId, resumedTurnId, 'Answering the resumed question must continue that Turn')
+  return true
+}
+
 export async function verifyEditableWebPpt(path, artifact, { source = webPptSourceHost, marker } = {}) {
   const { default: JSZip } = await import('jszip')
   const info = await lstat(path)
@@ -717,9 +728,13 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
         cdp = restarted.cdp
         journey = await answerWebPptQuestion(cdp, journey, {
           sourceAnswer: fallback?.url ?? webPptSourceHost,
-          requireNewTurn: Boolean(fallback || pauseAndRestart), onStage
+          requireNewTurn: Boolean(fallback), onStage
         })
         restartRecovery = restarted.evidence
+        restartRecovery.afterRestart.answerTurnId = journey.replyTrace.after.task.activeTurnId
+        validatePostRestartTurnFlow({ originalTurnId: restartRecovery.beforeRestart.activeTurnId,
+          resumedTurnId: restartRecovery.afterRestart.resumedTurnId,
+          answerTurnId: journey.replyTrace.after.task.activeTurnId })
         restartRecovery.answerReceiptCount = journey.replyTrace.answerReceipt?.count ?? 0
         restartRecovery.answerReceiptRequestId = journey.replyTrace.answerReceipt?.idempotencyKey?.slice('user-input:'.length)
         const inputs = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(journey.taskId)}/inputs`))

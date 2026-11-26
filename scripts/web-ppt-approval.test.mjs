@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution } from './web-ppt-journey.mjs'
+import { inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 
@@ -28,10 +28,14 @@ test('PPT live approval is limited to the official read-only origin', () => {
   const summary = 'Read public web page\nOrigin: https://www.railwise.cn\nEffect: Read page content only.'
   const value = approval(summary)
   assert.equal(inspectLiveWebPptApproval(value, { taskId: value.taskId }).scope, 'read-only-public-origin')
+  const chinese = approval('读取公开网页\n网站：https://www.railwise.cn\n范围：仅当前任务\n影响：只读取网页内容，不会登录、填写或提交数据。')
+  assert.equal(inspectLiveWebPptApproval(chinese, { taskId: chinese.taskId }).scope, 'read-only-public-origin')
   for (const changed of [
     { ...value, taskId: 'another-task' },
     approval(summary.replace('www.railwise.cn', 'example.com')),
     approval(summary.replace('Read page content only.', 'Write page content.')),
+    approval('读取公开网页\n网站：https://www.railwise.cn\n范围：所有任务\n影响：只读取网页内容，不会登录、填写或提交数据。'),
+    approval('读取公开网页\n网站：https://www.railwise.cn\n范围：仅当前任务\n影响：读取并提交网页表单。'),
     approval(summary, 'exec')
   ]) assert.throws(() => inspectLiveWebPptApproval(changed, { taskId: value.taskId }))
 })
@@ -69,4 +73,10 @@ test('PPT live approval reads the real TaskInput JSON envelope and rejects a sta
     [{ ...input, text: JSON.stringify({ request: attention.payload.approval.summary, resolution: { decision: 'deny' } }) }],
     [{ ...input, text: 'invalid-json' }]
   ]) assert.throws(() => inspectLiveWebPptApprovalResolution(inputs, attention))
+})
+
+test('paused PPT continuation creates one new Turn and its answer continues that Turn', () => {
+  assert.equal(validatePostRestartTurnFlow({ originalTurnId: 'turn-before-pause', resumedTurnId: 'turn-after-resume', answerTurnId: 'turn-after-resume' }), true)
+  assert.throws(() => validatePostRestartTurnFlow({ originalTurnId: 'turn-before-pause', resumedTurnId: 'turn-before-pause', answerTurnId: 'turn-before-pause' }), /must start a new Turn/)
+  assert.throws(() => validatePostRestartTurnFlow({ originalTurnId: 'turn-before-pause', resumedTurnId: 'turn-after-resume', answerTurnId: 'another-turn' }), /must continue that Turn/)
 })
