@@ -14,7 +14,8 @@ export class PersistentApprovalGate implements ApprovalGate {
       message: approval.summary, payload: { approval }, status: 'pending', createdAt: approval.createdAt, updatedAt: approval.createdAt })
     const previous = saved.payload.approval as ApprovalRequest | undefined
     if (saved.kind !== 'approval' || !previous || previous.threadId !== approval.threadId || previous.turnId !== approval.turnId ||
-        previous.toolName !== approval.toolName || previous.summary !== approval.summary || previous.requestHash !== approval.requestHash || previous.callId !== approval.callId) {
+        previous.toolName !== approval.toolName || previous.summary !== approval.summary || previous.requestHash !== approval.requestHash ||
+        previous.callId !== approval.callId || previous.networkReadOrigin !== approval.networkReadOrigin) {
       return Promise.reject(Object.assign(new Error('Approval identity belongs to a different operation.'), { code: 'approval_request_conflict' }))
     }
     if (saved.status !== 'pending') return Promise.resolve(approvalDecision(saved))
@@ -47,7 +48,14 @@ export class PersistentApprovalGate implements ApprovalGate {
       this.resolvers.delete(id)
       return false
     }
-    this.repository.resolveHumanRequest(id, { decision, ...(reason ? { reason } : {}) }, 'answered', now)
+    const approval = saved.payload.approval as ApprovalRequest | undefined
+    this.repository.transact(() => {
+      this.repository.resolveHumanRequest(id, { decision, ...(reason ? { reason } : {}) }, 'answered', now)
+      if (decision === 'allow' && owner && approval?.toolName === 'web_fetch' && approval.networkReadOrigin) {
+        this.repository.approveTaskWebReadOrigin({ taskId: owner.id, threadId: approval.threadId, turnId: approval.turnId,
+          approvalId: approval.id, origin: approval.networkReadOrigin, nowIso: now })
+      }
+    })
     this.flush()
     return true
   }

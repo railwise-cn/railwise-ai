@@ -81,6 +81,8 @@ export type LocalTool = {
   contextBlock?: (context: ToolHostContext) => { code: string; message: string } | undefined
   /** A trusted Provider reads and describes the actual target before user review. */
   approvalSummary?: (args: Record<string, unknown>, context: ToolHostContext) => Promise<string>
+  /** Exact HTTP(S) origin whose read-only access this approval covers for the current task. */
+  approvalNetworkReadOrigin?: (args: Record<string, unknown>, context: ToolHostContext) => Promise<string | undefined>
   /**
    * Optional gating predicate. When present, the tool is only listed
    * and only executed when `shouldAdvertise` returns true for the
@@ -237,9 +239,13 @@ export class LocalToolHost implements ToolHost {
     }
     let needsApproval: boolean
     let reviewedSummary: string | undefined
+    let approvedNetworkReadOrigin: string | undefined
     try {
       needsApproval = await this.requiresApproval(tool, activeCall, context)
-      if (needsApproval) reviewedSummary = await tool.approvalSummary?.(activeCall.arguments, context)
+      if (needsApproval) {
+        reviewedSummary = await tool.approvalSummary?.(activeCall.arguments, context)
+        approvedNetworkReadOrigin = await tool.approvalNetworkReadOrigin?.(activeCall.arguments, context)
+      }
     } catch (error) {
       if (context.abortSignal.aborted) throw error
       const code = (error as { code?: unknown })?.code
@@ -256,7 +262,8 @@ export class LocalToolHost implements ToolHost {
         toolName: activeCall.toolName,
         requestHash: approvedRequestHash,
         callId: activeCall.callId,
-        summary: reviewedSummary ?? this.buildApprovalSummary(activeCall, context.workspace)
+        summary: reviewedSummary ?? this.buildApprovalSummary(activeCall, context.workspace),
+        ...(approvedNetworkReadOrigin ? { networkReadOrigin: approvedNetworkReadOrigin } : {})
       })
       const decision = context.claimUndispatchedApproval?.(approval)
         ? 'allow'

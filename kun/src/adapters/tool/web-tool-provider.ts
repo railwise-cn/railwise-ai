@@ -140,21 +140,29 @@ function createFetchTool(
     description: 'Fetch an allowed HTTP or HTTPS page and return extracted text with source metadata. A pasted www address defaults to HTTPS. Read-only; no browser setup is needed.',
     approvalSummary: async args => {
       const address = pickString(args.url)
-      if (!address) return 'Read public web page\nOrigin: unavailable\nEffect: Read page content only.'
+      if (!address) return '读取公开网页\n网站：无法识别\n影响：只读取网页内容。'
       try {
         const url = parseWebSourceAddress(address)
-        return `Read public web page\nOrigin: ${url.origin}\nEffect: Read page content only.`
+        return `读取公开网页\n网站：${url.origin}\n范围：仅当前任务\n影响：只读取网页内容，不会登录、填写或提交数据。`
       } catch {
-        return 'Read public web page\nOrigin: unavailable\nEffect: Read page content only.'
+        return '读取公开网页\n网站：无法识别\n影响：只读取网页内容。'
       }
+    },
+    approvalNetworkReadOrigin: async args => {
+      const address = pickString(args.url)
+      if (!address) return undefined
+      try { return parseWebSourceAddress(address).origin } catch { return undefined }
     },
     hasScopedApproval: async (args, context) => {
       const grant = context.executionGrant
       const address = pickString(args.url)
-      if (!grant?.taskId || !address || grant.networkAllowlist.includes('*')) return false
+      if (!grant?.taskId || !address) return false
       try {
         const url = parseWebSourceAddress(address)
-        return grant.networkAllowlist.includes(url.origin) || Boolean(exactSearchResultUrl(address, context))
+        if (await context.isTaskWebReadOriginApproved?.(url.origin)) return true
+        if (exactSearchResultUrl(address, context)) return true
+        if (grant.networkAllowlist.includes('*')) return false
+        return grant.networkAllowlist.includes(url.origin)
       } catch {
         return false
       }
@@ -195,12 +203,17 @@ function createFetchTool(
       )
       const timeoutMs = boundedInt(args.timeout_ms, DEFAULT_WEB_TIMEOUT_MS, 1, DEFAULT_WEB_TIMEOUT_MS)
       try {
+        let allowedOrigins = context.executionGrant?.networkAllowlist
+        if (allowedOrigins?.includes('*')) {
+          if (authorizedSearchUrl) allowedOrigins = [new URL(authorizedSearchUrl).origin]
+          else if (await context.isTaskWebReadOriginApproved?.(policy.url.origin)) allowedOrigins = [policy.url.origin]
+        }
         const result = await provider.fetch({
           url: policy.url.href,
           maxBytes,
           timeoutMs,
           signal: context.abortSignal,
-          allowedOrigins: context.executionGrant?.networkAllowlist,
+          allowedOrigins,
           ...(authorizedSearchUrl ? { allowedUrls: [authorizedSearchUrl] } : {})
         })
         return {

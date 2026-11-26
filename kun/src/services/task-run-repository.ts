@@ -1,5 +1,5 @@
 import { recoverablePermissionFailure } from './task-permission-recovery.js'
-import { legacyLocalArtifactSourceMismatch } from '../contracts/task-source-intent.js'
+import { explicitWebSourceOrigin, legacyLocalArtifactSourceMismatch } from '../contracts/task-source-intent.js'
 import { verifiedTaskPublicQueryAction } from './browser-public-query-authority.js'
 import { BrowserScheduleActionSchema } from '../contracts/browser-schedule-actions.js'
 import { browserVerificationPolicy } from '../contracts/browser-skill.js'
@@ -363,6 +363,34 @@ export class TaskRunRepository {
       }
       return next
     })
+  }
+
+  approveTaskWebReadOrigin(input: { taskId: string; threadId: string; turnId: string; approvalId: string; origin: string; nowIso: string }): TaskRun {
+    const parsed = new URL(input.origin)
+    if (explicitWebSourceOrigin(input.origin) !== input.origin || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+      throw Object.assign(new Error('A task web-read approval requires one canonical HTTP(S) origin.'), { code: 'approval_scope_invalid' })
+    }
+    const request = this.humanRequest(input.approvalId)
+    const approval = request?.payload.approval as { toolName?: unknown; networkReadOrigin?: unknown } | undefined
+    if (!request || request.kind !== 'approval' || request.status !== 'answered' ||
+        (request.resolution as { decision?: unknown } | undefined)?.decision !== 'allow' ||
+        request.threadId !== input.threadId || request.turnId !== input.turnId ||
+        approval?.toolName !== 'web_fetch' || approval.networkReadOrigin !== input.origin) {
+      throw Object.assign(new Error('The approved web origin does not match a completed web_fetch approval.'), { code: 'approval_scope_invalid' })
+    }
+    const current = this.get(input.taskId)
+    if (!current || current.threadId !== input.threadId || current.activeTurnId !== input.turnId ||
+        TERMINAL_TASK_STATUSES.has(current.status) || current.authority?.revokedAt) {
+      throw Object.assign(new Error('The task is no longer eligible for this web-read approval.'), { code: 'execution_grant_revoked' })
+    }
+    const existing = current.authority?.approvedWebReadOrigins ?? []
+    if (existing.some(item => item.origin === input.origin)) return current
+    const authority = current.authority ?? { source: 'legacy' as const, workspaceRoot: current.workspaceRoot, externalTargets: [], grantedAt: current.createdAt }
+    return this.update(current.id, current.revision, task => ({ ...task,
+      authority: { ...authority, approvedWebReadOrigins: [...existing, { origin: input.origin, approvalId: input.approvalId,
+        turnId: input.turnId, approvedAt: input.nowIso }] }, updatedAt: input.nowIso
+    }), { key: `web-read-origin-approved:${input.approvalId}`, kind: 'task_web_read_origin_approved',
+      payload: { origin: input.origin, approvalId: input.approvalId }, createdAt: input.nowIso })
   }
 
   saveCheckpoint(checkpoint: TaskCheckpoint): TaskCheckpoint {

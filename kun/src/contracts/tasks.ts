@@ -149,6 +149,9 @@ export const TaskAuthoritySchema = z.object({
   approvalPolicy: z.string().optional(),
   sandboxMode: z.string().optional(),
   externalTargets: z.array(z.string()).default([]),
+  approvedWebReadOrigins: z.array(z.object({
+    origin: z.string().url(), approvalId: z.string().min(1), turnId: z.string().min(1), approvedAt: z.string().min(1)
+  }).strict()).optional(),
   grantedAt: z.string(),
   revokedAt: z.string().optional()
   ,taskApprovalGrant: TaskApprovalGrantSchema.optional()

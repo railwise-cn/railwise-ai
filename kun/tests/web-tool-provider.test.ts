@@ -703,7 +703,7 @@ describe('Web tool provider', () => {
     const tool = registry.resolveTool('web_fetch', buildContext()).tool
 
     await expect(tool.approvalSummary?.({ url: 'https://docs.example.test/private/path?token=hidden' }, buildContext()))
-      .resolves.toBe('Read public web page\nOrigin: https://docs.example.test\nEffect: Read page content only.')
+      .resolves.toBe('读取公开网页\n网站：https://docs.example.test\n范围：仅当前任务\n影响：只读取网页内容，不会登录、填写或提交数据。')
   })
 
   it('reports web availability in the runtime capability manifest', () => {

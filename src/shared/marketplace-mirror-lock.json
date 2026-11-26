@@ -348,8 +348,8 @@
       "arch": "arm64",
       "parts": [
         {
-          "sha256": "85b5f42fd16fd53533ce973f770caafdf73573443db852888d40c11064a4a6e5",
-          "size": 3054774
+          "sha256": "1d1cc50d6cb5aa5a16f60b2735217a88f8a661d5df74b0728a28929a9b053bd5",
+          "size": 3060653
         }
       ]
     },
@@ -712,8 +712,8 @@
       "arch": "x64",
       "parts": [
         {
-          "sha256": "85b5f42fd16fd53533ce973f770caafdf73573443db852888d40c11064a4a6e5",
-          "size": 3054774
+          "sha256": "1d1cc50d6cb5aa5a16f60b2735217a88f8a661d5df74b0728a28929a9b053bd5",
+          "size": 3060653
         }
       ]
     },
@@ -1084,8 +1084,8 @@
       "arch": "x64",
       "parts": [
         {
-          "sha256": "3fae5608c3ec2f19de4ea99b9967574fe0beac45eb35977cb5ff8ef66a636ff0",
-          "size": 3067600
+          "sha256": "d12891de7f07ed3081cba1d2904745c84a515814d8626e459c8448be6278c1f7",
+          "size": 3073729
         }
       ]
     }
