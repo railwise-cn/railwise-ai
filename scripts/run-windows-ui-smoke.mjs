@@ -2963,9 +2963,11 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
           assert.equal(persistedTask.id, beforeRestart.taskId)
           assert.equal(persistedTask.status, 'paused')
           assert.equal(persistedTask.originThreadId, beforeRestart.threadId)
+          const persistedExecutionThread = await cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/threads/${encodeURIComponent(journey.executionThreadId)}`)},'GET').then(response=>JSON.parse(response.body))`)
+          assert.equal(persistedExecutionThread.id, beforeRestart.executionThreadId)
+          assert.ok(persistedExecutionThread.turns.some(turn => turn.id === beforeRestart.activeTurnId && turn.items.some(item => item.kind === 'user_input' && item.inputId === beforeRestart.requestId && item.status === 'cancelled')))
           const persistedThread = await cdp.evaluate(`window.workwise.runtimeRequest(${JSON.stringify(`/v1/threads/${encodeURIComponent(journey.conversationThreadId)}`)},'GET').then(response=>JSON.parse(response.body))`)
           assert.equal(persistedThread.id, beforeRestart.threadId)
-          assert.ok(persistedThread.turns.some(turn => turn.id === beforeRestart.activeTurnId && turn.items.some(item => item.kind === 'user_input' && item.inputId === beforeRestart.requestId && item.status === 'cancelled')))
           const rowLabel = await cdp.wait(`(()=>{const thread=${JSON.stringify(persistedThread.title)};return [...document.querySelectorAll('.ds-sidebar-shell button[aria-label]')].find(button=>button.textContent.includes(thread))?.getAttribute('aria-label')})()`,
             'the original conversation in the restarted sidebar', 30_000)
           await cdp.click('.ds-sidebar-shell button[aria-label]', rowLabel)

@@ -88,6 +88,36 @@ describe('persistent human gates', () => {
     repository.close()
   })
 
+  it('persists an exact-origin read grant only after a web_fetch approval', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-web-read-grant-')); roots.push(root)
+    const path = join(root, 'tasks.sqlite3')
+    const before = '2026-11-09T00:00:01Z'
+    const repository = new TaskRunRepository(path)
+    repository.create({ ...task(), activeTurnId: 'turn-1', authority: {
+      source: 'user', workspaceRoot: '/tmp/ws', externalTargets: [], grantedAt: before
+    } })
+    const gate = new PersistentApprovalGate(repository, () => before)
+    const allowed = createApprovalRequest({ id: 'approval-web-read', threadId: 'thread-gate', turnId: 'turn-1',
+      toolName: 'web_fetch', summary: '读取网站内容', networkReadOrigin: 'https://www.railwise.cn', createdAt: before })
+    const allowedResult = gate.request(allowed)
+    expect(gate.decide(allowed.id, 'allow')).toBe(true)
+    await expect(allowedResult).resolves.toBe('allow')
+
+    const denied = createApprovalRequest({ id: 'approval-web-denied', threadId: 'thread-gate', turnId: 'turn-1',
+      toolName: 'web_fetch', summary: '读取另一个网站', networkReadOrigin: 'https://private.example', createdAt: before })
+    const deniedResult = gate.request(denied)
+    expect(gate.decide(denied.id, 'deny')).toBe(true)
+    await expect(deniedResult).resolves.toBe('deny')
+    expect(repository.get('task-gate')?.authority?.approvedWebReadOrigins).toEqual([{
+      origin: 'https://www.railwise.cn', approvalId: allowed.id, turnId: 'turn-1', approvedAt: before
+    }])
+    repository.close()
+
+    const reopened = new TaskRunRepository(path)
+    expect(reopened.get('task-gate')?.authority?.approvedWebReadOrigins?.map(item => item.origin)).toEqual(['https://www.railwise.cn'])
+    reopened.close()
+  })
+
   it.each(['expired', 'revoked', 'prepared'] as const)('settles a %s task approval once after restart without granting it', async reason => {
     const root = await mkdtemp(join(tmpdir(), 'railwise-gate-invalid-')); roots.push(root)
     const path = join(root, 'tasks.sqlite3')

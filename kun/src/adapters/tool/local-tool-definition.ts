@@ -25,6 +25,7 @@ export function defineLocalTool(
     ...(tool.hasScopedApproval ? { hasScopedApproval: tool.hasScopedApproval } : {}),
     ...(tool.contextBlock ? { contextBlock: tool.contextBlock } : {}),
     ...(tool.approvalSummary ? { approvalSummary: tool.approvalSummary } : {}),
+    ...(tool.approvalNetworkReadOrigin ? { approvalNetworkReadOrigin: tool.approvalNetworkReadOrigin } : {}),
     ...(tool.shouldAdvertise ? { shouldAdvertise: tool.shouldAdvertise } : {})
   }
 }

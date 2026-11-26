@@ -1165,6 +1165,14 @@ export class AgentLoop {
     if (executionGrant) {
       await this.validateGrant(executionGrant)
       toolContext.executionGrant = executionGrant
+      if (executionGrant.taskId && this.opts.tasks) {
+        toolContext.isTaskWebReadOriginApproved = origin => {
+          const task = this.opts.tasks!.activeTask(threadId)
+          return Boolean(task && task.id === executionGrant.taskId && !task.authority?.revokedAt &&
+            Boolean(task.authority?.approvedWebReadOrigins?.some(approval => approval.origin === origin))
+          )
+        }
+      }
       toolContext.workspace = executionGrant.workspaceRoot
       sandboxMode = executionGrant.sandboxMode
       toolContext.sandboxMode = sandboxMode

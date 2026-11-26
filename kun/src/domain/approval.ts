@@ -14,6 +14,7 @@ export type ApprovalRequest = {
   summary: string
   requestHash?: string
   callId?: string
+  networkReadOrigin?: string
   status: ApprovalStatus
   createdAt: string
   decidedAt?: string
@@ -28,6 +29,7 @@ export function createApprovalRequest(input: {
   summary: string
   requestHash?: string
   callId?: string
+  networkReadOrigin?: string
   createdAt?: string
 }): ApprovalRequest {
   return {
@@ -38,6 +40,7 @@ export function createApprovalRequest(input: {
     summary: input.summary,
     ...(input.requestHash ? { requestHash: input.requestHash } : {}),
     ...(input.callId ? { callId: input.callId } : {}),
+    ...(input.networkReadOrigin ? { networkReadOrigin: input.networkReadOrigin } : {}),
     status: 'pending',
     createdAt: input.createdAt ?? new Date().toISOString()
   }

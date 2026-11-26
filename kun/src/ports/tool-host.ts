@@ -130,6 +130,8 @@ export type ToolHostContext = {
   sandboxMode?: SandboxMode
   /** Immutable effective workspace/agent grant for this execution attempt. */
   executionGrant?: ExecutionGrant
+  /** Check whether this active task has a persisted read-only approval for an exact web origin. */
+  isTaskWebReadOriginApproved?: (origin: string) => boolean | Promise<boolean>
   /** Server-reserved session identity for one explicitly authorized host command. */
   hostShellSessionId?: string
   /** Supplied by LocalToolHost only after this exact call received an allow decision. */
