@@ -9,7 +9,7 @@ describe('task-scoped web read approvals', () => {
     const approvedOrigins = new Set<string>()
     const approvalOrigins: string[] = []
     const approvalSummaries: string[] = []
-    const fetchScopes: Array<string[] | undefined> = []
+    const fetchScopes: Array<{ origins?: string[]; urls?: string[] }> = []
     const fetch = vi.fn(async ({ url }: { url: string }) => ({
       sourceId: `source-${fetch.mock.calls.length}`,
       url,
@@ -20,13 +20,14 @@ describe('task-scoped web read approvals', () => {
       byteCount: 20,
       truncated: false
     }))
-    const scopedFetch = vi.fn(async (request: { url: string; allowedOrigins?: string[] }) => {
-      fetchScopes.push(request.allowedOrigins)
+    const scopedFetch = vi.fn(async (request: { url: string; allowedOrigins?: string[]; allowedUrls?: string[] }) => {
+      fetchScopes.push({ origins: request.allowedOrigins, urls: request.allowedUrls })
       return fetch(request)
     })
     const provider = buildWebToolProviders({
       enabled: true, fetchEnabled: true, searchEnabled: false, allowDomains: [], denyDomains: [], maxFetchBytes: 1024
-    } satisfies WebCapabilityConfig, { fetchProvider: { id: 'test-fetch', fetch: scopedFetch } })
+    } satisfies WebCapabilityConfig, { fetchProvider: { id: 'test-fetch', fetch: scopedFetch },
+      searchResultUrls: () => ['https://search.example/result'] })
     const host = new LocalToolHost({ registry: new CapabilityRegistry(provider.providers) })
     let approvalCount = 0
     const context = {
@@ -50,16 +51,20 @@ describe('task-scoped web read approvals', () => {
     const first = await host.execute({ callId: 'fetch-home', toolName: 'web_fetch', arguments: { url: 'https://www.railwise.cn/' } }, context)
     const second = await host.execute({ callId: 'fetch-about', toolName: 'web_fetch', arguments: { url: 'https://www.railwise.cn/about' } }, context)
     const otherOrigin = await host.execute({ callId: 'fetch-other-origin', toolName: 'web_fetch', arguments: { url: 'https://public.example/' } }, context)
+    const searchResult = await host.execute({ callId: 'fetch-search-result', toolName: 'web_fetch', arguments: { url: 'https://search.example/result' } }, context)
 
     expect(first.item).toMatchObject({ kind: 'tool_result', isError: false })
     expect(second.item).toMatchObject({ kind: 'tool_result', isError: false })
     expect(otherOrigin.item).toMatchObject({ kind: 'tool_result', isError: false })
+    expect(searchResult.item).toMatchObject({ kind: 'tool_result', isError: false })
     expect(approvalCount).toBe(2)
     expect(approvalOrigins).toEqual(['https://www.railwise.cn', 'https://public.example'])
     expect(approvalSummaries[0]).toContain('范围：仅当前任务')
-    expect(scopedFetch).toHaveBeenCalledTimes(3)
+    expect(scopedFetch).toHaveBeenCalledTimes(4)
     expect(fetchScopes).toEqual([
-      ['https://www.railwise.cn'], ['https://www.railwise.cn'], ['https://public.example']
+      { origins: ['https://www.railwise.cn'] }, { origins: ['https://www.railwise.cn'] },
+      { origins: ['https://public.example'] },
+      { origins: ['https://search.example'], urls: ['https://search.example/result'] }
     ])
   })
 })

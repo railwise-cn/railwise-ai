@@ -160,8 +160,9 @@ function createFetchTool(
       try {
         const url = parseWebSourceAddress(address)
         if (await context.isTaskWebReadOriginApproved?.(url.origin)) return true
+        if (exactSearchResultUrl(address, context)) return true
         if (grant.networkAllowlist.includes('*')) return false
-        return grant.networkAllowlist.includes(url.origin) || Boolean(exactSearchResultUrl(address, context))
+        return grant.networkAllowlist.includes(url.origin)
       } catch {
         return false
       }
@@ -204,7 +205,7 @@ function createFetchTool(
       try {
         let allowedOrigins = context.executionGrant?.networkAllowlist
         if (allowedOrigins?.includes('*')) {
-          if (authorizedSearchUrl) allowedOrigins = []
+          if (authorizedSearchUrl) allowedOrigins = [new URL(authorizedSearchUrl).origin]
           else if (await context.isTaskWebReadOriginApproved?.(policy.url.origin)) allowedOrigins = [policy.url.origin]
         }
         const result = await provider.fetch({
