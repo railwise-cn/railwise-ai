@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
+import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 
@@ -79,4 +79,15 @@ test('paused PPT continuation creates one new Turn and its answer continues that
   assert.equal(validatePostRestartTurnFlow({ originalTurnId: 'turn-before-pause', resumedTurnId: 'turn-after-resume', answerTurnId: 'turn-after-resume' }), true)
   assert.throws(() => validatePostRestartTurnFlow({ originalTurnId: 'turn-before-pause', resumedTurnId: 'turn-before-pause', answerTurnId: 'turn-before-pause' }), /must start a new Turn/)
   assert.throws(() => validatePostRestartTurnFlow({ originalTurnId: 'turn-before-pause', resumedTurnId: 'turn-after-resume', answerTurnId: 'another-turn' }), /must continue that Turn/)
+})
+
+test('controlled pause recovery permits only the scoped web read and exact attribution check approvals', () => {
+  for (const toolName of ['web_fetch', 'request_host_shell']) {
+    assert.equal(canResolvePptJourneyApproval({ live: false, allowControlledHostShell: true, toolName }), true)
+  }
+  for (const toolName of ['browser_click', 'write', 'exec']) {
+    assert.equal(canResolvePptJourneyApproval({ live: false, allowControlledHostShell: true, toolName }), false)
+  }
+  assert.equal(canResolvePptJourneyApproval({ live: false, allowControlledHostShell: false, toolName: 'web_fetch' }), false)
+  assert.equal(canResolvePptJourneyApproval({ live: true, allowControlledHostShell: false, toolName: 'unexpected' }), true)
 })

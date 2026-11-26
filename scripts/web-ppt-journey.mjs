@@ -192,6 +192,10 @@ export function inspectLiveWebPptApproval(attention, { taskId, workspace, skillG
     commandSha256: field('Command SHA256'), workspaceSha256: field('Workspace SHA256'), requestHash: approval.requestHash }
 }
 
+export function canResolvePptJourneyApproval({ live, allowControlledHostShell, toolName }) {
+  return live === true || allowControlledHostShell === true && ['web_fetch', 'request_host_shell'].includes(toolName)
+}
+
 export function inspectLiveWebPptApprovalResolution(inputs, attention) {
   assert.ok(Array.isArray(inputs), 'The actual task inputs API must return an array')
   const rows = inputs.filter(input => input.kind === 'approval_resolution' && input.sourceId === attention.requestId)
@@ -242,8 +246,9 @@ async function waitForWebPptTask(cdp, taskId, options) {
     if (task.status === 'waiting_approval') {
       const pending = await cdp.evaluate(`${readRuntime('/v1/inbox')}.then(items=>items.filter(item=>item.taskId===${literal(taskId)}&&item.kind==='approval'&&item.status==='pending'))`)
       assert.equal(pending.length, 1, 'The task may have only one real approval pending at once')
-      assert.ok(options.live || options.allowControlledHostShell && pending[0].payload?.approval?.toolName === 'request_host_shell',
-        'Only the controlled PPT attribution check may request one exact host approval')
+      assert.ok(canResolvePptJourneyApproval({ live: options.live,
+        allowControlledHostShell: options.allowControlledHostShell, toolName: pending[0].payload?.approval?.toolName }),
+      'Only the official read-only page or the exact packaged attribution check may request an approval')
       const receipt = await resolveLiveWebPptApproval(cdp, taskId, { ...options, reviewedScopes })
       assert.ok(!visited.has(receipt.id), 'An approval may be resolved only once')
       visited.add(receipt.id)
