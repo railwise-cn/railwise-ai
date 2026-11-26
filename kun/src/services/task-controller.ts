@@ -2522,9 +2522,14 @@ export class TaskController {
   }
 
   private async collectArtifacts(task: TaskRun, items: TurnItem[], turnId: string, revalidationKey?: string, recordValidationSpans = true): Promise<TaskArtifact[]> {
+    const required = task.acceptance.requiredFormats?.map((value) => value.toLowerCase())
     const paths = [
       ...task.artifacts.map(artifact => artifact.absolutePath ?? artifact.relativePath),
-      ...items.flatMap(declaredFileOutputPaths),
+      ...items.flatMap(item => {
+        const declared = declaredFileOutputPaths(item)
+        if (!required?.length || item.kind !== 'tool_result' || !['write', 'edit'].includes(item.toolName)) return declared
+        return declared.filter(path => required.includes(extname(path).slice(1).toLowerCase()))
+      }),
       ...verifiedShellDeliverablePaths(items, turnId)
     ]
     const root = await realpath(task.workspaceRoot).catch(() => resolve(task.workspaceRoot))
@@ -2545,6 +2550,7 @@ export class TaskController {
       const allowed = inside || Boolean(externalWrite)
       const info = canonical && allowed ? await stat(canonical).catch(() => null) : null
       const managedOutput = externalWrite?.authorizedRoot === this.managedArtifactRoot(task.id)
+      const validFormat = !required || required.includes(extension) || Boolean(externalWrite && managedOutput)
       const validationSpanId = artifactValidationSpanId(task.id, revalidationKey ? `${rawPath}\0revalidation:${revalidationKey}` : rawPath)
       if (recordValidationSpans) this.spans?.start({
         id: validationSpanId,
@@ -2555,7 +2561,7 @@ export class TaskController {
         retryCount: 0,
         attributes: { format: extension || 'unknown' }
       })
-      const validation = info?.isFile()
+      const validation = info?.isFile() && validFormat
         ? await validateArtifactFile(canonical, extension).catch((error) => ({
             valid: false,
             format: extension,
@@ -2578,7 +2584,9 @@ export class TaskController {
             ? 'unsafe_path'
             : !info?.isFile()
               ? 'artifact_not_found'
-              : 'artifact_invalid'
+              : !validFormat
+                ? 'artifact_format_mismatch'
+                : 'artifact_invalid'
         } : {}),
         attributes: {
           format: validation?.format ?? (extension || 'unknown'),
@@ -2605,7 +2613,9 @@ export class TaskController {
             ? '成果路径缺少对应执行授权或成功写入回执。'
             : !info?.isFile()
               ? '成果文件不存在或不是普通文件。'
-              : validation?.message ?? '成果文件未通过格式验证。',
+              : validFormat
+                ? validation?.message ?? '成果文件未通过格式验证。'
+                : `成果格式 .${extension || 'unknown'} 不符合要求。`,
         createdAt: previous?.createdAt ?? this.nowIso()
       })
     }

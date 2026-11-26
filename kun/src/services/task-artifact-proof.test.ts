@@ -46,7 +46,7 @@ async function fixture(authorized = true, wait = false, toolName = 'write', requ
   const output = authorized && toolName === 'write'
     ? await createWriteLocalTool().execute(call.arguments, { threadId: thread.id, turnId: turn.id, workspace, threadMode: 'agent', approvalPolicy: 'auto', sandboxMode: 'workspace-write', abortSignal: new AbortController().signal, awaitApproval: async () => 'allow', executionGrant: grant })
     : { output: toolName === 'ppt_master_export'
-      ? { ok: true, generatedFiles: [{ name: 'result.md', path: '../delivery/result.md', relativePath: '../delivery/result.md', absolutePath: path, sha256: createHash('sha256').update(content).digest('hex') }] }
+      ? { ok: true, generatedFiles: requiredFormats?.includes('pptx') ? [] : [{ name: 'result.md', path: '../delivery/result.md', relativePath: '../delivery/result.md', absolutePath: path, sha256: createHash('sha256').update(content).digest('hex') }] }
       : { path, sha256: createHash('sha256').update(content).digest('hex') } }
   if (!authorized || toolName === 'ppt_master_export') await writeFile(path, content)
   if (toolName === 'ppt_master_export' && requiredFormats?.includes('pptx')) {
@@ -91,13 +91,26 @@ describe('authorized external task artifacts', () => {
     } finally { f.repository.close() }
   })
 
-  it('validates intermediate project files by their own format while requiring a valid PPTX deliverable', async () => {
+  it('keeps intermediate project files out of final artifacts while requiring a valid PPTX deliverable', async () => {
     const f = await fixture(true, false, 'ppt_master_export', ['pptx'])
     try {
+      const project = join(f.workspace, 'deck')
+      const intermediateFiles = [
+        { path: join(project, 'spec_lock.md'), relativePath: 'deck/spec_lock.md', content: '# Locked presentation specification\n' },
+        { path: join(project, 'svg_output', 'slide_01.svg'), relativePath: 'deck/svg_output/slide_01.svg', content: '<svg xmlns="http://www.w3.org/2000/svg"/>' }
+      ]
+      for (const [index, file] of intermediateFiles.entries()) {
+        await mkdir(join(project, 'svg_output'), { recursive: true })
+        await writeFile(file.path, file.content)
+        await f.sessionStore.appendItem(f.thread.id, makeToolResultItem({
+          id: `intermediate-${index}`, threadId: f.thread.id, turnId: f.turn.id,
+          callId: `intermediate-${index}`, toolName: 'write', toolKind: 'file_change',
+          output: { path: file.relativePath, sha256: createHash('sha256').update(file.content).digest('hex') }, isError: false
+        }))
+      }
       const decision = await f.controller.assessCandidate(f.thread.id, f.turn.id)
       expect(decision.kind).toBe('completed')
       expect(decision.task.artifacts).toMatchObject([
-        { relativePath: 'result.md', format: 'md', validation: 'valid' },
         { relativePath: 'result.pptx', format: 'pptx', validation: 'valid' }
       ])
     } finally { f.repository.close() }
