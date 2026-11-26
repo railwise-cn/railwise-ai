@@ -82,6 +82,12 @@ function conversationTextProbe() {
   return `Array.from(document.querySelectorAll(${literal(timeline)})).map(node=>node.innerText).join('\\n')`
 }
 
+export function safeWebPptErrorCode(item) {
+  const candidate = item?.kind === 'error' ? item.code
+    : item?.kind === 'tool_result' && item.isError === true ? item.output?.code : undefined
+  return typeof candidate === 'string' && /^[a-z][a-z0-9_:-]{0,79}$/i.test(candidate) ? candidate : undefined
+}
+
 async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
   const [task, inputs, inbox, thread] = await Promise.all([
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
@@ -103,7 +109,7 @@ async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
         approvalPolicy: turn.executionGrant.approvalPolicy, networkAllowlist: turn.executionGrant.networkAllowlist,
         taskPermissionId: turn.executionGrant.taskPermissionId, webTools: turn.executionGrant.allowedToolNames?.filter(name => ['web_fetch', 'web_search'].includes(name)) } } : {}),
       itemKinds: turn.items.map(item => ({ kind: item.kind, toolName: item.toolName, requestId: item.requestId,
-        status: item.status, isError: item.isError })) }))
+        status: item.status, isError: item.isError, errorCode: safeWebPptErrorCode(item) })) }))
   }
 }
 
