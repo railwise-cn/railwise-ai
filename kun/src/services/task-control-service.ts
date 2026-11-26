@@ -29,7 +29,7 @@ export type TaskControlResult = { task:TaskRun; corrected?:boolean; completed?:b
 /** One deterministic mutation path for chat commands and the task HTTP API. */
 export class TaskControlService {
   private readonly pending = new Map<string,Promise<unknown>>()
-  constructor(private readonly deps:{publicQueryRecovery?:BrowserPublicQueryRecoveryService;repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;preflightRecoveryTask?(text:string,thread:import('../contracts/threads.js').ThreadRecord,binding:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):ReturnType<ExternalTaskPreflight>;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;validateRecoveryExecution?(task:TaskRun):Promise<void>;validateRecoveryPermission?(threadId:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;validateRetryLocalSchedule?(task:TaskRun,receipt:OperationReceipt,recovery?:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):Promise<boolean>;nowIso():string}) {}
+  constructor(private readonly deps:{publicQueryRecovery?:BrowserPublicQueryRecoveryService;repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;waitTurn?(threadId:string,turnId:string):Promise<void>;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;preflightRecoveryTask?(text:string,thread:import('../contracts/threads.js').ThreadRecord,binding:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):ReturnType<ExternalTaskPreflight>;validateTaskPermission?(threadId:string,sourceTaskId?:string):Promise<unknown>;validateRecoveryExecution?(task:TaskRun):Promise<void>;validateRecoveryPermission?(threadId:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;validateRetryLocalSchedule?(task:TaskRun,receipt:OperationReceipt,recovery?:import('../contracts/browser-public-query-recovery.js').BrowserPublicQueryRecoveryBinding):Promise<boolean>;nowIso():string}) {}
 
   async mutate(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     return this.serialize(taskId, () => this.execute(taskId, action, data))
@@ -218,6 +218,10 @@ export class TaskControlService {
         if (finishTurnBeforePause) {
           try {
             await turns.interruptTurn({ threadId: taskAtControl.threadId, turnId: activeTurnId!, preserveTask: true, reason: 'task_pause' })
+            // The abort is delivered synchronously, but the AgentLoop may still
+            // be unwinding and persisting its terminal state. Wait for that
+            // write to finish before correcting the durable question item.
+            await this.deps.waitTurn?.(taskAtControl.threadId, activeTurnId!)
             const interruptedThread = await threads.get(taskAtControl.threadId)
             const interruptedTurn = interruptedThread?.turns.find(turn => turn.id === activeTurnId)
             for (const item of interruptedTurn?.items ?? []) {
