@@ -19,7 +19,7 @@ import { inspectWindowsDocumentNavigation, observeWindowsBrowserConnect, readWin
 import { validateWindowsComposerMenuGeometry, validateWindowsAdaptiveWorkbenchEvidence, windowsComposerMenuKeyboardExpression, validateWindowsComposerMenuKeyboardReceipt, windowsComposerMenuExpression, windowsOwnedWindowScript } from './run-windows-ui-smoke.mjs'
 import { summarizeWindowsUpdateMetadata, checkWindowsUpdateMetadata } from './run-windows-ui-smoke.mjs'
 import { windowsVideoModelAction } from './verify-windows-video-evaluation.mjs'
-import { createWebPptJourney, inspectWebPptFallback, startWebPptFallbackSource, validateWebPptTurnIdentity, webPptJourneyPrompt } from './web-ppt-journey.mjs'
+import { createWebPptJourney, inspectWebPptFallback, startWebPptFallbackSource, validatePostRestartTurnFlow, validateWebPptTurnIdentity, webPptJourneyPrompt } from './web-ppt-journey.mjs'
 import { reviewedPermissionDecisions } from './verify-windows-composer-acceptance.mjs'
 
 test('Video Shotcraft UI acceptance validates reviewed permission declarations before install', () => {
@@ -73,6 +73,12 @@ test('BrowserSkill PPT fixture serves a loopback source whose marker only appear
   assert.ok(!html.includes(source.marker))
   const payload = /atob\('([^']+)'\)/.exec(html)?.[1]
   assert.equal(JSON.parse(Buffer.from(payload, 'base64').toString()).marker, source.marker)
+})
+
+test('paused task continuation starts one new Turn and answers within that resumed Turn', () => {
+  assert.equal(validatePostRestartTurnFlow({ originalTurnId: 'turn-before-pause', resumedTurnId: 'turn-after-resume', answerTurnId: 'turn-after-resume' }), true)
+  assert.throws(() => validatePostRestartTurnFlow({ originalTurnId: 'turn-before-pause', resumedTurnId: 'turn-before-pause', answerTurnId: 'turn-before-pause' }), /must start a new Turn/)
+  assert.throws(() => validatePostRestartTurnFlow({ originalTurnId: 'turn-before-pause', resumedTurnId: 'turn-after-resume', answerTurnId: 'extra-turn' }), /must continue that Turn/)
 })
 
 test('BrowserSkill PPT fallback consumes the durable URL and requires a verified DOM read before writing', () => {
@@ -238,8 +244,8 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
   report.webPpt.restartRecovery = {
     status: 'passed', exactPackageVersion: version, installedAsarSha256: report.installedAsarSha256,
     appClosedNormally: true, appRestarted: true, sameProfile: true, sameRuntimeDataDir: true,
-    beforeRestart: { taskId: 'task-1', threadId: 'conversation-1', taskStatus: 'paused', questionVisible: true },
-    afterRestart: { taskId: 'task-1', threadId: 'conversation-1', taskStatus: 'paused', oldQuestionStillRecorded: true,
+    beforeRestart: { taskId: 'task-1', threadId: 'conversation-1', activeTurnId: 'turn-before-pause', taskStatus: 'paused', questionVisible: true },
+    afterRestart: { taskId: 'task-1', threadId: 'conversation-1', taskStatus: 'paused', resumedTurnId: 'turn-after-resume', answerTurnId: 'turn-after-resume', oldQuestionStillRecorded: true,
       oldQuestionStillVisible: true, resumedQuestionVisible: true, resumedQuestionRequestId: 'question-2', originalChat: { surface: 'original-chat' } },
     answerReceiptCount: 1, answerReceiptRequestId: 'question-2', answeredQuestionRequestCount: 1,
     approvalCardCount: 1, approvalResolutionDuplicateCount: 0, approvalResolutionCount: 1,
@@ -253,6 +259,8 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
     proof => { proof.webPpt.restartRecovery.approvalResolutionCount = 0 },
     proof => { proof.webPpt.restartRecovery.approvalResolutionRequestIds = ['unrelated-request'] },
     proof => { proof.webPpt.restartRecovery.approvalResolutionDuplicateCount = 1 },
+    proof => { proof.webPpt.restartRecovery.afterRestart.answerTurnId = 'extra-turn' },
+    proof => { proof.webPpt.restartRecovery.afterRestart.resumedTurnId = proof.webPpt.restartRecovery.beforeRestart.activeTurnId },
     proof => { proof.webPpt.restartRecovery.approvals[0].method = 'automatic' }
   ]) {
     const invalid = structuredClone(report)
