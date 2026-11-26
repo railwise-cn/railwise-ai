@@ -4835,6 +4835,7 @@
   "taskPermissionSaved": "当前任务权限已保存。点击“继续原任务”执行。",
   "taskPermissionAgentSaved": "已更新当前任务的 Agent。请重新检查权限后继续原任务。",
   "taskPermissionScope": "授权仅限当前任务，最长 15 分钟。文件读写按已确认路径执行，平台业务写入按具体目标核验。",
+  "taskPermissionWriteUnavailable": "当前 Agent 或执行沙箱不允许写入，无法为此任务授权文件生成。请在工作区或 Agent 设置中开启写入后再继续。",
   "taskPermissionExpires": "有效期至 {{at}}",
   "taskPermissionConfirmScope": "我已核对当前任务、工作区和权限范围，确认仅按此范围申请执行。",
   "taskPermissionAllow": "允许当前任务请求审批",

@@ -4836,6 +4836,7 @@
   "taskPermissionSaved": "Task permissions saved. Choose Continue original task to execute.",
   "taskPermissionAgentSaved": "The task Agent was updated. Recheck permissions before continuing the original task.",
   "taskPermissionScope": "Authorize this task for up to 15 minutes. File access follows the reviewed paths. External writes are checked against their specific targets.",
+  "taskPermissionWriteUnavailable": "The current Agent or execution sandbox does not allow writing. Enable workspace or Agent write access before authorizing file creation for this task.",
   "taskPermissionExpires": "Expires at {{at}}",
   "taskPermissionConfirmScope": "I have reviewed this task, workspace and permission scope and confirm requests within this scope only.",
   "taskPermissionAllow": "Allow this task to request approvals",

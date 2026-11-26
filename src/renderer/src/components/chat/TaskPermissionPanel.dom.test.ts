@@ -205,6 +205,43 @@ describe('task permission authority overview',()=>{
     expect(onConfirmed).not.toHaveBeenCalled()
   })
 
+  it('grants the current workspace write path and continues the same waiting task', async () => {
+    const reviewed = { ...snapshot, workspaceTrust: 'read-only' as const, sandboxMode: 'workspace-write' as const,
+      agentTrust: 'workspace-write' as const, canWritePaths: true, approvalPolicy: 'on-request' as const }
+    const task = { id: 'task-1', threadId: 'hidden-1', status: 'waiting_user', revision: 5 } as TaskRunV1
+    const permission: TaskPermissionSnapshotV1 = { ...reviewed, taskRevision: 5,
+      grant: { id: 'workspace-write-grant', status: 'active', duration: 'task', confirmedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 900_000).toISOString(), scope: { readPaths: ['/project/synthetic'], writePaths: ['/project/synthetic'] } } }
+    const onContinue = vi.fn(async () => undefined)
+    api.getTaskPermissions.mockResolvedValue(reviewed)
+    api.getTaskRun.mockResolvedValue({ ...task, revision: 4 } as TaskRunV1)
+    api.confirmTaskPermissions.mockResolvedValue({ task, permission, resumed: false })
+    await act(async () => root.render(createElement(TaskPermissionPanel, { taskId: 'task-1', onConfirmed, onContinue,
+      autoLoad: true, workspaceWriteRequired: true })))
+    const writePaths = container.querySelector<HTMLTextAreaElement>('textarea')
+    expect(writePaths?.value).toBe('/project/synthetic')
+    expect(button('授权并继续').disabled).toBe(true)
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('授权并继续')
+    expect(api.confirmTaskPermissions).toHaveBeenCalledExactlyOnceWith('task-1', expect.objectContaining({
+      expectedRevision: 4, scopeHash: 'reviewed-scope', duration: 'task',
+      scope: { readPaths: ['/project/synthetic'], writePaths: ['/project/synthetic'] }
+    }))
+    expect(onContinue).toHaveBeenCalledExactlyOnceWith(task, permission)
+    expect(onConfirmed).not.toHaveBeenCalled()
+  })
+
+  it('does not authorize or continue workspace writes when the sandbox forbids them', async () => {
+    api.getTaskPermissions.mockResolvedValue({ ...snapshot, canWritePaths: false, sandboxMode: 'read-only' })
+    const onContinue = vi.fn(async () => undefined)
+    await act(async () => root.render(createElement(TaskPermissionPanel, { taskId: 'task-1', onConfirmed, onContinue,
+      autoLoad: true, workspaceWriteRequired: true })))
+    expect(container.textContent).toContain(i18n.t('common:taskPermissionWriteUnavailable'))
+    expect(button('允许当前任务请求审批').disabled).toBe(true)
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(onContinue).not.toHaveBeenCalled()
+  })
+
   it.each(['inactive', 'expired', 'wrong duration', 'changed authority', 'refused', 'already resumed'] as const)('does not continue a %s confirmation reply', async scenario => {
     const onContinue = vi.fn(async () => undefined)
     const task = {id:'task-1',threadId:'hidden-1',status:'waiting_user',revision:6} as TaskRunV1
