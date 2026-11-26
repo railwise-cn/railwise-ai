@@ -221,7 +221,7 @@ export class TaskControlService {
             const interruptedThread = await threads.get(taskAtControl.threadId)
             const interruptedTurn = interruptedThread?.turns.find(turn => turn.id === activeTurnId)
             for (const item of interruptedTurn?.items ?? []) {
-              if (item.kind === 'user_input' && item.status === 'pending') {
+              if (item.kind === 'user_input' && item.status !== 'cancelled') {
                 await turns.updateItem(taskAtControl.threadId, item.id, { status: 'cancelled', finishedAt: nowIso() })
               }
             }
