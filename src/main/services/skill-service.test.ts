@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, truncate, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InstalledPackageV1 } from '../../shared/marketplace'
 import {
@@ -25,6 +25,27 @@ const originalFetch = globalThis.fetch
 const originalCodexHome = process.env.CODEX_HOME
 const originalGithubToken = process.env.GITHUB_TOKEN
 const originalGhToken = process.env.GH_TOKEN
+
+async function markdownFiles(root: string): Promise<string[]> {
+  const entries = await readdir(root, { withFileTypes: true })
+  const nested = await Promise.all(entries.map(async entry => {
+    const target = join(root, entry.name)
+    return entry.isDirectory() ? markdownFiles(target) : entry.isFile() && target.endsWith('.md') ? [target] : []
+  }))
+  return nested.flat()
+}
+
+async function expectBundledSkillLinksResolve(skillRoot: string): Promise<void> {
+  const files = (await Promise.all(['workflows', 'references'].map(directory => markdownFiles(join(skillRoot, directory))))).flat()
+  for (const file of files) {
+    const content = await readFile(file, 'utf8')
+    for (const match of content.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
+      const target = match[1]!.split('#', 1)[0]!.trim()
+      if (!target || /^(?:https?:|mailto:|data:)/i.test(target)) continue
+      expect(existsSync(resolve(dirname(file), decodeURIComponent(target))), `${file} -> ${target}`).toBe(true)
+    }
+  }
+}
 
 describe('skill-service', () => {
   // PPT Master is a 13 MiB, 450+ file audited bundle. During the desktop-wide
@@ -595,6 +616,12 @@ describe('skill-service', () => {
     expect(existsSync(join(installedRoot, 'scripts', 'confirm_ui', 'server.py'))).toBe(true)
     expect(existsSync(join(installedRoot, 'scripts', 'confirm_ui', 'static', 'index.html'))).toBe(true)
     expect(existsSync(join(installedRoot, 'scripts', 'docs', 'confirm_ui.md'))).toBe(true)
+    await expectBundledSkillLinksResolve(installedRoot)
+    for (const path of [
+      'references/confirm-surface.md', 'references/native-formula.md', 'references/native-hyperlinks.md',
+      'references/plan-core.md', 'references/preset-shape-vocabulary.md', 'references/video-design.md',
+      'workflows/create-template/create-style.md', 'workflows/stages/web-image-review.md'
+    ]) expect(existsSync(join(installedRoot, path)), path).toBe(true)
     expect(existsSync(join(installedRoot, 'scripts', 'svg_editor', 'static', 'index.html'))).toBe(true)
     // 保持 v4.3 官方目录结构；图标大包不分发，只保留说明。
     expect(existsSync(join(installedRoot, 'templates', 'charts', 'charts_index.json'))).toBe(true)
@@ -639,7 +666,7 @@ describe('skill-service', () => {
       await readFile(join(installedRoot, '.workwise-skill-source.json'), 'utf8')
     ) as Record<string, unknown>
     expect(existsSync(join(installedRoot, '.workgpt-skill-source.json'))).toBe(false)
-    // v4.3 curated slim bundle: autoUpdate disabled, overlay preserved
+    // v6.8.0 curated slim bundle: autoUpdate disabled, overlay preserved
     expect(source).toMatchObject({
       type: 'github',
       owner: 'hugohe3',

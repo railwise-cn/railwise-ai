@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from 'node:f
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
+import JSZip from 'jszip'
 import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
 import { createThreadRecord } from '../domain/thread.js'
@@ -16,7 +17,7 @@ import { authorizedArtifactWrites } from './task-artifact-proof.js'
 
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
-async function fixture(authorized = true, wait = false, toolName = 'write') {
+async function fixture(authorized = true, wait = false, toolName = 'write', requiredFormats?: string[]) {
   const temporary = await mkdtemp(join(tmpdir(), 'railwise-external-artifact-')); roots.push(temporary)
   const root = await realpath(temporary)
   const workspace = join(root, 'workspace'), destination = join(root, 'delivery')
@@ -28,7 +29,13 @@ async function fixture(authorized = true, wait = false, toolName = 'write') {
   const nowIso = () => '2026-11-01T00:00:00.000Z'
   const controller = new TaskController({ repository, threadStore, sessionStore, nowIso,
     ...(wait ? { completionGuard: () => ({ reason: '需要审阅', fingerprint: 'review', retryable: false }) } : {}) })
-  const task = controller.ensureTask({ thread, turnId: 'turn-1', request: { prompt: '请生成并交付 result.md Markdown 文件。' } })
+  let task = controller.ensureTask({ thread, turnId: 'turn-1', request: { prompt: '请生成并交付 result.md Markdown 文件。' } })
+  if (requiredFormats) {
+    task = repository.update(task.id, task.revision, current => ({
+      ...current,
+      acceptance: { ...current.acceptance, requiredFormats }
+    }), { key: 'required-formats', kind: 'task_updated', payload: {}, createdAt: nowIso() })
+  }
   const grant = ExecutionGrantSchema.parse({ id: 'grant-1', taskId: task.id, threadId: thread.id, turnId: 'turn-1', workspaceRoot: workspace, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', approvalPolicy: 'auto', sandboxMode: 'workspace-write', allowedToolNames: [toolName], pathAllowlist: [workspace, destination], writePathAllowlist: authorized ? [workspace, destination] : [workspace], workspaceRevision: 1, agentRevision: 0, revision: 1, idempotencyKey: 'grant-1', issuedAt: nowIso() })
   const turn = { ...createTurnRecord({ id: 'turn-1', threadId: thread.id, prompt: task.goal }), executionGrant: grant }
   await threadStore.upsert({ ...thread, turns: [turn] })
@@ -42,6 +49,20 @@ async function fixture(authorized = true, wait = false, toolName = 'write') {
       ? { ok: true, generatedFiles: [{ name: 'result.md', path: '../delivery/result.md', relativePath: '../delivery/result.md', absolutePath: path, sha256: createHash('sha256').update(content).digest('hex') }] }
       : { path, sha256: createHash('sha256').update(content).digest('hex') } }
   if (!authorized || toolName === 'ppt_master_export') await writeFile(path, content)
+  if (toolName === 'ppt_master_export' && requiredFormats?.includes('pptx')) {
+    const pptxPath = join(destination, 'result.pptx')
+    const pptx = new JSZip()
+    pptx.file('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>')
+    pptx.file('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>')
+    pptx.file('ppt/presentation.xml', '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>')
+    pptx.file('ppt/_rels/presentation.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>')
+    pptx.file('ppt/slides/slide1.xml', '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree/></p:cSld></p:sld>')
+    const bytes = await pptx.generateAsync({ type: 'nodebuffer' })
+    await writeFile(pptxPath, bytes)
+    const files = (output.output as { generatedFiles: Array<Record<string, unknown>> }).generatedFiles
+    files.push({ name: 'result.pptx', path: '../delivery/result.pptx', relativePath: '../delivery/result.pptx',
+      absolutePath: pptxPath, sha256: createHash('sha256').update(bytes).digest('hex') })
+  }
   const item = makeToolResultItem({ id: 'write-result', threadId: thread.id, turnId: turn.id, callId: call.callId, toolName: call.toolName, toolKind: 'file_change', output: output.output, isError: output.isError })
   controller.finishToolOperation(operation.token, operation.key, { approved: true, item })
   await sessionStore.appendItem(thread.id, item)
@@ -67,6 +88,18 @@ describe('authorized external task artifacts', () => {
       expect(decision.kind).toBe('completed')
       expect(decision.task.artifacts).toMatchObject([{ relativePath: 'result.md', absolutePath: f.path,
         authorizedRoot: f.destination, executionGrantId: f.grant.id, validation: 'valid' }])
+    } finally { f.repository.close() }
+  })
+
+  it('validates intermediate project files by their own format while requiring a valid PPTX deliverable', async () => {
+    const f = await fixture(true, false, 'ppt_master_export', ['pptx'])
+    try {
+      const decision = await f.controller.assessCandidate(f.thread.id, f.turn.id)
+      expect(decision.kind).toBe('completed')
+      expect(decision.task.artifacts).toMatchObject([
+        { relativePath: 'result.md', format: 'md', validation: 'valid' },
+        { relativePath: 'result.pptx', format: 'pptx', validation: 'valid' }
+      ])
     } finally { f.repository.close() }
   })
 
