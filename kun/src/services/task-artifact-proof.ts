@@ -29,7 +29,7 @@ export async function authorizedArtifactWrites(task: TaskRun, receipts: Operatio
     const result = receipt.result as { approved?: boolean; item?: { kind?: string; status?: string; isError?: boolean; toolName?: string; toolKind?: string; turnId?: string; output?: unknown } } | undefined
     const item = result?.item
     if (result?.approved !== true || item?.kind !== 'tool_result' || item.status !== 'completed' || item.isError) continue
-    if (!['write', 'edit', 'export_document', 'propose_document', 'publish_artifact'].includes(item.toolName ?? '') || receipt.request?.toolName !== item.toolName) continue
+    if (!['write', 'edit', 'export_document', 'ppt_master_export', 'propose_document', 'publish_artifact'].includes(item.toolName ?? '') || receipt.request?.toolName !== item.toolName) continue
     const parsed = ExecutionGrantSchema.safeParse(receipt.request?.executionGrant)
     if (!parsed.success) continue
     const grant = parsed.data

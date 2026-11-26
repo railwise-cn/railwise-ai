@@ -16,7 +16,7 @@ import { authorizedArtifactWrites } from './task-artifact-proof.js'
 
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
-async function fixture(authorized = true, wait = false) {
+async function fixture(authorized = true, wait = false, toolName = 'write') {
   const temporary = await mkdtemp(join(tmpdir(), 'railwise-external-artifact-')); roots.push(temporary)
   const root = await realpath(temporary)
   const workspace = join(root, 'workspace'), destination = join(root, 'delivery')
@@ -29,17 +29,19 @@ async function fixture(authorized = true, wait = false) {
   const controller = new TaskController({ repository, threadStore, sessionStore, nowIso,
     ...(wait ? { completionGuard: () => ({ reason: '需要审阅', fingerprint: 'review', retryable: false }) } : {}) })
   const task = controller.ensureTask({ thread, turnId: 'turn-1', request: { prompt: '请生成并交付 result.md Markdown 文件。' } })
-  const grant = ExecutionGrantSchema.parse({ id: 'grant-1', taskId: task.id, threadId: thread.id, turnId: 'turn-1', workspaceRoot: workspace, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', approvalPolicy: 'auto', sandboxMode: 'workspace-write', allowedToolNames: ['write'], pathAllowlist: [workspace, destination], writePathAllowlist: authorized ? [workspace, destination] : [workspace], workspaceRevision: 1, agentRevision: 0, revision: 1, idempotencyKey: 'grant-1', issuedAt: nowIso() })
+  const grant = ExecutionGrantSchema.parse({ id: 'grant-1', taskId: task.id, threadId: thread.id, turnId: 'turn-1', workspaceRoot: workspace, workspaceTrust: 'workspace-write', agentTrust: 'workspace-write', approvalPolicy: 'auto', sandboxMode: 'workspace-write', allowedToolNames: [toolName], pathAllowlist: [workspace, destination], writePathAllowlist: authorized ? [workspace, destination] : [workspace], workspaceRevision: 1, agentRevision: 0, revision: 1, idempotencyKey: 'grant-1', issuedAt: nowIso() })
   const turn = { ...createTurnRecord({ id: 'turn-1', threadId: thread.id, prompt: task.goal }), executionGrant: grant }
   await threadStore.upsert({ ...thread, turns: [turn] })
   controller.beginAttempt(thread.id, turn.id)
   const path = join(destination, 'result.md'), content = '# External deliverable\n'
-  const call = { callId: 'write-1', toolName: 'write', toolKind: 'file_change' as const, arguments: { path, content } }
+  const call = { callId: 'write-1', toolName, toolKind: 'file_change' as const, arguments: { path, content } }
   const operation = controller.beginToolOperation(turn.id, call, grant)!
-  const output = authorized
+  const output = authorized && toolName === 'write'
     ? await createWriteLocalTool().execute(call.arguments, { threadId: thread.id, turnId: turn.id, workspace, threadMode: 'agent', approvalPolicy: 'auto', sandboxMode: 'workspace-write', abortSignal: new AbortController().signal, awaitApproval: async () => 'allow', executionGrant: grant })
-    : { output: { path, sha256: createHash('sha256').update(content).digest('hex') } }
-  if (!authorized) await writeFile(path, content)
+    : { output: toolName === 'ppt_master_export'
+      ? { ok: true, generatedFiles: [{ name: 'result.md', path: '../delivery/result.md', relativePath: '../delivery/result.md', absolutePath: path, sha256: createHash('sha256').update(content).digest('hex') }] }
+      : { path, sha256: createHash('sha256').update(content).digest('hex') } }
+  if (!authorized || toolName === 'ppt_master_export') await writeFile(path, content)
   const item = makeToolResultItem({ id: 'write-result', threadId: thread.id, turnId: turn.id, callId: call.callId, toolName: call.toolName, toolKind: 'file_change', output: output.output, isError: output.isError })
   controller.finishToolOperation(operation.token, operation.key, { approved: true, item })
   await sessionStore.appendItem(thread.id, item)
@@ -55,6 +57,16 @@ describe('authorized external task artifacts', () => {
       expect(decision.kind).toBe('completed')
       expect(decision.task.artifacts).toMatchObject([{ relativePath: 'result.md', absolutePath: f.path, authorizedRoot: f.destination, executionGrantId: f.grant.id, validation: 'valid' }])
       expect(decision.task.artifacts[0].sha256).toHaveLength(64)
+    } finally { f.repository.close() }
+  })
+
+  it('accepts a PPT Master export only from its successful immutable write receipt', async () => {
+    const f = await fixture(true, false, 'ppt_master_export')
+    try {
+      const decision = await f.controller.assessCandidate(f.thread.id, f.turn.id)
+      expect(decision.kind).toBe('completed')
+      expect(decision.task.artifacts).toMatchObject([{ relativePath: 'result.md', absolutePath: f.path,
+        authorizedRoot: f.destination, executionGrantId: f.grant.id, validation: 'valid' }])
     } finally { f.repository.close() }
   })
 

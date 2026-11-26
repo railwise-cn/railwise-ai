@@ -1,11 +1,14 @@
+import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { createReadStream } from 'node:fs'
 import { lstat, mkdir, readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import PptxGenJS from 'pptxgenjs'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { resolveWorkspacePath, withToolBoundary } from './builtin-tool-utils.js'
+import { assertCanWritePath } from './sandbox-policy.js'
 import { LocalToolHost } from './local-tool-host.js'
 import {
   runRuntimePptMasterSidecar,
@@ -144,7 +147,8 @@ function createPptMasterExportTool(input: {
       if (extname(rawOutputPath).toLowerCase() !== '.pptx') {
         throw new Error('invalid_output: output_path must end in .pptx')
       }
-      const output = await resolveWorkspacePath(rawOutputPath, context)
+      const output = await resolveWorkspacePath(rawOutputPath, context, 'write')
+      assertCanWritePath(output.absolutePath, context)
       await input.beforeMutation?.({
         absolutePath: output.absolutePath,
         relativePath: output.relativePath,
@@ -153,7 +157,7 @@ function createPptMasterExportTool(input: {
         turnId: context.turnId
       })
       await mkdir(dirname(output.absolutePath), { recursive: true })
-      await resolveWorkspacePath(output.absolutePath, context)
+      await resolveWorkspacePath(output.absolutePath, context, 'write')
 
       await input.runner({
         workspaceRoot: context.workspace,
@@ -173,16 +177,20 @@ function createPptMasterExportTool(input: {
       if (outputInfo.size > MAX_PPTX_BYTES) {
         throw new Error(`resource_limit: exported PPTX exceeds ${MAX_PPTX_BYTES} bytes`)
       }
-      const verifiedOutput = await resolveWorkspacePath(output.absolutePath, context)
+      const verifiedOutput = await resolveWorkspacePath(output.absolutePath, context, 'write')
+      const sha256 = await hashFile(verifiedOutput.absolutePath)
       return {
         output: {
           ok: true,
           format: 'pptx',
+          path: verifiedOutput.relativePath,
+          sha256,
           generatedFiles: [{
             name: basename(verifiedOutput.absolutePath),
             path: verifiedOutput.relativePath,
             relativePath: verifiedOutput.relativePath,
             absolutePath: verifiedOutput.absolutePath,
+            sha256,
             mimeType: PPTX_MIME_TYPE,
             byteSize: outputInfo.size
           }]
@@ -190,6 +198,12 @@ function createPptMasterExportTool(input: {
       }
     })
   })
+}
+
+async function hashFile(path: string): Promise<string> {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(path)) hash.update(chunk)
+  return hash.digest('hex')
 }
 
 async function validateSvgDirectory(path: string, context: ToolHostContext): Promise<void> {

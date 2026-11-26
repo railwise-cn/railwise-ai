@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
+import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, safeWebPptErrorCode, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 
@@ -90,4 +90,11 @@ test('controlled pause recovery permits only the scoped web read and exact attri
   }
   assert.equal(canResolvePptJourneyApproval({ live: false, allowControlledHostShell: false, toolName: 'web_fetch' }), false)
   assert.equal(canResolvePptJourneyApproval({ live: true, allowControlledHostShell: false, toolName: 'unexpected' }), true)
+})
+
+test('PPT failure diagnostics retain error codes while excluding error messages and unsafe values', () => {
+  assert.equal(safeWebPptErrorCode({ kind: 'error', code: 'turn_attempt_exception', message: 'private response text' }), 'turn_attempt_exception')
+  assert.equal(safeWebPptErrorCode({ kind: 'tool_result', isError: true, output: { code: 'web_fetch_failed', error: 'private response text' } }), 'web_fetch_failed')
+  assert.equal(safeWebPptErrorCode({ kind: 'tool_result', isError: false, output: { code: 'ok' } }), undefined)
+  assert.equal(safeWebPptErrorCode({ kind: 'error', code: 'private response text' }), undefined)
 })

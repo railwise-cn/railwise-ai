@@ -13,6 +13,19 @@ For visual changes, inspect the packaged application's affected primary
 language, theme and window size. Changes to updater or download paths require
 one real updater smoke against the exact package.
 
+## Validation cadence
+
+Run focused tests locally while diagnosing a change. Required Quality checks run
+once for each pull request update. Feature-branch pushes do not run a second
+copy of the same checks. Keep the default-branch run for the exact merged source
+used by release evidence.
+
+Run package acceptance only after the candidate package is built, and select
+the journeys affected by the change. Use retained logs and reports to diagnose
+a failed journey before starting it again. Rebuild the candidate only when
+source or packaged bytes change. A test-harness correction can reuse the same
+immutable package.
+
 The current exact-build path uses `Release` (`release.yml`) from the selected
 source ref with these inputs when updater acceptance is required.
 
