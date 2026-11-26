@@ -218,6 +218,13 @@ export class TaskControlService {
         if (finishTurnBeforePause) {
           try {
             await turns.interruptTurn({ threadId: taskAtControl.threadId, turnId: activeTurnId!, preserveTask: true, reason: 'task_pause' })
+            const interruptedThread = await threads.get(taskAtControl.threadId)
+            const interruptedTurn = interruptedThread?.turns.find(turn => turn.id === activeTurnId)
+            for (const item of interruptedTurn?.items ?? []) {
+              if (item.kind === 'user_input' && item.status === 'pending') {
+                await turns.updateItem(taskAtControl.threadId, item.id, { status: 'cancelled', finishedAt: nowIso() })
+              }
+            }
           } catch (error) {
             // Commit the paused state even when the in-process interruption
             // temporarily fails. The idempotent replay below retries that
