@@ -263,15 +263,20 @@ function ownedProcessIsRunning(executable, pid) {
 }
 
 async function closeOwnedWindows(executable, ownerPid) {
-  const windows = windowsForExecutable(executable).filter(window => ownerPid === undefined || window.pid === ownerPid)
-  for (const { pid } of windows) powershell(`
-    $process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
-    if ($process.Path -eq ${psQuote(executable)} -and $process.MainWindowHandle -ne 0) { $null = $process.CloseMainWindow() }
-  `)
   // Electron helper processes share the executable path; an updater relaunch is owned by its main window PID.
-  await waitUntil(() => ownerPid === undefined
-    ? windowsForExecutable(executable).length === 0
-    : !ownedProcessIsRunning(executable, ownerPid), 'the owned RailWise process to exit', 60_000)
+  // Re-send CloseMainWindow on each poll in case the relaunched app was mid-transition from splash to main window.
+  await waitUntil(() => {
+    const targets = ownerPid !== undefined
+      ? [{ pid: ownerPid }]
+      : windowsForExecutable(executable)
+    for (const { pid } of targets) powershell(`
+      $process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
+      if ($process -and $process.Path -eq ${psQuote(executable)} -and $process.MainWindowHandle -ne 0) { $null = $process.CloseMainWindow() }
+    `)
+    return ownerPid === undefined
+      ? windowsForExecutable(executable).length === 0
+      : !ownedProcessIsRunning(executable, ownerPid)
+  }, 'the owned RailWise process to exit', 60_000, 1_000)
 }
 
 async function clickLabeledButton(cdp, labels, action, timeout = 90_000) {
